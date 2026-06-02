@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
+import { TokenDanceMark } from '@shared/ui';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/api/hubClient';
 import styles from './AuthPage.module.css';
@@ -20,8 +21,6 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     if (user) onSuccess(user);
   }, [onSuccess, user]);
 
-  if (user) return null;
-
   const handleTokenDanceLogin = useCallback(async () => {
     setServerError(null);
     setIdentityNotice(null);
@@ -36,6 +35,8 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       setIdentityLoading(false);
     }
   }, [loginWithTokenDance, t]);
+
+  if (user) return null;
 
   return (
     <div className={styles.body}>
@@ -57,7 +58,10 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         {identityLoading ? (
           <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
         ) : (
-          <KeyRound size={16} aria-hidden="true" />
+          <>
+            <TokenDanceMark className={styles.identityIcon} alt="" aria-hidden="true" />
+            <KeyRound size={15} aria-hidden="true" />
+          </>
         )}
         <span>{t('auth.tokenDanceLogin')}</span>
       </button>

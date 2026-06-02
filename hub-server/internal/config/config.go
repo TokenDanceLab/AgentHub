@@ -6,10 +6,13 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/agenthub/hub-server/internal/model"
 )
 
 type Config struct {
@@ -20,6 +23,7 @@ type Config struct {
 	Upload       UploadConfig       `mapstructure:"upload"`
 	S3           S3Config           `mapstructure:"s3"`
 	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
+	AgentTeam    AgentTeamConfig    `mapstructure:"agent_team"`
 }
 
 // TokenDanceIDConfig holds OIDC/OAuth2 configuration for TokenDance ID integration.
@@ -51,10 +55,11 @@ func (t TokenDanceIDConfig) LogValue() slog.Value {
 }
 
 type ServerConfig struct {
-	Port      int    `mapstructure:"port"`
-	LogLevel  string `mapstructure:"log_level"`
-	LogFile   string `mapstructure:"log_file"`
-	AdminPort int    `mapstructure:"admin_port"`
+	Port         int    `mapstructure:"port"`
+	LogLevel     string `mapstructure:"log_level"`
+	LogFile      string `mapstructure:"log_file"`
+	AdminPort    int    `mapstructure:"admin_port"`
+	AuditLogFile string `mapstructure:"audit_log_file"`
 }
 
 type DBConfig struct {
@@ -126,6 +131,90 @@ type UploadConfig struct {
 	MaxSize int64  `mapstructure:"max_size"`
 }
 
+type AgentTeamConfig struct {
+	MaxDelegationDepth       int           `mapstructure:"max_delegation_depth"`
+	MaxActiveSubAgentsPerRun int           `mapstructure:"max_active_subagents_per_run"`
+	MaxRouteRepeats          int           `mapstructure:"max_route_repeats"`
+	MaxTasksPerTeamRun       int           `mapstructure:"max_tasks_per_team_run"`
+	AssignmentTimeout        time.Duration `mapstructure:"assignment_timeout"`
+	MaxTeamRunBudgetTokens   int64         `mapstructure:"max_team_run_budget_tokens"`
+	MaxTeamRunBudgetUsagePct float64       `mapstructure:"max_team_run_budget_usage_pct"`
+}
+
+func setAgentTeamDefaults(v *viper.Viper) {
+	defaults := DefaultAgentTeamConfig()
+	v.SetDefault("agent_team.max_delegation_depth", defaults.MaxDelegationDepth)
+	v.SetDefault("agent_team.max_active_subagents_per_run", defaults.MaxActiveSubAgentsPerRun)
+	v.SetDefault("agent_team.max_route_repeats", defaults.MaxRouteRepeats)
+	v.SetDefault("agent_team.max_tasks_per_team_run", defaults.MaxTasksPerTeamRun)
+	v.SetDefault("agent_team.assignment_timeout", defaults.AssignmentTimeout)
+	v.SetDefault("agent_team.max_team_run_budget_tokens", defaults.MaxTeamRunBudgetTokens)
+	v.SetDefault("agent_team.max_team_run_budget_usage_pct", defaults.MaxTeamRunBudgetUsagePct)
+}
+
+func DefaultAgentTeamConfig() AgentTeamConfig {
+	return AgentTeamConfig{
+		MaxDelegationDepth:       model.MaxDelegationDepth,
+		MaxActiveSubAgentsPerRun: model.MaxActiveSubAgentsPerRun,
+		MaxRouteRepeats:          model.MaxRouteRepeats,
+		MaxTasksPerTeamRun:       model.MaxTasksPerTeamRun,
+		AssignmentTimeout:        model.DefaultAssignmentTimeout,
+		MaxTeamRunBudgetTokens:   model.MaxTeamRunBudgetTokens,
+		MaxTeamRunBudgetUsagePct: model.MaxTeamRunBudgetUsagePct,
+	}
+}
+
+func (a AgentTeamConfig) withDefaults() AgentTeamConfig {
+	defaults := DefaultAgentTeamConfig()
+	if a.MaxDelegationDepth == 0 {
+		a.MaxDelegationDepth = defaults.MaxDelegationDepth
+	}
+	if a.MaxActiveSubAgentsPerRun == 0 {
+		a.MaxActiveSubAgentsPerRun = defaults.MaxActiveSubAgentsPerRun
+	}
+	if a.MaxRouteRepeats == 0 {
+		a.MaxRouteRepeats = defaults.MaxRouteRepeats
+	}
+	if a.MaxTasksPerTeamRun == 0 {
+		a.MaxTasksPerTeamRun = defaults.MaxTasksPerTeamRun
+	}
+	if a.AssignmentTimeout == 0 {
+		a.AssignmentTimeout = defaults.AssignmentTimeout
+	}
+	if a.MaxTeamRunBudgetTokens == 0 {
+		a.MaxTeamRunBudgetTokens = defaults.MaxTeamRunBudgetTokens
+	}
+	if a.MaxTeamRunBudgetUsagePct == 0 {
+		a.MaxTeamRunBudgetUsagePct = defaults.MaxTeamRunBudgetUsagePct
+	}
+	return a
+}
+
+func (a AgentTeamConfig) Validate() error {
+	if a.MaxDelegationDepth < 0 {
+		return fmt.Errorf("agent_team.max_delegation_depth must be non-negative")
+	}
+	if a.MaxActiveSubAgentsPerRun < 0 {
+		return fmt.Errorf("agent_team.max_active_subagents_per_run must be non-negative")
+	}
+	if a.MaxRouteRepeats < 0 {
+		return fmt.Errorf("agent_team.max_route_repeats must be non-negative")
+	}
+	if a.MaxTasksPerTeamRun < 0 {
+		return fmt.Errorf("agent_team.max_tasks_per_team_run must be non-negative")
+	}
+	if a.AssignmentTimeout < 0 {
+		return fmt.Errorf("agent_team.assignment_timeout must be non-negative")
+	}
+	if a.MaxTeamRunBudgetTokens < 0 {
+		return fmt.Errorf("agent_team.max_team_run_budget_tokens must be non-negative")
+	}
+	if a.MaxTeamRunBudgetUsagePct < 0 || a.MaxTeamRunBudgetUsagePct > 100 {
+		return fmt.Errorf("agent_team.max_team_run_budget_usage_pct must be between 0 and 100")
+	}
+	return nil
+}
+
 // S3Config holds S3-compatible object storage settings for attachments.
 // When Endpoint/Bucket are empty, the server falls back to local filesystem storage.
 type S3Config struct {
@@ -140,7 +229,39 @@ type S3Config struct {
 // IsConfigured returns true when enough S3 settings are present to attempt
 // S3-backed attachment storage.
 func (s S3Config) IsConfigured() bool {
-	return s.Endpoint != "" && s.Bucket != ""
+	return strings.TrimSpace(s.Endpoint) != "" && strings.TrimSpace(s.Bucket) != ""
+}
+
+func (s S3Config) hasAnySetting() bool {
+	return strings.TrimSpace(s.Endpoint) != "" ||
+		strings.TrimSpace(s.AccessKey) != "" ||
+		strings.TrimSpace(s.SecretKey) != "" ||
+		strings.TrimSpace(s.Bucket) != "" ||
+		strings.TrimSpace(s.Region) != ""
+}
+
+func (s S3Config) Validate() error {
+	if !s.hasAnySetting() {
+		return nil
+	}
+	if strings.TrimSpace(s.Endpoint) == "" {
+		return fmt.Errorf("s3.endpoint is required when S3 attachment storage is configured")
+	}
+	if strings.TrimSpace(s.Bucket) == "" {
+		return fmt.Errorf("s3.bucket is required when S3 attachment storage is configured")
+	}
+	if strings.TrimSpace(s.AccessKey) == "" {
+		return fmt.Errorf("s3.access_key is required when S3 attachment storage is configured")
+	}
+	if strings.TrimSpace(s.SecretKey) == "" {
+		return fmt.Errorf("s3.secret_key is required when S3 attachment storage is configured")
+	}
+	if strings.Contains(s.Endpoint, "://") &&
+		!strings.HasPrefix(s.Endpoint, "http://") &&
+		!strings.HasPrefix(s.Endpoint, "https://") {
+		return fmt.Errorf("s3.endpoint must use http or https when a scheme is provided")
+	}
+	return nil
 }
 
 // LogValue implements slog.LogValuer to redact secrets when config is logged.
@@ -161,6 +282,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetEnvPrefix("AGENTHUB")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	setAgentTeamDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -199,10 +321,35 @@ func Load(configPath string) (*Config, error) {
 		cfg.TokenDanceID.AllowedRedirectURIs = splitEnvList(envAllowedRedirectURIs)
 	}
 
+	// Explicit env var overrides for S3-compatible attachment storage.
+	if envEndpoint := firstEnv("AGENTHUB_S3_ENDPOINT", "S3_ENDPOINT"); envEndpoint != "" {
+		cfg.S3.Endpoint = envEndpoint
+	}
+	if envAccessKey := firstEnv("AGENTHUB_S3_ACCESS_KEY", "S3_ACCESS_KEY"); envAccessKey != "" {
+		cfg.S3.AccessKey = envAccessKey
+	}
+	if envSecretKey := firstEnv("AGENTHUB_S3_SECRET_KEY", "S3_SECRET_KEY"); envSecretKey != "" {
+		cfg.S3.SecretKey = envSecretKey
+	}
+	if envBucket := firstEnv("AGENTHUB_S3_BUCKET", "S3_BUCKET"); envBucket != "" {
+		cfg.S3.Bucket = envBucket
+	}
+	if envRegion := firstEnv("AGENTHUB_S3_REGION", "S3_REGION"); envRegion != "" {
+		cfg.S3.Region = envRegion
+	}
+	if envUseSSL := firstEnv("AGENTHUB_S3_USE_SSL", "S3_USE_SSL"); envUseSSL != "" {
+		useSSL, err := strconv.ParseBool(envUseSSL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid AGENTHUB_S3_USE_SSL: %w", err)
+		}
+		cfg.S3.UseSSL = useSSL
+	}
+
 	// Auto-derive JWKS URI from issuer URL when not explicitly set.
 	if cfg.TokenDanceID.JWKSURI == "" && cfg.TokenDanceID.IssuerURL != "" {
 		cfg.TokenDanceID.JWKSURI = cfg.TokenDanceID.IssuerURL + "/oidc/jwks"
 	}
+	cfg.AgentTeam = cfg.AgentTeam.withDefaults()
 
 	return &cfg, nil
 }
@@ -296,8 +443,17 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Upload: if a directory is configured, it must exist.
-	if c.Upload.Dir != "" {
+	c.AgentTeam = c.AgentTeam.withDefaults()
+	if err := c.AgentTeam.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.S3.Validate(); err != nil {
+		return err
+	}
+
+	// Upload: if local storage is used and a directory is configured, it must exist.
+	if !c.S3.IsConfigured() && c.Upload.Dir != "" {
 		if _, err := os.Stat(c.Upload.Dir); os.IsNotExist(err) {
 			return fmt.Errorf("upload directory does not exist: %s", c.Upload.Dir)
 		}

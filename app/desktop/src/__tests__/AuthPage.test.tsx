@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import type { ComponentProps } from 'react';
 
 const mockLoginWithTokenDance = vi.fn();
 
@@ -9,40 +10,30 @@ vi.mock('@/hooks/useAuth', () => ({
     loginWithTokenDance: mockLoginWithTokenDance,
     token: null,
     user: null,
-    refreshToken: null,
     isAuthenticated: false,
     tokenSource: null,
   }),
   getAccessToken: () => null,
 }));
 
-vi.mock('@/api/hubClient', () => ({
-  createHubClient: () => ({
-    me: vi.fn().mockResolvedValue({ id: 'u1', username: 'test', nickname: 'Test' }),
-    refresh: vi.fn().mockResolvedValue({ access_token: 't1', refresh_token: 'r1', expires_in: 900 }),
-  }),
-}));
-
 import AuthPage from '@/components/AuthPage';
 
-function renderAuthPage(onLoginSuccess = vi.fn(), onClose?: () => void) {
-  return render(<AuthPage onLoginSuccess={onLoginSuccess} onClose={onClose} />);
+function renderAuthPage(props: Partial<ComponentProps<typeof AuthPage>> = {}) {
+  return render(<AuthPage onLoginSuccess={vi.fn()} {...props} />);
 }
 
 describe('AuthPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Suppress fetch errors during Hub health check
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no-op'));
   });
 
-  // ── Render ────────────────────────────────────────
-
-  it('renders brand header with logo and tagline', () => {
+  it('renders brand header and TokenDance login entry', () => {
     renderAuthPage();
+
     expect(screen.getByText('auth.title')).toBeInTheDocument();
     expect(screen.getByText('auth.tagline')).toBeInTheDocument();
-    expect(screen.getByText('AH')).toBeInTheDocument();
+    expect(screen.getByAltText('TokenDance')).toBeInTheDocument();
+    expect(screen.queryByText('AH')).not.toBeInTheDocument();
   });
 
   it('renders the TokenDance ID login button', () => {
@@ -53,60 +44,67 @@ describe('AuthPage', () => {
   it('renders the primary auth hint', () => {
     renderAuthPage();
     expect(screen.getByText('auth.tokenDancePrimary')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'auth.tokenDanceLogin' })).toBeInTheDocument();
   });
 
-  // ── Close button ──────────────────────────────────
-
-  it('renders close button when onClose is provided', () => {
-    const onClose = vi.fn();
-    renderAuthPage(vi.fn(), onClose);
-    // The close button is rendered as an X icon button
-    const closeBtn = document.querySelector('button[title="关闭"]');
-    expect(closeBtn).toBeInTheDocument();
-  });
-
-  it('does not render close button when onClose is not provided', () => {
+  it('does not render legacy developer login or register controls', () => {
     renderAuthPage();
-    const closeBtn = document.querySelector('button[title="关闭"]');
-    expect(closeBtn).not.toBeInTheDocument();
+
+    expect(screen.queryByText('auth.devLogin')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('auth.username')).not.toBeInTheDocument();
+    expect(screen.queryByText('auth.switchToRegister')).not.toBeInTheDocument();
   });
 
-  it('calls onClose when close button is clicked', () => {
-    const onClose = vi.fn();
-    renderAuthPage(vi.fn(), onClose);
-    const closeBtn = document.querySelector('button[title="关闭"]')!;
-    fireEvent.click(closeBtn);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Hub URL input ─────────────────────────────────
-
-  it('renders advanced settings toggle', () => {
+  it('starts TokenDance login from the primary button', async () => {
+    mockLoginWithTokenDance.mockResolvedValueOnce(undefined);
     renderAuthPage();
-    expect(screen.getByText('高级设置')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
+
+    await waitFor(() => {
+      expect(mockLoginWithTokenDance).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('status')).toHaveTextContent('auth.tokenDanceCallbackPending');
+    });
   });
 
-  it('shows Hub URL input when advanced settings are expanded', () => {
+  it('renders Hub URL input with default value in advanced settings', () => {
     renderAuthPage();
-    fireEvent.click(screen.getByText('高级设置'));
+
+    fireEvent.click(screen.getByRole('button', { name: /auth\.advancedSettings/ }));
     const hubInput = screen.getByLabelText('auth.hubUrl');
+
     expect(hubInput).toBeInTheDocument();
     expect(hubInput).toHaveValue();
   });
 
   it('allows editing Hub URL', () => {
     renderAuthPage();
-    fireEvent.click(screen.getByText('高级设置'));
+
+    fireEvent.click(screen.getByRole('button', { name: /auth\.advancedSettings/ }));
     const hubInput = screen.getByLabelText('auth.hubUrl') as HTMLInputElement;
     fireEvent.change(hubInput, { target: { value: 'http://hub.example.com:8080' } });
-    expect(hubInput.value).toBe('http://hub.example.com:8080');
-  });
 
-  // ── Hub connection indicator ──────────────────────
+    expect(hubInput.value).toBe('http://hub.example.com:8080');
+    expect(localStorage.getItem('agenthub_hub_url')).toBe('http://hub.example.com:8080');
+  });
 
   it('renders Hub connection status indicator', () => {
     renderAuthPage();
-    fireEvent.click(screen.getByText('高级设置'));
+
+    fireEvent.click(screen.getByRole('button', { name: /auth\.advancedSettings/ }));
+
     expect(screen.getByText('auth.hubChecking')).toBeInTheDocument();
+  });
+
+  it('renders close button only when onClose is provided', () => {
+    const onClose = vi.fn();
+    const { rerender } = renderAuthPage();
+
+    expect(screen.queryByTitle('auth.close')).not.toBeInTheDocument();
+
+    rerender(<AuthPage onLoginSuccess={vi.fn()} onClose={onClose} />);
+    fireEvent.click(screen.getByTitle('auth.close'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

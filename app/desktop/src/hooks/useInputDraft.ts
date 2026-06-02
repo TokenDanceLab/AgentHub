@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react';
 
-const DRAFT_PREFIX = 'ah:draft:';
+const DRAFT_PREFIX = 'draft_';
 const DEBOUNCE_MS = 500;
 
 function getKey(threadId: string): string {
@@ -25,7 +25,10 @@ interface UseInputDraftReturn {
 export function useInputDraft(threadId: string | undefined): UseInputDraftReturn {
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const threadIdRef = useRef(threadId);
-  threadIdRef.current = threadId;
+
+  useEffect(() => {
+    threadIdRef.current = threadId;
+  }, [threadId]);
 
   // Clean up pending timer on unmount or threadId change
   useEffect(() => {
@@ -65,6 +68,7 @@ export function useInputDraft(threadId: string | undefined): UseInputDraftReturn
   }, []);
 
   const clear = useCallback(() => {
+    clearTimeout(timerRef.current);
     const tid = threadIdRef.current;
     if (!tid) return;
     localStorage.removeItem(getKey(tid));

@@ -18,7 +18,6 @@ import {
   Keyboard,
   Link2,
   LockKeyhole,
-  LogIn,
   LogOut,
   MessageSquareText,
   Monitor,
@@ -36,15 +35,41 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import AppearanceSection from './settings/sections/AppearanceSection';
+import ConnectionsSection from './settings/sections/ConnectionsSection';
 import { useHubStore } from '@/stores/hubStore';
-import { APP_VERSION, HUB_URL } from '@/config';
+import { APP_VERSION, HUB_URL, getEdgeBaseUrl } from '@/config';
+import {
+  useAddAgentTeamMember,
+  useCreateAgentTeam,
+  useDecideTeamApproval,
+  useHubAgentTeams,
+  useResolveTeamConflict,
+  useStartTeamRun,
+} from '@/api/agentTeamQueries';
+import type { AgentTeamRunBundle } from '@/api/agentTeamQueries';
 import { useAgentList } from '@/api/agentQueries';
+import type { ModelCatalogResponse } from '@/api/modelCatalogQueries';
 import { useHubExecutionTargets, usePingHubExecutionTarget } from '@/api/executionTargetQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
+import { resolveModelDisplayName, type ModelDisplayNameMap } from '@/utils/modelDisplay';
+import { resolveLocalOrchestration } from '@/utils/localOrchestration';
+import {
+  buildTeamLocalExecutions,
+  normalizeTeamTasks,
+  type TeamLocalExecution,
+} from '@/utils/teamLocalExecution';
+import {
+  MAX_CUSTOM_INSTRUCTIONS_CHARS,
+  clearCustomInstructions,
+  readCustomInstructions,
+  writeCustomInstructions,
+} from '@/utils/customInstructions';
+import { KEYBOARD_SHORTCUT_GROUPS } from '@/utils/keyboardShortcuts';
 import {
   useModelSettingsStore,
   type ProviderHealth,
@@ -52,7 +77,24 @@ import {
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
-import type { ExecutionTarget, ExecutionTargetHealthState, ExecutionTargetType } from '@/api/hubClient';
+import type {
+  AgentTeamDetail,
+  AgentTeamRun,
+  CoordinatorRouteDecision,
+  CustomAgent,
+  ExecutionTarget,
+  ExecutionTargetHealthState,
+  ExecutionTargetType,
+  TeamApprovalState,
+  TeamArtifactState,
+  TeamAssignmentState,
+  TeamBudget,
+  TeamConflictState,
+  TeamMemberState,
+  TeamRunEventState,
+  TeamRunState,
+  TeamTaskState,
+} from '@/api/hubClient';
 import styles from './SettingsPage.module.css';
 
 export type SectionId =
@@ -94,6 +136,8 @@ interface Props {
   onBack: () => void;
   onOpenAuth: () => void;
   initialSection?: SectionId;
+  modelCatalog?: ModelCatalogResponse;
+  modelDisplayNames?: ModelDisplayNameMap;
 }
 
 interface NavItem {
@@ -101,11 +145,6 @@ interface NavItem {
   label: string;
   icon: ReactNode;
   group: 'workspace' | 'automation' | 'system';
-}
-
-interface ShortcutRow {
-  keys: string[];
-  action: string;
 }
 
 interface ProjectSkill {
@@ -122,15 +161,15 @@ const DEVICE_ID_KEY = 'agenthub_device_id';
 
 const MODEL_OPTIONS = [
   ['auto', 'Auto'],
-  ['claude-opus-4-7', 'claude-opus-4-7'],
-  ['claude-sonnet-4-6', 'claude-sonnet-4-6'],
-  ['claude-haiku-4-5', 'claude-haiku-4-5'],
+  ['opus[1m]', 'opus[1m]'],
+  ['deepseek-v4-pro', 'deepseek-v4-pro'],
+  ['deepseek-v4-flash', 'deepseek-v4-flash'],
   ['gpt-5.5', 'gpt-5.5'],
   ['glm-5.1', 'glm-5.1'],
 ] as const;
 
 const PROVIDER_OPTIONS = [
-  ['tokendance-gateway', 'TokenDance Gateway'],
+  ['tokendance-gateway', 'TokenDance'],
   ['anthropic', 'Anthropic'],
   ['openai', 'OpenAI'],
   ['cc-switch-local', 'cc-switch local'],
@@ -148,6 +187,54 @@ const PROVIDER_HEALTH_OPTIONS = [
   ['degraded', 'Degraded'],
   ['disabled', 'Disabled'],
 ] as const;
+
+function displayProviderName(value: string | undefined): string | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const lower = raw.toLowerCase();
+  if (lower.includes('tokendance') || lower.includes('newapi') || lower.includes('api.vectorcontrol.tech')) {
+    return 'TokenDance';
+  }
+  return raw.replace(/\s+gateway\b/ig, '').trim() || raw;
+}
+
+function modelCatalogOptions(
+  catalog?: ModelCatalogResponse,
+  includeAuto = true,
+  modelDisplayNames?: ModelDisplayNameMap,
+): Array<[SettingsSelectValue, string]> {
+  const options: Array<[SettingsSelectValue, string]> = includeAuto ? [['auto', 'Auto']] : [];
+  const seen = new Set(options.map(([value]) => String(value)));
+  for (const item of catalog?.items ?? []) {
+    if (item.status === 'unavailable') continue;
+    const value = item.value;
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    const label = resolveModelDisplayName(item.label || item.resolvedModel || item.value, modelDisplayNames);
+    const resolvedLabel = resolveModelDisplayName(item.resolvedModel, modelDisplayNames);
+    const detail = resolvedLabel && item.resolvedModel !== item.value && resolvedLabel !== label ? ` -> ${resolvedLabel}` : '';
+    const source = item.sourceLabel ? ` (${item.sourceLabel})` : '';
+    options.push([value, `${label}${detail}${source}`]);
+  }
+  for (const [value, label] of MODEL_OPTIONS) {
+    if (!includeAuto && value === 'auto') continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    options.push([value, resolveModelDisplayName(label, modelDisplayNames) || label]);
+  }
+  return options;
+}
+
+function providerCatalogOptions(catalog?: ModelCatalogResponse): Array<[SettingsSelectValue, string]> {
+  const options: Array<[SettingsSelectValue, string]> = PROVIDER_OPTIONS.map(([value, label]) => [value, label]);
+  const seen = new Set(options.map(([value]) => String(value)));
+  for (const source of catalog?.sources ?? []) {
+    if (source.status === 'unavailable' || seen.has(source.id)) continue;
+    seen.add(source.id);
+    options.push([source.id, displayProviderName(source.label) ?? source.label]);
+  }
+  return options;
+}
 
 const PROJECT_SKILLS: ProjectSkill[] = [
   {
@@ -274,9 +361,9 @@ function formatTargetEndpoint(target: ExecutionTarget) {
   return '';
 }
 
-export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
+export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general', modelCatalog, modelDisplayNames }: Props) {
   const { t } = useTranslation();
-  const { themeMode, setThemeMode } = useTheme();
+  const { themeMode, setThemeMode, themePreset, setThemePreset } = useTheme();
   const hubAuth = useAuth();
   const hubInventoryEnabled = hubAuth.isAuthenticated && Boolean(hubAuth.token);
   const hubTargetsQuery = useHubExecutionTargets({
@@ -286,8 +373,31 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const pingHubTargetMutation = usePingHubExecutionTarget({
     getToken: () => hubAuth.token,
   });
-  const { online: edgeOnline, health } = useHealth();
-  const { data: agentData } = useAgentList(edgeOnline);
+  const [selectedAgentTeamId, setSelectedAgentTeamId] = useState('');
+  const [selectedTeamRunId, setSelectedTeamRunId] = useState('');
+  const agentTeamsQuery = useHubAgentTeams({
+    enabled: hubInventoryEnabled,
+    getToken: () => hubAuth.token,
+    selectedTeamId: selectedAgentTeamId || undefined,
+    selectedRunId: selectedTeamRunId || undefined,
+  });
+  const createAgentTeamMutation = useCreateAgentTeam({
+    getToken: () => hubAuth.token,
+  });
+  const addAgentTeamMemberMutation = useAddAgentTeamMember({
+    getToken: () => hubAuth.token,
+  });
+  const startTeamRunMutation = useStartTeamRun({
+    getToken: () => hubAuth.token,
+  });
+  const decideTeamApprovalMutation = useDecideTeamApproval({
+    getToken: () => hubAuth.token,
+  });
+  const resolveTeamConflictMutation = useResolveTeamConflict({
+    getToken: () => hubAuth.token,
+  });
+  const { online: edgeOnline, health, refetch: refetchHealth } = useHealth();
+  const { data: agentData, refetch: refetchAgents } = useAgentList(edgeOnline);
   const {
     data: runData,
     isError: runsError,
@@ -302,6 +412,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [active, setActive] = useState<SectionId>(initialSection);
   const [navSearch, setNavSearch] = useState('');
   const navSearchRef = useRef<HTMLInputElement>(null);
+  const [teamDraftName, setTeamDraftName] = useState('');
+  const [teamDraftDescription, setTeamDraftDescription] = useState('');
+  const [teamMemberProfileId, setTeamMemberProfileId] = useState('');
+  const [teamMemberRole, setTeamMemberRole] = useState('executor');
+  const [teamRunPrompt, setTeamRunPrompt] = useState('');
 
   // Keyboard shortcut: `/` focuses the search input
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
@@ -336,6 +451,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
+  const [customInstructions, setCustomInstructions] = useState(() => readCustomInstructions());
+  const [customInstructionsDraft, setCustomInstructionsDraft] = useState(() => readCustomInstructions());
   const defaultModel = useModelSettingsStore((s) => s.defaultModel);
   const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
   const modelReasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
@@ -354,7 +471,34 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const setCcSwitchBridge = useModelSettingsStore((s) => s.setCcSwitchBridgeEnabled);
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
+  const customInstructionsDirty = customInstructionsDraft.trim() !== customInstructions;
+  const customInstructionsRemaining = Math.max(0, MAX_CUSTOM_INSTRUCTIONS_CHARS - customInstructionsDraft.length);
+
+  const handleSaveCustomInstructions = useCallback(() => {
+    const saved = writeCustomInstructions(customInstructionsDraft);
+    setCustomInstructions(saved);
+    setCustomInstructionsDraft(saved);
+  }, [customInstructionsDraft]);
+
+  const handleClearCustomInstructions = useCallback(() => {
+    clearCustomInstructions();
+    setCustomInstructions('');
+    setCustomInstructionsDraft('');
+  }, []);
+
   const agents = agentData?.items ?? [];
+  const modelSelectOptions = useMemo(
+    () => modelCatalogOptions(modelCatalog, true, modelDisplayNames),
+    [modelCatalog, modelDisplayNames],
+  );
+  const aliasModelSelectOptions = useMemo(
+    () => modelCatalogOptions(modelCatalog, false, modelDisplayNames),
+    [modelCatalog, modelDisplayNames],
+  );
+  const providerSelectOptions = useMemo(
+    () => providerCatalogOptions(modelCatalog),
+    [modelCatalog],
+  );
   const localAgentProfiles = useMemo(
     () => agents.map((agent) => ({
       agent,
@@ -380,6 +524,12 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const runnerSummary = edgeOnline
     ? t('settings.runnerSummary', { available: availableRunners, total: totalRunners })
     : t('settings.edgeOffline');
+  const edgeAddress = getEdgeBaseUrl();
+  const healthStatus = edgeOnline ? (health?.status ?? 'unknown') : 'offline';
+  const handleRefreshConnections = useCallback(() => {
+    refetchHealth();
+    refetchAgents();
+  }, [refetchHealth, refetchAgents]);
   const hubTargets = hubTargetsQuery.data?.items ?? [];
   const hubOnlineTargets = hubTargets.filter(isHubTargetConnected).length;
   const hubHealthyTargets = countTargetsByHealth(hubTargets, 'healthy');
@@ -429,12 +579,52 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const recentRuns = getRecentRuns(runs, 5);
   const activeHubTasks = bridgedTasks.filter(isActiveBridgeTask).length;
   const recentBridgeTasks = getRecentTasks(bridgedTasks, 5);
-  const schedulerActiveItems = activeRuns + activeHubTasks;
-  const schedulerTotalItems = runs.length + bridgedTasks.length;
+  const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
+  const agentTeamOverview = agentTeamsQuery.data;
+  const agentTeamBundles = agentTeamOverview?.bundles ?? [];
+  const hubCustomAgents = agentTeamOverview?.customAgents ?? [];
+  const agentTeamCount = agentTeamOverview?.teams.length ?? 0;
+  const teamRunTotal = agentTeamBundles.reduce((sum, bundle) => sum + bundle.runs.length, 0);
+  const activeTeamRuns = agentTeamBundles.reduce(
+    (sum, bundle) => sum + bundle.runs.filter(isActiveTeamRun).length,
+    0,
+  );
+  const teamRunState = agentTeamOverview?.state;
+  const teamRunTasks = normalizeTeamTasks(teamRunState, agentTeamOverview?.tasks ?? []);
+  const teamRunMembers = teamRunState?.members ?? [];
+  const teamRunAssignments = teamRunState?.assignments ?? [];
+  const teamRunApprovals = teamRunState?.approvals ?? [];
+  const teamRunConflicts = teamRunState?.conflicts ?? [];
+  const pendingTeamApprovals = teamRunApprovals.filter(isPendingTeamApproval);
+  const pendingTeamConflicts = teamRunConflicts.filter((conflict) => conflict.status !== 'resolved');
+  const teamRunEvents = teamRunState?.run_events ?? [];
+  const teamRouteLog = teamRunState?.route_log ?? [];
+  const teamLocalExecutions = buildTeamLocalExecutions({
+    selectedRunId: agentTeamOverview?.selectedRun?.id,
+    bridgeTasks: bridgedTasks,
+    tasks: teamRunTasks,
+    assignments: teamRunAssignments,
+    events: teamRunEvents,
+  });
+  const teamActiveMembers = teamRunMembers.filter((member) => (member.active_tasks ?? 0) > 0).length;
+  const teamCompletedTasks = teamRunTasks.filter((task) => task.status === 'done').length;
+  const agentTeamErrorMessage = agentTeamsQuery.error instanceof Error
+    ? agentTeamsQuery.error.message
+    : t('settings.agentTeamErrorDesc');
+  const taskSyncAvailable = hubSessionActive;
+  const groupChatAvailable = hubSessionActive;
+  const skillSyncAvailable = false;
+  const remoteControlAvailable = false;
+  const platformSyncAvailable = false;
+  const auditTrailAvailable = false;
+  const schedulerActiveItems = activeRuns + activeHubTasks + activeTeamRuns;
+  const schedulerTotalItems = runs.length + bridgedTasks.length + teamRunTotal;
+  const localOrchestration = resolveLocalOrchestration(agents);
+  const localOrchestratorName = localOrchestration.orchestratorName ?? 'Orchestrator';
   const schedulerTargetReadyCount = [
     edgeOnline,
     hubOnlineTargets > 0,
-    remoteControlEnabled,
+    remoteControlAvailable && remoteControlEnabled,
     false,
   ].filter(Boolean).length;
   const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
@@ -446,7 +636,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const mcpCapableAgents = agents.filter((agent) => agent.capabilities.mcpIntegration).length;
   const mcpPermissionHookAgents = agents.filter((agent) => agent.capabilities.permissionHooks).length;
   const mcpSubAgentAgents = agents.filter((agent) => agent.capabilities.subAgentSpawn).length;
-  const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
+  const mcpAvailable = edgeOnline && mcpCapableAgents > 0;
   const accountName = hubAuth.user?.username ?? username ?? t('settings.signedIn');
   const tokenSource = hubAuth.tokenSource;
   const tokenSourceLabel =
@@ -466,11 +656,52 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const handleCancelRun = (runId: string) => {
     void cancelRunMutation.mutateAsync(runId);
   };
+  const handleCreateAgentTeam = () => {
+    const name = teamDraftName.trim();
+    if (!name) return;
+    void Promise.resolve(createAgentTeamMutation.mutateAsync({
+      name,
+      description: teamDraftDescription.trim(),
+    })).then(() => {
+      setTeamDraftName('');
+      setTeamDraftDescription('');
+    });
+  };
+  const handleAddAgentTeamMember = () => {
+    const teamId = agentTeamOverview?.selectedTeam?.id;
+    if (!teamId || !teamMemberProfileId) return;
+    void addAgentTeamMemberMutation.mutateAsync({
+      teamId,
+      member: {
+        agent_profile_id: teamMemberProfileId,
+        role: teamMemberRole,
+      },
+    });
+  };
+  const handleStartTeamRun = () => {
+    const teamId = agentTeamOverview?.selectedTeam?.id;
+    const trigger = teamRunPrompt.trim();
+    if (!teamId || !trigger) return;
+    void Promise.resolve(startTeamRunMutation.mutateAsync({
+      teamId,
+      run: { trigger_message: trigger },
+    })).then(() => {
+      setTeamRunPrompt('');
+    });
+  };
+  const handleSelectAgentTeam = (team: AgentTeamDetail) => {
+    setSelectedAgentTeamId(team.id);
+    setSelectedTeamRunId('');
+  };
+  const handleSelectTeamRun = (teamId: string, run: AgentTeamRun) => {
+    setSelectedAgentTeamId(teamId);
+    setSelectedTeamRunId(run.id);
+  };
   const schedulerPolicyReadyCount = [
     modelMappingEnabled,
     ccSwitchBridge,
     autoReview,
-    remoteControlEnabled,
+    remoteControlAvailable && remoteControlEnabled,
   ].filter(Boolean).length;
 
   const navItems = useMemo<NavItem[]>(
@@ -522,18 +753,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       items: filteredNavItems.filter((item) => item.group === group),
     }));
   }, [filteredNavItems]);
+  const hasNavResults = filteredNavItems.length > 0;
 
   const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
-  const shortcuts: ShortcutRow[] = [
-    { keys: ['Enter'], action: t('shortcut.send') },
-    { keys: ['Shift', 'Enter'], action: t('shortcut.newline') },
-    { keys: ['Ctrl', 'K'], action: t('shortcut.search') },
-    { keys: ['⌘/Ctrl', 'B'], action: t('shortcut.toggleSidebar') },
-    { keys: ['⌘/Ctrl', 'J'], action: t('shortcut.toggleRunPanel') },
-    { keys: ['Esc'], action: t('shortcut.close') },
-    { keys: ['?'], action: t('shortcut.help') },
-  ];
-
   const setBooleanSetting = (key: string, setter: (value: boolean) => void) => (value: boolean) => {
     setter(value);
     writeStoredValue(key, value);
@@ -574,24 +796,19 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 ))}
             </div>
           ))}
+          {!hasNavResults && (
+            <div className={styles.navEmpty} role="status">
+              {t('settings.searchEmpty')}
+            </div>
+          )}
         </nav>
 
         <div className={styles.sidebarAccount}>
           <button className={styles.sidebarAccountBtn} onClick={() => setActive('account')}>
             <UserCircle size={18} />
             <span>{hubSessionActive ? accountName : t('settings.notSignedIn')}</span>
+            <ChevronRight size={15} className={styles.sidebarAccountChevron} aria-hidden="true" />
           </button>
-          {hubSessionActive ? (
-            <button className={styles.sidebarActionBtn} onClick={handleSignOut}>
-              <LogOut size={17} />
-              <span>{t('settings.signOut')}</span>
-            </button>
-          ) : (
-            <button className={styles.sidebarActionBtn} onClick={onOpenAuth}>
-              <LogIn size={17} />
-              <span>{t('settings.signIn')}</span>
-            </button>
-          )}
         </div>
       </aside>
 
@@ -659,30 +876,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'appearance' && (
-            <>
-              <Panel title={t('settings.theme')} description={t('settings.themeDesc')}>
-                <div className={styles.segmented}>
-                  {(['dark', 'light', 'system'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      className={themeMode === mode ? styles.segmentActive : ''}
-                      onClick={() => setThemeMode(mode)}
-                    >
-                      {t(`settings.theme.${mode}`)}
-                    </button>
-                  ))}
-                </div>
-              </Panel>
-              <Panel title={t('settings.density')}>
-                <SettingRow
-                  title={t('settings.compactMode')}
-                  description={t('settings.compactModeDesc')}
-                  control={
-                    <Switch checked={compactMode} onChange={setBooleanSetting('compactMode', setCompactMode)} />
-                  }
-                />
-              </Panel>
-            </>
+            <AppearanceSection
+              themeMode={themeMode}
+              setThemeMode={setThemeMode}
+              compactMode={compactMode}
+              setCompactMode={setCompactMode}
+              themePreset={themePreset}
+              setThemePreset={setThemePreset}
+            />
           )}
 
           {active === 'configuration' && (
@@ -717,7 +918,51 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'personalization' && (
             <Panel title={t('settings.personalization')} description={t('settings.personalizationDesc')}>
               <SettingRow title={t('settings.displayName')} description={username ?? 'AgentHub User'} value="Local" />
-              <SettingRow title={t('settings.instructions')} description={t('settings.instructionsDesc')} action />
+              <div className={styles.instructionsRow}>
+                <div className={styles.instructionsHeader}>
+                  <div className={styles.settingCopy}>
+                    <strong>{t('settings.instructions')}</strong>
+                    <span>{t('settings.instructionsDesc')}</span>
+                  </div>
+                  <span className={`${styles.statusPill} ${customInstructions ? styles.statusPillOn : ''}`}>
+                    {customInstructions ? t('settings.enabled') : t('settings.notConfigured')}
+                  </span>
+                </div>
+                <label className={styles.instructionsEditor}>
+                  <span>{t('settings.instructionsLabel')}</span>
+                  <textarea
+                    className={styles.textInput}
+                    value={customInstructionsDraft}
+                    maxLength={MAX_CUSTOM_INSTRUCTIONS_CHARS}
+                    placeholder={t('settings.instructionsPlaceholder')}
+                    onChange={(event) => setCustomInstructionsDraft(event.target.value)}
+                  />
+                </label>
+                <div className={styles.instructionsFooter}>
+                  <span>{t('settings.instructionsRuntimeDesc')}</span>
+                  <em>{t('settings.instructionsCharsRemaining', { count: customInstructionsRemaining })}</em>
+                </div>
+                <div className={styles.instructionsActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    onClick={handleClearCustomInstructions}
+                    disabled={!customInstructions && !customInstructionsDraft}
+                  >
+                    <XCircle size={15} />
+                    {t('settings.clearInstructions')}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    onClick={handleSaveCustomInstructions}
+                    disabled={!customInstructionsDirty}
+                  >
+                    <Check size={15} />
+                    {t('settings.saveInstructions')}
+                  </button>
+                </div>
+              </div>
               <Callout title={t('settings.personalizationNote')} body={t('settings.personalizationNoteDesc')} />
             </Panel>
           )}
@@ -928,7 +1173,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Monitor size={18} />}
                   label={t('settings.taskLastRun')}
-                  value={latestRun ? t(`run.status.${latestRun.status}`, { defaultValue: latestRun.status }) : t('settings.noData')}
+                  value={latestRun ? t(`run.status.${latestRun.status.toLowerCase()}`, { defaultValue: latestRun.status }) : t('settings.noData')}
                   detail={latestRun ? formatTimestamp(latestRun.finishedAt ?? latestRun.startedAt ?? latestRun.createdAt) : t('settings.taskLastRunDesc')}
                 />
                 <SummaryCard
@@ -941,7 +1186,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.taskSync')}
                 description={t('settings.taskSyncDesc')}
-                control={<Switch checked={taskSync} onChange={setBooleanSetting('taskSync', setTaskSync)} />}
+                control={
+                  <SwitchControl
+                    checked={taskSyncAvailable && taskSync}
+                    onChange={setBooleanSetting('taskSync', setTaskSync)}
+                    disabled={!taskSyncAvailable}
+                    title={!taskSyncAvailable ? t('settings.requiresHubSignIn') : undefined}
+                    status={!taskSyncAvailable ? t('settings.notConfigured') : undefined}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.taskInbox')}
@@ -1032,7 +1285,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.enableGroupChat')}
                 description={t('settings.enableGroupChatDesc')}
-                control={<Switch checked={groupChatEnabled} onChange={setBooleanSetting('groupChat', setGroupChatEnabled)} />}
+                control={
+                  <SwitchControl
+                    checked={groupChatAvailable && groupChatEnabled}
+                    onChange={setBooleanSetting('groupChat', setGroupChatEnabled)}
+                    disabled={!groupChatAvailable}
+                    title={!groupChatAvailable ? t('settings.requiresHubSignIn') : undefined}
+                    status={!groupChatAvailable ? t('settings.notConfigured') : undefined}
+                  />
+                }
               />
               <SettingRow title={t('settings.groupChatAgents')} description={t('settings.groupChatAgentsDesc')} value={t('settings.statusReady')} />
               <SettingRow title={t('settings.groupChatRooms')} description={t('settings.groupChatRoomsDesc')} value={t('settings.statusPlanned')} />
@@ -1048,6 +1309,22 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   label={t('settings.schedulerQueueLive')}
                   value={`${schedulerActiveItems}/${schedulerTotalItems}`}
                   detail={runsLoading ? t('settings.loading') : t('settings.schedulerQueueLiveDesc')}
+                />
+                <SummaryCard
+                  icon={<GitBranch size={18} />}
+                  label={t('settings.agentTeamRuns')}
+                  value={`${activeTeamRuns}/${teamRunTotal}`}
+                  detail={pendingTeamApprovals.length > 0
+                    ? t('settings.agentTeamPendingApprovals', { count: pendingTeamApprovals.length })
+                    : t('settings.agentTeamRunsDesc', { count: agentTeamCount })}
+                />
+                <SummaryCard
+                  icon={<Route size={18} />}
+                  label={t('settings.localOrchestration')}
+                  value={localOrchestration.available ? t('settings.localOrchestrationReadyStatus') : t('settings.notConfigured')}
+                  detail={localOrchestration.available
+                    ? t('settings.localOrchestrationAvailableDesc', { count: localOrchestration.availableSubAgents })
+                    : t('settings.localOrchestrationNoOrchestratorDesc')}
                 />
                 <SummaryCard
                   icon={<Bot size={18} />}
@@ -1069,10 +1346,141 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 />
               </div>
               <SettingRow
-                title={t('settings.enableAgentScheduling')}
-                description={t('settings.enableAgentSchedulingDesc')}
-                control={<Switch checked={agentSchedulingEnabled} onChange={setBooleanSetting('agentScheduling', setAgentSchedulingEnabled)} />}
+                title={t('settings.agentTeamApi')}
+                description={t('settings.agentTeamApiDesc')}
+                value={
+                  !hubInventoryEnabled
+                    ? t('settings.targetHubSignInRequired')
+                    : agentTeamsQuery.isError
+                      ? t('settings.targetHubError')
+                      : t('settings.statusReady')
+                }
               />
+              <div className={styles.taskSection} data-testid="settings-local-orchestration">
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.localOrchestration')}</strong>
+                  <span>{t('settings.localOrchestrationDesc')}</span>
+                </div>
+                {localOrchestration.available ? (
+                  <div className={styles.capabilityGrid}>
+                    <CapabilityCard
+                      title={t('settings.localOrchestrationRuntime')}
+                      description={t('settings.localOrchestrationRuntimeDesc')}
+                      status={localOrchestratorName}
+                    />
+                    <CapabilityCard
+                      title={t('settings.localOrchestrationSubagents')}
+                      description={t('settings.localOrchestrationSubagentsDesc')}
+                      status={`${localOrchestration.availableSubAgents}/${availableRuntimes}`}
+                    />
+                    <CapabilityCard
+                      title={t('settings.localOrchestrationHubBoundary')}
+                      description={t('settings.localOrchestrationHubBoundaryDesc')}
+                      status={hubInventoryEnabled ? t('settings.enabled') : t('settings.notConfigured')}
+                    />
+                  </div>
+                ) : (
+                  <EmptyBlock
+                    title={t('settings.localOrchestrationNoOrchestrator')}
+                    description={t('settings.localOrchestrationNoOrchestratorDesc')}
+                  />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.agentTeamBuilder')}</strong>
+                  <span>{t('settings.agentTeamBuilderDesc')}</span>
+                </div>
+                <AgentTeamBuilder
+                  hubReady={hubInventoryEnabled}
+                  selectedTeam={agentTeamOverview?.selectedTeam}
+                  customAgents={hubCustomAgents}
+                  teamName={teamDraftName}
+                  teamDescription={teamDraftDescription}
+                  memberProfileId={teamMemberProfileId}
+                  memberRole={teamMemberRole}
+                  runPrompt={teamRunPrompt}
+                  creating={createAgentTeamMutation.isPending}
+                  addingMember={addAgentTeamMemberMutation.isPending}
+                  startingRun={startTeamRunMutation.isPending}
+                  onTeamNameChange={setTeamDraftName}
+                  onTeamDescriptionChange={setTeamDraftDescription}
+                  onMemberProfileChange={setTeamMemberProfileId}
+                  onMemberRoleChange={setTeamMemberRole}
+                  onRunPromptChange={setTeamRunPrompt}
+                  onCreateTeam={handleCreateAgentTeam}
+                  onAddMember={handleAddAgentTeamMember}
+                  onStartRun={handleStartTeamRun}
+                />
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.agentTeamConsole')}</strong>
+                  <span>{t('settings.agentTeamConsoleDesc')}</span>
+                </div>
+                {!hubInventoryEnabled ? (
+                  <EmptyBlock
+                    title={t('settings.agentTeamSignInRequired')}
+                    description={t('settings.agentTeamSignInRequiredDesc')}
+                  />
+                ) : agentTeamsQuery.isLoading ? (
+                  <EmptyBlock title={t('settings.loading')} description={t('settings.agentTeamLoadingDesc')} />
+                ) : agentTeamsQuery.isError ? (
+                  <EmptyBlock title={t('settings.agentTeamError')} description={agentTeamErrorMessage} />
+                ) : agentTeamCount === 0 ? (
+                  <EmptyBlock title={t('settings.agentTeamEmpty')} description={t('settings.agentTeamEmptyDesc')} />
+                ) : (
+                  <AgentTeamConsole
+                    teams={agentTeamOverview?.teams ?? []}
+                    bundles={agentTeamBundles}
+                    selectedTeam={agentTeamOverview?.selectedTeam}
+                    selectedRun={agentTeamOverview?.selectedRun}
+                    state={teamRunState}
+                    tasks={teamRunTasks}
+                    members={teamRunMembers}
+                    assignments={teamRunAssignments}
+                    approvals={teamRunApprovals}
+                    conflicts={teamRunConflicts}
+                    events={teamRunEvents}
+                    artifacts={teamRunState?.artifacts ?? []}
+                    budget={teamRunState?.budget}
+                    terminalReason={teamRunState?.terminal_reason}
+                    routeLog={teamRouteLog}
+                    localExecutions={teamLocalExecutions}
+                    refreshing={agentTeamsQuery.isFetching}
+                    approvalBusy={decideTeamApprovalMutation.isPending}
+                    conflictBusy={resolveTeamConflictMutation.isPending}
+                    onSelectTeam={handleSelectAgentTeam}
+                    onSelectRun={handleSelectTeamRun}
+                    onApprovalDecision={(approval, decision) => {
+                      if (!agentTeamOverview?.selectedTeam || !agentTeamOverview.selectedRun) return;
+                      void decideTeamApprovalMutation.mutateAsync({
+                        teamId: agentTeamOverview.selectedTeam.id,
+                        runId: agentTeamOverview.selectedRun.id,
+                        approvalId: approval.approval_id,
+                        decision: {
+                          decision,
+                          reason: 'Desktop TeamRun Console decision',
+                        },
+                      });
+                    }}
+                    onResolveConflict={(conflict, decision) => {
+                      if (!agentTeamOverview?.selectedTeam || !agentTeamOverview.selectedRun) return;
+                      void resolveTeamConflictMutation.mutateAsync({
+                        teamId: agentTeamOverview.selectedTeam.id,
+                        runId: agentTeamOverview.selectedRun.id,
+                        conflictId: conflict.conflict_id,
+                        resolution: {
+                          path: conflict.path,
+                          resolution: decision.resolution,
+                          selected_agent_task_id: decision.selectedAgentTaskId,
+                          reason: decision.reason,
+                        },
+                      });
+                    }}
+                  />
+                )}
+              </div>
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
                   <strong>{t('settings.schedulerLiveQueue')}</strong>
@@ -1117,9 +1525,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     icon={<Computer size={18} />}
                     title={t('settings.schedulerRouteRemote')}
                     description={t('settings.schedulerRouteRemoteDesc')}
-                    status={remoteControlEnabled ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                    status={remoteControlAvailable && remoteControlEnabled ? t('settings.statusInProgress') : t('settings.statusPlanned')}
                     metric="SSH / Tailscale"
-                    connected={remoteControlEnabled}
+                    connected={remoteControlAvailable && remoteControlEnabled}
                   />
                   <ExecutionTargetCard
                     icon={<Server size={18} />}
@@ -1149,7 +1557,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.schedulerPolicyRemote')}
                     description={t('settings.schedulerPolicyRemoteDesc')}
-                    status={remoteControlEnabled ? t('settings.enabled') : t('settings.statusPlanned')}
+                    status={remoteControlAvailable && remoteControlEnabled ? t('settings.enabled') : t('settings.statusPlanned')}
                   />
                   <CapabilityCard
                     title={t('settings.schedulerPolicyApproval')}
@@ -1240,14 +1648,19 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'keyboard' && (
             <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
               <div className={styles.shortcutTable}>
-                {shortcuts.map((shortcut) => (
-                  <div key={`${shortcut.keys.join('+')}-${shortcut.action}`} className={styles.shortcutRow}>
-                    <span>{shortcut.action}</span>
-                    <div>
-                      {shortcut.keys.map((key) => (
-                        <kbd key={key}>{key}</kbd>
-                      ))}
-                    </div>
+                {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
+                  <div key={group.id} className={styles.shortcutGroup}>
+                    <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
+                    {group.shortcuts.map((shortcut) => (
+                      <div key={shortcut.id} className={styles.shortcutRow}>
+                        <span>{t(shortcut.labelKey)}</span>
+                        <div>
+                          {shortcut.keys.map((key) => (
+                            <kbd key={key}>{key}</kbd>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -1278,14 +1691,22 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.mcpHubSync')}
-                  value={hubAuthenticated && enableMcp ? t('settings.enabled') : t('settings.notConfigured')}
+                  value={hubSessionActive && mcpAvailable && enableMcp ? t('settings.enabled') : t('settings.notConfigured')}
                   detail={hubAuthenticated ? t('settings.mcpHubSyncDesc') : t('settings.mcpHubSyncSignedOut')}
                 />
               </div>
               <SettingRow
                 title={t('settings.enableMcp')}
                 description={t('settings.enableMcpDesc')}
-                control={<Switch checked={enableMcp} onChange={setBooleanSetting('enableMcp', setEnableMcp)} />}
+                control={
+                  <SwitchControl
+                    checked={mcpAvailable && enableMcp}
+                    onChange={setBooleanSetting('enableMcp', setEnableMcp)}
+                    disabled={!mcpAvailable}
+                    title={!edgeOnline ? t('settings.requiresEdgeOnline') : t('settings.requiresMcpRuntime')}
+                    status={!mcpAvailable ? t('settings.notConfigured') : undefined}
+                  />
+                }
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1358,14 +1779,22 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.skillHubSync')}
-                  value={hubAuthenticated && skillSync ? t('settings.enabled') : t('settings.notConfigured')}
+                  value={hubSessionActive && skillSyncAvailable && skillSync ? t('settings.enabled') : t('settings.notConfigured')}
                   detail={hubAuthenticated ? t('settings.skillHubSyncDesc') : t('settings.skillHubSyncSignedOut')}
                 />
               </div>
               <SettingRow
                 title={t('settings.skillSync')}
                 description={t('settings.skillSyncDesc')}
-                control={<Switch checked={skillSync} onChange={setBooleanSetting('skillSync', setSkillSync)} />}
+                control={
+                  <SwitchControl
+                    checked={skillSyncAvailable && skillSync}
+                    onChange={setBooleanSetting('skillSync', setSkillSync)}
+                    disabled={!skillSyncAvailable}
+                    title={t('settings.requiresSkillSyncApi')}
+                    status={t('settings.notConfigured')}
+                  />
+                }
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1430,7 +1859,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 control={
                   <SelectControl
                     value={defaultModel}
-                    options={MODEL_OPTIONS.map(([value, label]) => [value, label])}
+                    options={modelSelectOptions}
                     onChange={setDefaultModel}
                   />
                 }
@@ -1441,7 +1870,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 control={
                   <SelectControl
                     value={defaultProvider}
-                    options={PROVIDER_OPTIONS.map(([value, label]) => [value, label])}
+                    options={providerSelectOptions}
                     onChange={setDefaultProvider}
                   />
                 }
@@ -1487,6 +1916,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                       provider={item.provider}
                       reasoningEffort={item.reasoningEffort}
                       enabled={item.enabled}
+                      modelOptions={aliasModelSelectOptions}
+                      providerOptions={providerSelectOptions}
                       onToggle={() => toggleModelAlias(item.alias)}
                       onModelChange={(model) => updateModelAlias(item.alias, { model })}
                       onProviderChange={(provider) => updateModelAlias(item.alias, { provider })}
@@ -1531,15 +1962,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'connections' && (
-            <Panel title={t('settings.connections')} description={t('settings.connectionsDesc')}>
-              <ConnectionRow
-                name="Hub"
-                description={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
-                connected={hubAuthenticated}
-              />
-              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
-              <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
-            </Panel>
+            <ConnectionsSection
+              edgeOnline={edgeOnline}
+              hubSessionActive={hubAuthenticated}
+              edgeAddress={edgeAddress}
+              healthStatus={healthStatus}
+              availableRunners={availableRunners}
+              totalRunners={totalRunners}
+              onRefresh={handleRefreshConnections}
+            />
           )}
 
           {active === 'remoteControl' && (
@@ -1547,7 +1978,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.remoteControlEnable')}
                 description={t('settings.remoteControlEnableDesc')}
-                control={<Switch checked={remoteControlEnabled} onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)} />}
+                control={
+                  <SwitchControl
+                    checked={remoteControlAvailable && remoteControlEnabled}
+                    onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)}
+                    disabled={!remoteControlAvailable}
+                    title={t('settings.requiresRemoteControlApi')}
+                    status={t('settings.statusPlanned')}
+                  />
+                }
               />
               <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
               <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.statusPlanned')} />
@@ -1627,7 +2066,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.platformSync')}
                 description={t('settings.platformSyncDesc')}
-                control={<Switch checked={platformSync} onChange={setBooleanSetting('platformSync', setPlatformSync)} />}
+                control={
+                  <SwitchControl
+                    checked={platformSyncAvailable && platformSync}
+                    onChange={setBooleanSetting('platformSync', setPlatformSync)}
+                    disabled={!platformSyncAvailable}
+                    title={t('settings.requiresPlatformSyncApi')}
+                    status={t('settings.statusPlanned')}
+                  />
+                }
               />
               <div className={styles.capabilityGrid}>
                 <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.statusReady')} />
@@ -1653,7 +2100,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   </button>
                 ) : (
                   <button className={styles.primaryBtn} onClick={onOpenAuth}>
-                    <LogIn size={16} />
+                    <UserCircle size={16} />
                     {t('settings.signIn')}
                   </button>
                 )}
@@ -1723,7 +2170,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.auditTrail')}
                 description={t('settings.auditTrailDesc')}
-                control={<Switch checked={auditTrail} onChange={setBooleanSetting('auditTrail', setAuditTrail)} />}
+                control={
+                  <SwitchControl
+                    checked={auditTrailAvailable && auditTrail}
+                    onChange={setBooleanSetting('auditTrail', setAuditTrail)}
+                    disabled={!auditTrailAvailable}
+                    title={t('settings.requiresAuditStore')}
+                    status={t('settings.statusPlanned')}
+                  />
+                }
               />
               <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
               <SettingRow title={t('settings.secretScan')} description={t('settings.secretScanDesc')} value={t('settings.statusPlanned')} />
@@ -1801,6 +2256,25 @@ function shortId(value?: string) {
   return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
 }
 
+function isActiveTeamRun(run: AgentTeamRun) {
+  return ['queued', 'running'].includes(run.status);
+}
+
+function isPendingTeamApproval(approval: TeamApprovalState) {
+  const status = approval.status.toLowerCase();
+  return status === 'pending' || status === 'requested' || status === 'waiting';
+}
+
+function previewText(value?: string, max = 110) {
+  if (!value) return '';
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized.length > max ? `${normalized.slice(0, max - 1)}...` : normalized;
+}
+
+function pathBasename(value: string) {
+  return value.split(/[\\/]+/).filter(Boolean).pop() ?? value;
+}
+
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <section className={styles.panel}>
@@ -1837,7 +2311,7 @@ function TaskRunRow({
         </div>
       </div>
       <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
-        {t(`run.status.${run.status}`, { defaultValue: run.status })}
+        {t(`run.status.${run.status.toLowerCase()}`, { defaultValue: run.status })}
       </span>
       {onCancel ? (
         <button
@@ -1874,6 +2348,1307 @@ function HubTaskRow({ task }: { task: AgentTask }) {
       <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
         {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
       </span>
+    </div>
+  );
+}
+
+function AgentTeamBuilder({
+  hubReady,
+  selectedTeam,
+  customAgents,
+  teamName,
+  teamDescription,
+  memberProfileId,
+  memberRole,
+  runPrompt,
+  creating,
+  addingMember,
+  startingRun,
+  onTeamNameChange,
+  onTeamDescriptionChange,
+  onMemberProfileChange,
+  onMemberRoleChange,
+  onRunPromptChange,
+  onCreateTeam,
+  onAddMember,
+  onStartRun,
+}: {
+  hubReady: boolean;
+  selectedTeam?: AgentTeamDetail;
+  customAgents: CustomAgent[];
+  teamName: string;
+  teamDescription: string;
+  memberProfileId: string;
+  memberRole: string;
+  runPrompt: string;
+  creating: boolean;
+  addingMember: boolean;
+  startingRun: boolean;
+  onTeamNameChange: (value: string) => void;
+  onTeamDescriptionChange: (value: string) => void;
+  onMemberProfileChange: (value: string) => void;
+  onMemberRoleChange: (value: string) => void;
+  onRunPromptChange: (value: string) => void;
+  onCreateTeam: () => void;
+  onAddMember: () => void;
+  onStartRun: () => void;
+}) {
+  const { t } = useTranslation();
+  const canCreate = hubReady && teamName.trim().length > 0 && !creating;
+  const canAddMember = hubReady && !!selectedTeam && !!memberProfileId && !addingMember;
+  const canStart = hubReady && !!selectedTeam && runPrompt.trim().length > 0 && !startingRun;
+  const memberOptions: Array<[string, string]> = [
+    ['', t('settings.agentTeamSelectProfile')],
+    ...customAgents.map((agent) => [agent.id, `${agent.name} (${agent.agent_type})`] as [string, string]),
+  ];
+  const roleOptions: Array<[string, string]> = [
+    ['supervisor', t('settings.teamMemberRole.supervisor')],
+    ['executor', t('settings.teamMemberRole.executor')],
+    ['reviewer', t('settings.teamMemberRole.reviewer')],
+  ];
+
+  return (
+    <div className={styles.teamBuilder} data-testid="agent-team-builder">
+      <div className={styles.teamBuilderGrid}>
+        <section className={styles.teamForm}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeamCreate')}</strong>
+            <span>{hubReady ? t('settings.agentTeamCreateDesc') : t('settings.agentTeamSignInRequired')}</span>
+          </div>
+          <label>
+            <span>{t('settings.agentTeamName')}</span>
+            <input
+              className={styles.textInput}
+              value={teamName}
+              onChange={(event) => onTeamNameChange(event.target.value)}
+              disabled={!hubReady || creating}
+              placeholder={t('settings.agentTeamNamePlaceholder')}
+            />
+          </label>
+          <label>
+            <span>{t('settings.agentTeamDescription')}</span>
+            <textarea
+              className={styles.textInput}
+              value={teamDescription}
+              onChange={(event) => onTeamDescriptionChange(event.target.value)}
+              disabled={!hubReady || creating}
+              placeholder={t('settings.agentTeamDescriptionPlaceholder')}
+            />
+          </label>
+          <button type="button" className={styles.primaryBtn} onClick={onCreateTeam} disabled={!canCreate}>
+            {creating ? t('settings.creating') : t('settings.agentTeamCreateAction')}
+          </button>
+        </section>
+
+        <section className={styles.teamForm}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeamMembersSetup')}</strong>
+            <span>{selectedTeam ? selectedTeam.name : t('settings.agentTeamSelectTeamFirst')}</span>
+          </div>
+          <label>
+            <span>{t('settings.agentTeamProfile')}</span>
+            <SelectControl
+              value={memberProfileId}
+              options={memberOptions}
+              onChange={onMemberProfileChange}
+              disabled={!hubReady || !selectedTeam || customAgents.length === 0 || addingMember}
+            />
+          </label>
+          <label>
+            <span>{t('settings.agentTeamRole')}</span>
+            <SelectControl
+              value={memberRole}
+              options={roleOptions}
+              onChange={onMemberRoleChange}
+              disabled={!hubReady || !selectedTeam || addingMember}
+            />
+          </label>
+          <button type="button" className={styles.secondaryBtn} onClick={onAddMember} disabled={!canAddMember}>
+            {addingMember ? t('settings.adding') : t('settings.agentTeamAddMember')}
+          </button>
+          {customAgents.length === 0 ? (
+            <span className={styles.teamFormHint}>{t('settings.agentTeamNoCustomAgents')}</span>
+          ) : null}
+        </section>
+      </div>
+
+      <section className={styles.teamForm}>
+        <div className={styles.teamBlockHeader}>
+          <strong>{t('settings.agentTeamStartRun')}</strong>
+          <span>{selectedTeam ? t('settings.agentTeamStartRunDesc') : t('settings.agentTeamSelectTeamFirst')}</span>
+        </div>
+        <textarea
+          className={styles.textInput}
+          value={runPrompt}
+          onChange={(event) => onRunPromptChange(event.target.value)}
+          disabled={!hubReady || !selectedTeam || startingRun}
+          placeholder={t('settings.agentTeamRunPromptPlaceholder')}
+        />
+        <button type="button" className={styles.primaryBtn} onClick={onStartRun} disabled={!canStart}>
+          {startingRun ? t('settings.starting') : t('settings.agentTeamStartRunAction')}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function AgentTeamConsole({
+  teams,
+  bundles,
+  selectedTeam,
+  selectedRun,
+  state,
+  tasks,
+  members,
+  assignments,
+  approvals,
+  conflicts,
+  events,
+  artifacts,
+  budget,
+  terminalReason,
+  routeLog,
+  localExecutions,
+  refreshing,
+  approvalBusy,
+  conflictBusy,
+  onSelectTeam,
+  onSelectRun,
+  onApprovalDecision,
+  onResolveConflict,
+}: {
+  teams: AgentTeamDetail[];
+  bundles: AgentTeamRunBundle[];
+  selectedTeam?: AgentTeamDetail;
+  selectedRun?: AgentTeamRun;
+  state?: TeamRunState;
+  tasks: TeamTaskState[];
+  members: TeamMemberState[];
+  assignments: TeamAssignmentState[];
+  approvals: TeamApprovalState[];
+  conflicts: TeamConflictState[];
+  events: TeamRunEventState[];
+  artifacts: TeamArtifactState[];
+  budget?: TeamBudget;
+  terminalReason?: string;
+  routeLog: CoordinatorRouteDecision[];
+  localExecutions: TeamLocalExecution[];
+  refreshing: boolean;
+  approvalBusy: boolean;
+  conflictBusy: boolean;
+  onSelectTeam: (team: AgentTeamDetail) => void;
+  onSelectRun: (teamId: string, run: AgentTeamRun) => void;
+  onApprovalDecision: (approval: TeamApprovalState, decision: 'allow' | 'deny') => void;
+  onResolveConflict: (conflict: TeamConflictState, decision: TeamConflictDecision) => void;
+}) {
+  const { t } = useTranslation();
+  const pendingApprovals = approvals.filter(isPendingTeamApproval);
+  const pendingConflicts = conflicts.filter((conflict) => conflict.status !== 'resolved');
+  const activeMembers = members.filter((member) => (member.active_tasks ?? 0) > 0).length;
+  const completedTasks = tasks.filter((task) => task.status === 'done').length;
+  const status = state?.status ?? selectedRun?.status ?? 'unknown';
+  const resultRows = buildTeamResultRows(tasks, events, terminalReason);
+  const communicationGraph = buildTeamCommunicationGraph({
+    members,
+    tasks,
+    assignments,
+    routeLog,
+    events,
+    artifacts,
+    conflicts,
+  });
+  const runTitle = selectedRun?.trigger_message
+    ? previewText(selectedRun.trigger_message, 86)
+    : t('settings.agentTeamNoRunSelected');
+
+  return (
+    <div className={styles.teamConsole} data-testid="agent-team-console">
+      <div className={styles.teamConsoleHeader}>
+        <div className={styles.connectionIcon}>
+          <GitBranch size={17} />
+        </div>
+        <div className={styles.settingCopy}>
+          <strong>{selectedTeam?.name ?? t('settings.agentTeamConsole')}</strong>
+          <span>{runTitle}</span>
+          <div className={styles.taskMeta}>
+            {selectedRun ? <span>{shortId(selectedRun.id)}</span> : null}
+            {selectedRun?.updated_at || selectedRun?.created_at ? (
+              <span>{formatTimestamp(selectedRun?.updated_at ?? selectedRun?.created_at)}</span>
+            ) : null}
+            {refreshing ? <span>{t('settings.refreshing')}</span> : null}
+          </div>
+        </div>
+        <span className={`${styles.statusPill} ${isActiveTeamStatus(status) ? styles.statusPillOn : ''}`}>
+          {t(`settings.teamRunStatus.${status}`, { defaultValue: status })}
+        </span>
+      </div>
+
+      <div className={styles.teamMetricGrid}>
+        <TeamMetric label={t('settings.agentTeamMembers')} value={`${activeMembers}/${members.length}`} />
+        <TeamMetric label={t('settings.agentTeamTasks')} value={`${completedTasks}/${tasks.length}`} />
+        <TeamMetric label={t('settings.agentTeamApprovals')} value={`${pendingApprovals.length}/${approvals.length}`} />
+        <TeamMetric label={t('settings.agentTeamRoutes')} value={`${routeLog.length}`} />
+      </div>
+
+      <TeamCommunicationGraph graph={communicationGraph} />
+      <TeamLocalExecutionPanel executions={localExecutions} />
+
+      <div className={styles.teamConsoleGrid}>
+        <section className={styles.teamSurface}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeams')}</strong>
+            <span>{t('settings.agentTeamsDesc')}</span>
+          </div>
+          <div className={styles.teamList}>
+            {teams.map((team) => (
+              <TeamTemplateRow
+                key={team.id}
+                team={team}
+                selected={team.id === selectedTeam?.id}
+                onSelect={onSelectTeam}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.teamSurface}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeamBranchSwitch')}</strong>
+            <span>{t('settings.agentTeamBranchSwitchDesc')}</span>
+          </div>
+          {bundles.some((bundle) => bundle.runs.length > 0) ? (
+            <div className={styles.teamList}>
+              {bundles.flatMap((bundle) => bundle.runs).slice(0, 8).map((run) => (
+                <TeamRunBranchRow
+                  key={run.id}
+                  run={run}
+                  selected={run.id === selectedRun?.id}
+                  onSelect={(nextRun) => onSelectRun(nextRun.team_id, nextRun)}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyBlock title={t('settings.agentTeamNoRuns')} description={t('settings.agentTeamNoRunsDesc')} />
+          )}
+        </section>
+      </div>
+
+      <section className={styles.teamSurface}>
+        <div className={styles.teamBlockHeader}>
+          <strong>{t('settings.agentTeamMemberStatus')}</strong>
+          <span>{t('settings.agentTeamMemberStatusDesc')}</span>
+        </div>
+        {members.length > 0 ? (
+          <div className={styles.teamList}>
+            {members.map((member) => (
+              <TeamMemberRow key={member.member_id} member={member} />
+            ))}
+          </div>
+        ) : (
+          <EmptyBlock title={t('settings.agentTeamNoMembers')} description={t('settings.agentTeamNoMembersDesc')} />
+        )}
+      </section>
+
+      <section className={styles.teamSurface}>
+        <div className={styles.teamBlockHeader}>
+          <strong>{t('settings.agentTeamTaskBoard')}</strong>
+          <span>{t('settings.agentTeamTaskBoardDesc')}</span>
+        </div>
+        {tasks.length > 0 ? (
+          <div className={styles.teamList}>
+            {tasks.slice(0, 8).map((task) => (
+              <TeamTaskRow key={task.task_id} task={task} />
+            ))}
+          </div>
+        ) : (
+          <EmptyBlock title={t('settings.agentTeamNoTasks')} description={t('settings.agentTeamNoTasksDesc')} />
+        )}
+      </section>
+
+      <div className={styles.teamConsoleGrid}>
+        <section className={styles.teamSurface}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeamResults')}</strong>
+            <span>{t('settings.agentTeamResultsDesc')}</span>
+          </div>
+          {resultRows.length > 0 ? (
+            <div className={styles.teamList}>
+              {resultRows.slice(0, 6).map((result) => (
+                <TeamResultRow key={result.id} result={result} />
+              ))}
+            </div>
+          ) : (
+            <EmptyBlock title={t('settings.agentTeamNoResults')} description={t('settings.agentTeamNoResultsDesc')} />
+          )}
+        </section>
+
+        <section className={styles.teamSurface}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeamArtifacts')}</strong>
+            <span>{t('settings.agentTeamArtifactsDesc')}</span>
+          </div>
+          {artifacts.length > 0 ? (
+            <div className={styles.teamList}>
+              {artifacts.slice(0, 8).map((artifact, index) => (
+                <TeamArtifactRow key={`${artifact.path}-${artifact.event_seq ?? index}`} artifact={artifact} />
+              ))}
+            </div>
+          ) : (
+            <EmptyBlock title={t('settings.agentTeamNoArtifacts')} description={t('settings.agentTeamNoArtifactsDesc')} />
+          )}
+        </section>
+      </div>
+
+      <TeamBudgetBlock budget={budget} />
+
+      <div className={styles.teamConsoleGrid}>
+        <section className={styles.teamSurface}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeamRouteLog')}</strong>
+            <span>{t('settings.agentTeamRouteLogDesc')}</span>
+          </div>
+          {routeLog.length > 0 ? (
+            <div className={styles.teamList}>
+              {routeLog.slice(0, 5).map((decision, index) => (
+                <TeamRouteRow key={`${decision.correlation_id ?? decision.action}-${index}`} decision={decision} />
+              ))}
+            </div>
+          ) : (
+            <EmptyBlock title={t('settings.agentTeamNoRoutes')} description={t('settings.agentTeamNoRoutesDesc')} />
+          )}
+        </section>
+
+        <section className={styles.teamSurface}>
+          <div className={styles.teamBlockHeader}>
+            <strong>{t('settings.agentTeamApprovalsConflicts')}</strong>
+            <span>{t('settings.agentTeamApprovalsConflictsDesc')}</span>
+          </div>
+          {approvals.length > 0 || conflicts.length > 0 ? (
+            <div className={styles.teamList}>
+              {approvals.slice(0, 4).map((approval) => (
+                <TeamApprovalRow
+                  key={approval.approval_id}
+                  approval={approval}
+                  busy={approvalBusy}
+                  onDecision={onApprovalDecision}
+                />
+              ))}
+              {conflicts.slice(0, 3).map((conflict) => (
+                <TeamConflictRow
+                  key={conflict.conflict_id}
+                  conflict={conflict}
+                  artifacts={artifacts}
+                  busy={conflictBusy}
+                  onResolve={onResolveConflict}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyBlock
+              title={t('settings.agentTeamNoApprovals')}
+              description={pendingConflicts.length > 0
+                ? t('settings.agentTeamPendingConflicts', { count: pendingConflicts.length })
+                : t('settings.agentTeamNoApprovalsDesc')}
+            />
+          )}
+        </section>
+      </div>
+
+      <section className={styles.teamSurface}>
+        <div className={styles.teamBlockHeader}>
+          <strong>{t('settings.agentTeamActivity')}</strong>
+          <span>{t('settings.agentTeamActivityDesc')}</span>
+        </div>
+        {events.length > 0 ? (
+          <div className={styles.teamList}>
+            {events.slice(0, 6).map((event) => (
+              <TeamEventRow key={`${event.agent_task_id}-${event.event_seq}`} event={event} />
+            ))}
+          </div>
+        ) : (
+          <EmptyBlock title={t('settings.agentTeamNoEvents')} description={t('settings.agentTeamNoEventsDesc')} />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function isActiveTeamStatus(status: string) {
+  return status === 'queued' || status === 'running';
+}
+
+function TeamMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.teamMetric}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function TeamLocalExecutionPanel({ executions }: { executions: TeamLocalExecution[] }) {
+  const { t } = useTranslation();
+  return (
+    <section className={styles.teamSurface} data-testid="agent-team-local-execution">
+      <div className={styles.teamBlockHeader}>
+        <strong>{t('settings.agentTeamLocalExecution')}</strong>
+        <span>{t('settings.agentTeamLocalExecutionDesc')}</span>
+      </div>
+      {executions.length > 0 ? (
+        <div className={styles.teamList}>
+          {executions.slice(0, 8).map((execution) => (
+            <TeamLocalExecutionRow key={execution.id} execution={execution} />
+          ))}
+        </div>
+      ) : (
+        <EmptyBlock
+          title={t('settings.agentTeamNoLocalExecution')}
+          description={t('settings.agentTeamNoLocalExecutionDesc')}
+        />
+      )}
+    </section>
+  );
+}
+
+function TeamLocalExecutionRow({ execution }: { execution: TeamLocalExecution }) {
+  const { t } = useTranslation();
+  const sourceLabel = execution.source === 'desktopBridge'
+    ? t('settings.agentTeamLocalSource')
+    : t('settings.agentTeamHubProjectionSource');
+  return (
+    <div className={`${styles.teamMiniRow} ${styles.teamExecutionRow}`}>
+      <div>
+        <strong>{previewText(execution.title, 120)}</strong>
+        <span>{execution.error || sourceLabel}</span>
+        <div className={styles.taskMeta}>
+          <span>{execution.runtimeLabel}</span>
+          {execution.agentTaskId ? <span>{t('settings.agentTeamHubTask')}: {shortId(execution.agentTaskId)}</span> : null}
+          {execution.edgeRunId ? <span>{t('settings.agentTeamEdgeRun')}: {shortId(execution.edgeRunId)}</span> : null}
+          {execution.hubTaskId ? <span>{shortId(execution.hubTaskId)}</span> : null}
+          {execution.assignmentId ? <span>{shortId(execution.assignmentId)}</span> : null}
+          {execution.memberId ? <span>{shortId(execution.memberId)}</span> : null}
+          {execution.latestEventType ? <span>{execution.latestEventType}</span> : null}
+          {execution.eventCount > 0 ? <span>{t('settings.agentTeamLocalEvents', { count: execution.eventCount })}</span> : null}
+          {execution.createdAt ? <span>{formatTimestamp(execution.createdAt)}</span> : null}
+        </div>
+      </div>
+      <em>{t(`settings.taskStatus.${execution.status}`, { defaultValue: execution.status })}</em>
+    </div>
+  );
+}
+
+type TeamGraphNodeKind = 'coordinator' | 'member' | 'task' | 'runtime' | 'artifact' | 'conflict';
+type TeamGraphEdgeKind = 'assignment' | 'route' | 'task' | 'runtime' | 'artifact' | 'conflict';
+
+interface TeamGraphNode {
+  id: string;
+  label: string;
+  meta: string;
+  kind: TeamGraphNodeKind;
+  status?: string;
+}
+
+interface TeamGraphEdge {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+  kind: TeamGraphEdgeKind;
+}
+
+interface TeamCommunicationGraphModel {
+  nodes: TeamGraphNode[];
+  edges: TeamGraphEdge[];
+}
+
+function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel }) {
+  const { t } = useTranslation();
+  const nodeClass: Record<TeamGraphNodeKind, string> = {
+    artifact: styles.teamGraphNodeArtifact ?? '',
+    conflict: styles.teamGraphNodeConflict ?? '',
+    coordinator: styles.teamGraphNodeCoordinator ?? '',
+    member: styles.teamGraphNodeMember ?? '',
+    runtime: styles.teamGraphNodeRuntime ?? '',
+    task: styles.teamGraphNodeTask ?? '',
+  };
+
+  return (
+    <section className={styles.teamSurface} data-testid="agent-team-communication-graph">
+      <div className={styles.teamBlockHeader}>
+        <strong>{t('settings.agentTeamCommunicationGraph')}</strong>
+        <span>{t('settings.agentTeamCommunicationGraphDesc')}</span>
+      </div>
+      {graph.nodes.length > 0 || graph.edges.length > 0 ? (
+        <div className={styles.teamGraph}>
+          <div className={styles.teamGraphNodes} aria-label={t('settings.agentTeamGraphNodes')}>
+            {graph.nodes.map((node) => (
+              <div key={node.id} className={`${styles.teamGraphNode} ${nodeClass[node.kind]}`}>
+                <strong>{node.label}</strong>
+                <span>{node.meta}</span>
+                {node.status ? <em>{node.status}</em> : null}
+              </div>
+            ))}
+          </div>
+          <div className={styles.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
+            {graph.edges.map((edge) => {
+              const from = graph.nodes.find((node) => node.id === edge.from);
+              const to = graph.nodes.find((node) => node.id === edge.to);
+              return (
+                <div key={edge.id} className={styles.teamGraphEdge}>
+                  <span>{from?.label ?? shortGraphId(edge.from)}</span>
+                  <strong>{edge.label}</strong>
+                  <span>{to?.label ?? shortGraphId(edge.to)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <EmptyBlock
+          title={t('settings.agentTeamNoCommunicationGraph')}
+          description={t('settings.agentTeamNoCommunicationGraphDesc')}
+        />
+      )}
+    </section>
+  );
+}
+
+function buildTeamCommunicationGraph({
+  members,
+  tasks,
+  assignments,
+  routeLog,
+  events,
+  artifacts,
+  conflicts,
+}: {
+  members: TeamMemberState[];
+  tasks: TeamTaskState[];
+  assignments: TeamAssignmentState[];
+  routeLog: CoordinatorRouteDecision[];
+  events: TeamRunEventState[];
+  artifacts: TeamArtifactState[];
+  conflicts: TeamConflictState[];
+}): TeamCommunicationGraphModel {
+  const nodeMap = new Map<string, TeamGraphNode>();
+  const edgeMap = new Map<string, TeamGraphEdge>();
+  const supervisor = members.find((member) => member.role === 'supervisor') ?? members[0];
+  const coordinatorId = supervisor ? memberNodeId(supervisor.member_id) : 'coordinator:supervisor';
+  const taskByAgentTask = new Map<string, TeamTaskState>();
+
+  const addNode = (node: TeamGraphNode) => {
+    const previous = nodeMap.get(node.id);
+    nodeMap.set(node.id, previous ? { ...previous, ...node } : node);
+  };
+  const addEdge = (edge: TeamGraphEdge) => {
+    if (edge.from === edge.to || edgeMap.has(edge.id)) return;
+    edgeMap.set(edge.id, edge);
+  };
+  const ensureMember = (memberId?: string, role = 'member') => {
+    if (!memberId) return undefined;
+    const id = memberNodeId(memberId);
+    if (!nodeMap.has(id)) {
+      addNode({ id, label: shortId(memberId), meta: role, kind: 'member' });
+    }
+    return id;
+  };
+  const ensureTask = (taskId?: string, fallback?: Partial<TeamTaskState>) => {
+    if (!taskId) return undefined;
+    const id = taskNodeId(taskId);
+    if (!nodeMap.has(id)) {
+      addNode({
+        id,
+        label: previewText(fallback?.objective || taskId, 48),
+        meta: shortId(taskId),
+        kind: 'task',
+        status: fallback?.status,
+      });
+    }
+    return id;
+  };
+
+  if (!supervisor && (routeLog.length > 0 || assignments.length > 0 || tasks.length > 0)) {
+    addNode({
+      id: coordinatorId,
+      label: 'Supervisor',
+      meta: 'coordinator',
+      kind: 'coordinator',
+    });
+  }
+
+  members.forEach((member) => {
+    addNode({
+      id: memberNodeId(member.member_id),
+      label: tFallbackRole(member.role),
+      meta: member.agent_profile_id ? shortId(member.agent_profile_id) : shortId(member.member_id),
+      kind: member.role === 'supervisor' ? 'coordinator' : 'member',
+      status: `${member.active_tasks ?? 0}/${member.completed_tasks ?? 0}`,
+    });
+  });
+
+  tasks.forEach((task) => {
+    addNode({
+      id: taskNodeId(task.task_id),
+      label: previewText(task.objective || task.task_id, 48),
+      meta: task.assignee_member_id ? shortId(task.assignee_member_id) : shortId(task.task_id),
+      kind: 'task',
+      status: task.status,
+    });
+    if (task.agent_task_id) taskByAgentTask.set(task.agent_task_id, task);
+    if (task.assignee_member_id) {
+      const memberId = ensureMember(task.assignee_member_id);
+      if (memberId) {
+        addEdge({
+          id: `task:${task.assignee_member_id}:${task.task_id}`,
+          from: memberId,
+          to: taskNodeId(task.task_id),
+          label: 'owns',
+          kind: 'task',
+        });
+      }
+    }
+    if (task.parent_task_id) {
+      const parentId = ensureTask(task.parent_task_id);
+      if (parentId) {
+        addEdge({
+          id: `parent:${task.parent_task_id}:${task.task_id}`,
+          from: parentId,
+          to: taskNodeId(task.task_id),
+          label: 'forks',
+          kind: 'task',
+        });
+      }
+    }
+    if (task.edge_run_id || task.run_id) {
+      const runtimeId = runtimeNodeId(task.edge_run_id ?? task.run_id);
+      addNode({ id: runtimeId, label: shortId(task.edge_run_id ?? task.run_id), meta: 'Edge run', kind: 'runtime' });
+      addEdge({
+        id: `runtime:${task.task_id}:${task.edge_run_id ?? task.run_id}`,
+        from: taskNodeId(task.task_id),
+        to: runtimeId,
+        label: 'runs',
+        kind: 'runtime',
+      });
+    }
+  });
+
+  assignments.forEach((assignment) => {
+    const from = ensureMember(assignment.from_member_id, 'from') ?? coordinatorId;
+    const to = ensureMember(assignment.to_member_id, 'to');
+    if (!to) return;
+    addEdge({
+      id: `assignment:${assignment.assignment_id}`,
+      from,
+      to,
+      label: assignment.type || assignment.status || 'assigns',
+      kind: 'assignment',
+    });
+  });
+
+  routeLog.forEach((decision, index) => {
+    const worker = ensureMember(decision.next_worker, 'worker');
+    if (!worker) return;
+    addEdge({
+      id: `route:${decision.correlation_id ?? index}:${decision.action}:${decision.next_worker}`,
+      from: coordinatorId,
+      to: worker,
+      label: decision.action,
+      kind: 'route',
+    });
+  });
+
+  events.slice(0, 8).forEach((event) => {
+    const task = taskByAgentTask.get(event.agent_task_id);
+    const taskId = task ? ensureTask(task.task_id, task) : ensureTask(event.agent_task_id, {
+      objective: event.event_type,
+      status: event.event_type,
+    });
+    if (!taskId || !event.edge_run_id) return;
+    const runtimeId = runtimeNodeId(event.edge_run_id);
+    addNode({ id: runtimeId, label: shortId(event.edge_run_id), meta: 'runtime event', kind: 'runtime' });
+    addEdge({
+      id: `event:${event.agent_task_id}:${event.edge_run_id}:${event.event_seq}`,
+      from: taskId,
+      to: runtimeId,
+      label: previewText(event.event_type, 22),
+      kind: 'runtime',
+    });
+  });
+
+  artifacts.slice(0, 6).forEach((artifact, index) => {
+    const sourceId = ensureTask(artifact.team_task_id ?? artifact.agent_task_id)
+      ?? ensureMember(artifact.member_id)
+      ?? (artifact.edge_run_id ? runtimeNodeId(artifact.edge_run_id) : undefined);
+    if (artifact.edge_run_id && !nodeMap.has(runtimeNodeId(artifact.edge_run_id))) {
+      addNode({ id: runtimeNodeId(artifact.edge_run_id), label: shortId(artifact.edge_run_id), meta: 'Edge run', kind: 'runtime' });
+    }
+    const artifactId = `artifact:${artifact.path}:${artifact.event_seq ?? index}`;
+    addNode({
+      id: artifactId,
+      label: previewText(pathBasename(artifact.path), 36),
+      meta: previewText(artifact.path, 44),
+      kind: 'artifact',
+      status: artifact.status || artifact.action,
+    });
+    if (sourceId) {
+      addEdge({
+        id: `artifact:${sourceId}:${artifactId}`,
+        from: sourceId,
+        to: artifactId,
+        label: artifact.action || artifact.tool_name || 'artifact',
+        kind: 'artifact',
+      });
+    }
+  });
+
+  conflicts.slice(0, 4).forEach((conflict) => {
+    const conflictId = `conflict:${conflict.conflict_id}`;
+    addNode({
+      id: conflictId,
+      label: previewText(pathBasename(conflict.path), 36),
+      meta: previewText(conflict.path, 44),
+      kind: 'conflict',
+      status: conflict.status,
+    });
+    const sourceIds = [
+      ...(conflict.team_task_ids ?? []).map((id) => ensureTask(id)),
+      ...(conflict.agent_task_ids ?? []).map((id) => {
+        const task = taskByAgentTask.get(id);
+        return task ? ensureTask(task.task_id, task) : ensureTask(id);
+      }),
+      ...(conflict.member_ids ?? []).map((id) => ensureMember(id)),
+    ].filter((id): id is string => Boolean(id));
+    sourceIds.slice(0, 4).forEach((sourceId) => {
+      addEdge({
+        id: `conflict:${sourceId}:${conflict.conflict_id}`,
+        from: sourceId,
+        to: conflictId,
+        label: 'conflict',
+        kind: 'conflict',
+      });
+    });
+  });
+
+  return {
+    nodes: [...nodeMap.values()].slice(0, 14),
+    edges: [...edgeMap.values()]
+      .filter((edge) => nodeMap.has(edge.from) && nodeMap.has(edge.to))
+      .slice(0, 16),
+  };
+}
+
+function memberNodeId(value: string) {
+  return `member:${value}`;
+}
+
+function taskNodeId(value: string) {
+  return `task:${value}`;
+}
+
+function runtimeNodeId(value?: string) {
+  return `runtime:${value ?? 'unknown'}`;
+}
+
+function shortGraphId(value: string) {
+  return shortId(value.replace(/^(member|task|runtime|artifact|conflict|coordinator):/, ''));
+}
+
+function tFallbackRole(role: string) {
+  return role || 'member';
+}
+
+function TeamTemplateRow({
+  team,
+  selected,
+  onSelect,
+}: {
+  team: AgentTeamDetail;
+  selected: boolean;
+  onSelect: (team: AgentTeamDetail) => void;
+}) {
+  const { t } = useTranslation();
+  const memberCount = team.members?.length ?? 0;
+  return (
+    <button
+      type="button"
+      className={`${styles.teamMiniRow} ${styles.teamMiniButton} ${selected ? styles.teamMiniRowSelected : ''}`}
+      aria-pressed={selected}
+      onClick={() => onSelect(team)}
+    >
+      <div>
+        <strong>{team.name}</strong>
+        <span>{team.description || t('settings.agentTeamDefaultDesc')}</span>
+      </div>
+      <em>{t('settings.agentTeamMemberCount', { count: memberCount })}</em>
+    </button>
+  );
+}
+
+function TeamRunBranchRow({
+  run,
+  selected,
+  onSelect,
+}: {
+  run: AgentTeamRun;
+  selected: boolean;
+  onSelect: (run: AgentTeamRun) => void;
+}) {
+  const { t } = useTranslation();
+  const title = run.trigger_message ? previewText(run.trigger_message, 90) : shortId(run.id);
+  return (
+    <button
+      type="button"
+      className={`${styles.teamMiniRow} ${styles.teamMiniButton} ${selected ? styles.teamMiniRowSelected : ''}`}
+      aria-pressed={selected}
+      onClick={() => onSelect(run)}
+    >
+      <div>
+        <strong>{title}</strong>
+        <span>{shortId(run.team_id)}</span>
+        <div className={styles.taskMeta}>
+          <span>{shortId(run.id)}</span>
+          {run.updated_at || run.created_at ? <span>{formatTimestamp(run.updated_at ?? run.created_at)}</span> : null}
+        </div>
+      </div>
+      <em>{t(`settings.teamRunStatus.${run.status}`, { defaultValue: run.status })}</em>
+    </button>
+  );
+}
+
+function TeamMemberRow({ member }: { member: TeamMemberState }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.teamMiniRow}>
+      <div>
+        <strong>{t(`settings.teamMemberRole.${member.role}`, { defaultValue: member.role })}</strong>
+        <span>{member.agent_profile_id ? shortId(member.agent_profile_id) : shortId(member.member_id)}</span>
+      </div>
+      <em>{t('settings.agentTeamMemberLoad', {
+        active: member.active_tasks ?? 0,
+        done: member.completed_tasks ?? 0,
+      })}</em>
+    </div>
+  );
+}
+
+function TeamTaskRow({ task }: { task: TeamTaskState }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.teamMiniRow}>
+      <div>
+        <strong>{previewText(task.objective || task.task_id, 120)}</strong>
+        <span>{task.assignee_member_id ? shortId(task.assignee_member_id) : t('settings.agentTeamUnassigned')}</span>
+        <div className={styles.taskMeta}>
+          {task.run_id ? <span>{shortId(task.run_id)}</span> : null}
+          {task.risk_level ? <span>{task.risk_level}</span> : null}
+          {task.attempt ? <span>{t('settings.agentTeamAttempt', { count: task.attempt })}</span> : null}
+        </div>
+      </div>
+      <em>{t(`settings.teamTaskStatus.${task.status}`, { defaultValue: task.status })}</em>
+    </div>
+  );
+}
+
+interface TeamResultItem {
+  id: string;
+  title: string;
+  body: string;
+  meta: string[];
+  status?: string;
+}
+
+function buildTeamResultRows(
+  tasks: TeamTaskState[],
+  events: TeamRunEventState[],
+  terminalReason?: string,
+): TeamResultItem[] {
+  const rows: TeamResultItem[] = [];
+  const terminal = terminalReason?.trim();
+  if (terminal) {
+    rows.push({
+      id: 'terminal-reason',
+      title: 'settings.agentTeamTerminalReason',
+      body: terminal,
+      meta: ['TeamRunState'],
+      status: 'terminal',
+    });
+  }
+
+  tasks.forEach((task) => {
+    const result = (task as TeamTaskState & { result?: string }).result?.trim();
+    if (!result) return;
+    rows.push({
+      id: `task-result-${task.task_id}`,
+      title: task.objective || task.task_id,
+      body: result,
+      meta: [
+        shortId(task.task_id),
+        task.assignee_member_id ? shortId(task.assignee_member_id) : '',
+        task.run_id ? shortId(task.run_id) : '',
+      ].filter(Boolean),
+      status: task.status,
+    });
+  });
+
+  events.forEach((event) => {
+    if (!isTeamResultEvent(event.event_type)) return;
+    const body = extractTeamEventResult(event.payload);
+    if (!body) return;
+    rows.push({
+      id: `event-result-${event.agent_task_id}-${event.event_seq}`,
+      title: event.event_type,
+      body,
+      meta: [
+        `#${event.event_seq}`,
+        event.edge_run_id ? shortId(event.edge_run_id) : '',
+        event.created_at ? formatTimestamp(event.created_at) : '',
+      ].filter(Boolean),
+      status: shortId(event.agent_task_id),
+    });
+  });
+
+  return rows;
+}
+
+function isTeamResultEvent(eventType: string) {
+  const normalized = eventType.toLowerCase();
+  return normalized === 'agent.result'
+    || normalized === 'agent.done'
+    || normalized === 'run.agent.result'
+    || normalized.endsWith('.result')
+    || normalized.endsWith('.done');
+}
+
+function extractTeamEventResult(payload?: string) {
+  const normalized = payload?.trim();
+  if (!normalized) return '';
+  try {
+    const parsed = JSON.parse(normalized) as Record<string, unknown>;
+    const candidate = parsed.final_content
+      ?? parsed.result_summary
+      ?? parsed.content
+      ?? parsed.result
+      ?? parsed.reason
+      ?? parsed.message
+      ?? parsed.output;
+    if (typeof candidate === 'string') return previewText(candidate, 180);
+    if (candidate != null) return previewText(JSON.stringify(candidate), 180);
+    return previewText(normalized, 180);
+  } catch {
+    return previewText(normalized, 180);
+  }
+}
+
+function TeamResultRow({ result }: { result: TeamResultItem }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.teamMiniRow}>
+      <div>
+        <strong>{t(result.title, { defaultValue: previewText(result.title, 120) })}</strong>
+        <span>{result.body}</span>
+        {result.meta.length > 0 ? (
+          <div className={styles.taskMeta}>
+            {result.meta.map((item) => <span key={item}>{item}</span>)}
+          </div>
+        ) : null}
+      </div>
+      {result.status ? <em>{result.status}</em> : null}
+    </div>
+  );
+}
+
+function TeamArtifactRow({ artifact }: { artifact: TeamArtifactState }) {
+  return (
+    <div className={styles.teamMiniRow}>
+      <div>
+        <strong>{artifact.path}</strong>
+        <span>{artifact.tool_name || artifact.action || artifact.edge_run_id || shortId(artifact.team_task_id)}</span>
+        <div className={styles.taskMeta}>
+          {artifact.action ? <span>{artifact.action}</span> : null}
+          {artifact.tool_name ? <span>{artifact.tool_name}</span> : null}
+          {artifact.member_id ? <span>{shortId(artifact.member_id)}</span> : null}
+          {artifact.created_at ? <span>{formatTimestamp(artifact.created_at)}</span> : null}
+        </div>
+      </div>
+      <em>{artifact.status || artifact.action || 'artifact'}</em>
+    </div>
+  );
+}
+
+function TeamBudgetBlock({ budget }: { budget?: TeamBudget }) {
+  const { t } = useTranslation();
+  if (!budget) return null;
+
+  const total = formatTeamNumber(budget.total_tokens_used);
+  const limit = formatTeamNumber(budget.token_limit);
+  const remaining = formatTeamNumber(budget.remaining_tokens);
+  const input = formatTeamNumber(budget.input_tokens);
+  const output = formatTeamNumber(budget.output_tokens);
+  const usage = typeof budget.usage_percent === 'number' ? `${Math.round(budget.usage_percent)}%` : t('settings.agentTeamBudgetUnknown');
+
+  return (
+    <section className={styles.teamSurface}>
+      <div className={styles.teamBlockHeader}>
+        <strong>{t('settings.agentTeamBudget')}</strong>
+        <span>{t('settings.agentTeamBudgetDesc')}</span>
+      </div>
+      <div className={styles.teamBudgetGrid}>
+        <TeamMetric label={t('settings.agentTeamBudgetTokens')} value={`${total} / ${limit}`} />
+        <TeamMetric label={t('settings.agentTeamBudgetUsage')} value={usage} />
+        <TeamMetric label={t('settings.agentTeamBudgetRemaining')} value={remaining} />
+        <TeamMetric label={t('settings.agentTeamBudgetIO')} value={`${input} / ${output}`} />
+        <TeamMetric label={t('settings.agentTeamBudgetRuns')} value={formatTeamNumber(budget.run_count)} />
+        <TeamMetric
+          label={t('settings.agentTeamBudgetWarnings')}
+          value={`${formatTeamNumber(budget.context_warnings)} / ${formatTeamNumber(budget.compactions)}`}
+        />
+      </div>
+    </section>
+  );
+}
+
+function formatTeamNumber(value?: number) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? new Intl.NumberFormat('en-US').format(value)
+    : '--';
+}
+
+function TeamRouteRow({ decision }: { decision: CoordinatorRouteDecision }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.teamMiniRow}>
+      <div>
+        <strong>{t(`settings.teamRouteAction.${decision.action}`, { defaultValue: decision.action })}</strong>
+        <span>{previewText(decision.instructions || decision.summary || decision.reasoning || decision.blocked_reason, 120)}</span>
+        <div className={styles.taskMeta}>
+          {decision.next_worker ? <span>{shortId(decision.next_worker)}</span> : null}
+          {decision.correlation_id ? <span>{shortId(decision.correlation_id)}</span> : null}
+        </div>
+      </div>
+      <em>{decision.action}</em>
+    </div>
+  );
+}
+
+function TeamApprovalRow({
+  approval,
+  busy,
+  onDecision,
+}: {
+  approval: TeamApprovalState;
+  busy: boolean;
+  onDecision: (approval: TeamApprovalState, decision: 'allow' | 'deny') => void;
+}) {
+  const { t } = useTranslation();
+  const pending = isPendingTeamApproval(approval);
+  return (
+    <div className={`${styles.teamMiniRow} ${styles.teamActionRow}`}>
+      <div>
+        <strong>{approval.tool_name || approval.request_id || approval.approval_id}</strong>
+        <span>{approval.reason || approval.edge_run_id || t('settings.agentTeamApprovalDefaultDesc')}</span>
+        <div className={styles.taskMeta}>
+          <span>{approval.status}</span>
+          {approval.member_id ? <span>{shortId(approval.member_id)}</span> : null}
+        </div>
+      </div>
+      {pending ? (
+        <div className={styles.teamActions}>
+          <button type="button" className={styles.secondaryBtn} disabled={busy} onClick={() => onDecision(approval, 'deny')}>
+            {t('settings.deny')}
+          </button>
+          <button type="button" className={styles.primaryBtn} disabled={busy} onClick={() => onDecision(approval, 'allow')}>
+            {t('settings.allow')}
+          </button>
+        </div>
+      ) : (
+        <em>{approval.status}</em>
+      )}
+    </div>
+  );
+}
+
+interface TeamConflictDecision {
+  resolution: 'accept_agent_task' | 'manual_merge' | 'keep_all' | 'discard_all' | 'blocked';
+  selectedAgentTaskId?: string;
+  reason: string;
+}
+
+function TeamConflictRow({
+  conflict,
+  artifacts,
+  busy,
+  onResolve,
+}: {
+  conflict: TeamConflictState;
+  artifacts: TeamArtifactState[];
+  busy: boolean;
+  onResolve: (conflict: TeamConflictState, decision: TeamConflictDecision) => void;
+}) {
+  const { t } = useTranslation();
+  const pending = conflict.status !== 'resolved';
+  const sources = buildConflictSources(conflict, artifacts);
+  const sourceCount = sources.length || conflict.agent_task_ids?.length || 0;
+  return (
+    <div className={`${styles.teamMiniRow} ${styles.teamActionRow}`}>
+      <div>
+        <strong>{conflict.path}</strong>
+        <span>{t('settings.agentTeamConflictSources', { count: sourceCount })}</span>
+        <div className={styles.taskMeta}>
+          <span>{conflict.status}</span>
+          {conflict.resolution ? <span>{conflict.resolution}</span> : null}
+          {conflict.selected_agent_task_id ? <span>{shortId(conflict.selected_agent_task_id)}</span> : null}
+        </div>
+      </div>
+      {sources.length > 0 ? (
+        <div className={styles.conflictSourceGrid}>
+          {sources.map((source) => (
+            <div className={styles.conflictSourceCard} key={source.id}>
+              <div className={styles.conflictSourceHead}>
+                <strong>{source.label}</strong>
+                <em>{source.action || source.status || t('settings.agentTeamArtifactSource')}</em>
+              </div>
+              <span>{source.path}</span>
+              <div className={styles.taskMeta}>
+                {source.memberId ? <span>{shortId(source.memberId)}</span> : null}
+                {source.edgeRunId ? <span>{shortId(source.edgeRunId)}</span> : null}
+                {source.createdAt ? <span>{formatTimestamp(source.createdAt)}</span> : null}
+              </div>
+              {pending && source.agentTaskId ? (
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  disabled={busy}
+                  onClick={() => onResolve(conflict, {
+                    resolution: 'accept_agent_task',
+                    selectedAgentTaskId: source.agentTaskId,
+                    reason: `Accepted ${source.agentTaskId} from Desktop TeamRun Console`,
+                  })}
+                >
+                  {t('settings.acceptAgentTask')}
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {pending ? (
+        <div className={styles.teamActions}>
+          <button
+            type="button"
+            className={styles.secondaryBtn}
+            disabled={busy}
+            onClick={() => onResolve(conflict, {
+              resolution: 'keep_all',
+              reason: 'Keep all conflict artifacts from Desktop TeamRun Console',
+            })}
+          >
+            {t('settings.keepAllArtifacts')}
+          </button>
+          <button
+            type="button"
+            className={styles.secondaryBtn}
+            disabled={busy}
+            onClick={() => onResolve(conflict, {
+              resolution: 'manual_merge',
+              reason: 'Marked from Desktop TeamRun Console',
+            })}
+          >
+            {t('settings.markManualMerge')}
+          </button>
+        </div>
+      ) : (
+        <em>{conflict.status}</em>
+      )}
+    </div>
+  );
+}
+
+interface ConflictSourceView {
+  id: string;
+  label: string;
+  path: string;
+  agentTaskId?: string;
+  memberId?: string;
+  edgeRunId?: string;
+  action?: string;
+  status?: string;
+  createdAt?: string;
+}
+
+function buildConflictSources(
+  conflict: TeamConflictState,
+  artifacts: TeamArtifactState[],
+): ConflictSourceView[] {
+  const path = normalizeArtifactPath(conflict.path);
+  const matched = artifacts.filter((artifact) => {
+    if (conflict.conflict_id && artifact.conflict_id === conflict.conflict_id) return true;
+    return normalizeArtifactPath(artifact.path) === path;
+  });
+
+  const bySource = new Map<string, ConflictSourceView>();
+  matched.forEach((artifact, index) => {
+    const sourceId = artifact.agent_task_id
+      || artifact.team_task_id
+      || artifact.member_id
+      || artifact.edge_run_id
+      || `${artifact.path}-${artifact.event_seq ?? index}`;
+    const prev = bySource.get(sourceId);
+    const next: ConflictSourceView = {
+      id: sourceId,
+      label: artifact.agent_task_id
+        ? shortId(artifact.agent_task_id)
+        : artifact.member_id
+          ? shortId(artifact.member_id)
+          : shortId(sourceId),
+      path: artifact.path,
+      agentTaskId: artifact.agent_task_id,
+      memberId: artifact.member_id,
+      edgeRunId: artifact.edge_run_id,
+      action: artifact.action,
+      status: artifact.status,
+      createdAt: artifact.created_at,
+    };
+    if (!prev || timestampOfArtifact(next.createdAt) >= timestampOfArtifact(prev.createdAt)) {
+      bySource.set(sourceId, next);
+    }
+  });
+
+  (conflict.agent_task_ids ?? []).forEach((agentTaskId) => {
+    if (bySource.has(agentTaskId)) return;
+    bySource.set(agentTaskId, {
+      id: agentTaskId,
+      label: shortId(agentTaskId),
+      path: conflict.path,
+      agentTaskId,
+    });
+  });
+
+  return [...bySource.values()];
+}
+
+function normalizeArtifactPath(value?: string) {
+  return (value ?? '').replace(/\\/g, '/').replace(/\/+/g, '/').toLowerCase();
+}
+
+function timestampOfArtifact(value?: string) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function TeamEventRow({ event }: { event: TeamRunEventState }) {
+  return (
+    <div className={styles.teamMiniRow}>
+      <div>
+        <strong>{event.event_type}</strong>
+        <span>{previewText(event.payload, 120) || shortId(event.agent_task_id)}</span>
+        <div className={styles.taskMeta}>
+          <span>#{event.event_seq}</span>
+          {event.edge_run_id ? <span>{shortId(event.edge_run_id)}</span> : null}
+          {event.created_at ? <span>{formatTimestamp(event.created_at)}</span> : null}
+        </div>
+      </div>
+      <em>{shortId(event.agent_task_id)}</em>
     </div>
   );
 }
@@ -1936,12 +3711,16 @@ function AliasMappingRow({
   onModelChange,
   onProviderChange,
   onReasoningChange,
+  modelOptions,
+  providerOptions,
 }: {
   alias: string;
   model: string;
   provider: string;
   reasoningEffort: ReasoningEffortPreference;
   enabled: boolean;
+  modelOptions: Array<[SettingsSelectValue, string]>;
+  providerOptions: Array<[SettingsSelectValue, string]>;
   onToggle: () => void;
   onModelChange: (model: string) => void;
   onProviderChange: (provider: string) => void;
@@ -1962,7 +3741,7 @@ function AliasMappingRow({
           <span>{t('settings.modelAliasModel')}</span>
           <SelectControl
             value={model}
-            options={MODEL_OPTIONS.filter(([value]) => value !== 'auto').map(([value, label]) => [value, label])}
+            options={modelOptions}
             onChange={onModelChange}
           />
         </label>
@@ -1970,7 +3749,7 @@ function AliasMappingRow({
           <span>{t('settings.modelAliasProvider')}</span>
           <SelectControl
             value={provider}
-            options={PROVIDER_OPTIONS.map(([value, label]) => [value, label])}
+            options={providerOptions}
             onChange={onProviderChange}
           />
         </label>
@@ -2305,13 +4084,11 @@ function SettingRow({
   description,
   value,
   control,
-  action,
 }: {
   title: string;
   description: string;
   value?: string;
   control?: ReactNode;
-  action?: boolean;
 }) {
   return (
     <div className={styles.settingRow}>
@@ -2320,7 +4097,6 @@ function SettingRow({
         <span>{description}</span>
       </div>
       {control ?? (value ? <span className={styles.settingValue}>{value}</span> : null)}
-      {action ? <ChevronRight size={17} className={styles.rowChevron} /> : null}
     </div>
   );
 }
@@ -2342,13 +4118,49 @@ function ConnectionRow({ name, description, connected }: { name: string; descrip
   );
 }
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+function SwitchControl({
+  checked,
+  onChange,
+  disabled = false,
+  title,
+  status,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  title?: string;
+  status?: string;
+}) {
+  return (
+    <div className={styles.switchControl}>
+      {status ? <span className={styles.switchStatus}>{status}</span> : null}
+      <Switch checked={checked} onChange={onChange} disabled={disabled} title={title} />
+    </div>
+  );
+}
+
+function Switch({
+  checked,
+  onChange,
+  disabled = false,
+  title,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
     <button
       className={`${styles.switch} ${checked ? styles.switchOn : ''}`}
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
+      aria-disabled={disabled}
+      disabled={disabled}
+      title={title}
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
     >
       <span />
     </button>
@@ -2359,13 +4171,15 @@ function SelectControl({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   value: SettingsSelectValue;
   options: Array<[SettingsSelectValue, string]>;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
-    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)}>
+    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
       {options.map(([optionValue, label]) => (
         <option key={optionValue} value={optionValue}>
           {label}

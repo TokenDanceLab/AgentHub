@@ -10,6 +10,10 @@
     "./types": "./src/types.ts",
     "./events": "./src/events.ts",
     "./errors": "./src/errors.ts",
+    "./hubEvents": "./src/hubEvents.ts",
+    "./hubClient": "./src/hubClient.ts",
+    "./surfaceMetadata": "./src/surfaceMetadata.ts",
+    "./workbenchState": "./src/workbenchState.ts",
     "./tree": "./src/tree.ts",
     "./diff": "./src/diff.ts",
     "./apiClient": "./src/apiClient.ts",
@@ -26,6 +30,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
+    "react-i18next": "^15.0.0",
+    "lucide-react": "^0.400.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -37,9 +43,11 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.9.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "jsdom": "^29.1.1",
+    "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "~5.8.0",

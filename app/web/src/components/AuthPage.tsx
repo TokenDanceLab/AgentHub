@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronDown } from 'lucide-react';
+import { TokenDanceMark } from '@shared/ui';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
@@ -77,16 +78,13 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
     <div className={styles.page}>
       {/* Close button */}
       {onClose && (
-        <button className={styles.closeBtn} onClick={onClose} title="关闭">
+        <button className={styles.closeBtn} onClick={onClose} title={t('action.close')} aria-label={t('action.close')}>
           <X size={16} />
         </button>
       )}
 
-      {/* Clean header — no dark background */}
       <div className={styles.header}>
-        <div className={styles.logo} aria-hidden="true">
-          AH
-        </div>
+        <TokenDanceMark className={styles.logo} />
         <h1 className={styles.appName}>{t('auth.title')}</h1>
         <p className={styles.tagline}>{t('auth.tagline')}</p>
       </div>
@@ -102,7 +100,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         <span className={`${styles.advancedToggleIcon} ${showAdvanced ? styles.advancedToggleIconOpen : ''}`}>
           <ChevronDown size={14} />
         </span>
-        高级设置
+        {t('auth.advancedSettings')}
       </button>
 
       {showAdvanced && (

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ func newMockDBAgent(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
 }
 
 type mockAgentCache struct {
+	mu             sync.Mutex
 	routeID        string
 	deviceRoutes   map[string]string
 	pushedUser     string
@@ -68,17 +70,41 @@ func (m *mockAgentCache) GetRouteForDevice(ctx context.Context, userID, deviceTy
 }
 
 func (m *mockAgentCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.pushedUser = userID
 	m.pushed = append(m.pushed, taskJSON)
 	return nil
 }
 
 func (m *mockAgentCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.pushedUser = userID
 	m.pushedTargetID = targetID
 	m.pushedDeviceID = deviceID
 	m.pushedTarget = append(m.pushedTarget, taskJSON)
 	return nil
+}
+
+func (m *mockAgentCache) snapshot() mockAgentCacheSnapshot {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return mockAgentCacheSnapshot{
+		pushedUser:     m.pushedUser,
+		pushed:         append([]string(nil), m.pushed...),
+		pushedTarget:   append([]string(nil), m.pushedTarget...),
+		pushedDeviceID: m.pushedDeviceID,
+		pushedTargetID: m.pushedTargetID,
+	}
+}
+
+type mockAgentCacheSnapshot struct {
+	pushedUser     string
+	pushed         []string
+	pushedTarget   []string
+	pushedDeviceID string
+	pushedTargetID string
 }
 
 func (m *mockAgentCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
@@ -119,12 +145,13 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 		DisplayName:   "Claude",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`)
+	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "")
 
-	require.Equal(t, "user-1", cache.pushedUser)
-	require.Len(t, cache.pushed, 1)
+	snapshot := cache.snapshot()
+	require.Equal(t, "user-1", snapshot.pushedUser)
+	require.Len(t, snapshot.pushed, 1)
 	var payload dispatchPayload
-	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 	require.Equal(t, "Run the real runtime", payload.Prompt)
 	require.Equal(t, "claude-code", payload.AgentType)
 	require.Equal(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
@@ -152,12 +179,13 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "", "")
 
-	require.Equal(t, "user-1", cache.pushedUser)
-	require.Len(t, cache.pushedTarget, 1)
+	snapshot := cache.snapshot()
+	require.Equal(t, "user-1", snapshot.pushedUser)
+	require.Len(t, snapshot.pushedTarget, 1)
 	var payload dispatchPayload
-	require.NoError(t, json.Unmarshal([]byte(cache.pushedTarget[0]), &payload))
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushedTarget[0]), &payload))
 	require.Equal(t, "target-1", payload.TargetID)
 }
 
@@ -235,11 +263,12 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 		DisplayName:   "Supervisor",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "")
+	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "", "")
 
-	require.Len(t, cache.pushed, 1)
+	snapshot := cache.snapshot()
+	require.Len(t, snapshot.pushed, 1)
 	var payload dispatchPayload
-	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 	require.Equal(t, "team-1", payload.TeamID)
 	require.Equal(t, "run-team-1", payload.TeamRunID)
 	require.Equal(t, "member-supervisor", payload.TeamMemberID)
@@ -271,15 +300,16 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "", "")
 
 	select {
 	case <-connA.Send:
 		t.Fatal("target task without edge device fell back to online desktop")
 	default:
 	}
-	require.Empty(t, cache.pushed)
-	require.Empty(t, cache.pushedTarget)
+	snapshot := cache.snapshot()
+	require.Empty(t, snapshot.pushed)
+	require.Empty(t, snapshot.pushedTarget)
 }
 
 func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
@@ -304,7 +334,7 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "", "")
 
 	select {
 	case <-conn.Send:
@@ -338,7 +368,7 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "", "")
 
 	select {
 	case <-conn.Send:
@@ -385,7 +415,7 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on B", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run on B", "", "")
 
 	select {
 	case data := <-connB.Send:
@@ -409,7 +439,7 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "task-target").First(&stored).Error)
 	require.Equal(t, model.TaskStatusDispatched, stored.Status)
 	require.Equal(t, "dev-b", stored.EdgeDeviceID)
-	require.Empty(t, cache.pushedTarget)
+	require.Empty(t, cache.snapshot().pushedTarget)
 }
 
 func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
@@ -440,7 +470,7 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "", "")
 
 	select {
 	case <-connB.Send:
@@ -480,7 +510,7 @@ func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "", "")
 
 	select {
 	case <-connB.Send:
@@ -516,17 +546,18 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "", "")
 
 	select {
 	case <-connA.Send:
 		t.Fatal("target-bound dispatch fell back to online device A")
 	default:
 	}
-	require.Empty(t, cache.pushed)
-	require.Len(t, cache.pushedTarget, 1)
-	require.Equal(t, "target-dev-b", cache.pushedTargetID)
-	require.Equal(t, "dev-b", cache.pushedDeviceID)
+	snapshot := cache.snapshot()
+	require.Empty(t, snapshot.pushed)
+	require.Len(t, snapshot.pushedTarget, 1)
+	require.Equal(t, "target-dev-b", snapshot.pushedTargetID)
+	require.Equal(t, "dev-b", snapshot.pushedDeviceID)
 }
 
 func TestMergeModelParamsLetsDispatchOverrideProfileDefaults(t *testing.T) {
@@ -1187,10 +1218,11 @@ func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 	require.Equal(t, "target-local", stored.TargetID)
 	require.Equal(t, "dev-target", stored.EdgeDeviceID)
 	require.Eventually(t, func() bool {
-		return len(cache.pushedTarget) == 1
+		return len(cache.snapshot().pushedTarget) == 1
 	}, time.Second, 10*time.Millisecond)
+	snapshot := cache.snapshot()
 	var payload dispatchPayload
-	require.NoError(t, json.Unmarshal([]byte(cache.pushedTarget[0]), &payload))
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushedTarget[0]), &payload))
 	require.Equal(t, "target-local", payload.TargetID)
 }
 

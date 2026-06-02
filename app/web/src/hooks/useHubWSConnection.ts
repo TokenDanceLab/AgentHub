@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import { createHubWS, type HubWSHandle } from '@/api/hubWS';
 import type { TransportStatus } from '@/api/transport';
@@ -9,23 +10,29 @@ interface HubWSConnectionState {
   hubWS: HubWSHandle | null;
   status: TransportStatus;
   authenticated: boolean;
+  /** Whether a reconnection was just completed (transient, resets after one read). */
+  justReconnected: boolean;
 }
 
 export function useHubWSConnection(): HubWSConnectionState {
+  const { t } = useTranslation();
   const auth = useAuth();
   const setConnected = useConnectionStore((s) => s.setConnected);
   const setError = useConnectionStore((s) => s.setError);
+  const setReconnecting = useConnectionStore((s) => s.setReconnecting);
   const addToast = useToastStore((s) => s.addToast);
   const [hubWS, setHubWS] = useState<HubWSHandle | null>(null);
   const [status, setStatus] = useState<TransportStatus>('disconnected');
   const [authenticated, setAuthenticated] = useState(false);
+  const [justReconnected, setJustReconnected] = useState(false);
   const authFailToastRef = useRef(false);
+  const prevStatusRef = useRef<TransportStatus>('disconnected');
 
   useEffect(() => {
     void auth.tryAutoLogin().catch((error) => {
       addToast({
         type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to complete Hub login',
+        message: error instanceof Error ? error.message : t('hub.error.autoLoginFailed'),
       });
     });
   }, [addToast, auth.tryAutoLogin]);
@@ -40,6 +47,7 @@ export function useHubWSConnection(): HubWSConnectionState {
       setStatus('disconnected');
       setAuthenticated(false);
       setConnected(false);
+      setReconnecting(false);
       return;
     }
 
@@ -50,23 +58,34 @@ export function useHubWSConnection(): HubWSConnectionState {
         setAuthenticated(true);
         setConnected(true);
         setError(null);
+        setReconnecting(false);
+        // Detect reconnection: went through reconnecting or disconnected state
+        if (prevStatusRef.current === 'reconnecting' || prevStatusRef.current === 'disconnected') {
+          setJustReconnected(true);
+        }
       },
       onAuthFail: (reason) => {
         setAuthenticated(false);
         setConnected(false);
-        setError(`Hub WebSocket auth failed: ${reason}`);
+        setError(t('hub.error.wsAuthFailed', { reason }));
         if (!authFailToastRef.current) {
           authFailToastRef.current = true;
-          addToast({ type: 'error', message: `Hub realtime auth failed: ${reason}` });
+          addToast({ type: 'error', message: t('hub.error.wsAuthFailed', { reason }) });
         }
       },
     });
 
     const unsubscribeStatus = ws.onStatus((nextStatus) => {
+      prevStatusRef.current = status;
       setStatus(nextStatus);
+      setReconnecting(nextStatus === 'reconnecting');
       if (nextStatus !== 'connected') {
         setAuthenticated(false);
         setConnected(false);
+      }
+      // Reset justReconnected flag after disconnection / reconnection cycle starts
+      if (nextStatus === 'disconnected' || nextStatus === 'connecting') {
+        setJustReconnected(false);
       }
     });
 
@@ -79,8 +98,9 @@ export function useHubWSConnection(): HubWSConnectionState {
       setHubWS((current) => (current === ws ? null : current));
       setAuthenticated(false);
       setConnected(false);
+      setReconnecting(false);
     };
-  }, [addToast, auth.isAuthenticated, auth.token, setConnected, setError]);
+  }, [addToast, auth.isAuthenticated, auth.token, setConnected, setError, setReconnecting]);
 
-  return { hubWS, status, authenticated };
+  return { hubWS, status, authenticated, justReconnected };
 }

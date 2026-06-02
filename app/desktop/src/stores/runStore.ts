@@ -14,16 +14,27 @@ export type AgentLoopState =
   | 'RUNNING'
   | 'STREAMING'
   | 'WAITING_FOR_INPUT'
+  | 'DRAINING'
   | 'IDLE'
   | 'COMPLETED'
   | 'FAILED'
   | 'CANCELLED';
+
+/** Live token usage snapshot, updated on each context_usage event. */
+export interface TokenStats {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  contextLimit?: number | undefined;
+  usagePercent?: number | undefined;
+}
 
 function agentLoopFromRunState(rs: RunState): AgentLoopState {
   switch (rs) {
     case RunState.RUNNING: return 'RUNNING';
     case RunState.STREAMING: return 'STREAMING';
     case RunState.WAITING_FOR_INPUT: return 'WAITING_FOR_INPUT';
+    case RunState.DRAINING: return 'DRAINING';
     case RunState.COMPLETED: return 'COMPLETED';
     case RunState.FAILED: return 'FAILED';
     case RunState.CANCELLED: return 'CANCELLED';
@@ -39,6 +50,8 @@ interface RunUIStore {
   errorCount: number;
   abortController: AbortController | null;
   fileReadCache: Map<string, { readCount: number; mtime: number }>;
+  /** Latest token usage snapshot from context_usage events. */
+  tokenStats: TokenStats | null;
 
   setRunState: (state: RunState) => void;
   setStreaming: (v: boolean) => void;
@@ -47,6 +60,7 @@ interface RunUIStore {
   incrementErrorCount: () => void;
   setAbortController: (ctrl: AbortController | null) => void;
   checkFileReadCache: (path: string, mtime: number) => boolean;
+  setTokenStats: (stats: TokenStats | null) => void;
   clear: () => void;
 }
 
@@ -61,6 +75,7 @@ export const useRunStore = create<RunUIStore>()(
     errorCount: 0,
     abortController: null,
     fileReadCache: new Map(),
+    tokenStats: null,
 
     setRunState: (rs) => {
       const ok = sm.transition(rs);
@@ -87,6 +102,8 @@ export const useRunStore = create<RunUIStore>()(
       set({ abortController: ctrl });
     },
 
+    setTokenStats: (stats) => set({ tokenStats: stats }),
+
     checkFileReadCache: (path, mtime) => {
       const cached = get().fileReadCache.get(path);
       if (cached && cached.mtime === mtime) {
@@ -112,6 +129,7 @@ export const useRunStore = create<RunUIStore>()(
         errorCount: 0,
         abortController: null,
         fileReadCache: new Map(),
+        tokenStats: null,
       });
     },
   })),

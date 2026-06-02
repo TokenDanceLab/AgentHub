@@ -13,8 +13,7 @@ export interface HealthResponse {
 
 export interface HealthCheck {
   status: string;
-  detail?: string;
-  [key: string]: unknown;
+  message?: string;
 }
 
 export interface RunnerHealthItem {
@@ -24,12 +23,13 @@ export interface RunnerHealthItem {
   capabilities?: string[];
 }
 
-export interface RunnerHealthCheck extends HealthCheck {
-  total?: number;
-  available?: number;
-  unavailable?: number;
-  statuses?: Record<string, number>;
+export interface RunnerHealthCheck {
+  status: string;
+  message?: string;
+  runnerIds?: string[];
   items?: RunnerHealthItem[];
+  available?: number;
+  total?: number;
 }
 
 export interface HealthChecks {
@@ -55,9 +55,9 @@ export interface ListResponse<T> {
 export interface Project {
   id: string;
   name: string;
-  description?: string;
+  description?: string | undefined;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt?: string | undefined;
 }
 
 export interface ProjectMemory {
@@ -75,11 +75,11 @@ export interface Conversation {
 export interface Thread {
   id: string;
   projectId: string;
-  conversationId?: string;
-  title?: string;
+  conversationId?: string | undefined;
+  title?: string | undefined;
   status: 'active' | 'archived';
   createdAt: string;
-  updatedAt?: string;
+  updatedAt?: string | undefined;
 }
 
 export interface ThreadInfo {
@@ -115,7 +115,7 @@ export interface Message {
 export interface Runner {
   id: string;
   name: string;
-  status: 'online' | 'offline' | 'draining';
+  status: string;
   capabilities?: string;
 }
 
@@ -134,10 +134,22 @@ export interface Run {
   threadId: string;
   status: RunStatus;
   createdAt: string;
-  startedAt?: string;
-  finishedAt?: string;
+  startedAt?: string | undefined;
+  finishedAt?: string | undefined;
 }
 
+export interface StartRunRequest {
+  projectId?: string;
+  threadId?: string;
+  prompt?: string;
+  agentId?: string;
+  model?: string;
+  provider?: string;
+  modelAlias?: string;
+  reasoningEffort?: string;
+  modelMappingEnabled?: boolean;
+  providerFallbackEnabled?: boolean;
+}
 export interface RunInfo {
   runId: string;
   projectId: string;
@@ -150,6 +162,8 @@ export interface RunInfo {
 
 // ── Agent types ─────────────────────────────────
 
+// Compatibility aliases for Desktop code that still consumes the original
+// Edge REST shape while the domain model above is being consolidated.
 export interface AgentCapabilities {
   streaming: boolean;
   toolCalls: boolean;
@@ -178,7 +192,37 @@ export interface AgentInfo {
   capabilities: AgentCapabilities;
 }
 
-// ── Request types ───────────────────────────────
+export interface RunInfo {
+  runId: string;
+  projectId: string;
+  threadId: string;
+  status: string;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface ThreadInfo {
+  threadId: string;
+  projectId: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ThreadItemInfo {
+  itemId: string;
+  projectId: string;
+  threadId: string;
+  runId?: string;
+  type: string;
+  role?: string;
+  status: string;
+  content?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface StartRunRequest {
   projectId?: string;
@@ -190,18 +234,31 @@ export interface StartRunRequest {
   modelAlias?: string;
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;
+  sessionId?: string;
+  continue?: boolean;
+  fork?: boolean;
   reasoningEffort?: string;
   thinkingMode?: string;
   maxThinkingTokens?: number;
   permissionMode?: string;
   workDir?: string;
   includePartial?: boolean;
+  structuredOutputSchema?: string;
   systemPrompt?: string;
   appendSystemPrompt?: string;
   allowedTools?: string[];
   configOverrides?: Record<string, string>;
+  agentDefinitions?: Record<string, AgentDefinition>;
+  mcpConfig?: string;
   ephemeral?: boolean;
   hubTaskId?: string;
+}
+
+export interface AgentDefinition {
+  description: string;
+  prompt: string;
+  tools?: string[];
+  model?: string;
 }
 
 export interface RunLogs {
@@ -229,7 +286,7 @@ export interface Approval {
   summary: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
-  decidedAt?: string;
+  decidedAt?: string | undefined;
 }
 
 export interface Artifact {
@@ -246,7 +303,7 @@ export interface Preview {
   id: string;
   runId: string;
   threadId: string;
-  url?: string;
+  url?: string | undefined;
   status: 'starting' | 'ready' | 'stopped';
   createdAt: string;
 }

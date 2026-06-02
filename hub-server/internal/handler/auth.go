@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/gin-gonic/gin"
@@ -32,11 +34,13 @@ type refreshReq struct {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req refreshReq
 	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Error("auth refresh bind error", "request_id", middleware.GetRequestID(c), "error", err)
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
 	resp, err := h.service.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
+		slog.Error("auth refresh token error", "request_id", middleware.GetRequestID(c), "error", err)
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -53,6 +57,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	// Scope revocation by device_type if provided as a query parameter (#149).
 	deviceType := c.Query("device_type")
 	if err := h.service.Logout(c.Request.Context(), userID, deviceID, deviceType); err != nil {
+		slog.Error("auth logout error", "request_id", middleware.GetRequestID(c), "error", err)
 		Fail(c, errcode.ErrInternal)
 		return
 	}
@@ -63,6 +68,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	userID := c.GetString("user_id")
 	user, err := h.service.GetMe(c.Request.Context(), userID)
 	if err != nil {
+		slog.Error("auth get me error", "request_id", middleware.GetRequestID(c), "error", err)
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -81,12 +87,14 @@ type updateProfileReq struct {
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	var req updateProfileReq
 	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Error("auth update profile bind error", "request_id", middleware.GetRequestID(c), "error", err)
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
 	userID := c.GetString("user_id")
 	user, err := h.service.UpdateProfile(c.Request.Context(), userID, req.Nickname, req.AvatarURL)
 	if err != nil {
+		slog.Error("auth update profile error", "request_id", middleware.GetRequestID(c), "error", err)
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return

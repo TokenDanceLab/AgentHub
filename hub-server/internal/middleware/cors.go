@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -19,7 +20,8 @@ func CORS() gin.HandlerFunc {
 	}
 	origins := splitAndTrim(raw)
 	if err := validateCORSOriginsForEnvironment(corsEnvironment(), origins); err != nil {
-		panic(err)
+		slog.Error("invalid CORS configuration", "err", err)
+		os.Exit(1)
 	}
 	return cors.New(cors.Config{
 		AllowOrigins:     origins,
@@ -35,7 +37,8 @@ func defaultCORSOrigins(env string) string {
 	if isProductionEnvironment(env) {
 		return "https://hub.vectorcontrol.tech"
 	}
-	return "https://hub.vectorcontrol.tech,http://localhost:3000"
+	// Dev: Hub web (3000), Desktop Vite (5173), TokenDance ID (3000)
+	return "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173"
 }
 
 func corsEnvironment() string {

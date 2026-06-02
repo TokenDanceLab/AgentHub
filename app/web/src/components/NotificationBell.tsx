@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Bell, UserPlus, Bot, MessageSquare, Info, CheckCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { ActivityCard, EmptyState } from '@shared/ui';
 import { useNotificationStore } from '@/stores/notificationStore';
 import type { Notification, NotificationType } from '@/stores/notificationStore';
 import styles from './NotificationBell.module.css';
@@ -11,29 +13,30 @@ const TYPE_ICONS: Record<NotificationType, typeof Bell> = {
   system: Info,
 };
 
-const TYPE_LABEL: Record<NotificationType, string> = {
-  friend_request: 'Friend request',
-  agent_task: 'Agent task',
-  message: 'Message',
-  system: 'System',
+const TYPE_LABEL_KEYS: Record<NotificationType, string> = {
+  friend_request: 'notification.type.friendRequest',
+  agent_task: 'notification.type.agentTask',
+  message: 'notification.type.message',
+  system: 'notification.type.system',
 };
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, t: ReturnType<typeof useTranslation>['t']): string {
   const now = Date.now();
   const then = new Date(iso).getTime();
   const diff = now - then;
   const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return 'just now';
+  if (seconds < 60) return t('time.justNow');
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t('time.minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('time.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t('time.daysAgo', { count: days });
   return new Date(iso).toLocaleDateString();
 }
 
 export function NotificationBell() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const notifications = useNotificationStore((s) => s.notifications);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
@@ -76,7 +79,7 @@ export function NotificationBell() {
         type="button"
         className={`${styles.bell} ${unreadCount > 0 ? styles.hasUnread : ''}`}
         onClick={toggleOpen}
-        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-label={unreadCount > 0 ? t('notification.bellUnread', { count: unreadCount }) : t('notification.bell')}
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -87,9 +90,9 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className={styles.dropdown} role="menu" aria-label="Notifications panel">
+        <div className={styles.dropdown} role="menu" aria-label={t('notification.panel')}>
           <div className={styles.header}>
-            <h3 className={styles.title}>Notifications</h3>
+            <h3 className={styles.title}>{t('notification.title')}</h3>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -97,23 +100,30 @@ export function NotificationBell() {
                 onClick={() => markAllRead()}
               >
                 <CheckCheck size={14} />
-                Mark all read
+                {t('notification.markAllRead')}
               </button>
             )}
           </div>
 
           <div className={styles.list}>
             {recentItems.length === 0 ? (
-              <div className={styles.empty}>
-                <Bell size={32} className={styles.emptyIcon} />
-                <p>No notifications yet</p>
-              </div>
+              <EmptyState
+                className={styles.empty ?? ''}
+                iconClassName={styles.emptyIcon ?? ''}
+                titleClassName={styles.emptyTitle ?? ''}
+                descriptionClassName={styles.emptyDescription ?? ''}
+                icon={<Bell size={20} />}
+                title={t('notification.emptyTitle')}
+                description={t('notification.emptyDescription')}
+                titleLevel={3}
+              />
             ) : (
               recentItems.map((item) => (
                 <NotificationItem
                   key={item.id}
                   notification={item}
                   onMarkRead={markRead}
+                  t={t}
                 />
               ))
             )}
@@ -127,40 +137,45 @@ export function NotificationBell() {
 function NotificationItem({
   notification,
   onMarkRead,
+  t,
 }: {
   notification: Notification;
   onMarkRead: (id: string) => void;
+  t: ReturnType<typeof useTranslation>['t'];
 }) {
   const Icon = TYPE_ICONS[notification.type];
-  const label = TYPE_LABEL[notification.type];
+  const label = t(TYPE_LABEL_KEYS[notification.type]);
 
   return (
     <div
       className={`${styles.item} ${!notification.read ? styles.unread : ''}`}
       role="menuitem"
     >
-      <span className={styles.itemIcon} aria-label={label}>
-        <Icon size={16} />
-      </span>
-      <div className={styles.itemBody}>
-        <div className={styles.itemHeader}>
-          <span className={styles.itemTitle}>{notification.title}</span>
-          <span className={styles.itemTime}>
-            {formatRelativeTime(notification.createdAt)}
-          </span>
-        </div>
-        <p className={styles.itemText}>{notification.body}</p>
-      </div>
-      {!notification.read && (
-        <button
-          type="button"
-          className={styles.markReadBtn}
-          onClick={() => onMarkRead(notification.id)}
-          aria-label="Mark as read"
-        >
-          <CheckCheck size={14} />
-        </button>
-      )}
+      <ActivityCard
+        className={styles.itemCard ?? ''}
+        iconClassName={styles.itemIcon ?? ''}
+        bodyClassName={styles.itemBody ?? ''}
+        metaClassName={styles.itemHeader ?? ''}
+        labelClassName={styles.itemTitle ?? ''}
+        contentClassName={styles.itemText ?? ''}
+        actionsClassName={styles.itemActions ?? ''}
+        icon={<Icon size={16} aria-label={label} />}
+        label={notification.title}
+        meta={<span className={styles.itemTime}>{formatRelativeTime(notification.createdAt, t)}</span>}
+        contentAs="div"
+        actions={!notification.read ? (
+          <button
+            type="button"
+            className={styles.markReadBtn}
+            onClick={() => onMarkRead(notification.id)}
+            aria-label={t('notification.markRead')}
+          >
+            <CheckCheck size={14} />
+          </button>
+        ) : undefined}
+      >
+        {notification.body}
+      </ActivityCard>
     </div>
   );
 }

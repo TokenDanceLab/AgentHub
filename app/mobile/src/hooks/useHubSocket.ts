@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import type { EventEnvelope, AnyEvent } from "@agenthub/shared";
-import { HUB_WS_URL } from "../config";
+import { DEFAULT_HUB_WS_URL } from "../config";
 
 type HubEventCallback = (event: AnyEvent) => void;
 
@@ -50,7 +50,7 @@ export function useHubSocket(options: UseHubSocketOptions = {}) {
     clearReconnect();
 
     const gen = ++generationRef.current;
-    const url = token ? `${HUB_WS_URL}?token=${encodeURIComponent(token)}` : HUB_WS_URL;
+    const url = token ? `${DEFAULT_HUB_WS_URL}?token=${encodeURIComponent(token)}` : DEFAULT_HUB_WS_URL;
 
     const ws = new WebSocket(url);
     wsRef.current = ws;

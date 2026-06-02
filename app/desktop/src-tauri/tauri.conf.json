@@ -5,9 +5,9 @@
   "identifier": "com.agenthub.desktop",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeDevCommand": "corepack pnpm dev",
+    "beforeBuildCommand": "corepack pnpm build"
   },
   "app": {
     "windows": [
@@ -15,17 +15,49 @@
         "title": "AgentHub Desktop",
         "width": 1200,
         "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "decorations": false,
         "transparent": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:3210 ws://127.0.0.1:3210 http://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "SimpChinese"],
+        "displayLanguageSelector": true,
+        "headerImage": "icons/installer-header.bmp",
+        "sidebarImage": "icons/installer-sidebar.bmp",
+        "installerIcon": "icons/icon.ico"
+      }
     }
   },
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://releases.agenthub.dev/updater/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "",
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

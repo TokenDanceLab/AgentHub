@@ -2,12 +2,16 @@ package httpserver
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +23,7 @@ import (
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
+	"github.com/agenthub/edge-server/internal/middleware"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
@@ -53,8 +58,11 @@ type Config struct {
 	HubJWTSecret       string             // shared secret for validating Hub-issued HS256 JWTs
 	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
 	HubToken           string             // JWT bearer token for Hub callback authentication
+	RemoteMode         bool               // allow non-loopback bind + remote origins (requires auth)
+	Dev                bool               // dev mode disables auto-generated local auth token
 	WorkspaceAllowlist []string           // optional roots allowed for request workDir
 	SkillsDirs         []string           // optional SKILL.md search dirs; empty = use defaults
+	EventLogPath       string             // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -64,12 +72,41 @@ func Run(cfg Config) error {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:3210"
 	}
-	if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
-		return err
+	if cfg.RemoteMode {
+		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
+			slog.Error("invalid remote listen address", "err", err)
+			return err
+		}
+	} else {
+		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
+			slog.Error("invalid local listen address", "err", err)
+			return err
+		}
 	}
 	handler, err := newHandlerFromConfig(cfg)
 	if err != nil {
+		slog.Error("failed to create handler from config", "err", err)
 		return err
+	}
+
+	// Auto-generate a random local auth token when running in non-dev mode
+	// without an explicitly configured auth token. This is the primary
+	// defense layer between browsers and the local agent runtime: a malicious
+	// local process or XSS from a local web app cannot invoke state-changing
+	// endpoints (POST/PATCH/DELETE) or subscribe to the live event stream (GET /v1/events with WebSocket upgrade) without the token.
+	// Use --dev or AGENTHUB_DEV=1 to disable auto-generated auth for local
+	// development. Use --local-auth-token or AGENTHUB_EDGE_AUTH_TOKEN to set
+	// a specific token.
+	if !cfg.Dev && cfg.LocalAuthToken == "" && cfg.HubJWTSecret == "" {
+		tokenBytes := make([]byte, 32)
+		if _, err := rand.Read(tokenBytes); err != nil {
+			slog.Error("failed to generate local auth token", "err", err)
+			return fmt.Errorf("failed to generate local auth token: %w", err)
+		}
+		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
+		slog.Info("auto-generated local auth token for Edge Server API protection; "+
+			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections",
+			"token_prefix", cfg.LocalAuthToken[:16]+"...")
 	}
 
 	mux := http.NewServeMux()
@@ -79,7 +116,7 @@ func Run(cfg Config) error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout)),
+		Handler: middleware.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
@@ -105,7 +142,15 @@ func Run(cfg Config) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	return srv.Shutdown(ctx)
+	if err := srv.Shutdown(ctx); err != nil {
+		return err
+	}
+
+	// Flush and close the event log so no events are lost on shutdown.
+	if err := handler.Bus.Close(); err != nil {
+		slog.Error("failed to close event bus event log", "err", err)
+	}
+	return nil
 }
 
 func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
@@ -113,7 +158,11 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		cfg.Store = store.New()
 	}
 
-	bus := events.NewBus(10000)
+	busOpts := []events.BusOption{}
+	if cfg.EventLogPath != "" {
+		busOpts = append(busOpts, events.WithEventLogPath(cfg.EventLogPath))
+	}
+	bus := events.NewBus(10000, busOpts...)
 	reg := runners.NewRegistry()
 
 	// Prometheus metrics wired to bus depth
@@ -131,6 +180,42 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// Result aggregator collects sub-agent output and routes it back to the parent orchestrator.
 	resultAgg := lifecycle.NewResultAggregator(bus, agentReg)
 	_ = resultAgg.Start() // stop function; goroutine exits on process shutdown
+
+	// Per-run event counter: tracks event counts per run and debugs at
+	// completion time. OFF by default (slog.Debug). Observers are NOT
+	// in the hot path — the bus fans out concurrently.
+	{
+		var mu sync.Mutex
+		type runEventTracker struct {
+			count int64
+			types map[string]int64
+		}
+		trackers := make(map[string]*runEventTracker)
+		bus.AddObserver(func(evt events.EventEnvelope) {
+			runID, _ := evt.Scope["runId"].(string)
+			if runID == "" {
+				return
+			}
+			mu.Lock()
+			t, ok := trackers[runID]
+			if !ok {
+				t = &runEventTracker{types: make(map[string]int64)}
+				trackers[runID] = t
+			}
+			t.count++
+			t.types[evt.Type]++
+			switch evt.Type {
+			case "run.finished", "run.failed", "run.cancelled":
+				typeStrs := make([]string, 0, len(t.types))
+				for k, v := range t.types {
+					typeStrs = append(typeStrs, fmt.Sprintf("%s=%d", k, v))
+				}
+				slog.Debug("ws.run.events", "runId", runID, "eventCount", t.count, "eventTypes", typeStrs)
+				delete(trackers, runID)
+			}
+			mu.Unlock()
+		})
+	}
 
 	if cfg.ProcessExecutor.Command != "" || hasAdapter {
 		execCfg := cfg.ProcessExecutor
@@ -191,6 +276,13 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		Metrics:            edgeMetrics,
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 		SkillRegistry:      skillReg,
+	}
+	// Validate security-critical configuration at startup.
+	// An empty workspace allowlist means all non-empty workDir values
+	// will be rejected (fail-closed).  Warn the operator so they are
+	// aware that file-system runs are unavailable until configured.
+	if len(cfg.WorkspaceAllowlist) == 0 {
+		slog.Warn("workspace allowlist is empty — requests with a non-empty workDir will be rejected; configure --workspace-allowlist or AGENTHUB_WORKSPACE_ALLOWLIST to allow file system access")
 	}
 	// Create default project/thread fixtures so POST /v1/runs
 	// with empty projectId/threadId works out of the box.
@@ -287,11 +379,11 @@ func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecu
 	orchAdapter.WithMessageQueue(msgQueue)
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(next http.Handler, remoteMode bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
-			if !security.IsTrustedLocalOrigin(origin) {
+			if !security.IsTrustedOrigin(origin, remoteMode) {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
@@ -353,8 +445,21 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 	})
 }
 
+// isLocalAuthExempt reports whether a request is exempt from local auth checks.
+// Read-only methods (GET, HEAD, OPTIONS) are generally exempt — they expose
+// project/thread/run metadata but cannot mutate state or execute commands.
+// Only POST/PATCH/DELETE endpoints require authentication because they can
+// create runs, send messages, approve tool calls, or delete threads.
+//
+// WebSocket upgrade requests (GET to /v1/events) are NOT exempt even though
+// they use the GET method, because the live event stream exposes real-time
+// agent output, tool-call permission prompts, and file-change notifications —
+// the same class of sensitive data that mutation endpoints protect.
 func isLocalAuthExempt(r *http.Request) bool {
-	return r.Method == http.MethodOptions || (r.Method == http.MethodGet && r.URL.Path == "/v1/health")
+	if isWebSocketUpgrade(r) {
+		return false
+	}
+	return r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions
 }
 
 // authTokenCandidates extracts all possible auth tokens from a request.

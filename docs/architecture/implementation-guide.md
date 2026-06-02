@@ -210,7 +210,7 @@ api/
 - Web/Mobile 远程控制。
 - 安全审计。
 
-Hub Server 已完整实现：三层架构（Handler → Service → Repository），15 个数据库迁移，技术栈 Gin + GORM + Redis + PostgreSQL。
+Hub Server 核心已实现：三层架构（Handler → Service → Repository），78+ 组数据库迁移（持续递增），技术栈 Gin + GORM + Redis + PostgreSQL。
 
 ## 7. WebSocket 输出规则
 
@@ -264,6 +264,8 @@ PR 说明按影响选择填写：
 | Desktop e2e | Playwright，覆盖在线/离线状态、Runtime/Agent 列表、EventLog、Agent 端到端执行 |
 | 全链路 | `scripts/client-smoke.ps1`，覆盖 Edge build、`app/shared` 依赖、Desktop web build、核心 REST 接口和 WebSocket run 事件流 |
 | Adapter 集成 | Go `testing`，覆盖 Claude Code、OpenCode、Codex 三种 adapter 端到端执行、工具调用、取消、stdin 控制、命令行参数 |
+
+> **注意**：`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查；不应将其作为唯一验收依据。
 
 必须继续覆盖的高风险点：
 

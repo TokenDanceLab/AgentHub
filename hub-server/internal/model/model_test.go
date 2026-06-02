@@ -57,7 +57,7 @@ func TestUserJSONMarshal(t *testing.T) {
 	u := User{
 		ID:           "user-abc-123",
 		Username:     "alice",
-		PasswordHash: "$2a$10$xXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXx",
+		PasswordHash: stringPtr("$2a$10$xXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXx"),
 		Nickname:     "Alice",
 		AvatarURL:    "https://example.com/avatar.png",
 		CreatedAt:    now,
@@ -144,9 +144,9 @@ func TestUserJSONUnmarshal(t *testing.T) {
 	if u.AvatarURL != "https://example.com/charlie.png" {
 		t.Errorf("AvatarURL = %q, want https://example.com/charlie.png", u.AvatarURL)
 	}
-	// PasswordHash should remain empty (not in JSON).
-	if u.PasswordHash != "" {
-		t.Errorf("PasswordHash = %q, want empty (not in JSON)", u.PasswordHash)
+	// PasswordHash should remain nil (not in JSON).
+	if u.PasswordHash != nil {
+		t.Errorf("PasswordHash = %q, want nil (not in JSON)", *u.PasswordHash)
 	}
 }
 
@@ -164,9 +164,13 @@ func TestUserJSONPasswordExcluded(t *testing.T) {
 	if err := json.Unmarshal([]byte(jsonStr), &u); err != nil {
 		t.Fatalf("json.Unmarshal error = %v", err)
 	}
-	if u.PasswordHash != "" {
-		t.Errorf("PasswordHash = %q, want empty (json:\"-\" should skip it)", u.PasswordHash)
+	if u.PasswordHash != nil {
+		t.Errorf("PasswordHash = %q, want nil (json:\"-\" should skip it)", *u.PasswordHash)
 	}
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
 
 // --- Message JSON serialization ---
@@ -480,5 +484,264 @@ func TestFriendshipJSONMarshal(t *testing.T) {
 	}
 	if result["status"] != "accepted" {
 		t.Errorf("status = %v, want accepted", result["status"])
+	}
+}
+
+// --- Task status constants ---
+
+func TestTaskStatusConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"TaskStatusQueued", TaskStatusQueued, "queued"},
+		{"TaskStatusDispatched", TaskStatusDispatched, "dispatched"},
+		{"TaskStatusRunning", TaskStatusRunning, "running"},
+		{"TaskStatusDone", TaskStatusDone, "done"},
+		{"TaskStatusFailed", TaskStatusFailed, "failed"},
+		{"TaskStatusTimeout", TaskStatusTimeout, "timeout"},
+		{"TaskStatusCancelled", TaskStatusCancelled, "cancelled"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+// --- Team constants ---
+
+func TestTeamMemberRoleConstants(t *testing.T) {
+	if TeamMemberRoleSupervisor != "supervisor" {
+		t.Errorf("TeamMemberRoleSupervisor = %q, want supervisor", TeamMemberRoleSupervisor)
+	}
+	if TeamMemberRoleExecutor != "executor" {
+		t.Errorf("TeamMemberRoleExecutor = %q, want executor", TeamMemberRoleExecutor)
+	}
+	if TeamMemberRoleReviewer != "reviewer" {
+		t.Errorf("TeamMemberRoleReviewer = %q, want reviewer", TeamMemberRoleReviewer)
+	}
+}
+
+func TestTeamRunStatusConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"TeamRunStatusQueued", TeamRunStatusQueued, "queued"},
+		{"TeamRunStatusRunning", TeamRunStatusRunning, "running"},
+		{"TeamRunStatusCompleted", TeamRunStatusCompleted, "completed"},
+		{"TeamRunStatusFailed", TeamRunStatusFailed, "failed"},
+		{"TeamRunStatusCancelled", TeamRunStatusCancelled, "cancelled"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAssignmentTypeConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"AssignmentTypeDelegate", AssignmentTypeDelegate, "delegate"},
+		{"AssignmentTypeReview", AssignmentTypeReview, "review"},
+		{"AssignmentTypeApprove", AssignmentTypeApprove, "approve"},
+		{"AssignmentTypeNotify", AssignmentTypeNotify, "notify"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAssignmentStatusConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"AssignmentStatusPending", AssignmentStatusPending, "pending"},
+		{"AssignmentStatusDispatched", AssignmentStatusDispatched, "dispatched"},
+		{"AssignmentStatusRunning", AssignmentStatusRunning, "running"},
+		{"AssignmentStatusDone", AssignmentStatusDone, "done"},
+		{"AssignmentStatusFailed", AssignmentStatusFailed, "failed"},
+		{"AssignmentStatusCancelled", AssignmentStatusCancelled, "cancelled"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTeamTaskStatusConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"TeamTaskStatusPending", TeamTaskStatusPending, "pending"},
+		{"TeamTaskStatusDispatched", TeamTaskStatusDispatched, "dispatched"},
+		{"TeamTaskStatusRunning", TeamTaskStatusRunning, "running"},
+		{"TeamTaskStatusDone", TeamTaskStatusDone, "done"},
+		{"TeamTaskStatusFailed", TeamTaskStatusFailed, "failed"},
+		{"TeamTaskStatusCancelled", TeamTaskStatusCancelled, "cancelled"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTeamTaskRiskConstants(t *testing.T) {
+	if TeamTaskRiskNormal != "normal" {
+		t.Errorf("TeamTaskRiskNormal = %q, want normal", TeamTaskRiskNormal)
+	}
+	if TeamTaskRiskHigh != "high" {
+		t.Errorf("TeamTaskRiskHigh = %q, want high", TeamTaskRiskHigh)
+	}
+}
+
+// --- Guardrail constants ---
+
+func TestGuardrailDelegationConstants(t *testing.T) {
+	if MaxDelegationDepth != 3 {
+		t.Errorf("MaxDelegationDepth = %d, want 3", MaxDelegationDepth)
+	}
+	if MaxActiveSubAgentsPerRun != 5 {
+		t.Errorf("MaxActiveSubAgentsPerRun = %d, want 5", MaxActiveSubAgentsPerRun)
+	}
+	if MaxRouteRepeats != 3 {
+		t.Errorf("MaxRouteRepeats = %d, want 3", MaxRouteRepeats)
+	}
+	if MaxTasksPerTeamRun != 20 {
+		t.Errorf("MaxTasksPerTeamRun = %d, want 20", MaxTasksPerTeamRun)
+	}
+	if MaxTeamRunBudgetTokens != int64(200_000) {
+		t.Errorf("MaxTeamRunBudgetTokens = %d, want 200000", MaxTeamRunBudgetTokens)
+	}
+	if MaxTeamRunBudgetUsagePct != 95.0 {
+		t.Errorf("MaxTeamRunBudgetUsagePct = %f, want 95.0", MaxTeamRunBudgetUsagePct)
+	}
+}
+
+// --- Team conflict constants ---
+
+func TestTeamConflictConstants(t *testing.T) {
+	if TeamConflictStatusPending != "pending" {
+		t.Errorf("TeamConflictStatusPending = %q, want pending", TeamConflictStatusPending)
+	}
+	if TeamConflictStatusResolved != "resolved" {
+		t.Errorf("TeamConflictStatusResolved = %q, want resolved", TeamConflictStatusResolved)
+	}
+}
+
+func TestTeamConflictResolutionConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"AcceptAgentTask", TeamConflictResolutionAcceptAgentTask, "accept_agent_task"},
+		{"ManualMerge", TeamConflictResolutionManualMerge, "manual_merge"},
+		{"KeepAll", TeamConflictResolutionKeepAll, "keep_all"},
+		{"DiscardAll", TeamConflictResolutionDiscardAll, "discard_all"},
+		{"Blocked", TeamConflictResolutionBlocked, "blocked"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+// --- Team event type constants ---
+
+func TestTeamEventTypeConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"AssignmentCreated", TeamEventAssignmentCreated, "assignment.created"},
+		{"AssignmentDispatched", TeamEventAssignmentDispatched, "assignment.dispatched"},
+		{"AssignmentCompleted", TeamEventAssignmentCompleted, "assignment.completed"},
+		{"AssignmentFailed", TeamEventAssignmentFailed, "assignment.failed"},
+		{"AssignmentCancelled", TeamEventAssignmentCancelled, "assignment.cancelled"},
+		{"TaskCreated", TeamEventTaskCreated, "team.task.created"},
+		{"RouteDecided", TeamEventRouteDecided, "team.route.decided"},
+		{"RouteRejected", TeamEventRouteRejected, "team.route.rejected"},
+		{"RunStarted", TeamEventRunStarted, "team.run.started"},
+		{"RunCompleted", TeamEventRunCompleted, "team.run.completed"},
+		{"RunFailed", TeamEventRunFailed, "team.run.failed"},
+		{"AgentMessage", TeamEventAgentMessage, "agent.message"},
+		{"ApprovalDecided", TeamEventApprovalDecided, "team.approval.decided"},
+		{"ConflictResolved", TeamEventConflictResolved, "team.conflict.resolved"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("%s = %q, want %q", tt.name, tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+// --- TableName tests ---
+
+func TestTableNames(t *testing.T) {
+	tests := []struct {
+		instance interface{ TableName() string }
+		want     string
+	}{
+		{AgentTeam{}, "agent_teams"},
+		{AgentTeamMember{}, "agent_team_members"},
+		{AgentTeamRun{}, "agent_team_runs"},
+		{AgentTeamAssignment{}, "agent_team_assignments"},
+		{AgentTeamTask{}, "agent_team_tasks"},
+		{AgentTeamEvent{}, "agent_team_events"},
+		{AgentTeamArtifact{}, "agent_team_artifacts"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := tt.instance.TableName(); got != tt.want {
+				t.Errorf("TableName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// --- ValidActions ---
+
+func TestValidActions(t *testing.T) {
+	actions := ValidActions()
+	expected := []string{"delegate", "review", "approve", "finish"}
+	for _, a := range expected {
+		if !actions[a] {
+			t.Errorf("ValidActions() missing %q", a)
+		}
+	}
+	if len(actions) != len(expected) {
+		t.Errorf("ValidActions() has %d entries, want %d", len(actions), len(expected))
 	}
 }

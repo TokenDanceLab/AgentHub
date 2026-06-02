@@ -1,13 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, Check, ChevronDown, Sparkles } from 'lucide-react';
-import { Claude } from '@lobehub/icons';
+import { Bot, Check, ChevronDown } from 'lucide-react';
+import { Claude, DeepSeek, Doubao, Kimi, Minimax, OpenAI, Qwen, XiaomiMiMo, Zhipu } from '@lobehub/icons';
+import { useTranslation } from 'react-i18next';
+import { resolveModelDisplayName, type ModelDisplayNameMap } from '@/utils/modelDisplay';
 import styles from './ModelReasoningPicker.module.css';
 
 export interface ModelReasoningOption {
+  id?: string;
   value: string;
   label: string;
   provider?: string;
+  providerId?: string;
+  requestModel?: string;
+  modelAlias?: string;
+  source?: string;
+  sourceId?: string;
+  runtimeId?: string;
+  resolvedModel?: string;
+  routeKind?: 'config' | 'mapping' | 'default' | 'direct';
+  routeLabel?: string;
+  description?: string;
+  status?: string;
+  default?: boolean;
 }
 
 export interface ReasoningOption {
@@ -24,22 +39,49 @@ interface Props {
   reasoningOptions: ReasoningOption[];
   disabled?: boolean;
   ariaLabel?: string;
-  onModelChange: (value: string) => void;
+  modelDisplayNames?: ModelDisplayNameMap;
+  onModelChange: (value: string, option?: ModelReasoningOption) => void;
   onReasoningChange: (value: string) => void;
 }
 
-function cleanModelName(name: string): string {
-  const map: Record<string, string> = {
-    'claude-opus-4-7': 'Claude 4.7 Opus',
-    'claude-opus-4-5': 'Claude 4.5 Opus',
-    'claude-sonnet-4-6': 'Claude 4.6 Sonnet',
-    'claude-haiku-4-5': 'Claude 4.5 Haiku',
-  };
-  return map[name] || name;
+function BrandModelIcon({ name }: { name: string }) {
+  const lower = name.toLowerCase();
+  if (lower.includes('deepseek')) return <DeepSeek size={18} />;
+  if (lower.includes('mimo') || lower.includes('xiaomi')) return <XiaomiMiMo size={18} />;
+  if (lower.includes('minimax')) return <Minimax size={18} />;
+  if (lower.includes('glm') || lower.includes('chatglm') || lower.includes('zhipu')) return <Zhipu size={18} />;
+  if (lower.includes('kimi') || lower.includes('moonshot')) return <Kimi size={18} />;
+  if (lower.includes('qwen')) return <Qwen size={18} />;
+  if (lower.includes('doubao')) return <Doubao size={18} />;
+  if (/\b(gpt|openai)\b/.test(lower) || lower.includes('gpt-') || /\b(o[1345])\b/.test(lower)) {
+    return <OpenAI size={18} />;
+  }
+  if (lower.includes('claude')) return <Claude size={18} />;
+  return <Bot size={16} />;
 }
 
-function ModelIcon({ name }: { name: string }) {
-  return name.toLowerCase().includes('claude') ? <Claude size={18} /> : <Bot size={16} />;
+function DecorativeBrandModelIcon({ name }: { name: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    ref.current?.querySelectorAll('title').forEach((node) => node.remove());
+  });
+
+  return (
+    <span ref={ref} className={styles.decorativeModelIcon} aria-hidden="true">
+      <BrandModelIcon name={name} />
+    </span>
+  );
+}
+
+function modelMeta(model: ModelReasoningOption): string {
+  if (!model.provider || model.provider === 'TokenDance') return '';
+  if (model.provider === 'Claude Code' || model.provider === 'Codex' || model.provider === 'OpenCode') return '';
+  return model.provider;
+}
+
+function optionKey(model: ModelReasoningOption): string {
+  return `${model.id ?? model.value}:${model.sourceId ?? model.source ?? ''}:${model.runtimeId ?? ''}`;
 }
 
 export default function ModelReasoningPicker({
@@ -51,22 +93,32 @@ export default function ModelReasoningPicker({
   reasoningOptions,
   disabled,
   ariaLabel,
+  modelDisplayNames,
   onModelChange,
   onReasoningChange,
 }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const displayModel = cleanModelName(modelLabel || modelValue);
+  const displayModel = resolveModelDisplayName(modelLabel || modelValue, modelDisplayNames);
+  const selectedModel = useMemo(
+    () => models.find((model) => model.value === modelValue),
+    [modelValue, models],
+  );
+  const selectedModelKey = selectedModel ? optionKey(selectedModel) : '';
+  const triggerIconName = selectedModel
+    ? `${selectedModel.label} ${selectedModel.resolvedModel ?? ''} ${selectedModel.requestModel ?? ''}`
+    : `${modelLabel} ${modelValue}`;
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
     const margin = 12;
-    const width = Math.min(Math.max(rect.width, 460), window.innerWidth - margin * 2);
-    const height = 334;
+    const width = Math.min(Math.max(rect.width, 356), window.innerWidth - margin * 2);
+    const height = Math.min(300, 68 + models.length * 38);
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const up = spaceBelow < height && spaceAbove > spaceBelow;
@@ -76,7 +128,7 @@ export default function ModelReasoningPicker({
       width,
       up,
     });
-  }, []);
+  }, [models.length]);
 
   const openPicker = useCallback(() => {
     if (disabled) return;
@@ -107,11 +159,6 @@ export default function ModelReasoningPicker({
     };
   }, [open, updatePosition]);
 
-  const selectedModel = useMemo(
-    () => models.find((model) => model.value === modelValue),
-    [modelValue, models],
-  );
-
   const popover = open && createPortal(
     <div
       ref={popoverRef}
@@ -125,38 +172,49 @@ export default function ModelReasoningPicker({
         width: pos.width,
       }}
     >
-      <div className={styles.sectionLabel}>Model</div>
+      <div className={styles.reasoningBar} aria-label={t('prompt.reasoning')}>
+        <span className={styles.sectionLabel}>{t('prompt.reasoning')}</span>
+        <div className={styles.reasoningOptions}>
+          {reasoningOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`${styles.reasoningChip} ${option.value === reasoningValue ? styles.reasoningChipActive : ''}`}
+              onClick={() => onReasoningChange(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className={styles.sectionLabel}>{t('prompt.modelRoute')}</div>
       <div className={styles.modelList}>
         {models.map((model) => {
-          const selected = model.value === modelValue || (!selectedModel && cleanModelName(model.value) === displayModel);
+          const selected = selectedModel
+            ? optionKey(model) === selectedModelKey
+            : resolveModelDisplayName(model.value, modelDisplayNames) === displayModel;
+          const meta = modelMeta(model);
           return (
-            <div key={model.value} className={`${styles.modelRow} ${selected ? styles.modelRowActive : ''}`}>
+            <div key={optionKey(model)} className={`${styles.modelRow} ${selected ? styles.modelRowActive : ''}`}>
               <button
                 type="button"
                 className={styles.modelButton}
-                onClick={() => onModelChange(model.value)}
+                aria-current={selected ? 'true' : undefined}
+                onClick={() => onModelChange(model.value, model)}
+                title={[
+                  model.resolvedModel && model.resolvedModel !== model.value ? `Resolves to ${model.resolvedModel}` : '',
+                  model.description,
+                ].filter(Boolean).join('\n') || undefined}
               >
-                <span className={styles.modelIcon}><ModelIcon name={model.value} /></span>
-                <span className={styles.modelText}>
-                  <span className={styles.modelName}>{cleanModelName(model.label)}</span>
-                  {model.provider && <span className={styles.modelProvider}>{model.provider}</span>}
+                <span className={styles.modelIcon}>
+                  <DecorativeBrandModelIcon name={`${model.label} ${model.resolvedModel ?? ''} ${model.requestModel ?? ''}`} />
                 </span>
+                <span className={styles.modelText}>
+                  <span className={styles.modelName}>{resolveModelDisplayName(model.label, modelDisplayNames)}</span>
+                </span>
+                {meta && <span className={styles.modelProvider}>{meta}</span>}
                 {selected && <Check size={15} className={styles.check} />}
               </button>
-              {selected && (
-                <div className={styles.reasoningStrip} aria-label="Reasoning level">
-                  {reasoningOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`${styles.reasoningChip} ${option.value === reasoningValue ? styles.reasoningChipActive : ''}`}
-                      onClick={() => onReasoningChange(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
@@ -177,7 +235,7 @@ export default function ModelReasoningPicker({
         onClick={() => open ? setOpen(false) : openPicker()}
       >
         <span className={styles.providerDot} aria-hidden="true">
-          <Sparkles size={14} />
+          <DecorativeBrandModelIcon name={triggerIconName} />
         </span>
         <span className={styles.triggerModel}>{displayModel}</span>
         <span className={styles.triggerReasoning}>{reasoningLabel}</span>

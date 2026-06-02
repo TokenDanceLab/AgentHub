@@ -84,6 +84,10 @@ func (h *SessionHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.ListSessions(c.Request.Context(), userID)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}
@@ -143,7 +147,15 @@ func (h *SessionHandler) Leave(c *gin.Context) {
 }
 
 type transferOwnerReq struct {
-	NewOwnerID string `json:"new_owner_id" binding:"required"`
+	NewOwnerID       string `json:"new_owner_id"`
+	NewOwnerUserID   string `json:"new_owner_user_id"`
+}
+
+func (r transferOwnerReq) resolveNewOwnerID() string {
+	if r.NewOwnerUserID != "" {
+		return r.NewOwnerUserID
+	}
+	return r.NewOwnerID
 }
 
 func (h *SessionHandler) TransferOwner(c *gin.Context) {
@@ -152,9 +164,14 @@ func (h *SessionHandler) TransferOwner(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	newOwnerID := req.resolveNewOwnerID()
+	if newOwnerID == "" {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
-	if err := h.service.TransferGroupOwnership(c.Request.Context(), userID, sessionID, req.NewOwnerID); err != nil {
+	if err := h.service.TransferGroupOwnership(c.Request.Context(), userID, sessionID, newOwnerID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -253,6 +270,10 @@ func (h *SessionHandler) SearchSessions(c *gin.Context) {
 
 	result, err := h.service.SearchSessions(c.Request.Context(), userID, q)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}
