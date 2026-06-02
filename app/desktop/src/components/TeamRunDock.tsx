@@ -124,6 +124,12 @@ export default function TeamRunDock({
     ? t('settings.agentTeamLocalSource')
     : t('settings.agentTeamHubProjectionSource');
   const budgetUsage = formatBudgetUsage(summary.state);
+  const hasMetrics = summary.members > 0
+    || summary.tasks > 0
+    || summary.routes > 0
+    || summary.artifacts > 0
+    || summary.blocking > 0
+    || Boolean(budgetUsage);
   const localName = localOrchestration?.orchestratorName ?? 'Orchestrator';
   const description = !signedIn
     ? canStartLocalOrchestration
@@ -186,18 +192,28 @@ export default function TeamRunDock({
         ) : null}
       </div>
 
-      <div className={styles.metrics} aria-label={t('chat.teamRunDockTitle')}>
-        <span><UsersRound size={12} />{t('chat.teamRunMembers')}: {summary.members}</span>
-        <span><GitBranch size={12} />{t('chat.teamRunTasks')}: {summary.activeTasks}/{summary.tasks}</span>
-        <span><Route size={12} />{t('chat.teamRunRoutes')}: {summary.routes}</span>
-        <span>{t('chat.teamRunArtifacts')}: {summary.artifacts}</span>
-        {summary.blocking > 0 ? (
-          <span className={styles.blockingMetric}>{t('chat.teamRunBlocks')}: {summary.blocking}</span>
-        ) : null}
-        {budgetUsage ? (
-          <span>{t('chat.teamRunBudgetUsage', { percent: budgetUsage })}</span>
-        ) : null}
-      </div>
+      {hasMetrics ? (
+        <div className={styles.metrics} aria-label={t('chat.teamRunDockTitle')}>
+          {summary.members > 0 ? (
+            <span><UsersRound size={12} />{t('chat.teamRunMembers')}: {summary.members}</span>
+          ) : null}
+          {summary.tasks > 0 ? (
+            <span><GitBranch size={12} />{t('chat.teamRunTasks')}: {summary.activeTasks}/{summary.tasks}</span>
+          ) : null}
+          {summary.routes > 0 ? (
+            <span><Route size={12} />{t('chat.teamRunRoutes')}: {summary.routes}</span>
+          ) : null}
+          {summary.artifacts > 0 ? (
+            <span>{t('chat.teamRunArtifacts')}: {summary.artifacts}</span>
+          ) : null}
+          {summary.blocking > 0 ? (
+            <span className={styles.blockingMetric}>{t('chat.teamRunBlocks')}: {summary.blocking}</span>
+          ) : null}
+          {budgetUsage ? (
+            <span>{t('chat.teamRunBudgetUsage', { percent: budgetUsage })}</span>
+          ) : null}
+        </div>
+      ) : null}
 
       {primaryExecution ? (
         <div className={styles.localExecution} data-testid="teamrun-dock-local-execution">
