@@ -329,12 +329,16 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const codeChallenge = await computeCodeChallenge(codeVerifier);
       const deviceId = getOrCreateDeviceId();
 
+      // Tauri callback server captures the authorization code when
+      // the user returns from TokenDance ID. We NEVER pass a localhost
+      // redirect_uri to Hub/TokenDance ID — production TokenDance ID
+      // client only allows https://hub.vectorcontrol.tech/... callbacks.
+      // The local server only receives the code via Tauri's oidc-callback
+      // event after Hub exchanges the code.
       let callbackResult: Promise<CallbackResult> | null = null;
-      let redirectUri = '';
       if (isTauri()) {
         const callbackServer = await startCallbackServer();
         callbackResult = callbackServer.result;
-        redirectUri = buildRedirectUri(callbackServer.port);
       }
 
       // 2. Call Hub to bind PKCE/state/device and get the authorization URL.
@@ -344,7 +348,10 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
       let authorizeResp: { state: string; authorization_url: string };
       try {
-        const authorizeBody: {
+        // redirect_uri is never passed — Hub uses its own production
+      // callback URL (https://hub.vectorcontrol.tech/client/auth/oidc/callback).
+      // This avoids TokenDance ID rejecting dynamic localhost redirect URIs.
+      const authorizeBody: {
           code_challenge: string;
           code_challenge_method: string;
           device_type: string;
@@ -356,9 +363,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
           device_type: 'desktop',
           device_id: deviceId,
         };
-        if (redirectUri) {
-          authorizeBody.redirect_uri = redirectUri;
-        }
+        // No redirect_uri — Hub uses its registered production callback
         authorizeResp = await authClient.oidcAuthorize(authorizeBody);
       } catch (err) {
         throw withCause(
@@ -398,7 +403,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       // 7. Exchange the code for Hub tokens
       let tokenResp: HubTokenResponse;
       try {
-        tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, redirectUri, deviceId);
+        tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, '', deviceId);
       } catch (err) {
         throw withCause(
           `Token exchange failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
