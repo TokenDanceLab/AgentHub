@@ -1639,19 +1639,20 @@ export default function ChatView({
           </div>
         )}
         {isStreaming && !lastMsgHasText ? <PendingThinking label={t('chat.thinkingLabel')} /> : null}
+        {showScrollIndicator && (
+          <div className={styles.scrollToBottomWrap}>
+            <button
+              className={styles.scrollToBottomBtn}
+              onClick={handleScrollToBottom}
+              title={t('chat.scrollToBottom')}
+              aria-label={t('chat.scrollToBottom')}
+            >
+              <ArrowDown size={16} />
+              <span>{t('chat.newMessages')}</span>
+            </button>
+          </div>
+        )}
       </div>
-
-      {showScrollIndicator && (
-        <button
-          className={styles.scrollToBottomBtn}
-          onClick={handleScrollToBottom}
-          title={t('chat.scrollToBottom')}
-          aria-label={t('chat.scrollToBottom')}
-        >
-          <ArrowDown size={16} />
-          <span>{t('chat.newMessages')}</span>
-        </button>
-      )}
     </div>
   );
 }
