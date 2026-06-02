@@ -190,6 +190,8 @@
   border-radius: 999px;
   background: rgba(0,0,0,0.04);
   color: var(--text-weaker);
+}
+
 [data-theme='dark'] .runtimeMeta {
   background: rgba(255,255,255,0.065);
 }
