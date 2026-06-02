@@ -70,9 +70,25 @@ func (v *repeatedString) Set(value string) error {
 }
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})))
+	logLevel := slog.LevelInfo
+	switch strings.ToLower(getEnv("AGENTHUB_LOG_LEVEL", "info")) {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	}
+
+	var handler slog.Handler
+	if strings.ToLower(getEnv("AGENTHUB_LOG_FORMAT", "text")) == "json" {
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+	}
+	slog.SetDefault(slog.New(handler))
 
 	cfg, err := buildConfig(os.Args[1:])
 	if err != nil {
