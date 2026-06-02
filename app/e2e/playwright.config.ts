@@ -22,7 +22,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm --filter agenthub-web preview --port 5175',
+    command: 'pnpm --filter agenthub-web preview',
     port: 5175,
     reuseExistingServer: !process.env.CI,
   },
