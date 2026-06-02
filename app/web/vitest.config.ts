@@ -13,7 +13,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['src/**/*.e2e.test.ts', 'src/**/*.e2e.test.tsx', 'e2e/**'],
-    setupFiles: [],
+    setupFiles: ['./src/test-setup.ts'],
     server: {
       deps: {
         inline: ['@emoji-mart/data', 'emoji-mart'],
