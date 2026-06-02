@@ -1,11 +1,22 @@
 import { useTranslation } from 'react-i18next';
-import { Bot } from 'lucide-react';
+import { Bot, Pencil, Trash2, Globe2 } from 'lucide-react';
 import type { CustomAgentMarketItem } from '../sections/AgentMarketSection';
 import { formatTimestamp } from '../utils';
 import styles from '../../SettingsPage.module.css';
 
-export default function AgentMarketCard({ agent }: { agent: CustomAgentMarketItem }) {
+export default function AgentMarketCard({
+  agent,
+  onEdit,
+  onDelete,
+  onPublish,
+}: {
+  agent: CustomAgentMarketItem;
+  onEdit?: (agentId: string) => void;
+  onDelete?: (agentId: string) => void;
+  onPublish?: (agent: CustomAgentMarketItem) => void;
+}) {
   const { t } = useTranslation();
+  const isLocalDraft = agent.source === 'local';
   return (
     <div className={styles.profileCard}>
       <div className={styles.profileHeader}>
@@ -34,6 +45,43 @@ export default function AgentMarketCard({ agent }: { agent: CustomAgentMarketIte
           <span>{t('settings.marketNoCapabilityTags')}</span>
         )}
       </div>
+      {isLocalDraft && (onEdit || onDelete || onPublish) && (
+        <div className={styles.profileCardActions}>
+          {onPublish && (
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              title={t('settings.agentCreator.publishToHub')}
+              onClick={() => onPublish(agent)}
+            >
+              <Globe2 size={13} />
+              {t('settings.agentCreator.publishToHub')}
+            </button>
+          )}
+          {onEdit && (
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              title={t('settings.agentCreator.editBtn')}
+              onClick={() => onEdit(agent.id)}
+            >
+              <Pencil size={13} />
+              {t('settings.agentCreator.editBtn')}
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              className={styles.dangerBtn}
+              title={t('settings.agentCreator.deleteBtn')}
+              onClick={() => onDelete(agent.id)}
+            >
+              <Trash2 size={13} />
+              {t('settings.agentCreator.deleteBtn')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

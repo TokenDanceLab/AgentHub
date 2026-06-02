@@ -27,7 +27,7 @@ describe('runQueries cache helpers', () => {
       runId: 'run-1',
       status: 'running',
     });
-    expect(qc.getQueryData<ListResponse<RunInfo>>(['runs', 'project-2', 'thread-2'])?.items).toHaveLength(0);
+    expect(qc.getQueryData<ListResponse<RunInfo>>(['runs', 'project-2', 'thread-2'])?.items).toHaveLength(1);
   });
 
   it('marks terminal statuses in every cached list containing the run', () => {

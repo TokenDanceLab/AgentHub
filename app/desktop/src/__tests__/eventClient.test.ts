@@ -71,10 +71,10 @@ describe('eventClient', () => {
     stream.onStatusChange(statusFn);
 
     lastWs().onopen?.();
-    expect(statusFn).toHaveBeenCalledWith(true);
+    expect(statusFn).toHaveBeenCalledWith('connected');
 
-    lastWs().close(); // triggers onclose → notifyStatus(false)
-    expect(statusFn).toHaveBeenCalledWith(false);
+    lastWs().close(); // triggers onclose → notifyStatus('disconnected')
+    expect(statusFn).toHaveBeenCalledWith('disconnected');
 
     stream.close();
   });

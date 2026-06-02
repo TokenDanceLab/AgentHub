@@ -9,29 +9,40 @@
   pointer-events: none;
 }
 
-.notificationBar,
-.panel {
-  pointer-events: auto;
-}
-
-/* ── Notification bar ──────────────────────── */
-
 .notificationBar {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-md);
   background: var(--background);
   border-top: 1px solid var(--border);
   font-size: var(--font-size-xs);
   color: var(--foreground);
-  cursor: pointer;
-  transition: background 0.15s;
   height: 36px;
+  padding: 0 var(--space-xs);
 }
 
-.notificationBar:hover {
+.notificationBarBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.notificationBarBtn:hover {
   background: var(--hover);
+}
+
+.notificationBar,
+.panel {
+  pointer-events: auto;
 }
 
 .barIcon {
@@ -336,6 +347,128 @@
 
 .iconDenied {
   color: var(--danger, #ef4444);
+}
+
+/* ── Risk level badges ─────────────────────── */
+
+.riskBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+}
+
+.riskLow {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success, #22c55e);
+}
+
+.riskMedium {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning, #f59e0b);
+}
+
+.riskHigh {
+  background: rgba(249, 115, 22, 0.12);
+  color: var(--warning);
+}
+
+.riskCritical {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger, #ef4444);
+}
+
+.riskDefault {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted-foreground);
+}
+
+/* ── Approval mode selector ────────────────── */
+
+.modeSelector {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, border-color 0.15s;
+  line-height: 1.6;
+}
+
+.modeBtn:hover:not(:disabled) {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.modeBtn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.modeIconYOLO {
+  color: var(--warning);
+}
+
+.modeIconAuto {
+  color: var(--warning, #f59e0b);
+}
+
+.modeIconManual {
+  color: var(--success, #22c55e);
+}
+
+.modeLabel {
+  white-space: nowrap;
+}
+
+/* ── "Always allow this type" checkbox ─────── */
+
+.alwaysAllowLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  font-size: 11px;
+  color: var(--foreground);
+  opacity: 0.7;
+  cursor: pointer;
+  user-select: none;
+}
+
+.alwaysAllowLabel:hover {
+  opacity: 1;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.alwaysAllowText {
+  font-size: 11px;
 }
 
 /* ── Mobile ───────────────────────────────── */

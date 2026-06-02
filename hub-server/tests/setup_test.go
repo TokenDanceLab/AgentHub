@@ -105,7 +105,7 @@ func TestMain(m *testing.M) {
 	pbHandler := handler.NewProviderBindingHandler(pbService)
 	targetService := service.NewExecutionTargetService(db)
 	targetHandler := handler.NewExecutionTargetHandler(targetService)
-	auditService := service.NewAuditService(db)
+	auditService := service.NewAuditService(db, nil)
 	auditHandler := handler.NewAuditHandler(auditService)
 	relayService := service.NewRelayService(cacheClient, mgr)
 	relayHandler := handler.NewRelayHandler(relayService)

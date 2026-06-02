@@ -56,6 +56,12 @@ import {
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo } from '@shared/types';
+import {
+  getSurfaceByDesktopSectionId,
+  getSurfaceStatusMetadata,
+  type SurfaceMetadata,
+} from '@shared/surfaceMetadata';
+import { ActivityCard, EmptyState, StatusNotice } from '@shared/ui';
 import styles from './SettingsPage.module.css';
 
 export type SectionId =
@@ -102,8 +108,12 @@ interface Props {
 interface NavItem {
   id: SectionId;
   label: string;
+  description: string;
+  sourceLabel: string;
+  statusLabel: string;
   icon: ReactNode;
   group: 'workspace' | 'automation' | 'system';
+  surface?: SurfaceMetadata;
 }
 
 interface ShortcutRow {
@@ -152,6 +162,30 @@ const PROVIDER_HEALTH_OPTIONS = [
   ['degraded', 'Degraded'],
   ['disabled', 'Disabled'],
 ] as const;
+
+function buildNavItem(
+  id: SectionId,
+  labelKey: string,
+  icon: ReactNode,
+  group: NavItem['group'],
+  t: ReturnType<typeof useTranslation>['t'],
+): NavItem {
+  const surface = getSurfaceByDesktopSectionId(id);
+  const status = surface ? getSurfaceStatusMetadata(surface.defaultStatus) : null;
+  const item = {
+    id,
+    label: t(surface?.labelKey ?? labelKey),
+    description: surface
+      ? t(surface.descriptionKey)
+      : t(`settings.webLocal.${id}.description`, { defaultValue: t('settings.webLocal.description') }),
+    sourceLabel: surface ? t('settings.sharedDesktopSection') : t('settings.webLocal.section'),
+    statusLabel: status ? t(status.labelKey) : t('settings.webLocal.status'),
+    icon,
+    group,
+  };
+
+  return surface ? { ...item, surface } : item;
+}
 
 const PROJECT_SKILLS: ProjectSkill[] = [
   {
@@ -429,41 +463,42 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
   const navItems = useMemo<NavItem[]>(
     () => [
-      { id: 'general', label: t('settings.general'), icon: <SlidersHorizontal size={17} />, group: 'workspace' },
-      { id: 'appearance', label: t('settings.appearance'), icon: <Palette size={17} />, group: 'workspace' },
-      { id: 'configuration', label: t('settings.configuration'), icon: <Wrench size={17} />, group: 'workspace' },
-      { id: 'personalization', label: t('settings.personalization'), icon: <UserCircle size={17} />, group: 'workspace' },
-      { id: 'permissions', label: t('settings.permissions'), icon: <ShieldCheck size={17} />, group: 'workspace' },
-      { id: 'agentProfiles', label: t('settings.agentProfiles'), icon: <Bot size={17} />, group: 'workspace' },
-      { id: 'executionTargets', label: t('settings.executionTargets'), icon: <Server size={17} />, group: 'workspace' },
-      { id: 'tasks', label: t('settings.tasks'), icon: <ClipboardList size={17} />, group: 'workspace' },
-      { id: 'onlineIm', label: t('settings.onlineIm'), icon: <Globe2 size={17} />, group: 'workspace' },
-      { id: 'groupChat', label: t('settings.groupChat'), icon: <MessageSquareText size={17} />, group: 'workspace' },
-      { id: 'agentScheduling', label: t('settings.agentScheduling'), icon: <Route size={17} />, group: 'workspace' },
-      { id: 'agentMarket', label: t('settings.agentMarket'), icon: <Bot size={17} />, group: 'workspace' },
-      { id: 'keyboard', label: t('settings.keyboard'), icon: <Keyboard size={17} />, group: 'workspace' },
-      { id: 'mcp', label: t('settings.mcp'), icon: <Plug size={17} />, group: 'automation' },
-      { id: 'skills', label: t('settings.skills'), icon: <Code2 size={17} />, group: 'automation' },
-      { id: 'hooks', label: t('settings.hooks'), icon: <TerminalSquare size={17} />, group: 'automation' },
-      { id: 'models', label: t('settings.models'), icon: <SlidersHorizontal size={17} />, group: 'automation' },
-      { id: 'modelMapping', label: t('settings.modelMapping'), icon: <Link2 size={17} />, group: 'automation' },
-      { id: 'ccSwitch', label: t('settings.ccSwitch'), icon: <Plug size={17} />, group: 'automation' },
-      { id: 'connections', label: t('settings.connections'), icon: <Globe2 size={17} />, group: 'automation' },
-      { id: 'remoteControl', label: t('settings.remoteControl'), icon: <Computer size={17} />, group: 'automation' },
-      { id: 'git', label: t('settings.git'), icon: <GitBranch size={17} />, group: 'automation' },
-      { id: 'environment', label: t('settings.environment'), icon: <HardDrive size={17} />, group: 'system' },
-      { id: 'worktree', label: t('settings.worktree'), icon: <FolderGit2 size={17} />, group: 'system' },
-      { id: 'browser', label: t('settings.browser'), icon: <Eye size={17} />, group: 'system' },
-      { id: 'computerUse', label: t('settings.computerUse'), icon: <Computer size={17} />, group: 'system' },
-      { id: 'platforms', label: t('settings.platforms'), icon: <Monitor size={17} />, group: 'system' },
-      { id: 'account', label: t('settings.account'), icon: <LockKeyhole size={17} />, group: 'system' },
-      { id: 'securityAudit', label: t('settings.securityAudit'), icon: <ShieldCheck size={17} />, group: 'system' },
-      { id: 'archived', label: t('settings.archived'), icon: <Archive size={17} />, group: 'system' },
+      buildNavItem('general', 'settings.general', <SlidersHorizontal size={17} />, 'workspace', t),
+      buildNavItem('appearance', 'settings.appearance', <Palette size={17} />, 'workspace', t),
+      buildNavItem('configuration', 'settings.configuration', <Wrench size={17} />, 'workspace', t),
+      buildNavItem('personalization', 'settings.personalization', <UserCircle size={17} />, 'workspace', t),
+      buildNavItem('permissions', 'settings.permissions', <ShieldCheck size={17} />, 'workspace', t),
+      buildNavItem('agentProfiles', 'settings.agentProfiles', <Bot size={17} />, 'workspace', t),
+      buildNavItem('executionTargets', 'settings.executionTargets', <Server size={17} />, 'workspace', t),
+      buildNavItem('tasks', 'settings.tasks', <ClipboardList size={17} />, 'workspace', t),
+      buildNavItem('onlineIm', 'settings.onlineIm', <Globe2 size={17} />, 'workspace', t),
+      buildNavItem('groupChat', 'settings.groupChat', <MessageSquareText size={17} />, 'workspace', t),
+      buildNavItem('agentScheduling', 'settings.agentScheduling', <Route size={17} />, 'workspace', t),
+      buildNavItem('agentMarket', 'settings.agentMarket', <Bot size={17} />, 'workspace', t),
+      buildNavItem('keyboard', 'settings.keyboard', <Keyboard size={17} />, 'workspace', t),
+      buildNavItem('mcp', 'settings.mcp', <Plug size={17} />, 'automation', t),
+      buildNavItem('skills', 'settings.skills', <Code2 size={17} />, 'automation', t),
+      buildNavItem('hooks', 'settings.hooks', <TerminalSquare size={17} />, 'automation', t),
+      buildNavItem('models', 'settings.models', <SlidersHorizontal size={17} />, 'automation', t),
+      buildNavItem('modelMapping', 'settings.modelMapping', <Link2 size={17} />, 'automation', t),
+      buildNavItem('ccSwitch', 'settings.ccSwitch', <Plug size={17} />, 'automation', t),
+      buildNavItem('connections', 'settings.connections', <Globe2 size={17} />, 'automation', t),
+      buildNavItem('remoteControl', 'settings.remoteControl', <Computer size={17} />, 'automation', t),
+      buildNavItem('git', 'settings.git', <GitBranch size={17} />, 'automation', t),
+      buildNavItem('environment', 'settings.environment', <HardDrive size={17} />, 'system', t),
+      buildNavItem('worktree', 'settings.worktree', <FolderGit2 size={17} />, 'system', t),
+      buildNavItem('browser', 'settings.browser', <Eye size={17} />, 'system', t),
+      buildNavItem('computerUse', 'settings.computerUse', <Computer size={17} />, 'system', t),
+      buildNavItem('platforms', 'settings.platforms', <Monitor size={17} />, 'system', t),
+      buildNavItem('account', 'settings.account', <LockKeyhole size={17} />, 'system', t),
+      buildNavItem('securityAudit', 'settings.securityAudit', <ShieldCheck size={17} />, 'system', t),
+      buildNavItem('archived', 'settings.archived', <Archive size={17} />, 'system', t),
     ],
     [t],
   );
 
-  const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
+  const activeItem = navItems.find((item) => item.id === active);
+  const activeLabel = activeItem?.label ?? t('settings.title');
   const shortcuts: ShortcutRow[] = [
     { keys: ['Enter'], action: t('shortcut.send') },
     { keys: ['Shift', 'Enter'], action: t('shortcut.newline') },
@@ -531,6 +566,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           <div className={styles.header}>
             <span>{t('settings.title')}</span>
             <h1>{activeLabel}</h1>
+            {activeItem ? (
+              <>
+                <p>{activeItem.description}</p>
+                <div className={styles.headerMeta}>
+                  <span>{activeItem.sourceLabel}</span>
+                  <span>{activeItem.statusLabel}</span>
+                </div>
+              </>
+            ) : null}
           </div>
 
           {active === 'general' && (
@@ -1742,56 +1786,66 @@ function TaskRunRow({
   const { t } = useTranslation();
   const timestamp = run.finishedAt ?? run.startedAt ?? run.createdAt;
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
-        <Route size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{shortId(run.runId)}</strong>
-        <span>{run.projectId} / {run.threadId}</span>
-        <div className={styles.taskMeta}>
-          <span>{formatTimestamp(timestamp)}</span>
-        </div>
-      </div>
-      <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
-        {t(`run.status.${run.status}`, { defaultValue: run.status })}
+    <ActivityCard
+      className={styles.taskRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.taskRowLabel}
+      contentClassName={styles.taskRowContent}
+      actionsClassName={styles.taskRowActions}
+      icon={<Route size={17} />}
+      label={shortId(run.runId)}
+      actions={(
+        <>
+          <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
+            {t(`run.status.${run.status}`, { defaultValue: run.status })}
+          </span>
+          {onCancel ? (
+            <button
+              type="button"
+              className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+              onClick={() => onCancel(run.runId)}
+              disabled={cancelling}
+              aria-label={t('settings.taskCancelRun')}
+              title={t('settings.taskCancelRun')}
+            >
+              <XCircle size={15} />
+              {cancelling ? t('settings.taskCancellingRun') : t('settings.taskCancelRun')}
+            </button>
+          ) : null}
+        </>
+      )}
+    >
+      <span className={styles.taskRowDescription}>{run.projectId} / {run.threadId}</span>
+      <span className={styles.taskMeta}>
+        <span>{formatTimestamp(timestamp)}</span>
       </span>
-      {onCancel ? (
-        <button
-          type="button"
-          className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
-          onClick={() => onCancel(run.runId)}
-          disabled={cancelling}
-          aria-label={t('settings.taskCancelRun')}
-          title={t('settings.taskCancelRun')}
-        >
-          <XCircle size={15} />
-          {cancelling ? t('settings.taskCancellingRun') : t('settings.taskCancelRun')}
-        </button>
-      ) : null}
-    </div>
+    </ActivityCard>
   );
 }
 
 function HubTaskRow({ task }: { task: AgentTask }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
-        <ClipboardList size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{shortId(task.taskId)}</strong>
-        <span>{task.prompt}</span>
-        <div className={styles.taskMeta}>
-          <span>{task.agentId}</span>
-          <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
-        </div>
-      </div>
-      <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
-        {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
+    <ActivityCard
+      className={styles.taskRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.taskRowLabel}
+      contentClassName={styles.taskRowContent}
+      actionsClassName={styles.taskRowActions}
+      icon={<ClipboardList size={17} />}
+      label={shortId(task.taskId)}
+      actions={(
+        <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
+          {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
+        </span>
+      )}
+    >
+      <span className={styles.taskRowDescription}>{task.prompt}</span>
+      <span className={styles.taskMeta}>
+        <span>{task.agentId}</span>
+        <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
       </span>
-    </div>
+    </ActivityCard>
   );
 }
 
@@ -1813,34 +1867,40 @@ function HubExecutionTargetRow({
     : shortId(target.id);
 
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
-        <Server size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{target.name}</strong>
-        <span>{identityLabel}</span>
-        <div className={styles.taskMeta}>
-          <span>{t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })}</span>
-          <span>{t(`settings.targetTrust.${target.trust_level}`, { defaultValue: target.trust_level })}</span>
-          <span>{workspaceLabel}</span>
-        </div>
-      </div>
-      <span className={`${styles.statusPill} ${target.is_online ? styles.statusPillOn : ''}`}>
-        {t(`settings.targetHealth.${target.health_state}`, { defaultValue: target.health_state })}
+    <ActivityCard
+      className={styles.taskRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.taskRowLabel}
+      contentClassName={styles.taskRowContent}
+      actionsClassName={styles.taskRowActions}
+      icon={<Server size={17} />}
+      label={target.name}
+      actions={(
+        <>
+          <span className={`${styles.statusPill} ${target.is_online ? styles.statusPillOn : ''}`}>
+            {t(`settings.targetHealth.${target.health_state}`, { defaultValue: target.health_state })}
+          </span>
+          <button
+            type="button"
+            className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+            onClick={() => onPing(target.id)}
+            disabled={pinging}
+            aria-label={t('settings.targetPing')}
+            title={t('settings.targetPing')}
+          >
+            <RefreshCw size={15} />
+            {pinging ? t('settings.targetPinging') : t('settings.targetPing')}
+          </button>
+        </>
+      )}
+    >
+      <span className={styles.taskRowDescription}>{identityLabel}</span>
+      <span className={styles.taskMeta}>
+        <span>{t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })}</span>
+        <span>{t(`settings.targetTrust.${target.trust_level}`, { defaultValue: target.trust_level })}</span>
+        <span>{workspaceLabel}</span>
       </span>
-      <button
-        type="button"
-        className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
-        onClick={() => onPing(target.id)}
-        disabled={pinging}
-        aria-label={t('settings.targetPing')}
-        title={t('settings.targetPing')}
-      >
-        <RefreshCw size={15} />
-        {pinging ? t('settings.targetPinging') : t('settings.targetPing')}
-      </button>
-    </div>
+    </ActivityCard>
   );
 }
 
@@ -1871,24 +1931,33 @@ function ModeCard({
 
 function CapabilityCard({ title, description, status }: { title: string; description: string; status: string }) {
   return (
-    <div className={styles.capabilityCard}>
-      <strong>{title}</strong>
-      <span>{description}</span>
-      <em>{status}</em>
-    </div>
+    <ActivityCard
+      className={styles.capabilityCard}
+      metaClassName={styles.capabilityMeta}
+      labelClassName={styles.capabilityLabel}
+      contentClassName={styles.capabilityDescription}
+      label={title}
+      meta={<em className={styles.capabilityStatus}>{status}</em>}
+    >
+      {description}
+    </ActivityCard>
   );
 }
 
 function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
   return (
-    <div className={styles.summaryCard}>
-      <div className={styles.summaryIcon}>{icon}</div>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </div>
-    </div>
+    <ActivityCard
+      className={styles.summaryCard}
+      iconClassName={styles.summaryIcon}
+      metaClassName={styles.summaryBody}
+      labelClassName={styles.summaryLabel}
+      contentClassName={styles.summaryDetail}
+      label={value}
+      meta={<span className={styles.summaryMeta}>{label}</span>}
+      icon={icon}
+    >
+      {detail}
+    </ActivityCard>
   );
 }
 
@@ -1915,15 +1984,16 @@ function AliasMappingRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.modelAliasRow}>
-      <div className={styles.modelAliasHead}>
-        <div>
-          <strong>{alias}</strong>
-          <span>{t('settings.modelAliasRoute', { model, provider })}</span>
-        </div>
-        <Switch checked={enabled} onChange={onToggle} />
-      </div>
-      <div className={styles.modelAliasControls}>
+    <ActivityCard
+      className={styles.modelAliasRow}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.modelAliasContent}
+      actionsClassName={styles.settingActions}
+      label={alias}
+      actions={<Switch checked={enabled} onChange={onToggle} />}
+    >
+      <span className={styles.settingDescription}>{t('settings.modelAliasRoute', { model, provider })}</span>
+      <span className={styles.modelAliasControls}>
         <label>
           <span>{t('settings.modelAliasModel')}</span>
           <SelectControl
@@ -1948,8 +2018,8 @@ function AliasMappingRow({
             onChange={(value) => onReasoningChange(value as ReasoningEffortPreference)}
           />
         </label>
-      </div>
-    </div>
+      </span>
+    </ActivityCard>
   );
 }
 
@@ -1972,23 +2042,25 @@ function ProviderHealthRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.providerRow}>
-      <div className={styles.providerMain}>
-        <div className={styles.connectionIcon}>
-          <Plug size={17} />
-        </div>
-        <div className={styles.settingCopy}>
-          <strong>{name}</strong>
-          <span>{id}</span>
-          <div className={styles.taskMeta}>
-            <span>{t('settings.ccSwitchModelCount', { count: modelCount })}</span>
-          </div>
-        </div>
+    <ActivityCard
+      className={styles.providerRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.providerContent}
+      actionsClassName={styles.settingActions}
+      icon={<Plug size={17} />}
+      label={name}
+      actions={
         <span className={`${styles.statusPill} ${health === 'ready' ? styles.statusPillOn : ''}`}>
           {t(`settings.providerHealth.${health}`)}
         </span>
-      </div>
-      <div className={styles.providerControls}>
+      }
+    >
+      <span className={styles.settingDescription}>{id}</span>
+      <span className={styles.taskMeta}>
+        <span>{t('settings.ccSwitchModelCount', { count: modelCount })}</span>
+      </span>
+      <span className={styles.providerControls}>
         <label>
           <span>{t('settings.ccSwitchHealth')}</span>
           <SelectControl
@@ -2005,34 +2077,60 @@ function ProviderHealthRow({
             onChange={(event) => onNotesChange(event.target.value)}
           />
         </label>
-      </div>
-    </div>
+      </span>
+    </ActivityCard>
+  );
+}
+
+function ProfileActivityCard({
+  icon,
+  title,
+  description,
+  status,
+  statusClassName,
+  children,
+}: {
+  icon: ReactNode;
+  title: ReactNode;
+  description: ReactNode;
+  status: ReactNode;
+  statusClassName: string | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <ActivityCard
+      className={styles.profileCard}
+      iconClassName={styles.profileIcon}
+      labelClassName={styles.profileTitle}
+      contentClassName={styles.profileContent}
+      actionsClassName={styles.profileActions}
+      icon={icon}
+      label={title}
+      actions={<em className={`${styles.profileStatus} ${statusClassName ?? ''}`}>{status}</em>}
+    >
+      <span className={styles.profileDescription}>{description}</span>
+      {children}
+    </ActivityCard>
   );
 }
 
 function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Bot size={17} />
-        </div>
-        <div>
-          <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.runtimeDefaultDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
-          {t(`agent.status.${agent.status}`)}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Bot size={17} />}
+      title={agent.name}
+      description={agent.description || t('settings.runtimeDefaultDesc')}
+      status={t(`agent.status.${agent.status}`)}
+      statusClassName={styles[`profileStatus_${agent.status}`]}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.runtimeAdapter')}: {agent.id}</span>
         <span>{t('settings.profileRuntime')}: {t('settings.statusReady')}</span>
         <span>{t('settings.profileModel')}: {t('settings.statusPlanned')}</span>
         <span>{t('settings.profileConfig')}: {t('settings.statusPlanned')}</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
@@ -2050,20 +2148,14 @@ function LocalAgentProfileCard({
   const { t } = useTranslation();
   const profileReady = edgeOnline && agent.status === 'available';
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Bot size={17} />
-        </div>
-        <div>
-          <strong>{t('settings.localProfileName', { runtime: agent.name })}</strong>
-          <span>{t('settings.localProfileDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${profileReady ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
-          {profileReady ? t('settings.enabled') : t('settings.notConfigured')}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Bot size={17} />}
+      title={t('settings.localProfileName', { runtime: agent.name })}
+      description={t('settings.localProfileDesc')}
+      status={profileReady ? t('settings.enabled') : t('settings.notConfigured')}
+      statusClassName={profileReady ? styles.profileStatus_available : styles.profileStatus_configuring}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.profileModel')}: {route.model ?? t('prompt.routeAuto')}</span>
         <span>{t('settings.modelAliasProvider')}: {route.provider ?? t('prompt.routeAuto')}</span>
@@ -2071,8 +2163,8 @@ function LocalAgentProfileCard({
         {alias ? <span>{t('settings.profileAlias')}: {alias}</span> : null}
         <span>{t('settings.executionTargets')}: {t('settings.targetLocalEdge')}</span>
         <span>{t('settings.profileConfigSource')}: AGENTS.md / memory / skills</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
@@ -2083,57 +2175,45 @@ function AgentMarketCard({ agent }: { agent: AgentInfo }) {
     .map(([name]) => t(`settings.capability.${name}`, { defaultValue: name }));
 
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Bot size={17} />
-        </div>
-        <div>
-          <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.marketProfileDefaultDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
-          {t(`agent.status.${agent.status}`)}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Bot size={17} />}
+      title={agent.name}
+      description={agent.description || t('settings.marketProfileDefaultDesc')}
+      status={t(`agent.status.${agent.status}`)}
+      statusClassName={styles[`profileStatus_${agent.status}`]}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.runtimeId ?? agent.id}</span>
         <span>{t('settings.marketInstallSource')}: TokenDance Hub</span>
         <span>{t('settings.marketPublishStatus')}: {agent.status === 'available' ? t('settings.statusInProgress') : t('settings.statusPlanned')}</span>
-      </div>
-      <div className={styles.profileMeta}>
+      </span>
+      <span className={styles.profileMeta}>
         {capabilityNames.length > 0 ? (
           capabilityNames.map((name) => <span key={name}>{name}</span>)
         ) : (
           <span>{t('settings.marketNoCapabilityTags')}</span>
         )}
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
 function ProjectSkillCard({ skill }: { skill: ProjectSkill }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Code2 size={17} />
-        </div>
-        <div>
-          <strong>{skill.title}</strong>
-          <span>{t(skill.descriptionKey)}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${skill.status === 'ready' ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
-          {skill.status === 'ready' ? t('settings.statusReady') : t('settings.statusInProgress')}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Code2 size={17} />}
+      title={skill.title}
+      description={t(skill.descriptionKey)}
+      status={skill.status === 'ready' ? t('settings.statusReady') : t('settings.statusInProgress')}
+      statusClassName={skill.status === 'ready' ? styles.profileStatus_available : styles.profileStatus_configuring}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.skillLocalRegistry')}: .agents/skills/{skill.id}</span>
         <span>{t('settings.skillScripts')}: {skill.hasScripts ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.skillReferences')}: {skill.hasReferences ? t('settings.enabled') : t('settings.notConfigured')}</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
@@ -2141,26 +2221,20 @@ function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   const { mcpIntegration, permissionHooks, subAgentSpawn } = agent.capabilities;
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Plug size={17} />
-        </div>
-        <div>
-          <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.mcpRuntimeDefaultDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
-          {mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Plug size={17} />}
+      title={agent.name}
+      description={agent.description || t('settings.mcpRuntimeDefaultDesc')}
+      status={mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}
+      statusClassName={mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.mcpIntegration')}: {mcpIntegration ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.mcpPermissionHooks')}: {permissionHooks ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.mcpSubAgentSpawn')}: {subAgentSpawn ? t('settings.enabled') : t('settings.notConfigured')}</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
@@ -2180,15 +2254,19 @@ function ExecutionTargetCard({
   connected?: boolean;
 }) {
   return (
-    <div className={styles.targetCard}>
-      <div className={styles.targetTop}>
-        <div className={styles.targetIcon}>{icon}</div>
-        <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>{status}</span>
-      </div>
-      <strong>{title}</strong>
-      <span>{description}</span>
-      <em>{metric}</em>
-    </div>
+    <ActivityCard
+      className={styles.targetCard}
+      iconClassName={styles.targetIcon}
+      labelClassName={styles.targetTitle}
+      contentClassName={styles.targetContent}
+      actionsClassName={styles.targetActions}
+      icon={icon}
+      label={title}
+      actions={<span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>{status}</span>}
+    >
+      <span className={styles.targetDescription}>{description}</span>
+      <em className={styles.targetMetric}>{metric}</em>
+    </ActivityCard>
   );
 }
 
@@ -2205,32 +2283,46 @@ function SettingRow({
   control?: ReactNode;
   action?: boolean;
 }) {
+  const actions = control ?? (value ? <span className={styles.settingValue}>{value}</span> : null);
   return (
-    <div className={styles.settingRow}>
-      <div className={styles.settingCopy}>
-        <strong>{title}</strong>
-        <span>{description}</span>
-      </div>
-      {control ?? (value ? <span className={styles.settingValue}>{value}</span> : null)}
-      {action ? <ChevronRight size={17} className={styles.rowChevron} /> : null}
-    </div>
+    <ActivityCard
+      className={styles.settingRow}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.settingContent}
+      actionsClassName={styles.settingActions}
+      label={title}
+      actions={
+        actions || action ? (
+          <>
+            {actions}
+            {action ? <ChevronRight size={17} className={styles.rowChevron} /> : null}
+          </>
+        ) : undefined
+      }
+    >
+      <span className={styles.settingDescription}>{description}</span>
+    </ActivityCard>
   );
 }
 
 function ConnectionRow({ name, description, connected }: { name: string; description: string; connected: boolean }) {
   return (
-    <div className={styles.connectionRow}>
-      <div className={styles.connectionIcon}>
-        <Link2 size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{name}</strong>
-        <span>{description}</span>
-      </div>
-      <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>
-        {connected ? 'Online' : 'Offline'}
-      </span>
-    </div>
+    <ActivityCard
+      className={styles.connectionRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.settingContent}
+      actionsClassName={styles.settingActions}
+      icon={<Link2 size={17} />}
+      label={name}
+      actions={
+        <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>
+          {connected ? 'Online' : 'Offline'}
+        </span>
+      }
+    >
+      <span className={styles.settingDescription}>{description}</span>
+    </ActivityCard>
   );
 }
 
@@ -2269,22 +2361,26 @@ function SelectControl({
 
 function Callout({ title, body }: { title: string; body: string }) {
   return (
-    <div className={styles.callout}>
-      <ShieldCheck size={18} />
-      <div>
+    <StatusNotice className={styles.callout ?? ''} iconClassName={styles.calloutIcon ?? ''} contentClassName={styles.calloutContent ?? ''} icon={<ShieldCheck size={18} />}>
+      <>
         <strong>{title}</strong>
         <span>{body}</span>
-      </div>
-    </div>
+      </>
+    </StatusNotice>
   );
 }
 
 function EmptyBlock({ title, description }: { title: string; description: string }) {
   return (
-    <div className={styles.emptyBlock}>
-      <Archive size={24} />
-      <strong>{title}</strong>
-      <span>{description}</span>
-    </div>
+    <EmptyState
+      className={styles.emptyBlock ?? ''}
+      contentClassName={styles.emptyBlockContent ?? ''}
+      iconClassName={styles.emptyBlockIcon ?? ''}
+      titleClassName={styles.emptyBlockTitle ?? ''}
+      descriptionClassName={styles.emptyBlockDescription ?? ''}
+      icon={<Archive size={24} />}
+      title={title}
+      description={description}
+    />
   );
 }

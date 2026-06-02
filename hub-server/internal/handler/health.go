@@ -76,7 +76,7 @@ func (h *HealthHandler) Check(c *gin.Context) {
 
 	uptime := time.Since(h.startTime).Truncate(time.Second).String()
 
-	c.JSON(200, gin.H{
+	OK(c, gin.H{
 		"status":  overall,
 		"version": h.version,
 		"uptime":  uptime,

@@ -42,7 +42,7 @@
 
 .userBubble {
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--accent-foreground);
   border-bottom-right-radius: 4px;
 }
 
@@ -70,15 +70,15 @@
 }
 
 .authorityHub {
-  background: #3b82f6;   /* Blue */
+  background: var(--primary);   /* Blue */
 }
 
 .authorityEdge {
-  background: #22c55e;   /* Green */
+  background: var(--success);   /* Green */
 }
 
 .authorityHybrid {
-  background: #f97316;   /* Orange */
+  background: var(--warning);   /* Orange */
 }
 
 /* ── Sender header ───────────────────────── */
@@ -104,7 +104,7 @@
 
 .avatarAgent {
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--accent-foreground);
 }
 
 .avatarUser {
@@ -130,17 +130,17 @@
 
 .authorityBadgeHub {
   background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  color: var(--primary);
 }
 
 .authorityBadgeEdge {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  color: var(--success);
 }
 
 .authorityBadgeHybrid {
   background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
+  color: var(--warning);
 }
 
 /* ── Timestamp ───────────────────────────── */

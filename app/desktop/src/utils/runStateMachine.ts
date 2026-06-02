@@ -1,16 +1,17 @@
 // RunState state machine — formal state model for AgentHub run lifecycle.
 // Reference: Roo-Code AgentLoopState, Kanna dual-Map pattern (already used in runStore.ts).
 //
-// States:  IDLE → RUNNING ↔ STREAMING → WAITING_FOR_INPUT / COMPLETED / FAILED / CANCELLED
+// States:  IDLE → RUNNING ↔ STREAMING → WAITING_FOR_INPUT → DRAINING / COMPLETED / FAILED / CANCELLED
 //
-// Only validated transitions are accepted. Invalid jumps are rejected and logged as
-// warnings so Edge event ordering bugs can't corrupt local state.
+// DRAINING: Agent returned a final result but background tool calls are still running.
+// Once all tool calls complete, transitions to COMPLETED.
 
 export enum RunState {
   IDLE = 'IDLE',
   RUNNING = 'RUNNING',
   STREAMING = 'STREAMING',
   WAITING_FOR_INPUT = 'WAITING_FOR_INPUT',
+  DRAINING = 'DRAINING',
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
@@ -22,6 +23,7 @@ const TRANSITIONS: Record<RunState, readonly RunState[]> = {
   [RunState.RUNNING]: [
     RunState.STREAMING,
     RunState.WAITING_FOR_INPUT,
+    RunState.DRAINING,
     RunState.COMPLETED,
     RunState.FAILED,
     RunState.CANCELLED,
@@ -29,12 +31,19 @@ const TRANSITIONS: Record<RunState, readonly RunState[]> = {
   [RunState.STREAMING]: [
     RunState.RUNNING,
     RunState.WAITING_FOR_INPUT,
+    RunState.DRAINING,
     RunState.COMPLETED,
     RunState.FAILED,
     RunState.CANCELLED,
   ],
   [RunState.WAITING_FOR_INPUT]: [
     RunState.RUNNING,
+    RunState.DRAINING,
+    RunState.COMPLETED,
+    RunState.FAILED,
+    RunState.CANCELLED,
+  ],
+  [RunState.DRAINING]: [
     RunState.COMPLETED,
     RunState.FAILED,
     RunState.CANCELLED,
@@ -54,6 +63,7 @@ const ACTIVE_STATES = new Set<RunState>([
   RunState.RUNNING,
   RunState.STREAMING,
   RunState.WAITING_FOR_INPUT,
+  RunState.DRAINING,
 ]);
 
 /**
@@ -65,6 +75,7 @@ const LEGACY_MAP: Record<string, RunState> = {
   running: RunState.RUNNING,
   streaming: RunState.STREAMING,
   waiting_for_input: RunState.WAITING_FOR_INPUT,
+  draining: RunState.DRAINING,
   finished: RunState.COMPLETED,
   completed: RunState.COMPLETED,
   failed: RunState.FAILED,
@@ -76,6 +87,7 @@ const LEGACY_MAP: Record<string, RunState> = {
   [RunState.RUNNING]: RunState.RUNNING,
   [RunState.STREAMING]: RunState.STREAMING,
   [RunState.WAITING_FOR_INPUT]: RunState.WAITING_FOR_INPUT,
+  [RunState.DRAINING]: RunState.DRAINING,
   [RunState.COMPLETED]: RunState.COMPLETED,
   [RunState.FAILED]: RunState.FAILED,
   [RunState.CANCELLED]: RunState.CANCELLED,

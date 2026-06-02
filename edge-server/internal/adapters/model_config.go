@@ -7,12 +7,16 @@ var ModelAliases = map[string]map[string]string{
 		"opus":   "claude-opus-4-7",
 		"sonnet": "claude-sonnet-4-6",
 		"haiku":  "claude-haiku-4-5-20251001",
+		// Direct model-name aliases for convenience
+		"4.7": "claude-opus-4-7",
+		"4.6": "claude-sonnet-4-6",
+		"4.5": "claude-haiku-4-5-20251001",
 	},
 	"codex": {
 		"gpt-5":       "gpt-5.3-codex",
 		"gpt-5-codex": "gpt-5.3-codex",
 		"gpt-5-mini":  "gpt-5.4-mini",
-		"gpt-5.5":  "gpt-5.5",
+		"gpt-5.5":     "gpt-5.5",
 		"o4":          "o4-mini",
 	},
 	"opencode": {

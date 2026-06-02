@@ -1,4 +1,4 @@
-package adapters
+﻿package adapters
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -17,7 +18,8 @@ import (
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
 type OpenCodeAdapter struct {
 	binaryPath string
-	available  bool // #177: true if the CLI binary exists and is executable
+	available  bool   // #177: true if the CLI binary exists and is executable
+	budget     *runnerctx.ContextBudget // extracted from ctx in ParseStream; nil = no tracking
 }
 
 // NewOpenCodeAdapter creates an OpenCode adapter.
@@ -50,7 +52,14 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		prompt = "Continue."
 	}
 
+	// --format json: emit raw JSON events to stdout (our primary parsing path).
+	// Pass --thinking unless explicitly disabled, so reasoning events are included in
+	// the JSON output. When ThinkingMode=="disabled", omit --thinking to let the
+	// provider skip thinking tokens entirely (saves cost/latency).
 	args := []string{"run", "--format", "json"}
+	if ctx.ThinkingMode != "disabled" {
+		args = append(args, "--thinking")
+	}
 
 	// Model: resolve aliases, then pass as provider/model to OpenCode
 	if ctx.Model != "" {
@@ -61,11 +70,10 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "-m", resolved)
 	}
 
-	// Reasoning effort: --thinking enables thinking, --variant sets effort level
+	// Reasoning effort → OpenCode --variant (provider-specific reasoning effort:
+	// "high", "max", "minimal", etc.). This is independent of --thinking.
 	if ctx.ReasoningEffort != "" {
-		effort := ResolveReasoningEffort("opencode", ctx.ReasoningEffort)
-		args = append(args, "--thinking")
-		if effort != "" {
+		if effort := ResolveReasoningEffort("opencode", ctx.ReasoningEffort); effort != "" {
 			args = append(args, "--variant", effort)
 		}
 	}
@@ -85,8 +93,13 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--fork")
 	}
 
-	// Permission mode: bypassPermissions maps to --dangerously-skip-permissions
-	if ctx.PermissionMode == "bypassPermissions" {
+	// Permission mode: in non-interactive (batch) mode OpenCode has no terminal
+	// to prompt the user. If permission ruleset would trigger permission.asked,
+	// OpenCode blocks forever waiting for a reply that never comes.
+	// --dangerously-skip-permissions makes OpenCode auto-approve everything;
+	// AgentHub's SecurityHook is the real gatekeeper. Only skip permissions
+	// when the caller explicitly requests bypassPermissions or yolo mode.
+	if ctx.PermissionMode == "bypassPermissions" || ctx.PermissionMode == "yolo" {
 		args = append(args, "--dangerously-skip-permissions")
 	}
 
@@ -109,9 +122,20 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--command", cmd)
 	}
 
+	// Session title via --title
+	if title, ok := ctx.ConfigOverrides["title"]; ok && title != "" {
+		args = append(args, "--title", title)
+	}
+
 	// Skills prompt: prepend to the prompt since OpenCode has no --append-system-prompt.
 	if ctx.SkillsPrompt != "" {
 		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
+	}
+
+	// Context continuity: prepend thread history + pinned messages so OpenCode
+	// has full Hub conversation context (not just the trigger message).
+	if contextPreface := runnerctx.BuildContextPreface(ctx.Messages, ctx.PinnedMessages); contextPreface != "" {
+		prompt = contextPreface + "\n---\n\n" + prompt
 	}
 
 	args = append(args, prompt)
@@ -133,7 +157,19 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 		"runId":     run.ID,
 	}
 
-	return ScanLines(ctx, stdout, func(line []byte) error {
+	// Extract budget from context for token tracking (nil = no tracking).
+	if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
+		a.budget = budget
+	}
+
+	return ScanLines(ctx, stdout, func(line []byte) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("opencode: panic in stream handler, recovering to keep stream alive",
+					"runId", run.ID, "panic", r)
+				err = nil // allow ScanLines to continue
+			}
+		}()
 		var evt opencodeEvent
 		if err := json.Unmarshal(line, &evt); err != nil {
 			slog.Debug("opencode: skipping unparseable line", "err", err)
@@ -216,13 +252,20 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 			result["success"] = evt.Part.Reason == "stop" || evt.Part.Reason == ""
 			result["reason"] = evt.Part.Reason
 			if evt.Part.Tokens != nil {
-				result["usage"] = map[string]any{
+				usageMap := map[string]any{
 					"inputTokens":      evt.Part.Tokens.Input,
 					"outputTokens":     evt.Part.Tokens.Output,
 					"reasoningTokens":  evt.Part.Tokens.Reasoning,
 					"totalTokens":      evt.Part.Tokens.Total,
 					"cacheReadTokens":  evt.Part.Tokens.Cache.Read,
 					"cacheWriteTokens": evt.Part.Tokens.Cache.Write,
+				}
+				result["usage"] = usageMap
+				// Emit context usage metrics so budgeting and dashboards can track token burn.
+				emitter.Emit(BusEventContextUsage, scope, usageMap)
+				// Track cumulative token consumption for context budget.
+				if a.budget != nil {
+					a.budget.Track(evt.Part.Tokens.Input + evt.Part.Tokens.Output)
 				}
 			}
 			if evt.Part.Cost > 0 {
@@ -234,10 +277,26 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 			"state": "idle",
 		})
 	case "error":
-		emitter.Emit(BusEventResult, scope, map[string]any{
+		result := map[string]any{
 			"success": false,
-			"error":   evt.ErrorMessage,
-		})
+		}
+		// OpenCode errors can be either a plain string or an object like
+		// { name: "AuthError", data: { message: "details" } }.
+		switch e := evt.Error.(type) {
+		case string:
+			result["error"] = e
+		case map[string]any:
+			if msg, ok := e["message"].(string); ok && msg != "" {
+				result["error"] = msg
+			} else if name, ok := e["name"].(string); ok {
+				result["error"] = name + ": " + extractErrorDataMessage(e)
+			} else {
+				result["error"] = "unknown error"
+			}
+		default:
+			result["error"] = "unknown error"
+		}
+		emitter.Emit(BusEventResult, scope, result)
 	default:
 		slog.Debug("opencode: unhandled event type", "type", evt.Type)
 	}
@@ -250,7 +309,7 @@ type opencodeEvent struct {
 	Timestamp    float64       `json:"timestamp,omitempty"`
 	SessionID    string        `json:"sessionID,omitempty"`
 	Part         *opencodePart `json:"part,omitempty"`
-	ErrorMessage string        `json:"error,omitempty"`
+	Error        any           `json:"error,omitempty"` // string or object { name, data: { message } }
 	Model        string        `json:"model,omitempty"`
 	Provider     string        `json:"provider,omitempty"`
 	Tools        []string      `json:"tools,omitempty"`
@@ -281,11 +340,13 @@ type opencodePart struct {
 }
 
 type opencodeToolState struct {
-	Status string `json:"status"`
-	Input  any    `json:"input,omitempty"`
-	Output string `json:"output,omitempty"`
-	Title  string `json:"title,omitempty"`
-	Error  string `json:"error,omitempty"`
+	Status     string `json:"status"`
+	Input      any    `json:"input,omitempty"`
+	Output     string `json:"output,omitempty"`
+	Title      string `json:"title,omitempty"`
+	Error      string `json:"error,omitempty"`
+	Truncated  bool   `json:"truncated,omitempty"`
+	OutputPath string `json:"outputPath,omitempty"`
 }
 
 type opencodeTime struct {
@@ -317,4 +378,22 @@ func splitComma(s string) []string {
 		}
 	}
 	return out
+}
+
+// extractErrorDataMessage extracts the embedded message from an OpenCode error
+// object's data.message field: { name: "...", data: { message: "..." } }.
+func extractErrorDataMessage(e map[string]any) string {
+	data, ok := e["data"]
+	if !ok {
+		return ""
+	}
+	dm, ok := data.(map[string]any)
+	if !ok {
+		return ""
+	}
+	msg, ok := dm["message"].(string)
+	if !ok {
+		return ""
+	}
+	return msg
 }

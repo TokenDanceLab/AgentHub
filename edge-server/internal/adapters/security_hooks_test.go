@@ -367,6 +367,188 @@ func TestClassifyRiskUnknownToolIsHigh(t *testing.T) {
 	}
 }
 
+func TestClassifyRiskNotebookEditIsMedium(t *testing.T) {
+	h := newSecurityHook()
+	risk := h.classifyRisk("NotebookEdit", nil)
+	if risk != RiskMedium {
+		t.Fatalf("classifyRisk(NotebookEdit) = %s, want %s", risk, RiskMedium)
+	}
+}
+
+func TestClassifyRiskSkillIsHighByDefault(t *testing.T) {
+	h := newSecurityHook()
+	risk := h.classifyRisk("Skill", map[string]any{
+		"skill": "some-unknown-skill",
+	})
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(Skill) = %s, want %s (default without inspector)", risk, RiskHigh)
+	}
+}
+
+func TestClassifyRiskSkillWithInspector(t *testing.T) {
+	inspector := func(skillName string) RiskLevel {
+		switch skillName {
+		case "safe-skill":
+			return RiskLow
+		case "dangerous-skill":
+			return RiskBlocked
+		default:
+			return RiskHigh
+		}
+	}
+	h := NewSecurityHookWithSkillInspector(ApprovalAuto, inspector)
+
+	// Safe skill → RiskLow
+	risk := h.classifyRisk("Skill", map[string]any{"skill": "safe-skill"})
+	if risk != RiskLow {
+		t.Fatalf("classifyRisk(Skill, safe-skill) = %s, want %s", risk, RiskLow)
+	}
+
+	// Dangerous skill → RiskBlocked
+	risk = h.classifyRisk("Skill", map[string]any{"skill": "dangerous-skill"})
+	if risk != RiskBlocked {
+		t.Fatalf("classifyRisk(Skill, dangerous-skill) = %s, want %s", risk, RiskBlocked)
+	}
+
+	// Unknown skill → RiskHigh
+	risk = h.classifyRisk("Skill", map[string]any{"skill": "unknown-skill"})
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(Skill, unknown-skill) = %s, want %s", risk, RiskHigh)
+	}
+}
+
+func TestClassifyRiskSkillWithCapitalSkillKey(t *testing.T) {
+	inspector := func(skillName string) RiskLevel {
+		if skillName == "safe-skill" {
+			return RiskLow
+		}
+		return RiskHigh
+	}
+	h := NewSecurityHookWithSkillInspector(ApprovalAuto, inspector)
+
+	risk := h.classifyRisk("Skill", map[string]any{"Skill": "safe-skill"})
+	if risk != RiskLow {
+		t.Fatalf("classifyRisk(Skill, capital key) = %s, want %s", risk, RiskLow)
+	}
+}
+
+func TestClassifyRiskSkillNoInspectorReturnsRiskHigh(t *testing.T) {
+	h := newSecurityHook() // no SkillInspector
+	risk := h.classifyRisk("Skill", map[string]any{"skill": "any-skill"})
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(Skill) without inspector = %s, want RiskHigh", risk)
+	}
+}
+
+func TestClassifyRiskSkillEmptyInputReturnsRiskHigh(t *testing.T) {
+	inspector := func(skillName string) RiskLevel { return RiskLow }
+	h := NewSecurityHookWithSkillInspector(ApprovalAuto, inspector)
+
+	// Empty input — no skill name to inspect
+	risk := h.classifyRisk("Skill", nil)
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(Skill, nil) = %s, want RiskHigh", risk)
+	}
+
+	risk = h.classifyRisk("Skill", map[string]any{})
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(Skill, empty) = %s, want RiskHigh", risk)
+	}
+}
+
+func TestClassifyRiskSendMessageIsHigh(t *testing.T) {
+	h := newSecurityHook()
+	risk := h.classifyRisk("SendMessage", nil)
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(SendMessage) = %s, want %s", risk, RiskHigh)
+	}
+}
+
+func TestClassifyRiskTaskCreateIsHigh(t *testing.T) {
+	h := newSecurityHook()
+	risk := h.classifyRisk("TaskCreate", nil)
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(TaskCreate) = %s, want %s", risk, RiskHigh)
+	}
+}
+
+func TestClassifyRiskTaskUpdateIsHigh(t *testing.T) {
+	h := newSecurityHook()
+	risk := h.classifyRisk("TaskUpdate", nil)
+	if risk != RiskHigh {
+		t.Fatalf("classifyRisk(TaskUpdate) = %s, want %s", risk, RiskHigh)
+	}
+}
+
+func TestClassifyRiskMCPPrefixIsHigh(t *testing.T) {
+	h := newSecurityHook()
+
+	mcpTools := []string{
+		"mcp__stitch__create_project",
+		"mcp__stitch__get_screen",
+		"mcp__github__list_repos",
+		"mcp__filesystem__read_file",
+	}
+	for _, name := range mcpTools {
+		risk := h.classifyRisk(name, nil)
+		if risk != RiskHigh {
+			t.Fatalf("classifyRisk(%s) = %s, want RiskHigh", name, risk)
+		}
+	}
+}
+
+func TestExtractSkillNameFromSkillKey(t *testing.T) {
+	name := extractSkillName(map[string]any{"skill": "my-skill"})
+	if name != "my-skill" {
+		t.Fatalf("extractSkillName = %q, want %q", name, "my-skill")
+	}
+}
+
+func TestExtractSkillNameFromCapitalSkillKey(t *testing.T) {
+	name := extractSkillName(map[string]any{"Skill": "capital-skill"})
+	if name != "capital-skill" {
+		t.Fatalf("extractSkillName = %q, want %q", name, "capital-skill")
+	}
+}
+
+func TestExtractSkillNameFromCommandKey(t *testing.T) {
+	name := extractSkillName(map[string]any{"command": "legacy-skill"})
+	if name != "legacy-skill" {
+		t.Fatalf("extractSkillName = %q, want %q", name, "legacy-skill")
+	}
+}
+
+func TestExtractSkillNamePrefersSkillKeyOverCommand(t *testing.T) {
+	name := extractSkillName(map[string]any{
+		"skill":   "primary-skill",
+		"command": "fallback-skill",
+	})
+	if name != "primary-skill" {
+		t.Fatalf("extractSkillName = %q, want %q", name, "primary-skill")
+	}
+}
+
+func TestExtractSkillNameNilInput(t *testing.T) {
+	name := extractSkillName(nil)
+	if name != "" {
+		t.Fatalf("extractSkillName(nil) = %q, want empty", name)
+	}
+}
+
+func TestExtractSkillNameEmptyMap(t *testing.T) {
+	name := extractSkillName(map[string]any{})
+	if name != "" {
+		t.Fatalf("extractSkillName(empty) = %q, want empty", name)
+	}
+}
+
+func TestExtractSkillNameEmptySkillValue(t *testing.T) {
+	name := extractSkillName(map[string]any{"skill": ""})
+	if name != "" {
+		t.Fatalf("extractSkillName(empty value) = %q, want empty", name)
+	}
+}
+
 func TestClassifyRiskWebFetchBlockedUrl(t *testing.T) {
 	h := newSecurityHook()
 	// URL that contains a curl|bash pattern in the url field

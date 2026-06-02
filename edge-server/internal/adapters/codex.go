@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os/exec"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -17,7 +18,8 @@ import (
 type CodexAdapter struct {
 	binaryPath string
 	model      string
-	available  bool // #177: true if the CLI binary exists and is executable
+	available  bool                    // #177: true if the CLI binary exists and is executable
+	budget     *runnerctx.ContextBudget // extracted from ctx in ParseStream; nil = no tracking
 }
 
 // NewCodexAdapter creates a Codex adapter.
@@ -36,10 +38,13 @@ func (a *CodexAdapter) Metadata() AdapterMetadata {
 
 func (a *CodexAdapter) Capabilities() AgentCapabilities {
 	return AgentCapabilities{
-		Streaming:   false, // Phase 1: batch only; P1: streaming via app-server
-		ToolCalls:   true,
-		FileChanges: true,
-		MultiTurn:   true,
+		Streaming:       false, // Phase 1: batch only; P1: streaming via app-server
+		ToolCalls:       true,
+		FileChanges:     true,
+		ThinkingVisible: true, // reasoning items are emitted via item.completed
+		MultiTurn:       true,
+		MCPIntegration:  true, // mcp_tool_call items are fully handled
+		SubAgentSpawn:   true, // collab_tool_call items map to BusEventTaskStarted/Notification
 	}
 }
 
@@ -101,6 +106,12 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
 	}
 
+	// Context continuity: prepend thread history + pinned messages so Codex
+	// has full Hub conversation context (not just the trigger message).
+	if contextPreface := runnerctx.BuildContextPreface(ctx.Messages, ctx.PinnedMessages); contextPreface != "" {
+		prompt = contextPreface + "\n---\n\n" + prompt
+	}
+
 	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
@@ -136,10 +147,23 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 		"runId":     run.ID,
 	}
 
+	// Extract budget from context for token tracking (nil = no tracking).
+	if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
+		a.budget = budget
+	}
+
 	jsonlMode := false
 	offset := 0
 
-	return ScanLines(ctx, stdout, func(line []byte) error {
+	return ScanLines(ctx, stdout, func(line []byte) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("codex: panic in stream handler, recovering to keep stream alive",
+					"runId", run.ID, "panic", r)
+				err = nil // allow ScanLines to continue
+			}
+		}()
+
 		if !jsonlMode {
 			var probe json.RawMessage
 			if json.Unmarshal(line, &probe) == nil {
@@ -194,11 +218,17 @@ type codexError struct {
 	Message string `json:"message"`
 }
 
+// codexUsage mirrors exec_events::Usage. The exec-level Usage struct only
+// contains input_tokens, cached_input_tokens, and output_tokens. The
+// reasoning_output_tokens and total_tokens fields are protocol-level
+// TokenUsage fields included here for forward compatibility — they will be
+// zero when Codex does not emit them.
 type codexUsage struct {
 	InputTokens           int64 `json:"input_tokens"`
 	CachedInputTokens     int64 `json:"cached_input_tokens"`
 	OutputTokens          int64 `json:"output_tokens"`
-	ReasoningOutputTokens int64 `json:"reasoning_output_tokens"`
+	ReasoningOutputTokens int64 `json:"reasoning_output_tokens,omitempty"`
+	TotalTokens           int64 `json:"total_tokens,omitempty"`
 }
 
 // itemBase is used to probe the item's "type" field before decoding the full payload.
@@ -229,14 +259,24 @@ func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmi
 	case "turn.completed":
 		payload := map[string]any{"success": true}
 		if evt.Usage != nil {
-			payload["usage"] = map[string]any{
+			usageMap := map[string]any{
 				"inputTokens":           evt.Usage.InputTokens,
 				"cachedInputTokens":     evt.Usage.CachedInputTokens,
 				"outputTokens":          evt.Usage.OutputTokens,
 				"reasoningOutputTokens": evt.Usage.ReasoningOutputTokens,
 			}
+			payload["usage"] = usageMap
+			// Emit context usage metrics so budgeting and dashboards can track token burn.
+			emitter.Emit(BusEventContextUsage, scope, usageMap)
+			// Track cumulative token consumption for context budget.
+			if a.budget != nil {
+				a.budget.Track(int(evt.Usage.InputTokens + evt.Usage.OutputTokens))
+			}
 		}
 		emitter.Emit(BusEventResult, scope, payload)
+		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
+			"state": "idle",
+		})
 
 	case "turn.failed":
 		msg := "turn failed"
@@ -246,6 +286,9 @@ func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmi
 		emitter.Emit(BusEventResult, scope, map[string]any{
 			"success": false,
 			"error":   msg,
+		})
+		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
+			"state": "idle",
 		})
 
 	case "item.started":
@@ -286,6 +329,8 @@ func (a *CodexAdapter) dispatchItemStarted(scope map[string]any, emitter EventEm
 	case "collab_tool_call":
 		a.emitTaskStarted(raw, scope, emitter)
 	case "file_change":
+		// Note: Codex currently emits file_change only as item.completed.
+		// We handle item.started defensively in case the protocol evolves.
 		a.emitFileChange(raw, scope, emitter)
 	case "todo_list":
 		a.emitTodoList(raw, scope, emitter)
@@ -323,6 +368,10 @@ func (a *CodexAdapter) dispatchItemCompleted(scope map[string]any, emitter Event
 	}
 }
 
+// dispatchItemUpdated handles item.updated events. Note that per the Codex
+// exec protocol, file_change items are only emitted as item.completed — the
+// file_change case here is defensive. collab_tool_call on item.updated is
+// valid (sub-agent state transitions).
 func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEmitter, raw json.RawMessage) {
 	if raw == nil {
 		return
@@ -344,6 +393,7 @@ func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEm
 	case "todo_list":
 		a.emitTodoList(raw, scope, emitter)
 	case "file_change":
+		// Defensive: Codex currently only emits file_change as item.completed.
 		a.emitFileChange(raw, scope, emitter)
 	}
 }
@@ -491,6 +541,10 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 	emitter.Emit(BusEventToolResult, scope, payload)
 }
 
+// emitFileChange handles file_change items. Per the Codex exec protocol
+// (codex-rs/exec/src/exec_events.rs), this item is only emitted as
+// item.completed once the patch succeeds or fails. The handler is also
+// wired to item.started/updated defensively.
 func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {
 	var item struct {
 		ID      string `json:"id"`

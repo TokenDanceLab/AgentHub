@@ -198,6 +198,11 @@ func TestAgentTeamHandler_DecideApproval(t *testing.T) {
 }
 
 type mockAgentTeamService struct {
+	createTeam          func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
+	listTeams           func(ctx context.Context, userID string) ([]model.AgentTeam, error)
+	getTeamWithMembers  func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
+	addTeamMember       func(ctx context.Context, userID, teamID, agentProfileID, role string) error
+	startTeamRun        func(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
 	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
 	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
@@ -206,7 +211,10 @@ type mockAgentTeamService struct {
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
-	return nil, nil
+	if m.createTeam == nil {
+		return nil, nil
+	}
+	return m.createTeam(ctx, userID, name, description)
 }
 
 func (m *mockAgentTeamService) GetTeam(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
@@ -214,11 +222,17 @@ func (m *mockAgentTeamService) GetTeam(ctx context.Context, userID, teamID strin
 }
 
 func (m *mockAgentTeamService) GetTeamWithMembers(ctx context.Context, userID, teamID string) (*model.TeamDetail, error) {
-	return nil, nil
+	if m.getTeamWithMembers == nil {
+		return nil, nil
+	}
+	return m.getTeamWithMembers(ctx, userID, teamID)
 }
 
 func (m *mockAgentTeamService) ListTeams(ctx context.Context, userID string) ([]model.AgentTeam, error) {
-	return nil, nil
+	if m.listTeams == nil {
+		return nil, nil
+	}
+	return m.listTeams(ctx, userID)
 }
 
 func (m *mockAgentTeamService) UpdateTeam(ctx context.Context, userID, teamID, name, description string) error {
@@ -230,7 +244,10 @@ func (m *mockAgentTeamService) DeleteTeam(ctx context.Context, userID, teamID st
 }
 
 func (m *mockAgentTeamService) AddTeamMember(ctx context.Context, userID, teamID, agentProfileID, role string) error {
-	return nil
+	if m.addTeamMember == nil {
+		return nil
+	}
+	return m.addTeamMember(ctx, userID, teamID, agentProfileID, role)
 }
 
 func (m *mockAgentTeamService) RemoveTeamMember(ctx context.Context, userID, teamID, memberID string) error {
@@ -238,7 +255,10 @@ func (m *mockAgentTeamService) RemoveTeamMember(ctx context.Context, userID, tea
 }
 
 func (m *mockAgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error) {
-	return nil, nil
+	if m.startTeamRun == nil {
+		return nil, nil
+	}
+	return m.startTeamRun(ctx, userID, teamID, triggerMessage)
 }
 
 func (m *mockAgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error) {
@@ -306,4 +326,190 @@ func (m *mockAgentTeamService) DecideApproval(ctx context.Context, userID, teamI
 		return nil, nil
 	}
 	return m.decideApproval(ctx, userID, teamID, runID, approvalID, decision)
+}
+
+func TestAgentTeamHandler_CreateTeam(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("success", func(t *testing.T) {
+		called := false
+		svc := &mockAgentTeamService{
+			createTeam: func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
+				called = true
+				assert.Equal(t, "user-1", userID)
+				assert.Equal(t, "My Team", name)
+				assert.Equal(t, "A test team", description)
+				return &model.AgentTeam{ID: "team-1", Name: name, Description: description}, nil
+			},
+		}
+		h := NewAgentTeamHandler(svc)
+
+		r := gin.New()
+		r.POST("/web/agent-teams", func(c *gin.Context) {
+			c.Set("user_id", "user-1")
+			h.CreateTeam(c)
+		})
+
+		body := bytes.NewBufferString(`{"name":"My Team","description":"A test team"}`)
+		req := httptest.NewRequest(http.MethodPost, "/web/agent-teams", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.True(t, called)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "team-1")
+		assert.Contains(t, w.Body.String(), "My Team")
+	})
+
+	t.Run("empty name fails", func(t *testing.T) {
+		svc := &mockAgentTeamService{}
+		h := NewAgentTeamHandler(svc)
+
+		r := gin.New()
+		r.POST("/web/agent-teams", func(c *gin.Context) {
+			c.Set("user_id", "user-1")
+			h.CreateTeam(c)
+		})
+
+		body := bytes.NewBufferString(`{}`)
+		req := httptest.NewRequest(http.MethodPost, "/web/agent-teams", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "BAD_REQUEST")
+	})
+}
+
+func TestAgentTeamHandler_ListTeams(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentTeamService{
+		listTeams: func(ctx context.Context, userID string) ([]model.AgentTeam, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			return []model.AgentTeam{
+				{ID: "team-1", Name: "Team Alpha"},
+				{ID: "team-2", Name: "Team Beta"},
+			}, nil
+		},
+	}
+	h := NewAgentTeamHandler(svc)
+
+	r := gin.New()
+	r.GET("/web/agent-teams", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.ListTeams(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/web/agent-teams", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "team-1")
+	assert.Contains(t, w.Body.String(), "Team Alpha")
+	assert.Contains(t, w.Body.String(), "team-2")
+}
+
+func TestAgentTeamHandler_GetTeam(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentTeamService{
+		getTeamWithMembers: func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "team-1", teamID)
+			return &model.TeamDetail{
+				AgentTeam: &model.AgentTeam{ID: "team-1", Name: "My Team"},
+				Members:   []model.AgentTeamMember{},
+			}, nil
+		},
+	}
+	h := NewAgentTeamHandler(svc)
+
+	r := gin.New()
+	r.GET("/web/agent-teams/:id", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.GetTeam(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/web/agent-teams/team-1", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "team-1")
+	assert.Contains(t, w.Body.String(), "My Team")
+}
+
+func TestAgentTeamHandler_AddMember(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentTeamService{
+		addTeamMember: func(ctx context.Context, userID, teamID, agentProfileID, role string) error {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "team-1", teamID)
+			assert.Equal(t, "agent-1", agentProfileID)
+			assert.Equal(t, "worker", role)
+			return nil
+		},
+	}
+	h := NewAgentTeamHandler(svc)
+
+	r := gin.New()
+	r.POST("/web/agent-teams/:id/members", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.AddMember(c)
+	})
+
+	body := bytes.NewBufferString(`{"agent_profile_id":"agent-1","role":"worker"}`)
+	req := httptest.NewRequest(http.MethodPost, "/web/agent-teams/team-1/members", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestAgentTeamHandler_StartRun(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentTeamService{
+		startTeamRun: func(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "team-1", teamID)
+			assert.Equal(t, "Build the UI", triggerMessage)
+			return &model.AgentTeamRun{ID: "run-1", TeamID: teamID, TriggerMessage: triggerMessage, Status: "queued"}, nil
+		},
+	}
+	h := NewAgentTeamHandler(svc)
+
+	r := gin.New()
+	r.POST("/web/agent-teams/:id/runs", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.StartRun(c)
+	})
+
+	body := bytes.NewBufferString(`{"trigger_message":"Build the UI"}`)
+	req := httptest.NewRequest(http.MethodPost, "/web/agent-teams/team-1/runs", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "run-1")
+	assert.Contains(t, w.Body.String(), "queued")
 }

@@ -45,7 +45,7 @@ describe('PermissionDialog', () => {
     render(<PermissionDialog requests={[makeRequest()]} onDecide={onDecide} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Allow Bash execution' }));
-    expect(onDecide).toHaveBeenCalledWith('perm-1', 'allow');
+    expect(onDecide).toHaveBeenCalledWith('perm-1', 'allow', undefined);
 
     onDecide.mockClear();
     fireEvent.click(screen.getByRole('button', { name: 'Deny Bash execution' }));

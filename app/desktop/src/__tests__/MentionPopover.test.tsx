@@ -71,7 +71,7 @@ describe('MentionPopover', () => {
     render(<MentionPopover {...defaultProps} agents={agents} onSelect={onSelect} />);
 
     fireEvent.click(screen.getByText('Alpha'));
-    expect(onSelect).toHaveBeenCalledWith(agents[0]);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ kind: 'agent', agent: agents[0] }));
   });
 
   it('calls onClose on outside mousedown', async () => {

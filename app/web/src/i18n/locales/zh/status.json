@@ -31,6 +31,7 @@
   "prompt.targetAuto": "自动目标",
   "prompt.targetOfflineQueue": "离线队列",
   "prompt.targetLocked": "锁定",
+  "prompt.targetLabel": "{{name}} 路 {{status}}",
   "run.status.queued": "已排队",
   "run.status.running": "运行中",
   "run.status.finished": "已完成",
