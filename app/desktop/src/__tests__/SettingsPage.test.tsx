@@ -132,6 +132,7 @@ vi.mock('@/hooks/useAuth', () => ({
     logout: vi.fn(),
     tryAutoLogin: vi.fn(),
   }),
+  getAccessToken: vi.fn(() => 'mock-token'),
 }));
 
 vi.mock('@/api/hubClient', () => ({
