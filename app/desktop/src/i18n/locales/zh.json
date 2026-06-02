@@ -93,7 +93,6 @@
   "chat.result.success": "已完成 — 输入 {{input}} / 输出 {{output}} tokens",
   "chat.runStatus.agentFallback": "Agent",
   "chat.runStatus.completed": "{{agent}} 已返回运行状态：{{status}}。右侧运行面板包含完整日志、工具调用和文件变更。",
-  "chat.runStatus.noReplayOutput": "这次运行已结束（{{status}}），但本地没有保存可回放的 Agent 输出。运行 {{runId}} 可能来自旧版本记录。",
   "chat.runStatus.running": "已交给 {{agent}}，当前状态：{{status}}。如果该 Runtime 没有文本流，进度会同步显示在右侧运行面板。",
   "chat.scrollToBottom": "滚动到底部",
   "chat.sessionInit": "会话已初始化 — {{model}}",

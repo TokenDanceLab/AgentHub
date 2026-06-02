@@ -147,7 +147,6 @@
   "chat.runStatus.agentFallback": "Agent",
   "chat.runStatus.running": "Handed off to {{agent}}. Current status: {{status}}. If this Runtime does not stream text, progress is mirrored in the run panel on the right.",
   "chat.runStatus.completed": "{{agent}} returned run status: {{status}}. The run panel on the right has full logs, tool calls, and file changes.",
-  "chat.runStatus.noReplayOutput": "This run ended ({{status}}), but no replayable agent output was saved locally. Run {{runId}} may be an older record.",
   "chat.copy": "Copy",
   "chat.copied": "Copied",
   "chat.retry": "Retry",

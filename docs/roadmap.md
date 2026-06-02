@@ -1096,18 +1096,18 @@ pnpm typecheck                                         # 零错误
 
 ---
 
-### 7.7 B7: CI / 文档 / 清理（🟢 低，2d）
+### 7.7 B7: CI / 文档 / 清理（🟢 低，2d，✅ 已收口）
 
 | # | Issue | 文件 | 方案 |
 |---|-------|------|------|
-| 181 | Desktop CI test 脚本名修正 | `.github/workflows/checks.yml` | `test:desktop` → 正确脚本名 |
-| 180 | Web ESLint 接入 package scripts + CI | `app/web/package.json` | 添加 `lint` script |
-| 105 | CI gates 对齐安全/覆盖率策略 | `.github/workflows/checks.yml` | 硬阻断门槛确认 |
-| 71 | pnpm lockfile 漂移修复 | `app/web/pnpm-lock.yaml` | 重新 `pnpm install` |
-| 164 | 清理跟踪的 Go coverage profiles | `edge-server/cov_full`, `hub-server/tests/uploads/` | `.gitignore` + `git rm --cached` |
-| 74 | 同上 — 删除 tracked Edge coverage | `.gitignore` | 同上 |
-| 69 | 删除 tracked Desktop bundle analyzer 输出 | `.gitignore` | `app/desktop/stats.html` |
-| 114 | dev/smoke 脚本更新（runner 已移除） | `scripts/client-smoke.ps1` | 更新引用 |
+| 181 | Desktop CI test 脚本名修正 | `.github/workflows/checks.yml` | ✅ Desktop 使用 `pnpm test:ci` |
+| 180 | Web ESLint 接入 package scripts + CI | `app/web/package.json` / `.github/workflows/checks.yml` | ✅ Web `lint` script 已接 CI |
+| 105 | CI gates 对齐安全/覆盖率策略 | `.github/workflows/checks.yml` / `scripts/verify-ci-gates.ps1` | ✅ 覆盖率、govulncheck、OpenAPI、secret guard 和 frontend pnpm gate 已纳入校验 |
+| 71 | pnpm lockfile 漂移修复 | `app/pnpm-lock.yaml` | ✅ Web/Mobile/E2E 使用 workspace lockfile；CI cache 指向 `app/pnpm-lock.yaml` |
+| 164 | 清理跟踪的 Go coverage profiles | `edge-server/cov_full`, `hub-server/tests/uploads/` | ✅ `.gitignore` + tracked artifact 清理已完成 |
+| 74 | 同上 — 删除 tracked Edge coverage | `.gitignore` | ✅ 已完成 |
+| 69 | 删除 tracked Desktop bundle analyzer 输出 | `.gitignore` | ✅ `app/desktop/stats.html` 不再跟踪 |
+| 114 | dev/smoke 脚本更新（runner 已移除） | `scripts/client-smoke.ps1` | ✅ 使用 Edge 内置 `agenthub-runner-mock`，不再构建独立 `runner/` |
 
 **2026-05-26 Worker A CI 定位记录**：
 - PR #199 合入后 `Cross-platform build (windows-latest)` 红灯定位到 `edge-server/internal/lifecycle` 的 `TestProcessExecutorPublishesOutputAndFinished`：Windows runner 实际 stdout 为 `"stdout chunk\n"`，测试期望包含动态 `run=run_TestProcessExecutorPublishesOutputAndFinished_...`。
@@ -1197,7 +1197,7 @@ pnpm typecheck                                         # 零错误
 |---|-------|:--:|
 | — | — | — |
 
-**B7 剩余（4 个，客户端相关）**：#181, #180, #71, #114
+**B7 剩余（0 个）**：#181, #180, #71, #114 已按当前 CI/workspace lockfile/client-smoke 事实收口。
 **B6 剩余（9 个，Desktop IM/Hub 对接）**：#123, #121, #119, #118, #125, #126, #102, #106, #150
 
 ---
