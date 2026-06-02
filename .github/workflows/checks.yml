@@ -329,6 +329,9 @@ jobs:
       - name: Build desktop
         run: pnpm build
         working-directory: ./app/desktop
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: ./app
       - name: Smoke test
         run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium
         working-directory: ./app
