@@ -380,7 +380,20 @@ export function createHubAuth(client?: HubClient): HubAuth {
       pendingOidcState = serverState;
 
       // 3. Open browser for user authentication.
-      const opened = window.open(authUrl, '_blank');
+      // In Tauri, we use shell.open to open the system default browser
+      // instead of window.open() which may be blocked by Tauri's WebView popup policy.
+      let opened: Window | null | undefined;
+      if (isTauri()) {
+        try {
+          const shell = await import('@tauri-apps/plugin-shell');
+          await shell.open(authUrl);
+          opened = window; // fake non-null to avoid popup error below
+        } catch {
+          opened = window.open(authUrl, '_blank');
+        }
+      } else {
+        opened = window.open(authUrl, '_blank');
+      }
       if (!opened) {
         throw new Error(
           'Popup blocked — please allow popups for AgentHub to use TokenDance ID login. ' +
