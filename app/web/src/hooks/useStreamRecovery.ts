@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useCallback } from 'react';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { createHubClient, type AgentRunEvent } from '@/api/hubClient';
@@ -32,6 +33,7 @@ export function useStreamRecovery({
   justReconnected: boolean;
   isConnected: boolean;
 }) {
+  const { t } = useTranslation();
   const recoveryState = useConnectionStore((s) => s.recoveryState);
   const setRecoveryState = useConnectionStore((s) => s.setRecoveryState);
   const setRecoveryError = useConnectionStore((s) => s.setRecoveryError);
@@ -81,7 +83,7 @@ export function useStreamRecovery({
           } catch (err) {
             if (cancelled) return;
             if (attempt >= MAX_RECOVERY_RETRIES) {
-              const message = err instanceof Error ? err.message : 'Failed to recover stream events';
+              const message = err instanceof Error ? err.message : t('hub.error.streamRecoveryFailed');
               setRecoveryError(message);
               setRecoveryState('failed');
               recoveryInProgressRef.current = false;
@@ -143,7 +145,7 @@ export function useStreamRecovery({
           return;
         } catch (err) {
           if (attempt >= MAX_RETRIES) {
-            setRecoveryError(err instanceof Error ? err.message : 'Recovery failed');
+            setRecoveryError(err instanceof Error ? err.message : t('hub.error.recoveryFailed'));
             setRecoveryState('failed');
             return;
           }

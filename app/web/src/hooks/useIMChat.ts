@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createHubClient, type MessageResponse, type Session } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
@@ -78,6 +79,7 @@ interface UseIMChatOptions {
 }
 
 export function useIMChat({ hubWS }: UseIMChatOptions) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<Map<string, IMMessage[]>>(new Map());
   const [contacts, setContacts] = useState<IMContact[]>([]);
   const authenticated = useHubStore((s) => s.authenticated);
@@ -95,7 +97,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
     } catch (error) {
       addToast({
         type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to load Hub sessions',
+        message: error instanceof Error ? error.message : t('hub.toast.loadSessionsFailed'),
       });
     }
   }, [authenticated, addToast]);
@@ -120,7 +122,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       } catch (error) {
         addToast({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to load Hub messages',
+          message: error instanceof Error ? error.message : t('hub.toast.loadMessagesFailed'),
         });
       }
     },
@@ -212,7 +214,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
   const sendMessage = useCallback(
     (sessionId: string, content: string, replyToId?: string) => {
       if (!authenticated || !getAccessToken()) {
-        addToast({ type: 'error', message: 'Not connected to Hub' });
+        addToast({ type: 'error', message: t('hub.toast.notConnected') });
         return;
       }
       const clientMsgId = newClientMessageId();
@@ -264,7 +266,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
           });
           addToast({
             type: 'error',
-            message: error instanceof Error ? error.message : 'Failed to send Hub message',
+            message: error instanceof Error ? error.message : t('hub.toast.sendMessageFailed'),
           });
         });
     },
@@ -278,7 +280,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
   const recallMessage = useCallback(
     async (messageId: string, sessionId: string) => {
       if (!authenticated || !getAccessToken()) {
-        addToast({ type: 'error', message: 'Not connected to Hub' });
+        addToast({ type: 'error', message: t('hub.toast.notConnected') });
         return;
       }
       try {
@@ -295,11 +297,11 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
           );
           return next;
         });
-        addToast({ type: 'success', message: 'Message recalled' });
+        addToast({ type: 'success', message: t('hub.toast.messageRecalled') });
       } catch (error) {
         addToast({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to recall message',
+          message: error instanceof Error ? error.message : t('hub.toast.recallMessageFailed'),
         });
       }
     },
@@ -309,7 +311,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
   const forwardMessage = useCallback(
     async (messageId: string, targetSessionIds: string[]) => {
       if (!authenticated || !getAccessToken()) {
-        addToast({ type: 'error', message: 'Not connected to Hub' });
+        addToast({ type: 'error', message: t('hub.toast.notConnected') });
         return;
       }
       try {
@@ -318,7 +320,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       } catch (error) {
         addToast({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to forward message',
+          message: error instanceof Error ? error.message : t('hub.toast.forwardMessageFailed'),
         });
       }
     },
@@ -387,7 +389,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       } catch (error) {
         addToast({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to update pin status',
+          message: error instanceof Error ? error.message : t('hub.toast.updatePinFailed'),
         });
       }
     },
@@ -408,7 +410,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       } catch (error) {
         addToast({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to update archive status',
+          message: error instanceof Error ? error.message : t('hub.toast.updateArchiveFailed'),
         });
       }
     },
@@ -429,7 +431,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       } catch (error) {
         addToast({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to update mute status',
+          message: error instanceof Error ? error.message : t('hub.toast.updateMuteFailed'),
         });
       }
     },
