@@ -18,21 +18,11 @@ type Registry struct {
 	runners map[string]RunnerInfo
 }
 
-// NewRegistry creates a new runner registry and pre-populates it
-// with a single mock runner.
+// NewRegistry creates an empty runner registry.
 func NewRegistry() *Registry {
-	r := &Registry{
+	return &Registry{
 		runners: make(map[string]RunnerInfo),
 	}
-	// Pre-populate with one mock runner.
-	mock := RunnerInfo{
-		ID:           "runner_local_1",
-		Name:         "Mock Runner (local)",
-		Status:       "online",
-		Capabilities: []string{"mock", "shell"},
-	}
-	r.runners[mock.ID] = mock
-	return r
 }
 
 // List returns the current list of runners.
