@@ -13,25 +13,16 @@
   padding: 10px 14px;
 }
 
-.statusIcon {
-  display: flex;
-  flex-shrink: 0;
-}
+.statusIcon { display: flex; flex-shrink: 0; }
 
-.spin {
-  animation: spin 1.2s linear infinite;
-}
+.spin { animation: deploySpin 1.2s linear infinite; }
 
-@keyframes spin {
+@keyframes deploySpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-.info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.info { display: flex; flex-direction: column; gap: 2px; }
 
 .label {
   font-size: 10px;
@@ -46,25 +37,11 @@
   text-transform: capitalize;
 }
 
-.statusPending {
-  color: var(--muted-foreground);
-}
-
-.statusBuilding {
-  color: var(--warning);
-}
-
-.statusDeploying {
-  color: var(--primary);
-}
-
-.statusDeployed {
-  color: var(--success);
-}
-
-.statusFailed {
-  color: var(--danger, #ef4444);
-}
+.statusPending { color: var(--muted-foreground); }
+.statusBuilding { color: var(--warning); }
+.statusDeploying { color: var(--primary); }
+.statusDeployed { color: var(--success); }
+.statusFailed { color: var(--danger, #ef4444); }
 
 .message {
   flex: 1;
@@ -109,12 +86,6 @@
 }
 
 @media (max-width: 767px) {
-  .header {
-    padding: 10px 12px;
-    gap: 8px;
-  }
-
-  .message {
-    display: none;
-  }
+  .header { padding: 10px 12px; gap: 8px; }
+  .message { display: none; }
 }

@@ -30,6 +30,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
+    "react-i18next": "^15.0.0",
     "lucide-react": "^0.400.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

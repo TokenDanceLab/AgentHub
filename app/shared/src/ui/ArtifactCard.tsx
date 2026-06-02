@@ -1,9 +1,15 @@
 import { FileText, Globe, Image, Monitor, Download, ExternalLink, CheckCircle2 } from 'lucide-react';
-import type { MessageBlock } from './ChatView.types';
 import styles from './ArtifactCard.module.css';
 
-interface Props {
-  block: Extract<MessageBlock, { kind: 'artifact' }>;
+export interface ArtifactCardProps {
+  artifactId: string;
+  artifactType: string;
+  title: string;
+  artifactUrl?: string | undefined;
+  previewUrl?: string | undefined;
+  size?: number | undefined;
+  canApplyDiff?: boolean | undefined;
+  diffApplied?: boolean | undefined;
 }
 
 const TYPE_ICON: Record<string, typeof FileText> = {
@@ -20,10 +26,19 @@ function formatSize(bytes: number | undefined): string | null {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function ArtifactCard({ block }: Props) {
-  const Icon = TYPE_ICON[block.artifactType] ?? FileText;
-  const sizeLabel = formatSize(block.size);
-  const artifactUrl = block.artifactUrl ?? block.url;
+export default function ArtifactCard({
+  artifactId,
+  artifactType,
+  title,
+  artifactUrl,
+  previewUrl,
+  size,
+  canApplyDiff,
+  diffApplied,
+}: ArtifactCardProps) {
+  const Icon = TYPE_ICON[artifactType] ?? FileText;
+  const sizeLabel = formatSize(size);
+  const url = artifactUrl;
 
   return (
     <div className={styles.card} data-testid="artifact-card">
@@ -31,16 +46,16 @@ export default function ArtifactCard({ block }: Props) {
         <span className={styles.icon}>
           <Icon size={14} />
         </span>
-        <span className={styles.typeLabel}>{block.artifactType}</span>
-        <span className={styles.title}>{block.title}</span>
+        <span className={styles.typeLabel}>{artifactType}</span>
+        <span className={styles.title}>{title}</span>
         {sizeLabel && <span className={styles.size}>{sizeLabel}</span>}
         <div className={styles.actions}>
-          {block.canApplyDiff && !block.diffApplied && (
+          {canApplyDiff && !diffApplied && (
             <button
               className={styles.applyBtn}
               onClick={() =>
                 window.dispatchEvent(
-                  new CustomEvent('agenthub:apply-artifact-diff', { detail: { artifactId: block.artifactId } }),
+                  new CustomEvent('agenthub:apply-artifact-diff', { detail: { artifactId } }),
                 )
               }
               title="Apply diff"
@@ -50,16 +65,16 @@ export default function ArtifactCard({ block }: Props) {
               <span className={styles.applyLabel}>Apply</span>
             </button>
           )}
-          {block.diffApplied && (
+          {diffApplied && (
             <span className={styles.appliedBadge}>
               <CheckCircle2 size={12} />
               Applied
             </span>
           )}
-          {artifactUrl && (
+          {url && (
             <a
               className={styles.actionBtn}
-              href={artifactUrl}
+              href={url}
               target="_blank"
               rel="noopener noreferrer"
               title="Open artifact"
@@ -68,10 +83,10 @@ export default function ArtifactCard({ block }: Props) {
               <ExternalLink size={14} />
             </a>
           )}
-          {artifactUrl && (
+          {url && (
             <a
               className={styles.actionBtn}
-              href={artifactUrl}
+              href={url}
               download
               title="Download artifact"
               aria-label="Download artifact"
@@ -81,19 +96,19 @@ export default function ArtifactCard({ block }: Props) {
           )}
         </div>
       </div>
-      {block.previewUrl && (
+      {previewUrl && (
         <div className={styles.preview}>
-          {block.artifactType === 'image' ? (
+          {artifactType === 'image' ? (
             <img
-              src={block.previewUrl}
-              alt={block.title}
+              src={previewUrl}
+              alt={title}
               className={styles.previewImage}
               loading="lazy"
             />
           ) : (
             <iframe
-              src={block.previewUrl}
-              title={`Preview: ${block.title}`}
+              src={previewUrl}
+              title={`Preview: ${title}`}
               className={styles.previewFrame}
               sandbox="allow-scripts allow-same-origin"
             />
