@@ -89,7 +89,6 @@ import {
   applyRuntimeAgentLabel,
   buildChatMessagesFromThreadItems,
   buildDisplayedRunOutputMessage,
-  buildRunReplayFallbackMessages,
   filterOptimisticMessagesForThread,
   mergeChatMessages,
 } from '@/utils/chatMessages';
@@ -168,10 +167,6 @@ function focusComposer() {
 
 function setComposerDraft(text: string) {
   window.dispatchEvent(new CustomEvent('agenthub:set-composer-draft', { detail: { text } }));
-}
-
-function shortRunId(value: string): string {
-  return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
 }
 
 function hiddenMessagesStorageKey(threadId: string): string {
@@ -533,9 +528,6 @@ export default function App() {
   const selectedThread = threads.find((th) => th.threadId === activeThreadId);
   const { data: threadItemData } = useThreadMessages(activeThreadId);
   const { data: allRunsData } = useRuns(undefined, undefined, { enabled: online });
-  const { data: selectedThreadRunsData } = useRuns(undefined, activeThreadId ?? undefined, {
-    enabled: Boolean(activeThreadId),
-  });
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
@@ -547,24 +539,9 @@ export default function App() {
     () => buildChatMessagesFromThreadItems(threadItemData?.items ?? []),
     [threadItemData?.items],
   );
-  const runReplayFallbackMessages = useMemo(
-    () => buildRunReplayFallbackMessages(threadItemData?.items ?? [], selectedThreadRunsData?.items ?? [], {
-      agentName: selectedAgent?.name,
-      statusLabel: (status) => t(`run.status.${status}`, { defaultValue: status }),
-      content: ({ runId, statusLabel }) => t('chat.runStatus.noReplayOutput', {
-        runId: shortRunId(runId),
-        status: statusLabel,
-      }),
-    }),
-    [selectedAgent?.name, selectedThreadRunsData?.items, t, threadItemData?.items],
-  );
-  const replayMessages = useMemo(
-    () => [...persistedMessages, ...runReplayFallbackMessages],
-    [persistedMessages, runReplayFallbackMessages],
-  );
   const allMessages = useMemo(() => {
     const merged = mergeChatMessages({
-      persisted: replayMessages,
+      persisted: persistedMessages,
       optimistic: filterOptimisticMessagesForThread(userMessages, activeThreadId),
       live: messages,
     });
@@ -583,7 +560,7 @@ export default function App() {
       ...labeled,
       runOutputMessage,
     ], hiddenMessageIds);
-  }, [activeThreadId, displayedRun, hiddenMessageIds, messages, replayMessages, selectedAgent?.name, userMessages]);
+  }, [activeThreadId, displayedRun, hiddenMessageIds, messages, persistedMessages, selectedAgent?.name, userMessages]);
   const effectiveLeftSidebarWidth = clamp(leftSidebarWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
   const shellStyle = {
     '--left-sidebar-width': `${effectiveLeftSidebarWidth}px`,
