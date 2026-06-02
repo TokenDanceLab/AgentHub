@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
+  ArrowRight,
   Boxes,
   CheckCircle2,
   CircleDashed,
@@ -10,12 +11,25 @@ import {
   GitBranch,
   KeyRound,
   Network,
+  Play,
   Route,
   ShieldCheck,
+  UserPlus,
   Users,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useAgentTeams, useTeamEvents, useTeamRuns, useTeamRunsForTeams, useTeamRunState } from '@/api/teamRunQueries';
+import {
+  useAgentTeams,
+  useTeamEvents,
+  useTeamRuns,
+  useTeamRunsForTeams,
+  useTeamRunState,
+  useStartTeamRun,
+  useDecideApproval,
+  useResolveConflict,
+  useCreateAssignment,
+} from '@/api/teamRunQueries';
 import type {
   AgentTeam,
   AgentTeamEvent,
@@ -28,6 +42,7 @@ import type {
   TeamRunState,
   TeamTaskState,
 } from '@/api/hubClient';
+import { useToastStore } from '@/stores/toastStore';
 import styles from './TeamRunConsole.module.css';
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'dispatching', 'started', 'waiting_approval']);
@@ -362,10 +377,28 @@ function ConflictItem({ conflict }: { conflict: TeamConflictState }) {
 export default function TeamRunConsole() {
   const { t } = useTranslation();
   const auth = useAuth();
+  const addToast = useToastStore((s) => s.addToast);
   const hubReady = auth.isAuthenticated && Boolean(auth.token);
   const [showSignedOutDemo, setShowSignedOutDemo] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+
+  // ── Interactive form state ──────────────────────────────────────
+  const [showStartRunForm, setShowStartRunForm] = useState(false);
+  const [startRunMessage, setStartRunMessage] = useState('');
+  const [approvalDecisions, setApprovalDecisions] = useState<Record<string, { decision: 'allow' | 'deny'; reason?: string }>>({});
+  const [conflictResolutions, setConflictResolutions] = useState<Record<string, { resolution: string; reason?: string; selected_agent_task_id?: string }>>({});
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [assignToMember, setAssignToMember] = useState('');
+  const [assignFromMember, setAssignFromMember] = useState('');
+  const [assignPrompt, setAssignPrompt] = useState('');
+  const [assignType, setAssignType] = useState('task');
+
+  // ── Mutation hooks ──────────────────────────────────────────────
+  const startRunMutation = useStartTeamRun();
+  const decideApprovalMutation = useDecideApproval();
+  const resolveConflictMutation = useResolveConflict();
+  const createAssignmentMutation = useCreateAssignment();
 
   const teamsQuery = useAgentTeams(hubReady);
   const teams = useMemo(() => teamsQuery.data ?? [], [teamsQuery.data]);
@@ -416,6 +449,67 @@ export default function TeamRunConsole() {
     }
     return counts;
   }, [state?.dependencies]);
+
+  // ── Interactive handlers ────────────────────────────────────────
+
+  async function handleStartRun() {
+    if (!selectedTeam?.id || !startRunMessage.trim()) return;
+    try {
+      await startRunMutation.mutateAsync({ teamId: selectedTeam.id, data: { trigger_message: startRunMessage.trim() } });
+      addToast({ type: 'success', message: t('teamrun.runStarted') });
+      setStartRunMessage('');
+      setShowStartRunForm(false);
+    } catch {
+      addToast({ type: 'error', message: t('teamrun.runStartFailed') });
+    }
+  }
+
+  async function handleDecideApproval(approvalId: string) {
+    if (!selectedTeam?.id || !selectedRun?.id) return;
+    const decision = approvalDecisions[approvalId];
+    if (!decision) return;
+    try {
+      await decideApprovalMutation.mutateAsync({
+        teamId: selectedTeam.id, runId: selectedRun.id, approvalId,
+        data: { decision: decision.decision, reason: decision.reason || undefined },
+      });
+      addToast({ type: 'success', message: t('teamrun.approvalDecided') });
+      setApprovalDecisions((prev) => { const next = { ...prev }; delete next[approvalId]; return next; });
+    } catch {
+      addToast({ type: 'error', message: t('teamrun.approvalDecideFailed') });
+    }
+  }
+
+  async function handleResolveConflict(conflictId: string) {
+    if (!selectedTeam?.id || !selectedRun?.id) return;
+    const resolution = conflictResolutions[conflictId];
+    if (!resolution) return;
+    try {
+      await resolveConflictMutation.mutateAsync({
+        teamId: selectedTeam.id, runId: selectedRun.id, conflictId,
+        data: { resolution: resolution.resolution, reason: resolution.reason || undefined, selected_agent_task_id: resolution.selected_agent_task_id || undefined },
+      });
+      addToast({ type: 'success', message: t('teamrun.conflictResolved') });
+      setConflictResolutions((prev) => { const next = { ...prev }; delete next[conflictId]; return next; });
+    } catch {
+      addToast({ type: 'error', message: t('teamrun.conflictResolveFailed') });
+    }
+  }
+
+  async function handleCreateAssignment() {
+    if (!selectedTeam?.id || !selectedRun?.id || !assignToMember.trim() || !assignFromMember.trim() || !assignPrompt.trim()) return;
+    try {
+      await createAssignmentMutation.mutateAsync({
+        teamId: selectedTeam.id, runId: selectedRun.id,
+        data: { from_member_id: assignFromMember.trim(), to_member_id: assignToMember.trim(), task_prompt: assignPrompt.trim(), type: assignType || undefined },
+      });
+      addToast({ type: 'success', message: t('teamrun.assignmentCreated') });
+      setAssignPrompt(''); setAssignToMember(''); setAssignFromMember(''); setAssignType('task');
+      setShowAssignForm(false);
+    } catch {
+      addToast({ type: 'error', message: t('teamrun.assignmentCreateFailed') });
+    }
+  }
 
   const tasksByBucket = useMemo(() => {
     const buckets: Record<'pending' | 'running' | 'done' | 'blocked', TeamTaskState[]> = {
@@ -468,6 +562,34 @@ export default function TeamRunConsole() {
           <MetricCard label={t('teamrun.tasks')} value={state?.tasks.length ?? 0} icon={<CheckCircle2 size={14} />} />
           <MetricCard label={t('teamrun.pendingApprovals')} value={pendingApprovals.length} icon={<ShieldCheck size={14} />} />
         </div>
+        {!useDemoData && displayTeam && (
+          <div className={styles.headerActions}>
+            {!showStartRunForm ? (
+              <button type="button" className={styles.primaryButton} onClick={() => setShowStartRunForm(true)}>
+                <Play size={14} />
+                {t('teamrun.startRun')}
+              </button>
+            ) : (
+              <div className={styles.inlineForm}>
+                <input
+                  type="text"
+                  className={styles.inlineInput}
+                  value={startRunMessage}
+                  onChange={(e) => setStartRunMessage(e.target.value)}
+                  placeholder={t('teamrun.startRunPlaceholder')}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleStartRun(); if (e.key === 'Escape') setShowStartRunForm(false); }}
+                />
+                <button type="button" className={styles.primaryButton} disabled={!startRunMessage.trim() || startRunMutation.isPending} onClick={handleStartRun}>
+                  {startRunMutation.isPending ? t('settings.loading') : t('action.startRun')}
+                </button>
+                <button type="button" className={styles.secondaryButton} onClick={() => setShowStartRunForm(false)}>
+                  {t('common.cancel')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <section className={`${styles.sourceBanner} ${useDemoData ? styles.sourceBannerDemo : ''}`} aria-label={t('teamrun.source')}>
@@ -475,9 +597,15 @@ export default function TeamRunConsole() {
         <span>
           <strong>{sourceLabel}</strong>
           <small>{sourceDescription}</small>
-          <small>{t('teamrun.readOnlyDesc')}</small>
+          {useDemoData ? (
+            <small>{t('teamrun.readOnlyDesc')}</small>
+          ) : (
+            <small>{t('teamrun.interactiveDesc')}</small>
+          )}
         </span>
-        <span className={styles.readOnlyPill}>{t('teamrun.readOnly')}</span>
+        <span className={`${styles.readOnlyPill} ${useDemoData ? '' : styles.pillInteractive}`}>
+          {useDemoData ? t('teamrun.readOnly') : t('teamrun.interactive')}
+        </span>
         {showSignedOutDemo && (
           <button type="button" className={styles.inlineButton} onClick={() => setShowSignedOutDemo(false)}>
             {t('teamrun.backToSignIn')}
@@ -617,6 +745,72 @@ export default function TeamRunConsole() {
         </main>
 
         <aside className={styles.summaryRail}>
+          {!useDemoData && displayTeam && displayRun && (
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <h3>{t('teamrun.assignTask')}</h3>
+              </div>
+              {!showAssignForm ? (
+                <button type="button" className={styles.primaryButton} onClick={() => setShowAssignForm(true)}>
+                  <UserPlus size={14} />
+                  {t('teamrun.assignTask')}
+                </button>
+              ) : (
+                <div className={styles.assignForm}>
+                  <div className={styles.assignField}>
+                    <label>{t('teamrun.assignFrom')}</label>
+                    <select value={assignFromMember} onChange={(e) => setAssignFromMember(e.target.value)} className={styles.inlineSelect}>
+                      <option value="">{t('teamrun.selectMember')}</option>
+                      {(state?.members ?? []).map((m) => (
+                        <option key={m.member_id} value={m.member_id}>{m.role} ({shortId(m.agent_profile_id || m.member_id)})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.assignField}>
+                    <label>{t('teamrun.assignTo')}</label>
+                    <select value={assignToMember} onChange={(e) => setAssignToMember(e.target.value)} className={styles.inlineSelect}>
+                      <option value="">{t('teamrun.selectMember')}</option>
+                      {(state?.members ?? []).map((m) => (
+                        <option key={m.member_id} value={m.member_id}>{m.role} ({shortId(m.agent_profile_id || m.member_id)})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.assignField}>
+                    <label>{t('teamrun.assignType')}</label>
+                    <select value={assignType} onChange={(e) => setAssignType(e.target.value)} className={styles.inlineSelect}>
+                      <option value="task">{t('teamrun.assignType.task')}</option>
+                      <option value="review">{t('teamrun.assignType.review')}</option>
+                      <option value="handoff">{t('teamrun.assignType.handoff')}</option>
+                    </select>
+                  </div>
+                  <div className={styles.assignField}>
+                    <label>{t('teamrun.assignPrompt')}</label>
+                    <textarea
+                      className={styles.inlineTextarea}
+                      value={assignPrompt}
+                      onChange={(e) => setAssignPrompt(e.target.value)}
+                      placeholder={t('teamrun.assignPromptPlaceholder')}
+                      rows={2}
+                    />
+                  </div>
+                  <div className={styles.assignActions}>
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      disabled={!assignToMember.trim() || !assignFromMember.trim() || !assignPrompt.trim() || createAssignmentMutation.isPending}
+                      onClick={handleCreateAssignment}
+                    >
+                      {createAssignmentMutation.isPending ? t('settings.loading') : t('teamrun.assignTask')}
+                    </button>
+                    <button type="button" className={styles.secondaryButton} onClick={() => setShowAssignForm(false)}>
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <h3>{t('teamrun.routeLog')}</h3>
@@ -648,10 +842,49 @@ export default function TeamRunConsole() {
               <h3>{t('teamrun.approvals')}</h3>
               <span>{state?.approvals.length ?? 0}</span>
             </div>
-            {(state?.approvals ?? []).slice(0, 5).map((approval) => (
-              <ApprovalItem key={approval.approval_id || approval.request_id} approval={approval} />
-            ))}
-            {(state?.approvals ?? []).length === 0 && <div className={styles.mutedText}>{t('teamrun.noApprovals')}</div>}
+            {(state?.approvals ?? []).length === 0 ? (
+              <div className={styles.mutedText}>{t('teamrun.noApprovals')}</div>
+            ) : (
+              (state?.approvals ?? []).slice(0, 5).map((approval) => {
+                const decision = approvalDecisions[approval.approval_id];
+                const isDeciding = decideApprovalMutation.isPending && decideApprovalMutation.variables?.approvalId === approval.approval_id;
+                return (
+                  <div key={approval.approval_id || approval.request_id} className={styles.interactiveItem}>
+                    <ApprovalItem approval={approval} />
+                    {!useDemoData && (isActiveStatus(approval.status) || approval.status.toLowerCase() === 'pending') ? (
+                      <div className={styles.interactiveControls}>
+                        {decision ? (
+                          <div className={styles.confirmRow}>
+                            <input
+                              type="text"
+                              className={styles.inlineInputSmall}
+                              value={decision.reason ?? ''}
+                              onChange={(e) => setApprovalDecisions((prev) => ({ ...prev, [approval.approval_id]: { ...decision, reason: e.target.value } }))}
+                              placeholder={t('teamrun.approvalReason')}
+                            />
+                            <button type="button" className={styles.primaryButtonSmall} disabled={isDeciding} onClick={() => handleDecideApproval(approval.approval_id)}>
+                              {isDeciding ? '...' : t(`teamrun.${decision.decision}`)}
+                            </button>
+                            <button type="button" className={styles.secondaryButtonSmall} onClick={() => setApprovalDecisions((prev) => { const next = { ...prev }; delete next[approval.approval_id]; return next; })}>
+                              <XCircle size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className={styles.decisionRow}>
+                            <button type="button" className={styles.approveBtn} onClick={() => setApprovalDecisions((prev) => ({ ...prev, [approval.approval_id]: { decision: 'allow' } }))}>
+                              <CheckCircle2 size={13} />{t('run.reviewAllow')}
+                            </button>
+                            <button type="button" className={styles.denyBtn} onClick={() => setApprovalDecisions((prev) => ({ ...prev, [approval.approval_id]: { decision: 'deny' } }))}>
+                              <XCircle size={13} />{t('run.reviewDeny')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
           </section>
 
           <section className={styles.panel}>
@@ -670,10 +903,55 @@ export default function TeamRunConsole() {
               <h3>{t('teamrun.conflicts')}</h3>
               <span>{state?.conflicts.length ?? 0}</span>
             </div>
-            {(state?.conflicts ?? []).slice(0, 4).map((conflict) => (
-              <ConflictItem key={conflict.conflict_id} conflict={conflict} />
-            ))}
-            {(state?.conflicts ?? []).length === 0 && <div className={styles.mutedText}>{t('teamrun.noConflicts')}</div>}
+            {(state?.conflicts ?? []).length === 0 ? (
+              <div className={styles.mutedText}>{t('teamrun.noConflicts')}</div>
+            ) : (
+              (state?.conflicts ?? []).slice(0, 4).map((conflict) => {
+                const resolution = conflictResolutions[conflict.conflict_id];
+                const isResolving = resolveConflictMutation.isPending && resolveConflictMutation.variables?.conflictId === conflict.conflict_id;
+                const isOpen = conflict.status.toLowerCase() === 'open';
+                return (
+                  <div key={conflict.conflict_id} className={styles.interactiveItem}>
+                    <ConflictItem conflict={conflict} />
+                    {!useDemoData && isOpen ? (
+                      <div className={styles.interactiveControls}>
+                        {resolution ? (
+                          <div className={styles.confirmRow}>
+                            <select
+                              className={styles.inlineSelect}
+                              value={resolution.resolution}
+                              onChange={(e) => setConflictResolutions((prev) => ({ ...prev, [conflict.conflict_id]: { ...resolution, resolution: e.target.value } }))}
+                            >
+                              <option value="accept">{t('teamrun.resolution.accept')}</option>
+                              <option value="reject">{t('teamrun.resolution.reject')}</option>
+                              <option value="merge">{t('teamrun.resolution.merge')}</option>
+                              <option value="defer">{t('teamrun.resolution.defer')}</option>
+                            </select>
+                            <input
+                              type="text"
+                              className={styles.inlineInputSmall}
+                              value={resolution.reason ?? ''}
+                              onChange={(e) => setConflictResolutions((prev) => ({ ...prev, [conflict.conflict_id]: { ...resolution, reason: e.target.value } }))}
+                              placeholder={t('teamrun.conflictReason')}
+                            />
+                            <button type="button" className={styles.primaryButtonSmall} disabled={isResolving} onClick={() => handleResolveConflict(conflict.conflict_id)}>
+                              {isResolving ? '...' : t('teamrun.resolve')}
+                            </button>
+                            <button type="button" className={styles.secondaryButtonSmall} onClick={() => setConflictResolutions((prev) => { const next = { ...prev }; delete next[conflict.conflict_id]; return next; })}>
+                              <XCircle size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button type="button" className={styles.resolveBtn} onClick={() => setConflictResolutions((prev) => ({ ...prev, [conflict.conflict_id]: { resolution: 'accept' } }))}>
+                            <ArrowRight size={13} />{t('teamrun.resolve')}
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
           </section>
 
           <section className={styles.panel}>

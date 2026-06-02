@@ -936,6 +936,78 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`,
       ),
 
+    // --- AgentTeam CRUD ---
+
+    createAgentTeam: (data: { name: string; description?: string }) =>
+      request<AgentTeam>('/web/agent-teams', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    getAgentTeam: (teamId: string) =>
+      request<AgentTeam>(`/web/agent-teams/${encodeURIComponent(teamId)}`),
+
+    updateAgentTeam: (teamId: string, data: { name?: string; description?: string }) =>
+      request<AgentTeam>(`/web/agent-teams/${encodeURIComponent(teamId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentTeam: (teamId: string) =>
+      request<EmptyHubResponse>(`/web/agent-teams/${encodeURIComponent(teamId)}`, {
+        method: 'DELETE',
+      }),
+
+    addTeamMember: (teamId: string, data: { agent_profile_id: string; role?: string }) =>
+      request<HubListResponse<AgentTeamMember>>(`/web/agent-teams/${encodeURIComponent(teamId)}/members`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    removeTeamMember: (teamId: string, memberId: string) =>
+      request<EmptyHubResponse>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+        { method: 'DELETE' },
+      ),
+
+    startTeamRun: (teamId: string, data: { trigger_message: string }) =>
+      request<AgentTeamRun>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+
+    decideTeamApproval: (
+      teamId: string,
+      runId: string,
+      approvalId: string,
+      data: { decision: 'allow' | 'deny'; reason?: string },
+    ) =>
+      request<Record<string, unknown>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+
+    resolveTeamConflict: (
+      teamId: string,
+      runId: string,
+      conflictId: string,
+      data: { resolution: string; selected_agent_task_id?: string; reason?: string },
+    ) =>
+      request<Record<string, unknown>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/conflicts/${encodeURIComponent(conflictId)}/resolve`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+
+    createTeamAssignment: (
+      teamId: string,
+      runId: string,
+      data: { from_member_id: string; to_member_id: string; task_prompt: string; type?: string; context?: string },
+    ) =>
+      request<Record<string, unknown>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/assignments`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+
     // 鈹€鈹€ Custom agents 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     listCustomAgents: () =>

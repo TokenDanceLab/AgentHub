@@ -11,7 +11,7 @@
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  overflow: hidden;
+  overflow: clip;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -218,7 +218,7 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-radius: 14px;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid rgba(0,0,0,0.04);
   position: relative;
 }
