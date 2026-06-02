@@ -41,10 +41,7 @@
   flex-shrink: 0;
 }
 
-.triggerInfo {
-  flex: 1;
-  min-width: 0;
-}
+.triggerInfo { flex: 1; min-width: 0; }
 
 .triggerTitle {
   font-size: var(--font-size-sm);
@@ -61,36 +58,113 @@
   text-transform: capitalize;
 }
 
-.triggerArrow {
+.triggerArrow { color: var(--muted-foreground); flex-shrink: 0; }
+
+/* ── Streaming card ─── */
+.streamingCard {
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--primary) 4%, var(--card));
+  margin: 6px 0;
+  overflow: hidden;
+}
+
+.streamingHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.streamingIcon { color: var(--primary); display: flex; flex-shrink: 0; }
+.streamingLabel {
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
   color: var(--muted-foreground);
   flex-shrink: 0;
 }
-
-/* ── Inline preview (small iframe inside chat, before fullscreen) ─── */
-.inlinePreview {
-  margin: var(--space-xs) 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+.streamingTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
   overflow: hidden;
-  min-height: 240px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
-.inlineFrame {
-  width: 100%;
-  height: 240px;
-  border: none;
-  display: block;
+.streamingPulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: artifactPulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
 }
+
+@keyframes artifactPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.streamingPreview {
+  padding: 8px 14px;
+  background: #1e1e2e;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: #cdd6f4;
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.streamingLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prompt { color: #a6e3a1; flex-shrink: 0; }
+.lineContent { overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background: var(--primary);
+  vertical-align: middle;
+  animation: cursorBlink 0.8s step-end infinite;
+}
+
+@keyframes cursorBlink {
+  50% { opacity: 0; }
+}
+
+.streamingEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 14px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.miniSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: miniSpin 0.6s linear infinite;
+}
+
+@keyframes miniSpin { to { transform: rotate(360deg); } }
 
 /* ── Fullscreen overlay (inside Modal) ─── */
-.fullscreenRoot {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-}
-
 .toolbar {
   display: flex;
   align-items: center;
@@ -128,21 +202,13 @@
   flex-shrink: 0;
 }
 
-.toolbarBtn:hover {
-  background: var(--hover-overlay);
-  color: var(--foreground);
-}
-
-.toolbarBtnPrimary {
-  color: var(--primary);
-}
-
+.toolbarBtn:hover { background: var(--hover-overlay); color: var(--foreground); }
+.toolbarBtnPrimary { color: var(--primary); }
 .toolbarBtnPrimary:hover {
   background: color-mix(in oklch, var(--primary) 12%, transparent);
   color: var(--primary);
 }
 
-/* ── Action button (Apply diff, Open in new tab, etc.) ─── */
 .actionBtn {
   display: inline-flex;
   align-items: center;
@@ -159,13 +225,8 @@
   flex-shrink: 0;
 }
 
-.actionBtn:hover {
-  background: color-mix(in oklch, var(--primary) 12%, transparent);
-}
-
-.actionBtn:active {
-  transform: scale(0.97);
-}
+.actionBtn:hover { background: color-mix(in oklch, var(--primary) 12%, transparent); }
+.actionBtn:active { transform: scale(0.97); }
 
 .actionBtnApplied {
   background: color-mix(in oklch, var(--success) 14%, transparent);
@@ -174,22 +235,9 @@
   cursor: default;
 }
 
-/* ── Frame container ─── */
-.frameWrapper {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-  background: var(--background);
-}
+.frameWrapper { flex: 1; min-height: 0; position: relative; background: var(--background); }
+.frame { width: 100%; height: 100%; border: none; display: block; }
 
-.frame {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
-
-/* ── Image artifact ─── */
 .imageWrapper {
   flex: 1;
   display: flex;
@@ -208,7 +256,6 @@
   border-radius: var(--radius-sm);
 }
 
-/* ── Loading ─── */
 .loading {
   flex: 1;
   display: flex;
@@ -228,16 +275,11 @@
   border: 3px solid var(--border);
   border-top-color: var(--primary);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: previewSpin 0.7s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+@keyframes previewSpin { to { transform: rotate(360deg); } }
 
-/* ── Error ─── */
 .error {
   flex: 1;
   display: flex;
@@ -252,15 +294,8 @@
   text-align: center;
 }
 
-.errorIcon {
-  color: var(--danger, #ef4444);
-  opacity: 0.6;
-}
-
-.errorMessage {
-  max-width: 480px;
-  word-break: break-word;
-}
+.errorIcon { color: var(--danger, #ef4444); opacity: 0.6; }
+.errorMessage { max-width: 480px; word-break: break-word; }
 
 .retryBtn {
   display: inline-flex;
@@ -277,12 +312,8 @@
   transition: background var(--duration-fast), color var(--duration-fast);
 }
 
-.retryBtn:hover {
-  background: var(--hover-overlay);
-  color: var(--foreground);
-}
+.retryBtn:hover { background: var(--hover-overlay); color: var(--foreground); }
 
-/* ── File artifact fallback ─── */
 .fileFallback {
   flex: 1;
   display: flex;
@@ -297,10 +328,7 @@
   text-align: center;
 }
 
-.fileIcon {
-  color: var(--muted-foreground);
-  opacity: 0.5;
-}
+.fileIcon { color: var(--muted-foreground); opacity: 0.5; }
 
 .downloadLink {
   color: var(--primary);
@@ -308,6 +336,4 @@
   font-size: var(--font-size-sm);
 }
 
-.downloadLink:hover {
-  text-decoration: underline;
-}
+.downloadLink:hover { text-decoration: underline; }
