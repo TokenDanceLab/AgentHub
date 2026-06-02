@@ -363,35 +363,39 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const codeChallenge = await computeCodeChallenge(codeVerifier);
       const deviceId = getOrCreateDeviceId();
 
-      // TokenDance ID callback goes to Hub's production redirect_uri
-      // (https://api.hub.vectorcontrol.tech/...). Hub's GET /oidc/callback
-      // displays a Login Successful page with the authorization code.
-      //
-      // We use window.prompt() to let the user paste the code from that
-      // page. The state has been saved in pendingOidcState.
-      let callbackResult: Promise<CallbackResult> | null = null;
-      if (!isTauri()) {
-        // Non-Tauri: manual code entry via prompt
+      // 2. Start local callback server (Tauri) or prepare manual fallback.
+      //    In Tauri, the Rust backend starts an HTTP server on a random port
+      //    and emits `oidc-callback` / `oidc-callback-error` events.
+      //    The redirect_uri is `http://127.0.0.1:{port}/callback`.
+      let callbackResult: Promise<CallbackResult>;
+      let redirectUri = '';
+
+      if (isTauri()) {
+        const { port, result } = await startCallbackServer();
+        redirectUri = buildRedirectUri(port);
+        callbackResult = result;
+      } else {
+        // Non-Tauri: manual code entry via prompt (dev mode fallback)
+        redirectUri = '';
         callbackResult = new Promise<CallbackResult>((resolve, reject) => {
           const code = window.prompt('Enter the authorization code from the login page:');
-          if (!code) { reject(new OidcError('noAuthCode', 'No authorization code provided.')); return; }
+          if (!code) {
+            reject(new OidcError('noAuthCode', 'No authorization code provided.'));
+            return;
+          }
           const state = pendingOidcState || '';
           pendingOidcState = '';
           resolve({ code: code.trim(), state });
         });
       }
 
-      // 2. Call Hub to bind PKCE/state/device and get the authorization URL.
-      // For Tauri, the local loopback callback is sent before Hub creates the
-      // state so Hub and TokenDance ID use the same redirect_uri end to end.
+      // 3. Call Hub to bind PKCE/state/device and get the authorization URL.
+      //    Pass the redirect_uri so Hub and TokenDance ID use the same one.
       const authClient = createPublicClient();
 
       let authorizeResp: { state: string; authorization_url: string };
       try {
-        // redirect_uri is never passed — Hub uses its own production
-      // callback URL (https://hub.vectorcontrol.tech/client/auth/oidc/callback).
-      // This avoids TokenDance ID rejecting dynamic localhost redirect URIs.
-      const authorizeBody: {
+        const authorizeBody: {
           code_challenge: string;
           code_challenge_method: string;
           device_type: string;
@@ -403,7 +407,9 @@ export function createHubAuth(client?: HubClient): HubAuth {
           device_type: 'desktop',
           device_id: deviceId,
         };
-        // No redirect_uri — Hub uses its registered production callback
+        if (redirectUri) {
+          authorizeBody.redirect_uri = redirectUri;
+        }
         authorizeResp = await authClient.oidcAuthorize(authorizeBody);
       } catch (err) {
         const detail = err instanceof Error ? err.message : 'Unknown error';
@@ -415,32 +421,27 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const { state: serverState, authorization_url: authUrl } = authorizeResp;
 
       // code_verifier stays in closure — never written to sessionStorage/localStorage
-      // to prevent same-origin JS from stealing PKCE parameters.
-      // The state bridge is only for the non-Tauri manual-code fallback.
       pendingOidcState = serverState;
 
-      // 3. Open browser for user authentication.
-      // In Tauri, use shell.open to open the system default browser.
-      // In non-Tauri (Vite dev / Web), window.open() works fine.
-      let opened: Window | null | undefined;
+      // 4. Open browser for user authentication.
       if (isTauri()) {
         try {
           const shell = await import('@tauri-apps/plugin-shell');
           await shell.open(authUrl);
-          opened = window;
         } catch {
-          opened = window.open(authUrl, '_blank');
+          window.open(authUrl, '_blank');
         }
       } else {
-        opened = window.open(authUrl, '_blank');
-      }
-      if (!opened) {
-        throw new OidcError('popupBlocked', 'Popup blocked — please allow popups for AgentHub to use TokenDance ID login.');
+        const opened = window.open(authUrl, '_blank');
+        if (!opened) {
+          throw new OidcError('popupBlocked', 'Popup blocked — please allow popups for AgentHub to use TokenDance ID login.');
+        }
       }
 
-      const callback = await waitForOIDCCallback();
+      // 5. Wait for the callback from the local HTTP server (Tauri) or manual paste
+      const callback = await callbackResult;
 
-      // Validate state matches (CSRF protection)
+      // 6. Validate state matches (CSRF protection)
       if (callback.state !== serverState) {
         throw new OidcError('stateMismatch', 'OIDC state mismatch — possible CSRF attack. Please try again.');
       }
@@ -448,7 +449,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       // 7. Exchange the code for Hub tokens
       let tokenResp: HubTokenResponse;
       try {
-        tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, '', deviceId);
+        tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, redirectUri, deviceId);
       } catch (err) {
         const detail = err instanceof Error ? err.message : 'Unknown error';
         const oidcErr = new OidcError('tokenExchangeFailed', `Token exchange failed: ${detail}`, detail);
