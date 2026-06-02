@@ -292,6 +292,8 @@ jobs:
         run: pnpm build
       - name: Test
         run: pnpm test -- --run
+        env:
+          NODE_OPTIONS: --import ./scripts/vitest-loader.mjs
 
   # ── Frontend: Mobile ──────────────────────────
   frontend-mobile:
@@ -337,7 +339,7 @@ jobs:
         working-directory: ./app
       - name: Start web preview server
         run: |
-          pnpm --filter agenthub-web exec vite preview --port 5175 --strictPort &
+          cd web && pnpm exec vite preview --port 5175 --strictPort &
           sleep 3
           curl --retry 5 --retry-connrefused http://127.0.0.1:5175/ > /dev/null
         working-directory: ./app
