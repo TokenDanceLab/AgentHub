@@ -22,6 +22,7 @@ import (
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
+	"github.com/agenthub/edge-server/internal/middleware"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
@@ -72,15 +73,18 @@ func Run(cfg Config) error {
 	}
 	if cfg.RemoteMode {
 		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
+			slog.Error("invalid remote listen address", "err", err)
 			return err
 		}
 	} else {
 		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
+			slog.Error("invalid local listen address", "err", err)
 			return err
 		}
 	}
 	handler, err := newHandlerFromConfig(cfg)
 	if err != nil {
+		slog.Error("failed to create handler from config", "err", err)
 		return err
 	}
 
@@ -95,6 +99,7 @@ func Run(cfg Config) error {
 	if !cfg.Dev && cfg.LocalAuthToken == "" && cfg.HubJWTSecret == "" {
 		tokenBytes := make([]byte, 32)
 		if _, err := rand.Read(tokenBytes); err != nil {
+			slog.Error("failed to generate local auth token", "err", err)
 			return fmt.Errorf("failed to generate local auth token: %w", err)
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
@@ -110,7 +115,7 @@ func Run(cfg Config) error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode),
+		Handler: middleware.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,

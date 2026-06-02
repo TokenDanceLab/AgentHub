@@ -6,10 +6,10 @@ import (
 )
 
 func TestCORSRejectsProductionLoopbackOrigin(t *testing.T) {
-	// CORS uses log.Fatalf for init-time config validation, which exits the
+	// CORS uses slog.Error + os.Exit(1) for init-time config validation, which exits the
 	// process. This cannot be tested directly via recover(). The underlying
 	// validation function is covered by TestValidateCORSOriginsForEnvironmentRejectsLoopbackInProduction.
-	t.Skip("CORS middleware uses log.Fatalf (os.Exit) on config errors; cannot test via recover()")
+	t.Skip("CORS middleware uses os.Exit(1) on config errors; cannot test via recover()")
 }
 
 func TestValidateCORSOriginsForEnvironmentRejectsLoopbackInProduction(t *testing.T) {
