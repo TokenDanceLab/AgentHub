@@ -87,6 +87,14 @@ backups/
 # Local temp files
 .tmp/
 
+# Competition and competitive-analysis materials (not open-source)
+docs/competition/
+docs/competitive-gap/
+docs/COMPETITIVE-GAP.md
+
+# TypeScript compiler output
+**/tsc-output.txt
+
 # Local machine and agent state
 .worktrees/
 docs/review/
@@ -132,6 +140,9 @@ screenshots/
 docs/inbox/*
 !docs/inbox/README.md
 
+# Local dev tracking (not for repo)
+docs/GOAL.md
+
 # Local ops docs — deployment details, SSH, server addresses (not for repo)
 .ops/
 
@@ -150,3 +161,8 @@ hub-server/.tmp/
 
 # Tauri Android generated (source tracked, builds ignored by inner .gitignore)
 # app/desktop/src-tauri/gen/android/ is committed
+app/mobile/src-tauri/gen/
+
+# Build output / generated artifacts
+output/
+app/desktop/app/

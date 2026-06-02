@@ -20,7 +20,12 @@
   text-align: left;
   font-family: inherit;
   font-size: inherit;
-  transition: border-color var(--duration-fast, 150ms), background var(--duration-fast, 150ms);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    transition: border-color var(--duration-fast, 150ms), background var(--duration-fast, 150ms);
+  }
 }
 
 .card:hover {
@@ -30,11 +35,7 @@
 /* ── Active ──────────────────────────────────────────────── */
 .active {
   border-color: oklch(0.55 0.16 255 / 0.28);
-  background: linear-gradient(
-    135deg,
-    oklch(0.55 0.16 255 / 0.12),
-    oklch(0.6 0.12 230 / 0.08)
-  );
+  background: oklch(0.55 0.16 255 / 0.12);
 }
 
 /* ── Avatar ──────────────────────────────────────────────── */
@@ -46,11 +47,12 @@
   height: 36px;
   flex: 0 0 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--brand), var(--info));
-  color: oklch(1 0 0);
+  background: oklch(0.55 0.16 255 / 0.12);
+  color: var(--brand);
+  border: 1px solid oklch(0.55 0.16 255 / 0.22);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
+  box-shadow: none;
 }
 
 /* ── Body ────────────────────────────────────────────────── */

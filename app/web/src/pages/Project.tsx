@@ -1,1 +1,1 @@
-export { default } from '@/pages/projects/ProjectPage';
+export { default } from '@/App';

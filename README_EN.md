@@ -8,7 +8,7 @@ Chat with AI Agents like teammates. @mention them, create group chats, and keep 
 
 [中文文档](README.md) &nbsp;·&nbsp; [Product Requirements](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [System Architecture](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API](api/) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
 
-<img src="https://img.shields.io/badge/status-P0_Complete-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/v0.1.0-Active_Development-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
@@ -106,15 +106,15 @@ macOS/Linux:
 
 ```powershell
 cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
 ```
 
 Common runtime presets:
 
 ```powershell
-go run ./cmd/agenthub-edge --agent-default claude-code
-go run ./cmd/agenthub-edge --agent-default codex
-go run ./cmd/agenthub-edge --agent-default opencode
+go run ./cmd/agenthub-edge --runner-profile claude-code
+go run ./cmd/agenthub-edge --runner-profile codex
+go run ./cmd/agenthub-edge --runner-profile opencode
 ```
 
 ### Start Desktop
@@ -165,6 +165,7 @@ AgentHub/
 ├── app/
 │   ├── desktop/            # Tauri desktop app
 │   ├── web/                # Web workspace and page preview
+│   ├── mobile/             # Mobile lightweight IM, approvals, and previews
 │   └── shared/             # shared frontend components, state, types, API/event clients
 ├── hub-server/             # central Hub: auth, IM, groups, sync, relay
 ├── edge-server/            # Edge node: projects, context, run lifecycle, Runtime adapters

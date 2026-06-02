@@ -47,6 +47,10 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 
 	result, err := h.service.ListNotifications(c.Request.Context(), userID, unreadOnly, limit, offset)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}
@@ -73,6 +77,10 @@ func (h *NotificationHandler) ReadAll(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if err := h.service.MarkAllRead(c.Request.Context(), userID); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

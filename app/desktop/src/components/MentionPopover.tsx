@@ -1,16 +1,30 @@
 import { useEffect, useRef } from 'react';
-import { Circle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Bot, Circle, FileText, MessageSquareText } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
+import type { MentionItem } from '@/hooks/useMention';
 import styles from './MentionPopover.module.css';
 
 interface Props {
-  agents: AgentInfo[];
+  agents?: AgentInfo[];
+  items?: MentionItem[];
   isOpen: boolean;
   query: string;
   position: { top: number; left: number };
   selectedIndex: number;
-  onSelect: (agent: AgentInfo) => void;
+  onSelect: (item: MentionItem) => void;
   onClose: () => void;
+}
+
+function agentToMentionItem(agent: AgentInfo): MentionItem {
+  return {
+    id: `agent:${agent.id}`,
+    kind: 'agent',
+    label: agent.name,
+    description: agent.description,
+    status: agent.status,
+    agent,
+  };
 }
 
 /**
@@ -36,8 +50,15 @@ function HighlightedName({ name, query }: { name: string; query: string }) {
   );
 }
 
+function MentionIcon({ item }: { item: MentionItem }) {
+  if (item.kind === 'file') return <FileText size={15} />;
+  if (item.kind === 'thread') return <MessageSquareText size={15} />;
+  return <Bot size={15} />;
+}
+
 export default function MentionPopover({
-  agents,
+  agents = [],
+  items,
   isOpen,
   query,
   position,
@@ -46,6 +67,7 @@ export default function MentionPopover({
   onClose,
 }: Props) {
   const listRef = useRef<HTMLUListElement>(null);
+  const displayItems = items ?? agents.map(agentToMentionItem);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -72,9 +94,9 @@ export default function MentionPopover({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen || agents.length === 0) return null;
+  if (!isOpen || displayItems.length === 0) return null;
 
-  return (
+  return createPortal(
     <div
       className={styles.popover}
       style={{ top: position.top, left: position.left }}
@@ -82,40 +104,46 @@ export default function MentionPopover({
       aria-label="Agent suggestions"
     >
       <ul ref={listRef} className={styles.list}>
-        {agents.map((agent, i) => (
-          <li key={agent.id} role="option" aria-selected={i === selectedIndex}>
+        {displayItems.map((item, i) => (
+          <li key={item.id} role="option" aria-selected={i === selectedIndex}>
             <button
               className={`${styles.item} ${i === selectedIndex ? styles.itemSelected : ''}`}
-              onClick={() => onSelect(agent)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onSelect(item)}
               onMouseEnter={() => {
                 // Mouse move can update selectedIndex — handled by parent
               }}
               type="button"
             >
-              <span className={styles.statusDot}>
-                <Circle
-                  size={8}
-                  fill="currentColor"
-                  style={{
-                    color:
-                      agent.status === 'available'
-                        ? 'var(--color-success)'
-                        : 'var(--color-danger)',
-                  }}
-                />
+              <span className={styles.kindIcon} aria-hidden="true">
+                <MentionIcon item={item} />
+                {item.kind === 'agent' && (
+                  <Circle
+                    size={6}
+                    fill="currentColor"
+                    className={styles.statusDot}
+                    style={{
+                      color:
+                        item.status === 'available'
+                          ? 'var(--color-success)'
+                          : 'var(--color-danger)',
+                    }}
+                  />
+                )}
               </span>
               <span className={styles.info}>
                 <span className={styles.name}>
-                  <HighlightedName name={agent.name} query={query} />
+                  <HighlightedName name={item.label} query={query} />
                 </span>
-                {agent.description && (
-                  <span className={styles.description}>{agent.description}</span>
+                {item.description && (
+                  <span className={styles.description}>{item.description}</span>
                 )}
               </span>
             </button>
           </li>
         ))}
       </ul>
-    </div>
+    </div>,
+    document.body,
   );
 }

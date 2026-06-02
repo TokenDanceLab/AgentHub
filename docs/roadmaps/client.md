@@ -35,6 +35,7 @@
 | **P0** | 输入体验 | 受控输入引起流式渲染闪烁，无草稿持久化、无循环检测、无去重 |
 | **P0** | 连接健壮性 | 无心跳、无离线队列、无重连回调、无传输抽象 |
 | **P0** | 性能 | 无虚拟滚动、App.tsx 500+ 行单体 |
+| **P0** | QA/交接 | Desktop UI 变更必须按 `docs/operations/desktop-ui-qa-sop.md` 留存客户端截图、真实交互路径、DOM probe、脱敏命令摘要和剩余风险 |
 | **P1** | 聊天消息 | 无消息树、无子 Agent 视图、无 Fork、无 @提及、无斜杠命令 |
 | **P1** | Agent 可观测性 | 无实时 Token、无工具时间线、无任务列表 |
 | **P1** | 线程管理 | 扁平列表、无状态标记、无归档、无快捷键面板 |
@@ -98,27 +99,35 @@
 #### P1-1: 多 Agent 聊天（5 天）
 
 - [ ] 消息树形数据模型（2 天）— `buildTree/flattenTree` 函数
-- [ ] 子 Agent 内联视图（2 天）— `SubAgentCard.tsx`，处理 `child_spawn/child_result` 事件
+- [x] 子 Agent 内联视图 Desktop MVP（2026-05-29）— `ChatView` 支持 `child_agent` block，处理 `run.agent.task_dispatched`、`run.agent.child_spawn`、`run.agent.child_result` 并按 child id / child run id upsert；完整 sidechain 展开、child transcript 和服务端 message-tree lineage 仍依赖 P1-1 消息树后续。
 - [ ] 消息 Fork 支持（1 天）— 从任意消息分叉新线程
+  - [x] Desktop fork MVP（2026-05-29）：Agent 回复 action 与 `/fork` 会创建真实 Edge thread，切换到新 thread，并把来源 thread + 最近用户请求写入可编辑 composer draft；当前不是服务端 message-tree fork。
 
 #### P1-2: 富文本输入（4 天）
 
-- [ ] @提及 + 自动补全（2 天）— `@agent` / `@file` / `@thread`
+- [x] @提及 + 自动补全 Desktop MVP（2026-05-29）— `@agent` 切换真实 Runtime，`@file` 打开真实附件入口，`@thread` 插入可发送 thread 引用；popover 已 portal 到 body，修复点击穿透、焦点丢失和右侧越界。完整富文本 reference model 仍留到 P1-1 message tree 后续。
 - [ ] 斜杠命令系统（1.5 天）— `/model`, `/clear`, `/retry`, `/fork` 等
+  - [x] Desktop composer slash palette MVP（2026-05-29）：`/` 可直接执行 Agent 切换、真实 model catalog 选择、reasoning、permission、workspace selector 和 clear composer；命令文本不会发送给 Runtime。
+  - [x] `/retry` / `/fork` Desktop MVP（2026-05-29）：`/retry` 重发最近用户请求，Agent 消息 action 的 retry 也回溯上一条用户 prompt，不会把 Agent 输出当 prompt；`/fork` 创建真实 thread 并生成可编辑 draft。
+  - [ ] 完整 message-tree fork、branch lineage、server-side parent message id 仍依赖 P1-1 数据模型后再接。
 - [ ] 模型别名解析（0.5 天）— "sonnet" → 完整 model ID
 
 #### P1-3: Agent 可观测性（3 天）
 
 - [ ] Token 用量实时更新（1 天）— 流式过程中实时更新 ContextUsage 条
-- [ ] 工具调用时间线面板（1 天）— `ToolTimeline.tsx`
-- [ ] Agent 任务列表（1 天）— `TaskList.tsx`
+  - [x] Desktop chat usage strip MVP（2026-05-29）：`run.agent.session_metrics/context_usage/context_warning/context_compaction` 会投影到当前 Agent 回复内的紧凑上下文条，`run.agent.result.usage` 会渲染同一风格的 Token 用量条；按 runId upsert，避免上下文告警刷屏。Playwright `desktop-chat-context-usage-pw.png` 与 probe 覆盖 typed runtime events、Token 用量、阈值、费用、模型/provider 标签、无横向溢出和不被 composer 遮挡。完整跨 run 聚合与持续 streaming 预算曲线仍留在 P1-3 后续。
+- [x] 工具调用时间线面板 Desktop MVP（2026-05-29）— `ToolTimeline.tsx` 从真实聊天 message blocks 派生 route / tool / file / task / child-agent 活动，紧凑显示在 Agent 消息内；已用 Playwright `desktop-chat-subagent-cards-pw.png` 和 probe 覆盖 typed subagent + route + tool/file 活动。完整 RunDetail 观测控制台、实时 token usage 和服务端任务索引仍留在 P1-3 后续。
+- [x] Agent 任务列表 Desktop MVP（2026-05-29）— `TaskList.tsx` 从同一条 Agent 消息里的 `agent_task` / `child_agent` blocks 派生紧凑总览，显示任务总数、运行/完成/失败计数、worker 与 child run 线索；不引入独立假状态。服务端 TeamTask 索引、跨 run 聚合和右侧 RunDetail 任务表仍留到后续。
 
 #### P1-4: 线程管理升级（3 天）
 
-- [ ] 按项目+日期分组（1 天）
+- [x] 按项目+日期分组 Desktop MVP（2026-05-29）— ThreadPanel 按 Today / Yesterday / Earlier 分组；多项目同时可见时自动显示 `projectId · 日期`，单项目保持紧凑日期标题。
 - [ ] 线程状态标记（0.5 天）— 运行中/错误/未读
-- [ ] 线程归档（0.5 天）
-- [ ] 快捷键面板（1 天）— `ShortcutPanel.tsx`
+  - [x] active/archived 状态 Desktop MVP（2026-05-29）：左侧会话支持活跃/已归档 tab、归档状态 pill 和计数；运行中/错误/未读的 live 状态仍待接 Run/Thread event 聚合。
+  - [x] 真实 Run 状态标记 Desktop MVP（2026-05-29）：`App` 将 `/v1/runs` 全量列表传给 `ThreadPanel`，会话行从真实 `RunInfo.status` 派生 `运行中`、`待审批`、`失败` pill；选中会话不显示活动 dot，避免伪未读。Playwright `desktop-thread-status-pw.png` / `desktop-thread-status-probe.json` 覆盖 running、waiting_approval、failed、completed 四类 run。
+  - [ ] 精确未读仍需 Thread read cursor / lastSeen item id 或 Hub unread counter；当前不再用 `runCount` 伪装未读。
+- [x] 线程归档 Desktop/Edge MVP（2026-05-29）— Edge 支持 `PATCH /v1/threads/{id}`、`POST /v1/threads/{id}:archive`、`DELETE /v1/threads/{id}`；Desktop 归档/恢复按钮调用真实 mutation，TanStack Query 会更新所有 `['threads', projectId]` cache key 并在失败时回滚。Playwright `desktop-thread-archive-active-pw.png` / `desktop-thread-archive-archived-pw.png` 覆盖真实 UI 操作和 POST/PATCH 请求捕获。
+- [x] 快捷键面板 Desktop MVP（2026-05-29）— `ShortcutHelp` 与 Settings `键盘快捷键` 共用 `KEYBOARD_SHORTCUT_GROUPS`，只展示真实接线快捷键；内置浏览器截图 `.tmp/desktop-g-shortcut-after-iab.png`、`.tmp/desktop-settings-keyboard-shortcuts-iab.png`，probe 覆盖 4 组 / 14 行、无水平溢出和 `g/p/y` descender 行盒余量。
 
 ---
 
@@ -133,6 +142,10 @@
 
 #### P2-2: 多 Agent 协作可视化（5 天）
 
+- [x] TeamRun branch switch Desktop MVP（2026-05-29）— TeamRun Console 的 AgentTeam / TeamRun 列表已从静态卡片改为真实可点击分支选择；选择不同 Hub TeamRun 会把 `selectedTeamId/selectedRunId` 写入 `useHubAgentTeams` 查询 key，并重新读取对应 `TeamRunState`、tasks、events。Playwright 截图 `.tmp/desktop-agentteam-console-branch-switch-pw.png`、probe `.tmp/desktop-agentteam-console-after-probe.json` 覆盖切到 Review TeamRun 后成员、任务板、路由和 `agent.result` 活动全部换源；双真实 Runtime Profile live smoke 仍归 AT-4。
+- [x] TeamRun result/artifact/budget blocks Desktop MVP（2026-05-29）— TeamRun Console 现在直接消费 `TeamRunState.terminal_reason`、`run_events` 中的 `agent.result`、`artifacts` 和 `budget`，渲染结果、产物与预算区块，不再只在活动列表里露出原始事件。Playwright 截图 `.tmp/desktop-agentteam-console-results-pw.png`、probe `.tmp/desktop-agentteam-console-after-probe.json` 覆盖 terminal reason、result event、artifact path、token budget、无横向溢出和空 console；双真实 Runtime Profile live smoke 仍归 AT-4。
+- [x] TeamRun approval/conflict decision Desktop MVP（2026-05-29）— TeamRun Console 的 `允许` 与 `标记人工合并` 按钮已走真实 Hub mutation，Playwright 捕获 request body：approval 为 `{ decision: "allow", reason: "Desktop TeamRun Console decision" }`，conflict 为 `{ path, resolution: "manual_merge", reason: "Marked from Desktop TeamRun Console" }`；Desktop `useHubIntegration` 同步消费 Hub `agent.control` / `permission.decide` 并 POST Local Edge `/v1/permissions/decide`。截图 `.tmp/desktop-agentteam-console-decision-after-pw.png`、probe `.tmp/desktop-agentteam-console-after-probe.json` 覆盖按钮消失、状态刷新、request body 与空 console；2026-05-29 追加真实 HTTP Edge pending endpoint 集成测试，证明 Desktop hook 能消费 pending permission 并阻止同一 control 重放。完整 live Hub WS device delivery + Go Edge handler 同进程 E2E 仍归 AT-5。
+- [x] TeamRun artifact source compare Desktop MVP（2026-05-29）— 冲突卡现在按 `conflict_id` / normalized path 从 `TeamRunState.artifacts` 聚合同一路径的来源，显示 agent task、member、edge run、action/status/time，并把 `采用该来源`、`保留全部`、`标记人工合并` 按钮放在卡片内部；`采用该来源` 会向 Hub 发送 `resolution: "accept_agent_task"` 和 `selected_agent_task_id`，不是前端占位。Playwright 截图 `.tmp/desktop-agentteam-console-conflict-compare-pw.png`、probe `.tmp/desktop-agentteam-console-after-probe.json` 覆盖两个 source 卡、真实 request body、无横向溢出和空 console；artifact 内容/diff content index 后的真正 side-by-side diff 仍归 AT-5 后续。
 - [ ] Agent 通信图可视化（3 天）— D3/ReactFlow
 - [ ] Agent 市场/发现（2 天）
 

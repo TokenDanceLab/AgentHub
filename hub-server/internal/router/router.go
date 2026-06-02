@@ -21,15 +21,15 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.Timeout(config.DefaultRequestTimeout))
 	r.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    "NOT_FOUND",
-			"message": "route not found",
+		c.JSON(http.StatusNotFound, handler.Response{
+			Code:    "NOT_FOUND",
+			Message: "route not found",
 		})
 	})
 	r.NoMethod(func(c *gin.Context) {
-		c.JSON(http.StatusMethodNotAllowed, gin.H{
-			"code":    "METHOD_NOT_ALLOWED",
-			"message": "method not allowed",
+		c.JSON(http.StatusMethodNotAllowed, handler.Response{
+			Code:    "METHOD_NOT_ALLOWED",
+			Message: "method not allowed",
 		})
 	})
 
@@ -37,7 +37,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		r.GET("/health", healthHandler.Check)
 	} else {
 		r.GET("/health", func(c *gin.Context) {
-			c.JSON(200, gin.H{"status": "ok"})
+			handler.OK(c, gin.H{"status": "ok"})
 		})
 	}
 
@@ -61,6 +61,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			if oidcHandler != nil {
 				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
 				auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
+				auth.GET("/oidc/callback", oidcHandler.GetOIDCCallback)
 			}
 		}
 
@@ -158,6 +159,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		edge.POST("/agent-tasks/:id/stream", agentHandler.TaskStream)
 		edge.POST("/agent-tasks/:id/done", agentHandler.TaskDone)
 		edge.POST("/agent-tasks/:id/fail", agentHandler.TaskFail)
+	}
+
+	// Cloud Edge registration (authenticated, no device type restriction)
+	cloud := r.Group("/cloud")
+	cloud.Use(middleware.AuthMiddleware(cfg))
+	cloud.Use(middleware.RequireHubSession())
+	{
+		cloud.POST("/edge/register", deviceHandler.CloudEdgeRegister)
 	}
 
 	web := r.Group("/web")

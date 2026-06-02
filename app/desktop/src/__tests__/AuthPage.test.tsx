@@ -32,7 +32,17 @@ describe('AuthPage', () => {
 
     expect(screen.getByText('auth.title')).toBeInTheDocument();
     expect(screen.getByText('auth.tagline')).toBeInTheDocument();
-    expect(screen.getByText('AH')).toBeInTheDocument();
+    expect(screen.getByAltText('TokenDance')).toBeInTheDocument();
+    expect(screen.queryByText('AH')).not.toBeInTheDocument();
+  });
+
+  it('renders the TokenDance ID login button', () => {
+    renderAuthPage();
+    expect(screen.getByText('auth.tokenDanceLogin')).toBeInTheDocument();
+  });
+
+  it('renders the primary auth hint', () => {
+    renderAuthPage();
     expect(screen.getByText('auth.tokenDancePrimary')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'auth.tokenDanceLogin' })).toBeInTheDocument();
   });

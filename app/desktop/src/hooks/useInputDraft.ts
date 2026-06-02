@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react';
 
-const DRAFT_PREFIX = 'ah:draft:';
+const DRAFT_PREFIX = 'draft_';
 const DEBOUNCE_MS = 500;
 
 function getKey(threadId: string): string {
@@ -68,6 +68,7 @@ export function useInputDraft(threadId: string | undefined): UseInputDraftReturn
   }, []);
 
   const clear = useCallback(() => {
+    clearTimeout(timerRef.current);
     const tid = threadIdRef.current;
     if (!tid) return;
     localStorage.removeItem(getKey(tid));
