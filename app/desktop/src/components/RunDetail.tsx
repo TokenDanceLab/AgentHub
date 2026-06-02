@@ -318,7 +318,7 @@ export default function RunDetail({
   }
 
   const resolvedStatus = RunStateMachine.fromLegacyStatus(run.status);
-  const statusKey = `run.status.${run.status}`;
+  const statusKey = `run.status.${run.status.toLowerCase()}`;
   const statusClass =
     resolvedStatus === RunState.COMPLETED
       ? styles.statusDone
