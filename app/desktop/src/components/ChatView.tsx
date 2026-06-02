@@ -1518,10 +1518,22 @@ export default function ChatView({
           />
         )}
         {visibleMessages.length === 0 ? (
-          <EmptyState
-            title={t('chat.emptyTitle')}
-            description={t('chat.emptyDescription')}
-          />
+          connectionStatus !== 'connected' ? (
+            <EmptyState
+              title={t('chat.edgeNotConnected')}
+              description={t('chat.edgeNotConnectedHint')}
+              action={{
+                label: t('chat.openSettings'),
+                onClick: () => window.dispatchEvent(new CustomEvent('agenthub:open-settings')),
+                icon: <Settings size={14} />,
+              }}
+            />
+          ) : (
+            <EmptyState
+              title={t('chat.emptyTitle')}
+              description={t('chat.emptyDescription')}
+            />
+          )
         ) : (
           <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
