@@ -1768,6 +1768,14 @@
   opacity: 0.55;
 }
 
+.spinIcon {
+  animation: settingsSpin 0.9s linear infinite;
+}
+
+@keyframes settingsSpin {
+  to { transform: rotate(360deg); }
+}
+
 [data-theme='dark'] .secondaryBtn {
   border-color: rgba(255, 255, 255, 0.09);
 }
