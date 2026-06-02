@@ -26,7 +26,7 @@ export default function TaskRunRow({ run, onCancel, cancelling = false }: TaskRu
         </div>
       </div>
       <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
-        {t(`run.status.${run.status}`, { defaultValue: run.status })}
+        {t(`run.status.${run.status.toLowerCase()}`, { defaultValue: run.status })}
       </span>
       {onCancel ? (
         <button
