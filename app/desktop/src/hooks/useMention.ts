@@ -1,5 +1,19 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { AgentInfo } from '@shared/types';
+
+export type MentionKind = 'agent' | 'file' | 'thread';
+
+export interface MentionItem {
+  id: string;
+  kind: MentionKind;
+  label: string;
+  description?: string;
+  status?: AgentInfo['status'];
+  keywords?: string[];
+  replacementText?: string;
+  agent?: AgentInfo;
+  payload?: unknown;
+}
 
 export interface MentionState {
   /** Whether the mention popover is visible */
@@ -12,12 +26,17 @@ export interface MentionState {
   selectedIndex: number;
   /** Agents filtered by the current query */
   filteredAgents: AgentInfo[];
+  /** All mention suggestions filtered by the current query */
+  filteredItems: MentionItem[];
 }
 
 interface UseMentionOptions {
   agents: AgentInfo[];
+  items?: MentionItem[];
   /** Called when an agent is selected from the mention popover */
   onSelectAgent: (agentId: string) => void;
+  /** Called after any mention item is selected. */
+  onSelectMention?: (item: MentionItem) => void;
 }
 
 interface UseMentionReturn extends MentionState {
@@ -27,20 +46,56 @@ interface UseMentionReturn extends MentionState {
   handleKeyDown: (e: React.KeyboardEvent<Element>) => boolean;
   /** Select an agent: remove @query text, set selected agent, close popover */
   selectAgent: (agent: AgentInfo) => void;
+  /** Select any mention item. */
+  selectItem: (item: MentionItem) => void;
   /** Close the popover */
   closeMention: () => void;
 }
 
 const POPOVER_HEIGHT = 250; // ~max popover height
+const POPOVER_MAX_WIDTH = 360;
+const POPOVER_MARGIN = 16;
 const POPOVER_OFFSET_Y = 8; // gap above caret line
+
+function clampPopoverToViewport(position: { top: number; left: number }): { top: number; left: number } {
+  const maxLeft = Math.max(POPOVER_MARGIN, window.innerWidth - POPOVER_MAX_WIDTH - POPOVER_MARGIN);
+  return {
+    top: Math.max(POPOVER_MARGIN, position.top),
+    left: Math.min(Math.max(POPOVER_MARGIN, position.left), maxLeft),
+  };
+}
 
 /**
  * Filters agents by the given query (case-insensitive match on name).
  */
-function filterAgents(agents: AgentInfo[], query: string): AgentInfo[] {
-  if (!query) return agents;
+function agentToMentionItem(agent: AgentInfo): MentionItem {
+  return {
+    id: `agent:${agent.id}`,
+    kind: 'agent',
+    label: agent.name,
+    description: agent.description,
+    status: agent.status,
+    keywords: [agent.id, agent.name, 'agent', 'runtime'],
+    replacementText: '',
+    agent,
+  };
+}
+
+function filterMentionItems(items: MentionItem[], query: string): MentionItem[] {
+  if (!query) return items;
   const q = query.toLowerCase();
-  return agents.filter((a) => a.name.toLowerCase().includes(q));
+  return items.filter((item) => {
+    const haystack = [
+      item.kind,
+      item.label,
+      item.description,
+      ...(item.keywords ?? []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return q.split(/\s+/).every((part) => haystack.includes(part));
+  });
 }
 
 /**
@@ -139,13 +194,22 @@ function parseMentionAtCursor(
   return { query, startIndex: atIndex };
 }
 
-export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMentionReturn {
+export function useMention({ agents, items, onSelectAgent, onSelectMention }: UseMentionOptions): UseMentionReturn {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const filteredAgents = filterAgents(agents, query);
+  const allItems = items ?? agents.map(agentToMentionItem);
+  const filteredItems = filterMentionItems(allItems, query);
+  const filteredAgents = filteredItems
+    .filter((item) => item.kind === 'agent' && item.agent)
+    .map((item) => item.agent as AgentInfo);
+
+  // Reset selectedIndex when filtered list changes
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
 
   const closeMention = useCallback(() => {
     setIsOpen(false);
@@ -161,24 +225,20 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
     const mention = parseMentionAtCursor(ta.value, cursorPos);
 
     if (mention) {
+      const caretPos = getCaretViewportPosition(ta);
       setQuery(mention.query);
-      setSelectedIndex(0);
+      setPosition(clampPopoverToViewport({
+        top: caretPos.top - POPOVER_HEIGHT - POPOVER_OFFSET_Y,
+        left: caretPos.left,
+      }));
       setIsOpen(true);
-      // Compute position after a frame so textarea layout is up to date
-      requestAnimationFrame(() => {
-        const caretPos = getCaretViewportPosition(ta);
-        setPosition({
-          top: caretPos.top - POPOVER_HEIGHT - POPOVER_OFFSET_Y,
-          left: caretPos.left,
-        });
-      });
     } else {
       closeMention();
     }
   }, [closeMention]);
 
-  const selectAgent = useCallback(
-    (agent: AgentInfo) => {
+  const selectItem = useCallback(
+    (item: MentionItem) => {
       const ta = document.activeElement as HTMLTextAreaElement | null;
       if (!ta || ta.tagName !== 'TEXTAREA') {
         closeMention();
@@ -194,11 +254,19 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
         return;
       }
 
-      // Remove the @query portion (including any preceding space)
-      const spaceBefore = atIndex > 0 && ta.value[atIndex - 1] === ' ' ? 1 : 0;
+      // Replace the @query portion. Agent/file items remove the token; thread
+      // items insert an explicit reference that is sent to the runtime.
+      const replacement = item.replacementText ?? '';
+      const removesToken = replacement.length === 0;
+      const spaceBefore = removesToken && atIndex > 0 && ta.value[atIndex - 1] === ' ' ? 1 : 0;
       const start = atIndex - spaceBefore;
       const textAfter = ta.value.substring(cursorPos);
-      const newValue = ta.value.substring(0, start) + textAfter;
+      const prefix = ta.value.substring(0, start);
+      const needsSpaceAfter =
+        replacement.length > 0 && textAfter.length > 0 && !/\s$/.test(replacement) && !/^\s/.test(textAfter);
+      const trailingSpace = replacement.length > 0 && textAfter.length === 0 ? ' ' : '';
+      const newValue = `${prefix}${replacement}${needsSpaceAfter ? ' ' : trailingSpace}${textAfter}`;
+      const nextCursor = prefix.length + replacement.length + (needsSpaceAfter || trailingSpace.length > 0 ? 1 : 0);
 
       // Use native setter to avoid React controlled/uncontrolled conflicts
       const nativeSetter = Object.getOwnPropertyDescriptor(
@@ -211,26 +279,34 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
         ta.value = newValue;
       }
 
-      ta.selectionStart = ta.selectionEnd = start;
+      ta.selectionStart = ta.selectionEnd = nextCursor;
       ta.focus();
 
       // Fire input event so attached listeners (auto-resize, draft save, etc.) run
       ta.dispatchEvent(new Event('input', { bubbles: true }));
 
       closeMention();
-      onSelectAgent(agent.id);
+      if (item.kind === 'agent' && item.agent) onSelectAgent(item.agent.id);
+      onSelectMention?.(item);
     },
-    [closeMention, onSelectAgent],
+    [closeMention, onSelectAgent, onSelectMention],
+  );
+
+  const selectAgent = useCallback(
+    (agent: AgentInfo) => {
+      selectItem(agentToMentionItem(agent));
+    },
+    [selectItem],
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<Element>): boolean => {
-      if (!isOpen || filteredAgents.length === 0) return false;
+      if (!isOpen || filteredItems.length === 0) return false;
 
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex((prev) => Math.min(prev + 1, filteredAgents.length - 1));
+          setSelectedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
           return true;
         case 'ArrowUp':
           e.preventDefault();
@@ -239,8 +315,8 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
         case 'Enter':
         case 'Tab': {
           e.preventDefault();
-          const agent = filteredAgents[selectedIndex];
-          if (agent) selectAgent(agent);
+          const item = filteredItems[selectedIndex];
+          if (item) selectItem(item);
           return true;
         }
         case 'Escape':
@@ -251,7 +327,7 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
           return false;
       }
     },
-    [isOpen, filteredAgents, selectedIndex, selectAgent, closeMention],
+    [isOpen, filteredItems, selectedIndex, selectItem, closeMention],
   );
 
   return {
@@ -260,9 +336,11 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
     position,
     selectedIndex,
     filteredAgents,
+    filteredItems,
     handleInput,
     handleKeyDown,
     selectAgent,
+    selectItem,
     closeMention,
   };
 }

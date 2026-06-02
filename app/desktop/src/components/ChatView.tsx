@@ -1,16 +1,25 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
-import type { ReactNode } from 'react';
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, memo } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge, AlertTriangle, X, Settings } from 'lucide-react';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { formatTokens, formatCost } from '@shared/context/breakdown';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import EmptyState from './EmptyState';
+import { EmptyState, ToolTimeline } from '@shared/ui';
+import TaskList from './TaskList';
+import ToolGroup from './ToolGroup';
+import TeamRunDock from './TeamRunDock';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
+import { useConnectionStore } from '@/stores/connectionStore';
+import { useShallow } from 'zustand/shallow';
+import type { AgentTeamOverview } from '@/api/agentTeamQueries';
+import type { LocalOrchestrationStatus } from '@/utils/localOrchestration';
+import type { TeamLocalExecution } from '@/utils/teamLocalExecution';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -19,8 +28,21 @@ interface Props {
   messages: ChatMessage[];
   isStreaming?: boolean;
   onRetry?: (messageId: string) => void;
+  onFork?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  agentTeamOverview?: AgentTeamOverview;
+  agentTeamsLoading?: boolean;
+  agentTeamsSignedIn?: boolean;
+  teamLocalExecutions?: TeamLocalExecution[];
+  localOrchestration?: LocalOrchestrationStatus;
+  onStartLocalOrchestration?: (agentId: string, draft: string) => void;
+  onOpenTeamRuns?: () => void;
 }
+
+const LONG_AGENT_TEXT_MAX_LINES = 24;
+const LONG_AGENT_TEXT_PREVIEW_LINES = 18;
+const LONG_AGENT_TEXT_MAX_CHARS = 2200;
+const LONG_AGENT_TEXT_PREVIEW_CHARS = 1800;
 
 // ── Tool icons ───────────────────────────────
 const TOOL_ICON_MAP: Record<string, typeof FileText> = {
@@ -41,22 +63,57 @@ function resolveToolIcon(toolName: string) {
   return <Icon size={14} />;
 }
 
+function DecorativeAgentIcon({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    ref.current?.querySelectorAll('title').forEach((node) => node.remove());
+  });
+
+  return (
+    <span ref={ref} className={styles.decorativeAgentIcon} aria-hidden="true">
+      {children}
+    </span>
+  );
+}
+
 function AgentAvatarIcon({ name }: { name: string }) {
   const normalized = name.toLowerCase();
   if (
+    normalized.includes('claude code') ||
+    normalized === 'claude' ||
     normalized.includes('claude-opus') ||
     normalized.includes('claude-sonnet') ||
-    normalized.includes('claude-haiku') ||
+    normalized.includes('claude-haiku')
+  ) {
+    return <DecorativeAgentIcon><ClaudeCode size={18} /></DecorativeAgentIcon>;
+  }
+  if (normalized.includes('codex')) return <DecorativeAgentIcon><Codex size={18} /></DecorativeAgentIcon>;
+  if (normalized.includes('opencode') || normalized.includes('open-code')) return <DecorativeAgentIcon><OpenCode size={18} /></DecorativeAgentIcon>;
+  if (
     normalized.includes('gpt') ||
     normalized.includes('glm') ||
     normalized.includes('qwen')
   ) {
-    return <Bot size={16} />;
+    return <DecorativeAgentIcon><Bot size={16} /></DecorativeAgentIcon>;
   }
-  if (normalized.includes('claude code') || normalized === 'claude') return <ClaudeCode size={18} />;
-  if (normalized.includes('codex')) return <Codex size={18} />;
-  if (normalized.includes('opencode')) return <OpenCode size={18} />;
-  return <Bot size={15} />;
+  return <DecorativeAgentIcon><Bot size={15} /></DecorativeAgentIcon>;
+}
+
+function agentDisplayName(name: string): string {
+  const normalized = name.toLowerCase();
+  if (
+    normalized.includes('claude code') ||
+    normalized === 'claude' ||
+    normalized.includes('claude-opus') ||
+    normalized.includes('claude-sonnet') ||
+    normalized.includes('claude-haiku')
+  ) {
+    return 'Claude Code';
+  }
+  if (normalized.includes('codex')) return 'Codex';
+  if (normalized.includes('opencode') || normalized.includes('open-code')) return 'OpenCode';
+  if (normalized.includes('tokendance')) return 'TokenDance';
+  return name;
 }
 
 function summarizeInput(input: Record<string, unknown>): string {
@@ -146,7 +203,6 @@ function toolStatusClass(status: string): string {
 function ThinkingBlock({ content, active }: { content: string; active?: boolean }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  if (!active) return null;
   return (
     <div className={styles.thinking}>
       <button
@@ -155,17 +211,13 @@ function ThinkingBlock({ content, active }: { content: string; active?: boolean 
         aria-expanded={expanded}
       >
         <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
-        <span className={active ? styles.runningText : styles.settledText}>{t('chat.thinkingLabel')}</span>
+        <span className={active ? styles.runningText : styles.settledText}>
+          {active ? t('chat.thinkingLabel') : t('chat.thinkingSettledLabel')}
+        </span>
       </button>
       {expanded && <div className={styles.thinkingContent}>{content}</div>}
     </div>
   );
-}
-
-// ── StreamingTextBlock ───────────────────────
-function StreamingTextBlock({ content, isStreaming }: { content: string; isStreaming: boolean }) {
-  const displayed = useStreamingText(content, isStreaming);
-  return <MarkdownRenderer content={displayed} />;
 }
 
 function PendingThinking({ label }: { label: string }) {
@@ -173,6 +225,142 @@ function PendingThinking({ label }: { label: string }) {
     <div className={styles.pendingThinking}>
       <span className={styles.pendingThinkingLabel}>{label}</span>
     </div>
+  );
+}
+
+function previewAgentText(content: string): { preview: string; hiddenLines: number; hiddenChars: number } | null {
+  const lines = content.split(/\r?\n/);
+  const tooManyLines = lines.length > LONG_AGENT_TEXT_MAX_LINES;
+  const tooManyChars = content.length > LONG_AGENT_TEXT_MAX_CHARS;
+  if (!tooManyLines && !tooManyChars) return null;
+
+  let preview = tooManyLines
+    ? lines.slice(0, LONG_AGENT_TEXT_PREVIEW_LINES).join('\n')
+    : content.slice(0, LONG_AGENT_TEXT_PREVIEW_CHARS);
+  if (preview.length > LONG_AGENT_TEXT_PREVIEW_CHARS) {
+    preview = preview.slice(0, LONG_AGENT_TEXT_PREVIEW_CHARS);
+  }
+  preview = preview.trimEnd();
+
+  const hiddenLines = Math.max(0, lines.length - preview.split(/\r?\n/).length);
+  const hiddenChars = Math.max(0, content.length - preview.length);
+  return { preview, hiddenLines, hiddenChars };
+}
+
+function previewInlineText(content: string, maxLength: number): string {
+  const normalized = content.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
+function AgentTextBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+  const { t } = useTranslation();
+  const displayed = useStreamingText(content, Boolean(isStreaming));
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = previewAgentText(displayed);
+
+  if (!collapsed || expanded) {
+    return (
+      <div className={styles.longTextBlock}>
+        <MarkdownRenderer content={displayed} />
+        {collapsed && (
+          <button
+            type="button"
+            className={styles.longTextToggle}
+            onClick={() => setExpanded(false)}
+            aria-label={t('chat.collapseOutput')}
+          >
+            {t('chat.collapseOutput')}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.longTextBlock}>
+      <MarkdownRenderer content={collapsed.preview} />
+      <button
+        type="button"
+        className={styles.longTextToggle}
+        onClick={() => setExpanded(true)}
+        aria-label={t('chat.showFullOutput')}
+      >
+        {t('chat.showFullOutput', {
+          lines: collapsed.hiddenLines,
+          chars: collapsed.hiddenChars,
+        })}
+      </button>
+    </div>
+  );
+}
+
+interface ParsedAttachmentSummary {
+  name: string;
+  source?: string;
+  size?: string;
+}
+
+function parseUserAttachmentContext(content: string): { text: string; attachments: ParsedAttachmentSummary[] } | null {
+  const match = content.match(/\n\s*Attached files:\s*/i);
+  if (!match || match.index == null) return null;
+
+  const text = content.slice(0, match.index).trim();
+  const context = content.slice(match.index + match[0].length);
+  const attachments: ParsedAttachmentSummary[] = [];
+  let current: ParsedAttachmentSummary | null = null;
+
+  for (const rawLine of context.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const itemMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (itemMatch) {
+      const name = itemMatch[1]?.trim();
+      if (!name) continue;
+      current = { name };
+      attachments.push(current);
+      continue;
+    }
+
+    if (!current) continue;
+    const fieldMatch = line.match(/^(Source|Size):\s*(.+)$/i);
+    if (!fieldMatch) continue;
+    const key = fieldMatch[1]?.toLowerCase();
+    const value = fieldMatch[2]?.trim();
+    if (!key || !value) continue;
+    if (key === 'source') current.source = value;
+    if (key === 'size') current.size = value;
+  }
+
+  return attachments.length > 0 ? { text, attachments } : null;
+}
+
+function UserTextBlock({ content }: { content: string }) {
+  const { t } = useTranslation();
+  const parsed = parseUserAttachmentContext(content);
+  if (!parsed) return <MarkdownRenderer content={content} />;
+
+  return (
+    <>
+      {parsed.text && <MarkdownRenderer content={parsed.text} />}
+      <div
+        className={styles.userAttachmentList}
+        aria-label={t('chat.attachmentsLabel', { count: parsed.attachments.length })}
+      >
+        {parsed.attachments.map((attachment, index) => (
+          <div key={`${attachment.name}-${index}`} className={styles.userAttachmentChip}>
+            <FileText size={13} />
+            <span className={styles.userAttachmentName}>{attachment.name}</span>
+            {(attachment.source || attachment.size) && (
+              <span className={styles.userAttachmentMeta}>
+                {[attachment.source, attachment.size].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -276,6 +464,118 @@ function StatusRow({
         {meta && <span className={styles.statusRowMeta}>{meta}</span>}
       </button>
       {expanded && children && <div className={styles.statusRowBody}>{children}</div>}
+    </div>
+  );
+}
+
+type ContextUsageBlockType = Extract<MessageBlock, { kind: 'context_usage' }>;
+
+function isDetailedContextUsage(block: ContextUsageBlockType): boolean {
+  return block.variant === 'warning' || block.variant === 'compaction';
+}
+
+function usagePercentFrom(block: ContextUsageBlockType): number | undefined {
+  if (block.usagePercent != null) return block.usagePercent;
+  if (block.contextLimit && block.total != null && block.contextLimit > 0) {
+    return Math.max(0, Math.min(100, (block.total / block.contextLimit) * 100));
+  }
+  return undefined;
+}
+
+function formatTokenUsageFooter(
+  msg: ChatMessage,
+  t: (key: string, vars?: Record<string, unknown>) => string,
+): string | null {
+  let stats: { input?: number; output?: number; total?: number } | null = null;
+
+  for (const block of msg.blocks) {
+    if (block.kind === 'result' && block.success && block.tokenUsage) {
+      stats = {
+        input: block.tokenUsage.input,
+        output: block.tokenUsage.output,
+        total: block.tokenUsage.input + block.tokenUsage.output,
+      };
+    }
+    if (block.kind === 'context_usage' && !isDetailedContextUsage(block)) {
+      const total = block.total ?? (
+        block.input != null || block.output != null ? (block.input ?? 0) + (block.output ?? 0) : undefined
+      );
+      stats = {
+        input: block.input,
+        output: block.output,
+        total,
+      };
+    }
+  }
+
+  if (!stats) return null;
+  const parts: string[] = [];
+  if (stats.input != null) parts.push(`${t('chat.tokenUsageInput')} ${formatTokens(stats.input)}`);
+  if (stats.output != null) parts.push(`${t('chat.tokenUsageOutput')} ${formatTokens(stats.output)}`);
+  if (stats.total != null) parts.push(`${t('chat.tokenUsageTotal')} ${formatTokens(stats.total)}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function ContextUsageInline({ block }: { block: ContextUsageBlockType }) {
+  const { t } = useTranslation();
+  const usagePercent = usagePercentFrom(block);
+  const total = block.total ?? (
+    block.input != null || block.output != null ? (block.input ?? 0) + (block.output ?? 0) : undefined
+  );
+  const title = block.variant === 'warning'
+      ? t('chat.contextWarning')
+      : block.variant === 'compaction'
+        ? t('chat.contextCompaction')
+        : t('chat.contextUsage');
+  const modelLabel = [block.provider, block.model].filter(Boolean).join(' / ');
+  const usageStyle = usagePercent != null
+    ? { '--usage-percent': `${Math.max(0, Math.min(100, usagePercent))}%` } as CSSProperties
+    : undefined;
+
+  const stats: Array<[string, string]> = [];
+  if (block.input != null) stats.push([t('chat.tokenUsageInput'), formatTokens(block.input)]);
+  if (block.output != null) stats.push([t('chat.tokenUsageOutput'), formatTokens(block.output)]);
+  if (total != null) stats.push([t('chat.tokenUsageTotal'), formatTokens(total)]);
+  if (block.remaining != null) stats.push([t('chat.contextRemaining'), formatTokens(block.remaining)]);
+  if (block.contextLimit != null) stats.push([t('chat.contextLimit'), formatTokens(block.contextLimit)]);
+  if (block.totalCost != null) stats.push([t('chat.tokenUsageCost'), formatCost(block.totalCost)]);
+  const summary = stats.map(([label, value]) => `${label} ${value}`).join(' · ');
+
+  const rootClass = [
+    styles.contextUsageStrip,
+    styles.contextUsageDetailed,
+    block.variant === 'warning' ? styles.contextUsageWarning : '',
+    block.variant === 'compaction' ? styles.contextUsageCompaction : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <div className={rootClass} data-testid="context-usage-strip" title={[summary, modelLabel].filter(Boolean).join(' · ') || undefined}>
+      <div className={styles.contextUsageHeader}>
+        <span className={styles.contextUsageIcon} aria-hidden="true"><Gauge size={14} /></span>
+        <span className={styles.contextUsageTitle}>{title}</span>
+        {usagePercent != null ? (
+          <span className={styles.contextUsagePercent}>{Math.round(usagePercent)}%</span>
+        ) : null}
+        {block.threshold != null ? (
+          <span className={styles.contextUsageThreshold}>
+            {t('chat.contextThreshold', { percent: Math.round(block.threshold) })}
+          </span>
+        ) : null}
+      </div>
+      {usagePercent != null ? (
+        <div className={styles.contextUsageBar} style={usageStyle} aria-hidden="true" />
+      ) : null}
+      {stats.length > 0 ? (
+        <div className={styles.contextUsageStats}>
+          {stats.map(([label, value]) => (
+            <span key={label} className={styles.contextUsageStat}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {modelLabel ? <div className={styles.contextUsageModel}>{modelLabel}</div> : null}
     </div>
   );
 }
@@ -389,18 +689,228 @@ function FileChangeBlock({ block }: { block: Extract<MessageBlock, { kind: 'file
   );
 }
 
+function AgentTaskBlock({ block }: { block: Extract<MessageBlock, { kind: 'agent_task' }> }) {
+  const { t } = useTranslation();
+  const title = block.title.trim() || block.taskId;
+  return (
+    <div className={styles.agentTaskBlock} data-testid="subagent-task-card">
+      <div className={styles.agentTaskHeader}>
+        <span className={styles.agentTaskIcon} aria-hidden="true"><Bot size={14} /></span>
+        <span className={styles.agentTaskKind}>{t('chat.subagentTask')}</span>
+        <strong>{title}</strong>
+        <span className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}>
+          {t(`chat.taskStatus.${block.status}`, { defaultValue: block.status })}
+        </span>
+      </div>
+      {block.summary ? <p className={styles.agentTaskSummary}>{block.summary}</p> : null}
+      <div className={styles.agentTaskMeta}>
+        <code>{block.taskId}</code>
+        {block.worker ? <span>{t('chat.subagentWorker')}: {block.worker}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function formatDurationMs(durationMs?: number): string | null {
+  if (durationMs == null || !Number.isFinite(durationMs)) return null;
+  if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+  return `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`;
+}
+
+function ChildAgentBlock({ block }: { block: Extract<MessageBlock, { kind: 'child_agent' }> }) {
+  const { t } = useTranslation();
+  const title = block.title.trim() || block.childId;
+  const detail = block.error || block.result;
+  const duration = formatDurationMs(block.durationMs);
+
+  return (
+    <div className={styles.childAgentBlock} data-testid="child-agent-card">
+      <div className={styles.childAgentHeader}>
+        <span className={styles.childAgentIcon} aria-hidden="true"><GitFork size={14} /></span>
+        <span className={styles.childAgentKind}>{t('chat.childAgent')}</span>
+        {block.agentName ? <span className={styles.childAgentName}>{block.agentName}</span> : null}
+        <strong>{title}</strong>
+        <span className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}>
+          {t(`chat.taskStatus.${block.status}`, { defaultValue: block.status })}
+        </span>
+      </div>
+      {detail ? <p className={styles.childAgentSummary}>{detail}</p> : null}
+      <div className={styles.childAgentMeta}>
+        <code>{block.childId}</code>
+        {block.childRunId ? <span>{t('chat.childAgentRun')}: {block.childRunId}</span> : null}
+        {block.parentRunId ? <span>{t('chat.childAgentParent')}: {block.parentRunId}</span> : null}
+        {duration ? <span>{duration}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function RouteDecisionBlock({ block }: { block: Extract<MessageBlock, { kind: 'route_decision' }> }) {
+  const { t } = useTranslation();
+  const headline = block.instructions || block.summary || block.blockedReason || block.reasoning || block.action;
+  return (
+    <div className={styles.routeDecisionBlock} data-testid="route-decision-card">
+      <div className={styles.routeDecisionHeader}>
+        <span className={styles.routeDecisionIcon} aria-hidden="true"><Route size={14} /></span>
+        <span className={styles.routeDecisionKind}>{t('chat.routeDecision')}</span>
+        <em>{block.action}</em>
+      </div>
+      <p>{headline}</p>
+      <div className={styles.routeDecisionMeta}>
+        {block.nextWorker ? <span>{t('chat.routeNextWorker')}: {block.nextWorker}</span> : null}
+        {block.blockedReason ? <span>{t('chat.routeBlocked')}: {block.blockedReason}</span> : null}
+        {block.reasoning ? <span>{t('chat.routeReasoning')}: {previewInlineText(block.reasoning, 90)}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+// ── ErrorBlock ─────────────────────────────
+type ErrorBlockType = Extract<MessageBlock, { kind: 'error' }>;
+
+function errorCategoryClass(category: ErrorBlockType['category']): string {
+  switch (category) {
+    case 'auth': return styles.errorBlockAuth!;
+    case 'quota': return styles.errorBlockQuota!;
+    case 'model': return styles.errorBlockModel!;
+    case 'network': return styles.errorBlockNetwork!;
+    case 'server': return styles.errorBlockServer!;
+    case 'context_length': return styles.errorBlockContextLength!;
+    case 'tool': return styles.errorBlockTool!;
+    default: return styles.errorBlockUnknown!;
+  }
+}
+
+function errorCategoryIcon(category: ErrorBlockType['category']): ReactNode {
+  switch (category) {
+    case 'auth': return <AlertTriangle size={14} />;
+    case 'quota': return <Gauge size={14} />;
+    case 'model': return <Bot size={14} />;
+    case 'network': return <Globe size={14} />;
+    case 'server': return <AlertTriangle size={14} />;
+    case 'context_length': return <FileText size={14} />;
+    case 'tool': return <Wrench size={14} />;
+    default: return <AlertTriangle size={14} />;
+  }
+}
+
+function ErrorBlock({ block }: { block: ErrorBlockType }) {
+  const { t } = useTranslation();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+
+  const categoryClass = errorCategoryClass(block.category) ?? styles.errorBlockUnknown;
+
+  return (
+    <div className={`${styles.errorBlock} ${categoryClass}`} data-testid="error-block">
+      <span className={styles.errorBlockIcon} aria-hidden="true">
+        {errorCategoryIcon(block.category)}
+      </span>
+      <span className={styles.errorBlockMessage}>
+        {block.message || t('chat.errorUnknown')}
+      </span>
+      <div className={styles.errorBlockActions}>
+        {block.retryable && (
+          <button
+            type="button"
+            className={styles.errorBlockActionBtn}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('agenthub:retry-run'));
+            }}
+          >
+            <RefreshCw size={12} />
+            <span>{t('chat.retry')}</span>
+          </button>
+        )}
+        {(block.category === 'auth' || block.category === 'model') && (
+          <button
+            type="button"
+            className={styles.errorBlockActionBtn}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('agenthub:open-settings'));
+            }}
+          >
+            <Settings size={12} />
+            <span>{t('chat.openSettings')}</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className={styles.errorBlockDismissBtn}
+          onClick={() => setDismissed(true)}
+          title={t('chat.dismiss')}
+          aria-label={t('chat.dismiss')}
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Stable block key generation ──────────────
+function blockKey(block: MessageBlock, index: number): string {
+  switch (block.kind) {
+    case 'tool_use':
+      return `tool-${block.callId}`;
+    case 'text':
+      return `text-${index}`;
+    case 'thinking':
+      return `thinking-${index}`;
+    case 'code':
+      return `code-${index}`;
+    case 'result':
+      return `result-${block.error ?? 'success'}-${index}`;
+    case 'file_change':
+      return `file-${block.path}-${block.action}-${index}`;
+    case 'agent_task':
+      return `task-${block.taskId}`;
+    case 'child_agent':
+      return `child-${block.childId}`;
+    case 'route_decision':
+      return `route-${block.action}-${index}`;
+    case 'context_usage':
+      return `context-${block.runId ?? index}`;
+    case 'session_init':
+      return `session-${block.model ?? index}`;
+    case 'artifact':
+      return `artifact-${block.artifactId}`;
+    case 'deploy_card':
+      return `deploy-${block.deployId ?? index}`;
+    case 'link_card':
+      return `link-${block.url}-${index}`;
+    case 'approval':
+      return `approval-${block.approvalId}`;
+    case 'tool_group':
+      return `toolgroup-${block.blocks[0]?.callId ?? index}`;
+    case 'error':
+      return `error-${index}`;
+    case 'citation':
+      return `cite-${block.url ?? block.text ?? index}`;
+    case 'compact':
+      return `compact-${index}`;
+    default:
+      return `block-${index}`;
+  }
+}
+
 // ── Main BlockRenderer ──────────────────────
-function BlockRenderer({
+const BlockRenderer = memo(function BlockRenderer({
   block,
   t,
+  role,
   active,
 }: {
   block: MessageBlock;
   t: (key: string, vars?: Record<string, unknown>) => string;
+  role?: ChatMessage['role'];
   active?: boolean;
 }) {
   switch (block.kind) {
     case 'text':
+      if (role === 'user') return <UserTextBlock content={block.content} />;
+      if (role === 'agent') return <AgentTextBlock content={block.content} isStreaming={active} />;
       return <MarkdownRenderer content={block.content} />;
 
     case 'code':
@@ -412,8 +922,20 @@ function BlockRenderer({
     case 'tool_use':
       return <ToolUseBlock block={block} />;
 
+    case 'tool_group':
+      return <ToolGroup blocks={block.blocks} isStreaming={active} />;
+
     case 'file_change':
       return <FileChangeBlock block={block} />;
+
+    case 'agent_task':
+      return <AgentTaskBlock block={block} />;
+
+    case 'child_agent':
+      return <ChildAgentBlock block={block} />;
+
+    case 'route_decision':
+      return <RouteDecisionBlock block={block} />;
 
     case 'session_init':
       return null;
@@ -422,10 +944,16 @@ function BlockRenderer({
       if (block.success) return null;
       return <StatusRow label={t('chat.result.failed', { error: block.error ?? 'unknown error' })} meta="failed" />;
 
+    case 'error':
+      return <ErrorBlock block={block} />;
+
+    case 'context_usage':
+      return isDetailedContextUsage(block) ? <ContextUsageInline block={block} /> : null;
+
     default:
       return null;
   }
-}
+});
 
 // ── Message text extraction (for copy) ──────
 function extractMessageText(msg: ChatMessage): string {
@@ -442,12 +970,22 @@ function extractMessageText(msg: ChatMessage): string {
           return `[${block.toolName}] ${summarizeInput(block.input)}`;
         case 'file_change':
           return `[${block.action}] ${block.path}`;
+        case 'agent_task':
+          return `[subagent:${block.status}] ${block.title || block.taskId}${block.summary ? ` — ${block.summary}` : ''}`;
+        case 'child_agent':
+          return `[child:${block.status}] ${block.agentName ?? block.childId} ${block.title || block.childId}${block.result ? ` — ${block.result}` : ''}${block.error ? ` — ${block.error}` : ''}`;
+        case 'route_decision':
+          return `[route:${block.action}] ${block.instructions ?? block.summary ?? block.blockedReason ?? ''}`;
         case 'session_init':
           return `Session: ${block.model ?? 'unknown'}`;
         case 'result':
           return block.success
             ? `Result: success (tokens in=${block.tokenUsage?.input ?? '?'} out=${block.tokenUsage?.output ?? '?'})`
             : `Result: failed — ${block.error ?? 'unknown error'}`;
+        case 'context_usage':
+          return `Context usage: total=${block.total ?? '?'} input=${block.input ?? '?'} output=${block.output ?? '?'} percent=${block.usagePercent ?? '?'}`;
+        case 'error':
+          return `${block.category ? `[${block.category}] ` : ''}Error: ${block.message}`;
         default:
           return '';
       }
@@ -456,41 +994,313 @@ function extractMessageText(msg: ChatMessage): string {
     .join('\n');
 }
 
+function hasVisibleBlock(block: MessageBlock): boolean {
+  switch (block.kind) {
+    case 'session_init':
+      return false;
+    case 'result':
+      return !block.success;
+    case 'context_usage':
+      return isDetailedContextUsage(block);
+    case 'text':
+    case 'code':
+    case 'thinking':
+      return block.content.trim().length > 0;
+    case 'tool_use':
+    case 'file_change':
+    case 'agent_task':
+    case 'child_agent':
+    case 'route_decision':
+      return true;
+    case 'error':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function hasVisibleMessage(message: ChatMessage): boolean {
+  return message.blocks.some(hasVisibleBlock);
+}
+
+// ── MessageCard (memoized message row) ───────
+interface MessageCardProps {
+  msg: ChatMessage;
+  t: (key: string, vars?: Record<string, unknown>) => string;
+  language: string;
+  isStreaming: boolean;
+  isLastMsg: boolean;
+  isCopying: boolean;
+  isDeleting: boolean;
+  onCopy: (msg: ChatMessage) => void;
+  onRetry?: (messageId: string) => void;
+  onFork?: (messageId: string) => void;
+  onDeleteClick?: (messageId: string) => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: (messageId: string) => void;
+}
+
+function messageBlockSignature(blocks: ChatMessage['blocks']): string {
+  return blocks.map((b) => {
+    if (b.kind === 'tool_use') return `tool:${b.callId}:${b.status}:${b.children?.length ?? 0}`;
+    if (b.kind === 'text') return `text:${b.content.length}`;
+    if (b.kind === 'thinking') return `think:${b.content.length}`;
+    if (b.kind === 'code') return `code:${b.content.length}`;
+    if (b.kind === 'result') return `result:${b.success}:${b.tokenUsage?.input ?? 0}:${b.tokenUsage?.output ?? 0}`;
+    if (b.kind === 'context_usage') return `ctx:${b.variant ?? ''}:${b.total ?? 0}:${b.usagePercent ?? 0}`;
+    if (b.kind === 'file_change') return `file:${b.path}:${b.action}`;
+    if (b.kind === 'agent_task') return `task:${b.taskId}:${b.status}`;
+    if (b.kind === 'child_agent') return `child:${b.childId}:${b.status}`;
+    if (b.kind === 'route_decision') return `route:${b.action}`;
+    if (b.kind === 'artifact') return `artifact:${b.artifactId}`;
+    if (b.kind === 'approval') return `approval:${b.approvalId}:${b.status}`;
+    if (b.kind === 'tool_group') return `tgrp:${b.blocks.map((tb) => `${tb.callId}:${tb.status}:${tb.children?.length ?? 0}`).join(',')}`;
+    if (b.kind === 'error') return `error:${b.category ?? ''}:${b.message}`;
+    return b.kind;
+  }).join('|');
+}
+
+const MessageCard = memo(function MessageCard({
+  msg,
+  t,
+  language,
+  isStreaming,
+  isLastMsg,
+  isCopying,
+  isDeleting,
+  onCopy,
+  onRetry,
+  onFork,
+  onDeleteClick,
+  onCancelDelete,
+  onConfirmDelete,
+}: MessageCardProps) {
+  const isActive = isStreaming && isLastMsg;
+  const messageTime = formatMessageTime(msg.timestamp, language);
+  const tokenUsageFooter = formatTokenUsageFooter(msg, t);
+
+  return (
+    <div
+      className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
+    >
+      {msg.role === 'agent' && msg.agentName && (
+        <div className={styles.agentAvatar} title={msg.agentName}>
+          <div className={styles.avatarCircle}>
+            <AgentAvatarIcon name={msg.agentName} />
+          </div>
+          <span className={styles.agentNameLabel}>{agentDisplayName(msg.agentName)}</span>
+        </div>
+      )}
+
+      {msg.role === 'agent' ? <TaskList blocks={msg.blocks} /> : null}
+      {msg.role === 'agent' ? <ToolTimeline blocks={msg.blocks} /> : null}
+
+      {/* Group consecutive tool_use blocks into ToolGroup */}
+      {(() => {
+        const items: Array<MessageBlock | { kind: 'tool_group'; blocks: Extract<MessageBlock, { kind: 'tool_use' }>[]; totalCount: number }> = [];
+        let toolBuffer: Extract<MessageBlock, { kind: 'tool_use' }>[] = [];
+
+        for (const block of msg.blocks) {
+          if (block.kind === 'tool_use') {
+            toolBuffer.push(block);
+          } else {
+            if (toolBuffer.length > 0) {
+              items.push({ kind: 'tool_group', blocks: [...toolBuffer], totalCount: toolBuffer.length });
+              toolBuffer = [];
+            }
+            items.push(block);
+          }
+        }
+        if (toolBuffer.length > 0) {
+          items.push({ kind: 'tool_group', blocks: [...toolBuffer], totalCount: toolBuffer.length });
+        }
+
+        return items.map((block, i) => (
+          <BlockRenderer
+            key={blockKey(block as MessageBlock, i)}
+            block={block as MessageBlock}
+            t={t}
+            role={msg.role}
+            active={isActive}
+          />
+        ));
+      })()}
+
+      {msg.role !== 'user' && (
+        <div className={`${styles.messageFooter} ${isDeleting ? styles.messageFooterActive : ''}`}>
+          {isDeleting ? (
+            <div className={styles.deleteConfirmBar} role="group" aria-label={t('chat.deleteConfirm')}>
+              <span className={styles.deleteConfirmText}>{t('chat.deleteConfirmShort')}</span>
+              <button
+                type="button"
+                className={styles.deleteCancelBtn}
+                onClick={onCancelDelete}
+              >
+                {t('thread.cancel')}
+              </button>
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() => onConfirmDelete(msg.id)}
+              >
+                {t('chat.deleteConfirmAction')}
+              </button>
+            </div>
+          ) : (
+            <div className={styles.actionBar}>
+              <button
+                className={styles.actionBtn}
+                title={t('chat.copy')}
+                aria-label={t('chat.copy')}
+                onClick={() => onCopy(msg)}
+              >
+                <Copy size={14} />
+              </button>
+              {onRetry && (
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.retry')}
+                  aria-label={t('chat.retry')}
+                  onClick={() => onRetry(msg.id)}
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
+              {onFork && (
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.fork')}
+                  aria-label={t('chat.fork')}
+                  onClick={() => onFork(msg.id)}
+                >
+                  <GitFork size={14} />
+                </button>
+              )}
+              {onDeleteClick && (
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.delete')}
+                  aria-label={t('chat.delete')}
+                  onClick={() => onDeleteClick(msg.id)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          )}
+          <span
+            className={styles.timestamp}
+            title={messageTime.exact}
+            aria-label={messageTime.exact}
+          >
+            {messageTime.short}
+          </span>
+          {tokenUsageFooter ? (
+            <span
+              className={styles.messageTokenUsage}
+              title={tokenUsageFooter}
+              aria-label={tokenUsageFooter}
+            >
+              · {tokenUsageFooter}
+            </span>
+          ) : null}
+        </div>
+      )}
+      {isCopying && (
+        <span className={styles.copyToast}>{t('chat.copied')}</span>
+      )}
+    </div>
+  );
+}, (prev, next) => {
+  // Always re-render the streaming last message (blocks change rapidly)
+  if (next.isLastMsg && next.isStreaming) return false;
+  // Transition from streaming to settled — re-render to finalize
+  if (prev.isStreaming && !next.isStreaming && prev.isLastMsg) return false;
+
+  // Message identity
+  if (prev.msg.id !== next.msg.id) return false;
+
+  // Visual state toggles
+  if (prev.isCopying !== next.isCopying) return false;
+  if (prev.isDeleting !== next.isDeleting) return false;
+
+  // Block content signature
+  if (messageBlockSignature(prev.msg.blocks) !== messageBlockSignature(next.msg.blocks)) return false;
+
+  // Metadata
+  if (prev.msg.timestamp !== next.msg.timestamp) return false;
+  if (prev.msg.agentName !== next.msg.agentName) return false;
+  if (prev.msg.role !== next.msg.role) return false;
+  if (prev.language !== next.language) return false;
+
+  // Function references (stable in production, test mocks may produce new refs)
+  if (prev.t !== next.t) return false;
+
+  return true;
+});
+
 // ── ChatView ────────────────────────────────
-export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
+export default function ChatView({
+  messages,
+  isStreaming,
+  onRetry,
+  onFork,
+  onDelete,
+  agentTeamOverview,
+  agentTeamsLoading,
+  agentTeamsSignedIn,
+  teamLocalExecutions,
+  localOrchestration,
+  onStartLocalOrchestration,
+  onOpenTeamRuns,
+}: Props) {
   const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
+  const connectionStatus = useConnectionStore(useShallow((s) => s.connectionStatus));
+  const wasEverConnectedRef = useRef(false);
+  const connectionStatusRef = useRef(connectionStatus);
+  const [connectionBannerDismissed, setConnectionBannerDismissed] = useState(false);
+  const [connectionBannerFadeOut, setConnectionBannerFadeOut] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const visibleMessages = messages.filter(hasVisibleMessage);
 
   // ── Virtualizer ──────────────────────────────
   const virtualizer = useVirtualizer({
-    count: messages.length,
+    count: visibleMessages.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: (index: number) => {
-      const msg = messages[index];
+      const msg = visibleMessages[index];
       if (!msg) return 200;
       if (msg.role === 'system') return 80;
-      if (msg.blocks.some((b) => b.kind === 'tool_use')) return 300;
+      const hasToolUse = msg.blocks.some((b) => b.kind === 'tool_use');
+      if (hasToolUse) return 320;
+      const hasApproval = msg.blocks.some((b) => b.kind === 'approval');
+      if (hasApproval) return 280;
+      const hasAgentTask = msg.blocks.some((b) => b.kind === 'agent_task' || b.kind === 'child_agent' || b.kind === 'route_decision');
+      if (hasAgentTask) return 250;
+      const hasContextUsage = msg.blocks.some((b) => b.kind === 'context_usage');
+      if (hasContextUsage) return 220;
       return 160;
     },
     overscan: 5,
-    getItemKey: (index: number) => messages[index]?.id ?? index,
+    getItemKey: (index: number) => visibleMessages[index]?.id ?? index,
   });
 
   // Stable refs so the callback closure always sees latest values
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+  const visibleMessagesRef = useRef(visibleMessages);
+  visibleMessagesRef.current = visibleMessages;
   const virtualizerRef = useRef(virtualizer);
   virtualizerRef.current = virtualizer;
 
   const { scrollToBottom, isNearBottom } = useAutoScroll(
     scrollRef,
-    { messages, isStreaming: isStreaming ?? false },
+    { messages: visibleMessages, isStreaming: isStreaming ?? false },
     {
       scrollToBottomFn: () => {
-        const len = messagesRef.current.length;
+        const len = visibleMessagesRef.current.length;
         if (len > 0) {
           virtualizerRef.current.scrollToIndex(len - 1, { align: 'end' });
         }
@@ -498,13 +1308,16 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     },
   );
 
-  const lastMsg = messages[messages.length - 1];
+  const lastMsg = visibleMessages[visibleMessages.length - 1];
   const lastMessageId = lastMsg?.id ?? null;
   const lastMessageSignature = lastMsg
     ? `${lastMsg.id}:${lastMsg.blocks.map((block) => {
         if ('content' in block && typeof block.content === 'string') return block.content.length;
         if (block.kind === 'tool_use') return `${block.status}:${block.children?.length ?? 0}`;
+        if (block.kind === 'agent_task') return `${block.status}:${block.summary?.length ?? 0}`;
+        if (block.kind === 'child_agent') return `${block.status}:${block.result?.length ?? 0}:${block.error?.length ?? 0}`;
         if (block.kind === 'result') return block.success ? 'success' : block.error ?? 'failed';
+        if (block.kind === 'context_usage') return `${block.variant ?? 'usage'}:${block.total ?? ''}:${block.usagePercent ?? ''}`;
         return block.kind;
       }).join('|')}`
     : '';
@@ -512,20 +1325,21 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   useEffect(() => {
     if (!lastMessageId || lastMessageIdRef.current === lastMessageId) return;
     lastMessageIdRef.current = lastMessageId;
+    const force = lastMsg?.role === 'user';
 
     const frame = requestAnimationFrame(() => {
-      scrollToBottom(true);
-      requestAnimationFrame(() => scrollToBottom(true));
+      scrollToBottom(force);
+      requestAnimationFrame(() => scrollToBottom(force));
     });
     return () => cancelAnimationFrame(frame);
-  }, [lastMessageId, scrollToBottom]);
+  }, [lastMessageId, lastMsg?.role, scrollToBottom]);
 
   useEffect(() => {
     if (!lastMessageSignature) return;
     const timers = [
-      window.setTimeout(() => scrollToBottom(true), 0),
-      window.setTimeout(() => scrollToBottom(true), 80),
-      window.setTimeout(() => scrollToBottom(true), 220),
+      window.setTimeout(() => scrollToBottom(false), 0),
+      window.setTimeout(() => scrollToBottom(false), 80),
+      window.setTimeout(() => scrollToBottom(false), 220),
     ];
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [lastMessageSignature, scrollToBottom]);
@@ -539,8 +1353,8 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       if (frame !== null) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         frame = null;
-        scrollToBottom(true);
-        requestAnimationFrame(() => scrollToBottom(true));
+        scrollToBottom(false);
+        requestAnimationFrame(() => scrollToBottom(false));
       });
     };
 
@@ -564,14 +1378,40 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     };
   }, [scrollToBottom]);
 
-  useEffect(() => {
-    if (messages.length === 0) return;
-    virtualizer.measure();
-    const frame = requestAnimationFrame(() => scrollToBottom(true));
-    return () => cancelAnimationFrame(frame);
-  }, [messages.length, scrollToBottom, virtualizer]);
-
   const showScrollIndicator = isStreaming && !isNearBottom;
+
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      wasEverConnectedRef.current = true;
+    }
+    // Trigger fade-out when transitioning to connected from visible state
+    if (
+      connectionStatus === 'connected' &&
+      connectionStatusRef.current !== 'connected' &&
+      !connectionBannerDismissed &&
+      wasEverConnectedRef.current
+    ) {
+      setConnectionBannerFadeOut(true);
+      const timer = setTimeout(() => {
+        setConnectionBannerDismissed(false);
+        setConnectionBannerFadeOut(false);
+      }, 400);
+      connectionStatusRef.current = connectionStatus;
+      return () => clearTimeout(timer);
+    }
+    if (connectionStatus === 'connected') {
+      setConnectionBannerDismissed(false);
+      setConnectionBannerFadeOut(false);
+    }
+    connectionStatusRef.current = connectionStatus;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionStatus]);
+
+  useEffect(() => {
+    if (!deletingMessageId) return;
+    if (visibleMessages.some((message) => message.id === deletingMessageId)) return;
+    setDeletingMessageId(null);
+  }, [deletingMessageId, visibleMessages]);
 
   const handleCopy = useCallback(async (msg: ChatMessage) => {
     const text = extractMessageText(msg);
@@ -588,137 +1428,137 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const lastMsgHasText =
     lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
 
-  const renderMessage = useCallback(
-    (msg: ChatMessage) => {
-      const messageTime = formatMessageTime(msg.timestamp, i18n.language);
-      return (
-        <div
-          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
-        >
-          {msg.role === 'agent' && msg.agentName && (
-            <div className={styles.agentAvatar}>
-              <div className={styles.avatarCircle}>
-                <AgentAvatarIcon name={msg.agentName} />
-              </div>
-              <span className={styles.agentNameLabel}>{msg.agentName}</span>
-            </div>
-          )}
-
-          {msg.blocks.map((block, i) => {
-            if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
-              return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
-            }
-            return (
-              <BlockRenderer
-                key={i}
-                block={block}
-                t={t}
-                active={Boolean(isStreaming && msg.id === lastMsg?.id)}
-              />
-            );
-          })}
-
-          {msg.role !== 'user' && (
-            <div className={styles.messageFooter}>
-              <div className={styles.actionBar}>
-                <button
-                  className={styles.actionBtn}
-                  title={t('chat.copy')}
-                  aria-label={t('chat.copy')}
-                  onClick={() => handleCopy(msg)}
-                >
-                  <Copy size={14} />
-                </button>
-                {onRetry && (
-                  <button
-                    className={styles.actionBtn}
-                    title={t('chat.retry')}
-                    aria-label={t('chat.retry')}
-                    onClick={() => onRetry(msg.id)}
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                )}
-                {onDelete && (
-                  <button
-                    className={styles.actionBtn}
-                    title={t('chat.delete')}
-                    aria-label={t('chat.delete')}
-                    onClick={() => onDelete(msg.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-              <span
-                className={styles.timestamp}
-                title={messageTime.exact}
-                aria-label={messageTime.exact}
-              >
-                {messageTime.short}
-              </span>
-            </div>
-          )}
-          {copiedMessageId === msg.id && (
-            <span className={styles.copyToast}>{t('chat.copied')}</span>
-          )}
-        </div>
-      );
-    },
-    [t, i18n.language, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
-  );
-
   const handleScrollToBottom = useCallback(() => {
     scrollToBottom(true);
   }, [scrollToBottom]);
 
+  const handleCancelDelete = useCallback(() => {
+    setDeletingMessageId(null);
+  }, []);
+
+  const handleDeleteClick = useCallback((messageId: string) => {
+    setDeletingMessageId(messageId);
+  }, []);
+
+  const handleConfirmDelete = useCallback((messageId: string) => {
+    onDelete?.(messageId);
+    setDeletingMessageId(null);
+  }, [onDelete]);
+
+  const showConnectionBanner =
+    !connectionBannerDismissed &&
+    wasEverConnectedRef.current &&
+    (connectionStatus === 'reconnecting' || connectionStatus === 'disconnected');
+  const isReconnecting = connectionStatus === 'reconnecting';
+
+  const handleConnectionRefresh = useCallback(() => {
+    wasEverConnectedRef.current = true;
+    setConnectionBannerDismissed(false);
+    window.dispatchEvent(new CustomEvent('agenthub:reconnect'));
+  }, []);
+
+  const handleConnectionBannerDismiss = useCallback(() => {
+    setConnectionBannerDismissed(true);
+  }, []);
+
   return (
     <div className={styles.root}>
+      {showConnectionBanner && (
+        <div
+          className={`${styles.connectionBanner} ${isReconnecting ? styles.connectionBannerReconnecting : styles.connectionBannerFailed} ${connectionBannerFadeOut ? styles.connectionBannerFadeOut : ''}`}
+          role="alert"
+        >
+          <span className={styles.connectionBannerIcon} aria-hidden="true">
+            <AlertTriangle size={14} />
+          </span>
+          <span className={styles.connectionBannerMsg}>
+            {isReconnecting ? t('status.reconnecting') : t('connection.lost')}
+          </span>
+          {!isReconnecting && (
+            <>
+              <span className={styles.connectionBannerDetail}>
+                {t('connection.failed')}
+              </span>
+              <button
+                type="button"
+                className={styles.connectionBannerBtn}
+                onClick={handleConnectionRefresh}
+              >
+                <RefreshCw size={12} />
+                <span>{t('connection.refresh')}</span>
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className={styles.connectionBannerDismiss}
+            onClick={handleConnectionBannerDismiss}
+            title={t('banner.dismiss')}
+            aria-label={t('banner.dismiss')}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
       <div
         ref={scrollRef}
         className={styles.stream}
         role="log"
         aria-live="polite"
       >
-        {messages.length === 0 ? (
+        {(agentTeamsSignedIn || localOrchestration?.available || agentTeamsLoading) && (
+          <TeamRunDock
+            overview={agentTeamOverview}
+            loading={agentTeamsLoading}
+            signedIn={agentTeamsSignedIn}
+            localExecutions={teamLocalExecutions}
+            localOrchestration={localOrchestration}
+            onStartLocalOrchestration={onStartLocalOrchestration}
+            onOpenConsole={onOpenTeamRuns}
+          />
+        )}
+        {visibleMessages.length === 0 ? (
           <EmptyState
             title={t('chat.emptyTitle')}
             description={t('chat.emptyDescription')}
-            suggestions={[
-              { label: t('chat.suggestion.newTask'), onClick: () => {} },
-              { label: t('chat.suggestion.explainCode'), onClick: () => {} },
-              { label: t('chat.suggestion.fixBugs'), onClick: () => {} },
-            ]}
           />
         ) : (
-          <div className={styles.virtualContent} style={{ height: virtualizer.getTotalSize() }}>
+          <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
-              const msg = messages[virtualRow.index];
+              const msg = visibleMessages[virtualRow.index];
               if (!msg) return null;
-              const isLast = virtualRow.index === messages.length - 1;
               return (
                 <div
                   key={virtualRow.key}
                   data-index={virtualRow.index}
+                  data-message-id={msg.id}
                   ref={virtualizer.measureElement}
-                  className={`${styles.virtualItem} ${msg.role === 'user' ? styles.virtualItemUser : ''}`}
+                  className={`${styles.virtualItem} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
                   style={{
                     transform: `translateY(${virtualRow.start}px)`,
-                    paddingBottom: isLast ? 0 : undefined,
                   }}
                 >
-                  {renderMessage(msg)}
+                  <MessageCard
+                    msg={msg}
+                    t={t}
+                    language={i18n.language}
+                    isStreaming={isStreaming ?? false}
+                    isLastMsg={msg.id === lastMsg?.id}
+                    isCopying={copiedMessageId === msg.id}
+                    isDeleting={deletingMessageId === msg.id}
+                    onCopy={handleCopy}
+                    onRetry={onRetry}
+                    onFork={onFork}
+                    onDeleteClick={onDelete ? handleDeleteClick : undefined}
+                    onCancelDelete={handleCancelDelete}
+                    onConfirmDelete={handleConfirmDelete}
+                  />
                 </div>
               );
             })}
           </div>
         )}
-        {isStreaming &&
-          (lastMsgHasText ? (
-            <div className={styles.streamProgress} />
-          ) : (
-            <PendingThinking label={t('chat.thinkingLabel')} />
-          ))}
+        {isStreaming && !lastMsgHasText ? <PendingThinking label={t('chat.thinkingLabel')} /> : null}
       </div>
 
       {showScrollIndicator && (

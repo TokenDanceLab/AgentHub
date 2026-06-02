@@ -199,7 +199,7 @@ export const VIEW_LIST: ViewConfig[] = Object.values(VIEW_REGISTRY);
 
 // ── Main content view mode (used by MainView resolution) ──
 
-export type ViewMode = 'welcome' | 'loading' | 'chat' | 'im';
+export type ViewMode = 'welcome' | 'loading' | 'chat' | 'im' | 'team';
 
 export interface ViewDescriptor {
   mode: ViewMode;
@@ -211,4 +211,5 @@ export const VIEWS: Record<ViewMode, ViewDescriptor> = {
   loading: { mode: 'loading', label: 'Loading' },
   chat: { mode: 'chat', label: 'Chat' },
   im: { mode: 'im', label: 'Messages' },
+  team: { mode: 'team', label: 'TeamRun Console' },
 };

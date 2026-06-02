@@ -99,6 +99,10 @@ func (h *MCPServerHandler) ListMCPServers(c *gin.Context) {
 
 	result, err := h.svc.List(c.Request.Context(), userID, q, transport, cursor, pageSize)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

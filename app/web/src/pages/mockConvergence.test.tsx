@@ -3,10 +3,10 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n';
-import AgentSquarePageInteractive from './agent-square/AgentSquarePage';
-import GroupWorkspacePageInteractive from './group-workspace/GroupWorkspacePage';
-import PrivateChatsPageInteractive from './private-chats/PrivateChatsPage';
-import ProjectPageInteractive from './projects/ProjectPage';
+import AgentSquarePageInteractive from './AgentSquare';
+import GroupWorkspacePageInteractive from './GroupWorkspace';
+import PrivateChatsPageInteractive from './PrivateChats';
+import ProjectPageInteractive from './Project';
 
 const emptyWorkbenchState = {
   projects: [],

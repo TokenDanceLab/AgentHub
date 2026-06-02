@@ -1,3 +1,6 @@
+> ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/handoff/STATE.md` and `docs/roadmap.md` for current status.**
+> Most planned work in this document has been completed. This file is retained as a historical reference.
+
 # Phase 0+1 实现计划
 
 ## 执行顺序

@@ -15,6 +15,7 @@ vi.mock('../native/mobileCommands', () => ({
 
 vi.mock('../native/hubHealth', () => ({
   checkHubHealth: vi.fn(() => Promise.resolve({ reachable: true })),
+  getMobileHubHealth: vi.fn(() => Promise.resolve({ status: "ok" })),
 }));
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -29,11 +30,11 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('Mobile App', () => {
   it('renders the bottom navigation bar', () => {
     renderWithProviders(<App />);
-    expect(screen.getByText('Threads')).toBeInTheDocument();
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
   });
 
   it('starts on the threads view', () => {
     renderWithProviders(<App />);
-    expect(screen.getByText('Threads')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads', level: 1 })).toBeInTheDocument();
   });
 });

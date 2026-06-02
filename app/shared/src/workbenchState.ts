@@ -544,6 +544,16 @@ function setRunStatus(runs: Run[], runId: string, status: Run['status']): Run[] 
   }));
 }
 
+function logChunk(
+  chunkText: string,
+  stream?: string,
+): { stream?: string; text: string } {
+  return {
+    text: chunkText,
+    ...(stream !== undefined ? { stream } : {}),
+  };
+}
+
 function chunkTexts(
   value: unknown,
   fallbackStream?: string,

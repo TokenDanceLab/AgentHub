@@ -3,7 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -14,7 +19,13 @@ import (
 
 // ExecutionTargetService handles CRUD for execution targets.
 type ExecutionTargetService struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache ExecutionTargetCache
+}
+
+// ExecutionTargetCache is the subset of *cache.Client methods used by ExecutionTargetService.
+type ExecutionTargetCache interface {
+	IsOnline(ctx context.Context, userID string) (bool, error)
 }
 
 // TargetListResult holds paginated execution target results.
@@ -26,6 +37,11 @@ type TargetListResult struct {
 
 func NewExecutionTargetService(db *gorm.DB) *ExecutionTargetService {
 	return &ExecutionTargetService{db: db}
+}
+
+// SetCache injects an optional cache client for hub_relay health checks.
+func (s *ExecutionTargetService) SetCache(cache ExecutionTargetCache) {
+	s.cache = cache
 }
 
 func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
@@ -190,9 +206,68 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 	switch t.TargetType {
 	case "local_edge":
 		return repository.UpdateTargetOnlineStatus(s.db, id, true)
-	case "remote_ssh", "tailscale", "cloud_edge", "hub_relay":
-		return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
+	case "remote_ssh", "tailscale", "cloud_edge":
+		if t.Host == "" {
+			return errcode.TargetNotRoutable.WithMessage("execution target has no host configured")
+		}
+		port := t.Port
+		if port == 0 {
+			port = 3210
+		}
+		addr := net.JoinHostPort(t.Host, fmt.Sprintf("%d", port))
+		return pingEdgeServer(ctx, addr, t.AuthMethod, t.ID, id, s.db)
+	case "hub_relay":
+		// hub_relay health depends on whether the owner has an active
+		// WebSocket connection that can relay tasks.
+		if s.cache == nil {
+			return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
+		}
+		online, err := s.cache.IsOnline(ctx, t.OwnerID)
+		if err != nil || !online {
+			_ = repository.UpdateTargetOnlineStatus(s.db, id, false)
+			return errcode.TargetNotRoutable.WithMessage("relay route not available: target owner is offline")
+		}
+		_ = repository.UpdateTargetOnlineStatus(s.db, id, true)
+		return nil
 	default:
 		return errcode.ErrBadRequest.WithMessage("unsupported target_type")
 	}
+}
+
+// pingEdgeServer performs an actual HTTP GET /v1/health against the Edge Server
+// and updates the target's online status and last_seen_at accordingly.
+func pingEdgeServer(ctx context.Context, addr string, authMethod, targetID, targetOwnerID string, db *gorm.DB) error {
+	scheme := "http"
+	url := scheme + "://" + addr + "/v1/health"
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+		return errcode.TargetNotRoutable.WithMessage("failed to build ping request: " + err.Error())
+	}
+
+	// If the target has an auth method configured, attach the token.
+	// In practice, remote SSH Edge uses SSH tunnel auth (no HTTP auth needed),
+	// Tailscale uses mTLS/networking auth (no HTTP auth needed),
+	// Cloud Edge uses Hub JWT (attached by the caller).
+	if authMethod != "" && authMethod != "none" {
+		req.Header.Set("Authorization", "Bearer "+authMethod)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		slog.Debug("execution target ping failed", "target_id", targetOwnerID, "addr", addr, "err", err)
+		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+		return errcode.TargetNotRoutable.WithMessage("ping failed: " + err.Error())
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		_ = repository.UpdateTargetOnlineStatus(db, targetID, true)
+		return nil
+	}
+
+	_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+	return errcode.TargetNotRoutable.WithMessage(fmt.Sprintf("ping returned HTTP %d", resp.StatusCode))
 }

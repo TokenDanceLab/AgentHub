@@ -104,7 +104,7 @@ describeReal('Real Edge Server E2E', () => {
     }
 
     // Start the server on the test port
-    serverProcess = spawn(BINARY_PATH, ['--addr', `127.0.0.1:${TEST_PORT}`], {
+    serverProcess = spawn(BINARY_PATH, ['--addr', `127.0.0.1:${TEST_PORT}`, '--dev'], {
       cwd: EDGE_SERVER_DIR,
       stdio: 'pipe',
     });
@@ -319,6 +319,8 @@ describeReal('Real Edge Server E2E', () => {
 
     it('defaults projectId/threadId to local defaults when omitted', async () => {
       requireServer();
+      // Allow the mock executor to finish any run from the previous test.
+      await new Promise((resolve) => setTimeout(resolve, 400));
       const res = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -333,6 +335,8 @@ describeReal('Real Edge Server E2E', () => {
 
     it('accepts empty body (decodeOptionalJSON)', async () => {
       requireServer();
+      // Allow the mock executor to finish any run from the previous test.
+      await new Promise((resolve) => setTimeout(resolve, 400));
       const res = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -440,15 +444,15 @@ describeReal('Real Edge Server E2E', () => {
       expect(typeof body.status).toBe('string');
     });
 
-    it('returns 202 for unknown run (matches handler.go contract)', async () => {
+    it('returns 404 for unknown run on cancel (#108)', async () => {
       requireServer();
       const res = await fetch(`${BASE_URL}/v1/runs/unknown_run_id:cancel`, {
         method: 'POST',
       });
-      expect(res.status).toBe(202);
+      expect(res.status).toBe(404);
       const body = await res.json();
-      expect(body.runId).toBe('unknown_run_id');
-      expect(body.status).toBe('cancelling');
+      expect(body.error).toBeDefined();
+      expect(body.error.code).toBe('not_found');
     });
   });
 

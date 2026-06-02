@@ -263,23 +263,16 @@ jobs:
 
   # ── Frontend: Web ────────────────────────────
   frontend-web:
+    name: Frontend (web)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: app/web
+        working-directory: ./app/web
     steps:
       - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-
+          node-version: 22
       - name: Install
         run: pnpm install --frozen-lockfile
 
@@ -288,6 +281,48 @@ jobs:
 
       - name: Build Web
         run: pnpm build
+      - name: Test
+        run: pnpm test -- --run
+
+  # ── Frontend: Mobile ──────────────────────────
+  frontend-mobile:
+    name: Frontend (mobile)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: corepack enable && pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+      - name: Test
+        run: pnpm test -- --run
+
+  # ── E2E Smoke ─────────────────────────────────
+  e2e-smoke:
+    name: E2E Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: corepack enable && pnpm install --frozen-lockfile
+        working-directory: ./app
+      - name: Build desktop
+        run: pnpm build
+        working-directory: ./app/desktop
+      - name: Smoke test
+        run: pnpm exec playwright test --project=chromium
+        working-directory: ./app
 
   # ── Validation ───────────────────────────────
   validate:
