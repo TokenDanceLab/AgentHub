@@ -335,6 +335,12 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
         working-directory: ./app
+      - name: Start web preview server
+        run: |
+          pnpm --filter agenthub-web exec vite preview --port 5175 --strictPort &
+          sleep 3
+          curl --retry 5 --retry-connrefused http://127.0.0.1:5175/ > /dev/null
+        working-directory: ./app
       - name: Smoke test
         run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium
         working-directory: ./app
