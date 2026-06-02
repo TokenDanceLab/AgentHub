@@ -10,6 +10,10 @@ const mockUseTeamRuns = vi.fn();
 const mockUseTeamRunsForTeams = vi.fn();
 const mockUseTeamRunState = vi.fn();
 const mockUseTeamEvents = vi.fn();
+const mockUseStartTeamRun = vi.fn();
+const mockUseDecideApproval = vi.fn();
+const mockUseResolveConflict = vi.fn();
+const mockUseCreateAssignment = vi.fn();
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -27,6 +31,14 @@ vi.mock('@/api/teamRunQueries', () => ({
   useTeamRunsForTeams: (...args: unknown[]) => mockUseTeamRunsForTeams(...args),
   useTeamRunState: (...args: unknown[]) => mockUseTeamRunState(...args),
   useTeamEvents: (...args: unknown[]) => mockUseTeamEvents(...args),
+  useStartTeamRun: () => mockUseStartTeamRun(),
+  useDecideApproval: () => mockUseDecideApproval(),
+  useResolveConflict: () => mockUseResolveConflict(),
+  useCreateAssignment: () => mockUseCreateAssignment(),
+}));
+
+vi.mock('@/stores/toastStore', () => ({
+  useToastStore: () => ({ addToast: vi.fn() }),
 }));
 
 const baseTeam = {
@@ -154,6 +166,10 @@ function signedInDefaults() {
     isFetching: false,
     error: null,
   });
+  mockUseStartTeamRun.mockReturnValue({ mutateAsync: vi.fn(), isPending: false, variables: undefined });
+  mockUseDecideApproval.mockReturnValue({ mutateAsync: vi.fn(), isPending: false, variables: undefined });
+  mockUseResolveConflict.mockReturnValue({ mutateAsync: vi.fn(), isPending: false, variables: undefined });
+  mockUseCreateAssignment.mockReturnValue({ mutateAsync: vi.fn(), isPending: false, variables: undefined });
 }
 
 describe('TeamRunConsole', () => {
