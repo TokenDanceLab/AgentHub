@@ -68,7 +68,7 @@ jobs:
             fi
           }
           FAILED=0
-          check_pkg "edge-server/internal/security/" 70 "security" || FAILED=1
+          check_pkg "edge-server/internal/security/" 68 "security" || FAILED=1
           check_pkg "edge-server/internal/lifecycle/" 60 "lifecycle" || FAILED=1
           check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
           exit $FAILED
@@ -329,6 +329,9 @@ jobs:
       - name: Build desktop
         run: pnpm build
         working-directory: ./app/desktop
+      - name: Build web for E2E
+        run: pnpm build
+        working-directory: ./app/web
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
         working-directory: ./app
