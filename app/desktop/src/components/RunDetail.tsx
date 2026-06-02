@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Brain,
@@ -19,9 +19,17 @@ import type { SessionMetrics } from '@shared/context/breakdown';
 import type { PermissionRequestItem } from '@/hooks/useChatMessages';
 import type { RunEvidenceState } from '@/api/runEvidenceQueries';
 import { RunState, RunStateMachine } from '@/utils/runStateMachine';
+import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
+import { createHubClient, type AgentRunEventSummary } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
+import { getSavedWorkDir } from '@/utils/workspaceStore';
+import { useGitStatus } from '@/hooks/useGitStatus';
+import { useGitDiff } from '@/hooks/useGitDiff';
 import DiffViewer from './DiffViewer';
-import DiffReviewPanel from './DiffReviewPanel';
+import { DiffReviewPanel } from '@shared/ui/DiffReviewPanel';
 import ContextUsage from './ContextUsage';
+import ArtifactBrowser from './ArtifactBrowser';
+import type { ArtifactItem } from './ArtifactBrowser';
 import styles from './RunDetail.module.css';
 
 interface ToolCallEntry {
@@ -68,6 +76,18 @@ function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics |
   let inputTokens = 0;
   let outputTokens = 0;
   let model: string | undefined;
+  let contextLimit: number | undefined;
+  let provider: string | undefined;
+  let totalCost: number | undefined;
+
+  // Track latest context_usage data — it provides the most complete snapshot
+  let ctxTotal: number | undefined;
+  let ctxInput: number | undefined;
+  let ctxOutput: number | undefined;
+  let ctxLimit: number | undefined;
+  let ctxModel: string | undefined;
+  let ctxProvider: string | undefined;
+  let ctxCost: number | undefined;
 
   for (const msg of chatMessages) {
     for (const block of msg.blocks) {
@@ -75,11 +95,30 @@ function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics |
         inputTokens += block.tokenUsage.input;
         outputTokens += block.tokenUsage.output;
       }
+      if (block.kind === 'context_usage') {
+        // Discriminated union narrowing is flaky — access via Record cast
+        const ctx = block as Record<string, unknown>;
+        if (ctx.input != null) ctxInput = ctx.input as number;
+        if (ctx.output != null) ctxOutput = ctx.output as number;
+        if (ctx.total != null) ctxTotal = ctx.total as number;
+        if (ctx.contextLimit != null) ctxLimit = ctx.contextLimit as number;
+        if (ctx.model != null) ctxModel = ctx.model as string;
+        if (ctx.provider != null) ctxProvider = ctx.provider as string;
+        if (ctx.totalCost != null) ctxCost = ctx.totalCost as number;
+      }
       if (block.kind === 'session_init' && block.model) {
         model = block.model;
       }
     }
   }
+
+  // Use context_usage totals if available (they come from the edge server's accurate tokenizer)
+  if (ctxInput != null) inputTokens = ctxInput;
+  if (ctxOutput != null) outputTokens = ctxOutput;
+  if (ctxLimit != null) contextLimit = ctxLimit;
+  if (ctxModel) model = ctxModel;
+  if (ctxProvider) provider = ctxProvider;
+  if (ctxCost != null) totalCost = ctxCost;
 
   const totalTokens = inputTokens + outputTokens;
   if (totalTokens === 0) return null;
@@ -88,6 +127,7 @@ function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics |
     inputTokens,
     outputTokens,
     totalTokens,
+    contextLimit,
     model,
     messages: chatMessages.map((msg) => ({
       role: msg.role,
@@ -229,6 +269,45 @@ export default function RunDetail({
   const runtimeBlocks = useMemo(() => collectRuntimeBlocks(chatMessages), [chatMessages]);
   const eventDiffs = useMemo(() => collectDiffs(chatMessages), [chatMessages]);
 
+  // ── Hub event summary ────────────────────────────
+  const getTaskByRunId = useTaskBridgeStore((s) => s.getTaskByRunId);
+  const hubTaskId: string | undefined = useMemo(() => {
+    if (!run?.runId) return undefined;
+    return getTaskByRunId(run.runId)?.taskId;
+  }, [run?.runId, getTaskByRunId]);
+
+  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+  const [eventSummary, setEventSummary] = useState<AgentRunEventSummary | null>(null);
+
+  useEffect(() => {
+    if (!hubTaskId) {
+      setEventSummary(null);
+      return;
+    }
+    let cancelled = false;
+    hubClient.getTaskRunEventSummary(hubTaskId).then((summary) => {
+      if (!cancelled) setEventSummary(summary);
+    }).catch(() => {
+      if (!cancelled) setEventSummary(null);
+    });
+    return () => { cancelled = true; };
+  }, [hubTaskId, hubClient]);
+
+  const hasSummary = eventSummary != null;
+
+  // ── Artifact browser "Apply" → diff review focus ──
+  const [appliedArtifactPath, setAppliedArtifactPath] = useState<string | null>(null);
+
+  const handleApplyDiff = (artifact: ArtifactItem) => {
+    setAppliedArtifactPath(artifact.path);
+    // Dispatch custom event so parents / extensions can react
+    window.dispatchEvent(
+      new CustomEvent('agenthub:apply-artifact-diff', {
+        detail: { artifactId: artifact.id, path: artifact.path, title: artifact.title },
+      }),
+    );
+  };
+
   if (!run) {
     return (
       <div className={styles.panel}>
@@ -274,6 +353,12 @@ export default function RunDetail({
       : null;
   const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges || runtimeBlocks.length > 0;
   const latestFiles = changedFiles.slice(-4).reverse();
+
+  // ── Git status integration ──
+  const workDir = useMemo(() => getSavedWorkDir(), []);
+  const { status: gitStatus } = useGitStatus(workDir || undefined);
+  const { allDiffs: gitDiffs, stagedDiffs: gitStagedDiffs, unstagedDiffs: gitUnstagedDiffs } = useGitDiff(workDir || undefined);
+
   const latestTools = toolCalls.slice(-4).reverse();
   const pendingApprovals = approvals.filter((approval) => !approval.decision && approval.runId === run.runId);
   const latestBlocks = runtimeBlocks.slice(-6).reverse();

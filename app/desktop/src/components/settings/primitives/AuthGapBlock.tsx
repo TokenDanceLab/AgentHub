@@ -1,4 +1,4 @@
-import { LogIn } from 'lucide-react';
+import { UserCircle } from 'lucide-react';
 import styles from '../../SettingsPage.module.css';
 
 interface AuthGapBlockProps {
@@ -16,7 +16,7 @@ export default function AuthGapBlock({ title, description, actionLabel, onAction
         <span>{description}</span>
       </div>
       <button type="button" className={styles.primaryBtn} onClick={onAction}>
-        <LogIn size={16} />
+        <UserCircle size={16} />
         {actionLabel}
       </button>
     </div>

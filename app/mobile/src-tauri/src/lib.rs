@@ -10,6 +10,12 @@ mod notifications;
 mod oidc;
 mod secure_store;
 
+/// PKCE state held in Tauri managed state so the deep-link callback handler
+/// can retrieve the verifier and exchange the authorization code for tokens.
+pub struct OidcState {
+    pub verifier: std::sync::Mutex<Option<String>>,
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

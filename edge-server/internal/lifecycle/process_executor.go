@@ -33,6 +33,23 @@ type ProcessExecutorConfig struct {
 	Env      []string
 	ExtraEnv []string
 	WorkDir  string
+
+	// RunTimeout is the per-run deadline. After this duration the runner
+	// context is cancelled, which triggers process termination. Zero means
+	// use defaultRunTimeout (30 minutes).
+	RunTimeout time.Duration
+
+	// ShutdownGracePeriod is how long to wait after sending a stdin interrupt
+	// before escalating to process termination. On Unix, SIGTERM is sent first
+	// and the process is given ShutdownForceTimeout before a final SIGKILL.
+	// Zero means use defaultShutdownGracePeriod (10 seconds).
+	ShutdownGracePeriod time.Duration
+
+	// ShutdownForceTimeout is how long to wait after sending SIGTERM (Unix)
+	// before escalating to SIGKILL. Zero means use defaultShutdownForceTimeout
+	// (5 seconds). Only relevant on Unix; on Windows we escalate directly to
+	// os.Kill after the grace period.
+	ShutdownForceTimeout time.Duration
 }
 
 type ProcessExecutor struct {
@@ -55,9 +72,19 @@ type ProcessExecutor struct {
 	messageQueue  *agents.Queue     // inter-agent message queue for result delivery; may be nil
 	resultAgg     *ResultAggregator // tracks sub-agent completion and emits sub_agents_complete; may be nil
 
+	// Decision loop step tracking (optional). When configured, the emitter in
+	// publishStructuredOutput is wrapped with step-counting and max-steps enforcement.
+	decisionLoopFactory *DecisionLoopEmitterFactory
+
+	// Configurable timeouts for run lifecycle and graceful shutdown.
+	runTimeout           time.Duration
+	shutdownGracePeriod  time.Duration
+	shutdownForceTimeout time.Duration
+
 	mu         sync.Mutex
 	running    map[string]context.CancelFunc
 	stdins     map[string]io.Writer                 // runID to stdin (for adapter-aware interrupt)
+	processes  map[string]*os.Process               // runID to os.Process (for graceful shutdown)
 	runOutputs map[string]*runnerctx.RunOutputStore // runID to temp log for output persistence and replay
 	runToAgent map[string]string                    // runID to agentInstanceID for result aggregation
 	hubTasks   map[string]string                    // runID to Hub taskID (for Edge→Hub callbacks)
@@ -84,6 +111,18 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 			return nil, fmt.Errorf("process workdir %q is not a directory", cfg.WorkDir)
 		}
 	}
+	runTimeout := cfg.RunTimeout
+	if runTimeout <= 0 {
+		runTimeout = defaultRunTimeout
+	}
+	shutdownGP := cfg.ShutdownGracePeriod
+	if shutdownGP <= 0 {
+		shutdownGP = defaultShutdownGracePeriod
+	}
+	shutdownFT := cfg.ShutdownForceTimeout
+	if shutdownFT <= 0 {
+		shutdownFT = defaultShutdownForceTimeout
+	}
 	return &ProcessExecutor{
 		bus:                       bus,
 		store:                     store,
@@ -93,8 +132,12 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		maxConcurrentRuns:         defaultMaxConcurrentRuns,
 		maxRunOutputBytes:         defaultRunOutputMaxBytes,
 		maxStructuredPayloadBytes: adapters.DefaultStructuredPayloadMaxBytes,
+		runTimeout:                runTimeout,
+		shutdownGracePeriod:       shutdownGP,
+		shutdownForceTimeout:      shutdownFT,
 		running:                   make(map[string]context.CancelFunc),
 		stdins:                    make(map[string]io.Writer),
+		processes:                 make(map[string]*os.Process),
 		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
 		runToAgent:                make(map[string]string),
 		hubTasks:                  make(map[string]string),
@@ -106,12 +149,21 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 // should not block the executor goroutine forever.
 const defaultRunTimeout = 30 * time.Minute
 
+// defaultShutdownGracePeriod is the time between sending a stdin interrupt and
+// escalating to SIGTERM (Unix) or Kill (Windows).
+const defaultShutdownGracePeriod = 10 * time.Second
+
+// defaultShutdownForceTimeout is the time between SIGTERM and SIGKILL on Unix.
+const defaultShutdownForceTimeout = 5 * time.Second
+
 const (
-	defaultMaxConcurrentRuns = 5
-	defaultReadBufferSize    = 32 * 1024
-	defaultRunOutputMaxBytes = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
-	hubCallbackFinalMaxBytes = 32 * 1024
-	hubCallbackChunkMaxBytes = 16 * 1024
+	defaultMaxConcurrentRuns          = 5
+	defaultReadBufferSize             = 32 * 1024
+	defaultRunOutputMaxBytes          = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
+	hubCallbackFinalMaxBytes          = 32 * 1024
+	hubCallbackChunkMaxBytes          = 16 * 1024
+	persistedAssistantMessageMaxBytes = 200 * 1024
+	persistedFailureMessageMaxBytes   = 8 * 1024
 )
 
 type runOutputLimiter struct {
@@ -183,6 +235,19 @@ func (e *ProcessExecutor) WithResultAggregator(ra *ResultAggregator) *ProcessExe
 	return e
 }
 
+// WithDecisionLoop attaches a DecisionLoopEmitterFactory that wraps the
+// adapter event stream with step counting, max-steps enforcement, and
+// tool-approval gating. This enables multi-step execution visibility for
+// agents that otherwise run as opaque single-shot processes.
+//
+// When set, the factory is applied in publishStructuredOutput to wrap the
+// raw adapter emitter. The DecisionLoop state (currentStep, phase, etc.)
+// is accessible via the factory's Loop() method for API progress reporting.
+func (e *ProcessExecutor) WithDecisionLoop(factory *DecisionLoopEmitterFactory) *ProcessExecutor {
+	e.decisionLoopFactory = factory
+	return e
+}
+
 // SetHubCallback configures the Edge→Hub direct callback client.
 // When set, run lifecycle transitions (started, finished, failed, cancelled)
 // are reported to the Hub server. Callbacks are fire-and-forget: errors are
@@ -221,7 +286,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	}
 	// Create context and atomically insert cancel into the map while holding
 	// the lock, so a concurrent Cancel can never miss the cancel func.
-	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
 	e.running[run.ID] = cancel
 
 	runCtx.Run = run
@@ -295,6 +360,18 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 	}
 
+	// SEC-02: Defense-in-depth — reject 'bypassPermissions' at the executor level
+	// before launching the agent process. If the API validation is somehow
+	// bypassed (e.g. direct internal calls), this fallback ensures the agent
+	// never receives a permission mode that disables all security hooks.
+	if runCtx.PermissionMode == "bypassPermissions" {
+		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'",
+			"runId", run.ID,
+			"agentId", runCtx.AgentID,
+		)
+		runCtx.PermissionMode = "default"
+	}
+
 	var runStartTime time.Time
 	if e.metrics != nil {
 		defer func() {
@@ -316,26 +393,33 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if adapter != nil {
 		// Adapter mode: BuildCommand provides full command configuration
 		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
-			Run:                runCtx.Run,
-			Prompt:             runCtx.Prompt,
-			AgentID:            runCtx.AgentID,
-			Model:              runCtx.Model,
-			WorkDir:            runCtx.WorkDir,
-			SessionID:          runCtx.SessionID,
-			ContinueLast:       runCtx.ContinueLast,
-			ForkSession:        runCtx.ForkSession,
-			ReasoningEffort:    runCtx.ReasoningEffort,
-			ThinkingMode:       runCtx.ThinkingMode,
-			MaxThinkingTokens:  runCtx.MaxThinkingTokens,
-			PermissionMode:     runCtx.PermissionMode,
-			IncludePartial:     runCtx.IncludePartial,
-			SystemPrompt:       runCtx.SystemPrompt,
-			AppendSystemPrompt: runCtx.AppendSystemPrompt,
-			AllowedTools:       runCtx.AllowedTools,
-			ConfigOverrides:    runCtx.ConfigOverrides,
-			Ephemeral:          runCtx.Ephemeral,
-			AgentName:          runCtx.AgentName,
-			Budget:             runCtx.Budget,
+			Run:                    runCtx.Run,
+			Prompt:                 runCtx.Prompt,
+			AgentID:                runCtx.AgentID,
+			Model:                  runCtx.Model,
+			WorkDir:                runCtx.WorkDir,
+			SessionID:              runCtx.SessionID,
+			ContinueLast:           runCtx.ContinueLast,
+			ForkSession:            runCtx.ForkSession,
+			ReasoningEffort:        runCtx.ReasoningEffort,
+			ThinkingMode:           runCtx.ThinkingMode,
+			MaxThinkingTokens:      runCtx.MaxThinkingTokens,
+			PermissionMode:         runCtx.PermissionMode,
+			IncludePartial:         runCtx.IncludePartial,
+			StructuredOutputSchema: runCtx.StructuredOutputSchema,
+			SystemPrompt:           runCtx.SystemPrompt,
+			AppendSystemPrompt:     runCtx.AppendSystemPrompt,
+			SkillsPrompt:           runCtx.SkillsPrompt,
+			AgentDefinitions:       runCtx.AgentDefinitions,
+			MCPConfig:              runCtx.MCPConfig,
+			AllowedTools:           runCtx.AllowedTools,
+			HubTaskID:              runCtx.HubTaskID,
+			ConfigOverrides:        runCtx.ConfigOverrides,
+			Ephemeral:              runCtx.Ephemeral,
+			AgentName:              runCtx.AgentName,
+			Budget:                 runCtx.Budget,
+			Messages:               runCtx.Messages,
+			PinnedMessages:         runCtx.PinnedMessages,
 		})
 	} else {
 		// Profile mode: use configured command template
@@ -395,12 +479,17 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 
-	// Close stdin immediately: the prompt is passed via CLI args, not stdin.
-	// An open pipe with no data causes CLI agents (Claude Code) to wait 3s
-	// and warn "no stdin data". Closing the pipe signals EOF immediately.
-	// Interrupt is handled via process signal; permission responses via stdin
-	// will be re-enabled when the full permission bridge is implemented.
-	if stdin != nil {
+	// Track process for graceful shutdown signals (SIGTERM on Unix).
+	e.mu.Lock()
+	e.processes[run.ID] = cmd.Process
+	e.mu.Unlock()
+
+	// Close stdin unless the adapter needs it for the control protocol
+	// (permission responses) or a DecisionLoop is configured (force-finish
+	// via stdin interrupt). An open pipe with no data causes CLI agents
+	// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
+	// eagerly when neither mechanism requires stdin.
+	if stdin != nil && !adapter.NeedsStdin() && e.decisionLoopFactory == nil {
 		_ = stdin.Close()
 		e.mu.Lock()
 		delete(e.stdins, run.ID)
@@ -484,15 +573,28 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 	if waitErr != nil {
-		e.publishFailed(run, waitErr)
+		e.publishFailed(run, errorWithRunOutput(waitErr, outStore))
 		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": waitErr.Error()})
 		return
 	}
-	// #179: fail the run when structured output parsing fails critically
+	// #179: handle structured output parse errors with recoverability distinction.
+	// Non-recoverable errors (pipe broken, context cancelled) fail the run.
+	// Recoverable errors (malformed event, orphaned tool) emit a warning and
+	// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
 	if parseErr != nil {
-		e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
-		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
-		return
+		var psErr *adapters.ParseStreamError
+		if errors.As(parseErr, &psErr) && psErr.Recoverable() {
+			slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "err", parseErr)
+			e.bus.Publish(adapters.BusEventContextWarning, runScope(run), map[string]any{
+				"runId":   run.ID,
+				"message": fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
+				"warning": psErr.Error(),
+			})
+		} else {
+			e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
+			e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
+			return
+		}
 	}
 	finished, ok := e.store.SetRunStatusIf(run.ID, "finished", "started")
 	if ok {
@@ -579,6 +681,9 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	if ok {
 		exitCode := ExitCodeFromErr(err)
 		classified := ClassifyError(err, exitCode)
+		if classified != nil {
+			e.persistAgentFailureMessage(failed, classified.Message)
+		}
 		e.bus.Publish("run.failed", runScope(failed), map[string]any{
 			"runId":  failed.ID,
 			"status": failed.Status,
@@ -588,6 +693,67 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 		e.fireHubFail(failed.ID, classified.Message)
 	}
 	e.checkPersistError(run.ID)
+}
+
+func errorWithRunOutput(err error, outStore *runnerctx.RunOutputStore) error {
+	if err == nil || outStore == nil {
+		return err
+	}
+	output, readErr := outStore.ReadAll()
+	output = strings.TrimSpace(output)
+	if readErr != nil || output == "" {
+		return err
+	}
+	chunks := splitHubCallbackText(output, persistedFailureMessageMaxBytes)
+	if len(chunks) == 0 {
+		return err
+	}
+	message := chunks[0]
+	if len(chunks) > 1 || len(output) > len(message) {
+		message += "\n[output truncated]"
+	}
+	return fmt.Errorf("%w: %s", err, message)
+}
+
+func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	repository, ok := e.store.(interface {
+		store.Reader
+		store.Writer
+	})
+	if !ok {
+		return
+	}
+	for _, item := range repository.ListThreadItems(run.ThreadID) {
+		if item.RunID == run.ID && item.Type == "agent_message" {
+			return
+		}
+	}
+	item, err := repository.CreateItem(store.Item{
+		ID:        transcriptItemID(run.ID),
+		ProjectID: run.ProjectID,
+		ThreadID:  run.ThreadID,
+		RunID:     run.ID,
+		Type:      "agent_message",
+		Role:      "agent",
+		Status:    "failed",
+		Content:   content,
+	})
+	if err != nil {
+		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "err", err)
+		return
+	}
+	scope := map[string]any{
+		"projectId": item.ProjectID,
+		"threadId":  item.ThreadID,
+		"runId":     item.RunID,
+		"itemId":    item.ID,
+	}
+	e.bus.Publish("message.created", scope, item)
+	e.bus.Publish("item.created", scope, item)
 }
 
 func (e *ProcessExecutor) publishCancelled(run store.Run) {
@@ -637,6 +803,7 @@ func (e *ProcessExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.running, runID)
 	delete(e.stdins, runID)
+	delete(e.processes, runID)
 	delete(e.runToAgent, runID)
 	delete(e.hubTasks, runID)
 	delete(e.hubOutputs, runID)
@@ -694,6 +861,21 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 		},
 		Timestamp: time.Now().UTC(),
 	})
+
+	// Store structured result in the aggregator's collector for eventual
+	// synthesis when all children of the parent complete (or timeout).
+	// Reference: AionUi Team Mode Mailbox — persisted sub-agent results.
+	// Reference: LibreChat — structured subagent result return.
+	if e.resultAgg != nil {
+		e.resultAgg.StoreSubAgentResult(inst.ParentID, SubAgentResult{
+			AgentID:     agentID,
+			AgentName:   inst.Name,
+			RunID:       runID,
+			Status:      status,
+			Output:      payload,
+			CompletedAt: time.Now().UTC(),
+		})
+	}
 }
 
 // publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
@@ -706,6 +888,10 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		scope,
 	)
 	emitter = newHubCallbackEmitter(e, run.ID, emitter)
+	transcriptEmitter := newThreadTranscriptEmitter(e.store, run, emitter)
+	if transcriptEmitter != nil {
+		emitter = transcriptEmitter
+	}
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
@@ -713,9 +899,19 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, scope)
 	}
 
+	// Wrap emitter with decision-loop step tracking and max-steps enforcement.
+	// When configured, tool_call events increment a step counter and force-finish
+	// is triggered when maxSteps is exceeded.
+	if e.decisionLoopFactory != nil {
+		emitter = e.decisionLoopFactory.Wrap(stdin, emitter, run)
+	}
+
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
 		*parseErr = err
+	}
+	if transcriptEmitter != nil {
+		transcriptEmitter.Flush()
 	}
 }
 
@@ -726,7 +922,14 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 // Before spawning, it checks the agent registry for slot availability and depth
 // limits (Codex AgentTree pattern parity).
 //
+// Each sub-agent receives its own isolated context budget (allocated via
+// ContextBudget.AllocateChild) and a unique ThreadID/SessionID so its token
+// tracking and context space never pollute the parent. This matches OpenCode's
+// sessions.create({parentID}) pattern where sub-agents get independent sessions
+// with derived permissions and no shared context contamination.
+//
 // Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
+// Reference: OpenCode task.ts:145-162 (sessions.create with parentID, deriveSubagentSessionPermission).
 func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAgentTask) (agentInstanceID string, runID string, err error) {
 	// Enforce spawn slot and depth limits via the agent registry.
 	if e.agentRegistry != nil {
@@ -744,10 +947,14 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	runID = "run_" + task.TaskID
 	agentInstanceID = "agent_" + task.TaskID
 
-	// Resolve ThreadID: prefer the explicit override from task, fall back to parent
+	// Resolve ThreadID: each sub-agent MUST have its own distinct thread so
+	// that its context space is fully isolated from the parent. If the task
+	// provides an explicit ThreadID we use it; otherwise we create a
+	// hierarchical child thread ID derived from the parent ThreadID.
+	// This prevents context contamination between parent and child.
 	threadID := task.ThreadID
 	if threadID == "" {
-		threadID = parentRun.ThreadID
+		threadID = parentRun.ThreadID + "/sub/" + runID
 	}
 
 	// Create the run in the store
@@ -755,6 +962,33 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	if err != nil {
 		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "err", err)
 		return "", "", err
+	}
+
+	// Register the child agent instance in the agent registry with its own
+	// context scope. This ensures budget tracking in publishStructuredOutput
+	// monitors only the child's tokens, and parent/child results are
+	// independently routed via the message queue.
+	if e.agentRegistry != nil {
+		inst := &agents.AgentInstance{
+			ID:        agentInstanceID,
+			Name:      task.AgentID,
+			AdapterID: task.AgentID,
+			Role:      "sub-agent",
+			Status:    agents.StatusIdle,
+			RunID:     runID,
+			ThreadID:  threadID,
+			ParentID:  parentRun.ID,
+			Depth:     task.Depth,
+			AgentPath: "/" + parentRun.ID + "/" + agentInstanceID,
+			CreatedAt: time.Now(),
+			LastSeen:  time.Now(),
+		}
+		if err := e.agentRegistry.Register(inst); err != nil {
+			slog.Warn("failed to register sub-agent instance in registry",
+				"agentInstanceId", agentInstanceID,
+				"err", err,
+			)
+		}
 	}
 
 	// Emit run.queued
@@ -765,25 +999,24 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	}
 	e.bus.Publish("run.queued", scope, run)
 
-	// Build run context with the task prompt, target agent, and propagated
-	// context budget from the parent orchestrator.
+	// Build run context with the task prompt, target agent, and an isolated
+	// context budget allocated from the parent via AllocateChild.
+	// The child budget is independent — it does NOT reference the parent's
+	// UsedTokens counter, so the child's token consumption never pollutes
+	// the parent's budget tracking.
 	runCtx := RunProcessContext{
-		Run:     run,
-		Prompt:  task.Prompt,
-		AgentID: task.AgentID,
-		Budget:  childBudget(task.Budget, task.Depth),
-		Model:   task.Model,
+		Run:       run,
+		Prompt:    task.Prompt,
+		AgentID:   task.AgentID,
+		Budget:    childBudget(task.Budget, task.Depth),
+		Model:     task.Model,
+		SessionID: threadID, // always set to child's own thread
 	}
 
 	// Store the run-to-agent mapping so result aggregation can find the agent later.
 	e.mu.Lock()
 	e.runToAgent[runID] = agentInstanceID
 	e.mu.Unlock()
-
-	// Use parent thread if no explicit ThreadID in task
-	if task.ThreadID != "" {
-		runCtx.SessionID = task.ThreadID
-	}
 
 	// Start the run
 	if err := e.Start(run, runCtx); err != nil {
@@ -797,26 +1030,20 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	return agentInstanceID, runID, nil
 }
 
-// childBudget creates a context budget for a sub-agent from the parent budget.
-// Deeper delegation levels get a smaller fraction of remaining tokens to prevent
-// budget exhaustion at the root.
+// childBudget creates an isolated context budget for a sub-agent from the parent
+// budget via ContextBudget.AllocateChild. Deeper delegation levels get a smaller
+// fraction of remaining tokens to prevent budget exhaustion at the root. The child
+// budget is fully independent — it does NOT reference the parent's UsedTokens
+// counter, so the child's token consumption cannot pollute the parent's tracking.
 func childBudget(parent *runnerctx.ContextBudget, depth int) *runnerctx.ContextBudget {
 	if parent == nil {
 		return runnerctx.NewContextBudget(0)
 	}
-	remaining := parent.Remaining()
 	// Fraction reduces with depth: depth 1 gets 1/2, depth 2 gets 1/4, etc.
-	// Minimum 16K tokens to ensure useful work can be done.
+	// AllocateChild clamps to min 10K tokens and properly scales ReservedTokens.
 	fraction := int64(1 << depth) // 2, 4, 8, ...
-	alloc := remaining / fraction
-	const minTokens = 16_000
-	if alloc < minTokens {
-		alloc = minTokens
-	}
-	if alloc > remaining {
-		alloc = remaining
-	}
-	return runnerctx.NewContextBudget(int(alloc))
+	ratio := 1.0 / float64(fraction)
+	return parent.AllocateChild(ratio)
 }
 
 // ── Hub callback fire-and-forget helpers ─────────────────────────────────
@@ -952,6 +1179,76 @@ func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payloa
 			e.executor.recordHubFinalFallback(e.runID, text)
 		}
 	}
+}
+
+type threadTranscriptEmitter struct {
+	writer    store.Writer
+	run       store.Run
+	inner     adapters.EventEmitter
+	collector *hubOutputCollector
+	mu        sync.Mutex
+	persisted bool
+}
+
+func newThreadTranscriptEmitter(repository store.RunLifecycleStore, run store.Run, inner adapters.EventEmitter) *threadTranscriptEmitter {
+	writer, ok := repository.(store.Writer)
+	if !ok || inner == nil {
+		return nil
+	}
+	return &threadTranscriptEmitter{
+		writer:    writer,
+		run:       run,
+		inner:     inner,
+		collector: newHubOutputCollector(persistedAssistantMessageMaxBytes),
+	}
+}
+
+func (e *threadTranscriptEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	e.inner.Emit(eventType, scope, payload)
+	switch eventType {
+	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.collector.Append(text)
+		}
+	case adapters.BusEventResult:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.collector.SetFallback(text)
+		}
+	}
+}
+
+func (e *threadTranscriptEmitter) Flush() {
+	e.mu.Lock()
+	if e.persisted {
+		e.mu.Unlock()
+		return
+	}
+	e.persisted = true
+	e.mu.Unlock()
+
+	content := e.collector.Final()
+	if strings.TrimSpace(content) == "" {
+		return
+	}
+	item, err := e.writer.CreateItem(store.Item{
+		ID:        transcriptItemID(e.run.ID),
+		ProjectID: e.run.ProjectID,
+		ThreadID:  e.run.ThreadID,
+		RunID:     e.run.ID,
+		Type:      "agent_message",
+		Role:      "agent",
+		Status:    "created",
+		Content:   content,
+	})
+	if err != nil {
+		slog.Warn("process: failed to persist assistant transcript", "runId", e.run.ID, "err", err)
+		return
+	}
+	_ = item
+}
+
+func transcriptItemID(runID string) string {
+	return fmt.Sprintf("item_%s_agent_%d", strings.TrimPrefix(runID, "run_"), time.Now().UnixNano())
 }
 
 type hubOutputCollector struct {

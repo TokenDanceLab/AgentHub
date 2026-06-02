@@ -1,1 +1,1 @@
-export { default } from '@/pages/agent-square/AgentSquarePage';
+export { default } from '@/App';

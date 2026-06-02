@@ -55,9 +55,9 @@ export interface ListResponse<T> {
 export interface Project {
   id: string;
   name: string;
-  description?: string;
+  description?: string | undefined;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt?: string | undefined;
 }
 
 export interface ProjectMemory {
@@ -75,11 +75,11 @@ export interface Conversation {
 export interface Thread {
   id: string;
   projectId: string;
-  conversationId?: string;
-  title?: string;
+  conversationId?: string | undefined;
+  title?: string | undefined;
   status: 'active' | 'archived';
   createdAt: string;
-  updatedAt?: string;
+  updatedAt?: string | undefined;
 }
 
 export interface ThreadInfo {
@@ -134,8 +134,8 @@ export interface Run {
   threadId: string;
   status: RunStatus;
   createdAt: string;
-  startedAt?: string;
-  finishedAt?: string;
+  startedAt?: string | undefined;
+  finishedAt?: string | undefined;
 }
 
 export interface StartRunRequest {
@@ -234,18 +234,31 @@ export interface StartRunRequest {
   modelAlias?: string;
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;
+  sessionId?: string;
+  continue?: boolean;
+  fork?: boolean;
   reasoningEffort?: string;
   thinkingMode?: string;
   maxThinkingTokens?: number;
   permissionMode?: string;
   workDir?: string;
   includePartial?: boolean;
+  structuredOutputSchema?: string;
   systemPrompt?: string;
   appendSystemPrompt?: string;
   allowedTools?: string[];
   configOverrides?: Record<string, string>;
+  agentDefinitions?: Record<string, AgentDefinition>;
+  mcpConfig?: string;
   ephemeral?: boolean;
   hubTaskId?: string;
+}
+
+export interface AgentDefinition {
+  description: string;
+  prompt: string;
+  tools?: string[];
+  model?: string;
 }
 
 export interface RunLogs {
@@ -273,7 +286,7 @@ export interface Approval {
   summary: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
-  decidedAt?: string;
+  decidedAt?: string | undefined;
 }
 
 export interface Artifact {
@@ -290,7 +303,7 @@ export interface Preview {
   id: string;
   runId: string;
   threadId: string;
-  url?: string;
+  url?: string | undefined;
   status: 'starting' | 'ready' | 'stopped';
   createdAt: string;
 }

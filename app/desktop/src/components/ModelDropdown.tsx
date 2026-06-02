@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Bot } from 'lucide-react';
 import { Claude, ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { resolveModelDisplayName, type ModelDisplayNameMap } from '@/utils/modelDisplay';
 import styles from './ModelDropdown.module.css';
 
 interface Option {
@@ -23,15 +24,7 @@ interface Props {
   ariaLabel?: string;
   alignRight?: boolean;
   variant?: 'default' | 'text';
-}
-
-function cleanModelName(name: string): string {
-  const map: Record<string, string> = {
-    'claude-opus-4-7': 'Claude 4.7 Opus', 'claude-opus-4-5': 'Claude 4.5 Opus',
-    'claude-sonnet-4-6': 'Claude 4.6 Sonnet', 'claude-haiku-4-5': 'Claude 4.5 Haiku',
-    'Claude Code': 'Claude Code', 'Codex': 'Codex', 'OpenCode': 'OpenCode',
-  };
-  return map[name] || name;
+  modelDisplayNames?: ModelDisplayNameMap;
 }
 
 function AgentDot({ name }: { name: string }) {
@@ -53,7 +46,7 @@ function ModelIcon({ name }: { name: string }) {
   return <ModelDot />;
 }
 
-export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight, variant = 'default' }: Props) {
+export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight, variant = 'default', modelDisplayNames }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -61,7 +54,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
 
   const selected = options.find((o) => o.value === value);
   const showPlaceholder = !selected;
-  const displayLabel = selected ? cleanModelName(selected.label) : (showPlaceholder ? (placeholder || 'Select...') : '');
+  const displayLabel = selected ? resolveModelDisplayName(selected.label, modelDisplayNames) : (showPlaceholder ? (placeholder || 'Select...') : '');
 
   const grouped: Record<string, Option[]> = useMemo(() => {
     const g: Record<string, Option[]> = {};
@@ -159,7 +152,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
                 {opt.isAgent ? <AgentDot name={opt.label} /> : <ModelIcon name={opt.label} />}
               </span>
               <span className={styles.itemBody}>
-                <span className={styles.itemName}>{cleanModelName(opt.label)}</span>
+                <span className={styles.itemName}>{resolveModelDisplayName(opt.label, modelDisplayNames)}</span>
                 {opt.desc && !compact && <span className={styles.itemDesc}>{opt.desc}</span>}
               </span>
               <span className={styles.itemRight}>

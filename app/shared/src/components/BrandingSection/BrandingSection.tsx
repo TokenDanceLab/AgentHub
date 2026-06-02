@@ -6,20 +6,20 @@ export interface BrandingSectionProps {
   title: string;
   /** Supporting text shown below the title */
   subtitle?: string;
-  /** Optional gradient direction override for the brand mark. Defaults to blue-cyan. */
-  gradient?: string;
+  /** Optional solid color override for the brand mark. */
+  accent?: string;
   /** Additional class names for the root container */
   className?: string;
 }
 
-export function BrandingSection({ title, subtitle, gradient, className }: BrandingSectionProps) {
+export function BrandingSection({ title, subtitle, accent, className }: BrandingSectionProps) {
   const rootClass = [styles.root, className].filter(Boolean).join(' ');
 
   return (
     <div className={rootClass}>
       <div
         className={styles.mark}
-        style={gradient ? { background: gradient } : undefined}
+        style={accent ? { backgroundColor: accent } : undefined}
         aria-hidden="true"
       >
         AH

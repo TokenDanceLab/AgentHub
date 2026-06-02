@@ -1,45 +1,57 @@
 import type { MobileView } from "../App";
-import { MessageSquare, Play, Settings, Hash } from "lucide-react";
+import { MessageSquare, Play, UserRound, Hash } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { getSurfaceMetadata, type SurfaceId } from "@agenthub/shared";
 
-const NAV_ITEMS: { view: MobileView; label: string; icon: typeof MessageSquare }[] = [
-  { view: "threads", label: "Threads", icon: Hash },
-  { view: "chat", label: "Chat", icon: MessageSquare },
-  { view: "runs", label: "Runs", icon: Play },
-  { view: "settings", label: "Settings", icon: Settings },
+const NAV_ITEMS: { view: MobileView; surfaceId: SurfaceId; icon: typeof MessageSquare }[] = [
+  { view: "threads", surfaceId: "mobile.threads", icon: Hash },
+  { view: "chat", surfaceId: "mobile.chat", icon: MessageSquare },
+  { view: "runs", surfaceId: "mobile.runs", icon: Play },
+  { view: "account", surfaceId: "mobile.account", icon: UserRound },
 ];
 
 interface BottomNavProps {
   activeView: MobileView;
   onNavigate: (view: MobileView) => void;
+  activeThreadCount?: number;
+  pendingReviewCount?: number;
 }
 
-export function BottomNav({ activeView, onNavigate }: BottomNavProps) {
+export function BottomNav({ activeView, onNavigate, activeThreadCount = 0, pendingReviewCount = 0 }: BottomNavProps) {
+  const { t } = useTranslation();
+
   return (
-    <nav
-      className="glass flex justify-around items-center shrink-0"
-      style={{
-        height: "calc(64px + env(safe-area-inset-bottom))",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-    >
+    <nav className="mobileBottomNav" aria-label={t("nav.primary")}>
       {NAV_ITEMS.map((item) => {
         const isActive = item.view === activeView;
+        const surface = getSurfaceMetadata(item.surfaceId);
+        const label = t(surface.labelKey);
+        const description = t(surface.descriptionKey);
+        const badge =
+          item.view === "threads" && activeThreadCount > 0
+            ? String(activeThreadCount)
+            : item.view === "runs" && pendingReviewCount > 0
+              ? String(pendingReviewCount)
+              : null;
+        const countLabel =
+          item.view === "threads" && activeThreadCount > 0
+            ? `${label}, ${activeThreadCount} ${t("nav.activeThreads")}`
+            : item.view === "runs" && pendingReviewCount > 0
+              ? `${label}, ${pendingReviewCount} ${t("nav.pendingReviews")}`
+              : `${label}. ${description}`;
         return (
           <button
             key={item.view}
             onClick={() => onNavigate(item.view)}
-            className="flex flex-col items-center justify-center gap-0.5 px-3 py-1
-                       transition-colors duration-150"
-            style={{
-              color: isActive ? "var(--td-plum)" : "var(--td-ink-50)",
-              minWidth: 64,
-              minHeight: 48,
-            }}
-            aria-label={item.label}
+            className={`mobileNavButton${isActive ? " mobileNavButtonActive" : ""}`}
+            aria-label={countLabel}
             aria-current={isActive ? "page" : undefined}
           >
-            <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-            <span className="text-[11px] leading-none font-medium">{item.label}</span>
+            <span className="mobileNavIconWrap">
+              <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              {badge && <span className="mobileNavBadge">{badge}</span>}
+            </span>
+            <span>{label}</span>
           </button>
         );
       })}

@@ -180,7 +180,7 @@ export default function PromptInput({
     : t('prompt.placeholder');
   const selectedTarget = executionTargets.find((target) => target.id === selectedTargetId);
   const targetLabel = selectedTarget
-    ? `${selectedTarget.name} 路 ${t(`settings.targetHealth.${selectedTarget.health_state}`, { defaultValue: selectedTarget.health_state })}`
+    ? t('prompt.targetLabel', { name: selectedTarget.name, status: t(`settings.targetHealth.${selectedTarget.health_state}`, { defaultValue: selectedTarget.health_state }) })
     : t('prompt.targetAuto');
 
   return (
@@ -274,7 +274,7 @@ export default function PromptInput({
                       : t('prompt.targetLocked');
                     return (
                       <option key={target.id} value={target.id} disabled={!dispatchable}>
-                        {target.name} 路 {suffix}
+                        {t('prompt.targetLabel', { name: target.name, status: suffix })}
                       </option>
                     );
                   })}

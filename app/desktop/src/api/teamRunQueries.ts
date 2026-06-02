@@ -4,13 +4,13 @@ import {
   type AgentTeam,
   type AgentTeamEvent,
   type AgentTeamRun,
-  type AgentTeamMember,
-  type HubListResponse,
   type TeamRunState,
 } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
+
+type HubListResponse<T> = T[] | { items: T[] } | null | undefined;
 
 function listItems<T>(value: HubListResponse<T> | null | undefined): T[] {
   if (Array.isArray(value)) return value;
@@ -105,7 +105,7 @@ export function useCreateAgentTeam() {
 export function useUpdateAgentTeam() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ teamId, data }: { teamId: string; data: { name?: string; description?: string } }) =>
+    mutationFn: ({ teamId, data }: { teamId: string; data: { name: string; description?: string } }) =>
       hubClient.updateAgentTeam(teamId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hub', 'agent-teams'] });
@@ -126,8 +126,8 @@ export function useDeleteAgentTeam() {
 export function useAddTeamMember() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ teamId, data }: { teamId: string; data: { agent_profile_id: string; role?: string } }) =>
-      hubClient.addTeamMember(teamId, data),
+    mutationFn: ({ teamId, data }: { teamId: string; data: { agent_profile_id: string; role: string } }) =>
+      hubClient.addAgentTeamMember(teamId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hub', 'agent-teams'] });
     },
@@ -138,7 +138,7 @@ export function useRemoveTeamMember() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ teamId, memberId }: { teamId: string; memberId: string }) =>
-      hubClient.removeTeamMember(teamId, memberId),
+      hubClient.removeAgentTeamMember(teamId, memberId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['hub', 'agent-teams'] });
     },

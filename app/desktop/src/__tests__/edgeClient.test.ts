@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  cancelRun,
-  createThread,
-  decidePermission,
-  fetchArtifacts,
   fetchHealth,
-  fetchPreviews,
   fetchRunners,
-  fetchRunDiff,
-  fetchThreadItems,
   startRun,
+  cancelRun,
+  decidePermission,
+  archiveThread,
+  deleteThread,
+  updateThreadStatus,
+  renameThread,
+  createThread,
+  fetchThreadItems,
+  fetchRunDiff,
+  fetchArtifacts,
+  fetchPreviews,
 } from '../api/edgeClient';
 
 describe('edgeClient', () => {
@@ -355,6 +359,232 @@ describe('edgeClient', () => {
       await expect(fetchPreviews()).resolves.toMatchObject({ items: [{ id: 'preview-1' }] });
       expect(fetchSpy).toHaveBeenNthCalledWith(1, expect.stringMatching(/\/v1\/artifacts$/), expect.anything());
       expect(fetchSpy).toHaveBeenNthCalledWith(2, expect.stringMatching(/\/v1\/previews$/), expect.anything());
+    });
+  });
+
+  describe('thread status actions', () => {
+    it('renames a thread through the real patch endpoint', async () => {
+      const thread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Repair message ordering',
+        status: 'active',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:01:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(thread),
+      } as Response);
+
+      const result = await renameThread('thread_abc', 'Repair message ordering');
+
+      expect(result.title).toBe('Repair message ordering');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads\/thread_abc$/),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Repair message ordering' }),
+        }),
+      );
+    });
+
+    it('archives a thread through the real archive endpoint', async () => {
+      const thread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Archive me',
+        status: 'archived',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:01:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(thread),
+      } as Response);
+
+      const result = await archiveThread('thread_abc');
+
+      expect(result.status).toBe('archived');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads\/thread_abc:archive$/),
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+
+    it('restores a thread by patching status active', async () => {
+      const thread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Restore me',
+        status: 'active',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:02:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(thread),
+      } as Response);
+
+      const result = await updateThreadStatus('thread_abc', 'active');
+
+      expect(result.status).toBe('active');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads\/thread_abc$/),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'active' }),
+        }),
+      );
+    });
+
+    it('falls back to archive when the running Edge does not allow DELETE', async () => {
+      const archivedThread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Delete fallback',
+        status: 'archived',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:03:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 405,
+          statusText: 'Method Not Allowed',
+          json: () => Promise.resolve({ error: { code: 'method_not_allowed', message: 'method not allowed' } }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(archivedThread),
+        } as Response);
+
+      const result = await deleteThread('thread_abc');
+
+      expect(result).toBe('archived');
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching(/\/v1\/threads\/thread_abc$/),
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(/\/v1\/threads\/thread_abc:archive$/),
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+  });
+
+  describe('thread status actions', () => {
+    it('renames a thread through the real patch endpoint', async () => {
+      const thread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Repair message ordering',
+        status: 'active',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:01:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(thread),
+      } as Response);
+
+      const result = await renameThread('thread_abc', 'Repair message ordering');
+
+      expect(result.title).toBe('Repair message ordering');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads\/thread_abc$/),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Repair message ordering' }),
+        }),
+      );
+    });
+
+    it('archives a thread through the real archive endpoint', async () => {
+      const thread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Archive me',
+        status: 'archived',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:01:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(thread),
+      } as Response);
+
+      const result = await archiveThread('thread_abc');
+
+      expect(result.status).toBe('archived');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads\/thread_abc:archive$/),
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+
+    it('restores a thread by patching status active', async () => {
+      const thread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Restore me',
+        status: 'active',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:02:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(thread),
+      } as Response);
+
+      const result = await updateThreadStatus('thread_abc', 'active');
+
+      expect(result.status).toBe('active');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads\/thread_abc$/),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'active' }),
+        }),
+      );
+    });
+
+    it('falls back to archive when the running Edge does not allow DELETE', async () => {
+      const archivedThread = {
+        threadId: 'thread_abc',
+        projectId: 'proj_local',
+        title: 'Delete fallback',
+        status: 'archived',
+        createdAt: '2026-05-29T00:00:00Z',
+        updatedAt: '2026-05-29T00:03:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 405,
+          statusText: 'Method Not Allowed',
+          json: () => Promise.resolve({ error: { code: 'method_not_allowed', message: 'method not allowed' } }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(archivedThread),
+        } as Response);
+
+      const result = await deleteThread('thread_abc');
+
+      expect(result).toBe('archived');
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching(/\/v1\/threads\/thread_abc$/),
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(/\/v1\/threads\/thread_abc:archive$/),
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
   });
 });
