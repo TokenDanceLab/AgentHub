@@ -30,6 +30,8 @@
 
 ## 1. 当前状态总览
 
+> **2026-06-02 Competition Submission Readiness**: All P0 items complete. Desktop 1166/1166 tests, Edge 17/17 Go packages, Hub 17/17 Go packages, Web ~16 test files, i18n 1560 zh/en keys. Known open: 3 Dependabot moderate vulns (vendor deps), Mobile OIDC stub, no Firefox/WebKit Playwright projects.
+
 ### 1.0 近期更新（Desktop Run Workbench，2026-05-31）
 
 - [x] Desktop 日常工作台闭环保存点：`27ee3a7 feat(desktop): 收口日常工作台闭环`。

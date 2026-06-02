@@ -79,7 +79,7 @@ Local execution does not depend on Hub: Desktop can connect only to `127.0.0.1:3
 | Layer | Technology |
 |---|---|
 | Frontend | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens + `@shared/ui` |
-| Desktop | Tauri 2 |
+| Desktop | Tauri 2.5 |
 | Edge Server | Go 1.25 + `net/http` + WebSocket + Agent Runtime adapters |
 | Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis + Hub session; TokenDance ID bearer middleware is compatibility-only |
 | Realtime | WebSocket typed events |
