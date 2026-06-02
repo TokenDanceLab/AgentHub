@@ -30,6 +30,7 @@ const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "tokendance" | "hub"
 export class OidcError extends Error {
   code: string;
   detail?: string;
+  cause?: unknown;
 
   constructor(code: string, fallbackMessage: string, detail?: string) {
     super(fallbackMessage);
@@ -105,12 +106,6 @@ function base64UrlEncode(bytes: Uint8Array): string {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function withCause(message: string, cause: unknown): Error {
-  const error = new Error(message) as Error & { cause?: unknown };
-  error.cause = cause;
-  return error;
 }
 
 async function computeCodeChallenge(verifier: string): Promise<string> {
