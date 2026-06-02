@@ -1,9 +1,11 @@
 import { Rocket, ExternalLink, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import type { MessageBlock } from './ChatView.types';
 import styles from './DeployCard.module.css';
 
-interface Props {
-  block: Extract<MessageBlock, { kind: 'deploy_card' }>;
+export interface DeployCardProps {
+  deployId?: string | undefined;
+  status?: string | undefined;
+  statusMessage?: string | undefined;
+  url?: string | undefined;
 }
 
 const STATUS_ICON: Record<string, typeof Rocket> = {
@@ -22,10 +24,16 @@ const STATUS_CLASS: Record<string, string | undefined> = {
   failed: styles.statusFailed,
 };
 
-export default function DeployCard({ block }: Props) {
-  const StatusIcon = STATUS_ICON[block.status] ?? Rocket;
-  const statusClass = STATUS_CLASS[block.status] ?? '';
-  const isSpinning = block.status === 'building' || block.status === 'deploying';
+export default function DeployCard({
+  deployId,
+  status,
+  statusMessage,
+  url,
+}: DeployCardProps) {
+  const resolvedStatus = status ?? 'pending';
+  const StatusIcon = STATUS_ICON[resolvedStatus] ?? Rocket;
+  const statusClass = STATUS_CLASS[resolvedStatus] ?? '';
+  const isSpinning = resolvedStatus === 'building' || resolvedStatus === 'deploying';
 
   return (
     <div className={styles.card} data-testid="deploy-card">
@@ -35,13 +43,13 @@ export default function DeployCard({ block }: Props) {
         </span>
         <div className={styles.info}>
           <span className={styles.label}>Deploy</span>
-          <span className={`${styles.statusLabel} ${statusClass}`}>{block.status}</span>
+          <span className={`${styles.statusLabel} ${statusClass}`}>{resolvedStatus}</span>
         </div>
-        {block.statusMessage && <span className={styles.message}>{block.statusMessage}</span>}
-        {block.url && (
+        {statusMessage && <span className={styles.message}>{statusMessage}</span>}
+        {url && (
           <a
             className={styles.actionBtn}
-            href={block.url}
+            href={url}
             target="_blank"
             rel="noopener noreferrer"
             title="Open deployment"
@@ -51,9 +59,9 @@ export default function DeployCard({ block }: Props) {
           </a>
         )}
       </div>
-      {block.deployId && (
+      {deployId && (
         <div className={styles.footer}>
-          <code className={styles.deployId}>{block.deployId}</code>
+          <code className={styles.deployId}>{deployId}</code>
         </div>
       )}
     </div>

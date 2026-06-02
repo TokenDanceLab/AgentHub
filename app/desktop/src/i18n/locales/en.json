@@ -216,6 +216,7 @@
   "artifact.diffApplied": "Diff Applied",
   "artifact.download": "Download",
   "artifact.error.loadFailed": "Failed to load: {{url}}",
+  "artifact.generating": "Generating...",
   "artifact.loading": "Loading...",
   "artifact.openInNewTab": "Open in New Tab",
   "artifact.openPreview": "Open preview: {{title}}",

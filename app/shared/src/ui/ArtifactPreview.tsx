@@ -29,6 +29,10 @@ export interface ArtifactPreviewProps {
   onApplyDiff?: ((artifactUrl: string) => void) | undefined;
   /** True when the diff has already been applied. */
   diffApplied?: boolean | undefined;
+  /** When true, shows a streaming/generating state (Cherry Studio pattern). */
+  isStreaming?: boolean | undefined;
+  /** Partial content shown during streaming (terminal preview). */
+  streamingContent?: string | undefined;
 }
 
 const TYPE_ICON_MAP: Record<ArtifactType, typeof Globe> = {
@@ -52,6 +56,8 @@ export default function ArtifactPreview({
   inline = false,
   onApplyDiff,
   diffApplied = false,
+  isStreaming = false,
+  streamingContent,
 }: ArtifactPreviewProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -65,10 +71,11 @@ export default function ArtifactPreview({
   const displayTitle = title ?? artifactUrl.split('/').pop() ?? artifactUrl;
 
   const handleOpen = useCallback(() => {
+    if (isStreaming) return;
     setIsOpen(true);
     setIframeError(false);
     setIframeLoading(true);
-  }, []);
+  }, [isStreaming]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
@@ -88,7 +95,6 @@ export default function ArtifactPreview({
     if (applyState === 'applied') return;
     try {
       setApplyState('applying');
-      // Fire custom event so ChatView or parent can react
       window.dispatchEvent(
         new CustomEvent('agenthub:apply-diff', {
           detail: { artifactUrl, title: displayTitle },
@@ -101,9 +107,43 @@ export default function ArtifactPreview({
     }
   }, [applyState, artifactUrl, displayTitle, onApplyDiff]);
 
-  // ── Inline card trigger ────────────────────
   const TypeIcon = TYPE_ICON_MAP[artifactType] ?? FileText;
 
+  // ── Streaming card (Cherry Studio pattern) ──
+  if (isStreaming) {
+    const lines = (streamingContent ?? '').split('\n').filter(Boolean);
+    const lastLines = lines.slice(-3);
+
+    return (
+      <div className={styles.streamingCard}>
+        <div className={styles.streamingHeader}>
+          <span className={styles.streamingIcon}><TypeIcon size={14} /></span>
+          <span className={styles.streamingLabel}>{t(TYPE_LABEL_KEY[artifactType])}</span>
+          <span className={styles.streamingTitle}>{displayTitle}</span>
+          <span className={styles.streamingPulse} />
+        </div>
+        {lastLines.length > 0 && (
+          <div className={styles.streamingPreview}>
+            {lastLines.map((line, i) => (
+              <div key={i} className={styles.streamingLine}>
+                <span className={styles.prompt}>$</span>
+                <span className={styles.lineContent}>{line.slice(0, 200)}</span>
+                {i === lastLines.length - 1 && <span className={styles.cursor} />}
+              </div>
+            ))}
+          </div>
+        )}
+        {lastLines.length === 0 && (
+          <div className={styles.streamingEmpty}>
+            <div className={styles.miniSpinner} />
+            <span>{t('artifact.generating')}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Inline card trigger ────────────────────
   if (inline) {
     return (
       <>
@@ -225,7 +265,6 @@ function ArtifactContent({
   if (artifactType === 'image') {
     return (
       <div className={styles.imageWrapper}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={artifactUrl}
           alt={displayTitle}
