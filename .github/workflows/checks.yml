@@ -291,9 +291,7 @@ jobs:
       - name: Build Web
         run: pnpm build
       - name: Test
-        run: pnpm test -- --run
-        env:
-          NODE_OPTIONS: --import ./scripts/vitest-loader.mjs
+        run: node --import ./scripts/vitest-loader.mjs ./node_modules/.bin/vitest run
 
   # ── Frontend: Mobile ──────────────────────────
   frontend-mobile:
