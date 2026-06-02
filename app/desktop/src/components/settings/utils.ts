@@ -171,5 +171,5 @@ export function statusLabelFromDevice({
     return registeredLabel === 'registered' ? t('settings.deviceStatus.registered') : t('settings.status.snapshot');
   }
   if (status === 'registering') return t('settings.deviceStatus.registering');
-  return idleLabel === 'deviceStatus' ? t('settings.deviceStatus.idle') : t('settings.status.localSource');
+  return idleLabel === 'deviceStatus' ? t('settings.deviceStatus.idle') : t('settings.statusLocalSource');
 }

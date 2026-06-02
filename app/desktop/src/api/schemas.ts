@@ -51,6 +51,36 @@ export const AgentInfoSchema = z.object({
   capabilities: AgentCapabilitiesSchema,
 });
 
+// ── Model catalog ───────────────────────────────
+
+export const ModelCatalogItemSchema = z.object({
+  id: z.string(),
+  value: z.string(),
+  label: z.string(),
+  provider: z.string().optional(),
+  runtimeId: z.string().optional(),
+  resolvedModel: z.string().optional(),
+  sourceId: z.string(),
+  sourceLabel: z.string(),
+  status: z.enum(['available', 'configured', 'unavailable']).or(z.string()),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  reasoningEfforts: z.array(z.string()).optional(),
+  default: z.boolean().optional(),
+});
+
+export const ModelCatalogSourceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: z.enum(['ready', 'configured', 'unavailable']).or(z.string()),
+  detail: z.string().optional(),
+});
+
+export const ModelCatalogResponseSchema = z.object({
+  items: z.array(ModelCatalogItemSchema),
+  sources: z.array(ModelCatalogSourceSchema),
+});
+
 // ── Page / List ─────────────────────────────────
 
 export const PageInfoSchema = z.object({

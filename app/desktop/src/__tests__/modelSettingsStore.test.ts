@@ -23,10 +23,25 @@ describe('modelSettingsStore', () => {
 
   it('resolves enabled aliases to concrete model provider pairs', () => {
     expect(useModelSettingsStore.getState().resolveRunRequestOptions({ model: 'opus' })).toMatchObject({
-      model: 'claude-opus-4-7',
-      provider: 'anthropic',
+      model: 'deepseek-v4-pro',
+      provider: 'tokendance-gateway',
       reasoningEffort: 'max',
       modelAlias: 'opus',
+    });
+  });
+
+  it('preserves provider and source alias supplied by the model picker', () => {
+    expect(useModelSettingsStore.getState().resolveRunRequestOptions({
+      model: 'claude-opus-4-7[1M]',
+      provider: 'claude-code',
+      modelAlias: 'opus[1m]',
+    })).toMatchObject({
+      model: 'claude-opus-4-7[1M]',
+      provider: 'claude-code',
+      reasoningEffort: 'high',
+      modelAlias: 'opus[1m]',
+      modelMappingEnabled: true,
+      providerFallbackEnabled: true,
     });
   });
 

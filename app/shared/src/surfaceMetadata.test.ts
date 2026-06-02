@@ -7,6 +7,7 @@ import {
   getSurfaceMetadata,
   getSurfaceStatusMetadata,
   getSurfacesByCategory,
+  getSurfacesByPlatform,
   type SurfaceStatus,
 } from './surfaceMetadata';
 
@@ -35,10 +36,10 @@ describe('surfaceMetadata', () => {
   it('keeps surface ids, desktop sections, and web route patterns unique', () => {
     const ids = SURFACE_METADATA.map((surface) => surface.id);
     const desktopSectionIds = SURFACE_METADATA.flatMap((surface) =>
-      surface.desktopSectionId === undefined ? [] : [surface.desktopSectionId],
+      'desktopSectionId' in surface ? [surface.desktopSectionId] : [],
     );
     const webRoutePatterns = SURFACE_METADATA.flatMap((surface) =>
-      surface.webRoutePattern === undefined ? [] : [surface.webRoutePattern],
+      'webRoutePattern' in surface ? [surface.webRoutePattern] : [],
     );
 
     expect(new Set(ids).size).toBe(ids.length);
@@ -61,7 +62,7 @@ describe('surfaceMetadata', () => {
     for (const surface of SURFACE_METADATA) {
       expect(statuses.has(surface.defaultStatus)).toBe(true);
       expect(categories.has(surface.category)).toBe(true);
-      expect(['desktop', 'web']).toContain(surface.platform);
+      expect(['desktop', 'web', 'mobile']).toContain(surface.platform);
       expect(surface.labelKey.length).toBeGreaterThan(0);
       expect(surface.descriptionKey.length).toBeGreaterThan(0);
       expect('label' in surface).toBe(false);
@@ -87,6 +88,10 @@ describe('surfaceMetadata', () => {
       id: 'web.workbench',
       defaultStatus: 'error',
     });
+    expect(getSurfaceByWebRoute('/agent-square')).toMatchObject({
+      id: 'web.agentSquare',
+      defaultStatus: 'catalogFallback',
+    });
     expect(getSurfaceByWebRoute('/group/abc')).toMatchObject({
       id: 'web.groupWorkspace',
       defaultStatus: 'demoFallback',
@@ -111,6 +116,22 @@ describe('surfaceMetadata', () => {
       'desktop.settings.groupChat',
       'web.privateChats',
       'web.groupWorkspace',
+      'mobile.threads',
+      'mobile.chat',
     ]);
+  });
+
+  it('exposes Mobile IA surfaces through the shared registry', () => {
+    expect(getSurfacesByPlatform('mobile').map((surface) => surface.id)).toEqual([
+      'mobile.threads',
+      'mobile.chat',
+      'mobile.runs',
+      'mobile.account',
+    ]);
+
+    expect(getSurfaceMetadata('mobile.runs')).toMatchObject({
+      category: 'automation',
+      defaultStatus: 'realSnapshot',
+    });
   });
 });

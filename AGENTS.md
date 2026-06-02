@@ -114,7 +114,7 @@ Rust/Tauri 隔离规则：
 - AgentHub Home 的 `https://hub.vectorcontrol.tech/api/auth/callback` 是产品官网静态站 OIDC callback，不是 Hub API 登录 callback。
 - 现有 TokenDance ID bearer-token middleware 只是兼容路径；最终浏览器/桌面登录必须由 Hub Server 兑换 code 并签发 Hub 本地 session。
 
-当前协作提醒（2026-05-25）：Hub Agent 和 Client Agent 正在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
+当前协作提醒（2026-06-02）：Hub Agent 和 Client Agent 正在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
 
 ### AgentHub 授权边界
 
@@ -430,7 +430,7 @@ corepack.cmd pnpm exec vite build
 |------|-----------|------|
 | edge-server | 75% | CI 强制阻断 |
 | hub-server | 40% | CI 强制阻断 |
-| app/desktop | 不做硬性要求 | 551/560 tests |
+| app/desktop | 不做硬性要求 | 不做硬性要求 |
 | app/web | 不做硬性要求 | build 通过即可 |
 
 - CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。

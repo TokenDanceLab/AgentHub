@@ -8,26 +8,15 @@ interface UseAutoScrollOptions {
 }
 
 /**
- * Port of OpenCode's createAutoScroll pattern.
+ * Auto-follow chat output while preserving manual history reading.
  *
- * Algorithm (from OpenCode source):
- * - Track whether user has manually scrolled up (threshold: 200px from bottom)
- * - If user is near bottom → auto-follow new messages
- * - If user has scrolled up → DON'T auto-scroll (they're reading history)
- * - When isStreaming starts → auto-scroll to bottom
- * - When new message arrives AND user is near bottom → scroll to bottom
- * - isNearBottom boolean for UI indicators
+ * ChatView renders in normal document flow. This hook therefore uses only DOM
+ * scroll state; there is no virtual-list custom path or estimated row height.
  *
  * When scrollToBottomFn is provided (virtual scroll):
  * - Uses flag-based detection: sets a flag before calling custom fn,
- *   clears after 100ms timeout, skips scroll events while flag is set
+ *   clears after 300ms timeout, skips scroll events while flag is set
  * - Position-based markAutoScroll/isAutoScroll still used as fallback
- *
- * @param containerRef - Ref to the scrollable container element
- * @param deps.messages - Chat messages array (scroll on length change)
- * @param deps.isStreaming - Whether the agent is currently streaming
- * @param options.scrollToBottomFn - Optional custom scroll function (e.g. virtualizer.scrollToIndex)
- * @returns scrollToBottom function and isNearBottom flag
  */
 export function useAutoScroll(
   containerRef: RefObject<HTMLDivElement | null>,
@@ -50,11 +39,7 @@ export function useAutoScroll(
 
   // Stable ref for customFn to avoid dependency churn
   const customFnRef = useRef(customFn);
-  useEffect(() => {
-    customFnRef.current = customFn;
-  }, [customFn]);
-
-  // ── Helpers ───────────────────────────────────
+  customFnRef.current = customFn;
 
   const distanceFromBottom = useCallback(
     (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTop,
@@ -74,16 +59,14 @@ export function useAutoScroll(
   }, []);
 
   const isAutoScroll = useCallback((el: HTMLElement) => {
-    const a = autoScrollRef.current;
-    if (!a) return false;
-    if (Date.now() - a.time > 1500) {
+    const state = autoScrollRef.current;
+    if (!state) return false;
+    if (Date.now() - state.time > 1500) {
       autoScrollRef.current = undefined;
       return false;
     }
-    return Math.abs(el.scrollTop - a.top) < 2;
+    return Math.abs(el.scrollTop - state.top) < 2;
   }, []);
-
-  // ── Core scroll ───────────────────────────────
 
   const scrollToBottom = useCallback(
     (force?: boolean) => {
@@ -138,8 +121,6 @@ export function useAutoScroll(
     [containerRef, distanceFromBottom, markAutoScroll],
   );
 
-  // ── Scroll event handler ──────────────────────
-
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -150,27 +131,19 @@ export function useAutoScroll(
     }
 
     // Position-based: ignore scroll events triggered by our own scrollToBottom calls
-    if (!userScrolledRef.current && isAutoScroll(el)) {
-      return;
-    }
+    if (!userScrolledRef.current && isAutoScroll(el)) return;
 
-    const dist = distanceFromBottom(el);
-    const scrolled = dist > BOTTOM_THRESHOLD;
-
-    // Only update if changed to avoid unnecessary re-renders
+    const scrolled = distanceFromBottom(el) > BOTTOM_THRESHOLD;
     if (userScrolledRef.current !== scrolled) {
       userScrolledRef.current = scrolled;
       setIsNearBottom(!scrolled);
     }
   }, [containerRef, distanceFromBottom, isAutoScroll]);
 
-  // ── Wheel handler (pause auto-scroll on scroll up) ──
-
   const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      if (e.deltaY >= 0) return; // only care about scrolling up
-      // If scrolling within a nested scrollable, don't treat as "leave follow"
-      const target = e.target instanceof Element ? e.target : null;
+    (event: WheelEvent) => {
+      if (event.deltaY >= 0) return;
+      const target = event.target instanceof Element ? event.target : null;
       const nested = target?.closest('[data-scrollable]');
       const el = containerRef.current;
       if (el && nested && nested !== el) return;
@@ -181,9 +154,6 @@ export function useAutoScroll(
     [containerRef],
   );
 
-  // ── Effects ────────────────────────────────────
-
-  // Auto-scroll when isStreaming starts (e.g. new user message sent)
   useEffect(() => {
     const prev = prevStreamingRef.current;
     prevStreamingRef.current = deps.isStreaming;
@@ -194,18 +164,18 @@ export function useAutoScroll(
     }
   }, [deps.isStreaming, scrollToBottom]);
 
-  // Auto-scroll when new messages arrive and user is near bottom
   useEffect(() => {
     const prev = prevMessageCountRef.current;
     prevMessageCountRef.current = deps.messages.length;
 
     // New message arrived
     if (deps.messages.length > prev) {
-      scrollToBottom(true);
+      if (!userScrolledRef.current) {
+        scrollToBottom(false);
+      }
     }
   }, [deps.messages.length, scrollToBottom]);
 
-  // Attach wheel listener
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -217,7 +187,6 @@ export function useAutoScroll(
     };
   }, [containerRef, handleScroll, handleWheel]);
 
-  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (autoTimerRef.current) clearTimeout(autoTimerRef.current);

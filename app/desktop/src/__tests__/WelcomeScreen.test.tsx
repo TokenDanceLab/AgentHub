@@ -71,8 +71,8 @@ describe('WelcomeScreen', () => {
     expect(screen.getByRole('button', { name: 'welcome.target' })).toBeInTheDocument();
     expect(screen.getByText('welcome.commandPlaceholderForAgent(runtime=Claude Code)')).toBeInTheDocument();
     expect(screen.getByText('welcome.profileName(runtime=Claude Code)')).toBeInTheDocument();
-    expect(screen.getByText('claude-opus-4-7')).toBeInTheDocument();
-    expect(screen.getByText('anthropic')).toBeInTheDocument();
+    expect(screen.getAllByText('opus[1m]').length).toBeGreaterThan(0);
+    expect(screen.getByText('tokendance-gateway')).toBeInTheDocument();
     expect(screen.getByText('welcome.localEdge')).toBeInTheDocument();
     expect(screen.getByText('welcome.approval')).toBeInTheDocument();
     expect(screen.getByText('welcome.tokendance')).toBeInTheDocument();
@@ -121,7 +121,7 @@ describe('WelcomeScreen', () => {
 
     expect(onCreateThread).toHaveBeenCalledTimes(1);
     expect(onSendMessage).toHaveBeenCalledTimes(1);
-    expect(onSendMessage).toHaveBeenCalledWith('welcome.suggestion1', 'codex', { model: 'sonnet' });
+    expect(onSendMessage).toHaveBeenCalledWith('welcome.suggestion1', 'codex', { model: 'gpt-5.5' });
     // onCreateThread must be called before onSendMessage
     expect(onCreateThread.mock.invocationCallOrder[0]).toBeLessThan(
       onSendMessage.mock.invocationCallOrder[0],

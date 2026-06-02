@@ -7,38 +7,29 @@ import { startRun, cancelRun, fetchRuns } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
 
-type RunPatch = Partial<RunInfo> & { runId: string };
-type RunsSnapshot = Array<[QueryKey, ListResponse<RunInfo> | undefined]>;
+type RunQuerySnapshot = Array<[readonly unknown[], ListResponse<RunInfo> | undefined]>;
 
-function queryFilterMatchesRun(queryKey: QueryKey, run: RunPatch, current?: RunInfo): boolean {
-  const [, projectFilter, threadFilter] = queryKey;
-  const projectId = run.projectId ?? current?.projectId;
-  const threadId = run.threadId ?? current?.threadId;
-  if (typeof projectFilter === 'string' && projectFilter && projectId && projectId !== projectFilter) return false;
-  if (typeof threadFilter === 'string' && threadFilter && threadId && threadId !== threadFilter) return false;
-  if (typeof projectFilter === 'string' && projectFilter && !projectId) return false;
-  if (typeof threadFilter === 'string' && threadFilter && !threadId) return false;
-  return true;
-}
-
-function restoreRunsSnapshot(qc: QueryClient, snapshot: RunsSnapshot | undefined) {
-  snapshot?.forEach(([key, value]) => qc.setQueryData(key, value));
-}
-
-export function snapshotRunQueries(qc: QueryClient): RunsSnapshot {
+export function snapshotRunQueries(qc: QueryClient): RunQuerySnapshot {
   return qc.getQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] });
 }
 
-export function upsertRunInQueries(qc: QueryClient, patch: RunPatch) {
-  const entries = qc.getQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] });
-  for (const [key, data] of entries) {
-    if (!data) continue;
-    const existing = data.items.find((run) => run.runId === patch.runId);
-    if (!queryFilterMatchesRun(key, patch, existing)) continue;
-    const items = existing
-      ? data.items.map((run) => (run.runId === patch.runId ? { ...run, ...patch } : run))
-      : [{ projectId: '', threadId: '', status: 'queued', ...patch }, ...data.items];
-    qc.setQueryData<ListResponse<RunInfo>>(key, { ...data, items });
+export function upsertRunInQueries(qc: QueryClient, run: RunInfo) {
+  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] }, (current) => {
+    if (!current) return { items: [run], page: { hasMore: false } };
+    const idx = current.items.findIndex((r) => r.runId === run.runId);
+    if (idx >= 0) {
+      const items = [...current.items];
+      items[idx] = run;
+      return { ...current, items };
+    }
+    return { ...current, items: [run, ...current.items] };
+  });
+}
+
+export function restoreRunsSnapshot(qc: QueryClient, snapshot: RunQuerySnapshot | undefined) {
+  if (!snapshot) return;
+  for (const [queryKey, value] of snapshot) {
+    qc.setQueryData(queryKey, value);
   }
 }
 
@@ -46,27 +37,27 @@ export function updateRunStatusInQueries(
   qc: QueryClient,
   runId: string,
   status: string,
-  timestamps: Partial<Pick<RunInfo, 'startedAt' | 'finishedAt'>> = {},
+  overrides?: Partial<RunInfo>,
 ) {
-  const entries = qc.getQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] });
-  for (const [key, data] of entries) {
-    if (!data?.items.some((run) => run.runId === runId)) continue;
-    qc.setQueryData<ListResponse<RunInfo>>(key, {
-      ...data,
-      items: data.items.map((run) =>
-        run.runId === runId ? { ...run, status, ...timestamps } : run,
+  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] }, (current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      items: current.items.map((r) =>
+        r.runId === runId ? { ...r, status, ...overrides } : r,
       ),
-    });
-  }
+    };
+  });
 }
 
-export function useRuns(projectId?: string, threadId?: string) {
+export function useRuns(projectId?: string, threadId?: string, options: { enabled?: boolean } = {}) {
   return useQuery<ListResponse<RunInfo>>({
     queryKey: ['runs', projectId, threadId],
     queryFn: async () => {
       const raw = await fetchRuns(projectId, threadId);
       return safeParse(listResponseSchema(RunInfoSchema), raw, 'runs');
     },
+    enabled: options.enabled ?? true,
     refetchInterval: 10_000,
   });
 }

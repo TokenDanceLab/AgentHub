@@ -74,6 +74,10 @@ export type {
   ReviewDiff,
 } from './diff';
 
+// Go-ported extraction / validation (edge-server/internal/diff/diff.go)
+export { isDiff, extractDiffs, isObj } from './diff';
+export type { DiffInput } from './diff';
+
 export {
   estimateTokens,
   breakdownContext,
@@ -273,6 +277,7 @@ export {
   getSurfaceMetadata,
   getSurfaceStatusMetadata,
   getSurfacesByCategory,
+  getSurfacesByPlatform,
   surfaceMetadataById,
   surfaceStatusById,
 } from './surfaceMetadata';

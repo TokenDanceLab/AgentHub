@@ -3,6 +3,7 @@
   inset: 0;
   z-index: var(--z-modal, 40);
   display: flex;
+  align-items: flex-start;
   justify-content: center;
   padding-top: 15vh;
   background: oklch(0 0 0 / 0.4);
@@ -10,11 +11,13 @@
 
 .dialog {
   width: 560px;
+  max-width: calc(100vw - 24px);
   max-height: 60vh;
-  background: var(--card);
+  background: var(--surface-overlay, var(--card));
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   box-shadow: var(--shadow-md);
+  backdrop-filter: blur(20px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -35,6 +38,7 @@
 
 .input {
   flex: 1;
+  min-height: 44px;
   border: none;
   background: transparent;
   color: var(--foreground);
@@ -55,21 +59,30 @@
 
 .results {
   overflow-y: auto;
-  padding: var(--space-xs);
+  display: grid;
+  gap: 4px;
+  padding: 8px;
 }
 
 .item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
+  width: 100%;
+}
+
+.itemButton {
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
   cursor: pointer;
+  font-family: var(--font-sans);
   transition: background var(--duration-fast);
 }
-.item:hover,
+
+.itemButton:hover,
 .selected {
-  background: var(--accent);
+  background: var(--hover-overlay, var(--accent));
 }
 
 .itemIcon {
@@ -110,15 +123,33 @@
 }
 
 .timestamp {
+  min-width: max-content;
   font-size: var(--font-size-xs);
   color: var(--muted-foreground);
-  flex-shrink: 0;
   white-space: nowrap;
 }
 
 .empty {
-  padding: var(--space-xl);
-  text-align: center;
-  color: var(--muted-foreground);
-  font-size: var(--font-size-sm);
+  margin: 8px;
+  min-height: 132px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--background) 48%, transparent);
+}
+
+@media (max-width: 767px) {
+  .overlay {
+    align-items: flex-start;
+    padding: 72px 10px 10px;
+  }
+
+  .dialog {
+    width: 100%;
+    max-height: calc(100vh - 92px);
+  }
+
+  .itemButton {
+    min-height: 64px;
+  }
 }

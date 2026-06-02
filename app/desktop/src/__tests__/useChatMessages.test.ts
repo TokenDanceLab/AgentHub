@@ -24,13 +24,13 @@ import { queryClient } from '@/api/queryClient';
 import { RunState } from '@/utils/runStateMachine';
 import type { EventEnvelope } from '@shared/events';
 
-function makeEvent(type: string, payload: Record<string, unknown> = {}): EventEnvelope {
+function makeEvent(type: string, payload: Record<string, unknown> = {}, scope: Record<string, unknown> = {}): EventEnvelope {
   return {
     version: 'v1',
     id: `evt-${Math.random().toString(36).slice(2, 8)}`,
     seq: 1,
     type,
-    scope: {},
+    scope,
     sentAt: new Date().toISOString(),
     payload,
   };
@@ -38,7 +38,7 @@ function makeEvent(type: string, payload: Record<string, unknown> = {}): EventEn
 
 describe('useChatMessages', () => {
   let eventHandler: ((event: EventEnvelope) => void) | null;
-  let statusHandler: ((connected: boolean) => void) | null;
+  let statusHandler: ((status: string) => void) | null;
 
   beforeEach(() => {
     eventHandler = null;
@@ -80,6 +80,18 @@ describe('useChatMessages', () => {
     expect(result.current.currentRun).toBeNull();
   });
 
+  it('opens the event stream at the live tail instead of replaying stale bus history', () => {
+    renderHook(() => useChatMessages(true));
+
+    expect(createEventStream).toHaveBeenCalledWith(String(Number.MAX_SAFE_INTEGER));
+  });
+
+  it('replays event history when a concrete thread is selected', () => {
+    renderHook(() => useChatMessages(true, 'thread-current'));
+
+    expect(createEventStream).toHaveBeenCalledWith('0');
+  });
+
   it('does not create stream when offline', () => {
     renderHook(() => useChatMessages(false));
     // createEventStream should not be called for offline
@@ -92,7 +104,7 @@ describe('useChatMessages', () => {
     expect(statusHandler).not.toBeNull();
 
     act(() => {
-      statusHandler!(true);
+      statusHandler!('connected');
     });
 
     expect(result.current.isConnected).toBe(true);
@@ -102,12 +114,12 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      statusHandler!(true);
+      statusHandler!('connected');
     });
     expect(result.current.isConnected).toBe(true);
 
     act(() => {
-      statusHandler!(false);
+      statusHandler!('disconnected');
     });
     expect(result.current.isConnected).toBe(false);
   });
@@ -146,6 +158,22 @@ describe('useChatMessages', () => {
     });
   });
 
+  it('ignores run events from another selected thread', () => {
+    const { result } = renderHook(() => useChatMessages(true, 'thread-current'));
+
+    act(() => {
+      eventHandler!(makeEvent('run.agent.text_delta', { runId: 'run-old', content: 'old thread' }, { threadId: 'thread-old' }));
+    });
+
+    expect(result.current.messages).toEqual([]);
+
+    act(() => {
+      eventHandler!(makeEvent('run.agent.text_delta', { runId: 'run-current', content: 'current thread' }, { threadId: 'thread-current' }));
+    });
+
+    expect(result.current.messages[0].blocks).toEqual([{ kind: 'text', content: 'current thread' }]);
+  });
+
   it('merges consecutive text_delta events into same message', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
@@ -168,6 +196,34 @@ describe('useChatMessages', () => {
       kind: 'text',
       content: 'Hello World',
     });
+  });
+
+  it('does not merge agent output from different runs into the same reply row', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.text_block', {
+          runId: 'run-1',
+          content: 'first reply',
+        }),
+      );
+    });
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.text_block', {
+          runId: 'run-2',
+          content: 'second reply',
+        }),
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages.map((message) => message.parentId)).toEqual(['run-1', 'run-2']);
+    expect(result.current.messages.map((message) => message.blocks[0])).toEqual([
+      { kind: 'text', content: 'first reply' },
+      { kind: 'text', content: 'second reply' },
+    ]);
   });
 
   it('creates tool_use blocks from tool_call events', () => {
@@ -238,9 +294,8 @@ describe('useChatMessages', () => {
       eventHandler!(makeEvent('run.cancelled', { runId: 'run-3', status: 'cancelled' }));
     });
 
-    expect(invalidateSpy).toHaveBeenCalledTimes(6);
+    expect(invalidateSpy).toHaveBeenCalledTimes(3);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['runs'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['threads'] });
   });
 
   it('updates currentRun status on run.failed', () => {
@@ -523,7 +578,121 @@ describe('useChatMessages', () => {
     expect(result.current.currentRun).toBeNull();
   });
 
-  it('creates result block on run.agent.result', () => {
+  it('appends success result to an existing agent message', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.text_block', {
+          runId: 'run-1',
+          content: 'Done',
+        }),
+      );
+    });
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.result', {
+          runId: 'run-1',
+          success: true,
+          usage: { inputTokens: 100, outputTokens: 50 },
+        }),
+      );
+    });
+
+    expect(result.current.messages[0].blocks[1]).toMatchObject({
+      kind: 'result',
+      success: true,
+      tokenUsage: { input: 100, output: 50 },
+    });
+  });
+
+  it('projects context usage events into the current agent message', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.text_block', {
+          runId: 'run-1',
+          content: 'Done',
+        }),
+      );
+    });
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.context_usage', {
+          runId: 'run-1',
+          context: {
+            input: 32000,
+            output: 1200,
+            total: 33200,
+            limit: 200000,
+            usage: 0.166,
+          },
+          cost: {
+            totalCostUsd: 0.42,
+            modelLabel: 'claude-sonnet',
+            providerLabel: 'Claude Code',
+          },
+        }),
+      );
+    });
+
+    expect(result.current.messages[0].blocks[1]).toMatchObject({
+      kind: 'context_usage',
+      runId: 'run-1',
+      input: 32000,
+      output: 1200,
+      total: 33200,
+      contextLimit: 200000,
+      usagePercent: 16.6,
+      totalCost: 0.42,
+      model: 'claude-sonnet',
+      provider: 'Claude Code',
+      variant: 'usage',
+    });
+  });
+
+  it('upserts context warning and compaction usage instead of appending noisy rows', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.context_warning', {
+          runId: 'run-1',
+          usagePercent: 90,
+          threshold: 85,
+        }),
+      );
+    });
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.context_compaction', {
+          runId: 'run-1',
+          usagePercent: 92,
+          tokensUsed: 174800,
+          tokensRemaining: 15200,
+          threshold: 85,
+        }),
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].blocks).toHaveLength(1);
+    expect(result.current.messages[0].blocks[0]).toMatchObject({
+      kind: 'context_usage',
+      runId: 'run-1',
+      usagePercent: 92,
+      total: 174800,
+      remaining: 15200,
+      threshold: 85,
+      variant: 'compaction',
+    });
+  });
+
+  it('does not create an empty timestamp-only row for a standalone success result', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
@@ -536,11 +705,7 @@ describe('useChatMessages', () => {
       );
     });
 
-    expect(result.current.messages[0].blocks[0]).toMatchObject({
-      kind: 'result',
-      success: true,
-      tokenUsage: { input: 100, output: 50 },
-    });
+    expect(result.current.messages).toEqual([]);
   });
 
   it('creates result block for failed result', () => {
@@ -560,6 +725,146 @@ describe('useChatMessages', () => {
       kind: 'result',
       success: false,
       error: 'Something went wrong',
+    });
+  });
+
+  it('renders supervisor route decisions as visible chat blocks', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.route_decision', {
+          runId: 'run-1',
+          action: 'delegate',
+          next_worker: 'member_builder',
+          instructions: 'Build the Desktop TeamRun UI.',
+          reasoning: 'The builder profile owns implementation.',
+        }),
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].blocks[0]).toMatchObject({
+      kind: 'route_decision',
+      action: 'delegate',
+      nextWorker: 'member_builder',
+      instructions: 'Build the Desktop TeamRun UI.',
+    });
+  });
+
+  it('upserts subagent task events into a single visible task block', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.task_started', {
+          runId: 'run-1',
+          taskId: 'task_builder',
+          description: 'Implement subagent cards',
+          worker: 'builder',
+        }),
+      );
+    });
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.task_progress', {
+          runId: 'run-1',
+          taskId: 'task_builder',
+          message: 'Rendering card shell',
+        }),
+      );
+    });
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.task_notification', {
+          runId: 'run-1',
+          taskId: 'task_builder',
+          status: 'completed',
+          summary: 'Cards are wired to typed events.',
+        }),
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].blocks).toHaveLength(1);
+    expect(result.current.messages[0].blocks[0]).toMatchObject({
+      kind: 'agent_task',
+      taskId: 'task_builder',
+      title: 'Implement subagent cards',
+      status: 'completed',
+      summary: 'Cards are wired to typed events.',
+      worker: 'builder',
+    });
+  });
+
+  it('upserts child spawn and result events into a single child agent block', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.child_spawn', {
+          runId: 'run-parent',
+          childId: 'child_builder',
+          childRunId: 'run-child-builder',
+          agentName: 'Builder',
+          title: 'Implement the Desktop TeamRun cards',
+        }),
+      );
+    });
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.child_result', {
+          runId: 'run-parent',
+          childId: 'child_builder',
+          status: 'completed',
+          result: 'Builder returned card markup and tests.',
+          durationMs: 1240,
+        }),
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].blocks).toHaveLength(1);
+    expect(result.current.messages[0].blocks[0]).toMatchObject({
+      kind: 'child_agent',
+      childId: 'child_builder',
+      childRunId: 'run-child-builder',
+      agentName: 'Builder',
+      title: 'Implement the Desktop TeamRun cards',
+      status: 'completed',
+      result: 'Builder returned card markup and tests.',
+      durationMs: 1240,
+    });
+  });
+
+  it('renders task_dispatched as a spawned child agent block', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.task_dispatched', {
+          runId: 'run-child-reviewer',
+          parentId: 'run-parent',
+          agentId: 'agent_reviewer',
+          agent: 'Reviewer',
+          task: 'Review the Desktop interaction model',
+          role: 'reviewer',
+        }),
+      );
+    });
+
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].blocks[0]).toMatchObject({
+      kind: 'child_agent',
+      childId: 'agent_reviewer',
+      parentRunId: 'run-parent',
+      childRunId: 'run-child-reviewer',
+      agentName: 'Reviewer',
+      title: 'Review the Desktop interaction model',
+      status: 'running',
     });
   });
 

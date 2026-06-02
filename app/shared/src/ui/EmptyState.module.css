@@ -1,0 +1,174 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 120px var(--space-md, 1rem) var(--space-xl, 1.5rem);
+  color: var(--foreground);
+  text-align: center;
+  user-select: none;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md, 0.75rem);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  background: color-mix(in oklch, var(--card, white) 78%, transparent);
+  color: var(--muted-foreground);
+}
+
+.title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 22px;
+  font-weight: 520;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+.description {
+  max-width: 420px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm, 0.875rem);
+  line-height: 1.5;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  margin-top: var(--space-xs, 0.25rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  padding: 0 16px;
+  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.action:hover {
+  border-color: color-mix(in oklch, var(--primary) 30%, var(--border));
+  background: color-mix(in oklch, var(--primary) 10%, var(--card));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .action {
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+
+  .action:active {
+    transform: scale(0.98);
+  }
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: var(--space-sm, 0.5rem);
+}
+
+.suggestionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  border-radius: var(--radius-lg, 8px);
+  padding: 0 12px;
+  background: color-mix(in oklch, var(--card, white) 64%, transparent);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .suggestionChip {
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+
+  .suggestionChip:hover {
+    transform: translateY(-1px);
+  }
+
+  .suggestionChip:active {
+    transform: scale(0.98);
+  }
+}
+
+.suggestionChip:hover {
+  border-color: color-mix(in oklch, var(--primary) 22%, var(--border));
+  background: color-mix(in oklch, var(--primary) 8%, var(--card));
+}
+
+.suggestionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.58;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .container {
+    animation: emptyStateIn 0.18s ease-out;
+  }
+
+  @keyframes emptyStateIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    max-width: 100%;
+    padding: 80px var(--space-sm, 0.75rem) var(--space-lg, 1rem);
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .action {
+    min-height: var(--touch-target-min, 44px);
+    padding: 0 20px;
+    font-size: var(--font-size-base, 1rem);
+  }
+
+  .suggestions {
+    gap: 6px;
+  }
+
+  .suggestionChip {
+    min-height: var(--touch-target-min, 44px);
+    padding: 0 13px;
+    font-size: 12px;
+  }
+}

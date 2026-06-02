@@ -7,6 +7,8 @@ export interface HubResponseEnvelope<T = unknown> {
   data?: T;
 }
 
+export type HubEnvelope<T = unknown> = HubResponseEnvelope<T>;
+
 export interface HubClientOptions {
   baseUrl?: string;
   getToken?: () => string | null | undefined;

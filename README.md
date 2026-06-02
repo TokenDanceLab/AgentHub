@@ -8,7 +8,7 @@
 
 [English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
 
-<img src="https://img.shields.io/badge/状态-P0_完成-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/v0.1.0-活跃开发-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
@@ -180,6 +180,7 @@ AgentHub/
 ├── app/
 │   ├── desktop/            # Tauri 桌面端入口
 │   ├── web/                # Web 工作台和页面预览
+│   ├── mobile/             # Mobile 轻量 IM、审批和预览
 │   └── shared/             # 前端共享组件、状态、类型和 API/event client
 ├── hub-server/             # 中心 Hub：账号、IM、群聊、同步、中继
 ├── edge-server/            # Edge 节点：项目、上下文、run 生命周期、Runtime adapters

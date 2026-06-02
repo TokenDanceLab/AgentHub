@@ -23,6 +23,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
@@ -89,6 +90,9 @@ type App struct {
 	// Relay
 	RelayService *service.RelayService
 	RelayHandler *handler.RelayHandler
+
+	// Audit
+	AuditService *service.AuditService
 
 	// Goroutine lifecycle
 	coreCtx    context.Context
@@ -190,11 +194,19 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Execution Target service
 	targetSvc := service.NewExecutionTargetService(a.DB)
+	targetSvc.SetCache(a.CacheClient)
 	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
 
 	// Audit service
-	auditSvc := service.NewAuditService(a.DB)
+	auditSvc := service.NewAuditService(a.DB, &service.AuditServiceConfig{
+		AuditLogFile:    a.Config.Server.AuditLogFile,
+		RetryBufferSize: 1024,
+	})
+	a.AuditService = auditSvc
 	a.AuditHandler = handler.NewAuditHandler(auditSvc)
+
+	// Wire audit into middleware for permission decision logging.
+	middleware.AuditPermissionFn = auditSvc.RecordPermissionDecision
 
 	// AgentTeam service
 	a.AgentTeamService = service.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, service.AgentTeamGuardrails{
@@ -212,6 +224,7 @@ func (a *App) Run(ctx context.Context) error {
 	// Relay service
 	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
 	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
+	a.AgentService.SetRelayService(a.RelayService)
 
 	// OIDC Service (optional — only when TokenDance ID client is configured)
 	if a.Config.TokenDanceID.ClientID != "" {
@@ -222,6 +235,7 @@ func (a *App) Run(ctx context.Context) error {
 	// Handler layer
 	a.AuthHandler = handler.NewAuthHandler(a.AuthService)
 	a.DeviceHandler = handler.NewDeviceHandler(a.DeviceService)
+	a.DeviceHandler.SetJWTConfig(a.Config.JWT.Secret, a.Config.JWT.AccessTTL)
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
 	a.MessageHandler = handler.NewMessageHandler(a.MessageService)
@@ -310,6 +324,11 @@ func (a *App) Shutdown(ctx context.Context) error {
 	// 5. Cancel background goroutines (scheduler, heartbeat, metrics collector).
 	if a.coreCancel != nil {
 		a.coreCancel()
+	}
+
+	// 5b. Shutdown audit service (drains retry queue, closes file sink).
+	if a.AuditService != nil {
+		a.AuditService.Shutdown()
 	}
 
 	// 6. Close database connection pool.
