@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+﻿import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowUp,
@@ -21,6 +21,7 @@ import MentionPopover from '@/components/MentionPopover';
 import ModelDropdown from '@/components/ModelDropdown';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
+import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { useShallow } from 'zustand/shallow';
 import styles from './PromptInput.module.css';
 
@@ -32,23 +33,26 @@ const COMMON_MODELS = [
 const REASONING_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
 type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
-interface SendOptions { model?: string; reasoningEffort?: ReasoningEffort; }
+interface SendOptions { model?: string; reasoningEffort?: ReasoningEffort; targetId?: string; }
 
 interface Props {
   agents: AgentInfo[];
   selectedAgentId?: string;
   onSelectAgent: (agentId: string) => void;
-  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | void | Promise<boolean | void>;
+  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | undefined | Promise<boolean | undefined>;
   isStreaming?: boolean;
   isStarting?: boolean;
   onCancel?: () => void;
   disabled?: boolean;
   threadId?: string;
+  executionTargets?: ExecutionTargetInventoryItem[];
+  selectedTargetId?: string;
+  onSelectTarget?: (targetId: string) => void;
 }
 
 function modelDesc(name: string): string {
   const m: Record<string, string> = {
-    'claude-opus-4-7': 'Anthropic flagship — strongest reasoning & coding',
+    'claude-opus-4-7': 'Anthropic flagship 鈥?strongest reasoning & coding',
     'claude-opus-4-5': 'Previous-gen flagship, balanced performance',
     'claude-sonnet-4-6': 'Fast, cost-effective for daily tasks',
     'claude-haiku-4-5': 'Lightning-fast for simple tasks',
@@ -66,6 +70,7 @@ function modelMeta(name: string): string {
 export default function PromptInput({
   agents, selectedAgentId, onSelectAgent, onSend,
   isStreaming = false, isStarting = false, onCancel, disabled, threadId,
+  executionTargets = [], selectedTargetId = '', onSelectTarget,
 }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -152,14 +157,15 @@ export default function PromptInput({
     const routedModel = model || selectedAgentAlias;
     if (routedModel) opts.model = routedModel;
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
-    const accepted = await onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort ? opts : undefined);
+    if (selectedTargetId) opts.targetId = selectedTargetId;
+    const accepted = await onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort || opts.targetId ? opts : undefined);
     if (accepted === false) return;
     ta.value = '';
     ta.style.height = 'auto';
     setPromptLength(0);
     closeMention();
     clearDraft();
-  }, [disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, reasoningEffort, onSend, clearDraft, closeMention]);
+  }, [disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, reasoningEffort, selectedTargetId, onSend, clearDraft, closeMention]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (mentionHandleKeyDown(e)) return;
@@ -172,6 +178,10 @@ export default function PromptInput({
   const placeholder = selectedAgent
     ? `${t('prompt.placeholder')} @${selectedAgent.name}...`
     : t('prompt.placeholder');
+  const selectedTarget = executionTargets.find((target) => target.id === selectedTargetId);
+  const targetLabel = selectedTarget
+    ? t('prompt.targetLabel', { name: selectedTarget.name, status: t(`settings.targetHealth.${selectedTarget.health_state}`, { defaultValue: selectedTarget.health_state }) })
+    : t('prompt.targetAuto');
 
   return (
     <div className={styles.root}>
@@ -239,11 +249,37 @@ export default function PromptInput({
                 type="button"
                 className={styles.attachBtn}
                 disabled={disabled || isStarting}
-                title={selectedAgent?.name ?? t('prompt.routeAuto')}
-                aria-label={selectedAgent?.name ?? t('prompt.routeAuto')}
+                title={targetLabel}
+                aria-label={targetLabel}
               >
                 <Target size={17} strokeWidth={2} />
               </button>
+              <label className={styles.targetSelectWrap}>
+                <span className={styles.targetSelectLabel}>{t('prompt.executionTarget')}</span>
+                <select
+                  className={styles.targetSelect}
+                  value={selectedTargetId}
+                  onChange={(event) => onSelectTarget?.(event.target.value)}
+                  disabled={disabled || isStarting || !onSelectTarget}
+                  aria-label={t('prompt.executionTarget')}
+                >
+                  <option value="">{t('prompt.targetAuto')}</option>
+                  {executionTargets.map((target) => {
+                    const dispatchable = target.target_type === 'local_edge' || target.target_type === 'hub_relay';
+                    const health = t(`settings.targetHealth.${target.health_state}`, { defaultValue: target.health_state });
+                    const suffix = dispatchable
+                      ? target.is_online
+                        ? health
+                        : t('prompt.targetOfflineQueue')
+                      : t('prompt.targetLocked');
+                    return (
+                      <option key={target.id} value={target.id} disabled={!dispatchable}>
+                        {t('prompt.targetLabel', { name: target.name, status: suffix })}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
             </div>
 
             <div className={styles.rightGroup}>

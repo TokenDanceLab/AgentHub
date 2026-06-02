@@ -8,6 +8,7 @@ import { HEALTH_POLL_MS } from '@/config';
 export interface HealthState {
   online: boolean;
   health: HealthResponse | null;
+  refetch: () => void;
 }
 
 export function useHealth(): HealthState {
@@ -30,7 +31,9 @@ export function useHealth(): HealthState {
 
   useEffect(() => {
     mountedRef.current = true;
-    poll();
+    queueMicrotask(() => {
+      void poll();
+    });
     const id = setInterval(poll, HEALTH_POLL_MS);
     return () => {
       mountedRef.current = false;
@@ -38,5 +41,5 @@ export function useHealth(): HealthState {
     };
   }, [poll]);
 
-  return { online, health };
+  return { online, health, refetch: poll };
 }

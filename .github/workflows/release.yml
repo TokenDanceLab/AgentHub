@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+
+jobs:
+  # ── Go: Edge Server + Hub Server ─────────────
+  build-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Build Edge Server (Linux)
+        working-directory: edge-server
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-linux-amd64 ./cmd/agenthub-edge/
+
+      - name: Build Edge Server (Windows)
+        working-directory: edge-server
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-windows-amd64.exe ./cmd/agenthub-edge/
+
+      - name: Build Hub Server (Linux)
+        working-directory: hub-server
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-linux-amd64 ./cmd/server-hub/
+
+      - name: Upload Go artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-binaries
+          path: dist/
+
+  # ── Tauri Desktop ────────────────────────────
+  build-desktop:
+    needs: build-go
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/desktop/pnpm-lock.yaml
+
+      - name: Install desktop dependencies
+        working-directory: app/desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Install shared dependencies
+        working-directory: app/shared
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Tauri (NSIS)
+        working-directory: app/desktop
+        run: pnpm tauri build
+
+      - name: Create dist directory
+        shell: pwsh
+        run: New-Item -ItemType Directory dist -Force
+
+      - name: Collect NSIS installer
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v',''
+          $nsis = Get-ChildItem "app\desktop\src-tauri\target\release\bundle\nsis" -Filter "*setup.exe" | Select-Object -First 1
+          Copy-Item $nsis.FullName "dist\AgentHub_${ver}_x64-setup.exe"
+
+      - name: Create portable zip
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v',''
+          $exe = Get-ChildItem "app\desktop\src-tauri\target\release" -Filter "agenthub-desktop.exe" | Select-Object -First 1
+          $portableDir = "dist\AgentHub-portable"
+          New-Item -ItemType Directory $portableDir -Force
+          Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
+          @"
+          AgentHub ${{ github.ref_name }} — Portable Edition
+
+          No installation required. Double-click AgentHub.exe to run.
+          Requires: Windows 10/11 (WebView2 built-in).
+
+          Full documentation: https://github.com/TokenDanceLab/AgentHub
+          "@ | Out-File "$portableDir\README.txt" -Encoding UTF8
+          Compress-Archive -Path "$portableDir\*" -DestinationPath "dist\AgentHub_${ver}_x64-portable.zip" -Force
+
+      - name: Upload Desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-artifacts
+          path: dist/
+
+  # ── GitHub Release ───────────────────────────
+  release:
+    needs: [build-go, build-desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Go artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: dist
+
+      - name: Download Desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-artifacts
+          path: dist
+
+      - name: List assets
+        run: ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

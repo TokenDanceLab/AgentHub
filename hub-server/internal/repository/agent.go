@@ -1,12 +1,16 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/agenthub/hub-server/internal/model"
 )
+
+var ErrRunEventLimitExceeded = errors.New("run event limit exceeded for task")
 
 func CreateAgentInstance(db *gorm.DB, ai *model.AgentInstance) error {
 	return db.Create(ai).Error
@@ -205,13 +209,29 @@ func BumpRunningTaskExpireAt(db *gorm.DB, id string, ttl time.Duration) error {
 }
 
 func CreateAgentRunEventWithNextSeq(db *gorm.DB, event *model.AgentRunEvent) error {
+	return CreateAgentRunEventWithNextSeqLimited(db, event, 0)
+}
+
+func CreateAgentRunEventWithNextSeqLimited(db *gorm.DB, event *model.AgentRunEvent, maxEvents int64) error {
 	return db.Transaction(func(tx *gorm.DB) error {
+		if maxEvents > 0 {
+			var task model.PendingAgentTask
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Select("id").
+				Where("id = ?", event.TaskID).
+				First(&task).Error; err != nil {
+				return err
+			}
+		}
 		var maxSeq int64
 		if err := tx.Model(&model.AgentRunEvent{}).
 			Where("task_id = ?", event.TaskID).
 			Select("COALESCE(MAX(event_seq), 0)").
 			Scan(&maxSeq).Error; err != nil {
 			return err
+		}
+		if maxEvents > 0 && maxSeq >= maxEvents {
+			return ErrRunEventLimitExceeded
 		}
 		event.EventSeq = maxSeq + 1
 		return tx.Create(event).Error

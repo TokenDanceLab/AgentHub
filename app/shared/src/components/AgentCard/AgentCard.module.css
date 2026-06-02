@@ -7,15 +7,25 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--card);
-  transition: transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    transition: transform var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
 }
 
 .card:hover {
-  transform: translateY(-2px);
   border-color: oklch(0.55 0.16 255 / 0.24);
   box-shadow: 0 22px 54px oklch(0.14 0.005 260 / 0.16);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .installed {
@@ -120,8 +130,8 @@
 .isFavorite,
 .isFavorite :global(.material-symbols-outlined) {
   color: oklch(1 0 0);
-  border-color: transparent;
-  background: linear-gradient(135deg, oklch(0.5 0.18 285), var(--brand));
+  border-color: oklch(0.5 0.18 285 / 0.28);
+  background: oklch(0.5 0.18 285);
   font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 24;
 }
 
@@ -223,12 +233,13 @@
 .primaryBtn {
   border-color: transparent;
   color: oklch(1 0 0);
-  background: linear-gradient(135deg, var(--brand), oklch(0.6 0.12 215));
+  background: var(--brand);
   box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.23);
 }
 
 .successBtn {
-  background: linear-gradient(135deg, oklch(0.52 0.16 155), oklch(0.6 0.12 215));
+  border-color: oklch(0.52 0.16 155 / 0.28);
+  background: oklch(0.52 0.16 155);
 }
 
 .ghostBtn {

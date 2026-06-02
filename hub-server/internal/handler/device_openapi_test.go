@@ -55,6 +55,22 @@ func TestOpenAPIEdgeDeviceRegisterMatchesHubRouteAndEnvelope(t *testing.T) {
 	}
 }
 
+func TestOpenAPIDoesNotContainDuplicateMappingKeys(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	duplicatePath, ok := firstDuplicateMappingKey(spec, "$")
+	if ok {
+		t.Fatalf("OpenAPI contains duplicate mapping key at %s", duplicatePath)
+	}
+}
+
+func TestOpenAPIHubAuthDeviceIDsUseUUIDContract(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCAuthorizeRequest")
+	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCCallbackRequest")
+}
+
 func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
@@ -91,6 +107,180 @@ func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	requireMaxLength(t, yamlMapField(t, doneProps, "final_content", "HubTaskDoneRequest.properties.final_content"), "1048576", "done final_content")
 }
 
+func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+
+	expected := map[string][]string{
+		"/client/ws":                                                          {"get"},
+		"/client/auth/refresh":                                                {"post"},
+		"/client/auth/oidc/authorize":                                         {"post"},
+		"/client/auth/oidc/callback":                                          {"post"},
+		"/client/auth/me":                                                     {"get"},
+		"/client/auth/logout":                                                 {"post"},
+		"/client/auth/profile":                                                {"put"},
+		"/client/contacts/search":                                             {"get"},
+		"/client/contacts/friend-requests":                                    {"get", "post"},
+		"/client/contacts/friend-requests/{id}/accept":                        {"post"},
+		"/client/contacts/friend-requests/{id}/reject":                        {"post"},
+		"/client/contacts":                                                    {"get"},
+		"/client/contacts/{userId}":                                           {"delete"},
+		"/client/contacts/{userId}/block":                                     {"post"},
+		"/client/contacts/{userId}/unblock":                                   {"post"},
+		"/client/contacts/{userId}/remark":                                    {"put"},
+		"/client/sessions":                                                    {"get"},
+		"/client/sessions/private":                                            {"post"},
+		"/client/sessions/group":                                              {"post"},
+		"/client/sessions/{id}/members":                                       {"post"},
+		"/client/sessions/{id}/members/{user_id}":                             {"delete"},
+		"/client/sessions/{id}/leave":                                         {"post"},
+		"/client/sessions/{id}/transfer-owner":                                {"post"},
+		"/client/sessions/{id}/dissolve":                                      {"post"},
+		"/client/sessions/{id}/info":                                          {"put"},
+		"/client/sessions/{id}/settings":                                      {"put"},
+		"/client/sessions/{id}":                                               {"delete"},
+		"/client/sessions/{id}/messages":                                      {"get", "post"},
+		"/client/sessions/{id}/messages/sync":                                 {"get"},
+		"/client/sessions/{id}/pins":                                          {"get"},
+		"/client/sessions/{id}/read":                                          {"post"},
+		"/client/sessions/{id}/agents":                                        {"post"},
+		"/client/sessions/{id}/messages/search":                               {"get"},
+		"/client/sessions/search":                                             {"get"},
+		"/client/messages/{id}/recall":                                        {"post"},
+		"/client/messages/{id}/pin":                                           {"post", "delete"},
+		"/client/messages/{id}/forward":                                       {"post"},
+		"/client/messages/search":                                             {"get"},
+		"/client/attachments/probe":                                           {"post"},
+		"/client/attachments":                                                 {"post"},
+		"/client/attachments/{id}":                                            {"get"},
+		"/client/notifications":                                               {"get"},
+		"/client/notifications/{id}/read":                                     {"post"},
+		"/client/notifications/read-all":                                      {"post"},
+		"/edge/devices/register":                                              {"post"},
+		"/edge/agent-tasks/{id}/ack":                                          {"post"},
+		"/edge/agent-tasks/{id}/stream":                                       {"post"},
+		"/edge/agent-tasks/{id}/done":                                         {"post"},
+		"/edge/agent-tasks/{id}/fail":                                         {"post"},
+		"/web/agent-tasks":                                                    {"post"},
+		"/web/agent-tasks/{id}/cancel":                                        {"post"},
+		"/web/agent-tasks/{id}/events/summary":                                {"get"},
+		"/web/agent-tasks/{id}/events":                                        {"get"},
+		"/web/custom-agents":                                                  {"get", "post"},
+		"/web/custom-agents/{id}":                                             {"put", "delete"},
+		"/web/agent-profiles":                                                 {"get", "post"},
+		"/web/agent-profiles/{id}":                                            {"get", "patch", "delete"},
+		"/web/agent-profiles/{id}/publish":                                    {"post"},
+		"/web/agent-profiles/{id}/install":                                    {"post"},
+		"/web/skills":                                                         {"get", "post"},
+		"/web/skills/{id}":                                                    {"get", "put", "delete"},
+		"/web/skills/{id}/publish":                                            {"post"},
+		"/web/skills/{id}/unpublish":                                          {"post"},
+		"/web/mcp-servers":                                                    {"get", "post"},
+		"/web/mcp-servers/{id}":                                               {"get", "put", "delete"},
+		"/web/mcp-servers/{id}/publish":                                       {"post"},
+		"/web/mcp-servers/{id}/unpublish":                                     {"post"},
+		"/web/market/profiles":                                                {"get"},
+		"/web/market/profiles/{id}":                                           {"get"},
+		"/web/market/profiles/{id}/install":                                   {"post"},
+		"/web/market/profiles/{id}/rate":                                      {"post"},
+		"/web/provider-bindings":                                              {"get", "post"},
+		"/web/provider-bindings/{id}":                                         {"put", "delete"},
+		"/web/execution-targets":                                              {"get", "post"},
+		"/web/execution-targets/{id}":                                         {"get", "patch", "delete"},
+		"/web/execution-targets/{id}/ping":                                    {"post"},
+		"/web/audit-events":                                                   {"get"},
+		"/web/relay/commands":                                                 {"post"},
+		"/web/relay/commands/{id}":                                            {"get"},
+		"/web/relay/commands/{id}/ack":                                        {"post"},
+		"/web/devices":                                                        {"get"},
+		"/web/agent-teams":                                                    {"get", "post"},
+		"/web/agent-teams/{id}":                                               {"get", "put", "delete"},
+		"/web/agent-teams/{id}/members":                                       {"post"},
+		"/web/agent-teams/{id}/members/{member_id}":                           {"delete"},
+		"/web/agent-teams/{id}/runs":                                          {"get", "post"},
+		"/web/agent-teams/{id}/runs/{run_id}":                                 {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/state":                           {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/tasks":                           {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/events":                          {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/route-decisions":                 {"post"},
+		"/web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide":  {"post"},
+		"/web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve": {"post"},
+		"/web/agent-teams/{id}/runs/{run_id}/assignments":                     {"get", "post"},
+		"/web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/dispatch": {"post"},
+		"/web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/complete": {"post"},
+		"/web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/fail":     {"post"},
+	}
+
+	for path, methods := range expected {
+		pathNode := yamlMapField(t, paths, path, "paths."+path)
+		for _, method := range methods {
+			op := yamlMapField(t, pathNode, method, "paths."+path+"."+method)
+			if got := yamlScalarField(t, op, "x-agenthub-status", "paths."+path+"."+method+".x-agenthub-status"); got != "implemented" {
+				t.Fatalf("%s %s status = %q, want implemented", method, path, got)
+			}
+		}
+	}
+
+	legacyImplementedPaths := []string{
+		"/client/contacts/{userId}:block",
+		"/client/contacts/{userId}:unblock",
+		"/client/friend-requests",
+		"/client/friend-requests/sent",
+		"/client/sessions/{id}/members/{memberId}",
+		"/client/sessions/{id}:leave",
+		"/client/sessions/{id}:dissolve",
+		"/client/sessions/{id}:transfer-owner",
+		"/client/sessions/{id}/member-settings",
+		"/client/sessions/{id}:read",
+		"/client/messages:forward",
+		"/client/attachments:probe",
+		"/client/attachments:upload",
+		"/client/notifications/{id}:read",
+		"/client/notifications:read-all",
+		"/web/agent-tasks/{id}:cancel",
+		"/web/agent-profiles/{profileId}",
+		"/web/agent-profiles/{profileId}:publish",
+		"/web/agent-profiles/{profileId}:install",
+		"/web/skills/{skillId}",
+		"/web/skills/{skillId}:publish",
+		"/web/skills/{skillId}:unpublish",
+		"/web/mcp-servers/{serverId}",
+		"/web/mcp-servers/{serverId}:publish",
+		"/web/mcp-servers/{serverId}:unpublish",
+		"/web/provider-bindings/{bindingId}",
+		"/web/market/profiles/{profileId}",
+		"/web/market/profiles/{profileId}:install",
+		"/web/market/profiles/{profileId}:rate",
+	}
+	for _, path := range legacyImplementedPaths {
+		assertPathHasNoImplementedOperations(t, paths, path)
+	}
+
+	legacyImplementedOperations := map[string][]string{
+		"/client/sessions/{id}/members": {"get"},
+		"/web/custom-agents/{id}":       {"get"},
+	}
+	for path, methods := range legacyImplementedOperations {
+		for _, method := range methods {
+			assertOperationIsNotImplemented(t, paths, path, method)
+		}
+	}
+}
+
+func assertSchemaRequiresUUIDDeviceID(t *testing.T, schemas *yaml.Node, schemaName string) {
+	t.Helper()
+	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
+	required := yamlStringSlice(t, yamlField(t, schema, "required", schemaName+".required"), schemaName+".required")
+	if !containsString(required, "device_type") || !containsString(required, "device_id") {
+		t.Fatalf("%s.required = %v, want device_type and device_id", schemaName, required)
+	}
+	properties := yamlMapField(t, schema, "properties", schemaName+".properties")
+	deviceID := yamlMapField(t, properties, "device_id", schemaName+".properties.device_id")
+	if got := yamlScalarField(t, deviceID, "format", schemaName+".properties.device_id.format"); got != "uuid" {
+		t.Fatalf("%s device_id format = %v, want uuid", schemaName, got)
+	}
+}
+
 func requestBodySchema(t *testing.T, post *yaml.Node, name string) *yaml.Node {
 	t.Helper()
 	body := yamlMapField(t, post, "requestBody", name+" requestBody")
@@ -113,6 +303,43 @@ func loadOpenAPISpec(t *testing.T) *yaml.Node {
 		return spec.Content[0]
 	}
 	return &spec
+}
+
+func firstDuplicateMappingKey(node *yaml.Node, path string) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	if node.Kind == yaml.DocumentNode {
+		for _, child := range node.Content {
+			if duplicatePath, ok := firstDuplicateMappingKey(child, path); ok {
+				return duplicatePath, true
+			}
+		}
+		return "", false
+	}
+	if node.Kind == yaml.MappingNode {
+		seen := map[string]struct{}{}
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			key := node.Content[i].Value
+			childPath := path + "." + key
+			if _, exists := seen[key]; exists {
+				return childPath, true
+			}
+			seen[key] = struct{}{}
+			if duplicatePath, ok := firstDuplicateMappingKey(node.Content[i+1], childPath); ok {
+				return duplicatePath, true
+			}
+		}
+		return "", false
+	}
+	if node.Kind == yaml.SequenceNode {
+		for _, child := range node.Content {
+			if duplicatePath, ok := firstDuplicateMappingKey(child, path+"[]"); ok {
+				return duplicatePath, true
+			}
+		}
+	}
+	return "", false
 }
 
 func yamlMapField(t *testing.T, node *yaml.Node, key string, path string) *yaml.Node {
@@ -200,6 +427,44 @@ func requireMaxLength(t *testing.T, node *yaml.Node, want string, field string) 
 	t.Helper()
 	if got := yamlScalarField(t, node, "maxLength", field+" maxLength"); got != want {
 		t.Fatalf("%s maxLength = %v, want %s", field, got, want)
+	}
+}
+
+func assertPathHasNoImplementedOperations(t *testing.T, paths *yaml.Node, path string) {
+	t.Helper()
+	pathNode := yamlOptionalMapField(paths, path)
+	if pathNode == nil {
+		return
+	}
+	if pathNode.Kind != yaml.MappingNode {
+		t.Fatalf("paths.%s has kind %v, want mapping", path, pathNode.Kind)
+	}
+	for i := 0; i+1 < len(pathNode.Content); i += 2 {
+		method := pathNode.Content[i].Value
+		op := pathNode.Content[i+1]
+		if op.Kind != yaml.MappingNode {
+			continue
+		}
+		status := yamlOptionalMapField(op, "x-agenthub-status")
+		if status != nil && status.Kind == yaml.ScalarNode && status.Value == "implemented" {
+			t.Fatalf("legacy path %s %s must not be marked implemented", method, path)
+		}
+	}
+}
+
+func assertOperationIsNotImplemented(t *testing.T, paths *yaml.Node, path string, method string) {
+	t.Helper()
+	pathNode := yamlOptionalMapField(paths, path)
+	if pathNode == nil {
+		return
+	}
+	op := yamlOptionalMapField(pathNode, method)
+	if op == nil || op.Kind != yaml.MappingNode {
+		return
+	}
+	status := yamlOptionalMapField(op, "x-agenthub-status")
+	if status != nil && status.Kind == yaml.ScalarNode && status.Value == "implemented" {
+		t.Fatalf("legacy operation %s %s must not be marked implemented", method, path)
 	}
 }
 

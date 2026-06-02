@@ -51,7 +51,8 @@ export class LoopDetector {
       return 'allow';
     }
 
-    const entry = this.calls.get(signature)!;
+    const entry = existing;
+    if (!entry) return 'allow';
     const stopThreshold = this.opts.stopThreshold ?? 5;
     const warnThreshold = this.opts.warnThreshold ?? 3;
 

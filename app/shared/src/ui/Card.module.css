@@ -38,3 +38,11 @@
   padding-top: var(--space-md, 0.75rem);
   border-top: 1px solid var(--border);
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .card:not(.compact):not(.padNone) {
+    padding: var(--space-md, 0.75rem);
+  }
+}

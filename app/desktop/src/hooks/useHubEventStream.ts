@@ -53,10 +53,12 @@ export function useHubEventStream(
   const [lastNotification, setLastNotification] = useState<HubNotification | null>(null);
   const [lastAgentTask, setLastAgentTask] = useState<HubAgentTask | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [hubWS, setHubWS] = useState<HubWSHandle | null>(null);
 
   useEffect(() => {
     const handle = createHubWS({ getToken, url });
     handleRef.current = handle;
+    queueMicrotask(() => setHubWS(handle));
 
     const unsubStatus = handle.onStatus(setStatus);
 
@@ -100,8 +102,8 @@ export function useHubEventStream(
       unsubAny();
       handle.close();
       handleRef.current = null;
+      queueMicrotask(() => setHubWS(null));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getToken, url]);
 
   const sendTyping = useCallback((sessionId: string) => {
@@ -132,7 +134,7 @@ export function useHubEventStream(
   }, []);
 
   return {
-    hubWS: handleRef.current,
+    hubWS,
     status,
     lastFrame,
     lastMessage,

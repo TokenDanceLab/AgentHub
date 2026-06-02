@@ -102,6 +102,24 @@ func (f *FileStore) GetThread(id string) (Thread, bool) {
 	return f.store.GetThread(id)
 }
 
+func (f *FileStore) UpdateThread(id string, title *string, status *string) (Thread, bool) {
+	thread, ok := f.store.UpdateThread(id, title, status)
+	if !ok {
+		return Thread{}, false
+	}
+	_ = f.persist()
+	return thread, true
+}
+
+func (f *FileStore) DeleteThread(id string) bool {
+	ok := f.store.DeleteThread(id)
+	if !ok {
+		return false
+	}
+	_ = f.persist()
+	return true
+}
+
 func (f *FileStore) ListThreads(projectID string) []Thread {
 	return f.store.ListThreads(projectID)
 }
@@ -239,17 +257,18 @@ func saveFileSnapshot(path string, snapshot fileSnapshot) error {
 	if err != nil {
 		return fmt.Errorf("create store snapshot temp file: %w", err)
 	}
+	defer temp.Close()
 	tempPath := temp.Name()
 	defer os.Remove(tempPath)
 
 	encoder := json.NewEncoder(temp)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(snapshot); err != nil {
-		_ = temp.Close()
 		return fmt.Errorf("encode store snapshot: %w", err)
 	}
+	// Close before rename — required on Windows where open handles block os.Rename.
 	if err := temp.Close(); err != nil {
-		return fmt.Errorf("close store snapshot temp file: %w", err)
+		return fmt.Errorf("close store snapshot temp: %w", err)
 	}
 	if err := os.Rename(tempPath, path); err != nil {
 		return fmt.Errorf("replace store snapshot: %w", err)

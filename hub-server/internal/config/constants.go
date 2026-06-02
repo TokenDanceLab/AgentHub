@@ -80,6 +80,10 @@ const PendingTaskTTL = 24 * time.Hour
 // #132: ensures long-running agent tasks are eventually expired on inactivity.
 const RunningTaskHeartbeatTTL = 10 * time.Minute
 
+// MaxRunEventsPerTask bounds typed runtime event persistence for a single Hub
+// task so an abnormal Edge callback loop cannot grow agent_run_events forever.
+const MaxRunEventsPerTask int64 = 4096
+
 // PendingTaskScanInterval controls how often expired pending tasks are scanned.
 const PendingTaskScanInterval = time.Minute
 

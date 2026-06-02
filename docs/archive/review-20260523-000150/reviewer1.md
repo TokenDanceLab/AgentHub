@@ -17,7 +17,7 @@
 审查人：1号评委 / Reviewer1  
 模型：gpt-5.5  
 时间：2026-05-23 00:01  
-范围：对 `README.md`、`docs/architecture/product-requirements.md`、`docs/architecture/system-architecture.md`、`docs/architecture/implementation-guide.md` 四份核心文档做交叉 Review，并合并为一份统一报告。  
+范围：对 `README.md`、`docs/architecture/product-requirements.md`、`docs/architecture/system-architecture.md`、`docs/architecture/implementation-guide.md` 四份核心文档做交叉 Review，并合并为一份统一报告。
 审查依据：四份核心文档、`docs/operations/client-roadmap.md`、`api/` 契约、Edge/Runner/Desktop 当前实现、测试与 CI 配置。
 
 ## 1. 交叉 Review 结论

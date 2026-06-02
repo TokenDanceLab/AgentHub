@@ -1,0 +1,128 @@
+.root {
+  width: min(100%, 680px);
+  margin: 2px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.022);
+  color: var(--foreground);
+}
+
+[data-theme='light'] .root {
+  border-color: rgba(15, 23, 42, 0.09);
+  background: rgba(15, 23, 42, 0.024);
+}
+
+.header,
+.headerLabel,
+.entry {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.header {
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.headerLabel {
+  gap: 6px;
+  color: color-mix(in oklch, var(--foreground) 84%, var(--muted-foreground) 16%);
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.5;
+}
+
+.headerLabel svg {
+  flex: 0 0 auto;
+  color: color-mix(in oklch, var(--primary) 72%, var(--foreground) 28%);
+}
+
+.headerCount {
+  flex: 0 0 auto;
+  color: var(--text-weaker);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.entries {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  gap: 7px;
+  min-height: 28px;
+}
+
+.marker {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.entryText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.entryText strong {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--foreground) 91%, transparent);
+  font-size: 12px;
+  font-weight: 660;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entryText code {
+  flex: 0 1 auto;
+  max-width: 190px;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--foreground) 56%, var(--muted-foreground) 44%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.statusPending {
+  color: color-mix(in oklch, var(--muted-foreground) 82%, var(--foreground));
+}
+
+.statusRunning {
+  color: color-mix(in oklch, var(--warning) 72%, var(--foreground));
+}
+
+.statusCompleted {
+  color: color-mix(in oklch, var(--success) 72%, var(--foreground));
+}
+
+.statusFailed {
+  color: color-mix(in oklch, var(--destructive) 78%, var(--foreground));
+}

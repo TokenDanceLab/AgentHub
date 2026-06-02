@@ -1,87 +1,159 @@
 #!/usr/bin/env bash
-# setup-tokendance-oidc.sh — Create or rotate OAuth client credentials for AgentHub Desktop
-#
-# Usage: bash scripts/setup-tokendance-oidc.sh [tokendance_url]
+# ───────────────────────────────────────────────
+# TokenDance ID OIDC Client Setup for AgentHub
+# ───────────────────────────────────────────────
+# Sets up the "AgentHub Desktop" OAuth client in TokenDance ID
+# so Hub Server can use OIDC PKCE login.
 #
 # Prerequisites:
-#   - TokenDance ID is running (default: http://localhost:3000)
-#   - jq is installed
-#   - curl is installed
+#   docker compose up -d postgres redis    (or local PG/Redis)
 #
-# Output: Exports AGENTHUB_TOKENDANCE_ID_* env vars to stdout
-
+# Two modes:
+#   1. TokenDance ID running → uses API (preferred)
+#   2. TokenDance ID offline  → uses SQLite seed (fallback)
+#
+# Usage:
+#   bash scripts/setup-tokendance-oidc.sh
+#
+# After running, copy the output client_secret to:
+#   AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET in .env
+# ───────────────────────────────────────────────
 set -euo pipefail
 
-TOKENDANCE_URL="${1:-http://localhost:3000}"
-CLIENT_NAME="AgentHub Desktop"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TD_ROOT="$REPO_ROOT/../tokendance-id"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+banner()  { printf '\n%s=== %s ===%s\n' "$GREEN" "$1" "$NC"; }
+info()    { printf '  %s[+]%s %s\n' "$GREEN" "$NC" "$1"; }
+warn()    { printf '  %s[*]%s %s\n' "$YELLOW" "$NC" "$1"; }
+detail()  { printf '  %s    %s%s\n' "$CYAN" "$NC" "$1"; }
+code()    { printf '  %s      %s%s\n' "$CYAN" "$NC" "$1"; }
+
 CLIENT_ID="agenthub-desktop"
-REDIRECT_URIS='["http://127.0.0.1/callback","http://localhost:5174/auth/tokendance/callback"]'
-GRANT_TYPES='["authorization_code"]'
+CLIENT_NAME="AgentHub Desktop"
+CLIENT_SECRET="agenthub-dev-secret-change-me"
+# Pre-computed bcrypt hash for the above secret.
+# To regenerate: go run scripts/bcrypt-hash.go "your-secret"
+BCRYPT_HASH='$2a$10$CFRzH1R6MEUVU88nLzRSo.1qX7DtG6sPTqOrZ5HNfp1awu0ei0XpS'
+REDIRECT_URIS='["http://127.0.0.1/callback","http://localhost:5173/auth/tokendance/callback"]'
+GRANT_TYPES='["authorization_code","refresh_token"]'
 SCOPES='["openid","profile","email"]'
 
-echo "=== AgentHub Desktop — TokenDance ID OAuth Client Setup ==="
-echo ""
+banner "TokenDance ID OIDC Client Setup"
 
-# ── Step 1: Check TokenDance ID is reachable ──────────────────────────
-echo "[1/3] Checking TokenDance ID at $TOKENDANCE_URL ..."
-if ! curl -sf "$TOKENDANCE_URL/health" >/dev/null 2>&1; then
-  echo "  ERROR: TokenDance ID is not reachable at $TOKENDANCE_URL"
-  echo "  Start it with: cd ../tokendance-id && go run ./cmd/tokendance-id"
-  echo "  Then retry this script."
-  exit 1
-fi
-echo "  TokenDance ID is running."
-
-# ── Step 2: Get admin credentials ─────────────────────────────────────
-echo ""
-echo "[2/3] You need an API key to create OAuth clients."
-echo "  Open $TOKENDANCE_URL in your browser and log in."
-echo "  Then go to API Keys and create a key with name 'setup-script'."
-echo ""
-read -r -p "  Paste your API key (starts with sk-): " API_KEY
-if [ -z "$API_KEY" ]; then
-  echo "  ERROR: No API key provided."
-  exit 1
+# ── Check prerequisites ──────────────────────────
+if ! command -v go &>/dev/null; then
+    echo -e "${RED}[!] Go is not installed.${NC}"
+    echo '    Install Go 1.26+ from https://go.dev/dl/'
+    exit 1
 fi
 
-# ── Step 3: Create or rotate client ──────────────────────────────────
-echo ""
-echo "[3/3] Setting up OAuth client '$CLIENT_NAME' ..."
-
-# Try to find existing client
-EXISTING=$(curl -sf -H "Authorization: Bearer $API_KEY" "$TOKENDANCE_URL/api/clients" 2>/dev/null || echo "")
-EXISTING_ID=$(echo "$EXISTING" | jq -r '.clients[]? | select(.client_id=="'"$CLIENT_ID"'") | .id' 2>/dev/null || echo "")
-
-if [ -n "$EXISTING_ID" ]; then
-  echo "  Client '$CLIENT_ID' already exists. Rotating secret..."
-  ROTATE_RESP=$(curl -sf -X POST "$TOKENDANCE_URL/api/clients/$EXISTING_ID/rotate-secret" \
-    -H "Authorization: Bearer $API_KEY" 2>/dev/null || echo '{"error":"rotate failed"}')
-  SECRET=$(echo "$ROTATE_RESP" | jq -r '.client_secret // empty')
-  echo "  Secret rotated."
+# ── Step 1: Check if TokenDance ID is running ────
+info "Checking TokenDance ID..."
+TD_RUNNING=false
+if curl -s --max-time 2 "http://localhost:3000/.well-known/openid-configuration" >/dev/null 2>&1; then
+    TD_RUNNING=true
+    info "TokenDance ID is running at http://localhost:3000"
 else
-  echo "  Creating new client '$CLIENT_ID' ..."
-  CREATE_RESP=$(curl -sf -X POST "$TOKENDANCE_URL/api/clients" \
-    -H "Authorization: Bearer $API_KEY" \
-    -H "Content-Type: application/json" \
-    -d "{\"name\":\"$CLIENT_NAME\",\"redirect_uris\":$REDIRECT_URIS,\"grant_types\":$GRANT_TYPES,\"scopes\":$SCOPES}" 2>/dev/null || echo '{"error":"create failed"}')
-  SECRET=$(echo "$CREATE_RESP" | jq -r '.client_secret // empty')
+    warn "TokenDance ID is NOT running — will use SQLite seed mode"
+    warn "(Start TokenDance ID for API-based setup: cd ../tokendance-id && go run ./cmd/tokendance-id)"
 fi
 
-if [ -z "$SECRET" ] || [ "$SECRET" = "null" ]; then
-  echo "  ERROR: Failed to create/rotate client. Check your API key permissions."
-  echo "  As a fallback, use the seed SQL:"
-  echo "    sqlite3 ../tokendance-id/data/tokendance.db < scripts/seed-tokendance-client.sql"
-  exit 1
+# ── Step 2: Register the OAuth client ─────────────
+if [ "$TD_RUNNING" = true ]; then
+    banner "API-based Client Registration"
+
+    EXISTING=$(curl -s --max-time 5 "http://localhost:3000/api/clients" 2>/dev/null | grep -c "$CLIENT_ID" || true)
+    if [ "$EXISTING" -gt 0 ] 2>/dev/null; then
+        warn "Client '$CLIENT_ID' already exists. Skipping registration."
+    else
+        info "Creating OAuth client '$CLIENT_ID'..."
+        RESP=$(curl -s --max-time 10 -X POST "http://localhost:3000/api/clients" \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"client_id\": \"$CLIENT_ID\",
+                \"name\": \"$CLIENT_NAME\",
+                \"redirect_uris\": $REDIRECT_URIS,
+                \"grant_types\": $GRANT_TYPES,
+                \"scopes\": $SCOPES
+            }" 2>/dev/null)
+
+        if echo "$RESP" | grep -q "client_id"; then
+            info "Client registered successfully."
+            detail "Response: $RESP"
+        else
+            warn "API registration returned unexpected response:"
+            detail "$RESP"
+            warn "Falling back to SQLite seed mode..."
+            TD_RUNNING=false
+        fi
+    fi
 fi
 
-# ── Output ────────────────────────────────────────────────────────────
-echo ""
-echo "=== Add these to your hub-server/.env ==="
-echo ""
-echo "AGENTHUB_TOKENDANCE_ID_ISSUER_URL=$TOKENDANCE_URL"
-echo "AGENTHUB_TOKENDANCE_ID_CLIENT_ID=$CLIENT_ID"
-echo "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=$SECRET"
-echo "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1/callback"
-echo "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS=http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback"
-echo ""
-echo "Done. Keep the client_secret safe — it will never be shown again."
+# ── Step 3: SQLite seed mode ─────────────────────
+if [ "$TD_RUNNING" = false ]; then
+    banner "SQLite Seed Mode"
+
+    TD_DB="$TD_ROOT/data/tokendance.db"
+    if [ ! -f "$TD_DB" ]; then
+        echo -e "${RED}[!] TokenDance ID database not found at:${NC}"
+        echo "    $TD_DB"
+        echo ''
+        echo '  Start TokenDance ID first to create the database:'
+        echo "    cd $TD_ROOT && go run ./cmd/tokendance-id"
+        exit 1
+    fi
+
+    info "TokenDance ID database found: $TD_DB"
+
+    # Create a test user if none exist
+    info "Ensuring at least one user exists..."
+    USER_COUNT=$(sqlite3 "$TD_DB" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "0")
+    if [ "$USER_COUNT" -eq 0 ]; then
+        TD_USER_ID=$(python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null || echo "00000000-0000-0000-0000-000000000001")
+        sqlite3 "$TD_DB" "INSERT INTO users (id, username, email, display_name, email_verified, created_at, updated_at) VALUES ('$TD_USER_ID', 'dev-test', 'dev@test.local', 'Dev Test User', 1, datetime('now'), datetime('now'));"
+        info "Created test user: dev-test (id=$TD_USER_ID)"
+    else
+        TD_USER_ID=$(sqlite3 "$TD_DB" "SELECT id FROM users LIMIT 1;")
+    fi
+
+    # Delete existing client if present
+    sqlite3 "$TD_DB" "DELETE FROM oauth_clients WHERE client_id='$CLIENT_ID';" 2>/dev/null || true
+
+    # Generate a stable UUID for the client row
+    CLIENT_ROW_ID="11111111-1111-1111-1111-111111111111"
+
+    info "Inserting OAuth client into database..."
+    sqlite3 "$TD_DB" "INSERT INTO oauth_clients (id, client_id, secret_hash, name, redirect_uris, grant_types, scopes, user_id, enabled, is_trusted, created_at, updated_at) VALUES ('$CLIENT_ROW_ID', '$CLIENT_ID', '$BCRYPT_HASH', '$CLIENT_NAME', '$REDIRECT_URIS', '$GRANT_TYPES', '$SCOPES', '$TD_USER_ID', 1, 0, datetime('now'), datetime('now'));"
+
+    info "Client inserted successfully."
+fi
+
+# ── Step 4: Verify ────────────────────────────────
+banner "Configuration Summary"
+echo ''
+echo "  Add to hub-server/.env:"
+echo ''
+code "AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://localhost:3000"
+code "AGENTHUB_TOKENDANCE_ID_CLIENT_ID=$CLIENT_ID"
+code "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=$CLIENT_SECRET"
+code "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1/callback"
+code "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS=http://127.0.0.1/callback,http://localhost:5173/auth/tokendance/callback"
+echo ''
+info "Add to TokenDance ID config (configs/config.yaml):"
+echo ''
+code "security:"
+code "  allowed_origins:"
+code "    - http://localhost:5173"
+code "    - http://localhost:3000"
+echo ''
+info "Done. Restart Hub Server to apply changes:"
+echo '    cd hub-server && go run ./cmd/server-hub'
+echo ''

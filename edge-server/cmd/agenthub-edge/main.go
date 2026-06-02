@@ -26,10 +26,16 @@ type config struct {
 	WorkspaceAllowlist repeatedString
 	LocalAuthToken     string
 	HubJWTSecret       string // shared secret for validating Hub-issued HS256 JWTs
+	RemoteMode         bool   // allow non-loopback bind + remote origins (requires auth)
+	Dev                bool   // disable auto-generated local auth token for development
 
 	// Hub callback configuration (Edge→Hub direct bridge)
 	HubURL   string // Hub server base URL for Edge callback reporting
 	HubToken string // JWT bearer token for authenticating with Hub
+
+	// Tailscale mode (implies --remote-mode, registers with Hub via tailscale identity)
+	Tailscale   bool   // enable tailscale mode
+	TailscaleIP string // tailscale IP for Hub registration identity
 
 	// Agent adapter configuration
 	AgentDefault   string // default agent adapter ID
@@ -40,6 +46,9 @@ type config struct {
 
 	// SKILL.md discovery
 	SkillsDirs repeatedString // additional dirs to search for SKILL.md files
+
+	// Event log persistence for crash recovery and replay
+	EventLogPath string // append-only JSON-lines event log path; empty = no persistence
 }
 
 type repeatedString []string
@@ -61,9 +70,25 @@ func (v *repeatedString) Set(value string) error {
 }
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})))
+	logLevel := slog.LevelInfo
+	switch strings.ToLower(getEnv("AGENTHUB_LOG_LEVEL", "info")) {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	}
+
+	var handler slog.Handler
+	if strings.ToLower(getEnv("AGENTHUB_LOG_FORMAT", "text")) == "json" {
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+	}
+	slog.SetDefault(slog.New(handler))
 
 	cfg, err := buildConfig(os.Args[1:])
 	if err != nil {
@@ -88,7 +113,10 @@ func main() {
 		HubJWTSecret:       cfg.HubJWTSecret,
 		HubURL:             cfg.HubURL,
 		HubToken:           cfg.HubToken,
+		RemoteMode:         cfg.RemoteMode,
+		Dev:                cfg.Dev,
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
+		EventLogPath:       cfg.EventLogPath,
 	}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
@@ -140,6 +168,10 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.HubJWTSecret, "hub-jwt-secret", getEnv("AGENTHUB_HUB_JWT_SECRET", ""), "shared secret for validating Hub-issued HS256 JWTs (enables TokenDance trust chain)")
 	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")
 	fs.StringVar(&cfg.HubToken, "hub-token", getEnv("AGENTHUB_HUB_TOKEN", ""), "JWT bearer token for authenticating callback requests to Hub")
+	fs.BoolVar(&cfg.RemoteMode, "remote-mode", getEnv("AGENTHUB_REMOTE_MODE", "0") == "1", "allow non-loopback bind and remote origins (requires --local-auth-token or --hub-jwt-secret)")
+	fs.BoolVar(&cfg.Dev, "dev", getEnv("AGENTHUB_DEV", "0") == "1", "disable auto-generated local auth token for development; all endpoints are open")
+	fs.BoolVar(&cfg.Tailscale, "tailscale", getEnv("AGENTHUB_TAILSCALE", "0") == "1", "enable tailscale mode (implies --remote-mode, registers with Hub via tailscale identity)")
+	fs.StringVar(&cfg.TailscaleIP, "tailscale-ip", getEnv("AGENTHUB_TAILSCALE_IP", ""), "tailscale IP address for Hub registration identity")
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 
@@ -152,12 +184,32 @@ func buildConfig(args []string) (config, error) {
 	cfg.SkillsDirs = append(cfg.SkillsDirs, splitPathList(getEnv("AGENTHUB_SKILLS_DIRS", ""))...)
 	fs.Var(&cfg.SkillsDirs, "skills-dir", "directory containing SKILL.md subdirectories; may be repeated; defaults to .agents/skills and .codex/skills")
 
+	fs.StringVar(&cfg.EventLogPath, "event-log-path", getEnv("AGENTHUB_EVENT_LOG_PATH", ""), "append-only JSON-lines event log path for crash recovery and replay; empty = no persistence")
+
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
 	cfg.Addr = strings.TrimSpace(cfg.Addr)
-	if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
-		return config{}, err
+	// --tailscale implies --remote-mode and tailscale-aware registration with Hub
+	if cfg.Tailscale {
+		cfg.RemoteMode = true
+		if cfg.TailscaleIP != "" {
+			slog.Info("tailscale mode enabled", "tailscale_ip", cfg.TailscaleIP)
+		} else {
+			slog.Info("tailscale mode enabled")
+		}
+	}
+	if cfg.RemoteMode {
+		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
+			return config{}, err
+		}
+		if cfg.LocalAuthToken == "" && cfg.HubJWTSecret == "" {
+			return config{}, fmt.Errorf("--remote-mode requires --local-auth-token or --hub-jwt-secret to be set")
+		}
+	} else {
+		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
+			return config{}, err
+		}
 	}
 	if err := applyRunnerProfile(&cfg); err != nil {
 		return config{}, err
@@ -249,8 +301,36 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpenCodePath)
 		}
 	}
+	if cfg.ClaudeCodePath != "" {
+		childAgents := registeredChildAgentIDs(reg)
+		a := adapters.NewOrchestratorAdapter(
+			cfg.ClaudeCodePath,
+			cfg.AgentModel,
+			adapters.DefaultOrchestratorPrompt(childAgents),
+			childAgents,
+		)
+		if err := reg.Register(a); err != nil {
+			slog.Warn("failed to register orchestrator adapter", "err", err)
+		} else {
+			reg.SetDefault("orchestrator", a.Metadata().ID)
+			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.ClaudeCodePath, "children", childAgents)
+		}
+	}
+	if cfg.AgentDefault != "" {
+		reg.SetDefault("default", cfg.AgentDefault)
+	}
 
 	return reg
+}
+
+func registeredChildAgentIDs(reg *adapters.Registry) []string {
+	ids := make([]string, 0, 3)
+	for _, id := range []string{"claude-code", "codex", "opencode"} {
+		if _, ok := reg.Get(id); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func newStoreFromConfig(cfg config) (store.Repository, error) {

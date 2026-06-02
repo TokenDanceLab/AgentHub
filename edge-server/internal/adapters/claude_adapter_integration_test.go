@@ -266,6 +266,31 @@ func TestClaudeCodeBuildCommandArgs(t *testing.T) {
 		}
 	})
 
+	t.Run("session_resume_with_id", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:          run,
+			Prompt:       "hello",
+			SessionID:    "11111111-1111-5111-8111-111111111111",
+			ContinueLast: true,
+		})
+		hasResume := false
+		hasSessionID := false
+		for i, a := range args {
+			if a == "--resume" && i+1 < len(args) && args[i+1] == "11111111-1111-5111-8111-111111111111" {
+				hasResume = true
+			}
+			if a == "--session-id" {
+				hasSessionID = true
+			}
+		}
+		if !hasResume {
+			t.Error("--resume <session> not in args when SessionID and ContinueLast are set")
+		}
+		if hasSessionID {
+			t.Error("--session-id should not be used when resuming an existing Claude Code session")
+		}
+	})
+
 	t.Run("session_fork", func(t *testing.T) {
 		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
 			Run:         run,

@@ -6,6 +6,7 @@ export type TransportStatus = 'connecting' | 'connected' | 'disconnected' | 'rec
 export type TransportEvent = 'message' | 'status';
 export type TransportMessageHandler = (data: unknown) => void;
 export type TransportStatusHandler = (status: TransportStatus) => void;
+type TransportHandler = TransportMessageHandler | TransportStatusHandler;
 
 export interface Transport {
   connect(url?: string): void;
@@ -30,7 +31,7 @@ export class WebSocketTransport implements Transport {
   private ws: WebSocket | null = null;
   private status: TransportStatus = 'disconnected';
   private retryCount = 0;
-  private handlers = new Map<TransportEvent, Set<Function>>();
+  private handlers = new Map<TransportEvent, Set<TransportHandler>>();
   private queue: unknown[] = [];
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
@@ -148,10 +149,12 @@ export class WebSocketTransport implements Transport {
   }
 
   on(event: TransportEvent, handler: TransportMessageHandler | TransportStatusHandler): () => void {
-    if (!this.handlers.has(event)) {
-      this.handlers.set(event, new Set());
+    let handlers = this.handlers.get(event);
+    if (!handlers) {
+      handlers = new Set<TransportHandler>();
+      this.handlers.set(event, handlers);
     }
-    this.handlers.get(event)!.add(handler);
+    handlers.add(handler);
     return () => {
       this.handlers.get(event)?.delete(handler);
     };
@@ -174,7 +177,11 @@ export class WebSocketTransport implements Transport {
     if (!set) return;
     for (const handler of set) {
       try {
-        handler(data);
+        if (event === 'status') {
+          (handler as TransportStatusHandler)(data as TransportStatus);
+        } else {
+          (handler as TransportMessageHandler)(data);
+        }
       } catch (e) {
         console.error(`Transport handler error for event "${event}":`, e);
       }

@@ -57,10 +57,7 @@ func (h *PublicHandler) Stats(c *gin.Context) {
 	stats.TotalMessages = publicCountBucket(stats.TotalMessages)
 	stats.Uptime = publicUptimeBucket(time.Since(h.startTime))
 
-	c.JSON(200, gin.H{
-		"status": "ok",
-		"data":   stats,
-	})
+	OK(c, stats)
 }
 
 func publicCountBucket(count int64) int64 {

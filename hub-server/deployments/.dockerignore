@@ -1,0 +1,56 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+
+# Docs (not needed at runtime)
+docs
+*.md
+!README.md
+
+# Tests and fixtures
+*_test.go
+**/tests/
+**/testdata/
+
+# Build artifacts
+*.out
+*.exe
+*.test
+coverage*
+.cov
+
+# IDE and editor
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Node (not needed for Go build)
+node_modules
+app/
+
+# Reference repos
+reference/
+
+# Local ops (gitignored, shouldn't be here but belt-and-suspenders)
+.ops
+.tmp
+.worktrees
+
+# Deployment state (local only)
+deployments/.env.production
+deployments/backups

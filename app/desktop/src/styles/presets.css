@@ -1,0 +1,1026 @@
+/* ═════════════════════════════════════════════════════════════════════
+   AgentHub Preset Themes — 6 套预设主题，每套覆盖 light/dark 变体
+   选择器: [data-theme-preset="名称"][data-theme="light"] (浅色)
+           [data-theme-preset="名称"]:not([data-theme="light"]) (深色)
+   默认不设置 preset 时使用 themes.css 原始主题
+   ═════════════════════════════════════════════════════════════════════ */
+
+/* ── Classic Blue ───────────────────────────────────────────────────────
+   主色 #2563EB, 背景 白/#1E1E2E
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Classic Blue — Dark */
+[data-theme-preset='classic-blue']:not([data-theme='light']) {
+  --app-bg: #1E1E2E;
+  --sidebar-bg: #1E1E2E;
+
+  --background: #1E1E2E;
+  --foreground: #E2E8F0;
+  --card: #252536;
+  --card-foreground: #E2E8F0;
+  --popover: #2D2D40;
+  --popover-foreground: #E2E8F0;
+
+  --primary: #3B82F6;
+  --primary-foreground: #FFFFFF;
+  --secondary: rgba(255, 255, 255, 0.055);
+  --secondary-foreground: #E2E8F0;
+  --muted: rgba(255, 255, 255, 0.045);
+  --muted-foreground: #94A3B8;
+  --accent: #3B82F6;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: rgba(255, 255, 255, 0.065);
+  --input: rgba(255, 255, 255, 0.052);
+  --ring: rgba(59, 130, 246, 0.42);
+
+  --success: #22C55E;
+  --success-foreground: #0F172A;
+  --warning: #FBBF24;
+  --warning-foreground: #0F172A;
+  --info: #60A5FA;
+  --info-foreground: #0F172A;
+
+  --color-success: #22C55E;
+  --color-danger: #EF4444;
+  --color-border: rgba(255, 255, 255, 0.05);
+
+  --brand: #3B82F6;
+  --skill: #A78BFA;
+  --authority-hub: #3B82F6;
+  --authority-edge: #22C55E;
+  --authority-hybrid: #FBBF24;
+
+  --surface-base: #1E1E2E;
+  --surface-raised: #252536;
+  --surface-raised-hover: #2D2D40;
+  --surface-overlay: #353548;
+
+  --text-strong: #F1F5F9;
+  --text-primary: #E2E8F0;
+  --text-weaker: #94A3B8;
+  --text-weakest: #64748B;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.10);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(59, 130, 246, 0.08);
+  --chat-code-bg: rgba(255, 255, 255, 0.055);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.02);
+  --chat-thinking-border: rgba(255, 255, 255, 0.055);
+
+  --input-panel-bg: #252536;
+  --input-panel-border: rgba(0, 0, 0, 0.11);
+  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.14);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(59, 130, 246, 0.05);
+  --agent-card-active: rgba(59, 130, 246, 0.08);
+
+  --hover-overlay: rgba(255, 255, 255, 0.04);
+
+  --diff-added-bg: rgba(34, 197, 94, 0.10);
+  --diff-added-border: #22C55E;
+  --diff-removed-bg: rgba(239, 68, 68, 0.10);
+  --diff-removed-border: #EF4444;
+}
+
+/* Classic Blue — Light */
+[data-theme-preset='classic-blue'][data-theme='light'] {
+  --app-bg: #F8FAFC;
+  --sidebar-bg: #F1F5F9;
+
+  --background: #FFFFFF;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+
+  --primary: #2563EB;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #EFF6FF;
+  --accent-foreground: #1D4ED8;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E2E8F0;
+  --input: #F1F5F9;
+  --ring: rgba(37, 99, 235, 0.25);
+
+  --success: #22C55E;
+  --success-foreground: #FFFFFF;
+  --warning: #F59E0B;
+  --warning-foreground: #0F172A;
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
+
+  --color-success: #22C55E;
+  --color-danger: #EF4444;
+  --color-border: #E2E8F0;
+
+  --brand: #2563EB;
+  --skill: #8B5CF6;
+  --authority-hub: #2563EB;
+  --authority-edge: #22C55E;
+  --authority-hybrid: #F59E0B;
+
+  --surface-base: #F8FAFC;
+  --surface-raised: #FFFFFF;
+  --surface-raised-hover: #F1F5F9;
+  --surface-overlay: #FFFFFF;
+
+  --text-strong: #0F172A;
+  --text-primary: #1E293B;
+  --text-weaker: #64748B;
+  --text-weakest: #94A3B8;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.20);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: #EFF6FF;
+  --chat-code-bg: #F1F5F9;
+  --chat-thinking-bg: rgba(0, 0, 0, 0.015);
+  --chat-thinking-border: rgba(0, 0, 0, 0.05);
+
+  --input-panel-bg: rgba(255, 255, 255, 0.72);
+  --input-panel-border: rgba(0, 0, 0, 0.06);
+  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(37, 99, 235, 0.04);
+  --agent-card-active: rgba(37, 99, 235, 0.06);
+
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+
+  --diff-added-bg: rgba(34, 197, 94, 0.08);
+  --diff-added-border: #22C55E;
+  --diff-removed-bg: rgba(239, 68, 68, 0.08);
+  --diff-removed-border: #EF4444;
+}
+
+/* ── Claude Warm ────────────────────────────────────────────────────────
+   主色 #D97706, 背景 #FFFBEB/#2D2420
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Claude Warm — Dark */
+[data-theme-preset='claude-warm']:not([data-theme='light']) {
+  --app-bg: #2D2420;
+  --sidebar-bg: #2D2420;
+
+  --background: #2D2420;
+  --foreground: #FEF3C7;
+  --card: #3D3028;
+  --card-foreground: #FEF3C7;
+  --popover: #4A3A30;
+  --popover-foreground: #FEF3C7;
+
+  --primary: #F59E0B;
+  --primary-foreground: #451A03;
+  --secondary: rgba(255, 255, 255, 0.045);
+  --secondary-foreground: #FEF3C7;
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #D97706;
+  --accent: #F59E0B;
+  --accent-foreground: #451A03;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.045);
+  --ring: rgba(245, 158, 11, 0.42);
+
+  --success: #84CC16;
+  --success-foreground: #1A2E05;
+  --warning: #FBBF24;
+  --warning-foreground: #451A03;
+  --info: #38BDF8;
+  --info-foreground: #0C4A6E;
+
+  --color-success: #84CC16;
+  --color-danger: #EF4444;
+  --color-border: rgba(255, 255, 255, 0.045);
+
+  --brand: #F59E0B;
+  --skill: #C084FC;
+  --authority-hub: #F59E0B;
+  --authority-edge: #84CC16;
+  --authority-hybrid: #FBBF24;
+
+  --surface-base: #2D2420;
+  --surface-raised: #3D3028;
+  --surface-raised-hover: #4A3A30;
+  --surface-overlay: #5A4A40;
+
+  --text-strong: #FFF7ED;
+  --text-primary: #FEF3C7;
+  --text-weaker: #D97706;
+  --text-weakest: #B45309;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.15);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.40);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(245, 158, 11, 0.07);
+  --chat-code-bg: rgba(255, 255, 255, 0.05);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.015);
+  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+
+  --input-panel-bg: #3D3028;
+  --input-panel-border: rgba(0, 0, 0, 0.10);
+  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.12);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(245, 158, 11, 0.04);
+  --agent-card-active: rgba(245, 158, 11, 0.07);
+
+  --hover-overlay: rgba(255, 255, 255, 0.035);
+
+  --diff-added-bg: rgba(132, 204, 22, 0.10);
+  --diff-added-border: #84CC16;
+  --diff-removed-bg: rgba(239, 68, 68, 0.10);
+  --diff-removed-border: #EF4444;
+}
+
+/* Claude Warm — Light */
+[data-theme-preset='claude-warm'][data-theme='light'] {
+  --app-bg: #FFFBEB;
+  --sidebar-bg: #FEF3C7;
+
+  --background: #FFFBEB;
+  --foreground: #451A03;
+  --card: #FFFFFF;
+  --card-foreground: #451A03;
+  --popover: #FFFFFF;
+  --popover-foreground: #451A03;
+
+  --primary: #D97706;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FEF3C7;
+  --secondary-foreground: #451A03;
+  --muted: #FEF3C7;
+  --muted-foreground: #92400E;
+  --accent: #FFF7ED;
+  --accent-foreground: #C2410C;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #FDE68A;
+  --input: #FEF3C7;
+  --ring: rgba(217, 119, 6, 0.25);
+
+  --success: #65A30D;
+  --success-foreground: #FFFFFF;
+  --warning: #D97706;
+  --warning-foreground: #FFFFFF;
+  --info: #0EA5E9;
+  --info-foreground: #FFFFFF;
+
+  --color-success: #65A30D;
+  --color-danger: #EF4444;
+  --color-border: #FDE68A;
+
+  --brand: #D97706;
+  --skill: #7C3AED;
+  --authority-hub: #D97706;
+  --authority-edge: #65A30D;
+  --authority-hybrid: #F59E0B;
+
+  --surface-base: #FFFBEB;
+  --surface-raised: #FFFFFF;
+  --surface-raised-hover: #FFF7ED;
+  --surface-overlay: #FFFFFF;
+
+  --text-strong: #451A03;
+  --text-primary: #78350F;
+  --text-weaker: #92400E;
+  --text-weakest: #B45309;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.18);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: #FFF7ED;
+  --chat-code-bg: #FEF3C7;
+  --chat-thinking-bg: rgba(0, 0, 0, 0.012);
+  --chat-thinking-border: rgba(0, 0, 0, 0.04);
+
+  --input-panel-bg: rgba(255, 255, 255, 0.68);
+  --input-panel-border: rgba(0, 0, 0, 0.05);
+  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.03);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(217, 119, 6, 0.04);
+  --agent-card-active: rgba(217, 119, 6, 0.06);
+
+  --hover-overlay: rgba(0, 0, 0, 0.035);
+
+  --diff-added-bg: rgba(101, 163, 13, 0.08);
+  --diff-added-border: #65A30D;
+  --diff-removed-bg: rgba(239, 68, 68, 0.08);
+  --diff-removed-border: #EF4444;
+}
+
+/* ── ChatGPT Minimal ────────────────────────────────────────────────────
+   主色 #10A37F, 背景 白/#212121
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* ChatGPT Minimal — Dark */
+[data-theme-preset='chatgpt-minimal']:not([data-theme='light']) {
+  --app-bg: #212121;
+  --sidebar-bg: #1A1A1A;
+
+  --background: #212121;
+  --foreground: #ECECF1;
+  --card: #2D2D2D;
+  --card-foreground: #ECECF1;
+  --popover: #353535;
+  --popover-foreground: #ECECF1;
+
+  --primary: #10A37F;
+  --primary-foreground: #FFFFFF;
+  --secondary: rgba(255, 255, 255, 0.05);
+  --secondary-foreground: #ECECF1;
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #8E8E93;
+  --accent: #10A37F;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: rgba(255, 255, 255, 0.07);
+  --input: rgba(255, 255, 255, 0.05);
+  --ring: rgba(16, 163, 127, 0.42);
+
+  --success: #34D399;
+  --success-foreground: #064E3B;
+  --warning: #FBBF24;
+  --warning-foreground: #451A03;
+  --info: #60A5FA;
+  --info-foreground: #0C4A6E;
+
+  --color-success: #34D399;
+  --color-danger: #EF4444;
+  --color-border: rgba(255, 255, 255, 0.05);
+
+  --brand: #10A37F;
+  --skill: #A78BFA;
+  --authority-hub: #10A37F;
+  --authority-edge: #34D399;
+  --authority-hybrid: #FBBF24;
+
+  --surface-base: #212121;
+  --surface-raised: #2D2D2D;
+  --surface-raised-hover: #353535;
+  --surface-overlay: #404040;
+
+  --text-strong: #FFFFFF;
+  --text-primary: #ECECF1;
+  --text-weaker: #8E8E93;
+  --text-weakest: #6E6E73;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.15);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.38);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(255, 255, 255, 0.045);
+  --chat-code-bg: rgba(255, 255, 255, 0.05);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.015);
+  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+
+  --input-panel-bg: #2D2D2D;
+  --input-panel-border: rgba(0, 0, 0, 0.10);
+  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.12);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(255, 255, 255, 0.03);
+  --agent-card-active: rgba(16, 163, 127, 0.06);
+
+  --hover-overlay: rgba(255, 255, 255, 0.035);
+
+  --diff-added-bg: rgba(52, 211, 153, 0.10);
+  --diff-added-border: #34D399;
+  --diff-removed-bg: rgba(239, 68, 68, 0.10);
+  --diff-removed-border: #EF4444;
+}
+
+/* ChatGPT Minimal — Light */
+[data-theme-preset='chatgpt-minimal'][data-theme='light'] {
+  --app-bg: #FFFFFF;
+  --sidebar-bg: #F9FAFB;
+
+  --background: #FFFFFF;
+  --foreground: #111827;
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
+
+  --primary: #10A37F;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F7F7F8;
+  --secondary-foreground: #111827;
+  --muted: #F7F7F8;
+  --muted-foreground: #8E8E93;
+  --accent: #ECFDF5;
+  --accent-foreground: #047850;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E5E5E5;
+  --input: #F7F7F8;
+  --ring: rgba(16, 163, 127, 0.25);
+
+  --success: #10A37F;
+  --success-foreground: #FFFFFF;
+  --warning: #F59E0B;
+  --warning-foreground: #111827;
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
+
+  --color-success: #10A37F;
+  --color-danger: #EF4444;
+  --color-border: #E5E5E5;
+
+  --brand: #10A37F;
+  --skill: #8B5CF6;
+  --authority-hub: #10A37F;
+  --authority-edge: #22C55E;
+  --authority-hybrid: #F59E0B;
+
+  --surface-base: #FFFFFF;
+  --surface-raised: #F9FAFB;
+  --surface-raised-hover: #F3F4F6;
+  --surface-overlay: #FFFFFF;
+
+  --text-strong: #111827;
+  --text-primary: #1F2937;
+  --text-weaker: #8E8E93;
+  --text-weakest: #B0B0B5;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.18);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 2px 16px rgba(0, 0, 0, 0.04);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: #F7F7F8;
+  --chat-code-bg: #F7F7F8;
+  --chat-thinking-bg: rgba(0, 0, 0, 0.01);
+  --chat-thinking-border: rgba(0, 0, 0, 0.04);
+
+  --input-panel-bg: rgba(255, 255, 255, 0.60);
+  --input-panel-border: rgba(0, 0, 0, 0.06);
+  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(0, 0, 0, 0.03);
+  --agent-card-active: rgba(16, 163, 127, 0.05);
+
+  --hover-overlay: rgba(0, 0, 0, 0.03);
+
+  --diff-added-bg: rgba(16, 163, 127, 0.08);
+  --diff-added-border: #10A37F;
+  --diff-removed-bg: rgba(239, 68, 68, 0.08);
+  --diff-removed-border: #EF4444;
+}
+
+/* ── DeepSeek Tech ──────────────────────────────────────────────────────
+   主色 #6366F1, 背景 白/#0F172A
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* DeepSeek Tech — Dark */
+[data-theme-preset='deepseek-tech']:not([data-theme='light']) {
+  --app-bg: #0F172A;
+  --sidebar-bg: #0F172A;
+
+  --background: #0F172A;
+  --foreground: #E2E8F0;
+  --card: #1E293B;
+  --card-foreground: #E2E8F0;
+  --popover: #1E293B;
+  --popover-foreground: #E2E8F0;
+
+  --primary: #818CF8;
+  --primary-foreground: #0F172A;
+  --secondary: rgba(255, 255, 255, 0.045);
+  --secondary-foreground: #E2E8F0;
+  --muted: #334155;
+  --muted-foreground: #94A3B8;
+  --accent: #818CF8;
+  --accent-foreground: #0F172A;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #334155;
+  --input: #1E293B;
+  --ring: rgba(129, 140, 248, 0.42);
+
+  --success: #4ADE80;
+  --success-foreground: #052E16;
+  --warning: #FBBF24;
+  --warning-foreground: #451A03;
+  --info: #818CF8;
+  --info-foreground: #0F172A;
+
+  --color-success: #4ADE80;
+  --color-danger: #EF4444;
+  --color-border: #334155;
+
+  --brand: #818CF8;
+  --skill: #C4B5FD;
+  --authority-hub: #818CF8;
+  --authority-edge: #4ADE80;
+  --authority-hybrid: #FBBF24;
+
+  --surface-base: #0F172A;
+  --surface-raised: #1E293B;
+  --surface-raised-hover: #334155;
+  --surface-overlay: #475569;
+
+  --text-strong: #F1F5F9;
+  --text-primary: #E2E8F0;
+  --text-weaker: #94A3B8;
+  --text-weakest: #64748B;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.14);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.42);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(129, 140, 248, 0.08);
+  --chat-code-bg: rgba(255, 255, 255, 0.05);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.02);
+  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+
+  --input-panel-bg: #1E293B;
+  --input-panel-border: rgba(0, 0, 0, 0.12);
+  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.15);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(129, 140, 248, 0.04);
+  --agent-card-active: rgba(129, 140, 248, 0.07);
+
+  --hover-overlay: rgba(255, 255, 255, 0.035);
+
+  --diff-added-bg: rgba(74, 222, 128, 0.10);
+  --diff-added-border: #4ADE80;
+  --diff-removed-bg: rgba(239, 68, 68, 0.10);
+  --diff-removed-border: #EF4444;
+}
+
+/* DeepSeek Tech — Light */
+[data-theme-preset='deepseek-tech'][data-theme='light'] {
+  --app-bg: #FFFFFF;
+  --sidebar-bg: #F8FAFC;
+
+  --background: #FFFFFF;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+
+  --primary: #6366F1;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #EEF2FF;
+  --accent-foreground: #4338CA;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E2E8F0;
+  --input: #F1F5F9;
+  --ring: rgba(99, 102, 241, 0.25);
+
+  --success: #22C55E;
+  --success-foreground: #FFFFFF;
+  --warning: #F59E0B;
+  --warning-foreground: #0F172A;
+  --info: #6366F1;
+  --info-foreground: #FFFFFF;
+
+  --color-success: #22C55E;
+  --color-danger: #EF4444;
+  --color-border: #E2E8F0;
+
+  --brand: #6366F1;
+  --skill: #A78BFA;
+  --authority-hub: #6366F1;
+  --authority-edge: #22C55E;
+  --authority-hybrid: #F59E0B;
+
+  --surface-base: #FFFFFF;
+  --surface-raised: #F8FAFC;
+  --surface-raised-hover: #F1F5F9;
+  --surface-overlay: #FFFFFF;
+
+  --text-strong: #0F172A;
+  --text-primary: #1E293B;
+  --text-weaker: #64748B;
+  --text-weakest: #94A3B8;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.18);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: #EEF2FF;
+  --chat-code-bg: #F1F5F9;
+  --chat-thinking-bg: rgba(0, 0, 0, 0.012);
+  --chat-thinking-border: rgba(0, 0, 0, 0.04);
+
+  --input-panel-bg: rgba(255, 255, 255, 0.65);
+  --input-panel-border: rgba(0, 0, 0, 0.06);
+  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(99, 102, 241, 0.04);
+  --agent-card-active: rgba(99, 102, 241, 0.06);
+
+  --hover-overlay: rgba(0, 0, 0, 0.035);
+
+  --diff-added-bg: rgba(34, 197, 94, 0.08);
+  --diff-added-border: #22C55E;
+  --diff-removed-bg: rgba(239, 68, 68, 0.08);
+  --diff-removed-border: #EF4444;
+}
+
+/* ── One Dark Pro ───────────────────────────────────────────────────────
+   主色 #61AFEF, 背景 #FAFAFA/#282C34
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* One Dark Pro — Dark */
+[data-theme-preset='one-dark-pro']:not([data-theme='light']) {
+  --app-bg: #282C34;
+  --sidebar-bg: #21252B;
+
+  --background: #282C34;
+  --foreground: #ABB2BF;
+  --card: #2C313C;
+  --card-foreground: #ABB2BF;
+  --popover: #353B46;
+  --popover-foreground: #ABB2BF;
+
+  --primary: #61AFEF;
+  --primary-foreground: #21252B;
+  --secondary: rgba(255, 255, 255, 0.045);
+  --secondary-foreground: #ABB2BF;
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #636D83;
+  --accent: #61AFEF;
+  --accent-foreground: #21252B;
+  --destructive: #E06C75;
+  --destructive-foreground: #FFFFFF;
+
+  --border: rgba(255, 255, 255, 0.065);
+  --input: rgba(255, 255, 255, 0.05);
+  --ring: rgba(97, 175, 239, 0.42);
+
+  --success: #98C379;
+  --success-foreground: #21252B;
+  --warning: #E5C07B;
+  --warning-foreground: #21252B;
+  --info: #61AFEF;
+  --info-foreground: #21252B;
+
+  --color-success: #98C379;
+  --color-danger: #E06C75;
+  --color-border: rgba(255, 255, 255, 0.05);
+
+  --brand: #61AFEF;
+  --skill: #C678DD;
+  --authority-hub: #61AFEF;
+  --authority-edge: #98C379;
+  --authority-hybrid: #E5C07B;
+
+  --surface-base: #282C34;
+  --surface-raised: #2C313C;
+  --surface-raised-hover: #353B46;
+  --surface-overlay: #3E4452;
+
+  --text-strong: #FFFFFF;
+  --text-primary: #ABB2BF;
+  --text-weaker: #636D83;
+  --text-weakest: #4B5263;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.14);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.38);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(97, 175, 239, 0.06);
+  --chat-code-bg: rgba(255, 255, 255, 0.05);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.015);
+  --chat-thinking-border: rgba(255, 255, 255, 0.045);
+
+  --input-panel-bg: #2C313C;
+  --input-panel-border: rgba(0, 0, 0, 0.10);
+  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.12);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(97, 175, 239, 0.04);
+  --agent-card-active: rgba(97, 175, 239, 0.07);
+
+  --hover-overlay: rgba(255, 255, 255, 0.035);
+
+  --diff-added-bg: rgba(152, 195, 121, 0.10);
+  --diff-added-border: #98C379;
+  --diff-removed-bg: rgba(224, 108, 117, 0.10);
+  --diff-removed-border: #E06C75;
+}
+
+/* One Dark Pro — Light */
+[data-theme-preset='one-dark-pro'][data-theme='light'] {
+  --app-bg: #FAFAFA;
+  --sidebar-bg: #F0F0F0;
+
+  --background: #FAFAFA;
+  --foreground: #21252B;
+  --card: #FFFFFF;
+  --card-foreground: #21252B;
+  --popover: #FFFFFF;
+  --popover-foreground: #21252B;
+
+  --primary: #61AFEF;
+  --primary-foreground: #21252B;
+  --secondary: #ECECEC;
+  --secondary-foreground: #21252B;
+  --muted: #F0F0F0;
+  --muted-foreground: #636D83;
+  --accent: #E5F3FD;
+  --accent-foreground: #3A8FD4;
+  --destructive: #E06C75;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E0E0E0;
+  --input: #F0F0F0;
+  --ring: rgba(97, 175, 239, 0.30);
+
+  --success: #98C379;
+  --success-foreground: #21252B;
+  --warning: #E5C07B;
+  --warning-foreground: #21252B;
+  --info: #61AFEF;
+  --info-foreground: #21252B;
+
+  --color-success: #98C379;
+  --color-danger: #E06C75;
+  --color-border: #E0E0E0;
+
+  --brand: #61AFEF;
+  --skill: #C678DD;
+  --authority-hub: #61AFEF;
+  --authority-edge: #98C379;
+  --authority-hybrid: #E5C07B;
+
+  --surface-base: #FAFAFA;
+  --surface-raised: #FFFFFF;
+  --surface-raised-hover: #F5F5F5;
+  --surface-overlay: #FFFFFF;
+
+  --text-strong: #21252B;
+  --text-primary: #383E49;
+  --text-weaker: #636D83;
+  --text-weakest: #828997;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.18);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: #E5F3FD;
+  --chat-code-bg: #F0F0F0;
+  --chat-thinking-bg: rgba(0, 0, 0, 0.012);
+  --chat-thinking-border: rgba(0, 0, 0, 0.04);
+
+  --input-panel-bg: rgba(255, 255, 255, 0.60);
+  --input-panel-border: rgba(0, 0, 0, 0.06);
+  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(97, 175, 239, 0.04);
+  --agent-card-active: rgba(97, 175, 239, 0.06);
+
+  --hover-overlay: rgba(0, 0, 0, 0.03);
+
+  --diff-added-bg: rgba(152, 195, 121, 0.10);
+  --diff-added-border: #98C379;
+  --diff-removed-bg: rgba(224, 108, 117, 0.10);
+  --diff-removed-border: #E06C75;
+}
+
+/* ── Dracula ────────────────────────────────────────────────────────────
+   主色 #BD93F9, 背景 #F8F8F2/#282A36
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Dracula — Dark */
+[data-theme-preset='dracula']:not([data-theme='light']) {
+  --app-bg: #282A36;
+  --sidebar-bg: #21222C;
+
+  --background: #282A36;
+  --foreground: #F8F8F2;
+  --card: #2C2E3A;
+  --card-foreground: #F8F8F2;
+  --popover: #383A4A;
+  --popover-foreground: #F8F8F2;
+
+  --primary: #BD93F9;
+  --primary-foreground: #282A36;
+  --secondary: rgba(255, 255, 255, 0.05);
+  --secondary-foreground: #F8F8F2;
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #6272A4;
+  --accent: #BD93F9;
+  --accent-foreground: #282A36;
+  --destructive: #FF5555;
+  --destructive-foreground: #FFFFFF;
+
+  --border: rgba(255, 255, 255, 0.065);
+  --input: rgba(255, 255, 255, 0.05);
+  --ring: rgba(189, 147, 249, 0.42);
+
+  --success: #50FA7B;
+  --success-foreground: #282A36;
+  --warning: #FFB86C;
+  --warning-foreground: #282A36;
+  --info: #8BE9FD;
+  --info-foreground: #282A36;
+
+  --color-success: #50FA7B;
+  --color-danger: #FF5555;
+  --color-border: rgba(255, 255, 255, 0.05);
+
+  --brand: #BD93F9;
+  --skill: #FF79C6;
+  --authority-hub: #BD93F9;
+  --authority-edge: #50FA7B;
+  --authority-hybrid: #FFB86C;
+
+  --surface-base: #282A36;
+  --surface-raised: #2C2E3A;
+  --surface-raised-hover: #383A4A;
+  --surface-overlay: #44475A;
+
+  --text-strong: #FFFFFF;
+  --text-primary: #F8F8F2;
+  --text-weaker: #6272A4;
+  --text-weakest: #4A4D5E;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.15);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.40);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(189, 147, 249, 0.07);
+  --chat-code-bg: rgba(255, 255, 255, 0.05);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.015);
+  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+
+  --input-panel-bg: #2C2E3A;
+  --input-panel-border: rgba(0, 0, 0, 0.10);
+  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.12);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(189, 147, 249, 0.04);
+  --agent-card-active: rgba(189, 147, 249, 0.07);
+
+  --hover-overlay: rgba(255, 255, 255, 0.035);
+
+  --diff-added-bg: rgba(80, 250, 123, 0.10);
+  --diff-added-border: #50FA7B;
+  --diff-removed-bg: rgba(255, 85, 85, 0.10);
+  --diff-removed-border: #FF5555;
+}
+
+/* Dracula — Light */
+[data-theme-preset='dracula'][data-theme='light'] {
+  --app-bg: #F8F8F2;
+  --sidebar-bg: #F0F0E8;
+
+  --background: #F8F8F2;
+  --foreground: #282A36;
+  --card: #FFFFFF;
+  --card-foreground: #282A36;
+  --popover: #FFFFFF;
+  --popover-foreground: #282A36;
+
+  --primary: #BD93F9;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0F0E8;
+  --secondary-foreground: #282A36;
+  --muted: #F0F0E8;
+  --muted-foreground: #6272A4;
+  --accent: #F4F0FE;
+  --accent-foreground: #9D6BDB;
+  --destructive: #FF5555;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E0E0D8;
+  --input: #F0F0E8;
+  --ring: rgba(189, 147, 249, 0.30);
+
+  --success: #50FA7B;
+  --success-foreground: #282A36;
+  --warning: #FFB86C;
+  --warning-foreground: #282A36;
+  --info: #8BE9FD;
+  --info-foreground: #282A36;
+
+  --color-success: #50FA7B;
+  --color-danger: #FF5555;
+  --color-border: #E0E0D8;
+
+  --brand: #BD93F9;
+  --skill: #FF79C6;
+  --authority-hub: #BD93F9;
+  --authority-edge: #50FA7B;
+  --authority-hybrid: #FFB86C;
+
+  --surface-base: #F8F8F2;
+  --surface-raised: #FFFFFF;
+  --surface-raised-hover: #F5F5F0;
+  --surface-overlay: #FFFFFF;
+
+  --text-strong: #282A36;
+  --text-primary: #3D3F4D;
+  --text-weaker: #6272A4;
+  --text-weakest: #8B8FA8;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.18);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+
+  --chat-agent-bg: transparent;
+  --chat-user-bg: #F4F0FE;
+  --chat-code-bg: #F0F0E8;
+  --chat-thinking-bg: rgba(0, 0, 0, 0.01);
+  --chat-thinking-border: rgba(0, 0, 0, 0.04);
+
+  --input-panel-bg: rgba(255, 255, 255, 0.65);
+  --input-panel-border: rgba(0, 0, 0, 0.05);
+  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.03);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(189, 147, 249, 0.04);
+  --agent-card-active: rgba(189, 147, 249, 0.07);
+
+  --hover-overlay: rgba(0, 0, 0, 0.03);
+
+  --diff-added-bg: rgba(80, 250, 123, 0.10);
+  --diff-added-border: #50FA7B;
+  --diff-removed-bg: rgba(255, 85, 85, 0.10);
+  --diff-removed-border: #FF5555;
+}

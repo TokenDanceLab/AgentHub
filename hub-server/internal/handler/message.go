@@ -90,6 +90,12 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 		}
 		limit = parsed
 	}
+	if limit <= 0 {
+		limit = config.DefaultPaginationLimit
+	}
+	if limit > config.MaxMessagePageLimit {
+		limit = config.MaxMessagePageLimit
+	}
 
 	result, err := h.service.GetMessages(c.Request.Context(), sessionID, userID, beforeSeq, limit)
 	if err != nil {
@@ -128,6 +134,12 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 			return
 		}
 		limit = parsed
+	}
+	if limit <= 0 {
+		limit = config.DefaultPaginationLimit
+	}
+	if limit > config.MaxIncrementalMessageLimit {
+		limit = config.MaxIncrementalMessageLimit
 	}
 
 	result, err := h.service.GetMessagesIncremental(c.Request.Context(), sessionID, userID, afterSeq, limit)

@@ -4,6 +4,7 @@ import { X, ChevronDown } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
+import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
 
 type HubStatus = 'connected' | 'disconnected' | 'checking';
@@ -77,16 +78,14 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
     <div className={styles.page}>
       {/* Close button */}
       {onClose && (
-        <button className={styles.closeBtn} onClick={onClose} title="关闭">
+        <button className={styles.closeBtn} onClick={onClose} title={t('auth.close')}>
           <X size={16} />
         </button>
       )}
 
-      {/* Clean header — no dark background */}
+      {/* Clean header without the old dark auth shell. */}
       <div className={styles.header}>
-        <div className={styles.logo} aria-hidden="true">
-          AH
-        </div>
+        <img className={styles.logo} src={tokenDanceLogo} alt="TokenDance" />
         <h1 className={styles.appName}>{t('auth.title')}</h1>
         <p className={styles.tagline}>{t('auth.tagline')}</p>
       </div>
@@ -102,7 +101,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         <span className={`${styles.advancedToggleIcon} ${showAdvanced ? styles.advancedToggleIconOpen : ''}`}>
           <ChevronDown size={14} />
         </span>
-        高级设置
+        {t('auth.advancedSettings')}
       </button>
 
       {showAdvanced && (

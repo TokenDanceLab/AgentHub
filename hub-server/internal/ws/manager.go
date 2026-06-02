@@ -23,10 +23,10 @@ type Conn struct {
 	Send       chan []byte
 	missedPong atomic.Int32
 	mu         sync.Mutex
+	sendMu     sync.Mutex
 
 	// closed is set atomically before the Send channel is closed.  PushToConn
-	// checks this flag as a best-effort guard against sending on a closed
-	// channel; a recover() inside PushToConn provides a hard safety net.
+	// and closeSend use sendMu so channel send and close never race.
 	closed atomic.Bool
 }
 
@@ -49,6 +49,8 @@ func (c *Conn) Close() {
 // closeSend closes the Send channel exactly once and marks the connection as
 // closed so PushToConn can avoid a panic on closed-channel send.
 func (c *Conn) closeSend() {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
 	if c.closed.CompareAndSwap(false, true) {
 		close(c.Send)
 	}
@@ -181,9 +183,7 @@ func (m *Manager) Unregister(connID string) {
 	slog.Info("ws disconnected", "conn_id", connID, "user_id", c.UserID)
 }
 
-// PushToConn sends a frame to a single connection.  It protects against
-// sending on a closed channel via a recover safety net, so callers never
-// panic even during shutdown races.
+// PushToConn sends a frame to a single connection.
 func (m *Manager) PushToConn(connID string, frame Frame) {
 	m.mu.RLock()
 	c, ok := m.conns[connID]
@@ -199,14 +199,11 @@ func (m *Manager) PushToConn(connID string, frame Frame) {
 		return
 	}
 
-	// recover catches the race where closeSend() is called between the
-	// c.closed.Load() check above and the channel send below.
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Warn("ws push recovered from closed-channel send",
-				"conn_id", connID, "recover", r)
-		}
-	}()
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+	if c.closed.Load() {
+		return
+	}
 
 	select {
 	case c.Send <- data:

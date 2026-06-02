@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WebSocketTransport, type Transport, type TransportStatus } from '../api/transport';
+import { WebSocketTransport, type TransportStatus } from '../api/transport';
 
 // Track WebSocket instances
 const instances: MockWebSocket[] = [];

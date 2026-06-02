@@ -62,7 +62,7 @@
   border: 1px solid rgba(0, 0, 0, 0.07);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.54);
-  color: #6366f1;
+  color: var(--primary);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.74),
     0 16px 38px rgba(15, 23, 42, 0.08);
@@ -266,40 +266,59 @@
 
 .status_available {
   background: rgba(52, 199, 89, 0.14);
-  color: #1f8f45;
+  color: var(--success);
 }
 
 .status_configuring {
   background: rgba(255, 204, 0, 0.16);
-  color: #a26a00;
+  color: var(--warning);
 }
 
 .status_unavailable {
   background: rgba(255, 69, 58, 0.13);
-  color: #b42318;
-}
-
-[data-theme='dark'] .status_available {
-  color: #7ee29b;
-}
-
-[data-theme='dark'] .status_configuring {
-  color: #ffd66b;
-}
-
-[data-theme='dark'] .status_unavailable {
-  color: #ff9b95;
+  color: var(--destructive);
 }
 
 .emptyRuntime {
-  display: flex;
-  min-height: 76px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--muted-foreground);
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.035);
+  box-shadow: none;
+}
+
+[data-theme='dark'] .emptyRuntime {
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.emptyRuntimeContent {
+  max-width: 100%;
+  gap: 7px;
+}
+
+.emptyRuntimeIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.055);
+}
+
+[data-theme='dark'] .emptyRuntimeIcon {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.emptyRuntimeTitle {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 760;
+}
+
+.emptyRuntimeDescription {
+  max-width: 420px;
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.45;
 }
 
 .profilePreview,
@@ -365,17 +384,17 @@
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: #8e8e93;
+  background: var(--muted-foreground);
   box-shadow: 0 0 0 5px rgba(142, 142, 147, 0.1);
 }
 
 .targetDotOnline {
-  background: #34c759;
+  background: var(--success);
   box-shadow: 0 0 0 5px rgba(52, 199, 89, 0.14);
 }
 
 .targetDotOffline {
-  background: #ff453a;
+  background: var(--destructive);
   box-shadow: 0 0 0 5px rgba(255, 69, 58, 0.13);
 }
 
@@ -562,5 +581,7 @@
   .chip {
     flex: 0 1 auto;
     justify-content: center;
+    min-height: 44px;
+    padding: 0 13px;
   }
 }

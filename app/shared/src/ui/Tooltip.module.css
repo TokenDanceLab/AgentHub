@@ -26,12 +26,18 @@
   pointer-events: none;
   text-align: center;
   white-space: nowrap;
-  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.host:hover .tooltip,
-.host:focus-visible .tooltip {
+@media (prefers-reduced-motion: no-preference) {
+  .tooltip {
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+}
+
+/* Visible state — controlled by JS to support hover-bridge, Escape dismiss, and WCAG SC 1.4.13 */
+.visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* position: top */
@@ -62,8 +68,12 @@
   transform: translateY(-50%);
 }
 
-@media (hover: none), (max-width: 767px) {
-  .tooltip {
-    display: none;
+/* On touch-only devices tooltips cannot be triggered by hover, but they remain
+   reachable via focus (keyboard navigation). The JS-driven .visible class still
+   works, so tooltips display on focus and are dismissible via Escape. */
+@media (hover: none) {
+  .host:not(:focus-within) .tooltip:not(.visible) {
+    opacity: 0;
+    pointer-events: none;
   }
 }

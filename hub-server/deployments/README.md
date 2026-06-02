@@ -61,7 +61,7 @@ copy .env.example .env
 docker compose up -d
 ```
 
-生产部署参考 `deployments/docker-compose.prod.yml`。生产服务器只加载开发机/CI 构建好的镜像并执行 `docker compose up -d --no-build`；不得在服务器上运行 `docker compose build`。镜像构建入口为 `deployments/Dockerfile`。生产 compose 默认给 Hub/PostgreSQL/Redis 设置内存、CPU、pids 和日志轮转护栏，防止低流量实例被异常请求或日志放大拖垮宿主机。
+生产部署参考 `deployments/docker-compose.prod.yml`。生产服务器只加载开发机/CI 构建好的镜像并执行 `docker compose up -d --no-build --force-recreate`；不得在服务器上运行 `docker compose build`。镜像构建入口为 `deployments/Dockerfile`。生产 compose 默认给 Hub/PostgreSQL/Redis 设置内存、CPU、pids 和日志轮转护栏，防止低流量实例被异常请求或日志放大拖垮宿主机。
 
 ## 生产部署
 

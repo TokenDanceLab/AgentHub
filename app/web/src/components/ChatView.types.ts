@@ -3,6 +3,12 @@
 
 export type MessageRole = 'user' | 'agent' | 'system';
 
+export interface ReplyTarget {
+  messageId: string;
+  author: string;
+  preview: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -34,6 +40,71 @@ export type MessageBlock =
       success: boolean;
       error?: string | undefined;
       tokenUsage?: { input: number; output: number } | undefined;
+    }
+  | {
+      kind: 'error';
+      error?: string | undefined;
+      message?: string | undefined;
+      detail?: string | undefined;
+      retryable?: boolean | undefined;
+    }
+  | {
+      kind: 'citation';
+      text?: string | undefined;
+      url?: string | undefined;
+      title?: string | undefined;
+    }
+  | {
+      kind: 'compact';
+      summary: string;
+      items?: MessageBlock[] | undefined;
+      expanded?: boolean | undefined;
+    }
+  | {
+      kind: 'approval';
+      approvalId: string;
+      agentName: string;
+      toolName: string;
+      riskLevel: 'low' | 'medium' | 'high' | 'critical';
+      status: 'pending' | 'approved' | 'denied' | 'timeout';
+      timestamp: string;
+      reason?: string | undefined;
+      decidedBy?: string | undefined;
+      decidedAt?: string | undefined;
+      /** Context for team approval API calls */
+      teamId?: string | undefined;
+      runId?: string | undefined;
+      agentTaskId?: string | undefined;
+    }
+  | {
+      kind: 'artifact';
+      artifactId: string;
+      artifactType: 'iframe' | 'file' | 'page' | 'image';
+      title: string;
+      artifactUrl?: string | undefined;
+      url?: string | undefined;
+      previewUrl?: string | undefined;
+      size?: number | undefined;
+      /** If true, an "Apply Diff" action button is rendered on the artifact preview. */
+      canApplyDiff?: boolean | undefined;
+      /** True after the diff has been successfully applied. */
+      diffApplied?: boolean | undefined;
+    }
+  | {
+      kind: 'deploy_card';
+      deployId?: string | undefined;
+      url?: string | undefined;
+      status: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed';
+      statusMessage?: string | undefined;
+      timestamp?: string | undefined;
+    }
+  | {
+      kind: 'link_card';
+      url: string;
+      title?: string | undefined;
+      description?: string | undefined;
+      thumbnailUrl?: string | undefined;
+      siteName?: string | undefined;
     };
 
 // Tool result subtypes (nested under tool_use, 参考: Cline DiffEditRow 双格式)

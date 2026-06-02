@@ -1,9 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, TerminalSquare, Wrench } from 'lucide-react';
+import { FileText, TerminalSquare, Wrench, Hash, Clock, Cpu, CheckCircle, Package } from 'lucide-react';
+import { ActivityCard, DisclosureRow, MetricGrid } from '@shared/ui';
+import type { MetricGridItem } from '@shared/ui';
 import type { RunInfo } from '@shared/types';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
+import { formatTokens } from '@shared/context/breakdown';
+import { createHubClient, type AgentRunEventSummary } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
 import { RunState } from '@/utils/runStateMachine';
 import { RunStateMachine } from '@/utils/runStateMachine';
 import DiffViewer from './DiffViewer';
@@ -67,9 +72,20 @@ function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics |
     inputTokens,
     outputTokens,
     totalTokens,
+    contextLimit: 200000,
     model,
     messages: flatMessages,
   };
+}
+
+function formatElapsed(ms: number | undefined): string {
+  if (ms == null || ms < 0) return '--';
+  if (ms < 5000) return `${ms}ms`;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const remS = s % 60;
+  return `${m}m ${remS}s`;
 }
 
 function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
@@ -77,25 +93,53 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
   const hasOutput = !!tc.output;
 
   return (
-    <div className={styles.toolCallItem}>
-      <button
-        className={styles.toolCallHeader}
-        onClick={() => hasOutput && setExpanded((v) => !v)}
-        aria-expanded={hasOutput ? expanded : undefined}
-        disabled={!hasOutput}
-      >
-        <span className={tc.status === 'completed' ? styles.success : styles.pending}>
-          {tc.toolName}
-        </span>
-        <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
-        {hasOutput && (
-          <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
-        )}
-      </button>
-      {expanded && tc.output && (
+    <DisclosureRow
+      className={styles.toolCallItem}
+      buttonClassName={styles.toolCallHeader}
+      chevronClassName={hasOutput ? styles.chevron : styles.chevronHidden}
+      labelClassName={tc.status === 'completed' ? styles.success : styles.pending}
+      metaClassName={styles.itemTs}
+      label={tc.toolName}
+      meta={new Date(tc.timestamp).toLocaleTimeString()}
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+      disabled={!hasOutput}
+      bodyClassName={styles.toolCallBody}
+    >
+      {tc.output ? (
         <pre className={styles.toolCallOutput}>{tc.output.slice(0, 5000)}</pre>
-      )}
-    </div>
+      ) : null}
+    </DisclosureRow>
+  );
+}
+
+function RunDetailSection({
+  icon,
+  title,
+  count,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  count?: number;
+  children: ReactNode;
+}) {
+  return (
+    <ActivityCard
+      className={styles.cardSection}
+      icon={icon}
+      iconClassName={styles.cardSectionIcon}
+      label={title}
+      labelClassName={styles.cardSectionTitle}
+      bodyClassName={styles.cardSectionBody}
+      metaClassName={styles.cardSectionHeader}
+      contentClassName={styles.cardSectionContent}
+      actionsClassName={styles.cardSectionActions}
+      actions={typeof count === 'number' ? <span className={styles.cardCount}>{count}</span> : undefined}
+      contentAs="div"
+    >
+      {children}
+    </ActivityCard>
   );
 }
 
@@ -112,12 +156,112 @@ export default function RunDetail({
 
   const metrics = useMemo(() => buildMetrics(chatMessages), [chatMessages]);
 
+  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+
+  const [summary, setSummary] = useState<AgentRunEventSummary | null>(null);
+  const [summaryError, setSummaryError] = useState(false);
+
+  useEffect(() => {
+    const taskId = run?.runId;
+    if (!taskId || !getAccessToken()) {
+      setSummary(null);
+      setSummaryError(false);
+      return;
+    }
+
+    let cancelled = false;
+    hubClient
+      .getTaskRunEventSummary(taskId)
+      .then((data) => {
+        if (!cancelled) {
+          setSummary(data);
+          setSummaryError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSummary(null);
+          setSummaryError(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run?.runId, hubClient]);
+
+  const summaryItems: MetricGridItem[] = useMemo(() => {
+    if (!summary) return [];
+    return [
+      {
+        id: 'steps',
+        icon: <Hash size={14} />,
+        value: summary.step_count,
+        label: t('run.summary.steps'),
+      },
+      {
+        id: 'elapsed',
+        icon: <Clock size={14} />,
+        value: formatElapsed(summary.elapsed_ms),
+        label: t('run.summary.elapsed'),
+      },
+      {
+        id: 'inputTokens',
+        icon: <Cpu size={14} />,
+        value: formatTokens(summary.input_tokens),
+        label: t('run.summary.tokensInput'),
+      },
+      {
+        id: 'outputTokens',
+        icon: <Cpu size={14} />,
+        value: formatTokens(summary.output_tokens),
+        label: t('run.summary.tokensOutput'),
+      },
+      {
+        id: 'approvals',
+        icon: <CheckCircle size={14} />,
+        value: `${summary.decided_approvals}/${summary.approval_count}`,
+        label: summary.pending_approvals > 0
+          ? t('run.summary.pendingApprovals', { decided: summary.decided_approvals, pending: summary.pending_approvals })
+          : t('run.summary.approvals'),
+      },
+      {
+        id: 'artifacts',
+        icon: <Package size={14} />,
+        value: summary.artifact_count,
+        label: t('run.summary.artifacts'),
+      },
+    ];
+  }, [summary, t]);
+
   if (!run) {
     return (
-      <div className={styles.panel}>
+      <aside className={styles.panel} aria-label={t('run.title')}>
         <div className={styles.title}>{t('run.title')}</div>
-        <div className={styles.empty}>{t('run.empty')}</div>
-      </div>
+        <div className={styles.emptyStack}>
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<TerminalSquare size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.empty')}
+          />
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<FileText size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptyOutput')}
+          />
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<Wrench size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptySources')}
+          />
+        </div>
+      </aside>
     );
   }
 
@@ -167,75 +311,73 @@ export default function RunDetail({
         </div>
       )}
 
+      {summaryItems.length > 0 && (
+        <div className={styles.summaryGrid}>
+          <MetricGrid items={summaryItems} />
+        </div>
+      )}
+
       <ContextUsage metrics={metrics} />
 
       {!hasAnyContent && (
         <div className={styles.emptyStack}>
-          <div className={styles.emptyCard}>
-            <TerminalSquare size={16} />
-            <span>{t('run.emptyOutput')}</span>
-          </div>
-          <div className={styles.emptyCard}>
-            <FileText size={16} />
-            <span>{t('run.emptySources')}</span>
-          </div>
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<TerminalSquare size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptyOutput')}
+          />
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<FileText size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptySources')}
+          />
         </div>
       )}
 
       {hasAnyContent && (
         <div className={styles.tabContent}>
           {hasOutput && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <TerminalSquare size={14} />
-                <span>{t('run.output')}</span>
-              </div>
+            <RunDetailSection icon={<TerminalSquare size={14} />} title={t('run.output')}>
               <pre className={styles.output}>{outputText}</pre>
-            </section>
+            </RunDetailSection>
           )}
 
           {hasToolCalls && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <Wrench size={14} />
-                <span>{t('run.toolCalls')}</span>
-                <span className={styles.cardCount}>{toolCalls.length}</span>
-              </div>
+            <RunDetailSection icon={<Wrench size={14} />} title={t('run.toolCalls')} count={toolCalls.length}>
               <div className={styles.list}>
                 {latestTools.map((tc) => (
                   <ToolCallItem key={tc.callId} tc={tc} />
                 ))}
               </div>
-            </section>
+            </RunDetailSection>
           )}
 
           {hasFileChanges && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <FileText size={14} />
-                <span>{t('run.fileChanges')}</span>
-                <span className={styles.cardCount}>{changedFiles.length}</span>
-              </div>
+            <RunDetailSection icon={<FileText size={14} />} title={t('run.fileChanges')} count={changedFiles.length}>
               <div className={styles.sourceList}>
                 {latestFiles.map((f) => (
-                  <div key={`${f.path}-${f.timestamp}`} className={styles.sourceItem}>
-                    <code className={styles.filePath}>{f.path}</code>
-                    <span className={styles.action}>{f.action}</span>
-                  </div>
+                  <ActivityCard
+                    key={`${f.path}-${f.timestamp}`}
+                    className={styles.sourceItem}
+                    bodyClassName={styles.sourceBody}
+                    labelClassName={styles.filePath}
+                    actionsClassName={styles.sourceAction}
+                    label={f.path}
+                    actions={<span className={styles.action}>{f.action}</span>}
+                  />
                 ))}
               </div>
-            </section>
+            </RunDetailSection>
           )}
 
           {diffs && diffs.length > 0 && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <FileText size={14} />
-                <span>{t('run.preview')}</span>
-                <span className={styles.cardCount}>{diffs.length}</span>
-              </div>
+            <RunDetailSection icon={<FileText size={14} />} title={t('run.preview')} count={diffs.length}>
               <DiffViewer files={diffs} />
-            </section>
+            </RunDetailSection>
           )}
         </div>
       )}
