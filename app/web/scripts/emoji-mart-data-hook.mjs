@@ -5,5 +5,18 @@ export async function resolve(specifier, context, nextResolve) {
       url: 'data:text/javascript,export default {}',
     };
   }
-  return nextResolve(specifier, context);
+  try {
+    return await nextResolve(specifier, context);
+  } catch (e) {
+    const parent = context.parentURL || '';
+    if (e.code === 'ERR_MODULE_NOT_FOUND' &&
+        (parent.includes('@lobehub/icons') || parent.includes('@lobehub/ui'))) {
+      return {
+        shortCircuit: true,
+        format: 'module',
+        url: 'data:text/javascript,export default {}',
+      };
+    }
+    throw e;
+  }
 }
