@@ -124,14 +124,12 @@
   "confirm.filePlaceholderDetail": "文件计数器已针对此交互式预览进行本地更改。",
   "confirm.exportPrepared": "导出已准备",
   "confirm.exportPreparedDetail": "未下载任何文件。该操作已记录在活动流中。",
-  "source": {
-    "edgeSnapshot": "Edge 快照",
-    "offlineSnapshot": "离线快照",
-    "loadingSnapshot": "正在加载快照",
-    "mockFallback": "演示 / mock fallback",
-    "snapshotUnavailable": "快照不可用",
-    "localDryRun": "本地 dry-run / {{source}}"
-  },
+  "source.edgeSnapshot": "Edge 快照",
+  "source.offlineSnapshot": "离线快照",
+  "source.loadingSnapshot": "正在加载快照",
+  "source.mockFallback": "演示 / mock fallback",
+  "source.snapshotUnavailable": "快照不可用",
+  "source.localDryRun": "本地 dry-run / {{source}}",
   "demo.detail": "演示/mock fallback 数据：{{detail}}",
   "demo.summary": "演示/mock fallback 任务：{{summary}}",
   "demo.role": "演示/mock fallback 成员：{{role}}"
