@@ -2009,6 +2009,51 @@
 
 /* ── Scroll-to-bottom indicator ──────────── */
 
+/* ── Citation / Link blocks ─────────────── */
+
+.citationBlock {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: 10px 14px;
+  margin: 6px 0;
+}
+
+.citationHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.citationTitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.citationPreview {
+  font-size: var(--font-size-xs);
+  color: var(--text-weaker);
+  margin: 4px 0;
+  word-break: break-word;
+}
+
+.citationLink {
+  display: block;
+  font-size: 11px;
+  color: var(--primary);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.citationLink:hover { text-decoration: underline; }
+
 .scrollToBottomBtn {
   position: absolute;
   bottom: 16px;
