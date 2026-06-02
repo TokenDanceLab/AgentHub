@@ -16,6 +16,10 @@ export default defineConfig({
     port: 5175,
     strictPort: true,
   },
+  preview: {
+    port: 5175,
+    strictPort: true,
+  },
   build: {
     target: ['es2021', 'chrome100', 'safari15'],
   },
