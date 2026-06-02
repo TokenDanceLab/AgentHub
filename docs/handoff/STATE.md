@@ -21,15 +21,21 @@
 | **johnny-hub-fixes 分支评估已删除** | 已评估并清理，产出已合入主线 | ✅ |
 | **trump-frontend-closeout 已删除** | 分支已合并/关闭，不再保留为活跃引用 | ✅ |
 
-### 工程指标（2026-06-02）
+### 工程指标（2026-06-02）- 最终
 
-| 组件 | TypeScript | Go |
-|------|:--:|:--:|
-| Desktop | 0 TS error | — |
-| Web | 0 TS error | — |
-| Mobile | 0 TS error | — |
-| Edge Server | — | 全部通过 |
-| Hub Server | — | 全部通过 |
+| 指标 | 状态 |
+|------|:--:|
+| Desktop TS | **0 error** (含 noUncheckedIndexedAccess strict) |
+| Web TS | **0 error** |
+| Mobile TS | **0 error** |
+| Desktop 测试 | **1165/1165 全通** (109文件) |
+| Mobile 测试 | **27/27 全通** (6文件) |
+| Go 编译+vet | Edge ✓ Hub ✓ |
+| Go 测试 (`-short`) | hub 19/19包 edge 17/17包 |
+| 8 执行场景 | 32/32 (local_edge/remote_ssh/hub_relay/tailscale/cloud_edge) |
+| CSS 硬编码颜色 | 0残留 (150+处→变量 33文件) |
+| i18n key同步 | Desktop 1496/1496 Web 238/238 |
+| 仓库 本地分支 | 1 (dev/delicious233) |
 
 ## 本次 Desktop/UI 推进（2026-05-30）
 
