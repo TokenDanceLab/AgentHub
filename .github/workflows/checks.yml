@@ -270,9 +270,17 @@ jobs:
         working-directory: ./app/web
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/web/pnpm-lock.yaml
+
       - name: Install
         run: pnpm install --frozen-lockfile
 
@@ -321,7 +329,7 @@ jobs:
         run: pnpm build
         working-directory: ./app/desktop
       - name: Smoke test
-        run: pnpm exec playwright test --project=chromium
+        run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium
         working-directory: ./app
 
   # ── Validation ───────────────────────────────
