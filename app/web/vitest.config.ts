@@ -2,6 +2,17 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
+  plugins: [
+    {
+      name: 'mock-emoji-mart-data',
+      resolveId(id) {
+        if (id === '@emoji-mart/data' || id.startsWith('@emoji-mart/data/')) {
+          return path.resolve(__dirname, 'src/mocks/emoji-mart-data.ts');
+        }
+        return null;
+      },
+    },
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
