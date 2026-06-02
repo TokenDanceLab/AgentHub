@@ -5,6 +5,14 @@ export async function resolve(specifier, context, nextResolve) {
       url: 'data:text/javascript,export default {}',
     };
   }
+  // Stub any .json import — Node 22 requires import assertion
+  if (specifier.endsWith('.json')) {
+    return {
+      shortCircuit: true,
+      format: 'module',
+      url: 'data:text/javascript,export default {}',
+    };
+  }
   try {
     return await nextResolve(specifier, context);
   } catch (e) {
