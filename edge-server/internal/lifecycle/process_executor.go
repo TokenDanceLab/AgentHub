@@ -1,4 +1,4 @@
-package lifecycle
+﻿package lifecycle
 
 import (
 	"context"
@@ -541,8 +541,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
 	}
 
-	waitErr := cmd.Wait()
 	wg.Wait()
+	waitErr := cmd.Wait()
 
 	// Context budget compaction check: after the stream completes, evaluate
 	// whether the context budget exceeded the auto-compaction threshold.
