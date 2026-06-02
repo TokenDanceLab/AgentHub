@@ -79,7 +79,7 @@ Desktop UI -> Local Edge Server -> Agent Runtime Adapter -> Claude Code / Codex 
 | 层 | 技术 |
 |---|---|
 | 前端 | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens + `@shared/ui` |
-| Desktop | Tauri 2 |
+| Desktop | Tauri 2.5 |
 | Edge Server | Go 1.25 + `net/http` + WebSocket + Agent Runtime adapters |
 | Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis + Hub session；TokenDance ID bearer middleware 仅作兼容路径 |
 | 实时通信 | WebSocket typed events |
