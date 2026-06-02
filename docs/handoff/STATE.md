@@ -11,13 +11,18 @@
 | **多预设主题引擎** | 6 套主题（One Dark Pro / Codex Dark / GitHub Light / Monokai / Solarized Dark / Nord），CSS 变量驱动 | ✅ |
 | **WS 重连 UI 横幅** | WebSocket 断开后顶部横幅提示，含重试倒计时和手动重连 | ✅ |
 | **noUncheckedIndexedAccess: true** | Desktop 全局 `tsconfig.json` 已启用，零 TS error | ✅ |
-| **i18n Desktop en.json 1496 key 完全同步** | 中英文 key 一一对应，零缺失/多余 key | ✅ |
+| **i18n Desktop zh/en 1560 key 完全同步** | 中英文 key 一一对应，零缺失/多余 key | ✅ |
 | **CSS 硬编码颜色→CSS 变量** | Desktop 150+ 处硬编码颜色替换为 `--td-*` CSS 变量 | ✅ |
 | **Mobile 测试 2→27 用例** | Mobile 测试从 2 个扩展到 27 个，覆盖核心视图和 hooks | ✅ |
 | **Hub log+metrics 测试补充** | Hub 日志与 metrics 新增 16 个测试用例 | ✅ |
 | **12 处 handler 错误码透传修复** | 修复 handler 层吞掉底层错误码、统一返回 500 的问题 | ✅ |
 | **API 响应格式统一** | `{code, data, message}` envelope 在所有 endpoint 一致 | ✅ |
 | **ViewSlot/ViewMode 类型修复** | 修复 viewRegistry 的类型定义和 slot 匹配 | ✅ |
+| **Frontend CI pnpm gate 收口** | Web/Mobile/E2E 明确安装 pnpm，统一缓存 `app/pnpm-lock.yaml`，治理脚本防回归 | ✅ |
+| **Desktop 暗色 footer 修复** | Tauri/Desktop 侧栏底部工具条补暗色背景，Playwright 探针确认无白底残留 | ✅ |
+| **Desktop Local Edge 自动启动修复** | Tauri 启动时自动启动 Edge，修正 Edge 二进制路径解析和 `--addr` 参数 | ✅ |
+| **Desktop 聊天诊断输出清理** | 聊天区不再合成旧运行“无回放输出”agent 消息，过滤 mock runner 诊断文本，TeamRunDock 不显示 0/0 空指标 | ✅ |
+| **TokenDance ID 生产 OIDC smoke** | `verify-oidc-flow.ps1` 兼容生产 envelope，ID+Hub 非交互 smoke 32/32 通过；完整浏览器登录仍待闭环 | 🟡 |
 | **johnny-hub-fixes 分支评估已删除** | 已评估并清理，产出已合入主线 | ✅ |
 | **trump-frontend-closeout 已删除** | 分支已合并/关闭，不再保留为活跃引用 | ✅ |
 
@@ -28,13 +33,13 @@
 | Desktop TS | **0 error** (含 noUncheckedIndexedAccess strict) |
 | Web TS | **0 error** |
 | Mobile TS | **0 error** |
-| Desktop 测试 | **1165/1165 全通** (109文件) |
+| Desktop 测试 | **1166/1166 全通** (109文件) |
 | Mobile 测试 | **27/27 全通** (6文件) |
 | Go 编译+vet | Edge ✓ Hub ✓ |
 | Go 测试 (`-short`) | hub 19/19包 edge 17/17包 |
 | 8 执行场景 | 32/32 (local_edge/remote_ssh/hub_relay/tailscale/cloud_edge) |
 | CSS 硬编码颜色 | 0残留 (150+处→变量 33文件) |
-| i18n key同步 | Desktop 1496/1496 Web 238/238 |
+| i18n key同步 | Desktop 1560/1560 Web 238/238 |
 | 仓库 本地分支 | 1 (dev/delicious233) |
 
 ## 本次 Desktop/UI 推进（2026-05-30）
