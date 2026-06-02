@@ -5,35 +5,23 @@ import (
 	"testing"
 )
 
-func TestNewRegistryPrePopulatesMockRunner(t *testing.T) {
+func TestNewRegistryStartsEmpty(t *testing.T) {
 	r := NewRegistry()
 	list := r.List()
-	if len(list) != 1 {
-		t.Fatalf("expected 1 pre-populated runner, got %d", len(list))
-	}
-	info := list[0]
-	if info.ID != "runner_local_1" {
-		t.Errorf("id = %q, want runner_local_1", info.ID)
-	}
-	if info.Name != "Mock Runner (local)" {
-		t.Errorf("name = %q", info.Name)
-	}
-	if info.Status != "online" {
-		t.Errorf("status = %q, want online", info.Status)
-	}
-	if len(info.Capabilities) < 2 {
-		t.Errorf("expected at least 2 capabilities, got %v", info.Capabilities)
+	if len(list) != 0 {
+		t.Fatalf("expected 0 runners in empty registry, got %d", len(list))
 	}
 }
 
 func TestListReturnsCopy(t *testing.T) {
 	r := NewRegistry()
+	r.Upsert(RunnerInfo{ID: "t1", Name: "T1", Status: "online", Capabilities: []string{"shell"}})
 	list1 := r.List()
 	list2 := r.List()
 	// Modify the returned slice; should not affect internal state.
 	list1[0] = RunnerInfo{ID: "hacked"}
 	list3 := r.List()
-	if list3[0].ID != "runner_local_1" {
+	if list3[0].ID != "t1" {
 		t.Error("List should return a copy, not internal reference")
 	}
 	_ = list2
@@ -41,11 +29,12 @@ func TestListReturnsCopy(t *testing.T) {
 
 func TestGetExisting(t *testing.T) {
 	r := NewRegistry()
-	info, ok := r.Get("runner_local_1")
+	r.Upsert(RunnerInfo{ID: "t1", Name: "T1", Status: "online", Capabilities: []string{"shell"}})
+	info, ok := r.Get("t1")
 	if !ok {
-		t.Fatal("expected runner_local_1 to exist")
+		t.Fatal("expected t1 to exist")
 	}
-	if info.ID != "runner_local_1" {
+	if info.ID != "t1" {
 		t.Errorf("id = %q", info.ID)
 	}
 }
@@ -68,8 +57,8 @@ func TestUpsertNew(t *testing.T) {
 	})
 
 	list := r.List()
-	if len(list) != 2 {
-		t.Fatalf("expected 2 runners, got %d", len(list))
+	if len(list) != 1 {
+		t.Fatalf("expected 1 runner, got %d", len(list))
 	}
 	info, ok := r.Get("runner_2")
 	if !ok {
@@ -82,16 +71,17 @@ func TestUpsertNew(t *testing.T) {
 
 func TestUpsertUpdate(t *testing.T) {
 	r := NewRegistry()
+	r.Upsert(RunnerInfo{ID: "r1", Name: "Original", Status: "online", Capabilities: []string{"shell"}})
 	r.Upsert(RunnerInfo{
-		ID:           "runner_local_1",
+		ID:           "r1",
 		Name:         "Updated Runner",
 		Status:       "offline",
 		Capabilities: []string{"mock"},
 	})
 
-	info, ok := r.Get("runner_local_1")
+	info, ok := r.Get("r1")
 	if !ok {
-		t.Fatal("runner_local_1 should still exist")
+		t.Fatal("r1 should still exist")
 	}
 	if info.Name != "Updated Runner" {
 		t.Errorf("name = %q, want 'Updated Runner'", info.Name)
@@ -103,20 +93,22 @@ func TestUpsertUpdate(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	r := NewRegistry()
-	r.Remove("runner_local_1")
+	r.Upsert(RunnerInfo{ID: "r1", Name: "R1", Status: "online", Capabilities: []string{"shell"}})
+	r.Remove("r1")
 
 	list := r.List()
 	if len(list) != 0 {
 		t.Errorf("expected 0 runners after remove, got %d", len(list))
 	}
-	_, ok := r.Get("runner_local_1")
+	_, ok := r.Get("r1")
 	if ok {
-		t.Error("runner_local_1 should not exist after remove")
+		t.Error("r1 should not exist after remove")
 	}
 }
 
 func TestRemoveNonExisting(t *testing.T) {
 	r := NewRegistry()
+	r.Upsert(RunnerInfo{ID: "r1", Name: "R1", Status: "online", Capabilities: []string{"shell"}})
 	// Should not panic.
 	r.Remove("nonexistent")
 	if len(r.List()) != 1 {
@@ -126,7 +118,6 @@ func TestRemoveNonExisting(t *testing.T) {
 
 func TestListEmpty(t *testing.T) {
 	r := NewRegistry()
-	r.Remove("runner_local_1")
 	list := r.List()
 	if list == nil {
 		t.Error("List should return empty slice, not nil")
@@ -138,6 +129,7 @@ func TestListEmpty(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	r := NewRegistry()
+	r.Upsert(RunnerInfo{ID: "r1", Name: "R1", Status: "online", Capabilities: []string{"shell"}})
 	var wg sync.WaitGroup
 	const goroutines = 20
 
@@ -146,7 +138,7 @@ func TestConcurrentAccess(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			r.List()
-			r.Get("runner_local_1")
+			r.Get("r1")
 		}(i)
 	}
 
