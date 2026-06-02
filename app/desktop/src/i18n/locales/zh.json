@@ -28,6 +28,7 @@
   "artifact.diffApplied": "差异已应用",
   "artifact.download": "下载",
   "artifact.error.loadFailed": "加载失败：{{url}}",
+  "artifact.generating": "生成中...",
   "artifact.loading": "加载中...",
   "artifact.openInNewTab": "在新标签页打开",
   "artifact.openPreview": "打开预览：{{title}}",
