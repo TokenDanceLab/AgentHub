@@ -17,6 +17,7 @@ import { cancelRun } from '@/api/edgeClient';
 import { queryClient } from '@/api/queryClient';
 import { updateRunStatusInQueries, upsertRunInQueries } from '@/api/runQueries';
 import type { TransportStatus } from '@/api/transport';
+import { sanitizeAgentOutputText } from '@/utils/chatMessages';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -503,7 +504,8 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.text_delta': {
-      const content = event.payload.content as string;
+      const content = sanitizeAgentOutputText((event.payload.content as string | undefined) ?? '');
+      if (!content) break;
       const runId = eventRunId(event);
       const block: MessageBlock = {
         kind: 'text',
@@ -530,9 +532,11 @@ function processEvent(state: State, event: EventEnvelope): State {
 
     case 'run.agent.text_block': {
       const runId = eventRunId(event);
+      const content = sanitizeAgentOutputText((event.payload.content as string | undefined) ?? '');
+      if (!content) break;
       const block: MessageBlock = {
         kind: (event.payload.contentType as MessageBlock['kind']) === 'code' ? 'code' : 'text',
-        content: event.payload.content as string,
+        content,
         language: event.payload.language as string | undefined,
       };
       const last = messages[messages.length - 1];
@@ -1010,7 +1014,8 @@ function processEvent(state: State, event: EventEnvelope): State {
     case 'run.output.batch': {
       const rid = event.payload.runId as string;
       const chunks = event.payload.chunks as Array<{ offset: number; text: string }>;
-      const text = chunks.map((c) => c.text).join('');
+      const text = sanitizeAgentOutputText(chunks.map((c) => c.text).join(''));
+      if (!text) break;
       if (currentRun && currentRun.runId === rid) {
         currentRun = {
           ...currentRun,
