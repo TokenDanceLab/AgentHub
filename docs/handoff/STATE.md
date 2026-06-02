@@ -2,6 +2,17 @@
 
 最后更新：2026-06-02 UTC+8 | commit: 8c6c3b5 | 分支：dev/delicious233 | 状态：Desktop 0 TS error / Web 0 TS error / Mobile 0 TS error / Go 全量通过
 
+## Artifact Lifecycle 推进（2026-06-02）
+
+- **P0-1 Desktop ChatView 盲区修复**：Desktop BlockRenderer 补齐 artifact、deploy_card、link_card、citation、compact、approval 6 个缺失 case arm，此前全部落到 `default: return null`
+- **P0-2 组件重复消除**：ArtifactCard、ArtifactPreview、DeployCard 从 desktop/web 重复副本迁移到 `app/shared/src/ui/`，破除了 ChatView.types 耦合，改为独立 props 接口
+- **P1-1 流式预览增强**：ArtifactPreview 新增 `isStreaming` / `streamingContent` props，实现 Cherry Studio 三态（空→终端闪烁→完整卡片）
+- **P1-2 FileChangeGroup 共享组件**：新建 `shared/ui/FileChangeGroup.tsx`，复刻 AionUi FileChangesPanel 可折叠分组 +N/-N 模式
+- **P2-1 Artifact 版本历史**：新建 `shared/ui/ArtifactVersionTimeline.tsx`，垂直时间线 + per-version diff toggle + revert 按钮
+- **测试**：shared 新增 4 个测试文件（ArtifactCard/DeployCard/FileChangeGroup/ArtifactVersionTimeline），50 files / 375 tests 全部通过
+- **Typecheck**：Desktop 0 error / Web 0 error
+- **Desktop tests**：111/113 文件通过（hubClient + edge-real 为既有失败，非本次引入）
+
 ## 近三轮 Sprint 交付汇总（2026-05-31 ~ 2026-06-02）
 
 | 交付项 | 详情 | 状态 |
