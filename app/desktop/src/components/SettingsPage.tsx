@@ -36,8 +36,9 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import AppearanceSection from './settings/sections/AppearanceSection';
+import ConnectionsSection from './settings/sections/ConnectionsSection';
 import { useHubStore } from '@/stores/hubStore';
-import { APP_VERSION, HUB_URL } from '@/config';
+import { APP_VERSION, HUB_URL, getEdgeBaseUrl } from '@/config';
 import {
   useAddAgentTeamMember,
   useCreateAgentTeam,
@@ -395,8 +396,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const resolveTeamConflictMutation = useResolveTeamConflict({
     getToken: () => hubAuth.token,
   });
-  const { online: edgeOnline, health } = useHealth();
-  const { data: agentData } = useAgentList(edgeOnline);
+  const { online: edgeOnline, health, refetch: refetchHealth } = useHealth();
+  const { data: agentData, refetch: refetchAgents } = useAgentList(edgeOnline);
   const {
     data: runData,
     isError: runsError,
@@ -523,6 +524,12 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const runnerSummary = edgeOnline
     ? t('settings.runnerSummary', { available: availableRunners, total: totalRunners })
     : t('settings.edgeOffline');
+  const edgeAddress = getEdgeBaseUrl();
+  const healthStatus = edgeOnline ? (health?.status ?? 'unknown') : 'offline';
+  const handleRefreshConnections = useCallback(() => {
+    refetchHealth();
+    refetchAgents();
+  }, [refetchHealth, refetchAgents]);
   const hubTargets = hubTargetsQuery.data?.items ?? [];
   const hubOnlineTargets = hubTargets.filter(isHubTargetConnected).length;
   const hubHealthyTargets = countTargetsByHealth(hubTargets, 'healthy');
@@ -1166,7 +1173,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Monitor size={18} />}
                   label={t('settings.taskLastRun')}
-                  value={latestRun ? t(`run.status.${latestRun.status}`, { defaultValue: latestRun.status }) : t('settings.noData')}
+                  value={latestRun ? t(`run.status.${latestRun.status.toLowerCase()}`, { defaultValue: latestRun.status }) : t('settings.noData')}
                   detail={latestRun ? formatTimestamp(latestRun.finishedAt ?? latestRun.startedAt ?? latestRun.createdAt) : t('settings.taskLastRunDesc')}
                 />
                 <SummaryCard
@@ -1955,15 +1962,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'connections' && (
-            <Panel title={t('settings.connections')} description={t('settings.connectionsDesc')}>
-              <ConnectionRow
-                name="Hub"
-                description={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
-                connected={hubAuthenticated}
-              />
-              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
-              <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
-            </Panel>
+            <ConnectionsSection
+              edgeOnline={edgeOnline}
+              hubSessionActive={hubAuthenticated}
+              edgeAddress={edgeAddress}
+              healthStatus={healthStatus}
+              availableRunners={availableRunners}
+              totalRunners={totalRunners}
+              onRefresh={handleRefreshConnections}
+            />
           )}
 
           {active === 'remoteControl' && (
@@ -2304,7 +2311,7 @@ function TaskRunRow({
         </div>
       </div>
       <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
-        {t(`run.status.${run.status}`, { defaultValue: run.status })}
+        {t(`run.status.${run.status.toLowerCase()}`, { defaultValue: run.status })}
       </span>
       {onCancel ? (
         <button
