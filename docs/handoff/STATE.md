@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-06-02 UTC+8 | 分支：dev/delicious233 | 状态：Desktop 0 TS error / Web 0 TS error / Mobile 0 TS error / Go 全量通过
+最后更新：2026-06-02 UTC+8 | commit: 8c6c3b5 | 分支：dev/delicious233 | 状态：Desktop 0 TS error / Web 0 TS error / Mobile 0 TS error / Go 全量通过
 
 ## 近三轮 Sprint 交付汇总（2026-05-31 ~ 2026-06-02）
 
@@ -36,11 +36,28 @@
 | Desktop 测试 | **1166/1166 全通** (109文件) |
 | Mobile 测试 | **27/27 全通** (6文件) |
 | Go 编译+vet | Edge ✓ Hub ✓ |
-| Go 测试 (`-short`) | hub 19/19包 edge 17/17包 |
+| Go 测试 (`-short`) | hub 17/17包 edge 17/17包 |
 | 8 执行场景 | 32/32 (local_edge/remote_ssh/hub_relay/tailscale/cloud_edge) |
 | CSS 硬编码颜色 | 0残留 (150+处→变量 33文件) |
 | i18n key同步 | Desktop 1560/1560 Web 238/238 |
 | 仓库 本地分支 | 1 (dev/delicious233) |
+
+### 近期成果（2026-06-02 competition submission）
+
+- Mock runner 已移除，测试切换到真实 executor profile
+- Settings 新增 Edge 健康状态面板
+- OIDC 竞态条件修复（`HandleTaskAck` CAS backfill）
+- Web 页面差异化：`/` 生态控制台 vs `/workbench-preview` 旧工作台
+- `run.status` key 归一化，`RunStateMachine` 幂等 transition
+- `edge-real` 测试套件更新为真实 Runtime profile
+- ChatView Edge 断开连接提示
+- Playwright e2e 测试套件已创建（27/27 全通过）
+
+### 已知未关闭项（competition submission）
+
+- 3 个 Dependabot moderate 级漏洞（来自 vendor 项目依赖）
+- Mobile OIDC 深链仍是 Rust stub（`not yet implemented`）
+- 无 Firefox/WebKit Playwright 项目（仅 Chromium）
 
 ## 本次 Desktop/UI 推进（2026-05-30）
 
@@ -582,6 +599,9 @@ CI 说明：Go lint 已迁移到 golangci-lint v2 配置，gosec 已切到当前
 - api.hub.vectorcontrol.tech 无 SSL（HTTP only）— （待排期）
 - 登录已修复但需验证（migration 0017 + UUIDv7 修复后需重建容器）— （低优先级）
 - 服务器磁盘 29GB 总量偏小，需定期清理 Docker 镜像 — （运维任务）
+- 3 个 Dependabot moderate 级漏洞（vendor 项目依赖，非直接依赖）
+- Mobile OIDC 深链 Rust stub（`not yet implemented`）
+- 无 Firefox/WebKit Playwright 项目（仅 Chromium）
 
 ## 本地开发
 
