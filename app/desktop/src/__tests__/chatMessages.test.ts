@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   applyRuntimeAgentLabel,
   buildChatMessagesFromThreadItems,
-  buildRunReplayFallbackMessages,
+  buildDisplayedRunOutputMessage,
   filterOptimisticMessagesForThread,
   mergeChatMessages,
+  sanitizeAgentOutputText,
 } from '@/utils/chatMessages';
 import type { ChatMessage } from '@/components/ChatView.types';
 
@@ -194,81 +195,50 @@ describe('chat message projection', () => {
     expect(merged[0].blocks.map((block) => block.kind)).toEqual(['thinking', 'text']);
   });
 
-  it('projects terminal runs without persisted agent transcript into explicit replay fallback rows', () => {
-    const fallback = buildRunReplayFallbackMessages(
-      [
-        {
-          itemId: 'item_user',
-          type: 'user_message',
-          role: 'user',
-          content: 'why did the answer disappear?',
-          createdAt: '2026-05-28T10:33:50Z',
-        },
-        {
-          itemId: 'item_run',
-          runId: 'run_missing',
-          type: 'run',
-          status: 'queued',
-          createdAt: '2026-05-28T10:33:50Z',
-        },
-      ],
-      [
-        {
-          runId: 'run_missing',
-          status: 'finished',
-          createdAt: '2026-05-28T10:33:50Z',
-          finishedAt: '2026-05-28T10:33:57Z',
-        },
-      ],
+  it('does not project terminal runs without persisted transcript into synthetic agent messages', () => {
+    const messages = buildChatMessagesFromThreadItems([
       {
-        agentName: 'Codex',
-        statusLabel: (status) => `status:${status}`,
-        content: ({ runId, statusLabel }) => `No replayable output for ${runId} (${statusLabel}).`,
+        itemId: 'item_user',
+        type: 'user_message',
+        role: 'user',
+        content: 'why did the answer disappear?',
+        createdAt: '2026-05-28T10:33:50Z',
       },
-    );
-
-    expect(fallback).toEqual([
       {
-        id: 'run-replay-fallback-run_missing',
-        role: 'agent',
-        timestamp: '2026-05-28T10:33:57Z',
-        parentId: 'run_missing',
-        agentName: 'Codex',
-        blocks: [{ kind: 'text', content: 'No replayable output for run_missing (status:finished).' }],
+        itemId: 'item_run',
+        runId: 'run_missing',
+        type: 'run',
+        status: 'finished',
+        createdAt: '2026-05-28T10:33:57Z',
       },
     ]);
+
+    expect(messages.map((message) => message.role)).toEqual(['user']);
   });
 
-  it('does not add replay fallback when the run already has an agent transcript', () => {
-    const fallback = buildRunReplayFallbackMessages(
-      [
-        {
-          itemId: 'item_run',
-          runId: 'run_has_agent',
-          type: 'run',
-          status: 'queued',
-          createdAt: '2026-05-28T10:33:50Z',
-        },
-        {
-          itemId: 'item_agent',
-          runId: 'run_has_agent',
-          type: 'agent_message',
-          role: 'agent',
-          content: 'USER-BUBBLE-528',
-          createdAt: '2026-05-28T10:33:57Z',
-        },
-      ],
-      [
-        {
-          runId: 'run_has_agent',
-          status: 'finished',
-          createdAt: '2026-05-28T10:33:50Z',
-          finishedAt: '2026-05-28T10:33:57Z',
-        },
-      ],
-    );
+  it('filters internal mock runner diagnostics from persisted and displayed output', () => {
+    const mockOutput = [
+      'Initializing mock runner...',
+      'Executing mock task step 1/3...',
+      'Warning: mock task is running in simulation mode',
+      'Executing mock task step 3/3...',
+    ].join(' ');
 
-    expect(fallback).toEqual([]);
+    expect(sanitizeAgentOutputText(mockOutput)).toBe('');
+    expect(buildChatMessagesFromThreadItems([
+      {
+        itemId: 'item_agent',
+        type: 'agent_message',
+        role: 'agent',
+        content: mockOutput,
+        createdAt: '2026-05-28T10:33:57Z',
+      },
+    ])).toEqual([]);
+    expect(buildDisplayedRunOutputMessage({
+      runId: 'run_mock',
+      status: 'finished',
+      outputText: mockOutput,
+    })).toBeNull();
   });
 
   it('uses the selected runtime label instead of inner model labels for live agent rows', () => {

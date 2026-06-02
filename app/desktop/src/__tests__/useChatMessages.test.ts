@@ -158,6 +158,39 @@ describe('useChatMessages', () => {
     });
   });
 
+  it('drops internal mock runner text from live agent output', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+      eventHandler!(
+        makeEvent('run.agent.text_delta', {
+          runId: 'run-1',
+          content: 'Initializing mock runner...',
+          offset: 0,
+        }),
+      );
+      eventHandler!(
+        makeEvent('run.agent.text_block', {
+          runId: 'run-1',
+          content: 'Warning: mock task is running in simulation mode',
+        }),
+      );
+      eventHandler!(
+        makeEvent('run.output.batch', {
+          runId: 'run-1',
+          chunks: [
+            { offset: 0, text: 'Executing mock task step 1/3...' },
+            { offset: 32, text: ' Executing mock task step 2/3...' },
+          ],
+        }),
+      );
+    });
+
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.currentRun?.outputText).toBe('');
+  });
+
   it('ignores run events from another selected thread', () => {
     const { result } = renderHook(() => useChatMessages(true, 'thread-current'));
 
