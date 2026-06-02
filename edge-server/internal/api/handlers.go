@@ -199,7 +199,6 @@ func ensureStore(h *Handler) store.Repository {
 		h.Store = store.New()
 	}
 	h.ensureDefaults()
-	h.ensureExecutor()
 	return h.Store
 }
 
@@ -209,12 +208,6 @@ func (h *Handler) ensureDefaults() {
 	}
 	_, _ = h.Store.CreateProject("proj_local", "Local Project")
 	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Local Thread")
-}
-
-func (h *Handler) ensureExecutor() {
-	if h.Executor == nil && h.Bus != nil && h.Store != nil {
-		h.Executor = lifecycle.NewMockExecutor(h.Bus, h.Store)
-	}
 }
 
 func acceptedResponse(data map[string]any) map[string]any {
@@ -626,7 +619,7 @@ func (h *Handler) GetRuns(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /v1/runs  (mock run)
+// POST /v1/runs
 // ---------------------------------------------------------------------------
 
 func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
@@ -713,6 +706,12 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.Continue = true
 	}
 
+	if h.Executor == nil {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse("executor_unavailable", "no Agent Runtime executor configured"))
+		return
+	}
+
 	// #175: Reject unknown agentId — do not fall back to default adapter.
 	if req.AgentID != "" && h.AdapterRegistry != nil {
 		if _, ok := h.AdapterRegistry.Get(req.AgentID); !ok {
@@ -772,9 +771,6 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		Content:   "Run queued",
 	})
 
-	if h.Executor == nil {
-		h.ensureExecutor()
-	}
 	if h.Executor != nil {
 		runCtx := lifecycle.RunProcessContext{
 			Run:                    run,
