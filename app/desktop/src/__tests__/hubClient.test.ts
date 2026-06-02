@@ -522,7 +522,7 @@ describe('hubClient', () => {
 
       await client.me();
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://api.hub.vectorcontrol.tech/client/auth/me');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://api.hub.vectorcontrol.tech/client/auth/me');
     });
   });
 });
