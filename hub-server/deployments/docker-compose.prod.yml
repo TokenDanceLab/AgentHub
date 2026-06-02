@@ -93,7 +93,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    dns: 127.0.0.11
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       # 数据库（连接 Docker 网络内的独立 PG）
       AGENTHUB_DB_HOST: postgres
