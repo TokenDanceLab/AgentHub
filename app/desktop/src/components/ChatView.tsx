@@ -12,7 +12,6 @@ import { EmptyState, ToolTimeline, ArtifactCard, ArtifactPreview, DeployCard } f
 import type { ArtifactType } from '@shared/ui';
 import TaskList from './TaskList';
 import ToolGroup from './ToolGroup';
-import TeamRunDock from './TeamRunDock';
 import LinkCard from './LinkCard';
 import ApprovalCard from './ApprovalCard';
 import { useStreamingText } from '@/hooks/useStreamingText';
@@ -20,9 +19,6 @@ import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useShallow } from 'zustand/shallow';
-import type { AgentTeamOverview } from '@/api/agentTeamQueries';
-import type { LocalOrchestrationStatus } from '@/utils/localOrchestration';
-import type { TeamLocalExecution } from '@/utils/teamLocalExecution';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -33,13 +29,6 @@ interface Props {
   onRetry?: (messageId: string) => void;
   onFork?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
-  agentTeamOverview?: AgentTeamOverview;
-  agentTeamsLoading?: boolean;
-  agentTeamsSignedIn?: boolean;
-  teamLocalExecutions?: TeamLocalExecution[];
-  localOrchestration?: LocalOrchestrationStatus;
-  onStartLocalOrchestration?: (agentId: string, draft: string) => void;
-  onOpenTeamRuns?: () => void;
 }
 
 const LONG_AGENT_TEXT_MAX_LINES = 24;
@@ -1314,13 +1303,6 @@ export default function ChatView({
   onRetry,
   onFork,
   onDelete,
-  agentTeamOverview,
-  agentTeamsLoading,
-  agentTeamsSignedIn,
-  teamLocalExecutions,
-  localOrchestration,
-  onStartLocalOrchestration,
-  onOpenTeamRuns,
 }: Props) {
   const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
@@ -1495,6 +1477,7 @@ export default function ChatView({
 
   const lastMsgHasText =
     lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
+  const lastMsgHasThinking = lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'thinking');
 
   const handleScrollToBottom = useCallback(() => {
     scrollToBottom(true);
@@ -1574,17 +1557,6 @@ export default function ChatView({
         role="log"
         aria-live="polite"
       >
-        {(agentTeamsSignedIn || localOrchestration?.available || agentTeamsLoading) && (
-          <TeamRunDock
-            overview={agentTeamOverview}
-            loading={agentTeamsLoading}
-            signedIn={agentTeamsSignedIn}
-            localExecutions={teamLocalExecutions}
-            localOrchestration={localOrchestration}
-            onStartLocalOrchestration={onStartLocalOrchestration}
-            onOpenConsole={onOpenTeamRuns}
-          />
-        )}
         {visibleMessages.length === 0 ? (
           connectionStatus !== 'connected' ? (
             <EmptyState
@@ -1638,7 +1610,7 @@ export default function ChatView({
             })}
           </div>
         )}
-        {isStreaming && !lastMsgHasText ? <PendingThinking label={t('chat.thinkingLabel')} /> : null}
+        {isStreaming && !lastMsgHasText && !lastMsgHasThinking ? <PendingThinking label={t('chat.thinkingLabel')} /> : null}
         {showScrollIndicator && (
           <div className={styles.scrollToBottomWrap}>
             <button
