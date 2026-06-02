@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { OidcError } from '@/api/hubAuth';
 import type { UserProfile } from '@/api/hubClient';
 import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
@@ -29,8 +30,12 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       await loginWithTokenDance();
       setIdentityNotice(t('auth.tokenDanceCallbackPending'));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '';
-      setServerError(message || t('auth.error.tokenDanceUnavailable'));
+      if (err instanceof OidcError) {
+        setServerError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '' }));
+      } else {
+        const message = err instanceof Error ? err.message : '';
+        setServerError(message || t('auth.error.tokenDanceUnavailable'));
+      }
     } finally {
       setIdentityLoading(false);
     }

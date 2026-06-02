@@ -361,5 +361,20 @@
   "im.searchClear": "Clear search",
 
   "diff.actions.diffApplied": "Applied",
-  "diff.actions.applyDiff": "Apply diff"
+  "diff.actions.applyDiff": "Apply diff",
+
+  "hub.toast.notConnected": "Not connected to Hub",
+  "hub.toast.messageRecalled": "Message recalled",
+  "hub.toast.recallMessageFailed": "Failed to recall message",
+  "hub.toast.forwardMessageFailed": "Failed to forward message",
+  "hub.toast.sendMessageFailed": "Failed to send Hub message",
+  "hub.toast.loadSessionsFailed": "Failed to load Hub sessions",
+  "hub.toast.loadMessagesFailed": "Failed to load Hub messages",
+  "hub.toast.updatePinFailed": "Failed to update pin status",
+  "hub.toast.updateArchiveFailed": "Failed to update archive status",
+  "hub.toast.updateMuteFailed": "Failed to update mute status",
+  "hub.error.autoLoginFailed": "Failed to complete Hub login",
+  "hub.error.wsAuthFailed": "Hub WebSocket auth failed: {{reason}}",
+  "hub.error.streamRecoveryFailed": "Failed to recover stream events",
+  "hub.error.recoveryFailed": "Recovery failed"
 }
