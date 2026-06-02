@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@shared': path.resolve(__dirname, '..', 'shared', 'src'),
+      '@emoji-mart/data': path.resolve(__dirname, 'src/mocks/emoji-mart-data.ts'),
     },
   },
   test: {
