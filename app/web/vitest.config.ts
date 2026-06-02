@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@shared': path.resolve(__dirname, '..', 'shared', 'src'),
+      '@emoji-mart/data': path.resolve(__dirname, '__mocks__/emoji-mart-data.ts'),
     },
   },
   test: {
@@ -14,13 +15,5 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['src/**/*.e2e.test.ts', 'src/**/*.e2e.test.tsx', 'e2e/**'],
     setupFiles: [],
-    deps: {
-      optimizer: {
-        web: {
-          enabled: true,
-          include: ['emoji-mart', '@emoji-mart/data', '@emoji-mart/react'],
-        },
-      },
-    },
   },
 });
