@@ -769,12 +769,6 @@ export default function App() {
   }, [handleSelectThread]);
   const handleSelectAgent = useCallback(async (agentId: string) => {
     const store = useThreadStore.getState();
-    const existing = store.agentThreadMap[agentId];
-    if (existing) {
-      store.selectAgentThread(agentId, existing);
-      setLeftSidebarView('thread');
-      return;
-    }
     const agent = agents.find((a) => a.id === agentId);
     try {
       const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
@@ -1773,12 +1767,6 @@ export default function App() {
                   onFork={handleForkThread}
                   onDelete={handleDelete}
                   onSendMessage={handleSend}
-                  agentTeamOverview={agentTeamsQuery.data}
-                  agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
-                  agentTeamsSignedIn={hubInventoryEnabled}
-                  teamLocalExecutions={teamLocalExecutions}
-                  onStartLocalOrchestration={handleStartLocalOrchestration}
-                  onOpenTeamRuns={() => openSettings('agentScheduling')}
                 />
               )}
             </div>
