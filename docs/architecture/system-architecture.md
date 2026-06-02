@@ -255,7 +255,7 @@ Desktop App
 
 当前架构边界：
 
-- Hub Server 已完整实现（三层架构，28 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
+- Hub Server 核心已实现（三层架构，78+ 组数据库迁移，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。部分高级功能和 web handler 仍在推进。
 - Web/Mobile 可通过 Hub 远程查看和审批。
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Agent CLI 进程，UI 不直接启动 Agent CLI。
@@ -286,6 +286,8 @@ Desktop App
 | API Contract | `api/` | REST API 和 WebSocket event 契约 |
 
 > **注意**：早期曾存在独立的 `runner/` 组件。当前进程生命周期管理已合并到 `edge-server/internal/lifecycle/`，Agent Runtime 适配层位于 `edge-server/internal/adapters/`，不再作为独立组件。旧文档里的 Runner 应理解为 Edge lifecycle + AgentAdapter，不要再新增 root-level `runner/`。
+>
+> 兼容说明：`edge-server/internal/runners/` 仍保留为内部兼容包，通过 `/v1/runners` 提供 Runtime/Target health 摘要；但 root-level `runner/` 目录（原独立服务）已不再存在。
 
 ## 5. 通信方式
 
@@ -346,7 +348,7 @@ Edge EventStore -> Desktop bridge -> Hub callbacks -> Web/Mobile
 Edge EventStore -> Hub Sync -> other devices
 ```
 
-本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，28 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
+本地 EventStore 语义已完整实现。Hub Server 核心已实现（三层架构，78+ 组数据库迁移，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。部分高级功能和 web handler 仍在推进。
 
 ## 7. EventStore 和恢复语义
 

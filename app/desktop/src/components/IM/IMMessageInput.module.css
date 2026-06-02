@@ -93,7 +93,7 @@
   border: none;
   border-radius: 8px;
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: var(--accent-foreground);
   cursor: pointer;
   flex-shrink: 0;
   transition: opacity var(--duration-fast) var(--ease-out);

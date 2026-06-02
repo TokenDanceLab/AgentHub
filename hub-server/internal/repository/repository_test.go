@@ -28,7 +28,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 		`CREATE TABLE users (
 			id TEXT PRIMARY KEY,
 			username TEXT NOT NULL UNIQUE,
-			password_hash TEXT NOT NULL,
+			password_hash TEXT,
 			nickname TEXT NOT NULL,
 			avatar_url TEXT DEFAULT '',
 			tokendance_sub TEXT DEFAULT NULL,
@@ -263,7 +263,7 @@ func TestUserRepo_CRUD(t *testing.T) {
 
 	user := &model.User{
 		Username:     "testuser",
-		PasswordHash: "hashed_password",
+		PasswordHash: strPtr("hashed_password"),
 		Nickname:     "Test User",
 	}
 
@@ -300,16 +300,17 @@ func TestUserRepo_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	fetched, err = GetUserByID(db, user.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "new_hash", fetched.PasswordHash)
+	require.NotNil(t, fetched.PasswordHash)
+	assert.Equal(t, "new_hash", *fetched.PasswordHash)
 }
 
 func TestUserRepo_GetUsersByIDs(t *testing.T) {
 	db := setupSQLite(t)
 
 	// Create multiple users
-	u1 := &model.User{Username: "user1", PasswordHash: "h1", Nickname: "U1"}
-	u2 := &model.User{Username: "user2", PasswordHash: "h2", Nickname: "U2"}
-	u3 := &model.User{Username: "user3", PasswordHash: "h3", Nickname: "U3"}
+	u1 := &model.User{Username: "user1", PasswordHash: strPtr("h1"), Nickname: "U1"}
+	u2 := &model.User{Username: "user2", PasswordHash: strPtr("h2"), Nickname: "U2"}
+	u3 := &model.User{Username: "user3", PasswordHash: strPtr("h3"), Nickname: "U3"}
 	require.NoError(t, CreateUser(db, u1))
 	require.NoError(t, CreateUser(db, u2))
 	require.NoError(t, CreateUser(db, u3))
@@ -355,6 +356,30 @@ func TestUserRepo_FindOrCreateByTokenDanceSubCreatesStableDistinctHubUsers(t *te
 	require.NoError(t, err)
 	assert.Equal(t, u1.ID, again.ID)
 	assert.Equal(t, u1.Username, again.Username)
+}
+
+func TestUserRepo_ReadsOIDCOnlyUserWithNullPasswordHash(t *testing.T) {
+	db := setupSQLite(t)
+
+	sub := "tokendance-sub-null-password"
+	now := time.Now().UTC()
+	require.NoError(t, db.Exec(`
+		INSERT INTO users (
+			id, username, password_hash, nickname, tokendance_sub, tokendance_sub_linked_at, created_at, updated_at
+		) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)
+	`, "user-oidc-null-password", "td_null_password", "OIDC Only", sub, now, now, now).Error)
+
+	bySub, err := FindByTokenDanceSub(db, sub)
+	require.NoError(t, err)
+	require.NotNil(t, bySub)
+	assert.Equal(t, "user-oidc-null-password", bySub.ID)
+	assert.Nil(t, bySub.PasswordHash)
+
+	byID, err := GetUserByID(db, "user-oidc-null-password")
+	require.NoError(t, err)
+	require.NotNil(t, byID)
+	assert.Equal(t, sub, *byID.TokenDanceSub)
+	assert.Nil(t, byID.PasswordHash)
 }
 
 // =============================================================================
@@ -988,6 +1013,21 @@ func TestNotificationRepo_CreateAndList(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	assert.Equal(t, n2.ID, result[0].ID)
+}
+
+func TestNotificationRepo_MarkReadRequiresOwningUser(t *testing.T) {
+	db := setupSQLite(t)
+
+	n := &model.Notification{UserID: "user-owner", Type: model.TypeMention, Payload: `{}`}
+	require.NoError(t, CreateNotification(db, n))
+
+	err := MarkNotificationRead(db, "user-other", n.ID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	unread, err := ListNotifications(db, "user-owner", true, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, unread, 1)
+	assert.Equal(t, n.ID, unread[0].ID)
 }
 
 func TestNotificationRepo_MarkAllRead(t *testing.T) {
@@ -1766,7 +1806,7 @@ func TestUserRepo_UpdatePasswordAndRevokeTokens(t *testing.T) {
 	db := setupSQLite(t)
 
 	// Create user
-	user := &model.User{Username: "pwuser", PasswordHash: "old-hash", Nickname: "PW"}
+	user := &model.User{Username: "pwuser", PasswordHash: strPtr("old-hash"), Nickname: "PW"}
 	require.NoError(t, CreateUser(db, user))
 
 	// Create a couple of refresh tokens
@@ -1788,7 +1828,8 @@ func TestUserRepo_UpdatePasswordAndRevokeTokens(t *testing.T) {
 	// Verify password updated
 	fetchedUser, err := GetUserByID(db, user.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "new-hash", fetchedUser.PasswordHash)
+	require.NotNil(t, fetchedUser.PasswordHash)
+	assert.Equal(t, "new-hash", *fetchedUser.PasswordHash)
 
 	// Verify all tokens revoked
 	rt1Check, err := FindRefreshTokenByHash(db, "hash1")

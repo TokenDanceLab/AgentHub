@@ -146,7 +146,7 @@ func setupE2EDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE users (
 			id TEXT PRIMARY KEY,
 			username TEXT NOT NULL UNIQUE,
-			password_hash TEXT NOT NULL DEFAULT '',
+			password_hash TEXT,
 			nickname TEXT NOT NULL,
 			avatar_url TEXT DEFAULT '',
 			tokendance_sub TEXT,

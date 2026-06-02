@@ -1,5 +1,5 @@
 <!--
-标题格式：docs: 中文变更说明 / feat(edge): 中文变更说明 / fix(runner): 中文变更说明
+标题格式：feat(desktop): 中文变更说明 / fix(hub): 中文变更说明 / docs(api): 中文变更说明
 正文中文为主；代码标识、路径、协议字段、命令保持英文。
 如果使用 squash merge，最终 commit 标题仍按 `type(scope): 中文摘要` 改写。
 -->

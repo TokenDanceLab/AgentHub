@@ -16,7 +16,6 @@ pub struct EdgeManager {
     edge_path: PathBuf,
     store_path: PathBuf,
     port: u16,
-    auto_restart: bool,
 }
 
 impl EdgeManager {
@@ -26,7 +25,6 @@ impl EdgeManager {
             edge_path,
             store_path,
             port: 3210,
-            auto_restart: true,
         }
     }
 
@@ -35,12 +33,13 @@ impl EdgeManager {
             return Err("Edge Server is already running".into());
         }
 
+        let addr = format!("127.0.0.1:{}", self.port);
         let child = Command::new(&self.edge_path)
             .args([
                 "--store-file",
                 self.store_path.to_str().unwrap_or("agenthub_store.json"),
-                "--port",
-                &self.port.to_string(),
+                "--addr",
+                &addr,
             ])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -85,6 +84,43 @@ impl EdgeManager {
 
 pub type SharedEdgeManager = Arc<Mutex<EdgeManager>>;
 
+fn edge_binary_name() -> &'static str {
+    if cfg!(windows) {
+        "agenthub-edge.exe"
+    } else {
+        "agenthub-edge"
+    }
+}
+
+fn edge_binary_candidates() -> Vec<PathBuf> {
+    let binary_name = edge_binary_name();
+    let mut candidates = Vec::new();
+
+    candidates.push(PathBuf::from("edge-server").join(binary_name));
+    candidates.push(PathBuf::from(binary_name));
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    candidates.push(manifest_dir.join(binary_name));
+    if let Some(desktop_dir) = manifest_dir.parent() {
+        candidates.push(desktop_dir.join(binary_name));
+        if let Some(app_dir) = desktop_dir.parent() {
+            if let Some(repo_root) = app_dir.parent() {
+                candidates.push(repo_root.join("edge-server").join(binary_name));
+                candidates.push(repo_root.join(binary_name));
+            }
+        }
+    }
+
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(exe_dir) = current_exe.parent() {
+            candidates.push(exe_dir.join(binary_name));
+            candidates.push(exe_dir.join("edge-server").join(binary_name));
+        }
+    }
+
+    candidates
+}
+
 pub fn resolve_edge_path() -> PathBuf {
     // 1. Check EDGE_BINARY env var
     if let Ok(path) = std::env::var("EDGE_BINARY") {
@@ -94,18 +130,22 @@ pub fn resolve_edge_path() -> PathBuf {
         }
     }
 
-    // 2. Check relative to the project root (dev mode)
-    let dev_path = PathBuf::from("edge-server/agenthub-edge.exe");
-    if dev_path.exists() {
-        return dev_path;
+    // 2. Check common dev/bundle locations. Tauri dev often runs from
+    // app/desktop or app/desktop/src-tauri, not the repository root.
+    for candidate in edge_binary_candidates() {
+        if candidate.exists() {
+            return candidate;
+        }
     }
 
-    // 3. Check current directory
-    let cwd_path = PathBuf::from("agenthub-edge.exe");
-    if cwd_path.exists() {
-        return cwd_path;
-    }
-
-    // Default: return the dev path (will fail with clear error if missing)
-    dev_path
+    // Default: return the repository-root dev path when it can be derived.
+    // The subsequent spawn error then includes the path that should be built.
+    edge_binary_candidates()
+        .into_iter()
+        .find(|candidate| {
+            candidate
+                .components()
+                .any(|part| part.as_os_str() == std::ffi::OsStr::new("edge-server"))
+        })
+        .unwrap_or_else(|| PathBuf::from("edge-server").join(edge_binary_name()))
 }

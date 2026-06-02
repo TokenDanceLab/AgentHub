@@ -77,6 +77,8 @@ type Reader interface {
 type Writer interface {
 	CreateProject(id, name string) (Project, error)
 	CreateThread(id, projectID, title string) (Thread, error)
+	UpdateThread(id string, title *string, status *string) (Thread, bool)
+	DeleteThread(id string) bool
 	CreateRun(id, projectID, threadID string) (Run, error)
 	SetRunStatus(id, status string) (Run, bool)
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
@@ -260,6 +262,50 @@ func (s *Store) GetThread(id string) (Thread, bool) {
 	defer s.mu.RUnlock()
 	thread, ok := s.threads[id]
 	return thread, ok
+}
+
+func (s *Store) UpdateThread(id string, title *string, status *string) (Thread, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	thread, ok := s.threads[id]
+	if !ok {
+		return Thread{}, false
+	}
+	if title != nil {
+		thread.Title = *title
+	}
+	if status != nil {
+		thread.Status = *status
+	}
+	thread.UpdatedAt = nowString()
+	s.threads[id] = thread
+	return thread, true
+}
+
+func (s *Store) DeleteThread(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.threads[id]; !ok {
+		return false
+	}
+	delete(s.threads, id)
+	s.threadOrder = removeString(s.threadOrder, id)
+
+	for runID, run := range s.runs {
+		if run.ThreadID == id {
+			delete(s.runs, runID)
+			s.runOrder = removeString(s.runOrder, runID)
+		}
+	}
+	for itemID, item := range s.items {
+		if item.ThreadID == id {
+			delete(s.items, itemID)
+			s.itemOrder = removeString(s.itemOrder, itemID)
+		}
+	}
+	return true
 }
 
 func (s *Store) ListThreads(projectID string) []Thread {
@@ -584,4 +630,14 @@ func (s *Store) ListThreadItems(threadID string) []Item {
 
 func nowString() string {
 	return time.Now().UTC().Format(time.RFC3339)
+}
+
+func removeString(values []string, target string) []string {
+	out := values[:0]
+	for _, value := range values {
+		if value != target {
+			out = append(out, value)
+		}
+	}
+	return out
 }

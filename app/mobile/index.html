@@ -8,6 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="/manifest.json" />
     <title>AgentHub Mobile</title>
+    <script>
+      (function(){try{var t=window.localStorage.getItem("agenthub.mobile.theme");if(t==="light"||t==="dark"||t==="oled"){document.documentElement.setAttribute("data-theme",t);var m=document.querySelector('meta[name="theme-color"]');if(m){if(t==="light")m.content="#f5f5f7";else if(t==="oled")m.content="#000000";else m.content="#1f1f27"}}}catch(e){}})();
+    </script>
   </head>
   <body>
     <div id="root"></div>

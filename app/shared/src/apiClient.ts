@@ -21,7 +21,7 @@ import { parseError } from './errors';
 
 // ── Config ────────────────────────────────────
 
-let baseUrl = 'http://127.0.0.1:3210';
+let baseUrl = '';
 
 export function setBaseUrl(url: string) {
   baseUrl = url.replace(/\/+$/, '');
@@ -31,12 +31,19 @@ export function getBaseUrl() {
   return baseUrl;
 }
 
+export function isConfigured(): boolean {
+  return baseUrl !== '';
+}
+
 // ── Internal fetch wrapper ────────────────────
 
 async function request<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  if (!baseUrl) {
+    throw new Error('[AgentHub API] Base URL is not configured. Call setBaseUrl() before making API requests.');
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
@@ -54,6 +61,24 @@ async function request<T>(
   }
 
   return res.json() as Promise<T>;
+}
+
+async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  if (!baseUrl) {
+    throw new Error('[AgentHub API] Base URL is not configured. Call setBaseUrl() before making API requests.');
+  }
+  const res = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+    },
+  });
+
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+
+  return res.blob();
 }
 
 function qs(params: Record<string, string | number | undefined>): string {
@@ -197,7 +222,7 @@ export function getRun(runId: string): Promise<Run> {
 export function startRun(body?: StartRunRequest): Promise<Run> {
   return request('/v1/runs', {
     method: 'POST',
-    body: body ? JSON.stringify(body) : undefined,
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 
@@ -261,7 +286,7 @@ export function getArtifact(artifactId: string): Promise<Artifact> {
 export function getArtifactContent(
   artifactId: string,
 ): Promise<Blob> {
-  return request(
+  return requestBlob(
     `/v1/artifacts/${encodeURIComponent(artifactId)}/content`,
   );
 }

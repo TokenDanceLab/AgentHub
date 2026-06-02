@@ -1,0 +1,130 @@
+import { describe, expect, it } from 'vitest';
+import {
+  getWorkbenchCatalogState,
+  getWorkbenchDataMode,
+  getWorkbenchSectionSource,
+  type WorkbenchDataMode,
+} from './workbenchDataMode';
+import type { WorkbenchState } from './workbenchState';
+
+function state(
+  overrides: Partial<WorkbenchState> = {},
+): WorkbenchState {
+  return {
+    projects: [],
+    threads: [],
+    runners: [],
+    runs: [],
+    threadItems: [],
+    approvals: [],
+    artifacts: [],
+    previews: [],
+    runLogs: {},
+    connection: { status: 'idle' },
+    lastSeq: 0,
+    ...overrides,
+  };
+}
+
+describe('workbenchDataMode', () => {
+  it.each<[string, WorkbenchState, WorkbenchDataMode]>([
+    ['loading while Edge snapshot is pending', state({ connection: { status: 'loading' } }), 'loading'],
+    [
+      'live when connected with snapshot data',
+      state({
+        connection: { status: 'connected' },
+        projects: [{ id: 'project-1', name: 'AgentHub', createdAt: '2026-05-24T10:00:00.000Z' }],
+      }),
+      'live',
+    ],
+    [
+      'offline snapshot when disconnected with reducer data',
+      state({
+        connection: { status: 'disconnected', error: 'socket closed' },
+        runs: [
+          {
+            runId: 'run-1',
+            projectId: 'project-1',
+            threadId: 'thread-1',
+            status: 'running',
+            createdAt: '2026-05-24T10:00:00.000Z',
+          },
+        ],
+      }),
+      'offline-snapshot',
+    ],
+    [
+      'mock fallback when Edge failed before snapshot data loaded',
+      state({ connection: { status: 'error', error: 'network down' } }),
+      'mock',
+    ],
+    ['unavailable before a load begins', state(), 'unavailable'],
+  ])('%s', (_label, input, expected) => {
+    expect(getWorkbenchDataMode(input)).toBe(expected);
+  });
+
+  it('keeps mock fallback visually distinct from live catalog data', () => {
+    const catalogState = getWorkbenchCatalogState(
+      state({ connection: { status: 'error', error: 'network down' } }),
+    );
+
+    expect(catalogState).toMatchObject({
+      mode: 'mock',
+      label: 'Mock fallback',
+      tone: 'amber',
+      hasLiveCatalog: false,
+    });
+    expect(catalogState.message).toContain('Showing mock demo data.');
+  });
+
+  it('marks offline snapshots as reusable catalog data without calling them live', () => {
+    const catalogState = getWorkbenchCatalogState(
+      state({
+        connection: { status: 'error', error: 'network down' },
+        runners: [{ id: 'runner-1', name: 'Local Runner', status: 'online' }],
+      }),
+    );
+
+    expect(catalogState).toMatchObject({
+      mode: 'offline-snapshot',
+      label: 'Offline snapshot',
+      tone: 'purple',
+      hasLiveCatalog: true,
+    });
+  });
+
+  it.each([
+    [
+      'loading section without snapshot data',
+      { mode: 'loading', hasSectionSnapshot: false },
+      { label: 'Loading snapshot', tone: 'cyan' },
+    ],
+    [
+      'unavailable section without snapshot data',
+      { mode: 'unavailable', hasSectionSnapshot: false },
+      { label: 'Snapshot unavailable', tone: 'neutral' },
+    ],
+    [
+      'mock section without snapshot data',
+      { mode: 'mock', hasSectionSnapshot: false },
+      { label: 'Mock fallback', tone: 'amber' },
+    ],
+    [
+      'offline section with snapshot data',
+      { mode: 'offline-snapshot', hasSectionSnapshot: true },
+      { label: 'Offline snapshot', tone: 'purple' },
+    ],
+    [
+      'available snapshot mode with section data',
+      { mode: 'live', hasSectionSnapshot: true },
+      { label: 'Edge snapshot', tone: 'green' },
+    ],
+    [
+      'local dry-run layered over the base section source',
+      { mode: 'mock', hasSectionSnapshot: false, hasLocalDryRun: true },
+      { label: 'Local dry-run / Mock fallback', tone: 'cyan' },
+    ],
+  ] as const)('%s', (_label, input, expected) => {
+    expect(getWorkbenchSectionSource(input)).toEqual(expected);
+  });
+});

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -21,8 +22,8 @@ import (
 // mockHub is a test double for the Hub server that captures Edge's callback
 // requests (device registration, task stream, task done/fail).
 type mockHub struct {
-	mu      sync.Mutex
-	server  *httptest.Server
+	mu     sync.Mutex
+	server *httptest.Server
 
 	// Captured requests.
 	registerReqs []capturedRegisterReq
@@ -36,6 +37,15 @@ type capturedRegisterReq struct {
 	AppVersion   string   `json:"app_version"`
 	Capabilities []string `json:"capabilities"`
 }
+
+var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+const (
+	edgeWinDeviceID   = "11111111-1111-4111-8111-111111111111"
+	edgeMacDeviceID   = "22222222-2222-4222-8222-222222222222"
+	edgeLinuxDeviceID = "33333333-3333-4333-8333-333333333333"
+	edgeE2EDeviceID   = "44444444-4444-4444-8444-444444444444"
+)
 
 func newMockHub(t *testing.T) *mockHub {
 	t.Helper()
@@ -61,6 +71,10 @@ func (mh *mockHub) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	var req capturedRegisterReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !uuidPattern.MatchString(req.DeviceID) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -226,7 +240,7 @@ func TestEdgeRegistersWithHub(t *testing.T) {
 
 	// Simulate Edge Desktop sending a registration request to Hub.
 	reqBody := map[string]any{
-		"device_id":    "edge-win-001",
+		"device_id":    edgeWinDeviceID,
 		"app_version":  "1.5.0",
 		"capabilities": []string{"codex", "claude-code", "opencode"},
 	}
@@ -244,8 +258,8 @@ func TestEdgeRegistersWithHub(t *testing.T) {
 	mockHub.mu.Lock()
 	reg := mockHub.registerReqs[0]
 	mockHub.mu.Unlock()
-	if reg.DeviceID != "edge-win-001" {
-		t.Errorf("device_id = %q, want edge-win-001", reg.DeviceID)
+	if reg.DeviceID != edgeWinDeviceID {
+		t.Errorf("device_id = %q, want %s", reg.DeviceID, edgeWinDeviceID)
 	}
 	if reg.AppVersion != "1.5.0" {
 		t.Errorf("app_version = %q, want 1.5.0", reg.AppVersion)
@@ -260,8 +274,8 @@ func TestEdgeRegistersWithHubMultiple(t *testing.T) {
 	mockHub := newMockHub(t)
 
 	devices := []map[string]any{
-		{"device_id": "edge-mac-001", "app_version": "1.5.0", "capabilities": []string{"codex"}},
-		{"device_id": "edge-linux-001", "app_version": "1.5.1", "capabilities": []string{"claude-code"}},
+		{"device_id": edgeMacDeviceID, "app_version": "1.5.0", "capabilities": []string{"codex"}},
+		{"device_id": edgeLinuxDeviceID, "app_version": "1.5.1", "capabilities": []string{"claude-code"}},
 	}
 
 	for _, dev := range devices {
@@ -410,7 +424,7 @@ func TestEdgeFullProtocolRoundTrip(t *testing.T) {
 
 	// Phase 1: Edge registers device with Hub.
 	resp := postJSON(t, mockHub.URL()+"/edge/devices/register", map[string]any{
-		"device_id":    "edge-e2e-001",
+		"device_id":    edgeE2EDeviceID,
 		"app_version":  "2.0.0",
 		"capabilities": []string{"codex", "claude-code"},
 	})

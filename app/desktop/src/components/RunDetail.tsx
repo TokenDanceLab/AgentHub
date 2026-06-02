@@ -1,14 +1,35 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, TerminalSquare, Wrench } from 'lucide-react';
+import {
+  Brain,
+  Check,
+  Eye,
+  FileText,
+  ListTree,
+  Package,
+  ShieldAlert,
+  TerminalSquare,
+  Wrench,
+  XCircle,
+} from 'lucide-react';
 import type { RunInfo } from '@shared/types';
+import { parseUnifiedDiff } from '@shared/diff';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
-import { RunState } from '@/utils/runStateMachine';
-import { RunStateMachine } from '@/utils/runStateMachine';
+import type { PermissionRequestItem } from '@/hooks/useChatMessages';
+import type { RunEvidenceState } from '@/api/runEvidenceQueries';
+import { RunState, RunStateMachine } from '@/utils/runStateMachine';
+import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
+import { createHubClient, type AgentRunEventSummary } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
+import { getSavedWorkDir } from '@/utils/workspaceStore';
+import { useGitStatus } from '@/hooks/useGitStatus';
+import { useGitDiff } from '@/hooks/useGitDiff';
 import DiffViewer from './DiffViewer';
-import DiffReviewPanel from './DiffReviewPanel';
+import { DiffReviewPanel } from '@shared/ui/DiffReviewPanel';
 import ContextUsage from './ContextUsage';
+import ArtifactBrowser from './ArtifactBrowser';
+import type { ArtifactItem } from './ArtifactBrowser';
 import styles from './RunDetail.module.css';
 
 interface ToolCallEntry {
@@ -19,6 +40,21 @@ interface ToolCallEntry {
   output?: string;
 }
 
+interface RunArtifactEntry {
+  id: string;
+  path: string;
+  kind: string;
+  createdAt: string;
+  sizeBytes?: number;
+}
+
+interface RunPreviewEntry {
+  id: string;
+  url?: string;
+  status: string;
+  createdAt: string;
+}
+
 interface Props {
   run: RunInfo | null;
   toolCalls: ToolCallEntry[];
@@ -26,17 +62,32 @@ interface Props {
   outputText: string;
   diffs?: FileDiff[];
   onCancel?: () => void;
-  /** Chat messages from the current session, used for context breakdown visualization. */
+  approvals?: PermissionRequestItem[];
+  artifacts?: RunArtifactEntry[];
+  previews?: RunPreviewEntry[];
+  evidence?: RunEvidenceState;
+  onDecideApproval?: (requestId: string, decision: 'allow' | 'deny', reason?: string) => Promise<void> | void;
   chatMessages?: ChatMessage[];
 }
 
-/** Build SessionMetrics from chat messages by extracting token data from result blocks. */
 function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics | null {
   if (!chatMessages || chatMessages.length === 0) return null;
 
   let inputTokens = 0;
   let outputTokens = 0;
   let model: string | undefined;
+  let contextLimit: number | undefined;
+  let provider: string | undefined;
+  let totalCost: number | undefined;
+
+  // Track latest context_usage data — it provides the most complete snapshot
+  let ctxTotal: number | undefined;
+  let ctxInput: number | undefined;
+  let ctxOutput: number | undefined;
+  let ctxLimit: number | undefined;
+  let ctxModel: string | undefined;
+  let ctxProvider: string | undefined;
+  let ctxCost: number | undefined;
 
   for (const msg of chatMessages) {
     for (const block of msg.blocks) {
@@ -44,32 +95,47 @@ function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics |
         inputTokens += block.tokenUsage.input;
         outputTokens += block.tokenUsage.output;
       }
+      if (block.kind === 'context_usage') {
+        // Discriminated union narrowing is flaky — access via Record cast
+        const ctx = block as Record<string, unknown>;
+        if (ctx.input != null) ctxInput = ctx.input as number;
+        if (ctx.output != null) ctxOutput = ctx.output as number;
+        if (ctx.total != null) ctxTotal = ctx.total as number;
+        if (ctx.contextLimit != null) ctxLimit = ctx.contextLimit as number;
+        if (ctx.model != null) ctxModel = ctx.model as string;
+        if (ctx.provider != null) ctxProvider = ctx.provider as string;
+        if (ctx.totalCost != null) ctxCost = ctx.totalCost as number;
+      }
       if (block.kind === 'session_init' && block.model) {
         model = block.model;
       }
     }
   }
 
+  // Use context_usage totals if available (they come from the edge server's accurate tokenizer)
+  if (ctxInput != null) inputTokens = ctxInput;
+  if (ctxOutput != null) outputTokens = ctxOutput;
+  if (ctxLimit != null) contextLimit = ctxLimit;
+  if (ctxModel) model = ctxModel;
+  if (ctxProvider) provider = ctxProvider;
+  if (ctxCost != null) totalCost = ctxCost;
+
   const totalTokens = inputTokens + outputTokens;
   if (totalTokens === 0) return null;
-
-  // Flatten to simple {role, content} for the breakdown algorithm
-  const flatMessages = chatMessages.map((msg) => ({
-    role: msg.role,
-    content: msg.blocks
-      .filter(
-        (b) => b.kind === 'text' || b.kind === 'thinking' || b.kind === 'code',
-      )
-      .map((b) => ('content' in b ? (b.content as string) : ''))
-      .join('\n'),
-  }));
 
   return {
     inputTokens,
     outputTokens,
     totalTokens,
+    contextLimit,
     model,
-    messages: flatMessages,
+    messages: chatMessages.map((msg) => ({
+      role: msg.role,
+      content: msg.blocks
+        .filter((b) => b.kind === 'text' || b.kind === 'thinking' || b.kind === 'code')
+        .map((b) => ('content' in b ? (b.content as string) : ''))
+        .join('\n'),
+    })),
   };
 }
 
@@ -90,7 +156,9 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
         </span>
         <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
         {hasOutput && (
-          <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
+          <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>
+            &gt;
+          </span>
         )}
       </button>
       {expanded && tc.output && (
@@ -100,6 +168,85 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
   );
 }
 
+function getRuntimeBlockLabel(kind: string, t: (key: string) => string): string {
+  switch (kind) {
+    case 'thinking':
+      return t('run.block.thinking');
+    case 'tool_use':
+      return t('run.block.toolCall');
+    case 'file_change':
+      return t('run.block.fileChange');
+    case 'result':
+      return t('run.block.result');
+    case 'session_init':
+      return t('run.block.session');
+    case 'code':
+      return t('run.block.code');
+    case 'text':
+      return t('run.block.text');
+    default:
+      return t('run.block.raw');
+  }
+}
+
+function blockSummary(block: ChatMessage['blocks'][number]): string {
+  switch (block.kind) {
+    case 'text':
+    case 'code':
+    case 'thinking':
+      return block.content.slice(0, 140);
+    case 'tool_use':
+      return `${block.toolName} ${block.status}`;
+    case 'file_change':
+      return `${block.action} ${block.path}`;
+    case 'result':
+      return block.success ? 'success' : (block.error ?? 'failed');
+    case 'session_init':
+      return [block.model, block.permissionMode].filter(Boolean).join(' / ') || 'session';
+    default:
+      return JSON.stringify(block).slice(0, 140);
+  }
+}
+
+function collectRuntimeBlocks(chatMessages: ChatMessage[] | undefined) {
+  return (chatMessages ?? [])
+    .flatMap((message) => message.blocks.map((block) => ({ block, timestamp: message.timestamp })))
+    .filter(({ block }) => block.kind !== 'session_init' || blockSummary(block) !== 'session');
+}
+
+function collectDiffs(chatMessages: ChatMessage[] | undefined): FileDiff[] {
+  const parsed: FileDiff[] = [];
+  for (const message of chatMessages ?? []) {
+    for (const block of message.blocks) {
+      if (block.kind !== 'file_change' || !block.diff) continue;
+      const files = parseUnifiedDiff(block.diff, block.path) as FileDiff[];
+      if (files.length > 0) {
+        parsed.push(...files);
+        continue;
+      }
+      const lines = block.diff.split(/\r?\n/).filter(Boolean);
+      parsed.push({
+        filePath: block.path,
+        status: block.action === 'created' ? 'added' : block.action,
+        additions: lines.filter((line) => line.startsWith('+')).length,
+        deletions: lines.filter((line) => line.startsWith('-')).length,
+        hunks: [
+          {
+            header: '@@ runtime event diff @@',
+            lines: lines.map((line, index) => ({
+              type: line.startsWith('+') ? 'added' : line.startsWith('-') ? 'deleted' : 'context',
+              content: line.replace(/^[-+ ]/, ''),
+              oldLineNumber: line.startsWith('+') ? undefined : index + 1,
+              newLineNumber: line.startsWith('-') ? undefined : index + 1,
+            })),
+          },
+        ],
+      });
+    }
+  }
+  return parsed;
+}
+
 export default function RunDetail({
   run,
   toolCalls,
@@ -107,11 +254,59 @@ export default function RunDetail({
   outputText,
   diffs,
   onCancel,
+  approvals = [],
+  artifacts = [],
+  previews = [],
+  evidence,
+  onDecideApproval,
   chatMessages,
 }: Props) {
   const { t } = useTranslation();
+  const [approvalActionId, setApprovalActionId] = useState<string | null>(null);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
 
   const metrics = useMemo(() => buildMetrics(chatMessages), [chatMessages]);
+  const runtimeBlocks = useMemo(() => collectRuntimeBlocks(chatMessages), [chatMessages]);
+  const eventDiffs = useMemo(() => collectDiffs(chatMessages), [chatMessages]);
+
+  // ── Hub event summary ────────────────────────────
+  const getTaskByRunId = useTaskBridgeStore((s) => s.getTaskByRunId);
+  const hubTaskId: string | undefined = useMemo(() => {
+    if (!run?.runId) return undefined;
+    return getTaskByRunId(run.runId)?.taskId;
+  }, [run?.runId, getTaskByRunId]);
+
+  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+  const [eventSummary, setEventSummary] = useState<AgentRunEventSummary | null>(null);
+
+  useEffect(() => {
+    if (!hubTaskId) {
+      setEventSummary(null);
+      return;
+    }
+    let cancelled = false;
+    hubClient.getTaskRunEventSummary(hubTaskId).then((summary) => {
+      if (!cancelled) setEventSummary(summary);
+    }).catch(() => {
+      if (!cancelled) setEventSummary(null);
+    });
+    return () => { cancelled = true; };
+  }, [hubTaskId, hubClient]);
+
+  const hasSummary = eventSummary != null;
+
+  // ── Artifact browser "Apply" → diff review focus ──
+  const [appliedArtifactPath, setAppliedArtifactPath] = useState<string | null>(null);
+
+  const handleApplyDiff = (artifact: ArtifactItem) => {
+    setAppliedArtifactPath(artifact.path);
+    // Dispatch custom event so parents / extensions can react
+    window.dispatchEvent(
+      new CustomEvent('agenthub:apply-artifact-diff', {
+        detail: { artifactId: artifact.id, path: artifact.path, title: artifact.title },
+      }),
+    );
+  };
 
   if (!run) {
     return (
@@ -122,9 +317,8 @@ export default function RunDetail({
     );
   }
 
-  // Normalize legacy status strings → RunState enum values
   const resolvedStatus = RunStateMachine.fromLegacyStatus(run.status);
-  const statusKey = `run.status.${run.status}`;
+  const statusKey = `run.status.${run.status.toLowerCase()}`;
   const statusClass =
     resolvedStatus === RunState.COMPLETED
       ? styles.statusDone
@@ -139,18 +333,64 @@ export default function RunDetail({
   const hasOutput = !!outputText;
   const hasToolCalls = toolCalls.length > 0;
   const hasFileChanges = changedFiles.length > 0;
-
-  const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
-  const hasDiffs = diffs && diffs.length > 0;
+  const reviewDiffs = diffs && diffs.length > 0 ? diffs : eventDiffs;
+  const hasDiffs = reviewDiffs.length > 0;
+  const diffSource =
+    diffs && diffs.length > 0
+      ? t('run.reviewSourceEdge')
+      : eventDiffs.length > 0
+        ? t('run.reviewSourceEvents')
+        : null;
+  const artifactSource = evidence?.artifactSource === 'edge'
+    ? t('run.reviewSourceEdge')
+    : artifacts.length > 0
+      ? t('run.reviewSourceEvents')
+      : null;
+  const previewSource = evidence?.previewSource === 'edge'
+    ? t('run.reviewSourceEdge')
+    : previews.length > 0
+      ? t('run.reviewSourceEvents')
+      : null;
+  const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges || runtimeBlocks.length > 0;
   const latestFiles = changedFiles.slice(-4).reverse();
-  const latestTools = toolCalls.slice(-4).reverse();
 
-  // Show cancel button while the run is active (not terminal, not IDLE)
+  // ── Git status integration ──
+  const workDir = useMemo(() => getSavedWorkDir(), []);
+  const { status: gitStatus } = useGitStatus(workDir || undefined);
+  const { allDiffs: gitDiffs, stagedDiffs: gitStagedDiffs, unstagedDiffs: gitUnstagedDiffs } = useGitDiff(workDir || undefined);
+
+  const latestTools = toolCalls.slice(-4).reverse();
+  const pendingApprovals = approvals.filter((approval) => !approval.decision && approval.runId === run.runId);
+  const latestBlocks = runtimeBlocks.slice(-6).reverse();
+
   const isActive =
     resolvedStatus !== RunState.COMPLETED &&
     resolvedStatus !== RunState.FAILED &&
     resolvedStatus !== RunState.CANCELLED &&
     resolvedStatus !== RunState.IDLE;
+
+  const decideApproval = async (requestId: string, decision: 'allow' | 'deny') => {
+    if (!onDecideApproval) return;
+    setApprovalActionId(`${requestId}:${decision}`);
+    setApprovalError(null);
+    try {
+      await onDecideApproval(requestId, decision, decision === 'deny' ? 'review panel denied' : undefined);
+    } catch (error) {
+      const status = typeof (error as { status?: unknown })?.status === 'number'
+        ? (error as { status: number }).status
+        : undefined;
+      const code = typeof (error as { code?: unknown })?.code === 'string'
+        ? (error as { code: string }).code
+        : undefined;
+      setApprovalError(
+        status === 404 || code === 'permission_request_not_found'
+          ? t('run.reviewApprovalAlreadyHandled')
+          : t('run.reviewApprovalFailed'),
+      );
+    } finally {
+      setApprovalActionId(null);
+    }
+  };
 
   return (
     <aside className={styles.panel} aria-label={t('run.title')}>
@@ -171,10 +411,160 @@ export default function RunDetail({
 
       <ContextUsage metrics={metrics} />
 
-      {/* ── Diff Review Panel: primary view when diffs exist ── */}
+      <section className={styles.reviewSurface} aria-label={t('run.reviewSurface')}>
+        <div className={styles.cardHeader}>
+          <ListTree size={14} />
+          <span>{t('run.reviewSurface')}</span>
+        </div>
+
+        <div className={styles.reviewGrid}>
+          <div className={styles.reviewCard}>
+            <div className={styles.reviewCardTitle}>
+              <ShieldAlert size={13} />
+              <span>{t('run.reviewApprovals')}</span>
+              <span className={styles.cardCount}>{pendingApprovals.length}</span>
+            </div>
+            {pendingApprovals.length > 0 ? (
+              <div className={styles.reviewList}>
+                {pendingApprovals.slice(-3).reverse().map((approval) => (
+                  <div key={approval.requestId} className={styles.reviewItem}>
+                    <code className={styles.filePath}>{approval.toolName}</code>
+                    <span className={styles.reviewSummary}>
+                      {Object.keys(approval.toolInput).join(', ') || approval.requestId}
+                    </span>
+                    <span className={styles.sourceTag}>{t('run.reviewApprovalSource')}</span>
+                    {onDecideApproval && (
+                      <span className={styles.reviewActions}>
+                        <button
+                          className={styles.iconAction}
+                          onClick={() => void decideApproval(approval.requestId, 'allow')}
+                          disabled={approvalActionId !== null}
+                          aria-label={t('run.reviewAllow')}
+                        >
+                          {approvalActionId === `${approval.requestId}:allow`
+                            ? <span className={styles.actionText}>{t('run.reviewDecisionPending')}</span>
+                            : <Check size={12} />}
+                        </button>
+                        <button
+                          className={styles.iconAction}
+                          onClick={() => void decideApproval(approval.requestId, 'deny')}
+                          disabled={approvalActionId !== null}
+                          aria-label={t('run.reviewDeny')}
+                        >
+                          {approvalActionId === `${approval.requestId}:deny`
+                            ? <span className={styles.actionText}>{t('run.reviewDecisionPending')}</span>
+                            : <XCircle size={12} />}
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className={styles.gapText}>{t('run.reviewNoApprovals')}</span>
+            )}
+            {approvalError && <span className={styles.errorText}>{approvalError}</span>}
+          </div>
+
+          <div className={styles.reviewCard}>
+            <div className={styles.reviewCardTitle}>
+              <FileText size={13} />
+              <span>{t('run.reviewDiff')}</span>
+              {diffSource && <span className={styles.sourceTag}>{diffSource}</span>}
+              <span className={styles.cardCount}>{reviewDiffs.length}</span>
+            </div>
+            {hasDiffs ? (
+              <div className={styles.reviewList}>
+                {reviewDiffs.slice(0, 3).map((file) => (
+                  <div key={file.filePath} className={styles.reviewItem}>
+                    <code className={styles.filePath}>{file.filePath}</code>
+                    <span className={styles.action}>{file.status}</span>
+                  </div>
+                ))}
+              </div>
+            ) : evidence?.diffLoading ? (
+              <span className={styles.gapText}>{t('run.reviewLoading')}</span>
+            ) : evidence?.diffError ? (
+              <span className={styles.gapText}>{t('run.reviewDiffError')}</span>
+            ) : (
+              <span className={styles.gapText}>{t('run.reviewDiffGap')}</span>
+            )}
+          </div>
+
+          <div className={styles.reviewCard}>
+            <div className={styles.reviewCardTitle}>
+              <Package size={13} />
+              <span>{t('run.reviewArtifacts')}</span>
+              {artifactSource && <span className={styles.sourceTag}>{artifactSource}</span>}
+              <span className={styles.cardCount}>{artifacts.length}</span>
+            </div>
+            {artifacts.length > 0 ? (
+              <div className={styles.reviewList}>
+                {artifacts.slice(-3).reverse().map((artifact) => (
+                  <div key={artifact.id} className={styles.reviewItem}>
+                    <code className={styles.filePath}>{artifact.path}</code>
+                    <span className={styles.action}>{artifact.kind}</span>
+                  </div>
+                ))}
+              </div>
+            ) : evidence?.artifactLoading ? (
+              <span className={styles.gapText}>{t('run.reviewLoading')}</span>
+            ) : evidence?.artifactError ? (
+              <span className={styles.gapText}>{t('run.reviewArtifactError')}</span>
+            ) : (
+              <span className={styles.gapText}>{t('run.reviewArtifactGap')}</span>
+            )}
+          </div>
+
+          <div className={styles.reviewCard}>
+            <div className={styles.reviewCardTitle}>
+              <Eye size={13} />
+              <span>{t('run.reviewPreviews')}</span>
+              {previewSource && <span className={styles.sourceTag}>{previewSource}</span>}
+              <span className={styles.cardCount}>{previews.length}</span>
+            </div>
+            {previews.length > 0 ? (
+              <div className={styles.reviewList}>
+                {previews.slice(-3).reverse().map((preview) => (
+                  <div key={preview.id} className={styles.reviewItem}>
+                    <code className={styles.filePath}>{preview.url ?? preview.id}</code>
+                    <span className={styles.action}>{preview.status}</span>
+                  </div>
+                ))}
+              </div>
+            ) : evidence?.previewLoading ? (
+              <span className={styles.gapText}>{t('run.reviewLoading')}</span>
+            ) : evidence?.previewError ? (
+              <span className={styles.gapText}>{t('run.reviewPreviewError')}</span>
+            ) : (
+              <span className={styles.gapText}>{t('run.reviewPreviewGap')}</span>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {latestBlocks.length > 0 && (
+        <section className={styles.cardSection}>
+          <div className={styles.cardHeader}>
+            <Brain size={14} />
+            <span>{t('run.runtimeBlocks')}</span>
+            <span className={styles.cardCount}>{runtimeBlocks.length}</span>
+          </div>
+          <div className={styles.runtimeList}>
+            {latestBlocks.map(({ block, timestamp }, index) => (
+              <div key={`${timestamp}-${index}-${block.kind}`} className={styles.runtimeItem}>
+                <span className={styles.runtimeKind}>{getRuntimeBlockLabel(block.kind, t)}</span>
+                <span className={styles.runtimeSummary}>{blockSummary(block)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {hasDiffs && (
         <div className={styles.diffReviewPrimary}>
-          <DiffReviewPanel files={diffs} />
+          {diffSource && <div className={styles.evidenceSource}>{t('run.reviewDiffSource', { source: diffSource })}</div>}
+          <DiffReviewPanel files={reviewDiffs} />
         </div>
       )}
 
@@ -236,15 +626,15 @@ export default function RunDetail({
             </section>
           )}
 
-          {/* Unified DiffViewer kept as supplementary detailed view when diffs exist */}
           {hasDiffs && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <FileText size={14} />
                 <span>{t('run.preview')}</span>
-                <span className={styles.cardCount}>{diffs.length}</span>
+                {diffSource && <span className={styles.sourceTag}>{diffSource}</span>}
+                <span className={styles.cardCount}>{reviewDiffs.length}</span>
               </div>
-              <DiffViewer files={diffs} />
+              <DiffViewer files={reviewDiffs} />
             </section>
           )}
         </div>

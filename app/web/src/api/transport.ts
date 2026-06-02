@@ -30,7 +30,7 @@ export class WebSocketTransport implements Transport {
   private ws: WebSocket | null = null;
   private status: TransportStatus = 'disconnected';
   private retryCount = 0;
-  private handlers = new Map<TransportEvent, Set<Function>>();
+  private handlers = new Map<TransportEvent, Set<TransportMessageHandler | TransportStatusHandler>>();
   private queue: unknown[] = [];
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
@@ -174,7 +174,7 @@ export class WebSocketTransport implements Transport {
     if (!set) return;
     for (const handler of set) {
       try {
-        handler(data);
+        (handler as (value: unknown) => void)(data);
       } catch (e) {
         console.error(`Transport handler error for event "${event}":`, e);
       }

@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { OidcError } from '@/api/hubAuth';
 import type { UserProfile } from '@/api/hubClient';
+import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
 
 interface LoginFormProps {
@@ -20,8 +22,6 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     if (user) onSuccess(user);
   }, [onSuccess, user]);
 
-  if (user) return null;
-
   const handleTokenDanceLogin = useCallback(async () => {
     setServerError(null);
     setIdentityNotice(null);
@@ -30,12 +30,18 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       await loginWithTokenDance();
       setIdentityNotice(t('auth.tokenDanceCallbackPending'));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '';
-      setServerError(message || t('auth.error.tokenDanceUnavailable'));
+      if (err instanceof OidcError) {
+        setServerError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '' }));
+      } else {
+        const message = err instanceof Error ? err.message : '';
+        setServerError(message || t('auth.error.tokenDanceUnavailable'));
+      }
     } finally {
       setIdentityLoading(false);
     }
   }, [loginWithTokenDance, t]);
+
+  if (user) return null;
 
   return (
     <div className={styles.body}>
@@ -57,7 +63,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         {identityLoading ? (
           <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
         ) : (
-          <KeyRound size={16} aria-hidden="true" />
+          <img className={styles.identityIcon} src={tokenDanceLogo} alt="" aria-hidden="true" />
         )}
         <span>{t('auth.tokenDanceLogin')}</span>
       </button>

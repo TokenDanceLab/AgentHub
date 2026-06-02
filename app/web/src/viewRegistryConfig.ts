@@ -1,9 +1,9 @@
 import { lazy, type ComponentType } from 'react';
-import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users } from 'lucide-react';
+import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users, UserCog } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Slot in the layout shell that views can occupy. */
-export type ViewSlot = 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal';
+export type ViewSlot = 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal' | 'shell';
 
 /**
  * Standardized props that every registered view component can receive.
@@ -43,10 +43,10 @@ export interface ViewConfig {
 // ═══════════════════════════════════════════════════════════════════
 
 // Lazy imports
-const ChatView = lazy(() => import('@/components/ChatView'));
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 const IMView = lazy(() => import('@/views/IMView'));
+const TeamRunConsole = lazy(() => import('@/views/TeamRunConsole'));
 
 // Eager imports
 import StatusBar from '@/components/StatusBar';
@@ -62,7 +62,7 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   'status-bar': {
     id: 'status-bar',
     component: StatusBar,
-    slot: 'shell' as ViewSlot,
+    slot: 'shell',
     showOnMobile: true,
     showOnTablet: true,
     icon: Shield,
@@ -98,7 +98,7 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   'prompt-input': {
     id: 'prompt-input',
     component: PromptInput,
-    slot: 'shell' as ViewSlot,
+    slot: 'shell',
     showOnMobile: true,
     showOnTablet: true,
     icon: MessageSquare,
@@ -152,6 +152,16 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
     label: 'view.messages',
     lazy: true,
   },
+  'team-run-console': {
+    id: 'team-run-console',
+    component: TeamRunConsole,
+    slot: 'center',
+    showOnMobile: true,
+    showOnTablet: true,
+    icon: UserCog,
+    label: 'view.teamRun',
+    lazy: true,
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -189,7 +199,7 @@ export const VIEW_LIST: ViewConfig[] = Object.values(VIEW_REGISTRY);
 
 // ── Main content view mode (used by MainView resolution) ──
 
-export type ViewMode = 'welcome' | 'loading' | 'chat' | 'im';
+export type ViewMode = 'welcome' | 'loading' | 'chat' | 'im' | 'team';
 
 export interface ViewDescriptor {
   mode: ViewMode;
@@ -201,4 +211,5 @@ export const VIEWS: Record<ViewMode, ViewDescriptor> = {
   loading: { mode: 'loading', label: 'Loading' },
   chat: { mode: 'chat', label: 'Chat' },
   im: { mode: 'im', label: 'Messages' },
+  team: { mode: 'team', label: 'Team' },
 };

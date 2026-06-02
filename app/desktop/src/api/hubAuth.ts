@@ -22,6 +22,24 @@ const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "tokendance" | "hub"
 
 // ── Types ────────────────────────────────────────
 
+/**
+ * OIDC auth error with an i18n code so UI can map to localized messages.
+ * `code` is the suffix under `auth.error.oidc.<code>` in locale files.
+ * `detail` carries dynamic context (e.g. upstream error text) for interpolation.
+ */
+export class OidcError extends Error {
+  code: string;
+  detail?: string;
+  cause?: unknown;
+
+  constructor(code: string, fallbackMessage: string, detail?: string) {
+    super(fallbackMessage);
+    this.name = 'OidcError';
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
 export interface HubAuthState {
   token: string | null;
   refreshToken: string | null;
@@ -56,6 +74,26 @@ function isTauri(): boolean {
 // In Tauri mode PKCE values stay in the async function closure and are never written to storage.
 let pendingOidcState = '';
 
+// OIDC callback waiter. After the user authorizes in the browser,
+// TokenDance ID redirects to Hub's GET /oidc/callback?code=xxx&state=yyy
+// which displays a Login Successful page. The user copies the code
+// from that page and pastes it here.
+async function waitForOIDCCallback(): Promise<CallbackResult> {
+  return new Promise<CallbackResult>((resolve, reject) => {
+    // Give the browser time to open and the user to log in
+    setTimeout(() => {
+      const code = window.prompt('Please copy the authorization code from the login page and paste it here:');
+      if (!code) {
+        reject(new OidcError('noAuthCode', 'No authorization code provided.'));
+        return;
+      }
+      const state = pendingOidcState || '';
+      pendingOidcState = '';
+      resolve({ code: code.trim(), state });
+    }, 2000);
+  });
+}
+
 function generateCodeVerifier(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -64,8 +102,8 @@ function generateCodeVerifier(): string {
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -95,7 +133,7 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
       result: new Promise<CallbackResult>((resolve, reject) => {
         const code = window.prompt('Enter the authorization code from the login page:');
         if (!code) {
-          reject(new Error('No authorization code provided'));
+          reject(new OidcError('noAuthCode', 'No authorization code provided.'));
           return;
         }
         // In non-Tauri mode we don't have state from the server redirect,
@@ -111,7 +149,12 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
   // ---- Tauri path: Rust HTTP callback server ----
   return import('@tauri-apps/api/core')
     .then(({ invoke }) => invoke<number>('start_oidc_callback_server'))
-    .then((port) => {
+    .then(async (port) => {
+      // Import modules up front so listeners are registered before we return.
+      const [{ listen }] = await Promise.all([
+        import('@tauri-apps/api/event'),
+      ]);
+
       const result = new Promise<CallbackResult>((resolve, reject) => {
         let settled = false;
 
@@ -120,56 +163,49 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
           settled = true;
           unlisten();
           unlistenError();
-          reject(new Error('Login timed out — no callback received within 5 minutes'));
+          reject(new OidcError('timeout', 'Login timed out — no callback received within 5 minutes.'));
         }, 5 * 60_000);
 
         let unlisten: () => void = () => {};
         let unlistenError: () => void = () => {};
 
         // Listen for successful callback
-        import('@tauri-apps/api/event')
-          .then(({ listen }) => {
-            const p1 = listen<{ code: string; state: string }>('oidc-callback', (event) => {
-              if (settled) return;
-              settled = true;
-              clearTimeout(timeout);
-              unlistenError();
-              resolve({ code: event.payload.code, state: event.payload.state });
-            });
+        listen<{ code: string; state: string }>('oidc-callback', (event) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          unlistenError();
+          resolve({ code: event.payload.code, state: event.payload.state });
+        }).then((u) => {
+          if (settled) {
+            u();
+            return;
+          }
+          unlisten = u;
+        });
 
-            const p2 = listen<{ error: string; description?: string }>(
-              'oidc-callback-error',
-              (event) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timeout);
-                unlisten();
-                reject(
-                  new Error(
-                    `OIDC error: ${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
-                  ),
-                );
-              },
+        listen<{ error: string; description?: string }>(
+          'oidc-callback-error',
+          (event) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            unlisten();
+            reject(
+              new OidcError(
+                'callbackError',
+                `OIDC error: ${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
+                `${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
+              ),
             );
-
-            return Promise.all([p1, p2]);
-          })
-          .then(([u1, u2]) => {
-            if (settled) {
-              u1();
-              u2();
-              return;
-            }
-            unlisten = u1;
-            unlistenError = u2;
-          })
-          .catch((err) => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeout);
-              reject(new Error(`Failed to listen for OIDC callback: ${err}`));
-            }
-          });
+          },
+        ).then((u) => {
+          if (settled) {
+            u();
+            return;
+          }
+          unlistenError = u;
+        });
       });
 
       return { port, result };
@@ -182,7 +218,7 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
         result: new Promise<CallbackResult>((resolve, reject) => {
           const code = window.prompt('Enter the authorization code from the login page:');
           if (!code) {
-            reject(new Error('No authorization code provided'));
+            reject(new OidcError('noAuthCode', 'No authorization code provided.'));
             return;
           }
           const state = pendingOidcState || '';
@@ -235,8 +271,6 @@ async function exchangeCodeForToken(
 // ── Auth factory ──────────────────────────────────
 
 export function createHubAuth(client?: HubClient): HubAuth {
-  const hubClient = client || createHubClient();
-
   const state: HubAuthState = {
     // Access token loaded from secure store on tryAutoLogin.
     // Legacy localStorage read is handled via loadStoredHubAccessToken fallback.
@@ -264,7 +298,10 @@ export function createHubAuth(client?: HubClient): HubAuth {
     return state.token;
   }
 
-  let authClient = createHubClient({ getToken });
+  const createAuthClient = () => client ?? createHubClient({ getToken });
+  const createPublicClient = () => client ?? createHubClient();
+
+  let authClient = createAuthClient();
 
   async function completeLogin(token: string, refreshToken: string | null, source: 'tokendance' | 'hub', user?: UserProfile) {
     await saveStoredHubRefreshToken(refreshToken);
@@ -276,7 +313,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       localStorage.setItem(TOKEN_SOURCE_KEY, source);
     }
 
-    authClient = createHubClient({ getToken });
+    authClient = createAuthClient();
     // If user profile is already available (from OIDC callback), use it directly
     if (user) {
       state.user = user;
@@ -321,19 +358,38 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await computeCodeChallenge(codeVerifier);
       const deviceId = getOrCreateDeviceId();
+      console.debug('[oidc] PKCE generated, code_verifier length:', codeVerifier.length);
 
-      let callbackResult: Promise<CallbackResult> | null = null;
+      // 2. Start local callback server (Tauri) or prepare manual fallback.
+      //    In Tauri, the Rust backend starts an HTTP server on a random port
+      //    and emits `oidc-callback` / `oidc-callback-error` events.
+      //    The redirect_uri is `http://127.0.0.1:{port}/callback`.
+      let callbackResult: Promise<CallbackResult>;
       let redirectUri = '';
+
       if (isTauri()) {
-        const callbackServer = await startCallbackServer();
-        callbackResult = callbackServer.result;
-        redirectUri = buildRedirectUri(callbackServer.port);
+        const { port, result } = await startCallbackServer();
+        console.debug('[oidc] Callback server on port:', port);
+        redirectUri = buildRedirectUri(port);
+        callbackResult = result;
+      } else {
+        // Non-Tauri: manual code entry via prompt (dev mode fallback)
+        redirectUri = '';
+        callbackResult = new Promise<CallbackResult>((resolve, reject) => {
+          const code = window.prompt('Enter the authorization code from the login page:');
+          if (!code) {
+            reject(new OidcError('noAuthCode', 'No authorization code provided.'));
+            return;
+          }
+          const state = pendingOidcState || '';
+          pendingOidcState = '';
+          resolve({ code: code.trim(), state });
+        });
       }
 
-      // 2. Call Hub to bind PKCE/state/device and get the authorization URL.
-      // For Tauri, the local loopback callback is sent before Hub creates the
-      // state so Hub and TokenDance ID use the same redirect_uri end to end.
-      const authClient = createHubClient();
+      // 3. Call Hub to bind PKCE/state/device and get the authorization URL.
+      //    Pass the redirect_uri so Hub and TokenDance ID use the same one.
+      const authClient = createPublicClient();
 
       let authorizeResp: { state: string; authorization_url: string };
       try {
@@ -354,52 +410,55 @@ export function createHubAuth(client?: HubClient): HubAuth {
         }
         authorizeResp = await authClient.oidcAuthorize(authorizeBody);
       } catch (err) {
-        throw new Error(
-          `Failed to start OIDC login: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        );
+        const detail = err instanceof Error ? err.message : 'Unknown error';
+        const oidcErr = new OidcError('startFailed', `Failed to start OIDC login: ${detail}`, detail);
+        oidcErr.cause = err;
+        throw oidcErr;
       }
 
       const { state: serverState, authorization_url: authUrl } = authorizeResp;
+      console.debug('[oidc] Hub returned authorization URL, state:', serverState.substring(0, 8) + '...');
 
       // code_verifier stays in closure — never written to sessionStorage/localStorage
-      // to prevent same-origin JS from stealing PKCE parameters.
-      // The state bridge is only for the non-Tauri manual-code fallback.
       pendingOidcState = serverState;
 
-      // 3. Open browser for user authentication.
-      const opened = window.open(authUrl, '_blank');
-      if (!opened) {
-        throw new Error(
-          'Popup blocked — please allow popups for AgentHub to use TokenDance ID login. ' +
-          'You can also use username/password login below.',
-        );
+      // 4. Open browser for user authentication.
+      if (isTauri()) {
+        try {
+          const shell = await import('@tauri-apps/plugin-shell');
+          await shell.open(authUrl);
+        } catch {
+          window.open(authUrl, '_blank');
+        }
+      } else {
+        const opened = window.open(authUrl, '_blank');
+        if (!opened) {
+          throw new OidcError('popupBlocked', 'Popup blocked — please allow popups for AgentHub to use TokenDance ID login.');
+        }
       }
 
-      if (!callbackResult) {
-        callbackResult = (await startCallbackServer()).result;
-      }
+      console.debug('[oidc] Browser opened for auth URL');
 
-      // 6. Wait for the callback to arrive
-      let callback: CallbackResult;
-      try {
-        callback = await callbackResult;
-      } catch (err) {
-        throw err;
-      }
+      // 5. Wait for the callback from the local HTTP server (Tauri) or manual paste
+      const callback = await callbackResult;
+      console.debug('[oidc] Callback received, state match:', callback.state === serverState);
 
-      // Validate state matches (CSRF protection)
+      // 6. Validate state matches (CSRF protection)
       if (callback.state !== serverState) {
-        throw new Error('OIDC state mismatch — possible CSRF attack. Please try again.');
+        throw new OidcError('stateMismatch', 'OIDC state mismatch — possible CSRF attack. Please try again.');
       }
 
       // 7. Exchange the code for Hub tokens
       let tokenResp: HubTokenResponse;
+      console.debug('[oidc] Exchanging code for tokens, redirect_uri:', redirectUri);
       try {
         tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, redirectUri, deviceId);
+        console.debug('[oidc] Token exchange complete, username:', tokenResp.user?.username);
       } catch (err) {
-        throw new Error(
-          `Token exchange failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        );
+        const detail = err instanceof Error ? err.message : 'Unknown error';
+        const oidcErr = new OidcError('tokenExchangeFailed', `Token exchange failed: ${detail}`, detail);
+        oidcErr.cause = err;
+        throw oidcErr;
       }
 
       // 8. Store tokens and update auth state
@@ -442,7 +501,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
         }
       }
       if (!state.token) return false;
-      authClient = createHubClient({ getToken });
+      authClient = createAuthClient();
       try {
         state.user = await authClient.me();
         state.isAuthenticated = true;
@@ -453,13 +512,13 @@ export function createHubAuth(client?: HubClient): HubAuth {
         const refreshToken = state.refreshToken ?? (await loadStoredHubRefreshToken());
         if (refreshToken) {
           try {
-            const refreshClient = createHubClient();
+            const refreshClient = createPublicClient();
             const res = await refreshClient.refresh(refreshToken);
             state.token = res.access_token;
             state.refreshToken = res.refresh_token;
             await saveStoredHubAccessToken(res.access_token);
             await saveStoredHubRefreshToken(res.refresh_token);
-            authClient = createHubClient({ getToken });
+            authClient = createAuthClient();
             state.user = await authClient.me();
             state.isAuthenticated = true;
             useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);

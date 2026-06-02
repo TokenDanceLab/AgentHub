@@ -1,8 +1,10 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,8 +14,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -128,8 +132,7 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 				if !ok || len(chunks) == 0 {
 					t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 				}
-				text, _ := chunks[0]["text"].(string)
-				stdoutText += text
+				stdoutText += outputChunksText(chunks)
 			}
 		case "run.finished":
 			if !seenOutput["stdout"] || !seenOutput["stderr"] {
@@ -155,6 +158,150 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 		default:
 			t.Fatalf("unexpected event type %q", evt.Type)
 		}
+	}
+}
+
+type recordingLifecycleEmitter struct {
+	events []string
+}
+
+func (e *recordingLifecycleEmitter) Emit(eventType string, _ map[string]any, _ any) {
+	e.events = append(e.events, eventType)
+}
+
+type recordingContextAdapter struct {
+	contexts chan adapters.RunProcessContext
+}
+
+func (a *recordingContextAdapter) Metadata() adapters.AdapterMetadata {
+	return adapters.AdapterMetadata{ID: "recording-agent", Name: "Recording Agent"}
+}
+
+func (a *recordingContextAdapter) Capabilities() adapters.AgentCapabilities {
+	return adapters.AgentCapabilities{Streaming: true, MultiTurn: true}
+}
+
+func (a *recordingContextAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
+	a.contexts <- ctx
+	return os.Args[0], []string{processExecutorHelperRunFlag, "--", "success"}, append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"), ""
+}
+
+func (a *recordingContextAdapter) ParseStream(ctx context.Context, stdout io.Reader, _ io.Writer, emitter adapters.EventEmitter, run store.Run) error {
+	_, err := io.Copy(io.Discard, stdout)
+	if err != nil {
+		return err
+	}
+	emitter.Emit(adapters.BusEventResult, map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}, map[string]any{"success": true})
+	return ctx.Err()
+}
+
+func (a *recordingContextAdapter) NeedsStdin() bool { return false }
+
+func (a *recordingContextAdapter) Available() bool { return true }
+
+func TestThreadTranscriptEmitterPersistsAssistantMessage(t *testing.T) {
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	inner := &recordingLifecycleEmitter{}
+	emitter := newThreadTranscriptEmitter(s, run, inner)
+	if emitter == nil {
+		t.Fatal("newThreadTranscriptEmitter returned nil")
+	}
+
+	emitter.Emit(adapters.BusEventTextDelta, nil, map[string]any{"content": "OK"})
+	emitter.Emit(adapters.BusEventTextBlock, nil, map[string]any{"content": "-OUTPUT"})
+	emitter.Flush()
+	emitter.Flush()
+
+	items := s.ListThreadItems(run.ThreadID)
+	var assistantItems []store.Item
+	for _, item := range items {
+		if item.Type == "agent_message" {
+			assistantItems = append(assistantItems, item)
+		}
+	}
+	if len(assistantItems) != 1 {
+		t.Fatalf("assistant items = %#v, want exactly one persisted assistant message", assistantItems)
+	}
+	if assistantItems[0].Role != "agent" || assistantItems[0].RunID != run.ID || assistantItems[0].Content != "OK-OUTPUT" {
+		t.Fatalf("assistant item = %#v, want persisted agent transcript", assistantItems[0])
+	}
+	if len(inner.events) != 2 {
+		t.Fatalf("inner events = %#v, want passthrough events", inner.events)
+	}
+}
+
+func TestProcessExecutorPassesRuntimeContextToAdapter(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	adapter := &recordingContextAdapter{contexts: make(chan adapters.RunProcessContext, 1)}
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-adapter-sentinel",
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	runCtx := RunProcessContext{
+		Run:                    run,
+		Prompt:                 "coordinate this",
+		AgentID:                "recording-agent",
+		Model:                  "sonnet",
+		SessionID:              "session-1",
+		ContinueLast:           true,
+		ReasoningEffort:        "high",
+		ThinkingMode:           "adaptive",
+		PermissionMode:         "plan",
+		WorkDir:                t.TempDir(),
+		IncludePartial:         true,
+		StructuredOutputSchema: `{"type":"object"}`,
+		SystemPrompt:           "system",
+		AppendSystemPrompt:     "append",
+		SkillsPrompt:           "skills",
+		AgentDefinitions: map[string]runnerctx.AgentDefinition{
+			"reviewer": {Description: "Review", Prompt: "Review code", Tools: []string{"Read"}, Model: "sonnet"},
+		},
+		MCPConfig:       `{"servers":{"fs":{"command":"node"}}}`,
+		AllowedTools:    []string{"Read"},
+		HubTaskID:       "task-1",
+		ConfigOverrides: map[string]string{"reasoning_summary": "auto"},
+		Ephemeral:       true,
+	}
+	if err := executor.Start(run, runCtx); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var got adapters.RunProcessContext
+	select {
+	case got = <-adapter.contexts:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for adapter BuildCommand context")
+	}
+	for {
+		evt := nextEventWithin(t, ch, 20*time.Second)
+		if evt.Type == "run.finished" {
+			break
+		}
+		if evt.Type == "run.failed" {
+			t.Fatalf("run failed: %#v", evt.Payload)
+		}
+	}
+
+	if got.StructuredOutputSchema != runCtx.StructuredOutputSchema || got.SkillsPrompt != runCtx.SkillsPrompt {
+		t.Fatalf("structured/skills context = %#v", got)
+	}
+	if got.AgentDefinitions["reviewer"].Prompt != "Review code" || got.MCPConfig != runCtx.MCPConfig {
+		t.Fatalf("agent/mcp context = %#v", got)
+	}
+	if got.HubTaskID != "task-1" || got.ConfigOverrides["reasoning_summary"] != "auto" || !got.Ephemeral {
+		t.Fatalf("runtime metadata context = %#v", got)
 	}
 }
 
@@ -204,8 +351,7 @@ func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 			}
 			sawStdoutBatch = true
-			text, _ := chunks[0]["text"].(string)
-			stdoutText += text
+			stdoutText += outputChunksText(chunks)
 		case "run.finished":
 			if !sawStarted {
 				t.Fatal("run.finished arrived before run.started")
@@ -273,8 +419,7 @@ func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
 			if !ok || len(chunks) == 0 {
 				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 			}
-			text, _ := chunks[0]["text"].(string)
-			stdoutText += text
+			stdoutText += outputChunksText(chunks)
 		case "run.finished":
 			want := "cwd=" + filepath.Clean(workDir)
 			if !strings.Contains(stdoutText, want) {
@@ -517,6 +662,7 @@ func TestProcessExecutorPublishesFailedForNonZeroExit(t *testing.T) {
 		case "run.started":
 			sawStarted = true
 		case "run.output.batch":
+		case "message.created", "item.created":
 		case "run.failed":
 			if !sawStarted {
 				t.Fatal("run.failed arrived before run.started")
@@ -527,6 +673,20 @@ func TestProcessExecutorPublishesFailedForNonZeroExit(t *testing.T) {
 			}
 			if payload["status"] != "failed" || payload["error"] == "" {
 				t.Fatalf("failed payload = %#v, want failed status and error", payload)
+			}
+			items := s.ListThreadItems(run.ThreadID)
+			var failureItem *store.Item
+			for i := range items {
+				if items[i].RunID == run.ID && items[i].Type == "agent_message" {
+					failureItem = &items[i]
+					break
+				}
+			}
+			if failureItem == nil {
+				t.Fatalf("thread items = %#v, want failed agent_message", items)
+			}
+			if failureItem.Status != "failed" || !strings.Contains(failureItem.Content, "failure chunk") {
+				t.Fatalf("failure item = %#v, want stderr-backed failed message", *failureItem)
 			}
 			return
 		default:
@@ -549,7 +709,14 @@ func TestProcessExecutorPublishesFailedWhenCommandCannotStart(t *testing.T) {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
-	evt := nextEvent(t, ch)
+	var evt events.EventEnvelope
+	for {
+		evt = nextEvent(t, ch)
+		if evt.Type == "message.created" || evt.Type == "item.created" {
+			continue
+		}
+		break
+	}
 	if evt.Type != "run.failed" {
 		t.Fatalf("event type = %q, want run.failed", evt.Type)
 	}
@@ -670,6 +837,16 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 	return executor
 }
 
+func outputChunksText(chunks []map[string]any) string {
+	var text strings.Builder
+	for _, chunk := range chunks {
+		if value, ok := chunk["text"].(string); ok {
+			text.WriteString(value)
+		}
+	}
+	return text.String()
+}
+
 func TestProcessExecutorHelperRunsFromModeArgument(t *testing.T) {
 	cmd := exec.Command(os.Args[0], processExecutorHelperRunFlag, "--", "success")
 	cmd.Env = withoutEnvKey(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER")
@@ -716,16 +893,27 @@ func TestProcessExecutorHelper(t *testing.T) {
 	}
 	switch mode {
 	case "success":
-		fmt.Fprint(os.Stdout, "stdout chunk\n")
-		fmt.Fprintf(os.Stdout, "run=%s\n", os.Getenv("AGENTHUB_RUN_ID"))
-		fmt.Fprintf(os.Stdout, "project=%s\n", os.Getenv("AGENTHUB_PROJECT_ID"))
-		fmt.Fprintf(os.Stdout, "thread=%s\n", os.Getenv("AGENTHUB_THREAD_ID"))
+		fmt.Fprintf(
+			os.Stdout,
+			"stdout chunk\nrun=%s\nproject=%s\nthread=%s\n",
+			os.Getenv("AGENTHUB_RUN_ID"),
+			os.Getenv("AGENTHUB_PROJECT_ID"),
+			os.Getenv("AGENTHUB_THREAD_ID"),
+		)
 		fmt.Fprint(os.Stderr, "stderr chunk\n")
 	case "fail":
 		fmt.Fprint(os.Stderr, "failure chunk\n")
 		os.Exit(7)
 	case "sleep":
 		time.Sleep(5 * time.Second)
+	case "stdin-read":
+		buf := make([]byte, 1024)
+		_, err := os.Stdin.Read(buf)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "stdin read error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stdout, "stdin-ok\n")
 	case "pwd":
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -736,9 +924,13 @@ func TestProcessExecutorHelper(t *testing.T) {
 	case "args":
 		fmt.Fprintf(os.Stdout, "args=%s\n", strings.Join(os.Args, "\n"))
 	case "env":
-		fmt.Fprintf(os.Stdout, "profileRun=%s\n", os.Getenv("PROFILE_RUN"))
-		fmt.Fprintf(os.Stdout, "profileProject=%s\n", os.Getenv("PROFILE_PROJECT"))
-		fmt.Fprintf(os.Stdout, "profileThread=%s\n", os.Getenv("PROFILE_THREAD"))
+		fmt.Fprintf(
+			os.Stdout,
+			"profileRun=%s\nprofileProject=%s\nprofileThread=%s\n",
+			os.Getenv("PROFILE_RUN"),
+			os.Getenv("PROFILE_PROJECT"),
+			os.Getenv("PROFILE_THREAD"),
+		)
 	case "inherited-env":
 		fmt.Fprintf(os.Stdout, "inherited=%s\n", os.Getenv("AGENTHUB_INHERITED_ENV_FOR_TEST"))
 	case "sanitized-env":
@@ -965,4 +1157,110 @@ func TestSendSubAgentResult_NonSubAgentNoAction(t *testing.T) {
 
 	// Should not panic or send a message because parentID is empty.
 	executor.sendSubAgentResult("run-nosub", "finished", nil)
+}
+
+// needsStdinTestAdapter is a stub adapter that reports NeedsStdin=true and
+// uses the test helper binary. Its ParseStream drains stdout and then writes
+// a control response via stdin to verify the pipe is still open.
+type needsStdinTestAdapter struct {
+	cmdPath string
+	cmdArgs []string
+}
+
+func (a *needsStdinTestAdapter) Metadata() adapters.AdapterMetadata {
+	return adapters.AdapterMetadata{ID: "needs-stdin-test", Name: "Needs Stdin Test"}
+}
+
+func (a *needsStdinTestAdapter) Capabilities() adapters.AgentCapabilities {
+	return adapters.AgentCapabilities{Streaming: true, MultiTurn: true}
+}
+
+func (a *needsStdinTestAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
+	return a.cmdPath, a.cmdArgs, append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"), ""
+}
+
+func (a *needsStdinTestAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter adapters.EventEmitter, run store.Run) error {
+	// Drain stdout (test helper prints "stdin-ok" after reading from stdin)
+	data, err := io.ReadAll(stdout)
+	if err != nil {
+		return err
+	}
+	emitter.Emit(adapters.BusEventResult, map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}, map[string]any{"output": string(data)})
+	return nil
+}
+
+func (a *needsStdinTestAdapter) NeedsStdin() bool { return true }
+
+func (a *needsStdinTestAdapter) Available() bool { return true }
+
+// TestProcessExecutorKeepsStdinOpenForNeedsStdinAdapter verifies that when an
+// adapter reports NeedsStdin()==true and no DecisionLoop is configured, the
+// executor does NOT close stdin after cmd.Start(). The adapter's ParseStream
+// receives a writable stdin pipe, enabling the permission gating protocol to
+// function correctly (G03 fix).
+func TestProcessExecutorKeepsStdinOpenForNeedsStdinAdapter(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	adapter := &needsStdinTestAdapter{
+		cmdPath: os.Args[0],
+		cmdArgs: []string{processExecutorHelperRunFlag, "--", "stdin-read"},
+	}
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-needs-stdin-test",
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	// Wait for run.started so we know the close-or-keep section has run.
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.started":
+			goto started
+		case "run.failed":
+			t.Fatalf("run failed before started: %#v", evt.Payload)
+		}
+	}
+started:
+
+	// After run.started, stdin should still be open (not closed prematurely).
+	executor.mu.Lock()
+	stdin := executor.stdins[run.ID]
+	executor.mu.Unlock()
+
+	if stdin == nil {
+		t.Fatal("stdin was nil after run.started — closed prematurely despite NeedsStdin()==true")
+	}
+
+	// Write a control response to stdin — the test helper is blocked reading stdin.
+	_, err = stdin.Write([]byte("test-control-response\n"))
+	if err != nil {
+		t.Fatalf("stdin.Write failed: %v — pipe was closed prematurely", err)
+	}
+
+	// Wait for the run to finish (the helper should exit after reading stdin).
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.finished":
+			return
+		case "run.failed":
+			payload, _ := evt.Payload.(map[string]any)
+			errInfo, _ := payload["error"]
+			t.Fatalf("run failed: %#v", errInfo)
+		}
+	}
 }

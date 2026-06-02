@@ -29,15 +29,26 @@ type agentCache interface {
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
+// relayDispatcher is the subset of *RelayService methods used by AgentService.
+type relayDispatcher interface {
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*RelayCommandData, error)
+}
+
 type AgentService struct {
 	db          *gorm.DB
 	bus         *Bus
 	mgr         *ws.Manager
 	cacheClient agentCache
+	relay       relayDispatcher
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
 	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient)}
+}
+
+// SetRelayService injects an optional relay service for hub_relay target dispatch.
+func (s *AgentService) SetRelayService(relay relayDispatcher) {
+	s.relay = relay
 }
 
 // CustomAgent CRUD
@@ -196,6 +207,16 @@ type dispatchPayload struct {
 	TeamRunID        string `json:"team_run_id,omitempty"`
 	TeamMemberID     string `json:"team_member_id,omitempty"`
 	TeamMemberRole   string `json:"team_member_role,omitempty"`
+	// Context continuity: thread history and pinned messages for all agent runtimes.
+	Messages       []dispatchMessage `json:"messages,omitempty"`
+	PinnedMessages []dispatchMessage `json:"pinned_messages,omitempty"`
+}
+
+// dispatchMessage represents a single message in thread history or pinned context.
+type dispatchMessage struct {
+	Role      string `json:"role"`
+	Content   string `json:"content"`
+	Timestamp string `json:"timestamp"` // RFC 3339
 }
 
 type dispatchTeamContext struct {
@@ -321,8 +342,10 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 	if err != nil {
 		return nil, err
 	}
+	targetType := ""
 	if dispatchTarget != nil {
 		targetID = dispatchTarget.ID
+		targetType = dispatchTarget.TargetType
 	} else {
 		targetID = ""
 	}
@@ -344,7 +367,7 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
 	// cancelled when the HTTP handler's request context is cancelled.
-	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams)
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams, targetType)
 
 	return task, nil
 }
@@ -365,7 +388,7 @@ func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targe
 		return nil, errcode.TargetNotFound
 	}
 	switch target.TargetType {
-	case "local_edge", "hub_relay":
+	case "local_edge", "hub_relay", "remote_ssh", "tailscale", "cloud_edge":
 		if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
 			return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
 		}
@@ -406,7 +429,7 @@ func promptFromMessage(msg *model.Message) string {
 	return msg.Content
 }
 
-func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams string) {
+func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string) {
 	dp := dispatchPayload{
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
@@ -436,12 +459,33 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		dp.TeamMemberRole = teamContext.TeamMemberRole
 	}
 
+	// Load thread history for context continuity (all agent runtimes).
+	dp.Messages = s.loadThreadHistory(ai.SessionID, task.TriggerMessageID)
+	dp.PinnedMessages = s.loadPinnedMessages(ai.SessionID)
+
 	payload, _ := json.Marshal(dp)
 
 	cacheClient := resolveAgentCache(s.cacheClient)
 	if task.TargetID != "" {
 		if task.EdgeDeviceID == "" {
 			slog.Error("target-bound agent task missing edge device id", "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
+			return
+		}
+		// Route by target type: hub_relay uses the relay service; all others
+		// (local_edge, remote_ssh, cloud_edge, tailscale) go through the
+		// device-bound WebSocket path.
+		if targetType == "hub_relay" && s.relay != nil {
+			_, err := s.relay.CreateCommand(ctx, ai.InviterUserID, "agent_dispatch", json.RawMessage(payload), ai.InviterUserID)
+			if err != nil {
+				slog.Error("failed to create relay command for hub_relay dispatch", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+				if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); pushErr != nil {
+					slog.Error("failed to push hub_relay task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
+				}
+				return
+			}
+			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); err != nil {
+				slog.Error("failed to mark hub_relay task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			}
 			return
 		}
 		s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
@@ -500,6 +544,95 @@ func (s *AgentService) resolveDispatchTeamContext(ai *model.AgentInstance) dispa
 	return dispatchTeamContext{
 		TeamID:    run.TeamID,
 		TeamRunID: run.ID,
+	}
+}
+
+// loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
+// Limits to a maximum of 50 messages to avoid oversized dispatch payloads.
+func (s *AgentService) loadThreadHistory(sessionID, triggerMessageID string) []dispatchMessage {
+	if sessionID == "" || triggerMessageID == "" {
+		return nil
+	}
+	triggerMsg, err := repository.GetMessageByID(s.db, triggerMessageID)
+	if err != nil || triggerMsg == nil {
+		return nil
+	}
+	msgs, err := repository.GetMessagesBySession(s.db, sessionID, triggerMsg.SeqID, 50)
+	if err != nil || len(msgs) == 0 {
+		return nil
+	}
+	// Reverse to chronological order (GetMessagesBySession returns DESC).
+	result := make([]dispatchMessage, len(msgs))
+	for i := range msgs {
+		content := extractMessageText(&msgs[i])
+		result[len(msgs)-1-i] = dispatchMessage{
+			Role:      mapSenderType(msgs[i].SenderType),
+			Content:   content,
+			Timestamp: msgs[i].CreatedAt.UTC().Format(time.RFC3339),
+		}
+	}
+	return result
+}
+
+// loadPinnedMessages loads pinned messages for a session for context continuity.
+func (s *AgentService) loadPinnedMessages(sessionID string) []dispatchMessage {
+	if sessionID == "" {
+		return nil
+	}
+	pins, err := repository.ListPinsBySession(s.db, sessionID)
+	if err != nil || len(pins) == 0 {
+		return nil
+	}
+	messageIDs := make([]string, len(pins))
+	for i, p := range pins {
+		messageIDs[i] = p.MessageID
+	}
+	msgs, err := repository.GetMessagesByIDs(s.db, messageIDs)
+	if err != nil {
+		return nil
+	}
+	result := make([]dispatchMessage, 0, len(msgs))
+	for _, m := range msgs {
+		content := extractMessageText(&m)
+		if content == "" {
+			continue
+		}
+		result = append(result, dispatchMessage{
+			Role:      mapSenderType(m.SenderType),
+			Content:   content,
+			Timestamp: m.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	return result
+}
+
+// extractMessageText extracts the human-readable text from a message's JSON content.
+func extractMessageText(msg *model.Message) string {
+	if msg == nil {
+		return ""
+	}
+	switch msg.ContentType {
+	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
+		var payload struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && payload.Text != "" {
+			return payload.Text
+		}
+	}
+	// For non-text messages or unparseable content, just return raw content.
+	return msg.Content
+}
+
+// mapSenderType maps Hub sender types to standard roles (user/assistant/system).
+func mapSenderType(t string) string {
+	switch t {
+	case model.SenderTypeAgent:
+		return "assistant"
+	case model.SenderTypeUser:
+		return "user"
+	default:
+		return t
 	}
 }
 
@@ -720,12 +853,15 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	msg.SeqID = seq
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := repository.CreateAgentRunEventWithNextSeq(tx, runEvent); err != nil {
+		if err := repository.CreateAgentRunEventWithNextSeqLimited(tx, runEvent, config.MaxRunEventsPerTask); err != nil {
 			return err
 		}
 		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
+		if errors.Is(err, repository.ErrRunEventLimitExceeded) {
+			return errcode.ErrBadRequest.WithMessage("agent callback event limit exceeded")
+		}
 		return err
 	}
 

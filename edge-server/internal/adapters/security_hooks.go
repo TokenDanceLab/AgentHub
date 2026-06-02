@@ -9,18 +9,55 @@ package adapters
 
 import (
 	"context"
+	"log/slog"
 	"regexp"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/security"
 )
 
 // SecurityHook validates tool calls against the AgentHub security policy.
 // It implements AgentHook and integrates into the NDJSONStreamParser hook chain.
-type SecurityHook struct{}
+type SecurityHook struct {
+	// Mode determines how PermissionRequest gates tool calls:
+	//   YOLO  — auto-approve all except RiskCritical/Blocked
+	//   Auto  — Low/Medium auto, High requires user confirmation (default)
+	//   Manual — all non-blocked tools require user confirmation
+	Mode ApprovalMode
 
-// NewSecurityHook creates a new SecurityHook ready for use in a HookChain.
+	// SkillInspector is an optional callback that inspects skill metadata
+	// when the Skill tool is invoked. It receives the skill name from the tool
+	// input and returns a risk override. If nil, Skill defaults to RiskHigh.
+	//
+	// The inspector can return:
+	//   - RiskLow/Medium for well-known safe skills (e.g. pdf, xlsx)
+	//   - RiskHigh for skills that execute code or access network
+	//   - RiskBlocked for forbidden skills
+	SkillInspector func(skillName string) RiskLevel
+}
+
+// SkillInspector defines a callback for inspecting skill metadata to
+// produce an informed risk classification for Skill tool invocations.
+// Implementations should consult a skill registry, hard-coded allowlist,
+// or external policy service.
+type SkillInspector func(skillName string) RiskLevel
+
+// NewSecurityHook creates a new SecurityHook with Auto (default) mode.
+// For explicit mode control use NewSecurityHookWithMode.
 func NewSecurityHook() *SecurityHook {
-	return &SecurityHook{}
+	return &SecurityHook{Mode: ApprovalAuto}
+}
+
+// NewSecurityHookWithMode creates a SecurityHook with the given approval mode.
+func NewSecurityHookWithMode(mode ApprovalMode) *SecurityHook {
+	return &SecurityHook{Mode: mode}
+}
+
+// NewSecurityHookWithSkillInspector creates a SecurityHook with a SkillInspector
+// callback for skill-aware risk classification. When the Skill tool is invoked,
+// the inspector is called with the skill name to determine the actual risk level.
+func NewSecurityHookWithSkillInspector(mode ApprovalMode, inspector SkillInspector) *SecurityHook {
+	return &SecurityHook{Mode: mode, SkillInspector: inspector}
 }
 
 // --- AgentHook implementation ---
@@ -28,9 +65,14 @@ func NewSecurityHook() *SecurityHook {
 // PreToolUse classifies the tool call by risk level and blocks commands
 // containing dangerous patterns. Classification:
 //
-//	Read / Grep / Glob        → RiskLow     (read-only)
-//	Write / Edit              → RiskMedium  (local filesystem writes)
-//	Bash / WebFetch / WebSearch → RiskHigh  (network/shell execution)
+//	Read / Grep / Glob                → RiskLow     (read-only)
+//	Write / Edit / NotebookEdit       → RiskMedium  (local filesystem writes)
+//	Bash / WebFetch / WebSearch       → RiskHigh    (network/shell execution)
+//	Skill                             → RiskHigh    (meta-tool, inspectable via SkillInspector)
+//	SendMessage                       → RiskHigh    (inter-agent communication)
+//	TaskCreate / TaskUpdate           → RiskHigh    (sub-task spawning)
+//	mcp__*                            → RiskHigh    (MCP server-side execution)
+//	<unknown>                         → RiskHigh    (safe default + audit warning)
 //
 // Bash and WebFetch inputs are scanned for blocked patterns (see
 // dangerousPatternsRE). If a blocked pattern is detected the tool is
@@ -45,15 +87,31 @@ func (h *SecurityHook) PreToolUse(_ context.Context, toolName string, input map[
 }
 
 // PermissionRequest denies RiskBlocked operations without user recourse.
-// RiskHigh tools require one-time approval; lower risks are auto-allowed.
+// RiskHigh tools are gated based on the configured ApprovalMode:
+//
+//	YOLO        → PermAllow     (skip prompt)
+//	Auto/Manual → PermAllowOnce (require user confirmation)
+//
+// RiskLow/Medium are auto-allowed in YOLO and Auto modes;
+// Manual mode requires user confirmation for every non-blocked level.
 func (h *SecurityHook) PermissionRequest(_ context.Context, toolName string, risk RiskLevel) PermDecision {
 	switch risk {
-	case RiskBlocked:
+	case RiskBlocked, RiskCritical:
 		return PermDeny
 	case RiskHigh:
-		return PermAllowOnce
+		switch h.Mode {
+		case ApprovalYOLO:
+			return PermAllow
+		default: // ApprovalAuto, ApprovalManual
+			return PermAllowOnce
+		}
 	case RiskLow, RiskMedium:
-		return PermAllow
+		switch h.Mode {
+		case ApprovalManual:
+			return PermAllowOnce
+		default: // ApprovalYOLO, ApprovalAuto
+			return PermAllow
+		}
 	default:
 		return PermAllow
 	}
@@ -81,14 +139,29 @@ func (h *SecurityHook) PostResponse(_ context.Context, response string) string {
 
 // --- Internal helpers ---
 
+// ClassifyRisk maps a tool name to its risk level. For Bash and WebFetch
+// the input is scanned for blocked patterns that escalate the risk to
+// RiskBlocked. This is the full classification (with input scanning);
+// use adapters.ClassifyToolRisk for a cheaper name-only classification.
+func (h *SecurityHook) ClassifyRisk(toolName string, input map[string]any) RiskLevel {
+	return h.classifyRisk(toolName, input)
+}
+
 // classifyRisk maps a tool name to its risk level. For Bash and WebFetch
 // the input is scanned for blocked patterns that escalate the risk to
-// RiskBlocked.
+// RiskBlocked. For Skill, the optional SkillInspector callback is consulted.
+//
+// Tool taxonomy:
+//
+//	RiskLow     — Read, Grep, Glob
+//	RiskMedium  — Write, Edit, NotebookEdit
+//	RiskHigh    — Bash, WebFetch, WebSearch, Skill, SendMessage,
+//	              TaskCreate, TaskUpdate, and any mcp__* tool
 func (h *SecurityHook) classifyRisk(toolName string, input map[string]any) RiskLevel {
 	switch toolName {
 	case "Read", "Grep", "Glob":
 		return RiskLow
-	case "Write", "Edit":
+	case "Write", "Edit", "NotebookEdit":
 		return RiskMedium
 	case "Bash", "WebFetch", "WebSearch":
 		cmd := extractCommand(input)
@@ -96,9 +169,66 @@ func (h *SecurityHook) classifyRisk(toolName string, input map[string]any) RiskL
 			return RiskBlocked
 		}
 		return RiskHigh
+	case "Skill":
+		// Skill is a meta-tool that delegates to arbitrary sub-tools defined
+		// in SKILL.md files. Without inspection, it defaults to RiskHigh.
+		// With a SkillInspector, the actual risk is determined by the invoked skill.
+		return h.classifySkillRisk(input)
+	case "SendMessage":
+		// Outbound inter-agent message relay — always high-risk because it
+		// enables cross-agent communication chains.
+		return RiskHigh
+	case "TaskCreate", "TaskUpdate":
+		// Self-spawning sub-tasks — high-risk because they can create
+		// recursive or unauthorized task chains.
+		return RiskHigh
 	default:
+		// MCP tools use the mcp__<server>__<tool> naming convention.
+		if strings.HasPrefix(toolName, "mcp__") {
+			return RiskHigh
+		}
+		// Unknown tools default to RiskHigh (safe default), but operators
+		// should audit these to ensure the tool catalog is complete.
+		slog.Warn("SecurityHook.classifyRisk: unknown tool, defaulting to RiskHigh — audit recommended",
+			"toolName", toolName)
 		return RiskHigh
 	}
+}
+
+// classifySkillRisk determines the risk level for a Skill tool invocation.
+// If a SkillInspector is configured, it extracts the skill name from the
+// tool input and delegates to the inspector. Otherwise it returns RiskHigh
+// (the safe default for a meta-tool).
+func (h *SecurityHook) classifySkillRisk(input map[string]any) RiskLevel {
+	if h.SkillInspector == nil {
+		return RiskHigh
+	}
+	skillName := extractSkillName(input)
+	if skillName == "" {
+		// No skill name in input — cannot inspect, default to RiskHigh.
+		return RiskHigh
+	}
+	return h.SkillInspector(skillName)
+}
+
+// extractSkillName attempts to extract a skill name from the Skill tool input.
+// The Skill tool accepts: { "skill": "<name>", "args": "..." }
+// or the legacy form: { "command": "<name>" }.
+func extractSkillName(input map[string]any) string {
+	if input == nil {
+		return ""
+	}
+	if name, ok := input["skill"].(string); ok && name != "" {
+		return name
+	}
+	if name, ok := input["Skill"].(string); ok && name != "" {
+		return name
+	}
+	// Legacy: some agent implementations pass the skill name via "command".
+	if name, ok := input["command"].(string); ok && name != "" {
+		return name
+	}
+	return ""
 }
 
 // extractCommand pulls the command string from a tool input map.

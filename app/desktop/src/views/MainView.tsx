@@ -1,8 +1,10 @@
 import { useCallback, lazy, Suspense } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '@/config/viewRegistry';
 import type { ChatMessage } from '@/components/ChatView.types';
+import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import type { AgentInfo } from '@shared/types';
+import { resolveLocalOrchestration } from '@/utils/localOrchestration';
+import type { TeamLocalExecution } from '@/utils/teamLocalExecution';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import { SkeletonLine } from '@/components/Skeleton';
@@ -20,8 +22,15 @@ interface Props {
   selectedAgentId?: string;
   onSelectAgent?: (agentId: string) => void;
   onRetry: (messageId: string) => void;
+  onFork?: (messageId: string) => void;
   onDelete: (messageId: string) => void;
   onSendMessage: (message: string, agentId?: string, opts?: { model?: string }) => void;
+  agentTeamOverview?: AgentTeamOverview;
+  agentTeamsLoading?: boolean;
+  agentTeamsSignedIn?: boolean;
+  teamLocalExecutions?: TeamLocalExecution[];
+  onStartLocalOrchestration?: (agentId: string, draft: string) => void;
+  onOpenTeamRuns?: () => void;
 }
 
 /** Determine which view mode to display based on app state. */
@@ -32,8 +41,8 @@ export function resolveViewMode(
   isStreaming: boolean,
   isConnected: boolean,
 ): ViewMode {
-  if (messages.length === 0 && isStreaming) return 'loading';
   const hasUserMessage = allMessages.some((message) => message.role === 'user');
+  if (messages.length === 0 && isStreaming && !hasUserMessage) return 'loading';
   if (threadsCount === 0 && isConnected && !hasUserMessage) return 'welcome';
   return 'chat';
 }
@@ -48,13 +57,17 @@ export default function MainView({
   selectedAgentId,
   onSelectAgent,
   onRetry,
+  onFork,
   onDelete,
   onSendMessage,
+  agentTeamOverview,
+  agentTeamsLoading,
+  agentTeamsSignedIn,
+  teamLocalExecutions,
+  onStartLocalOrchestration,
+  onOpenTeamRuns,
 }: Props) {
-  const { t } = useTranslation();
-
   const viewMode = resolveViewMode(allMessages, messages, threadsCount, isStreaming, isConnected);
-
   const handleCreateThread = useCallback(() => {
     const textarea = document.querySelector<HTMLTextAreaElement>(
       'textarea[aria-label], textarea[placeholder]',
@@ -65,6 +78,19 @@ export default function MainView({
     }
   }, []);
 
+  const handleWelcomeSend = useCallback(
+    (message: string, agentId?: string, opts?: { model?: string }) => {
+      const resolvedAgentId = agentId ?? selectedAgentId;
+      if (opts) {
+        onSendMessage(message, resolvedAgentId, opts);
+      } else {
+        onSendMessage(message, resolvedAgentId);
+      }
+    },
+    [onSendMessage, selectedAgentId],
+  );
+  const localOrchestration = resolveLocalOrchestration(agents, selectedAgentId);
+
   if (viewMode === 'welcome') {
     return (
       <WelcomeScreen
@@ -73,7 +99,7 @@ export default function MainView({
         selectedAgentId={selectedAgentId}
         onSelectAgent={onSelectAgent}
         onCreateThread={handleCreateThread}
-        onSendMessage={onSendMessage}
+        onSendMessage={handleWelcomeSend}
       />
     );
   }
@@ -107,7 +133,15 @@ export default function MainView({
           messages={allMessages}
           isStreaming={isStreaming}
           onRetry={onRetry}
+          onFork={onFork}
           onDelete={onDelete}
+          agentTeamOverview={agentTeamOverview}
+          agentTeamsLoading={agentTeamsLoading}
+          agentTeamsSignedIn={agentTeamsSignedIn}
+          teamLocalExecutions={teamLocalExecutions}
+          localOrchestration={localOrchestration}
+          onStartLocalOrchestration={onStartLocalOrchestration}
+          onOpenTeamRuns={onOpenTeamRuns}
         />
       </Suspense>
     </ErrorBoundary>

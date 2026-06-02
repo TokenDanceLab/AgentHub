@@ -1,0 +1,172 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.sectionTitle {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex: 1;
+}
+
+.sectionCount {
+  font-size: 11px;
+  background: var(--color-surface-variant, rgba(255, 255, 255, 0.05));
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.sectionIconActive {
+  color: var(--warning);
+}
+
+.sectionIconDone {
+  color: var(--success);
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.taskCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  background: var(--color-surface-variant, rgba(255, 255, 255, 0.02));
+  transition: background 0.15s;
+}
+
+.taskCard:hover {
+  background: var(--color-surface-variant-hover, rgba(255, 255, 255, 0.04));
+}
+
+.taskHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.objective {
+  font-size: 13px;
+  color: var(--color-text, #e5e7eb);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.taskMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #9ca3af);
+  padding-left: 22px;
+}
+
+.assignee {
+  color: var(--color-text-secondary, #9ca3af);
+  font-family: monospace;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--color-surface, rgba(255, 255, 255, 0.05));
+}
+
+.highRisk {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--destructive);
+}
+
+.attempt {
+  font-family: monospace;
+  font-size: 10px;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* Status badges */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.statusPending {
+  color: var(--warning);
+}
+
+.statusDispatched {
+  color: var(--primary);
+}
+
+.statusRunning {
+  color: var(--warning);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.statusDone {
+  color: var(--success);
+}
+
+.statusFailed {
+  color: var(--destructive);
+}
+
+.statusCancelled {
+  color: var(--muted-foreground);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.hint,
+.empty,
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 13px;
+  text-align: center;
+}
+
+.emptyIcon {
+  opacity: 0.4;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.error {
+  color: var(--color-danger, #ef4444);
+}

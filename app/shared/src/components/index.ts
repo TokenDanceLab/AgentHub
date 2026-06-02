@@ -11,6 +11,7 @@ export { ProjectCard } from './ProjectCard/ProjectCard';
 export type { ProjectCardProps, ProjectStatus } from './ProjectCard/ProjectCard';
 
 export { StatusBadge } from './StatusBadge/StatusBadge';
+export { getStatusVariantClassName } from './StatusBadge/StatusBadge';
 export type { StatusBadgeProps, StatusVariant } from './StatusBadge/StatusBadge';
 
 export { ChatBubble } from './ChatBubble/ChatBubble';

@@ -67,11 +67,15 @@ func createLoginUser(t *testing.T, username, password, nickname string) testUser
 	}
 	user := &model.User{
 		Username:     username,
-		PasswordHash: string(hash),
+		PasswordHash: stringPtr(string(hash)),
 		Nickname:     nickname,
 	}
 	if err := repository.CreateUser(db, user); err != nil {
 		t.Fatalf("create user %s: %v", username, err)
 	}
 	return testUser{Username: username, Password: password, ID: user.ID}
+}
+
+func stringPtr(s string) *string {
+	return &s
 }

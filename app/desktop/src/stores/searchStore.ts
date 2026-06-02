@@ -15,7 +15,7 @@ interface SearchState {
   query: string;
   results: SearchResult[];
   selectedIndex: number;
-  openDialog: () => void;
+  openDialog: (initialQuery?: string) => void;
   closeDialog: () => void;
   setQuery: (q: string) => void;
   setResults: (r: SearchResult[]) => void;
@@ -28,7 +28,7 @@ export const useSearchStore = create<SearchState>()(
   query: '',
   results: [],
   selectedIndex: 0,
-  openDialog: () => set({ open: true, query: '', results: [], selectedIndex: 0 }),
+  openDialog: (initialQuery = '') => set({ open: true, query: initialQuery, results: [], selectedIndex: 0 }),
   closeDialog: () => set({ open: false }),
   setQuery: (q) => set({ query: q, selectedIndex: 0 }),
   setResults: (r) => set({ results: r }),

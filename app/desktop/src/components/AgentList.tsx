@@ -1,22 +1,36 @@
 import { useTranslation } from 'react-i18next';
-import { Search, Settings2, Sparkles } from 'lucide-react';
-import { useState, useMemo, memo, type ReactNode } from 'react';
+import { Network, Search, Settings2, Sparkles } from 'lucide-react';
+import { useState, useMemo, memo, useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import styles from './AgentList.module.css';
 
-const RUNTIME_ORDER = ['codex', 'claude', 'opencode'];
+const RUNTIME_ORDER = ['orchestrator', 'codex', 'claude', 'opencode'];
+
+function DecorativeRuntimeIcon({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    ref.current?.querySelectorAll('title').forEach((node) => node.remove());
+  });
+
+  return (
+    <span ref={ref} className={styles.decorativeIcon} aria-hidden="true">
+      {children}
+    </span>
+  );
+}
 
 function agentIcon(name: string): ReactNode {
   const n = name.toLowerCase();
-  if (n.includes('claude')) return <ClaudeCode size={20} />;
-  if (n.includes('codex')) return <Codex size={20} />;
-  if (n.includes('opencode')) return <OpenCode size={20} />;
+  if (n.includes('orchestrator')) return <Network size={18} />;
+  if (n.includes('claude')) return <DecorativeRuntimeIcon><ClaudeCode size={20} /></DecorativeRuntimeIcon>;
+  if (n.includes('codex')) return <DecorativeRuntimeIcon><Codex size={20} /></DecorativeRuntimeIcon>;
+  if (n.includes('opencode')) return <DecorativeRuntimeIcon><OpenCode size={20} /></DecorativeRuntimeIcon>;
   return null;
 }
 
 function runtimeRank(agent: AgentInfo): number {
-  const n = agent.name.toLowerCase();
+  const n = `${agent.id} ${agent.name}`.toLowerCase();
   const idx = RUNTIME_ORDER.findIndex((key) => n.includes(key));
   return idx === -1 ? RUNTIME_ORDER.length : idx;
 }

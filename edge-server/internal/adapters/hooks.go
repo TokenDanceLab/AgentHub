@@ -4,17 +4,79 @@
 
 package adapters
 
-import "context"
+import (
+	"context"
+	"log/slog"
+	"strings"
+)
 
 // RiskLevel classifies tool call risk for permission decisions.
 type RiskLevel string
 
 const (
-	RiskLow     RiskLevel = "low"     // read-only: Read, Grep, Glob
-	RiskMedium  RiskLevel = "medium"  // local write: Write, Edit
-	RiskHigh    RiskLevel = "high"    // network/shell: Bash, WebFetch
-	RiskBlocked RiskLevel = "blocked" // never allowed: rm -rf /, curl | bash
+	RiskLow      RiskLevel = "low"      // read-only: Read, Grep, Glob
+	RiskMedium   RiskLevel = "medium"   // local write: Write, Edit
+	RiskHigh     RiskLevel = "high"     // network/shell: Bash, WebFetch, WebSearch
+	RiskCritical RiskLevel = "critical" // never allowed: rm -rf /, sudo bash, chmod 777 (same semantic as RiskBlocked)
+	RiskBlocked  RiskLevel = "blocked"  // legacy alias for RiskCritical — use RiskCritical in new code
 )
+
+// ApprovalMode controls the overall permission gating strategy.
+// Mirrors AionUi's three-tier YOLO/Auto/Manual model.
+type ApprovalMode string
+
+const (
+	// ApprovalYOLO auto-approves all tool calls except RiskCritical/Blocked.
+	// The PermissionRequest hook returns PermAllow even for RiskHigh tools.
+	ApprovalYOLO ApprovalMode = "yolo"
+
+	// ApprovalAuto auto-approves Low/Medium risk tools; High risk tools
+	// require user confirmation. This is the default mode.
+	ApprovalAuto ApprovalMode = "auto"
+
+	// ApprovalManual requires explicit user confirmation for every tool call
+	// that reaches the PermissionRequest hook (all risk levels except Blocked).
+	ApprovalManual ApprovalMode = "manual"
+)
+
+// ClassifyToolRisk maps a tool name to its base risk level without scanning
+// input for dangerous patterns. Use this for display/event purposes; use
+// SecurityHook.ClassifyRisk for the full classification including blocked-pattern checks.
+//
+// Known tool taxonomy:
+//
+//	RiskLow     — Read, Grep, Glob (read-only filesystem)
+//	RiskMedium  — Write, Edit, NotebookEdit (local writes)
+//	RiskHigh    — Bash, WebFetch, WebSearch, Skill, SendMessage,
+//	              TaskCreate, TaskUpdate, and mcp__* tools (network/shell/meta)
+//
+// Skill is always RiskHigh because it is a meta-tool that can invoke
+// arbitrary sub-tools; the actual risk depends on which skill is invoked.
+// Use SecurityHook.classifyRisk (which accepts tool input) for skill-aware
+// classification when available.
+func ClassifyToolRisk(toolName string) RiskLevel {
+	switch toolName {
+	case "Read", "Grep", "Glob":
+		return RiskLow
+	case "Write", "Edit", "NotebookEdit":
+		return RiskMedium
+	case "Bash", "WebFetch", "WebSearch",
+		"Skill", "SendMessage",
+		"TaskCreate", "TaskUpdate":
+		return RiskHigh
+	default:
+		// MCP tools use the mcp__<server>__<tool> naming convention.
+		// They execute server-side code and must be treated as high-risk.
+		if strings.HasPrefix(toolName, "mcp__") {
+			return RiskHigh
+		}
+		// Unknown tools default to RiskHigh (safe default), but operators
+		// should audit these to ensure the tool catalog is complete.
+		slog.Warn("ClassifyToolRisk: unknown tool, defaulting to RiskHigh — audit recommended",
+			"toolName", toolName)
+		return RiskHigh
+	}
+}
 
 // PermDecision is the result of a permission check.
 type PermDecision string

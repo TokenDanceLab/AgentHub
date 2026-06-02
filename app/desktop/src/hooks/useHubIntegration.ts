@@ -162,6 +162,19 @@ interface TeamRouteContext {
   teamMemberRole?: string;
 }
 
+interface EdgePermissionDecisionControl {
+  runId: string;
+  requestId: string;
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
+const HUB_AGENT_CONTROL_EVENT = 'agent.control';
+
+function isTerminalBridgeTask(task: AgentTask): boolean {
+  return task.status === 'done' || task.status === 'failed';
+}
+
 function getTeamRouteContext(task: AgentTask): TeamRouteContext | null {
   const data = task.dispatchPayload ?? {};
   const modelParams = parseRecord(data.model_params);
@@ -186,6 +199,54 @@ function routeDecisionKey(taskId: string, decision: CoordinatorRouteDecision): s
     decision.summary ?? '',
     decision.blocked_reason ?? '',
   ].join('\u001f');
+}
+
+function parsePermissionDecisionControl(payload: unknown): EdgePermissionDecisionControl | null {
+  const data = parseRecord(payload);
+  const kind = getFirstString(data.kind)?.trim();
+  if (kind !== 'permission.decide') return null;
+
+  const edgeControl = parseRecord(data.edge_control);
+  const fallbackControl = parseRecord(data.edgeControl);
+  const source = Object.keys(edgeControl).length > 0 ? edgeControl : fallbackControl;
+
+  const runId = getFirstString(source.runId, source.run_id);
+  const requestId = getFirstString(source.requestId, source.request_id);
+  const decision = getFirstString(source.decision)?.trim().toLowerCase();
+  if (!runId || !requestId || (decision !== 'allow' && decision !== 'deny')) {
+    return null;
+  }
+
+  return {
+    runId,
+    requestId,
+    decision,
+    reason: getFirstString(source.reason, data.reason),
+  };
+}
+
+function permissionDecisionControlKey(control: EdgePermissionDecisionControl): string {
+  return [
+    control.runId,
+    control.requestId,
+    control.decision,
+    control.reason ?? '',
+  ].join('\u001f');
+}
+
+async function postEdgePermissionDecision(
+  edgeBaseUrl: string,
+  control: EdgePermissionDecisionControl,
+): Promise<void> {
+  const resp = await fetch(`${edgeBaseUrl}/v1/permissions/decide`, {
+    method: 'POST',
+    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(control),
+  });
+  if (!resp.ok) {
+    const errorText = await resp.text().catch(() => 'Unknown error');
+    throw new Error(`Edge POST /v1/permissions/decide returned ${resp.status}: ${errorText}`);
+  }
 }
 
 function normalizeRuntimeAgentId(agentId: string): string {
@@ -263,6 +324,8 @@ export function useHubIntegration(
   const streamRef = useRef<StreamHandle | null>(null);
   const outputByRunRef = useRef<Map<string, string>>(new Map());
   const postedRouteDecisionsRef = useRef<Set<string>>(new Set());
+  const deliveredAgentControlsRef = useRef<Set<string>>(new Set());
+  const inFlightAgentControlsRef = useRef<Set<string>>(new Set());
   const store = useTaskBridgeStore;
 
   const rememberOutput = useCallback((runId: string, content: string) => {
@@ -308,6 +371,7 @@ export function useHubIntegration(
 
       const task = store.getState().getTaskByRunId(runId);
       if (!task) return; // not one of our bridged tasks
+      if (isTerminalBridgeTask(task)) return;
 
       const taskId = task.taskId;
 
@@ -392,8 +456,6 @@ export function useHubIntegration(
               error,
             });
           }
-          // Clean up mapping after terminal event
-          store.getState().removeTask(taskId);
           forgetOutput(runId);
           break;
         }
@@ -404,7 +466,6 @@ export function useHubIntegration(
           store.getState().updateTask(taskId, {
             status: 'done',
           });
-          store.getState().removeTask(taskId);
           forgetOutput(runId);
           break;
         }
@@ -419,7 +480,6 @@ export function useHubIntegration(
             status: 'failed',
             error,
           });
-          store.getState().removeTask(taskId);
           forgetOutput(runId);
           break;
         }
@@ -430,7 +490,6 @@ export function useHubIntegration(
             status: 'failed',
             error: 'Run cancelled',
           });
-          store.getState().removeTask(taskId);
           forgetOutput(runId);
           break;
         }
@@ -545,15 +604,43 @@ export function useHubIntegration(
           status: 'failed',
           error: 'Cancelled by Hub',
         });
-        store.getState().removeTask(taskId);
       } catch {
         // Best-effort cancel — Edge may already be stopped
+      }
+    });
+
+    // ── agent.control: apply Hub-originated control to Local Edge ─────
+    const unsubControl = hubWS.on(HUB_AGENT_CONTROL_EVENT as never, async (payload: unknown) => {
+      const control = parsePermissionDecisionControl(payload);
+      if (!control) {
+        const kind = getFirstString(parseRecord(payload).kind);
+        if (kind === 'permission.decide') {
+          console.warn('[useHubIntegration] Malformed agent.control permission.decide payload:', payload);
+        }
+        return;
+      }
+
+      const key = permissionDecisionControlKey(control);
+      if (deliveredAgentControlsRef.current.has(key) || inFlightAgentControlsRef.current.has(key)) {
+        return;
+      }
+
+      inFlightAgentControlsRef.current.add(key);
+      try {
+        await postEdgePermissionDecision(edgeBaseUrl, control);
+        deliveredAgentControlsRef.current.add(key);
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.warn('[useHubIntegration] Failed to apply agent.control permission.decide:', errorMsg);
+      } finally {
+        inFlightAgentControlsRef.current.delete(key);
       }
     });
 
     return () => {
       unsubDispatch();
       unsubCancel();
+      unsubControl();
     };
   }, [hubWS, hubClient, edgeBaseUrl, onDispatch]);
 

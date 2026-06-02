@@ -23,13 +23,14 @@ export function useRunners(online: boolean): Runner[] {
   useEffect(() => {
     mountedRef.current = true;
     if (!online) {
-      setRunners([]);
       return () => {
         mountedRef.current = false;
       };
     }
 
-    load();
+    queueMicrotask(() => {
+      void load();
+    });
     const id = setInterval(load, RUNNERS_POLL_MS);
     return () => {
       mountedRef.current = false;
@@ -37,5 +38,5 @@ export function useRunners(online: boolean): Runner[] {
     };
   }, [online, load]);
 
-  return runners;
+  return online ? runners : [];
 }
