@@ -8,10 +8,13 @@ import { formatTokens, formatCost } from '@shared/context/breakdown';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import { EmptyState, ToolTimeline } from '@shared/ui';
+import { EmptyState, ToolTimeline, ArtifactCard, ArtifactPreview, DeployCard } from '@shared/ui';
+import type { ArtifactType } from '@shared/ui';
 import TaskList from './TaskList';
 import ToolGroup from './ToolGroup';
 import TeamRunDock from './TeamRunDock';
+import LinkCard from './LinkCard';
+import ApprovalCard from './ApprovalCard';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
@@ -849,6 +852,44 @@ function ErrorBlock({ block }: { block: ErrorBlockType }) {
   );
 }
 
+// ── ArtifactBlock ────────────────────────────
+function ArtifactBlock({ block }: { block: Extract<MessageBlock, { kind: 'artifact' }> }) {
+  const artifactUrl = block.artifactUrl ?? block.url ?? block.previewUrl ?? '';
+  const artifactType: ArtifactType = (
+    block.artifactType === 'iframe' ? 'iframe' :
+    block.artifactType === 'image' ? 'image' :
+    'file'
+  );
+  return (
+    <ArtifactPreview
+      artifactUrl={artifactUrl}
+      artifactType={artifactType}
+      title={block.title}
+      inline
+      onApplyDiff={block.canApplyDiff ? () => {} : undefined}
+      diffApplied={block.diffApplied}
+    />
+  );
+}
+
+// ── CitationBlock ─────────────────────────────
+function CitationBlock({ block }: { block: Extract<MessageBlock, { kind: 'citation' }> }) {
+  const title = block.url ?? block.text?.slice(0, 80) ?? '';
+  return (
+    <div className={styles.citationBlock} data-testid="citation-block">
+      <div className={styles.citationHeader}>
+        <span className={styles.citationTitle}>{title}</span>
+      </div>
+      {block.text && <p className={styles.citationPreview}>{block.text.slice(0, 200)}</p>}
+      {block.url && (
+        <a className={styles.citationLink} href={block.url} target="_blank" rel="noopener noreferrer">
+          {block.url}
+        </a>
+      )}
+    </div>
+  );
+}
+
 // ── Stable block key generation ──────────────
 function blockKey(block: MessageBlock, index: number): string {
   switch (block.kind) {
@@ -950,6 +991,28 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'context_usage':
       return isDetailedContextUsage(block) ? <ContextUsageInline block={block} /> : null;
 
+    case 'artifact':
+      return <ArtifactBlock block={block} />;
+    case 'deploy_card':
+      return <DeployCard deployId={block.deployId} status={block.status} statusMessage={block.statusMessage} url={block.url} />;
+    case 'link_card':
+      return <LinkCard block={block} />;
+    case 'citation':
+      return <CitationBlock block={block} />;
+    case 'compact':
+      return null;
+    case 'approval':
+      return (
+        <ApprovalCard
+          approvalId={block.approvalId}
+          agentName="Agent"
+          toolName=""
+          riskLevel="low"
+          status={block.status as 'pending' | 'approved' | 'denied' | 'timeout'}
+          timestamp=""
+        />
+      );
+
     default:
       return null;
   }
@@ -1011,6 +1074,11 @@ function hasVisibleBlock(block: MessageBlock): boolean {
     case 'agent_task':
     case 'child_agent':
     case 'route_decision':
+    case 'artifact':
+    case 'deploy_card':
+    case 'link_card':
+    case 'approval':
+    case 'citation':
       return true;
     case 'error':
       return true;
