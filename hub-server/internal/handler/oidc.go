@@ -86,18 +86,27 @@ func (h *OIDCHandler) PostOIDCCallback(c *gin.Context) {
 func (h *OIDCHandler) GetOIDCCallback(c *gin.Context) {
 	code := c.Query("code")
 	state := c.Query("state")
+	lang := detectLang(c)
+	c.Header("Content-Type", "text/html; charset=utf-8")
+
 	if code == "" || state == "" {
-		// Return a friendly HTML page so the user sees something useful
-		c.Header("Content-Type", "text/html; charset=utf-8")
-		const missing = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Missing Parameters</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto"><h2>Missing OIDC Parameters</h2><p>The callback is missing <code>code</code> or <code>state</code>. This usually means the login flow was interrupted or the URL was truncated.</p><p><a href="https://hub.vectorcontrol.tech">Back to AgentHub</a></p></body></html>`
-		c.String(400, missing)
+		if lang == "zh" {
+			const missing = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 缺少参数</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto"><h2>缺少参数</h2><p>回调地址缺少 <code>code</code> 或 <code>state</code> 参数，这通常意味着登录流程被中断，或 URL 被截断。</p><p><a href="https://hub.vectorcontrol.tech">返回 AgentHub</a></p></body></html>`
+			c.String(400, missing)
+		} else {
+			const missing = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Missing Parameters</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto"><h2>Missing OIDC Parameters</h2><p>The callback is missing <code>code</code> or <code>state</code>. This usually means the login flow was interrupted or the URL was truncated.</p><p><a href="https://hub.vectorcontrol.tech">Back to AgentHub</a></p></body></html>`
+			c.String(400, missing)
+		}
 		return
 	}
-	// Return a simple HTML page that shows the code for the Desktop app.
-	// The local Tauri callback server and/or manual entry will pick this up.
-	c.Header("Content-Type", "text/html; charset=utf-8")
-	success := fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Login Successful</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">Login Successful ✓</h2><p>You can close this page and return to the AgentHub desktop app.</p><p style="color:#6B7280;font-size:13px">Authorization code: <code>%s</code></p><p style="color:#6B7280;font-size:13px">State: <code>%s</code></p></body></html>`, code, state)
-	c.String(200, success)
+
+	if lang == "zh" {
+		success := fmt.Sprintf(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 登录成功</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">登录成功 ✓</h2><p>您可以关闭此页面并返回 AgentHub 桌面应用。</p><p style="color:#6B7280;font-size:13px">授权码: <code>%s</code></p><p style="color:#6B7280;font-size:13px">状态码: <code>%s</code></p></body></html>`, code, state)
+		c.String(200, success)
+	} else {
+		success := fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Login Successful</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">Login Successful ✓</h2><p>You can close this page and return to the AgentHub desktop app.</p><p style="color:#6B7280;font-size:13px">Authorization code: <code>%s</code></p><p style="color:#6B7280;font-size:13px">State: <code>%s</code></p></body></html>`, code, state)
+		c.String(200, success)
+	}
 }
 
 func (h *OIDCHandler) handleCallback(c *gin.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) {
@@ -131,4 +140,14 @@ func normalizeOIDCDeviceType(value string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// detectLang inspects the Accept-Language header to determine the preferred language.
+// Returns "zh" for Chinese variants, "en" otherwise.
+func detectLang(c *gin.Context) string {
+	al := c.GetHeader("Accept-Language")
+	if strings.HasPrefix(al, "zh") {
+		return "zh"
+	}
+	return "en"
 }
