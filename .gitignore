@@ -86,6 +86,10 @@ backups/
 
 # Local temp files
 .tmp/
+.claude-flow/
+.od/
+.swarm/
+tmp/
 
 # Competition and competitive-analysis materials (not open-source)
 docs/competition/
