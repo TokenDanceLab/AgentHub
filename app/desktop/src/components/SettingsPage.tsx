@@ -125,6 +125,8 @@ import type {
   TeamTaskState,
 } from '@/api/hubClient';
 import styles from './SettingsPage.module.css';
+import primitives from './settings/primitives/primitives.module.css';
+import agents from './settings/sections/sections-agents.module.css';
 
 export type SectionId =
   | 'general'
@@ -1216,12 +1218,12 @@ function pathBasename(value: string) {
 
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
-    <section className={styles.panel}>
-      <div className={styles.panelHeader}>
+    <section className={primitives.panel}>
+      <div className={primitives.panelHeader}>
         <h2>{title}</h2>
         {description ? <p>{description}</p> : null}
       </div>
-      <div className={styles.panelBody}>{children}</div>
+      <div className={primitives.panelBody}>{children}</div>
     </section>
   );
 }
@@ -1238,24 +1240,24 @@ function TaskRunRow({
   const { t } = useTranslation();
   const timestamp = run.finishedAt ?? run.startedAt ?? run.createdAt;
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
+    <div className={primitives.taskRow}>
+      <div className={primitives.connectionIcon}>
         <Route size={17} />
       </div>
-      <div className={styles.settingCopy}>
+      <div className={primitives.settingCopy}>
         <strong>{shortId(run.runId)}</strong>
         <span>{run.projectId} / {run.threadId}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           <span>{formatTimestamp(timestamp)}</span>
         </div>
       </div>
-      <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
+      <span className={`${primitives.statusPill} ${isActiveRun(run) ? primitives.statusPillOn : ''}`}>
         {t(`run.status.${run.status.toLowerCase()}`, { defaultValue: run.status })}
       </span>
       {onCancel ? (
         <button
           type="button"
-          className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+          className={`${primitives.secondaryBtn} ${primitives.taskRowAction}`}
           onClick={() => onCancel(run.runId)}
           disabled={cancelling}
           aria-label={t('settings.taskCancelRun')}
@@ -1272,19 +1274,19 @@ function TaskRunRow({
 function HubTaskRow({ task }: { task: AgentTask }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
+    <div className={primitives.taskRow}>
+      <div className={primitives.connectionIcon}>
         <ClipboardList size={17} />
       </div>
-      <div className={styles.settingCopy}>
+      <div className={primitives.settingCopy}>
         <strong>{shortId(task.taskId)}</strong>
         <span>{task.prompt}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           <span>{task.agentId}</span>
           <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
         </div>
       </div>
-      <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
+      <span className={`${primitives.statusPill} ${isActiveBridgeTask(task) ? primitives.statusPillOn : ''}`}>
         {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
       </span>
     </div>
@@ -1347,17 +1349,17 @@ function AgentTeamBuilder({
   ];
 
   return (
-    <div className={styles.teamBuilder} data-testid="agent-team-builder">
-      <div className={styles.teamBuilderGrid}>
-        <section className={styles.teamForm}>
-          <div className={styles.teamBlockHeader}>
+    <div className={agents.teamBuilder} data-testid="agent-team-builder">
+      <div className={agents.teamBuilderGrid}>
+        <section className={agents.teamForm}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeamCreate')}</strong>
             <span>{hubReady ? t('settings.agentTeamCreateDesc') : t('settings.agentTeamSignInRequired')}</span>
           </div>
           <label>
             <span>{t('settings.agentTeamName')}</span>
             <input
-              className={styles.textInput}
+              className={primitives.textInput}
               value={teamName}
               onChange={(event) => onTeamNameChange(event.target.value)}
               disabled={!hubReady || creating}
@@ -1367,20 +1369,20 @@ function AgentTeamBuilder({
           <label>
             <span>{t('settings.agentTeamDescription')}</span>
             <textarea
-              className={styles.textInput}
+              className={primitives.textInput}
               value={teamDescription}
               onChange={(event) => onTeamDescriptionChange(event.target.value)}
               disabled={!hubReady || creating}
               placeholder={t('settings.agentTeamDescriptionPlaceholder')}
             />
           </label>
-          <button type="button" className={styles.primaryBtn} onClick={onCreateTeam} disabled={!canCreate}>
+          <button type="button" className={primitives.primaryBtn} onClick={onCreateTeam} disabled={!canCreate}>
             {creating ? t('settings.creating') : t('settings.agentTeamCreateAction')}
           </button>
         </section>
 
-        <section className={styles.teamForm}>
-          <div className={styles.teamBlockHeader}>
+        <section className={agents.teamForm}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeamMembersSetup')}</strong>
             <span>{selectedTeam ? selectedTeam.name : t('settings.agentTeamSelectTeamFirst')}</span>
           </div>
@@ -1402,28 +1404,28 @@ function AgentTeamBuilder({
               disabled={!hubReady || !selectedTeam || addingMember}
             />
           </label>
-          <button type="button" className={styles.secondaryBtn} onClick={onAddMember} disabled={!canAddMember}>
+          <button type="button" className={primitives.secondaryBtn} onClick={onAddMember} disabled={!canAddMember}>
             {addingMember ? t('settings.adding') : t('settings.agentTeamAddMember')}
           </button>
           {customAgents.length === 0 ? (
-            <span className={styles.teamFormHint}>{t('settings.agentTeamNoCustomAgents')}</span>
+            <span className={agents.teamFormHint}>{t('settings.agentTeamNoCustomAgents')}</span>
           ) : null}
         </section>
       </div>
 
-      <section className={styles.teamForm}>
-        <div className={styles.teamBlockHeader}>
+      <section className={agents.teamForm}>
+        <div className={agents.teamBlockHeader}>
           <strong>{t('settings.agentTeamStartRun')}</strong>
           <span>{selectedTeam ? t('settings.agentTeamStartRunDesc') : t('settings.agentTeamSelectTeamFirst')}</span>
         </div>
         <textarea
-          className={styles.textInput}
+          className={primitives.textInput}
           value={runPrompt}
           onChange={(event) => onRunPromptChange(event.target.value)}
           disabled={!hubReady || !selectedTeam || startingRun}
           placeholder={t('settings.agentTeamRunPromptPlaceholder')}
         />
-        <button type="button" className={styles.primaryBtn} onClick={onStartRun} disabled={!canStart}>
+        <button type="button" className={primitives.primaryBtn} onClick={onStartRun} disabled={!canStart}>
           {startingRun ? t('settings.starting') : t('settings.agentTeamStartRunAction')}
         </button>
       </section>
@@ -1501,15 +1503,15 @@ function AgentTeamConsole({
     : t('settings.agentTeamNoRunSelected');
 
   return (
-    <div className={styles.teamConsole} data-testid="agent-team-console">
-      <div className={styles.teamConsoleHeader}>
-        <div className={styles.connectionIcon}>
+    <div className={agents.teamConsole} data-testid="agent-team-console">
+      <div className={agents.teamConsoleHeader}>
+        <div className={primitives.connectionIcon}>
           <GitBranch size={17} />
         </div>
-        <div className={styles.settingCopy}>
+        <div className={primitives.settingCopy}>
           <strong>{selectedTeam?.name ?? t('settings.agentTeamConsole')}</strong>
           <span>{runTitle}</span>
-          <div className={styles.taskMeta}>
+          <div className={primitives.taskMeta}>
             {selectedRun ? <span>{shortId(selectedRun.id)}</span> : null}
             {selectedRun?.updated_at || selectedRun?.created_at ? (
               <span>{formatTimestamp(selectedRun?.updated_at ?? selectedRun?.created_at)}</span>
@@ -1517,12 +1519,12 @@ function AgentTeamConsole({
             {refreshing ? <span>{t('settings.refreshing')}</span> : null}
           </div>
         </div>
-        <span className={`${styles.statusPill} ${isActiveTeamStatus(status) ? styles.statusPillOn : ''}`}>
+        <span className={`${primitives.statusPill} ${isActiveTeamStatus(status) ? primitives.statusPillOn : ''}`}>
           {t(`settings.teamRunStatus.${status}`, { defaultValue: status })}
         </span>
       </div>
 
-      <div className={styles.teamMetricGrid}>
+      <div className={agents.teamMetricGrid}>
         <TeamMetric label={t('settings.agentTeamMembers')} value={`${activeMembers}/${members.length}`} />
         <TeamMetric label={t('settings.agentTeamTasks')} value={`${completedTasks}/${tasks.length}`} />
         <TeamMetric label={t('settings.agentTeamApprovals')} value={`${pendingApprovals.length}/${approvals.length}`} />
@@ -1532,13 +1534,13 @@ function AgentTeamConsole({
       <TeamCommunicationGraph graph={communicationGraph} />
       <TeamLocalExecutionPanel executions={localExecutions} />
 
-      <div className={styles.teamConsoleGrid}>
-        <section className={styles.teamSurface}>
-          <div className={styles.teamBlockHeader}>
+      <div className={agents.teamConsoleGrid}>
+        <section className={agents.teamSurface}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeams')}</strong>
             <span>{t('settings.agentTeamsDesc')}</span>
           </div>
-          <div className={styles.teamList}>
+          <div className={agents.teamList}>
             {teams.map((team) => (
               <TeamTemplateRow
                 key={team.id}
@@ -1550,13 +1552,13 @@ function AgentTeamConsole({
           </div>
         </section>
 
-        <section className={styles.teamSurface}>
-          <div className={styles.teamBlockHeader}>
+        <section className={agents.teamSurface}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeamBranchSwitch')}</strong>
             <span>{t('settings.agentTeamBranchSwitchDesc')}</span>
           </div>
           {bundles.some((bundle) => bundle.runs.length > 0) ? (
-            <div className={styles.teamList}>
+            <div className={agents.teamList}>
               {bundles.flatMap((bundle) => bundle.runs).slice(0, 8).map((run) => (
                 <TeamRunBranchRow
                   key={run.id}
@@ -1572,13 +1574,13 @@ function AgentTeamConsole({
         </section>
       </div>
 
-      <section className={styles.teamSurface}>
-        <div className={styles.teamBlockHeader}>
+      <section className={agents.teamSurface}>
+        <div className={agents.teamBlockHeader}>
           <strong>{t('settings.agentTeamMemberStatus')}</strong>
           <span>{t('settings.agentTeamMemberStatusDesc')}</span>
         </div>
         {members.length > 0 ? (
-          <div className={styles.teamList}>
+          <div className={agents.teamList}>
             {members.map((member) => (
               <TeamMemberRow key={member.member_id} member={member} />
             ))}
@@ -1588,13 +1590,13 @@ function AgentTeamConsole({
         )}
       </section>
 
-      <section className={styles.teamSurface}>
-        <div className={styles.teamBlockHeader}>
+      <section className={agents.teamSurface}>
+        <div className={agents.teamBlockHeader}>
           <strong>{t('settings.agentTeamTaskBoard')}</strong>
           <span>{t('settings.agentTeamTaskBoardDesc')}</span>
         </div>
         {tasks.length > 0 ? (
-          <div className={styles.teamList}>
+          <div className={agents.teamList}>
             {tasks.slice(0, 8).map((task) => (
               <TeamTaskRow key={task.task_id} task={task} />
             ))}
@@ -1604,14 +1606,14 @@ function AgentTeamConsole({
         )}
       </section>
 
-      <div className={styles.teamConsoleGrid}>
-        <section className={styles.teamSurface}>
-          <div className={styles.teamBlockHeader}>
+      <div className={agents.teamConsoleGrid}>
+        <section className={agents.teamSurface}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeamResults')}</strong>
             <span>{t('settings.agentTeamResultsDesc')}</span>
           </div>
           {resultRows.length > 0 ? (
-            <div className={styles.teamList}>
+            <div className={agents.teamList}>
               {resultRows.slice(0, 6).map((result) => (
                 <TeamResultRow key={result.id} result={result} />
               ))}
@@ -1621,13 +1623,13 @@ function AgentTeamConsole({
           )}
         </section>
 
-        <section className={styles.teamSurface}>
-          <div className={styles.teamBlockHeader}>
+        <section className={agents.teamSurface}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeamArtifacts')}</strong>
             <span>{t('settings.agentTeamArtifactsDesc')}</span>
           </div>
           {artifacts.length > 0 ? (
-            <div className={styles.teamList}>
+            <div className={agents.teamList}>
               {artifacts.slice(0, 8).map((artifact, index) => (
                 <TeamArtifactRow key={`${artifact.path}-${artifact.event_seq ?? index}`} artifact={artifact} />
               ))}
@@ -1640,14 +1642,14 @@ function AgentTeamConsole({
 
       <TeamBudgetBlock budget={budget} />
 
-      <div className={styles.teamConsoleGrid}>
-        <section className={styles.teamSurface}>
-          <div className={styles.teamBlockHeader}>
+      <div className={agents.teamConsoleGrid}>
+        <section className={agents.teamSurface}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeamRouteLog')}</strong>
             <span>{t('settings.agentTeamRouteLogDesc')}</span>
           </div>
           {routeLog.length > 0 ? (
-            <div className={styles.teamList}>
+            <div className={agents.teamList}>
               {routeLog.slice(0, 5).map((decision, index) => (
                 <TeamRouteRow key={`${decision.correlation_id ?? decision.action}-${index}`} decision={decision} />
               ))}
@@ -1657,13 +1659,13 @@ function AgentTeamConsole({
           )}
         </section>
 
-        <section className={styles.teamSurface}>
-          <div className={styles.teamBlockHeader}>
+        <section className={agents.teamSurface}>
+          <div className={agents.teamBlockHeader}>
             <strong>{t('settings.agentTeamApprovalsConflicts')}</strong>
             <span>{t('settings.agentTeamApprovalsConflictsDesc')}</span>
           </div>
           {approvals.length > 0 || conflicts.length > 0 ? (
-            <div className={styles.teamList}>
+            <div className={agents.teamList}>
               {approvals.slice(0, 4).map((approval) => (
                 <TeamApprovalRow
                   key={approval.approval_id}
@@ -1693,13 +1695,13 @@ function AgentTeamConsole({
         </section>
       </div>
 
-      <section className={styles.teamSurface}>
-        <div className={styles.teamBlockHeader}>
+      <section className={agents.teamSurface}>
+        <div className={agents.teamBlockHeader}>
           <strong>{t('settings.agentTeamActivity')}</strong>
           <span>{t('settings.agentTeamActivityDesc')}</span>
         </div>
         {events.length > 0 ? (
-          <div className={styles.teamList}>
+          <div className={agents.teamList}>
             {events.slice(0, 6).map((event) => (
               <TeamEventRow key={`${event.agent_task_id}-${event.event_seq}`} event={event} />
             ))}
@@ -1718,7 +1720,7 @@ function isActiveTeamStatus(status: string) {
 
 function TeamMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className={styles.teamMetric}>
+    <div className={agents.teamMetric}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -1728,13 +1730,13 @@ function TeamMetric({ label, value }: { label: string; value: string }) {
 function TeamLocalExecutionPanel({ executions }: { executions: TeamLocalExecution[] }) {
   const { t } = useTranslation();
   return (
-    <section className={styles.teamSurface} data-testid="agent-team-local-execution">
-      <div className={styles.teamBlockHeader}>
+    <section className={agents.teamSurface} data-testid="agent-team-local-execution">
+      <div className={agents.teamBlockHeader}>
         <strong>{t('settings.agentTeamLocalExecution')}</strong>
         <span>{t('settings.agentTeamLocalExecutionDesc')}</span>
       </div>
       {executions.length > 0 ? (
-        <div className={styles.teamList}>
+        <div className={agents.teamList}>
           {executions.slice(0, 8).map((execution) => (
             <TeamLocalExecutionRow key={execution.id} execution={execution} />
           ))}
@@ -1755,11 +1757,11 @@ function TeamLocalExecutionRow({ execution }: { execution: TeamLocalExecution })
     ? t('settings.agentTeamLocalSource')
     : t('settings.agentTeamHubProjectionSource');
   return (
-    <div className={`${styles.teamMiniRow} ${styles.teamExecutionRow}`}>
+    <div className={`${agents.teamMiniRow} ${agents.teamExecutionRow}`}>
       <div>
         <strong>{previewText(execution.title, 120)}</strong>
         <span>{execution.error || sourceLabel}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           <span>{execution.runtimeLabel}</span>
           {execution.agentTaskId ? <span>{t('settings.agentTeamHubTask')}: {shortId(execution.agentTaskId)}</span> : null}
           {execution.edgeRunId ? <span>{t('settings.agentTeamEdgeRun')}: {shortId(execution.edgeRunId)}</span> : null}
@@ -1803,37 +1805,37 @@ interface TeamCommunicationGraphModel {
 function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel }) {
   const { t } = useTranslation();
   const nodeClass: Record<TeamGraphNodeKind, string> = {
-    artifact: styles.teamGraphNodeArtifact ?? '',
-    conflict: styles.teamGraphNodeConflict ?? '',
-    coordinator: styles.teamGraphNodeCoordinator ?? '',
-    member: styles.teamGraphNodeMember ?? '',
-    runtime: styles.teamGraphNodeRuntime ?? '',
-    task: styles.teamGraphNodeTask ?? '',
+    artifact: agents.teamGraphNodeArtifact ?? '',
+    conflict: agents.teamGraphNodeConflict ?? '',
+    coordinator: agents.teamGraphNodeCoordinator ?? '',
+    member: agents.teamGraphNodeMember ?? '',
+    runtime: agents.teamGraphNodeRuntime ?? '',
+    task: agents.teamGraphNodeTask ?? '',
   };
 
   return (
-    <section className={styles.teamSurface} data-testid="agent-team-communication-graph">
-      <div className={styles.teamBlockHeader}>
+    <section className={agents.teamSurface} data-testid="agent-team-communication-graph">
+      <div className={agents.teamBlockHeader}>
         <strong>{t('settings.agentTeamCommunicationGraph')}</strong>
         <span>{t('settings.agentTeamCommunicationGraphDesc')}</span>
       </div>
       {graph.nodes.length > 0 || graph.edges.length > 0 ? (
-        <div className={styles.teamGraph}>
-          <div className={styles.teamGraphNodes} aria-label={t('settings.agentTeamGraphNodes')}>
+        <div className={agents.teamGraph}>
+          <div className={agents.teamGraphNodes} aria-label={t('settings.agentTeamGraphNodes')}>
             {graph.nodes.map((node) => (
-              <div key={node.id} className={`${styles.teamGraphNode} ${nodeClass[node.kind]}`}>
+              <div key={node.id} className={`${agents.teamGraphNode} ${nodeClass[node.kind]}`}>
                 <strong>{node.label}</strong>
                 <span>{node.meta}</span>
                 {node.status ? <em>{node.status}</em> : null}
               </div>
             ))}
           </div>
-          <div className={styles.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
+          <div className={agents.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
             {graph.edges.map((edge) => {
               const from = graph.nodes.find((node) => node.id === edge.from);
               const to = graph.nodes.find((node) => node.id === edge.to);
               return (
-                <div key={edge.id} className={styles.teamGraphEdge}>
+                <div key={edge.id} className={agents.teamGraphEdge}>
                   <span>{from?.label ?? shortGraphId(edge.from)}</span>
                   <strong>{edge.label}</strong>
                   <span>{to?.label ?? shortGraphId(edge.to)}</span>
@@ -2110,7 +2112,7 @@ function TeamTemplateRow({
   return (
     <button
       type="button"
-      className={`${styles.teamMiniRow} ${styles.teamMiniButton} ${selected ? styles.teamMiniRowSelected : ''}`}
+      className={`${agents.teamMiniRow} ${agents.teamMiniButton} ${selected ? agents.teamMiniRowSelected : ''}`}
       aria-pressed={selected}
       onClick={() => onSelect(team)}
     >
@@ -2137,14 +2139,14 @@ function TeamRunBranchRow({
   return (
     <button
       type="button"
-      className={`${styles.teamMiniRow} ${styles.teamMiniButton} ${selected ? styles.teamMiniRowSelected : ''}`}
+      className={`${agents.teamMiniRow} ${agents.teamMiniButton} ${selected ? agents.teamMiniRowSelected : ''}`}
       aria-pressed={selected}
       onClick={() => onSelect(run)}
     >
       <div>
         <strong>{title}</strong>
         <span>{shortId(run.team_id)}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           <span>{shortId(run.id)}</span>
           {run.updated_at || run.created_at ? <span>{formatTimestamp(run.updated_at ?? run.created_at)}</span> : null}
         </div>
@@ -2157,7 +2159,7 @@ function TeamRunBranchRow({
 function TeamMemberRow({ member }: { member: TeamMemberState }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.teamMiniRow}>
+    <div className={agents.teamMiniRow}>
       <div>
         <strong>{t(`settings.teamMemberRole.${member.role}`, { defaultValue: member.role })}</strong>
         <span>{member.agent_profile_id ? shortId(member.agent_profile_id) : shortId(member.member_id)}</span>
@@ -2173,11 +2175,11 @@ function TeamMemberRow({ member }: { member: TeamMemberState }) {
 function TeamTaskRow({ task }: { task: TeamTaskState }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.teamMiniRow}>
+    <div className={agents.teamMiniRow}>
       <div>
         <strong>{previewText(task.objective || task.task_id, 120)}</strong>
         <span>{task.assignee_member_id ? shortId(task.assignee_member_id) : t('settings.agentTeamUnassigned')}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           {task.run_id ? <span>{shortId(task.run_id)}</span> : null}
           {task.risk_level ? <span>{task.risk_level}</span> : null}
           {task.attempt ? <span>{t('settings.agentTeamAttempt', { count: task.attempt })}</span> : null}
@@ -2281,12 +2283,12 @@ function extractTeamEventResult(payload?: string) {
 function TeamResultRow({ result }: { result: TeamResultItem }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.teamMiniRow}>
+    <div className={agents.teamMiniRow}>
       <div>
         <strong>{t(result.title, { defaultValue: previewText(result.title, 120) })}</strong>
         <span>{result.body}</span>
         {result.meta.length > 0 ? (
-          <div className={styles.taskMeta}>
+          <div className={primitives.taskMeta}>
             {result.meta.map((item) => <span key={item}>{item}</span>)}
           </div>
         ) : null}
@@ -2298,11 +2300,11 @@ function TeamResultRow({ result }: { result: TeamResultItem }) {
 
 function TeamArtifactRow({ artifact }: { artifact: TeamArtifactState }) {
   return (
-    <div className={styles.teamMiniRow}>
+    <div className={agents.teamMiniRow}>
       <div>
         <strong>{artifact.path}</strong>
         <span>{artifact.tool_name || artifact.action || artifact.edge_run_id || shortId(artifact.team_task_id)}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           {artifact.action ? <span>{artifact.action}</span> : null}
           {artifact.tool_name ? <span>{artifact.tool_name}</span> : null}
           {artifact.member_id ? <span>{shortId(artifact.member_id)}</span> : null}
@@ -2326,12 +2328,12 @@ function TeamBudgetBlock({ budget }: { budget?: TeamBudget }) {
   const usage = typeof budget.usage_percent === 'number' ? `${Math.round(budget.usage_percent)}%` : t('settings.agentTeamBudgetUnknown');
 
   return (
-    <section className={styles.teamSurface}>
-      <div className={styles.teamBlockHeader}>
+    <section className={agents.teamSurface}>
+      <div className={agents.teamBlockHeader}>
         <strong>{t('settings.agentTeamBudget')}</strong>
         <span>{t('settings.agentTeamBudgetDesc')}</span>
       </div>
-      <div className={styles.teamBudgetGrid}>
+      <div className={agents.teamBudgetGrid}>
         <TeamMetric label={t('settings.agentTeamBudgetTokens')} value={`${total} / ${limit}`} />
         <TeamMetric label={t('settings.agentTeamBudgetUsage')} value={usage} />
         <TeamMetric label={t('settings.agentTeamBudgetRemaining')} value={remaining} />
@@ -2355,11 +2357,11 @@ function formatTeamNumber(value?: number) {
 function TeamRouteRow({ decision }: { decision: CoordinatorRouteDecision }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.teamMiniRow}>
+    <div className={agents.teamMiniRow}>
       <div>
         <strong>{t(`settings.teamRouteAction.${decision.action}`, { defaultValue: decision.action })}</strong>
         <span>{previewText(decision.instructions || decision.summary || decision.reasoning || decision.blocked_reason, 120)}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           {decision.next_worker ? <span>{shortId(decision.next_worker)}</span> : null}
           {decision.correlation_id ? <span>{shortId(decision.correlation_id)}</span> : null}
         </div>
@@ -2381,21 +2383,21 @@ function TeamApprovalRow({
   const { t } = useTranslation();
   const pending = isPendingTeamApproval(approval);
   return (
-    <div className={`${styles.teamMiniRow} ${styles.teamActionRow}`}>
+    <div className={`${agents.teamMiniRow} ${agents.teamActionRow}`}>
       <div>
         <strong>{approval.tool_name || approval.request_id || approval.approval_id}</strong>
         <span>{approval.reason || approval.edge_run_id || t('settings.agentTeamApprovalDefaultDesc')}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           <span>{approval.status}</span>
           {approval.member_id ? <span>{shortId(approval.member_id)}</span> : null}
         </div>
       </div>
       {pending ? (
-        <div className={styles.teamActions}>
-          <button type="button" className={styles.secondaryBtn} disabled={busy} onClick={() => onDecision(approval, 'deny')}>
+        <div className={agents.teamActions}>
+          <button type="button" className={primitives.secondaryBtn} disabled={busy} onClick={() => onDecision(approval, 'deny')}>
             {t('settings.deny')}
           </button>
-          <button type="button" className={styles.primaryBtn} disabled={busy} onClick={() => onDecision(approval, 'allow')}>
+          <button type="button" className={primitives.primaryBtn} disabled={busy} onClick={() => onDecision(approval, 'allow')}>
             {t('settings.allow')}
           </button>
         </div>
@@ -2428,26 +2430,26 @@ function TeamConflictRow({
   const sources = buildConflictSources(conflict, artifacts);
   const sourceCount = sources.length || conflict.agent_task_ids?.length || 0;
   return (
-    <div className={`${styles.teamMiniRow} ${styles.teamActionRow}`}>
+    <div className={`${agents.teamMiniRow} ${agents.teamActionRow}`}>
       <div>
         <strong>{conflict.path}</strong>
         <span>{t('settings.agentTeamConflictSources', { count: sourceCount })}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           <span>{conflict.status}</span>
           {conflict.resolution ? <span>{conflict.resolution}</span> : null}
           {conflict.selected_agent_task_id ? <span>{shortId(conflict.selected_agent_task_id)}</span> : null}
         </div>
       </div>
       {sources.length > 0 ? (
-        <div className={styles.conflictSourceGrid}>
+        <div className={agents.conflictSourceGrid}>
           {sources.map((source) => (
-            <div className={styles.conflictSourceCard} key={source.id}>
-              <div className={styles.conflictSourceHead}>
+            <div className={agents.conflictSourceCard} key={source.id}>
+              <div className={agents.conflictSourceHead}>
                 <strong>{source.label}</strong>
                 <em>{source.action || source.status || t('settings.agentTeamArtifactSource')}</em>
               </div>
               <span>{source.path}</span>
-              <div className={styles.taskMeta}>
+              <div className={primitives.taskMeta}>
                 {source.memberId ? <span>{shortId(source.memberId)}</span> : null}
                 {source.edgeRunId ? <span>{shortId(source.edgeRunId)}</span> : null}
                 {source.createdAt ? <span>{formatTimestamp(source.createdAt)}</span> : null}
@@ -2455,7 +2457,7 @@ function TeamConflictRow({
               {pending && source.agentTaskId ? (
                 <button
                   type="button"
-                  className={styles.secondaryBtn}
+                  className={primitives.secondaryBtn}
                   disabled={busy}
                   onClick={() => onResolve(conflict, {
                     resolution: 'accept_agent_task',
@@ -2471,10 +2473,10 @@ function TeamConflictRow({
         </div>
       ) : null}
       {pending ? (
-        <div className={styles.teamActions}>
+        <div className={agents.teamActions}>
           <button
             type="button"
-            className={styles.secondaryBtn}
+            className={primitives.secondaryBtn}
             disabled={busy}
             onClick={() => onResolve(conflict, {
               resolution: 'keep_all',
@@ -2485,7 +2487,7 @@ function TeamConflictRow({
           </button>
           <button
             type="button"
-            className={styles.secondaryBtn}
+            className={primitives.secondaryBtn}
             disabled={busy}
             onClick={() => onResolve(conflict, {
               resolution: 'manual_merge',
@@ -2577,11 +2579,11 @@ function timestampOfArtifact(value?: string) {
 
 function TeamEventRow({ event }: { event: TeamRunEventState }) {
   return (
-    <div className={styles.teamMiniRow}>
+    <div className={agents.teamMiniRow}>
       <div>
         <strong>{event.event_type}</strong>
         <span>{previewText(event.payload, 120) || shortId(event.agent_task_id)}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           <span>#{event.event_seq}</span>
           {event.edge_run_id ? <span>{shortId(event.edge_run_id)}</span> : null}
           {event.created_at ? <span>{formatTimestamp(event.created_at)}</span> : null}
@@ -2606,20 +2608,20 @@ function ModeCard({
   onClick: () => void;
 }) {
   return (
-    <button className={`${styles.modeCard} ${active ? styles.modeCardActive : ''}`} onClick={onClick}>
+    <button className={`${primitives.modeCard} ${active ? primitives.modeCardActive : ''}`} onClick={onClick}>
       {icon}
       <span>
         <strong>{title}</strong>
         <small>{description}</small>
       </span>
-      {active ? <Check size={16} className={styles.modeCheck} /> : null}
+      {active ? <Check size={16} className={primitives.modeCheck} /> : null}
     </button>
   );
 }
 
 function CapabilityCard({ title, description, status }: { title: string; description: string; status: string }) {
   return (
-    <div className={styles.capabilityCard}>
+    <div className={primitives.capabilityCard}>
       <strong>{title}</strong>
       <span>{description}</span>
       <em>{status}</em>
@@ -2629,8 +2631,8 @@ function CapabilityCard({ title, description, status }: { title: string; descrip
 
 function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
   return (
-    <div className={styles.summaryCard}>
-      <div className={styles.summaryIcon}>{icon}</div>
+    <div className={primitives.summaryCard}>
+      <div className={primitives.summaryIcon}>{icon}</div>
       <div>
         <span>{label}</span>
         <strong>{value}</strong>
@@ -2667,15 +2669,15 @@ function AliasMappingRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.modelAliasRow}>
-      <div className={styles.modelAliasHead}>
+    <div className={primitives.modelAliasRow}>
+      <div className={primitives.modelAliasHead}>
         <div>
           <strong>{alias}</strong>
           <span>{t('settings.modelAliasRoute', { model, provider })}</span>
         </div>
         <Switch checked={enabled} onChange={onToggle} />
       </div>
-      <div className={styles.modelAliasControls}>
+      <div className={primitives.modelAliasControls}>
         <label>
           <span>{t('settings.modelAliasModel')}</span>
           <SelectControl
@@ -2724,23 +2726,23 @@ function ProviderHealthRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.providerRow}>
-      <div className={styles.providerMain}>
-        <div className={styles.connectionIcon}>
+    <div className={primitives.providerRow}>
+      <div className={primitives.providerMain}>
+        <div className={primitives.connectionIcon}>
           <Plug size={17} />
         </div>
-        <div className={styles.settingCopy}>
+        <div className={primitives.settingCopy}>
           <strong>{name}</strong>
           <span>{id}</span>
-          <div className={styles.taskMeta}>
+          <div className={primitives.taskMeta}>
             <span>{t('settings.ccSwitchModelCount', { count: modelCount })}</span>
           </div>
         </div>
-        <span className={`${styles.statusPill} ${health === 'ready' ? styles.statusPillOn : ''}`}>
+        <span className={`${primitives.statusPill} ${health === 'ready' ? primitives.statusPillOn : ''}`}>
           {t(`settings.providerHealth.${health}`)}
         </span>
       </div>
-      <div className={styles.providerControls}>
+      <div className={primitives.providerControls}>
         <label>
           <span>{t('settings.ccSwitchHealth')}</span>
           <SelectControl
@@ -2752,7 +2754,7 @@ function ProviderHealthRow({
         <label>
           <span>{t('settings.ccSwitchNotes')}</span>
           <textarea
-            className={styles.textInput}
+            className={primitives.textInput}
             value={notes}
             onChange={(event) => onNotesChange(event.target.value)}
           />
@@ -2765,20 +2767,20 @@ function ProviderHealthRow({
 function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
+    <div className={primitives.profileCard}>
+      <div className={primitives.profileHeader}>
+        <div className={primitives.profileIcon}>
           <Bot size={17} />
         </div>
         <div>
           <strong>{agent.name}</strong>
           <span>{agent.description || t('settings.runtimeDefaultDesc')}</span>
         </div>
-        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
+        <em className={`${primitives.profileStatus} ${primitives[`profileStatus_${agent.status}`]}`}>
           {t(`agent.status.${agent.status}`)}
         </em>
       </div>
-      <div className={styles.profileMeta}>
+      <div className={primitives.profileMeta}>
         <span>{t('settings.runtimeAdapter')}: {agent.id}</span>
         <span>{t('settings.profileRuntime')}: {t('settings.statusReady')}</span>
         <span>{t('settings.profileModel')}: {t('settings.statusPlanned')}</span>
@@ -2802,20 +2804,20 @@ function LocalAgentProfileCard({
   const { t } = useTranslation();
   const profileReady = edgeOnline && agent.status === 'available';
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
+    <div className={primitives.profileCard}>
+      <div className={primitives.profileHeader}>
+        <div className={primitives.profileIcon}>
           <Bot size={17} />
         </div>
         <div>
           <strong>{t('settings.localProfileName', { runtime: agent.name })}</strong>
           <span>{t('settings.localProfileDesc')}</span>
         </div>
-        <em className={`${styles.profileStatus} ${profileReady ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
+        <em className={`${primitives.profileStatus} ${profileReady ? primitives.profileStatus_available : primitives.profileStatus_configuring}`}>
           {profileReady ? t('settings.enabled') : t('settings.notConfigured')}
         </em>
       </div>
-      <div className={styles.profileMeta}>
+      <div className={primitives.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.profileModel')}: {route.model ?? t('prompt.routeAuto')}</span>
         <span>{t('settings.modelAliasProvider')}: {route.provider ?? t('prompt.routeAuto')}</span>
@@ -2835,25 +2837,25 @@ function AgentMarketCard({ agent }: { agent: AgentInfo }) {
     .map(([name]) => t(`settings.capability.${name}`, { defaultValue: name }));
 
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
+    <div className={primitives.profileCard}>
+      <div className={primitives.profileHeader}>
+        <div className={primitives.profileIcon}>
           <Bot size={17} />
         </div>
         <div>
           <strong>{agent.name}</strong>
           <span>{agent.description || t('settings.marketProfileDefaultDesc')}</span>
         </div>
-        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
+        <em className={`${primitives.profileStatus} ${primitives[`profileStatus_${agent.status}`]}`}>
           {t(`agent.status.${agent.status}`)}
         </em>
       </div>
-      <div className={styles.profileMeta}>
+      <div className={primitives.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.marketInstallSource')}: Local Edge</span>
         <span>{t('settings.marketPublishStatus')}: {agent.status === 'available' ? t('settings.statusInProgress') : t('settings.statusPlanned')}</span>
       </div>
-      <div className={styles.profileMeta}>
+      <div className={primitives.profileMeta}>
         {capabilityNames.length > 0 ? (
           capabilityNames.map((name) => <span key={name}>{name}</span>)
         ) : (
@@ -2867,20 +2869,20 @@ function AgentMarketCard({ agent }: { agent: AgentInfo }) {
 function ProjectSkillCard({ skill }: { skill: ProjectSkill }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
+    <div className={primitives.profileCard}>
+      <div className={primitives.profileHeader}>
+        <div className={primitives.profileIcon}>
           <Code2 size={17} />
         </div>
         <div>
           <strong>{skill.title}</strong>
           <span>{t(skill.descriptionKey)}</span>
         </div>
-        <em className={`${styles.profileStatus} ${skill.status === 'ready' ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
+        <em className={`${primitives.profileStatus} ${skill.status === 'ready' ? primitives.profileStatus_available : primitives.profileStatus_configuring}`}>
           {skill.status === 'ready' ? t('settings.statusReady') : t('settings.statusInProgress')}
         </em>
       </div>
-      <div className={styles.profileMeta}>
+      <div className={primitives.profileMeta}>
         <span>{t('settings.skillLocalRegistry')}: .agents/skills/{skill.id}</span>
         <span>{t('settings.skillScripts')}: {skill.hasScripts ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.skillReferences')}: {skill.hasReferences ? t('settings.enabled') : t('settings.notConfigured')}</span>
@@ -2893,20 +2895,20 @@ function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   const { mcpIntegration, permissionHooks, subAgentSpawn } = agent.capabilities;
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
+    <div className={primitives.profileCard}>
+      <div className={primitives.profileHeader}>
+        <div className={primitives.profileIcon}>
           <Plug size={17} />
         </div>
         <div>
           <strong>{agent.name}</strong>
           <span>{agent.description || t('settings.mcpRuntimeDefaultDesc')}</span>
         </div>
-        <em className={`${styles.profileStatus} ${mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
+        <em className={`${primitives.profileStatus} ${mcpIntegration ? primitives.profileStatus_available : primitives.profileStatus_configuring}`}>
           {mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}
         </em>
       </div>
-      <div className={styles.profileMeta}>
+      <div className={primitives.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.mcpIntegration')}: {mcpIntegration ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.mcpPermissionHooks')}: {permissionHooks ? t('settings.enabled') : t('settings.notConfigured')}</span>
@@ -2932,10 +2934,10 @@ function ExecutionTargetCard({
   connected?: boolean;
 }) {
   return (
-    <div className={styles.targetCard}>
-      <div className={styles.targetTop}>
-        <div className={styles.targetIcon}>{icon}</div>
-        <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>{status}</span>
+    <div className={primitives.targetCard}>
+      <div className={primitives.targetTop}>
+        <div className={primitives.targetIcon}>{icon}</div>
+        <span className={`${primitives.statusPill} ${connected ? primitives.statusPillOn : ''}`}>{status}</span>
       </div>
       <strong>{title}</strong>
       <span>{description}</span>
@@ -2946,15 +2948,15 @@ function ExecutionTargetCard({
 
 function RunnerRow({ runner }: { runner: RunnerHealthItem }) {
   return (
-    <div className={styles.runnerRow}>
-      <div className={styles.connectionIcon}>
+    <div className={primitives.runnerRow}>
+      <div className={primitives.connectionIcon}>
         <Cpu size={17} />
       </div>
-      <div className={styles.settingCopy}>
+      <div className={primitives.settingCopy}>
         <strong>{runner.name}</strong>
         <span>{runner.capabilities?.join(' / ') || runner.id}</span>
       </div>
-      <span className={`${styles.statusPill} ${runner.status === 'online' ? styles.statusPillOn : ''}`}>
+      <span className={`${primitives.statusPill} ${runner.status === 'online' ? primitives.statusPillOn : ''}`}>
         {runner.status}
       </span>
     </div>
@@ -2975,8 +2977,8 @@ function HubExecutionTargetRow({
   const endpoint = formatTargetEndpoint(target);
 
   return (
-    <div className={styles.runnerRow}>
-      <div className={styles.connectionIcon}>
+    <div className={primitives.runnerRow}>
+      <div className={primitives.connectionIcon}>
         {target.target_type === 'cloud_edge' ? (
           <Computer size={17} />
         ) : target.target_type === 'hub_relay' ? (
@@ -2985,10 +2987,10 @@ function HubExecutionTargetRow({
           <Server size={17} />
         )}
       </div>
-      <div className={styles.settingCopy}>
+      <div className={primitives.settingCopy}>
         <strong>{target.name}</strong>
         <span>{t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })}</span>
-        <div className={styles.taskMeta}>
+        <div className={primitives.taskMeta}>
           {target.trust_level ? (
             <span>{t(`settings.targetTrust.${target.trust_level}`, { defaultValue: target.trust_level })}</span>
           ) : null}
@@ -3000,12 +3002,12 @@ function HubExecutionTargetRow({
           </span>
         </div>
       </div>
-      <span className={`${styles.statusPill} ${isHubTargetConnected(target) ? styles.statusPillOn : ''}`}>
+      <span className={`${primitives.statusPill} ${isHubTargetConnected(target) ? primitives.statusPillOn : ''}`}>
         {t(`settings.targetHealth.${health}`, { defaultValue: health })}
       </span>
       <button
         type="button"
-        className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+        className={`${primitives.secondaryBtn} ${primitives.taskRowAction}`}
         onClick={() => onPing(target.id)}
         disabled={pinging}
         aria-label={t('settings.targetPing')}
@@ -3030,27 +3032,27 @@ function SettingRow({
   control?: ReactNode;
 }) {
   return (
-    <div className={styles.settingRow}>
-      <div className={styles.settingCopy}>
+    <div className={primitives.settingRow}>
+      <div className={primitives.settingCopy}>
         <strong>{title}</strong>
         <span>{description}</span>
       </div>
-      {control ?? (value ? <span className={styles.settingValue}>{value}</span> : null)}
+      {control ?? (value ? <span className={primitives.settingValue}>{value}</span> : null)}
     </div>
   );
 }
 
 function ConnectionRow({ name, description, connected }: { name: string; description: string; connected: boolean }) {
   return (
-    <div className={styles.connectionRow}>
-      <div className={styles.connectionIcon}>
+    <div className={primitives.connectionRow}>
+      <div className={primitives.connectionIcon}>
         <Link2 size={17} />
       </div>
-      <div className={styles.settingCopy}>
+      <div className={primitives.settingCopy}>
         <strong>{name}</strong>
         <span>{description}</span>
       </div>
-      <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>
+      <span className={`${primitives.statusPill} ${connected ? primitives.statusPillOn : ''}`}>
         {connected ? 'Online' : 'Offline'}
       </span>
     </div>
@@ -3071,8 +3073,8 @@ function SwitchControl({
   status?: string;
 }) {
   return (
-    <div className={styles.switchControl}>
-      {status ? <span className={styles.switchStatus}>{status}</span> : null}
+    <div className={primitives.switchControl}>
+      {status ? <span className={primitives.switchStatus}>{status}</span> : null}
       <Switch checked={checked} onChange={onChange} disabled={disabled} title={title} />
     </div>
   );
@@ -3091,7 +3093,7 @@ function Switch({
 }) {
   return (
     <button
-      className={`${styles.switch} ${checked ? styles.switchOn : ''}`}
+      className={`${primitives.switch} ${checked ? primitives.switchOn : ''}`}
       role="switch"
       aria-checked={checked}
       aria-disabled={disabled}
@@ -3118,7 +3120,7 @@ function SelectControl({
   disabled?: boolean;
 }) {
   return (
-    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+    <select className={primitives.select} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
       {options.map(([optionValue, label]) => (
         <option key={optionValue} value={optionValue}>
           {label}
@@ -3130,7 +3132,7 @@ function SelectControl({
 
 function Callout({ title, body }: { title: string; body: string }) {
   return (
-    <div className={styles.callout}>
+    <div className={primitives.callout}>
       <ShieldCheck size={18} />
       <div>
         <strong>{title}</strong>
@@ -3142,7 +3144,7 @@ function Callout({ title, body }: { title: string; body: string }) {
 
 function EmptyBlock({ title, description }: { title: string; description: string }) {
   return (
-    <div className={styles.emptyBlock}>
+    <div className={primitives.emptyBlock}>
       <Archive size={24} />
       <strong>{title}</strong>
       <span>{description}</span>

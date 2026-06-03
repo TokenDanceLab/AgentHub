@@ -1,5 +1,5 @@
 import { UserCircle } from 'lucide-react';
-import styles from '../../SettingsPage.module.css';
+import styles from './primitives.module.css';
 
 interface AuthGapBlockProps {
   title: string;
