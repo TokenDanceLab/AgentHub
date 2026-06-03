@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { MessageSquareText } from 'lucide-react';
 import type { Session } from '@/api/hubClient';
 import { shortId, formatTimestamp } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 function sessionIdOfSettings(session: Session) {
   return session.session_id ?? session.id ?? 'session';

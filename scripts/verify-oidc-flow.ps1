@@ -70,6 +70,21 @@ function Fetch-Json([string]$Url, [string]$Label) {
     }
 }
 
+function Unwrap-Envelope([object]$Obj) {
+    if ($null -ne $Obj -and $null -ne $Obj.PSObject.Properties["data"] -and $null -ne $Obj.PSObject.Properties["code"]) {
+        return $Obj.data
+    }
+    return $Obj
+}
+
+function Test-HealthOk([object]$Health) {
+    $body = Unwrap-Envelope $Health
+    if ($body -is [string]) {
+        return $body.Trim() -eq "ok"
+    }
+    return $null -ne $body -and $body.status -eq "ok"
+}
+
 function Assert-Field([object]$Obj, [string]$Field, [string]$Label) {
     if ($null -ne $Obj -and $Obj.$Field) {
         Pass "$Label = $($Obj.$Field)"
@@ -106,7 +121,7 @@ if (-not $SkipTD) {
     # 1.1 Health / reachability
     try {
         $health = Invoke-RestMethod -Uri "$TdUrl/health" -TimeoutSec 5 -ErrorAction Stop
-        if ($health.status -eq "ok") {
+        if (Test-HealthOk $health) {
             Pass "TokenDance ID health endpoint reachable"
         } else {
             Fail "TokenDance ID health returned: $($health | ConvertTo-Json)"
@@ -175,7 +190,7 @@ if (-not $SkipHub) {
     # 2.1 Hub health
     try {
         $hubHealth = Invoke-RestMethod -Uri "$HubUrl/health" -TimeoutSec 5 -ErrorAction Stop
-        if ($hubHealth.status -eq "ok") {
+        if (Test-HealthOk $hubHealth) {
             Pass "Hub Server health endpoint reachable"
         } else {
             Fail "Hub Server health returned: $($hubHealth | ConvertTo-Json)"
@@ -213,13 +228,15 @@ if (-not $SkipHub) {
             -TimeoutSec $TimeoutSec `
             -ErrorAction Stop
 
-        if ($authResp.state -and $authResp.authorization_url) {
+        $authData = Unwrap-Envelope $authResp
+
+        if ($authData.state -and $authData.authorization_url) {
             Pass "  POST /client/auth/oidc/authorize — returns state + authorization_url"
-            Assert-Field $authResp "state" "    state"
-            Assert-Field $authResp "authorization_url" "    authorization_url"
+            Assert-Field $authData "state" "    state"
+            Assert-Field $authData "authorization_url" "    authorization_url"
 
             # Verify authorization URL structure
-            $authUrlParsed = $authResp.authorization_url
+            $authUrlParsed = $authData.authorization_url
             Assert-Contains $authUrlParsed "response_type=code"         "    auth URL includes response_type=code"
             Assert-Contains $authUrlParsed "client_id="                 "    auth URL includes client_id"
             Assert-Contains $authUrlParsed "redirect_uri="              "    auth URL includes redirect_uri"
@@ -228,8 +245,8 @@ if (-not $SkipHub) {
             Assert-Contains $authUrlParsed "code_challenge_method=S256" "    auth URL includes code_challenge_method=S256"
 
             # Store for later phases
-            $global:VerifyState = $authResp.state
-            $global:VerifyAuthUrl = $authResp.authorization_url
+            $global:VerifyState = $authData.state
+            $global:VerifyAuthUrl = $authData.authorization_url
             $global:VerifyCodeVerifier = $codeVerifier
             $global:VerifyDeviceId = $deviceId
             Pass "  Authorization URL is well-formed OIDC PKCE request"

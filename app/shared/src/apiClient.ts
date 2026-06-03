@@ -35,6 +35,29 @@ export function isConfigured(): boolean {
   return baseUrl !== '';
 }
 
+// ── Retry & timeout config ────────────────────
+
+let defaultTimeoutMs = 30000;
+let defaultMaxRetries = 3;
+const retryableStatuses = new Set([408, 429, 502, 503, 504]);
+
+export function setDefaultTimeout(ms: number) {
+  defaultTimeoutMs = ms;
+}
+
+export function setDefaultMaxRetries(n: number) {
+  defaultMaxRetries = n;
+}
+
+function isRetryable(method: string, status: number): boolean {
+  if (method !== 'GET') return false;
+  return retryableStatuses.has(status) || status >= 500;
+}
+
+function delayMs(attempt: number): number {
+  return Math.min(1000 * Math.pow(2, attempt), 10000);
+}
+
 // ── Internal fetch wrapper ────────────────────
 
 async function request<T>(
@@ -44,35 +67,72 @@ async function request<T>(
   if (!baseUrl) {
     throw new Error('[AgentHub API] Base URL is not configured. Call setBaseUrl() before making API requests.');
   }
-  const res = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
-  });
 
-  if (!res.ok) {
-    throw await parseError(res);
+  const method = init?.method ?? 'GET';
+  const maxRetries = method === 'GET' ? defaultMaxRetries : 0;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, delayMs(attempt - 1)));
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), defaultTimeoutMs);
+
+      const res = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...init?.headers,
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        if (attempt < maxRetries && isRetryable(method, res.status)) {
+          lastError = await parseError(res);
+          continue;
+        }
+        throw await parseError(res);
+      }
+
+      if (res.status === 204) {
+        return undefined as unknown as T;
+      }
+
+      return res.json() as Promise<T>;
+    } catch (err) {
+      lastError = err;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        lastError = new Error('Request timed out');
+      }
+      if (attempt >= maxRetries) break;
+    }
   }
 
-  if (res.status === 204) {
-    return undefined as unknown as T;
-  }
-
-  return res.json() as Promise<T>;
+  throw lastError;
 }
 
 async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
   if (!baseUrl) {
     throw new Error('[AgentHub API] Base URL is not configured. Call setBaseUrl() before making API requests.');
   }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), defaultTimeoutMs);
+
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
+    signal: controller.signal,
     headers: {
       ...init?.headers,
     },
   });
+
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
     throw await parseError(res);

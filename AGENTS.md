@@ -77,7 +77,7 @@ Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri
 
 | 服务 | 端口 | 说明 |
 |---|---|---|
-| Hub Server (本地) | 8090 | 开发时 localhost |
+| Hub Server (本地) | 8080 | 开发时 localhost |
 | Edge Server (本地) | 3210 | Desktop 本地 Edge |
 | OIDC callback (Desktop) | 随机 (127.0.0.1:0) | Rust TcpListener 动态分配 |
 | OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
