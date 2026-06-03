@@ -1,0 +1,126 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ── Status messages ─────────────────────────────────── */
+.loading {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+.error {
+  padding: var(--space-lg);
+  color: var(--td-danger);
+  font-size: var(--font-size-xs);
+}
+
+.empty {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Section ─────────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--td-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Task card ───────────────────────────────────────── */
+.card {
+  padding: 10px 12px;
+  border-radius: var(--td-radius-panel);
+  border: 1px solid var(--td-line);
+  background: var(--surface-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.cardTitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  flex: 1;
+  line-height: var(--line-height-tight);
+  color: var(--td-ink);
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-2xs);
+  color: var(--td-ink-muted);
+}
+
+/* ── Status dot ──────────────────────────────────────── */
+.statusDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusPending {
+  background: var(--td-ink-muted);
+}
+
+.statusDispatched {
+  background: var(--td-plum);
+}
+
+.statusRunning {
+  background: var(--warning);
+}
+
+.statusDone {
+  background: var(--td-moss);
+}
+
+.statusFailed {
+  background: var(--td-danger);
+}
+
+.statusCancelled {
+  background: var(--td-ink-muted);
+}
+
+/* ── Risk badge ──────────────────────────────────────── */
+.riskBadge {
+  display: inline-block;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  line-height: 16px;
+}
+
+.riskHigh {
+  background: var(--glass-tint-danger);
+  color: var(--td-danger);
+}
+
+.riskNormal {
+  background: var(--td-tint);
+  color: var(--td-ink-muted);
+}
