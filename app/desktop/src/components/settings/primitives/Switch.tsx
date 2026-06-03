@@ -1,4 +1,4 @@
-import styles from '../../SettingsPage.module.css';
+import styles from './primitives.module.css';
 
 interface SwitchProps {
   checked: boolean;

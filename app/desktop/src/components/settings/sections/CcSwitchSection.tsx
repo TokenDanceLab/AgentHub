@@ -5,7 +5,7 @@ import SettingRow from '../primitives/SettingRow';
 import Switch from '../primitives/Switch';
 import Callout from '../primitives/Callout';
 import ProviderHealthRow from '../cards/ProviderHealthRow';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface CcSwitchSectionProps {
   ccSwitchBridge: boolean;
