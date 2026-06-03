@@ -86,6 +86,57 @@
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
 
+  /* ═══════════════════════════════════════════════════════════════════
+     Glass Tokens — translucent overlay system
+     Dark theme default: white glow over dark canvas
+     Light theme: dark overlay over light canvas (reversed in themes.css)
+     20 tokens covering bg layers / borders / tints / shadows / text
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Glass background layers (dark: white translucent) */
+  --glass-bg-subtle: rgba(255, 255, 255, 0.03);
+  --glass-bg-light: rgba(255, 255, 255, 0.045);
+  --glass-bg-medium: rgba(255, 255, 255, 0.065);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.12);
+
+  /* Glass hover / active states */
+  --glass-bg-hover: rgba(255, 255, 255, 0.06);
+  --glass-bg-active: rgba(255, 255, 255, 0.1);
+
+  /* Glass borders */
+  --glass-border-subtle: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-strong: rgba(255, 255, 255, 0.1);
+  --glass-border-heavy: rgba(255, 255, 255, 0.15);
+
+  /* Glass panel backgrounds (dark semi-transparent solids) */
+  --glass-panel: rgba(36, 36, 44, 0.82);
+  --glass-panel-strong: rgba(31, 31, 39, 0.92);
+  --glass-panel-overlay: rgba(30, 30, 37, 0.98);
+
+  /* Tinted glass */
+  --glass-tint-plum: rgba(99, 102, 241, 0.12);
+  --glass-tint-moss: rgba(34, 197, 94, 0.12);
+  --glass-tint-danger: rgba(239, 68, 68, 0.1);
+  --glass-tint-amber: rgba(245, 158, 11, 0.12);
+  --glass-tint-sky: rgba(59, 130, 246, 0.12);
+
+  /* Glass shadows */
+  --glass-shadow: rgba(0, 0, 0, 0.25);
+  --glass-shadow-subtle: rgba(0, 0, 0, 0.12);
+
+  /* Glass text */
+  --glass-text-muted: rgba(255, 255, 255, 0.5);
+  --glass-text-disabled: rgba(255, 255, 255, 0.3);
+
+  /* Glass input fields */
+  --glass-input-bg: rgba(255, 255, 255, 0.48);
+  --glass-input-bg-hover: rgba(255, 255, 255, 0.72);
+
+  /* Light page fill (light-theme opaque panels) */
+  --glass-light-fill: rgba(250, 250, 251, 0.92);
+
   /* ── Surface Layers (base — theme overrides in themes.css) ────────── */
   --surface-base:         oklch(0.14 0.006 260);  /* bottom container */
   --surface-raised:       oklch(0.17 0.007 260);  /* cards/panels */

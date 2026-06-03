@@ -21,11 +21,11 @@
 
 .section {
   padding: 4px 0 9px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-bottom: 1px solid var(--glass-border-subtle);
 }
 
 [data-theme='light'] .section {
-  border-bottom-color: rgba(0, 0, 0, 0.055);
+  border-bottom-color: var(--glass-border);
 }
 
 .tabContent {
@@ -55,10 +55,10 @@
   font-weight: 600;
   font-family: var(--font-mono);
 }
-.statusDone    { background: rgba(105, 201, 103, 0.09); color: var(--success); }
-.statusFailed  { background: rgba(255, 126, 120, 0.09); color: var(--diff-removed-border); }
-.statusRunning { background: rgba(93, 104, 204, 0.11); color: var(--skill); }
-.statusPending { background: rgba(255, 255, 255, 0.07); color: var(--muted-foreground); }
+.statusDone    { background: var(--glass-tint-moss); color: var(--success); }
+.statusFailed  { background: var(--glass-tint-danger); color: var(--diff-removed-border); }
+.statusRunning { background: var(--glass-tint-plum); color: var(--skill); }
+.statusPending { background: var(--glass-bg-medium); color: var(--muted-foreground); }
 
 .runId {
   margin-left: 6px;
@@ -107,7 +107,7 @@
 .emptyCard,
 .cardSection {
   border: 0;
-  border-bottom: 1px solid rgba(0,0,0,0.055);
+  border-bottom: 1px solid var(--glass-border);
   border-radius: 0;
   background: transparent;
 }
@@ -115,7 +115,7 @@
 [data-theme='dark'] .emptyCard,
 [data-theme='dark'] .cardSection {
   background: transparent;
-  border-color: rgba(255,255,255,0.045);
+  border-color: var(--glass-border-subtle);
 }
 
 .emptyCard {
@@ -124,7 +124,7 @@
   gap: 8px;
   min-height: 36px;
   padding: 6px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.055);
+  border-bottom: 1px solid var(--glass-border);
   color: var(--muted-foreground);
   font-size: 12px;
   opacity: 0.72;
@@ -135,12 +135,12 @@
 }
 
 .reviewSurface {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-bottom: 1px solid var(--glass-border-subtle);
   padding: 3px 0 8px;
 }
 
 [data-theme='light'] .reviewSurface {
-  border-bottom-color: rgba(0, 0, 0, 0.055);
+  border-bottom-color: var(--glass-border);
 }
 
 .reviewGrid {
@@ -152,11 +152,11 @@
 .reviewCard {
   min-width: 0;
   padding: 6px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.045);
+  border-top: 1px solid var(--glass-border-subtle);
 }
 
 [data-theme='light'] .reviewCard {
-  border-top-color: rgba(0, 0, 0, 0.055);
+  border-top-color: var(--glass-border);
 }
 
 .reviewCardTitle,
@@ -249,11 +249,11 @@
 .runtimeItem {
   gap: 8px;
   padding: 4px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.035);
+  border-top: 1px solid var(--glass-border-subtle);
 }
 
 [data-theme='light'] .runtimeItem {
-  border-top-color: rgba(0, 0, 0, 0.045);
+  border-top-color: var(--glass-border);
 }
 
 .runtimeKind {
@@ -280,14 +280,14 @@
   margin-left: auto;
   padding: 1px 5px;
   border-radius: 999px;
-  background: rgba(0,0,0,0.035);
+  background: var(--glass-bg-subtle);
   color: var(--muted-foreground);
   font-size: 10px;
   font-weight: 600;
 }
 
 [data-theme='dark'] .cardCount {
-  background: rgba(255,255,255,0.07);
+  background: var(--glass-bg-medium);
 }
 
 .list {
@@ -328,10 +328,10 @@
 }
 
 /* ── Tool call items ───────────────────────── */
-.toolCallItem { border-bottom: 1px solid rgba(0,0,0,0.04); }
+.toolCallItem { border-bottom: 1px solid var(--glass-bg-light); }
 .toolCallItem:last-child { border-bottom: none; }
 
-[data-theme='dark'] .toolCallItem { border-bottom-color: rgba(255,255,255,0.045); }
+[data-theme='dark'] .toolCallItem { border-bottom-color: var(--glass-bg-light); }
 
 .toolCallHeader {
   display: flex;
@@ -350,7 +350,7 @@
 .toolCallOutput {
   margin: 2px 0 8px;
   padding: 7px 8px;
-  background: rgba(0,0,0,0.026);
+  background: var(--glass-bg-subtle);
   border-radius: 7px;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -360,8 +360,8 @@
   word-break: break-all;
 }
 
-[data-theme='light'] .toolCallOutput { background: rgba(0, 0, 0, 0.035); }
-[data-theme='dark'] .toolCallOutput { background: rgba(255, 255, 255, 0.04); }
+[data-theme='light'] .toolCallOutput { background: var(--glass-bg-subtle); }
+[data-theme='dark'] .toolCallOutput { background: var(--glass-bg-light); }
 
 .chevron {
   display: inline-block;
@@ -397,16 +397,16 @@
 .cancelButton {
   width: 100%;
   padding: 6px 12px;
-  border: 1px solid rgba(239,68,68,0.2);
+  border: 1px solid var(--glass-tint-danger);
   border-radius: 8px;
-  background: rgba(239,68,68,0.04);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
 }
-.cancelButton:hover { background: rgba(239,68,68,0.08); }
+.cancelButton:hover { background: var(--glass-tint-danger); }
 
 /* ── Diff Review Panel (primary when diffs exist) ── */
 .diffReviewPrimary {
@@ -432,7 +432,7 @@
 }
 
 [data-theme='dark'] .tabContentSecondary {
-  border-top-color: rgba(255, 255, 255, 0.045);
+  border-top-color: var(--glass-border-subtle);
 }
 
 /* ── Token usage ───────────────────────────── */

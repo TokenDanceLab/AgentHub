@@ -5,7 +5,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.34);
+  background: var(--glass-shadow);
   animation: shortcutOverlayIn 0.14s ease-out;
 }
 
@@ -13,22 +13,22 @@
   width: min(640px, calc(100vw - 40px));
   max-height: min(720px, calc(100vh - 48px));
   overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 12px;
-  background: rgba(252, 252, 253, 0.98);
+  background: var(--glass-light-fill);
   box-shadow:
-    0 24px 68px rgba(15, 23, 42, 0.2),
-    0 1px 0 rgba(255, 255, 255, 0.82) inset;
+    0 24px 68px var(--glass-shadow),
+    0 1px 0 var(--glass-input-bg-hover) inset;
   color: var(--foreground);
   animation: shortcutDialogIn 0.16s ease-out;
 }
 
 [data-theme='dark'] .dialog {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(30, 30, 37, 0.98);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-panel-overlay);
   box-shadow:
-    0 28px 78px rgba(0, 0, 0, 0.42),
-    0 1px 0 rgba(255, 255, 255, 0.055) inset;
+    0 28px 78px var(--glass-shadow),
+    0 1px 0 var(--glass-bg-medium) inset;
 }
 
 .header {
@@ -37,11 +37,11 @@
   align-items: center;
   gap: 10px;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 [data-theme='dark'] .header {
-  border-bottom-color: rgba(255, 255, 255, 0.07);
+  border-bottom-color: var(--glass-border);
 }
 
 .headerIcon,
@@ -56,12 +56,12 @@
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
   color: color-mix(in oklch, var(--foreground) 74%, var(--muted-foreground));
 }
 
 [data-theme='dark'] .headerIcon {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
 }
 
 .title {
@@ -89,13 +89,13 @@
 .closeBtn:hover,
 .closeBtn:focus-visible {
   outline: none;
-  background: rgba(15, 23, 42, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
 [data-theme='dark'] .closeBtn:hover,
 [data-theme='dark'] .closeBtn:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-strong);
 }
 
 .groupList {
@@ -143,11 +143,11 @@
   min-height: 54px;
   padding: 8px 9px;
   border-radius: 9px;
-  background: rgba(15, 23, 42, 0.035);
+  background: var(--glass-bg-subtle);
 }
 
 [data-theme='dark'] .commandRow {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
 }
 
 .commandText {
@@ -196,10 +196,10 @@
   min-width: 27px;
   min-height: 25px;
   padding: 2px 7px 3px;
-  border: 1px solid rgba(15, 23, 42, 0.09);
-  border-bottom-color: rgba(15, 23, 42, 0.18);
+  border: 1px solid var(--glass-border-strong);
+  border-bottom-color: var(--glass-border-heavy);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--glass-input-bg-hover);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 11.5px;
@@ -209,9 +209,9 @@
 }
 
 [data-theme='dark'] .keyGroup kbd {
-  border-color: rgba(255, 255, 255, 0.09);
-  border-bottom-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.065);
+  border-color: var(--glass-border-strong);
+  border-bottom-color: var(--glass-border-heavy);
+  background: var(--glass-bg-medium);
 }
 
 @keyframes shortcutOverlayIn {
