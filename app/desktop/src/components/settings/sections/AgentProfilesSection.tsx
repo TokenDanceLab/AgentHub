@@ -14,7 +14,7 @@ interface AgentProfilesSectionProps {
   agents: AgentInfo[];
   edgeOnline: boolean;
   runnerSummary: string;
-  localAgentProfiles: Array<{ agent: AgentInfo; alias: string; route: ResolvedRunModelSettings }>;
+  localAgentProfiles: Array<{ agent: AgentInfo; alias: string | undefined; route: ResolvedRunModelSettings }>;
 }
 
 export default function AgentProfilesSection({ agents, edgeOnline, runnerSummary, localAgentProfiles }: AgentProfilesSectionProps) {
