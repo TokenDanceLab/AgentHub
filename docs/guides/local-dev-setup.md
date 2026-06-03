@@ -2,7 +2,7 @@
 
 ## 前置要求
 
-- Go 1.22+
+- Go 1.25+
 - Node.js 20+ / pnpm 9+
 - PostgreSQL 15+（推荐 16）
 - Redis 7+

@@ -7,8 +7,38 @@
 #        make fe-build    (build all frontend packages)
 
 #        make release VER=v0.1.1  (build + upload release binaries)
+#        make help        (show this help)
 .PHONY: test test-all test-edge test-hub lint coverage sec release clean \
-        fe-install fe-dev fe-build fe-test fe-lint fe-typecheck
+        fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
+
+# ── Help ───────────────────────────────────────────
+
+help:
+	@echo "AgentHub Makefile targets:"
+	@echo ""
+	@echo "  Backend:"
+	@echo "    test          单元测试 (edge + hub, -short)"
+	@echo "    test-all      完整测试 (需 Redis + PG)"
+	@echo "    test-edge     Edge Server 单元测试"
+	@echo "    test-hub      Hub Server 单元测试"
+	@echo "    lint          golangci-lint (edge + hub)"
+	@echo "    coverage      覆盖率报告 (HTML + func)"
+	@echo "    sec           gosec + govulncheck"
+	@echo "    bench         Benchmark (events + service)"
+	@echo "    ci            全量 CI: test + lint + sec"
+	@echo "    clean         清理测试缓存和覆盖率文件"
+	@echo ""
+	@echo "  Frontend:"
+	@echo "    fe-install    pnpm install"
+	@echo "    fe-dev        pnpm dev (desktop :5173)"
+	@echo "    fe-build      pnpm -r build (全部包)"
+	@echo "    fe-test       pnpm -r test"
+	@echo "    fe-lint       eslint + stylelint"
+	@echo "    fe-typecheck  tsc --noEmit (desktop + web)"
+	@echo ""
+	@echo "  Release:"
+	@echo "    release VER=v0.1.1   一键构建 + 上传"
+	@echo ""
 
 # ── Unit tests (no external deps) ────────────────────
 

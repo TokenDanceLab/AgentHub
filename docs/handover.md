@@ -1,6 +1,6 @@
 # AgentHub 交接文档
 
-> **分支**: `dev/delicious233` · **HEAD**: `815fc32a` · **日期**: 2026-06-03
+> **分支**: `dev/delicious233` · **HEAD**: `2aa8646e` · **日期**: 2026-06-03
 > **累计合并 worktree**: 18 个（Wave 1×5 + Wave 2×9 + Wave 3×4）+ 3 个 SettingsPage 收敛提交
 
 ---
@@ -16,7 +16,7 @@ AgentHub（词元跳动 / TokenDance）是字节跳动 AI 编程协作竞赛的�
 | 角色代号 | 模型 | 上下文窗口 | 擅长领域 |
 |---------|------|-----------|---------|
 | opus | DeepSeek-V4-Pro | 1M | 架构设计、复杂推理、大规模重构 |
-| sonnet | mimo-v2.5 | 1M | 前端 UI、多模态、CSS |
+| sonnet | Kimi-K2.6 | 256k | 前端 UI、多模态、CSS |
 | haiku | GLM-5.1 | 200k | Go 后端、常规编码、测试 |
 
 项目根目录有 `AGENTS.md` 定义项目规范和协作约定。`.agents/skills/dev-loop/SKILL.md` 定义开发循环引擎。
