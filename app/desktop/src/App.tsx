@@ -53,6 +53,7 @@ import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
 import HomeDashboard from '@/components/HomeDashboard';
+import ConnectionStatus from '@/components/ConnectionStatus';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
@@ -1490,6 +1491,12 @@ export default function App() {
           </span>
         </div>
       )}
+
+      <ConnectionStatus
+        isConnected={isConnected}
+        isReconnecting={edgeStatus.retrying}
+        onReconnect={edgeStatus.retry}
+      />
 
       {settingsOpen ? (
         <SettingsPage
