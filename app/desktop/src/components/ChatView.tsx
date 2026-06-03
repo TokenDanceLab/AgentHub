@@ -849,13 +849,37 @@ function ArtifactBlock({ block }: { block: Extract<MessageBlock, { kind: 'artifa
     block.artifactType === 'image' ? 'image' :
     'file'
   );
+  const addToast = useToastStore((s) => s.addToast);
+
+  const handleApplyDiff = useCallback(
+    async (url: string) => {
+      try {
+        const res = await fetch(
+          `/v1/artifacts/${encodeURIComponent(block.artifactId)}:apply`,
+          { method: 'POST' },
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        addToast({ type: 'success', message: 'Diff applied' });
+      } catch {
+        // API unavailable — fallback to clipboard
+        try {
+          await navigator.clipboard.writeText(url);
+          addToast({ type: 'info', message: 'Diff URL copied to clipboard' });
+        } catch {
+          addToast({ type: 'error', message: 'Failed to apply diff' });
+        }
+      }
+    },
+    [block.artifactId, addToast],
+  );
+
   return (
     <ArtifactPreview
       artifactUrl={artifactUrl}
       artifactType={artifactType}
       title={block.title}
       inline
-      onApplyDiff={block.canApplyDiff ? () => {} : undefined}
+      onApplyDiff={block.canApplyDiff ? handleApplyDiff : undefined}
       diffApplied={block.diffApplied}
     />
   );
@@ -994,11 +1018,12 @@ const BlockRenderer = memo(function BlockRenderer({
       return (
         <ApprovalCard
           approvalId={block.approvalId}
-          agentName="Agent"
-          toolName=""
-          riskLevel="low"
+          agentName={block.agentName ?? ''}
+          toolName={block.toolName ?? ''}
+          riskLevel={block.riskLevel ?? 'low'}
           status={block.status as 'pending' | 'approved' | 'denied' | 'timeout'}
-          timestamp=""
+          timestamp={block.timestamp ?? ''}
+          reason={block.reason}
         />
       );
 
