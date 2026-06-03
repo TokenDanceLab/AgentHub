@@ -28,8 +28,8 @@
     0 4px 12px var(--glass-bg-medium),
     0 1px 0 rgba(255, 255, 255, 0.55) inset;
   word-break: break-word;
-  border: 1px solid rgba(12, 18, 28, 0.07);
-  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-input-bg-hover);
   color: var(--foreground);
   backdrop-filter: blur(28px) saturate(1.16);
   -webkit-backdrop-filter: blur(28px) saturate(1.16);

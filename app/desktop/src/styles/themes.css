@@ -262,6 +262,11 @@
 
   --glass-text-muted: rgba(0, 0, 0, 0.45);
   --glass-text-disabled: rgba(0, 0, 0, 0.25);
+
+  --glass-input-bg: rgba(0, 0, 0, 0.04);
+  --glass-input-bg-hover: rgba(255, 255, 255, 0.72);
+
+  --glass-light-fill: rgba(246, 247, 250, 0.92);
 }
 
 /* ── Shared glass/backdrop utilities ──────────────────────────────────── */

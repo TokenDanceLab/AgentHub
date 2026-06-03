@@ -130,6 +130,13 @@
   --glass-text-muted: rgba(255, 255, 255, 0.5);
   --glass-text-disabled: rgba(255, 255, 255, 0.3);
 
+  /* Glass input fields */
+  --glass-input-bg: rgba(255, 255, 255, 0.48);
+  --glass-input-bg-hover: rgba(255, 255, 255, 0.72);
+
+  /* Light page fill (light-theme opaque panels) */
+  --glass-light-fill: rgba(250, 250, 251, 0.92);
+
   /* ── Surface Layers (base — theme overrides in themes.css) ────────── */
   --surface-base:         oklch(0.14 0.006 260);  /* bottom container */
   --surface-raised:       oklch(0.17 0.007 260);  /* cards/panels */
