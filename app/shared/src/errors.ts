@@ -150,8 +150,8 @@ export class ErrorReporter {
       message: error.message,
       timestamp: Date.now(),
       count: 1,
-      stack: error.stack,
-      context,
+      ...(error.stack != null && { stack: error.stack }),
+      ...(context != null && { context }),
     };
     this.errors.set(key, report);
     this.notify(report);
