@@ -1699,6 +1699,13 @@ export default function ChatView({
             <EmptyState
               title={t('chat.edgeNotConnected')}
               description={t('chat.edgeNotConnectedHint')}
+              icon={
+                <svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 14a4 4 0 0 1 4-4h20a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H22l-8 6V32h-0a4 4 0 0 1-4-4V14z" />
+                  <line x1="18" y1="18" x2="30" y2="18" />
+                  <line x1="18" y1="24" x2="26" y2="24" />
+                </svg>
+              }
               action={{
                 label: t('chat.openSettings'),
                 onClick: () => window.dispatchEvent(new CustomEvent('agenthub:open-settings')),
@@ -1709,6 +1716,11 @@ export default function ChatView({
             <EmptyState
               title={t('chat.emptyTitle')}
               description={t('chat.emptyDescription')}
+              icon={
+                <svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M26 6L12 28h10l-2 14L34 20H24l2-14z" />
+                </svg>
+              }
             />
           )
         ) : (

@@ -3,6 +3,7 @@ import { Network, Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { EmptyState } from '@shared/ui';
 import styles from './AgentList.module.css';
 
 const RUNTIME_ORDER = ['orchestrator', 'codex', 'claude', 'opencode'];
@@ -103,10 +104,22 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
       </div>
 
       {isEmpty ? (
-        <div className={styles.empty}>
-          <Sparkles size={16} />
-          <span>{online ? t('agent.emptyOnline') : t('agent.emptyOffline')}</span>
-        </div>
+        <EmptyState
+          className={styles.sidebarEmpty}
+          titleLevel={3}
+          icon={
+            <svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="10" y="14" width="28" height="22" rx="4" />
+              <circle cx="19" cy="24" r="2.5" />
+              <circle cx="29" cy="24" r="2.5" />
+              <path d="M18 31c0 0 2.5 3 6 3s6-3 6-3" />
+              <line x1="24" y1="8" x2="24" y2="14" />
+              <circle cx="24" cy="7" r="2" />
+            </svg>
+          }
+          title={t('agent.emptyTitle')}
+          description={online ? t('agent.emptyOnline') : t('agent.emptyOffline')}
+        />
       ) : isSearchEmpty ? (
         <div className={styles.empty}>{t('agent.noMatch')}</div>
       ) : (
