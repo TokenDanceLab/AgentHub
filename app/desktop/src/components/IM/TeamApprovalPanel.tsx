@@ -2,6 +2,7 @@ import { type FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X, Clock, ShieldAlert, AlertTriangle } from 'lucide-react';
 import type { TeamApprovalState, TeamConflictState } from '@/api/hubClient';
+import styles from './TeamApprovalPanel.module.css';
 
 interface TeamApprovalPanelProps {
   approvals: TeamApprovalState[];
@@ -26,22 +27,22 @@ function timeAgo(dateStr?: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function statusStyle(status: string): React.CSSProperties {
+function badgeClass(status: string): string {
   switch (status.toLowerCase()) {
     case 'pending':
     case 'requested':
     case 'waiting':
     case 'waiting_for_approval':
-      return { color: '#f59e0b', backgroundColor: '#fef3c7' };
+      return styles.badgePending!;
     case 'approved':
     case 'allowed':
     case 'resolved':
-      return { color: '#10b981', backgroundColor: '#d1fae5' };
+      return styles.badgeApproved!;
     case 'denied':
     case 'rejected':
-      return { color: '#ef4444', backgroundColor: '#fee2e2' };
+      return styles.badgeDenied!;
     default:
-      return { color: '#6b7280', backgroundColor: '#f3f4f6' };
+      return styles.badgeDefault!;
   }
 }
 
@@ -90,7 +91,7 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 
   if (loading) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.loading}>
         {t('teamRun.loading', 'Loading approvals...')}
       </div>
     );
@@ -98,7 +99,7 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: 16, color: 'var(--color-danger, #e53e3e)', fontSize: 13 }}>
+      <div className={styles.error}>
         {error}
       </div>
     );
@@ -106,31 +107,22 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 
   if (!hasItems) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.empty}>
         {t('teamRun.noApprovals', 'No pending approvals or conflicts.')}
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className={styles.container}>
       {/* Reason input shared across decisions */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div className={styles.reasonRow}>
         <input
           type="text"
           placeholder={t('teamRun.reasonPlaceholder', 'Reason (optional)...')}
           value={reasonInput}
           onChange={(e) => setReasonInput(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '6px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--border-subtle, #e5e7eb)',
-            fontSize: 12,
-            backgroundColor: 'var(--surface-default, #fff)',
-            color: 'var(--foreground)',
-            outline: 'none',
-          }}
+          className={styles.reasonInput}
         />
       </div>
 
@@ -141,58 +133,39 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
           : undefined;
 
         return (
-          <div
-            key={approval.approval_id}
-            style={{
-              padding: '10px 12px',
-              borderRadius: 8,
-              border: '1px solid var(--border-subtle, #e5e7eb)',
-              backgroundColor: 'var(--surface-raised, #f9fafb)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ShieldAlert size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>
+          <div key={approval.approval_id} className={styles.card}>
+            <div className={styles.cardHeader}>
+              <ShieldAlert size={16} className={styles.cardIconWarning} />
+              <span className={styles.cardTitle}>
                 {t('teamRun.approvalRequest', 'Approval: {{tool}}', {
                   tool: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
                 })}
               </span>
-              <span
-                style={{
-                  ...statusStyle(approval.status),
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: 9999,
-                }}
-              >
-                <Clock size={10} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+              <span className={`${styles.badge} ${badgeClass(approval.status)}`}>
+                <Clock size={10} className={styles.badgeIcon} />
                 {t('teamRun.status.pending', 'Pending')}
               </span>
             </div>
 
             {memberLabel && (
-              <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+              <div className={styles.cardMeta}>
                 {t('teamRun.requestedBy', 'Requested by {{member}}', { member: memberLabel })}
               </div>
             )}
 
             {approval.reason && (
-              <div style={{ fontSize: 12, color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
+              <div className={styles.cardMetaItalic}>
                 {approval.reason}
               </div>
             )}
 
             {approval.created_at && (
-              <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+              <div className={styles.cardMeta}>
                 {timeAgo(approval.created_at)}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div className={styles.cardActions}>
               <button
                 type="button"
                 disabled={isDeciding}
@@ -201,20 +174,7 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
                     decision: 'deny',
                     toolLabel: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
                   })}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--color-danger-border, #fca5a5)',
-                  backgroundColor: 'var(--color-danger-bg, #fef2f2)',
-                  color: 'var(--color-danger, #dc2626)',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: isDeciding ? 'not-allowed' : 'pointer',
-                  opacity: isDeciding ? 0.5 : 1,
-                }}
+                className={`${styles.actionBtn} ${styles.actionBtnDeny}`}
               >
                 <X size={14} /> {t('teamRun.deny', 'Deny')}
               </button>
@@ -226,20 +186,7 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
                     decision: 'approve',
                     toolLabel: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
                   })}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--color-success-border, #86efac)',
-                  backgroundColor: 'var(--color-success-bg, #f0fdf4)',
-                  color: 'var(--color-success, #16a34a)',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: isDeciding ? 'not-allowed' : 'pointer',
-                  opacity: isDeciding ? 0.5 : 1,
-                }}
+                className={`${styles.actionBtn} ${styles.actionBtnApprove}`}
               >
                 <Check size={14} /> {t('teamRun.approve', 'Approve')}
               </button>
@@ -249,38 +196,19 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
       })}
 
       {pendingConflicts.map((conflict) => (
-        <div
-          key={conflict.conflict_id}
-          style={{
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: '1px solid var(--border-subtle, #e5e7eb)',
-            backgroundColor: 'var(--surface-raised, #f9fafb)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertTriangle size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
-            <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>
+        <div key={conflict.conflict_id} className={styles.card}>
+          <div className={styles.cardHeader}>
+            <AlertTriangle size={16} className={styles.cardIconWarning} />
+            <span className={styles.cardTitle}>
               {t('teamRun.conflictOn', 'Conflict: {{path}}', { path: conflict.path })}
             </span>
-            <span
-              style={{
-                ...statusStyle(conflict.status),
-                fontSize: 11,
-                fontWeight: 600,
-                padding: '2px 8px',
-                borderRadius: 9999,
-              }}
-            >
+            <span className={`${styles.badge} ${badgeClass(conflict.status)}`}>
               {conflict.status}
             </span>
           </div>
 
           {conflict.agent_task_ids && conflict.agent_task_ids.length > 0 && (
-            <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+            <div className={styles.cardMeta}>
               {t('teamRun.conflictSources', '{{count}} conflicting source(s)', {
                 count: conflict.agent_task_ids.length,
               })}
@@ -288,28 +216,16 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
           )}
 
           {conflict.first_seen_at && (
-            <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+            <div className={styles.cardMeta}>
               {t('teamRun.firstSeen', 'First seen {{time}}', { time: timeAgo(conflict.first_seen_at) })}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div className={styles.cardActions}>
             <button
               type="button"
               onClick={() => onResolveConflict(conflict.conflict_id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '5px 12px',
-                borderRadius: 6,
-                border: '1px solid #86efac',
-                backgroundColor: '#f0fdf4',
-                color: '#16a34a',
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
+              className={styles.actionBtnResolve}
             >
               <Check size={14} /> {t('teamRun.resolveConflict', 'Resolve')}
             </button>
@@ -318,60 +234,32 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
       ))}
       {confirmAction && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'var(--overlay, rgba(0,0,0,0.4))',
-            zIndex: 1000,
-          }}
+          className={styles.overlay}
           onClick={() => setConfirmAction(null)}
           role="dialog"
           aria-label={t('teamRun.confirmTitle', 'Confirm decision')}
         >
-          <div
-            style={{
-              backgroundColor: 'var(--surface-default, #fff)',
-              border: '1px solid var(--border-subtle, #e5e7eb)',
-              borderRadius: 8,
-              padding: 20,
-              minWidth: 320,
-              maxWidth: 420,
-              boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>
+          <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h4 className={styles.dialogTitle}>
               {confirmAction.decision === 'approve'
                 ? t('teamRun.confirmApprove', 'Confirm approval')
                 : t('teamRun.confirmDeny', 'Confirm denial')}
             </h4>
-            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--muted-foreground)' }}>
+            <p className={styles.dialogBody}>
               {confirmAction.decision === 'approve'
                 ? t('teamRun.confirmApproveDesc', 'Approve "{{tool}}"?', { tool: confirmAction.toolLabel })
                 : t('teamRun.confirmDenyDesc', 'Deny "{{tool}}"?', { tool: confirmAction.toolLabel })}
             </p>
             {reasonInput && (
-              <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--muted-foreground)' }}>
+              <p className={styles.dialogReason}>
                 {t('teamRun.reasonLabel', 'Reason')}: {reasonInput}
               </p>
             )}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div className={styles.dialogActions}>
               <button
                 type="button"
                 onClick={() => setConfirmAction(null)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 6,
-                  border: '1px solid var(--border-subtle, #e5e7eb)',
-                  backgroundColor: 'var(--surface-raised, #f9fafb)',
-                  color: 'var(--foreground)',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
+                className={styles.dialogCancel}
               >
                 {t('teamRun.cancel', 'Cancel')}
               </button>
@@ -382,19 +270,11 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
                     ? handleApprove(confirmAction.approvalId)
                     : handleDeny(confirmAction.approvalId)
                 }
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 6,
-                  border: 'none',
-                  backgroundColor:
-                    confirmAction.decision === 'approve'
-                      ? 'var(--color-success, #16a34a)'
-                      : 'var(--color-danger, #dc2626)',
-                  color: '#fff',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
+                className={`${styles.dialogConfirm} ${
+                  confirmAction.decision === 'approve'
+                    ? styles.dialogConfirmApprove
+                    : styles.dialogConfirmDeny
+                }`}
               >
                 {confirmAction.decision === 'approve'
                   ? t('teamRun.confirm', 'Confirm')

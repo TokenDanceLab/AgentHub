@@ -1,0 +1,239 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* ── Status messages ─────────────────────────────────── */
+.loading {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+.error {
+  padding: var(--space-lg);
+  color: var(--td-danger);
+  font-size: var(--font-size-xs);
+}
+
+.empty {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Reason input ────────────────────────────────────── */
+.reasonRow {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.reasonInput {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--td-radius-control);
+  border: 1px solid var(--td-line);
+  font-size: var(--font-size-xs);
+  background: var(--td-surface);
+  color: var(--td-ink);
+  outline: none;
+}
+
+/* ── Card shared by approval & conflict ──────────────── */
+.card {
+  padding: 10px 12px;
+  border-radius: var(--td-radius-panel);
+  border: 1px solid var(--td-line);
+  background: var(--surface-raised);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.cardIcon {
+  flex-shrink: 0;
+}
+
+.cardIconWarning {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+
+.cardTitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  flex: 1;
+}
+
+.cardMeta {
+  font-size: var(--font-size-2xs);
+  color: var(--td-ink-muted);
+}
+
+.cardMetaItalic {
+  font-size: var(--font-size-xs);
+  color: var(--td-ink-muted);
+  font-style: italic;
+}
+
+.badgeIcon {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.cardActions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+/* ── Status badges ───────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.badgePending {
+  color: var(--warning);
+  background: var(--glass-tint-amber);
+}
+
+.badgeApproved {
+  color: var(--td-moss);
+  background: var(--glass-tint-moss);
+}
+
+.badgeDenied {
+  color: var(--td-danger);
+  background: var(--glass-tint-danger);
+}
+
+.badgeDefault {
+  color: var(--td-ink-muted);
+  background: var(--td-tint);
+}
+
+/* ── Action buttons ──────────────────────────────────── */
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: var(--td-radius-control);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.actionBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.actionBtnDeny {
+  border-color: var(--td-danger);
+  background: var(--glass-tint-danger);
+  color: var(--td-danger);
+}
+
+.actionBtnApprove {
+  border-color: var(--td-moss);
+  background: var(--glass-tint-moss);
+  color: var(--td-moss);
+}
+
+.actionBtnResolve {
+  border: 1px solid var(--td-moss);
+  background: var(--glass-tint-moss);
+  color: var(--td-moss);
+  cursor: pointer;
+}
+
+/* ── Confirm dialog overlay ──────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-shadow);
+  z-index: var(--z-modal);
+}
+
+.dialog {
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-panel);
+  padding: 20px;
+  min-width: 320px;
+  max-width: 420px;
+  box-shadow: var(--shadow-md);
+}
+
+.dialogTitle {
+  margin: 0 0 8px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--td-ink);
+}
+
+.dialogBody {
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--td-ink-muted);
+}
+
+.dialogReason {
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--td-ink-muted);
+}
+
+.dialogActions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+.dialogCancel {
+  padding: 6px 14px;
+  border-radius: var(--td-radius-control);
+  border: 1px solid var(--td-line);
+  background: var(--surface-raised);
+  color: var(--td-ink);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.dialogConfirm {
+  padding: 6px 14px;
+  border-radius: var(--td-radius-control);
+  border: none;
+  color: var(--primary-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.dialogConfirmApprove {
+  background: var(--td-moss);
+}
+
+.dialogConfirmDeny {
+  background: var(--td-danger);
+}
