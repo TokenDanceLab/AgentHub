@@ -1501,8 +1501,6 @@ export default function App() {
       {settingsOpen ? (
         <SettingsPage
           initialSection={settingsInitialSection}
-          modelCatalog={modelCatalogQuery.data}
-          modelDisplayNames={modelsDevDisplayNamesQuery.data}
           onBack={() => setSettingsOpen(false)}
           onOpenAuth={handleOpenAuth}
         />
