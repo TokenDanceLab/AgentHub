@@ -1,6 +1,14 @@
 import { Component, type ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Clock,
+  RefreshCw,
+  RotateCcw,
+  ServerCrash,
+  WifiOff,
+} from 'lucide-react';
 import i18n from '@/i18n';
+import styles from './ErrorBoundary.module.css';
 
 // ── Props ──────────────────────────────────────────────
 
@@ -11,6 +19,20 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+}
+
+// ── Error classification ──────────────────────────────
+
+type ErrorKind = 'chunk' | 'network' | 'timeout' | 'crash' | 'unknown';
+
+function classifyError(error: Error | null): ErrorKind {
+  if (!error) return 'unknown';
+  const msg = error.message || '';
+  if (/ChunkLoadError|Loading chunk failed/i.test(msg)) return 'chunk';
+  if (/network|fetch|Failed to fetch|NetworkError|ERR_NETWORK|ECONNREFUSED|connection\s*(lost|refused|reset)/i.test(msg)) return 'network';
+  if (/timeout|ETIMEDOUT|timed\s*out|AbortError/i.test(msg)) return 'timeout';
+  if (/agent|runtime|crash|SIGTERM|SIGKILL|process.*exit|spawn.*ENOENT/i.test(msg)) return 'crash';
+  return 'unknown';
 }
 
 // ── ChunkLoadError auto-recovery ──────────────────────
@@ -61,6 +83,72 @@ function t(key: string, fallback: string): string {
   return fallback;
 }
 
+// ── Error kind configs ────────────────────────────────
+
+interface ErrorConfig {
+  icon: ReactNode;
+  iconClass: string | undefined;
+  titleKey: string;
+  titleFallback: string;
+  descKey: string;
+  descFallback: string;
+  primaryLabelKey: string;
+  primaryLabelFallback: string;
+}
+
+const ERROR_CONFIGS: Record<ErrorKind, ErrorConfig> = {
+  chunk: {
+    icon: <RefreshCw size={28} aria-hidden="true" />,
+    iconClass: styles.iconWrapChunk,
+    titleKey: 'errorBoundary.chunkLoadTitle',
+    titleFallback: 'Update Required',
+    descKey: 'errorBoundary.chunkLoadDesc',
+    descFallback: 'A new version of the app is available. Please reload to continue.',
+    primaryLabelKey: 'errorBoundary.reload',
+    primaryLabelFallback: 'Reload Page',
+  },
+  network: {
+    icon: <WifiOff size={28} aria-hidden="true" />,
+    iconClass: styles.iconWrapNetwork,
+    titleKey: 'errorBoundary.networkTitle',
+    titleFallback: 'Connection Lost',
+    descKey: 'errorBoundary.networkDesc',
+    descFallback: 'The connection to the server was lost. Check your network and try reconnecting.',
+    primaryLabelKey: 'errorBoundary.reconnect',
+    primaryLabelFallback: 'Reconnect',
+  },
+  timeout: {
+    icon: <Clock size={28} aria-hidden="true" />,
+    iconClass: styles.iconWrapTimeout,
+    titleKey: 'errorBoundary.timeoutTitle',
+    titleFallback: 'Service Timeout',
+    descKey: 'errorBoundary.timeoutDesc',
+    descFallback: 'The service took too long to respond. Please try again.',
+    primaryLabelKey: 'errorBoundary.retry',
+    primaryLabelFallback: 'Retry',
+  },
+  crash: {
+    icon: <ServerCrash size={28} aria-hidden="true" />,
+    iconClass: styles.iconWrapCrash,
+    titleKey: 'errorBoundary.crashTitle',
+    titleFallback: 'Agent Error',
+    descKey: 'errorBoundary.crashDesc',
+    descFallback: 'The agent runtime encountered an unexpected error. Restart the agent to continue.',
+    primaryLabelKey: 'errorBoundary.restartAgent',
+    primaryLabelFallback: 'Restart Agent',
+  },
+  unknown: {
+    icon: <AlertTriangle size={28} aria-hidden="true" />,
+    iconClass: styles.iconWrapUnknown,
+    titleKey: 'errorBoundary.title',
+    titleFallback: 'Something went wrong',
+    descKey: 'errorBoundary.desc',
+    descFallback: 'An unexpected error occurred while rendering this section.',
+    primaryLabelKey: 'errorBoundary.reload',
+    primaryLabelFallback: 'Reload Page',
+  },
+};
+
 // ── Component ─────────────────────────────────────────
 
 export default class ErrorBoundary extends Component<Props, State> {
@@ -91,144 +179,84 @@ export default class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  handleReconnect = (): void => {
+    this.setState({ hasError: false, error: null });
+    // Trigger a navigation-level reconnect attempt
+    window.dispatchEvent(new CustomEvent('agenthub:reconnect'));
+  };
+
+  handleRestartAgent = (): void => {
+    this.setState({ hasError: false, error: null });
+    // Signal the edge to restart the agent runtime
+    window.dispatchEvent(new CustomEvent('agenthub:restart-agent'));
+  };
+
   render(): ReactNode {
     if (this.state.hasError) {
       const error = this.state.error;
-      const isChunk = !!(error && isChunkLoadError(error));
+      const kind = classifyError(error);
+      const config = ERROR_CONFIGS[kind];
 
-      const title = isChunk
-        ? t('errorBoundary.chunkLoadTitle', 'Update Required')
-        : t('errorBoundary.title', 'Something went wrong');
-
-      const description = isChunk
-        ? t(
-            'errorBoundary.chunkLoadDesc',
-            'A new version of the app is available. Please reload to continue.',
-          )
-        : t(
-            'errorBoundary.desc',
-            'An unexpected error occurred while rendering this section.',
-          );
-
-      const retryLabel = t('errorBoundary.retry', 'Retry');
-      const reloadLabel = t('errorBoundary.reload', 'Reload Page');
+      const title = t(config.titleKey, config.titleFallback);
+      const description = t(config.descKey, config.descFallback);
+      const primaryLabel = t(config.primaryLabelKey, config.primaryLabelFallback);
       const stackLabel = t('errorBoundary.stackTrace', 'Stack Trace');
 
+      // Determine primary action handler
+      let onPrimary: () => void;
+      switch (kind) {
+        case 'chunk':
+        case 'unknown':
+          onPrimary = this.handleReload;
+          break;
+        case 'network':
+          onPrimary = this.handleReconnect;
+          break;
+        case 'timeout':
+          onPrimary = this.handleRetry;
+          break;
+        case 'crash':
+          onPrimary = this.handleRestartAgent;
+          break;
+      }
+
       return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '48px 24px',
-            textAlign: 'center',
-            color: 'var(--foreground)',
-          }}
-          role="alert"
-        >
-          <AlertTriangle
-            size={40}
-            style={{ color: 'var(--warning, #f59e0b)', marginBottom: 16 }}
-            aria-hidden="true"
-          />
+        <div className={styles.container} role="alert">
+          <div className={config.iconClass ?? styles.iconWrap}>
+            {config.icon}
+          </div>
 
-          <h2
-            style={{
-              margin: '0 0 8px',
-              fontSize: 'var(--font-size-lg, 18px)',
-              fontWeight: 600,
-            }}
-          >
-            {title}
-          </h2>
+          <h2 className={styles.title}>{title}</h2>
+          <p className={styles.description}>{description}</p>
 
-          <p
-            style={{
-              margin: '0 0 24px',
-              fontSize: 'var(--font-size-sm, 14px)',
-              color: 'var(--muted-foreground)',
-              maxWidth: 480,
-              lineHeight: 1.5,
-            }}
-          >
-            {description}
-          </p>
+          <div className={styles.actions}>
+            <button
+              type="button"
+              onClick={onPrimary}
+              className={styles.btnPrimary}
+            >
+              {kind === 'network' && <RotateCcw size={14} aria-hidden="true" />}
+              {kind === 'crash' && <ServerCrash size={14} aria-hidden="true" />}
+              {primaryLabel}
+            </button>
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-            {isChunk ? (
-              <button
-                type="button"
-                onClick={this.handleReload}
-                style={{
-                  padding: '8px 20px',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md, 6px)',
-                  background: 'var(--primary)',
-                  color: 'var(--primary-foreground)',
-                  fontSize: 'var(--font-size-sm, 14px)',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                }}
-              >
-                {reloadLabel}
-              </button>
-            ) : (
+            {kind !== 'chunk' && (
               <button
                 type="button"
                 onClick={this.handleRetry}
-                style={{
-                  padding: '8px 20px',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md, 6px)',
-                  background: 'var(--primary)',
-                  color: 'var(--primary-foreground)',
-                  fontSize: 'var(--font-size-sm, 14px)',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sans)',
-                }}
+                className={styles.btnSecondary}
               >
-                {retryLabel}
+                {t('errorBoundary.retry', 'Retry')}
               </button>
             )}
           </div>
 
           {error?.stack && (
-            <details
-              style={{
-                width: '100%',
-                maxWidth: 560,
-                textAlign: 'left',
-                fontSize: 'var(--font-size-xs, 12px)',
-              }}
-            >
-              <summary
-                style={{
-                  cursor: 'pointer',
-                  color: 'var(--muted-foreground)',
-                  marginBottom: 8,
-                  userSelect: 'none',
-                }}
-              >
+            <details className={styles.stackDetails}>
+              <summary className={styles.stackSummary}>
                 {stackLabel}
               </summary>
-              <pre
-                style={{
-                  margin: 0,
-                  padding: 12,
-                  background: 'var(--muted)',
-                  borderRadius: 'var(--radius-md, 6px)',
-                  overflow: 'auto',
-                  maxHeight: 200,
-                  fontSize: 'var(--font-size-xs, 12px)',
-                  lineHeight: 1.4,
-                  color: 'var(--muted-foreground)',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                }}
-              >
+              <pre className={styles.stackPre}>
                 {error.stack}
               </pre>
             </details>
