@@ -8,8 +8,8 @@ interface TeamApprovalPanelProps {
   conflicts: TeamConflictState[];
   loading?: boolean;
   error?: string | null;
-  onApprove: (approvalId: string) => void;
-  onDeny: (approvalId: string) => void;
+  onApprove: (approvalId: string, reason?: string) => void;
+  onDeny: (approvalId: string, reason?: string) => void;
   onResolveConflict: (conflictId: string) => void;
   decidingIds?: Set<string>;
   memberNames?: Record<string, string>;
@@ -58,6 +58,11 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 }) => {
   const { t } = useTranslation();
   const [reasonInput, setReasonInput] = useState('');
+  const [confirmAction, setConfirmAction] = useState<{
+    approvalId: string;
+    decision: 'approve' | 'deny';
+    toolLabel: string;
+  } | null>(null);
 
   const pendingApprovals = approvals.filter((a) =>
     ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(a.status.toLowerCase()),
@@ -67,18 +72,20 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 
   const handleApprove = useCallback(
     (approvalId: string) => {
-      onApprove(approvalId);
+      onApprove(approvalId, reasonInput || undefined);
       setReasonInput('');
+      setConfirmAction(null);
     },
-    [onApprove],
+    [onApprove, reasonInput],
   );
 
   const handleDeny = useCallback(
     (approvalId: string) => {
-      onDeny(approvalId);
+      onDeny(approvalId, reasonInput || undefined);
       setReasonInput('');
+      setConfirmAction(null);
     },
-    [onDeny],
+    [onDeny, reasonInput],
   );
 
   if (loading) {
@@ -189,16 +196,20 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
               <button
                 type="button"
                 disabled={isDeciding}
-                onClick={() => handleDeny(approval.approval_id)}
+                onClick={() => setConfirmAction({
+                    approvalId: approval.approval_id,
+                    decision: 'deny',
+                    toolLabel: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
+                  })}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
                   padding: '5px 12px',
                   borderRadius: 6,
-                  border: '1px solid #fca5a5',
-                  backgroundColor: '#fef2f2',
-                  color: '#dc2626',
+                  border: '1px solid var(--color-danger-border, #fca5a5)',
+                  backgroundColor: 'var(--color-danger-bg, #fef2f2)',
+                  color: 'var(--color-danger, #dc2626)',
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: isDeciding ? 'not-allowed' : 'pointer',
@@ -210,16 +221,20 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
               <button
                 type="button"
                 disabled={isDeciding}
-                onClick={() => handleApprove(approval.approval_id)}
+                onClick={() => setConfirmAction({
+                    approvalId: approval.approval_id,
+                    decision: 'approve',
+                    toolLabel: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
+                  })}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
                   padding: '5px 12px',
                   borderRadius: 6,
-                  border: '1px solid #86efac',
-                  backgroundColor: '#f0fdf4',
-                  color: '#16a34a',
+                  border: '1px solid var(--color-success-border, #86efac)',
+                  backgroundColor: 'var(--color-success-bg, #f0fdf4)',
+                  color: 'var(--color-success, #16a34a)',
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: isDeciding ? 'not-allowed' : 'pointer',
@@ -301,6 +316,94 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
           </div>
         </div>
       ))}
+      {confirmAction && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--overlay, rgba(0,0,0,0.4))',
+            zIndex: 1000,
+          }}
+          onClick={() => setConfirmAction(null)}
+          role="dialog"
+          aria-label={t('teamRun.confirmTitle', 'Confirm decision')}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--surface-default, #fff)',
+              border: '1px solid var(--border-subtle, #e5e7eb)',
+              borderRadius: 8,
+              padding: 20,
+              minWidth: 320,
+              maxWidth: 420,
+              boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>
+              {confirmAction.decision === 'approve'
+                ? t('teamRun.confirmApprove', 'Confirm approval')
+                : t('teamRun.confirmDeny', 'Confirm denial')}
+            </h4>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--muted-foreground)' }}>
+              {confirmAction.decision === 'approve'
+                ? t('teamRun.confirmApproveDesc', 'Approve "{{tool}}"?', { tool: confirmAction.toolLabel })
+                : t('teamRun.confirmDenyDesc', 'Deny "{{tool}}"?', { tool: confirmAction.toolLabel })}
+            </p>
+            {reasonInput && (
+              <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--muted-foreground)' }}>
+                {t('teamRun.reasonLabel', 'Reason')}: {reasonInput}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border-subtle, #e5e7eb)',
+                  backgroundColor: 'var(--surface-raised, #f9fafb)',
+                  color: 'var(--foreground)',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('teamRun.cancel', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  confirmAction.decision === 'approve'
+                    ? handleApprove(confirmAction.approvalId)
+                    : handleDeny(confirmAction.approvalId)
+                }
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  border: 'none',
+                  backgroundColor:
+                    confirmAction.decision === 'approve'
+                      ? 'var(--color-success, #16a34a)'
+                      : 'var(--color-danger, #dc2626)',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                {confirmAction.decision === 'approve'
+                  ? t('teamRun.confirm', 'Confirm')
+                  : t('teamRun.confirm', 'Confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
