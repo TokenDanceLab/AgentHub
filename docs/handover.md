@@ -1,0 +1,392 @@
+# AgentHub 交接文档
+
+> **分支**: `dev/delicious233` · **HEAD**: `4bb626ae` · **日期**: 2026-06-03
+> **累计合并 worktree**: 18 个（Wave 1×5 + Wave 2×9 + Wave 3×4）
+
+---
+
+## 一、项目概述
+
+AgentHub（词元跳动 / TokenDance）是字节跳动 AI 编程协作竞赛的参赛项目。它是一个 AI 编程协作平台，让开发者通过桌面端或 Web 端与多种 AI Agent 运行时（Claude Code、Codex、OpenCode）进行对话式编程协作。
+
+评分维度：AI 协作能力 30%、功能完整度 25%、生成效果质量 20%、代码理解度 15%、创新与产品感 10%。
+
+### 1.1 团队与模型分配
+
+| 角色代号 | 模型 | 上下文窗口 | 擅长领域 |
+|---------|------|-----------|---------|
+| opus | DeepSeek-V4-Pro | 1M | 架构设计、复杂推理、大规模重构 |
+| sonnet | mimo-v2.5 | 1M | 前端 UI、多模态、CSS |
+| haiku | GLM-5.1 | 200k | Go 后端、常规编码、测试 |
+
+项目根目录有 `AGENTS.md` 定义项目规范和协作约定。`.agents/skills/dev-loop/SKILL.md` 定义开发循环引擎。
+
+---
+
+## 二、技术架构
+
+### 2.1 三层架构
+
+```
+┌─────────────────────────────────────────────────┐
+│  Desktop (React + Tauri, :5173)                 │
+│  Web (React, :5173)                             │
+│  ← pnpm monorepo, shared 包共享组件              │
+└──────────────────┬──────────────────────────────┘
+                   │ WebSocket (gorilla/websocket)
+┌──────────────────▼──────────────────────────────┐
+│  Edge Server (Go, :3210)                        │
+│  ← AdapterRegistry 统一三种 runtime 输出          │
+│  ← MCP Server (JSON-RPC 2.0, 8 tools)           │
+│  ← 本地 auth token 鉴权                          │
+└──────────────────┬──────────────────────────────┘
+                   │ HTTP + WebSocket
+┌──────────────────▼──────────────────────────────┐
+│  Hub Server (Go + Gin + GORM, :8090)            │
+│  ← PostgreSQL + Redis                           │
+│  ← 项目/线程/消息/Agent 管理                      │
+└─────────────────────────────────────────────────┘
+```
+
+### 2.2 目录结构
+
+```
+AgentHub/
+├── app/                          # 前端 pnpm monorepo
+│   ├── desktop/                  # Tauri 桌面端 (React)
+│   │   └── src/components/
+│   │       ├── SettingsPage.tsx       # 设置页主文件 (3153 行)
+│   │       ├── SettingsPage.module.css # 设置页样式 (390 行)
+│   │       ├── ChatView.tsx           # 聊天视图
+│   │       ├── ThreadPanel.tsx        # 对话列表面板
+│   │       ├── WelcomeScreen.tsx      # 欢迎页
+│   │       ├── ErrorBoundary.tsx      # 错误边界
+│   │       └── settings/sections/     # 32 个提取的设置 section
+│   ├── web/                      # Web 端 (React)
+│   ├── shared/                   # 共享包
+│   │   └── src/
+│   │       ├── types/chat.ts          # 共享 ChatMessage 类型
+│   │       ├── errors.ts              # 错误处理 (AppError + ErrorReporter)
+│   │       ├── errorReporting.ts      # useErrorReporter hook
+│   │       └── ui/                    # 150+ 共享 UI 组件文件
+│   ├── e2e/                      # Playwright E2E 测试
+│   └── mobile/                   # Rust 移动端 (stub)
+├── edge-server/                  # Go 边缘服务
+│   └── internal/
+│       ├── adapters/             # Claude/Codex/OpenCode 适配器
+│       ├── mcp/                  # MCP Server (WT-H 新增)
+│       ├── httpserver/           # HTTP + WebSocket 路由
+│       ├── runners/              # Agent 运行时管理
+│       └── store/                # 本地存储
+├── hub-server/                   # Go Hub 服务
+│   └── internal/
+│       ├── handler/              # HTTP 处理器
+│       ├── service/              # 业务逻辑
+│       ├── repository/           # 数据访问
+│       ├── middleware/           # 中间件 (86.3% 覆盖率)
+│       └── ws/                   # WebSocket 管理
+├── docs/
+│   ├── roadmaps/                 # 路线图 + 竞品分析
+│   └── architecture/decisions/   # 5 份 ADR (WT-U 新增)
+├── Makefile                      # 统一构建命令
+├── AGENTS.md                     # 项目规范
+└── .agents/skills/               # Agent 技能定义
+```
+
+### 2.3 设计系统
+
+项目有两套 CSS 变量系统：
+
+**Glass Token（`--glass-*`）** — 玻璃态效果，26 个语义化变量：`--glass-bg-subtle`、`--glass-border`、`--glass-blur`、`--glass-shadow` 等。替代了原来 797 处组件 TSX 中的 `rgba()` 硬编码（现 TSX 内联已清零）。token 定义文件（tokens.css、themes.css、presets.css）中仍保留 rgba() 作为变量值，这是预期行为。
+
+**Design Token（`--td-*`）** — 通用设计变量：`--td-text-primary`、`--td-text-secondary`、`--td-bg-*`、`--td-status-success/warning/error` 等。
+
+stylelint 已配置禁止新增 `rgba()`/`rgb()`/hex 硬编码（`app/.stylelintrc.json`）。
+
+---
+
+## 三、已完成的 18 个 Worktree
+
+### Wave 1 — 基础治理（5 个）
+
+| 代号 | 分支 | 内容 | 关键变更 |
+|------|------|------|---------|
+| WT-A | `feat/web-mock-cleanup` | Web 端 mock 数据清除 | Web 端不再有假数据 |
+| WT-B | `feat/chat-stub-fixes` | ChatView stub handler 修复 | 修复空点击、未绑定事件 |
+| WT-C | `feat/settings-extraction` | SettingsPage 主体拆分 | 4213→3151 行，29 个 section 提取到 `settings/sections/` |
+| WT-D | `feat/glass-tokens` | Glass Token 系统 | 797 rgba()→12，新增 26 个 `--glass-*` token |
+| WT-E | `feat/git-hygiene-backend` | Git 卫生 + 文档 | CHANGELOG、local-dev-setup.md、dev guide |
+
+### Wave 2 — 功能推进（9 个）
+
+| 代号 | 分支 | 内容 | 关键变更 |
+|------|------|------|---------|
+| WT-C2 | `feat/settings-css-split` | SettingsPage CSS 拆分 | 2033→375 行，3 个 CSS module |
+| WT-B2 | `feat/im-css-modular` | IM 组件 CSS 模块化 | 72 处 inline style→0 |
+| WT-D2 | `feat/web-light-theme` | Web 浅色主题 | 6 个主题 preset + light/dark 切换 |
+| WT-F | `feat/docs-productization` | 文档产品化 | README 重写 + 用户指南 + FAQ + 快捷键参考 |
+| WT-G | `feat/chat-enhancements` | Chat 增强 | 对话历史搜索 + Apply All 批量 Diff |
+| WT-H | `feat/edge-mcp-endpoint` | Edge MCP 端点 | 8 个 MCP tools (JSON-RPC 2.0)，含测试 |
+| WT-I | `feat/hub-test-coverage` | Hub 测试覆盖率 | middleware 86%、handler 58%、总计 ~55% |
+| WT-J | `feat/onboarding-error-ux` | Onboarding + 错误 UX | 3 步引导流、4 类错误分类、ConnectionStatus |
+| WT-K | `feat/shared-utils` | 共享工具层 | ErrorReporter + WS 重连 + API 重试 + IM i18n |
+
+### Wave 3 — 编译修复 + 打磨（4 个）
+
+| 代号 | 分支 | 内容 | 关键变更 |
+|------|------|------|---------|
+| WT-W | `fix/build-ts-errors` | TS 编译错误修复 | 共享 ChatMessage 类型 + exactOptional 兼容 |
+| WT-N | `feat/empty-state-branding` | 空状态品牌个性 | EmptyState 组件 + 4 页面引导 + i18n |
+| WT-O | `feat/tsx-inline-cleanup` | 硬编码颜色清理 | 5 个 settings section token 化 + mock 标注 |
+| WT-U | `feat/engineering-infra` | 工程化基础设施 | stylelint + Makefile `fe-*` targets + 5 ADR |
+
+---
+
+## 四、当前状态快照
+
+### 4.1 关键指标
+
+| 指标 | 起点 | 当前 | 目标 |
+|------|------|------|------|
+| SettingsPage.tsx 行数 | 4213 | **3153** | ≤1500 |
+| SettingsPage.module.css 行数 | 2033 | **390** | ≤400 ✅ |
+| TSX inline rgba() | 797 | **0** ✅ | 0 |
+| CSS rgba() 非 token 文件 | ~50 | **~20** | 0 |
+| IM inline style | 72 | **0** ✅ | 0 |
+| Hub middleware 覆盖率 | ~20% | **86.3%** | 80%+ ✅ |
+| MCP tools | 0 | **8** ✅ | — |
+| Glass tokens | 0 | **26** ✅ | — |
+| Web 主题 preset | 0 | **6 + light/dark** ✅ | — |
+| Settings sections 提取 | 0 | **32 个** | — |
+| 空状态页面 | 纯文字 | **品牌引导** ✅ | — |
+| ADR 文档 | 0 | **5** ✅ | — |
+
+### 4.2 Hub Server 测试覆盖率
+
+| 包 | 覆盖率 | 备注 |
+|---|---|---|
+| middleware | **86.3%** | WT-I 重点提升 |
+| cache | **73.9%** | |
+| config | **79.4%** | |
+| errcode / log / metrics | **100%** | |
+| handler | **58.4%** | 仍有提升空间 |
+| service | **57.4%** | 仍有提升空间 |
+| ws | **56.6%** | |
+| repository | **43.3%** | 需 mock DB |
+| model | **35.9%** | |
+
+### 4.3 构建状态
+
+| 模块 | 编译 | 单元测试 | 集成测试 |
+|------|------|---------|---------|
+| hub-server | ✅ 通过 | ✅ 全部通过 | ⚠️ 需 PostgreSQL |
+| edge-server | ✅ 通过 | ✅ 大部分通过 | ⚠️ 需 Claude CLI / OpenCode / Hub |
+| frontend (desktop) | ✅ TS 零错误 | — | — |
+| frontend (web) | ✅ TS 零错误 | — | — |
+
+集成测试失败是因为需要外部服务（PostgreSQL、Redis、Claude CLI），不是代码缺陷。
+
+### 4.4 Git 分支
+
+```
+origin/dev/delicious233   ← 主力开发分支（所有 worktree 合并于此）
+origin/master             ← 主分支
+origin/dev/johnny         ← 团队成员分支
+origin/dev/trump          ← 团队成员分支
+origin/feat/team-johnny-merge ← 待合并
+fork/dev/delicious233     ← fork 同步
+```
+
+本地已无残留 worktree 或 feature 分支。
+
+---
+
+## 五、未完成的工作（按优先级排序）
+
+### P0 — 比赛核心加分项
+
+| # | 任务 | 冲突域 | 工作量 | 说明 |
+|---|------|--------|--------|------|
+| 1 | SettingsPage 最终收敛 (≤1500 行) | SettingsPage | M (1-2天) | 当前 3153 行，需再提取 ~1650 行。`available=false` 改 feature flag，加设置搜索 (Ctrl+K) |
+| 2 | @symbol / @folder 引用 | ChatView+IM | M (1-2天) | 扩展 useMention 支持 symbol (函数/类搜索) 和 folder (文件浏览) |
+| 3 | Code Generation Preview | ChatView+IM | L (2-3天) | tool 结果先 preview 再 apply，需 runtime 层配合 |
+
+### P1 — 产品化打磨
+
+| # | 任务 | 冲突域 | 工作量 | 说明 |
+|---|------|--------|--------|------|
+| 4 | 子代理执行进度可视化 | ChatView+IM | M (1天) | agentTaskBlock 动画 + agentId 色条区分 |
+| 5 | 视图转场 + 微交互 | CSS-tokens | M (1天) | 面板切换动画、scroll-to-bottom badge、diff 操作反馈 |
+| 6 | Chat 综合打磨 | ChatView+IM | M (1-2天) | Reply 可视化、/model 命令、smartCollapse |
+| 7 | Hub 测试覆盖率 55%→65% | Backend | M (1-2天) | 重点 service/repository/model 层 |
+| 8 | Web + Shared 测试覆盖 | Web+Shared | M (1-2天) | 用户说过"前端测试别急着搞"，按需安排 |
+
+### P2 — 工程完整性
+
+| # | 任务 | 冲突域 | 工作量 | 说明 |
+|---|------|--------|--------|------|
+| 9 | i18n 命名空间重构 | i18n | M (1-2天) | Desktop 目前 flat JSON 1000+ key，需按 namespace 拆分 |
+| 10 | OIDC 浏览器冒烟测试 | Backend | M (1天) | 完整 login/callback/logout/reconnect 流程 |
+| 11 | Hub→Edge 推送机制 | Backend | L (2-3天) | 反向 WebSocket / Edge 自注册 |
+| 12 | 沙箱执行隔离 (Docker) | Backend | XL (7-10天) | 作为 M2 里程碑单独规划 |
+| 13 | OpenAPI Spec 自动生成 | Backend | M (3-5天) | 手写 YAML 与 Go 代码可能 drift |
+
+### 冲突域拓扑（并行规划参考）
+
+```
+ChatView+IM  ── ChatView.tsx, ChatView.types.ts, PromptInput, MessageCard
+SettingsPage ── SettingsPage.tsx, settings/sections/*.tsx
+Web-pages    ── app/web/src/ 下的页面组件
+CSS-tokens   ── designTokens.ts, glass tokens, *.module.css 中的变量
+i18n         ── locales/*.json, useTranslation()
+Backend      ── hub-server/*, edge-server/*
+Engineering  ── Makefile, .stylelint*, docs/, .gitignore
+Shared-utils ── app/shared/src/ 下的工具文件
+```
+
+同一冲突域内的任务不能并行。不同域可以自由并行。
+
+---
+
+## 六、开发指南
+
+### 6.1 常用命令
+
+```bash
+# Go 后端
+make test              # 单元测试（无需外部依赖）
+make test-all          # 完整测试（需 PG + Redis）
+make lint              # golangci-lint
+make coverage          # 覆盖率报告
+
+# 前端
+make fe-install        # pnpm install
+make fe-build          # pnpm -r build
+make fe-test           # vitest run
+make fe-lint           # eslint + stylelint
+make fe-typecheck      # tsc --noEmit (desktop + web)
+
+# 开发
+make fe-dev            # desktop dev server (:5173)
+pnpm dev:web           # web dev server (在 app/ 目录)
+```
+
+### 6.2 Worktree 并行开发流程
+
+本项目使用 git worktree 进行并行开发，worktree 统一放在 `D:\Code\TokenDance\.worktrees\`。
+
+```bash
+# 创建 worktree
+cd D:\Code\TokenDance\AgentHub
+git worktree add "D:\Code\TokenDance\.worktrees\feat-xxx" -b feat/xxx dev/delicious233
+
+# 工作完成后合并
+cd D:\Code\TokenDance\AgentHub
+cd "D:\Code\TokenDance\.worktrees\feat-xxx"
+git rebase dev/delicious233        # 先 rebase 到最新 dev
+cd D:\Code\TokenDance\AgentHub
+git merge feat/xxx -m "merge: xxx (WT-XX) — 描述" --no-edit
+
+# 清理
+git worktree remove "D:\Code\TokenDance\.worktrees\feat-xxx" --force
+git branch -D feat/xxx
+git push origin dev/delicious233
+```
+
+**注意事项**：
+- Windows 上 `git worktree remove` 可能因文件锁失败，需先关闭在该目录打开的编辑器/终端
+- 合并前务必 rebase，避免 merge conflict
+- 前端项目用 pnpm（不是 npm），误生成的 `package-lock.json` 要删掉
+- `--force` 删除 worktree 后记得 `git worktree prune`
+
+### 6.3 Agent Prompt 编写模板
+
+每个 worktree agent 的 prompt 应包含：
+1. **工作目录和分支** — 精确的 worktree 路径
+2. **项目背景** — 架构简述 + 相关模块说明
+3. **具体任务** — 文件级精确指令
+4. **模型分配** — opus/sonnet/haiku 对应哪个模型
+5. **验收标准** — 可量化的完成条件
+6. **提交规范** — commit message 格式 + 不要推送
+
+---
+
+## 七、关键文件索引
+
+### 项目规范与文档
+- `AGENTS.md` — 项目规范、团队约定、安全规则
+- `.agents/skills/dev-loop/SKILL.md` — 开发循环引擎
+- `docs/roadmaps/quality-convergence.md` — 质量收敛路线图（34 项，11 完成 / 7 部分 / 16 open）
+- `docs/roadmaps/worktree-execution-plan.md` — Worktree 执行计划（冲突域拓扑）
+- `docs/roadmaps/wave1-progress-review.md` — Wave 1 进度总结
+- `docs/roadmaps/competitive-gap-*.md` — 4 份竞品分析报告（Chat/UI-UX/工程/产品）
+- `docs/architecture/decisions/ADR-*.md` — 5 份架构决策记录
+
+### 核心前端文件
+- `app/desktop/src/components/SettingsPage.tsx` — 设置页主文件（3153 行，29 section 已提取）
+- `app/desktop/src/components/settings/sections/` — 32 个提取的 section 组件
+- `app/desktop/src/components/ChatView.tsx` — 聊天视图
+- `app/desktop/src/components/ThreadPanel.tsx` — 对话列表
+- `app/desktop/src/components/WelcomeScreen.tsx` — 欢迎/引导页
+- `app/shared/src/types/chat.ts` — 共享 ChatMessage 类型（WT-W 新增）
+- `app/shared/src/errors.ts` — AppError + ErrorReporter + ErrorReport
+- `app/shared/src/ui/EmptyState.tsx` — 共享空状态组件（WT-N 新增）
+
+### 核心后端文件
+- `edge-server/internal/httpserver/server.go` — Edge HTTP 路由 + 中间件
+- `edge-server/internal/mcp/` — MCP Server（WT-H 新增，8 tools）
+- `edge-server/internal/adapters/` — 三种 runtime 适配器
+- `hub-server/internal/handler/` — Hub HTTP 处理器
+- `hub-server/internal/service/` — Hub 业务逻辑
+- `hub-server/internal/middleware/` — Hub 中间件（86.3% 覆盖率）
+
+### 配置
+- `app/.stylelintrc.json` — CSS lint 规则（禁止新 hex/rgba）
+- `app/.stylelintignore` — stylelint 忽略
+- `Makefile` — 统一前后端构建命令
+- `app/package.json` — pnpm workspace 根配置
+
+---
+
+## 八、已知问题与注意事项
+
+### 8.1 Windows 特有
+- `git worktree remove` 经常因文件锁失败（Windows Explorer、编辑器、终端持有句柄），需手动关闭后重试或 `--force`
+- Bash glob 模式在 Windows Git Bash 中行为不一致，优先用 `git worktree list` 而非 `ls`
+- 提交时 CRLF 警告可忽略（`core.autocrlf` 相关）
+
+### 8.2 集成测试
+- `hub-server/tests` 需要 localhost:5432 PostgreSQL
+- `edge-server/internal/adapters` 测试需要 Claude CLI / OpenCode 环境
+- `edge-server/internal/api` 测试需要 runner 健康检查通过
+- 这些在 CI 环境需要配置对应服务，本地开发用 `make test`（short 模式）即可
+
+### 8.3 前端
+- pnpm 项目，**不要**用 npm install（会生成不需要的 package-lock.json）
+- Web 端 tsconfig 启用了 `exactOptionalPropertyTypes: true`，对可选属性赋值更严格
+- `app/shared/` 中的类型被 desktop 和 web 共享引用，修改时需验证两端编译
+- SettingsPage 仍有 3153 行，后续重构注意分批提交，避免单次改动过大
+
+### 8.4 Dependabot
+- GitHub 报告了 4 个 moderate 漏洞，尚未处理
+- 建议在功能开发告一段落后统一处理 `npm audit` + Dependabot PR
+
+---
+
+## 九、竞品分析要点（摘要）
+
+分析了 10 个竞品：Cursor、Windsurf、Claude Code、OpenAI Codex、Devin、OpenHands、Aider、Cline、Continue.dev、Augment Code、GitHub Copilot。
+
+**AgentHub 优势**：
+- 三运行时统一适配器（业界独有）
+- Glass Token + 双语支持（中文+英文）
+- MCP Server 端点（符合 Anthropic 标准）
+- 完整的 Onboarding 引导流
+
+**主要差距**：
+- 沙箱执行隔离（竞品普遍有 Docker sandbox）
+- Code Generation Preview before Apply
+- @symbol 引用（需 LSP/TS Server 集成）
+- Conversation Resume（中断恢复）
+
+详细分析见 `docs/roadmaps/competitive-gap-*.md` 四份报告。
