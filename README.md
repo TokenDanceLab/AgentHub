@@ -17,7 +17,7 @@
 
 <!-- 截图占位：Desktop 主界面 dark theme -->
 <p align="center">
-  <img src="screenshots/hero-desktop.png" alt="AgentHub Desktop 主界面" width="80%">
+  <img src="screenshots/web-app.png" alt="AgentHub 工作台" width="80%">
 </p>
 
 ---
@@ -141,9 +141,12 @@ AgentHub/
 ├── hub-server/           # Hub 中心服务
 ├── api/                  # API 契约（OpenAPI + WebSocket events）
 ├── docs/                 # 文档
-│   ├── guides/           # 用户手册、FAQ、快捷键
-│   ├── architecture/     # 产品需求、系统架构、实现指南
-│   └── roadmaps/         # 路线图与竞品分析
+│   ├── guides/           # 用户手册、FAQ、快捷键、本地开发指南
+│   ├── architecture/     # 产品需求、系统架构、实现指南、ADR
+│   ├── roadmaps/         # 路线图与竞品分析
+│   ├── governance/       # 安全台账、分支治理
+│   ├── handoff/          # 项目状态与交接
+│   └── operations/       # 客户端路线图、运维
 └── scripts/              # 初始化脚本、git hooks
 ```
 
@@ -156,6 +159,7 @@ AgentHub/
 | [用户手册](docs/guides/user-guide.md) | 想用 AgentHub 做事的用户 |
 | [常见问题](docs/guides/faq.md) | 使用中遇到的疑问 |
 | [快捷键参考](docs/guides/keyboard-shortcuts.md) | 键盘操作速查 |
+| [本地开发指南](docs/guides/local-dev-setup.md) | 新贡献者搭建环境 |
 | [产品需求](docs/architecture/product-requirements.md) | 产品定位与阶段目标 |
 | [系统架构](docs/architecture/system-architecture.md) | 技术架构与核心概念 |
 | [API 契约](api/) | REST + WebSocket 接口定义 |
