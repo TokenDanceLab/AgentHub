@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+# Per-workspace lockfiles (only root app/pnpm-lock.yaml is tracked)
+app/desktop/pnpm-lock.yaml
+app/shared/pnpm-lock.yaml
+app/web/pnpm-lock.yaml
+app/mobile/pnpm-lock.yaml
 
 # Build output
 dist/
@@ -143,6 +148,9 @@ screenshots/
 *.jpeg
 *.webp
 *.gif
+# Tauri app icons (must be tracked for builds)
+!app/desktop/src-tauri/icons/
+!app/mobile/src-tauri/icons/
 .cursor/
 .continue/
 
