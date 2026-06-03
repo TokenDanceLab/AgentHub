@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ClipboardList, Bot, Server, ShieldCheck, Monitor, Globe2, Computer } from 'lucide-react';
-import type { RunInfo } from '@shared/types';
+import type { RunInfo, AgentInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
-import type { AgentInfo } from '@shared/types';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import SummaryCard from '../primitives/SummaryCard';

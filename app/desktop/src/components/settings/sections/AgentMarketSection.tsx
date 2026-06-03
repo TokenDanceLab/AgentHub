@@ -2,9 +2,8 @@ import { useTranslation } from 'react-i18next';
 import {
   Bot, ShieldCheck, Code2, Globe2, RefreshCw, Plus,
   Search, Star, Download, Eye, X, Tag, Clock,
-  Zap, Users, ArrowLeft, Upload, Filter, SlidersHorizontal,
-  MessageSquare, Wrench, Cpu, TrendingUp, Check, BookOpen, Sparkles,
-  LayoutTemplate, Trash2, Pencil, Send,
+  ArrowLeft, Filter, SlidersHorizontal,
+  Wrench, Cpu, Check, BookOpen, Sparkles,
 } from 'lucide-react';
 import { useState, useCallback, useMemo } from 'react';
 import type { AgentInfo } from '@shared/types';
@@ -69,8 +68,7 @@ function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketIt
   };
 }
 
-// ── Mock community catalog (backend will serve from Hub API) ──
-// TODO: Replace with real API data
+// ── Community / Hub agent shape for marketplace browse ──
 const MOCK_COMMUNITY_AGENTS: CommunityAgentItem[] = [
   {
     id: 'hub-code-reviewer',
