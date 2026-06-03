@@ -35,8 +35,37 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import GeneralSection from './settings/sections/GeneralSection';
+import ConfigurationSection from './settings/sections/ConfigurationSection';
+import PersonalizationSection from './settings/sections/PersonalizationSection';
+import PermissionsSection from './settings/sections/PermissionsSection';
+import AgentProfilesSection from './settings/sections/AgentProfilesSection';
+import ExecutionTargetsSection from './settings/sections/ExecutionTargetsSection';
+import TasksSection from './settings/sections/TasksSection';
+import OnlineImSection from './settings/sections/OnlineImSection';
+import GroupChatSection from './settings/sections/GroupChatSection';
+import AgentSchedulingSection from './settings/sections/AgentSchedulingSection';
+import AgentMarketSection from './settings/sections/AgentMarketSection';
+import KeyboardSection from './settings/sections/KeyboardSection';
+import McpSection from './settings/sections/McpSection';
+import SkillsSection from './settings/sections/SkillsSection';
+import HooksSection from './settings/sections/HooksSection';
+import ModelsSection from './settings/sections/ModelsSection';
+import ModelMappingSection from './settings/sections/ModelMappingSection';
+import CcSwitchSection from './settings/sections/CcSwitchSection';
 import AppearanceSection from './settings/sections/AppearanceSection';
 import ConnectionsSection from './settings/sections/ConnectionsSection';
+import RemoteControlSection from './settings/sections/RemoteControlSection';
+import GitSection from './settings/sections/GitSection';
+import EnvironmentSection from './settings/sections/EnvironmentSection';
+import WorktreeSection from './settings/sections/WorktreeSection';
+import BrowserSection from './settings/sections/BrowserSection';
+import ComputerUseSection from './settings/sections/ComputerUseSection';
+import PlatformsSection from './settings/sections/PlatformsSection';
+import AccountSection from './settings/sections/AccountSection';
+import SecurityAuditSection from './settings/sections/SecurityAuditSection';
+import ArchivedSection from './settings/sections/ArchivedSection';
+import DataSection from './settings/sections/DataSection';
 import { useHubStore } from '@/stores/hubStore';
 import { APP_VERSION, HUB_URL, getEdgeBaseUrl } from '@/config';
 import {
@@ -127,7 +156,8 @@ export type SectionId =
   | 'platforms'
   | 'account'
   | 'securityAudit'
-  | 'archived';
+  | 'archived'
+  | 'data';
 
 type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never';
 type SettingsSelectValue = SelectValue | ReasoningEffortPreference | ProviderHealth | string;
@@ -736,6 +766,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       { id: 'account', label: t('settings.account'), icon: <LockKeyhole size={17} />, group: 'system' },
       { id: 'securityAudit', label: t('settings.securityAudit'), icon: <ShieldCheck size={17} />, group: 'system' },
       { id: 'archived', label: t('settings.archived'), icon: <Archive size={17} />, group: 'system' },
+      { id: 'data', label: t('settings.data'), icon: <HardDrive size={17} />, group: 'system' },
     ],
     [t],
   );
@@ -820,59 +851,12 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           </div>
 
           {active === 'general' && (
-            <>
-              <Panel title={t('settings.workMode')} description={t('settings.workModeDesc')}>
-                <div className={styles.modeGrid}>
-                  <ModeCard
-                    active={detailLevel === 'detailed'}
-                    icon={<Monitor size={20} />}
-                    title={t('settings.modeCoding')}
-                    description={t('settings.modeCodingDesc')}
-                    onClick={() => {
-                      setDetailLevel('detailed');
-                      writeStoredValue('detailLevel', 'detailed');
-                    }}
-                  />
-                  <ModeCard
-                    active={detailLevel === 'balanced'}
-                    icon={<Eye size={20} />}
-                    title={t('settings.modeDaily')}
-                    description={t('settings.modeDailyDesc')}
-                    onClick={() => {
-                      setDetailLevel('balanced');
-                      writeStoredValue('detailLevel', 'balanced');
-                    }}
-                  />
-                </div>
-              </Panel>
-
-              <Panel title={t('settings.general')}>
-                <SettingRow
-                  title={t('settings.compactMode')}
-                  description={t('settings.compactModeDesc')}
-                  control={
-                    <Switch checked={compactMode} onChange={setBooleanSetting('compactMode', setCompactMode)} />
-                  }
-                />
-                <SettingRow
-                  title={t('settings.detailLevel')}
-                  description={t('settings.detailLevelDesc')}
-                  control={
-                    <SelectControl
-                      value={detailLevel}
-                      onChange={(value) => {
-                        setDetailLevel(value as SelectValue);
-                        writeStoredValue('detailLevel', value);
-                      }}
-                      options={[
-                        ['detailed', t('settings.detailLevel.detailed')],
-                        ['balanced', t('settings.detailLevel.balanced')],
-                      ]}
-                    />
-                  }
-                />
-              </Panel>
-            </>
+            <GeneralSection
+              detailLevel={detailLevel}
+              setDetailLevel={setDetailLevel}
+              compactMode={compactMode}
+              setCompactMode={setCompactMode}
+            />
           )}
 
           {active === 'appearance' && (
@@ -887,1078 +871,194 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'configuration' && (
-            <Panel title={t('settings.configuration')} description={t('settings.configurationDesc')}>
-              <SettingRow title={t('settings.defaultAgent')} description="Claude Code / Codex / OpenCode" value="Auto" />
-              <SettingRow
-                title={t('settings.routing')}
-                description={t('settings.routingDesc')}
-                value={t('settings.routingAuto')}
-              />
-              <SettingRow
-                title={t('settings.approvalMode')}
-                description={t('settings.approvalModeDesc')}
-                control={
-                  <SelectControl
-                    value={approvalMode}
-                    onChange={(value) => {
-                      setApprovalMode(value as SelectValue);
-                      writeStoredValue('approvalMode', value);
-                    }}
-                    options={[
-                      ['ask', t('settings.approvalMode.ask')],
-                      ['auto', t('settings.approvalMode.auto')],
-                      ['manual', t('settings.approvalMode.manual')],
-                    ]}
-                  />
-                }
-              />
-            </Panel>
+            <ConfigurationSection
+              defaultAgent="Auto"
+              setDefaultAgent={() => {}}
+              routing={t('settings.routingAuto')}
+              setRouting={() => {}}
+              approvalMode={approvalMode}
+              setApprovalMode={setApprovalMode}
+              defaultAgentOptions={[['Auto', 'Auto']]}
+              routingOptions={[['auto', t('settings.routingAuto')]]}
+            />
           )}
 
           {active === 'personalization' && (
-            <Panel title={t('settings.personalization')} description={t('settings.personalizationDesc')}>
-              <SettingRow title={t('settings.displayName')} description={username ?? 'AgentHub User'} value="Local" />
-              <div className={styles.instructionsRow}>
-                <div className={styles.instructionsHeader}>
-                  <div className={styles.settingCopy}>
-                    <strong>{t('settings.instructions')}</strong>
-                    <span>{t('settings.instructionsDesc')}</span>
-                  </div>
-                  <span className={`${styles.statusPill} ${customInstructions ? styles.statusPillOn : ''}`}>
-                    {customInstructions ? t('settings.enabled') : t('settings.notConfigured')}
-                  </span>
-                </div>
-                <label className={styles.instructionsEditor}>
-                  <span>{t('settings.instructionsLabel')}</span>
-                  <textarea
-                    className={styles.textInput}
-                    value={customInstructionsDraft}
-                    maxLength={MAX_CUSTOM_INSTRUCTIONS_CHARS}
-                    placeholder={t('settings.instructionsPlaceholder')}
-                    onChange={(event) => setCustomInstructionsDraft(event.target.value)}
-                  />
-                </label>
-                <div className={styles.instructionsFooter}>
-                  <span>{t('settings.instructionsRuntimeDesc')}</span>
-                  <em>{t('settings.instructionsCharsRemaining', { count: customInstructionsRemaining })}</em>
-                </div>
-                <div className={styles.instructionsActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={handleClearCustomInstructions}
-                    disabled={!customInstructions && !customInstructionsDraft}
-                  >
-                    <XCircle size={15} />
-                    {t('settings.clearInstructions')}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.primaryBtn}
-                    onClick={handleSaveCustomInstructions}
-                    disabled={!customInstructionsDirty}
-                  >
-                    <Check size={15} />
-                    {t('settings.saveInstructions')}
-                  </button>
-                </div>
-              </div>
-              <Callout title={t('settings.personalizationNote')} body={t('settings.personalizationNoteDesc')} />
-            </Panel>
+            <PersonalizationSection username={username} />
           )}
 
           {active === 'permissions' && (
-            <Panel title={t('settings.permissions')} description={t('settings.permissionsDesc')}>
-              <SettingRow
-                title={t('settings.autoReview')}
-                description={t('settings.autoReviewDesc')}
-                control={<Switch checked={autoReview} onChange={setBooleanSetting('autoReview', setAutoReview)} />}
-              />
-              <SettingRow
-                title={t('settings.fullAccess')}
-                description={t('settings.fullAccessDesc')}
-                control={<Switch checked={fullAccess} onChange={setBooleanSetting('fullAccess', setFullAccess)} />}
-              />
-              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
-            </Panel>
+            <PermissionsSection
+              autoReview={autoReview}
+              setAutoReview={setAutoReview}
+              fullAccess={fullAccess}
+              setFullAccess={setFullAccess}
+              allowlistEntries={[]}
+              setAllowlistEntries={() => {}}
+            />
           )}
 
           {active === 'agentProfiles' && (
-            <Panel title={t('settings.agentProfiles')} description={t('settings.agentProfilesDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<Bot size={18} />}
-                  label={t('settings.profileAvailable')}
-                  value={`${availableRuntimes}/${agents.length}`}
-                  detail={edgeOnline ? t('settings.runtimeInventoryDesc') : t('settings.edgeOffline')}
-                />
-                <SummaryCard
-                  icon={<Cpu size={18} />}
-                  label={t('settings.profileRuntimeCoverage')}
-                  value={runnerSummary}
-                  detail={t('settings.profileRuntimeCoverageDesc')}
-                />
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.runtimeInventory')}</strong>
-                  <span>{t('settings.runtimeInventoryDesc')}</span>
-                </div>
-                {agents.length > 0 ? (
-                  <div className={styles.profileGrid}>
-                    {agents.map((agent) => <RuntimeInventoryCard key={agent.id} agent={agent} />)}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.noRuntimes')} description={t('settings.noRuntimesDesc')} />
-                )}
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.profileComposition')}</strong>
-                  <span>{t('settings.profileCompositionDesc')}</span>
-                </div>
-                {localAgentProfiles.length > 0 ? (
-                  <div className={styles.profileGrid}>
-                    {localAgentProfiles.map((profile) => (
-                      <LocalAgentProfileCard
-                        key={`profile-${profile.agent.id}`}
-                        agent={profile.agent}
-                        alias={profile.alias}
-                        route={profile.route}
-                        edgeOnline={edgeOnline}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.noProfiles')} description={t('settings.noProfilesDesc')} />
-                )}
-                <div className={styles.capabilityGrid}>
-                  <CapabilityCard
-                    title={t('settings.profileRuntime')}
-                    description={t('settings.profileRuntimeDesc')}
-                    status={agents.length > 0 ? t('settings.statusReady') : t('settings.notConfigured')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.profileModel')}
-                    description={t('settings.profileModelDesc')}
-                    status={t('settings.statusInProgress')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.profileConfig')}
-                    description={t('settings.profileConfigDesc')}
-                    status={t('settings.statusInProgress')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.executionTargets')}
-                    description={t('settings.profileExecutionTargetDesc')}
-                    status={edgeOnline ? t('settings.statusReady') : t('settings.notConfigured')}
-                  />
-                </div>
-              </div>
-              <SettingRow title={t('settings.profileConfigSource')} description={t('settings.profileConfigSourceDesc')} value="AGENTS.md / memory / skills" />
-              <SettingRow title={t('settings.profilePublish')} description={t('settings.profilePublishDesc')} value={t('settings.statusPlanned')} />
-            </Panel>
+            <AgentProfilesSection
+              agents={agents}
+              edgeOnline={edgeOnline}
+              runnerSummary={runnerSummary}
+              localAgentProfiles={localAgentProfiles}
+            />
           )}
 
           {active === 'executionTargets' && (
-            <Panel title={t('settings.executionTargets')} description={t('settings.executionTargetsDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<Monitor size={18} />}
-                  label={t('settings.targetLocalInventory')}
-                  value={`${availableRunners}/${totalRunners}`}
-                  detail={edgeOnline ? runnerSummary : t('settings.edgeOffline')}
-                />
-                <SummaryCard
-                  icon={<Globe2 size={18} />}
-                  label={t('settings.targetHubInventory')}
-                  value={hubTargetsQuery.isLoading ? t('settings.loading') : `${hubOnlineTargets}/${hubTargets.length}`}
-                  detail={hubTargetInventoryDetail}
-                />
-                <SummaryCard
-                  icon={<ShieldCheck size={18} />}
-                  label={t('settings.targetHubHealth')}
-                  value={hubTargets.length > 0 ? `${hubHealthyTargets}/${hubTargets.length}` : t('settings.noData')}
-                  detail={targetHealthBreakdown}
-                />
-              </div>
-              <div className={styles.targetGrid}>
-                <ExecutionTargetCard
-                  icon={<Monitor size={18} />}
-                  title={t('settings.targetLocalEdge')}
-                  description={t('settings.targetLocalEdgeDesc')}
-                  status={edgeOnline ? health?.status ?? 'ok' : t('settings.offline')}
-                  metric={runnerSummary}
-                  connected={edgeOnline && availableRunners > 0}
-                />
-                <ExecutionTargetCard
-                  icon={<Globe2 size={18} />}
-                  title={t('settings.targetHubRelay')}
-                  description={t('settings.targetHubRelayDesc')}
-                  status={getHubTargetGroupStatus(hubRelayTargets)}
-                  metric={getHubTargetGroupMetric(hubRelayTargets)}
-                  connected={hubRelayTargets.some(isHubTargetConnected)}
-                />
-                <ExecutionTargetCard
-                  icon={<Server size={18} />}
-                  title={t('settings.targetSsh')}
-                  description={t('settings.targetSshDesc')}
-                  status={getHubTargetGroupStatus(remoteHubTargets)}
-                  metric={getHubTargetGroupMetric(remoteHubTargets)}
-                  connected={remoteHubTargets.some(isHubTargetConnected)}
-                />
-                <ExecutionTargetCard
-                  icon={<Computer size={18} />}
-                  title={t('settings.targetCloudEdge')}
-                  description={t('settings.targetCloudEdgeDesc')}
-                  status={getHubTargetGroupStatus(cloudHubTargets)}
-                  metric={getHubTargetGroupMetric(cloudHubTargets)}
-                  connected={cloudHubTargets.some(isHubTargetConnected)}
-                />
-              </div>
-              {runnerItems.length > 0 ? (
-                <div className={styles.runnerList}>
-                  {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}
-                </div>
-              ) : (
-                <Callout title={t('settings.runnerInventory')} body={t('settings.runnerInventoryDesc')} />
-              )}
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.targetHubInventory')}</strong>
-                  <span>{t('settings.targetHubInventoryDesc')}</span>
-                </div>
-                {!hubInventoryEnabled ? (
-                  <EmptyBlock
-                    title={t('settings.targetHubSignInRequired')}
-                    description={t('settings.targetHubSignedOutDesc')}
-                  />
-                ) : hubTargetsQuery.isLoading ? (
-                  <EmptyBlock title={t('settings.targetHubLoading')} description={t('settings.targetHubLoadingDesc')} />
-                ) : hubTargetsQuery.isError ? (
-                  <EmptyBlock title={t('settings.targetHubError')} description={hubTargetErrorMessage} />
-                ) : hubTargets.length > 0 ? (
-                  <div className={styles.runnerList}>
-                    {hubTargets.map((target) => (
-                      <HubExecutionTargetRow
-                        key={target.id}
-                        target={target}
-                        pinging={pingHubTargetMutation.isPending && pingHubTargetMutation.variables === target.id}
-                        onPing={(targetId) => pingHubTargetMutation.mutate(targetId)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.targetHubEmpty')} description={t('settings.targetHubEmptyDesc')} />
-                )}
-              </div>
-            </Panel>
+            <ExecutionTargetsSection
+              edgeOnline={edgeOnline}
+              health={health}
+              hubSessionActive={hubSessionActive}
+              runnerSummary={runnerSummary}
+              runnerItems={runnerItems}
+              availableRunners={availableRunners}
+              desktopDeviceStatus={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
+              deviceId={deviceId}
+            />
           )}
 
           {active === 'tasks' && (
-            <Panel title={t('settings.tasks')} description={t('settings.tasksDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<Route size={18} />}
-                  label={t('settings.taskLocalRuns')}
-                  value={`${activeRuns}/${runs.length}`}
-                  detail={runsLoading ? t('settings.loading') : t('settings.taskLocalRunsDesc')}
-                />
-                <SummaryCard
-                  icon={<ClipboardList size={18} />}
-                  label={t('settings.taskHubBridge')}
-                  value={`${activeHubTasks}/${bridgedTasks.length}`}
-                  detail={hubAuthenticated ? t('settings.taskHubBridgeDesc') : t('settings.taskHubBridgeSignedOut')}
-                />
-                <SummaryCard
-                  icon={<Monitor size={18} />}
-                  label={t('settings.taskLastRun')}
-                  value={latestRun ? t(`run.status.${latestRun.status.toLowerCase()}`, { defaultValue: latestRun.status }) : t('settings.noData')}
-                  detail={latestRun ? formatTimestamp(latestRun.finishedAt ?? latestRun.startedAt ?? latestRun.createdAt) : t('settings.taskLastRunDesc')}
-                />
-                <SummaryCard
-                  icon={<ShieldCheck size={18} />}
-                  label={t('settings.taskApprovalQueue')}
-                  value={t('settings.statusPlanned')}
-                  detail={t('settings.taskApprovalQueueDesc')}
-                />
-              </div>
-              <SettingRow
-                title={t('settings.taskSync')}
-                description={t('settings.taskSyncDesc')}
-                control={
-                  <SwitchControl
-                    checked={taskSyncAvailable && taskSync}
-                    onChange={setBooleanSetting('taskSync', setTaskSync)}
-                    disabled={!taskSyncAvailable}
-                    title={!taskSyncAvailable ? t('settings.requiresHubSignIn') : undefined}
-                    status={!taskSyncAvailable ? t('settings.notConfigured') : undefined}
-                  />
-                }
-              />
-              <SettingRow
-                title={t('settings.taskInbox')}
-                description={t('settings.taskInboxDesc')}
-                value={runsError ? t('settings.edgeOffline') : t('settings.statusInProgress')}
-              />
-              <SettingRow title={t('settings.taskRunBinding')} description={t('settings.taskRunBindingDesc')} value={t('settings.statusInProgress')} />
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <div className={styles.taskSectionTitleRow}>
-                    <div>
-                      <strong>{t('settings.taskRecentRuns')}</strong>
-                      <span>{runsFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRecentRunsDesc')}</span>
-                    </div>
-                    <div className={styles.taskSectionActions}>
-                      <span className={`${styles.statusPill} ${runsError ? '' : styles.statusPillOn}`}>
-                        {runsError ? t('settings.edgeOffline') : t('settings.taskRunLive')}
-                      </span>
-                      <button
-                        type="button"
-                        className={styles.secondaryBtn}
-                        onClick={handleRefreshRuns}
-                        disabled={runsFetching}
-                      >
-                        <RefreshCw size={15} />
-                        {runsFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRefreshRuns')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {recentRuns.length > 0 ? (
-                  <div className={styles.taskList}>
-                    {recentRuns.map((run) => (
-                      <TaskRunRow
-                        key={run.runId}
-                        run={run}
-                        onCancel={isActiveRun(run) ? handleCancelRun : undefined}
-                        cancelling={cancelRunMutation.isPending && cancelRunMutation.variables === run.runId}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.taskNoRuns')} description={t('settings.taskNoRunsDesc')} />
-                )}
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.taskBridgeQueue')}</strong>
-                  <span>{t('settings.taskBridgeQueueDesc')}</span>
-                </div>
-                {recentBridgeTasks.length > 0 ? (
-                  <div className={styles.taskList}>
-                    {recentBridgeTasks.map((task) => (
-                      <HubTaskRow key={task.taskId} task={task} />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.taskNoHubTasks')} description={t('settings.taskNoHubTasksDesc')} />
-                )}
-              </div>
-            </Panel>
+            <TasksSection
+              runs={runs}
+              activeRuns={activeRuns}
+              runsLoading={runsLoading}
+              runsFetching={runsFetching}
+              runsError={!!runsError}
+              refetchRuns={() => void refetchRuns()}
+              cancelRunMutation={{
+                mutateAsync: (id: string) => cancelRunMutation.mutateAsync(id),
+                isPending: cancelRunMutation.isPending,
+                variables: cancelRunMutation.variables ?? undefined,
+              }}
+              bridgedTasks={bridgedTasks}
+              hubSessionActive={hubSessionActive}
+              taskSync={taskSync}
+              setTaskSync={setTaskSync}
+              onOpenAuth={onOpenAuth}
+              latestRun={latestRun}
+            />
           )}
 
           {active === 'onlineIm' && (
-            <Panel title={t('settings.onlineIm')} description={t('settings.onlineImDesc')}>
-              <div className={styles.capabilityGrid}>
-                <CapabilityCard
-                  title={t('settings.onlineImSessions')}
-                  description={t('settings.onlineImSessionsDesc')}
-                  status={t('settings.statusReady')}
-                />
-                <CapabilityCard
-                  title={t('settings.onlineImPresence')}
-                  description={t('settings.onlineImPresenceDesc')}
-                  status={t('settings.statusPlanned')}
-                />
-                <CapabilityCard
-                  title={t('settings.onlineImNotifications')}
-                  description={t('settings.onlineImNotificationsDesc')}
-                  status={t('settings.statusPlanned')}
-                />
-              </div>
-            </Panel>
+            <OnlineImSection
+              hubSessionActive={hubSessionActive}
+              imSessions={[]}
+              imContacts={[]}
+              imFriendRequests={[]}
+              imNotifications={[]}
+              isLoading={false}
+              isFetching={false}
+              isError={false}
+              isSuccess={true}
+              refetch={() => {}}
+              deviceRegistrationStatus="idle"
+              onOpenAuth={onOpenAuth}
+            />
           )}
 
           {active === 'groupChat' && (
-            <Panel title={t('settings.groupChat')} description={t('settings.groupChatDesc')}>
-              <SettingRow
-                title={t('settings.enableGroupChat')}
-                description={t('settings.enableGroupChatDesc')}
-                control={
-                  <SwitchControl
-                    checked={groupChatAvailable && groupChatEnabled}
-                    onChange={setBooleanSetting('groupChat', setGroupChatEnabled)}
-                    disabled={!groupChatAvailable}
-                    title={!groupChatAvailable ? t('settings.requiresHubSignIn') : undefined}
-                    status={!groupChatAvailable ? t('settings.notConfigured') : undefined}
-                  />
-                }
-              />
-              <SettingRow title={t('settings.groupChatAgents')} description={t('settings.groupChatAgentsDesc')} value={t('settings.statusReady')} />
-              <SettingRow title={t('settings.groupChatRooms')} description={t('settings.groupChatRoomsDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.groupChatModeration')} description={t('settings.groupChatModerationDesc')} value={t('settings.statusPlanned')} />
-            </Panel>
+            <GroupChatSection
+              hubSessionActive={hubSessionActive}
+              isLoading={false}
+              isError={false}
+              imSessions={[]}
+              imContactsCount={0}
+              imSnapshotStatus={t('settings.status.interfaceGap')}
+              agents={agents}
+              edgeOnline={edgeOnline}
+              groupChatEnabled={groupChatEnabled}
+              setGroupChatEnabled={setGroupChatEnabled}
+              onOpenAuth={onOpenAuth}
+            />
           )}
 
           {active === 'agentScheduling' && (
-            <Panel title={t('settings.agentScheduling')} description={t('settings.agentSchedulingDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<ClipboardList size={18} />}
-                  label={t('settings.schedulerQueueLive')}
-                  value={`${schedulerActiveItems}/${schedulerTotalItems}`}
-                  detail={runsLoading ? t('settings.loading') : t('settings.schedulerQueueLiveDesc')}
-                />
-                <SummaryCard
-                  icon={<GitBranch size={18} />}
-                  label={t('settings.agentTeamRuns')}
-                  value={`${activeTeamRuns}/${teamRunTotal}`}
-                  detail={pendingTeamApprovals.length > 0
-                    ? t('settings.agentTeamPendingApprovals', { count: pendingTeamApprovals.length })
-                    : t('settings.agentTeamRunsDesc', { count: agentTeamCount })}
-                />
-                <SummaryCard
-                  icon={<Route size={18} />}
-                  label={t('settings.localOrchestration')}
-                  value={localOrchestration.available ? t('settings.localOrchestrationReadyStatus') : t('settings.notConfigured')}
-                  detail={localOrchestration.available
-                    ? t('settings.localOrchestrationAvailableDesc', { count: localOrchestration.availableSubAgents })
-                    : t('settings.localOrchestrationNoOrchestratorDesc')}
-                />
-                <SummaryCard
-                  icon={<Bot size={18} />}
-                  label={t('settings.schedulerProfiles')}
-                  value={`${availableRuntimes}/${agents.length}`}
-                  detail={edgeOnline ? t('settings.schedulerProfilesDesc') : t('settings.edgeOffline')}
-                />
-                <SummaryCard
-                  icon={<Server size={18} />}
-                  label={t('settings.schedulerTargets')}
-                  value={`${schedulerTargetReadyCount}/4`}
-                  detail={t('settings.schedulerTargetsDesc')}
-                />
-                <SummaryCard
-                  icon={<ShieldCheck size={18} />}
-                  label={t('settings.schedulerPolicyReady')}
-                  value={`${schedulerPolicyReadyCount}/4`}
-                  detail={t('settings.schedulerPolicyReadyDesc')}
-                />
-              </div>
-              <SettingRow
-                title={t('settings.agentTeamApi')}
-                description={t('settings.agentTeamApiDesc')}
-                value={
-                  !hubInventoryEnabled
-                    ? t('settings.targetHubSignInRequired')
-                    : agentTeamsQuery.isError
-                      ? t('settings.targetHubError')
-                      : t('settings.statusReady')
-                }
-              />
-              <div className={styles.taskSection} data-testid="settings-local-orchestration">
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.localOrchestration')}</strong>
-                  <span>{t('settings.localOrchestrationDesc')}</span>
-                </div>
-                {localOrchestration.available ? (
-                  <div className={styles.capabilityGrid}>
-                    <CapabilityCard
-                      title={t('settings.localOrchestrationRuntime')}
-                      description={t('settings.localOrchestrationRuntimeDesc')}
-                      status={localOrchestratorName}
-                    />
-                    <CapabilityCard
-                      title={t('settings.localOrchestrationSubagents')}
-                      description={t('settings.localOrchestrationSubagentsDesc')}
-                      status={`${localOrchestration.availableSubAgents}/${availableRuntimes}`}
-                    />
-                    <CapabilityCard
-                      title={t('settings.localOrchestrationHubBoundary')}
-                      description={t('settings.localOrchestrationHubBoundaryDesc')}
-                      status={hubInventoryEnabled ? t('settings.enabled') : t('settings.notConfigured')}
-                    />
-                  </div>
-                ) : (
-                  <EmptyBlock
-                    title={t('settings.localOrchestrationNoOrchestrator')}
-                    description={t('settings.localOrchestrationNoOrchestratorDesc')}
-                  />
-                )}
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.agentTeamBuilder')}</strong>
-                  <span>{t('settings.agentTeamBuilderDesc')}</span>
-                </div>
-                <AgentTeamBuilder
-                  hubReady={hubInventoryEnabled}
-                  selectedTeam={agentTeamOverview?.selectedTeam}
-                  customAgents={hubCustomAgents}
-                  teamName={teamDraftName}
-                  teamDescription={teamDraftDescription}
-                  memberProfileId={teamMemberProfileId}
-                  memberRole={teamMemberRole}
-                  runPrompt={teamRunPrompt}
-                  creating={createAgentTeamMutation.isPending}
-                  addingMember={addAgentTeamMemberMutation.isPending}
-                  startingRun={startTeamRunMutation.isPending}
-                  onTeamNameChange={setTeamDraftName}
-                  onTeamDescriptionChange={setTeamDraftDescription}
-                  onMemberProfileChange={setTeamMemberProfileId}
-                  onMemberRoleChange={setTeamMemberRole}
-                  onRunPromptChange={setTeamRunPrompt}
-                  onCreateTeam={handleCreateAgentTeam}
-                  onAddMember={handleAddAgentTeamMember}
-                  onStartRun={handleStartTeamRun}
-                />
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.agentTeamConsole')}</strong>
-                  <span>{t('settings.agentTeamConsoleDesc')}</span>
-                </div>
-                {!hubInventoryEnabled ? (
-                  <EmptyBlock
-                    title={t('settings.agentTeamSignInRequired')}
-                    description={t('settings.agentTeamSignInRequiredDesc')}
-                  />
-                ) : agentTeamsQuery.isLoading ? (
-                  <EmptyBlock title={t('settings.loading')} description={t('settings.agentTeamLoadingDesc')} />
-                ) : agentTeamsQuery.isError ? (
-                  <EmptyBlock title={t('settings.agentTeamError')} description={agentTeamErrorMessage} />
-                ) : agentTeamCount === 0 ? (
-                  <EmptyBlock title={t('settings.agentTeamEmpty')} description={t('settings.agentTeamEmptyDesc')} />
-                ) : (
-                  <AgentTeamConsole
-                    teams={agentTeamOverview?.teams ?? []}
-                    bundles={agentTeamBundles}
-                    selectedTeam={agentTeamOverview?.selectedTeam}
-                    selectedRun={agentTeamOverview?.selectedRun}
-                    state={teamRunState}
-                    tasks={teamRunTasks}
-                    members={teamRunMembers}
-                    assignments={teamRunAssignments}
-                    approvals={teamRunApprovals}
-                    conflicts={teamRunConflicts}
-                    events={teamRunEvents}
-                    artifacts={teamRunState?.artifacts ?? []}
-                    budget={teamRunState?.budget}
-                    terminalReason={teamRunState?.terminal_reason}
-                    routeLog={teamRouteLog}
-                    localExecutions={teamLocalExecutions}
-                    refreshing={agentTeamsQuery.isFetching}
-                    approvalBusy={decideTeamApprovalMutation.isPending}
-                    conflictBusy={resolveTeamConflictMutation.isPending}
-                    onSelectTeam={handleSelectAgentTeam}
-                    onSelectRun={handleSelectTeamRun}
-                    onApprovalDecision={(approval, decision) => {
-                      if (!agentTeamOverview?.selectedTeam || !agentTeamOverview.selectedRun) return;
-                      void decideTeamApprovalMutation.mutateAsync({
-                        teamId: agentTeamOverview.selectedTeam.id,
-                        runId: agentTeamOverview.selectedRun.id,
-                        approvalId: approval.approval_id,
-                        decision: {
-                          decision,
-                          reason: 'Desktop TeamRun Console decision',
-                        },
-                      });
-                    }}
-                    onResolveConflict={(conflict, decision) => {
-                      if (!agentTeamOverview?.selectedTeam || !agentTeamOverview.selectedRun) return;
-                      void resolveTeamConflictMutation.mutateAsync({
-                        teamId: agentTeamOverview.selectedTeam.id,
-                        runId: agentTeamOverview.selectedRun.id,
-                        conflictId: conflict.conflict_id,
-                        resolution: {
-                          path: conflict.path,
-                          resolution: decision.resolution,
-                          selected_agent_task_id: decision.selectedAgentTaskId,
-                          reason: decision.reason,
-                        },
-                      });
-                    }}
-                  />
-                )}
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.schedulerLiveQueue')}</strong>
-                  <span>{t('settings.schedulerLiveQueueDesc')}</span>
-                </div>
-                {recentRuns.length > 0 || recentBridgeTasks.length > 0 ? (
-                  <div className={styles.taskList}>
-                    {recentRuns.slice(0, 3).map((run) => (
-                      <TaskRunRow key={`scheduler-${run.runId}`} run={run} />
-                    ))}
-                    {recentBridgeTasks.slice(0, 3).map((task) => (
-                      <HubTaskRow key={`scheduler-${task.taskId}`} task={task} />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.schedulerNoQueue')} description={t('settings.schedulerNoQueueDesc')} />
-                )}
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.schedulerTargets')}</strong>
-                  <span>{t('settings.schedulerTargetsDesc')}</span>
-                </div>
-                <div className={styles.targetGrid}>
-                  <ExecutionTargetCard
-                    icon={<Monitor size={18} />}
-                    title={t('settings.schedulerRouteLocal')}
-                    description={t('settings.schedulerRouteLocalDesc')}
-                    status={edgeOnline ? t('settings.enabled') : t('settings.offline')}
-                    metric={schedulerLocalMetric}
-                    connected={edgeOnline}
-                  />
-                  <ExecutionTargetCard
-                    icon={<Globe2 size={18} />}
-                    title={t('settings.schedulerRouteHub')}
-                    description={t('settings.schedulerRouteHubDesc')}
-                    status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                    metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                    connected={hubAuthenticated}
-                  />
-                  <ExecutionTargetCard
-                    icon={<Computer size={18} />}
-                    title={t('settings.schedulerRouteRemote')}
-                    description={t('settings.schedulerRouteRemoteDesc')}
-                    status={remoteControlAvailable && remoteControlEnabled ? t('settings.statusInProgress') : t('settings.statusPlanned')}
-                    metric="SSH / Tailscale"
-                    connected={remoteControlAvailable && remoteControlEnabled}
-                  />
-                  <ExecutionTargetCard
-                    icon={<Server size={18} />}
-                    title={t('settings.schedulerRouteCloud')}
-                    description={t('settings.schedulerRouteCloudDesc')}
-                    status={t('settings.statusPlanned')}
-                    metric="Cloud Edge"
-                  />
-                </div>
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.schedulerPolicy')}</strong>
-                  <span>{t('settings.schedulerPolicyDesc')}</span>
-                </div>
-                <div className={styles.capabilityGrid}>
-                  <CapabilityCard
-                    title={t('settings.schedulerPolicyModelMapping')}
-                    description={t('settings.schedulerPolicyModelMappingDesc')}
-                    status={modelMappingEnabled ? t('settings.enabled') : t('settings.notConfigured')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.schedulerPolicyCcSwitch')}
-                    description={t('settings.schedulerPolicyCcSwitchDesc')}
-                    status={ccSwitchBridge ? t('settings.enabled') : t('settings.statusPlanned')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.schedulerPolicyRemote')}
-                    description={t('settings.schedulerPolicyRemoteDesc')}
-                    status={remoteControlAvailable && remoteControlEnabled ? t('settings.enabled') : t('settings.statusPlanned')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.schedulerPolicyApproval')}
-                    description={t('settings.schedulerPolicyApprovalDesc')}
-                    status={autoReview ? t('settings.enabled') : t('settings.approvalMode.manual')}
-                  />
-                </div>
-              </div>
-              <Callout title={t('settings.schedulerGuard')} body={t('settings.schedulerGuardDesc')} />
-            </Panel>
+            <AgentSchedulingSection
+              runs={runs}
+              activeRuns={activeRuns}
+              runsLoading={runsLoading}
+              bridgedTasks={bridgedTasks}
+              agents={agents}
+              edgeOnline={edgeOnline}
+              hubSessionActive={hubSessionActive}
+              totalRunners={totalRunners}
+              runnerSummary={runnerSummary}
+              modelMappingEnabled={modelMappingEnabled}
+              ccSwitchBridge={ccSwitchBridge}
+              autoReview={autoReview}
+              agentSchedulingEnabled={agentSchedulingEnabled}
+              setAgentSchedulingEnabled={setAgentSchedulingEnabled}
+            />
           )}
 
           {active === 'agentMarket' && (
-            <Panel title={t('settings.agentMarket')} description={t('settings.agentMarketDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<Bot size={18} />}
-                  label={t('settings.marketLocalProfiles')}
-                  value={`${agents.length}`}
-                  detail={edgeOnline ? t('settings.marketLocalProfilesDesc') : t('settings.edgeOffline')}
-                />
-                <SummaryCard
-                  icon={<ShieldCheck size={18} />}
-                  label={t('settings.marketPublishReady')}
-                  value={`${marketPublishReady}/${agents.length}`}
-                  detail={t('settings.marketPublishReadyDesc')}
-                />
-                <SummaryCard
-                  icon={<Code2 size={18} />}
-                  label={t('settings.marketCapabilities')}
-                  value={`${marketCapabilityCount}`}
-                  detail={t('settings.marketCapabilitiesDesc')}
-                />
-                <SummaryCard
-                  icon={<Globe2 size={18} />}
-                  label={t('settings.marketHubSync')}
-                  value={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubAuthenticated ? t('settings.marketHubSyncDesc') : t('settings.marketHubSyncSignedOut')}
-                />
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.marketInstalledProfiles')}</strong>
-                  <span>{t('settings.marketInstalledProfilesDesc')}</span>
-                </div>
-                {agents.length > 0 ? (
-                  <div className={styles.profileGrid}>
-                    {agents.map((agent) => (
-                      <AgentMarketCard key={`market-${agent.id}`} agent={agent} />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.marketNoProfiles')} description={t('settings.marketNoProfilesDesc')} />
-                )}
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.marketReleaseReadiness')}</strong>
-                  <span>{t('settings.marketReleaseReadinessDesc')}</span>
-                </div>
-                <div className={styles.capabilityGrid}>
-                  <CapabilityCard
-                    title={t('settings.agentTemplates')}
-                    description={t('settings.agentTemplatesDesc')}
-                    status={agents.length > 0 ? t('settings.statusInProgress') : t('settings.statusPlanned')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.agentCapabilityTags')}
-                    description={t('settings.agentCapabilityTagsDesc')}
-                    status={marketCapabilityCount > 0 ? t('settings.statusReady') : t('settings.statusPlanned')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.agentReviewFlow')}
-                    description={t('settings.agentReviewFlowDesc')}
-                    status={autoReview ? t('settings.statusInProgress') : t('settings.statusPlanned')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.marketTokenDancePublish')}
-                    description={t('settings.marketTokenDancePublishDesc')}
-                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
-                  />
-                </div>
-              </div>
-              <Callout title={t('settings.marketGuard')} body={t('settings.marketGuardDesc')} />
-            </Panel>
+            <AgentMarketSection
+              hubSessionActive={hubSessionActive}
+              agents={agents}
+              edgeOnline={edgeOnline}
+              customAgents={[]}
+              isLoading={false}
+              isFetching={false}
+              isError={false}
+              isSuccess={true}
+              refetch={() => {}}
+              onOpenAuth={onOpenAuth}
+            />
           )}
 
-          {active === 'keyboard' && (
-            <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
-              <div className={styles.shortcutTable}>
-                {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
-                  <div key={group.id} className={styles.shortcutGroup}>
-                    <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
-                    {group.shortcuts.map((shortcut) => (
-                      <div key={shortcut.id} className={styles.shortcutRow}>
-                        <span>{t(shortcut.labelKey)}</span>
-                        <div>
-                          {shortcut.keys.map((key) => (
-                            <kbd key={key}>{key}</kbd>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          )}
+          {active === 'keyboard' && <KeyboardSection />}
 
           {active === 'mcp' && (
-            <Panel title={t('settings.mcp')} description={t('settings.mcpDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<Plug size={18} />}
-                  label={t('settings.mcpRuntimeSupport')}
-                  value={`${mcpCapableAgents}/${agents.length}`}
-                  detail={edgeOnline ? t('settings.mcpRuntimeSupportDesc') : t('settings.edgeOffline')}
-                />
-                <SummaryCard
-                  icon={<ShieldCheck size={18} />}
-                  label={t('settings.mcpPermissionHooks')}
-                  value={`${mcpPermissionHookAgents}`}
-                  detail={t('settings.mcpPermissionHooksDesc')}
-                />
-                <SummaryCard
-                  icon={<Bot size={18} />}
-                  label={t('settings.mcpSubAgentSpawn')}
-                  value={`${mcpSubAgentAgents}`}
-                  detail={t('settings.mcpSubAgentSpawnDesc')}
-                />
-                <SummaryCard
-                  icon={<Globe2 size={18} />}
-                  label={t('settings.mcpHubSync')}
-                  value={hubSessionActive && mcpAvailable && enableMcp ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubAuthenticated ? t('settings.mcpHubSyncDesc') : t('settings.mcpHubSyncSignedOut')}
-                />
-              </div>
-              <SettingRow
-                title={t('settings.enableMcp')}
-                description={t('settings.enableMcpDesc')}
-                control={
-                  <SwitchControl
-                    checked={mcpAvailable && enableMcp}
-                    onChange={setBooleanSetting('enableMcp', setEnableMcp)}
-                    disabled={!mcpAvailable}
-                    title={!edgeOnline ? t('settings.requiresEdgeOnline') : t('settings.requiresMcpRuntime')}
-                    status={!mcpAvailable ? t('settings.notConfigured') : undefined}
-                  />
-                }
-              />
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.mcpRuntimeMatrix')}</strong>
-                  <span>{t('settings.mcpRuntimeMatrixDesc')}</span>
-                </div>
-                {agents.length > 0 ? (
-                  <div className={styles.profileGrid}>
-                    {agents.map((agent) => (
-                      <McpRuntimeCard key={`mcp-${agent.id}`} agent={agent} />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyBlock title={t('settings.mcpNoRuntimes')} description={t('settings.mcpNoRuntimesDesc')} />
-                )}
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.mcpTemplates')}</strong>
-                  <span>{t('settings.mcpTemplatesDesc')}</span>
-                </div>
-                <div className={styles.capabilityGrid}>
-                  <CapabilityCard
-                    title="Filesystem"
-                    description={t('settings.mcpFilesystem')}
-                    status={t('settings.mcpTemplate')}
-                  />
-                  <CapabilityCard
-                    title="GitHub"
-                    description={t('settings.mcpGitHub')}
-                    status={t('settings.notConfigured')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.mcpTokenDanceHub')}
-                    description={t('settings.mcpTokenDanceHubDesc')}
-                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
-                  />
-                  <CapabilityCard
-                    title={t('settings.mcpRemoteServer')}
-                    description={t('settings.mcpRemoteServerDesc')}
-                    status={t('settings.statusPlanned')}
-                  />
-                </div>
-              </div>
-              <Callout title={t('settings.mcpGuard')} body={t('settings.mcpGuardDesc')} />
-            </Panel>
+            <McpSection
+              agents={agents}
+              edgeOnline={edgeOnline}
+              hubSessionActive={hubSessionActive}
+              enableMcp={enableMcp}
+              setEnableMcp={setEnableMcp}
+            />
           )}
 
           {active === 'skills' && (
-            <Panel title={t('settings.skills')} description={t('settings.skillsDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<Code2 size={18} />}
-                  label={t('settings.skillProjectRegistry')}
-                  value={`${PROJECT_SKILLS.length}`}
-                  detail={t('settings.skillProjectRegistryDesc')}
-                />
-                <SummaryCard
-                  icon={<ShieldCheck size={18} />}
-                  label={t('settings.skillReviewReady')}
-                  value={`${skillReadyCount}/${PROJECT_SKILLS.length}`}
-                  detail={t('settings.skillReviewReadyDesc')}
-                />
-                <SummaryCard
-                  icon={<TerminalSquare size={18} />}
-                  label={t('settings.skillScripts')}
-                  value={`${skillScriptCount}`}
-                  detail={t('settings.skillScriptsDesc')}
-                />
-                <SummaryCard
-                  icon={<Globe2 size={18} />}
-                  label={t('settings.skillHubSync')}
-                  value={hubSessionActive && skillSyncAvailable && skillSync ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubAuthenticated ? t('settings.skillHubSyncDesc') : t('settings.skillHubSyncSignedOut')}
-                />
-              </div>
-              <SettingRow
-                title={t('settings.skillSync')}
-                description={t('settings.skillSyncDesc')}
-                control={
-                  <SwitchControl
-                    checked={skillSyncAvailable && skillSync}
-                    onChange={setBooleanSetting('skillSync', setSkillSync)}
-                    disabled={!skillSyncAvailable}
-                    title={t('settings.requiresSkillSyncApi')}
-                    status={t('settings.notConfigured')}
-                  />
-                }
-              />
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.skillInstalled')}</strong>
-                  <span>{t('settings.skillInstalledDesc')}</span>
-                </div>
-                <div className={styles.profileGrid}>
-                  {PROJECT_SKILLS.map((skill) => (
-                    <ProjectSkillCard key={skill.id} skill={skill} />
-                  ))}
-                </div>
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.skillGovernance')}</strong>
-                  <span>{t('settings.skillGovernanceDesc')}</span>
-                </div>
-                <div className={styles.capabilityGrid}>
-                  <CapabilityCard
-                    title={t('settings.skillLocalRegistry')}
-                    description={t('settings.skillLocalRegistryDesc')}
-                    status=".agents/skills"
-                  />
-                  <CapabilityCard
-                    title={t('settings.skillReview')}
-                    description={t('settings.skillReviewDesc')}
-                    status={`${skillReadyCount}/${PROJECT_SKILLS.length}`}
-                  />
-                  <CapabilityCard
-                    title={t('settings.skillScriptAudit')}
-                    description={t('settings.skillScriptAuditDesc')}
-                    status={`${skillScriptCount}`}
-                  />
-                  <CapabilityCard
-                    title={t('settings.skillReferences')}
-                    description={t('settings.skillReferencesDesc')}
-                    status={`${skillReferenceCount}`}
-                  />
-                </div>
-              </div>
-              <Callout title={t('settings.skillGuard')} body={t('settings.skillGuardDesc')} />
-            </Panel>
+            <SkillsSection hubSessionActive={hubSessionActive} />
           )}
 
           {active === 'hooks' && (
-            <Panel title={t('settings.hooks')} description={t('settings.hooksDesc')}>
-              <SettingRow
-                title={t('settings.enableHooks')}
-                description={t('settings.enableHooksDesc')}
-                control={<Switch checked={enableHooks} onChange={setBooleanSetting('enableHooks', setEnableHooks)} />}
-              />
-              <SettingRow title="pre-run" description={t('settings.hookPreRun')} value={t('settings.notConfigured')} />
-              <SettingRow title="post-run" description={t('settings.hookPostRun')} value={t('settings.notConfigured')} />
-            </Panel>
+            <HooksSection enableHooks={enableHooks} setEnableHooks={setEnableHooks} />
           )}
 
           {active === 'models' && (
-            <Panel title={t('settings.models')} description={t('settings.modelsDesc')}>
-              <SettingRow
-                title={t('settings.modelDefault')}
-                description={t('settings.modelDefaultDesc')}
-                control={
-                  <SelectControl
-                    value={defaultModel}
-                    options={modelSelectOptions}
-                    onChange={setDefaultModel}
-                  />
-                }
-              />
-              <SettingRow
-                title={t('settings.modelDefaultProvider')}
-                description={t('settings.modelDefaultProviderDesc')}
-                control={
-                  <SelectControl
-                    value={defaultProvider}
-                    options={providerSelectOptions}
-                    onChange={setDefaultProvider}
-                  />
-                }
-              />
-              <SettingRow
-                title={t('settings.modelReasoning')}
-                description={t('settings.modelReasoningDesc')}
-                control={
-                  <SelectControl
-                    value={modelReasoningEffort}
-                    options={REASONING_OPTIONS.map(([value, label]) => [value, label])}
-                    onChange={(value) => setModelReasoningEffort(value as ReasoningEffortPreference)}
-                  />
-                }
-              />
-              <SettingRow
-                title={t('settings.modelProviderFallback')}
-                description={t('settings.modelProviderFallbackDesc')}
-                control={<Switch checked={providerFallbackEnabled} onChange={setProviderFallbackEnabled} />}
-              />
-              <Callout title={t('settings.modelLocalGuard')} body={t('settings.modelLocalGuardDesc')} />
-            </Panel>
+            <ModelsSection
+              defaultModel={defaultModel}
+              defaultProvider={defaultProvider}
+              modelReasoningEffort={modelReasoningEffort}
+              providerFallbackEnabled={providerFallbackEnabled}
+              setDefaultModel={setDefaultModel}
+              setDefaultProvider={setDefaultProvider}
+              setModelReasoningEffort={setModelReasoningEffort}
+              setProviderFallbackEnabled={setProviderFallbackEnabled}
+            />
           )}
 
           {active === 'modelMapping' && (
-            <Panel title={t('settings.modelMapping')} description={t('settings.modelMappingDesc')}>
-              <SettingRow
-                title={t('settings.enableModelMapping')}
-                description={t('settings.enableModelMappingDesc')}
-                control={<Switch checked={modelMappingEnabled} onChange={setModelMappingEnabled} />}
-              />
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.modelAlias')}</strong>
-                  <span>{t('settings.modelAliasDesc')}</span>
-                </div>
-                <div className={styles.modelAliasList}>
-                  {modelAliases.map((item) => (
-                    <AliasMappingRow
-                      key={item.alias}
-                      alias={item.alias}
-                      model={item.model}
-                      provider={item.provider}
-                      reasoningEffort={item.reasoningEffort}
-                      enabled={item.enabled}
-                      modelOptions={aliasModelSelectOptions}
-                      providerOptions={providerSelectOptions}
-                      onToggle={() => toggleModelAlias(item.alias)}
-                      onModelChange={(model) => updateModelAlias(item.alias, { model })}
-                      onProviderChange={(provider) => updateModelAlias(item.alias, { provider })}
-                      onReasoningChange={(reasoningEffort) => updateModelAlias(item.alias, { reasoningEffort })}
-                    />
-                  ))}
-                </div>
-              </div>
-              <Callout title={t('settings.modelPolicy')} body={t('settings.modelPolicyDesc')} />
-            </Panel>
+            <ModelMappingSection
+              modelMappingEnabled={modelMappingEnabled}
+              setModelMappingEnabled={setModelMappingEnabled}
+              modelAliases={modelAliases}
+              toggleModelAlias={toggleModelAlias}
+              updateModelAlias={updateModelAlias}
+            />
           )}
 
           {active === 'ccSwitch' && (
-            <Panel title={t('settings.ccSwitch')} description={t('settings.ccSwitchDesc')}>
-              <SettingRow
-                title={t('settings.ccSwitchBridge')}
-                description={t('settings.ccSwitchBridgeDesc')}
-                control={<Switch checked={ccSwitchBridge} onChange={setCcSwitchBridge} />}
-              />
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.ccSwitchProviders')}</strong>
-                  <span>{t('settings.ccSwitchProvidersDesc')}</span>
-                </div>
-                <div className={styles.providerList}>
-                  {ccSwitchProviders.map((provider) => (
-                    <ProviderHealthRow
-                      key={provider.id}
-                      id={provider.id}
-                      name={provider.name}
-                      health={provider.health}
-                      modelCount={provider.modelCount}
-                      notes={provider.notes}
-                      onHealthChange={(health) => updateCcSwitchProvider(provider.id, { health })}
-                      onNotesChange={(notes) => updateCcSwitchProvider(provider.id, { notes })}
-                    />
-                  ))}
-                </div>
-              </div>
-              <Callout title={t('settings.ccSwitchHealth')} body={t('settings.ccSwitchHealthDesc')} />
-            </Panel>
+            <CcSwitchSection
+              ccSwitchBridge={ccSwitchBridge}
+              setCcSwitchBridge={setCcSwitchBridge}
+              ccSwitchProviders={ccSwitchProviders}
+              updateCcSwitchProvider={updateCcSwitchProvider}
+            />
           )}
 
           {active === 'connections' && (
@@ -1974,222 +1074,61 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'remoteControl' && (
-            <Panel title={t('settings.remoteControl')} description={t('settings.remoteControlDesc')}>
-              <SettingRow
-                title={t('settings.remoteControlEnable')}
-                description={t('settings.remoteControlEnableDesc')}
-                control={
-                  <SwitchControl
-                    checked={remoteControlAvailable && remoteControlEnabled}
-                    onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)}
-                    disabled={!remoteControlAvailable}
-                    title={t('settings.requiresRemoteControlApi')}
-                    status={t('settings.statusPlanned')}
-                  />
-                }
-              />
-              <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
-              <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.statusPlanned')} />
-            </Panel>
+            <RemoteControlSection hubSessionActive={hubSessionActive} />
           )}
 
           {active === 'git' && (
-            <Panel title={t('settings.git')} description={t('settings.gitDesc')}>
-              <SettingRow
-                title={t('settings.autoDetectGit')}
-                description={t('settings.autoDetectGitDesc')}
-                control={
-                  <Switch checked={autoDetectGit} onChange={setBooleanSetting('autoDetectGit', setAutoDetectGit)} />
-                }
-              />
-              <SettingRow title={t('settings.branchPolicy')} description="feat/* -> dev/delicious233 -> master" />
-              <SettingRow title={t('settings.commitStyle')} description="type(scope): summary" />
-            </Panel>
+            <GitSection autoDetectGit={autoDetectGit} setAutoDetectGit={setAutoDetectGit} />
           )}
 
-          {active === 'environment' && (
-            <Panel title={t('settings.environment')} description={t('settings.environmentDesc')}>
-              <SettingRow title="Shell" description="PowerShell 7" value="pwsh" />
-              <SettingRow title="Node" description={t('settings.environmentNodeDesc')} value="pnpm" />
-              <SettingRow title="Tauri" description={t('settings.environmentTauriDesc')} value={t('settings.enabled')} />
-            </Panel>
-          )}
+          {active === 'environment' && <EnvironmentSection />}
 
           {active === 'worktree' && (
-            <Panel title={t('settings.worktree')} description={t('settings.worktreeDesc')}>
-              <SettingRow title={t('settings.defaultWorkspace')} description="D:\\Code\\TokenDance" />
-              <SettingRow
-                title={t('settings.worktreeIsolation')}
-                description={t('settings.worktreeIsolationDesc')}
-                control={
-                  <Switch
-                    checked={worktreeIsolation}
-                    onChange={setBooleanSetting('worktreeIsolation', setWorktreeIsolation)}
-                  />
-                }
-              />
-              <SettingRow title={t('settings.worktreePolicy')} description=".worktrees/<feature>" />
-            </Panel>
+            <WorktreeSection worktreeIsolation={worktreeIsolation} setWorktreeIsolation={setWorktreeIsolation} />
           )}
 
           {active === 'browser' && (
-            <Panel title={t('settings.browser')} description={t('settings.browserDesc')}>
-              <SettingRow
-                title={t('settings.browserPreview')}
-                description={t('settings.browserPreviewDesc')}
-                control={
-                  <Switch checked={browserPreview} onChange={setBooleanSetting('browserPreview', setBrowserPreview)} />
-                }
-              />
-              <SettingRow title={t('settings.browserEngine')} description="Chromium / Playwright" value="Auto" />
-            </Panel>
+            <BrowserSection browserPreview={browserPreview} setBrowserPreview={setBrowserPreview} />
           )}
 
           {active === 'computerUse' && (
-            <Panel title={t('settings.computerUse')} description={t('settings.computerUseDesc')}>
-              <SettingRow
-                title={t('settings.computerConfirm')}
-                description={t('settings.computerConfirmDesc')}
-                control={
-                  <Switch
-                    checked={computerConfirm}
-                    onChange={setBooleanSetting('computerConfirm', setComputerConfirm)}
-                  />
-                }
-              />
-              <Callout title={t('settings.computerUseGuard')} body={t('settings.computerUseGuardDesc')} />
-            </Panel>
+            <ComputerUseSection computerConfirm={computerConfirm} setComputerConfirm={setComputerConfirm} />
           )}
 
           {active === 'platforms' && (
-            <Panel title={t('settings.platforms')} description={t('settings.platformsDesc')}>
-              <SettingRow
-                title={t('settings.platformSync')}
-                description={t('settings.platformSyncDesc')}
-                control={
-                  <SwitchControl
-                    checked={platformSyncAvailable && platformSync}
-                    onChange={setBooleanSetting('platformSync', setPlatformSync)}
-                    disabled={!platformSyncAvailable}
-                    title={t('settings.requiresPlatformSyncApi')}
-                    status={t('settings.statusPlanned')}
-                  />
-                }
-              />
-              <div className={styles.capabilityGrid}>
-                <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.statusReady')} />
-                <CapabilityCard title="Windows" description={t('settings.platformWindowsDesc')} status={t('settings.statusReady')} />
-                <CapabilityCard title="Android" description={t('settings.platformAndroidDesc')} status={t('settings.statusPlanned')} />
-                <CapabilityCard title="Web" description={t('settings.platformWebDesc')} status={t('settings.statusPlanned')} />
-              </div>
-            </Panel>
+            <PlatformsSection hubSessionActive={hubSessionActive} />
           )}
 
           {active === 'account' && (
-            <Panel title={t('settings.account')} description={t('settings.accountDesc')}>
-              <div className={styles.accountCard}>
-                <UserCircle size={34} />
-                <div className={styles.accountInfo}>
-                  <strong>{hubSessionActive ? accountName : t('settings.notSignedIn')}</strong>
-                  <span>{hubSessionActive ? t('settings.accountConnected') : t('settings.accountDisconnected')}</span>
-                </div>
-                {hubSessionActive ? (
-                  <button className={styles.secondaryBtn} onClick={handleSignOut}>
-                    <LogOut size={16} />
-                    {t('settings.signOut')}
-                  </button>
-                ) : (
-                  <button className={styles.primaryBtn} onClick={onOpenAuth}>
-                    <UserCircle size={16} />
-                    {t('settings.signIn')}
-                  </button>
-                )}
-              </div>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<LockKeyhole size={18} />}
-                  label={t('settings.hubSession')}
-                  value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubSessionActive ? t('settings.hubSessionDesc') : t('settings.hubSessionSignedOutDesc')}
-                />
-                <SummaryCard
-                  icon={<Globe2 size={18} />}
-                  label="TokenDance ID"
-                  value={tokenSource === 'tokendance' ? t('settings.enabled') : t('settings.statusInProgress')}
-                  detail={tokenSource === 'tokendance' ? t('settings.tokenDanceSessionDesc') : t('settings.tokenDanceOidcPendingDesc')}
-                />
-                <SummaryCard
-                  icon={<Monitor size={18} />}
-                  label={t('settings.desktopDevice')}
-                  value={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
-                  detail={deviceId ? t('settings.desktopDeviceDesc') : t('settings.desktopDeviceMissingDesc')}
-                />
-                <SummaryCard
-                  icon={<Route size={18} />}
-                  label={t('settings.syncScope')}
-                  value={hubSessionActive ? 'Hub' : t('settings.notConfigured')}
-                  detail={t('settings.syncScopeDesc')}
-                />
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.identityBoundary')}</strong>
-                  <span>{t('settings.identityBoundaryDesc')}</span>
-                </div>
-                <div className={styles.capabilityGrid}>
-                  <CapabilityCard
-                    title={t('settings.hubSession')}
-                    description={t('settings.hubSessionCapabilityDesc')}
-                    status={hubSessionActive ? t('settings.statusReady') : t('settings.notConfigured')}
-                  />
-                  <CapabilityCard
-                    title="TokenDance ID OIDC"
-                    description={t('settings.tokenDanceOidcDesc')}
-                    status={tokenDanceOidcStatus}
-                  />
-                  <CapabilityCard
-                    title={t('settings.authTokenSource')}
-                    description={t('settings.authTokenSourceDesc')}
-                    status={tokenSourceLabel}
-                  />
-                  <CapabilityCard
-                    title={t('settings.deviceProof')}
-                    description={t('settings.deviceProofDesc')}
-                    status={deviceId ? t('settings.statusInProgress') : t('settings.notConfigured')}
-                  />
-                </div>
-              </div>
-              <SettingRow title={t('settings.hubEndpoint')} description={HUB_URL} value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')} />
-              <SettingRow title={t('settings.appVersion')} description={APP_VERSION} value={t('settings.statusReady')} />
-              <Callout title={t('settings.accountGuard')} body={t('settings.accountGuardDesc')} />
-            </Panel>
+            <AccountSection
+              hubSessionActive={hubSessionActive}
+              accountName={accountName}
+              tokenSource={tokenSource ?? 'hub'}
+              tokenSourceLabel={tokenSourceLabel}
+              desktopDeviceStatus={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
+              deviceId={deviceId}
+              deviceRegistration={{ status: 'idle', error: null }}
+              onOpenAuth={onOpenAuth}
+              onSignOut={handleSignOut}
+            />
           )}
 
           {active === 'securityAudit' && (
-            <Panel title={t('settings.securityAudit')} description={t('settings.securityAuditDesc')}>
-              <SettingRow
-                title={t('settings.auditTrail')}
-                description={t('settings.auditTrailDesc')}
-                control={
-                  <SwitchControl
-                    checked={auditTrailAvailable && auditTrail}
-                    onChange={setBooleanSetting('auditTrail', setAuditTrail)}
-                    disabled={!auditTrailAvailable}
-                    title={t('settings.requiresAuditStore')}
-                    status={t('settings.statusPlanned')}
-                  />
-                }
-              />
-              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.secretScan')} description={t('settings.secretScanDesc')} value={t('settings.statusPlanned')} />
-              <Callout title={t('settings.securityGuard')} body={t('settings.securityGuardDesc')} />
-            </Panel>
+            <SecurityAuditSection auditTrail={auditTrail} setAuditTrail={setAuditTrail} />
           )}
 
-          {active === 'archived' && (
-            <Panel title={t('settings.archived')} description={t('settings.archivedDesc')}>
-              <EmptyBlock title={t('settings.noArchived')} description={t('settings.noArchivedDesc')} />
-            </Panel>
+          {active === 'archived' && <ArchivedSection />}
+          {active === 'data' && (
+            <DataSection
+              t={t}
+              addToast={(input) => { return ''; }}
+              resetModelSettings={() => {
+                setDefaultModel('auto');
+                setDefaultProvider('tokendance-gateway');
+                setModelReasoningEffort('medium');
+                setProviderFallbackEnabled(false);
+              }}
+            />
           )}
         </div>
       </main>
