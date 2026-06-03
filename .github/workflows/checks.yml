@@ -242,13 +242,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-          cache-dependency-path: app/desktop/pnpm-lock.yaml
+          cache-dependency-path: app/pnpm-lock.yaml
 
       - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Install shared deps
-        working-directory: app/shared
+        working-directory: app
         run: pnpm install --frozen-lockfile
 
       - name: Type check
