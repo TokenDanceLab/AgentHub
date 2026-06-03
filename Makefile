@@ -8,7 +8,7 @@
 
 #        make release VER=v0.1.1  (build + upload release binaries)
 #        make help        (show this help)
-.PHONY: test test-all test-edge test-hub lint coverage sec release clean \
+.PHONY: test test-all test-edge test-hub lint coverage sec release clean fmt \
         fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
 
 # ── Help ───────────────────────────────────────────
@@ -71,6 +71,12 @@ bench:
 lint:
 	cd edge-server && golangci-lint run ./...
 	cd hub-server && golangci-lint run ./...
+
+# ── Format ───────────────────────────────────────
+
+fmt:
+	cd edge-server && gofmt -w .
+	cd hub-server && gofmt -w .
 
 # ── Coverage ─────────────────────────────────────
 
