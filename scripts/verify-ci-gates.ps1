@@ -48,6 +48,10 @@ if (-not (Test-Path -LiteralPath $WorkflowPath)) {
 $workflow = Get-Content -LiteralPath $WorkflowPath -Raw
 $edge = Get-JobBlock $workflow "go-edge"
 $hub = Get-JobBlock $workflow "go-hub"
+$desktop = Get-JobBlock $workflow "frontend-desktop"
+$web = Get-JobBlock $workflow "frontend-web"
+$mobile = Get-JobBlock $workflow "frontend-mobile"
+$e2e = Get-JobBlock $workflow "e2e-smoke"
 $validate = Get-JobBlock $workflow "validate"
 
 Assert-Contains $edge "THRESHOLD=75" "go-edge coverage threshold must be 75%"
@@ -59,6 +63,17 @@ Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
 Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $false
 Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $false
+
+foreach ($job in @(
+    @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/desktop/pnpm-lock.yaml" },
+    @{ Name = "frontend-web"; Body = $web; Lockfile = "app/pnpm-lock.yaml" },
+    @{ Name = "frontend-mobile"; Body = $mobile; Lockfile = "app/pnpm-lock.yaml" },
+    @{ Name = "e2e-smoke"; Body = $e2e; Lockfile = "app/pnpm-lock.yaml" }
+)) {
+    Assert-Contains $job.Body "pnpm/action-setup@v4" "$($job.Name) must install pnpm explicitly"
+    Assert-Contains $job.Body "cache:\s+pnpm" "$($job.Name) must enable pnpm cache"
+    Assert-Contains $job.Body ([regex]::Escape($job.Lockfile)) "$($job.Name) must cache the correct pnpm lockfile"
+}
 
 Assert-Contains $validate "Verify CI gate policy" "validate job must run the CI gate policy verifier"
 Assert-Contains $validate "scripts/verify-ci-gates\.ps1" "validate job must call scripts/verify-ci-gates.ps1"

@@ -10,7 +10,7 @@ import AuthGapBlock from '../primitives/AuthGapBlock';
 import Switch from '../primitives/Switch';
 import HubSessionRow from '../cards/HubSessionRow';
 import { writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 function sessionIdOf(session: Session) { return session.session_id ?? session.id ?? 'session'; }
 

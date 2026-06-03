@@ -10,7 +10,7 @@ use edge_manager::{resolve_edge_path, EdgeManager};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Mutex;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Managed state: whether the window should minimize to tray instead of quitting on close.
 pub struct CloseToTrayState(pub Arc<AtomicBool>);
@@ -81,6 +81,14 @@ pub fn run() {
         .setup(move |app| {
             let handle = app.handle().clone();
             tray::build_tray(&handle)?;
+            let edge_for_start = edge.clone();
+            let start_handle = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut manager = edge_for_start.lock().await;
+                if let Err(error) = manager.start().await {
+                    let _ = start_handle.emit("edge-start-error", error);
+                }
+            });
             edge_health::spawn_health_check(handle, edge);
             Ok(())
         })

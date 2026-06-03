@@ -115,7 +115,7 @@ export default function IMView(props: ViewProps) {
       <div className={styles.root}>
         <div className={styles.empty}>
           <MessageCircle size={48} className={styles.emptyIcon} aria-hidden="true" />
-          <span className={styles.emptyTitle}>IM Chat</span>
+          <span className={styles.emptyTitle}>{label('im.title', 'IM Chat')}</span>
           <span>{label('im.state.connectHub', 'Connect to Hub to start chatting')}</span>
         </div>
       </div>

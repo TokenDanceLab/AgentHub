@@ -4,7 +4,7 @@ import {
   X, Send, Globe2, ShieldCheck, Package, FileText, Wrench, Tag,
   Cpu, Eye, Check, AlertTriangle, Loader2, Star, Users,
 } from 'lucide-react';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export interface PublishAgentPayload {
   id: string;
