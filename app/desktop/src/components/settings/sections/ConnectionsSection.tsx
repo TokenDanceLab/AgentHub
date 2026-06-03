@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
 import Panel from '../primitives/Panel';
 import ConnectionRow from '../primitives/ConnectionRow';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface ConnectionsSectionProps {
   edgeOnline: boolean;

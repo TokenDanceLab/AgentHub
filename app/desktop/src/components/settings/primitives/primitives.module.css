@@ -1,0 +1,1241 @@
+/* ── Settings Primitives ────────────────────────────────────────────── */
+/* Shared UI building-blocks used by settings sections, cards, and      */
+/* primitive components.  Design tokens only — no hardcoded colours.    */
+
+/* ── Panel ──────────────────────────────────────────────────────────── */
+.panel {
+  margin-bottom: 34px;
+}
+
+.panelHeader {
+  margin-bottom: 13px;
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 730;
+}
+
+.panelHeader p {
+  max-width: 640px;
+  margin: 6px 0 0;
+  color: var(--settings-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.panelBody {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Mode Card ──────────────────────────────────────────────────────── */
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modeCard {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 80px;
+  padding: 15px;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+[data-theme='dark'] .modeCard {
+  color-scheme: dark;
+}
+
+.modeCard:hover {
+  background: var(--glass-panel-strong);
+  border-color: color-mix(in oklch, var(--glass-border) 72%, var(--foreground));
+}
+
+[data-theme='dark'] .modeCard:hover {
+  background: var(--glass-panel-strong);
+}
+
+.modeCardActive,
+[data-theme='dark'] .modeCardActive {
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--glass-border));
+  background:
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
+    var(--glass-panel-strong);
+}
+
+.modeCard span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modeCard strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.modeCard small {
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.modeCheck {
+  flex-shrink: 0;
+  color: var(--settings-accent);
+}
+
+/* ── Capability Card ────────────────────────────────────────────────── */
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.capabilityCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 76px;
+  gap: 12px;
+  padding: 15px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+}
+
+[data-theme='dark'] .capabilityCard {
+  color-scheme: dark;
+}
+
+.capabilityCard strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.capabilityCard span {
+  grid-column: 1;
+  color: var(--settings-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.capabilityCard em {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--glass-tint-plum);
+  color: color-mix(in oklch, var(--settings-accent) 86%, white);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+/* ── Summary Card ───────────────────────────────────────────────────── */
+.summaryGrid,
+.profileGrid,
+.targetGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.summaryCard,
+.profileCard,
+.targetCard {
+  min-width: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+}
+
+[data-theme='dark'] .summaryCard,
+[data-theme='dark'] .profileCard,
+[data-theme='dark'] .targetCard {
+  color-scheme: dark;
+}
+
+.summaryCard {
+  display: flex;
+  gap: 13px;
+  min-height: 82px;
+  padding: 15px 18px;
+}
+
+.summaryIcon,
+.profileIcon,
+.targetIcon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--settings-icon-bg);
+  color: color-mix(in oklch, var(--settings-accent) 86%, white);
+}
+
+.summaryCard div:last-child,
+.profileHeader div:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryCard span,
+.profileCard span,
+.targetCard span,
+.profileMeta span {
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.summaryCard strong,
+.profileCard strong,
+.targetCard strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.summaryCard small {
+  color: var(--settings-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* ── Profile Card ───────────────────────────────────────────────────── */
+.profileCard {
+  display: flex;
+  min-height: 102px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px 18px;
+}
+
+.profileHeader {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.profileStatus {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--glass-bg-medium);
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.profileStatus_available {
+  background: var(--glass-tint-moss);
+  color: var(--success);
+}
+
+.profileStatus_configuring {
+  background: var(--glass-tint-amber);
+  color: var(--warning);
+}
+
+.profileMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profileMeta span,
+.targetCard em {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 8px;
+  border: 1px solid var(--settings-chip-border);
+  border-radius: 6px;
+  background: var(--settings-chip-bg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+/* ── Target Card ────────────────────────────────────────────────────── */
+.targetCard {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon title status"
+    "icon desc metric";
+  align-items: center;
+  min-height: 88px;
+  gap: 4px 14px;
+  padding: 15px 18px;
+}
+
+.targetTop {
+  display: contents;
+}
+
+.targetTop .targetIcon {
+  grid-area: icon;
+}
+
+.targetTop .statusPill {
+  grid-area: status;
+  justify-self: end;
+}
+
+.targetCard > strong {
+  grid-area: title;
+}
+
+.targetCard > span {
+  grid-area: desc;
+}
+
+.targetCard em {
+  grid-area: metric;
+  justify-self: end;
+  margin-top: 0;
+  color: var(--foreground);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+/* ── Task / Runner Layout ───────────────────────────────────────────── */
+.runnerList {
+  margin-top: 12px;
+}
+
+.taskSection {
+  margin-top: 18px;
+}
+
+.taskSectionHeader {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.taskSectionHeader strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.taskSectionHeader span {
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.taskSectionTitleRow {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.taskSectionTitleRow > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.taskSectionActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.taskList {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+/* ── Row Components ─────────────────────────────────────────────────── */
+.settingRow,
+.connectionRow,
+.runnerRow,
+.taskRow,
+.accountCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 70px;
+  padding: 15px 18px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-panel);
+  border-radius: 11px;
+  margin-bottom: 10px;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+[data-theme='dark'] .settingRow,
+[data-theme='dark'] .connectionRow,
+[data-theme='dark'] .runnerRow,
+[data-theme='dark'] .taskRow,
+[data-theme='dark'] .accountCard {
+  border-color: var(--glass-border);
+}
+
+.connectionIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--glass-bg-light);
+  color: var(--settings-muted);
+}
+
+[data-theme='dark'] .connectionIcon {
+  background: var(--glass-bg-medium);
+}
+
+.settingCopy,
+.accountInfo {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.settingCopy strong,
+.accountInfo strong {
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.settingCopy span,
+.accountInfo span {
+  color: var(--settings-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.settingValue {
+  max-width: 280px;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: right;
+}
+
+.taskMeta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.taskMeta span {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--glass-bg-medium);
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskRowAction {
+  height: 30px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+/* ── Status Pill ────────────────────────────────────────────────────── */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--glass-bg-medium);
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statusPillOn {
+  background: var(--glass-tint-moss);
+  color: var(--success);
+}
+
+/* ── Switch Control ─────────────────────────────────────────────────── */
+.switchControl {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.switchStatus {
+  max-width: 120px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.switch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--glass-bg-heavy);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+[data-theme='dark'] .switch {
+  background: var(--glass-bg-heavy);
+}
+
+.switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 1px 3px var(--glass-shadow);
+  transition: transform 0.18s ease;
+}
+
+.switchOn {
+  background: var(--settings-accent);
+}
+
+[data-theme='dark'] .switchOn {
+  background: color-mix(in oklch, var(--settings-accent) 84%, white);
+}
+
+.switchOn span {
+  transform: translateX(18px);
+}
+
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.switch:disabled span {
+  box-shadow: none;
+}
+
+/* ── Select Control ─────────────────────────────────────────────────── */
+.select {
+  min-width: 158px;
+  height: 34px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 9px;
+  background: var(--glass-input-bg);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+[data-theme='dark'] .select {
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-medium);
+}
+
+/* ── Text Input ─────────────────────────────────────────────────────── */
+.textInput {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 9px;
+  background: var(--glass-input-bg);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+[data-theme='dark'] .textInput {
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-medium);
+}
+
+/* ── Segmented Control ──────────────────────────────────────────────── */
+.segmented {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--glass-bg-medium);
+}
+
+[data-theme='dark'] .segmented {
+  background: var(--glass-bg-medium);
+}
+
+.segmented button {
+  min-width: 116px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--settings-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.segmented .segmentActive {
+  background: var(--glass-input-bg-hover);
+  color: var(--foreground);
+  box-shadow: 0 1px 6px var(--glass-shadow-subtle);
+}
+
+[data-theme='dark'] .segmented .segmentActive {
+  background: var(--glass-bg-heavy);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+.primaryBtn,
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 14px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.primaryBtn {
+  border: 0;
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.secondaryBtn {
+  border: 1px solid var(--glass-border-strong);
+  background: transparent;
+  color: var(--foreground);
+}
+
+.primaryBtn:disabled,
+.secondaryBtn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.spinIcon {
+  animation: settingsSpin 0.9s linear infinite;
+}
+
+@keyframes settingsSpin {
+  to { transform: rotate(360deg); }
+}
+
+[data-theme='dark'] .secondaryBtn {
+  border-color: var(--glass-border-strong);
+}
+
+/* ── Callout ────────────────────────────────────────────────────────── */
+.callout {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
+    var(--glass-panel);
+  color: var(--foreground);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(20px) saturate(1.12);
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+}
+
+.callout svg {
+  flex-shrink: 0;
+  color: var(--settings-accent);
+}
+
+.callout div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.callout strong {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.callout span {
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* ── Empty Block ────────────────────────────────────────────────────── */
+.emptyBlock {
+  display: flex;
+  min-height: 160px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+  color: var(--settings-muted);
+  text-align: center;
+}
+
+[data-theme='dark'] .emptyBlock {
+  color-scheme: dark;
+}
+
+.emptyBlock strong {
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+.emptyBlock span {
+  max-width: 360px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ── Instructions Row ───────────────────────────────────────────────── */
+.instructionsRow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  margin-top: 8px;
+  background: var(--glass-panel);
+}
+
+.instructionsHeader,
+.instructionsFooter,
+.instructionsActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.instructionsHeader {
+  justify-content: space-between;
+}
+
+.instructionsEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.instructionsEditor textarea {
+  min-height: 112px;
+  max-height: 240px;
+  font-weight: 560;
+}
+
+.instructionsFooter {
+  justify-content: space-between;
+  color: var(--settings-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.instructionsFooter span {
+  min-width: 0;
+}
+
+.instructionsFooter em {
+  flex-shrink: 0;
+  color: var(--settings-muted);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.instructionsActions {
+  justify-content: flex-end;
+}
+
+/* ── Model Alias / Provider ─────────────────────────────────────────── */
+.modelAliasList,
+.providerList {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modelAliasRow,
+.providerRow {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
+.modelAliasHead,
+.providerMain {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.modelAliasHead > div:first-child,
+.providerMain > .settingCopy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modelAliasHead strong,
+.providerMain strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.modelAliasHead span,
+.providerMain span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+}
+
+.modelAliasControls,
+.providerControls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.providerControls {
+  grid-template-columns: minmax(140px, 0.35fr) minmax(0, 1fr);
+}
+
+.modelAliasControls label,
+.providerControls label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modelAliasControls .select,
+.providerControls .select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ── Shortcut Table ─────────────────────────────────────────────────── */
+.shortcutTable {
+  display: grid;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
+[data-theme='dark'] .shortcutTable {
+  border-color: var(--glass-border);
+}
+
+.shortcutGroup {
+  display: grid;
+}
+
+.shortcutGroup + .shortcutGroup {
+  border-top: 1px solid var(--glass-border);
+}
+
+[data-theme='dark'] .shortcutGroup + .shortcutGroup {
+  border-top-color: var(--glass-border);
+}
+
+.shortcutGroupTitle {
+  min-height: 34px;
+  padding: 10px 16px 6px;
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 52px;
+  padding: 12px 16px;
+}
+
+.shortcutGroupTitle + .shortcutRow,
+.shortcutRow + .shortcutRow {
+  border-top: 1px solid var(--glass-border);
+}
+
+[data-theme='dark'] .shortcutGroupTitle + .shortcutRow,
+[data-theme='dark'] .shortcutRow + .shortcutRow {
+  border-top-color: var(--glass-border);
+}
+
+.shortcutRow span {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding: 1px 0 2px;
+}
+
+.shortcutRow div {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.shortcutRow kbd {
+  min-width: 26px;
+  height: 25px;
+  padding: 0 8px;
+  border: 1px solid var(--glass-border-strong);
+  border-bottom-color: var(--glass-border-heavy);
+  border-radius: 7px;
+  background: var(--glass-input-bg-hover);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  line-height: 23px;
+  text-align: center;
+}
+
+[data-theme='dark'] .shortcutRow kbd {
+  border-color: var(--glass-border);
+  border-bottom-color: var(--glass-border-heavy);
+  background: var(--glass-bg-medium);
+}
+
+/* ── Theme Preset Grid ──────────────────────────────────────────────── */
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.presetCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass-panel);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.presetCard:hover {
+  background: var(--glass-panel-strong);
+  border-color: color-mix(in oklch, var(--glass-border) 72%, var(--foreground));
+}
+
+.presetCard:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+
+.presetCardActive {
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--glass-border));
+  background:
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
+    var(--glass-panel-strong);
+}
+
+[data-theme='dark'] .presetCardActive {
+  background:
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
+    var(--glass-panel-strong);
+}
+
+.presetSwatches {
+  display: flex;
+  gap: 6px;
+}
+
+.presetSwatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px var(--glass-shadow-subtle);
+}
+
+.presetCardLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.presetCardLabel strong {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presetCardLabel small {
+  color: var(--settings-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Conflict Source ────────────────────────────────────────────────── */
+.conflictSourceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 188px), 1fr));
+  gap: 9px;
+  min-width: 0;
+}
+
+.conflictSourceCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--glass-panel) 82%, transparent);
+}
+
+.conflictSourceHead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.conflictSourceHead strong,
+.conflictSourceCard span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conflictSourceHead strong {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding: 1px 0 3px;
+}
+
+.conflictSourceHead em {
+  width: auto;
+  max-width: 92px;
+  padding: 3px 7px 4px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.conflictSourceCard span {
+  color: var(--settings-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding-bottom: 2px;
+}
+
+.conflictSourceCard .secondaryBtn {
+  align-self: flex-start;
+  min-height: 30px;
+  margin-top: 2px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .modeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .capabilityGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .summaryGrid,
+  .profileGrid,
+  .targetGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .profileHeader {
+    flex-wrap: wrap;
+  }
+
+  .taskSectionTitleRow {
+    flex-direction: column;
+  }
+
+  .taskSectionActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .modelAliasHead,
+  .providerMain {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .modelAliasControls,
+  .providerControls {
+    grid-template-columns: 1fr;
+  }
+
+  .select,
+  .settingValue {
+    max-width: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .settingRow,
+  .connectionRow,
+  .runnerRow,
+  .taskRow,
+  .accountCard {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}

@@ -7,7 +7,7 @@ import CapabilityCard from '../primitives/CapabilityCard';
 import Callout from '../primitives/Callout';
 import Switch from '../primitives/Switch';
 import ProjectSkillCard from '../cards/ProjectSkillCard';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export interface ProjectSkill {
   id: string;
