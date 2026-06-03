@@ -18,7 +18,7 @@ export interface ProjectSkill {
   hasReferences: boolean;
 }
 
-// TODO: Replace with real API data
+// Preview data — Hub API integration pending
 const PROJECT_SKILLS: ProjectSkill[] = [
   { id: 'adapter-dev', title: 'adapter-dev', descriptionKey: 'settings.skill.adapterDevDesc', status: 'ready', hasScripts: false, hasReferences: false },
   { id: 'dev-loop', title: 'dev-loop', descriptionKey: 'settings.skill.devLoopDesc', status: 'ready', hasScripts: false, hasReferences: true },
