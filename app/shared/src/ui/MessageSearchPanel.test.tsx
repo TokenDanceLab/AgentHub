@@ -76,18 +76,19 @@ describe('MessageSearchPanel', () => {
     const input = screen.getByPlaceholderText('Type to search...');
     fireEvent.change(input, { target: { value: 'auth' } });
 
-    const mark = await screen.findByText('auth', { selector: 'mark' });
-    expect(mark).toBeInTheDocument();
+    const marks = await screen.findAllByText('auth', { selector: 'mark' });
+    expect(marks.length).toBeGreaterThanOrEqual(1);
+    expect(marks[0].tagName).toBe('MARK');
   });
 
   it('calls onJumpToMessage when clicking a result', async () => {
     const onJump = vi.fn();
     render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
     const input = screen.getByPlaceholderText('Type to search...');
-    fireEvent.change(input, { target: { value: 'auth' } });
+    fireEvent.change(input, { target: { value: 'auth module' } });
 
-    const result = await screen.findByText(/auth module/);
-    fireEvent.click(result.closest('button')!);
+    const results = await screen.findAllByText(/auth module/);
+    fireEvent.click(results[0].closest('button')!);
 
     expect(onJump).toHaveBeenCalledWith(expect.any(String), expect.any(Number));
   });

@@ -13,6 +13,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -172,10 +173,13 @@ func (mh *mockHub) failError(taskID string) string {
 // verification.
 func startEdgeServer(t *testing.T) (*httptest.Server, *api.Handler) {
 	t.Helper()
+	bus := events.NewBus(100)
+	s := store.New()
 	h := &api.Handler{
-		Bus:      events.NewBus(100),
+		Bus:      bus,
 		Registry: runners.NewRegistry(),
-		Store:    store.New(),
+		Store:    s,
+		Executor: lifecycle.NewMockExecutor(bus, s),
 	}
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
