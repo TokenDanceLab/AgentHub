@@ -3,15 +3,15 @@
   width: fit-content;
   max-width: 100%;
   margin: 3px 0;
-  border: 1px solid rgba(255, 255, 255, 0.065);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--glass-bg-subtle);
   overflow: hidden;
 }
 
 [data-theme='light'] .root {
-  border-color: rgba(15, 23, 42, 0.07);
-  background: rgba(15, 23, 42, 0.016);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-subtle);
 }
 
 /* ── Summary header (collapsed state) ──────── */
@@ -36,7 +36,7 @@
 
 .summary:hover,
 .summary:focus-visible {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 82%, transparent);
   outline: none;
 }
@@ -74,12 +74,12 @@
   font-weight: 540;
   line-height: 1.45;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 58%, var(--muted-foreground) 42%);
 }
 
 [data-theme='light'] .categoryChip {
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--glass-bg-light);
 }
 
 .categoryChip .chipCount {
@@ -95,7 +95,7 @@
   font-size: 11px;
   font-weight: 540;
   line-height: 1.45;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
 }
 
 /* ── Expanded body ─────────────────────────── */
@@ -112,11 +112,11 @@
   margin: 0;
   border: none;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--glass-bg-subtle);
 }
 
 [data-theme='light'] .toolCard {
-  background: rgba(15, 23, 42, 0.012);
+  background: var(--glass-bg-subtle);
 }
 
 .toolCardHeader {
@@ -140,7 +140,7 @@
 
 .toolCardHeader:hover,
 .toolCardHeader:focus-visible {
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--foreground) 78%, transparent);
   outline: none;
 }
@@ -204,7 +204,7 @@
   padding: 2px 8px;
   border: none;
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--foreground) 54%, transparent);
   cursor: pointer;
   font-size: 11px;
@@ -216,7 +216,7 @@
 
 .toolCardBody .showParamsBtn:hover,
 .toolCardBody .showParamsBtn:focus-visible {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
   color: color-mix(in oklch, var(--foreground) 76%, transparent);
   outline: none;
 }
@@ -224,7 +224,7 @@
 .toolCardParams {
   margin-top: 4px;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--glass-bg-subtle);
   border-radius: 5px;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -240,7 +240,7 @@
   margin: 3px 0;
   padding: 4px 8px;
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--glass-bg-subtle);
   font-size: 11px;
   color: color-mix(in oklch, var(--foreground) 52%, var(--muted-foreground) 48%);
 }
@@ -254,14 +254,14 @@
   margin: 3px 0;
   padding: 4px 8px;
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--glass-bg-subtle);
   font-size: 11px;
 }
 
 .toolOutput {
   margin: 2px 0;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   border-radius: 4px;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -284,37 +284,37 @@
   font-size: 10px;
   font-weight: 540;
   font-family: var(--font-mono);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--foreground) 54%, var(--muted-foreground) 46%);
 }
 
 /* ── Status badges ─────────────────────────── */
 .statusPending {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--muted-foreground) 74%, var(--foreground) 26%);
 }
 
 .statusRunning {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--warning) 72%, var(--foreground) 28%);
 }
 
 .statusDone {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--success) 68%, var(--foreground) 32%);
 }
 
 .statusFailed {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--destructive) 72%, var(--foreground) 28%);
 }
 
 /* ── Light theme overrides ─────────────────── */
 [data-theme='light'] .toolCardBody .showParamsBtn {
-  background: rgba(15, 23, 42, 0.03);
+  background: var(--glass-bg-subtle);
 }
 
 [data-theme='light'] .toolCardBody .showParamsBtn:hover,
 [data-theme='light'] .toolCardBody .showParamsBtn:focus-visible {
-  background: rgba(15, 23, 42, 0.06);
+  background: var(--glass-bg-medium);
 }
