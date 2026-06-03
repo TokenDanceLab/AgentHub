@@ -1,5 +1,5 @@
 import { ShieldCheck } from 'lucide-react';
-import styles from '../../SettingsPage.module.css';
+import styles from './primitives.module.css';
 
 interface CalloutProps {
   title: string;

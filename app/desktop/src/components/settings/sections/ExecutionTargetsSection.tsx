@@ -6,7 +6,7 @@ import ExecutionTargetCard from '../primitives/ExecutionTargetCard';
 import Callout from '../primitives/Callout';
 import RunnerRow from '../cards/RunnerRow';
 import { shortId } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface ExecutionTargetsSectionProps {
   edgeOnline: boolean;
