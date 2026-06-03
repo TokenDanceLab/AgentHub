@@ -70,6 +70,7 @@ function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketIt
 }
 
 // ── Mock community catalog (backend will serve from Hub API) ──
+// TODO: Replace with real API data
 const MOCK_COMMUNITY_AGENTS: CommunityAgentItem[] = [
   {
     id: 'hub-code-reviewer',
@@ -604,6 +605,15 @@ export default function AgentMarketSection({
 
           {/* Community agent grid */}
           {filteredCommunityAgents.length > 0 ? (
+            <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--settings-muted)', background: 'var(--settings-chip-bg)', border: '1px solid var(--settings-chip-border)', padding: '2px 8px', borderRadius: 6 }}>
+                {t('settings.marketComingSoon', 'Coming Soon')}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--settings-muted)' }}>
+                {t('settings.marketPreviewData', 'Preview data — Hub API integration pending')}
+              </span>
+            </div>
             <div className={styles.marketAgentGrid}>
               {filteredCommunityAgents.map((agent) => {
                 const installed = installedIds.includes(agent.id);
@@ -681,6 +691,7 @@ export default function AgentMarketSection({
                 );
               })}
             </div>
+            </>
           ) : (
             <EmptyBlock
               title={hasActiveFilters ? t('settings.marketNoResults') : t('settings.marketLoading')}
