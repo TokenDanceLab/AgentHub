@@ -1067,19 +1067,20 @@ describe('PromptInput', () => {
     fireEvent.click(screen.getByTestId('slash-command-permission-bypassPermissions'));
 
     const strip = screen.getByTestId('prompt-active-run-settings');
-    expect(within(strip).getByText('prompt.activeSetting.model')).toBeInTheDocument();
-    expect(within(strip).getByText('deepseek-v4-pro')).toBeInTheDocument();
     expect(within(strip).getByText('prompt.activeSetting.permission')).toBeInTheDocument();
     expect(within(strip).getByText('prompt.permission.bypassPermissions')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'prompt.clearModelRoute' }));
     fireEvent.click(screen.getByRole('button', { name: 'prompt.clearPermissionMode' }));
     expect(screen.queryByTestId('prompt-active-run-settings')).not.toBeInTheDocument();
 
     typeInPrompt(input, 'Run with defaults');
     fireEvent.click(screen.getByRole('button', { name: 'action.startRun' }));
 
-    expect(onSend).toHaveBeenCalledWith('Run with defaults', undefined, undefined);
+    expect(onSend).toHaveBeenCalledWith('Run with defaults', undefined, {
+      model: 'claude-opus-4-7[1M]',
+      modelAlias: 'opus[1m]',
+      provider: 'claude-code',
+    });
   });
 
   it('uses slash commands to set reasoning and open the workspace selector', () => {

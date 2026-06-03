@@ -53,6 +53,14 @@ const mockAgents: AgentInfo[] = [
 ];
 
 describe('WelcomeScreen', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => (key === 'agenthub.onboarding.completed' ? 'true' : null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+  });
+
   it('renders when online with prompt suggestions', () => {
     render(
       <WelcomeScreen
