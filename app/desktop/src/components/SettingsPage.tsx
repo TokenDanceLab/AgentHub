@@ -158,15 +158,39 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [navSearch, setNavSearch] = useState('');
   const navSearchRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut: `/` focuses the search input
+  // Command palette (Ctrl+K / Cmd+K)
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
+  const [paletteIndex, setPaletteIndex] = useState(0);
+  const paletteInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, select, [contenteditable]')) return;
-    if (e.key === '/') {
+    const inInput = Boolean(target.closest('input, textarea, select, [contenteditable]'));
+    const metaCtrl = e.metaKey || e.ctrlKey;
+
+    if (!inInput && e.key === '/') {
       e.preventDefault();
       navSearchRef.current?.focus();
+      return;
+    }
+
+    if (metaCtrl && e.key === 'k' && !inInput) {
+      e.preventDefault();
+      setPaletteOpen((prev) => !prev);
     }
   }, []);
+
+  // Reset palette state on open
+  useEffect(() => {
+    if (paletteOpen) {
+      setPaletteQuery('');
+      setPaletteIndex(0);
+      // Focus the palette input after render
+      requestAnimationFrame(() => paletteInputRef.current?.focus());
+    }
+  }, [paletteOpen]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleSettingsKeyDown);
@@ -309,7 +333,53 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
   const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
 
+  // Command palette filtered items
+  const paletteItems = useMemo(() => {
+    if (!paletteQuery.trim()) return navItems;
+    const q = paletteQuery.toLowerCase();
+    return navItems.filter(
+      (item) =>
+        item.label.toLowerCase().includes(q) ||
+        t(`settings.group.${item.group}`).toLowerCase().includes(q),
+    );
+  }, [navItems, paletteQuery, t]);
+
+  const selectPaletteItem = useCallback(
+    (id: SectionId) => {
+      setActive(id);
+      setPaletteOpen(false);
+    },
+    [],
+  );
+
+  const handlePaletteKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setPaletteIndex((prev) => Math.min(prev + 1, paletteItems.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPaletteIndex((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter' && paletteItems[paletteIndex]) {
+        e.preventDefault();
+        selectPaletteItem(paletteItems[paletteIndex].id);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setPaletteOpen(false);
+      }
+    },
+    [paletteItems, paletteIndex, selectPaletteItem],
+  );
+
+  // Clamp palette index when items change
+  useEffect(() => {
+    if (paletteIndex >= paletteItems.length) {
+      setPaletteIndex(Math.max(0, paletteItems.length - 1));
+    }
+  }, [paletteItems.length, paletteIndex]);
+
   return (
+    <>
     <div className={styles.root}>
       <aside className={styles.sidebar}>
         <button className={styles.backBtn} onClick={onBack}>
@@ -650,5 +720,46 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
         </div>
       </main>
     </div>
+
+    {paletteOpen && (
+      <div className={styles.paletteOverlay} onClick={() => setPaletteOpen(false)}>
+        <div className={styles.palette} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.paletteInput}>
+            <Search size={16} />
+            <input
+              ref={paletteInputRef}
+              type="text"
+              placeholder={t('settings.searchPlaceholder')}
+              value={paletteQuery}
+              onChange={(e) => {
+                setPaletteQuery(e.target.value);
+                setPaletteIndex(0);
+              }}
+              onKeyDown={handlePaletteKeyDown}
+            />
+            <kbd>ESC</kbd>
+          </div>
+          <div className={styles.paletteList}>
+            {paletteItems.length === 0 ? (
+              <div className={styles.paletteEmpty}>{t('settings.searchEmpty')}</div>
+            ) : (
+              paletteItems.map((item, idx) => (
+                <button
+                  key={item.id}
+                  className={`${styles.paletteItem} ${idx === paletteIndex ? styles.paletteItemActive : ''}`}
+                  onClick={() => selectPaletteItem(item.id)}
+                  onMouseEnter={() => setPaletteIndex(idx)}
+                >
+                  <span className={styles.paletteItemIcon}>{item.icon}</span>
+                  <span className={styles.paletteItemLabel}>{item.label}</span>
+                  <span className={styles.paletteItemGroup}>{t(`settings.group.${item.group}`)}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
