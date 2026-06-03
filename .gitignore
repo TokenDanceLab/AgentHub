@@ -10,6 +10,7 @@ build/
 coverage/
 playwright-report/
 test-results/
+*.tgz
 
 # Generated reports and local test artifacts
 app/desktop/stats.html
@@ -22,10 +23,15 @@ edge-server/$covPath
 hub-server/tests/uploads/
 
 # Go
+server-hub-linux
+server-hub-*
+agenthub-edge
+agenthub-edge-*
 *.exe
 *.exe~
 *.test
 *.out
+*.coverprofile
 vendor/
 
 # Rust / Tauri
