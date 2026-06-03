@@ -1,0 +1,110 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ── Status messages ─────────────────────────────────── */
+.loading {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+.error {
+  padding: var(--space-lg);
+  color: var(--td-danger);
+  font-size: var(--font-size-xs);
+}
+
+.empty {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Timeline row ────────────────────────────────────── */
+.row {
+  display: flex;
+  gap: 10px;
+  position: relative;
+  min-height: 36px;
+}
+
+/* ── Timeline gutter ─────────────────────────────────── */
+.gutter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 2px solid var(--td-plum);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-base);
+}
+
+.dotIcon {
+  color: var(--td-plum);
+}
+
+.line {
+  width: 2px;
+  flex: 1;
+  background: var(--td-line);
+  margin-top: -2px;
+}
+
+/* ── Event content ───────────────────────────────────── */
+.content {
+  flex: 1;
+  padding-bottom: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contentLast {
+  flex: 1;
+  padding-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eventHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.eventType {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--td-ink);
+}
+
+.eventSeq {
+  font-size: var(--font-size-2xs);
+  color: var(--td-ink-muted);
+}
+
+.eventTime {
+  font-size: var(--font-size-2xs);
+  color: var(--td-ink-muted);
+}
+
+.eventSummary {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--td-ink-muted);
+  line-height: var(--line-height-tight);
+}
