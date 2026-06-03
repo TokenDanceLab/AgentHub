@@ -1,55 +1,45 @@
 import { useTranslation } from 'react-i18next';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Bot, Search, Sparkles, Star } from 'lucide-react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { queryClient } from '@/api/queryClient';
 import { useAgentList } from '@/api/agentQueries';
+import { useHubCustomAgents } from '@/hooks/useHubCustomAgents';
 import { useHubSession } from '@/hooks/useHubSession';
 import { EmptyState, SectionHeader, ActivityCard } from '@shared/ui';
 import type { AgentInfo } from '@shared/types';
 
 function AgentSquarePage() {
   const { t } = useTranslation('agentSquare');
-  const [hubError, setHubError] = useState<string | null>(null);
-  const [hubLoading, setHubLoading] = useState(false);
-  const { hasSession, token, hubBaseUrl } = useHubSession();
+  const { hasSession, token } = useHubSession();
 
-  const { data: agentData } = useAgentList(true);
+  const { data: agentData, isLoading: agentLoading } = useAgentList(true);
   const agents: AgentInfo[] = agentData?.items ?? [];
 
-  // Attempt Hub custom-agents fetch when session exists
-  useEffect(() => {
-    if (!token) return;
-    setHubLoading(true);
-    const controller = new AbortController();
-    fetch(`${hubBaseUrl}/api/v1/custom-agents`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        const body = await res.json().catch(() => null);
-        if (!res.ok || body?.code !== 'OK') {
-          throw new Error(body?.message || `HTTP ${res.status}`);
-        }
-        setHubError(null);
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') {
-          setHubError(err instanceof Error ? err.message : String(err));
-        }
-      })
-      .finally(() => setHubLoading(false));
-
-    return () => controller.abort();
-  }, [token, hubBaseUrl]);
+  const hubCustomAgents = useHubCustomAgents(token);
+  const hubAgents = hubCustomAgents.source === 'hub' && hubCustomAgents.agents.length > 0
+    ? hubCustomAgents.agents
+    : [];
 
   const sourceDescription = useMemo(() => {
-    if (hubLoading) return t('source.loading');
-    if (hubError) return t('source.errorDetail', { error: hubError });
+    if (hubCustomAgents.isLoading) return t('source.loading');
+    if (hubCustomAgents.error) return t('source.errorDetail', { error: hubCustomAgents.error });
     if (!hasSession) return t('source.loginRequiredDetail');
-    return t('source.hubDetail');
-  }, [hubError, hasSession, hubLoading, t]);
+    if (hubAgents.length > 0) return t('source.hubDetail');
+    return t('source.catalogFallbackDetail');
+  }, [hubCustomAgents, hasSession, t]);
+
+  const displayAgents = hubAgents.length > 0
+    ? hubAgents.map((a) => ({
+        id: a.id ?? '',
+        name: a.name ?? t('source.hub'),
+        description: a.system_prompt ?? '',
+        runtimeId: a.agent_type ?? '',
+      }))
+    : agents;
+
+  const displayCount = displayAgents.length;
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
@@ -69,14 +59,14 @@ function AgentSquarePage() {
 
       <div style={{ marginTop: 12, marginBottom: 16, display: 'flex', gap: 8 }}>
         <ActivityCard label={t('stats.curated')} icon={<Sparkles size={14} />}>
-          {agents.length}
+          {displayCount}
         </ActivityCard>
         <ActivityCard label={t('stats.favorites')} icon={<Star size={14} />}>
           0
         </ActivityCard>
       </div>
 
-      {agents.length === 0 ? (
+      {displayCount === 0 ? (
         <EmptyState
           title={t('empty.noResults')}
           description={t('empty.description')}
@@ -85,7 +75,7 @@ function AgentSquarePage() {
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          {agents.map((agent) => (
+          {displayAgents.map((agent) => (
             <div
               key={agent.id}
               style={{

@@ -3,30 +3,74 @@ import { Users, CheckSquare, FileText, Activity, Shield } from 'lucide-react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { queryClient } from '@/api/queryClient';
+import { useHubAgentTeams } from '@/api/agentTeamQueries';
+import { useHubSession } from '@/hooks/useHubSession';
 import { EmptyState, SectionHeader, ActivityCard } from '@shared/ui';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 function GroupWorkspacePage() {
   const { t } = useTranslation('groupWorkspace');
+  const { hasSession } = useHubSession();
 
   const [memberFilter, setMemberFilter] = useState<string>('all');
 
-  const mockMembers = [
-    { id: '1', name: 'Alice', role: 'Owner', status: 'online' as const },
-    { id: '2', name: 'Bob', role: 'Developer', status: 'busy' as const },
-    { id: '3', name: 'Charlie', role: 'Reviewer', status: 'offline' as const },
-  ];
+  const { data: overview, isLoading } = useHubAgentTeams({ enabled: hasSession });
 
-  const mockTasks = [
-    { id: '1', title: 'Update API schema', status: 'active' as const, owner: 'Bob' },
-    { id: '2', title: 'Review PR #128', status: 'done' as const, owner: 'Alice' },
-    { id: '3', title: 'Sync workspace files', status: 'queue' as const, owner: 'Charlie' },
-  ];
+  const members = useMemo(() => {
+    if (!overview?.selectedTeam?.members) return [];
+    return overview.selectedTeam.members.map((m) => ({
+      id: m.id,
+      name: m.agent_profile_id ?? m.id.slice(0, 8),
+      role: m.role,
+      status: 'online' as const,
+    }));
+  }, [overview]);
 
-  const filteredMembers = memberFilter === 'all' ? mockMembers : mockMembers.filter((m) => m.status === memberFilter);
+  const tasks = useMemo(() => {
+    if (!overview?.tasks) return [];
+    return overview.tasks.map((t) => ({
+      id: t.id,
+      title: t.objective ?? t.id.slice(0, 8),
+      status: (t.status === 'done' ? 'done' : t.status === 'running' || t.status === 'dispatched' ? 'active' : 'queue') as 'active' | 'done' | 'queue',
+      owner: t.assignee_member_id ?? '',
+    }));
+  }, [overview]);
 
-  const onlineCount = mockMembers.filter((m) => m.status !== 'offline').length;
-  const busyCount = mockMembers.filter((m) => m.status === 'busy').length;
+  const filteredMembers = memberFilter === 'all' ? members : members.filter((m) => m.status === memberFilter);
+
+  const onlineCount = members.length;
+  const activeTaskCount = tasks.filter((t) => t.status === 'active').length;
+
+  if (!hasSession) {
+    return (
+      <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+        <SectionHeader
+          title={t('header.title')}
+          eyebrow={t('sidebar.brandSubtitle')}
+        />
+        <EmptyState
+          title={t('confirm.ready')}
+          description={t('locked.description')}
+          icon={<Users size={24} />}
+          titleLevel={3}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+        <SectionHeader
+          title={t('header.title')}
+          eyebrow={t('sidebar.brandSubtitle')}
+        />
+        <ActivityCard label={t('source.loadingSnapshot')} icon={<Activity size={16} />}>
+          {t('source.loadingSnapshot')}
+        </ActivityCard>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
@@ -40,7 +84,9 @@ function GroupWorkspacePage() {
           label={t('sync.title')}
           icon={<Activity size={16} />}
         >
-          {t('sync.checklist.lastSyncDetail', { time: '2025-06-02 10:30' })}
+          {overview?.selectedTeam
+            ? t('sync.checklist.lastSyncDetail', { time: overview.selectedTeam.updated_at ?? '--' })
+            : t('sync.checklist.notSynced')}
         </ActivityCard>
       </div>
 
@@ -49,13 +95,13 @@ function GroupWorkspacePage() {
           {onlineCount}
         </ActivityCard>
         <ActivityCard label={t('stat.sharedTasks')} icon={<CheckSquare size={14} />}>
-          {mockTasks.filter((t) => t.status === 'active').length} / {mockTasks.length}
+          {activeTaskCount} / {tasks.length}
         </ActivityCard>
         <ActivityCard label={t('stat.workspaceFiles')} icon={<FileText size={14} />}>
-          12
+          --
         </ActivityCard>
         <ActivityCard label={t('sync.readiness')} icon={<Shield size={14} />}>
-          78%
+          --
         </ActivityCard>
       </div>
 
@@ -69,9 +115,9 @@ function GroupWorkspacePage() {
               style={{
                 padding: '4px 12px',
                 borderRadius: 14,
-                border: '1px solid var(--color-border, #e2e8f0)',
-                background: memberFilter === f ? 'var(--color-primary, #4f46e5)' : 'transparent',
-                color: memberFilter === f ? '#fff' : 'var(--color-text, #1a1a2e)',
+                border: '1px solid var(--color-border)',
+                background: memberFilter === f ? 'var(--primary)' : 'transparent',
+                color: memberFilter === f ? '#fff' : 'var(--text)',
                 cursor: 'pointer',
                 fontSize: 12,
               }}
@@ -80,66 +126,74 @@ function GroupWorkspacePage() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {filteredMembers.map((member) => (
-            <div
-              key={member.id}
-              style={{
-                display: 'flex', alignItems: 'center', padding: 10,
-                border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 8,
-                gap: 10,
-              }}
-            >
-              <div style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: member.status === 'offline' ? 'var(--color-muted, #94a3b8)' : 'var(--color-primary, #4f46e5)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontWeight: 600, fontSize: 14,
-              }}>
-                {member.name[0]}
+        {filteredMembers.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>{t('member.empty')}</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filteredMembers.map((member) => (
+              <div
+                key={member.id}
+                style={{
+                  display: 'flex', alignItems: 'center', padding: 10,
+                  border: '1px solid var(--color-border)', borderRadius: 8,
+                  gap: 10,
+                }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: 'var(--primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 600, fontSize: 14,
+                }}>
+                  {member.name[0]}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{member.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{member.role}</div>
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 500,
+                  padding: '2px 8px', borderRadius: 10,
+                  background: 'var(--success-surface)',
+                  color: 'var(--success)',
+                }}>
+                  {t(`member.status.${member.status}`)}
+                </span>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{member.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-muted, #64748b)' }}>{member.role}</div>
-              </div>
-              <span style={{
-                fontSize: 11, fontWeight: 500,
-                padding: '2px 8px', borderRadius: 10,
-                background: member.status === 'online' ? 'rgba(34,197,94,0.15)' : member.status === 'busy' ? 'rgba(245,158,11,0.15)' : 'rgba(148,163,184,0.15)',
-                color: member.status === 'online' ? '#16a34a' : member.status === 'busy' ? '#d97706' : '#64748b',
-              }}>
-                {t(`member.status.${member.status}`)}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
         <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{t('task.board')}</h3>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {mockTasks.map((task) => (
-            <div
-              key={task.id}
-              style={{
-                flex: '1 1 250px', minWidth: 200, padding: 12,
-                border: '1px solid var(--color-border, #e2e8f0)', borderRadius: 8,
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{task.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-muted, #64748b)', marginBottom: 6 }}>
-                {t('task.owner', { name: task.owner })}
+        {tasks.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>{t('task.board.backlog')}</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                style={{
+                  flex: '1 1 250px', minWidth: 200, padding: 12,
+                  border: '1px solid var(--color-border)', borderRadius: 8,
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{task.title}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                  {t('task.owner', { name: task.owner })}
+                </div>
+                <span style={{
+                  fontSize: 11, padding: '2px 8px', borderRadius: 10,
+                  background: task.status === 'active' ? 'var(--info-surface)' : task.status === 'done' ? 'var(--success-surface)' : 'var(--muted-surface)',
+                  color: task.status === 'active' ? 'var(--info)' : task.status === 'done' ? 'var(--success)' : 'var(--muted)',
+                }}>
+                  {t(`task.tag.${task.status}`)}
+                </span>
               </div>
-              <span style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                background: task.status === 'active' ? 'rgba(59,130,246,0.15)' : task.status === 'done' ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)',
-                color: task.status === 'active' ? '#2563eb' : task.status === 'done' ? '#16a34a' : '#64748b',
-              }}>
-                {t(`task.tag.${task.status === 'active' ? 'active' : task.status === 'done' ? 'done' : 'queue'}`)}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
