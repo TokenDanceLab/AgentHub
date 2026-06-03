@@ -22,7 +22,7 @@ import { deleteCustomAgent, loadCustomAgents } from '../agentCreation/agentStore
 import { agentTemplates, capabilityLabels } from '../agentCreation/agentTemplates';
 import type { AgentTemplate } from '../agentCreation/agentCreationTypes';
 import { countAgentCapabilities, statusLabelFromQuery, readUnknownString, readUnknownArray } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export interface CustomAgentMarketItem {
   id: string;

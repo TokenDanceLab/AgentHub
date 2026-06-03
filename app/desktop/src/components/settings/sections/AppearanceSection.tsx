@@ -6,7 +6,7 @@ import SettingRow from '../primitives/SettingRow';
 import SelectControl from '../primitives/SelectControl';
 import Switch from '../primitives/Switch';
 import { writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 type ThemeMode = 'dark' | 'light' | 'system';
 
