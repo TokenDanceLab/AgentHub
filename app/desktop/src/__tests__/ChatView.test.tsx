@@ -591,4 +591,123 @@ describe('ChatView', () => {
     // was called.
     expect(autoScrollState.scrollToBottom).toHaveBeenCalled();
   });
+
+  // ── Approval block rendering ───────────────────────
+
+  it('renders approval block with agentName, toolName, and riskLevel', () => {
+    const msg: ChatMessage = {
+      id: 'msg-approval-1',
+      role: 'agent',
+      timestamp: new Date().toISOString(),
+      blocks: [
+        {
+          kind: 'approval',
+          approvalId: 'approval-1',
+          status: 'pending',
+          agentName: 'BuilderAgent',
+          toolName: 'write_file',
+          riskLevel: 'high',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+    render(<ChatView messages={[msg]} />);
+
+    const card = screen.getByTestId('approval-card');
+    expect(card).toBeInTheDocument();
+    expect(card).toHaveTextContent('BuilderAgent');
+    expect(card).toHaveTextContent('write_file');
+    expect(card).toHaveTextContent('approval.risk.high');
+    expect(card).toHaveTextContent('approval.status.pending');
+  });
+
+  it('renders approval block with default fallbacks for missing optional fields', () => {
+    const msg: ChatMessage = {
+      id: 'msg-approval-2',
+      role: 'agent',
+      timestamp: new Date().toISOString(),
+      blocks: [
+        {
+          kind: 'approval',
+          approvalId: 'approval-2',
+          status: 'approved',
+        },
+      ],
+    };
+    render(<ChatView messages={[msg]} />);
+
+    const card = screen.getByTestId('approval-card');
+    expect(card).toBeInTheDocument();
+    expect(card).toHaveTextContent('approval.title');
+  });
+
+  it('renders different riskLevel visual styles', () => {
+    const critical: ChatMessage = {
+      id: 'msg-critical',
+      role: 'agent',
+      timestamp: new Date().toISOString(),
+      blocks: [
+        { kind: 'approval', approvalId: 'a-crit', status: 'pending', riskLevel: 'critical' },
+      ],
+    };
+    const { rerender } = render(<ChatView messages={[critical]} />);
+    const criticalBadge = screen.getByTestId('approval-card').querySelector('[class*="riskCritical"]');
+    expect(criticalBadge).not.toBeNull();
+
+    const low: ChatMessage = {
+      id: 'msg-low',
+      role: 'agent',
+      timestamp: new Date().toISOString(),
+      blocks: [
+        { kind: 'approval', approvalId: 'a-low', status: 'pending', riskLevel: 'low' },
+      ],
+    };
+    rerender(<ChatView messages={[low]} />);
+    const lowBadge = screen.getByTestId('approval-card').querySelector('[class*="riskLow"]');
+    expect(lowBadge).not.toBeNull();
+  });
+
+  // ── Artifact onApplyDiff ──────────────────────────
+
+  it('passes onApplyDiff handler to ArtifactPreview for diffs', () => {
+    const msg: ChatMessage = {
+      id: 'msg-artifact-1',
+      role: 'agent',
+      timestamp: new Date().toISOString(),
+      blocks: [
+        {
+          kind: 'artifact',
+          artifactId: 'art-1',
+          artifactType: 'file',
+          title: 'changes.patch',
+          canApplyDiff: true,
+          diffApplied: false,
+        },
+      ],
+    };
+    render(<ChatView messages={[msg]} />);
+
+    expect(screen.getByText('changes.patch')).toBeInTheDocument();
+    expect(screen.getByText('artifact.type.file')).toBeInTheDocument();
+  });
+
+  it('does not pass onApplyDiff when canApplyDiff is false', () => {
+    const msg: ChatMessage = {
+      id: 'msg-artifact-2',
+      role: 'agent',
+      timestamp: new Date().toISOString(),
+      blocks: [
+        {
+          kind: 'artifact',
+          artifactId: 'art-2',
+          artifactType: 'file',
+          title: 'readonly.txt',
+          canApplyDiff: false,
+        },
+      ],
+    };
+    render(<ChatView messages={[msg]} />);
+
+    expect(screen.getByText('readonly.txt')).toBeInTheDocument();
+  });
 });
