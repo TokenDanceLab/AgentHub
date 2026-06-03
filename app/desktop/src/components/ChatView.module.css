@@ -103,7 +103,7 @@
 
 [data-theme='light'] .userMsg {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.52)),
+    linear-gradient(180deg, rgba(255,255,255,0.64), var(--glass-input-bg)),
     var(--input-panel-bg);
   border-color: var(--glass-border-subtle);
 }
