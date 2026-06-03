@@ -1,167 +1,130 @@
 <div align="center">
 
-# AgentHub
+# AgentHub / AI 工作台
 
-## IM 形态的多 Agent 协作平台
+> 让 Claude Code、Codex、OpenCode 在同一 IM 工作台上协作
 
-像用飞书/微信一样，拉群组织 Claude Code、Codex、OpenCode 等 AI Agent 协作完成网页、代码和部署。
+[![status](https://img.shields.io/badge/v0.1.0-活跃开发-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
+[![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
+[![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
+[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
 
-[English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
-
-<img src="https://img.shields.io/badge/v0.1.0-活跃开发-blue?style=flat-square" alt="status">
-<img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
-<img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
-<img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
+[English](README_EN.md) &nbsp;·&nbsp; [用户手册](docs/guides/user-guide.md) &nbsp;·&nbsp; [FAQ](docs/guides/faq.md) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
 
 </div>
 
 <br>
 
-## 这是什么
+<!-- 截图占位：Desktop 主界面 dark theme -->
+<p align="center">
+  <img src="screenshots/hero-desktop.png" alt="AgentHub Desktop 主界面" width="80%">
+</p>
 
-AgentHub 把 AI 编程 Agent 变成 IM 联系人。你可以像在群聊里 @同事一样 @ClaudeCode 写代码、@Codex 做审查、@Reviewer 提建议，所有计划、执行、Diff、审批和预览都在同一个聊天线程中流转，不需要在工具之间来回切换。
+---
 
-与现有工具的区别：多数 Claude Code GUI 是单人聊天壳。AgentHub 的核心是多 Agent 协作和多端控制：Desktop 提供本地执行工作台，Edge Server 连接真实 Agent CLI，Hub Server 提供账号、IM、多端同步和远程中继。
+## 三种 AI Runtime 统一调度 · IM 原生多 Agent 协作 · 团队审批流 · 中英双语 · Glass 拟态设计
 
-你可以拉一个群，把 Builder、Reviewer、Tester 三个 Agent Profile 加进去——Builder 写代码，Reviewer 自动审查 Diff，Tester 跑测试，所有输出和决策都在群聊里透明可见。审批卡片、进度播报、Artifact 预览都是 IM 原生协作体验的一部分。
+<br>
 
-AgentHub 支持 Claude Code、Codex、OpenCode 三种 Agent Runtime。Agent Profile 可自由组合 Runtime、模型、Skill、MCP 和审批策略，配置一次，在多台设备上同步使用。
+## 核心卖点
+
+| | |
+|---|---|
+| **三种 Runtime 统一** | 同一界面调度 Claude Code、Codex、OpenCode，不锁定单一模型或工具链 |
+| **IM 原生协作** | 像飞书/微信一样拉群、@Agent、审批——不是又一个 IDE 插件 |
+| **Hub-Edge 分布式** | 本地执行 + 云端同步 + 多端协作，数据不出本地，协作走云端 |
+
+<br>
+
+## 快速开始（5 步）
+
+```powershell
+# 1. 克隆仓库
+git clone https://github.com/TokenDanceLab/AgentHub.git
+cd AgentHub
+
+# 2. 初始化开发环境
+.\scripts\setup.ps1
+
+# 3. 启动 Edge Server（选择一种 Runtime）
+cd edge-server
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
+
+# 4. 启动 Desktop
+cd ..\app\desktop
+pnpm install
+pnpm dev
+
+# 5. 打开 http://localhost:5173 开始使用
+```
+
+> 需要先安装 Go 1.25+、Node.js 20+ 和 pnpm。详见 [用户手册](docs/guides/user-guide.md)。
+
+<br>
+
+## 功能对比
+
+| 能力 | AgentHub | Cursor | Windsurf | Claude Code | Codex |
+|------|:---:|:---:|:---:|:---:|:---:|
+| 多 Agent 协作 | **IM 群聊** | 单人 | 单人 | 实验性 | 单人 |
+| 多 Runtime 支持 | **3 种** | 自有 | 自有 | Claude 专用 | OpenAI 专用 |
+| 中英双语 | **完整** | 英文 | 英文 | 英文 | 英文 |
+| 本地执行 | **Tauri 桌面端** | VS Code 插件 | VS Code 插件 | CLI | CLI |
+| 移动端 | **Android 原生** | 无 | 无 | 无 | Web |
+| 团队审批流 | **内置** | 无 | 无 | 权限弹窗 | 无 |
+| 多端同步 | **Hub 云端** | 无 | 无 | 无 | 无 |
+| 设计系统 | **Glass 拟态** | VS Code 主题 | VS Code 主题 | TUI | Web Dashboard |
+| MCP 生态 | 规划中 | 完整 | 完整 | 最完整 | 无 |
+| 定价 | **开源免费** | $20/月 | $20/月 | API 计费 | $20/月 |
+
+> AgentHub 是 IM 层的创新——不替代任何 Runtime，而是让它们在同一工作台上协作。
 
 <br>
 
 ## 架构
 
 ```text
-Desktop UI -> Local Edge Server -> Agent Runtime Adapter -> Claude Code / Codex / OpenCode
-                         |
-                         v
-                    Hub Server
+Desktop / Mobile / Web
+        |
+   Edge Server (Go) ── Agent Runtime Adapter ── Claude Code / Codex / OpenCode
+        |
+   Hub Server (Go) ── PostgreSQL + Redis
 ```
 
-| 组件 | 目录 | 职责 |
-|---|---|---|
-| **Hub Server** | `hub-server/` | 账号、TokenDance ID relying party、IM、联系人/群聊、多端同步、设备路由、Edge 中继和审计 |
-| **Edge Server** | `edge-server/` | 本地/远程执行节点：项目、Thread、Run、EventStore、执行生命周期、Agent Runtime adapter、Artifact 索引 |
-| **Agent Runtime** | `edge-server/internal/adapters/` | Codex、OpenCode、Claude Code 等 CLI/SDK 适配器；负责命令构造、协议解析、取消和能力声明 |
-| **Agent Profile** | Hub profile store / Edge local profile | 用户可管理的 Agent 实体：Runtime + Model/Provider + 配置 + Skill/MCP + 审批策略 + Execution Target |
-| **Desktop App** | `app/desktop/` | Tauri 桌面端工作台，本地 Edge 控制、Hub 登录、多端 IM、设置和可视化调试 |
-| **Web App** | `app/web/` | 浏览器工作台和页面预览入口，面向远程查看、审批和协作体验 |
-| **Shared App** | `app/shared/` | 前端共享类型、API/event client、树/Diff 工具和 `@shared/ui` 组件 |
-| **API Contract** | `api/` | REST JSON API 与 WebSocket typed events 契约 |
+| 组件 | 职责 |
+|------|------|
+| **Desktop App**（Tauri） | 本地执行工作台，IM 聊天、Diff 审批、多 Agent 管理 |
+| **Web App** | 浏览器工作台，远程查看、审批协作 |
+| **Mobile App**（Tauri Android） | 移动端 IM、审批、预览 |
+| **Edge Server** | 本地执行节点，Agent CLI 进程管理，EventStore |
+| **Hub Server** | 账号、IM 群聊、多端同步、设备路由、审计 |
+| **Agent Runtime** | Claude Code / Codex / OpenCode CLI 适配器 |
 
-<br>
-
-## 核心概念
-
-| 概念 | 含义 | 例子 |
-|---|---|---|
-| **Agent Runtime** | 能启动并解析某类 Agent CLI/SDK 的适配器。它回答"用什么运行"。 | Claude Code、Codex、OpenCode |
-| **Agent Profile** | 用户选择和管理的 Agent 实体。它回答"谁来做事"。 | `Reviewer on Codex/gpt-5.4-high`、`Builder on Claude Code/sonnet` |
-| **Agent Configuration** | Profile 的可编辑规则集合。它回答"按什么规则做事"。 | `AGENTS.md`、memory、上下文、聊天记录、工作目录、Skill、MCP、模型参数、审批策略 |
-| **Execution Target** | 某次 Run 实际执行的位置。它回答"在哪里执行"。 | Local Edge、Remote Edge over SSH/Tailscale、Cloud Edge、Hub Relay target |
-
-本地执行不依赖 Hub：Desktop 可以只连接 `127.0.0.1:3210` 的 Local Edge 完成项目、Thread、Run 和 Runtime adapter 调度。Hub 只在账号、团队 IM、多端同步、远程查看/审批、设备路由和中继场景进入链路。
+本地执行不依赖 Hub——Desktop 只连 Local Edge 即可完成项目、线程、Run 全流程。Hub 用于云端 IM、多端同步、远程审批。
 
 <br>
 
 ## 产品分层
 
 | 层 | 描述 | 阶段 |
-|---|---|:---:|
-| **Desktop Command Center** | 本地项目、线程、Agent 生命周期、工作树、Diff、审批、预览 | P0 |
-| **IM Collaboration** | 单聊、群聊、@Agent、Orchestrator、多 Agent 审查、Agent 进度卡片 | P1 |
-| **Hub Network** | 账号、好友、群聊、多端同步、Edge 中继、团队记忆和审计 | P2-P4 |
+|---|------|:---:|
+| **Desktop Command Center** | 本地项目、Thread、Run、Diff、审批、Preview | P0 ✅ |
+| **IM Collaboration** | 单聊、群聊、@Agent、多 Agent 审查、进度卡片 | P1 🔧 |
+| **Hub Network** | 账号、好友、多端同步、Edge 中继、审计 | P2-P4 📋 |
 
 <br>
 
 ## 技术栈
 
 | 层 | 技术 |
-|---|---|
-| 前端 | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens + `@shared/ui` |
+|---|------|
+| 前端 | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens |
 | Desktop | Tauri 2.5 |
-| Edge Server | Go 1.25 + `net/http` + WebSocket + Agent Runtime adapters |
-| Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis + Hub session；TokenDance ID bearer middleware 仅作兼容路径 |
+| Mobile | Tauri 2.5（Android） |
+| Edge Server | Go 1.25 + WebSocket + Agent Runtime adapters |
+| Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis |
 | 实时通信 | WebSocket typed events |
-| 数据库 | Hub: PostgreSQL + Redis；Edge: memory/file store |
-| 协议 | REST JSON API + WebSocket typed events |
-
-<br>
-
-## 快速开始
-
-### 直接使用
-
-[下载最新 Release](https://github.com/TokenDanceLab/AgentHub/releases)：
-
-| 文件 | 说明 |
-|:--|:--|
-| `AgentHub_x.x.x_x64-setup.exe` | Windows 安装版（推荐） |
-| `AgentHub_x.x.x_x64-portable.zip` | Windows 便携版，解压即用 |
-
-### 从源码构建
-
-首次克隆后先做本地开发初始化：
-
-```powershell
-.\scripts\setup.ps1
-```
-
-macOS/Linux:
-
-```bash
-./scripts/setup.sh
-```
-
-### 启动 Edge Server
-
-Mock/smoke 模式：
-
-```powershell
-cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile agenthub-runner-mock
-```
-
-真实 Runtime preset：
-
-```powershell
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile codex
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile opencode
-```
-
-`--runner-profile` 选择实际 executor/runtime command preset；`--agent-default` 只是在 run 未指定 agent 时选择默认 adapter ID，不会单独启动 Claude Code、Codex 或 OpenCode CLI。
-
-### 启动 Desktop
-
-```powershell
-cd app/desktop
-pnpm install
-pnpm dev --port 5199
-```
-
-打开 `http://localhost:5199`。Desktop 默认连接 `http://127.0.0.1:3210` 和 `ws://127.0.0.1:3210/v1/events`。
-
-### Hub 本地开发
-
-Hub 需要 PostgreSQL 16 和 Redis 7。根目录 `docker-compose.yml` 可用于本地联调依赖和 Hub 容器；代码调试时可直接运行：
-
-```powershell
-cd hub-server
-go run ./cmd/server-hub
-```
-
-默认配置来自 `hub-server/configs/config.yaml`：Hub HTTP `localhost:8080`，admin/pprof/metrics `localhost:6060`，Redis 默认 `localhost:6380`。
-
-### Desktop 应用构建
-
-```powershell
-cd app/desktop
-pnpm build
-pnpm tauri dev
-```
-
-`pnpm build` 只构建前端，不需要 Rust 工具链；`pnpm tauri dev` 需要 Rust 和 Tauri 系统依赖。
+| 共享组件 | `@shared/ui` — 通用 UI 组件库 |
 
 <br>
 
@@ -169,60 +132,49 @@ pnpm tauri dev
 
 ```text
 AgentHub/
-├── docs/                   # 主文档、handoff、roadmap、archive/reference
-│   ├── architecture/       # 产品需求、系统架构、实现指南
-│   ├── governance/         # 分支治理、文档规范、安全风险登记
-│   ├── operations/         # 客户端路线图、部署记录
-│   ├── handoff/STATE.md    # 当前状态 SSOT
-│   ├── roadmap.md          # 全局路线图
-│   ├── reference/          # 调研和工程规格文档
-│   └── archive/            # 历史归档
 ├── app/
-│   ├── desktop/            # Tauri 桌面端入口
-│   ├── web/                # Web 工作台和页面预览
-│   ├── mobile/             # Mobile 轻量 IM、审批和预览
-│   └── shared/             # 前端共享组件、状态、类型和 API/event client
-├── hub-server/             # 中心 Hub：账号、IM、群聊、同步、中继
-├── edge-server/            # Edge 节点：项目、上下文、run 生命周期、Runtime adapters
-├── api/                    # REST API 和 WebSocket event 契约
-└── scripts/                # 本地 setup、git hooks、联调脚本
+│   ├── desktop/          # Tauri 桌面端
+│   ├── web/              # Web 工作台
+│   ├── mobile/           # Mobile 端
+│   └── shared/           # 前端共享类型、API client、@shared/ui
+├── edge-server/          # Edge 执行节点
+├── hub-server/           # Hub 中心服务
+├── api/                  # API 契约（OpenAPI + WebSocket events）
+├── docs/                 # 文档
+│   ├── guides/           # 用户手册、FAQ、快捷键
+│   ├── architecture/     # 产品需求、系统架构、实现指南
+│   └── roadmaps/         # 路线图与竞品分析
+└── scripts/              # 初始化脚本、git hooks
 ```
 
 <br>
 
 ## 文档导航
 
-| 文档 | 描述 |
-|---|---|
-| [产品需求文档](docs/architecture/product-requirements.md) | 产品定位、用户、核心体验、阶段目标和比赛交付对应 |
-| [系统架构文档](docs/architecture/system-architecture.md) | Desktop-Edge-Hub、Agent 产品模型、执行生命周期、通信方式和权威边界 |
-| [功能实现文档](docs/architecture/implementation-guide.md) | 实现顺序、接口更新规则、Adapter 细节和验收命令 |
-| [客户端路线图](docs/operations/client-roadmap.md) | Desktop/Edge 客户端方向阶段任务和验收 |
-| [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
-| [安全风险台账](docs/governance/security-risk-register.md) | AgentHub 风险 ID、严重度、状态、证据和下一步 |
-| [调研索引](docs/reference/) | 跨仓库调研和工程规格 |
-| [调研与历史归档](docs/archive/) | 旧版架构、协议、memory、workspace 等历史材料 |
+| 文档 | 面向 |
+|------|------|
+| [用户手册](docs/guides/user-guide.md) | 想用 AgentHub 做事的用户 |
+| [常见问题](docs/guides/faq.md) | 使用中遇到的疑问 |
+| [快捷键参考](docs/guides/keyboard-shortcuts.md) | 键盘操作速查 |
+| [产品需求](docs/architecture/product-requirements.md) | 产品定位与阶段目标 |
+| [系统架构](docs/architecture/system-architecture.md) | 技术架构与核心概念 |
+| [API 契约](api/) | REST + WebSocket 接口定义 |
+| [安全风险台账](docs/governance/security-risk-register.md) | 安全风险登记与追踪 |
 
 <br>
 
 ## 鉴权
 
-AgentHub 使用 TokenDance ID 统一登录。Hub Server 管理自身会话层。本地执行无需登录；需要云端 IM、多端同步或远程控制时才需要连接 Hub。
+本地执行无需登录。使用云端 IM、多端同步或远程控制时，通过 TokenDance ID 统一登录。
 
 <br>
 
-## 参考项目
-
-- [Claude Code Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
-- [OpenAI Codex CLI](https://github.com/openai/codex)
-- [OpenCode](https://github.com/sst/opencode)
-- [Multica](https://github.com/multica-ai/multica)
-- [LibreChat](https://github.com/danny-avila/LibreChat)
-- [Kanna](https://github.com/jakemor/kanna)
-- [CloudCLI](https://github.com/siteboon/claudecodeui)
-
 ---
 
-<div align="center">
-<a href="README_EN.md">English</a> &nbsp;·&nbsp; <a href="docs/architecture/product-requirements.md">产品需求</a> &nbsp;·&nbsp; <a href="docs/architecture/system-architecture.md">系统架构</a> &nbsp;·&nbsp; <a href="api/">API 契约</a>
-</div>
+<p align="center">
+  <a href="README_EN.md">English</a> &nbsp;·&nbsp;
+  <a href="docs/guides/user-guide.md">用户手册</a> &nbsp;·&nbsp;
+  <a href="docs/guides/faq.md">FAQ</a> &nbsp;·&nbsp;
+  <a href="docs/architecture/system-architecture.md">系统架构</a> &nbsp;·&nbsp;
+  <a href="api/">API 契约</a>
+</p>
