@@ -102,6 +102,11 @@ export type MessageBlock =
       kind: 'approval';
       approvalId: string;
       status: string;
+      agentName?: string;
+      toolName?: string;
+      riskLevel?: 'low' | 'medium' | 'high' | 'critical';
+      reason?: string;
+      timestamp?: string;
     }
   | {
       kind: 'tool_group';
