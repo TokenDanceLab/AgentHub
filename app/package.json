@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "lint:css": "stylelint \"**/*.css\" --ignore-path .stylelintignore"
   },
   "pnpm": {
     "hoistedDependencies": [
@@ -33,6 +34,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.8.3",
     "typescript-eslint": "^8.59.4",
+    "stylelint": "^16.21.0",
+    "stylelint-config-standard": "^38.0.0",
     "vitest": "^4.1.7"
   },
   "dependencies": {
