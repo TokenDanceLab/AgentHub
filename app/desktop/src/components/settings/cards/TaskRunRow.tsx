@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Route, XCircle } from 'lucide-react';
 import type { RunInfo } from '@shared/types';
 import { isActiveRun, shortId, formatTimestamp } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface TaskRunRowProps {
   run: RunInfo;
