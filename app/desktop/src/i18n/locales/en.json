@@ -1412,7 +1412,13 @@
   "common.create": "Create",
 
   "im.action.interfaceGap": "Interface gap",
-  "im.contact.addContact": "Add contact",
+
+  "im.empty.noMessages": "No messages yet",
+  "im.empty.startConversation": "Start a conversation to begin",
+  "im.time.justNow": "Just now",
+  "im.time.minutesAgo": "{{n}}m ago",
+  "im.title": "IM Chat",
+
   "im.contact.cancelCompose": "Cancel Hub compose",
   "im.contact.chooseHubContact": "Choose Hub contact...",
   "im.contact.composeMode": "Hub compose mode",
