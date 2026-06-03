@@ -1,133 +1,55 @@
-/* ============================================================
-   AgentHub Web Design Tokens
-   Mapped to @agenthub/shared designTokens Desktop glass aliases.
-   Do not add app-local gradients, left rails, or new palettes here.
-   ============================================================ */
+/* ═════════════════════════════════════════════════════════════════════
+   AgentHub Web Design Tokens — non-theme tokens only
+   Theme colors live in themes.css (toggled via data-theme)
+   规则: 7字号 + 3字重 + 零阴影 + 语义token + 无硬编码色值
+   对齐 Desktop tokens.css — glass token 体系
+   ═════════════════════════════════════════════════════════════════════ */
 
+/* ── Base Tokens (theme-independent) ─────────────────────────────────── */
 :root {
   color-scheme: dark;
 
-  /* Codex App target: dark desktop workbench, calm glass layers. */
-  --app-bg: #1f1f27;
+  /* ── Scrollbar ────────────────────────────────────────────────────── */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 
-  /* Semantic Colors */
-  --background: #1f1f27;
-  --foreground: #e3e4e6;
-  --card: rgba(37, 37, 45, 0.82);
-  --card-foreground: #e3e4e6;
-  --popover: rgba(48, 48, 58, 0.88);
-  --popover-foreground: #e3e4e6;
-  --primary: #5d68cc;
-  --primary-foreground: #f4f5ff;
-  --secondary: rgba(255, 255, 255, 0.055);
-  --secondary-foreground: #e3e4e6;
-  --muted: rgba(255, 255, 255, 0.045);
-  --muted-foreground: #a0a1aa;
-  --accent: #5d68cc;
-  --accent-foreground: #f4f5ff;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.075);
-  --input: rgba(255, 255, 255, 0.06);
-  --ring: rgba(93, 104, 204, 0.42);
+  /* ── Typography ──────────────────────────────────────────────────── */
+  --font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', 'Inter Variable', 'Inter', sans-serif;
+  --font-mono:
+    'Geist Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Legacy aliases used by copied desktop components. */
-  --text: var(--foreground);
-  --text-muted: var(--muted-foreground);
-  --text-weaker: #a0a1aa;
-  --text-weakest: #6e7079;
-  --surface: var(--card);
-  --surface-base: #1f1f27;
-  --surface-raised: rgba(37, 37, 45, 0.82);
-  --surface-raised-hover: rgba(55, 55, 66, 0.86);
-  --surface-overlay: rgba(60, 60, 72, 0.9);
-  --hover: var(--secondary);
-  --hover-overlay: rgba(255, 255, 255, 0.04);
-  --color-border: rgba(255, 255, 255, 0.06);
-  --color-danger: var(--destructive);
+  /* 7 个字号 */
+  --font-size-2xs: 0.625rem; /* 10px — keybind badge, tiny labels */
+  --font-size-xs: 0.75rem;   /* 12px — metadata, badge, timestamp */
+  --font-size-sm: 0.875rem;  /* 14px — default body, menu, button, form */
+  --font-size-base: 1rem;    /* 16px — page title, empty state, editor */
+  --font-size-lg: 1.125rem;  /* 18px — section title */
+  --font-size-xl: 1.25rem;   /* 20px — page title */
+  --font-size-2xl: 1.5rem;   /* 24px — empty state big title */
 
-  /* Extended Semantic */
-  --success: #69c967;
-  --success-foreground: #0f172a;
-  --warning: #fbbf24;
-  --warning-foreground: #0f172a;
-  --info: #60a5fa;
-  --info-foreground: #0f172a;
-  --color-success: var(--success);
-
-  /* AgentHub-specific */
-  --brand: #5d68cc;
-  --skill: #c2a1ff;
-  --authority-hub: #5d68cc;
-  --authority-edge: #69c967;
-  --authority-hybrid: #fbbf24;
-
-  /* Chat surface */
-  --chat-agent-bg: transparent;
-  --chat-user-bg: rgba(255, 255, 255, 0.045);
-  --chat-code-bg: rgba(255, 255, 255, 0.055);
-  --chat-thinking-bg: rgba(255, 255, 255, 0.02);
-  --chat-thinking-border: rgba(255, 255, 255, 0.055);
-
-  /* Floating input panel */
-  --input-panel-bg: rgba(50, 50, 60, 0.78);
-  --input-panel-border: rgba(255, 255, 255, 0.09);
-  --input-panel-shadow: 0 -10px 34px rgba(0, 0, 0, 0.24);
-  --input-ghost-btn: rgba(255, 255, 255, 0.045);
-  --input-ghost-btn-hover: rgba(255, 255, 255, 0.075);
-
-  /* Sidebar inventory */
-  --sidebar-bg: rgba(31, 31, 39, 0.86);
-  --agent-card-bg: transparent;
-  --agent-card-hover: rgba(255, 255, 255, 0.03);
-  --agent-card-active: rgba(255, 255, 255, 0.06);
-  --agent-dot-online: #69c967;
-  --agent-dot-online-glow: 0 0 6px rgba(105, 201, 103, 0.3);
-
-  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
-  --scrollbar-track: transparent;
-
-  --td-canvas: var(--app-bg);
-  --td-surface: var(--surface-raised);
-  --td-tint: var(--secondary);
-  --td-ink: var(--foreground);
-  --td-ink-muted: var(--muted-foreground);
-  --td-line: var(--border);
-  --td-plum: var(--brand);
-  --td-moss: var(--success);
-  --td-danger: var(--destructive);
-  --td-focus: var(--ring);
-  --td-radius-control: var(--radius-md);
-  --td-radius-panel: var(--radius-xl);
-
-  /* Typography */
-  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI",
-    "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono: "Geist Mono", "SF Mono", "Cascadia Code", "Fira Code",
-    "JetBrains Mono", ui-monospace, monospace;
-
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-
+  /* 3 个字重 */
   --font-weight-normal: 400;
   --font-weight-medium: 500;
+  --font-weight-semibold: 600;
 
   --line-height-tight: 1.25;
   --line-height-normal: 1.5;
-  --line-height-relaxed: 1.625;
+  --line-height-relaxed: 1.75;
 
-  /* Spacing */
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 0.75rem;
-  --space-lg: 1rem;
-  --space-xl: 1.5rem;
-  --space-2xl: 2rem;
-  --space-3xl: 3rem;
+  /* ── Spacing (4px grid) ──────────────────────────────────────────── */
+  --space-0: 0;
+  --space-xs: 0.25rem;  /* 4px */
+  --space-sm: 0.5rem;   /* 8px */
+  --space-md: 0.75rem;  /* 12px */
+  --space-lg: 1rem;     /* 16px */
+  --space-xl: 1.5rem;   /* 24px */
+  --space-2xl: 2rem;    /* 32px */
+  --space-3xl: 3rem;    /* 48px */
 
-  /* Border Radius */
+  /* ── Border Radius ───────────────────────────────────────────────── */
+  --radius-xs: 0.125rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
@@ -135,33 +57,120 @@
   --radius-2xl: 1rem;
   --radius-full: 9999px;
 
-  /* Layout */
+  /* ── Focus Ring ──────────────────────────────────────────────────── */
+  --ring-width: 2px;
+  --ring-offset: 2px;
+
+  /* ── Z-Index ─────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-popover: 45;
+  --z-toast: 50;
+  --z-tooltip: 60;
+
+  /* ── Animation ───────────────────────────────────────────────────── */
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-medium: 200ms;
+  --duration-slow: 300ms;
+  --duration-glacial: 500ms;
+
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     Glass Tokens — translucent overlay system
+     Dark theme default: white glow over dark canvas
+     Light theme: dark overlay over light canvas (reversed in themes.css)
+     26 tokens covering bg layers / borders / tints / shadows / text / input
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Glass background layers (dark: white translucent) */
+  --glass-bg-subtle: rgba(255, 255, 255, 0.03);
+  --glass-bg-light: rgba(255, 255, 255, 0.045);
+  --glass-bg-medium: rgba(255, 255, 255, 0.065);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.12);
+
+  /* Glass hover / active states */
+  --glass-bg-hover: rgba(255, 255, 255, 0.06);
+  --glass-bg-active: rgba(255, 255, 255, 0.1);
+
+  /* Glass borders */
+  --glass-border-subtle: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-strong: rgba(255, 255, 255, 0.1);
+  --glass-border-heavy: rgba(255, 255, 255, 0.15);
+
+  /* Glass panel backgrounds (dark semi-transparent solids) */
+  --glass-panel: rgba(36, 36, 44, 0.82);
+  --glass-panel-strong: rgba(31, 31, 39, 0.92);
+  --glass-panel-overlay: rgba(30, 30, 37, 0.98);
+
+  /* Tinted glass */
+  --glass-tint-plum: rgba(99, 102, 241, 0.12);
+  --glass-tint-moss: rgba(34, 197, 94, 0.12);
+  --glass-tint-danger: rgba(239, 68, 68, 0.1);
+  --glass-tint-amber: rgba(245, 158, 11, 0.12);
+  --glass-tint-sky: rgba(59, 130, 246, 0.12);
+
+  /* Glass shadows */
+  --glass-shadow: rgba(0, 0, 0, 0.25);
+  --glass-shadow-subtle: rgba(0, 0, 0, 0.12);
+
+  /* Glass text */
+  --glass-text-muted: rgba(255, 255, 255, 0.5);
+  --glass-text-disabled: rgba(255, 255, 255, 0.3);
+
+  /* Glass input fields */
+  --glass-input-bg: rgba(255, 255, 255, 0.48);
+  --glass-input-bg-hover: rgba(255, 255, 255, 0.72);
+
+  /* Light page fill (light-theme opaque panels) */
+  --glass-light-fill: rgba(250, 250, 251, 0.92);
+
+  /* ── Surface Layers (base — overridden in themes.css) ────────────── */
+  --surface-base:         oklch(0.14 0.006 260);
+  --surface-raised:       oklch(0.17 0.007 260);
+  --surface-raised-hover: oklch(0.20 0.007 260);
+  --surface-overlay:      oklch(0.22 0.008 260);
+  --hover-overlay: oklch(1 0 0 / 0.06);
+
+  /* ── Text Colors (base — theme overrides in themes.css) ──────────── */
+  --text-weaker:  oklch(0.52 0.012 252);
+  --text-weakest: oklch(0.32 0.010 252);
+
+  /* ── Layout ──────────────────────────────────────────────────────── */
   --sidebar-width: 280px;
   --detail-width: 300px;
+  --sidebar-min: 200px;
+  --sidebar-max: 420px;
+  --sidebar-default: 280px;
+  --right-panel-min: 240px;
+  --right-panel-max: 600px;
+  --statusbar-height: 36px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px rgb(0 0 0 / 0.07);
-
-  /* Transitions */
-  --duration-fast: 150ms;
-  --duration-medium: 300ms;
-  --duration-slow: 500ms;
-  --ease-standard: ease;
-  --ease-out: ease-out;
+  /* ── Touch Targets (WCAG 2.5.5) ─────────────────────────────────── */
+  --touch-target-min: 44px;
 }
 
-[data-theme='dark'] {
-  color-scheme: dark;
-}
-
-*, *::before, *::after {
+/* ── Global Reset ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   min-height: 100%;
   background: var(--background);
   color: var(--foreground);
@@ -170,9 +179,13 @@ html, body, #root {
   line-height: var(--line-height-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-autospace: ideograph-alpha ideograph-numeric;
 }
 
-button, input, textarea, select {
+button,
+input,
+textarea,
+select {
   font: inherit;
   color: inherit;
 }
@@ -181,52 +194,94 @@ button {
   cursor: pointer;
 }
 
+/* ── Global Transition Reset ────────────────────────────────────────── */
 * {
-  scrollbar-width: thin;
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+/* ── Focus Ring ────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: var(--ring-width) solid var(--ring);
+  outline-offset: var(--ring-offset);
+  border-radius: var(--radius-md);
+}
+
+html[data-focus-source='pointer'] *:focus-visible {
+  outline: none !important;
+  outline-offset: 0;
+}
+
+/* ── Reduced Motion (WCAG 2.2 AA 2.3.1) ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: auto;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
-
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 11px;
+  height: 11px;
 }
-
 *::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
 }
-
 *::-webkit-scrollbar-thumb {
-  border-radius: 3px;
   background: var(--scrollbar-thumb);
+  border: 3px solid var(--scrollbar-track);
+  border-radius: 999px;
 }
-
 *::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
 }
 
-*:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-md);
-}
-
+/* ── Selection ─────────────────────────────────────────────────────── */
 ::selection {
   background: oklch(0.7 0.15 260 / 0.3);
   color: inherit;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Reduced motion: WCAG 2.2 SC 2.3.3 safety net
-   Overrides every transition/animation when the user prefers reduced motion.
-   Component-level wrappers are the primary mechanism; this is the fallback.
-   ═══════════════════════════════════════════════════════════════════ */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0s !important;
-    animation-duration: 0s !important;
-    transition-delay: 0s !important;
-    animation-delay: 0s !important;
+/* ── Mobile Input (iOS 16px 防缩放) ───────────────────────────────── */
+@media (pointer: coarse) {
+  input:not([type='button']):not([type='checkbox']):not([type='color']):not([type='file']):not(
+      [type='hidden']
+    ):not([type='image']):not([type='radio']):not([type='range']):not([type='reset']):not(
+      [type='submit']
+    ),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable='false']) {
+    font-size: 16px !important;
   }
 }
+
+/* ── Keyframe Animations ───────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* ── Animation Utility Classes ─────────────────────────────────────── */
+.animate-fade-in  { animation: fade-in var(--duration-medium) var(--ease-out); }
+.animate-slide-in { animation: slide-in-right var(--duration-medium) var(--ease-out); }
+.animate-progress { animation: progress-indeterminate 1.5s infinite; }
