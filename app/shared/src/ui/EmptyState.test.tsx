@@ -44,4 +44,18 @@ describe('EmptyState', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Mobile empty' })).toBeInTheDocument();
     expect(container.firstElementChild?.className).toContain('mobileEmptyView');
   });
+
+  it('renders shortcut badge on action', () => {
+    render(
+      <EmptyState
+        title="Threads"
+        action={{ label: 'New Thread', onClick: vi.fn(), shortcut: 'Ctrl+N' }}
+      />,
+    );
+
+    const btn = screen.getByRole('button', { name: /New Thread/ });
+    expect(btn).toBeInTheDocument();
+    expect(btn.querySelector('kbd')).toBeInTheDocument();
+    expect(btn.querySelector('kbd')?.textContent).toBe('Ctrl+N');
+  });
 });
