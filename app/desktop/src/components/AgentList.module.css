@@ -32,7 +32,7 @@
   height: 20px;
   padding: 0 8px;
   border-radius: 999px;
-  background: rgba(0,0,0,0.045);
+  background: var(--glass-bg-light);
   color: var(--text-weaker);
   font-size: 11px;
   font-weight: 500;
@@ -40,7 +40,7 @@
 }
 
 [data-theme='dark'] .countPill {
-  background: rgba(255,255,255,0.052);
+  background: var(--glass-bg-medium);
 }
 
 .searchWrapper,
@@ -80,7 +80,7 @@
 }
 
 .item:hover {
-  background: rgba(15,23,42,0.045);
+  background: var(--glass-bg-light);
 }
 
 .item:disabled {
@@ -90,13 +90,13 @@
 
 .selected {
   border-color: transparent;
-  background: rgba(15,23,42,0.038);
+  background: var(--glass-bg-light);
   color: var(--text-strong);
   box-shadow: none;
 }
 
 .selected:hover {
-  background: rgba(15,23,42,0.052);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='dark'] .item {
@@ -104,18 +104,18 @@
 }
 
 [data-theme='dark'] .item:hover {
-  background: rgba(255,255,255,0.045);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='dark'] .selected {
   border-color: transparent;
-  background: rgba(255,255,255,0.034);
+  background: var(--glass-bg-subtle);
   color: var(--text-strong);
   box-shadow: none;
 }
 
 [data-theme='dark'] .selected:hover {
-  background: rgba(255,255,255,0.052);
+  background: var(--glass-bg-medium);
 }
 
 .avatar {
@@ -126,7 +126,7 @@
   flex-shrink: 0;
   place-items: center;
   border-radius: 8px;
-  background: rgba(0,0,0,0.045);
+  background: var(--glass-bg-light);
   color: var(--text-weaker);
 }
 
@@ -145,7 +145,7 @@
 }
 
 [data-theme='dark'] .avatar {
-  background: rgba(255,255,255,0.052);
+  background: var(--glass-bg-medium);
 }
 
 .statusDot {
@@ -255,7 +255,7 @@
 
 /* ── Highlight ─────────────────────────────── */
 .highlight {
-  background: rgba(99,102,241,0.15);
+  background: var(--glass-tint-plum);
   color: var(--primary);
   border-radius: 2px;
   padding: 0 1px;
