@@ -32,7 +32,7 @@
   padding: 6px 8px;
   border-top: 1px solid rgba(255,255,255,0.32);
   border-bottom: 1px solid var(--glass-border);
-  background: rgba(250,250,251,0.78);
+  background: var(--glass-light-fill);
   backdrop-filter: blur(22px) saturate(1.15);
   -webkit-backdrop-filter: blur(22px) saturate(1.15);
   flex-shrink: 0;
@@ -115,7 +115,7 @@
   padding: 5px 8px 6px;
   border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: rgba(255,255,255,0.86);
+  background: var(--glass-input-bg-hover);
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
   box-shadow: 0 10px 28px var(--glass-shadow-subtle), 0 1px 0 rgba(255,255,255,0.7) inset;
@@ -219,7 +219,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: rgba(246, 246, 247, 0.82);
+  background: var(--glass-light-fill);
   backdrop-filter: blur(26px) saturate(1.08);
   -webkit-backdrop-filter: blur(26px) saturate(1.08);
   border-radius: 12px;
@@ -278,7 +278,7 @@
   padding: 8px 5px;
   border: 1px solid var(--glass-border-subtle);
   border-radius: 14px;
-  background: rgba(246,246,247,0.68);
+  background: var(--glass-light-fill);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -438,7 +438,7 @@
   gap: 8px;
   padding: 10px 14px;
   border-top: 1px solid var(--glass-border-subtle);
-  background: rgba(246, 246, 247, 0.9);
+  background: var(--glass-light-fill);
   backdrop-filter: blur(18px) saturate(1.06);
   -webkit-backdrop-filter: blur(18px) saturate(1.06);
 }
@@ -491,7 +491,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--glass-input-bg-hover);
   backdrop-filter: blur(22px) saturate(1.05);
   -webkit-backdrop-filter: blur(22px) saturate(1.05);
   border-radius: 16px;
@@ -597,7 +597,7 @@
   min-width: 15px;
   height: 15px;
   padding: 0 4px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--glass-input-bg-hover);
   border-radius: 999px;
   background: var(--destructive);
   color: var(--destructive-foreground);
@@ -823,7 +823,7 @@
   justify-content: space-between;
   height: 36px;
   padding: 0 10px 0 10px;
-  background: rgba(244, 244, 245, 0.72);
+  background: var(--glass-light-fill);
   backdrop-filter: blur(24px) saturate(1.12);
   -webkit-backdrop-filter: blur(24px) saturate(1.12);
   flex-shrink: 0;
@@ -876,7 +876,7 @@
   align-items: center;
   gap: 1px;
   margin-left: 2px;
-  color: rgba(176, 176, 181, 0.72);
+  color: var(--glass-text-muted);
 }
 
 .topBarNavBtn {
@@ -964,7 +964,7 @@
 
 [data-theme='light'] .topMenuPanel {
   border-color: var(--glass-border);
-  background: rgba(248,248,250,0.96);
+  background: var(--glass-light-fill);
   box-shadow:
     0 18px 44px var(--glass-shadow-subtle),
     0 6px 16px var(--glass-shadow-subtle);
@@ -1160,7 +1160,7 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-overlay);
-  background: rgba(0,0,0,0.22);
+  background: var(--glass-shadow);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -1170,13 +1170,13 @@
 
 .authModal {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255,255,255,0.68)),
+    linear-gradient(180deg, var(--glass-input-bg-hover), rgba(255,255,255,0.68)),
     rgba(248, 249, 252, 0.92);
   border: 1px solid var(--glass-border-strong);
   border-radius: 16px;
   box-shadow:
     0 18px 56px rgba(15,23,42,0.16),
-    inset 0 1px 0 rgba(255,255,255,0.72);
+    inset 0 1px 0 var(--glass-input-bg-hover);
   backdrop-filter: blur(28px) saturate(1.08);
   -webkit-backdrop-filter: blur(28px) saturate(1.08);
   max-height: 90vh;
@@ -1219,7 +1219,7 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-overlay);
-  background: rgba(0,0,0,0.25);
+  background: var(--glass-shadow);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
@@ -1232,7 +1232,7 @@
   width: 280px;
   transform: translateX(-100%);
   transition: transform 0.25s var(--ease-out);
-  background: rgba(250,250,251,0.92);
+  background: var(--glass-light-fill);
   backdrop-filter: blur(24px) saturate(1.1);
   -webkit-backdrop-filter: blur(24px) saturate(1.1);
   border-right: 1px solid var(--glass-border);

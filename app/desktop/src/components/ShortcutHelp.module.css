@@ -5,7 +5,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.34);
+  background: var(--glass-shadow);
   animation: shortcutOverlayIn 0.14s ease-out;
 }
 
@@ -15,10 +15,10 @@
   overflow: hidden;
   border: 1px solid var(--glass-border-strong);
   border-radius: 12px;
-  background: rgba(252, 252, 253, 0.98);
+  background: var(--glass-light-fill);
   box-shadow:
-    0 24px 68px rgba(15, 23, 42, 0.2),
-    0 1px 0 rgba(255, 255, 255, 0.82) inset;
+    0 24px 68px var(--glass-shadow),
+    0 1px 0 var(--glass-input-bg-hover) inset;
   color: var(--foreground);
   animation: shortcutDialogIn 0.16s ease-out;
 }
@@ -27,7 +27,7 @@
   border-color: var(--glass-border-strong);
   background: var(--glass-panel-overlay);
   box-shadow:
-    0 28px 78px rgba(0, 0, 0, 0.42),
+    0 28px 78px var(--glass-shadow),
     0 1px 0 var(--glass-bg-medium) inset;
 }
 
@@ -199,7 +199,7 @@
   border: 1px solid var(--glass-border-strong);
   border-bottom-color: var(--glass-border-heavy);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--glass-input-bg-hover);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 11.5px;
