@@ -3,7 +3,7 @@
 // P0-1: Run lifecycle events invalidate TanStack Query caches; streaming state stays local.
 // Status transitions are validated in runStore; invalid jumps are logged here as warnings.
 
-import { useReducer, useEffect, useRef, useCallback } from 'react';
+import { useReducer, useEffect, useRef, useCallback, useState } from 'react';
 import { createEventStream } from '@/api/eventClient';
 import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
@@ -17,6 +17,7 @@ import { cancelRun } from '@/api/edgeClient';
 import { queryClient } from '@/api/queryClient';
 import { updateRunStatusInQueries, upsertRunInQueries } from '@/api/runQueries';
 import type { TransportStatus } from '@/api/transport';
+import { sanitizeAgentOutputText } from '@/utils/chatMessages';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -503,7 +504,8 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.text_delta': {
-      const content = event.payload.content as string;
+      const content = sanitizeAgentOutputText((event.payload.content as string | undefined) ?? '');
+      if (!content) break;
       const runId = eventRunId(event);
       const block: MessageBlock = {
         kind: 'text',
@@ -530,9 +532,11 @@ function processEvent(state: State, event: EventEnvelope): State {
 
     case 'run.agent.text_block': {
       const runId = eventRunId(event);
+      const content = sanitizeAgentOutputText((event.payload.content as string | undefined) ?? '');
+      if (!content) break;
       const block: MessageBlock = {
         kind: (event.payload.contentType as MessageBlock['kind']) === 'code' ? 'code' : 'text',
-        content: event.payload.content as string,
+        content,
         language: event.payload.language as string | undefined,
       };
       const last = messages[messages.length - 1];
@@ -1010,7 +1014,8 @@ function processEvent(state: State, event: EventEnvelope): State {
     case 'run.output.batch': {
       const rid = event.payload.runId as string;
       const chunks = event.payload.chunks as Array<{ offset: number; text: string }>;
-      const text = chunks.map((c) => c.text).join('');
+      const text = sanitizeAgentOutputText(chunks.map((c) => c.text).join(''));
+      if (!text) break;
       if (currentRun && currentRun.runId === rid) {
         currentRun = {
           ...currentRun,
@@ -1144,6 +1149,7 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
   const [state, dispatch] = useReducer(reducer, initialState);
   const mountedRef = useRef(true);
   const streamRef = useRef<StreamHandle | null>(null);
+  const [reconnectTrigger, setReconnectTrigger] = useState(0);
 
   const clearMessages = useCallback(() => {
     dispatch({ type: 'CLEAR_MESSAGES' });
@@ -1162,6 +1168,12 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
   // Track pending tool call IDs for draining-state detection.
   // run.finished + non-empty pending set → DRAINING instead of COMPLETED.
   const pendingToolCallIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    const handler = () => setReconnectTrigger((n) => n + 1);
+    window.addEventListener('agenthub:reconnect', handler);
+    return () => window.removeEventListener('agenthub:reconnect', handler);
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1313,7 +1325,7 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
       clearInterval(latencyTimer);
       stream.close();
     };
-  }, [online, selectedThreadId]);
+  }, [online, selectedThreadId, reconnectTrigger]);
 
   return { ...state, clearMessages, decidePermission };
 }

@@ -152,24 +152,23 @@ export function statusLabelFromQuery({
   return t('settings.status.snapshot');
 }
 
-export function statusLabelFromDevice({
-  signedIn,
-  status,
-  registeredLabel = 'snapshot',
-  idleLabel = 'localSource',
-  t,
-}: {
-  signedIn: boolean;
-  status: 'idle' | 'registering' | 'registered' | 'error';
-  registeredLabel?: 'snapshot' | 'registered';
-  idleLabel?: 'localSource' | 'deviceStatus';
-  t: (key: string) => string;
-}) {
-  if (!signedIn) return t('settings.status.loginLocked');
-  if (status === 'error') return t('settings.status.error');
-  if (status === 'registered') {
-    return registeredLabel === 'registered' ? t('settings.deviceStatus.registered') : t('settings.status.snapshot');
-  }
-  if (status === 'registering') return t('settings.deviceStatus.registering');
-  return idleLabel === 'deviceStatus' ? t('settings.deviceStatus.idle') : t('settings.statusLocalSource');
-}
+// ---------------------------------------------------------------------------
+// Feature Flags — centralized `available=false` stubs for unimplemented sections
+// ---------------------------------------------------------------------------
+
+export const FEATURE_FLAGS = {
+  /** Permissions: allowlist management not yet implemented */
+  allowlistManagement: false,
+  /** Online IM: cross-device instant messaging not yet implemented */
+  onlineIm: false,
+  /** Agent Market: public agent marketplace not yet implemented */
+  agentMarket: false,
+  /** Agent Configuration: default agent / routing selection not yet implemented */
+  agentConfiguration: false,
+  /** Data Management: toast / bulk-actions not yet integrated */
+  dataManagement: false,
+} as const;
+
+/** Shared empty-arrays so JSX stubs don't recreate [] on every render */
+export const EMPTY_ARR: never[] = [];
+export const NOOP = () => {};

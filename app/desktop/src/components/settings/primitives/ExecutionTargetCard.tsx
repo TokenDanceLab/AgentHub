@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import styles from '../../SettingsPage.module.css';
+import styles from './primitives.module.css';
 
 interface ExecutionTargetCardProps {
   icon: ReactNode;

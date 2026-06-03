@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Route, XCircle } from 'lucide-react';
 import type { RunInfo } from '@shared/types';
 import { isActiveRun, shortId, formatTimestamp } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface TaskRunRowProps {
   run: RunInfo;
@@ -26,7 +26,7 @@ export default function TaskRunRow({ run, onCancel, cancelling = false }: TaskRu
         </div>
       </div>
       <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
-        {t(`run.status.${run.status}`, { defaultValue: run.status })}
+        {t(`run.status.${run.status.toLowerCase()}`, { defaultValue: run.status })}
       </span>
       {onCancel ? (
         <button

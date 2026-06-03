@@ -11,7 +11,7 @@ import { saveCustomAgent, loadCustomAgents, type StoredCustomAgent } from '../ag
 import { emojiOptions, modelOptions, reasoningOptions, capabilityLabels } from '../agentCreation/agentTemplates';
 import type { CustomAgentMarketItem } from '../sections/AgentMarketSection';
 import PublishAgentModal from './PublishAgentModal';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export interface CustomAgentDraft {
   name: string;

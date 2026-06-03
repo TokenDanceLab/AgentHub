@@ -7,7 +7,7 @@ import CapabilityCard from '../primitives/CapabilityCard';
 import Callout from '../primitives/Callout';
 import Switch from '../primitives/Switch';
 import ProjectSkillCard from '../cards/ProjectSkillCard';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export interface ProjectSkill {
   id: string;
@@ -18,6 +18,7 @@ export interface ProjectSkill {
   hasReferences: boolean;
 }
 
+// Preview data — Hub API integration pending
 const PROJECT_SKILLS: ProjectSkill[] = [
   { id: 'adapter-dev', title: 'adapter-dev', descriptionKey: 'settings.skill.adapterDevDesc', status: 'ready', hasScripts: false, hasReferences: false },
   { id: 'dev-loop', title: 'dev-loop', descriptionKey: 'settings.skill.devLoopDesc', status: 'ready', hasScripts: false, hasReferences: true },
@@ -48,7 +49,15 @@ export default function SkillsSection({ hubSessionActive }: SkillsSectionProps) 
       </div>
       <SettingRow title={t('settings.skillSync')} description={t('settings.skillSyncDesc')} control={<Switch checked={false} onChange={() => {}} disabled />} />
       <div className={styles.taskSection}>
-        <div className={styles.taskSectionHeader}><strong>{t('settings.skillInstalled')}</strong><span>{t('settings.skillInstalledDesc')}</span></div>
+        <div className={styles.taskSectionHeader}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong>{t('settings.skillInstalled')}</strong>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--settings-muted)', background: 'var(--settings-chip-bg)', border: '1px solid var(--settings-chip-border)', padding: '2px 8px', borderRadius: 6 }}>
+              {t('settings.skillPreviewData', 'Preview')}
+            </span>
+          </div>
+          <span>{t('settings.skillInstalledDesc')}</span>
+        </div>
         <div className={styles.profileGrid}>{PROJECT_SKILLS.map((skill) => <ProjectSkillCard key={skill.id} skill={skill} />)}</div>
       </div>
       <div className={styles.taskSection}>

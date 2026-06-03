@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+# Per-workspace lockfiles (only root app/pnpm-lock.yaml is tracked)
+app/desktop/pnpm-lock.yaml
+app/shared/pnpm-lock.yaml
+app/web/pnpm-lock.yaml
+app/mobile/pnpm-lock.yaml
 
 # Build output
 dist/
@@ -10,6 +15,7 @@ build/
 coverage/
 playwright-report/
 test-results/
+*.tgz
 
 # Generated reports and local test artifacts
 app/desktop/stats.html
@@ -22,10 +28,15 @@ edge-server/$covPath
 hub-server/tests/uploads/
 
 # Go
+server-hub-linux
+server-hub-*
+agenthub-edge
+agenthub-edge-*
 *.exe
 *.exe~
 *.test
 *.out
+*.coverprofile
 vendor/
 
 # Rust / Tauri
@@ -137,6 +148,9 @@ screenshots/
 *.jpeg
 *.webp
 *.gif
+# Tauri app icons (must be tracked for builds)
+!app/desktop/src-tauri/icons/
+!app/mobile/src-tauri/icons/
 .cursor/
 .continue/
 

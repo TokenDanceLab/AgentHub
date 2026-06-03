@@ -176,7 +176,7 @@
 
 .tokenLabel {
   font-size: 9px;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-bold, 700);
   color: var(--muted-foreground);
   opacity: 0.5;
   margin-right: 2px;

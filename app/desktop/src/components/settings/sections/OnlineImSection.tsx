@@ -10,7 +10,7 @@ import HubSessionRow from '../cards/HubSessionRow';
 import HubFriendRequestRow from '../cards/HubFriendRequestRow';
 import HubNotificationRow from '../cards/HubNotificationRow';
 import { statusLabelFromQuery } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface OnlineImSectionProps {
   hubSessionActive: boolean;

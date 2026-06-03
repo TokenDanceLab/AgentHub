@@ -2,15 +2,15 @@
   width: min(100%, 680px);
   margin: 2px 0 8px;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.075);
+  border: 1px solid var(--glass-border);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.022);
+  background: var(--glass-bg-subtle);
   color: var(--foreground);
 }
 
 [data-theme='light'] .root {
-  border-color: rgba(15, 23, 42, 0.09);
-  background: rgba(15, 23, 42, 0.024);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-subtle);
 }
 
 .header,
@@ -68,7 +68,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--glass-bg-subtle);
 }
 
 .entryText {
