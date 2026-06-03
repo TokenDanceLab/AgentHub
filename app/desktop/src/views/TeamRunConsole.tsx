@@ -255,7 +255,7 @@ export default function TeamRunConsole(_props: ViewProps) {
   }, [handleSelectRun, selectedTeamId, startRunMut, triggerMessage]);
 
   const handleApprove = useCallback(
-    async (approvalId: string) => {
+    async (approvalId: string, reason?: string) => {
       if (!selectedTeamId || !selectedRunId) return;
       setDecidingIds((prev) => new Set(prev).add(approvalId));
       try {
@@ -263,7 +263,7 @@ export default function TeamRunConsole(_props: ViewProps) {
           teamId: selectedTeamId,
           runId: selectedRunId,
           approvalId,
-          decision: { decision: 'allow' },
+          decision: { decision: 'allow', ...(reason ? { reason } : {}) },
         });
       } finally {
         setDecidingIds((prev) => {
@@ -277,7 +277,7 @@ export default function TeamRunConsole(_props: ViewProps) {
   );
 
   const handleDeny = useCallback(
-    async (approvalId: string) => {
+    async (approvalId: string, reason?: string) => {
       if (!selectedTeamId || !selectedRunId) return;
       setDecidingIds((prev) => new Set(prev).add(approvalId));
       try {
@@ -285,7 +285,7 @@ export default function TeamRunConsole(_props: ViewProps) {
           teamId: selectedTeamId,
           runId: selectedRunId,
           approvalId,
-          decision: { decision: 'deny' },
+          decision: { decision: 'deny', ...(reason ? { reason } : {}) },
         });
       } finally {
         setDecidingIds((prev) => {
