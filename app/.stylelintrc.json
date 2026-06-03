@@ -1,0 +1,13 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "color-no-hex": true,
+    "color-function-alias-notation": "modern",
+    "declaration-property-value-disallowed-list": {
+      "color": ["rgba()", "rgb()"],
+      "background": ["rgba()", "rgb()"],
+      "background-color": ["rgba()", "rgb()"],
+      "border-color": ["rgba()", "rgb()"]
+    }
+  }
+}
