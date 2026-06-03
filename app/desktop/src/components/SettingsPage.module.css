@@ -1,15 +1,8 @@
 .root {
   --settings-accent: var(--primary);
-  --settings-glass-bg: rgba(255, 255, 255, 0.52);
-  --settings-glass-border: var(--glass-border-strong);
-  --settings-glass-hover: rgba(255, 255, 255, 0.66);
-  --settings-glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 4px 18px var(--glass-bg-subtle);
   --settings-chip-bg: var(--glass-bg-light);
   --settings-chip-border: var(--glass-border);
   --settings-icon-bg: var(--glass-tint-plum);
-  --settings-sidebar-bg: rgba(246, 246, 248, 0.72);
   --settings-muted: var(--text-weaker);
   --settings-graph-artifact: var(--info);
   --settings-graph-conflict: var(--destructive);
@@ -20,27 +13,12 @@
   height: 100%;
   min-height: 0;
   flex: 1;
-  background:
-    linear-gradient(180deg, var(--glass-bg-subtle), transparent 34%),
-    var(--app-bg);
+  background: var(--app-bg);
   color: var(--foreground);
 }
 
 [data-theme='dark'] .root {
-  --settings-glass-bg: var(--glass-panel);
-  --settings-glass-border: var(--glass-border);
-  --settings-glass-hover: var(--glass-panel);
-  --settings-glass-shadow:
-    inset 0 1px 0 var(--glass-bg-light),
-    0 5px 18px var(--glass-bg-strong);
-  --settings-chip-bg: var(--glass-bg-light);
-  --settings-chip-border: var(--glass-border);
-  --settings-icon-bg: var(--glass-tint-plum);
-  --settings-sidebar-bg: var(--glass-panel);
-  background:
-    linear-gradient(180deg, var(--glass-bg-subtle), transparent 36%),
-    radial-gradient(ellipse at 78% 0%, var(--glass-tint-plum), transparent 34%),
-    var(--app-bg);
+  background: var(--app-bg);
 }
 
 .sidebar {
@@ -50,7 +28,7 @@
   flex-direction: column;
   padding: 16px 10px;
   border-right: 1px solid var(--glass-border);
-  background: var(--settings-sidebar-bg);
+  background: var(--glass-panel);
   backdrop-filter: blur(30px) saturate(1.16);
   -webkit-backdrop-filter: blur(30px) saturate(1.16);
 }
@@ -195,7 +173,7 @@
 .navEmpty {
   margin: 8px 6px;
   padding: 10px 11px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 9px;
   background: var(--glass-bg-subtle);
   color: var(--settings-muted);
@@ -346,10 +324,10 @@
   min-height: 76px;
   gap: 12px;
   padding: 15px 18px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 11px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(22px) saturate(1.18);
   -webkit-backdrop-filter: blur(22px) saturate(1.18);
 }
@@ -390,10 +368,10 @@
 .profileCard,
 .targetCard {
   min-width: 0;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 11px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(22px) saturate(1.18);
   -webkit-backdrop-filter: blur(22px) saturate(1.18);
 }
@@ -639,10 +617,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 15px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
@@ -680,10 +658,10 @@
   gap: 12px;
   min-height: 66px;
   padding: 13px 16px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 11px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
@@ -712,10 +690,10 @@
 .teamMetric {
   min-width: 0;
   padding: 13px 14px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 11px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
 }
 
 .teamMetric span {
@@ -746,7 +724,7 @@
   padding: 10px;
   border: 1px solid var(--glass-border);
   border-radius: 14px;
-  background: color-mix(in oklch, var(--settings-glass-bg) 88%, transparent);
+  background: color-mix(in oklch, var(--glass-panel) 88%, transparent);
   box-shadow: 0 10px 26px var(--glass-shadow-subtle);
 }
 
@@ -782,7 +760,7 @@
   border: 1px solid color-mix(in oklch, var(--settings-chip-border) 82%, transparent);
   border-left: 2px solid color-mix(in oklch, var(--team-node-accent) 58%, transparent);
   border-radius: 12px;
-  background: color-mix(in oklch, var(--settings-glass-bg) 92%, transparent);
+  background: color-mix(in oklch, var(--glass-panel) 92%, transparent);
   box-shadow: 0 6px 16px var(--glass-shadow-subtle);
 }
 
@@ -943,10 +921,10 @@
   gap: 12px;
   min-height: 66px;
   padding: 13px 15px;
-  border: 1px solid var(--settings-glass-border);
-  background: var(--settings-glass-bg);
-  backdrop-filter: blur(18px) saturate(1.12);
-  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  margin-bottom: 8px;
+  background: var(--glass-panel);
 }
 
 .teamMiniButton {
@@ -964,8 +942,8 @@
 .teamMiniButton:hover,
 .teamMiniButton:focus-visible {
   outline: none;
-  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--settings-glass-border));
-  background: var(--settings-glass-hover);
+  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--glass-border));
+  background: var(--glass-panel-strong);
 }
 
 .teamMiniButton:focus-visible {
@@ -983,25 +961,9 @@
   padding-block: 11px;
 }
 
-.teamMiniRow:first-child {
-  border-radius: 12px 12px 0 0;
-}
-
-.teamMiniRow:last-child {
-  border-radius: 0 0 12px 12px;
-}
-
-.teamMiniRow:only-child {
-  border-radius: 12px;
-}
-
-.teamMiniRow + .teamMiniRow {
-  border-top: 0;
-}
-
 .teamMiniRowSelected {
-  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--settings-glass-border));
-  background: var(--settings-glass-hover);
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--glass-border));
+  background: var(--glass-panel-strong);
 }
 
 .teamMiniRow > div:first-child {
@@ -1059,7 +1021,7 @@
   width: 100%;
   justify-content: flex-end;
   padding-top: 10px;
-  border-top: 1px solid var(--settings-glass-border);
+  border-top: 1px solid var(--glass-border);
 }
 
 .teamActionRow .primaryBtn,
@@ -1080,9 +1042,9 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
-  background: color-mix(in oklch, var(--settings-glass-bg) 82%, transparent);
+  background: color-mix(in oklch, var(--glass-panel) 82%, transparent);
 }
 
 .conflictSourceHead {
@@ -1144,10 +1106,10 @@
 .providerRow {
   min-width: 0;
   padding: 14px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 11px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
@@ -1242,10 +1204,10 @@
   gap: 13px;
   min-height: 80px;
   padding: 15px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 11px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(22px) saturate(1.18);
   -webkit-backdrop-filter: blur(22px) saturate(1.18);
   color: var(--foreground);
@@ -1262,20 +1224,20 @@
 }
 
 .modeCard:hover {
-  background: var(--settings-glass-hover);
-  border-color: color-mix(in oklch, var(--settings-glass-border) 72%, var(--foreground));
+  background: var(--glass-panel-strong);
+  border-color: color-mix(in oklch, var(--glass-border) 72%, var(--foreground));
 }
 
 [data-theme='dark'] .modeCard:hover {
-  background: var(--settings-glass-hover);
+  background: var(--glass-panel-strong);
 }
 
 .modeCardActive,
 [data-theme='dark'] .modeCardActive {
-  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--settings-glass-border));
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--glass-border));
   background:
     linear-gradient(180deg, var(--glass-bg-subtle), transparent),
-    var(--settings-glass-hover);
+    var(--glass-panel-strong);
 }
 
 .modeCard span {
@@ -1312,11 +1274,10 @@
   gap: 16px;
   min-height: 70px;
   padding: 15px 18px;
-  border: 1px solid var(--settings-glass-border);
-  background: var(--settings-glass-bg);
-  border-radius: 0;
-  backdrop-filter: blur(20px) saturate(1.14);
-  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-panel);
+  border-radius: 11px;
+  margin-bottom: 10px;
   transition:
     background 0.18s ease,
     border-color 0.18s ease;
@@ -1330,57 +1291,15 @@
   border-color: var(--glass-border);
 }
 
-.settingRow:first-child,
-.connectionRow:first-child,
-.runnerRow:first-child,
-.taskRow:first-child,
-.accountCard:first-child {
-  border-radius: 12px 12px 0 0;
-}
-
-.settingRow:last-child,
-.connectionRow:last-child,
-.runnerRow:last-child,
-.taskRow:last-child,
-.accountCard:last-child {
-  border-radius: 0 0 12px 12px;
-}
-
-.settingRow:only-child,
-.connectionRow:only-child,
-.runnerRow:only-child,
-.taskRow:only-child,
-.accountCard:only-child {
-  border-radius: 12px;
-}
-
-.settingRow:hover,
-.connectionRow:hover,
-.runnerRow:hover,
-.taskRow:hover,
-.accountCard:hover {
-  background: var(--settings-glass-hover);
-}
-
-.settingRow + .settingRow,
-.connectionRow + .connectionRow,
-.runnerRow + .runnerRow,
-.taskRow + .taskRow,
-.accountCard + .settingRow,
-.settingRow + .accountCard {
-  border-top: 0;
-}
-
 .instructionsRow {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 16px 18px;
-  border: 1px solid var(--settings-glass-border);
-  border-top: 0;
-  background: var(--settings-glass-bg);
-  backdrop-filter: blur(20px) saturate(1.14);
-  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  margin-top: 8px;
+  background: var(--glass-panel);
 }
 
 .instructionsHeader,
@@ -1611,14 +1530,14 @@
   border: 1px solid var(--glass-border);
   border-radius: 10px;
   overflow: hidden;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
 
 [data-theme='dark'] .shortcutTable {
-  border-color: var(--settings-glass-border);
+  border-color: var(--glass-border);
 }
 
 .shortcutGroup {
@@ -1791,13 +1710,13 @@
   gap: 12px;
   padding: 14px 16px;
   margin-top: 12px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   background:
     linear-gradient(180deg, var(--glass-bg-subtle), transparent),
-    var(--settings-glass-bg);
+    var(--glass-panel);
   color: var(--foreground);
-  box-shadow: var(--settings-glass-shadow);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(20px) saturate(1.12);
   -webkit-backdrop-filter: blur(20px) saturate(1.12);
 }
@@ -1832,10 +1751,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
   color: var(--settings-muted);
@@ -1870,14 +1789,14 @@
   gap: 10px;
   min-width: 0;
   padding: 13px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
-  background: var(--settings-glass-bg);
+  background: var(--glass-panel);
   color: var(--foreground);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  box-shadow: var(--settings-glass-shadow);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
   transition:
@@ -1887,8 +1806,8 @@
 }
 
 .presetCard:hover {
-  background: var(--settings-glass-hover);
-  border-color: color-mix(in oklch, var(--settings-glass-border) 72%, var(--foreground));
+  background: var(--glass-panel-strong);
+  border-color: color-mix(in oklch, var(--glass-border) 72%, var(--foreground));
 }
 
 .presetCard:focus-visible {
@@ -1897,16 +1816,16 @@
 }
 
 .presetCardActive {
-  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--settings-glass-border));
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--glass-border));
   background:
     linear-gradient(180deg, var(--glass-bg-subtle), transparent),
-    var(--settings-glass-hover);
+    var(--glass-panel-strong);
 }
 
 [data-theme='dark'] .presetCardActive {
   background:
     linear-gradient(180deg, var(--glass-bg-subtle), transparent),
-    var(--settings-glass-hover);
+    var(--glass-panel-strong);
 }
 
 .presetSwatches {
@@ -2013,9 +1932,9 @@
   }
 
   .navItemActive {
-    border-color: var(--settings-glass-border);
-    background: var(--settings-glass-hover);
-    box-shadow: var(--settings-glass-shadow);
+    border-color: var(--glass-border);
+    background: var(--glass-panel-strong);
+    box-shadow: 0 6px 18px var(--glass-shadow-subtle);
     font-weight: 580;
   }
 
