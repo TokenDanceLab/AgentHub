@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import styles from './TeamTaskBoard.module.css';
 
 export interface TeamTaskDisplay {
   taskId: string;
@@ -21,60 +22,26 @@ interface TeamTaskBoardProps {
   memberNames?: Record<string, string>;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: '#9ca3af',
-  dispatched: '#3b82f6',
-  running: '#f59e0b',
-  done: '#10b981',
-  failed: '#ef4444',
-  cancelled: '#6b7280',
+const STATUS_CLASS: Record<string, string> = {
+  pending: styles.statusPending!,
+  dispatched: styles.statusDispatched!,
+  running: styles.statusRunning!,
+  done: styles.statusDone!,
+  failed: styles.statusFailed!,
+  cancelled: styles.statusCancelled!,
 };
-
-function statusDotStyle(status: string): React.CSSProperties {
-  return {
-    display: 'inline-block',
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    backgroundColor: STATUS_COLORS[status] ?? '#9ca3af',
-    flexShrink: 0,
-  };
-}
-
-function riskBadge(risk: string): React.CSSProperties {
-  return {
-    display: 'inline-block',
-    fontSize: 10,
-    fontWeight: 600,
-    padding: '1px 6px',
-    borderRadius: 9999,
-    backgroundColor: risk === 'high' ? '#fee2e2' : '#f3f4f6',
-    color: risk === 'high' ? '#991b1b' : '#374151',
-    lineHeight: '16px',
-  };
-}
 
 const TaskCard: FC<{ task: TeamTaskDisplay; memberName?: string }> = ({ task, memberName }) => {
   const { t } = useTranslation();
   return (
-    <div
-      style={{
-        padding: '10px 12px',
-        borderRadius: 8,
-        border: '1px solid var(--border-subtle, #e5e7eb)',
-        backgroundColor: 'var(--surface-raised, #f9fafb)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={statusDotStyle(task.status)} />
-        <span style={{ fontSize: 13, fontWeight: 500, flex: 1, lineHeight: 1.4 }}>
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <span className={`${styles.statusDot} ${STATUS_CLASS[task.status] ?? styles.statusPending}`} />
+        <span className={styles.cardTitle}>
           {task.objective || t('teamRun.untitledTask', 'Untitled task')}
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted-foreground)' }}>
+      <div className={styles.cardMeta}>
         <span>
           {t(`settings.teamTaskStatus.${task.status}`, task.status)}
         </span>
@@ -82,7 +49,7 @@ const TaskCard: FC<{ task: TeamTaskDisplay; memberName?: string }> = ({ task, me
           <span>{memberName}</span>
         )}
         {task.riskLevel && (
-          <span style={riskBadge(task.riskLevel)}>
+          <span className={`${styles.riskBadge} ${task.riskLevel === 'high' ? styles.riskHigh : styles.riskNormal}`}>
             {task.riskLevel === 'high' ? t('teamRun.highRisk', 'High') : t('teamRun.normalRisk', 'Normal')}
           </span>
         )}
@@ -106,7 +73,7 @@ export const TeamTaskBoard: FC<TeamTaskBoardProps> = ({
 
   if (loading) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.loading}>
         {t('teamRun.loading', 'Loading tasks...')}
       </div>
     );
@@ -114,7 +81,7 @@ export const TeamTaskBoard: FC<TeamTaskBoardProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: 16, color: 'var(--color-danger, #e53e3e)', fontSize: 13 }}>
+      <div className={styles.error}>
         {error}
       </div>
     );
@@ -122,17 +89,17 @@ export const TeamTaskBoard: FC<TeamTaskBoardProps> = ({
 
   if (tasks.length === 0) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.empty}>
         {t('teamRun.noTasks', 'No tasks yet. Start a TeamRun to create tasks.')}
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className={styles.container}>
       {activeTasks.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div className={styles.section}>
+          <h4 className={styles.sectionTitle}>
             {t('teamRun.activeTasksHeader', 'Active ({{count}})', { count: activeTasks.length })}
           </h4>
           {activeTasks.map((task) => (
@@ -146,8 +113,8 @@ export const TeamTaskBoard: FC<TeamTaskBoardProps> = ({
       )}
 
       {completedTasks.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div className={styles.section}>
+          <h4 className={styles.sectionTitle}>
             {t('teamRun.completedTasksHeader', 'Completed ({{count}})', { count: completedTasks.length })}
           </h4>
           {completedTasks.map((task) => (
