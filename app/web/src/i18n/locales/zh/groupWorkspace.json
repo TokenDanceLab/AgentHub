@@ -132,5 +132,6 @@
   "source.localDryRun": "本地 dry-run / {{source}}",
   "demo.detail": "演示/mock fallback 数据：{{detail}}",
   "demo.summary": "演示/mock fallback 任务：{{summary}}",
-  "demo.role": "演示/mock fallback 成员：{{role}}"
+  "demo.role": "演示/mock fallback 成员：{{role}}",
+  "locked.description": "请先登录 Hub 以查看群组工作区数据。"
 }

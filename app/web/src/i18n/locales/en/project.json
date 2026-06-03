@@ -145,5 +145,9 @@
     "activeTasksRemaining_one": "{{count}} active task remains after local review.",
     "activeTasksRemaining_other": "{{count}} active tasks remain after local review.",
     "localSyncDetail": "Local sync captured {{tasks}} active tasks and {{risks}} open risks."
+  },
+  "locked": {
+    "title": "Hub session required",
+    "description": "Please sign in to Hub to view project data and milestones."
   }
 }
