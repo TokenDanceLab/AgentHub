@@ -152,28 +152,6 @@ export function statusLabelFromQuery({
   return t('settings.status.snapshot');
 }
 
-export function statusLabelFromDevice({
-  signedIn,
-  status,
-  registeredLabel = 'snapshot',
-  idleLabel = 'localSource',
-  t,
-}: {
-  signedIn: boolean;
-  status: 'idle' | 'registering' | 'registered' | 'error';
-  registeredLabel?: 'snapshot' | 'registered';
-  idleLabel?: 'localSource' | 'deviceStatus';
-  t: (key: string) => string;
-}) {
-  if (!signedIn) return t('settings.status.loginLocked');
-  if (status === 'error') return t('settings.status.error');
-  if (status === 'registered') {
-    return registeredLabel === 'registered' ? t('settings.deviceStatus.registered') : t('settings.status.snapshot');
-  }
-  if (status === 'registering') return t('settings.deviceStatus.registering');
-  return idleLabel === 'deviceStatus' ? t('settings.deviceStatus.idle') : t('settings.statusLocalSource');
-}
-
 // ---------------------------------------------------------------------------
 // Feature Flags — centralized `available=false` stubs for unimplemented sections
 // ---------------------------------------------------------------------------

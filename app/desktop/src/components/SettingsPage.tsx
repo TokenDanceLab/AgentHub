@@ -83,8 +83,6 @@ import {
   getRecentRuns,
   shortId,
   DEVICE_ID_KEY,
-  FEATURE_FLAGS,
-  EMPTY_ARR,
   NOOP,
 } from './settings/utils';
 
