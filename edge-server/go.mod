@@ -1,6 +1,6 @@
 module github.com/agenthub/edge-server
 
-go 1.25.0
+go 1.25.11
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
