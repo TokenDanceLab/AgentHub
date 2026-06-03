@@ -66,3 +66,4 @@ export { default as FileChangeGroup } from './FileChangeGroup';
 export type { FileChangeGroupProps, FileChangeItem } from './FileChangeGroup';
 export { default as ArtifactVersionTimeline } from './ArtifactVersionTimeline';
 export type { ArtifactVersionTimelineProps, ArtifactVersion } from './ArtifactVersionTimeline';
+export { default as MessageSearchPanel } from './MessageSearchPanel';
