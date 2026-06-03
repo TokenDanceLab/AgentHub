@@ -3,11 +3,11 @@
   z-index: var(--z-popover, 45);
   pointer-events: auto;
   background: rgb(34, 34, 42);
-  border: 1px solid rgba(255, 255, 255, 0.105);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 8px;
   box-shadow:
     0 18px 46px rgba(0, 0, 0, 0.32),
-    0 1px 0 rgba(255, 255, 255, 0.055) inset;
+    0 1px 0 var(--glass-bg-medium) inset;
   min-width: 260px;
   max-width: 360px;
   max-height: 240px;
@@ -17,9 +17,9 @@
 
 [data-theme='light'] .popover {
   background: rgb(255, 255, 255);
-  border-color: rgba(15, 23, 42, 0.1);
+  border-color: var(--glass-border-strong);
   box-shadow:
-    0 18px 44px rgba(15, 23, 42, 0.15),
+    0 18px 44px var(--glass-bg-heavy),
     0 1px 0 rgba(255, 255, 255, 0.82) inset;
 }
 
@@ -61,12 +61,12 @@
   height: 24px;
   margin-top: 1px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--muted-foreground);
 }
 
 [data-theme='light'] .kindIcon {
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 .statusDot {

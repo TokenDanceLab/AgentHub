@@ -13,7 +13,7 @@
 .dialog {
   width: min(600px, calc(100vw - 32px));
   max-height: min(68vh, 560px);
-  background: rgba(31, 32, 39, 0.96);
+  background: var(--glass-panel-overlay);
   border: 1px solid rgba(0, 0, 0, 0.34);
   border-radius: 14px;
   box-shadow:
@@ -29,7 +29,7 @@
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .searchIcon {
@@ -51,13 +51,13 @@
 
 .kbd {
   padding: 2px 6px 3px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--glass-border);
   border-radius: 6px;
   font-size: 10px;
   font-family: var(--font-sans);
   font-weight: 560;
   color: var(--muted-foreground);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
 }
 
 /* ── Mode tabs ── */
@@ -66,7 +66,7 @@
   display: flex;
   align-items: center;
   gap: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .modeTab {
@@ -117,7 +117,7 @@
 
 .item:hover,
 .selected {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
@@ -155,7 +155,7 @@
 .itemPath {
   font-size: 10px;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.27);
+  color: var(--glass-text-disabled);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -172,7 +172,7 @@
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(91, 155, 213, 0.15);
+  background: var(--glass-tint-sky);
   color: var(--primary, #5b9bd5);
   white-space: nowrap;
 }
@@ -222,7 +222,7 @@
 
 .highlight {
   color: var(--foreground);
-  background: rgba(255, 213, 79, 0.18);
+  background: var(--glass-tint-amber);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -231,25 +231,25 @@
 
 [data-theme='light'] .dialog {
   background: rgba(250, 250, 252, 0.97);
-  border-color: rgba(15, 23, 42, 0.08);
+  border-color: var(--glass-border-strong);
   box-shadow:
-    0 22px 56px rgba(15, 23, 42, 0.14),
-    0 4px 16px rgba(15, 23, 42, 0.08);
+    0 22px 56px var(--glass-bg-heavy),
+    0 4px 16px var(--glass-bg-strong);
 }
 
 [data-theme='light'] .inputRow,
 [data-theme='light'] .modeRow {
-  border-bottom-color: rgba(15, 23, 42, 0.075);
+  border-bottom-color: var(--glass-border-strong);
 }
 
 [data-theme='light'] .kbd {
-  border-color: rgba(15, 23, 42, 0.08);
-  background: rgba(15, 23, 42, 0.045);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='light'] .item:hover,
 [data-theme='light'] .selected {
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='light'] .itemPath {

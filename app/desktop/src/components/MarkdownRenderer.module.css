@@ -120,45 +120,45 @@
   max-width: 100%;
   margin: 0.65em 0;
   overflow-x: auto;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--glass-bg-subtle);
   font-size: 0.92em;
 }
 
 .root th,
 .root td {
   padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.065);
+  border: 1px solid var(--glass-border);
   text-align: left;
   white-space: nowrap;
 }
 
 .root th {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   font-weight: var(--font-weight-medium, 500);
 }
 
 .root tr:nth-child(even) td {
-  background: rgba(255, 255, 255, 0.024);
+  background: var(--glass-bg-subtle);
 }
 
 [data-theme='light'] .root table {
-  border-color: rgba(15, 23, 42, 0.08);
+  border-color: var(--glass-border-strong);
   background: rgba(255, 255, 255, 0.58);
 }
 
 [data-theme='light'] .root th,
 [data-theme='light'] .root td {
-  border-color: rgba(15, 23, 42, 0.075);
+  border-color: var(--glass-border-strong);
 }
 
 [data-theme='light'] .root th {
-  background: rgba(15, 23, 42, 0.045);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='light'] .root tr:nth-child(even) td {
-  background: rgba(15, 23, 42, 0.025);
+  background: var(--glass-bg-subtle);
 }
 
 /* ── Inline code ────────────────────────────── */

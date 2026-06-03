@@ -9,8 +9,8 @@
   --composer-column-width: 760px;
   --composer-control-h: 32px;
   --composer-control-radius: 14px;
-  --composer-control-bg: rgba(255, 255, 255, 0.044);
-  --composer-control-bg-hover: rgba(255, 255, 255, 0.066);
+  --composer-control-bg: var(--glass-bg-light);
+  --composer-control-bg-hover: var(--glass-bg-medium);
   --composer-control-edge: transparent;
   --composer-input-text: var(--text-primary);
   --composer-placeholder: var(--text-weaker);
@@ -18,8 +18,8 @@
   --composer-control-text-active: var(--text-strong);
   --composer-control-icon: var(--text-weaker);
   --composer-control-icon-active: var(--text-primary);
-  --composer-panel-edge: rgba(0, 0, 0, 0.04);
-  --composer-panel-shadow: 0 14px 34px rgba(0, 0, 0, 0.16), 0 1px 4px rgba(0, 0, 0, 0.1);
+  --composer-panel-edge: var(--glass-bg-light);
+  --composer-panel-shadow: 0 14px 34px var(--glass-shadow-subtle), 0 1px 4px var(--glass-shadow-subtle);
   --composer-side-pad: max(30px, calc((100% - var(--run-card-space, 0px) - var(--composer-column-width)) / 2));
   padding:
     8px
@@ -36,7 +36,7 @@
   width: 100%;
   max-width: var(--composer-column-width);
   margin: 0 auto;
-  background: rgba(47, 47, 57, 0.84);
+  background: var(--glass-panel);
   border: 1px solid var(--composer-panel-edge);
   border-radius: 26px;
   padding: 11px 14px 10px;
@@ -46,36 +46,36 @@
   backdrop-filter: blur(24px) saturate(1.06);
   -webkit-backdrop-filter: blur(24px) saturate(1.06);
   box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.14),
-    0 1px 4px rgba(0, 0, 0, 0.1);
+    0 12px 30px var(--glass-bg-heavy),
+    0 1px 4px var(--glass-bg-heavy);
   transition: background var(--duration-fast), border-color var(--duration-fast),
     box-shadow var(--duration-fast);
 }
 
 .capsule:focus-within {
-  background: rgba(49, 49, 59, 0.88);
-  border-color: rgba(0, 0, 0, 0.06);
+  background: var(--glass-panel-strong);
+  border-color: var(--glass-border);
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.17),
-    0 1px 5px rgba(0, 0, 0, 0.1);
+    0 14px 34px var(--glass-shadow-subtle),
+    0 1px 5px var(--glass-bg-heavy);
 }
 
 [data-theme='light'] .capsule {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.52)),
     rgba(244, 245, 248, 0.82);
-  border-color: rgba(15, 23, 42, 0.02);
+  border-color: var(--glass-border-subtle);
   box-shadow:
-    0 12px 30px rgba(15, 23, 42, 0.075);
+    0 12px 30px var(--glass-bg-strong);
 }
 
 [data-theme='light'] .capsule:focus-within {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.58)),
     rgba(246, 247, 250, 0.88);
-  border-color: rgba(15, 23, 42, 0.045);
+  border-color: var(--glass-border);
   box-shadow:
-    0 14px 32px rgba(15, 23, 42, 0.09);
+    0 14px 32px var(--glass-bg-strong);
 }
 
 /* ── Slash command palette ─────────────────── */
@@ -88,19 +88,19 @@
   max-height: min(430px, calc(100vh - 220px));
   overflow-y: auto;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.105);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 12px;
-  background: rgba(35, 35, 43, 0.97);
+  background: var(--glass-panel-overlay);
   box-shadow:
-    0 20px 52px rgba(0, 0, 0, 0.32),
-    0 1px 0 rgba(255, 255, 255, 0.055) inset;
+    0 20px 52px var(--glass-shadow),
+    0 1px 0 var(--glass-bg-medium) inset;
 }
 
 [data-theme='light'] .slashPalette {
-  border-color: rgba(15, 23, 42, 0.1);
+  border-color: var(--glass-border-strong);
   background: rgb(255, 255, 255);
   box-shadow:
-    0 18px 46px rgba(15, 23, 42, 0.16),
+    0 18px 46px var(--glass-shadow-subtle),
     0 1px 0 rgba(255, 255, 255, 0.82) inset;
 }
 
@@ -122,7 +122,7 @@
   min-width: 20px;
   height: 20px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 12px;
@@ -130,7 +130,7 @@
 }
 
 [data-theme='light'] .slashHeader kbd {
-  background: rgba(15, 23, 42, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 .slashCommandWrap {
@@ -165,12 +165,12 @@
 
 .slashCommand:hover,
 .slashCommandActive {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='light'] .slashCommand:hover,
 [data-theme='light'] .slashCommandActive {
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 .slashCommandLabel,
@@ -257,9 +257,9 @@
   min-height: 28px;
   gap: 6px;
   padding: 3px 4px 3px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.065);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: var(--composer-control-text);
   font-size: 12px;
   line-height: 1;
@@ -300,18 +300,18 @@
 .attachmentChip button:hover,
 .attachmentChip button:focus-visible {
   outline: none;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
 [data-theme='light'] .attachmentChip {
-  border-color: rgba(15, 23, 42, 0.075);
-  background: rgba(15, 23, 42, 0.04);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='light'] .attachmentChip button:hover,
 [data-theme='light'] .attachmentChip button:focus-visible {
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 .runSettingsStrip {
@@ -331,7 +331,7 @@
   padding: 3px 4px 3px 8px;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: var(--text-primary);
   box-shadow: none;
   font-size: 11.5px;
@@ -370,17 +370,17 @@
 .runSettingChip button:hover,
 .runSettingChip button:focus-visible {
   outline: none;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--text-primary);
 }
 
 [data-theme='light'] .runSettingChip {
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='light'] .runSettingChip button:hover,
 [data-theme='light'] .runSettingChip button:focus-visible {
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 /* ── Route preview chips ────────────────────── */
@@ -581,18 +581,18 @@
 }
 
 .workTargetBtn:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
 }
 
 .workTargetBtnActive {
-  background: rgba(255, 255, 255, 0.052);
+  background: var(--glass-bg-medium);
 }
 
 .workTargetBtn:focus-visible {
   outline: none;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.085),
-    0 0 0 2px rgba(255, 255, 255, 0.04);
+    inset 0 0 0 1px var(--glass-bg-strong),
+    0 0 0 2px var(--glass-bg-light);
 }
 
 .workTargetBtn:disabled {
@@ -607,7 +607,7 @@
 }
 
 [data-theme='light'] .workTargetBtn:focus-visible {
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+  box-shadow: inset 0 0 0 1px var(--glass-shadow-subtle);
 }
 
 .workTargetMenu {
@@ -621,16 +621,16 @@
   padding: 9px;
   border: 1px solid var(--composer-panel-edge);
   border-radius: 14px;
-  background: rgba(35, 35, 43, 0.97);
+  background: var(--glass-panel-overlay);
   box-shadow: var(--composer-panel-shadow);
   backdrop-filter: blur(24px) saturate(1.08);
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
 }
 
 [data-theme='light'] .workTargetMenu {
-  border-color: rgba(15, 23, 42, 0.09);
+  border-color: var(--glass-border-strong);
   background: rgba(250, 250, 252, 0.96);
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 18px 44px var(--glass-shadow-subtle);
 }
 
 .workTargetHeader,
@@ -642,12 +642,12 @@
 
 .workTargetHeader {
   padding: 4px 5px 10px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.24);
+  border-bottom: 1px solid var(--glass-border-heavy);
   margin-bottom: 7px;
 }
 
 [data-theme='light'] .workTargetHeader {
-  border-bottom-color: rgba(15, 23, 42, 0.07);
+  border-bottom-color: var(--glass-border);
 }
 
 .workTargetHeader span,
@@ -691,16 +691,16 @@
 
 [data-theme='light'] .workTargetOption:hover,
 [data-theme='light'] .workTargetOptionActive {
-  background: rgba(15, 23, 42, 0.045);
+  background: var(--glass-bg-light);
 }
 
 .workTargetOption:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px var(--glass-bg-heavy);
 }
 
 [data-theme='light'] .workTargetOption:focus-visible {
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+  box-shadow: inset 0 0 0 1px var(--glass-shadow-subtle);
 }
 
 .workTargetOption:disabled {
@@ -738,7 +738,7 @@
   min-height: 18px;
   padding: 3px 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--muted-foreground);
   font-size: 11px;
   font-style: normal;
@@ -750,7 +750,7 @@
 }
 
 [data-theme='light'] .workTargetMeta {
-  background: rgba(15, 23, 42, 0.045);
+  background: var(--glass-bg-light);
 }
 
 .workDirEditor {
@@ -760,8 +760,8 @@
   margin-top: 7px;
   padding: 9px;
   border-radius: var(--composer-control-radius);
-  background: rgba(255, 255, 255, 0.038);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  background: var(--glass-bg-light);
+  box-shadow: inset 0 0 0 1px var(--glass-shadow-subtle);
 }
 
 .workDirInputRow {
@@ -775,26 +775,26 @@
   height: var(--composer-control-h);
   border: 0;
   border-radius: var(--composer-control-radius);
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: var(--foreground);
   padding: 0 10px;
   outline: none;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 0 0 1px var(--glass-shadow);
 }
 
 [data-theme='light'] .workDirInputRow input {
-  border-color: rgba(15, 23, 42, 0.09);
-  background: rgba(15, 23, 42, 0.035);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-subtle);
 }
 
 .workDirInputRow input:focus {
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.36),
-    0 0 0 2px rgba(255, 255, 255, 0.055);
+    0 0 0 2px var(--glass-bg-medium);
 }
 
 [data-theme='light'] .workDirInputRow input:focus {
-  border-color: rgba(15, 23, 42, 0.16);
+  border-color: var(--glass-border-heavy);
 }
 
 .workDirInputRow button {
@@ -815,12 +815,12 @@
 }
 
 .workDirBrowseBtn {
-  background: rgba(255, 255, 255, 0.075) !important;
+  background: var(--glass-bg-medium) !important;
   color: var(--foreground) !important;
 }
 
 [data-theme='light'] .workDirBrowseBtn {
-  background: rgba(15, 23, 42, 0.07) !important;
+  background: var(--glass-bg-medium) !important;
 }
 
 .workDirApplyBtn {
@@ -932,7 +932,7 @@
 .sendBtnActive {
   background: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
   color: var(--background);
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 1px 8px var(--glass-shadow-subtle);
 }
 
 .sendBtnActive:hover {

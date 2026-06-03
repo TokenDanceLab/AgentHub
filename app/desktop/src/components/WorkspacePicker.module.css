@@ -67,9 +67,9 @@
   gap: var(--space-sm);
   padding: var(--space-md);
   border-radius: var(--radius-lg);
-  background: rgba(37, 37, 45, 0.58);
-  border: 1px solid rgba(0, 0, 0, 0.24);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  background: var(--glass-panel);
+  border: 1px solid var(--glass-border-heavy);
+  box-shadow: 0 10px 24px var(--glass-shadow-subtle);
   cursor: pointer;
   font-family: inherit;
   text-align: left;
@@ -82,7 +82,7 @@
 
 .card:hover {
   border-color: var(--ring);
-  background: rgba(37, 37, 45, 0.78);
+  background: var(--glass-panel);
 }
 
 .card:focus-visible {
@@ -92,11 +92,11 @@
 
 .cardSelected {
   border-color: var(--primary);
-  background: color-mix(in oklch, var(--primary) 6%, rgba(37, 37, 45, 0.58));
+  background: color-mix(in oklch, var(--primary) 6%, var(--glass-panel));
 }
 
 .cardSelected:hover {
-  background: color-mix(in oklch, var(--primary) 10%, rgba(37, 37, 45, 0.78));
+  background: color-mix(in oklch, var(--primary) 10%, var(--glass-panel));
   border-color: var(--primary);
 }
 

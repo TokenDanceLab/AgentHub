@@ -70,24 +70,24 @@
 }
 
 .riskLow {
-  background: rgba(105, 201, 103, 0.12);
+  background: var(--glass-tint-moss);
   color: var(--success);
 }
 
 .riskMedium {
-  background: rgba(251, 191, 36, 0.12);
+  background: var(--glass-tint-amber);
   color: var(--warning);
 }
 
 .riskHigh {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
 }
 
 .riskCritical {
-  background: rgba(220, 38, 38, 0.18);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  border: 1px solid var(--glass-tint-danger);
 }
 
 .statusBadge {
@@ -101,19 +101,19 @@
 
 .statusBadge.statusPending {
   border: none;
-  background: rgba(251, 191, 36, 0.12);
+  background: var(--glass-tint-amber);
   color: var(--warning);
 }
 
 .statusBadge.statusApproved {
   border: none;
-  background: rgba(105, 201, 103, 0.12);
+  background: var(--glass-tint-moss);
   color: var(--success);
 }
 
 .statusBadge.statusDenied {
   border: none;
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
 }
 
@@ -215,12 +215,12 @@
 }
 
 .approveBtn {
-  background: rgba(105, 201, 103, 0.15);
+  background: var(--glass-tint-moss);
   color: var(--success);
 }
 
 .approveBtn:hover {
-  background: rgba(105, 201, 103, 0.25);
+  background: var(--glass-tint-moss);
 }
 
 .approveBtn:disabled {
@@ -229,12 +229,12 @@
 }
 
 .denyBtn {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
 }
 
 .denyBtn:hover {
-  background: rgba(239, 68, 68, 0.22);
+  background: var(--glass-tint-danger);
 }
 
 .denyBtn:disabled {

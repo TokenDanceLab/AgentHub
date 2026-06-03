@@ -1,14 +1,14 @@
 .root {
   --settings-accent: var(--primary);
   --settings-glass-bg: rgba(255, 255, 255, 0.52);
-  --settings-glass-border: rgba(15, 23, 42, 0.075);
+  --settings-glass-border: var(--glass-border-strong);
   --settings-glass-hover: rgba(255, 255, 255, 0.66);
   --settings-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 4px 18px rgba(15, 23, 42, 0.035);
-  --settings-chip-bg: rgba(0, 0, 0, 0.04);
-  --settings-chip-border: rgba(0, 0, 0, 0.06);
-  --settings-icon-bg: rgba(93, 104, 204, 0.12);
+    0 4px 18px var(--glass-bg-subtle);
+  --settings-chip-bg: var(--glass-bg-light);
+  --settings-chip-border: var(--glass-border);
+  --settings-icon-bg: var(--glass-tint-plum);
   --settings-sidebar-bg: rgba(246, 246, 248, 0.72);
   --settings-muted: var(--text-weaker);
   --settings-graph-artifact: var(--info);
@@ -21,25 +21,25 @@
   min-height: 0;
   flex: 1;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 34%),
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent 34%),
     var(--app-bg);
   color: var(--foreground);
 }
 
 [data-theme='dark'] .root {
-  --settings-glass-bg: rgba(37, 37, 45, 0.58);
-  --settings-glass-border: rgba(255, 255, 255, 0.065);
-  --settings-glass-hover: rgba(48, 48, 57, 0.7);
+  --settings-glass-bg: var(--glass-panel);
+  --settings-glass-border: var(--glass-border);
+  --settings-glass-hover: var(--glass-panel);
   --settings-glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
-    0 5px 18px rgba(0, 0, 0, 0.08);
-  --settings-chip-bg: rgba(255, 255, 255, 0.04);
-  --settings-chip-border: rgba(255, 255, 255, 0.05);
-  --settings-icon-bg: rgba(93, 104, 204, 0.15);
-  --settings-sidebar-bg: rgba(27, 27, 34, 0.78);
+    inset 0 1px 0 var(--glass-bg-light),
+    0 5px 18px var(--glass-bg-strong);
+  --settings-chip-bg: var(--glass-bg-light);
+  --settings-chip-border: var(--glass-border);
+  --settings-icon-bg: var(--glass-tint-plum);
+  --settings-sidebar-bg: var(--glass-panel);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 36%),
-    radial-gradient(ellipse at 78% 0%, rgba(93, 104, 204, 0.045), transparent 34%),
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent 36%),
+    radial-gradient(ellipse at 78% 0%, var(--glass-tint-plum), transparent 34%),
     var(--app-bg);
 }
 
@@ -49,14 +49,14 @@
   min-height: 0;
   flex-direction: column;
   padding: 16px 10px;
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-right: 1px solid var(--glass-border);
   background: var(--settings-sidebar-bg);
   backdrop-filter: blur(30px) saturate(1.16);
   -webkit-backdrop-filter: blur(30px) saturate(1.16);
 }
 
 [data-theme='dark'] .sidebar {
-  border-right-color: rgba(255, 255, 255, 0.06);
+  border-right-color: var(--glass-border);
 }
 
 .backBtn,
@@ -88,7 +88,7 @@
 .navItem:hover,
 .sidebarAccountBtn:hover,
 .sidebarActionBtn:hover {
-  background: rgba(0, 0, 0, 0.045);
+  background: var(--glass-bg-light);
   color: var(--foreground);
 }
 
@@ -97,24 +97,24 @@
 .sidebarAccountBtn:focus-visible,
 .sidebarActionBtn:focus-visible {
   outline: none;
-  background: rgba(0, 0, 0, 0.045);
+  background: var(--glass-bg-light);
   color: var(--foreground);
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+  box-shadow: inset 0 0 0 1px var(--glass-shadow-subtle);
 }
 
 [data-theme='dark'] .backBtn:hover,
 [data-theme='dark'] .navItem:hover,
 [data-theme='dark'] .sidebarAccountBtn:hover,
 [data-theme='dark'] .sidebarActionBtn:hover {
-  background: rgba(255, 255, 255, 0.065);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='dark'] .backBtn:focus-visible,
 [data-theme='dark'] .navItem:focus-visible,
 [data-theme='dark'] .sidebarAccountBtn:focus-visible,
 [data-theme='dark'] .sidebarActionBtn:focus-visible {
-  background: rgba(255, 255, 255, 0.065);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  background: var(--glass-bg-medium);
+  box-shadow: inset 0 0 0 1px var(--glass-bg-heavy);
 }
 
 :global(html[data-focus-source='pointer']) .backBtn:focus-visible,
@@ -169,7 +169,7 @@
 .main::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: rgba(142, 142, 147, 0.32);
+  background: var(--glass-border-heavy);
   background-clip: padding-box;
 }
 
@@ -197,7 +197,7 @@
   padding: 10px 11px;
   border: 1px solid var(--settings-glass-border);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--glass-bg-subtle);
   color: var(--settings-muted);
   font-size: 13px;
   line-height: 1.45;
@@ -220,23 +220,23 @@
 }
 
 .navItemActive {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
   border-radius: 8px;
 }
 
 [data-theme='dark'] .navItemActive {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-strong);
 }
 
 .sidebarAccount {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--glass-border);
 }
 
 [data-theme='dark'] .sidebarAccount {
-  border-top-color: rgba(255, 255, 255, 0.06);
+  border-top-color: var(--glass-border);
 }
 
 .sidebarAccountBtn,
@@ -379,7 +379,7 @@
   width: fit-content;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(93, 104, 204, 0.13);
+  background: var(--glass-tint-plum);
   color: color-mix(in oklch, var(--settings-accent) 86%, white);
   font-size: 11px;
   font-style: normal;
@@ -476,7 +476,7 @@
   flex-shrink: 0;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(142, 142, 147, 0.14);
+  background: var(--glass-bg-medium);
   color: var(--settings-muted);
   font-size: 11px;
   font-style: normal;
@@ -484,12 +484,12 @@
 }
 
 .profileStatus_available {
-  background: rgba(34, 197, 94, 0.14);
+  background: var(--glass-tint-moss);
   color: var(--success);
 }
 
 .profileStatus_configuring {
-  background: rgba(245, 158, 11, 0.14);
+  background: var(--glass-tint-amber);
   color: var(--warning);
 }
 
@@ -744,16 +744,16 @@
   gap: 10px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.055);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   background: color-mix(in oklch, var(--settings-glass-bg) 88%, transparent);
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.045);
+  box-shadow: 0 10px 26px var(--glass-shadow-subtle);
 }
 
 [data-theme='dark'] .teamGraph {
-  border-color: rgba(0, 0, 0, 0.18);
-  background: rgba(31, 32, 39, 0.52);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
+  border-color: var(--glass-border-heavy);
+  background: var(--glass-panel);
+  box-shadow: 0 14px 34px var(--glass-shadow-subtle);
 }
 
 .teamGraphNodes {
@@ -783,14 +783,14 @@
   border-left: 2px solid color-mix(in oklch, var(--team-node-accent) 58%, transparent);
   border-radius: 12px;
   background: color-mix(in oklch, var(--settings-glass-bg) 92%, transparent);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+  box-shadow: 0 6px 16px var(--glass-shadow-subtle);
 }
 
 [data-theme='dark'] .teamGraphNode {
-  border-color: rgba(0, 0, 0, 0.2);
-  border-left-color: color-mix(in oklch, var(--team-node-accent) 52%, rgba(255, 255, 255, 0.08));
-  background: rgba(42, 43, 51, 0.72);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: var(--glass-border-heavy);
+  border-left-color: color-mix(in oklch, var(--team-node-accent) 52%, var(--glass-border));
+  background: var(--glass-panel);
+  box-shadow: 0 8px 20px var(--glass-shadow-subtle);
 }
 
 .teamGraphNode strong {
@@ -864,8 +864,8 @@
 }
 
 [data-theme='dark'] .teamGraphEdge {
-  border-color: rgba(0, 0, 0, 0.16);
-  background: rgba(255, 255, 255, 0.032);
+  border-color: var(--glass-border-heavy);
+  background: var(--glass-bg-subtle);
 }
 
 .teamGraphEdge span {
@@ -1220,7 +1220,7 @@
 .textInput {
   min-height: 34px;
   padding: 8px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.48);
   color: var(--foreground);
@@ -1232,8 +1232,8 @@
 }
 
 [data-theme='dark'] .textInput {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-medium);
 }
 
 .modeCard {
@@ -1274,7 +1274,7 @@
 [data-theme='dark'] .modeCardActive {
   border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--settings-glass-border));
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
     var(--settings-glass-hover);
 }
 
@@ -1327,7 +1327,7 @@
 [data-theme='dark'] .runnerRow,
 [data-theme='dark'] .taskRow,
 [data-theme='dark'] .accountCard {
-  border-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--glass-border);
 }
 
 .settingRow:first-child,
@@ -1446,7 +1446,7 @@
   overflow: hidden;
   padding: 3px 7px;
   border-radius: 999px;
-  background: rgba(142, 142, 147, 0.12);
+  background: var(--glass-bg-medium);
   color: var(--settings-muted);
   font-size: 11px;
   font-weight: 700;
@@ -1511,13 +1511,13 @@
   flex-shrink: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.14);
+  background: var(--glass-bg-heavy);
   cursor: pointer;
   transition: background 0.18s ease;
 }
 
 [data-theme='dark'] .switch {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--glass-bg-heavy);
 }
 
 .switch span {
@@ -1528,7 +1528,7 @@
   height: 18px;
   border-radius: 50%;
   background: var(--card);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px var(--glass-shadow);
   transition: transform 0.18s ease;
 }
 
@@ -1557,7 +1557,7 @@
   min-width: 158px;
   height: 34px;
   padding: 0 34px 0 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.48);
   color: var(--foreground);
@@ -1567,8 +1567,8 @@
 }
 
 [data-theme='dark'] .select {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-medium);
 }
 
 .segmented {
@@ -1576,11 +1576,11 @@
   width: fit-content;
   padding: 3px;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='dark'] .segmented {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
 }
 
 .segmented button {
@@ -1599,16 +1599,16 @@
 .segmented .segmentActive {
   background: rgba(255, 255, 255, 0.72);
   color: var(--foreground);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.09);
+  box-shadow: 0 1px 6px var(--glass-shadow-subtle);
 }
 
 [data-theme='dark'] .segmented .segmentActive {
-  background: rgba(255, 255, 255, 0.11);
+  background: var(--glass-bg-heavy);
 }
 
 .shortcutTable {
   display: grid;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   overflow: hidden;
   background: var(--settings-glass-bg);
@@ -1626,11 +1626,11 @@
 }
 
 .shortcutGroup + .shortcutGroup {
-  border-top: 1px solid rgba(0, 0, 0, 0.055);
+  border-top: 1px solid var(--glass-border);
 }
 
 [data-theme='dark'] .shortcutGroup + .shortcutGroup {
-  border-top-color: rgba(255, 255, 255, 0.06);
+  border-top-color: var(--glass-border);
 }
 
 .shortcutGroupTitle {
@@ -1655,12 +1655,12 @@
 
 .shortcutGroupTitle + .shortcutRow,
 .shortcutRow + .shortcutRow {
-  border-top: 1px solid rgba(0, 0, 0, 0.055);
+  border-top: 1px solid var(--glass-border);
 }
 
 [data-theme='dark'] .shortcutGroupTitle + .shortcutRow,
 [data-theme='dark'] .shortcutRow + .shortcutRow {
-  border-top-color: rgba(255, 255, 255, 0.06);
+  border-top-color: var(--glass-border);
 }
 
 .shortcutRow span {
@@ -1683,8 +1683,8 @@
   min-width: 26px;
   height: 25px;
   padding: 0 8px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-bottom-color: rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--glass-border-strong);
+  border-bottom-color: var(--glass-border-heavy);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.62);
   color: var(--foreground);
@@ -1695,9 +1695,9 @@
 }
 
 [data-theme='dark'] .shortcutRow kbd {
-  border-color: rgba(255, 255, 255, 0.08);
-  border-bottom-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--glass-border);
+  border-bottom-color: var(--glass-border-heavy);
+  background: var(--glass-bg-medium);
 }
 
 .connectionIcon {
@@ -1707,12 +1707,12 @@
   flex-shrink: 0;
   place-items: center;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--glass-bg-light);
   color: var(--settings-muted);
 }
 
 [data-theme='dark'] .connectionIcon {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 .statusPill {
@@ -1723,14 +1723,14 @@
   height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(142, 142, 147, 0.14);
+  background: var(--glass-bg-medium);
   color: var(--settings-muted);
   font-size: 12px;
   font-weight: 700;
 }
 
 .statusPillOn {
-  background: rgba(34, 197, 94, 0.14);
+  background: var(--glass-tint-moss);
   color: var(--success);
 }
 
@@ -1757,7 +1757,7 @@
 }
 
 .secondaryBtn {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--glass-border-strong);
   background: transparent;
   color: var(--foreground);
 }
@@ -1777,7 +1777,7 @@
 }
 
 [data-theme='dark'] .secondaryBtn {
-  border-color: rgba(255, 255, 255, 0.09);
+  border-color: var(--glass-border-strong);
 }
 
 .taskRowAction {
@@ -1794,7 +1794,7 @@
   border: 1px solid var(--settings-glass-border);
   border-radius: 12px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
     var(--settings-glass-bg);
   color: var(--foreground);
   box-shadow: var(--settings-glass-shadow);
@@ -1899,13 +1899,13 @@
 .presetCardActive {
   border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--settings-glass-border));
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
     var(--settings-glass-hover);
 }
 
 [data-theme='dark'] .presetCardActive {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
+    linear-gradient(180deg, var(--glass-bg-subtle), transparent),
     var(--settings-glass-hover);
 }
 
@@ -1919,7 +1919,7 @@
   height: 20px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 3px var(--glass-shadow-subtle);
 }
 
 .presetCardLabel {
@@ -1955,11 +1955,11 @@
   .sidebar {
     padding: 10px 12px 12px;
     border-right: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid var(--glass-border);
   }
 
   [data-theme='dark'] .sidebar {
-    border-bottom-color: rgba(255, 255, 255, 0.06);
+    border-bottom-color: var(--glass-border);
   }
 
   .nav {
@@ -1997,7 +1997,7 @@
     min-height: 34px;
     padding: 0 10px;
     border: 1px solid transparent;
-    background: rgba(255, 255, 255, 0.025);
+    background: var(--glass-bg-subtle);
     font-size: 13px;
     font-weight: 540;
     white-space: nowrap;
@@ -2009,7 +2009,7 @@
   }
 
   [data-theme='dark'] .navItem {
-    background: rgba(255, 255, 255, 0.035);
+    background: var(--glass-bg-subtle);
   }
 
   .navItemActive {
