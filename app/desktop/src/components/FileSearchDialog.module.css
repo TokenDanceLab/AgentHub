@@ -5,7 +5,7 @@
   display: flex;
   justify-content: center;
   padding-top: 15vh;
-  background: rgba(0, 0, 0, 0.32);
+  background: var(--glass-shadow);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -14,10 +14,10 @@
   width: min(600px, calc(100vw - 32px));
   max-height: min(68vh, 560px);
   background: var(--glass-panel-overlay);
-  border: 1px solid rgba(0, 0, 0, 0.34);
+  border: 1px solid var(--glass-shadow);
   border-radius: 14px;
   box-shadow:
-    0 22px 56px rgba(0, 0, 0, 0.36),
+    0 22px 56px var(--glass-shadow),
     0 4px 16px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   display: flex;
@@ -230,7 +230,7 @@
 /* ── Light theme ── */
 
 [data-theme='light'] .dialog {
-  background: rgba(250, 250, 252, 0.97);
+  background: var(--glass-light-fill);
   border-color: var(--glass-border-strong);
   box-shadow:
     0 22px 56px var(--glass-bg-heavy),
@@ -253,5 +253,5 @@
 }
 
 [data-theme='light'] .itemPath {
-  color: rgba(15, 23, 42, 0.3);
+  color: var(--glass-shadow);
 }
