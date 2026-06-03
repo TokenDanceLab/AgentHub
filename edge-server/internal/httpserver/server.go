@@ -22,6 +22,7 @@ import (
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/mcp"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/middleware"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -113,6 +114,12 @@ func Run(cfg Config) error {
 	handler.RegisterRoutes(mux)
 	// Expose Prometheus metrics on /metrics for Prometheus scraping.
 	mux.Handle("/metrics", handler.Metrics.Handler())
+
+	// Register MCP (Model Context Protocol) endpoint for external AI clients.
+	// This exposes project/thread/run capabilities as standard MCP tools.
+	mcpServer := mcp.NewServer(handler.Store, handler.Executor, handler.Bus, handler.PermissionRegistry)
+	mux.Handle("/mcp", mcpServer)
+	slog.Info("mcp server endpoint registered at /mcp")
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
