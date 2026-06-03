@@ -5,14 +5,14 @@
 
 .section {
   padding: 8px 0 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-bottom: 1px solid var(--glass-border-subtle);
   display: flex;
   flex-direction: column;
   gap: 7px;
 }
 
 [data-theme='light'] .section {
-  border-bottom-color: rgba(0, 0, 0, 0.055);
+  border-bottom-color: var(--glass-border);
 }
 
 /* ── Context Bar ───────────────────────────── */
@@ -21,12 +21,12 @@
   height: 4px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.095);
+  background: var(--glass-bg-strong);
   display: flex;
 }
 
 [data-theme='light'] .bar {
-  background: rgba(0, 0, 0, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 .barWarning {
@@ -121,11 +121,11 @@
   justify-content: space-between;
   align-items: center;
   padding-top: 7px;
-  border-top: 1px solid rgba(255, 255, 255, 0.045);
+  border-top: 1px solid var(--glass-border-subtle);
 }
 
 [data-theme='light'] .costRow {
-  border-top-color: rgba(0, 0, 0, 0.045);
+  border-top-color: var(--glass-border);
 }
 
 .costLabel {

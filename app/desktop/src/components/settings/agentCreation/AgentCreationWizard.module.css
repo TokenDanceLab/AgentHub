@@ -92,12 +92,12 @@
 }
 
 .wizardCloseBtn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
 [data-theme='dark'] .wizardCloseBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-strong);
 }
 
 .wizardSteps {
@@ -142,13 +142,13 @@
   flex-shrink: 0;
   place-items: center;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--glass-bg-medium);
   font-size: 11px;
   font-weight: 750;
 }
 
 [data-theme='dark'] .wizardStepIdx {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-strong);
 }
 
 .wizardStepActive .wizardStepIdx {
@@ -184,7 +184,7 @@
 
 .wizardBody::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(142, 142, 147, 0.24);
+  background: var(--glass-border-heavy);
 }
 
 .wizardFooter {
@@ -231,7 +231,7 @@
   width: 100%;
   min-height: 38px;
   padding: 9px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.48);
   color: var(--foreground);
@@ -241,8 +241,8 @@
 }
 
 [data-theme='dark'] .wizardInput {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-medium);
 }
 
 .wizardInput:focus {
@@ -289,11 +289,11 @@
 }
 
 .emojiOption:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='dark'] .emojiOption:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-strong);
 }
 
 .emojiOptionSelected {
@@ -448,12 +448,12 @@
   flex-shrink: 0;
   place-items: center;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--glass-bg-light);
   font-size: 18px;
 }
 
 [data-theme='dark'] .templateEmoji {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 .templateCardHeader strong {
@@ -577,7 +577,7 @@
 }
 
 .wizardDangerBtn {
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--glass-tint-danger);
   background: transparent;
   color: var(--destructive);
 }
@@ -590,11 +590,11 @@
 }
 
 .wizardSecondaryBtn:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='dark'] .wizardSecondaryBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 .wizardBtnFull {
@@ -633,7 +633,7 @@
   margin: 4px 0 0;
   padding: 10px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--glass-bg-subtle);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 11px;
   line-height: 1.55;
@@ -643,7 +643,7 @@
 }
 
 [data-theme='dark'] .reviewBlock pre {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
 }
 
 .reviewChips {

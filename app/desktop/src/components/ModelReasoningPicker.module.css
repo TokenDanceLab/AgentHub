@@ -17,7 +17,7 @@
   padding: 0 8px;
   border: 0;
   border-radius: var(--composer-control-radius, 10px);
-  background: var(--composer-control-bg, rgba(255, 255, 255, 0.052));
+  background: var(--composer-control-bg, var(--glass-bg-medium));
   box-shadow: none;
   color: var(--composer-control-text, var(--foreground));
   font: inherit;
@@ -30,7 +30,7 @@
 
 .trigger:hover,
 .trigger:focus-visible {
-  background: var(--composer-control-bg-hover, rgba(255, 255, 255, 0.078));
+  background: var(--composer-control-bg-hover, var(--glass-bg-strong));
   color: var(--composer-control-text-active, var(--foreground));
   outline: none;
 }
@@ -105,8 +105,8 @@
   padding: 5px;
   border: 1px solid var(--composer-panel-edge, rgba(0, 0, 0, 0.34));
   border-radius: 12px;
-  background: rgba(29, 30, 37, 0.97);
-  box-shadow: var(--composer-panel-shadow, 0 22px 56px rgba(0, 0, 0, 0.38), 0 3px 12px rgba(0, 0, 0, 0.22));
+  background: var(--glass-panel-overlay);
+  box-shadow: var(--composer-panel-shadow, 0 22px 56px var(--glass-shadow), 0 3px 12px var(--glass-shadow));
   animation: popoverIn 0.12s ease-out;
   backdrop-filter: blur(24px) saturate(1.08);
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
@@ -167,7 +167,7 @@
 }
 
 .modelRowActive {
-  background: rgba(255, 255, 255, 0.036);
+  background: var(--glass-bg-light);
 }
 
 .modelButton {
@@ -189,7 +189,7 @@
 
 .modelButton:hover,
 .modelButton:focus-visible {
-  background: rgba(255, 255, 255, 0.046);
+  background: var(--glass-bg-light);
   outline: none;
 }
 
@@ -223,7 +223,7 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-light);
   overflow: hidden;
   color: var(--composer-control-text, var(--muted-foreground));
   font-size: 11.5px;
@@ -252,7 +252,7 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 450;
@@ -277,7 +277,7 @@
   padding: 0 8px;
   border: 0;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
   color: var(--muted-foreground);
   font: inherit;
   font-size: 12px;
@@ -288,13 +288,13 @@
 
 .reasoningChip:hover,
 .reasoningChip:focus-visible {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-medium);
   color: var(--composer-control-text-active, var(--muted-foreground));
   outline: none;
 }
 
 .reasoningChipActive {
-  background: rgba(255, 255, 255, 0.085);
+  background: var(--glass-bg-strong);
   color: var(--composer-control-text-active, var(--muted-foreground));
 }
 
@@ -304,31 +304,31 @@
 
 [data-theme='light'] .trigger:hover,
 [data-theme='light'] .trigger:focus-visible {
-  background: rgba(15, 23, 42, 0.08);
+  background: var(--glass-bg-strong);
 }
 
 [data-theme='light'] .popover {
-  border-color: rgba(15, 23, 42, 0.08);
+  border-color: var(--glass-border-strong);
   background: rgba(248, 249, 252, 0.96);
   box-shadow:
-    0 18px 42px rgba(15, 23, 42, 0.14),
-    0 2px 10px rgba(15, 23, 42, 0.08);
+    0 18px 42px var(--glass-bg-heavy),
+    0 2px 10px var(--glass-bg-strong);
 }
 
 [data-theme='light'] .modelRowActive,
 [data-theme='light'] .modelButton:hover,
 [data-theme='light'] .modelButton:focus-visible {
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='light'] .reasoningChip {
-  background: rgba(15, 23, 42, 0.045);
+  background: var(--glass-bg-light);
 }
 
 [data-theme='light'] .reasoningChip:hover,
 [data-theme='light'] .reasoningChip:focus-visible,
 [data-theme='light'] .reasoningChipActive {
-  background: rgba(15, 23, 42, 0.082);
+  background: var(--glass-bg-strong);
 }
 
 /* Neutral typography pass: model identity is primary text, metadata is weak. */
