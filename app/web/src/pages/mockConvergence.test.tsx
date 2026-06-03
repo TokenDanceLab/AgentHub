@@ -8,24 +8,6 @@ import GroupWorkspacePageInteractive from './GroupWorkspace';
 import PrivateChatsPageInteractive from './PrivateChats';
 import ProjectPageInteractive from './Project';
 
-const emptyWorkbenchState = {
-  projects: [],
-  threads: [],
-  runners: [],
-  runs: [],
-  threadItems: [],
-  approvals: [],
-  artifacts: [],
-  previews: [],
-  runLogs: {},
-  connection: { status: 'error', error: 'Edge unavailable in test' },
-  lastSeq: 0,
-};
-
-vi.mock('../hooks/useWorkbenchProjection', () => ({
-  useWorkbenchProjection: () => emptyWorkbenchState,
-}));
-
 const fetchMock = vi.fn<typeof fetch>();
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
@@ -57,95 +39,124 @@ describe('Web mock convergence states', () => {
     vi.restoreAllMocks();
   });
 
-  it('labels Project fallback data as demo/mock when Edge has no snapshot', () => {
+  it('shows locked state in Project when there is no Hub session', () => {
     render(<ProjectPageInteractive />);
 
-    expect(screen.getAllByText('Demo / mock fallback').length).toBeGreaterThan(0);
-    expect(screen.getByText('Demo active tasks')).toBeInTheDocument();
-    expect(screen.getByText('Demo shared files')).toBeInTheDocument();
-    expect(screen.queryByText('source.mockFallback')).not.toBeInTheDocument();
+    expect(screen.getByText('AgentHub Desktop')).toBeInTheDocument();
+    expect(screen.getByText('Project detail')).toBeInTheDocument();
+    expect(screen.getByText('Hub session required')).toBeInTheDocument();
+    expect(
+      screen.getByText('Please sign in to Hub to view project data and milestones.'),
+    ).toBeInTheDocument();
   });
 
-  it('labels Group Workspace fallback counts as demo when Edge has no snapshot', () => {
+  it('shows ready state in Group Workspace when there is no Hub session', () => {
     render(<GroupWorkspacePageInteractive />);
 
-    expect(screen.getAllByText('Demo / mock fallback').length).toBeGreaterThan(0);
-    expect(screen.getByText('Demo online members')).toBeInTheDocument();
-    expect(screen.getByText('Demo shared tasks')).toBeInTheDocument();
-    expect(screen.getByText('Demo workspace files')).toBeInTheDocument();
+    expect(screen.getByText('Shared operations cockpit')).toBeInTheDocument();
+    expect(screen.getByText('Group Workspace')).toBeInTheDocument();
+    expect(screen.getByText('Local workspace ready')).toBeInTheDocument();
+    expect(
+      screen.getByText('Please sign in to Hub to view group workspace data.'),
+    ).toBeInTheDocument();
   });
 
-  it('locks Private Chats when there is no Web Hub session', () => {
+  it('shows locked state in Private Chats when there is no Hub session', () => {
     render(<PrivateChatsPageInteractive />);
 
     expect(screen.getAllByText('Hub session required').length).toBeGreaterThan(0);
-    expect(screen.getByText(/will not show mock conversations/i)).toBeInTheDocument();
-    expect(screen.queryByText('Local mock')).not.toBeInTheDocument();
+    expect(screen.getByText('Login required')).toBeInTheDocument();
+    expect(screen.getAllByText(/will not show mock conversations/i).length).toBeGreaterThan(0);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('loads Private Chats from Hub sessions and recent messages when a Web Hub token exists', async () => {
+  it('loads private sessions and shows chat list in Private Chats when a Hub token is present', async () => {
     window.sessionStorage.setItem('agenthub_web_hub_token', 'token-1');
     fetchMock
-      .mockResolvedValueOnce(jsonResponse({
-        code: 'OK',
-        data: [
-          { session_id: 's-private', type: 'private', name: 'Xavier', unread_count: 2, updated_at: '2026-05-25T09:12:00Z' },
-          { session_id: 's-group', type: 'group', name: 'Group room', unread_count: 5 },
-        ],
-      }))
-      .mockResolvedValueOnce(jsonResponse({
-        code: 'OK',
-        data: [
-          {
-            id: 'm1',
-            session_id: 's-private',
-            seq_id: 1,
-            sender_type: 'user',
-            sender_id: 'u1',
-            content_type: 'text',
-            content: '{"text":"Hub private handoff is ready"}',
-            created_at: '2026-05-25T09:13:00Z',
-          },
-        ],
-      }));
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          data: [
+            {
+              session_id: 's-private',
+              type: 'private',
+              name: 'Xavier',
+              unread_count: 2,
+              updated_at: '2026-05-25T09:12:00Z',
+            },
+            {
+              session_id: 's-group',
+              type: 'group',
+              name: 'Group room',
+              unread_count: 5,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: 'OK',
+          data: [
+            {
+              id: 'm1',
+              session_id: 's-private',
+              seq_id: 1,
+              sender_type: 'user',
+              sender_id: 'u1',
+              content_type: 'text',
+              content: '{"text":"Hub private handoff is ready"}',
+              created_at: '2026-05-25T09:13:00Z',
+            },
+          ],
+        }),
+      );
 
     render(<PrivateChatsPageInteractive />);
 
-    expect((await screen.findAllByText('Xavier')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Hub private handoff is ready').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Xavier')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.queryByText('Group room')).not.toBeInTheDocument();
+  });
+
+  it('shows empty chat list in Private Chats when Hub returns an error', async () => {
+    window.sessionStorage.setItem('agenthub_web_hub_token', 'token-1');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 'HUB_DOWN', message: 'Hub unavailable' }, { status: 503 }),
+    );
+
+    render(<PrivateChatsPageInteractive />);
+
+    expect(await screen.findByText('No private chats')).toBeInTheDocument();
     expect(screen.queryByText('Group room')).not.toBeInTheDocument();
     expect(screen.queryByText('Active conversation')).not.toBeInTheDocument();
   });
 
-  it('shows Private Chats error state instead of mock conversations when Hub fails', async () => {
-    window.sessionStorage.setItem('agenthub_web_hub_token', 'token-1');
-    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'HUB_DOWN', message: 'Hub unavailable' }, { status: 503 }));
-
-    render(<PrivateChatsPageInteractive />);
-
-    expect(await screen.findByText('Hub unavailable')).toBeInTheDocument();
-    expect(screen.getByText(/Mock conversations remain hidden/i)).toBeInTheDocument();
-    expect(screen.queryByText('Active conversation')).not.toBeInTheDocument();
-  });
-
-  it('labels Agent Square catalog fallback and does not render raw i18n keys', () => {
+  it('renders Agent Square with catalog fallback label and mock agents, without raw i18n keys', async () => {
     const { container } = render(<AgentSquarePageInteractive />);
-    const text = visibleText(container);
 
-    expect(screen.getAllByText('Catalog fallback').length).toBeGreaterThan(0);
+    expect(screen.getByText('Catalog fallback')).toBeInTheDocument();
+    expect(
+      screen.getByText('No Web Hub session is available. Showing the labeled catalog fallback.'),
+    ).toBeInTheDocument();
+
+    expect(await screen.findByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByText('GPT Builder')).toBeInTheDocument();
+    expect(screen.getByText('Local Agent')).toBeInTheDocument();
+
+    const text = visibleText(container);
     expect(text).not.toMatch(/\b(?:agentSquare|privateChats|groupWorkspace|project|workbench)\./);
     expect(text).not.toContain('source.catalogMock');
-    expect(text).not.toContain('Catalog/mock fallback');
     expect(text).not.toContain('brand.subtitle');
     expect(text).not.toContain('sidebar.catalog');
     expect(text).not.toContain('header.description');
     expect(text).not.toContain('common:action.dismiss');
   });
 
-  it('keeps Agent Square on labeled catalog fallback without fake sync wording when Hub is unavailable', async () => {
+  it('shows Hub error detail in Agent Square catalog fallback when Hub is unavailable', async () => {
     window.sessionStorage.setItem('agenthub_web_hub_token', 'token-1');
-    fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'HUB_DOWN', message: 'Hub unavailable' }, { status: 503 }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 'HUB_DOWN', message: 'Hub unavailable' }, { status: 503 }),
+    );
 
     const { container } = render(<AgentSquarePageInteractive />);
 

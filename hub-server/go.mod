@@ -1,6 +1,6 @@
 module github.com/agenthub/hub-server
 
-go 1.25.0
+go 1.25.11
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
