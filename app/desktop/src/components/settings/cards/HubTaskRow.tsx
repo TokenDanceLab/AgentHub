@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { ClipboardList } from 'lucide-react';
 import type { AgentTask } from '@/stores/taskBridgeStore';
 import { isActiveBridgeTask, shortId } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function HubTaskRow({ task }: { task: AgentTask }) {
   const { t } = useTranslation();

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, X, Check, FolderOpen, FileText, Terminal, Search, ShieldCheck, ShieldX } from 'lucide-react';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 import { STORAGE_PREFIX } from '../utils';
 import type { ExecutionTargetTrustLevel } from '@/api/hubClient';
 import { validateAllowlistPath, type TauriAllowlistEntry } from '@/api/allowlistValidation';
