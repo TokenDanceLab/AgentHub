@@ -1,6 +1,5 @@
 import { useMemo, useState, useRef, useCallback } from 'react';
 import {
-  Archive,
   Check,
   Download,
   HardDrive,
