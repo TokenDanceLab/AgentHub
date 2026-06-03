@@ -386,7 +386,7 @@
 }
 
 .riskDefault {
-  background: rgba(148, 163, 184, 0.12);
+  background: var(--glass-bg-heavy);
   color: var(--muted-foreground);
 }
 

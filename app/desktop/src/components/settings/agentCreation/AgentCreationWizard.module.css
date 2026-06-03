@@ -4,14 +4,14 @@
   z-index: 1000;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.42);
+  background: var(--glass-shadow);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: wizardFadeIn 180ms ease;
 }
 
 [data-theme='dark'] .wizardOverlay {
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--glass-shadow);
 }
 
 @keyframes wizardFadeIn {
@@ -29,7 +29,7 @@
   border: 1px solid var(--settings-glass-border);
   box-shadow:
     var(--settings-glass-shadow),
-    0 24px 64px rgba(15, 23, 42, 0.18);
+    0 24px 64px var(--glass-shadow);
   backdrop-filter: blur(28px) saturate(1.18);
   -webkit-backdrop-filter: blur(28px) saturate(1.18);
   animation: wizardSlideIn 220ms ease;
@@ -39,7 +39,7 @@
 [data-theme='dark'] .wizardModal {
   box-shadow:
     var(--settings-glass-shadow),
-    0 24px 64px rgba(0, 0, 0, 0.32);
+    0 24px 64px var(--glass-shadow);
 }
 
 @keyframes wizardSlideIn {
@@ -233,7 +233,7 @@
   padding: 9px 12px;
   border: 1px solid var(--glass-border-strong);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.48);
+  background: var(--glass-input-bg);
   color: var(--foreground);
   font: inherit;
   font-size: 13px;

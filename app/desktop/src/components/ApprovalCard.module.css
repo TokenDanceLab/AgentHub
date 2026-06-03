@@ -119,7 +119,7 @@
 
 .statusBadge.statusTimeout {
   border: none;
-  background: rgba(160, 161, 170, 0.12);
+  background: var(--glass-bg-heavy);
   color: var(--muted-foreground);
 }
 

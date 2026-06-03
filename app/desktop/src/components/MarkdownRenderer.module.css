@@ -145,7 +145,7 @@
 
 [data-theme='light'] .root table {
   border-color: var(--glass-border-strong);
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--glass-input-bg);
 }
 
 [data-theme='light'] .root th,
