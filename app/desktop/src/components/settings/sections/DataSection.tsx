@@ -212,7 +212,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
           title={t('settings.dataExport')}
           description={t('settings.dataExportDesc')}
           control={
-            <button type="button" className="primaryBtn" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', background: 'var(--settings-accent)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button type="button" className="primaryBtn" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', background: 'var(--settings-accent)', color: 'var(--settings-btn-primary-text)', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               <Download size={15} />
               <span>{t('settings.dataExportAction')}</span>
             </button>
@@ -242,7 +242,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
                 <XCircle size={15} />
                 <span>{t('settings.keyboardCancel')}</span>
               </button>
-              <button type="button" className="primaryBtn" onClick={handleImportConfirm} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--settings-accent)', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+              <button type="button" className="primaryBtn" onClick={handleImportConfirm} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--settings-accent)', color: 'var(--settings-btn-primary-text)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
                 <Check size={15} />
                 <span>{t('settings.save')}</span>
               </button>
@@ -267,7 +267,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
                 <XCircle size={14} />
                 <span>{t('settings.keyboardCancel')}</span>
               </button>
-              <button type="button" className="primaryBtn" onClick={handleClearCache} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, border: 'none', background: 'var(--settings-accent)', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+              <button type="button" className="primaryBtn" onClick={handleClearCache} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, border: 'none', background: 'var(--settings-accent)', color: 'var(--settings-btn-primary-text)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                 <Check size={14} />
                 <span>{t('settings.clear')}</span>
               </button>
@@ -285,7 +285,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
               type="button"
               className="secondaryBtn"
               onClick={() => setShowResetConfirm(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.06)', color: 'inherit', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: '1px solid var(--settings-danger-border)', background: 'var(--settings-danger-bg)', color: 'inherit', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               <RotateCcw size={15} />
               <span>{t('settings.dataResetAllAction')}</span>
@@ -301,7 +301,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
                 type="button"
                 className="primaryBtn"
                 onClick={handleResetAll}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, border: 'none', background: 'rgb(220,38,38)', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 8, border: 'none', background: 'var(--settings-danger)', color: 'var(--settings-btn-primary-text)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
               >
                 <Check size={14} />
                 <span>{t('settings.dataResetAllAction')}</span>
@@ -342,7 +342,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
                       {keyCategoryLabel(item.key)}
                     </span>
                     {item.isCache && (
-                      <span style={{ fontSize: 11, color: '#e67e22', background: 'rgba(230,126,34,0.1)', padding: '1px 6px', borderRadius: 4 }}>
+                      <span style={{ fontSize: 11, color: 'var(--settings-status-warning)', background: 'var(--settings-status-warning-bg)', padding: '1px 6px', borderRadius: 4 }}>
                         {t('settings.dataCacheKeys')}
                       </span>
                     )}
