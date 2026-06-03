@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, useLayoutEffect, memo } from 'react';
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo, memo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -8,7 +8,7 @@ import { formatTokens, formatCost } from '@shared/context/breakdown';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import { EmptyState, ToolTimeline, ArtifactCard, ArtifactPreview, DeployCard } from '@shared/ui';
+import { EmptyState, ToolTimeline, ArtifactCard, ArtifactPreview, DeployCard, MessageSearchPanel } from '@shared/ui';
 import type { ArtifactType } from '@shared/ui';
 import TaskList from './TaskList';
 import ToolGroup from './ToolGroup';
@@ -1340,6 +1340,9 @@ export default function ChatView({
   const lastMessageIdRef = useRef<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
+  const [applyAllState, setApplyAllState] = useState<Record<string, 'pending' | 'applying' | 'done' | 'error'>>({});
   const visibleMessages = messages.filter(hasVisibleMessage);
 
   // ── Virtualizer ──────────────────────────────
@@ -1521,6 +1524,77 @@ export default function ChatView({
     setDeletingMessageId(null);
   }, [onDelete]);
 
+  // ── Search ──────────────────────────────────
+  const toggleSearch = useCallback(() => {
+    setSearchOpen((v) => !v);
+    setHighlightMessageId(null);
+  }, []);
+
+  const handleSearchJump = useCallback(
+    (_messageId: string, _messageIndex: number) => {
+      setSearchOpen(false);
+      setHighlightMessageId(_messageId);
+      const row = scrollRef.current?.querySelector(`[data-message-id="${CSS.escape(_messageId)}"]`);
+      row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+        setHighlightMessageId(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // ── Apply All ───────────────────────────────
+  const allFileChanges = useMemo(() => {
+    const changes: Array<{ messageId: string; path: string; action: string; diff?: string }> = [];
+    for (const msg of visibleMessages) {
+      for (const block of msg.blocks) {
+        if (block.kind === 'file_change') {
+          changes.push({ messageId: msg.id, path: block.path, action: block.action, diff: block.diff });
+        }
+      }
+    }
+    return changes;
+  }, [visibleMessages]);
+
+  const handleApplyAll = useCallback(async () => {
+    const changes = allFileChanges;
+    if (changes.length === 0) return;
+
+    const newState: Record<string, 'pending' | 'applying' | 'done' | 'error'> = {};
+    for (const c of changes) newState[c.path] = 'pending';
+    setApplyAllState(newState);
+
+    for (const change of changes) {
+      setApplyAllState((prev) => ({ ...prev, [change.path]: 'applying' }));
+      try {
+        await new Promise<void>((resolve) => {
+          window.dispatchEvent(
+            new CustomEvent('agenthub:review-changes', {
+              detail: { path: change.path, action: change.action, diff: change.diff },
+            }),
+          );
+          // Give the handler time to process
+          setTimeout(resolve, 200);
+        });
+        setApplyAllState((prev) => ({ ...prev, [change.path]: 'done' }));
+      } catch {
+        setApplyAllState((prev) => ({ ...prev, [change.path]: 'error' }));
+      }
+    }
+
+    addToast({ type: 'success', message: t('chat.applyAllDone', { count: changes.length }) });
+    setTimeout(() => setApplyAllState({}), 2000);
+  }, [allFileChanges, addToast, t]);
+
   const showConnectionBanner =
     !connectionBannerDismissed &&
     wasEverConnectedRef.current &&
@@ -1576,6 +1650,44 @@ export default function ChatView({
           </button>
         </div>
       )}
+      {/* ── Chat toolbar ─────────────────────── */}
+      {visibleMessages.length > 0 && (
+        <div className={styles.chatToolbar}>
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={toggleSearch}
+            title={t('chat.searchMessages')}
+            aria-label={t('chat.searchMessages')}
+          >
+            <Search size={14} />
+            <span>{t('chat.searchMessages')}</span>
+          </button>
+          {allFileChanges.length > 0 && (
+            <button
+              type="button"
+              className={styles.toolbarApplyBtn}
+              onClick={handleApplyAll}
+              disabled={Object.keys(applyAllState).length > 0}
+            >
+              <CheckSquare size={14} />
+              <span>{t('chat.applyAllCount', { count: allFileChanges.length })}</span>
+            </button>
+          )}
+        </div>
+      )}
+      {/* ── Search panel ─────────────────────── */}
+      <MessageSearchPanel
+        messages={visibleMessages}
+        open={searchOpen}
+        onClose={() => { setSearchOpen(false); setHighlightMessageId(null); }}
+        onJumpToMessage={handleSearchJump}
+        highlightMessageId={highlightMessageId}
+        onHighlightEnd={() => setHighlightMessageId(null)}
+        searchLabel={t('chat.searchMessages')}
+        searchPlaceholder={t('chat.searchPlaceholder')}
+        noResultsLabel={t('chat.searchNoResults')}
+      />
       <div
         ref={scrollRef}
         className={styles.stream}
@@ -1610,7 +1722,7 @@ export default function ChatView({
                   data-index={virtualRow.index}
                   data-message-id={msg.id}
                   ref={virtualizer.measureElement}
-                  className={`${styles.virtualItem} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
+                  className={`${styles.virtualItem} ${msg.role === 'user' ? styles.messageRowUser : ''} ${highlightMessageId === msg.id ? styles.messageHighlight : ''}`}
                   style={{
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
