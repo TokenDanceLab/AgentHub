@@ -6,6 +6,8 @@ export interface EmptyStateAction {
   onClick: () => void;
   icon?: ReactNode;
   ariaLabel?: string;
+  /** Keyboard shortcut hint displayed as a kbd badge, e.g. "Ctrl+N" */
+  shortcut?: string;
 }
 
 export interface EmptyStateSuggestion {
@@ -74,6 +76,9 @@ export function EmptyState({
           >
             {action.icon}
             <span>{action.label}</span>
+            {action.shortcut ? (
+              <kbd className={styles.shortcut}>{action.shortcut}</kbd>
+            ) : null}
           </button>
         ) : null}
         {suggestions && suggestions.length > 0 ? (
