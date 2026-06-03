@@ -65,7 +65,7 @@ export function useErrorReporter() {
     return {
       total: recent.reduce((sum, r) => sum + r.count, 0),
       byCategory,
-      latest: recent.length > 0 ? recent[0] : null,
+      latest: recent[0] ?? null,
     };
   }, []);
 
