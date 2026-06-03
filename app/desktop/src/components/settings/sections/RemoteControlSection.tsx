@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface RemoteControlSectionProps {
   hubSessionActive: boolean;
