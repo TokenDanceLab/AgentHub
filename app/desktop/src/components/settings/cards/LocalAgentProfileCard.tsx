@@ -9,7 +9,7 @@ import {
   PROVIDER_OPTIONS,
   REASONING_OPTIONS,
 } from '../settingsShared';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 // ── Types ───────────────────────────────────────────
 

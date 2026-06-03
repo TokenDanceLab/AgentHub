@@ -1,0 +1,465 @@
+/* ── Agent Scheduling / Team Console / Team Builder ─────────────────── */
+/* Styles used by AgentSchedulingSection, AgentProfilesSection,         */
+/* AgentMarketSection, and the inline team components in SettingsPage.  */
+
+/* ── Team Console ───────────────────────────────────────────────────── */
+.teamConsole {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teamBuilder {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teamBuilderGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+}
+
+.teamForm {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
+.teamForm label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.teamForm textarea {
+  min-height: 74px;
+}
+
+.teamForm .primaryBtn,
+.teamForm .secondaryBtn {
+  align-self: flex-start;
+}
+
+.teamFormHint {
+  color: var(--settings-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.teamConsoleHeader {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  min-height: 66px;
+  padding: 13px 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
+.teamConsoleHeader .settingCopy {
+  gap: 3px;
+}
+
+.teamConsoleHeader .statusPill {
+  align-self: start;
+  margin-top: 2px;
+}
+
+.teamMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr));
+  gap: 10px;
+}
+
+.teamBudgetGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 124px), 1fr));
+  gap: 10px;
+}
+
+.teamMetric {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  background: var(--glass-panel);
+  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+}
+
+.teamMetric span {
+  display: block;
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamMetric strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+/* ── Team Graph ─────────────────────────────────────────────────────── */
+.teamGraph {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.65fr);
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--glass-panel) 88%, transparent);
+  box-shadow: 0 10px 26px var(--glass-shadow-subtle);
+}
+
+[data-theme='dark'] .teamGraph {
+  border-color: var(--glass-border-heavy);
+  background: var(--glass-panel);
+  box-shadow: 0 14px 34px var(--glass-shadow-subtle);
+}
+
+.teamGraphNodes {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr));
+  gap: 8px;
+}
+
+.teamGraphEdges {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.teamGraphNode {
+  --team-node-accent: var(--settings-muted);
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid color-mix(in oklch, var(--settings-chip-border) 82%, transparent);
+  border-left: 2px solid color-mix(in oklch, var(--team-node-accent) 58%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--glass-panel) 92%, transparent);
+  box-shadow: 0 6px 16px var(--glass-shadow-subtle);
+}
+
+[data-theme='dark'] .teamGraphNode {
+  border-color: var(--glass-border-heavy);
+  border-left-color: color-mix(in oklch, var(--team-node-accent) 52%, var(--glass-border));
+  background: var(--glass-panel);
+  box-shadow: 0 8px 20px var(--glass-shadow-subtle);
+}
+
+.teamGraphNode strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamGraphNode span {
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamGraphNode em {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--foreground) 72%, var(--settings-muted));
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 620;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamGraphNodeCoordinator {
+  --team-node-accent: var(--settings-accent);
+}
+
+.teamGraphNodeMember {
+  --team-node-accent: var(--foreground);
+}
+
+.teamGraphNodeTask {
+  --team-node-accent: var(--settings-graph-task);
+}
+
+.teamGraphNodeRuntime {
+  --team-node-accent: var(--settings-graph-runtime);
+}
+
+.teamGraphNodeArtifact {
+  --team-node-accent: var(--settings-graph-artifact);
+}
+
+.teamGraphNodeConflict {
+  --team-node-accent: var(--settings-graph-conflict);
+}
+
+.teamGraphEdge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in oklch, var(--settings-chip-border) 78%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--settings-chip-bg) 86%, transparent);
+}
+
+[data-theme='dark'] .teamGraphEdge {
+  border-color: var(--glass-border-heavy);
+  background: var(--glass-bg-subtle);
+}
+
+.teamGraphEdge span {
+  overflow: hidden;
+  color: color-mix(in oklch, var(--foreground) 72%, var(--settings-muted));
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamGraphEdge strong {
+  max-width: 86px;
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--settings-accent) 13%, transparent);
+  color: var(--foreground);
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Team Console Grid / Surface ────────────────────────────────────── */
+.teamConsoleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.teamSurface {
+  min-width: 0;
+}
+
+.teamBlockHeader {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.teamBlockHeader strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.teamBlockHeader span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamList {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+/* ── Team Mini Row ──────────────────────────────────────────────────── */
+.teamMiniRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  min-height: 66px;
+  padding: 13px 15px;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  margin-bottom: 8px;
+  background: var(--glass-panel);
+}
+
+.teamMiniButton {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    border-color var(--duration-fast),
+    background var(--duration-fast),
+    box-shadow var(--duration-fast);
+}
+
+.teamMiniButton:hover,
+.teamMiniButton:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--glass-border));
+  background: var(--glass-panel-strong);
+}
+
+.teamMiniButton:focus-visible {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--settings-accent) 30%, transparent);
+}
+
+.teamActionRow {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.teamExecutionRow {
+  min-height: 58px;
+  padding-block: 11px;
+}
+
+.teamMiniRowSelected {
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--glass-border));
+  background: var(--glass-panel-strong);
+}
+
+.teamMiniRow > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.teamMiniRow strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamMiniRow span {
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.teamMiniRow em {
+  width: fit-content;
+  max-width: 140px;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid var(--settings-chip-border);
+  border-radius: 999px;
+  background: var(--settings-chip-bg);
+  color: var(--foreground);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.teamActionRow .teamActions {
+  width: 100%;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.teamActionRow .primaryBtn,
+.teamActionRow .secondaryBtn {
+  min-width: 72px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .teamConsoleGrid,
+  .teamBuilderGrid,
+  .teamMetricGrid,
+  .teamGraph {
+    grid-template-columns: 1fr;
+  }
+
+  .teamGraph {
+    padding: 9px;
+  }
+
+  .teamConsoleHeader,
+  .teamMiniRow {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}

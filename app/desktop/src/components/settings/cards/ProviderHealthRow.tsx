@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Plug } from 'lucide-react';
 import type { ProviderHealth } from '@/stores/modelSettingsStore';
 import SelectControl from '../primitives/SelectControl';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 const PROVIDER_HEALTH_OPTIONS = [
   ['ready', 'Ready'],

@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import CapabilityCard from '../primitives/CapabilityCard';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface PlatformsSectionProps {
   hubSessionActive: boolean;
