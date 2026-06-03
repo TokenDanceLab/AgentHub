@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, memo } from 'react';
+import { useEffect, useMemo, useRef, useState, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Bot,
@@ -6,11 +6,14 @@ import {
   CheckCircle2,
   Cloud,
   Cpu,
+  FolderOpen,
   HardDrive,
   LockKeyhole,
   MessageSquareText,
   Route,
+  Send,
   Server,
+  SkipForward,
   Sparkles,
   Wifi,
   WifiOff,
@@ -18,6 +21,7 @@ import {
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import type { AgentInfo } from '@shared/types';
+import OnboardingStepper from './OnboardingStepper';
 import styles from './WelcomeScreen.module.css';
 
 interface Props {
@@ -29,6 +33,7 @@ interface Props {
   onSendMessage: (message: string, agentId?: string, opts?: { model?: string }) => void;
 }
 
+const ONBOARDING_STORAGE_KEY = 'agenthub.onboarding.completed';
 const SUGGESTION_KEYS = [
   'welcome.suggestion1',
   'welcome.suggestion2',
@@ -36,6 +41,22 @@ const SUGGESTION_KEYS = [
 ] as const;
 
 type LauncherMode = 'runtime' | 'profile' | 'target';
+
+function isOnboardingCompleted(): boolean {
+  try {
+    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setOnboardingCompleted(): void {
+  try {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+  } catch {
+    // localStorage may be unavailable
+  }
+}
 
 export default memo(function WelcomeScreen({
   online,
@@ -49,6 +70,17 @@ export default memo(function WelcomeScreen({
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeMode, setActiveMode] = useState<LauncherMode>('profile');
   const [draftAgentId, setDraftAgentId] = useState<string | undefined>();
+
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(() => !isOnboardingCompleted());
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  const onboardingSteps = useMemo(() => [
+    { label: t('onboarding.step1', 'Select Runtime') },
+    { label: t('onboarding.step2', 'Select Project') },
+    { label: t('onboarding.step3', 'Send Message') },
+  ], [t]);
+
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
   const defaultModel = useModelSettingsStore((s) => s.defaultModel);
   const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
@@ -94,7 +126,19 @@ export default memo(function WelcomeScreen({
     });
   }, []);
 
+  // Auto-advance onboarding step when agent is selected
+  useEffect(() => {
+    if (showOnboarding && onboardingStep === 0 && (selectedAgentId || draftAgentId)) {
+      // Agent has been selected, advance to step 2
+      setOnboardingStep(1);
+    }
+  }, [showOnboarding, onboardingStep, selectedAgentId, draftAgentId]);
+
   const handleSuggestionClick = (prompt: string) => {
+    // Complete onboarding if active
+    if (showOnboarding) {
+      completeOnboarding();
+    }
     onCreateThread();
     onSendMessage(prompt, activeAgent?.id, profileAlias ? { model: profileAlias } : undefined);
   };
@@ -103,17 +147,72 @@ export default memo(function WelcomeScreen({
     setDraftAgentId(agentId);
     onSelectAgent?.(agentId);
     setActiveMode('profile');
+    // Advance onboarding step if in onboarding mode
+    if (showOnboarding && onboardingStep === 0) {
+      setOnboardingStep(1);
+    }
   };
+
+  const completeOnboarding = useCallback(() => {
+    setOnboardingCompleted();
+    setShowOnboarding(false);
+  }, []);
+
+  const handleSkipOnboarding = useCallback(() => {
+    completeOnboarding();
+  }, [completeOnboarding]);
+
+  const handleOnboardingCreateThread = useCallback(() => {
+    if (showOnboarding && onboardingStep === 1) {
+      setOnboardingStep(2);
+    }
+    onCreateThread();
+  }, [showOnboarding, onboardingStep, onCreateThread]);
 
   return (
     <div ref={containerRef} className={styles.container} role="region" aria-label={t('welcome.title')}>
       <div className={styles.content}>
+        {showOnboarding && (
+          <div className={styles.onboardingHeader}>
+            <div className={styles.onboardingTitle}>
+              <Sparkles size={16} />
+              <span>{t('onboarding.title', 'Getting Started')}</span>
+            </div>
+            <OnboardingStepper steps={onboardingSteps} currentStep={onboardingStep} />
+            <button
+              type="button"
+              className={styles.skipBtn}
+              onClick={handleSkipOnboarding}
+            >
+              <SkipForward size={13} />
+              <span>{t('onboarding.skip', 'Skip')}</span>
+            </button>
+          </div>
+        )}
+
         <div className={styles.header}>
           <div className={styles.brandMark} aria-hidden="true">
             <Sparkles size={18} />
           </div>
           <span>{t('welcome.eyebrow')}</span>
-          <h1>{t('welcome.headline')}</h1>
+          <h1>
+            {showOnboarding && onboardingStep === 0
+              ? t('onboarding.step1Title', 'Choose your Agent Runtime')
+              : showOnboarding && onboardingStep === 1
+                ? t('onboarding.step2Title', 'Select or create a project')
+                : showOnboarding && onboardingStep === 2
+                  ? t('onboarding.step3Title', 'Send your first message')
+                  : t('welcome.headline')}
+          </h1>
+          {showOnboarding && onboardingStep === 0 && (
+            <p className={styles.onboardingHint}>{t('onboarding.step1Hint', 'Select a runtime to execute your agent tasks.')}</p>
+          )}
+          {showOnboarding && onboardingStep === 1 && (
+            <p className={styles.onboardingHint}>{t('onboarding.step2Hint', 'Open a project folder or create a new thread to start working.')}</p>
+          )}
+          {showOnboarding && onboardingStep === 2 && (
+            <p className={styles.onboardingHint}>{t('onboarding.step3Hint', 'Type a message below or click a suggestion to get started.')}</p>
+          )}
         </div>
 
         <div className={styles.launcher}>
@@ -219,7 +318,7 @@ export default memo(function WelcomeScreen({
             )}
           </div>
 
-          <button className={styles.commandBox} onClick={onCreateThread} type="button">
+          <button className={styles.commandBox} onClick={showOnboarding && onboardingStep === 1 ? handleOnboardingCreateThread : onCreateThread} type="button">
             <MessageSquareText size={19} />
             <span>
               {activeAgent
@@ -237,7 +336,11 @@ export default memo(function WelcomeScreen({
         </div>
 
         <div className={styles.suggestions}>
-          <p className={styles.suggestionsLabel}>{t('welcome.suggestionsLabel')}</p>
+          <p className={styles.suggestionsLabel}>
+            {showOnboarding && onboardingStep === 2
+              ? t('onboarding.trySuggestion', 'Try one of these to get started:')
+              : t('welcome.suggestionsLabel')}
+          </p>
           <div className={styles.chips}>
             {SUGGESTION_KEYS.map((key) => (
               <button
