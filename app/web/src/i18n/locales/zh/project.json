@@ -143,5 +143,9 @@
   },
   "demo": {
     "cardDetail": "演示/mock fallback 数据：{{detail}}"
+  },
+  "locked": {
+    "title": "需要 Hub 会话",
+    "description": "请先登录 Hub 以查看项目数据和里程碑信息。"
   }
 }
