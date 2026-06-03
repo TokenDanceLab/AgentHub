@@ -294,6 +294,9 @@ func TestEdgeRegistersWithHubMultiple(t *testing.T) {
 // (simulated via Edge's local REST API), Edge creates a run. In the real
 // system, Desktop forwards the Hub WebSocket dispatch to Edge's local API.
 func TestEdgeReceivesDispatchFromHub(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	ts, h := startEdgeServer(t)
 
 	// Simulate Hub dispatch arriving at Edge: Desktop calls POST /v1/runs
@@ -419,6 +422,9 @@ func TestEdgeReportsFailToHub(t *testing.T) {
 // TestEdgeFullProtocolRoundTrip simulates a complete Edge-Hub protocol
 // flow: device registration -> Hub dispatch -> Edge streaming results -> done.
 func TestEdgeFullProtocolRoundTrip(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	mockHub := newMockHub(t)
 	edgeTS, edgeH := startEdgeServer(t)
 
