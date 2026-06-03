@@ -90,22 +90,22 @@
   margin-left: 0;
   margin-right: 0;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.003)),
+    linear-gradient(180deg, var(--glass-bg-subtle), var(--glass-bg-subtle)),
     var(--input-panel-bg);
   color: color-mix(in oklch, var(--foreground) 74%, var(--muted-foreground) 26%);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--glass-border-subtle);
   border-radius: 18px;
   padding: 9px 13px 10px;
   box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.045),
-    0 1px 3px rgba(0, 0, 0, 0.055);
+    0 8px 20px var(--glass-shadow-subtle),
+    0 1px 3px var(--glass-shadow-subtle);
 }
 
 [data-theme='light'] .userMsg {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.52)),
+    linear-gradient(180deg, rgba(255,255,255,0.64), var(--glass-input-bg)),
     var(--input-panel-bg);
-  border-color: rgba(15, 23, 42, 0.02);
+  border-color: var(--glass-border-subtle);
 }
 
 .userAttachmentList {
@@ -127,9 +127,9 @@
   max-width: 100%;
   min-height: 34px;
   padding: 6px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.065);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
 }
 
 .userAttachmentChip svg {
@@ -165,8 +165,8 @@
 }
 
 [data-theme='light'] .userAttachmentChip {
-  border-color: rgba(15, 23, 42, 0.08);
-  background: rgba(15, 23, 42, 0.035);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-subtle);
 }
 
 .longTextBlock {
@@ -179,9 +179,9 @@
   min-height: 28px;
   margin-top: 6px;
   padding: 4px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.065);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--glass-bg-subtle);
   color: var(--muted-foreground);
   font-family: var(--font-sans);
   font-size: 12px;
@@ -192,18 +192,18 @@
 .longTextToggle:hover,
 .longTextToggle:focus-visible {
   outline: none;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: color-mix(in oklch, var(--foreground) 90%, var(--muted-foreground) 10%);
 }
 
 [data-theme='light'] .longTextToggle {
-  border-color: rgba(15, 23, 42, 0.08);
-  background: rgba(15, 23, 42, 0.035);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-subtle);
 }
 
 [data-theme='light'] .longTextToggle:hover,
 [data-theme='light'] .longTextToggle:focus-visible {
-  background: rgba(15, 23, 42, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 /* Agent: pure text on canvas, no background */
@@ -269,8 +269,8 @@
   width: 100%;
   min-height: 38px;
   padding: 6px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(251, 191, 36, 0.12);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-tint-amber);
   color: var(--warning);
   font-size: 13px;
   line-height: 1.45;
@@ -279,12 +279,12 @@
 }
 
 .connectionBannerReconnecting {
-  background: rgba(251, 191, 36, 0.1);
+  background: var(--glass-tint-amber);
   color: var(--warning);
 }
 
 .connectionBannerFailed {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
 }
 
@@ -336,7 +336,7 @@
 }
 
 .connectionBannerBtn:hover {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--glass-tint-danger);
   border-color: var(--destructive);
 }
 
@@ -362,19 +362,19 @@
 
 .connectionBannerDismiss:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-hover);
 }
 
 [data-theme='light'] .connectionBanner {
-  border-bottom-color: rgba(15, 23, 42, 0.06);
+  border-bottom-color: var(--glass-border);
 }
 
 [data-theme='light'] .connectionBannerReconnecting {
-  background: rgba(251, 191, 36, 0.12);
+  background: var(--glass-tint-amber);
 }
 
 [data-theme='light'] .connectionBannerFailed {
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--glass-tint-danger);
 }
 
 [data-theme='light'] .connectionBannerBtn {
@@ -382,11 +382,11 @@
 }
 
 [data-theme='light'] .connectionBannerBtn:hover {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--glass-tint-danger);
 }
 
 [data-theme='light'] .connectionBannerDismiss:hover {
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--glass-bg-hover);
 }
 
 @keyframes bannerSlideIn {
@@ -439,7 +439,7 @@
   width: 18px;
   height: 18px;
   border-radius: 6px;
-  background: rgba(255,255,255,0.032);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
   display: flex;
   align-items: center;
@@ -467,7 +467,7 @@
 }
 
 [data-theme='light'] .avatarCircle {
-  background: rgba(0,0,0,0.045);
+  background: var(--glass-bg-light);
 }
 
 .agentNameLabel {
@@ -567,7 +567,7 @@
 }
 
 .actionBtn:hover {
-  background: rgba(255,255,255,0.045);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
 }
 
@@ -578,9 +578,9 @@
 .viewFullDiff:focus-visible,
 .copyBtn:focus-visible {
   outline: none;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px var(--glass-bg-heavy);
 }
 
 :global([data-theme='light']) .actionBtn:focus-visible,
@@ -589,8 +589,8 @@
 :global([data-theme='light']) .thinkingToggle:focus-visible,
 :global([data-theme='light']) .viewFullDiff:focus-visible,
 :global([data-theme='light']) .copyBtn:focus-visible {
-  background: rgba(0, 0, 0, 0.04);
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+  background: var(--glass-bg-light);
+  box-shadow: inset 0 0 0 1px var(--glass-shadow-subtle);
 }
 
 :global(html[data-focus-source='pointer']) .actionBtn:focus-visible,
@@ -609,13 +609,13 @@
   min-height: 24px;
   padding: 2px 3px 2px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.036);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.052);
+  background: var(--glass-bg-light);
+  box-shadow: inset 0 0 0 1px var(--glass-bg-medium);
 }
 
 :global([data-theme='light']) .deleteConfirmBar {
-  background: rgba(15, 23, 42, 0.035);
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.045);
+  background: var(--glass-bg-subtle);
+  box-shadow: inset 0 0 0 1px var(--glass-shadow-subtle);
 }
 
 .deleteConfirmText {
@@ -651,12 +651,12 @@
 }
 
 .deleteCancelBtn:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 80%, var(--text-weaker) 20%);
 }
 
 :global([data-theme='light']) .deleteCancelBtn:hover {
-  background: rgba(15, 23, 42, 0.045);
+  background: var(--glass-bg-light);
 }
 
 .deleteConfirmBtn {
@@ -695,7 +695,7 @@
 }
 
 .thinkingToggle:hover {
-  background: rgba(255, 255, 255, 0.032);
+  background: var(--glass-bg-subtle);
   color: var(--muted-foreground);
 }
 
@@ -730,7 +730,7 @@
   width: min(100%, 680px);
   margin: 3px 0 8px 10px;
   padding: 2px 0 2px 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.075);
+  border-left: 1px solid var(--glass-border);
   font-size: 12.5px;
   font-family: var(--font-sans);
   line-height: 1.56;
@@ -742,7 +742,7 @@
 }
 
 [data-theme='light'] .thinkingContent {
-  border-left-color: rgba(15, 23, 42, 0.12);
+  border-left-color: var(--glass-border-strong);
 }
 
 /* ── File change ─────────────────────────── */
@@ -777,7 +777,7 @@
 
 .fileChangeHeader:hover,
 .fileChangeHeader:focus-visible {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 82%, transparent);
   outline: none;
 }
@@ -844,9 +844,9 @@
   padding: 8px 10px;
   max-height: 260px;
   overflow: auto;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--glass-bg-subtle);
   color: color-mix(in oklch, var(--foreground) 72%, transparent);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -889,18 +889,18 @@
   width: min(100%, 680px);
   margin: 4px 0;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.095);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.038);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 84%, var(--muted-foreground) 16%);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035) inset;
+  box-shadow: 0 1px 0 var(--glass-bg-subtle) inset;
 }
 
 [data-theme='light'] .agentTaskBlock,
 [data-theme='light'] .childAgentBlock,
 [data-theme='light'] .routeDecisionBlock {
-  border-color: rgba(15, 23, 42, 0.095);
-  background: rgba(15, 23, 42, 0.035);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-subtle);
 }
 
 .agentTaskHeader,
@@ -1045,7 +1045,7 @@
 }
 
 .statusRowHeader:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: var(--foreground);
 }
 
@@ -1081,7 +1081,7 @@
   min-height: 22px;
   padding: 2px 7px 3px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
   color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.45;
@@ -1155,7 +1155,7 @@
   min-height: 18px;
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 520;
@@ -1164,7 +1164,7 @@
 
 [data-theme='light'] .contextUsagePercent,
 [data-theme='light'] .contextUsageThreshold {
-  background: rgba(15, 23, 42, 0.052);
+  background: var(--glass-bg-medium);
 }
 
 .contextUsageWarning .contextUsagePercent {
@@ -1178,11 +1178,11 @@
   margin: 7px 0 0;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.075);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='light'] .contextUsageBar {
-  background: rgba(15, 23, 42, 0.075);
+  background: var(--glass-bg-strong);
 }
 
 .contextUsageBar::before {
@@ -1246,14 +1246,14 @@
   padding: 7px 8px 7px 12px;
   border-left: 3px solid var(--muted-foreground);
   border-radius: 0 4px 4px 0;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--glass-bg-subtle);
   color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.45;
 }
 
 [data-theme='light'] .errorBlock {
-  background: rgba(15, 23, 42, 0.028);
+  background: var(--glass-bg-subtle);
 }
 
 /* Category-specific border and icon colors */
@@ -1326,7 +1326,7 @@
   gap: 4px;
   min-height: 24px;
   padding: 2px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 5px;
   background: transparent;
   color: var(--muted-foreground);
@@ -1338,9 +1338,9 @@
 }
 
 .errorBlockActionBtn:hover {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--glass-border-heavy);
 }
 
 .errorBlockActionBtn:active {
@@ -1363,20 +1363,20 @@
 
 .errorBlockDismissBtn:hover {
   color: var(--foreground);
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
 }
 
 [data-theme='light'] .errorBlockActionBtn {
-  border-color: rgba(15, 23, 42, 0.086);
+  border-color: var(--glass-border-strong);
 }
 
 [data-theme='light'] .errorBlockActionBtn:hover {
-  background: rgba(15, 23, 42, 0.038);
-  border-color: rgba(15, 23, 42, 0.14);
+  background: var(--glass-bg-light);
+  border-color: var(--glass-border-heavy);
 }
 
 [data-theme='light'] .errorBlockDismissBtn:hover {
-  background: rgba(15, 23, 42, 0.038);
+  background: var(--glass-bg-light);
 }
 
 /* ── Progressive Disclosure ───────────────── */
@@ -1423,7 +1423,7 @@
 }
 .toolUseHeader:hover,
 .toolUseHeader:focus-visible {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 82%, transparent);
   outline: none;
 }
@@ -1485,13 +1485,13 @@
   font-size: 12px;
   font-weight: 520;
   line-height: 1.45;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   border: 0;
   flex-shrink: 0;
 }
 
 .toolStatusPending {
-  background: rgba(255, 255, 255, 0.075);
+  background: var(--glass-bg-medium);
   color: var(--muted-foreground);
 }
 
@@ -1577,7 +1577,7 @@
 
 .toolGroupHeader:hover,
 .toolGroupHeader:focus-visible {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 82%, transparent);
   outline: none;
 }
@@ -1636,18 +1636,18 @@
 /* ── Diff card �?left-border emphasis, no box ── */
 .diffCard {
   margin: var(--space-xs) 0;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.014);
+  background: var(--glass-bg-subtle);
 }
 .diffCardHeader {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 5px 10px;
-  background: rgba(255, 255, 255, 0.025);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-subtle);
+  border-bottom: 1px solid var(--glass-border-subtle);
   font-size: var(--font-size-xs);
   font-family: var(--font-mono);
 }
@@ -1689,7 +1689,7 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 5px;
   background: transparent;
   color: var(--muted-foreground);
@@ -1699,9 +1699,9 @@
   transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
 }
 .diffActionBtn:hover {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--glass-border-heavy);
 }
 .diffActionBtn:active {
   transform: scale(0.97);
@@ -1729,7 +1729,7 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 5px;
   background: transparent;
   color: var(--muted-foreground);
@@ -1739,7 +1739,7 @@
   transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
 }
 .diffViewToggle:hover {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 .diffViewToggleActive {
@@ -1779,7 +1779,7 @@
 }
 .diffHunkHeader {
   padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: var(--text-weaker);
   font-size: 10px;
   font-weight: 520;
@@ -1793,20 +1793,20 @@
 .diffSideBySideCol {
   flex: 1;
   min-width: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid var(--glass-border-subtle);
 }
 .diffSideBySideCol:last-child {
   border-right: none;
 }
 .diffSideBySideHeader {
   padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: var(--text-weaker);
   font-size: 10px;
   font-weight: 520;
   text-align: center;
   user-select: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--glass-border-subtle);
 }
 .diffSideBySideRow {
   display: flex;
@@ -1818,7 +1818,7 @@
   padding: 0 8px;
   white-space: pre;
   overflow-x: auto;
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid var(--glass-border-subtle);
 }
 .diffSideBySideCell:last-child {
   border-right: none;
@@ -1827,8 +1827,8 @@
   flex: 1;
   min-width: 0;
   padding: 0 8px;
-  background: rgba(255, 255, 255, 0.015);
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-subtle);
+  border-right: 1px solid var(--glass-border-subtle);
   color: transparent;
   user-select: none;
 }
@@ -1921,8 +1921,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-subtle);
+  border-bottom: 1px solid var(--glass-border-subtle);
 }
 
 .codeLangBadge {
@@ -1989,7 +1989,7 @@
 
 /* ── User msg actionBar tint ──────────────── */
 .userMsg .actionBtn:hover {
-  background: rgba(0,0,0,0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
@@ -2030,7 +2030,7 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px var(--glass-shadow-subtle);
   transition: background var(--duration-fast), transform var(--duration-fast);
 }
 
