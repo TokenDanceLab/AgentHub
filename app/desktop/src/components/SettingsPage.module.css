@@ -13,6 +13,21 @@
   --settings-graph-conflict: var(--destructive);
   --settings-graph-runtime: var(--skill);
   --settings-graph-task: var(--success);
+  /* Status tokens */
+  --settings-status-success: var(--success);
+  --settings-status-success-bg: var(--glass-tint-moss);
+  --settings-status-error: var(--destructive);
+  --settings-status-error-bg: var(--glass-tint-danger);
+  --settings-status-warning: var(--warning);
+  --settings-status-warning-bg: var(--glass-tint-amber);
+  /* Button / surface tokens */
+  --settings-btn-primary-text: var(--background);
+  --settings-danger: var(--destructive);
+  --settings-danger-bg: color-mix(in oklch, var(--destructive) 6%, transparent);
+  --settings-danger-border: color-mix(in oklch, var(--destructive) 30%, transparent);
+  /* Glass aliases (used by DataSection / AllowlistEditor) */
+  --settings-glass-bg: var(--glass-bg-subtle);
+  --settings-glass-border: var(--glass-border);
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
   height: 100%;
