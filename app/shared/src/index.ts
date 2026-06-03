@@ -55,7 +55,11 @@ export type {
   AnyEvent,
 } from './events';
 
-export { parseError, isErrorResponse, AppError } from './errors';
+export { parseError, isErrorResponse, AppError, globalErrorReporter, ErrorReporter } from './errors';
+export type { ErrorBody, ErrorCategory, ErrorReport } from './errors';
+
+export { useErrorReporter, setToastHandler } from './errorReporting';
+export type { ErrorStats, ToastConfig, ToastSeverity } from './errorReporting';
 
 export { buildTree, flattenTree } from './tree';
 export type { TreeNode } from './tree';
