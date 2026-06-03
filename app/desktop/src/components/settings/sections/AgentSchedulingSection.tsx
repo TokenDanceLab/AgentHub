@@ -14,7 +14,7 @@ import ExecutionTargetCard from '../primitives/ExecutionTargetCard';
 import TaskRunRow from '../cards/TaskRunRow';
 import HubTaskRow from '../cards/HubTaskRow';
 import { getRecentRuns, getRecentTasks, writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface AgentSchedulingSectionProps {
   runs: RunInfo[];

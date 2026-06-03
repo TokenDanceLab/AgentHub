@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Plug } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();

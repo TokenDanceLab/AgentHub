@@ -11,7 +11,7 @@ import {
   writeWorkspaceSettings,
   type WorkspaceEntry,
 } from '@/utils/workspaceStore';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 const PERMISSION_MODE_OPTIONS: Array<[string, string]> = [
   ['', 'Default'],
