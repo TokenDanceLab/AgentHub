@@ -13,14 +13,14 @@
   gap: 8px;
   min-height: 36px;
   padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid var(--glass-border);
   color: var(--muted-foreground);
   font-size: 12px;
   opacity: 0.72;
 }
 
 [data-theme='light'] .emptyCard {
-  border-bottom-color: rgba(0, 0, 0, 0.055);
+  border-bottom-color: var(--glass-border);
 }
 
 /* ── Category tabs ── */
@@ -29,11 +29,11 @@
   flex-wrap: wrap;
   gap: 3px;
   padding: 4px 0 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-bottom: 1px solid var(--glass-border-subtle);
 }
 
 [data-theme='light'] .tabBar {
-  border-bottom-color: rgba(0, 0, 0, 0.055);
+  border-bottom-color: var(--glass-border);
 }
 
 .tab {
@@ -53,12 +53,12 @@
 }
 
 .tab:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
 .tabActive {
-  background: rgba(93, 104, 204, 0.15);
+  background: var(--glass-tint-plum);
   color: var(--foreground);
 }
 
@@ -84,20 +84,20 @@
   justify-content: space-between;
   gap: 4px;
   padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--glass-border-subtle);
   transition: background 0.1s;
 }
 
 [data-theme='light'] .artifactRow {
-  border-bottom-color: rgba(0, 0, 0, 0.035);
+  border-bottom-color: var(--glass-border-subtle);
 }
 
 .artifactRow:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
 }
 
 .artifactRowActive {
-  background: rgba(93, 104, 204, 0.08);
+  background: var(--glass-tint-plum);
 }
 
 .artifactInfo {
@@ -138,7 +138,7 @@
   flex-shrink: 0;
   padding: 1px 4px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-bg-light);
 }
 
 .artifactActions {
@@ -164,7 +164,7 @@
 }
 
 .artifactBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
@@ -183,14 +183,14 @@
 /* ── Preview overlay ── */
 .previewOverlay {
   margin-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
 [data-theme='light'] .previewOverlay {
-  border-top-color: rgba(0, 0, 0, 0.06);
+  border-top-color: var(--glass-border);
 }
 
 .previewHeader {
@@ -224,9 +224,9 @@
   align-items: center;
   gap: 4px;
   padding: 3px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   color: var(--text-weakest);
   font-size: 10px;
   font-family: var(--font-sans);
@@ -235,17 +235,17 @@
 }
 
 .previewBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
 }
 
 [data-theme='light'] .previewBtn {
-  border-color: rgba(0, 0, 0, 0.08);
-  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--glass-border-strong);
+  background: var(--glass-bg-subtle);
 }
 
 [data-theme='light'] .previewBtn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--glass-bg-medium);
 }
 
 .previewBody {
@@ -261,7 +261,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--glass-bg-subtle);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -277,7 +277,7 @@
   min-height: 200px;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
 }
 
 .previewIframe {
@@ -296,7 +296,7 @@
 .previewCode {
   margin: 0;
   padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--glass-bg-light);
   border-radius: 6px;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -307,7 +307,7 @@
 }
 
 [data-theme='dark'] .previewCode {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
 }
 
 /* ── Placeholder ── */

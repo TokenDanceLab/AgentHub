@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -117,6 +118,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	if err := s.cache.GetRDB().Set(ctx, stateKey, string(entryJSON), 10*time.Minute).Err(); err != nil {
 		return nil, fmt.Errorf("store state in redis: %w", err)
 	}
+	slog.Debug("oidc.state.stored", "state", state[:8]+"...", "ttl", "10m")
 
 	// Build the TokenDance ID authorization URL
 	authURL, err := url.Parse(strings.TrimRight(s.cfg.IssuerURL, "/") + "/oidc/authorize")
@@ -132,6 +134,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	q.Set("code_challenge", codeChallenge)
 	q.Set("code_challenge_method", codeChallengeMethod)
 	authURL.RawQuery = q.Encode()
+	slog.Debug("oidc.authorize.url", "authorization_url_prefix", authURL.Scheme+"://"+authURL.Host+authURL.Path)
 
 	return &AuthorizationResult{
 		State:            state,
@@ -156,6 +159,7 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 	if err != nil {
 		return nil, errcode.OIDCInvalidState
 	}
+	slog.Debug("oidc.state.consumed", "state", state[:8]+"...")
 
 	var entry stateEntry
 	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
@@ -174,10 +178,12 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 	}
 
 	// 2. Exchange authorization code for tokens at TokenDance ID
+	slog.Debug("oidc.token.exchange.start", "redirect_uri", entry.RedirectURI, "code_len", len(code), "verifier_len", len(codeVerifier))
 	tokenResponse, err := s.exchangeCode(ctx, code, codeVerifier, entry.RedirectURI)
 	if err != nil {
 		return nil, errcode.OIDCCodeExchangeFailed
 	}
+	slog.Debug("oidc.token.exchange.ok", "has_id_token", tokenResponse.IDToken != "")
 	if tokenResponse.IDToken == "" {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
@@ -187,6 +193,7 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 	if err != nil {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
+	slog.Debug("oidc.jwt.validated", "sub", claims.Subject)
 	if claims.Subject == "" {
 		return nil, errcode.OIDCSubNotFound
 	}
@@ -196,6 +203,7 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 	if err != nil {
 		return nil, fmt.Errorf("find or create user by sub: %w", err)
 	}
+	slog.Debug("oidc.user.mapped", "sub", claims.Subject, "user_id", user.ID)
 
 	// 5. Register/update device
 	if err := repository.UpsertDevice(s.db, &model.Device{
@@ -265,6 +273,7 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		slog.Error("oidc token endpoint unreachable", "error", err, "token_url", tokenURL)
 		return nil, fmt.Errorf("token endpoint request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -275,6 +284,11 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		slog.Error("oidc token endpoint returned non-200",
+			"status", resp.StatusCode,
+			"response_body", string(body),
+			"redirect_uri_sent", redirectURI,
+		)
 		return nil, fmt.Errorf("token endpoint returned %d: %s", resp.StatusCode, string(body))
 	}
 

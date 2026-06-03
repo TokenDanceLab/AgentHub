@@ -149,7 +149,12 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
   // ---- Tauri path: Rust HTTP callback server ----
   return import('@tauri-apps/api/core')
     .then(({ invoke }) => invoke<number>('start_oidc_callback_server'))
-    .then((port) => {
+    .then(async (port) => {
+      // Import modules up front so listeners are registered before we return.
+      const [{ listen }] = await Promise.all([
+        import('@tauri-apps/api/event'),
+      ]);
+
       const result = new Promise<CallbackResult>((resolve, reject) => {
         let settled = false;
 
@@ -165,51 +170,42 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
         let unlistenError: () => void = () => {};
 
         // Listen for successful callback
-        import('@tauri-apps/api/event')
-          .then(({ listen }) => {
-            const p1 = listen<{ code: string; state: string }>('oidc-callback', (event) => {
-              if (settled) return;
-              settled = true;
-              clearTimeout(timeout);
-              unlistenError();
-              resolve({ code: event.payload.code, state: event.payload.state });
-            });
+        listen<{ code: string; state: string }>('oidc-callback', (event) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          unlistenError();
+          resolve({ code: event.payload.code, state: event.payload.state });
+        }).then((u) => {
+          if (settled) {
+            u();
+            return;
+          }
+          unlisten = u;
+        });
 
-            const p2 = listen<{ error: string; description?: string }>(
-              'oidc-callback-error',
-              (event) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timeout);
-                unlisten();
-                reject(
-                  new OidcError(
-                    'callbackError',
-                    `OIDC error: ${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
-                    `${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
-                  ),
-                );
-              },
+        listen<{ error: string; description?: string }>(
+          'oidc-callback-error',
+          (event) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            unlisten();
+            reject(
+              new OidcError(
+                'callbackError',
+                `OIDC error: ${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
+                `${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
+              ),
             );
-
-            return Promise.all([p1, p2]);
-          })
-          .then(([u1, u2]) => {
-            if (settled) {
-              u1();
-              u2();
-              return;
-            }
-            unlisten = u1;
-            unlistenError = u2;
-          })
-          .catch((err) => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeout);
-              reject(new OidcError('listenFailed', `Failed to listen for OIDC callback: ${err}`, String(err)));
-            }
-          });
+          },
+        ).then((u) => {
+          if (settled) {
+            u();
+            return;
+          }
+          unlistenError = u;
+        });
       });
 
       return { port, result };
@@ -362,6 +358,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await computeCodeChallenge(codeVerifier);
       const deviceId = getOrCreateDeviceId();
+      console.debug('[oidc] PKCE generated, code_verifier length:', codeVerifier.length);
 
       // 2. Start local callback server (Tauri) or prepare manual fallback.
       //    In Tauri, the Rust backend starts an HTTP server on a random port
@@ -372,6 +369,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
       if (isTauri()) {
         const { port, result } = await startCallbackServer();
+        console.debug('[oidc] Callback server on port:', port);
         redirectUri = buildRedirectUri(port);
         callbackResult = result;
       } else {
@@ -419,6 +417,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       }
 
       const { state: serverState, authorization_url: authUrl } = authorizeResp;
+      console.debug('[oidc] Hub returned authorization URL, state:', serverState.substring(0, 8) + '...');
 
       // code_verifier stays in closure — never written to sessionStorage/localStorage
       pendingOidcState = serverState;
@@ -438,8 +437,11 @@ export function createHubAuth(client?: HubClient): HubAuth {
         }
       }
 
+      console.debug('[oidc] Browser opened for auth URL');
+
       // 5. Wait for the callback from the local HTTP server (Tauri) or manual paste
       const callback = await callbackResult;
+      console.debug('[oidc] Callback received, state match:', callback.state === serverState);
 
       // 6. Validate state matches (CSRF protection)
       if (callback.state !== serverState) {
@@ -448,8 +450,10 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
       // 7. Exchange the code for Hub tokens
       let tokenResp: HubTokenResponse;
+      console.debug('[oidc] Exchanging code for tokens, redirect_uri:', redirectUri);
       try {
         tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, redirectUri, deviceId);
+        console.debug('[oidc] Token exchange complete, username:', tokenResp.user?.username);
       } catch (err) {
         const detail = err instanceof Error ? err.message : 'Unknown error';
         const oidcErr = new OidcError('tokenExchangeFailed', `Token exchange failed: ${detail}`, detail);

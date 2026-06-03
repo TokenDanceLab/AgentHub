@@ -1,6 +1,6 @@
 import { Cpu } from 'lucide-react';
 import type { RunnerHealthItem } from '@shared/types';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function RunnerRow({ runner }: { runner: RunnerHealthItem }) {
   return (

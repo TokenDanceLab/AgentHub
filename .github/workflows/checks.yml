@@ -68,7 +68,7 @@ jobs:
             fi
           }
           FAILED=0
-          check_pkg "edge-server/internal/security/" 68 "security" || FAILED=1
+          check_pkg "edge-server/internal/security/" 70 "security" || FAILED=1
           check_pkg "edge-server/internal/lifecycle/" 60 "lifecycle" || FAILED=1
           check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
           exit $FAILED
@@ -80,7 +80,6 @@ jobs:
         continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
       - name: Vulnerability check (govulncheck)
-        continue-on-error: true
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Vet
@@ -153,7 +152,6 @@ jobs:
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 
       - name: Vulnerability check (govulncheck)
-        continue-on-error: true
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Vet
@@ -244,13 +242,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-          cache-dependency-path: app/desktop/pnpm-lock.yaml
+          cache-dependency-path: app/pnpm-lock.yaml
 
       - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Install shared deps
-        working-directory: app/shared
+        working-directory: app
         run: pnpm install --frozen-lockfile
 
       - name: Type check
@@ -272,28 +267,24 @@ jobs:
         working-directory: ./app/web
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
-
       - name: Install
         run: pnpm install --frozen-lockfile
 
       - name: Lint Web
-        continue-on-error: true
-        run: pnpm lint --max-warnings 10
+        run: pnpm lint
 
       - name: Build Web
         run: pnpm build
       - name: Test
-        run: NODE_OPTIONS="--import ./scripts/vitest-loader.mjs" ./node_modules/.bin/vitest run
+        run: pnpm test -- --run
 
   # ── Frontend: Mobile ──────────────────────────
   frontend-mobile:
@@ -304,11 +295,16 @@ jobs:
         working-directory: ./app/mobile
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
       - name: Install
-        run: corepack enable && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
       - name: Build
@@ -322,23 +318,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
       - name: Install
-        run: corepack enable && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
         working-directory: ./app
       - name: Build desktop
         run: pnpm build
         working-directory: ./app/desktop
-      - name: Build web for E2E
-        run: pnpm build
-        working-directory: ./app/web
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-        working-directory: ./app
       - name: Smoke test
-        run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium
+        run: pnpm exec playwright test --project=chromium
         working-directory: ./app
 
   # ── Validation ───────────────────────────────

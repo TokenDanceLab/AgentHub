@@ -6,11 +6,8 @@ import SummaryCard from '../primitives/SummaryCard';
 import CapabilityCard from '../primitives/CapabilityCard';
 import Callout from '../primitives/Callout';
 import { APP_VERSION, HUB_URL } from '@/config';
-import { readBrowserStorage, shortId } from '../utils';
-import styles from '../../SettingsPage.module.css';
-
-const TD_CODE_VERIFIER_KEY = 'td_code_verifier';
-const TD_STATE_KEY = 'td_state';
+import { readBrowserStorage, shortId, TD_CODE_VERIFIER_KEY, TD_STATE_KEY } from '../utils';
+import styles from '../primitives/primitives.module.css';
 
 interface AccountSectionProps {
   hubSessionActive: boolean;

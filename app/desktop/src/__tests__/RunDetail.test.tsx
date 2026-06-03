@@ -37,7 +37,7 @@ describe('RunDetail', () => {
   it('shows run status with color coding for running', () => {
     const run = makeRun({ status: RunState.RUNNING });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.RUNNING');
+    const statusEl = screen.getByText('run.status.running');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusRunning');
   });
@@ -45,7 +45,7 @@ describe('RunDetail', () => {
   it('shows run status with color coding for completed', () => {
     const run = makeRun({ status: RunState.COMPLETED });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.COMPLETED');
+    const statusEl = screen.getByText('run.status.completed');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusDone');
   });
@@ -53,7 +53,7 @@ describe('RunDetail', () => {
   it('shows run status with color coding for failed', () => {
     const run = makeRun({ status: RunState.FAILED });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.FAILED');
+    const statusEl = screen.getByText('run.status.failed');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusFailed');
   });
@@ -61,7 +61,7 @@ describe('RunDetail', () => {
   it('shows cancelled status as failed style', () => {
     const run = makeRun({ status: RunState.CANCELLED });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.CANCELLED');
+    const statusEl = screen.getByText('run.status.cancelled');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusFailed');
   });
@@ -69,7 +69,7 @@ describe('RunDetail', () => {
   it('shows IDLE status in pending style', () => {
     const run = makeRun({ status: RunState.IDLE });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.IDLE');
+    const statusEl = screen.getByText('run.status.idle');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusPending');
   });

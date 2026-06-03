@@ -2,14 +2,15 @@ import { type FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X, Clock, ShieldAlert, AlertTriangle } from 'lucide-react';
 import type { TeamApprovalState, TeamConflictState } from '@/api/hubClient';
+import styles from './TeamApprovalPanel.module.css';
 
 interface TeamApprovalPanelProps {
   approvals: TeamApprovalState[];
   conflicts: TeamConflictState[];
   loading?: boolean;
   error?: string | null;
-  onApprove: (approvalId: string) => void;
-  onDeny: (approvalId: string) => void;
+  onApprove: (approvalId: string, reason?: string) => void;
+  onDeny: (approvalId: string, reason?: string) => void;
   onResolveConflict: (conflictId: string) => void;
   decidingIds?: Set<string>;
   memberNames?: Record<string, string>;
@@ -26,22 +27,22 @@ function timeAgo(dateStr?: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function statusStyle(status: string): React.CSSProperties {
+function badgeClass(status: string): string {
   switch (status.toLowerCase()) {
     case 'pending':
     case 'requested':
     case 'waiting':
     case 'waiting_for_approval':
-      return { color: '#f59e0b', backgroundColor: '#fef3c7' };
+      return styles.badgePending!;
     case 'approved':
     case 'allowed':
     case 'resolved':
-      return { color: '#10b981', backgroundColor: '#d1fae5' };
+      return styles.badgeApproved!;
     case 'denied':
     case 'rejected':
-      return { color: '#ef4444', backgroundColor: '#fee2e2' };
+      return styles.badgeDenied!;
     default:
-      return { color: '#6b7280', backgroundColor: '#f3f4f6' };
+      return styles.badgeDefault!;
   }
 }
 
@@ -58,6 +59,11 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 }) => {
   const { t } = useTranslation();
   const [reasonInput, setReasonInput] = useState('');
+  const [confirmAction, setConfirmAction] = useState<{
+    approvalId: string;
+    decision: 'approve' | 'deny';
+    toolLabel: string;
+  } | null>(null);
 
   const pendingApprovals = approvals.filter((a) =>
     ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(a.status.toLowerCase()),
@@ -67,23 +73,25 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 
   const handleApprove = useCallback(
     (approvalId: string) => {
-      onApprove(approvalId);
+      onApprove(approvalId, reasonInput || undefined);
       setReasonInput('');
+      setConfirmAction(null);
     },
-    [onApprove],
+    [onApprove, reasonInput],
   );
 
   const handleDeny = useCallback(
     (approvalId: string) => {
-      onDeny(approvalId);
+      onDeny(approvalId, reasonInput || undefined);
       setReasonInput('');
+      setConfirmAction(null);
     },
-    [onDeny],
+    [onDeny, reasonInput],
   );
 
   if (loading) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.loading}>
         {t('teamRun.loading', 'Loading approvals...')}
       </div>
     );
@@ -91,7 +99,7 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: 16, color: 'var(--color-danger, #e53e3e)', fontSize: 13 }}>
+      <div className={styles.error}>
         {error}
       </div>
     );
@@ -99,31 +107,22 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
 
   if (!hasItems) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.empty}>
         {t('teamRun.noApprovals', 'No pending approvals or conflicts.')}
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className={styles.container}>
       {/* Reason input shared across decisions */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div className={styles.reasonRow}>
         <input
           type="text"
           placeholder={t('teamRun.reasonPlaceholder', 'Reason (optional)...')}
           value={reasonInput}
           onChange={(e) => setReasonInput(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '6px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--border-subtle, #e5e7eb)',
-            fontSize: 12,
-            backgroundColor: 'var(--surface-default, #fff)',
-            color: 'var(--foreground)',
-            outline: 'none',
-          }}
+          className={styles.reasonInput}
         />
       </div>
 
@@ -134,97 +133,60 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
           : undefined;
 
         return (
-          <div
-            key={approval.approval_id}
-            style={{
-              padding: '10px 12px',
-              borderRadius: 8,
-              border: '1px solid var(--border-subtle, #e5e7eb)',
-              backgroundColor: 'var(--surface-raised, #f9fafb)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ShieldAlert size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>
+          <div key={approval.approval_id} className={styles.card}>
+            <div className={styles.cardHeader}>
+              <ShieldAlert size={16} className={styles.cardIconWarning} />
+              <span className={styles.cardTitle}>
                 {t('teamRun.approvalRequest', 'Approval: {{tool}}', {
                   tool: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
                 })}
               </span>
-              <span
-                style={{
-                  ...statusStyle(approval.status),
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: 9999,
-                }}
-              >
-                <Clock size={10} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+              <span className={`${styles.badge} ${badgeClass(approval.status)}`}>
+                <Clock size={10} className={styles.badgeIcon} />
                 {t('teamRun.status.pending', 'Pending')}
               </span>
             </div>
 
             {memberLabel && (
-              <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+              <div className={styles.cardMeta}>
                 {t('teamRun.requestedBy', 'Requested by {{member}}', { member: memberLabel })}
               </div>
             )}
 
             {approval.reason && (
-              <div style={{ fontSize: 12, color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
+              <div className={styles.cardMetaItalic}>
                 {approval.reason}
               </div>
             )}
 
             {approval.created_at && (
-              <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+              <div className={styles.cardMeta}>
                 {timeAgo(approval.created_at)}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div className={styles.cardActions}>
               <button
                 type="button"
                 disabled={isDeciding}
-                onClick={() => handleDeny(approval.approval_id)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  border: '1px solid #fca5a5',
-                  backgroundColor: '#fef2f2',
-                  color: '#dc2626',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: isDeciding ? 'not-allowed' : 'pointer',
-                  opacity: isDeciding ? 0.5 : 1,
-                }}
+                onClick={() => setConfirmAction({
+                    approvalId: approval.approval_id,
+                    decision: 'deny',
+                    toolLabel: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
+                  })}
+                className={`${styles.actionBtn} ${styles.actionBtnDeny}`}
               >
                 <X size={14} /> {t('teamRun.deny', 'Deny')}
               </button>
               <button
                 type="button"
                 disabled={isDeciding}
-                onClick={() => handleApprove(approval.approval_id)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  border: '1px solid #86efac',
-                  backgroundColor: '#f0fdf4',
-                  color: '#16a34a',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: isDeciding ? 'not-allowed' : 'pointer',
-                  opacity: isDeciding ? 0.5 : 1,
-                }}
+                onClick={() => setConfirmAction({
+                    approvalId: approval.approval_id,
+                    decision: 'approve',
+                    toolLabel: approval.tool_name || t('teamRun.unknownTool', 'unknown tool'),
+                  })}
+                className={`${styles.actionBtn} ${styles.actionBtnApprove}`}
               >
                 <Check size={14} /> {t('teamRun.approve', 'Approve')}
               </button>
@@ -234,38 +196,19 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
       })}
 
       {pendingConflicts.map((conflict) => (
-        <div
-          key={conflict.conflict_id}
-          style={{
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: '1px solid var(--border-subtle, #e5e7eb)',
-            backgroundColor: 'var(--surface-raised, #f9fafb)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertTriangle size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
-            <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>
+        <div key={conflict.conflict_id} className={styles.card}>
+          <div className={styles.cardHeader}>
+            <AlertTriangle size={16} className={styles.cardIconWarning} />
+            <span className={styles.cardTitle}>
               {t('teamRun.conflictOn', 'Conflict: {{path}}', { path: conflict.path })}
             </span>
-            <span
-              style={{
-                ...statusStyle(conflict.status),
-                fontSize: 11,
-                fontWeight: 600,
-                padding: '2px 8px',
-                borderRadius: 9999,
-              }}
-            >
+            <span className={`${styles.badge} ${badgeClass(conflict.status)}`}>
               {conflict.status}
             </span>
           </div>
 
           {conflict.agent_task_ids && conflict.agent_task_ids.length > 0 && (
-            <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+            <div className={styles.cardMeta}>
               {t('teamRun.conflictSources', '{{count}} conflicting source(s)', {
                 count: conflict.agent_task_ids.length,
               })}
@@ -273,34 +216,74 @@ export const TeamApprovalPanel: FC<TeamApprovalPanelProps> = ({
           )}
 
           {conflict.first_seen_at && (
-            <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+            <div className={styles.cardMeta}>
               {t('teamRun.firstSeen', 'First seen {{time}}', { time: timeAgo(conflict.first_seen_at) })}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div className={styles.cardActions}>
             <button
               type="button"
               onClick={() => onResolveConflict(conflict.conflict_id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '5px 12px',
-                borderRadius: 6,
-                border: '1px solid #86efac',
-                backgroundColor: '#f0fdf4',
-                color: '#16a34a',
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
+              className={styles.actionBtnResolve}
             >
               <Check size={14} /> {t('teamRun.resolveConflict', 'Resolve')}
             </button>
           </div>
         </div>
       ))}
+      {confirmAction && (
+        <div
+          className={styles.overlay}
+          onClick={() => setConfirmAction(null)}
+          role="dialog"
+          aria-label={t('teamRun.confirmTitle', 'Confirm decision')}
+        >
+          <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h4 className={styles.dialogTitle}>
+              {confirmAction.decision === 'approve'
+                ? t('teamRun.confirmApprove', 'Confirm approval')
+                : t('teamRun.confirmDeny', 'Confirm denial')}
+            </h4>
+            <p className={styles.dialogBody}>
+              {confirmAction.decision === 'approve'
+                ? t('teamRun.confirmApproveDesc', 'Approve "{{tool}}"?', { tool: confirmAction.toolLabel })
+                : t('teamRun.confirmDenyDesc', 'Deny "{{tool}}"?', { tool: confirmAction.toolLabel })}
+            </p>
+            {reasonInput && (
+              <p className={styles.dialogReason}>
+                {t('teamRun.reasonLabel', 'Reason')}: {reasonInput}
+              </p>
+            )}
+            <div className={styles.dialogActions}>
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className={styles.dialogCancel}
+              >
+                {t('teamRun.cancel', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  confirmAction.decision === 'approve'
+                    ? handleApprove(confirmAction.approvalId)
+                    : handleDeny(confirmAction.approvalId)
+                }
+                className={`${styles.dialogConfirm} ${
+                  confirmAction.decision === 'approve'
+                    ? styles.dialogConfirmApprove
+                    : styles.dialogConfirmDeny
+                }`}
+              >
+                {confirmAction.decision === 'approve'
+                  ? t('teamRun.confirm', 'Confirm')
+                  : t('teamRun.confirm', 'Confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,143 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--td-ink);
+}
+
+.iconWrap {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: var(--td-tint);
+}
+
+.iconWrapNetwork {
+  composes: iconWrap;
+  color: var(--warning);
+}
+
+.iconWrapTimeout {
+  composes: iconWrap;
+  color: var(--warning);
+}
+
+.iconWrapCrash {
+  composes: iconWrap;
+  color: var(--td-danger);
+}
+
+.iconWrapUnknown {
+  composes: iconWrap;
+  color: var(--td-ink-muted);
+}
+
+.iconWrapChunk {
+  composes: iconWrap;
+  color: var(--td-plum);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--td-ink);
+}
+
+.description {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--td-ink-muted);
+  max-width: 480px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--td-radius-control, 6px);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: opacity 0.15s ease;
+}
+
+.btnPrimary:hover {
+  opacity: 0.9;
+}
+
+.btnPrimary:focus-visible {
+  outline: 2px solid var(--td-focus);
+  outline-offset: 2px;
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control, 6px);
+  background: transparent;
+  color: var(--td-ink);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background 0.15s ease;
+}
+
+.btnSecondary:hover {
+  background: var(--td-tint);
+}
+
+.btnSecondary:focus-visible {
+  outline: 2px solid var(--td-focus);
+  outline-offset: 2px;
+}
+
+.stackDetails {
+  width: 100%;
+  max-width: 560px;
+  text-align: left;
+  font-size: 12px;
+}
+
+.stackSummary {
+  cursor: pointer;
+  color: var(--td-ink-muted);
+  margin-bottom: 8px;
+  user-select: none;
+}
+
+.stackPre {
+  margin: 0;
+  padding: 12px;
+  background: var(--td-tint);
+  border-radius: var(--td-radius-control, 6px);
+  overflow: auto;
+  max-height: 200px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--td-ink-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
