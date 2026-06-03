@@ -3,9 +3,12 @@
 #        make test-all    (all tests including integration)
 #        make lint        (golangci-lint)
 #        make coverage    (HTML coverage report)
+#        make fe-lint     (frontend eslint + stylelint)
+#        make fe-build    (build all frontend packages)
 
 #        make release VER=v0.1.1  (build + upload release binaries)
-.PHONY: test test-all test-edge test-hub lint coverage sec release clean
+.PHONY: test test-all test-edge test-hub lint coverage sec release clean \
+        fe-install fe-dev fe-build fe-test fe-lint fe-typecheck
 
 # ── Unit tests (no external deps) ────────────────────
 
@@ -70,3 +73,25 @@ clean:
 	cd hub-server && go clean -testcache
 	rm -f edge-server/coverage.out edge-server/coverage.html
 	rm -f hub-server/coverage.out hub-server/coverage.html
+
+# ── Frontend ─────────────────────────────────────
+
+fe-install:
+	cd app && pnpm install
+
+fe-dev:
+	cd app && pnpm dev
+
+fe-build:
+	cd app && pnpm -r build
+
+fe-test:
+	cd app && pnpm -r test
+
+fe-lint:
+	cd app && pnpm -r lint
+	cd app && pnpm lint:css
+
+fe-typecheck:
+	cd app/desktop && npx tsc --noEmit
+	cd app/web && npx tsc --noEmit
