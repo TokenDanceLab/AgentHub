@@ -20,10 +20,19 @@ import (
 )
 
 func newTestHandler() *Handler {
+	bus := events.NewBus(1000)
+	s := store.New()
+	reg := runners.NewRegistry()
+	reg.Upsert(runners.RunnerInfo{
+		ID:     "mock-runner",
+		Name:   "Mock Runner",
+		Status: "online",
+	})
 	return &Handler{
-		Bus:      events.NewBus(1000),
-		Registry: runners.NewRegistry(),
-		Store:    store.New(),
+		Bus:      bus,
+		Registry: reg,
+		Store:    s,
+		Executor: lifecycle.NewMockExecutor(bus, s),
 	}
 }
 
@@ -194,6 +203,8 @@ api_key = "SHOULD_NOT_LEAK"
 
 func TestGetHealthDegradesWhenNoRunnerAvailable(t *testing.T) {
 	h := newTestHandler()
+	// Reset registry to only contain an offline runner for this test.
+	h.Registry = runners.NewRegistry()
 	h.Registry.Upsert(runners.RunnerInfo{
 		ID:           "runner_local_1",
 		Name:         "Mock Runner (local)",

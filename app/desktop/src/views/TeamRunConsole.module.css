@@ -102,7 +102,7 @@
 
 .input:focus {
   border-color: var(--color-primary, #3b82f6);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px var(--glass-tint-sky);
 }
 
 .primaryBtn {
@@ -366,7 +366,7 @@
 
 .textarea:focus {
   border-color: var(--color-primary, #3b82f6);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px var(--glass-tint-sky);
 }
 
 .startRunActions {

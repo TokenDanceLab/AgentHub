@@ -6,7 +6,7 @@ import ModeCard from '../primitives/ModeCard';
 import Switch from '../primitives/Switch';
 import SelectControl from '../primitives/SelectControl';
 import { writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never';
 

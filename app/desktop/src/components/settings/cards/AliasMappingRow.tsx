@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import Switch from '../primitives/Switch';
 import SelectControl from '../primitives/SelectControl';
 import type { ReasoningEffortPreference } from '@/stores/modelSettingsStore';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 const MODEL_OPTIONS = [
   ['auto', 'Auto'],

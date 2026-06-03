@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,7 +22,9 @@ import (
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/mcp"
 	"github.com/agenthub/edge-server/internal/metrics"
+	"github.com/agenthub/edge-server/internal/middleware"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
@@ -72,15 +75,18 @@ func Run(cfg Config) error {
 	}
 	if cfg.RemoteMode {
 		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
+			slog.Error("invalid remote listen address", "err", err)
 			return err
 		}
 	} else {
 		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
+			slog.Error("invalid local listen address", "err", err)
 			return err
 		}
 	}
 	handler, err := newHandlerFromConfig(cfg)
 	if err != nil {
+		slog.Error("failed to create handler from config", "err", err)
 		return err
 	}
 
@@ -95,6 +101,7 @@ func Run(cfg Config) error {
 	if !cfg.Dev && cfg.LocalAuthToken == "" && cfg.HubJWTSecret == "" {
 		tokenBytes := make([]byte, 32)
 		if _, err := rand.Read(tokenBytes); err != nil {
+			slog.Error("failed to generate local auth token", "err", err)
 			return fmt.Errorf("failed to generate local auth token: %w", err)
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
@@ -108,9 +115,15 @@ func Run(cfg Config) error {
 	// Expose Prometheus metrics on /metrics for Prometheus scraping.
 	mux.Handle("/metrics", handler.Metrics.Handler())
 
+	// Register MCP (Model Context Protocol) endpoint for external AI clients.
+	// This exposes project/thread/run capabilities as standard MCP tools.
+	mcpServer := mcp.NewServer(handler.Store, handler.Executor, handler.Bus, handler.PermissionRegistry)
+	mux.Handle("/mcp", mcpServer)
+	slog.Info("mcp server endpoint registered at /mcp")
+
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode),
+		Handler: middleware.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
@@ -174,6 +187,42 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// Result aggregator collects sub-agent output and routes it back to the parent orchestrator.
 	resultAgg := lifecycle.NewResultAggregator(bus, agentReg)
 	_ = resultAgg.Start() // stop function; goroutine exits on process shutdown
+
+	// Per-run event counter: tracks event counts per run and debugs at
+	// completion time. OFF by default (slog.Debug). Observers are NOT
+	// in the hot path — the bus fans out concurrently.
+	{
+		var mu sync.Mutex
+		type runEventTracker struct {
+			count int64
+			types map[string]int64
+		}
+		trackers := make(map[string]*runEventTracker)
+		bus.AddObserver(func(evt events.EventEnvelope) {
+			runID, _ := evt.Scope["runId"].(string)
+			if runID == "" {
+				return
+			}
+			mu.Lock()
+			t, ok := trackers[runID]
+			if !ok {
+				t = &runEventTracker{types: make(map[string]int64)}
+				trackers[runID] = t
+			}
+			t.count++
+			t.types[evt.Type]++
+			switch evt.Type {
+			case "run.finished", "run.failed", "run.cancelled":
+				typeStrs := make([]string, 0, len(t.types))
+				for k, v := range t.types {
+					typeStrs = append(typeStrs, fmt.Sprintf("%s=%d", k, v))
+				}
+				slog.Debug("ws.run.events", "runId", runID, "eventCount", t.count, "eventTypes", typeStrs)
+				delete(trackers, runID)
+			}
+			mu.Unlock()
+		})
+	}
 
 	if cfg.ProcessExecutor.Command != "" || hasAdapter {
 		execCfg := cfg.ProcessExecutor

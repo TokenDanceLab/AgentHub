@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -145,7 +146,11 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 
 func (a *OrchestratorAdapter) NeedsStdin() bool { return true }
 
-func (a *OrchestratorAdapter) Available() bool { return a.inner.Available() }
+func (a *OrchestratorAdapter) Available() bool {
+	available := a.inner.Available()
+	slog.Debug("adapter.availability", "adapter", "orchestrator", "path", a.inner.binaryPath, "available", available)
+	return available
+}
 
 // DefaultOrchestratorPrompt returns the built-in orchestrator system prompt.
 func DefaultOrchestratorPrompt(availableAgents []string) string {

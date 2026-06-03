@@ -2,9 +2,8 @@ import { useTranslation } from 'react-i18next';
 import {
   Bot, ShieldCheck, Code2, Globe2, RefreshCw, Plus,
   Search, Star, Download, Eye, X, Tag, Clock,
-  Zap, Users, ArrowLeft, Upload, Filter, SlidersHorizontal,
-  MessageSquare, Wrench, Cpu, TrendingUp, Check, BookOpen, Sparkles,
-  LayoutTemplate, Trash2, Pencil, Send,
+  ArrowLeft, Filter, SlidersHorizontal,
+  Wrench, Cpu, Check, BookOpen, Sparkles,
 } from 'lucide-react';
 import { useState, useCallback, useMemo } from 'react';
 import type { AgentInfo } from '@shared/types';
@@ -22,7 +21,7 @@ import { deleteCustomAgent, loadCustomAgents } from '../agentCreation/agentStore
 import { agentTemplates, capabilityLabels } from '../agentCreation/agentTemplates';
 import type { AgentTemplate } from '../agentCreation/agentCreationTypes';
 import { countAgentCapabilities, statusLabelFromQuery, readUnknownString, readUnknownArray } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export interface CustomAgentMarketItem {
   id: string;
@@ -69,7 +68,7 @@ function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketIt
   };
 }
 
-// ── Mock community catalog (backend will serve from Hub API) ──
+// ── Community / Hub agent shape for marketplace browse ──
 const MOCK_COMMUNITY_AGENTS: CommunityAgentItem[] = [
   {
     id: 'hub-code-reviewer',
@@ -604,6 +603,15 @@ export default function AgentMarketSection({
 
           {/* Community agent grid */}
           {filteredCommunityAgents.length > 0 ? (
+            <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--settings-muted)', background: 'var(--settings-chip-bg)', border: '1px solid var(--settings-chip-border)', padding: '2px 8px', borderRadius: 6 }}>
+                {t('settings.marketComingSoon', 'Coming Soon')}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--settings-muted)' }}>
+                {t('settings.marketPreviewData', 'Preview data — Hub API integration pending')}
+              </span>
+            </div>
             <div className={styles.marketAgentGrid}>
               {filteredCommunityAgents.map((agent) => {
                 const installed = installedIds.includes(agent.id);
@@ -681,6 +689,7 @@ export default function AgentMarketSection({
                 );
               })}
             </div>
+            </>
           ) : (
             <EmptyBlock
               title={hasActiveFilters ? t('settings.marketNoResults') : t('settings.marketLoading')}
