@@ -295,9 +295,9 @@ export default function AllowlistEditor({ entries, onEntriesChange }: AllowlistE
               fontSize: 13,
               fontWeight: 600,
               background: testResult
-                ? 'rgba(34, 197, 94, 0.12)'
-                : 'rgba(239, 68, 68, 0.12)',
-              color: testResult ? '#22c55e' : '#ef4444',
+                ? 'var(--settings-status-success-bg)'
+                : 'var(--settings-status-error-bg)',
+              color: testResult ? 'var(--settings-status-success)' : 'var(--settings-status-error)',
             }}
           >
             {testResult ? (
@@ -402,8 +402,8 @@ function AllowlistEntryRow({
               className={styles.statusPill}
               style={{
                 minWidth: 'auto',
-                background: 'rgba(34, 197, 94, 0.14)',
-                color: '#69c967',
+                background: 'var(--settings-status-success-bg)',
+                color: 'var(--settings-status-success)',
               }}
             >
               <Check size={12} />

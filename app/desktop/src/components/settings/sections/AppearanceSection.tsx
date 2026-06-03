@@ -54,6 +54,7 @@ export default function AppearanceSection({
             onClick={() => setThemePreset(undefined)}
           >
             <div className={styles.presetSwatches}>
+              {/* theme preview swatch - intentional */}
               <span className={styles.presetSwatch} style={{ background: '#5d68cc' }} />
               <span className={styles.presetSwatch} style={{ background: '#25252d' }} />
               <span className={styles.presetSwatch} style={{ background: '#d7d9e1' }} />
@@ -74,6 +75,7 @@ export default function AppearanceSection({
                 onClick={() => setThemePreset(key)}
               >
                 <div className={styles.presetSwatches}>
+                  {/* theme preview swatch - intentional */}
                   <span className={styles.presetSwatch} style={{ background: accent }} />
                   <span className={styles.presetSwatch} style={{ background: surface }} />
                   <span className={styles.presetSwatch} style={{ background: muted }} />
