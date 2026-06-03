@@ -173,3 +173,24 @@ export function statusLabelFromDevice({
   if (status === 'registering') return t('settings.deviceStatus.registering');
   return idleLabel === 'deviceStatus' ? t('settings.deviceStatus.idle') : t('settings.statusLocalSource');
 }
+
+// ---------------------------------------------------------------------------
+// Feature Flags — centralized `available=false` stubs for unimplemented sections
+// ---------------------------------------------------------------------------
+
+export const FEATURE_FLAGS = {
+  /** Permissions: allowlist management not yet implemented */
+  allowlistManagement: false,
+  /** Online IM: cross-device instant messaging not yet implemented */
+  onlineIm: false,
+  /** Agent Market: public agent marketplace not yet implemented */
+  agentMarket: false,
+  /** Agent Configuration: default agent / routing selection not yet implemented */
+  agentConfiguration: false,
+  /** Data Management: toast / bulk-actions not yet integrated */
+  dataManagement: false,
+} as const;
+
+/** Shared empty-arrays so JSX stubs don't recreate [] on every render */
+export const EMPTY_ARR: never[] = [];
+export const NOOP = () => {};

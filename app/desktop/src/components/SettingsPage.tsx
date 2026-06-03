@@ -83,6 +83,9 @@ import {
   getRecentRuns,
   shortId,
   DEVICE_ID_KEY,
+  FEATURE_FLAGS,
+  EMPTY_ARR,
+  NOOP,
 } from './settings/utils';
 
 
@@ -387,9 +390,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'configuration' && (
             <ConfigurationSection
               defaultAgent="Auto"
-              setDefaultAgent={() => {}}
+              setDefaultAgent={NOOP}
               routing={t('settings.routingAuto')}
-              setRouting={() => {}}
+              setRouting={NOOP}
               approvalMode={approvalMode}
               setApprovalMode={setApprovalMode}
               defaultAgentOptions={[['Auto', 'Auto']]}
@@ -408,7 +411,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               fullAccess={fullAccess}
               setFullAccess={setFullAccess}
               allowlistEntries={[]}
-              setAllowlistEntries={() => {}}
+              setAllowlistEntries={NOOP}
             />
           )}
 
@@ -467,7 +470,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               isFetching={false}
               isError={false}
               isSuccess={true}
-              refetch={() => {}}
+              refetch={NOOP}
               deviceRegistrationStatus="idle"
               onOpenAuth={onOpenAuth}
             />
@@ -518,7 +521,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               isFetching={false}
               isError={false}
               isSuccess={true}
-              refetch={() => {}}
+              refetch={NOOP}
               onOpenAuth={onOpenAuth}
             />
           )}
