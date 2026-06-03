@@ -1,7 +1,7 @@
 # AgentHub 交接文档
 
-> **分支**: `dev/delicious233` · **HEAD**: `4bb626ae` · **日期**: 2026-06-03
-> **累计合并 worktree**: 18 个（Wave 1×5 + Wave 2×9 + Wave 3×4）
+> **分支**: `dev/delicious233` · **HEAD**: `815fc32a` · **日期**: 2026-06-03
+> **累计合并 worktree**: 18 个（Wave 1×5 + Wave 2×9 + Wave 3×4）+ 3 个 SettingsPage 收敛提交
 
 ---
 
@@ -140,6 +140,18 @@ stylelint 已配置禁止新增 `rgba()`/`rgb()`/hex 硬编码（`app/.stylelint
 | WT-O | `feat/tsx-inline-cleanup` | 硬编码颜色清理 | 5 个 settings section token 化 + mock 标注 |
 | WT-U | `feat/engineering-infra` | 工程化基础设施 | stylelint + Makefile `fe-*` targets + 5 ADR |
 
+### SettingsPage 收敛（3 个直接提交）
+
+Wave 3 之后，又有 3 个提交直接将 SettingsPage 从 3153 行收敛到 **765 行**，超额完成 ≤1500 行目标：
+
+| 提交 | 内容 | 行数变化 |
+|------|------|---------|
+| `94786496` | 删除全部死代码（内联重复组件、Agent Team 系统、hub targets、modelCatalog、死导入/状态） | -2518 行 |
+| `d2892ff0` | 集中化 feature flags 和 noop 函数占位符到 `settings/utils.ts` | 重构 |
+| `815fc32a` | 新增 Ctrl+K 命令面板快速搜索设置项 | +248 行 |
+
+这三个提交由另一个 agent session 完成，已推送至 `origin/dev/delicious233`。
+
 ---
 
 ## 四、当前状态快照
@@ -148,8 +160,8 @@ stylelint 已配置禁止新增 `rgba()`/`rgb()`/hex 硬编码（`app/.stylelint
 
 | 指标 | 起点 | 当前 | 目标 |
 |------|------|------|------|
-| SettingsPage.tsx 行数 | 4213 | **3153** | ≤1500 |
-| SettingsPage.module.css 行数 | 2033 | **390** | ≤400 ✅ |
+| SettingsPage.tsx 行数 | 4213 | **765** ✅ | ≤1500 |
+| SettingsPage.module.css 行数 | 2033 | **524** | ≤400 ⚠️ (Ctrl+K 新增) |
 | TSX inline rgba() | 797 | **0** ✅ | 0 |
 | CSS rgba() 非 token 文件 | ~50 | **~20** | 0 |
 | IM inline style | 72 | **0** ✅ | 0 |
@@ -189,13 +201,15 @@ stylelint 已配置禁止新增 `rgba()`/`rgb()`/hex 硬编码（`app/.stylelint
 ### 4.4 Git 分支
 
 ```
-origin/dev/delicious233   ← 主力开发分支（所有 worktree 合并于此）
+origin/dev/delicious233   ← 主力开发分支（所有 worktree + 收敛提交合并于此）
 origin/master             ← 主分支
 origin/dev/johnny         ← 团队成员分支
 origin/dev/trump          ← 团队成员分支
-origin/feat/team-johnny-merge ← 待合并
+origin/feat/team-johnny-merge ← Johnny Phase 0-8 后端工作（⚠️ 合并有冲突，见下文）
 fork/dev/delicious233     ← fork 同步
 ```
+
+**Johnny 分支合并状态**：`origin/feat/team-johnny-merge` 包含大量后端新工作（agent profiles、audit、execution targets、market、MCP server handlers、OIDC、skills 等 model + handler + migration），但合并到 dev 时存在冲突：迁移文件编号冲突（rename/rename）、`api/events.md` 内容冲突、`process_executor_test.go` 内容冲突。建议单独开 worktree 做冲突解决后合并。
 
 本地已无残留 worktree 或 feature 分支。
 
@@ -207,7 +221,7 @@ fork/dev/delicious233     ← fork 同步
 
 | # | 任务 | 冲突域 | 工作量 | 说明 |
 |---|------|--------|--------|------|
-| 1 | SettingsPage 最终收敛 (≤1500 行) | SettingsPage | M (1-2天) | 当前 3153 行，需再提取 ~1650 行。`available=false` 改 feature flag，加设置搜索 (Ctrl+K) |
+| 1 | 合并 Johnny 分支 | Backend | M (1天) | `feat/team-johnny-merge` 含大量后端新工作，需解决迁移编号 + api/events.md + edge test 冲突 |
 | 2 | @symbol / @folder 引用 | ChatView+IM | M (1-2天) | 扩展 useMention 支持 symbol (函数/类搜索) 和 folder (文件浏览) |
 | 3 | Code Generation Preview | ChatView+IM | L (2-3天) | tool 结果先 preview 再 apply，需 runtime 层配合 |
 
@@ -220,6 +234,7 @@ fork/dev/delicious233     ← fork 同步
 | 6 | Chat 综合打磨 | ChatView+IM | M (1-2天) | Reply 可视化、/model 命令、smartCollapse |
 | 7 | Hub 测试覆盖率 55%→65% | Backend | M (1-2天) | 重点 service/repository/model 层 |
 | 8 | Web + Shared 测试覆盖 | Web+Shared | M (1-2天) | 用户说过"前端测试别急着搞"，按需安排 |
+| 9 | SettingsPage CSS 收敛 | SettingsPage | S (半天) | 当前 524 行（Ctrl+K 搜索新增），目标 ≤400 行，可提取搜索面板 CSS |
 
 ### P2 — 工程完整性
 
@@ -323,8 +338,10 @@ git push origin dev/delicious233
 - `docs/architecture/decisions/ADR-*.md` — 5 份架构决策记录
 
 ### 核心前端文件
-- `app/desktop/src/components/SettingsPage.tsx` — 设置页主文件（3153 行，29 section 已提取）
+- `app/desktop/src/components/SettingsPage.tsx` — 设置页主文件（**765 行**，32 section 已提取，死代码已清理）
+- `app/desktop/src/components/SettingsPage.module.css` — 设置页样式（524 行，含 Ctrl+K 搜索面板样式）
 - `app/desktop/src/components/settings/sections/` — 32 个提取的 section 组件
+- `app/desktop/src/components/settings/utils.ts` — 集中化 feature flags + localStorage 工具函数
 - `app/desktop/src/components/ChatView.tsx` — 聊天视图
 - `app/desktop/src/components/ThreadPanel.tsx` — 对话列表
 - `app/desktop/src/components/WelcomeScreen.tsx` — 欢迎/引导页
@@ -365,7 +382,7 @@ git push origin dev/delicious233
 - pnpm 项目，**不要**用 npm install（会生成不需要的 package-lock.json）
 - Web 端 tsconfig 启用了 `exactOptionalPropertyTypes: true`，对可选属性赋值更严格
 - `app/shared/` 中的类型被 desktop 和 web 共享引用，修改时需验证两端编译
-- SettingsPage 仍有 3153 行，后续重构注意分批提交，避免单次改动过大
+- SettingsPage 已收敛到 765 行（超额完成 ≤1500 目标），后续修改注意保持精简
 
 ### 8.4 Dependabot
 - GitHub 报告了 4 个 moderate 漏洞，尚未处理

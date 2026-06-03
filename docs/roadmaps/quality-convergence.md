@@ -1,8 +1,51 @@
 # AgentHub 质量收敛 Roadmap
 
 > 基于 2026-06-03 四路并行审计（设置页、Chat/IM 页、设计系统、后端+文档）
-> 分支：`dev/delicious233` | 最后更新：2026-06-03
+> 分支：`dev/delicious233` | 最后更新：2026-06-03 (18:30 HKT)
 > 关联：`docs/handoff/STATE.md`、`docs/roadmaps/client.md`、`docs/roadmaps/integration.md`
+
+---
+
+## 进度总览（2026-06-03 最新）
+
+经过 18 个 worktree + 3 个 SettingsPage 收敛提交后，34 项中 **17 项已关闭**、**4 项部分完成**、**13 项仍 Open**。
+
+| 项 | 状态 | 说明 |
+|----|:--:|------|
+| **S1-01** 设置页双代码库 | ✅ 已关闭 | 4213→**765 行**（目标 ≤1500），29 section 提取 + 死代码清理 + feature flags + Ctrl+K 搜索 |
+| **S1-02** Online IM 设置区 | ✅ 已关闭 | OnlineImSection 已 import 到 SettingsPage |
+| **S1-03** Web mock 数据清理 | ✅ 已关闭 | WT-A 完成 |
+| **S1-04** ChatView stub handler | ✅ 已关闭 | WT-B 完成 |
+| **S1-05** OIDC 浏览器冒烟测试 | ❌ Open | 完整 browser login/callback/logout 未执行 |
+| **S1-06** Git 卫生 | ✅ 已关闭 | WT-E 完成 |
+| **S2-01** IM 内联样式 | ✅ 已关闭 | WT-B2 (72→0) |
+| **S2-02** rgba() 治理 | ✅ 已关闭 | WT-D (797→0 in TSX) |
+| **S2-03** Web Light Theme | ✅ 已关闭 | WT-D2 (6 preset + light/dark) |
+| **S2-04** SettingsPage CSS 拆分 | ✅ 已关闭 | WT-C2 (2033→375)，后因 Ctrl+K 增至 524 |
+| **S2-05** Shared 组件集成 | ⚠️ 部分 | EmptyState 已共享 (WT-N)，其余待评估 |
+| **S2-06** i18n 清理 | ⚠️ 部分 | WT-K 处理了 IM 组件；Settings/ChatView 残留 |
+| **S2-07** Web/Shared 测试 | ❌ Open | WT-A2 未执行（用户指示不急于前端测试） |
+| **S3-01** 键盘快捷键 | ✅ 已关闭 | WT-C 提取 KeyboardSection |
+| **S3-02** 权限管理 | ✅ 已关闭 | WT-C 提取 PermissionsSection + AllowlistEditor |
+| **S3-03** 工作区配置 | ✅ 已关闭 | WT-C 提取 WorktreeSection |
+| **S3-04** Group Chat | ❌ Open | GroupChatSection 可能仍显示 Planned |
+| **S3-05** Data Section | ✅ 已关闭 | WT-C 提取 + WT-O 颜色清理 |
+| **S3-06** MCP 配置 | ⚠️ 部分 | Edge MCP 端点已有 (WT-H)；UI CRUD 待验证 |
+| **S3-07** Hooks 配置 | ❌ Open | 仍为 "Not configured" |
+| **S3-08** Git 配置 | ❌ Open | 仍为硬编码文本 |
+| **S4-01** CHANGELOG | ✅ 已关闭 | WT-E 完成 |
+| **S4-02** 本地开发指南 | ✅ 已关闭 | WT-E 完成 |
+| **S4-03** Hub→Edge 推送 | ❌ Open | 反向 WebSocket 未实现 |
+| **S4-04** Mobile OIDC | ❌ Open | Rust stub 状态 |
+| **S4-05** 安全漏洞 | ❌ Open | npm audit + Dependabot 4 moderate 未处理 |
+| **S4-06** AgentTeam 集成 | ❌ Open | 20 路由已有，E2E 测试未写 |
+| **S5-01** stylelint | ✅ 已关闭 | WT-U 完成 (禁止新 hex/rgba) |
+| **S5-02** Makefile fe targets | ✅ 已关闭 | WT-U 完成 (fe-lint/fe-test/fe-build/fe-typecheck) |
+| **S5-03** i18n 命名空间 | ❌ Open | 仍为 flat JSON |
+| **S5-04** 视觉回归测试 | ❌ Open | Playwright 截图未实现 |
+| **S5-05** Settings 测试 | ❌ Open | Primitives 无单元测试 |
+| **S5-06** Runner→Runtime | ❌ Open | 命名未迁移 |
+| **S5-07** 文档归档 | ❌ Open | archive/ 无 staleness index |
 
 ---
 
