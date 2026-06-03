@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import type { ChatMessage } from './ChatView.types';
+import type { ChatMessage } from '../types/chat';
 import styles from './MessageSearchPanel.module.css';
 
 interface SearchResult {
@@ -36,7 +36,7 @@ function extractMessageText(msg: ChatMessage): string {
         case 'agent_task': return `${block.title} ${block.summary ?? ''}`;
         case 'child_agent': return `${block.title} ${block.result ?? ''} ${block.error ?? ''}`;
         case 'route_decision': return `${block.action} ${block.instructions ?? block.summary ?? ''} ${block.reasoning ?? ''}`;
-        case 'error': return block.message;
+        case 'error': return block.message ?? '';
         default: return '';
       }
     })
@@ -103,7 +103,7 @@ export default function MessageSearchPanel({
       items.push({
         messageId: msg.id,
         messageIndex: i,
-        agentName: msg.agentName,
+        ...(msg.agentName != null && { agentName: msg.agentName }),
         timestamp: msg.timestamp,
         snippet,
         matchStart: idx - snippetStart + (snippetStart > 0 ? 3 : 0),
