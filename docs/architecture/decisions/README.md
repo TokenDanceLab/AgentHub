@@ -2,11 +2,11 @@
 
 最后更新：2026-06-03
 
-本目录保存 AgentHub 项目已采纳的架构决策记录（Architecture Decision Records）。ADR 解释"为什么当时这样决定"，不自动覆盖当前主文档。若 ADR 与 `docs/architecture/system-architecture.md`、`docs/architecture/implementation-guide.md` 或 `api/` 契约冲突，以当前主文档和契约为准，并在后续新增 ADR 记录变更原因。
+本目录保存 AgentHub 项目已采纳的架构决策记录（Architecture Decision Records）。ADR 解释"为什么当时这样决定"，不自动覆盖当前主文档。若 ADR 与 `docs/architecture/system-design/system-architecture.md`、`docs/architecture/system-design/implementation-guide.md` 或 `api/` 契约冲突，以当前主文档和契约为准，并在后续新增 ADR 记录变更原因。
 
 ## 阅读规则
 
-- ADR 不作为 backlog。实现任务以 `docs/roadmap.md`、`docs/roadmaps/` 和当前 issue/PR 为准。
+- ADR 不作为 backlog。实现任务以 `docs/tutorials/roadmap.md`、`docs/roadmaps/` 和当前 issue/PR 为准。
 - ADR 不替代 API 契约。REST 以 `api/openapi.yaml` 为准，事件以 `api/events.md` 为准。
 - ADR 中的旧称呼需要按当前术语理解：Agent Runtime、Agent Profile、Agent Configuration、Execution Target。
 - 早期出现的独立 Runner、Runner registry、Runner 直连等说法应按当前 Edge lifecycle + AgentAdapter 模型重解释。

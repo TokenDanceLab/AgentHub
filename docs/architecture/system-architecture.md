@@ -448,9 +448,9 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 
 主文档只保留三份：
 
-- `docs/architecture/product-requirements.md`
-- `docs/architecture/system-architecture.md`
-- `docs/architecture/implementation-guide.md`
+- `docs/architecture/system-design/product-requirements.md`
+- `docs/architecture/system-design/system-architecture.md`
+- `docs/architecture/system-design/implementation-guide.md`
 
 深度材料保留在：
 
