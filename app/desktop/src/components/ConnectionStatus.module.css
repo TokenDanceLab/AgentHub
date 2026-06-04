@@ -36,9 +36,9 @@
   gap: 4px;
   padding: 3px 10px;
   margin-left: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: var(--td-radius-control, 6px);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.12);
   color: inherit;
   font: inherit;
   font-size: 11px;
@@ -48,7 +48,7 @@
 }
 
 .reconnectBtn:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .reconnectBtn:focus-visible {

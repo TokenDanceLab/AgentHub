@@ -15,17 +15,19 @@ pub struct EdgeManager {
     child: Option<Child>,
     edge_path: PathBuf,
     store_path: PathBuf,
+    local_auth_token: String,
     port: u16,
 }
 
 impl EdgeManager {
-    pub fn new(edge_path: PathBuf, store_path: PathBuf) -> Self {
-        Self {
+    pub fn new(edge_path: PathBuf, store_path: PathBuf) -> Result<Self, String> {
+        Ok(Self {
             child: None,
             edge_path,
             store_path,
+            local_auth_token: generate_local_auth_token()?,
             port: 3210,
-        }
+        })
     }
 
     pub async fn start(&mut self) -> Result<(), String> {
@@ -34,13 +36,20 @@ impl EdgeManager {
         }
 
         let addr = format!("127.0.0.1:{}", self.port);
-        let child = Command::new(&self.edge_path)
-            .args([
-                "--store-file",
-                self.store_path.to_str().unwrap_or("agenthub_store.json"),
-                "--addr",
-                &addr,
-            ])
+        let mut command = Command::new(&self.edge_path);
+        command.args([
+            "--store-file",
+            self.store_path.to_str().unwrap_or("agenthub_store.json"),
+            "--addr",
+            &addr,
+        ]);
+        if cfg!(debug_assertions) {
+            command.env("AGENTHUB_DEV", "1");
+        } else {
+            command.env("AGENTHUB_EDGE_AUTH_TOKEN", &self.local_auth_token);
+        }
+
+        let child = command
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
@@ -80,9 +89,27 @@ impl EdgeManager {
     pub fn is_running(&self) -> bool {
         self.child.is_some()
     }
+
+    pub fn local_auth_token(&self) -> &str {
+        &self.local_auth_token
+    }
 }
 
 pub type SharedEdgeManager = Arc<Mutex<EdgeManager>>;
+
+fn generate_local_auth_token() -> Result<String, String> {
+    let mut bytes = [0_u8; 32];
+    getrandom::fill(&mut bytes)
+        .map_err(|e| format!("Failed to generate Edge auth token: {}", e))?;
+    let mut token = String::with_capacity(5 + bytes.len() * 2);
+    token.push_str("aght_");
+    for byte in bytes {
+        use std::fmt::Write as _;
+        write!(&mut token, "{:02x}", byte)
+            .map_err(|e| format!("Failed to format Edge auth token: {}", e))?;
+    }
+    Ok(token)
+}
 
 fn edge_binary_name() -> &'static str {
     if cfg!(windows) {
