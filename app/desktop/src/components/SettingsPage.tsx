@@ -13,6 +13,7 @@ import {
   GitBranch,
   Globe2,
   HardDrive,
+  Info as InfoIcon,
   Keyboard,
   Link2,
   LockKeyhole,
@@ -61,6 +62,7 @@ import AccountSection from './settings/sections/AccountSection';
 import SecurityAuditSection from './settings/sections/SecurityAuditSection';
 import ArchivedSection from './settings/sections/ArchivedSection';
 import DataSection from './settings/sections/DataSection';
+import AboutSection from './settings/sections/AboutSection';
 import { useHubStore } from '@/stores/hubStore';
 import { getEdgeBaseUrl } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
@@ -118,7 +120,8 @@ export type SectionId =
   | 'account'
   | 'securityAudit'
   | 'archived'
-  | 'data';
+  | 'data'
+  | 'about';
 
 type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never';
 
@@ -310,6 +313,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       { id: 'securityAudit', label: t('settings.securityAudit'), icon: <ShieldCheck size={17} />, group: 'system' },
       { id: 'archived', label: t('settings.archived'), icon: <Archive size={17} />, group: 'system' },
       { id: 'data', label: t('settings.data'), icon: <HardDrive size={17} />, group: 'system' },
+      { id: 'about', label: t('settings.about'), icon: <InfoIcon size={17} />, group: 'system' },
     ],
     [t],
   );
@@ -715,6 +719,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               }}
             />
           )}
+          {active === 'about' && <AboutSection />}
         </div>
       </main>
     </div>
