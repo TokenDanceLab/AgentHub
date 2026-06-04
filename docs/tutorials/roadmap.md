@@ -400,7 +400,7 @@ Hub 调度（远程）:
 
 #### 3.1.3 Desktop 基础打磨（~14 天）✅ M5/M7 全部完成
 
-> **详细实现描述见 `docs/roadmaps/client.md` Phase 0。** 以下仅保留摘要。
+> **详细实现描述见 `docs/tutorials/roadmap.md` Phase 0。** 以下仅保留摘要。
 > 实施详情：`docs/architecture/design/client-p0-architecture.md` | 参考模式：`docs/architecture/design/client-reference-patterns.md`
 
 - [x] **P0-1: 状态架构重构** `[5d]` — TanStack Query + RunState 状态机 + Zustand selector 粒度优化
@@ -488,7 +488,7 @@ Hub 调度（远程）:
 
 #### 3.2.2 Hub-Edge-Desktop 集成
 
-> **详细实现描述见 `docs/roadmaps/integration.md`。** 以下仅保留阶段摘要。
+> **详细实现描述见 `docs/tutorials/roadmap.md`。** 以下仅保留阶段摘要。
 > 阶段 1-3 已于 M5 完成，阶段 4 核心组件完成，阶段 5-6 部分完成。
 
 | 阶段 | 内容 | 工期 | 状态 |
@@ -713,15 +713,15 @@ Hub 调度（远程）:
 - [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已完成文档架构审查，结论已合并入本文档；`docs/inbox/` 仍保留为临时报告投递入口，处理后归档到 `docs/reference/` 或 `docs/archive/`。
 - [x] 2026-05-25 Codex follow-up 文档 worker 已完成，确认主文档已基本对齐，剩余风险集中在 Runner 兼容 API 命名和旧 client handoff 入口。
 - [x] 结论：主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界。
-- [x] 旧 client smoke 文档入口已最小收口：`docs/roadmaps/client.md`（原 `docs/operations/client-roadmap.md`）、`docs/architecture/system-design/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
-- [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md` 等仍含旧独立 `runner/` 语义的文档。
+- [x] 旧 client smoke 文档入口已最小收口：`docs/tutorials/roadmap.md`（原 `docs/operations/client-roadmap.md`）、`docs/architecture/system-design/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
+- [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/archive/client-handoff.md`、`docs/tutorials/roadmap.md` 等仍含旧独立 `runner/` 语义的文档。
 - [ ] API 待办：决定 `/v1/runners`、`runner_offline`、`runner.online/offline` 是否长期保留为 deprecated compatibility，新增 schema 优先 Runtime/Profile/Execution Target 命名。
 
 ---
 
 #### 3.2.4 Desktop 竞争 UX（~15 天）
 
-> **详细实现描述见 `docs/roadmaps/client.md` Phase 1/Phase 2。** 以下仅保留摘要。
+> **详细实现描述见 `docs/tutorials/roadmap.md` Phase 1/Phase 2。** 以下仅保留摘要。
 
 - **P1-1: 多 Agent 聊天** `[5d]` — 消息树形数据模型、子 Agent 内联视图、消息 Fork、SiblingSwitch 分支导航
 - **P1-2: 富文本输入** `[4d]` — @提及/自动补全、斜杠命令系统、模型别名解析
@@ -771,7 +771,7 @@ Hub 调度（远程）:
 ### 3.3 Q4 2026（差异化 -- 超越竞品）
 
 > **目标**：AgentHub 独有功能，构建竞争壁垒
-> **详细实现描述见 `docs/roadmaps/client.md` Phase 2。** 以下仅保留功能摘要。
+> **详细实现描述见 `docs/tutorials/roadmap.md` Phase 2。** 以下仅保留功能摘要。
 
 #### 3.3.1 差异化功能
 
@@ -1259,8 +1259,7 @@ pnpm typecheck                                         # 零错误
 | | `docs/archive/review-archive/hub-server-audit.md` | Hub 22 项发现（P0-1 ~ P3-9） |
 | | `docs/archive/hub-server-testing.md` | Hub 测试覆盖率 + 改进计划 |
 | | `docs/archive/backend-engineering-standards.md` | 工程标准评分 + Top 10 改进 |
-| **路线图** | `docs/roadmaps/client.md` | Desktop Phase 0/1/2 详细任务 |
-| | `docs/roadmaps/integration.md` | Hub-Edge-Desktop 集成 6 阶段 |
+| **路线图** | `docs/tutorials/roadmap.md` | Desktop 详细任务、集成方案 |
 | **参考** | `docs/reference/cross-comparison/00-synthesis.md` | 18 项目全景分析 |
 | | `docs/reference/cross-comparison/10-best-practices-playbook.md` | 最佳实践索引 |
 | | `docs/reference/cross-comparison/02-im-ux.md` | IM/UX 设计建议 |
