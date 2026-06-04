@@ -22,3 +22,4 @@ tokio = { version = "1", features = ["process", "time", "sync"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
+getrandom = "0.3"
