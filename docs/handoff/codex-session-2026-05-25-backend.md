@@ -172,10 +172,10 @@ cd ../edge-server && go test ./... -short -count=1 # 确认基线 15/15
 
 | 文档 | 路径 |
 |------|------|
-| 系统架构 | `docs/architecture/system-architecture.md` |
+| 系统架构 | `docs/architecture/system-design/system-architecture.md` |
 | 安全风险登记册 | `docs/governance/security-risk-register.md` |
-| 全局路线图 | `docs/roadmap.md` |
-| 项目状态 | `docs/handoff/STATE.md` |
+| 全局路线图 | `docs/tutorials/roadmap.md` |
+| 项目状态 | `docs/development/handoffs/STATE.md` |
 | 开发规范 | `AGENTS.md` |
 | API 契约 | `api/openapi.yaml` |
 | WebSocket 事件 | `api/events.md` |

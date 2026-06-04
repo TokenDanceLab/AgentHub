@@ -10,8 +10,8 @@
 | **产品** | `docs/architecture/system-design/product-requirements.md` | 产品定位和需求 | 全员 | 三人协商 |
 | **架构** | `docs/architecture/system-design/system-architecture.md` | 系统设计和拓扑 | 开发者 | 三人协商 |
 | **实现** | `docs/architecture/system-design/implementation-guide.md` | 开发规范和流程 | 开发者 | 三人协商 |
-| **客户端** | `docs/roadmaps/client.md` | Desktop 路线图 | 前端 | Delicious233 |
-| **集成** | `docs/roadmaps/integration.md` | Hub↔Edge 对接方案 | 后端 | 三人协商 |
+| **客户端** | `docs/tutorials/roadmap.md` | Desktop 路线图 | 前端 | Delicious233 |
+| **集成** | `docs/tutorials/roadmap.md` | Hub↔Edge 对接方案 | 后端 | 三人协商 |
 | **设计规格** | `docs/architecture/design/` | 架构细节/参考模式（长文） | 开发者 | 任何人 |
 | **参考研究** | `docs/reference/` | 25 项目竞品分析，按问题检索 | 按需查阅 | 任何人 |
 | **审计报告** | `docs/archive/` | 代码/测试/工程审计 | 开发者 | 任何人 |
