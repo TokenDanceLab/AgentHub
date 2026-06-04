@@ -60,4 +60,4 @@
 ### 独立研究
 
 - `docs/research/research-synthesis.md` -- 研究综合报告
-- `docs/fix-notes/desktop-infinite-render-fix.md` -- Desktop 无限渲染修复记录
+- `docs/archive/desktop-infinite-render-fix.md` -- Desktop 无限渲染修复记录

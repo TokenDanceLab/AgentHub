@@ -227,7 +227,7 @@ AgentHub 采纳：
 
 ### P0：文档和架构决策先行
 
-1. 建 `docs/architecture/adr/`，先补 RAG/Memory、Web session、Execution Target、Run safety policy 四份 ADR。
+1. 建 `docs/architecture/decisions/`，先补 RAG/Memory、Web session、Execution Target、Run safety policy 四份 ADR。
 2. 在 `system-architecture.md` 把 `permission_mode` 明确降级为兼容字段，新增 `RunSafetyPolicy` 目标模型。
 3. 在 roadmap 增加 Memory/RAG 的分阶段口径：FTS/approved memory -> pgvector hybrid -> 专用检索服务。
 4. 把“8 个拓扑场景”的实现状态改成严格证据口径，避免 P3 planned 与“P0-P3 completed”冲突。
