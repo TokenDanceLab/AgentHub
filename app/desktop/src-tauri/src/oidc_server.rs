@@ -8,8 +8,8 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::Emitter;
 
 const CALLBACK_TIMEOUT_SECS: u64 = 300; // 5 minutes
@@ -113,7 +113,8 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
 
                     // Check for OAuth error response
                     if !error_val.is_empty() {
-                        let error_desc = query.split('&')
+                        let error_desc = query
+                            .split('&')
                             .find(|p| p.starts_with("error_description="))
                             .map(|p| url_decode(&p["error_description=".len()..]))
                             .unwrap_or_default();
@@ -134,10 +135,13 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                         );
                         let _ = stream.write_all(resp.as_bytes());
 
-                        let _ = app.emit("oidc-callback-error", serde_json::json!({
-                            "error": error_val,
-                            "description": error_desc,
-                        }));
+                        let _ = app.emit(
+                            "oidc-callback-error",
+                            serde_json::json!({
+                                "error": error_val,
+                                "description": error_desc,
+                            }),
+                        );
                         stopped_clone.store(true, Ordering::Relaxed);
                         return;
                     }
@@ -154,10 +158,13 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                         );
                         let _ = stream.write_all(resp.as_bytes());
 
-                        let _ = app.emit("oidc-callback-error", serde_json::json!({
-                            "error": "invalid_callback",
-                            "description": "Missing code or state in callback URL",
-                        }));
+                        let _ = app.emit(
+                            "oidc-callback-error",
+                            serde_json::json!({
+                                "error": "invalid_callback",
+                                "description": "Missing code or state in callback URL",
+                            }),
+                        );
                         stopped_clone.store(true, Ordering::Relaxed);
                         return;
                     }
@@ -177,28 +184,37 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                     );
                     let _ = stream.write_all(resp.as_bytes());
 
-                    let _ = app.emit("oidc-callback", serde_json::json!({
-                        "code": code,
-                        "state": state,
-                    }));
+                    let _ = app.emit(
+                        "oidc-callback",
+                        serde_json::json!({
+                            "code": code,
+                            "state": state,
+                        }),
+                    );
                     stopped_clone.store(true, Ordering::Relaxed);
                     return;
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     if start.elapsed() > std::time::Duration::from_secs(CALLBACK_TIMEOUT_SECS) {
-                        let _ = app.emit("oidc-callback-error", serde_json::json!({
-                            "error": "timeout",
-                            "description": "Login timed out after 5 minutes",
-                        }));
+                        let _ = app.emit(
+                            "oidc-callback-error",
+                            serde_json::json!({
+                                "error": "timeout",
+                                "description": "Login timed out after 5 minutes",
+                            }),
+                        );
                         return;
                     }
                     std::thread::sleep(std::time::Duration::from_millis(200));
                 }
                 Err(_) => {
-                    let _ = app.emit("oidc-callback-error", serde_json::json!({
-                        "error": "server_error",
-                        "description": "Callback server encountered an error",
-                    }));
+                    let _ = app.emit(
+                        "oidc-callback-error",
+                        serde_json::json!({
+                            "error": "server_error",
+                            "description": "Callback server encountered an error",
+                        }),
+                    );
                     return;
                 }
             }

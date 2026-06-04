@@ -13,7 +13,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     include: ['src/__tests__/integration/edge-integration.test.ts'],
-    setupFiles: ['src/__tests__/testSetup.ts'],
+    setupFiles: ['./src/__tests__/setup.ts'],
     execArgv: ['--max-old-space-size=4096'],
     memoryLimit: '512MB',
     maxWorkers: 1,

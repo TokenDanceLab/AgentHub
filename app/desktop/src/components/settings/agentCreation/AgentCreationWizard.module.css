@@ -37,6 +37,7 @@
 }
 
 [data-theme='dark'] .wizardModal {
+  border-color: transparent;
   box-shadow:
     var(--settings-glass-shadow),
     0 24px 64px var(--glass-shadow);
@@ -421,10 +422,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 12px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
 }
@@ -604,10 +605,10 @@
 /* Review section */
 .reviewBlock {
   padding: 16px;
-  border: 1px solid var(--settings-glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 12px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
 }
 
 .reviewBlock + .reviewBlock {

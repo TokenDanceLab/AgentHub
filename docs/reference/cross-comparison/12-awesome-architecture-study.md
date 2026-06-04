@@ -20,7 +20,7 @@
 
 | 参考层 | 用法 | AgentHub 对应位置 |
 |---|---|---|
-| 架构思考框架 | 每个大决策先写质量属性和约束 | `docs/architecture/`、未来 `docs/architecture/adr/` |
+| 架构思考框架 | 每个大决策先写质量属性和约束 | `docs/architecture/`、`docs/architecture/decisions/`（11 篇 ADR） |
 | 领域模板 | AI Agent、RAG、向量库、AI 网关、编码 Agent 的取舍参考 | `docs/reference/cross-comparison/` |
 | 反模式清单 | 防止“看起来先进”的过度设计 | `docs/roadmap.md`、issue 验收标准 |
 
@@ -220,7 +220,7 @@ AgentHub 采纳：
 | Execution Target 仍偏 UI 预留 | 3-8 远程/云拓扑无法真实闭环 | 先做 registered target + workspace allowlist + trust_level |
 | Memory 还只是概念 | 后续容易一口气黑箱向量化 | 先做 approved memory + FTS，pgvector 可选，检索可解释 |
 | Context Builder 不够一等 | Profile 配置能进 Runtime，但上下文预算还不透明 | 建 Context Budget 和注入来源 trace |
-| ADR 缺失 | roadmap 容易写成完成口径而非取舍记录 | 新增 `docs/architecture/adr/`，大决策一页一份 |
+| ADR 缺失 | roadmap 容易写成完成口径而非取舍记录 | ~~已修复~~：`docs/architecture/decisions/` 已有 11 篇 ADR |
 | Web session 仍是发布风险 | sessionStorage 降低持久化但不防同 tab XSS | 发布前落 BFF/HttpOnly cookie 或正式 accepted risk |
 
 ## 5. 建议的近期落地顺序

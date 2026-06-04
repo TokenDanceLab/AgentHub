@@ -924,6 +924,17 @@ export default function PromptInput({
   const providerLabel = selectedModelOption?.provider
     ?? (displayProviderName(resolvedRoute.provider) ?? t('prompt.routeAuto'));
   const activeRunSettings = [
+    ...(model ? [{
+      id: 'model',
+      label: t('prompt.activeSetting.model'),
+      value: displayedModelLabel,
+      title: t('prompt.clearModelRoute'),
+      clearLabel: t('prompt.clearModelRoute'),
+      onClear: () => {
+        setModel('');
+        setSelectedCatalogRoute(null);
+      },
+    }] : []),
     ...(reasoningEffort ? [{
       id: 'reasoning',
       label: t('prompt.activeSetting.reasoning'),

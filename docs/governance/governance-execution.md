@@ -8,17 +8,16 @@ This file maps TokenDance system-level governance work into AgentHub-owned execu
 
 Read these first when the work crosses identity, authorization, Feishu/Lark, Gateway, design, i18n, security, or packaging boundaries.
 
-（跨仓库引用 — 文件位于 D:\Code\TokenDance\docs\）
+（跨仓库引用 — 文件位于 `D:\Code\TokenDance\docs\`）
 
-- `../../docs/ecosystem-execution-queue.md`
-- `../../docs/governance-evidence-ledger.md`
-- `../../docs/identity-auth.md`
-- `../../docs/unified-login.md`
-- `../../docs/authorization-model.md`
-- `../../docs/feishu-agenthub-integration.md`
-- `../../docs/security-risk-governance.md`
-- `../../docs/design-implementation-playbook.md`
-- `../../docs/visual-qa-matrix.md`
+- `../../docs/ecosystem/ecosystem-execution-queue.md`
+- `../../docs/governance/scorecard-evidence.md`
+- `../../docs/identity/identity-auth.md`
+- `../../docs/identity/authorization-model.md`
+- `../../docs/identity/feishu-integration.md`
+- `../../docs/security/security-risk.md`
+- `../../docs/design/design-playbook.md`
+- `../../docs/design/visual-qa-matrix.md`
 
 ## AgentHub Queue Map
 
@@ -28,9 +27,9 @@ Read these first when the work crosses identity, authorization, Feishu/Lark, Gat
 | TD-P0-CLIENT-01 | Desktop/Web client | `app/desktop/`, `app/web/`, shared auth/client state | Desktop/Web login UX screenshots; Hub session storage/logout/reconnect tests or documented checks; no provider token stored client-side |
 | TD-P0-FEISHU-01 | Hub integration | `hub-server/`, `api/openapi.yaml`, `api/events.md`, future integration docs | `/integrations/feishu/events` and `/integrations/feishu/card-actions`; signature/decrypt path; `message_id` idempotency; 3 second card callback behavior; async queue evidence |
 | TD-P1-HUB-02 | Hub authorization | Hub handler/service layers, Agent/Profile/Run/Thread/Integration code | Resource/action allow/deny tests for org/project/thread/run/profile/integration secrets after TokenDance ID identity mapping |
-| TD-P0-DESIGN-01 | Desktop/Web surfaces | `app/desktop/`, `app/web/`, shared UI stories/tests | Screenshots for changed real work surfaces from `../../docs/visual-qa-matrix.md`; token usage or layout evidence; mobile/narrow check where applicable |
-| TD-P0-I18N-01 | Desktop/Web public/user copy | UI dictionaries or user-visible strings | zh/en copy parity for login, errors, Feishu, Gateway, Agent terms; focused tests or review notes for changed strings |
-| TD-P0-SEC-01 | Security/risk | `docs/governance/security-risk-register.md`, auth/session/Edge execution/integration code | Risk finding updated with severity/status/evidence; Critical/High fixed, verified, or explicitly accepted before release-ready claims |
+| TD-P0-DESIGN-01 | Desktop/Web surfaces | `app/desktop/`, `app/web/`, shared UI stories/tests | Screenshots for changed real work surfaces from `../../docs/design/visual-qa-matrix.md`; token usage or layout evidence; mobile/narrow check where applicable |
+| TD-P0-I18N-01 | Desktop/Web public/user copy | Desktop flat locale JSON, Web namespace locale JSON, or user-visible strings | zh/en copy parity for login, errors, Feishu, Gateway, Agent terms; focused tests or review notes for changed strings |
+| TD-P0-SEC-01 | Security/risk | `docs/security-risk-register.md`, auth/session/Edge execution/integration code | Risk finding updated with severity/status/evidence; Critical/High fixed, verified, or explicitly accepted before release-ready claims |
 
 Current TD-P0-HUB-01 status: Hub Server has repo-level implementation and tests for TokenDance ID authorize/callback exchange, configured JWKS validation, `tokendance_sub` mapping, Hub-local access/refresh token issuance, and UUID device proof. Remaining evidence before product-level closure is Desktop/Web callback UX, Hub session storage/logout/reconnect behavior, deployment config proof, and screenshots.
 
@@ -46,7 +45,7 @@ Current TD-P0-HUB-01 status: Hub Server has repo-level implementation and tests 
 ## Sync Checklist
 
 - Update root docs when the system rule changes.
-- Update `docs/governance/security-risk-register.md` when the work changes risk posture.
+- Update `docs/security-risk-register.md` when the work changes risk posture.
 - Update `api/openapi.yaml` / `api/events.md` when routes or events change.
 - Update this file when a queue ID is added, completed, superseded, or its evidence changes.
-- Update `../../docs/governance-evidence-ledger.md` only when the proof source or missing proof changes.
+- Update `../../docs/governance/scorecard-evidence.md` only when the proof source or missing proof changes.
