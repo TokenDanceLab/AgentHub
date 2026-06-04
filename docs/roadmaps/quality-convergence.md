@@ -2,7 +2,7 @@
 
 > 基于 2026-06-03 四路并行审计（设置页、Chat/IM 页、设计系统、后端+文档）
 > 分支：`dev/delicious233` | 最后更新：2026-06-03 (18:30 HKT)
-> 关联：`docs/handoff/STATE.md`、`docs/roadmaps/client.md`、`docs/roadmaps/integration.md`
+> 关联：`docs/development/handoffs/STATE.md`、`docs/roadmaps/client.md`、`docs/roadmaps/integration.md`
 
 ---
 
