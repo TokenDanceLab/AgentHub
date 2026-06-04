@@ -11,10 +11,11 @@
 // export { Tooltip } from './Tooltip';
 // export { SkeletonBar } from './SkeletonBar';
 // export type { SkeletonBarProps } from './SkeletonBar';
-// export { default as Modal } from './Modal';
+export { SkeletonLine, SkeletonBlock, SkeletonCircle } from './Skeleton';
+export { default as Modal } from './Modal';
 // export type { ModalProps } from './Modal';
-// export { DiffReviewPanel } from './DiffReviewPanel';
-// export type { DiffReviewFile, DiffReviewLabels, DiffReviewPanelProps } from './DiffReviewPanel';
+export { DiffReviewPanel } from './DiffReviewPanel';
+export type { DiffReviewFile, DiffReviewLabels, DiffReviewPanelProps } from './DiffReviewPanel';
 export { TextShimmer } from './TextShimmer';
 export { Select } from './Select';
 export type { SelectProps } from './Select';
