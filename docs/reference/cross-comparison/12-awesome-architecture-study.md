@@ -22,7 +22,7 @@
 |---|---|---|
 | 架构思考框架 | 每个大决策先写质量属性和约束 | `docs/architecture/`、`docs/architecture/decisions/`（11 篇 ADR） |
 | 领域模板 | AI Agent、RAG、向量库、AI 网关、编码 Agent 的取舍参考 | `docs/reference/cross-comparison/` |
-| 反模式清单 | 防止“看起来先进”的过度设计 | `docs/roadmap.md`、issue 验收标准 |
+| 反模式清单 | 防止”看起来先进”的过度设计 | `docs/tutorials/roadmap.md`、issue 验收标准 |
 
 ## 2. 可直接采纳的核心原则
 
