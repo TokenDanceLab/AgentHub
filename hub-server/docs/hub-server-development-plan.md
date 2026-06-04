@@ -1,4 +1,4 @@
-> ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/handoff/STATE.md` and `docs/roadmap.md` for current status.**
+> ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/development/handoffs/STATE.md` and `docs/tutorials/roadmap.md` for current status.**
 > Most planned work in this document has been completed. This file is retained as a historical reference.
 
 # AgentHub Hub Server 开发流程文档
@@ -12,7 +12,7 @@
 ### 0.1 每个 Agent 接手任务前
 
 1. 读 `AGENTS.md`（仓库根）
-2. 读 `docs/handoff/STATE.md`（当前状态）
+2. 读 `docs/development/handoffs/STATE.md`（当前状态）
 3. 读本文对应阶段的详细说明
 4. 读 `hub-server/docs/hub-server-requirements.md` 对应章节
 5. 确认当前分支是最新的 `dev/delicious233`
@@ -1120,7 +1120,7 @@ api/events.md
 
 ## 必须阅读
 - AGENTS.md
-- docs/handoff/STATE.md
+- docs/development/handoffs/STATE.md
 - hub-server/docs/hub-server-requirements.md （对应章节）
 - hub-server/docs/hub-server-development-plan.md （当前 Phase）
 
