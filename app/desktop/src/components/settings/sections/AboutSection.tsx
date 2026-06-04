@@ -101,7 +101,7 @@ export default function AboutSection() {
         </div>
       )}
 
-      {updateStatus === 'available' && (
+      {(updateStatus === 'available' || updateStatus === 'installing') && (
         <div className={styles.callout}>
           <Info size={18} />
           <div>
@@ -114,7 +114,7 @@ export default function AboutSection() {
             <button
               className={styles.primaryBtn}
               onClick={handleInstallUpdate}
-              disabled={isBusy}
+              disabled={updateStatus === 'installing'}
               style={{ marginTop: 10, alignSelf: 'flex-start' }}
             >
               {updateStatus === 'installing' ? (
