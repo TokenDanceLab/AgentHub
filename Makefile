@@ -100,7 +100,13 @@ ci: test lint sec
 
 release:
 	@if [ -z "$(VER)" ]; then echo "Usage: make release VER=v0.1.1"; exit 1; fi
-	powershell -File scripts/release.ps1 $(VER)
+	@if command -v pwsh >/dev/null 2>&1; then \
+		pwsh -File scripts/release.ps1 $(VER); \
+	elif command -v powershell >/dev/null 2>&1; then \
+		powershell -File scripts/release.ps1 $(VER); \
+	else \
+		echo "Error: PowerShell (pwsh or powershell) is required for release"; exit 1; \
+	fi
 
 # ── Clean ────────────────────────────────────────
 
