@@ -1,7 +1,7 @@
 # AgentHub Desktop Client -- P0 架构实施详情
 
-> 从 `docs/roadmaps/client.md` 提取的 Phase 0 实施细节：代码片段、风险评估、测试要求、验收标准。
-> 原文路线图仅保留任务清单和依赖关系，详见 `docs/roadmaps/client.md`。
+> 从 `docs/tutorials/roadmap.md` 提取的 Phase 0 实施细节：代码片段、风险评估、测试要求、验收标准。
+> 原文路线图仅保留任务清单和依赖关系，详见 `docs/tutorials/roadmap.md`。
 
 ---
 
