@@ -6,7 +6,7 @@
 2. `docs/architecture/system-architecture.md` — Desktop / Edge / Hub 与 Agent Runtime 架构
 3. `docs/architecture/product-requirements.md` — 产品需求（bytedance.md 的工程版）
 4. `docs/architecture/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
-5. `docs/operations/client-roadmap.md` — 客户端开发路线图
+5. `docs/roadmaps/client.md` — 客户端开发路线图
 6. `docs/archive/client-handoff.md` — 客户端操作手册
 7. `api/openapi.yaml` — REST API 契约
 8. `api/events.md` — WebSocket 事件契约

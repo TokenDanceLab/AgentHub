@@ -4,7 +4,7 @@
 
 > Claude Code, Codex, OpenCode — collaborating in one IM workspace
 
-[![status](https://img.shields.io/badge/v0.1.0-Active_Development-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
+[![status](https://img.shields.io/badge/v0.3.0-Active_Development-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
 [![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
 [![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
@@ -17,7 +17,7 @@
 
 <!-- Screenshot placeholder: Desktop main UI dark theme -->
 <p align="center">
-  <img src="screenshots/hero-desktop.png" alt="AgentHub Desktop main UI" width="80%">
+  <img src="screenshots/web-app.png" alt="AgentHub Desktop main UI" width="80%">
 </p>
 
 ---
@@ -142,8 +142,14 @@ AgentHub/
 ├── api/                  # API contracts (OpenAPI + WebSocket events)
 ├── docs/                 # Documentation
 │   ├── guides/           # User guide, FAQ, keyboard shortcuts
-│   ├── architecture/     # Product requirements, system architecture, implementation guide
-│   └── roadmaps/         # Roadmaps and competitive analysis
+│   ├── architecture/     # Product requirements, system architecture, implementation guide, design docs, ADR
+│   ├── roadmaps/         # Roadmaps and competitive analysis
+│   ├── governance/       # Security risk register, branch governance, doc standards
+│   ├── handoff/          # Project status and handoff
+│   ├── inbox/            # Uncategorized documents
+│   ├── operations/       # Desktop QA SOP, operations
+│   ├── research/         # Research and competitive analysis
+│   ├── review/           # Review records
 └── scripts/              # Setup scripts, git hooks
 ```
 
@@ -156,6 +162,7 @@ AgentHub/
 | [User Guide](docs/guides/user-guide.md) | Users who want to get things done with AgentHub |
 | [FAQ](docs/guides/faq.md) | Common questions |
 | [Keyboard Shortcuts](docs/guides/keyboard-shortcuts.md) | Keyboard reference card |
+| [Local Dev Setup](docs/guides/local-dev-setup.md) | New contributors setting up their dev environment |
 | [Product Requirements](docs/architecture/product-requirements.md) | Product positioning and phase goals |
 | [System Architecture](docs/architecture/system-architecture.md) | Technical architecture and core concepts |
 | [API Contract](api/) | REST + WebSocket interface definitions |
