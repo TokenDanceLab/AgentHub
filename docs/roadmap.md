@@ -1266,7 +1266,7 @@ pnpm typecheck                                         # 零错误
 | | `docs/reference/cross-comparison/02-im-ux.md` | IM/UX 设计建议 |
 | **设计** | `docs/architecture/design/client-p0-architecture.md` | Desktop P0 实施细节 |
 | | `docs/architecture/design/client-reference-patterns.md` | Desktop 参考模式 |
-| **架构** | `docs/architecture/system-architecture.md` | 系统架构文档 |
-| | `docs/architecture/product-requirements.md` | 产品需求文档 |
-| | `docs/architecture/implementation-guide.md` | 功能实现文档 |
+| **架构** | `docs/architecture/system-design/system-architecture.md` | 系统架构文档 |
+| | `docs/architecture/system-design/product-requirements.md` | 产品需求文档 |
+| | `docs/architecture/system-design/implementation-guide.md` | 功能实现文档 |
 | **规则** | `AGENTS.md` | 项目开发规则和约定 |
