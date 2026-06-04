@@ -4,7 +4,7 @@ import type { ChatMessage } from '@/components/ChatView.types';
 import type { AgentInfo } from '@shared/types';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WelcomeScreen from '@/components/WelcomeScreen';
-import { SkeletonLine } from '@/components/Skeleton';
+import { SkeletonLine } from '@shared/ui';
 import styles from '@/App.module.css';
 
 const ChatView = lazy(() => import('@/components/ChatView'));

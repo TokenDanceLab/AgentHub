@@ -46,7 +46,7 @@ import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { readCustomInstructions } from '@/utils/customInstructions';
 import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
 import { useShallow } from 'zustand/shallow';
-import { SkeletonLine } from '@/components/Skeleton';
+import { SkeletonLine } from '@shared/ui';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
