@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
@@ -32,7 +31,6 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.5.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.1.0",
