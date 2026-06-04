@@ -33,7 +33,11 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
 8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
 9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
+<<<<<<< HEAD
 10. 持续开发和任务拆解读 `docs/tutorials/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
+=======
+10. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
+>>>>>>> origin/master
 11. 客户端 M1 任务读 `docs/roadmaps/client.md`。
 12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
@@ -343,7 +347,11 @@ P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P
 ## 5. 文档规则
 
 - 主文档只保留三份：产品需求、系统架构、功能实现。
+<<<<<<< HEAD
 - `docs/tutorials/roadmap.md` 和 `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
+=======
+- `docs/roadmap.md` 和 `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
+>>>>>>> origin/master
 - `docs/roadmaps/client.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。

@@ -59,5 +59,9 @@
 
 ### 独立研究
 
+<<<<<<< HEAD
 - `docs/reference/technical/research-synthesis.md` -- 研究综合报告
+=======
+- `docs/research/research-synthesis.md` -- 研究综合报告
+>>>>>>> origin/master
 - `docs/archive/desktop-infinite-render-fix.md` -- Desktop 无限渲染修复记录
