@@ -112,9 +112,10 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
                 }
                 "start_edge" => {
                     let edge = app.state::<SharedEdgeManager>().inner().clone();
+                    let handle = app.clone();
                     tauri::async_runtime::spawn(async move {
                         let mut mgr = edge.lock().await;
-                        let _ = mgr.start().await;
+                        let _ = mgr.start(&handle).await;
                     });
                 }
                 "stop_edge" => {

@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+use tauri::{Manager, Runtime};
+use tauri_plugin_shell::process::{CommandEvent, CommandChild};
+use tauri_plugin_shell::ShellExt;
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
@@ -11,8 +14,22 @@ pub struct EdgeStatus {
     pub port: u16,
 }
 
+/// Wrapper for the two child-process types: Tauri sidecar (release) or
+/// tokio process (dev).
+enum EdgeChild {
+    Sidecar {
+        child: CommandChild,
+        pid: u32,
+        #[allow(dead_code)]
+        event_task: tokio::task::JoinHandle<()>,
+    },
+    Direct {
+        child: Child,
+    },
+}
+
 pub struct EdgeManager {
-    child: Option<Child>,
+    child: Option<EdgeChild>,
     edge_path: PathBuf,
     store_path: PathBuf,
     local_auth_token: String,
@@ -30,19 +47,101 @@ impl EdgeManager {
         })
     }
 
-    pub async fn start(&mut self) -> Result<(), String> {
+    pub async fn start<R: Runtime>(
+        &mut self,
+        app_handle: &tauri::AppHandle<R>,
+    ) -> Result<(), String> {
         if self.child.is_some() {
             return Err("Edge Server is already running".into());
         }
 
         let addr = format!("127.0.0.1:{}", self.port);
+
+        // Resolve store path: prefer app data dir over temp
+        let store_path = match app_handle.path().app_data_dir() {
+            Ok(dir) => {
+                std::fs::create_dir_all(&dir)
+                    .map_err(|e| format!("Failed to create app data dir: {}", e))?;
+                dir.join("agenthub-edge-store.json")
+            }
+            Err(_) => self.store_path.clone(),
+        };
+        let store_path_str = store_path
+            .to_str()
+            .unwrap_or("agenthub-edge-store.json")
+            .to_string();
+
+        let args = vec![
+            "--store-file".to_string(),
+            store_path_str.clone(),
+            "--addr".to_string(),
+            addr.clone(),
+            "--runner-profile".to_string(),
+            "claude-code".to_string(),
+        ];
+
+        // ── Try sidecar first (release / bundled builds) ─────────────────
+        if let Ok(sidecar_cmd) = app_handle.shell().sidecar("agenthub-edge") {
+            let mut cmd = sidecar_cmd.args(&args);
+
+            if cfg!(debug_assertions) {
+                cmd = cmd.env("AGENTHUB_DEV", "1");
+            } else {
+                cmd = cmd.env("AGENTHUB_EDGE_AUTH_TOKEN", &self.local_auth_token);
+            }
+
+            match cmd.spawn() {
+                Ok((mut rx, child)) => {
+                    let pid = child.pid();
+
+                    let event_task = tokio::spawn(async move {
+                        while let Some(event) = rx.recv().await {
+                            match event {
+                                CommandEvent::Stdout(line) => {
+                                    if let Ok(s) = String::from_utf8(line) {
+                                        log::info!("[edge] {}", s.trim_end());
+                                    }
+                                }
+                                CommandEvent::Stderr(line) => {
+                                    if let Ok(s) = String::from_utf8(line) {
+                                        log::warn!("[edge] {}", s.trim_end());
+                                    }
+                                }
+                                CommandEvent::Error(e) => {
+                                    log::error!("[edge] error: {}", e);
+                                }
+                                CommandEvent::Terminated(payload) => {
+                                    log::info!(
+                                        "[edge] terminated (code={:?}, signal={:?})",
+                                        payload.code,
+                                        payload.signal
+                                    );
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                    });
+
+                    log::info!("Edge Server started via sidecar (pid={})", pid);
+                    self.child = Some(EdgeChild::Sidecar {
+                        child,
+                        pid,
+                        event_task,
+                    });
+                    return Ok(());
+                }
+                Err(e) => {
+                    log::warn!("Sidecar spawn failed, falling back to direct path: {}", e);
+                }
+            }
+        } else {
+            log::debug!("Sidecar not available, falling back to direct path");
+        }
+
+        // ── Fallback: tokio::process::Command (dev mode) ─────────────────
         let mut command = Command::new(&self.edge_path);
-        command.args([
-            "--store-file",
-            self.store_path.to_str().unwrap_or("agenthub_store.json"),
-            "--addr",
-            &addr,
-        ]);
+        command.args(&args);
         if cfg!(debug_assertions) {
             command.env("AGENTHUB_DEV", "1");
         } else {
@@ -56,13 +155,25 @@ impl EdgeManager {
             .spawn()
             .map_err(|e| format!("Failed to start Edge Server: {}", e))?;
 
-        self.child = Some(child);
+        let pid = child.id().unwrap_or(0);
+        log::info!(
+            "Edge Server started via direct path (pid={}, path={:?})",
+            pid,
+            self.edge_path
+        );
+        self.child = Some(EdgeChild::Direct { child });
         Ok(())
     }
 
     pub async fn stop(&mut self) -> Result<(), String> {
-        match self.child.as_mut() {
-            Some(child) => {
+        match self.child.take() {
+            Some(EdgeChild::Sidecar { child, pid, event_task }) => {
+                let _ = child.kill();
+                event_task.abort();
+                log::info!("Edge Server (sidecar, pid={}) stopped", pid);
+                Ok(())
+            }
+            Some(EdgeChild::Direct { mut child }) => {
                 child
                     .kill()
                     .await
@@ -71,7 +182,7 @@ impl EdgeManager {
                     .wait()
                     .await
                     .map_err(|e| format!("Failed to wait for Edge Server exit: {}", e))?;
-                self.child = None;
+                log::info!("Edge Server (direct) stopped");
                 Ok(())
             }
             None => Err("Edge Server is not running".into()),
@@ -81,7 +192,10 @@ impl EdgeManager {
     pub fn status(&self) -> EdgeStatus {
         EdgeStatus {
             running: self.child.is_some(),
-            pid: self.child.as_ref().and_then(|c| c.id()),
+            pid: self.child.as_ref().and_then(|c| match c {
+                EdgeChild::Sidecar { pid, .. } => Some(*pid),
+                EdgeChild::Direct { child } => child.id(),
+            }),
             port: self.port,
         }
     }
