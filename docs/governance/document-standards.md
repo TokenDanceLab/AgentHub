@@ -6,16 +6,16 @@
 
 | 层级 | 目录 | 内容 | 读者 | 修改权限 |
 |------|------|------|------|:--:|
-| **项目事实** | `docs/roadmap.md` | 全局路线图，唯一进度台账 | 全员 | Delicious233 |
-| **产品** | `docs/architecture/product-requirements.md` | 产品定位和需求 | 全员 | 三人协商 |
-| **架构** | `docs/architecture/system-architecture.md` | 系统设计和拓扑 | 开发者 | 三人协商 |
-| **实现** | `docs/architecture/implementation-guide.md` | 开发规范和流程 | 开发者 | 三人协商 |
+| **项目事实** | `docs/tutorials/roadmap.md` | 全局路线图，唯一进度台账 | 全员 | Delicious233 |
+| **产品** | `docs/architecture/system-design/product-requirements.md` | 产品定位和需求 | 全员 | 三人协商 |
+| **架构** | `docs/architecture/system-design/system-architecture.md` | 系统设计和拓扑 | 开发者 | 三人协商 |
+| **实现** | `docs/architecture/system-design/implementation-guide.md` | 开发规范和流程 | 开发者 | 三人协商 |
 | **客户端** | `docs/roadmaps/client.md` | Desktop 路线图 | 前端 | Delicious233 |
 | **集成** | `docs/roadmaps/integration.md` | Hub↔Edge 对接方案 | 后端 | 三人协商 |
 | **设计规格** | `docs/architecture/design/` | 架构细节/参考模式（长文） | 开发者 | 任何人 |
 | **参考研究** | `docs/reference/` | 25 项目竞品分析，按问题检索 | 按需查阅 | 任何人 |
-| **审计报告** | `docs/review/` | 代码/测试/工程审计 | 开发者 | 任何人 |
-| **收件箱** | `docs/inbox/` | Agent 间通信，本地不提交 | Agent | Agent |
+| **审计报告** | `docs/archive/` | 代码/测试/工程审计 | 开发者 | 任何人 |
+| **收件箱** | （已删除） | Agent 间通信，本地不提交 | — | — |
 
 ## 命名和格式
 
@@ -27,7 +27,7 @@
 
 ## 路线图规范
 
-- `docs/roadmap.md` 是全局台账，所有进度在这里登记
+- `docs/tutorials/roadmap.md` 是全局台账，所有进度在这里登记
 - roadmap 只写：目标 + 任务清单 + 验收命令 + 依赖
 - 详细设计、代码片段、伪代码放 `docs/architecture/design/`
 - 竞品引用、采纳映射放 `docs/reference/`
