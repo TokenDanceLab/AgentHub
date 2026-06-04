@@ -28,6 +28,7 @@ import {
 } from '@/api/hubClient';
 import { useHubStore } from '@/stores/hubStore';
 import { getAccessToken } from '@/hooks/useAuth';
+import { EmptyState } from '@shared/ui';
 import { TeamMemberList } from '@/components/IM/TeamMemberList';
 import type { TeamMemberDisplay } from '@/components/IM/TeamMemberList';
 import { TeamTaskBoard } from '@/components/IM/TeamTaskBoard';
@@ -255,7 +256,7 @@ export default function TeamRunConsole(_props: ViewProps) {
   }, [handleSelectRun, selectedTeamId, startRunMut, triggerMessage]);
 
   const handleApprove = useCallback(
-    async (approvalId: string) => {
+    async (approvalId: string, reason?: string) => {
       if (!selectedTeamId || !selectedRunId) return;
       setDecidingIds((prev) => new Set(prev).add(approvalId));
       try {
@@ -263,7 +264,7 @@ export default function TeamRunConsole(_props: ViewProps) {
           teamId: selectedTeamId,
           runId: selectedRunId,
           approvalId,
-          decision: { decision: 'allow' },
+          decision: { decision: 'allow', ...(reason ? { reason } : {}) },
         });
       } finally {
         setDecidingIds((prev) => {
@@ -277,7 +278,7 @@ export default function TeamRunConsole(_props: ViewProps) {
   );
 
   const handleDeny = useCallback(
-    async (approvalId: string) => {
+    async (approvalId: string, reason?: string) => {
       if (!selectedTeamId || !selectedRunId) return;
       setDecidingIds((prev) => new Set(prev).add(approvalId));
       try {
@@ -285,7 +286,7 @@ export default function TeamRunConsole(_props: ViewProps) {
           teamId: selectedTeamId,
           runId: selectedRunId,
           approvalId,
-          decision: { decision: 'deny' },
+          decision: { decision: 'deny', ...(reason ? { reason } : {}) },
         });
       } finally {
         setDecidingIds((prev) => {
@@ -329,11 +330,16 @@ export default function TeamRunConsole(_props: ViewProps) {
   if (!hubAuthenticated) {
     return (
       <div className={styles.root}>
-        <div className={styles.emptyState}>
-          <Shield size={48} className={styles.emptyIcon} />
-          <span className={styles.emptyTitle}>{t('teamRun.title', 'TeamRun Console')}</span>
-          <span>{t('teamRun.signInRequired', 'Sign in to TokenDance ID to view and manage AgentTeams.')}</span>
-        </div>
+        <EmptyState
+          title={t('teamRun.title', 'TeamRun Console')}
+          description={t('teamRun.signInRequired', 'Sign in to TokenDance ID to view and manage AgentTeams.')}
+          icon={
+            <svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M24 6L8 14v10c0 10.5 6.8 20.3 16 22.8 9.2-2.5 16-12.3 16-22.8V14L24 6z" />
+              <path d="M18 24l4 4 8-8" />
+            </svg>
+          }
+        />
       </div>
     );
   }
@@ -462,11 +468,17 @@ export default function TeamRunConsole(_props: ViewProps) {
       {/* ── Main area ── */}
       <div className={styles.mainArea}>
         {!selectedTeamId ? (
-          <div className={styles.emptyState}>
-            <Users size={48} className={styles.emptyIcon} />
-            <span className={styles.emptyTitle}>{t('teamRun.selectTeam', 'Select a Team')}</span>
-            <span>{t('teamRun.selectTeamHint', 'Choose a team from the sidebar to view its details and runs.')}</span>
-          </div>
+          <EmptyState
+            title={t('teamrun.emptyTitle', 'No Run History')}
+            description={t('teamrun.emptyDesc', 'Task progress will appear here once started')}
+            icon={
+              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="24" cy="24" r="16" />
+                <path d="M20 16l12 8-12 8V16z" fill="currentColor" stroke="none" opacity="0.15" />
+                <path d="M20 16l12 8-12 8V16z" />
+              </svg>
+            }
+          />
         ) : (
           <>
             {/* Team header */}

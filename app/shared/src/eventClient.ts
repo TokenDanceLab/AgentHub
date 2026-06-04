@@ -1,17 +1,35 @@
 import type { EventEnvelope, AnyEvent } from './events';
 
 export type EventListener = (event: AnyEvent) => void;
-export type EventConnectionStatus = 'connected' | 'disconnected' | 'error';
+export type EventConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'error';
 export type EventConnectionListener = (
   status: EventConnectionStatus,
   error?: string,
 ) => void;
 
+export interface ReconnectOptions {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  backoffFactor: number;
+}
+
+const defaultReconnect: ReconnectOptions = {
+  maxRetries: Infinity,
+  baseDelay: 1000,
+  maxDelay: 30000,
+  backoffFactor: 2,
+};
+
 export interface EventClientOptions {
   baseUrl?: string;
   cursor?: string;
-  reconnectDelayMs?: number;
-  maxReconnectDelayMs?: number;
+  reconnect?: Partial<ReconnectOptions>;
 }
 
 // ── EventClient ───────────────────────────────
@@ -23,12 +41,12 @@ export class EventClient {
   private typeListeners = new Map<string, Set<EventListener>>();
   private baseUrl: string;
   private cursor: string | undefined;
-  private reconnectDelayMs: number;
-  private maxReconnectDelayMs: number;
+  private reconnect: ReconnectOptions;
   private currentDelayMs: number;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
   private lastSeq = 0;
+  private retryCount = 0;
 
   constructor(opts: EventClientOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? 'http://127.0.0.1:3210').replace(
@@ -36,9 +54,8 @@ export class EventClient {
       '',
     );
     this.cursor = opts.cursor;
-    this.reconnectDelayMs = opts.reconnectDelayMs ?? 1000;
-    this.maxReconnectDelayMs = opts.maxReconnectDelayMs ?? 30000;
-    this.currentDelayMs = this.reconnectDelayMs;
+    this.reconnect = { ...defaultReconnect, ...opts.reconnect };
+    this.currentDelayMs = this.reconnect.baseDelay;
   }
 
   // ── Connection ─────────────────────────────
@@ -62,10 +79,12 @@ export class EventClient {
       return;
     }
 
+    this.dispatchConnection('connecting');
     this.ws = new WebSocket(this.wsUrl);
 
     this.ws.onopen = () => {
-      this.currentDelayMs = this.reconnectDelayMs;
+      this.currentDelayMs = this.reconnect.baseDelay;
+      this.retryCount = 0;
       this.dispatchConnection('connected');
     };
 
@@ -87,7 +106,6 @@ export class EventClient {
       this.ws = null;
       this.dispatchConnection('disconnected');
       if (!this.destroyed) {
-        this.dispatchConnection('disconnected', 'Edge event stream disconnected');
         this.scheduleReconnect();
       }
     };
@@ -163,16 +181,24 @@ export class EventClient {
     }
   }
 
-  // ── Reconnection ───────────────────────────
+  // ── Reconnection (exponential backoff) ─────
 
   private scheduleReconnect(): void {
     if (this.destroyed) return;
+    if (this.reconnect.maxRetries !== Infinity && this.retryCount >= this.reconnect.maxRetries) {
+      this.dispatchConnection('disconnected', 'Max reconnect retries exceeded');
+      return;
+    }
+
+    this.retryCount += 1;
+    this.dispatchConnection('reconnecting', `Reconnecting (attempt ${this.retryCount})`);
+
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
       this.currentDelayMs = Math.min(
-        this.currentDelayMs * 2,
-        this.maxReconnectDelayMs,
+        this.currentDelayMs * this.reconnect.backoffFactor,
+        this.reconnect.maxDelay,
       );
     }, this.currentDelayMs);
   }

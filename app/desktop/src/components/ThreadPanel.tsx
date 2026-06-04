@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, MessageSquare, Pencil, Trash2, Check, X, Archive, ArchiveRestore } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { RunInfo, ThreadInfo } from '@shared/types';
+import { EmptyState } from '@shared/ui';
 import { useThreads, useRenameThread, useDeleteThread, useCreateThread, useArchiveThread, useRestoreThread } from '@/api/threadQueries';
 import { useToastStore } from '@/stores/toastStore';
 import styles from './ThreadPanel.module.css';
@@ -280,10 +281,25 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect, onCreat
 
       {filtered.length === 0 ? (
         threads.length === 0 && filter === 'active' ? (
-          <button className={styles.emptyCreate} type="button" onClick={handleCreate} disabled={!online || createMutation.isPending || externalCreatePending}>
-            <MessageSquare size={14} />
-            <span>{t('thread.emptyAction')}</span>
-          </button>
+          <EmptyState
+            className={styles.sidebarEmpty}
+            titleLevel={3}
+            icon={
+              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 12a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H18l-8 6V34h-0a4 4 0 0 1-4-4V12z" />
+                <circle cx="18" cy="21" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="24" cy="21" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="30" cy="21" r="1.5" fill="currentColor" stroke="none" />
+              </svg>
+            }
+            title={t('thread.emptyTitle')}
+            description={t('thread.emptyDescription')}
+            action={{
+              label: t('thread.emptyAction'),
+              onClick: handleCreate,
+              shortcut: 'Ctrl+N',
+            }}
+          />
         ) : (
           <div className={styles.empty}>{filter === 'archived' ? t('thread.emptyArchived') : t('thread.empty')}</div>
         )

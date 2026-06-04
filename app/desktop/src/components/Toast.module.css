@@ -24,12 +24,12 @@
   cursor: default;
   animation: toast-slide-in var(--duration-medium) var(--ease-out);
   box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.11),
-    0 4px 12px rgba(15, 23, 42, 0.06),
+    0 16px 36px var(--glass-bg-heavy),
+    0 4px 12px var(--glass-bg-medium),
     0 1px 0 rgba(255, 255, 255, 0.55) inset;
   word-break: break-word;
-  border: 1px solid rgba(12, 18, 28, 0.07);
-  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-input-bg-hover);
   color: var(--foreground);
   backdrop-filter: blur(28px) saturate(1.16);
   -webkit-backdrop-filter: blur(28px) saturate(1.16);
@@ -39,14 +39,13 @@
 }
 
 [data-theme='dark'] .toast {
-  border-color: rgba(255, 255, 255, 0.085);
+  border-color: transparent;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
-    rgba(37, 37, 45, 0.64);
+    linear-gradient(180deg, var(--glass-bg-medium), var(--glass-bg-subtle)),
+    var(--glass-panel);
   box-shadow:
     0 16px 34px rgba(0, 0, 0, 0.26),
-    0 4px 12px rgba(0, 0, 0, 0.13),
-    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+    0 4px 12px rgba(0, 0, 0, 0.16);
 }
 
 .toast.exiting {
@@ -57,19 +56,26 @@
 /* ── Variants ── */
 
 .success {
-  border-color: rgba(105, 201, 103, 0.22);
+  border-color: var(--glass-tint-moss);
 }
 
 .error {
-  border-color: rgba(255, 126, 120, 0.22);
+  border-color: var(--glass-tint-danger);
 }
 
 .warning {
-  border-color: rgba(251, 191, 36, 0.22);
+  border-color: var(--glass-tint-amber);
 }
 
 .info {
-  border-color: rgba(93, 104, 204, 0.22);
+  border-color: var(--glass-tint-plum);
+}
+
+[data-theme='dark'] .success,
+[data-theme='dark'] .error,
+[data-theme='dark'] .warning,
+[data-theme='dark'] .info {
+  border-color: transparent;
 }
 
 /* ── Inner elements ── */

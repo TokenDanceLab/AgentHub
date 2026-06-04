@@ -11,6 +11,7 @@ import {
   Shield,
 } from 'lucide-react';
 import type { AgentTeamEvent } from '@/api/hubClient';
+import styles from './TeamEventTimeline.module.css';
 
 interface TeamEventTimelineProps {
   events: AgentTeamEvent[];
@@ -77,7 +78,7 @@ export const TeamEventTimeline: FC<TeamEventTimelineProps> = ({
 
   if (loading) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.loading}>
         {t('teamRun.loading', 'Loading events...')}
       </div>
     );
@@ -85,7 +86,7 @@ export const TeamEventTimeline: FC<TeamEventTimelineProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: 16, color: 'var(--color-danger, #e53e3e)', fontSize: 13 }}>
+      <div className={styles.error}>
         {error}
       </div>
     );
@@ -93,7 +94,7 @@ export const TeamEventTimeline: FC<TeamEventTimelineProps> = ({
 
   if (events.length === 0) {
     return (
-      <div style={{ padding: 16, color: 'var(--muted-foreground)', fontSize: 13 }}>
+      <div className={styles.empty}>
         {t('teamRun.noEvents', 'No events recorded for this run.')}
       </div>
     );
@@ -103,68 +104,39 @@ export const TeamEventTimeline: FC<TeamEventTimelineProps> = ({
   const sorted = [...events].sort((a, b) => a.seq - b.seq);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div className={styles.container}>
       {sorted.map((event, idx) => {
         const Icon = EVENT_ICON[event.type] ?? MessageCircle;
         const summary = formatEventPayload(event.payload);
         const isLast = idx === sorted.length - 1;
 
         return (
-          <div key={event.id} style={{ display: 'flex', gap: 10, position: 'relative', minHeight: 36 }}>
+          <div key={event.id} className={styles.row}>
             {/* Timeline line */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, flexShrink: 0 }}>
-              <div
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--surface-raised, #f9fafb)',
-                  border: '2px solid var(--color-primary, #3b82f6)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1,
-                }}
-              >
-                <Icon size={10} style={{ color: 'var(--color-primary, #3b82f6)' }} />
+            <div className={styles.gutter}>
+              <div className={styles.dot}>
+                <Icon size={10} className={styles.dotIcon} />
               </div>
-              {!isLast && (
-                <div
-                  style={{
-                    width: 2,
-                    flex: 1,
-                    backgroundColor: 'var(--border-subtle, #e5e7eb)',
-                    marginTop: -2,
-                  }}
-                />
-              )}
+              {!isLast && <div className={styles.line} />}
             </div>
 
             {/* Event content */}
-            <div
-              style={{
-                flex: 1,
-                paddingBottom: isLast ? 0 : 12,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>
+            <div className={isLast ? styles.contentLast : styles.content}>
+              <div className={styles.eventHeader}>
+                <span className={styles.eventType}>
                   {t(`teamRun.eventType.${event.type}`, event.type)}
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>
+                <span className={styles.eventSeq}>
                   #{event.seq}
                 </span>
                 {event.created_at && (
-                  <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>
+                  <span className={styles.eventTime}>
                     {timeString(event.created_at)}
                   </span>
                 )}
               </div>
               {summary && (
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--muted-foreground)', lineHeight: 1.4 }}>
+                <p className={styles.eventSummary}>
                   {summary}
                 </p>
               )}

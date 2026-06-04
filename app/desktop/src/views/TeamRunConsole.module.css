@@ -4,7 +4,7 @@
   display: flex;
   height: 100%;
   min-height: 0;
-  background: var(--surface-default, #fff);
+  background: var(--surface-default, var(--surface-base));
   color: var(--foreground);
   font-size: 13px;
 }
@@ -93,7 +93,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-subtle, #e5e7eb);
   font-size: 12px;
-  background: var(--surface-default, #fff);
+  background: var(--surface-default, var(--surface-base));
   color: var(--foreground);
   outline: none;
   box-sizing: border-box;
@@ -102,7 +102,7 @@
 
 .input:focus {
   border-color: var(--color-primary, #3b82f6);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px var(--glass-tint-sky);
 }
 
 .primaryBtn {
@@ -138,7 +138,7 @@
   padding: 6px 14px;
   border-radius: 6px;
   border: 1px solid var(--border-subtle, #e5e7eb);
-  background: var(--surface-default, #fff);
+  background: var(--surface-default, var(--surface-base));
   color: var(--foreground);
   font-size: 12px;
   font-weight: 500;
@@ -354,7 +354,7 @@
   border-radius: 6px;
   border: 1px solid var(--border-subtle, #e5e7eb);
   font-size: 12px;
-  background: var(--surface-default, #fff);
+  background: var(--surface-default, var(--surface-base));
   color: var(--foreground);
   outline: none;
   resize: vertical;
@@ -366,7 +366,7 @@
 
 .textarea:focus {
   border-color: var(--color-primary, #3b82f6);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px var(--glass-tint-sky);
 }
 
 .startRunActions {

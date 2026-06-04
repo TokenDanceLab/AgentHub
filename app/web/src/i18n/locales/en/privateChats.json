@@ -114,5 +114,11 @@
     "loginRequired": "Sign in to Hub before using Private Chats.",
     "readOnly": "Private Chats are read-only in this Web pass.",
     "dismiss": "Dismiss"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}}h ago",
+    "yesterday": "Yesterday"
   }
 }

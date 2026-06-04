@@ -43,7 +43,20 @@ pub fn spawn_health_check(app: AppHandle, edge: SharedEdgeManager) {
 
 async fn check_http_health(port: u16) -> EdgeHealthPayload {
     let url = format!("http://127.0.0.1:{}/v1/health", port);
-    match reqwest::get(&url).await {
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+    {
+        Ok(client) => client,
+        Err(_) => {
+            return EdgeHealthPayload {
+                online: false,
+                version: None,
+                edge_id: None,
+            };
+        }
+    };
+    match client.get(&url).send().await {
         Ok(resp) if resp.status().is_success() => {
             if let Ok(body) = resp.json::<serde_json::Value>().await {
                 EdgeHealthPayload {

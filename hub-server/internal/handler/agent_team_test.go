@@ -198,16 +198,27 @@ func TestAgentTeamHandler_DecideApproval(t *testing.T) {
 }
 
 type mockAgentTeamService struct {
-	createTeam          func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
-	listTeams           func(ctx context.Context, userID string) ([]model.AgentTeam, error)
-	getTeamWithMembers  func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
-	addTeamMember       func(ctx context.Context, userID, teamID, agentProfileID, role string) error
-	startTeamRun        func(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
-	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
-	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
-	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
-	resolveConflict     func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
-	decideApproval      func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
+	createTeam            func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
+	listTeams             func(ctx context.Context, userID string) ([]model.AgentTeam, error)
+	getTeamWithMembers    func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
+	addTeamMember         func(ctx context.Context, userID, teamID, agentProfileID, role string) error
+	updateTeam            func(ctx context.Context, userID, teamID, name, description string) error
+	deleteTeam            func(ctx context.Context, userID, teamID string) error
+	removeTeamMember      func(ctx context.Context, userID, teamID, memberID string) error
+	startTeamRun          func(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
+	listTeamRuns          func(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+	getTeamRun            func(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
+	getTeamRunState       func(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
+	createAssignment      func(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
+	dispatchAssignment    func(ctx context.Context, userID, assignmentID string) error
+	completeAssignment    func(ctx context.Context, userID, assignmentID string, result string) error
+	failAssignment        func(ctx context.Context, userID, assignmentID string, reason string) error
+	listAssignments       func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
+	handleRouteDecision   func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	listTeamTasks         func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
+	listTeamEvents        func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
+	resolveConflict       func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
+	decideApproval        func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
@@ -236,11 +247,17 @@ func (m *mockAgentTeamService) ListTeams(ctx context.Context, userID string) ([]
 }
 
 func (m *mockAgentTeamService) UpdateTeam(ctx context.Context, userID, teamID, name, description string) error {
-	return nil
+	if m.updateTeam == nil {
+		return nil
+	}
+	return m.updateTeam(ctx, userID, teamID, name, description)
 }
 
 func (m *mockAgentTeamService) DeleteTeam(ctx context.Context, userID, teamID string) error {
-	return nil
+	if m.deleteTeam == nil {
+		return nil
+	}
+	return m.deleteTeam(ctx, userID, teamID)
 }
 
 func (m *mockAgentTeamService) AddTeamMember(ctx context.Context, userID, teamID, agentProfileID, role string) error {
@@ -251,7 +268,10 @@ func (m *mockAgentTeamService) AddTeamMember(ctx context.Context, userID, teamID
 }
 
 func (m *mockAgentTeamService) RemoveTeamMember(ctx context.Context, userID, teamID, memberID string) error {
-	return nil
+	if m.removeTeamMember == nil {
+		return nil
+	}
+	return m.removeTeamMember(ctx, userID, teamID, memberID)
 }
 
 func (m *mockAgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error) {
@@ -262,35 +282,59 @@ func (m *mockAgentTeamService) StartTeamRun(ctx context.Context, userID, teamID,
 }
 
 func (m *mockAgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error) {
-	return nil, nil
+	if m.getTeamRun == nil {
+		return nil, nil
+	}
+	return m.getTeamRun(ctx, userID, teamID, runID)
 }
 
 func (m *mockAgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error) {
-	return nil, nil
+	if m.getTeamRunState == nil {
+		return nil, nil
+	}
+	return m.getTeamRunState(ctx, userID, teamID, runID)
 }
 
 func (m *mockAgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error) {
-	return nil, nil
+	if m.listTeamRuns == nil {
+		return nil, nil
+	}
+	return m.listTeamRuns(ctx, userID, teamID)
 }
 
 func (m *mockAgentTeamService) CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error) {
-	return nil, nil
+	if m.createAssignment == nil {
+		return nil, nil
+	}
+	return m.createAssignment(ctx, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr)
 }
 
 func (m *mockAgentTeamService) DispatchAssignment(ctx context.Context, userID, assignmentID string) error {
-	return nil
+	if m.dispatchAssignment == nil {
+		return nil
+	}
+	return m.dispatchAssignment(ctx, userID, assignmentID)
 }
 
 func (m *mockAgentTeamService) CompleteAssignment(ctx context.Context, userID, assignmentID string, result string) error {
-	return nil
+	if m.completeAssignment == nil {
+		return nil
+	}
+	return m.completeAssignment(ctx, userID, assignmentID, result)
 }
 
 func (m *mockAgentTeamService) FailAssignment(ctx context.Context, userID, assignmentID string, reason string) error {
-	return nil
+	if m.failAssignment == nil {
+		return nil
+	}
+	return m.failAssignment(ctx, userID, assignmentID, reason)
 }
 
 func (m *mockAgentTeamService) ListAssignments(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error) {
-	return nil, nil
+	if m.listAssignments == nil {
+		return nil, nil
+	}
+	return m.listAssignments(ctx, userID, teamRunID)
 }
 
 func (m *mockAgentTeamService) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {

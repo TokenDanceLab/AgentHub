@@ -6,7 +6,7 @@ import SettingRow from '../primitives/SettingRow';
 import SelectControl from '../primitives/SelectControl';
 import Switch from '../primitives/Switch';
 import { writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 type ThemeMode = 'dark' | 'light' | 'system';
 
@@ -54,6 +54,7 @@ export default function AppearanceSection({
             onClick={() => setThemePreset(undefined)}
           >
             <div className={styles.presetSwatches}>
+              {/* theme preview swatch - intentional */}
               <span className={styles.presetSwatch} style={{ background: '#5d68cc' }} />
               <span className={styles.presetSwatch} style={{ background: '#25252d' }} />
               <span className={styles.presetSwatch} style={{ background: '#d7d9e1' }} />
@@ -74,6 +75,7 @@ export default function AppearanceSection({
                 onClick={() => setThemePreset(key)}
               >
                 <div className={styles.presetSwatches}>
+                  {/* theme preview swatch - intentional */}
                   <span className={styles.presetSwatch} style={{ background: accent }} />
                   <span className={styles.presetSwatch} style={{ background: surface }} />
                   <span className={styles.presetSwatch} style={{ background: muted }} />
