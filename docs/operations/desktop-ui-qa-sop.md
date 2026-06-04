@@ -17,7 +17,7 @@ Desktop UI 修复不能只停在“看起来好了”。满足以下条件后，
 
 ## 1. 接手检查
 
-1. 先读 `AGENTS.md`、`docs/development/handoffs/STATE.md`、`docs/roadmaps/client.md` 和本文件。
+1. 先读 `AGENTS.md`、`docs/development/handoffs/STATE.md`、`docs/tutorials/roadmap.md` 和本文件。
 2. 在 AgentHub 仓库根目录检查分支和脏工作区：
 
 ```powershell

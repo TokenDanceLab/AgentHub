@@ -131,11 +131,11 @@ agent_test.go
 | 文件 | 说明 |
 |------|------|
 | `AGENTS.md` | 项目规则、Git 流程、分支治理、前端规范 |
-| `docs/roadmap.md` | 全局路线图、已完成/待办清单 |
-| `docs/architecture/system-architecture.md` | 系统架构 |
-| `docs/architecture/implementation-guide.md` | 实现指南 |
+| `docs/tutorials/roadmap.md` | 全局路线图、已完成/待办清单 |
+| `docs/architecture/system-design/system-architecture.md` | 系统架构 |
+| `docs/architecture/system-design/implementation-guide.md` | 实现指南 |
 | `docs/governance/branch-governance.md` | 分支治理详细规则 |
-| `docs/handoff/STATE.md` | 跨 session 状态文件 |
+| `docs/development/handoffs/STATE.md` | 跨 session 状态文件 |
 | `.agents/skills/dev-loop/SKILL.md` | 长程开发引擎 |
 | `.agents/skills/ui-screenshot/SKILL.md` | **新增** UI 截图自动化 |
 

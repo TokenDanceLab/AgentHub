@@ -6,7 +6,7 @@
 
 ## 阅读规则
 
-- ADR 不作为 backlog。实现任务以 `docs/tutorials/roadmap.md`、`docs/roadmaps/` 和当前 issue/PR 为准。
+- ADR 不作为 backlog。实现任务以 `docs/tutorials/roadmap.md` 和当前 issue/PR 为准。
 - ADR 不替代 API 契约。REST 以 `api/openapi.yaml` 为准，事件以 `api/events.md` 为准。
 - ADR 中的旧称呼需要按当前术语理解：Agent Runtime、Agent Profile、Agent Configuration、Execution Target。
 - 早期出现的独立 Runner、Runner registry、Runner 直连等说法应按当前 Edge lifecycle + AgentAdapter 模型重解释。

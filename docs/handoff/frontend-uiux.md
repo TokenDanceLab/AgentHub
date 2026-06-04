@@ -154,9 +154,9 @@ pnpm tauri dev          # 实际看效果
 
 ## 6. 参考文档
 
-- `docs/architecture/product-requirements.md` — 产品需求
-- `docs/architecture/system-architecture.md` — 系统架构
-- `docs/roadmap.md` — 全局路线图
+- `docs/architecture/system-design/product-requirements.md` — 产品需求
+- `docs/architecture/system-design/system-architecture.md` — 系统架构
+- `docs/tutorials/roadmap.md` — 全局路线图
 - `docs/reference/competitor-master-report.md` — 8 竞品对标 + Borrow/Adapt/Ignore
 - `docs/reference/design-systems-master-report.md` — 设计系统完整报告
 - `docs/reference/desktop-fix-redesign-master-plan.md` — 66 项修复清单
