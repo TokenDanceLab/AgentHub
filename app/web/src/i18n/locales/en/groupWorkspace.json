@@ -101,6 +101,7 @@
   "demo.detail": "Demo/mock fallback data: {{detail}}",
   "demo.summary": "Demo/mock fallback task: {{summary}}",
   "demo.role": "Demo/mock fallback member: {{role}}",
+  "locked.description": "Please sign in to Hub to view group workspace data.",
   "confirm.dismiss": "Dismiss confirmation",
   "confirm.ready": "Local workspace ready",
   "confirm.readyDetail": "Local controls are wired for review, dry-run sync, assignment, member presence, and notes.",

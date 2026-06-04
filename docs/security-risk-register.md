@@ -1,8 +1,8 @@
 # AgentHub Security Risk Register
 
-Last reviewed: 2026-06-01
+Last reviewed: 2026-06-03
 
-AgentHub is the multi-model AI coding orchestration product. This register covers Hub Server, Edge Server, Desktop (Tauri), and Web (Hub-only webapp) security boundaries. Cross-repo severity, status vocabulary, release gates, and escalation rules are defined in the root `../docs/security-risk-governance.md`.
+AgentHub is the multi-model AI coding orchestration product. This register covers Hub Server, Edge Server, Desktop (Tauri), and Web (Hub-only webapp) security boundaries. Cross-repo severity, status vocabulary, release gates, and escalation rules are defined in the root `../docs/security/security-risk.md`.
 
 ## Scope
 
@@ -12,7 +12,7 @@ AgentHub is the multi-model AI coding orchestration product. This register cover
 - Web (Hub-only): `app/web/` — Hub boundary, sessionStorage token, WS auth
 - API contract: `api/`
 - CI/governance: `scripts/`, `.github/workflows/`
-- Cross-repo identity docs: `../docs/identity-auth.md`, `../docs/unified-login.md`, `../docs/authorization-model.md`
+- Cross-repo identity docs: `../docs/identity/identity-auth.md`, `../docs/identity/authorization-model.md`, `../docs/identity/relying-party.md`
 
 ## P0 / High
 
@@ -42,6 +42,10 @@ AgentHub is the multi-model AI coding orchestration product. This register cover
 | AH-SR-012 | High | Open | Hub OIDC callback, JWKS validation, code exchange, and Hub session issuance have code and test coverage. 2026-06-02 production non-interactive smoke verified TokenDance ID health/discovery/JWKS, Hub health, Hub OIDC authorize URL generation, invalid callback rejection, and Desktop dev CORS with `scripts/verify-oidc-flow.ps1` (32/32). This still lacks a browser-completed authorization code flow proving live callback registration, code exchange, Hub session issuance, and user-visible login completion. | `hub-server/internal/handler/oidc.go`, `hub-server/internal/service/oidc.go`, `hub-server/internal/service/oidc_test.go`, `scripts/verify-oidc-flow.ps1` | Complete an end-to-end browser OIDC login against production or staging, confirm Hub session issuance and `/client/auth/me`, then record private evidence without copying callback codes, tokens, client secrets, or session material into this public repo. |
 | AH-SR-013 | High | Open | No Desktop login/logout/reconnect deployment evidence. Desktop system-browser PKCE, Hub session acquisition, WebSocket auth, logout, and reconnect recovery have code but no production or staging deployment evidence with real TokenDance ID. This is release-blocking. | `app/desktop/src/lib/oidc.ts`, `app/desktop/src/lib/auth.ts`, `app/desktop/src-tauri/src/oidc.rs` | Deploy Desktop against a live Hub with OIDC enabled, complete full login/logout/reconnect cycle, capture evidence in private server docs. Do NOT copy tokens, callback parameters, or session secrets. |
 | AH-SR-014 | High | Open | Web server-owned session posture not proven. Web app currently uses `sessionStorage` for Hub session tokens. A release-quality Web deployment should demonstrate server-owned session posture (BFF/HttpOnly cookie or accepted documented alternative) before public exposure. | `app/web/src/lib/auth.ts`, `app/web/src/stores/session.ts` | Implement or document the Web session posture decision; if BFF/HttpOnly, add backend proxy with cookie-based session; if documented alternative, record accepted risk with owner, date, reason, and compensating controls. |
+| AH-SR-021 | High | Open | Mobile labels the native token layer as secure storage, but the current Tauri command writes the Hub access token as plaintext JSON under the app data directory. Mobile OIDC deep-link callback is also explicitly incomplete, so this path must not be treated as release-ready authentication. | `app/mobile/src-tauri/src/secure_store.rs`, `app/mobile/src-tauri/src/oidc.rs`, `app/mobile/src/native/mobileCommands.ts` | Before Mobile auth release, either return a clear not-implemented state for token persistence or integrate Android Keystore / iOS Keychain and route the full flow through Hub `/client/auth/oidc/*`; add native storage tests or platform QA evidence. |
+| AH-SR-022 | High | Open | Legacy username/password auth surface still exists in Web client types/comments and Hub integration tests even though the active Hub router only exposes refresh, OIDC authorize/callback, logout, and profile routes. Keeping dead login/register/password paths makes it easy to reintroduce unsupported auth logic. | `app/web/src/api/hubAuth.ts`, `app/web/src/api/hubClient.ts`, `hub-server/internal/router/router.go`, `hub-server/tests/api_test.go` | Delete or quarantine legacy password client/test surfaces behind an explicit migration task; ensure OpenAPI, Web auth UI, and tests only describe TokenDance ID OIDC plus Hub refresh/logout/profile. |
+| AH-SR-023 | Medium | Open | Web preview/mock surfaces are labeled, but demo fallbacks and local-preview actions still share production UI paths. Release-quality Web must not report fake execution, fake private-chat success, or local catalog mutation as Hub-backed behavior. | `app/web/src/pages/mockConvergence.test.tsx`, `app/web/src/api/agentQueries.ts`, `app/web/src/api/hubClient.ts`, `app/web/src/i18n/locales/en/*.json` | Gate demo/mock surfaces behind explicit preview mode and route production run mutations through Hub `/web/agent-tasks` or team-run APIs; keep tests that fail on mock success states in authenticated flows. |
+| AH-SR-024 | Medium | Open | Runner compatibility health still leaks into Desktop/Web settings and workbench state, while the architecture has moved to Runtime adapters plus Execution Targets. This can mislead operators about what is actually dispatchable. | `edge-server/README.md`, `edge-server/internal/runners/`, `app/desktop/src/components/settings/sections/ExecutionTargetsSection.tsx`, `app/web/src/hooks/useWorkbenchProjection.ts` | Replace direct runner-centric UI assumptions with a compatibility adapter over Runtime inventory and Execution Target health; keep `/v1/runners` only as a documented legacy summary until clients stop depending on it. |
 
 ## Observability / Hygiene
 
@@ -74,7 +78,7 @@ git diff --check
 ## Loop Notes
 
 - Hub session/auth, OIDC, Edge auth, or workspace boundary changes must update this register.
-- Critical/High risks in `Open` state block public release; see `../docs/security-risk-governance.md` for release gates.
+- Critical/High risks in `Open` state block public release; see `../docs/security/security-risk.md` for release gates.
 - Production live endpoint, callback URL, client secret, session token, host path, backup path, and rotation evidence belong only in `C:\Users\Ding\server` or private ops docs.
-- Cross-repo identity/auth changes must also update `../docs/identity-auth.md`, `../docs/unified-login.md`, and `../docs/authorization-model.md`.
+- Cross-repo identity/auth changes must also update `../docs/identity/identity-auth.md`, `../docs/identity/authorization-model.md`, and `../docs/identity/relying-party.md`.
 - Feishu/Lark Gateway security items should be added here when the integration skeleton lands.

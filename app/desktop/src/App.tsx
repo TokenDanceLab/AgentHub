@@ -53,6 +53,7 @@ import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
 import HomeDashboard from '@/components/HomeDashboard';
+import ConnectionStatus from '@/components/ConnectionStatus';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
@@ -134,7 +135,7 @@ type TopMenuDefinition = Record<TopMenuId, { label: string; items: TopMenuItem[]
 
 const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
-const RUN_CARD_MIN_WORKSPACE_WIDTH = 1180;
+const RUN_CARD_MIN_WORKSPACE_WIDTH = 760;
 const TOP_MENU_ORDER: TopMenuId[] = ['file', 'edit', 'view', 'window', 'help'];
 const HIDDEN_MESSAGES_STORAGE_PREFIX = 'agenthub.chat.hiddenMessages.';
 
@@ -769,12 +770,6 @@ export default function App() {
   }, [handleSelectThread]);
   const handleSelectAgent = useCallback(async (agentId: string) => {
     const store = useThreadStore.getState();
-    const existing = store.agentThreadMap[agentId];
-    if (existing) {
-      store.selectAgentThread(agentId, existing);
-      setLeftSidebarView('thread');
-      return;
-    }
     const agent = agents.find((a) => a.id === agentId);
     try {
       const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
@@ -1497,11 +1492,15 @@ export default function App() {
         </div>
       )}
 
+      <ConnectionStatus
+        isConnected={isConnected}
+        isReconnecting={edgeStatus.retrying}
+        onReconnect={edgeStatus.retry}
+      />
+
       {settingsOpen ? (
         <SettingsPage
           initialSection={settingsInitialSection}
-          modelCatalog={modelCatalogQuery.data}
-          modelDisplayNames={modelsDevDisplayNamesQuery.data}
           onBack={() => setSettingsOpen(false)}
           onOpenAuth={handleOpenAuth}
         />
@@ -1773,12 +1772,6 @@ export default function App() {
                   onFork={handleForkThread}
                   onDelete={handleDelete}
                   onSendMessage={handleSend}
-                  agentTeamOverview={agentTeamsQuery.data}
-                  agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
-                  agentTeamsSignedIn={hubInventoryEnabled}
-                  teamLocalExecutions={teamLocalExecutions}
-                  onStartLocalOrchestration={handleStartLocalOrchestration}
-                  onOpenTeamRuns={() => openSettings('agentScheduling')}
                 />
               )}
             </div>
