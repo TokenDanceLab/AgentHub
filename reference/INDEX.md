@@ -7,7 +7,7 @@
 ## 阅读入口
 
 - 调研报告入口：[docs/reference/README.md](../docs/reference/README.md)
-- 三份主文档：[产品需求](../docs/architecture/product-requirements.md)、[系统架构](../docs/architecture/system-architecture.md)、[功能实现](../docs/architecture/implementation-guide.md)
+- 三份主文档：[产品需求](../docs/architecture/system-design/product-requirements.md)、[系统架构](../docs/architecture/system-design/system-architecture.md)、[功能实现](../docs/architecture/system-design/implementation-guide.md)
 - API 契约：[api/README.md](../api/README.md)
 
 ## 重点参考
