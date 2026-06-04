@@ -5,7 +5,7 @@
 1. `AGENTS.md` — 项目规则和开发约束
 2. `docs/architecture/system-design/system-architecture.md` — Desktop / Edge / Hub 与 Agent Runtime 架构
 3. `docs/architecture/system-design/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
-4. `docs/tutorials/client.md` — 客户端路线图和任务状态
+4. `docs/roadmaps/client.md` — 客户端路线图和任务状态
 5. `api/openapi.yaml` — REST API 契约
 6. `api/events.md` — WebSocket 事件契约
 7. `api/conventions.md` — API 命名、分页、错误格式约定
