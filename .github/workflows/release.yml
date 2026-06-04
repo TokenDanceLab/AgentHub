@@ -46,6 +46,38 @@ jobs:
           CGO_ENABLED: "0"
         run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-linux-amd64 ./cmd/server-hub/
 
+      - name: Build Edge Server (macOS amd64)
+        working-directory: edge-server
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-darwin-amd64 ./cmd/agenthub-edge/
+
+      - name: Build Edge Server (macOS arm64)
+        working-directory: edge-server
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-darwin-arm64 ./cmd/agenthub-edge/
+
+      - name: Build Hub Server (macOS amd64)
+        working-directory: hub-server
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-darwin-amd64 ./cmd/server-hub/
+
+      - name: Build Hub Server (macOS arm64)
+        working-directory: hub-server
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-darwin-arm64 ./cmd/server-hub/
+
       - name: Upload Go artifacts
         uses: actions/upload-artifact@v4
         with:
