@@ -25,6 +25,7 @@ const INTERNAL_RUNNER_OUTPUT_PATTERNS = [
   /(?:^|\s+)Initializing mock runner\.\.\.(?=\s+|$)/gi,
   /(?:^|\s+)Executing mock task step \d+\/\d+\.\.\.(?=\s+|$)/gi,
   /(?:^|\s+)Warning:\s*mock task is running in simulation mode(?=\s+|$)/gi,
+  /(?:^|\s+)Warning:\s*no stdin data received.*?proceeding without it\.?(?=\s+|$)/gi,
 ];
 
 export function buildChatMessagesFromThreadItems(items: ThreadItemLike[] | undefined): ChatMessage[] {

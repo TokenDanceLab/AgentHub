@@ -1,0 +1,110 @@
+.stepper {
+  display: flex;
+  justify-content: center;
+  padding: var(--td-space-2, 8px) 0;
+}
+
+.list {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--td-space-2, 8px);
+  position: relative;
+}
+
+.connector {
+  width: 32px;
+  height: 2px;
+  background: var(--td-line);
+  border-radius: 1px;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.connectorFilled {
+  background: var(--td-moss);
+}
+
+.indicator {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--td-line);
+  background: transparent;
+  color: var(--td-ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.stepActive .indicator {
+  border-color: var(--td-plum);
+  background: var(--td-plum);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 4px rgba(93, 104, 204, 0.15);
+}
+
+.stepCompleted .indicator {
+  border-color: var(--td-moss);
+  background: var(--td-moss);
+  color: var(--success-foreground);
+}
+
+.stepPending .indicator {
+  border-color: var(--td-line);
+  background: transparent;
+  color: var(--td-ink-muted);
+}
+
+.checkIcon {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.stepNumber {
+  line-height: 1;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--td-ink-muted);
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.labelActive {
+  color: var(--td-ink);
+  font-weight: 700;
+}
+
+.labelPending {
+  color: var(--td-ink-muted);
+  opacity: 0.6;
+}
+
+.stepCompleted .label {
+  color: var(--td-moss);
+}
+
+@media (max-width: 540px) {
+  .label {
+    display: none;
+  }
+
+  .connector {
+    width: 20px;
+  }
+}

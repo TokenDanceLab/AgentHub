@@ -26,7 +26,7 @@
   transition: background 0.15s;
 }
 
-.closeBtn:hover { background: rgba(0, 0, 0, 0.05); }
+.closeBtn:hover { background: var(--glass-bg-light); }
 
 .header {
   text-align: center;
@@ -43,7 +43,11 @@
   margin-inline: auto;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    0 12px 28px rgba(0, 113, 188, 0.18);
+    0 12px 28px var(--glass-tint-sky);
+}
+
+[data-theme='dark'] .logo {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
 }
 
 .appName {
@@ -60,7 +64,7 @@
 
 .tabs {
   display: flex;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--glass-bg-light);
   border-radius: 8px;
   padding: 2px;
   margin-bottom: 18px;
@@ -82,7 +86,7 @@
 .tabActive {
   background: var(--card);
   color: var(--foreground);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 6px var(--glass-shadow-subtle);
 }
 
 .body {
@@ -107,7 +111,7 @@
   padding: 10px 14px;
   border: none;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--glass-bg-light);
   color: var(--foreground);
   font-size: 14px;
   font-family: var(--font-sans);
@@ -121,12 +125,12 @@
 .input::placeholder { color: var(--text-weakest); }
 
 .input:focus {
-  background: rgba(0, 0, 0, 0.02);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background: var(--glass-bg-subtle);
+  box-shadow: 0 0 0 3px var(--glass-tint-plum);
 }
 
 .input:disabled { opacity: 0.5; }
-.inputError { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3); }
+.inputError { box-shadow: 0 0 0 1px var(--glass-tint-danger); }
 
 .passwordWrapper {
   position: relative;
@@ -158,7 +162,7 @@
 .errorBanner {
   padding: 8px 12px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.06);
+  background: var(--glass-tint-danger);
   color: var(--destructive);
   font-size: 12px;
   display: flex;
@@ -199,7 +203,7 @@
 
 .identityDivider span {
   height: 1px;
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--glass-bg-strong);
 }
 
 .identityDivider strong {
@@ -209,15 +213,11 @@
 
 .identityButton {
   min-height: 44px;
-  border: 1px solid rgba(255, 255, 255, 0.64);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.68)),
-    rgba(255, 255, 255, 0.72);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 10px 28px rgba(15, 23, 42, 0.08);
-  color: #111827;
+  background: var(--glass-input-bg-hover);
+  box-shadow: 0 10px 28px var(--glass-shadow-subtle);
+  color: var(--foreground);
   font-size: 14px;
   font-weight: 650;
   cursor: pointer;
@@ -229,24 +229,55 @@
   width: 100%;
 }
 
-.identityButton:hover {
-  border-color: rgba(0, 122, 255, 0.28);
+[data-theme='light'] .identityButton {
+  border-color: rgba(255, 255, 255, 0.64);
+  background:
+    linear-gradient(180deg, var(--glass-input-bg-hover), rgba(255, 255, 255, 0.68)),
+    var(--glass-input-bg-hover);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 12px 32px rgba(0, 122, 255, 0.12);
+    inset 0 1px 0 var(--glass-input-bg-hover),
+    0 10px 28px var(--glass-bg-strong);
+  color: #111827;
+}
+
+.identityButton:hover {
+  border-color: var(--glass-tint-sky);
+  box-shadow: 0 12px 32px var(--glass-tint-sky);
 }
 
 .identityButton:focus-visible {
   outline: none;
+  box-shadow: 0 0 0 3px var(--glass-tint-sky), 0 12px 32px var(--glass-tint-sky);
+}
+
+[data-theme='light'] .identityButton:hover {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 0 0 3px rgba(0, 122, 255, 0.16),
-    0 12px 32px rgba(0, 122, 255, 0.12);
+    inset 0 1px 0 var(--glass-input-bg-hover),
+    0 12px 32px var(--glass-tint-sky);
+}
+
+[data-theme='light'] .identityButton:focus-visible {
+  box-shadow:
+    inset 0 1px 0 var(--glass-input-bg-hover),
+    0 0 0 3px var(--glass-tint-sky),
+    0 12px 32px var(--glass-tint-sky);
 }
 
 .identityButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+[data-theme='dark'] .identityButton {
+  border: 0;
+  background: var(--glass-panel-strong);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .identityButton:hover,
+[data-theme='dark'] .identityButton:focus-visible {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 }
 
 .identityIcon {
@@ -266,9 +297,9 @@
 
 .identityNotice {
   padding: 9px 11px;
-  border: 1px solid rgba(0, 122, 255, 0.16);
+  border: 1px solid var(--glass-tint-sky);
   border-radius: 10px;
-  background: rgba(0, 122, 255, 0.07);
+  background: var(--glass-tint-sky);
   color: var(--primary);
   font-size: 12px;
   line-height: 1.45;
@@ -349,7 +380,7 @@
   padding: 8px 12px;
   border: none;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--glass-bg-light);
   color: var(--foreground);
   font-size: 13px;
   font-family: var(--font-mono);
@@ -358,7 +389,7 @@
 }
 
 .hubInput:focus {
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px var(--glass-tint-plum);
 }
 
 .hubStatus {

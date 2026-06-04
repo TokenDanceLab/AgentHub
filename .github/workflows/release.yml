@@ -67,14 +67,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-          cache-dependency-path: app/desktop/pnpm-lock.yaml
+          cache-dependency-path: app/pnpm-lock.yaml
 
-      - name: Install desktop dependencies
-        working-directory: app/desktop
-        run: pnpm install --frozen-lockfile
-
-      - name: Install shared dependencies
-        working-directory: app/shared
+      - name: Install dependencies
+        working-directory: app
         run: pnpm install --frozen-lockfile
 
       - name: Setup Rust

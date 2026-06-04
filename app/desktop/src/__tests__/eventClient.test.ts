@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createEventStream } from '../api/eventClient';
+import { setEdgeAuthToken } from '../api/edgeAuth';
 
 // Track WebSocket instances created by the stream
 const instances: MockWebSocket[] = [];
@@ -32,7 +33,9 @@ describe('eventClient', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    setEdgeAuthToken('');
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   function lastWs(): MockWebSocket {
@@ -132,6 +135,17 @@ describe('eventClient', () => {
     const ws = lastWs();
     expect(ws.url).toContain('cursor=7');
     expect(ws.url).toContain('access_token=local-edge-token');
+    stream.close();
+  });
+
+  it('adds runtime Edge auth token to WebSocket URL', () => {
+    setEdgeAuthToken('runtime-edge-token');
+
+    const stream = createEventStream('ws://127.0.0.1:3210/v1/events?cursor=8');
+
+    const ws = lastWs();
+    expect(ws.url).toContain('cursor=8');
+    expect(ws.url).toContain('access_token=runtime-edge-token');
     stream.close();
   });
 });

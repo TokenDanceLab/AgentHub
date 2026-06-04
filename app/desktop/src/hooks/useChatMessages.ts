@@ -3,7 +3,7 @@
 // P0-1: Run lifecycle events invalidate TanStack Query caches; streaming state stays local.
 // Status transitions are validated in runStore; invalid jumps are logged here as warnings.
 
-import { useReducer, useEffect, useRef, useCallback } from 'react';
+import { useReducer, useEffect, useRef, useCallback, useState } from 'react';
 import { createEventStream } from '@/api/eventClient';
 import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
@@ -1149,6 +1149,7 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
   const [state, dispatch] = useReducer(reducer, initialState);
   const mountedRef = useRef(true);
   const streamRef = useRef<StreamHandle | null>(null);
+  const [reconnectTrigger, setReconnectTrigger] = useState(0);
 
   const clearMessages = useCallback(() => {
     dispatch({ type: 'CLEAR_MESSAGES' });
@@ -1167,6 +1168,12 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
   // Track pending tool call IDs for draining-state detection.
   // run.finished + non-empty pending set → DRAINING instead of COMPLETED.
   const pendingToolCallIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    const handler = () => setReconnectTrigger((n) => n + 1);
+    window.addEventListener('agenthub:reconnect', handler);
+    return () => window.removeEventListener('agenthub:reconnect', handler);
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1318,7 +1325,7 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
       clearInterval(latencyTimer);
       stream.close();
     };
-  }, [online, selectedThreadId]);
+  }, [online, selectedThreadId, reconnectTrigger]);
 
   return { ...state, clearMessages, decidePermission };
 }

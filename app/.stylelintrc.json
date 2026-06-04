@@ -1,0 +1,7 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "color-no-hex": true,
+    "color-function-alias-notation": "modern"
+  }
+}
