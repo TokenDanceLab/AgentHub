@@ -7,10 +7,10 @@ mod secure_store;
 mod tray;
 
 use edge_manager::{resolve_edge_path, EdgeManager};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::Mutex;
+use std::sync::Arc;
 use tauri::{Emitter, Manager};
+use tokio::sync::Mutex;
 
 /// Managed state: whether the window should minimize to tray instead of quitting on close.
 pub struct CloseToTrayState(pub Arc<AtomicBool>);
@@ -32,7 +32,10 @@ fn set_close_to_tray(state: tauri::State<'_, CloseToTrayState>, enabled: bool) {
 pub fn run() {
     let edge_path = resolve_edge_path();
     let store_path = std::env::temp_dir().join("agenthub-edge-store.json");
-    let edge = Arc::new(Mutex::new(EdgeManager::new(edge_path, store_path)));
+    let edge = Arc::new(Mutex::new(
+        EdgeManager::new(edge_path, store_path)
+            .expect("failed to initialize local Edge auth token"),
+    ));
 
     let close_to_tray = Arc::new(AtomicBool::new(true));
     let quitting = Arc::new(AtomicBool::new(false));
@@ -46,6 +49,7 @@ pub fn run() {
         .manage(QuittingState(quitting.clone()))
         .invoke_handler(tauri::generate_handler![
             commands::get_edge_status,
+            commands::get_edge_auth_token,
             commands::start_edge,
             commands::stop_edge,
             commands::read_dir_tree,
