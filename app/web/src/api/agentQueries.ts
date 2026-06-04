@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchAgents as fetchPreviewAgents } from './edgeClient';
 import { createHubClient } from './hubClient';
 import type { AgentProfile } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
@@ -114,7 +113,7 @@ export async function fetchAgentList(preferHub: boolean): Promise<ListResponse<A
   if (preferHub && token) {
     return fetchHubAgentProfiles(token);
   }
-  return fetchPreviewAgents();
+  return { items: [], page: { hasMore: false } };
 }
 
 export function useAgentList(enabled: boolean) {
