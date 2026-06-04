@@ -141,6 +141,7 @@ AgentHub/
 ├── hub-server/           # Hub 中心服务
 ├── api/                  # API 契约（OpenAPI + WebSocket events）
 ├── docs/                 # 文档
+<<<<<<< HEAD
 │   ├── getting-started/  # 快速上手指南
 │   ├── tutorials/        # 路线图与学习路径
 │   ├── architecture/     # 产品需求、系统架构、实现指南、设计文档、决策记录
@@ -149,6 +150,17 @@ AgentHub/
 │   ├── archive/          # 历史评审与归档
 │   ├── reference/        # 调研与竞品分析
 │   ├── operations/       # 桌面端 QA SOP、运维
+=======
+│   ├── guides/           # 用户手册、FAQ、快捷键、本地开发指南
+│   ├── architecture/     # 产品需求、系统架构、实现指南、设计文档、决策记录
+│   ├── roadmaps/         # 路线图与竞品分析
+│   ├── governance/       # 安全台账、分支治理、文档标准
+│   ├── handoff/          # 项目状态与交接
+│   ├── inbox/            # 待分类文档
+│   ├── operations/       # 桌面端 QA SOP、运维
+│   ├── research/         # 调研与竞品分析
+│   ├── review/           # 评审记录
+>>>>>>> origin/master
 └── scripts/              # 初始化脚本、git hooks
 ```
 
@@ -163,7 +175,11 @@ AgentHub/
 | [系统架构](docs/architecture/system-design/system-architecture.md) | 技术架构与核心概念 |
 | [API 契约](api/) | REST + WebSocket 接口定义 |
 | [安全风险台账](docs/governance/security-risk-register.md) | 安全风险登记与追踪 |
+<<<<<<< HEAD
 | [项目交接](docs/development/handoffs/) | 项目状态与交接文档 |
+=======
+| [项目交接](docs/handoff/) | 项目状态与交接文档 |
+>>>>>>> origin/master
 
 <br>
 
