@@ -88,12 +88,12 @@
 
   /* ═══════════════════════════════════════════════════════════════════
      Glass Tokens — translucent overlay system
-     Dark theme default: white glow over dark canvas
+     Dark theme default: neutral dark surfaces with low black elevation.
      Light theme: dark overlay over light canvas (reversed in themes.css)
      20 tokens covering bg layers / borders / tints / shadows / text
      ═══════════════════════════════════════════════════════════════════ */
 
-  /* Glass background layers (dark: white translucent) */
+  /* Glass background layers (dark: neutral lift without white outlines) */
   --glass-bg-subtle: rgba(255, 255, 255, 0.03);
   --glass-bg-light: rgba(255, 255, 255, 0.045);
   --glass-bg-medium: rgba(255, 255, 255, 0.065);
@@ -104,11 +104,11 @@
   --glass-bg-hover: rgba(255, 255, 255, 0.06);
   --glass-bg-active: rgba(255, 255, 255, 0.1);
 
-  /* Glass borders */
-  --glass-border-subtle: rgba(255, 255, 255, 0.04);
-  --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-border-strong: rgba(255, 255, 255, 0.1);
-  --glass-border-heavy: rgba(255, 255, 255, 0.15);
+  /* Glass borders: dark mode uses black edge shadows, never white outlines. */
+  --glass-border-subtle: rgba(0, 0, 0, 0.08);
+  --glass-border: rgba(0, 0, 0, 0.14);
+  --glass-border-strong: rgba(0, 0, 0, 0.2);
+  --glass-border-heavy: rgba(0, 0, 0, 0.28);
 
   /* Glass panel backgrounds (dark semi-transparent solids) */
   --glass-panel: rgba(36, 36, 44, 0.82);
@@ -131,8 +131,14 @@
   --glass-text-disabled: rgba(255, 255, 255, 0.3);
 
   /* Glass input fields */
-  --glass-input-bg: rgba(255, 255, 255, 0.48);
-  --glass-input-bg-hover: rgba(255, 255, 255, 0.72);
+  --glass-input-bg: rgba(0, 0, 0, 0.1);
+  --glass-input-bg-hover: rgba(0, 0, 0, 0.16);
+
+  /* Elevated cards: dark theme avoids white outlines and uses shadow for depth. */
+  --elevated-card-bg: var(--glass-panel);
+  --elevated-card-border: transparent;
+  --elevated-card-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  --elevated-card-shadow-strong: 0 14px 36px rgba(0, 0, 0, 0.2);
 
   /* Light page fill (light-theme opaque panels) */
   --glass-light-fill: rgba(250, 250, 251, 0.92);

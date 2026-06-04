@@ -30,7 +30,7 @@
   gap: 6px;
   min-height: 48px;
   padding: 6px 8px;
-  border-top: 1px solid rgba(255,255,255,0.32);
+  border-top: 1px solid var(--glass-border);
   border-bottom: 1px solid var(--glass-border);
   background: var(--glass-light-fill);
   backdrop-filter: blur(22px) saturate(1.15);
@@ -118,7 +118,7 @@
   background: var(--glass-input-bg-hover);
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
-  box-shadow: 0 10px 28px var(--glass-shadow-subtle), 0 1px 0 rgba(255,255,255,0.7) inset;
+  box-shadow: 0 10px 28px var(--glass-shadow-subtle);
   color: var(--foreground);
   font-size: 11px;
   font-weight: 560;
@@ -133,9 +133,9 @@
 }
 
 [data-theme='dark'] .iconTooltip {
-  border-color: var(--glass-border);
+  border-color: transparent;
   background: var(--glass-panel);
-  box-shadow: 0 14px 32px var(--glass-shadow), 0 1px 0 var(--glass-bg-medium) inset;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22);
 }
 
 .iconTooltipHost:hover .iconTooltip,
@@ -472,7 +472,7 @@
 }
 
 /* ═══════════════════════════════════════════════
-   Main zone — floating white card
+   Main zone — floating workspace
    ═══════════════════════════════════════════════ */
 
 .main {
@@ -488,6 +488,7 @@
 }
 
 .workspace {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -508,9 +509,8 @@
 
 [data-theme='dark'] .workspace {
   background: var(--glass-panel);
-  border-color: var(--glass-border-heavy);
-  box-shadow:
-    0 14px 36px var(--glass-bg-heavy);
+  border-color: transparent;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
 }
 
 .workspaceWithRunCard {
@@ -717,7 +717,13 @@
    ═══════════════════════════════════════════════ */
 
 .rightPanel {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+  z-index: 35;
   width: var(--right-panel-width, 360px);
+  max-width: min(var(--right-panel-width, 360px), calc(100% - 32px));
+  max-height: calc(100% - 64px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -725,6 +731,9 @@
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--glass-border-subtle);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.13);
+  transform-origin: top right;
+  transition: opacity 0.18s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 [data-theme='dark'] .rightPanel {
@@ -732,6 +741,19 @@
   backdrop-filter: blur(40px) saturate(1.2);
   -webkit-backdrop-filter: blur(40px) saturate(1.2);
   border-color: var(--glass-border);
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.34);
+}
+
+.rightPanelOpen {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.rightPanelClosing {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.985);
+  pointer-events: none;
 }
 
 .rightPanelHeader {
@@ -1187,10 +1209,8 @@
   background:
     linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg-subtle)),
     var(--glass-panel-strong);
-  border-color: var(--glass-border);
-  box-shadow:
-    0 18px 56px var(--glass-shadow),
-    inset 0 1px 0 var(--glass-bg-light);
+  border-color: transparent;
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.22);
 }
 
 .sidebarBrand {
@@ -1271,7 +1291,11 @@
 
 @media (max-width: 1023px) {
   .sidebar { width: min(var(--left-sidebar-width, 320px), 34vw); }
-  .rightPanel { width: min(var(--right-panel-width, 320px), 34vw); }
+  .rightPanel {
+    right: 12px;
+    width: min(var(--right-panel-width, 320px), 40vw);
+    max-height: calc(100% - 60px);
+  }
 }
 
 @media (max-width: 767px) {
