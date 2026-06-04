@@ -92,7 +92,7 @@ AgentHub 的目标定位应在 **CloudCLI 与 LibreChat 之间偏右**：即具�
 | 归档分离 | CloudCLI | `archivedProjects` / `archivedSessions` 独立视图 |
 
 **AgentHub 特有增强**：
-- 显示每条 session 的 **Authority 类型 badge**（hub / edge / hybrid），和 Edge 位置 label（见 `docs/architecture/system-architecture.md`）
+- 显示每条 session 的 **Authority 类型 badge**（hub / edge / hybrid），和 Edge 位置 label（见 `docs/architecture/system-design/system-architecture.md`）
 - 支持按 Authority / Edge / Active Agent 过滤
 
 ### 2.3 消息流（Message Flow）
