@@ -242,7 +242,11 @@ version / id / seq / type / scope / sentAt / payload
 - Agent 生成的代码由对应开发者负责审查、测试和解释。
 - 首次克隆后运行 `.\scripts\setup.ps1` 启用本地 hooks；需要参考仓库时运行 `.\scripts\setup.ps1 -Reference core`。
 - 并行开发使用 `.worktrees/`，具体规则见 `AGENTS.md`。
+<<<<<<< HEAD
 - 客户端后续以 `docs/tutorials/roadmap.md`、`docs/roadmaps/client.md` 和 `docs/development/handoffs/STATE.md` 为当前入口；`docs/archive/client-handoff.md` 是历史快照，不作为默认接手指南。
+=======
+- 客户端后续以 `docs/roadmap.md`、`docs/roadmaps/client.md` 和 `docs/handoff/STATE.md` 为当前入口；`docs/archive/client-handoff.md` 是历史快照，不作为默认接手指南。
+>>>>>>> origin/master
 
 PR 说明按影响选择填写：
 
