@@ -21,9 +21,6 @@ export default function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
       </div>
       <div className={styles.profileMeta}>
         <span>{t('settings.runtimeAdapter')}: {agent.id}</span>
-        <span>{t('settings.profileRuntime')}: {t('settings.statusReady')}</span>
-        <span>{t('settings.profileModel')}: {t('settings.statusPlanned')}</span>
-        <span>{t('settings.profileConfig')}: {t('settings.statusPlanned')}</span>
       </div>
     </div>
   );
