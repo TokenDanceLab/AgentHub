@@ -4,7 +4,7 @@
 
 > 让 Claude Code、Codex、OpenCode 在同一 IM 工作台上协作
 
-[![status](https://img.shields.io/badge/v0.1.0-活跃开发-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
+[![status](https://img.shields.io/badge/v0.3.0-活跃开发-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
 [![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
 [![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
@@ -142,11 +142,14 @@ AgentHub/
 ├── api/                  # API 契约（OpenAPI + WebSocket events）
 ├── docs/                 # 文档
 │   ├── guides/           # 用户手册、FAQ、快捷键、本地开发指南
-│   ├── architecture/     # 产品需求、系统架构、实现指南、ADR
+│   ├── architecture/     # 产品需求、系统架构、实现指南、设计文档、决策记录
 │   ├── roadmaps/         # 路线图与竞品分析
-│   ├── governance/       # 安全台账、分支治理
+│   ├── governance/       # 安全台账、分支治理、文档标准
 │   ├── handoff/          # 项目状态与交接
-│   └── operations/       # 客户端路线图、运维
+│   ├── inbox/            # 待分类文档
+│   ├── operations/       # 桌面端 QA SOP、运维
+│   ├── research/         # 调研与竞品分析
+│   ├── review/           # 评审记录
 └── scripts/              # 初始化脚本、git hooks
 ```
 
@@ -164,6 +167,7 @@ AgentHub/
 | [系统架构](docs/architecture/system-architecture.md) | 技术架构与核心概念 |
 | [API 契约](api/) | REST + WebSocket 接口定义 |
 | [安全风险台账](docs/governance/security-risk-register.md) | 安全风险登记与追踪 |
+| [项目交接](docs/handoff/) | 项目状态与交接文档 |
 
 <br>
 

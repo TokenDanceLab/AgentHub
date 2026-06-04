@@ -42,7 +42,7 @@ jobs:
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
 
-      - name: Coverage check (overall >= 70%)
+      - name: Coverage check (overall >= 75%)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           THRESHOLD=75

@@ -340,8 +340,8 @@ Wave 3（按需）:
 |------|------|
 | CREATE | `docs/guides/agent-team-integration.md` | AgentTeam E2E 集成指南 |
 | CREATE | `docs/guides/oidc-browser-test.md` | OIDC 浏览器冒烟测试手册 |
-| MODIFY | `docs/security-risk-register.md` | 合并重复的安全文档 |
-| DELETE | `docs/governance/security-risk-register.md` | 如果与上层重复 |
+| MODIFY | `docs/governance/security-risk-register.md` | 合并重复的安全文档 |
+| DELETE | `docs/governance/security-risk-register.md` | [not executed — governance/ copy is canonical] |
 
 ---
 

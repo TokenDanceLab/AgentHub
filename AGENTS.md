@@ -31,10 +31,10 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 5. 只读相关主文档章节：产品不清读 `docs/architecture/product-requirements.md`；边界不清读 `docs/architecture/system-architecture.md`；实现顺序不清读 `docs/architecture/implementation-guide.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
-8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
+8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
 9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
 10. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
-11. 客户端 M1 任务读 `docs/operations/client-roadmap.md`。
+11. 客户端 M1 任务读 `docs/roadmaps/client.md`。
 12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
@@ -114,7 +114,7 @@ Rust/Tauri 隔离规则：
 - AgentHub Home 的 `https://hub.vectorcontrol.tech/api/auth/callback` 是产品官网静态站 OIDC callback，不是 Hub API 登录 callback。
 - 现有 TokenDance ID bearer-token middleware 只是兼容路径；最终浏览器/桌面登录必须由 Hub Server 兑换 code 并签发 Hub 本地 session。
 
-当前协作提醒（2026-06-02）：Hub Agent 和 Client Agent 正在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
+协作提醒：Hub Agent 和 Client Agent 在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
 
 ### AgentHub 授权边界
 
@@ -128,12 +128,12 @@ AgentHub 角色、组织、项目、Thread、Run、Approval、Agent Profile、In
 
 ### 安全风险治理边界
 
-AgentHub 的 `docs/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security/security-risk.md`。
+AgentHub 的 `docs/governance/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security/security-risk.md`。
 
 - 涉及 Hub 登录/session、Edge 远程执行、Desktop/Web token storage、Feishu/Lark action、TokenDance API key、integration secret、公开 stats 或 generated artifact 的风险变更，必须同步更新本仓库风险表。
 - Critical/High 风险在未修复、未验证或未显式 accepted 之前阻断公开发布；accepted risk 必须写 owner、日期、原因、补偿控制和复查触发条件。
 - 需要生产 endpoint、host、日志、备份或 secret 证明的结论只在 `C:\Users\Ding\server` 或私有运维文档记录；AgentHub 公开文档只写证据指针和无密结论。
-- 发布前从 workspace 根运行 `..\scripts\verify-security-risks.ps1 -StrictReleaseGate`；默认治理 pass 里的 security warning 不是可忽略噪声，而是未关闭 release blocker。
+- 发布前从 workspace 根运行 `.\scripts\verify-ci-gates.ps1`；默认治理 pass 里的 security warning 不是可忽略噪声，而是未关闭 release blocker。
 
 ### Feishu/Lark 应用边界
 
@@ -295,7 +295,7 @@ feat/* → dev/delicious233 → master
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
 | master | PR-only 稳定快照，v0.1.0 已同步 | ✅ 当前 |
-| origin/dev/trump | Trump 独立分支，55 ahead/89 behind，代码已过期不建议合入 | 保留，不自动合并 |
+| origin/dev/trump | Trump 独立分支，与主线大幅分叉（截至 2026-06 快照），代码已过期不建议合入 | 保留，不自动合并 |
 | origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
 | origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
 | ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
@@ -308,7 +308,7 @@ feat/* → dev/delicious233 → master
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
-- `master` 目前滞后于 `dev/delicious233` 300+ commits，始终从 `dev/delicious233` 开始工作。
+- `master` 目前滞后于 `dev/delicious233`（差距较大），始终从 `dev/delicious233` 开始工作。
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
 - `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
@@ -344,7 +344,7 @@ P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P
 
 - 主文档只保留三份：产品需求、系统架构、功能实现。
 - `docs/roadmap.md` 和 `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
-- `docs/operations/client-roadmap.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
+- `docs/roadmaps/client.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。

@@ -26,7 +26,7 @@ This file maps TokenDance system governance into AgentHub execution items. Agent
 | TD-P1-HUB-02 | Hub authorization | `hub-server/internal/service/`, `hub-server/internal/middleware/` | Resource/action checks applied to org/project/thread/run/profile/integration secrets — pending TD-P0-HUB-01 deployment |
 | TD-P0-DESIGN-01 | Visual QA | `app/desktop/screenshots/`, `app/web/screenshots/`, `app/mobile/screenshots/` | Desktop 14 screenshots (missing approval/error/diff), Web 70+ screenshots (most complete), Mobile 80+ screenshots (most complete); public product sites pending |
 | TD-P0-I18N-01 | i18n parity | `app/desktop/src/i18n/locales/`, `app/web/src/i18n/locales/` | Desktop flat `zh.json`/`en.json` and Web namespace JSON directories structurally matching; Mobile missing dedicated i18n files |
-| TD-P0-SEC-01 | Security/risk | `docs/security-risk-register.md` | Register created 2026-06-01; Critical/High findings need production deployment evidence |
+| TD-P0-SEC-01 | Security/risk | `docs/governance/security-risk-register.md` | Register created 2026-06-01; Critical/High findings need production deployment evidence |
 
 ## Local Dispatch Rules
 
@@ -42,6 +42,6 @@ This file maps TokenDance system governance into AgentHub execution items. Agent
 - Update this file when a queue ID moves from open to partial or done.
 - Update `docs/roadmap.md` when major features or batches complete.
 - Update `docs/handoff/STATE.md` for deployment version and commit hash changes.
-- Update `docs/security-risk-register.md` for new findings, mitigations, or deployment verification.
+- Update `docs/governance/security-risk-register.md` for new findings, mitigations, or deployment verification.
 - Update root `docs/identity/identity-auth.md` / `docs/identity/authorization-model.md` when Hub session or token rules change.
 - Update `api/openapi.yaml` and `api/events.md` for API contract changes.
