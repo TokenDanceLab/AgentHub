@@ -88,6 +88,8 @@ jobs:
   build-desktop:
     needs: build-go
     runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -134,6 +136,11 @@ jobs:
           $ver = "${{ github.ref_name }}" -replace '^v',''
           $nsis = Get-ChildItem "app\desktop\src-tauri\target\release\bundle\nsis" -Filter "*setup.exe" | Select-Object -First 1
           Copy-Item $nsis.FullName "dist\AgentHub_${ver}_x64-setup.exe"
+          # Collect updater metadata if present
+          $updater = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "latest.json" -Recurse | Select-Object -First 1
+          if ($updater) { Copy-Item $updater.FullName "dist\latest.json" }
+          $sig = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "*.sig" -Recurse | Select-Object -First 1
+          if ($sig) { Copy-Item $sig.FullName "dist\AgentHub_${ver}_x64-setup.exe.sig" }
 
       - name: Create portable zip
         shell: pwsh
@@ -164,6 +171,8 @@ jobs:
   build-desktop-macos:
     needs: build-go
     runs-on: macos-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
 
