@@ -215,7 +215,12 @@ jobs:
         run: |
           ver="${{ github.ref_name }}"
           ver="${ver#v}"
-          dmg=$(find app/desktop/src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          dmg=$(find app/desktop/src-tauri/target/release/bundle -name "*.dmg" -o -name "*.app" | head -1)
+          if [ -z "$dmg" ]; then
+            echo "ERROR: No DMG or APP found in bundle directory"
+            find app/desktop/src-tauri/target/release/bundle -type f 2>/dev/null || echo "bundle dir not found"
+            exit 1
+          fi
           cp "$dmg" "dist/AgentHub_${ver}_aarch64.dmg"
 
       - name: Upload macOS Desktop artifacts
