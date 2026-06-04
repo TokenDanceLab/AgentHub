@@ -2,8 +2,14 @@
   position: relative;
   margin: var(--space-xs) 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 4px);
+  border-radius: 10px;
   overflow: hidden;
+  background: var(--chat-code-bg);
+}
+
+[data-theme='dark'] .wrapper {
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
 /* ── Header bar ──────────────────────────────── */
@@ -58,7 +64,7 @@
 .plain {
   margin: 0;
   padding: var(--space-sm);
-  background: var(--background);
+  background: var(--chat-code-bg);
   font-size: var(--font-size-xs);
   font-family: var(--font-mono);
   overflow-x: auto;
