@@ -13,14 +13,14 @@ interface IMMessageViewProps {
   onRecallMessage?: (message: IMMessage) => undefined | Promise<unknown>;
 }
 
-function formatTime(timestamp: string): string {
+function formatTime(timestamp: string, label: (key: string, fallback: string, vars?: Record<string, unknown>) => string): string {
   const d = new Date(timestamp);
   const now = Date.now();
   const diff = now - d.getTime();
   const minutes = Math.floor(diff / 60000);
 
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return label('im.time.justNow', 'Just now');
+  if (minutes < 60) return label('im.time.minutesAgo', '{{n}}m ago', { n: minutes });
 
   return d.toLocaleTimeString('en-US', {
     hour: 'numeric',
@@ -119,7 +119,7 @@ const IMMessageBubble = memo(function IMMessageBubble({
 
       <div className={styles.messageMeta}>
         <time className={styles.timestamp} dateTime={message.timestamp}>
-          {formatTime(message.timestamp)}
+          {formatTime(message.timestamp, label)}
         </time>
         {message.recalled || isRecalled ? (
           <span>{label('im.message.recalledStatus', 'Recalled on Hub')}</span>
@@ -160,6 +160,11 @@ const IMMessageView = memo(function IMMessageView({
   onRecallMessage,
 }: IMMessageViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
+  const label = (key: string, fallback: string, vars?: Record<string, unknown>) => {
+    const translated = t(key, vars);
+    return translated === key ? fallback : translated;
+  };
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -170,8 +175,8 @@ const IMMessageView = memo(function IMMessageView({
     return (
       <div className={styles.root}>
         <div className={styles.empty}>
-          <span>No messages yet</span>
-          <span>Start a conversation to begin</span>
+          <span>{label('im.empty.noMessages', 'No messages yet')}</span>
+          <span>{label('im.empty.startConversation', 'Start a conversation to begin')}</span>
         </div>
       </div>
     );

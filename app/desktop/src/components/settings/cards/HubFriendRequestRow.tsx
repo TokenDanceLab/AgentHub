@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { UserCircle } from 'lucide-react';
 import type { FriendRequestInfo } from '@/api/hubClient';
 import { formatTimestamp } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function HubFriendRequestRow({ request }: { request: FriendRequestInfo }) {
   const { t } = useTranslation();

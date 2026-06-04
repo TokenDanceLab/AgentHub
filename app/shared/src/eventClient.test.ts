@@ -72,8 +72,7 @@ describe('EventClient', () => {
   it('stores seq as the replay cursor and reuses it on reconnect', async () => {
     const client = new EventClient({
       baseUrl: 'http://127.0.0.1:3210',
-      reconnectDelayMs: 5,
-      maxReconnectDelayMs: 5,
+      reconnect: { baseDelay: 5, maxDelay: 5 },
     });
 
     client.connect();

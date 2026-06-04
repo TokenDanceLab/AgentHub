@@ -20,6 +20,12 @@ pub async fn get_edge_status(state: State<'_, SharedEdgeManager>) -> Result<Edge
 }
 
 #[tauri::command]
+pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
+    let mgr = state.lock().await;
+    Ok(mgr.local_auth_token().to_string())
+}
+
+#[tauri::command]
 pub async fn start_edge(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
     let mut mgr = state.lock().await;
     mgr.start().await?;
@@ -212,7 +218,8 @@ pub async fn git_status(dir: String) -> Result<GitStatus, String> {
     let lines: Vec<&str> = stdout.lines().collect();
 
     // Parse branch line: "## branch...origin/branch [ahead N] [behind M]"
-    let (branch, ahead, behind) = parse_branch_line(lines.first().copied().unwrap_or("## (no branch)"));
+    let (branch, ahead, behind) =
+        parse_branch_line(lines.first().copied().unwrap_or("## (no branch)"));
 
     // Parse file lines
     let files: Vec<GitFileStatus> = lines
@@ -384,7 +391,13 @@ fn parse_branch_line(line: &str) -> (Option<String>, u32, u32) {
     // Extract branch name (before "..." or end of string before [ahead/behind])
     let branch_part = rest.split(' ').next().unwrap_or(rest);
     let branch = if branch_part.contains("...") {
-        Some(branch_part.split("...").next().unwrap_or(branch_part).to_string())
+        Some(
+            branch_part
+                .split("...")
+                .next()
+                .unwrap_or(branch_part)
+                .to_string(),
+        )
     } else {
         Some(branch_part.to_string())
     };
@@ -527,10 +540,7 @@ fn is_ignored(entry_path: &Path, root: &Path, patterns: &[String]) -> bool {
     }
 
     // Also ignore common VCS/metadata dirs
-    let name = entry_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy();
+    let name = entry_path.file_name().unwrap_or_default().to_string_lossy();
     if is_dir {
         match name.as_ref() {
             ".git" | "node_modules" | ".svn" | ".hg" => return true,
@@ -603,12 +613,22 @@ fn gitignore_match_impl(path: &[u8], pattern: &[u8], pi: usize, si: usize) -> bo
     pi == plen
 }
 
-fn walk_dir(current: &Path, root: &Path, gitignore_patterns: &[String]) -> Result<Vec<FileEntry>, String> {
+fn walk_dir(
+    current: &Path,
+    root: &Path,
+    gitignore_patterns: &[String],
+) -> Result<Vec<FileEntry>, String> {
     let mut entries: Vec<FileEntry> = Vec::new();
 
     let dir_iter = match fs::read_dir(current) {
         Ok(it) => it,
-        Err(e) => return Err(format!("Failed to read directory {}: {}", current.display(), e)),
+        Err(e) => {
+            return Err(format!(
+                "Failed to read directory {}: {}",
+                current.display(),
+                e
+            ))
+        }
     };
 
     for entry_result in dir_iter {
@@ -695,10 +715,9 @@ pub async fn read_workspace_store(app: tauri::AppHandle) -> Result<WorkspaceStor
     if !path.exists() {
         return Ok(WorkspaceStoreData::default());
     }
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read workspace store: {}", e))?;
-    serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse workspace store: {}", e))
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
+    serde_json::from_str(&content).map_err(|e| format!("Failed to parse workspace store: {}", e))
 }
 
 #[tauri::command]
@@ -708,13 +727,11 @@ pub async fn write_workspace_store(
 ) -> Result<(), String> {
     let path = workspace_store_path(&app);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create app data dir: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create app data dir: {}", e))?;
     }
     let content = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
-    fs::write(&path, &content)
-        .map_err(|e| format!("Failed to write workspace store: {}", e))
+    fs::write(&path, &content).map_err(|e| format!("Failed to write workspace store: {}", e))
 }
 
 // ── Workspace Content Search ──

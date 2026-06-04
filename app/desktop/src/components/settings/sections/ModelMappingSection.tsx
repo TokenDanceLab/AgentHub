@@ -5,7 +5,7 @@ import SettingRow from '../primitives/SettingRow';
 import Switch from '../primitives/Switch';
 import Callout from '../primitives/Callout';
 import AliasMappingRow from '../cards/AliasMappingRow';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface ModelMappingSectionProps {
   modelMappingEnabled: boolean;

@@ -10,7 +10,7 @@ import Callout from '../primitives/Callout';
 import Switch from '../primitives/Switch';
 import McpRuntimeCard from '../cards/McpRuntimeCard';
 import { writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface McpSectionProps {
   agents: AgentInfo[];

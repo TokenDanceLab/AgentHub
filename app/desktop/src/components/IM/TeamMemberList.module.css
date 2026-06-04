@@ -1,0 +1,106 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* ── Status messages ─────────────────────────────────── */
+.loading {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+.error {
+  padding: var(--space-lg);
+  color: var(--td-danger);
+  font-size: var(--font-size-xs);
+}
+
+.empty {
+  padding: var(--space-lg);
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Member card ─────────────────────────────────────── */
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: var(--td-radius-panel);
+  border: 1px solid var(--td-line);
+  background: var(--surface-raised);
+}
+
+.cardLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cardRight {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--td-ink-muted);
+}
+
+/* ── Avatar ──────────────────────────────────────────── */
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--td-plum);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+}
+
+/* ── Name & role ─────────────────────────────────────── */
+.memberInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memberName {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--td-ink);
+}
+
+.roleBadge {
+  display: inline-block;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  line-height: 18px;
+  text-transform: capitalize;
+}
+
+.roleSupervisor {
+  background: var(--glass-tint-amber);
+  color: var(--warning);
+}
+
+.roleExecutor {
+  background: var(--glass-tint-sky);
+  color: var(--td-plum);
+}
+
+.roleReviewer {
+  background: var(--glass-tint-plum);
+  color: var(--td-plum);
+}
+
+.roleDefault {
+  background: var(--td-tint);
+  color: var(--td-ink-muted);
+}
