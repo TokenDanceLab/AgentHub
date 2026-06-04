@@ -18,8 +18,8 @@
   --composer-control-text-active: var(--text-strong);
   --composer-control-icon: var(--text-weaker);
   --composer-control-icon-active: var(--text-primary);
-  --composer-panel-edge: var(--glass-bg-light);
-  --composer-panel-shadow: 0 14px 34px var(--glass-shadow-subtle), 0 1px 4px var(--glass-shadow-subtle);
+  --composer-panel-edge: transparent;
+  --composer-panel-shadow: 0 16px 38px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.14);
   --composer-side-pad: max(30px, calc((100% - var(--run-card-space, 0px) - var(--composer-column-width)) / 2));
   padding:
     8px
@@ -37,7 +37,7 @@
   max-width: var(--composer-column-width);
   margin: 0 auto;
   background: var(--glass-panel);
-  border: 1px solid var(--composer-panel-edge);
+  border: 0;
   border-radius: 26px;
   padding: 11px 14px 10px;
   display: flex;
@@ -45,26 +45,21 @@
   gap: 8px;
   backdrop-filter: blur(24px) saturate(1.06);
   -webkit-backdrop-filter: blur(24px) saturate(1.06);
-  box-shadow:
-    0 12px 30px var(--glass-bg-heavy),
-    0 1px 4px var(--glass-bg-heavy);
+  box-shadow: var(--composer-panel-shadow);
   transition: background var(--duration-fast), border-color var(--duration-fast),
     box-shadow var(--duration-fast);
 }
 
 .capsule:focus-within {
   background: var(--glass-panel-strong);
-  border-color: var(--glass-border);
-  box-shadow:
-    0 14px 34px var(--glass-shadow-subtle),
-    0 1px 5px var(--glass-bg-heavy);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2), 0 2px 10px rgba(0, 0, 0, 0.16);
 }
 
 [data-theme='light'] .capsule {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.64), var(--glass-input-bg)),
     var(--glass-light-fill);
-  border-color: var(--glass-border-subtle);
+  border: 1px solid var(--glass-border-subtle);
   box-shadow:
     0 12px 30px var(--glass-bg-strong);
 }
@@ -92,8 +87,7 @@
   border-radius: 12px;
   background: var(--glass-panel-overlay);
   box-shadow:
-    0 20px 52px var(--glass-shadow),
-    0 1px 0 var(--glass-bg-medium) inset;
+    0 20px 52px var(--glass-shadow);
 }
 
 [data-theme='light'] .slashPalette {
@@ -696,7 +690,7 @@
 
 .workTargetOption:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 1px var(--glass-bg-heavy);
+  box-shadow: 0 0 0 2px var(--ring);
 }
 
 [data-theme='light'] .workTargetOption:focus-visible {
@@ -790,7 +784,7 @@
 .workDirInputRow input:focus {
   box-shadow:
     inset 0 0 0 1px var(--glass-shadow),
-    0 0 0 2px var(--glass-bg-medium);
+    0 0 0 2px var(--ring);
 }
 
 [data-theme='light'] .workDirInputRow input:focus {

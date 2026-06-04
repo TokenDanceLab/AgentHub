@@ -243,7 +243,6 @@ export interface AgentTeam {
   name: string;
   description?: string;
   avatar_url?: string;
-  members?: AgentTeamMember[];
   created_at?: string;
   updated_at?: string;
 }
@@ -1098,16 +1097,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
           method: 'POST',
           body: JSON.stringify(resolution),
         },
-      ),
-
-    createTeamAssignment: (
-      teamId: string,
-      runId: string,
-      data: { from_member_id: string; to_member_id: string; task_prompt: string; type?: string; context?: string },
-    ) =>
-      request<AgentTeamAssignment>(
-        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/assignments`,
-        { method: 'POST', body: JSON.stringify(data) },
       ),
 
     // ── Custom agents ─────────────────────────────

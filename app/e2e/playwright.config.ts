@@ -7,15 +7,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['html'], ['json', { outputFile: 'results.json' }]] : 'html',
   use: {
-    baseURL: 'http://127.0.0.1:5175',
+    baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-  },
-  webServer: {
-    command: 'python3 -m http.server 5175 --directory ../web/dist',
-    port: 5175,
-    timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
   },
   projects: [
     {
@@ -27,4 +21,9 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
   ],
+  webServer: {
+    command: 'pnpm --filter agenthub-web dev',
+    port: 5173,
+    reuseExistingServer: !process.env.CI,
+  },
 });

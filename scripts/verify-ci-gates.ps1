@@ -54,15 +54,15 @@ $mobile = Get-JobBlock $workflow "frontend-mobile"
 $e2e = Get-JobBlock $workflow "e2e-smoke"
 $validate = Get-JobBlock $workflow "validate"
 
-Assert-Contains $edge "THRESHOLD=70" "go-edge coverage threshold must be 70%"
+Assert-Contains $edge "THRESHOLD=75" "go-edge coverage threshold must be 75%"
 Assert-Contains $hub "THRESHOLD=40" "go-hub coverage threshold must be 40%"
 
 Assert-StepContinueOnError $edge "Lint" $true
 Assert-StepContinueOnError $hub "Lint" $true
 Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
-Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $true
-Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $true
+Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $false
+Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $false
 
 foreach ($job in @(
     @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/desktop/pnpm-lock.yaml" },
