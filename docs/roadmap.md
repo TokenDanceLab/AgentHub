@@ -504,7 +504,7 @@ Hub 调度（远程）:
 
 #### 3.2.3 当前 Sprint：Desktop 架构 / Settings / 概念重构（~12 天）
 
-> 顺序：先完成文档与架构语义收敛，再继续客户端实现。当前 worker 只维护 `docs/roadmap.md` 与 `docs/handoff/STATE.md`；核心架构文档由主线程在客户端实现前同步。
+> 顺序：先完成文档与架构语义收敛，再继续客户端实现。当前 worker 只维护 `docs/tutorials/roadmap.md` 与 `docs/development/handoffs/STATE.md`；核心架构文档由主线程在客户端实现前同步。
 
 ##### 批次 A：概念模型收敛 `[2d]`
 
