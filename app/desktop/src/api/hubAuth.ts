@@ -1,8 +1,6 @@
 // JWT token management for Hub Server authentication.
-// Supports two auth methods:
-// 1. TokenDance ID OIDC PKCE (primary) — opens browser, local callback server captures code,
+// TokenDance ID OIDC PKCE opens the system browser, captures the local callback,
 //    exchanges via Hub /client/auth/oidc/* endpoints, receives Hub-issued JWT tokens.
-// 2. Hub username/password (legacy fallback) — calls /client/auth/login
 
 import type { UserProfile } from './hubClient';
 import { createHubClient } from './hubClient';
@@ -70,28 +68,56 @@ function isTauri(): boolean {
 
 // ── PKCE helpers ──────────────────────────────────
 
-// Module-level state bridge for the non-Tauri fallback path.
+// Module-level state bridge for the browser dev path.
 // In Tauri mode PKCE values stay in the async function closure and are never written to storage.
+// In Vite dev mode, we persist PKCE to sessionStorage so it survives the browser redirect round-trip.
 let pendingOidcState = '';
 
-// OIDC callback waiter. After the user authorizes in the browser,
-// TokenDance ID redirects to Hub's GET /oidc/callback?code=xxx&state=yyy
-// which displays a Login Successful page. The user copies the code
-// from that page and pastes it here.
-async function waitForOIDCCallback(): Promise<CallbackResult> {
-  return new Promise<CallbackResult>((resolve, reject) => {
-    // Give the browser time to open and the user to log in
-    setTimeout(() => {
-      const code = window.prompt('Please copy the authorization code from the login page and paste it here:');
-      if (!code) {
-        reject(new OidcError('noAuthCode', 'No authorization code provided.'));
-        return;
-      }
-      const state = pendingOidcState || '';
-      pendingOidcState = '';
-      resolve({ code: code.trim(), state });
-    }, 2000);
-  });
+const OIDC_PENDING_KEY = 'agenthub_oidc_pkce_pending';
+const OIDC_CALLBACK_PATH = '/auth/tokendance/callback';
+
+interface BrowserOIDCPending {
+  state: string;
+  codeVerifier: string;
+  deviceId: string;
+  redirectUri: string;
+  createdAt: number;
+}
+
+function buildBrowserRedirectUri(): string {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}${OIDC_CALLBACK_PATH}`;
+}
+
+function savePendingOIDC(pending: BrowserOIDCPending): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(OIDC_PENDING_KEY, JSON.stringify(pending));
+}
+
+function loadPendingOIDC(): BrowserOIDCPending | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(OIDC_PENDING_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as BrowserOIDCPending;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingOIDC(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.removeItem(OIDC_PENDING_KEY);
+}
+
+function readBrowserCallbackFromURL(): CallbackResult | null {
+  if (typeof window === 'undefined') return null;
+  const url = new URL(window.location.href);
+  if (url.pathname !== OIDC_CALLBACK_PATH) return null;
+  const code = url.searchParams.get('code')?.trim();
+  const state = url.searchParams.get('state')?.trim();
+  if (!code || !state) return null;
+  return { code, state };
 }
 
 function generateCodeVerifier(): string {
@@ -120,28 +146,21 @@ async function computeCodeChallenge(verifier: string): Promise<string> {
  * Start a local HTTP callback server to capture the OIDC redirect.
  *
  * In Tauri context: delegates to the Rust backend via `start_oidc_callback_server`.
- * The Rust side starts an HTTP server on a random port and emits `oidc-callback`
- * or `oidc-callback-error` events when the redirect arrives.
- *
- * Fallback (non-Tauri / browser dev mode): shows a prompt for manual code entry.
+ * In Vite dev mode: uses browser redirect (TokenDance ID → Vite dev URL),
+ *   navigates the current page to the authorization URL, then reads code/state
+ *   from the URL query params after the redirect lands back.
  */
 function startCallbackServer(): Promise<{ port: number; result: Promise<CallbackResult> }> {
   if (!isTauri()) {
-    // ---- Non-Tauri fallback: manual code entry ----
+    // ---- Vite dev mode: browser redirect via window.location ----
+    // The TokenDance ID redirect_uri is http://localhost:5173/auth/tokendance/callback
+    // After login, the browser returns to this URL with ?code=xxx&state=yyy.
+    // tryAutoLogin() will detect the callback route and process it.
     return Promise.resolve({
       port: 0,
-      result: new Promise<CallbackResult>((resolve, reject) => {
-        const code = window.prompt('Enter the authorization code from the login page:');
-        if (!code) {
-          reject(new OidcError('noAuthCode', 'No authorization code provided.'));
-          return;
-        }
-        // In non-Tauri mode we don't have state from the server redirect,
-        // so we use a minimal flow. The state and code_verifier are held in
-        // module-level closure variables (never written to storage).
-        const state = pendingOidcState || '';
-        pendingOidcState = '';
-        resolve({ code: code.trim(), state });
+      result: new Promise<CallbackResult>(() => {
+        // This promise never resolves here — tryAutoLogin handles the callback.
+        // The user is navigated away via window.location in loginWithTokenDance().
       }),
     });
   }
@@ -211,21 +230,8 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
       return { port, result };
     })
     .catch((err) => {
-      // If Tauri command fails (e.g., port in use), fall back to manual code entry
-      console.warn('OIDC callback server failed to start, falling back to manual input:', err);
-      return {
-        port: 0,
-        result: new Promise<CallbackResult>((resolve, reject) => {
-          const code = window.prompt('Enter the authorization code from the login page:');
-          if (!code) {
-            reject(new OidcError('noAuthCode', 'No authorization code provided.'));
-            return;
-          }
-          const state = pendingOidcState || '';
-          pendingOidcState = '';
-          resolve({ code: code.trim(), state });
-        }),
-      };
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new OidcError('listenFailed', `Failed to listen for OIDC callback: ${detail}`, detail);
     });
 }
 
@@ -332,8 +338,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
   /**
    * Build the redirect_uri used in the OIDC flow.
    * - In Tauri: `http://127.0.0.1:{port}/callback` (captured by local HTTP server)
-   * - Fallback: empty string, so Hub uses its configured backend callback and
-   *   the user can manually paste the code from that callback URL.
+   * - Browser dev: Vite callback URL, handled by tryAutoLogin after redirect.
    */
   function buildRedirectUri(port: number): string {
     if (port > 0) {
@@ -360,7 +365,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const deviceId = getOrCreateDeviceId();
       console.debug('[oidc] PKCE generated, code_verifier length:', codeVerifier.length);
 
-      // 2. Start local callback server (Tauri) or prepare manual fallback.
+      // 2. Start local callback server (Tauri) or prepare browser dev callback.
       //    In Tauri, the Rust backend starts an HTTP server on a random port
       //    and emits `oidc-callback` / `oidc-callback-error` events.
       //    The redirect_uri is `http://127.0.0.1:{port}/callback`.
@@ -373,17 +378,20 @@ export function createHubAuth(client?: HubClient): HubAuth {
         redirectUri = buildRedirectUri(port);
         callbackResult = result;
       } else {
-        // Non-Tauri: manual code entry via prompt (dev mode fallback)
-        redirectUri = '';
-        callbackResult = new Promise<CallbackResult>((resolve, reject) => {
-          const code = window.prompt('Enter the authorization code from the login page:');
-          if (!code) {
-            reject(new OidcError('noAuthCode', 'No authorization code provided.'));
-            return;
-          }
-          const state = pendingOidcState || '';
-          pendingOidcState = '';
-          resolve({ code: code.trim(), state });
+        // Vite dev mode: redirect back to localhost after login.
+        // Save PKCE to sessionStorage, navigate to TokenDance ID,
+        // and tryAutoLogin() will process the callback on return.
+        redirectUri = buildBrowserRedirectUri();
+        savePendingOIDC({
+          state: '',
+          codeVerifier,
+          deviceId,
+          redirectUri,
+          createdAt: Date.now(),
+        });
+        // We'll fill in the state after the authorize call returns.
+        callbackResult = new Promise<CallbackResult>(() => {
+          // Will be resolved by the browser redirect → tryAutoLogin.
         });
       }
 
@@ -420,6 +428,16 @@ export function createHubAuth(client?: HubClient): HubAuth {
       console.debug('[oidc] Hub returned authorization URL, state:', serverState.substring(0, 8) + '...');
 
       // code_verifier stays in closure — never written to sessionStorage/localStorage
+      // In Vite mode, we update the pending state now that we have the server state.
+      if (!isTauri()) {
+        savePendingOIDC({
+          state: serverState,
+          codeVerifier,
+          deviceId,
+          redirectUri,
+          createdAt: Date.now(),
+        });
+      }
       pendingOidcState = serverState;
 
       // 4. Open browser for user authentication.
@@ -431,15 +449,17 @@ export function createHubAuth(client?: HubClient): HubAuth {
           window.open(authUrl, '_blank');
         }
       } else {
-        const opened = window.open(authUrl, '_blank');
-        if (!opened) {
-          throw new OidcError('popupBlocked', 'Popup blocked — please allow popups for AgentHub to use TokenDance ID login.');
-        }
+        // Vite dev mode: navigate the current window to TokenDance ID.
+        // After login, TokenDance ID redirects back to
+        // http://localhost:5173/auth/tokendance/callback?code=xxx&state=yyy
+        window.location.assign(authUrl);
+        // This unloads the page. tryAutoLogin() will handle the callback on return.
+        return;
       }
 
       console.debug('[oidc] Browser opened for auth URL');
 
-      // 5. Wait for the callback from the local HTTP server (Tauri) or manual paste
+      // 5. Wait for the callback from the local HTTP server.
       const callback = await callbackResult;
       console.debug('[oidc] Callback received, state match:', callback.state === serverState);
 
@@ -489,7 +509,50 @@ export function createHubAuth(client?: HubClient): HubAuth {
     },
 
     async tryAutoLogin() {
-      // Load access token from secure store (Tauri) or localStorage fallback
+      // Vite dev mode: check if we've returned from TokenDance ID with a code.
+      const browserCallback = readBrowserCallbackFromURL();
+      if (browserCallback) {
+        const pending = loadPendingOIDC();
+        clearPendingOIDC();
+        if (!pending) {
+          window.history.replaceState({}, document.title, '/');
+          return false;
+        }
+        if (pending.state !== browserCallback.state) {
+          window.history.replaceState({}, document.title, '/');
+          throw new OidcError('stateMismatch', 'OIDC state mismatch — possible CSRF attack. Please try again.');
+        }
+        if (Date.now() - pending.createdAt > 10 * 60 * 1000) {
+          window.history.replaceState({}, document.title, '/');
+          throw new OidcError('timeout', 'OIDC login expired. Please start TokenDance ID login again.');
+        }
+
+        try {
+          const tokenResp = await exchangeCodeForToken(
+            browserCallback.code,
+            browserCallback.state,
+            pending.codeVerifier,
+            pending.redirectUri,
+            pending.deviceId,
+          );
+          await completeLogin(
+            tokenResp.access_token,
+            tokenResp.refresh_token,
+            'tokendance',
+            tokenResp.user,
+          );
+          window.history.replaceState({}, document.title, '/');
+          return true;
+        } catch (err) {
+          window.history.replaceState({}, document.title, '/');
+          const detail = err instanceof Error ? err.message : 'Unknown error';
+          const oidcErr = new OidcError('tokenExchangeFailed', `Token exchange failed: ${detail}`, detail);
+          oidcErr.cause = err;
+          throw oidcErr;
+        }
+      }
+
+      // Load access token from secure store (Tauri) or sessionStorage fallback
       if (!state.token) {
         const stored = await loadStoredHubAccessToken();
         if (stored) {
