@@ -75,7 +75,7 @@
 
 > 以下 P0-P2 项在 M5 批次（2026-05-24）中全部修复，保留作为记录。M8 Codex 安全审计批次（2026-05-25~2026-05-27）129 Issues 中纯后端已全部清零，B6-B8 剩余项见 7.11。
 
-参考：`docs/archive/review-archive/edge-server-audit.md`、`docs/archive/review-archive/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
+参考：`docs/archive/review-archive/edge-server-audit.md`、`docs/archive/review-archive/hub-server-audit.md`、`docs/archive/hub-server-testing.md`、`docs/archive/backend-engineering-standards.md`
 
 | 严重度 | 层面 | 核心问题 | 报告索引 | 状态 |
 |:--:|------|------|:--:|:--:|
@@ -172,7 +172,7 @@ Hub 调度（远程）:
 ### 3.1 Q2 2026（当前 -- 工程基础收敛）
 
 > **目标**：代码质量达标、测试覆盖完整、CI/CD 完善、消除全局状态。
-> **参考**：`docs/archive/review-archive/edge-server-audit.md`、`docs/archive/review-archive/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
+> **参考**：`docs/archive/review-archive/edge-server-audit.md`、`docs/archive/review-archive/hub-server-audit.md`、`docs/archive/hub-server-testing.md`、`docs/archive/backend-engineering-standards.md`
 
 ---
 
@@ -248,7 +248,7 @@ Hub 调度（远程）:
 
 #### 3.1.2 Hub Server 工程完善（~18 天）
 
-> 参考：`docs/archive/review-archive/hub-server-audit.md` 全部 P0-P3 发现 + `docs/review/hub-server-testing.md` 测试改进计划
+> 参考：`docs/archive/review-archive/hub-server-audit.md` 全部 P0-P3 发现 + `docs/archive/hub-server-testing.md` 测试改进计划
 
 ##### P0 -- 阻断级
 
@@ -416,7 +416,7 @@ Hub 调度（远程）:
 
 #### 3.1.4 CI/CD 流水线升级（~5 天）
 
-> 参考：`docs/review/backend-engineering-standards.md` 第 3 节（CI/CD Pipeline）
+> 参考：`docs/archive/backend-engineering-standards.md` 第 3 节（CI/CD Pipeline）
 
 ##### 已接入（commit `1bbe365` 完成）
 
@@ -713,7 +713,7 @@ Hub 调度（远程）:
 - [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已完成文档架构审查，结论已合并入本文档；`docs/inbox/` 仍保留为临时报告投递入口，处理后归档到 `docs/reference/` 或 `docs/archive/`。
 - [x] 2026-05-25 Codex follow-up 文档 worker 已完成，确认主文档已基本对齐，剩余风险集中在 Runner 兼容 API 命名和旧 client handoff 入口。
 - [x] 结论：主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界。
-- [x] 旧 client smoke 文档入口已最小收口：`docs/roadmaps/client.md`（原 `docs/operations/client-roadmap.md`）、`docs/architecture/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
+- [x] 旧 client smoke 文档入口已最小收口：`docs/roadmaps/client.md`（原 `docs/operations/client-roadmap.md`）、`docs/architecture/system-design/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
 - [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md` 等仍含旧独立 `runner/` 语义的文档。
 - [ ] API 待办：决定 `/v1/runners`、`runner_offline`、`runner.online/offline` 是否长期保留为 deprecated compatibility，新增 schema 优先 Runtime/Profile/Execution Target 命名。
 
@@ -1257,8 +1257,8 @@ pnpm typecheck                                         # 零错误
 |------|------|------|
 | **审计** | `docs/archive/review-archive/edge-server-audit.md` | Edge 13 项发现（S1-S13） |
 | | `docs/archive/review-archive/hub-server-audit.md` | Hub 22 项发现（P0-1 ~ P3-9） |
-| | `docs/review/hub-server-testing.md` | Hub 测试覆盖率 + 改进计划 |
-| | `docs/review/backend-engineering-standards.md` | 工程标准评分 + Top 10 改进 |
+| | `docs/archive/hub-server-testing.md` | Hub 测试覆盖率 + 改进计划 |
+| | `docs/archive/backend-engineering-standards.md` | 工程标准评分 + Top 10 改进 |
 | **路线图** | `docs/roadmaps/client.md` | Desktop Phase 0/1/2 详细任务 |
 | | `docs/roadmaps/integration.md` | Hub-Edge-Desktop 集成 6 阶段 |
 | **参考** | `docs/reference/cross-comparison/00-synthesis.md` | 18 项目全景分析 |
