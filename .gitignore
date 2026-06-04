@@ -7,6 +7,13 @@ app/shared/pnpm-lock.yaml
 app/web/pnpm-lock.yaml
 app/mobile/pnpm-lock.yaml
 
+# npm lockfile (project uses pnpm exclusively)
+package-lock.json
+app/desktop/package-lock.json
+app/web/package-lock.json
+app/mobile/package-lock.json
+app/shared/package-lock.json
+
 # Build output
 dist/
 build/

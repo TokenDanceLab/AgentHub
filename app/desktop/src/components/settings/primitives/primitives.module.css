@@ -44,10 +44,10 @@
   gap: 13px;
   min-height: 80px;
   padding: 15px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(22px) saturate(1.18);
   -webkit-backdrop-filter: blur(22px) saturate(1.18);
   color: var(--foreground);
@@ -118,10 +118,10 @@
   min-height: 76px;
   gap: 12px;
   padding: 15px 18px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(22px) saturate(1.18);
   -webkit-backdrop-filter: blur(22px) saturate(1.18);
 }
@@ -172,10 +172,10 @@
 .profileCard,
 .targetCard {
   min-width: 0;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(22px) saturate(1.18);
   -webkit-backdrop-filter: blur(22px) saturate(1.18);
 }
@@ -409,10 +409,11 @@
   gap: 16px;
   min-height: 70px;
   padding: 15px 18px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-panel);
+  border: 1px solid var(--settings-card-border);
+  background: var(--settings-card-bg);
   border-radius: 11px;
   margin-bottom: 10px;
+  box-shadow: var(--settings-card-shadow);
   transition:
     background 0.18s ease,
     border-color 0.18s ease;
@@ -423,7 +424,7 @@
 [data-theme='dark'] .runnerRow,
 [data-theme='dark'] .taskRow,
 [data-theme='dark'] .accountCard {
-  border-color: var(--glass-border);
+  border-color: var(--settings-card-border);
 }
 
 .connectionIcon {
@@ -718,13 +719,13 @@
   gap: 12px;
   padding: 14px 16px;
   margin-top: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 12px;
   background:
     linear-gradient(180deg, var(--glass-bg-subtle), transparent),
-    var(--glass-panel);
+    var(--settings-card-bg);
   color: var(--foreground);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(20px) saturate(1.12);
   -webkit-backdrop-filter: blur(20px) saturate(1.12);
 }
@@ -760,10 +761,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 10px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
   color: var(--settings-muted);
@@ -791,10 +792,10 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px 18px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
   margin-top: 8px;
-  background: var(--glass-panel);
+  background: var(--settings-card-bg);
 }
 
 .instructionsHeader,
@@ -860,10 +861,10 @@
 .providerRow {
   min-width: 0;
   padding: 14px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
@@ -935,11 +936,11 @@
 /* ── Shortcut Table ─────────────────────────────────────────────────── */
 .shortcutTable {
   display: grid;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 10px;
   overflow: hidden;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
@@ -1040,14 +1041,14 @@
   gap: 10px;
   min-width: 0;
   padding: 13px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 10px;
-  background: var(--glass-panel);
+  background: var(--settings-card-bg);
   color: var(--foreground);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
   transition:
@@ -1131,9 +1132,9 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 10px;
-  background: color-mix(in oklch, var(--glass-panel) 82%, transparent);
+  background: color-mix(in oklch, var(--settings-card-bg) 82%, transparent);
 }
 
 .conflictSourceHead {

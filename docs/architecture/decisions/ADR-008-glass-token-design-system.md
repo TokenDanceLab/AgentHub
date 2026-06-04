@@ -1,4 +1,4 @@
-# ADR-002: Glass Token 设计系统
+# ADR-008: Glass Token 设计系统
 
 ## Status
 

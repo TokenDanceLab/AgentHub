@@ -14,7 +14,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['src/__tests__/integration/**'],
-    setupFiles: ['src/__tests__/testSetup.ts'],
+    setupFiles: ['./src/__tests__/setup.ts'],
     execArgv: ['--max-old-space-size=8192'],
     memoryLimit: '512MB',
     maxWorkers: 4,

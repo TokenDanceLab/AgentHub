@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { queryClient } from '@/api/queryClient';
+import { setEdgeAuthToken } from '@/api/edgeAuth';
 import App from '@/App';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -60,17 +61,30 @@ const root = document.getElementById('root');
 if (!root) {
   throw new Error('Missing #root element');
 }
+const rootElement = root;
 
-createRoot(root).render(
-  <StrictMode>
-    <LanguageProvider>
-      <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <ErrorBoundary>
-            <AppShell />
-          </ErrorBoundary>
-        </QueryClientProvider>
-      </ThemeProvider>
-    </LanguageProvider>
-  </StrictMode>,
-);
+async function hydrateEdgeAuthToken(): Promise<void> {
+  try {
+    setEdgeAuthToken(await invoke<string>('get_edge_auth_token'));
+  } catch {
+    // Browser preview or older Tauri shell: Edge auth remains disabled/externally configured.
+  }
+}
+
+function renderApp(): void {
+  createRoot(rootElement).render(
+    <StrictMode>
+      <LanguageProvider>
+        <ThemeProvider>
+          <QueryClientProvider client={queryClient}>
+            <ErrorBoundary>
+              <AppShell />
+            </ErrorBoundary>
+          </QueryClientProvider>
+        </ThemeProvider>
+      </LanguageProvider>
+    </StrictMode>,
+  );
+}
+
+void hydrateEdgeAuthToken().finally(renderApp);
