@@ -206,8 +206,8 @@
   5. 添加测试状态 badge（Desktop 1166 tests）
 - **验证**: 中英文 README 内容同步，无过期信息
 
-### T018 更新 docs/handoff/STATE.md 为最终提交状态
-- **文件**: `docs/handoff/STATE.md`
+### T018 更新 docs/development/handoffs/STATE.md 为最终提交状态
+- **文件**: `docs/development/handoffs/STATE.md`
 - **操作**:
   1. 更新所有 checkpoints 时间戳
   2. 记录当前测试通过数据
@@ -216,8 +216,8 @@
   5. 附上提交时 commit hash
 - **验证**: 文件自洽，无过时数据
 
-### T019 更新 docs/roadmap.md 比赛提交版本
-- **文件**: `docs/roadmap.md`
+### T019 更新 docs/tutorials/roadmap.md 比赛提交版本
+- **文件**: `docs/tutorials/roadmap.md`
 - **操作**:
   1. 标记当前已完成的所有 items
   2. 将未完成的 P2 items 移到 "Future" 区域
