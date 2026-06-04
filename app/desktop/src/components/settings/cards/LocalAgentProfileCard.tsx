@@ -275,10 +275,8 @@ export default function LocalAgentProfileCard({
           <span>{t('settings.profileRuntime')}: {agent.id}</span>
           <span>{t('settings.profileModel')}: {route.model ?? t('prompt.routeAuto')}</span>
           <span>{t('settings.modelAliasProvider')}: {route.provider ?? t('prompt.routeAuto')}</span>
-          <span>{t('settings.modelAliasReasoning')}: {route.reasoningEffort ?? t('prompt.routeAuto')}</span>
           {alias ? <span>{t('settings.profileAlias')}: {alias}</span> : null}
           <span>{t('settings.executionTargets')}: {t('settings.targetLocalEdge')}</span>
-          <span>{t('settings.profileConfigSource')}: AGENTS.md / memory / skills</span>
         </div>
         <div className={styles.profileExpandArrow}>
           {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
