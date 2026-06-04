@@ -108,6 +108,18 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Download Go binaries for sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: go-binaries
+
+      - name: Prepare edge-server sidecar binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory "app\desktop\src-tauri\binaries" -Force
+          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
+
       - name: Build Tauri (NSIS)
         working-directory: app/desktop
         run: pnpm tauri build
@@ -131,6 +143,7 @@ jobs:
           $portableDir = "dist\AgentHub-portable"
           New-Item -ItemType Directory $portableDir -Force
           Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
+          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
           @"
           AgentHub ${{ github.ref_name }} — Portable Edition
 
@@ -147,9 +160,64 @@ jobs:
           name: desktop-artifacts
           path: dist/
 
+  # ── Tauri Desktop (macOS) ─────────────────────
+  build-desktop-macos:
+    needs: build-go
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download Go binaries for sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: go-binaries
+
+      - name: Prepare edge-server sidecar binary
+        run: |
+          mkdir -p app/desktop/src-tauri/binaries
+          cp go-binaries/agenthub-edge-darwin-arm64 app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin
+
+      - name: Build Tauri (DMG)
+        working-directory: app/desktop
+        run: pnpm tauri build
+
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Collect DMG
+        run: |
+          ver="${{ github.ref_name }}"
+          ver="${ver#v}"
+          dmg=$(find app/desktop/src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          cp "$dmg" "dist/AgentHub_${ver}_aarch64.dmg"
+
+      - name: Upload macOS Desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-artifacts
+          path: dist/
+
   # ── GitHub Release ───────────────────────────
   release:
-    needs: [build-go, build-desktop]
+    needs: [build-go, build-desktop, build-desktop-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -164,6 +232,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: desktop-artifacts
+          path: dist
+
+      - name: Download macOS Desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-macos-artifacts
           path: dist
 
       - name: List assets
