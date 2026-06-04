@@ -1,4 +1,4 @@
-# ADR-004: MCP Server 端点设计
+# ADR-010: MCP Server 端点设计
 
 ## Status
 
