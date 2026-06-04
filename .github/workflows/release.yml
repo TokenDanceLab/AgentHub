@@ -108,6 +108,18 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Download Go binaries for sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: go-binaries
+
+      - name: Prepare edge-server sidecar binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory "app\desktop\src-tauri\binaries" -Force
+          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
+
       - name: Build Tauri (NSIS)
         working-directory: app/desktop
         run: pnpm tauri build
@@ -131,6 +143,7 @@ jobs:
           $portableDir = "dist\AgentHub-portable"
           New-Item -ItemType Directory $portableDir -Force
           Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
+          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
           @"
           AgentHub ${{ github.ref_name }} — Portable Edition
 

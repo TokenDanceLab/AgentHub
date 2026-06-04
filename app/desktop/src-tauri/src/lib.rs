@@ -44,6 +44,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(edge.clone())
         .manage(CloseToTrayState(close_to_tray.clone()))
         .manage(QuittingState(quitting.clone()))
@@ -89,7 +90,7 @@ pub fn run() {
             let start_handle = handle.clone();
             tauri::async_runtime::spawn(async move {
                 let mut manager = edge_for_start.lock().await;
-                if let Err(error) = manager.start().await {
+                if let Err(error) = manager.start(&start_handle).await {
                     let _ = start_handle.emit("edge-start-error", error);
                 }
             });

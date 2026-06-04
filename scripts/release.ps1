@@ -65,6 +65,18 @@ go build -ldflags="-s -w" -o "$DistPath\agenthub-hub-linux-amd64" .\cmd\server-h
 if ($LASTEXITCODE -ne 0) { throw "Hub build failed" }
 Pop-Location
 
+# ── Prepare edge-server sidecar for Tauri bundling ──
+Write-Step "Prepare edge-server sidecar"
+$BinariesDir = Join-Path $DesktopDir "src-tauri\binaries"
+New-Item -ItemType Directory -Path $BinariesDir -Force | Out-Null
+$EdgeExe = Get-ChildItem "$DistPath\agenthub-edge-windows-amd64.exe" -ErrorAction SilentlyContinue
+if ($EdgeExe) {
+    Copy-Item $EdgeExe.FullName (Join-Path $BinariesDir "agenthub-edge-x86_64-pc-windows-msvc.exe")
+    Write-Host "Sidecar binary prepared: agenthub-edge-x86_64-pc-windows-msvc.exe"
+} else {
+    Write-Warning "edge-server binary not found in dist/, sidecar will not be bundled"
+}
+
 # ── Tauri Desktop ──
 Write-Step "Install Desktop dependencies"
 Push-Location $DesktopDir

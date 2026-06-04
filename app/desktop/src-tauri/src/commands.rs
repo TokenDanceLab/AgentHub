@@ -26,9 +26,9 @@ pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<
 }
 
 #[tauri::command]
-pub async fn start_edge(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
+pub async fn start_edge(app: tauri::AppHandle, state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
     let mut mgr = state.lock().await;
-    mgr.start().await?;
+    mgr.start(&app).await?;
     Ok(mgr.status())
 }
 
