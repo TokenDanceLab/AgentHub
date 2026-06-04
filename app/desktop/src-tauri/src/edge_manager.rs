@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use tauri::Runtime;
+use tauri::{Manager, Runtime};
 use tauri_plugin_shell::process::{CommandEvent, CommandChild};
 use tauri_plugin_shell::ShellExt;
 use tokio::process::{Child, Command};
@@ -56,20 +56,33 @@ impl EdgeManager {
         }
 
         let addr = format!("127.0.0.1:{}", self.port);
-        let store_path_str = self
-            .store_path
+
+        // Resolve store path: prefer app data dir over temp
+        let store_path = match app_handle.path().app_data_dir() {
+            Ok(dir) => {
+                std::fs::create_dir_all(&dir)
+                    .map_err(|e| format!("Failed to create app data dir: {}", e))?;
+                dir.join("agenthub-edge-store.json")
+            }
+            Err(_) => self.store_path.clone(),
+        };
+        let store_path_str = store_path
             .to_str()
-            .unwrap_or("agenthub_store.json")
+            .unwrap_or("agenthub-edge-store.json")
             .to_string();
+
+        let args = vec![
+            "--store-file".to_string(),
+            store_path_str.clone(),
+            "--addr".to_string(),
+            addr.clone(),
+            "--runner-profile".to_string(),
+            "claude-code".to_string(),
+        ];
 
         // ── Try sidecar first (release / bundled builds) ─────────────────
         if let Ok(sidecar_cmd) = app_handle.shell().sidecar("agenthub-edge") {
-            let mut cmd = sidecar_cmd.args([
-                "--store-file",
-                &store_path_str,
-                "--addr",
-                &addr,
-            ]);
+            let mut cmd = sidecar_cmd.args(&args);
 
             if cfg!(debug_assertions) {
                 cmd = cmd.env("AGENTHUB_DEV", "1");
@@ -128,7 +141,7 @@ impl EdgeManager {
 
         // ── Fallback: tokio::process::Command (dev mode) ─────────────────
         let mut command = Command::new(&self.edge_path);
-        command.args(["--store-file", &store_path_str, "--addr", &addr]);
+        command.args(&args);
         if cfg!(debug_assertions) {
             command.env("AGENTHUB_DEV", "1");
         } else {

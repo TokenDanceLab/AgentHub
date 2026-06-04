@@ -53,7 +53,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://releases.agenthub.dev/updater/{{target}}/{{arch}}/{{current_version}}"
+        "https://github.com/TokenDanceLab/AgentHub/releases/latest/download/latest.json"
       ],
       "pubkey": "",
       "windows": {

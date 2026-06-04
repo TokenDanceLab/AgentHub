@@ -13,13 +13,15 @@ use tauri::Emitter;
 
 static OIDC_STOPPED: AtomicBool = AtomicBool::new(false);
 
-const CALLBACK_TIMEOUT_SECS: u64 = 300; // 5 minutes
+const CALLBACK_TIMEOUT_SECS: u64 = 60;
 
 /// Starts an HTTP server on a random port that listens for ONE OIDC callback.
 /// Returns the port number immediately.
 /// When the callback arrives, emits either `oidc-callback` or `oidc-callback-error`.
 #[tauri::command]
 pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, String> {
+    OIDC_STOPPED.store(true, Ordering::Relaxed); // stop any previous instance
+
     let listener = TcpListener::bind("127.0.0.1:0")
         .map_err(|e| format!("failed to bind callback server: {e}"))?;
 
@@ -28,6 +30,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
         .map(|a| a.port())
         .map_err(|e| format!("failed to get local address: {e}"))?;
 
+    // Reset for new instance
     OIDC_STOPPED.store(false, Ordering::Relaxed);
 
     // Spawn background thread to accept connections

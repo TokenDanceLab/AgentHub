@@ -5,6 +5,7 @@ mod notifications;
 mod oidc_server;
 mod secure_store;
 mod tray;
+mod updater;
 
 use edge_manager::{resolve_edge_path, EdgeManager};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -82,6 +83,8 @@ pub fn run() {
             get_close_to_tray,
             set_close_to_tray,
             tray::set_tray_labels,
+            updater::check_for_update,
+            updater::install_update,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

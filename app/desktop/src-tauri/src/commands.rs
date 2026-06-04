@@ -1,9 +1,43 @@
 use crate::edge_manager::{EdgeStatus, SharedEdgeManager};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::State;
+
+/// Validate that a path is within an allowed directory.
+/// Returns the canonicalized path on success.
+fn validate_path(path: &Path, allowlist: &[PathBuf]) -> Result<PathBuf, String> {
+    let canonical = path
+        .canonicalize()
+        .or_else(|_| {
+            // For non-existent paths, canonicalize the parent and join
+            if let Some(parent) = path.parent() {
+                parent.canonicalize().map(|p| p.join(path.file_name().unwrap_or_default()))
+            } else {
+                Err(std::io::Error::new(std::io::ErrorKind::NotFound, "path has no parent"))
+            }
+        })
+        .map_err(|e| format!("Cannot resolve path '{}': {}", path.display(), e))?;
+
+    if allowlist.is_empty() {
+        return Ok(canonical);
+    }
+
+    let allowed = allowlist.iter().any(|dir| {
+        let dir_canonical = dir.canonicalize().unwrap_or_else(|_| dir.clone());
+        canonical.starts_with(&dir_canonical)
+    });
+
+    if allowed {
+        Ok(canonical)
+    } else {
+        Err(format!(
+            "Path '{}' is outside allowed directories",
+            path.display()
+        ))
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileEntry {
@@ -56,8 +90,16 @@ pub async fn read_dir_tree(dir: String) -> Result<Vec<FileEntry>, String> {
 /// Create a new file at the given path. Parent directories must exist.
 /// If content is None, an empty file is created.
 #[tauri::command]
-pub async fn create_file(path: String, content: Option<String>) -> Result<(), String> {
+pub async fn create_file(
+    path: String,
+    content: Option<String>,
+    allowed_dirs: Option<Vec<String>>,
+) -> Result<(), String> {
     let p = Path::new(&path);
+    if let Some(dirs) = &allowed_dirs {
+        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
+        validate_path(p, &dirs)?;
+    }
     if p.exists() {
         return Err(format!("File already exists: {}", path));
     }
@@ -70,8 +112,15 @@ pub async fn create_file(path: String, content: Option<String>) -> Result<(), St
 
 /// Create a new directory at the given path. Creates parents as needed.
 #[tauri::command]
-pub async fn create_folder(path: String) -> Result<(), String> {
+pub async fn create_folder(
+    path: String,
+    allowed_dirs: Option<Vec<String>>,
+) -> Result<(), String> {
     let p = Path::new(&path);
+    if let Some(dirs) = &allowed_dirs {
+        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
+        validate_path(p, &dirs)?;
+    }
     if p.exists() {
         return Err(format!("Path already exists: {}", path));
     }
@@ -80,9 +129,18 @@ pub async fn create_folder(path: String) -> Result<(), String> {
 
 /// Rename/move a file or directory from old_path to new_path.
 #[tauri::command]
-pub async fn rename_entry(old_path: String, new_path: String) -> Result<(), String> {
+pub async fn rename_entry(
+    old_path: String,
+    new_path: String,
+    allowed_dirs: Option<Vec<String>>,
+) -> Result<(), String> {
     let src = Path::new(&old_path);
     let dst = Path::new(&new_path);
+    if let Some(dirs) = &allowed_dirs {
+        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
+        validate_path(src, &dirs)?;
+        validate_path(dst, &dirs)?;
+    }
     if !src.exists() {
         return Err(format!("Source does not exist: {}", old_path));
     }
@@ -97,9 +155,18 @@ pub async fn rename_entry(old_path: String, new_path: String) -> Result<(), Stri
 
 /// Copy a file. Directories are copied recursively.
 #[tauri::command]
-pub async fn copy_entry(src_path: String, dst_path: String) -> Result<(), String> {
+pub async fn copy_entry(
+    src_path: String,
+    dst_path: String,
+    allowed_dirs: Option<Vec<String>>,
+) -> Result<(), String> {
     let src = Path::new(&src_path);
     let dst = Path::new(&dst_path);
+    if let Some(dirs) = &allowed_dirs {
+        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
+        validate_path(src, &dirs)?;
+        validate_path(dst, &dirs)?;
+    }
     if !src.exists() {
         return Err(format!("Source does not exist: {}", src_path));
     }
@@ -135,8 +202,15 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 /// Delete a file or directory. Directories are removed recursively.
 #[tauri::command]
-pub async fn delete_entry(path: String) -> Result<(), String> {
+pub async fn delete_entry(
+    path: String,
+    allowed_dirs: Option<Vec<String>>,
+) -> Result<(), String> {
     let p = Path::new(&path);
+    if let Some(dirs) = &allowed_dirs {
+        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
+        validate_path(p, &dirs)?;
+    }
     if !p.exists() {
         return Err(format!("Path does not exist: {}", path));
     }
@@ -149,8 +223,15 @@ pub async fn delete_entry(path: String) -> Result<(), String> {
 
 /// Read the full contents of a file as a UTF-8 string.
 #[tauri::command]
-pub async fn read_file(path: String) -> Result<String, String> {
+pub async fn read_file(
+    path: String,
+    allowed_dirs: Option<Vec<String>>,
+) -> Result<String, String> {
     let p = Path::new(&path);
+    if let Some(dirs) = &allowed_dirs {
+        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
+        validate_path(p, &dirs)?;
+    }
     if !p.exists() {
         return Err(format!("File does not exist: {}", path));
     }
@@ -163,8 +244,16 @@ pub async fn read_file(path: String) -> Result<String, String> {
 /// Write content to a file, creating it if it does not exist or overwriting if it does.
 /// Parent directories are created as needed.
 #[tauri::command]
-pub async fn write_file(path: String, content: String) -> Result<(), String> {
+pub async fn write_file(
+    path: String,
+    content: String,
+    allowed_dirs: Option<Vec<String>>,
+) -> Result<(), String> {
     let p = Path::new(&path);
+    if let Some(dirs) = &allowed_dirs {
+        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
+        validate_path(p, &dirs)?;
+    }
     if p.is_dir() {
         return Err(format!("Path is a directory: {}", path));
     }
