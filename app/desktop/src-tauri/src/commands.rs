@@ -333,6 +333,7 @@ pub struct AllowlistEntry {
     pub path: String,
     pub globs: Vec<String>,
     #[serde(rename = "trustLevel")]
+    #[allow(dead_code)]
     pub trust_level: String,
 }
 
