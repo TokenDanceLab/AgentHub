@@ -141,6 +141,7 @@ AgentHub/
 ├── hub-server/           # Hub central service
 ├── api/                  # API contracts (OpenAPI + WebSocket events)
 ├── docs/                 # Documentation
+<<<<<<< HEAD
 │   ├── getting-started/  # Quick start guide
 │   ├── tutorials/        # Roadmaps and learning paths
 │   ├── architecture/     # Product requirements, system architecture, implementation guide, design docs, ADR
@@ -149,6 +150,17 @@ AgentHub/
 │   ├── archive/          # Historical reviews and archived documents
 │   ├── reference/        # Research and competitive analysis
 │   ├── operations/       # Desktop QA SOP, operations
+=======
+│   ├── guides/           # User guide, FAQ, keyboard shortcuts
+│   ├── architecture/     # Product requirements, system architecture, implementation guide, design docs, ADR
+│   ├── roadmaps/         # Roadmaps and competitive analysis
+│   ├── governance/       # Security risk register, branch governance, doc standards
+│   ├── handoff/          # Project status and handoff
+│   ├── inbox/            # Uncategorized documents
+│   ├── operations/       # Desktop QA SOP, operations
+│   ├── research/         # Research and competitive analysis
+│   ├── review/           # Review records
+>>>>>>> origin/master
 └── scripts/              # Setup scripts, git hooks
 ```
 
@@ -158,9 +170,18 @@ AgentHub/
 
 | Document | Audience |
 |------|------|
+<<<<<<< HEAD
 | [Get Started](docs/getting-started/GOAL.md) | New users and FAQ |
 | [Product Requirements](docs/architecture/system-design/product-requirements.md) | Product positioning and phase goals |
 | [System Architecture](docs/architecture/system-design/system-architecture.md) | Technical architecture and core concepts |
+=======
+| [User Guide](docs/guides/user-guide.md) | Users who want to get things done with AgentHub |
+| [FAQ](docs/guides/faq.md) | Common questions |
+| [Keyboard Shortcuts](docs/guides/keyboard-shortcuts.md) | Keyboard reference card |
+| [Local Dev Setup](docs/guides/local-dev-setup.md) | New contributors setting up their dev environment |
+| [Product Requirements](docs/architecture/product-requirements.md) | Product positioning and phase goals |
+| [System Architecture](docs/architecture/system-architecture.md) | Technical architecture and core concepts |
+>>>>>>> origin/master
 | [API Contract](api/) | REST + WebSocket interface definitions |
 | [Security Risk Register](docs/governance/security-risk-register.md) | Security risk tracking |
 
