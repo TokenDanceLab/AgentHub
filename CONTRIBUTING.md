@@ -56,7 +56,7 @@ For Edge changes, also run:
 
 For security-sensitive changes, run:
 ```powershell
-..\scripts\verify-security-risks.ps1 -StrictReleaseGate
+.\scripts\verify-ci-gates.ps1 -StrictReleaseGate
 ```
 
 ## Code Style
@@ -82,7 +82,7 @@ For security-sensitive changes, run:
 | `hub-server/` | Hub: accounts, IM, sync, relay (port 8090) |
 | `edge-server/` | Edge: execution node, runtime adapters (port 3210) |
 | `api/` | REST OpenAPI spec + WebSocket event contract |
-| `docs/` | Architecture, governance, operations, roadmap |
+| `docs/` | Guides, architecture, governance, handoff, operations, roadmaps, reference, archive |
 | `scripts/` | Setup, dev start/stop, verification scripts |
 
 Desktop and Mobile are independent Tauri projects. Do not modify each other's `tauri.conf.json`, `Cargo.toml`, or `lib.rs`.
