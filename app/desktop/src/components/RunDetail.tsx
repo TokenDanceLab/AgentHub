@@ -26,7 +26,7 @@ import { getSavedWorkDir } from '@/utils/workspaceStore';
 import { useGitStatus } from '@/hooks/useGitStatus';
 import { useGitDiff } from '@/hooks/useGitDiff';
 import DiffViewer from './DiffViewer';
-import { DiffReviewPanel } from '@shared/ui/DiffReviewPanel';
+import { DiffReviewPanel } from '@shared/ui';
 import ContextUsage from './ContextUsage';
 import ArtifactBrowser from './ArtifactBrowser';
 import type { ArtifactItem } from './ArtifactBrowser';
