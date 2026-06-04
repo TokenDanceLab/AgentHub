@@ -17,9 +17,9 @@ import AgentMarketCard from '../cards/AgentMarketCard';
 import CustomAgentCreator, { readCustomAgentDrafts } from '../cards/CustomAgentCreator';
 import PublishAgentModal from '../cards/PublishAgentModal';
 import type { PublishAgentPayload } from '../cards/PublishAgentModal';
-import { deleteCustomAgent, loadCustomAgents } from '../agentCreation/agentStore';
-import { agentTemplates, capabilityLabels } from '../agentCreation/agentTemplates';
-import type { AgentTemplate } from '../agentCreation/agentCreationTypes';
+import { deleteCustomAgent, loadCustomAgents } from '../agent-creation/agentStore';
+import { agentTemplates, capabilityLabels } from '../agent-creation/agentTemplates';
+import type { AgentTemplate } from '../agent-creation/agentCreationTypes';
 import { countAgentCapabilities, statusLabelFromQuery, readUnknownString, readUnknownArray } from '../utils';
 import styles from '../primitives/primitives.module.css';
 
