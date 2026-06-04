@@ -458,7 +458,7 @@ Hub 调度（远程）:
   - 验收：`http://localhost:8080/swagger/index.html` 可交互浏览
 
 - [x] **架构决策记录 (ADR)** `[1d]` ✅ M5
-  - `docs/architecture/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
+  - `docs/architecture/decisions/` — 11 篇 ADR (ADR-001~011)：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离/Agent通信模型/统一适配器/Glass Token/SettingsPage拆分/MCP Server/前端Monorepo
 
 - [x] **文档与代码一致性修复** `[1d]`
   - Hub Server 准确性矩阵（`docs/archive/review-archive/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
