@@ -35,9 +35,9 @@
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
-  /* Borders — faint white glow for glass edge */
-  --border: rgba(255, 255, 255, 0.058);
-  --input: rgba(255, 255, 255, 0.052);
+  /* Borders — separators only; elevated cards use black shadow for depth. */
+  --border: rgba(0, 0, 0, 0.16);
+  --input: rgba(0, 0, 0, 0.12);
   --ring: rgba(93, 104, 204, 0.42);
 
   /* Status */
@@ -50,7 +50,7 @@
 
   --color-success: #69c967;
   --color-danger: #EF4444;
-  --color-border: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(0, 0, 0, 0.16);
 
   --brand: #5d68cc;
   --skill: #c2a1ff;
@@ -81,9 +81,15 @@
   --sidebar-bg: #1f1f27;
 
   --surface-base: #1f1f27;
+  --surface-default: var(--surface-base);
+  --surface-lowered: #1b1b22;
   --surface-raised: #24242c;
   --surface-raised-hover: #2d2d36;
   --surface-overlay: #3c3c48;
+  --surface-hover: rgba(255, 255, 255, 0.035);
+  --surface-selected: rgba(93, 104, 204, 0.16);
+  --border-subtle: rgba(0, 0, 0, 0.14);
+  --color-primary: var(--primary);
   --hover-overlay: rgba(255, 255, 255, 0.04);
 
   --text-strong: #f0f2f7;
@@ -110,7 +116,7 @@
   --chat-user-bg: rgba(255, 255, 255, 0.045);
   --chat-code-bg: rgba(255, 255, 255, 0.055);
   --chat-thinking-bg: rgba(255, 255, 255, 0.02);
-  --chat-thinking-border: rgba(255, 255, 255, 0.055);
+  --chat-thinking-border: rgba(0, 0, 0, 0.14);
 
   /* ── Floating input panel ───────────────────── */
   --input-panel-bg: #25252d;
@@ -187,9 +193,15 @@
   --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
 
   --surface-base: #F4F4F5;
+  --surface-default: #FFFFFF;
+  --surface-lowered: #F8F8F9;
   --surface-raised: #FFFFFF;
   --surface-raised-hover: #F8F8F9;
   --surface-overlay: rgba(255, 255, 255, 0.85);
+  --surface-hover: #F3F4F6;
+  --surface-selected: #EFF6FF;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --color-primary: var(--primary);
 
   --hover-overlay: rgba(0, 0, 0, 0.04);
 
@@ -267,6 +279,11 @@
   --glass-input-bg-hover: rgba(255, 255, 255, 0.72);
 
   --glass-light-fill: rgba(246, 247, 250, 0.92);
+
+  --elevated-card-bg: var(--glass-panel);
+  --elevated-card-border: var(--glass-border);
+  --elevated-card-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  --elevated-card-shadow-strong: 0 10px 26px var(--glass-shadow-subtle);
 }
 
 /* ── Shared glass/backdrop utilities ──────────────────────────────────── */

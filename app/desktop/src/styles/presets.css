@@ -32,7 +32,7 @@
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
-  --border: rgba(255, 255, 255, 0.065);
+  --border: rgba(0, 0, 0, 0.16);
   --input: rgba(255, 255, 255, 0.052);
   --ring: rgba(59, 130, 246, 0.42);
 
@@ -45,7 +45,7 @@
 
   --color-success: #22C55E;
   --color-danger: #EF4444;
-  --color-border: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(0, 0, 0, 0.16);
 
   --brand: #3B82F6;
   --skill: #A78BFA;
@@ -74,7 +74,7 @@
   --chat-user-bg: rgba(59, 130, 246, 0.08);
   --chat-code-bg: rgba(255, 255, 255, 0.055);
   --chat-thinking-bg: rgba(255, 255, 255, 0.02);
-  --chat-thinking-border: rgba(255, 255, 255, 0.055);
+  --chat-thinking-border: rgba(0, 0, 0, 0.14);
 
   --input-panel-bg: #252536;
   --input-panel-border: rgba(0, 0, 0, 0.11);
@@ -202,7 +202,7 @@
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
-  --border: rgba(255, 255, 255, 0.06);
+  --border: rgba(0, 0, 0, 0.16);
   --input: rgba(255, 255, 255, 0.045);
   --ring: rgba(245, 158, 11, 0.42);
 
@@ -215,7 +215,7 @@
 
   --color-success: #84CC16;
   --color-danger: #EF4444;
-  --color-border: rgba(255, 255, 255, 0.045);
+  --color-border: rgba(0, 0, 0, 0.16);
 
   --brand: #F59E0B;
   --skill: #C084FC;
@@ -244,7 +244,7 @@
   --chat-user-bg: rgba(245, 158, 11, 0.07);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+  --chat-thinking-border: rgba(0, 0, 0, 0.14);
 
   --input-panel-bg: #3D3028;
   --input-panel-border: rgba(0, 0, 0, 0.10);
@@ -372,7 +372,7 @@
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
-  --border: rgba(255, 255, 255, 0.07);
+  --border: rgba(0, 0, 0, 0.16);
   --input: rgba(255, 255, 255, 0.05);
   --ring: rgba(16, 163, 127, 0.42);
 
@@ -385,7 +385,7 @@
 
   --color-success: #34D399;
   --color-danger: #EF4444;
-  --color-border: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(0, 0, 0, 0.16);
 
   --brand: #10A37F;
   --skill: #A78BFA;
@@ -414,7 +414,7 @@
   --chat-user-bg: rgba(255, 255, 255, 0.045);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+  --chat-thinking-border: rgba(0, 0, 0, 0.14);
 
   --input-panel-bg: #2D2D2D;
   --input-panel-border: rgba(0, 0, 0, 0.10);
@@ -584,7 +584,7 @@
   --chat-user-bg: rgba(129, 140, 248, 0.08);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.02);
-  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+  --chat-thinking-border: rgba(0, 0, 0, 0.14);
 
   --input-panel-bg: #1E293B;
   --input-panel-border: rgba(0, 0, 0, 0.12);
@@ -712,7 +712,7 @@
   --destructive: #E06C75;
   --destructive-foreground: #FFFFFF;
 
-  --border: rgba(255, 255, 255, 0.065);
+  --border: rgba(0, 0, 0, 0.16);
   --input: rgba(255, 255, 255, 0.05);
   --ring: rgba(97, 175, 239, 0.42);
 
@@ -725,7 +725,7 @@
 
   --color-success: #98C379;
   --color-danger: #E06C75;
-  --color-border: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(0, 0, 0, 0.16);
 
   --brand: #61AFEF;
   --skill: #C678DD;
@@ -754,7 +754,7 @@
   --chat-user-bg: rgba(97, 175, 239, 0.06);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  --chat-thinking-border: rgba(255, 255, 255, 0.045);
+  --chat-thinking-border: rgba(0, 0, 0, 0.14);
 
   --input-panel-bg: #2C313C;
   --input-panel-border: rgba(0, 0, 0, 0.10);
@@ -882,7 +882,7 @@
   --destructive: #FF5555;
   --destructive-foreground: #FFFFFF;
 
-  --border: rgba(255, 255, 255, 0.065);
+  --border: rgba(0, 0, 0, 0.16);
   --input: rgba(255, 255, 255, 0.05);
   --ring: rgba(189, 147, 249, 0.42);
 
@@ -895,7 +895,7 @@
 
   --color-success: #50FA7B;
   --color-danger: #FF5555;
-  --color-border: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(0, 0, 0, 0.16);
 
   --brand: #BD93F9;
   --skill: #FF79C6;
@@ -924,7 +924,7 @@
   --chat-user-bg: rgba(189, 147, 249, 0.07);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  --chat-thinking-border: rgba(255, 255, 255, 0.05);
+  --chat-thinking-border: rgba(0, 0, 0, 0.14);
 
   --input-panel-bg: #2C2E3A;
   --input-panel-border: rgba(0, 0, 0, 0.10);
