@@ -84,21 +84,40 @@ corepack.cmd pnpm install --frozen-lockfile *>$null
 if ($LASTEXITCODE -ne 0) { throw "pnpm install failed" }
 
 Write-Step "Build Desktop (NSIS + portable)"
+# TAURI_SIGNING_PRIVATE_KEY env is picked up automatically by tauri build
+if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+    Write-Warning "TAURI_SIGNING_PRIVATE_KEY not set — updater artifacts will not be signed"
+}
 corepack.cmd pnpm tauri build *>$null
 if ($LASTEXITCODE -ne 0) { throw "Tauri build failed" }
 Pop-Location
 
 # ── Collect assets ──
+$ver = $Version -replace '^v',''
 $nsis = Get-ChildItem "$WorktreePath\app\desktop\src-tauri\target\release\bundle\nsis" -Filter "*setup.exe" | Select-Object -First 1
 $exe  = Get-ChildItem "$WorktreePath\app\desktop\src-tauri\target\release" -Filter "agenthub-desktop.exe" | Select-Object -First 1
 
-Copy-Item $nsis.FullName "$DistPath\AgentHub_$($Version -replace '^v','')_x64-setup.exe"
+Copy-Item $nsis.FullName "$DistPath\AgentHub_${ver}_x64-setup.exe"
+
+# Collect updater metadata
+$latestJson = Get-ChildItem "$WorktreePath\app\desktop\src-tauri\target\release\bundle" -Filter "latest.json" -Recurse | Select-Object -First 1
+if ($latestJson) {
+    Copy-Item $latestJson.FullName "$DistPath\latest.json"
+    Write-Host "  updater: latest.json collected" -ForegroundColor Green
+}
+$setupSig = Get-ChildItem "$WorktreePath\app\desktop\src-tauri\target\release\bundle" -Filter "*.sig" -Recurse | Select-Object -First 1
+if ($setupSig) {
+    Copy-Item $setupSig.FullName "$DistPath\AgentHub_${ver}_x64-setup.exe.sig"
+    Write-Host "  updater: signature collected" -ForegroundColor Green
+}
 
 $portableDir = "$DistPath\AgentHub-portable"
 New-Item -ItemType Directory $portableDir -Force *>$null
 Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
-"AgentHub $Version — 便携版`n`n无需安装，双击 AgentHub.exe 即可运行。`n要求：Windows 10/11（自带 WebView2）。`n`n完整文档：https://github.com/TokenDanceLab/AgentHub" | Out-File "$portableDir\README.txt" -Encoding UTF8
-Compress-Archive -Path "$portableDir\*" -DestinationPath "$DistPath\AgentHub_$($Version -replace '^v','')_x64-portable.zip" -Force
+$edgeExe = Get-ChildItem "$DistPath\agenthub-edge-windows-amd64.exe" -ErrorAction SilentlyContinue
+if ($edgeExe) { Copy-Item $edgeExe.FullName "$portableDir\agenthub-edge.exe" }
+"AgentHub $Version`n`nNo installation required. Double-click AgentHub.exe to run.`nRequires: Windows 10/11 (WebView2 built-in).`n`nhttps://github.com/TokenDanceLab/AgentHub" | Out-File "$portableDir\README.txt" -Encoding UTF8
+Compress-Archive -Path "$portableDir\*" -DestinationPath "$DistPath\AgentHub_${ver}_x64-portable.zip" -Force
 
 # ── Report ──
 Write-Step "Build complete"
