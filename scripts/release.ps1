@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$RepoRoot = Split-Path -Parent $PSScriptRoot
 $WorktreePath = "$RepoRoot\.worktrees\release-$Version"
 $DistPath = "$WorktreePath\dist"
 $DesktopDir = "$WorktreePath\app\desktop"
