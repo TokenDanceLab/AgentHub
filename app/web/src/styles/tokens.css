@@ -9,6 +9,20 @@
 :root {
   color-scheme: dark;
 
+  /* Shared TokenDance aliases. themes.css overrides color values per theme. */
+  --td-canvas: var(--background);
+  --td-surface: var(--surface-raised);
+  --td-tint: var(--secondary);
+  --td-ink: var(--foreground);
+  --td-ink-muted: var(--muted-foreground);
+  --td-line: var(--border);
+  --td-plum: var(--brand);
+  --td-moss: var(--success);
+  --td-danger: var(--destructive);
+  --td-focus: var(--ring);
+  --td-radius-control: var(--radius-md);
+  --td-radius-panel: var(--radius-xl);
+
   /* ── Scrollbar ────────────────────────────────────────────────────── */
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;

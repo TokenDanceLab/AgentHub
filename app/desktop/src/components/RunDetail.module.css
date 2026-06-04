@@ -135,28 +135,37 @@
 }
 
 .reviewSurface {
-  border-bottom: 1px solid var(--glass-border-subtle);
-  padding: 3px 0 8px;
+  margin: 8px 0 10px;
+  padding: 9px 10px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--surface-raised) 88%, transparent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
 }
 
 [data-theme='light'] .reviewSurface {
-  border-bottom-color: var(--glass-border);
+  border-color: color-mix(in oklch, var(--border) 76%, transparent);
+  background: color-mix(in oklch, var(--surface-raised) 94%, var(--background));
 }
 
 .reviewGrid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 0;
 }
 
 .reviewCard {
   min-width: 0;
-  padding: 6px 0;
-  border-top: 1px solid var(--glass-border-subtle);
+  padding: 8px 0;
+  border-top: 1px solid var(--glass-border);
 }
 
 [data-theme='light'] .reviewCard {
-  border-top-color: var(--glass-border);
+  border-top-color: color-mix(in oklch, var(--border) 72%, transparent);
+}
+
+.reviewCard:first-child {
+  border-top: 0;
 }
 
 .reviewCardTitle,
@@ -169,7 +178,7 @@
 
 .reviewCardTitle {
   gap: 6px;
-  color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
+  color: var(--foreground);
   font-size: 11px;
   font-weight: 600;
 }
@@ -178,13 +187,14 @@
 .runtimeList {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-top: 5px;
+  gap: 2px;
+  padding-top: 6px;
 }
 
 .reviewItem {
   gap: 7px;
-  min-height: 24px;
+  min-height: 25px;
+  padding: 2px 0;
 }
 
 .reviewSummary,
@@ -196,17 +206,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: color-mix(in oklch, var(--muted-foreground) 74%, transparent);
+  color: var(--muted-foreground);
   font-size: 11px;
 }
 
 .sourceTag {
   flex: 0 0 auto;
-  padding: 1px 5px;
-  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border: 1px solid color-mix(in oklch, var(--border) 76%, transparent);
   border-radius: 999px;
-  color: color-mix(in oklch, var(--muted-foreground) 86%, transparent);
+  background: var(--glass-bg-subtle);
+  color: var(--muted-foreground);
   font-size: 10px;
+  font-weight: 500;
 }
 
 .errorText {
@@ -248,6 +260,7 @@
 
 .runtimeItem {
   gap: 8px;
+  min-height: 26px;
   padding: 4px 0;
   border-top: 1px solid var(--glass-border-subtle);
 }
@@ -257,21 +270,21 @@
 }
 
 .runtimeKind {
-  flex: 0 0 82px;
+  flex: 0 0 48px;
   color: var(--foreground);
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .cardHeader {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 26px;
-  padding: 7px 0 2px;
+  min-height: 24px;
+  padding: 0 0 6px;
   border-bottom: 0;
-  color: color-mix(in oklch, var(--muted-foreground) 78%, transparent);
+  color: var(--foreground);
   font-size: 11px;
   font-weight: 600;
 }
@@ -385,6 +398,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--foreground);
 }
 
 .action {
