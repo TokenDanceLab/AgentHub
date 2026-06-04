@@ -28,6 +28,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "externalBin": ["binaries/agenthub-edge"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -52,7 +53,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://releases.agenthub.dev/updater/{{target}}/{{arch}}/{{current_version}}"
+        "https://github.com/TokenDanceLab/AgentHub/releases/latest/download/latest.json"
       ],
       "pubkey": "",
       "windows": {
