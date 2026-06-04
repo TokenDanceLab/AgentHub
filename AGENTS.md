@@ -30,9 +30,9 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 5. 只读相关主文档章节：产品不清读 `docs/architecture/product-requirements.md`；边界不清读 `docs/architecture/system-architecture.md`；实现顺序不清读 `docs/architecture/implementation-guide.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity-auth.md`、`../docs/authorization-model.md`、`../docs/security-risk-governance.md`、`../docs/unified-login.md`、`../docs/feishu-agenthub-integration.md`、`../docs/product-matrix.md`、`../docs/relay-productization.md`、`../docs/ecosystem-execution-queue.md`、`../docs/agent-seo-i18n-packaging.md`、`../docs/i18n-parity-matrix.md`、`../docs/design-system.md`、`../docs/design-implementation-playbook.md` 或 `../docs/visual-qa-matrix.md` 中相关文档。
-8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem-product-backlog.md`、`../docs/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
-9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance-scorecard.md`、`../docs/governance-evidence-ledger.md`、`../docs/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
+7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
+8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
+9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
 10. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
 11. 客户端 M1 任务读 `docs/operations/client-roadmap.md`。
 12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
@@ -106,7 +106,7 @@ Rust/Tauri 隔离规则：
 
 ### 统一 TokenDance ID 登录边界
 
-所有 AgentHub 登录工作先读 `../docs/unified-login.md` 和 `../docs/identity-auth.md`。
+所有 AgentHub 登录工作先读 `../docs/identity/identity-auth.md`。
 
 - Hub Agent 负责 Hub Server 作为 TokenDance ID relying party 的后端流程：Hub-owned callback、code exchange、ID token 验证、`tokendance_sub` 到 Hub user 的映射、Hub 本地 access/refresh session 签发。
 - Client Agent 负责 Desktop/Web 登录入口、系统浏览器 PKCE/回调体验和 Hub session 存储；客户端不得直接集成 GitHub、Google、飞书，也不得把第三方 provider token 存进 AgentHub。
@@ -118,7 +118,7 @@ Rust/Tauri 隔离规则：
 
 ### AgentHub 授权边界
 
-AgentHub 角色、组织、项目、Thread、Run、Approval、Agent Profile、Integration 或 Execution Target 权限变更先读 `../docs/authorization-model.md`。
+AgentHub 角色、组织、项目、Thread、Run、Approval、Agent Profile、Integration 或 Execution Target 权限变更先读 `../docs/identity/authorization-model.md`。
 
 - TokenDance ID 只证明用户是谁；Hub Server 必须用 Hub-local user、org/project membership、resource/action check 决定用户能做什么。
 - Feishu/Lark 触发的任务、卡片按钮和 H5 操作必须先从飞书 actor 解析到 TokenDance ID `sub`，再映射 Hub user 并校验 Hub 权限。
@@ -128,7 +128,7 @@ AgentHub 角色、组织、项目、Thread、Run、Approval、Agent Profile、In
 
 ### 安全风险治理边界
 
-AgentHub 的 `docs/governance/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security-risk-governance.md`。
+AgentHub 的 `docs/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security/security-risk.md`。
 
 - 涉及 Hub 登录/session、Edge 远程执行、Desktop/Web token storage、Feishu/Lark action、TokenDance API key、integration secret、公开 stats 或 generated artifact 的风险变更，必须同步更新本仓库风险表。
 - Critical/High 风险在未修复、未验证或未显式 accepted 之前阻断公开发布；accepted risk 必须写 owner、日期、原因、补偿控制和复查触发条件。
@@ -137,7 +137,7 @@ AgentHub 的 `docs/governance/security-risk-register.md` 是本仓库风险事�
 
 ### Feishu/Lark 应用边界
 
-AgentHub 飞书/Lark应用规划见 `../docs/feishu-agenthub-integration.md`。Feishu app 只做协作入口：应用机器人收发消息、事件订阅、卡片交互、工作台/H5 和任务通知。它不得成为 AgentHub 第二套登录系统；飞书 OAuth provider、飞书账号绑定、TokenDance ID 账号自动创建和 `oauth_bindings` 由 TokenDance ID 负责。Hub Server 接收 Feishu Integration Gateway 转发的业务事件后，仍按 TokenDance ID `sub` 和 AgentHub 权限执行。
+AgentHub 飞书/Lark 应用规划见 `../docs/identity/feishu-integration.md`。Feishu app 只做协作入口：应用机器人收发消息、事件订阅、卡片交互、工作台/H5 和任务通知。它不得成为 AgentHub 第二套登录系统；飞书 OAuth provider、飞书账号绑定、TokenDance ID 账号自动创建和 `oauth_bindings` 由 TokenDance ID 负责。Hub Server 接收 Feishu Integration Gateway 转发的业务事件后，仍按 TokenDance ID `sub` 和 AgentHub 权限执行。
 
 - AgentHub 交互机器人必须按飞书应用机器人设计；群自定义机器人只适合单向通知，不作为接收消息、用户交互或卡片回调方案。
 - 生产 Feishu Gateway 必须保留 HTTPS Webhook 入口：`POST /integrations/feishu/events` 用于事件订阅，`POST /integrations/feishu/card-actions` 用于卡片回调。SDK 长连接/WebSocket 只作为企业自建应用开发或内测可选入口，不能成为唯一生产路径。
@@ -147,11 +147,11 @@ AgentHub 飞书/Lark应用规划见 `../docs/feishu-agenthub-integration.md`。F
 
 ### i18n 与公开文案边界
 
-AgentHub Desktop/Web 的 zh/en 字典、登录入口、错误/空状态、Agent Runtime/Profile/Configuration/Execution Target 术语、Feishu/Lark 协作入口和 Gateway 调用文案变更时，先查 `../docs/i18n-parity-matrix.md`。新增用户可见字符串必须保证中英文语义一致，尤其不能把第三方 provider 写成 AgentHub 直连登录，也不能把 TokenDance API key 写成 TokenDance ID token。
+AgentHub Desktop/Web 的 zh/en 字典、登录入口、错误/空状态、Agent Runtime/Profile/Configuration/Execution Target 术语、Feishu/Lark 协作入口和 Gateway 调用文案变更时，先查 `../docs/identity/i18n-packaging.md`。新增用户可见字符串必须保证中英文语义一致，尤其不能把第三方 provider 写成 AgentHub 直连登录，也不能把 TokenDance API key 写成 TokenDance ID token。
 
 ### TokenDance Gateway 调用边界
 
-AgentHub 后续调用模型 API 网关时，产品名写 TokenDance Gateway / 词元跳动 API 网关，设计边界见 `../docs/relay-productization.md`。TokenDance API key 只能由 Hub Server、Edge Server 或受信后端/本地运行面持有，不得暴露给浏览器 UI、飞书卡片 value、公开日志或第三方 OAuth session。TokenDance ID access token 只用于登录/身份，不是 `api.vectorcontrol.tech/v1` 的模型 API bearer token。
+AgentHub 后续调用模型 API 网关时，产品名写 TokenDance Gateway / 词元跳动 API 网关，设计边界见 `../docs/ecosystem/product-matrix.md`。TokenDance API key 只能由 Hub Server、Edge Server 或受信后端/本地运行面持有，不得暴露给浏览器 UI、飞书卡片 value、公开日志或第三方 OAuth session。TokenDance ID access token 只用于登录/身份，不是 `api.vectorcontrol.tech/v1` 的模型 API bearer token。
 
 任务分发：
 
@@ -223,7 +223,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 **样式**：CSS Modules + OKLCH 设计 tokens（`var(--primary)`, `var(--border)` 等）。禁止硬编码颜色值。
 
-**设计落地**：页面/组件重做、共享 UI、视觉 QA 或 token 变更先读 `../docs/design-implementation-playbook.md` 和 `../docs/visual-qa-matrix.md`。AgentHub 必须按 dense command-center surface 验收，截图优先覆盖 thread/run/diff/approval 等真实工作流状态，不能只截空壳。
+**设计落地**：页面/组件重做、共享 UI、视觉 QA 或 token 变更先读 `../docs/design/design-playbook.md` 和 `../docs/design/visual-qa-matrix.md`。AgentHub 必须按 dense command-center surface 验收，截图优先覆盖 thread/run/diff/approval 等真实工作流状态，不能只截空壳。
 
 **测试**：`cd app/desktop && pnpm test`。共享 UI 组件测试放在 `app/shared/src/ui/*.test.tsx`。新组件必须有测试 + Storybook story。
 

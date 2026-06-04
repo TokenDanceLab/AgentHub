@@ -101,6 +101,12 @@
     0 1px 3px var(--glass-shadow-subtle);
 }
 
+[data-theme='dark'] .userMsg {
+  border-color: transparent;
+  border-radius: 22px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
 [data-theme='light'] .userMsg {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.64), var(--glass-input-bg)),
@@ -580,7 +586,7 @@
   outline: none;
   background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
-  box-shadow: inset 0 0 0 1px var(--glass-bg-heavy);
+  box-shadow: 0 0 0 2px var(--ring);
 }
 
 :global([data-theme='light']) .actionBtn:focus-visible,
@@ -610,7 +616,7 @@
   padding: 2px 3px 2px 8px;
   border-radius: 999px;
   background: var(--glass-bg-light);
-  box-shadow: inset 0 0 0 1px var(--glass-bg-medium);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
 :global([data-theme='light']) .deleteConfirmBar {
@@ -894,6 +900,13 @@
   background: var(--glass-bg-light);
   color: color-mix(in oklch, var(--foreground) 84%, var(--muted-foreground) 16%);
   box-shadow: 0 1px 0 var(--glass-bg-subtle) inset;
+}
+
+[data-theme='dark'] .agentTaskBlock,
+[data-theme='dark'] .childAgentBlock,
+[data-theme='dark'] .routeDecisionBlock {
+  border-color: transparent;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
 }
 
 [data-theme='light'] .agentTaskBlock,
@@ -1901,7 +1914,7 @@
   padding: var(--space-sm) var(--space-md);
   background: var(--chat-code-bg);
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: var(--font-size-sm);
   font-family: var(--font-mono);
   line-height: 1.6;
@@ -1911,7 +1924,7 @@
 .codeBlockHighlighted {
   margin: var(--space-xs) 0;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   background: var(--chat-code-bg);
 }

@@ -135,7 +135,7 @@ type TopMenuDefinition = Record<TopMenuId, { label: string; items: TopMenuItem[]
 
 const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
-const RUN_CARD_MIN_WORKSPACE_WIDTH = 1180;
+const RUN_CARD_MIN_WORKSPACE_WIDTH = 760;
 const TOP_MENU_ORDER: TopMenuId[] = ['file', 'edit', 'view', 'window', 'help'];
 const HIDDEN_MESSAGES_STORAGE_PREFIX = 'agenthub.chat.hiddenMessages.';
 
