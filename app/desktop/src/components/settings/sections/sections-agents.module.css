@@ -29,10 +29,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 15px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 12px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
@@ -70,10 +70,10 @@
   gap: 12px;
   min-height: 66px;
   padding: 13px 16px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
@@ -102,10 +102,10 @@
 .teamMetric {
   min-width: 0;
   padding: 13px 14px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
-  background: var(--glass-panel);
-  box-shadow: 0 6px 18px var(--glass-shadow-subtle);
+  background: var(--settings-card-bg);
+  box-shadow: var(--settings-card-shadow);
 }
 
 .teamMetric span {
@@ -135,16 +135,16 @@
   gap: 10px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 14px;
   background: color-mix(in oklch, var(--glass-panel) 88%, transparent);
-  box-shadow: 0 10px 26px var(--glass-shadow-subtle);
+  box-shadow: var(--elevated-card-shadow-strong);
 }
 
 [data-theme='dark'] .teamGraph {
-  border-color: var(--glass-border-heavy);
-  background: var(--glass-panel);
-  box-shadow: 0 14px 34px var(--glass-shadow-subtle);
+  border-color: var(--settings-card-border);
+  background: var(--settings-card-bg);
+  box-shadow: var(--elevated-card-shadow-strong);
 }
 
 .teamGraphNodes {
@@ -336,10 +336,10 @@
   gap: 12px;
   min-height: 66px;
   padding: 13px 15px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--settings-card-border);
   border-radius: 11px;
   margin-bottom: 8px;
-  background: var(--glass-panel);
+  background: var(--settings-card-bg);
 }
 
 .teamMiniButton {
