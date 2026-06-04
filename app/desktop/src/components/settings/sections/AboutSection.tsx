@@ -15,7 +15,7 @@ interface UpdateInfo {
 
 type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'available' | 'error' | 'installing';
 
-const APP_VERSION = 'v0.1.0';
+const APP_VERSION = 'v0.2.0';
 
 export default function AboutSection() {
   const { t } = useTranslation();
