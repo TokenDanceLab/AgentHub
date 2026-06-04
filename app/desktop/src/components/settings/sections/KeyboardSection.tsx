@@ -14,7 +14,7 @@ import {
   deriveKeysFromEvent,
   checkConflicts,
 } from '@/utils/keyboardShortcuts';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function KeyboardSection() {
   const { t } = useTranslation();

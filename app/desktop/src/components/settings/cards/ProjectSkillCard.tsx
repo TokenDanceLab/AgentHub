@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Code2 } from 'lucide-react';
 import type { ProjectSkill } from '../sections/SkillsSection';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function ProjectSkillCard({ skill }: { skill: ProjectSkill }) {
   const { t } = useTranslation();

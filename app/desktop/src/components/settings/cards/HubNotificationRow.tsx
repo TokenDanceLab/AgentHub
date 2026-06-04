@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Globe2 } from 'lucide-react';
 import type { HubNotification } from '@/api/hubClient';
 import { formatTimestamp, parseNotificationPayload } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function HubNotificationRow({ notification }: { notification: HubNotification }) {
   const { t } = useTranslation();

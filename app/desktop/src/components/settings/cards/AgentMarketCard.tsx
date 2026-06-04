@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Bot, Pencil, Trash2, Globe2 } from 'lucide-react';
 import type { CustomAgentMarketItem } from '../sections/AgentMarketSection';
 import { formatTimestamp } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 export default function AgentMarketCard({
   agent,

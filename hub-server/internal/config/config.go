@@ -298,6 +298,14 @@ func Load(configPath string) (*Config, error) {
 		cfg.JWT.Secret = envSecret
 	}
 
+	// Explicit env var overrides for Server settings.
+	if envLogLevel := os.Getenv("AGENTHUB_SERVER_LOG_LEVEL"); envLogLevel != "" {
+		cfg.Server.LogLevel = envLogLevel
+	}
+	if envLogFile := os.Getenv("AGENTHUB_SERVER_LOG_FILE"); envLogFile != "" {
+		cfg.Server.LogFile = envLogFile
+	}
+
 	// Explicit env var overrides for TokenDance ID.
 	// Viper AutomaticEnv handles nesting with underscores but these
 	// belt-and-suspenders overrides guarantee the env vars take precedence

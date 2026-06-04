@@ -3,9 +3,42 @@
 #        make test-all    (all tests including integration)
 #        make lint        (golangci-lint)
 #        make coverage    (HTML coverage report)
+#        make fe-lint     (frontend eslint + stylelint)
+#        make fe-build    (build all frontend packages)
 
 #        make release VER=v0.1.1  (build + upload release binaries)
-.PHONY: test test-all test-edge test-hub lint coverage sec release clean
+#        make help        (show this help)
+.PHONY: test test-all test-edge test-hub lint coverage sec release clean fmt \
+        fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
+
+# ── Help ───────────────────────────────────────────
+
+help:
+	@echo "AgentHub Makefile targets:"
+	@echo ""
+	@echo "  Backend:"
+	@echo "    test          单元测试 (edge + hub, -short)"
+	@echo "    test-all      完整测试 (需 Redis + PG)"
+	@echo "    test-edge     Edge Server 单元测试"
+	@echo "    test-hub      Hub Server 单元测试"
+	@echo "    lint          golangci-lint (edge + hub)"
+	@echo "    coverage      覆盖率报告 (HTML + func)"
+	@echo "    sec           gosec + govulncheck"
+	@echo "    bench         Benchmark (events + service)"
+	@echo "    ci            全量 CI: test + lint + sec"
+	@echo "    clean         清理测试缓存和覆盖率文件"
+	@echo ""
+	@echo "  Frontend:"
+	@echo "    fe-install    pnpm install"
+	@echo "    fe-dev        pnpm dev (desktop :5173)"
+	@echo "    fe-build      pnpm -r build (全部包)"
+	@echo "    fe-test       pnpm -r test"
+	@echo "    fe-lint       eslint + stylelint"
+	@echo "    fe-typecheck  tsc --noEmit (desktop + web)"
+	@echo ""
+	@echo "  Release:"
+	@echo "    release VER=v0.1.1   一键构建 + 上传"
+	@echo ""
 
 # ── Unit tests (no external deps) ────────────────────
 
@@ -39,6 +72,12 @@ lint:
 	cd edge-server && golangci-lint run ./...
 	cd hub-server && golangci-lint run ./...
 
+# ── Format ───────────────────────────────────────
+
+fmt:
+	cd edge-server && gofmt -w .
+	cd hub-server && gofmt -w .
+
 # ── Coverage ─────────────────────────────────────
 
 coverage:
@@ -70,3 +109,25 @@ clean:
 	cd hub-server && go clean -testcache
 	rm -f edge-server/coverage.out edge-server/coverage.html
 	rm -f hub-server/coverage.out hub-server/coverage.html
+
+# ── Frontend ─────────────────────────────────────
+
+fe-install:
+	cd app && pnpm install
+
+fe-dev:
+	cd app && pnpm dev
+
+fe-build:
+	cd app && pnpm -r build
+
+fe-test:
+	cd app && pnpm -r test
+
+fe-lint:
+	cd app && pnpm -r lint
+	cd app && pnpm lint:css
+
+fe-typecheck:
+	cd app/desktop && npx tsc --noEmit
+	cd app/web && npx tsc --noEmit

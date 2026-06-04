@@ -129,8 +129,10 @@
     "allRisksReopened": "可审查的风险已重新打开。",
     "syncComplete": "同步已于 {{time}} 更新本地运行记录。",
     "fallbackNote": "未添加附加备注。",
-    "openRisksRemaining": "{{count}} 项未解决风险仍需审查。",
-    "activeTasksRemaining": "{{count}} 项进行中任务经本地审查后仍保留。",
+    "openRisksRemaining_one": "{{count}} 项未解决风险仍需审查。",
+    "openRisksRemaining_other": "{{count}} 项未解决风险仍需审查。",
+    "activeTasksRemaining_one": "{{count}} 项进行中任务经本地审查后仍保留。",
+    "activeTasksRemaining_other": "{{count}} 项进行中任务经本地审查后仍保留。",
     "localSyncDetail": "本地同步捕获了 {{tasks}} 项进行中任务和 {{risks}} 项未解决风险。"
   },
   "source": {
@@ -143,5 +145,9 @@
   },
   "demo": {
     "cardDetail": "演示/mock fallback 数据：{{detail}}"
+  },
+  "locked": {
+    "title": "需要 Hub 会话",
+    "description": "请先登录 Hub 以查看项目数据和里程碑信息。"
   }
 }

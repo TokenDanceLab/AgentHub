@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ClipboardList, Bot, Server, ShieldCheck, Monitor, Globe2, Computer } from 'lucide-react';
-import type { RunInfo } from '@shared/types';
+import type { RunInfo, AgentInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
-import type { AgentInfo } from '@shared/types';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import SummaryCard from '../primitives/SummaryCard';
@@ -14,7 +13,7 @@ import ExecutionTargetCard from '../primitives/ExecutionTargetCard';
 import TaskRunRow from '../cards/TaskRunRow';
 import HubTaskRow from '../cards/HubTaskRow';
 import { getRecentRuns, getRecentTasks, writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
+import styles from '../primitives/primitives.module.css';
 
 interface AgentSchedulingSectionProps {
   runs: RunInfo[];

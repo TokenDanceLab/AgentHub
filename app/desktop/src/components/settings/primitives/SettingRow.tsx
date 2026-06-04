@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
-import styles from '../../SettingsPage.module.css';
+import styles from './primitives.module.css';
 
 interface SettingRowProps {
   title: string;

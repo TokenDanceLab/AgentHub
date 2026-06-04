@@ -1,7 +1,10 @@
+const ONBOARDING_STORAGE_KEY = 'agenthub.onboarding.completed';
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, vars?: Record<string, unknown>) => {
+    t: (key: string, vars?: Record<string, unknown> | string) => {
       if (!vars) return key;
+      if (typeof vars === 'string') return key;
       const varStr = Object.entries(vars)
         .map(([k, v]) => `${k}=${v}`)
         .join(', ');
@@ -11,7 +14,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import WelcomeScreen from '@/components/WelcomeScreen';
@@ -53,6 +56,11 @@ const mockAgents: AgentInfo[] = [
 ];
 
 describe('WelcomeScreen', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+  });
+
   it('renders when online with prompt suggestions', () => {
     render(
       <WelcomeScreen

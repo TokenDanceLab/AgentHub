@@ -166,7 +166,7 @@
   border-radius: 6px;
   padding: 4px 0;
   min-width: 180px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 24px var(--glass-shadow);
 }
 
 .menuItem {
@@ -224,12 +224,12 @@
 }
 
 .gitStatusA {
-  background: var(--diff-added-bg, rgba(70, 149, 74, 0.15));
+  background: var(--diff-added-bg, var(--glass-tint-moss));
   color: var(--diff-added-border, #46954a);
 }
 
 .gitStatusD {
-  background: var(--diff-removed-bg, rgba(229, 83, 75, 0.15));
+  background: var(--diff-removed-bg, var(--glass-tint-danger));
   color: var(--diff-removed-border, #e5534b);
 }
 
@@ -244,7 +244,7 @@
 }
 
 .gitStatusU {
-  background: var(--diff-removed-bg, rgba(229, 83, 75, 0.15));
+  background: var(--diff-removed-bg, var(--glass-tint-danger));
   color: var(--diff-removed-border, #e5534b);
 }
 

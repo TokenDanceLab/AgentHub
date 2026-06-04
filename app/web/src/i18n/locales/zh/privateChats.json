@@ -114,5 +114,11 @@
     "dismiss": "忽略",
     "loginRequired": "请先登录 Hub 再使用私聊。",
     "readOnly": "本轮 Web 私聊保持只读。"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "yesterday": "昨天"
   }
 }

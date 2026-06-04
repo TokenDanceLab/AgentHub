@@ -2,8 +2,30 @@ import { EDGE_AUTH_TOKEN } from '@/config';
 
 const EDGE_AUTH_STORAGE_KEY = 'agenthub:edge_auth_token';
 
+let runtimeEdgeAuthToken = '';
+
+export function setEdgeAuthToken(token: string | null | undefined): void {
+  runtimeEdgeAuthToken = token?.trim() ?? '';
+  try {
+    if (runtimeEdgeAuthToken) {
+      sessionStorage.setItem(EDGE_AUTH_STORAGE_KEY, runtimeEdgeAuthToken);
+    } else {
+      sessionStorage.removeItem(EDGE_AUTH_STORAGE_KEY);
+    }
+  } catch {
+    // Session storage can be unavailable in restricted previews.
+  }
+}
+
 export function getEdgeAuthToken(): string {
   if (EDGE_AUTH_TOKEN) return EDGE_AUTH_TOKEN;
+  if (runtimeEdgeAuthToken) return runtimeEdgeAuthToken;
+  try {
+    const token = sessionStorage.getItem(EDGE_AUTH_STORAGE_KEY)?.trim();
+    if (token) return token;
+  } catch {
+    // Fall through to legacy localStorage.
+  }
   try {
     return localStorage.getItem(EDGE_AUTH_STORAGE_KEY)?.trim() ?? '';
   } catch {

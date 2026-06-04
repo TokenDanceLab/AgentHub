@@ -924,15 +924,11 @@ export default function PromptInput({
   const providerLabel = selectedModelOption?.provider
     ?? (displayProviderName(resolvedRoute.provider) ?? t('prompt.routeAuto'));
   const activeRunSettings = [
-    ...(model.trim() || selectedCatalogRoute ? [{
+    ...(model ? [{
       id: 'model',
       label: t('prompt.activeSetting.model'),
       value: displayedModelLabel,
-      title: [
-        selectedModelOption?.provider,
-        selectedModelOption?.requestModel,
-        selectedModelOption?.modelAlias ? t('prompt.routeAlias') + `: ${selectedModelOption.modelAlias}` : '',
-      ].filter(Boolean).join(' · ') || displayedModelLabel,
+      title: t('prompt.clearModelRoute'),
       clearLabel: t('prompt.clearModelRoute'),
       onClear: () => {
         setModel('');

@@ -36,6 +36,25 @@ describe('EmptyState', () => {
     expect(screen.getByRole('button', { name: 'Fix bugs' })).toBeInTheDocument();
   });
 
+  it('fires suggestion chip click', () => {
+    const onExplain = vi.fn();
+    const onFix = vi.fn();
+    render(
+      <EmptyState
+        title="Prompt"
+        suggestions={[
+          { label: 'Explain code', onClick: onExplain },
+          { label: 'Fix bugs', onClick: onFix },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fix bugs' }));
+
+    expect(onFix).toHaveBeenCalledTimes(1);
+    expect(onExplain).not.toHaveBeenCalled();
+  });
+
   it('allows mobile title level and external classes', () => {
     const { container } = render(
       <EmptyState title="Mobile empty" titleLevel={1} className="mobileEmptyView" actionClassName="mobileEmptyAction" />,
@@ -43,5 +62,19 @@ describe('EmptyState', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Mobile empty' })).toBeInTheDocument();
     expect(container.firstElementChild?.className).toContain('mobileEmptyView');
+  });
+
+  it('renders shortcut badge on action', () => {
+    render(
+      <EmptyState
+        title="Threads"
+        action={{ label: 'New Thread', onClick: vi.fn(), shortcut: 'Ctrl+N' }}
+      />,
+    );
+
+    const btn = screen.getByRole('button', { name: /New Thread/ });
+    expect(btn).toBeInTheDocument();
+    expect(btn.querySelector('kbd')).toBeInTheDocument();
+    expect(btn.querySelector('kbd')?.textContent).toBe('Ctrl+N');
   });
 });

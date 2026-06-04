@@ -166,8 +166,7 @@ pub fn set_tray_labels(app: AppHandle, labels: TrayLabels) -> Result<(), String>
         .tray_by_id(TRAY_ID)
         .ok_or_else(|| "tray icon not found".to_string())?;
     let menu = build_menu(&app, &labels).map_err(|e| e.to_string())?;
-    tray.set_menu(Some(menu))
-        .map_err(|e| e.to_string())?;
+    tray.set_menu(Some(menu)).map_err(|e| e.to_string())?;
     tray.set_tooltip(Some(&labels.tooltip))
         .map_err(|e| e.to_string())?;
     Ok(())
