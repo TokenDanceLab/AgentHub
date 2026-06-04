@@ -1431,7 +1431,6 @@
   "home.teamRunConsole": "TeamRun Console",
   "settings.searchPlaceholder": "Search settings...",
   "settings.searchEmpty": "No matching settings",
-
   "auth.advancedSettings": "Advanced settings",
   "auth.close": "Close",
   "auth.continueLocal": "Use local mode",
@@ -1439,19 +1438,15 @@
   "auth.localModeDesc": "Skip login and use Local Edge, local Runtimes, threads and runs offline.",
   "auth.localModeTitle": "Local mode always available",
   "auth.startupTagline": "Sign in to enable Hub sync, or continue working locally on this machine.",
-
   "common.add": "Add",
   "common.cancel": "Cancel",
   "common.create": "Create",
-
   "im.action.interfaceGap": "Interface gap",
-
   "im.empty.noMessages": "No messages yet",
   "im.empty.startConversation": "Start a conversation to begin",
   "im.time.justNow": "Just now",
   "im.time.minutesAgo": "{{n}}m ago",
   "im.title": "IM Chat",
-
   "im.contact.cancelCompose": "Cancel Hub compose",
   "im.contact.addContact": "Add contact",
   "im.contact.chooseHubContact": "Choose Hub contact...",
@@ -1503,7 +1498,6 @@
   "im.state.retry": "Retry",
   "im.state.selectContact": "Select a contact to start messaging",
   "im.state.unavailable": "Hub messages are currently unavailable.",
-
   "run.artifact.browser.title": "Artifact Browser",
   "run.artifact.all": "All",
   "run.artifact.applied": "Applied",
@@ -1524,10 +1518,8 @@
   "run.summary.elapsed": "Elapsed",
   "run.summary.steps": "Steps",
   "run.summary.title": "Summary",
-
   "status.draining": "Draining",
   "status.localMode": "Local mode",
-
   "settings.allowlistAdd": "Add directory",
   "settings.allowlistDesc": "Pre-approved directories, file patterns, and tool permissions.",
   "settings.allowlistEmpty": "No whitelist entries",
@@ -1703,7 +1695,6 @@
   "settings.taskNoHubSnapshot": "No Hub task snapshot",
   "settings.taskNoHubSnapshotDesc": "No Hub task list REST snapshot is currently available.",
   "settings.taskTarget": "Target {{target}}",
-
   "hub.toast.loadSessionsFailed": "Failed to load Hub sessions",
   "hub.toast.loadMessagesFailed": "Failed to load Hub messages",
   "hub.toast.connectToSend": "Connect to Hub to send messages",
@@ -1762,6 +1753,23 @@
   "onboarding.step2Hint": "Open a project folder or create a new thread to start working.",
   "onboarding.step3Hint": "Type a message below or click a suggestion to get started.",
   "onboarding.skip": "Skip",
-  "onboarding.trySuggestion": "Try one of these to get started:"
+  "onboarding.trySuggestion": "Try one of these to get started:",
+  "settings.about": "About",
+  "settings.about.desc": "App version and update information",
+  "settings.about.version": "Version",
+  "settings.about.versionDesc": "Current application version",
+  "settings.about.updates": "Updates",
+  "settings.about.updatesDesc": "Check for and install application updates",
+  "settings.about.checkForUpdates": "Check for Updates",
+  "settings.about.checking": "Checking...",
+  "settings.about.upToDate": "You are running the latest version.",
+  "settings.about.upToDateTitle": "Up to Date",
+  "settings.about.newVersionTitle": "Update Available",
+  "settings.about.newVersionAvailable": "Version {{version}} is available.",
+  "settings.about.downloadAndInstall": "Download and Install",
+  "settings.about.installing": "Installing...",
+  "settings.about.installComplete": "Update installed. Please restart the application.",
+  "settings.about.updateAvailable": "Version {{version}} is available for download.",
+  "settings.about.updateError": "Update Error",
+  "settings.data": "Data Management"
 }
-

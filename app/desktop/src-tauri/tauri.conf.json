@@ -55,7 +55,7 @@
       "endpoints": [
         "https://github.com/TokenDanceLab/AgentHub/releases/latest/download/latest.json"
       ],
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDNTdCQkU3MjRFRDUwNjEKUldSaFVPMGs1N3RYZkZFODM3VkE4R0pKU01BQjU0MlRPdzNiWVRQVi9nV0N5ak5SQ25uK1AxNXAK",
       "windows": {
         "installMode": "passive"
       }
