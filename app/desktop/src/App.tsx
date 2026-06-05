@@ -1032,7 +1032,7 @@ export default function App() {
                 />
                 </Suspense>
               ) : viewMode === 'im' ? (
-                <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
+                <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" agents={agents} /></Suspense></ErrorBoundary>
               ) : (
                 <Slot
                   name="main-view"
