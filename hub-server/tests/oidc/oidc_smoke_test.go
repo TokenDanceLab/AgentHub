@@ -54,19 +54,38 @@ type apiResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    json.RawMessage `json:"data"`
+	Error   *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		TraceID string `json:"traceId"`
+	} `json:"error"`
+}
+
+func (r apiResp) GetCode() string {
+	if r.Error != nil {
+		return r.Error.Code
+	}
+	return r.Code
+}
+
+func (r apiResp) GetMsg() string {
+	if r.Error != nil {
+		return r.Error.Message
+	}
+	return r.Message
 }
 
 func assertCode(t *testing.T, r apiResp, want string, ctx string) {
 	t.Helper()
-	if r.Code != want {
-		t.Fatalf("%s: want code=%q, got code=%q message=%q", ctx, want, r.Code, r.Message)
+	if r.GetCode() != want {
+		t.Fatalf("%s: want code=%q, got code=%q message=%q", ctx, want, r.GetCode(), r.GetMsg())
 	}
 }
 
 func assertContains(t *testing.T, r apiResp, substr string, ctx string) {
 	t.Helper()
-	if !strings.Contains(r.Code, substr) {
-		t.Fatalf("%s: want code containing %q, got %q", ctx, substr, r.Code)
+	if !strings.Contains(r.GetCode(), substr) {
+		t.Fatalf("%s: want code containing %q, got %q", ctx, substr, r.GetCode())
 	}
 }
 

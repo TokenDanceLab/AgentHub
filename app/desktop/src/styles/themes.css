@@ -130,6 +130,13 @@
   --agent-card-active: rgba(255, 255, 255, 0.06);
   --agent-dot-online: #69c967;
   --agent-dot-online-glow: 0 0 6px rgba(105, 201, 103, 0.3);
+
+  /* ── Tool category border colors ─────────────── */
+  --tool-edit: #F59E0B;
+  --tool-bash: #22C55E;
+  --tool-agent: #A855F7;
+  --tool-read: #3B82F6;
+  --tool-default: #71717A;
 }
 
 /* ── Light Theme — macOS matte gray ────────────────────────────────────── */
@@ -243,6 +250,13 @@
   --agent-card-active: rgba(0, 0, 0, 0.05);
   --agent-dot-online: #22c55e;
   --agent-dot-online-glow: 0 0 6px rgba(34, 197, 94, 0.25);
+
+  /* ── Tool category border colors ─────────────── */
+  --tool-edit: #D97706;
+  --tool-bash: #16A34A;
+  --tool-agent: #9333EA;
+  --tool-read: #2563EB;
+  --tool-default: #71717A;
 
   /* ── Glass tokens (light: dark overlay direction) ───────────────────── */
   --glass-bg-subtle: rgba(0, 0, 0, 0.02);

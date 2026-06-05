@@ -24,11 +24,12 @@ import (
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/mcp"
 	"github.com/agenthub/edge-server/internal/metrics"
-	"github.com/agenthub/edge-server/internal/middleware"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
+	debugpkg "github.com/agenthub/pkg/debug"
+	"github.com/agenthub/pkg/reqlog"
 )
 
 // ctxKey is a private context key type for injecting auth identity.
@@ -105,15 +106,37 @@ func Run(cfg Config) error {
 			return fmt.Errorf("failed to generate local auth token: %w", err)
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
-		slog.Info("auto-generated local auth token for Edge Server API protection; "+
+		slog.Debug("auto-generated local auth token for Edge Server API protection; "+
 			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections",
-			"token_prefix", cfg.LocalAuthToken[:16]+"...")
+			"token_prefix", cfg.LocalAuthToken[:8]+"...")
 	}
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
-	// Expose Prometheus metrics on /metrics for Prometheus scraping.
-	mux.Handle("/metrics", handler.Metrics.Handler())
+
+	// Register debug endpoints (health, pprof, metrics, config, state).
+	debugAuth := debugAuthFunc(cfg)
+	debugpkg.RegisterEndpoints(mux, debugpkg.MuxConfig{
+		HealthCheckers: map[string]debugpkg.HealthChecker{
+			"store": func(_ context.Context) error {
+				if handler.Store == nil {
+					return fmt.Errorf("store not initialized")
+				}
+				return nil
+			},
+			"bus": func(_ context.Context) error {
+				if handler.Bus == nil {
+					return fmt.Errorf("event bus not initialized")
+				}
+				return nil
+			},
+		},
+		EnablePprof:    true,
+		MetricsHandler: handler.Metrics.Handler(),
+		Auth:           debugAuth,
+		ConfigDumper:   edgeConfigDumper(cfg),
+		StateDumper:    edgeStateDumper(handler),
+	})
 
 	// Register MCP (Model Context Protocol) endpoint for external AI clients.
 	// This exposes project/thread/run capabilities as standard MCP tools.
@@ -123,7 +146,7 @@ func Run(cfg Config) error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: middleware.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
+		Handler: reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
@@ -524,4 +547,46 @@ func headerContainsToken(header http.Header, key, want string) bool {
 		}
 	}
 	return false
+}
+
+func debugAuthFunc(cfg Config) func(r *http.Request) bool {
+	if cfg.Dev {
+		return nil
+	}
+	if cfg.LocalAuthToken != "" {
+		return debugpkg.BearerAuth(cfg.LocalAuthToken)
+	}
+	return nil
+}
+
+func edgeConfigDumper(cfg Config) debugpkg.ConfigDumper {
+	return func() map[string]any {
+		return map[string]any{
+			"addr":                cfg.Addr,
+			"remote_mode":         cfg.RemoteMode,
+			"dev":                 cfg.Dev,
+			"workspace_allowlist": cfg.WorkspaceAllowlist,
+			"hub_url":             cfg.HubURL,
+			"local_auth_token":    cfg.LocalAuthToken,
+			"hub_jwt_secret":      cfg.HubJWTSecret,
+			"hub_token":           cfg.HubToken,
+		}
+	}
+}
+
+func edgeStateDumper(h *api.Handler) debugpkg.StateDumper {
+	return func() map[string]any {
+		state := map[string]any{}
+		if h.Store != nil {
+			state["store"] = map[string]any{
+				"projects": len(h.Store.ListProjects()),
+			}
+		}
+		if h.Bus != nil {
+			state["bus"] = map[string]any{
+				"history_len": h.Bus.HistoryLen(),
+			}
+		}
+		return state
+	}
 }

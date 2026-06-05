@@ -120,3 +120,21 @@
 - WebLayout 1117→970 行拆分
 - Web 移除死代码依赖 react-router-dom
 - gitignore 补全 + 编译产物清理 + 本地临时目录条目
+
+## [0.4.0] — 2026-06-04
+
+### Changed
+- 文档去重：删除旧 ADR 目录（`adr/` → `decisions/` 完整超集）；去重 `governance-execution.md`、`security-risk-register.md`；`handover.md` 移入 `handoff/`
+- 安全风险登记：根目录精简版与 governance/ 详细版合并为单一 272 行权威版本（44 项 AH-SR 发现）
+- 历史执行计划（wave1、worktree）和 fix-note 归档至 `archive/`
+- `.gitignore` 修复无效 pattern + 消除冗余 + 分组重构为 14 个清晰分组
+- AGENTS.md / CONTRIBUTING.md / README 交叉引用修复
+- 27 处断裂文档引用修复
+
+### Removed
+- 删除冗余 `docs/operations/client-roadmap.md`（纯指针文件）
+- 删除过时远程分支 `feat/team-johnny-merge`、`dependabot/*`
+
+### Fixed
+- 本地构建产物清理（edge-server/hub-server exe/cov/coverage，约 250MB+）
+- `.tmp/` 400+ 调试截图清除

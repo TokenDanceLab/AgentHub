@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 var _ Repository = (*FileStore)(nil)
@@ -26,14 +27,21 @@ type fileSnapshot struct {
 	ItemOrder    []string `json:"itemOrder"`
 }
 
-// FileStore wraps the in-memory store with a JSON snapshot saved after writes.
+// FileStore wraps the in-memory store with a JSON snapshot saved asynchronously after writes.
+// Writes are debounced — rapid mutations batch into a single disk write.
 type FileStore struct {
 	path string
 
 	persistMu sync.Mutex
 	store     *Store
 	lastErr   error
+
+	persistCh chan struct{}
+	done      chan struct{}
+	closeOnce sync.Once
 }
+
+const debounceInterval = 50 * time.Millisecond
 
 func NewFile(path string) (*FileStore, error) {
 	if path == "" {
@@ -50,19 +58,79 @@ func NewFile(path string) (*FileStore, error) {
 	}
 
 	f := &FileStore{
-		path:  path,
-		store: s,
+		path:      path,
+		store:     s,
+		persistCh: make(chan struct{}, 1),
+		done:      make(chan struct{}),
 	}
-	if err := f.persist(); err != nil {
+	go f.persistLoop()
+
+	// Initial persist to verify write path works.
+	if err := f.syncPersist(); err != nil {
+		f.Close()
 		return nil, fmt.Errorf("verify store snapshot write: %w", err)
 	}
 	return f, nil
+}
+
+// Close stops the background persist goroutine and flushes pending writes.
+func (f *FileStore) Close() {
+	f.closeOnce.Do(func() {
+		close(f.persistCh)
+		<-f.done
+	})
+}
+
+// Flush writes the current in-memory state to disk synchronously.
+func (f *FileStore) Flush() {
+	f.syncPersist()
 }
 
 func (f *FileStore) LastPersistError() error {
 	f.persistMu.Lock()
 	defer f.persistMu.Unlock()
 	return f.lastErr
+}
+
+// schedulePersist signals the background loop to persist. Non-blocking.
+func (f *FileStore) schedulePersist() {
+	select {
+	case f.persistCh <- struct{}{}:
+	default:
+	}
+}
+
+// persistLoop runs in the background, debouncing persist calls.
+func (f *FileStore) persistLoop() {
+	defer close(f.done)
+
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
+
+	for {
+		select {
+		case _, ok := <-f.persistCh:
+			if !ok {
+				f.syncPersist()
+				return
+			}
+			timer.Reset(debounceInterval)
+		case <-timer.C:
+			f.syncPersist()
+		}
+	}
+}
+
+// syncPersist performs the actual file write. Called by persistLoop and Close.
+func (f *FileStore) syncPersist() error {
+	f.persistMu.Lock()
+	defer f.persistMu.Unlock()
+
+	err := saveFileSnapshot(f.path, f.store.snapshot())
+	f.lastErr = err
+	return err
 }
 
 func (f *FileStore) CreateProject(id, name string) (Project, error) {
@@ -73,9 +141,7 @@ func (f *FileStore) CreateProject(id, name string) (Project, error) {
 	if err != nil {
 		return Project{}, err
 	}
-	if err := f.persist(); err != nil {
-		return project, err
-	}
+	f.schedulePersist()
 	return project, nil
 }
 
@@ -92,9 +158,7 @@ func (f *FileStore) CreateThread(id, projectID, title string) (Thread, error) {
 	if err != nil {
 		return Thread{}, err
 	}
-	if err := f.persist(); err != nil {
-		return thread, err
-	}
+	f.schedulePersist()
 	return thread, nil
 }
 
@@ -107,7 +171,7 @@ func (f *FileStore) UpdateThread(id string, title *string, status *string) (Thre
 	if !ok {
 		return Thread{}, false
 	}
-	_ = f.persist()
+	f.schedulePersist()
 	return thread, true
 }
 
@@ -116,7 +180,7 @@ func (f *FileStore) DeleteThread(id string) bool {
 	if !ok {
 		return false
 	}
-	_ = f.persist()
+	f.schedulePersist()
 	return true
 }
 
@@ -129,9 +193,7 @@ func (f *FileStore) CreateRun(id, projectID, threadID string) (Run, error) {
 	if err != nil {
 		return Run{}, err
 	}
-	if err := f.persist(); err != nil {
-		return run, err
-	}
+	f.schedulePersist()
 	return run, nil
 }
 
@@ -146,7 +208,7 @@ func (f *FileStore) ListRuns(threadID string) []Run {
 func (f *FileStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	result := f.store.CleanupRuns(opts)
 	if result.RemovedRuns > 0 || result.RemovedItems > 0 {
-		_ = f.persist()
+		f.schedulePersist()
 	}
 	return result
 }
@@ -154,8 +216,7 @@ func (f *FileStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 	run, ok := f.store.SetRunStatus(id, status)
 	if ok {
-		// Persist error is surfaced via LastPersistError() for callers.
-		_ = f.persist()
+		f.schedulePersist()
 	}
 	return run, ok
 }
@@ -163,8 +224,7 @@ func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 func (f *FileStore) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
 	run, ok := f.store.SetRunStatusIf(id, status, allowedCurrent...)
 	if ok {
-		// Persist error is surfaced via LastPersistError() for callers.
-		_ = f.persist()
+		f.schedulePersist()
 	}
 	return run, ok
 }
@@ -174,9 +234,7 @@ func (f *FileStore) CreateItem(item Item) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
-	if err := f.persist(); err != nil {
-		return created, err
-	}
+	f.schedulePersist()
 	return created, nil
 }
 
@@ -185,9 +243,7 @@ func (f *FileStore) CreateThreadMessage(itemID, threadID, role, content string) 
 	if err != nil {
 		return Item{}, err
 	}
-	if err := f.persist(); err != nil {
-		return item, err
-	}
+	f.schedulePersist()
 	return item, nil
 }
 
@@ -197,15 +253,6 @@ func (f *FileStore) GetItem(id string) (Item, bool) {
 
 func (f *FileStore) ListThreadItems(threadID string) []Item {
 	return f.store.ListThreadItems(threadID)
-}
-
-func (f *FileStore) persist() error {
-	f.persistMu.Lock()
-	defer f.persistMu.Unlock()
-
-	err := saveFileSnapshot(f.path, f.store.snapshot())
-	f.lastErr = err
-	return err
 }
 
 func ensureFileSnapshotDirectory(path string) error {
