@@ -8,6 +8,7 @@ interface SummaryCardProps {
   value: string;
   detail: string;
   expandedDetail?: ReactNode;
+  expandedDetailPlacement?: 'below' | 'detail';
   expandLabel?: string;
   collapseLabel?: string;
 }
@@ -18,12 +19,14 @@ export default function SummaryCard({
   value,
   detail,
   expandedDetail,
+  expandedDetailPlacement = 'below',
   expandLabel,
   collapseLabel,
 }: SummaryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const expandedId = useId();
   const canExpand = Boolean(expandedDetail);
+  const showInlineExpandedDetail = canExpand && expanded && expandedDetailPlacement === 'detail';
   const expandButtonLabel = expanded
     ? collapseLabel ?? label
     : expandLabel ?? label;
@@ -34,7 +37,13 @@ export default function SummaryCard({
       <div className={styles.summaryContent}>
         <span>{label}</span>
         <strong>{value}</strong>
-        <small>{detail}</small>
+        {showInlineExpandedDetail ? (
+          <div id={expandedId} className={styles.summaryInlineExpandedDetail}>
+            {expandedDetail}
+          </div>
+        ) : (
+          <small id={canExpand && expandedDetailPlacement === 'detail' ? expandedId : undefined}>{detail}</small>
+        )}
       </div>
       {canExpand && (
         <button
@@ -48,7 +57,7 @@ export default function SummaryCard({
           {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
       )}
-      {canExpand && expanded && (
+      {canExpand && expanded && expandedDetailPlacement === 'below' && (
         <div id={expandedId} className={styles.summaryExpandedDetail}>
           {expandedDetail}
         </div>
