@@ -544,6 +544,45 @@ describe('useHubIntegration', () => {
     );
   });
 
+  it('posts route decisions when TeamRun context is nested in model_params', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        model_params: JSON.stringify({
+          agenthub_team_context: {
+            team_id: 'team-nested',
+            team_run_id: 'team-run-nested',
+            team_member_role: 'supervisor',
+          },
+        }),
+      }));
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.route_decision', {
+        runId: 'run-1',
+        action: 'delegate',
+        next_worker: 'member-executor',
+        instructions: 'Continue from the nested team context.',
+        correlation_id: 'route-nested',
+      }));
+    });
+
+    expect(hubClient.postTeamRouteDecision).toHaveBeenCalledWith(
+      'team-nested',
+      'team-run-nested',
+      {
+        action: 'delegate',
+        next_worker: 'member-executor',
+        instructions: 'Continue from the nested team context.',
+        correlation_id: 'route-nested',
+      },
+    );
+  });
+
   it('posts structuredOutput route decisions from result only once', async () => {
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),

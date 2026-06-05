@@ -66,6 +66,7 @@ async function main() {
   const [vw, vh] = (viewport as string).split(',').map(Number);
   const waitMs = Number(wait);
   const useMock = mock !== 'false';
+  const captureTheme = theme === 'light' ? 'light' : 'dark';
 
   const timestamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
   const outputPath = resolve(out ?? `screenshots/capture-${timestamp}.png`);
@@ -78,11 +79,16 @@ async function main() {
 
   const context = await browser.newContext({
     viewport: { width: vw, height: vh },
-    colorScheme: theme as 'dark' | 'light',
+    colorScheme: captureTheme,
     deviceScaleFactor: 1,
   });
 
   const page = await context.newPage();
+
+  await page.addInitScript((selectedTheme) => {
+    window.localStorage.setItem('agenthub-theme', selectedTheme);
+    document.documentElement.setAttribute('data-theme', selectedTheme);
+  }, captureTheme);
 
   // Inject mock data before navigation
   if (useMock) {
