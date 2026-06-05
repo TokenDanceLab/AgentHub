@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 (五维 Review + 七项深研 + 比赛评审评估) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
+> 最后更新: 2026-06-05 (R2 Desktop shell QA + 比赛视觉验收校准) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
 ## 课题目标
 
@@ -109,7 +109,7 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 | 分支 | 状态 | 验证 | 合并前注意 |
 |---|---|---|---|
 | `phase-r1/teamrun-e2e` | PR #270 已 squash 合并 | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | 不是最终录屏；继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
-| `phase-r2/desktop-shell` | draft PR #271 已开；integration dry-run 无冲突 | `uiStore.test.ts` 4/4；队列 focused tests 128/128；`git diff --check` 通过 | 主线 typecheck 旧债已清；分支同步 base 后补 1440/1280/390 截图 QA 再 ready |
+| `phase-r2/desktop-shell` | PR #271 已 ready；`ec41bb0f` 修复视觉 QA 阻塞；integration dry-run 无冲突 | `uiStore.test.ts` 4/4；Desktop `pnpm typecheck` 通过；Playwright console 无 ErrorBoundary；light 1440/1280/390 shell 截图已生成；Claude sonnet 只读 review PASS；队列 focused tests 128/128；`git diff --check` 仅 CRLF 提示 | R2 可作为 shell 基础进入 review/合并；最终比赛截图仍需 R3/R4/R7 叠加真实 transcript、右侧证据列和 Demo 运行产物 |
 | `phase-r3/transcript-contract` | draft PR #272 已开；integration dry-run 无冲突 | `IMBlockRenderer.test.tsx` + `IMMessageView.test.tsx` 31/31；队列 focused tests 128/128；`git diff --check` 通过 | R5 建议先于 R6A；R3 与 R6A 相邻但已验证自动合并 |
 | `phase-r4/right-inspector` | draft PR #273 已开；integration dry-run 无冲突 | `RightInspector.test.tsx` 23/23；队列 focused tests 128/128；`git diff --check` 通过 | 先以 props-only 组件接入，避免在同一 PR 重写 shell grid；与 R2 组合后补截图 |
 | `phase-r5/composer-convergence` | draft PR #274 已开；integration dry-run 无冲突 | `useComposerCore`/`attachment`/`IMMessageInput` focused tests 44/44；队列 focused tests 128/128；`git diff --check` 通过 | 不引入巨型 `UnifiedComposer`；建议在 R6A 前合并 |
@@ -119,7 +119,7 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 ### R2-R4 落地细化
 
-- R2 Shell 产出：固定布局 zones（rail / conversation / transcript / inspector / composer），rail 只放 icon action，conversation 宽度使用稳定响应式约束；不在这一步重写消息数据流。
+- R2 Shell 产出：固定布局 zones（rail / conversation / transcript / inspector / composer），rail 只放 icon action，conversation 宽度使用稳定响应式约束；不在这一步重写消息数据流。QA 发现并修复两类 shell 基础问题：Zustand 对象 selector 未 shallow 导致的 `useSyncExternalStore` 循环风险，以及 390px 视口仍显示桌面菜单造成的顶部挤压。
 - R3 Transcript 产出：明确共享 `TranscriptBlock`/normalizer 或等价 adapter，保留 `IMBlockRenderer` 已有能力，把 `child_agent`、`route_decision`、`artifact`、`deploy_card` 从 null fallback 变为可见卡片。
 - R4 Inspector 产出：至少包含 Progress、Task Plan、Tool Timeline、Artifacts、Work Folder 五个区块；`TeamRunConsole` 作为深挖视图，右侧 Inspector 必须先给摘要证据；事件卡显示动作、工具名、路径/产物、完成状态，不堆无意义大卡片。
 
