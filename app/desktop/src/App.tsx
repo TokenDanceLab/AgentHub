@@ -29,6 +29,7 @@ import { useRuns } from '@/api/runQueries';
 import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useAuth } from '@/hooks/useAuth';
 import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
+import useShellShortcuts from '@/hooks/useShellShortcuts';
 import type { ListResponse, StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -44,7 +45,6 @@ import {
   clamp,
   isRunActiveStatus,
   getActiveRunConflictId,
-  isEditableShortcutTarget,
   focusComposer,
   setComposerDraft,
   readHiddenMessageIds,
@@ -1078,63 +1078,24 @@ export default function App() {
     workspaceExpanded,
   ]);
 
-  // Global shell shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setNavPanelOpen(false);
-      }
-      if (isEditableShortcutTarget(e.target)) return;
-
-      const shellModifier = e.ctrlKey || e.metaKey;
-      if (shortcutHelpOpen && !(e.key === '?' && !shellModifier)) return;
-      if (e.key === '?' && !shellModifier) {
-        e.preventDefault();
-        setShortcutHelpOpen((v) => !v);
-      }
-      if (shellModifier && e.altKey && e.key.toLowerCase() === 'n' && online) {
-        e.preventDefault();
-        void handleQuickChat();
-      } else if (shellModifier && e.key.toLowerCase() === 'n' && online) {
-        e.preventDefault();
-        void handleCreateThread();
-      } else if (shellModifier && e.key.toLowerCase() === 'o') {
-        e.preventDefault();
-        void handleOpenFolder();
-      } else if (shellModifier && e.key === ',') {
-        e.preventDefault();
-        openSettings('general');
-      } else if (shellModifier && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        void handleWindowCommand('close');
-      }
-      if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
-        e.preventDefault();
-        setLeftSidebarCollapsed(!leftSidebarCollapsed);
-      }
-      if (shellModifier && e.key.toLowerCase() === 'j' && displayedRun && !workspaceExpanded && !isMobile) {
-        e.preventDefault();
-        setRightPanelOpen(!rightPanelOpen);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
+  useShellShortcuts({
+    online,
+    isMobile,
+    workspaceExpanded,
+    leftSidebarCollapsed,
+    rightPanelOpen,
+    shortcutHelpOpen,
     displayedRun,
     handleCreateThread,
-    handleOpenFolder,
     handleQuickChat,
-    handleWindowCommand,
-    isMobile,
-    leftSidebarCollapsed,
-    online,
-    openSettings,
-    rightPanelOpen,
+    handleOpenFolder,
+    handleWindowCommand: handleWindowCommand as (command: string) => Promise<void>,
+    openSettings: openSettings as (section?: string) => void,
+    setNavPanelOpen,
+    setShortcutHelpOpen,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
-    shortcutHelpOpen,
-    workspaceExpanded,
-  ]);
+  });
 
   // ── Double-click top bar → toggle maximize/restore
   const handleTopBarDoubleClick = useCallback(async (e: React.MouseEvent) => {
