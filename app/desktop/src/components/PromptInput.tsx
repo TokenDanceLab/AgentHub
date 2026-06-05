@@ -18,13 +18,19 @@ import {
   type ModelDisplayNameMap,
 } from '@/utils/modelDisplay';
 import { useShallow } from 'zustand/shallow';
+import {
+  type PromptAttachment,
+  formatBytes,
+  formatAttachmentContext,
+  browserFilesToAttachments,
+  pathBasename,
+} from '@/utils/attachment';
 import styles from './PromptInput.module.css';
 
 const REASONING_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
 type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 const PERMISSION_MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions', 'dontAsk'] as const;
 type PermissionMode = (typeof PERMISSION_MODES)[number];
-const MAX_BROWSER_ATTACHMENT_PREVIEW = 12_000;
 const WORK_DIR_STORAGE_KEY = 'agenthub.prompt.workDir';
 const RECENT_WORK_DIRS_STORAGE_KEY = 'agenthub.prompt.recentWorkDirs';
 const MAX_RECENT_WORK_DIRS = 6;
@@ -44,17 +50,6 @@ interface SelectedCatalogRoute {
   requestModel: string;
   provider?: string;
   modelAlias?: string;
-}
-
-interface PromptAttachment {
-  id: string;
-  name: string;
-  source: 'desktop' | 'browser';
-  path?: string;
-  size?: number;
-  mime?: string;
-  contentPreview?: string;
-  truncated?: boolean;
 }
 
 interface SlashCommand {
@@ -123,10 +118,6 @@ function compactPathLabel(value: string): string {
   return parts[parts.length - 1] ?? trimmed;
 }
 
-function pathBasename(value: string): string {
-  return value.split(/[\\/]+/).filter(Boolean).pop() ?? value;
-}
-
 function normalizeWorkDir(value: string | null | undefined): string {
   return (value ?? '').trim().replace(/^["']|["']$/g, '').trim();
 }
@@ -168,63 +159,8 @@ function persistRecentWorkDirs(items: string[]): void {
   }
 }
 
-function formatBytes(value: number | undefined): string | undefined {
-  if (value == null) return undefined;
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
-}
-
-function shouldPreviewBrowserFile(file: File): boolean {
-  if (file.type.startsWith('text/')) return true;
-  return /\.(txt|md|markdown|json|jsonl|csv|tsv|yaml|yml|toml|xml|html|css|scss|js|jsx|ts|tsx|go|rs|py|java|c|cpp|h|hpp|log)$/i.test(file.name);
-}
-
-function formatAttachmentContext(attachments: PromptAttachment[]): string {
-  if (attachments.length === 0) return '';
-  const lines = ['Attached files:'];
-  attachments.forEach((attachment, index) => {
-    lines.push(`${index + 1}. ${attachment.name}`);
-    if (attachment.path) lines.push(`   Path: ${attachment.path}`);
-    lines.push(`   Source: ${attachment.source === 'desktop' ? 'Desktop file picker' : 'Browser file picker'}`);
-    const size = formatBytes(attachment.size);
-    if (size) lines.push(`   Size: ${size}`);
-    if (attachment.mime) lines.push(`   MIME: ${attachment.mime}`);
-    if (attachment.contentPreview) {
-      lines.push(`   Content preview${attachment.truncated ? ' (truncated)' : ''}:`);
-      lines.push(attachment.contentPreview.split(/\r?\n/).map((line) => `   ${line}`).join('\n'));
-    }
-  });
-  return lines.join('\n');
-}
-
-async function browserFilesToAttachments(files: File[]): Promise<PromptAttachment[]> {
-  return Promise.all(files.map(async (file, index) => {
-    let contentPreview: string | undefined;
-    let truncated = false;
-    if (shouldPreviewBrowserFile(file) && typeof file.text === 'function') {
-      try {
-        const text = await file.text();
-        contentPreview = text.slice(0, MAX_BROWSER_ATTACHMENT_PREVIEW);
-        truncated = text.length > MAX_BROWSER_ATTACHMENT_PREVIEW;
-      } catch {
-        contentPreview = undefined;
-      }
-    }
-    return {
-      id: `browser-${Date.now()}-${index}-${file.name}`,
-      name: file.name,
-      source: 'browser' as const,
-      size: file.size,
-      mime: file.type || undefined,
-      contentPreview,
-      truncated,
-    };
-  }));
 }
 
 async function pickDesktopAttachments(): Promise<PromptAttachment[] | null> {

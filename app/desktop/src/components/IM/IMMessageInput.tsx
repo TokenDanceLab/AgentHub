@@ -2,8 +2,9 @@ import { useState, useRef, useCallback, memo, useMemo } from 'react';
 import { Send } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import { useMention, type MentionItem } from '@/hooks/useMention';
+import { useComposerCore } from '@/hooks/useComposerCore';
 import MentionPopover from '@/components/MentionPopover';
-import type { IMMessageMention } from './types';
+import type { IMMessageMention, ComposerPayload } from './types';
 import styles from './IMMessageInput.module.css';
 
 const MAX_CHARS = 2000;
@@ -17,10 +18,7 @@ interface IMMessageInputProps {
   agents?: AgentInfo[];
 }
 
-export interface SendPayload {
-  content: string;
-  mentions?: IMMessageMention[];
-}
+export interface SendPayload extends ComposerPayload {}
 
 const IMMessageInput = memo(function IMMessageInput({
   onSend,
@@ -31,6 +29,8 @@ const IMMessageInput = memo(function IMMessageInput({
   const [value, setValue] = useState('');
   const [mentionedAgents, setMentionedAgents] = useState<IMMessageMention[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { autoResize, clearTextarea, handleEnterKey, trimForSend } = useComposerCore({ disabled });
 
   // Build mention items from the agents prop
   const mentionItems = useMemo<MentionItem[]>(
@@ -73,17 +73,16 @@ const IMMessageInput = memo(function IMMessageInput({
   } = useMention({ agents, items: mentionItems, onSelectAgent });
 
   const handleSend = useCallback(async () => {
-    const trimmed = value.trim();
-    if (!trimmed || disabled) return;
+    const trimmed = trimForSend(value);
+    if (trimmed === null) return;
     const currentMentions = mentionedAgents.length > 0 ? [...mentionedAgents] : undefined;
     const accepted = await onSend(trimmed, currentMentions);
     if (accepted === false) return;
     setValue('');
     setMentionedAgents([]);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-  }, [value, disabled, mentionedAgents, onSend]);
+    const ta = textareaRef.current;
+    if (ta) clearTextarea(ta);
+  }, [value, mentionedAgents, onSend, trimForSend, clearTextarea]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -92,28 +91,22 @@ const IMMessageInput = memo(function IMMessageInput({
         const consumed = mentionHandleKeyDown(e);
         if (consumed) return;
       }
-      // Send on Enter (no shift)
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
+      handleEnterKey(e, handleSend);
     },
-    [handleSend, mentionOpen, mentionHandleKeyDown],
+    [handleSend, mentionOpen, mentionHandleKeyDown, handleEnterKey],
   );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setValue(e.target.value);
-      // Auto-resize
-      e.target.style.height = 'auto';
-      e.target.style.height = e.target.scrollHeight + 'px';
-      // Check for @ mentions
+      autoResize(e.target);
       mentionHandleInput();
     },
-    [mentionHandleInput],
+    [mentionHandleInput, autoResize],
   );
 
   const overLimit = value.length > MAX_CHARS;
+  const sendDisabled = disabled || value.trim().length === 0;
 
   return (
     <div className={styles.root}>
@@ -163,7 +156,7 @@ const IMMessageInput = memo(function IMMessageInput({
         <button
           className={styles.sendBtn}
           onClick={handleSend}
-          disabled={disabled || value.trim().length === 0}
+          disabled={sendDisabled}
           aria-label="Send message"
           title="Send message"
         >
