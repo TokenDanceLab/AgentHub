@@ -16,8 +16,6 @@ interface TeamApprovalPanelProps {
   memberNames: Record<string, string>;
 }
 
-const DECIDED_STATUSES = new Set(['approved', 'denied', 'allow', 'deny', 'decided', 'resolved']);
-
 function isPending(a: TeamApprovalState): boolean {
   const s = a.status.toLowerCase();
   return ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(s);
