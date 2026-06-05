@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useHiddenMessages } from '@/hooks/useHiddenMessages';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
@@ -48,14 +49,10 @@ import {
   getActiveRunConflictId,
   focusComposer,
   setComposerDraft,
-  readHiddenMessageIds,
-  writeHiddenMessageIds,
   hideMessages,
   isTeamRunActiveStatus,
   isPendingTeamApprovalStatus,
   isTauriRuntime,
-  HIDDEN_MESSAGES_STORAGE_PREFIX,
-  hiddenMessagesStorageKey,
 } from '@/utils/appUtils';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@shared/ui';
@@ -256,7 +253,7 @@ export default function App() {
       ? t('workspace.teamRunsActive', { count: agentTeamSummary.activeRuns })
       : t('settings.agentScheduling');
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
-  const [hiddenMessageIds, setHiddenMessageIds] = useState<Set<string>>(() => readHiddenMessageIds(activeThreadId));
+  const { hiddenMessageIds, hideMessage } = useHiddenMessages(activeThreadId);
   const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
@@ -324,10 +321,6 @@ export default function App() {
     }
     prevThreadIdsRef.current = currentIds;
   }, [threads, online, addToast, t]);
-
-  useEffect(() => {
-    setHiddenMessageIds(readHiddenMessageIds(activeThreadId));
-  }, [activeThreadId]);
 
   useEffect(() => {
     if (!threadData?.items) return;
@@ -816,13 +809,8 @@ export default function App() {
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
-    setHiddenMessageIds((prev) => {
-      const next = new Set(prev);
-      next.add(messageId);
-      writeHiddenMessageIds(activeThreadId, next);
-      return next;
-    });
-  }, [activeThreadId]);
+    hideMessage(messageId);
+  }, [hideMessage]);
 
   useEffect(() => {
     if (!pendingComposerDraft || leftSidebarView === 'home' || viewMode !== 'agent') return undefined;
