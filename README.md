@@ -4,12 +4,12 @@
 
 > 让 Claude Code、Codex、OpenCode 在同一 IM 工作台上协作
 
-[![status](https://img.shields.io/badge/v0.1.0-活跃开发-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
+[![status](https://img.shields.io/badge/v0.3.0-活跃开发-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
 [![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
 [![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
 
-[English](README_EN.md) &nbsp;·&nbsp; [用户手册](docs/guides/user-guide.md) &nbsp;·&nbsp; [FAQ](docs/guides/faq.md) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
+[English](README_EN.md) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
 
 </div>
 
@@ -58,7 +58,7 @@ pnpm dev
 # 5. 打开 http://localhost:5173 开始使用
 ```
 
-> 需要先安装 Go 1.25+、Node.js 20+ 和 pnpm。详见 [用户手册](docs/guides/user-guide.md)。
+> 需要先安装 Go 1.25+、Node.js 20+ 和 pnpm。详见 [架构文档](docs/architecture.md)。
 
 <br>
 
@@ -141,12 +141,14 @@ AgentHub/
 ├── hub-server/           # Hub 中心服务
 ├── api/                  # API 契约（OpenAPI + WebSocket events）
 ├── docs/                 # 文档
-│   ├── guides/           # 用户手册、FAQ、快捷键、本地开发指南
-│   ├── architecture/     # 产品需求、系统架构、实现指南、ADR
-│   ├── roadmaps/         # 路线图与竞品分析
-│   ├── governance/       # 安全台账、分支治理
-│   ├── handoff/          # 项目状态与交接
-│   └── operations/       # 客户端路线图、运维
+│   ├── architecture.md   # 产品定位 + 系统架构 + 实现状态
+│   ├── adr/              # 架构决策记录
+│   ├── designs/          # 组件设计文档
+│   ├── handoffs/         # 项目状态与交接
+│   ├── governance/       # 安全台账、分支治理、文档标准
+│   ├── reference/        # 调研与竞品分析
+│   ├── operations/       # 运维文档
+│   └── archive/          # 历史评审与归档
 └── scripts/              # 初始化脚本、git hooks
 ```
 
@@ -156,14 +158,10 @@ AgentHub/
 
 | 文档 | 面向 |
 |------|------|
-| [用户手册](docs/guides/user-guide.md) | 想用 AgentHub 做事的用户 |
-| [常见问题](docs/guides/faq.md) | 使用中遇到的疑问 |
-| [快捷键参考](docs/guides/keyboard-shortcuts.md) | 键盘操作速查 |
-| [本地开发指南](docs/guides/local-dev-setup.md) | 新贡献者搭建环境 |
-| [产品需求](docs/architecture/product-requirements.md) | 产品定位与阶段目标 |
-| [系统架构](docs/architecture/system-architecture.md) | 技术架构与核心概念 |
+| [架构文档](docs/architecture.md) | 产品定位、系统架构、实现状态（首选入口） |
 | [API 契约](api/) | REST + WebSocket 接口定义 |
 | [安全风险台账](docs/governance/security-risk-register.md) | 安全风险登记与追踪 |
+| [项目交接](docs/handoffs/) | 项目状态与交接文档 |
 
 <br>
 
@@ -177,8 +175,6 @@ AgentHub/
 
 <p align="center">
   <a href="README_EN.md">English</a> &nbsp;·&nbsp;
-  <a href="docs/guides/user-guide.md">用户手册</a> &nbsp;·&nbsp;
-  <a href="docs/guides/faq.md">FAQ</a> &nbsp;·&nbsp;
-  <a href="docs/architecture/system-architecture.md">系统架构</a> &nbsp;·&nbsp;
+  <a href="docs/architecture.md">系统架构</a> &nbsp;·&nbsp;
   <a href="api/">API 契约</a>
 </p>

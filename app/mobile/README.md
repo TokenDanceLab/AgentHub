@@ -81,7 +81,7 @@ corepack.cmd pnpm build
 node --check scripts/visual-qa.mjs
 $env:MOBILE_QA_URL='http://127.0.0.1:5184/'
 corepack.cmd pnpm visual:qa
-git diff --check -- app/mobile/src app/mobile/scripts app/mobile/README.md docs/handoff/STATE.md
+git diff --check -- app/mobile/src app/mobile/scripts app/mobile/README.md docs/handoffs/STATE.md
 $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
 corepack.cmd pnpm tauri android build --debug
 $env:ADB_SERIAL='emulator-5556'

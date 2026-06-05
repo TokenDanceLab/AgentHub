@@ -10,7 +10,7 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-const STORAGE_KEY = 'agenthub-lang';
+const STORAGE_KEY = 'agenthub-language';
 const SUPPORTED: Language[] = ['en', 'zh'];
 
 function getStoredLanguage(): Language {

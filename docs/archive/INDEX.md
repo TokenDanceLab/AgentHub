@@ -10,13 +10,12 @@
 
 | 主题 | 权威文档 |
 |---|---|
-| 产品定位和验收范围 | `docs/architecture/product-requirements.md` |
-| 架构、组件职责、术语边界 | `docs/architecture/system-architecture.md` |
-| 实现阶段、API 规则、工程边界 | `docs/architecture/implementation-guide.md` |
+| 产品定位、系统架构、实现指南 | `docs/architecture.md`（三合一主文档） |
+| 全局开发路线图 | `docs/roadmap.md` |
 | REST 契约 | `api/openapi.yaml`、`api/README.md`、`api/conventions.md` |
 | WebSocket 事件契约 | `api/events.md` |
-| 当前进展和接手状态 | `docs/handoff/STATE.md` |
-| 持续开发台账 | `docs/roadmap.md`、`docs/roadmaps/` |
+| 当前接手状态 | `docs/handoffs/STATE.md` |
+| 分支治理与协作规则 | `AGENTS.md`、`docs/governance/branch-governance.md` |
 
 跨 TokenDance workspace 的身份、统一登录、设计系统和文档治理以仓库上层 `../docs/` 为准。生产拓扑、DNS、TLS、机器状态和部署实情属于 `C:\Users\Ding\server\STATE.md` 及 server workspace，不应复制到本仓文档。
 
@@ -52,13 +51,18 @@
 | `project-management.md` | 历史流程 | 只作早期流程记录。当前分支和协作规则以 `AGENTS.md`、`docs/governance/branch-governance.md`、`docs/roadmap.md` 为准。 |
 | `backend.md` | 历史路线图 | 自声明 superseded（2026-05-23），后端路线图已合并到 `docs/roadmap.md`。所有待办项实际已完成。 |
 | `frontend.md` | 历史路线图 | 自声明 superseded（2026-05-23），前端路线图已合并到 `docs/roadmap.md`。所有待办项实际已完成。 |
-| `client-handoff.md` | 历史交接 | 2026-05-22 历史快照，引用已废弃的 `runner/` 目录、旧分支名 `feat/client-dev`、旧 PR #26。当前客户端接手入口为 `docs/handoff/STATE.md`。 |
+| `client-handoff.md` | 历史交接 | 2026-05-22 历史快照，引用已废弃的 `runner/` 目录、旧分支名 `feat/client-dev`、旧 PR #26。当前客户端接手入口为 `docs/handoffs/STATE.md`。 |
 | `desktop-shell-layout-progress-2026-05-25.md` | 进度记录 | Desktop shell 布局进度快照。已完成项已合入 `docs/roadmap.md` batch B，8 项后续 TODO 已提取到群聊评论。 |
 | `PLAN-adapt-trump-ui.md` | 历史计划 | 旧 `worktree-adapt-trump-ui` 工作计划。涉及从 Trump 5 页面 UI 提取共享组件、工程规范、测试框架和 WebUI 集成。相关代号已过期，当前以主文档、roadmap 和 handoff 状态为准。 |
 | `RESEARCH-SUMMARY-2026-05-24.md` | 研究交付 | 研究交付封面备忘录，汇总调研成果和参考来源。 |
 | `desktop-frontend-handoff.md` | 历史交接 | React 渲染循环修复交接文档，记录无限重渲染根因和修复方案。 |
-| `branches/` | 历史归档 | 历史分支归档（14 个文件），包含已合入或废弃的功能分支快照。 |
-| `review-archive/` | 审计归档 | 已归档的代码审查报告。 |
+| `branches/` | 历史归档 | 历史分支归档（14 个文件），包含已合入或废弃的功能分支快照。（已展平删除） |
+| `review-20260522-reviewer2.md` | 审计归档 | 2026-05-22 代码审查报告。 |
+| `review-20260523-reviewer1.md` | 审计归档 | 2026-05-23 代码审查报告。 |
+| `review-doc-audit-2026-05-23.md` | 审计归档 | 文档审计报告。 |
+| `review-edge-server-audit.md` | 审计归档 | Edge Server 审计报告。 |
+| `review-hub-server-audit.md` | 审计归档 | Hub Server 审计报告。 |
+| `handoffs/` | 历史交接 | 已归档的交接文档（session handoff、角色分工、任务原子化）。 |
 
 ### 可参考原则 - 需要按新术语重解释
 
@@ -79,40 +83,40 @@
 
 ### Build Specs
 
-`docs/archive/build-specs/` 是早期大规格集合，不是当前 backlog 或实现任务来源。
+`build-specs-backend-*` 和 `build-specs-frontend-*` 是早期大规格集合（已展平到本目录），不是当前 backlog 或实现任务来源。
 
 | 目录或文件 | 状态 | 阅读方式 |
 |---|---|---|
-| `build-specs/backend/01-protocol.md` | 历史参考 | 类型设计可参考，实际契约以 `api/openapi.yaml` 和 `api/events.md` 为准。 |
-| `build-specs/backend/02-go-services.md` | 历史方案 | 包含 `runner/`、Protobuf、旧目录设计，不作为当前工程结构依据。 |
-| `build-specs/backend/03-eventstore-memory.md` | 可参考原则 | EventStore 和 memory 原则可参考，具体实现以 Edge store/events 当前代码为准。 |
-| `build-specs/backend/04-adapter-sdk.md` | 历史参考 | Adapter 方向仍相关，但开发者 SDK/manifest 不是当前交付面。 |
-| `build-specs/backend/05-context-builder.md` | 可参考原则 | Context 管线可参考，需合并进 Agent Configuration/Profile 语义。 |
-| `build-specs/backend/06-concurrency-limits.md` | 历史参考 | 并发目标可参考，Runner 并发模型需改为 Edge lifecycle 并发模型。 |
-| `build-specs/backend/07-observability.md` | 可参考原则 | 日志、指标、健康检查原则可参考，指标名称以当前代码为准。 |
-| `build-specs/backend/08-error-handling.md` | 可参考原则 | 错误分类和 UX 原则可参考，错误码以 `api/conventions.md` 和实现为准。 |
-| `build-specs/backend/09-testing-strategy.md` | 可参考原则 | 测试分层原则可参考，实际命令以 `AGENTS.md`、`docs/handoff/STATE.md` 为准。 |
-| `build-specs/backend/10-graceful-degradation.md` | 历史参考 | 韧性原则可参考，Runner -> Edge 心跳和 Runner 自主缓冲已过期。 |
-| `build-specs/backend/11-model-fallback.md` | 可参考原则 | Provider 降级思路可参考，不代表当前模型路由实现。 |
-| `build-specs/backend/12-workspace-lifecycle.md` | 可参考原则 | Workspace 生命周期可参考，Runner 集成段需改读为 Edge lifecycle。 |
-| `build-specs/backend/13-protobuf-schema.md` | 历史方案 | Protobuf schema 不是当前主协议。 |
-| `build-specs/backend/14-scaffold-services.md` | 历史方案 | 包含旧 `runner/` 构建和 Connect/Protobuf 规划，不采用。 |
-| `build-specs/backend/15-websocket-reliability.md` | 历史参考 | WS replay 和可靠性原则可参考，Runner-Edge 分层需更新。 |
-| `build-specs/backend/16-hub-server-requirements.md` | 历史参考 | Hub 产品需求可参考，实际 Hub API/DB/迁移以代码和主文档为准。 |
-| `build-specs/frontend/01-desktop-ux.md` | 历史参考 | 早期 UI 规格可参考，当前 UI 以 `app/desktop`、Storybook 和最新设计系统为准。 |
-| `build-specs/frontend/02-monorepo.md` | 历史方案 | 旧 monorepo 规划不作为当前目录依据。 |
-| `build-specs/frontend/03-agent-identity.md` | 可参考原则 | Agent 身份表达需改为 Runtime/Profile/Configuration/Execution Target。 |
-| `build-specs/frontend/04-global-search.md` | 可参考原则 | 功能设想可参考，不是当前任务。 |
-| `build-specs/frontend/05-keyboard-shortcuts.md` | 可参考原则 | 交互原则可参考，实际快捷键以后续 UI 文档为准。 |
-| `build-specs/frontend/06-markdown-rendering.md` | 可参考原则 | Markdown 渲染选型可参考，实际依赖以代码为准。 |
-| `build-specs/frontend/07-micro-interactions.md` | 可参考原则 | 微交互建议可参考，需服从当前视觉方向。 |
-| `build-specs/frontend/08-theme-system.md` | 可参考原则 | 主题原则可参考，当前 tokens 以 `app/shared` 和 `app/desktop` 实现为准。 |
-| `build-specs/frontend/09-accessibility.md` | 可参考原则 | 无障碍 checklist 可参考。 |
-| `build-specs/frontend/10-data-portability.md` | 可参考原则 | 导入导出设想可参考，不是当前交付面。 |
-| `build-specs/frontend/11-session-sharing.md` | 历史参考 | 协作分享原则可参考，authority 字段需更新。 |
-| `build-specs/frontend/12-cli-wizard.md` | 历史方案 | 旧 Edge + Runner daemon、Runner API、端口 39731 规划不采用。 |
-| `build-specs/frontend/13-plugin-marketplace.md` | 远期参考 | 插件市场不是当前交付面，Runner 模型需更新。 |
-| `build-specs/frontend/14-performance-budget.md` | 可参考原则 | 性能预算思路可参考，指标和链路需按当前 Desktop/Edge 实现更新。 |
+| `build-specs-backend-01-protocol.md` | 历史参考 | 类型设计可参考，实际契约以 `api/openapi.yaml` 和 `api/events.md` 为准。 |
+| `build-specs-backend-02-go-services.md` | 历史方案 | 包含 `runner/`、Protobuf、旧目录设计，不作为当前工程结构依据。 |
+| `build-specs-backend-03-eventstore-memory.md` | 可参考原则 | EventStore 和 memory 原则可参考，具体实现以 Edge store/events 当前代码为准。 |
+| `build-specs-backend-04-adapter-sdk.md` | 历史参考 | Adapter 方向仍相关，但开发者 SDK/manifest 不是当前交付面。 |
+| `build-specs-backend-05-context-builder.md` | 可参考原则 | Context 管线可参考，需合并进 Agent Configuration/Profile 语义。 |
+| `build-specs-backend-06-concurrency-limits.md` | 历史参考 | 并发目标可参考，Runner 并发模型需改为 Edge lifecycle 并发模型。 |
+| `build-specs-backend-07-observability.md` | 可参考原则 | 日志、指标、健康检查原则可参考，指标名称以当前代码为准。 |
+| `build-specs-backend-08-error-handling.md` | 可参考原则 | 错误分类和 UX 原则可参考，错误码以 `api/conventions.md` 和实现为准。 |
+| `build-specs-backend-09-testing-strategy.md` | 可参考原则 | 测试分层原则可参考，实际命令以 `AGENTS.md`、`docs/handoffs/STATE.md` 为准。 |
+| `build-specs-backend-10-graceful-degradation.md` | 历史参考 | 韧性原则可参考，Runner -> Edge 心跳和 Runner 自主缓冲已过期。 |
+| `build-specs-backend-11-model-fallback.md` | 可参考原则 | Provider 降级思路可参考，不代表当前模型路由实现。 |
+| `build-specs-backend-12-workspace-lifecycle.md` | 可参考原则 | Workspace 生命周期可参考，Runner 集成段需改读为 Edge lifecycle。 |
+| `build-specs-backend-13-protobuf-schema.md` | 历史方案 | Protobuf schema 不是当前主协议。 |
+| `build-specs-backend-14-scaffold-services.md` | 历史方案 | 包含旧 `runner/` 构建和 Connect/Protobuf 规划，不采用。 |
+| `build-specs-backend-15-websocket-reliability.md` | 历史参考 | WS replay 和可靠性原则可参考，Runner-Edge 分层需更新。 |
+| `build-specs-backend-16-hub-server-requirements.md` | 历史参考 | Hub 产品需求可参考，实际 Hub API/DB/迁移以代码和主文档为准。 |
+| `build-specs-frontend-01-desktop-ux.md` | 历史参考 | 早期 UI 规格可参考，当前 UI 以 `app/desktop`、Storybook 和最新设计系统为准。 |
+| `build-specs-frontend-02-monorepo.md` | 历史方案 | 旧 monorepo 规划不作为当前目录依据。 |
+| `build-specs-frontend-03-agent-identity.md` | 可参考原则 | Agent 身份表达需改为 Runtime/Profile/Configuration/Execution Target。 |
+| `build-specs-frontend-04-global-search.md` | 可参考原则 | 功能设想可参考，不是当前任务。 |
+| `build-specs-frontend-05-keyboard-shortcuts.md` | 可参考原则 | 交互原则可参考，实际快捷键以后续 UI 文档为准。 |
+| `build-specs-frontend-06-markdown-rendering.md` | 可参考原则 | Markdown 渲染选型可参考，实际依赖以代码为准。 |
+| `build-specs-frontend-07-micro-interactions.md` | 可参考原则 | 微交互建议可参考，需服从当前视觉方向。 |
+| `build-specs-frontend-08-theme-system.md` | 可参考原则 | 主题原则可参考，当前 tokens 以 `app/shared` 和 `app/desktop` 实现为准。 |
+| `build-specs-frontend-09-accessibility.md` | 可参考原则 | 无障碍 checklist 可参考。 |
+| `build-specs-frontend-10-data-portability.md` | 可参考原则 | 导入导出设想可参考，不是当前交付面。 |
+| `build-specs-frontend-11-session-sharing.md` | 历史参考 | 协作分享原则可参考，authority 字段需更新。 |
+| `build-specs-frontend-12-cli-wizard.md` | 历史方案 | 旧 Edge + Runner daemon、Runner API、端口 39731 规划不采用。 |
+| `build-specs-frontend-13-plugin-marketplace.md` | 远期参考 | 插件市场不是当前交付面，Runner 模型需更新。 |
+| `build-specs-frontend-14-performance-budget.md` | 可参考原则 | 性能预算思路可参考，指标和链路需按当前 Desktop/Edge 实现更新。 |
 
 ## 冲突提示
 
@@ -130,4 +134,4 @@
 
 ## 根 docs 归档建议
 
-根目录中仍有少量旧 handoff/roadmap 文档包含独立 Runner 或旧分支信息。受本轮写入范围限制，未移动这些文件；建议见 `docs/archive/stale-docs-2026-05-25.md`。
+根目录中仍有少量旧 handoff/roadmap 文档包含独立 Runner 或旧分支信息。受本轮写入范围限制，未移动这些文件；建议见 `stale-docs-2026-05-25.md`。

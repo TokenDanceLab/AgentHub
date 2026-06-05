@@ -25,6 +25,25 @@ type apiResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    json.RawMessage `json:"data"`
+	Error   *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		TraceID string `json:"traceId"`
+	} `json:"error"`
+}
+
+func (r apiResp) GetCode() string {
+	if r.Error != nil {
+		return r.Error.Code
+	}
+	return r.Code
+}
+
+func (r apiResp) GetMsg() string {
+	if r.Error != nil {
+		return r.Error.Message
+	}
+	return r.Message
 }
 
 // stringPtr returns a pointer to the given string.
@@ -353,7 +372,7 @@ func TestScenarioDispatch_CreateTargetViaAPI(t *testing.T) {
 			json.NewDecoder(resp.Body).Decode(&r)
 			resp.Body.Close()
 			// All valid target types should succeed with OK code.
-			assert.Equal(t, "OK", r.Code, "create target type=%s: code=%s message=%s", targetType, r.Code, r.Message)
+			assert.Equal(t, "OK", r.GetCode(), "create target type=%s: code=%s message=%s", targetType, r.GetCode(), r.GetMsg())
 		})
 	}
 }
@@ -404,7 +423,7 @@ func TestScenarioDispatch_InvalidTargetTypeViaAPI(t *testing.T) {
 			json.NewDecoder(resp.Body).Decode(&r)
 			resp.Body.Close()
 			// Invalid target types should be rejected with BAD_REQUEST.
-			assert.Equal(t, "BAD_REQUEST", r.Code, "invalid type %s should be rejected, got code=%s message=%s", tp, r.Code, r.Message)
+			assert.Equal(t, "BAD_REQUEST", r.GetCode(), "invalid type %s should be rejected, got code=%s message=%s", tp, r.GetCode(), r.GetMsg())
 		})
 	}
 }

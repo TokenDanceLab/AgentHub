@@ -556,6 +556,12 @@
   white-space: pre;
   overflow-x: auto;
   padding: 0 var(--space-md);
+  color: #e0e0e0;
+}
+
+/* Syntax highlighting token overrides — ensure no backgrounds bleed */
+.lineContent [class*="token"] {
+  background: transparent !important;
 }
 
 /* ── Accept/Reject actions ────────────────────────────────────────── */

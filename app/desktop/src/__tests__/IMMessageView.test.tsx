@@ -103,4 +103,24 @@ describe('IMMessageView', () => {
     expect(screen.getByText('From user')).toBeInTheDocument();
     expect(screen.getByText('From agent')).toBeInTheDocument();
   });
+
+  it('shows pending indicator for optimistic send state', () => {
+    const msg = makeMsg({ content: 'Pending body', sendState: 'pending' });
+    render(<IMMessageView messages={[msg]} />);
+    expect(screen.getByText('Sending...')).toBeInTheDocument();
+    expect(screen.getByText('Pending body')).toBeInTheDocument();
+  });
+
+  it('shows failed indicator with error message', () => {
+    const msg = makeMsg({ content: 'Failed msg', sendState: 'failed', sendError: 'Timeout' });
+    render(<IMMessageView messages={[msg]} />);
+    expect(screen.getByText('Timeout')).toBeInTheDocument();
+    expect(screen.getByText('Failed msg')).toBeInTheDocument();
+  });
+
+  it('shows default failed label when sendError is absent', () => {
+    const msg = makeMsg({ content: 'Oops', sendState: 'failed' });
+    render(<IMMessageView messages={[msg]} />);
+    expect(screen.getByText('Send failed')).toBeInTheDocument();
+  });
 });

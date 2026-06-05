@@ -8,11 +8,10 @@ import { formatTokens, formatCost } from '@shared/context/breakdown';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import { EmptyState, ToolTimeline, ArtifactCard, ArtifactPreview, DeployCard, MessageSearchPanel } from '@shared/ui';
+import { EmptyState, ToolTimeline, ArtifactCard, ArtifactPreview, DeployCard, MessageSearchPanel, LinkCard } from '@shared/ui';
 import type { ArtifactType } from '@shared/ui';
 import TaskList from './TaskList';
 import ToolGroup from './ToolGroup';
-import LinkCard from './LinkCard';
 import ApprovalCard from './ApprovalCard';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
@@ -108,7 +107,8 @@ function agentDisplayName(name: string): string {
   return name;
 }
 
-function summarizeInput(input: Record<string, unknown>): string {
+function summarizeInput(input: Record<string, unknown> | null | undefined): string {
+  if (!input) return '(no input)';
   const parts: string[] = [];
   if (typeof input.file_path === 'string') parts.push(input.file_path);
   else if (typeof input.path === 'string') parts.push(input.path);
@@ -903,17 +903,35 @@ function CitationBlock({ block }: { block: Extract<MessageBlock, { kind: 'citati
   );
 }
 
+// ── Stable hash (djb2-derived, 32-bit) ──────────
+// Used for stream-stable block keys: hashing a content prefix means the key
+// stays the same while text is appended during streaming.
+function stableHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; // keep within 32-bit signed int
+  }
+  return Math.abs(hash);
+}
+
+function contentHash(content: string): string {
+  // Use first 64 chars — stable across streamed appends
+  return stableHash(content.slice(0, 64)).toString(36);
+}
+
 // ── Stable block key generation ──────────────
 function blockKey(block: MessageBlock, index: number): string {
   switch (block.kind) {
     case 'tool_use':
       return `tool-${block.callId}`;
     case 'text':
-      return `text-${index}`;
+      return `text-${contentHash(block.content)}`;
     case 'thinking':
-      return `thinking-${index}`;
+      return `thinking-${contentHash(block.content)}`;
     case 'code':
-      return `code-${index}`;
+      return `code-${contentHash(block.content)}`;
     case 'result':
       return `result-${block.error ?? 'success'}-${index}`;
     case 'file_change':
@@ -939,11 +957,13 @@ function blockKey(block: MessageBlock, index: number): string {
     case 'tool_group':
       return `toolgroup-${block.blocks[0]?.callId ?? index}`;
     case 'error':
-      return `error-${index}`;
+      return `error-${block.category ?? ''}-${block.message.slice(0, 32)}`;
     case 'citation':
       return `cite-${block.url ?? block.text ?? index}`;
     case 'compact':
       return `compact-${index}`;
+    case 'status':
+      return `status-${contentHash(block.content)}`;
     default:
       return `block-${index}`;
   }
@@ -1014,6 +1034,8 @@ const BlockRenderer = memo(function BlockRenderer({
       return <CitationBlock block={block} />;
     case 'compact':
       return null;
+    case 'status':
+      return <StatusRow label={block.content} />;
     case 'approval':
       return (
         <ApprovalCard
@@ -1063,6 +1085,8 @@ function extractMessageText(msg: ChatMessage): string {
           return `Context usage: total=${block.total ?? '?'} input=${block.input ?? '?'} output=${block.output ?? '?'} percent=${block.usagePercent ?? '?'}`;
         case 'error':
           return `${block.category ? `[${block.category}] ` : ''}Error: ${block.message}`;
+        case 'status':
+          return block.content;
         default:
           return '';
       }
@@ -1095,6 +1119,8 @@ function hasVisibleBlock(block: MessageBlock): boolean {
     case 'citation':
       return true;
     case 'error':
+      return true;
+    case 'status':
       return true;
     default:
       return false;

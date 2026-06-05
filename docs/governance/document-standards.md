@@ -1,40 +1,40 @@
 # 文档规范
 
-最后更新：2026-05-25
+最后更新：2026-06-05
 
 ## 文档分层
 
-| 层级 | 目录 | 内容 | 读者 | 修改权限 |
-|------|------|------|------|:--:|
-| **项目事实** | `docs/roadmap.md` | 全局路线图，唯一进度台账 | 全员 | Delicious233 |
-| **产品** | `docs/architecture/product-requirements.md` | 产品定位和需求 | 全员 | 三人协商 |
-| **架构** | `docs/architecture/system-architecture.md` | 系统设计和拓扑 | 开发者 | 三人协商 |
-| **实现** | `docs/architecture/implementation-guide.md` | 开发规范和流程 | 开发者 | 三人协商 |
-| **客户端** | `docs/roadmaps/client.md` | Desktop 路线图 | 前端 | Delicious233 |
-| **集成** | `docs/roadmaps/integration.md` | Hub↔Edge 对接方案 | 后端 | 三人协商 |
-| **设计规格** | `docs/architecture/design/` | 架构细节/参考模式（长文） | 开发者 | 任何人 |
-| **参考研究** | `docs/reference/` | 25 项目竞品分析，按问题检索 | 按需查阅 | 任何人 |
-| **审计报告** | `docs/review/` | 代码/测试/工程审计 | 开发者 | 任何人 |
-| **收件箱** | `docs/inbox/` | Agent 间通信，本地不提交 | Agent | Agent |
+| 层级 | 文件 | 内容 | 修改权限 |
+|------|------|------|:--:|
+| **路线图** | `docs/roadmap.md` | Sprint 目标 + 待办清单 + 已完成汇总 | Delicious233 |
+| **架构** | `docs/architecture.md` | 产品定位 + 三层架构 + 数据流 + 实现状态 | 三人协商 |
+| **状态** | `docs/handoffs/STATE.md` | 构建状态、阻塞项、部署信息（本地，不提交） | 任何开发者 |
+| **ADR** | `docs/adr/` | 架构决策记录（11 篇） | 任何人 |
+| **设计** | `docs/designs/` | 组件设计文档（4 篇） | 任何人 |
+| **治理** | `docs/governance/` | 分支规范、文档标准、安全风险 | 三人协商 |
+| **参考** | `docs/reference/` | 技术参考 + 25 项目竞品调研 | 按需查阅 |
+| **归档** | `docs/archive/` | 历史方案、旧审查（INDEX.md 为索引） | 只读 |
 
 ## 命名和格式
 
 - 文件名用小写和连字符：`product-requirements.md`
 - 中文优先，代码标识保持英文
 - 每个文件开头标注最后更新日期
-- **不写绝对路径**（`D:\Code\TokenDance\AgentHub\...`）
-- **不写 `target: master`**（合并目标统一 `dev/delicious233`）
+- 不写绝对路径（`D:\Code\...`）
+- 不写 `target: master`（合并目标统一 `dev/delicious233`）
 
-## 路线图规范
+## 规则
 
-- `docs/roadmap.md` 是全局台账，所有进度在这里登记
-- roadmap 只写：目标 + 任务清单 + 验收命令 + 依赖
-- 详细设计、代码片段、伪代码放 `docs/architecture/design/`
-- 竞品引用、采纳映射放 `docs/reference/`
+1. **路线图唯一**：目标只写在 `roadmap.md`，完成打钩，不另建文件
+2. **主文档优先**：架构说明写进 `architecture.md`，不新增分散文档
+3. **交接精简**：`handoffs/` 只保留 STATE.md + 最近 session，旧的归档到 `archive/handoffs/`
+4. **归档不删**：过时文档移入 `archive/`，不直接删除
+5. 同一事实不出现在多个文档中
+6. 不用过时阶段名（M1/M3a/mock run）描述当前状态
 
-## 禁止事项
+## 新文档检查清单
 
-- 同一事实出现在多个文档中（README 底部和 roadmap 各写一遍进度）
-- 用 "M1"/"M3a"/"mock run" 等过时阶段名描述当前状态
-- 文档中写本机路径或个人信息
-- 在 AGENTS.md 中单方面添加规则（三人共享文件）
+创建新文档前先确认：
+- 能否合并到现有主文档（roadmap / architecture / STATE）？
+- 是否属于 ADR 或设计文档？
+- 归档类内容是否应放入 `archive/`？

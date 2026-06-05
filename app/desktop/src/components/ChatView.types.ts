@@ -144,6 +144,10 @@ export type MessageBlock =
     }
   | {
       kind: 'compact';
+    }
+  | {
+      kind: 'status';
+      content: string;
     };
 
 // Tool result subtypes (nested under tool_use, 参考: Cline DiffEditRow 双格式)

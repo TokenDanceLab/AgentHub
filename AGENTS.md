@@ -18,23 +18,21 @@
 人类同学先读：
 
 1. `README.md`
-2. `docs/architecture/product-requirements.md`
-3. `docs/architecture/system-architecture.md`
-4. `docs/architecture/implementation-guide.md`
+2. `docs/architecture.md`
 
 Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
-2. 读 `docs/handoff/STATE.md` — 当前项目状态、阻塞、部署信息（新 Agent 接手必读）。
+2. 读 `docs/handoffs/STATE.md` — 当前项目状态、阻塞、部署信息（新 Agent 接手必读）。
 3. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
 4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
-5. 只读相关主文档章节：产品不清读 `docs/architecture/product-requirements.md`；边界不清读 `docs/architecture/system-architecture.md`；实现顺序不清读 `docs/architecture/implementation-guide.md`。
+5. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
 8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
 9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
-10. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
-11. 客户端 M1 任务读 `docs/operations/client-roadmap.md`。
+10. 持续开发和任务拆解读 `docs/architecture.md`（路线图摘要）和当前分支路线图。
+11. 客户端任务读 `docs/roadmap.md` 和 `docs/architecture.md`。
 12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
@@ -55,7 +53,7 @@ Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri
 共享边界：
 
 - API 契约写在 `api/`。
-- Edge Server 同时连接前端和 Hub，改动前先看 `docs/architecture/system-architecture.md`。
+- Edge Server 同时连接前端和 Hub，改动前先看 `docs/architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
 
@@ -114,7 +112,7 @@ Rust/Tauri 隔离规则：
 - AgentHub Home 的 `https://hub.vectorcontrol.tech/api/auth/callback` 是产品官网静态站 OIDC callback，不是 Hub API 登录 callback。
 - 现有 TokenDance ID bearer-token middleware 只是兼容路径；最终浏览器/桌面登录必须由 Hub Server 兑换 code 并签发 Hub 本地 session。
 
-当前协作提醒（2026-06-02）：Hub Agent 和 Client Agent 正在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
+协作提醒：Hub Agent 和 Client Agent 在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
 
 ### AgentHub 授权边界
 
@@ -128,12 +126,12 @@ AgentHub 角色、组织、项目、Thread、Run、Approval、Agent Profile、In
 
 ### 安全风险治理边界
 
-AgentHub 的 `docs/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security/security-risk.md`。
+AgentHub 的 `docs/governance/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security/security-risk.md`。
 
 - 涉及 Hub 登录/session、Edge 远程执行、Desktop/Web token storage、Feishu/Lark action、TokenDance API key、integration secret、公开 stats 或 generated artifact 的风险变更，必须同步更新本仓库风险表。
 - Critical/High 风险在未修复、未验证或未显式 accepted 之前阻断公开发布；accepted risk 必须写 owner、日期、原因、补偿控制和复查触发条件。
 - 需要生产 endpoint、host、日志、备份或 secret 证明的结论只在 `C:\Users\Ding\server` 或私有运维文档记录；AgentHub 公开文档只写证据指针和无密结论。
-- 发布前从 workspace 根运行 `..\scripts\verify-security-risks.ps1 -StrictReleaseGate`；默认治理 pass 里的 security warning 不是可忽略噪声，而是未关闭 release blocker。
+- 发布前从 workspace 根运行 `.\scripts\verify-ci-gates.ps1`；默认治理 pass 里的 security warning 不是可忽略噪声，而是未关闭 release blocker。
 
 ### Feishu/Lark 应用边界
 
@@ -181,23 +179,25 @@ git status --short --branch       # 确认只改了允许的路径
 
 ### 模型分配策略
 
-> 实际后端模型映射，AgentHub 项目专用。dev-loop skill 同步更新。
+> AgentHub 项目专用。这里的 `opus` / `sonnet` / `haiku` 是本地 Claude CLI 路由别名，不等于公开 Claude 模型名；Codex 自带 agent 工具单独建模。dev-loop skill 同步更新。
 
-| 别名 | 实际模型 | 上下文 | 角色 | 适用场景 |
-|---|---|---|---|---|
-| **opus** | DeepSeek-V4-Pro | 1M | 推理/架构/审查/复杂重构 | 主 Agent、架构设计、安全审查、DI 重构 |
-| **sonnet** | Kimi-K2.6 | 256k | 前端/多模态/快速并行 | Desktop UI、IM 界面、视觉审查、批量编码 |
-| **haiku** | GLM-5.1 | 200k | 高智力编码/业务逻辑 | 算法实现、bug 修复、Go 后端编码、测试生成 |
+| 入口 | 别名/模型 | 上下文 | 强项 | 优先使用场景 |
+|---|---|---:|---|---|
+| Codex 自带 agent 工具 | GPT-5.5 | 256k | 全方面强，代码、agentic 执行、审查都稳 | 中等上下文内的核心实现、跨前后端小集成、主 Agent 复核前的强力 sidecar |
+| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 长上下文推理、架构、竞品仓库研究、安全/方案审查 | 大范围阅读、路线图/架构判断、复杂设计评审 |
+| Claude CLI | **sonnet** = GLM-5.1 | 200k | 代码和 agentic 能力强，但上下文短 | 窄范围代码实现、测试修复、Go/TS 小切片、明确文件集的重构 |
+| Claude CLI | **haiku** = mimo-v2.5 | 适中 | 多模态、看图、视觉判断 | 竞品截图复核、Desktop 视觉 QA、UI 可读性/布局审查 |
 
-- **主 Agent（本 session）** 使用 opus 做决策、审查、编辑核心文件
-- **前端 subagent** 派 sonnet（多模态 UI 能力）
-- **后端 subagent** 派 haiku（Go 编码 + 测试），失败才换 opus
-- **批量机械工作**（格式化、重命名、翻译）派 sonnet
+- **主 Agent（本 session）**：负责决策、分支治理、提交、roadmap、比赛材料和最终验收。
+- **Codex GPT-5.5 subagent**：工具可用时优先用于高价值代码实现或关键 review；上下文 256k，不承担超大仓库研究。
+- **Claude opus**：用于长上下文推理、竞品仓库研究、架构/安全审查。
+- **Claude sonnet**：用于明确路径内的代码实现和 focused tests；每次只给必要文件，避免 200k 上下文溢出。
+- **Claude haiku**：用于截图、多模态视觉审查和 UI/UX 对比，不派它做代码主力。
 
 ### Agent 间文件通信
 
-其他 Agent（或人类）通过 `docs/inbox/` 投递报告。规则见 `docs/inbox/README.md`。
-dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，处理后归档到 `docs/reference/`。
+其他 Agent（或人类）通过 `docs/handoffs/` 投递报告。规则见 `docs/handoffs/STATE.md`。
+dev-loop 主 Agent 每次循环开始时检查交接目录，按优先级处理，处理后归档到 `docs/reference/`。
 
 ### 仓库级 Skill
 
@@ -205,7 +205,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
-- `docs/roadmap.md` 和 `docs/roadmaps/` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
+- `docs/architecture.md` 路线图摘要和 `docs/roadmap.md` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
 - 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
 
 ## 3. 技术主线
@@ -233,7 +233,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 **类型检查**：`pnpm typecheck` 在 desktop 和 web 各跑一次。当前 `app/shared/src/ui` 存在 React 类型解析 / pnpm 跨包虚拟存储的既有限制；提交说明必须区分既有 shared-ui 限制和本次新增错误。
 
-前端架构详见 `docs/architecture/system-architecture.md` 前端章节。
+前端架构详见 `docs/architecture.md`。
 
 ## 4. Git 规则
 
@@ -295,7 +295,7 @@ feat/* → dev/delicious233 → master
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
 | master | PR-only 稳定快照，v0.1.0 已同步 | ✅ 当前 |
-| origin/dev/trump | Trump 独立分支，55 ahead/89 behind，代码已过期不建议合入 | 保留，不自动合并 |
+| origin/dev/trump | Trump 独立分支，与主线大幅分叉（截至 2026-06 快照），代码已过期不建议合入 | 保留，不自动合并 |
 | origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
 | origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
 | ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
@@ -308,7 +308,7 @@ feat/* → dev/delicious233 → master
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
-- `master` 目前滞后于 `dev/delicious233` 300+ commits，始终从 `dev/delicious233` 开始工作。
+- `master` 目前滞后于 `dev/delicious233`（差距较大），始终从 `dev/delicious233` 开始工作。
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
 - `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
@@ -316,7 +316,7 @@ feat/* → dev/delicious233 → master
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
-P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P1/P2 的 TokenDance ID、多端、Hub replay 和远程审批仍按 `docs/roadmap.md` 的部分闭环继续推进。
+P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P1/P2 的 TokenDance ID、多端、Hub replay 和远程审批仍按 `docs/architecture.md` 路线图摘要的部分闭环继续推进。
 
 进度同步：
 
@@ -342,9 +342,9 @@ P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P
 
 ## 5. 文档规则
 
-- 主文档只保留三份：产品需求、系统架构、功能实现。
-- `docs/roadmap.md` 和 `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
-- `docs/operations/client-roadmap.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
+- 主文档只保留一份：`docs/architecture.md`。
+- `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
+- `docs/roadmap.md` 是 Sprint 目标和待办清单；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
@@ -354,6 +354,16 @@ P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P
 - 修改目录、协议、分工后，同步 `README.md`、本文件和相关主文档。
 - 不在文档中依赖个人本机绝对路径、私人服务器、私人账号或不可公开的环境。
 - 如果别人克隆仓库后需要某个配置或命令才能开发，把它写进 `README.md`、三份主文档或 `.env.example`。
+
+### 文档维护规则
+
+1. **归档不删**：过时文档移入 `docs/archive/`，不直接删除。归档文件在开头加 `> ⚠️ 已归档：[原因]。当前权威文档见 [xxx]。` 标记。
+2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节，不留过期描述。
+3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
+4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase A/B/C/D + 子编号 A0/A1...），不使用旧命名（M1/M3a/P0-1/Phase 0/Phase 1）。旧文档归档时保留原名不改。
+5. **时间戳快照归档**：文件名含日期的快照文档（如 `*-20260531.md`、`*closeout-20260601.md`）完成任务后归档到 `docs/archive/`，不留在活跃目录。
+6. **计数同步**：`docs/README.md` 和 `docs/governance/document-standards.md` 中的文档篇数计数必须与实际文件数一致；增删文件后同步更新。
+7. **自检频率**：项目级 AGENTS.md 最多每 14 天自检一次（第 4 节规则）；`docs/` 目录结构每 7 天可做一次过期扫描。
 
 ## 6. 安全和隐私
 

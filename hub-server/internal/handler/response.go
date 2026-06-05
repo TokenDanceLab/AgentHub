@@ -4,13 +4,15 @@ import (
 	"net/http"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/gin-gonic/gin"
+
+	sharederr "github.com/agenthub/pkg/errcode"
 )
 
 type Response struct {
-	Code    string      `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
+	Code string      `json:"code"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 func OK(c *gin.Context, data interface{}) {
@@ -20,24 +22,21 @@ func OK(c *gin.Context, data interface{}) {
 	})
 }
 
+// Fail writes a standardized error response with the unified envelope:
+//
+//	{"error": {"code": "...", "message": "...", "traceId": "..."}}
 func Fail(c *gin.Context, e *errcode.Error) {
 	status := e.HTTPStatus
 	if status == 0 {
 		status = http.StatusInternalServerError
 	}
-	c.JSON(status, Response{
-		Code:    e.Code,
-		Message: e.Message,
-	})
+	traceID := middleware.GetRequestID(c)
+	if traceID == "" {
+		traceID = sharederr.NewTraceID()
+	}
+	c.AbortWithStatusJSON(status, sharederr.EnvelopeForGinWithTrace(e.WithTrace(traceID)))
 }
 
 func FailWithMessage(c *gin.Context, e *errcode.Error, message string) {
-	status := e.HTTPStatus
-	if status == 0 {
-		status = http.StatusInternalServerError
-	}
-	c.JSON(status, Response{
-		Code:    e.Code,
-		Message: message,
-	})
+	Fail(c, e.WithMessage(message))
 }

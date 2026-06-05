@@ -69,7 +69,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
     const lower = key.toLowerCase();
     if (lower.startsWith('agenthub-settings.')) return 'Settings';
     if (lower.startsWith('agenthub-model-settings')) return 'Model Settings';
-    if (lower.startsWith('agenthub-theme') || lower.startsWith('agenthub-lang')) return 'Appearance';
+    if (lower.startsWith('agenthub-theme') || lower.startsWith('agenthub-language')) return 'Appearance';
     if (lower.startsWith('agenthub_hub_') || lower.includes(':edge_auth')) return 'Auth';
     if (lower.startsWith('agenthub_device_id')) return 'Device';
     if (lower.startsWith('agenthub_edge_url') || lower.startsWith('agenthub_hub_url')) return 'Config';

@@ -428,7 +428,7 @@ func TestTaskEventSummaryReturnsRuntimeSummary(t *testing.T) {
 	assertStatus(t, w, 200)
 	resp := parseResp(t, w)
 	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+		t.Fatalf("expected OK, got %s", resp.Code)
 	}
 	payload, ok := resp.Data.(map[string]interface{})
 	if !ok {
@@ -524,7 +524,7 @@ func assertOK(t *testing.T, w *httptest.ResponseRecorder) {
 	t.Helper()
 	resp := parseResp(t, w)
 	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+		t.Fatalf("expected OK, got %s", resp.Code)
 	}
 }
 

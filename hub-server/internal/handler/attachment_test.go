@@ -110,12 +110,16 @@ func TestAttachmentUploadRejectsMalformedHashBeforePathDerivation(t *testing.T) 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp handler.Response
+	var resp struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.Code != "BAD_REQUEST" {
-		t.Fatalf("expected BAD_REQUEST, got %s", resp.Code)
+	if resp.Error.Code != "BAD_REQUEST" {
+		t.Fatalf("expected BAD_REQUEST, got %s", resp.Error.Code)
 	}
 	if svc.saveCalled {
 		t.Fatal("SaveAttachment should not be called for malformed hash")
@@ -192,12 +196,16 @@ func TestAttachmentUploadHashMismatchDoesNotModifyExistingBlob(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp handler.Response
+	var resp struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.Code != "ATTACH_HASH_MISMATCH" {
-		t.Fatalf("expected ATTACH_HASH_MISMATCH, got %s", resp.Code)
+	if resp.Error.Code != "ATTACH_HASH_MISMATCH" {
+		t.Fatalf("expected ATTACH_HASH_MISMATCH, got %s", resp.Error.Code)
 	}
 	if svc.saveCalled {
 		t.Fatal("SaveAttachment should not be called for a mismatched hash")

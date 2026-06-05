@@ -24,11 +24,11 @@ type AgentProfileService interface {
 }
 
 type AgentProfileHandler struct {
-	svc AgentProfileService
+	service AgentProfileService
 }
 
-func NewAgentProfileHandler(svc AgentProfileService) *AgentProfileHandler {
-	return &AgentProfileHandler{svc: svc}
+func NewAgentProfileHandler(service AgentProfileService) *AgentProfileHandler {
+	return &AgentProfileHandler{service: service}
 }
 
 type createProfileReq struct {
@@ -80,7 +80,7 @@ func (h *AgentProfileHandler) CreateProfile(c *gin.Context) {
 		profile.TargetPreferences = req.TargetPreferences
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, profile)
+	result, err := h.service.Create(c.Request.Context(), userID, profile)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -95,7 +95,7 @@ func (h *AgentProfileHandler) CreateProfile(c *gin.Context) {
 func (h *AgentProfileHandler) GetProfile(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
-	profile, err := h.svc.Get(c.Request.Context(), id, userID)
+	profile, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -114,7 +114,7 @@ func (h *AgentProfileHandler) ListProfiles(c *gin.Context) {
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 
-	result, err := h.svc.List(c.Request.Context(), userID, runtimeID, q, cursor, pageSize)
+	result, err := h.service.List(c.Request.Context(), userID, runtimeID, q, cursor, pageSize)
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
@@ -135,7 +135,7 @@ func (h *AgentProfileHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := h.svc.Update(c.Request.Context(), id, userID, updates)
+	profile, err := h.service.Update(c.Request.Context(), id, userID, updates)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -151,7 +151,7 @@ func (h *AgentProfileHandler) DeleteProfile(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Delete(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -166,7 +166,7 @@ func (h *AgentProfileHandler) PublishProfile(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Publish(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Publish(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -181,7 +181,7 @@ func (h *AgentProfileHandler) InstallProfile(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	profile, err := h.svc.Install(c.Request.Context(), id, userID)
+	profile, err := h.service.Install(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
