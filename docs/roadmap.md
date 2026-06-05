@@ -57,6 +57,34 @@
 
 ---
 
+## Next: Edge 持久化 + 构建体验
+
+> 目标: Edge 从内存临时态升级到持久化存储，为离线/远程/同步打基础；开发者从源码到运行的时间大幅缩短
+
+### E1: Edge SQLite 持久化层
+
+当前 Edge 用内存 + JSON 快照（`FileStore`），重启丢数据、无法搜索、无法同步。按架构文档决策（`build-specs-backend-02` / `build-specs-backend-03`）升级为 `modernc.org/sqlite`（纯 Go，FTS5 内置，无 CGO）。
+
+- [ ] **JSONL 事件流** — append-only 事件日志替代 JSON 快照，写操作先 append 再更新内存，保证不丢数据
+- [ ] **SQLite Schema** — projects / threads / runs / items 四张表 + 索引，替代内存 map
+- [ ] **FTS5 搜索索引** — `session_messages_fts` 虚拟表，porter + unicode61 tokenizer，BM25 排序，`snippet()` 高亮
+- [ ] **数据迁移** — 启动时检测旧 JSON 快照，自动导入 SQLite
+- [ ] **离线队列** — Hub 断连时写操作入队，重连后批量同步
+- [ ] **Cursor 同步协议** — Hub ↔ Edge 增量同步：`?cursor=<last_seq>` 拉取增量变更
+
+> 参考: `docs/archive/build-specs-backend-03-eventstore-memory.md`（JSONL + content_pool + FTS5 混合方案）
+
+### E2: 开发者构建体验
+
+- [x] **移除 keyring v4 重依赖** — 去除 turso/tantivy（-213 crate），改用平台原生 credential store
+- [x] **Cargo dev profile 优化** — `opt-level=1` 加速增量编译
+- [x] **前端 bundle 拆分** — vendor chunks 分离，首次加载更快
+- [ ] **Edge 自动构建** — `tauri dev` 时检测 edge-server 源码变更自动 `go build`，无需手动拷贝二进制
+- [ ] **sccache / 缓存共享** — CI 和本地共享 Rust 编译缓存
+- [ ] **开发文档** — 冷启动时间预期、前置依赖、troubleshooting
+
+---
+
 ## 已完成
 
 | 批次 | 内容 | 完成日期 |
@@ -70,6 +98,8 @@
 | M8 | 安全审计: 129 Issues 修复，纯后端清零 | 2026-05-27 |
 | W22 | Desktop UI 大打磨: 40+ 验收项，Mobile/Web 对齐 | 2026-05-30 |
 | 文档体系 | ADR 11 篇 + 竞品调研 25 项目 + 架构三合一 | 2026-06-02 |
+| v0.2.0 | Sidecar edge + Updater + NSIS/DMG + 安全加固 + CI 签名 | 2026-06-05 |
+| 构建优化 | 去除 keyring turso/tantivy（-213 crate）+ dev profile + bundle 拆分 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
@@ -81,6 +111,7 @@
 |---|------|:------:|
 | B6 (9项) | Desktop IM 对接真实 Hub session/message/WS 事件 | High |
 | @Agent | Desktop IM @mention 完全缺失，核心差异化 | High |
+| Edge 持久化 | 内存 FileStore 重启丢数据，缺搜索/同步/离线队列 | High |
 | AgentTeam | Hub 模型已有，缺 E2E live smoke | Medium |
 | Orchestrator | 文本扫描 JSON dispatch 脆弱，内存队列崩溃丢数据 | Medium |
 | OIDC | 后端已通，前端部署态 login/logout 证据待补 | Low |
@@ -93,16 +124,17 @@
 - [ ] Agent 商店 — 搜索、安装、使用自定义 Agent
 - [ ] 版本历史 — Checkpoint + Diff 对比 + 回滚
 - [ ] Mobile 轻量端 — 查看/审批/预览
-- [ ] FTS5 全文搜索
+- [ ] Content Pool — SHA-256 + zstd 文件内容去重（参考 Opcode checkpoint）
+- [ ] 远程 Edge — SSH / Tailscale / Hub Relay 连接远程 Desktop
 
 ---
 
 ## 技术栈速查
 
-| 层 | 技术 | 测试 |
-|----|------|------|
-| Desktop | React 19 + Tauri 2 + Zustand + TanStack Query | `pnpm test && pnpm typecheck` |
-| Edge Server | Go + gorilla/websocket + NDJSON | `go test ./... -short -race` |
-| Hub Server | Go + Gin + GORM + Redis + PG | `go test ./... -short -race` |
-| 协议 | REST JSON + WebSocket NDJSON | — |
-| CI | GitHub Actions 8 job | `scripts/verify-ci-gates.ps1` |
+| 层 | 技术 | 存储 | 测试 |
+|----|------|------|------|
+| Desktop | React 19 + Tauri 2 + Zustand + TanStack Query | 平台 Credential Store | `pnpm test && pnpm typecheck` |
+| Edge Server | Go + gorilla/websocket + NDJSON | **JSON 快照 → SQLite + FTS5 (规划中)** | `go test ./... -short -race` |
+| Hub Server | Go + Gin + GORM + Redis + PG | PostgreSQL 16 | `go test ./... -short -race` |
+| 协议 | REST JSON + WebSocket NDJSON | — | — |
+| CI | GitHub Actions (Win + macOS) | — | `scripts/verify-ci-gates.ps1` |
