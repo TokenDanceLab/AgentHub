@@ -183,8 +183,7 @@ export default function FileSearchDialog({ workspaceDir, onSelectFile, onOpenInV
         setFileTree(tree);
         setTreeLoaded(true);
       })
-      .catch((err) => {
-        console.error('[FileSearch] Failed to load directory tree:', err);
+      .catch(() => {
         setFileTree([]);
         setTreeLoaded(true);
       })
@@ -240,8 +239,7 @@ export default function FileSearchDialog({ workspaceDir, onSelectFile, onOpenInV
     debounceRef.current = setTimeout(() => {
       invoke<ContentMatch[]>('search_workspace_content', { dir: workspaceDir, query: query.trim() })
         .then((results) => setContentResults(results))
-        .catch((err) => {
-          console.error('[FileSearch] Content search failed:', err);
+        .catch(() => {
           setContentResults([]);
         })
         .finally(() => setContentLoading(false));
