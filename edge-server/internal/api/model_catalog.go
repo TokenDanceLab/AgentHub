@@ -47,7 +47,7 @@ func (h *Handler) GetModelCatalog(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		return
 	}
-	writeJSON(w, http.StatusOK, h.buildModelCatalog())
+	writeSuccess(w, http.StatusOK, h.buildModelCatalog())
 }
 
 func (h *Handler) buildModelCatalog() modelCatalogResponse {
