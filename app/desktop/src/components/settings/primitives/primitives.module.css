@@ -168,6 +168,11 @@
   margin-bottom: 12px;
 }
 
+.profileGridSpacious {
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
 .summaryCard,
 .profileCard,
 .targetCard {
@@ -248,6 +253,35 @@
   padding: 15px 18px;
 }
 
+.profileExpandTrigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: 11px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profileExpandTrigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+:global(html[data-focus-source='pointer']) .profileExpandTrigger:focus-visible {
+  box-shadow: none;
+}
+
+.profileExpandTrigger .profileHeader {
+  width: 100%;
+}
+
 .profileHeader {
   display: flex;
   min-width: 0;
@@ -271,9 +305,16 @@
   color: var(--success);
 }
 
+.profileStatus_unavailable,
 .profileStatus_configuring {
   background: var(--glass-tint-amber);
   color: var(--warning);
+}
+
+.profileStatus_error,
+.profileStatus_offline {
+  background: var(--glass-tint-danger);
+  color: var(--destructive);
 }
 
 .profileMeta {
@@ -294,6 +335,265 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
+}
+
+.profileExpandArrow {
+  display: grid;
+  width: 100%;
+  height: 16px;
+  place-items: center;
+  color: var(--settings-muted);
+}
+
+/* ── Local Agent Profile Editor ─────────────────────────────────────── */
+.profileEditor {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--settings-card-border);
+}
+
+.profileEditorSection {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--settings-card-border);
+  border-radius: 11px;
+  background: var(--glass-bg-subtle);
+}
+
+[data-theme='dark'] .profileEditorSection {
+  background: var(--glass-bg-light);
+}
+
+.profileEditorLabel {
+  display: block;
+  min-width: 0;
+}
+
+.profileEditorLabelRow {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+
+.profileEditorLabelRow > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profileEditorLabelRow strong,
+.profileEditorMiniLabel > span,
+.profileEditorSliderHead span {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.profileEditorLabelRow span,
+.profileEditorSliderHint,
+.profileEditorCharCount,
+.profileEditorSource {
+  color: var(--settings-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.profileEditorLabelRow em,
+.profileEditorSliderHead em {
+  flex-shrink: 0;
+  color: color-mix(in oklch, var(--foreground) 74%, var(--settings-muted));
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.profileEditorTextarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 132px;
+  padding: 11px 12px;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 10px;
+  background: var(--glass-input-bg);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+[data-theme='dark'] .profileEditorTextarea {
+  background: var(--glass-bg-medium);
+}
+
+.profileToolGrid,
+.profileEditorModelRow,
+.profileEditorSliders {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.profileToolGrid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 184px), 1fr));
+}
+
+.profileToolToggle {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 64px;
+  padding: 10px 11px;
+  border: 1px solid var(--settings-card-border);
+  border-radius: 10px;
+  background: var(--settings-card-bg);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profileToolToggle:hover {
+  background: var(--glass-panel-strong);
+}
+
+.profileToolToggleOn {
+  border-color: color-mix(in oklch, var(--settings-accent) 30%, var(--settings-card-border));
+}
+
+.profileToolCheck {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  place-items: center;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 5px;
+  color: var(--settings-accent);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.profileToolInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.profileToolInfo strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.profileToolInfo span {
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileEditorModelRow {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 176px), 1fr));
+}
+
+.profileEditorMiniLabel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profileEditorMiniLabel .select {
+  width: 100%;
+  min-width: 0;
+}
+
+.profileEditorSliders {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+
+.profileEditorSliderLabel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.profileEditorSliderHead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.profileEditorSlider {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--settings-accent);
+}
+
+.profileEditorInputRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileEditorRemoveBtn {
+  width: 34px;
+  padding: 0;
+  font-size: 18px;
+}
+
+.profileEditorAddBtn,
+.profileEditorResetBtn,
+.profileEditorSaveBtn {
+  white-space: nowrap;
+}
+
+.profileEditorActions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.profileEditorActionsLeft {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileEditorSource {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Target Card ────────────────────────────────────────────────────── */
@@ -1202,6 +1502,21 @@
 
   .profileHeader {
     flex-wrap: wrap;
+  }
+
+  .profileEditorLabelRow,
+  .profileEditorActions {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .profileEditorActionsLeft,
+  .profileEditorSaveBtn {
+    width: 100%;
+  }
+
+  .profileEditorSource {
+    white-space: normal;
   }
 
   .taskSectionTitleRow {
