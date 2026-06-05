@@ -7,7 +7,7 @@ on:
     branches: [master, dev/delicious233, dev/trump]
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.25.11"
   GOLANGCI_LINT_VERSION: "v2.12.2"
   NODE_VERSION: "22"
   PNPM_VERSION: "10"
@@ -333,7 +333,7 @@ jobs:
         run: pnpm build
         working-directory: ./app/desktop
       - name: Smoke test
-        run: pnpm exec playwright test --project=chromium
+        run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium
         working-directory: ./app
 
   # ── Validation ───────────────────────────────

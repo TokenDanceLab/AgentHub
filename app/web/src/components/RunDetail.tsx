@@ -159,13 +159,11 @@ export default function RunDetail({
   const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
 
   const [summary, setSummary] = useState<AgentRunEventSummary | null>(null);
-  const [summaryError, setSummaryError] = useState(false);
 
   useEffect(() => {
     const taskId = run?.runId;
     if (!taskId || !getAccessToken()) {
       setSummary(null);
-      setSummaryError(false);
       return;
     }
 
@@ -175,13 +173,11 @@ export default function RunDetail({
       .then((data) => {
         if (!cancelled) {
           setSummary(data);
-          setSummaryError(false);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setSummary(null);
-          setSummaryError(true);
         }
       });
 
