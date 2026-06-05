@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/errcode"
 )
 
 type modelCatalogResponse struct {
@@ -43,7 +44,7 @@ type modelCatalogSource struct {
 
 func (h *Handler) GetModelCatalog(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		return
 	}
 	writeJSON(w, http.StatusOK, h.buildModelCatalog())
