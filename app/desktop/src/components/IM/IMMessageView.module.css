@@ -189,6 +189,43 @@
   color: var(--destructive);
 }
 
+/* ── Optimistic send state ────────────────── */
+
+.sendPending {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--foreground);
+  opacity: 0.6;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+.sendFailed {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--destructive);
+  opacity: 1;
+  font-weight: 500;
+}
+
+.bubble:has(.sendFailed) {
+  border: 1px dashed var(--destructive);
+  opacity: 0.85;
+}
+
+.bubble:has(.sendPending) {
+  opacity: 0.7;
+}
+
 /* ── Recalled message ────────────────────── */
 
 .recalled {
