@@ -20,21 +20,20 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
-| P0-1 | R2 Desktop Shell IA | PR #271 ready，head `0048be84`；`frontend-desktop`/`validate` 绿，repo-wide checks 红 | 合并或明确必需检查豁免；不转去修 Web/Mobile/Go/Docker 基线债 | Desktop typecheck/focused tests，1440/1280/390 shell 截图 |
-| P0-2 | R4 Right Inspector | PR #273 draft，head `b71d9a5c` | 等 R2 后 rebase；接入 progress、tool timeline、changed files、workspace evidence | RightInspector focused tests，右侧证据列截图 |
-| P0-3 | R5 Composer Convergence | PR #274 draft，head `7d9bcd54` | 等 R2/R4 后 rebase；保持共享 core，小切片合并 | composer focused tests，@Agent/附件/approval mode 截图 |
-| P0-4 | R3 Transcript Contract | PR #272 draft，head `30894536` | 在 R5 后合；避免 IM/Chat 出现第三套 renderer | Tool/Diff/Thinking/Approval/Artifact block 回归测试 |
-| P0-5 | R6A Optimistic IM | PR #275 draft，head `89ade593` | 在 R3 后合；approval 一致性另起小切片 | pending/failed 气泡测试，失败回滚截图 |
-| P0-6 | 真实 TeamRun E2E | PR #270 已合入证据链基础，最终录屏/导出未完成 | 跑两个真实 Runtime Profile；导出 route/task/event/transcript | 运行日志、事件导出、截图、3 分钟视频素材 |
-| P0-7 | 比赛材料同步 | 旧提交清单仍混有 Web/Mobile/2026-06-01 状态 | 更新 feature matrix、submission checklist、demo script、AI 协作日志 | 文档 diff 指向当前 commit 证据 |
+| P0-1 | R4 Right Inspector | PR #273 draft，head `b71d9a5c` | rebase 到 R2 后接入 progress、tool timeline、changed files、workspace evidence | RightInspector focused tests，右侧证据列截图 |
+| P0-2 | R5 Composer Convergence | PR #274 draft，head `7d9bcd54` | 等 R4 后 rebase；保持共享 core，小切片合并 | composer focused tests，@Agent/附件/approval mode 截图 |
+| P0-3 | R3 Transcript Contract | PR #272 draft，head `30894536` | 在 R5 后合；避免 IM/Chat 出现第三套 renderer | Tool/Diff/Thinking/Approval/Artifact block 回归测试 |
+| P0-4 | R6A Optimistic IM | PR #275 draft，head `89ade593` | 在 R3 后合；approval 一致性另起小切片 | pending/failed 气泡测试，失败回滚截图 |
+| P0-5 | 真实 TeamRun E2E | PR #270 已合入证据链基础，最终录屏/导出未完成 | 跑两个真实 Runtime Profile；导出 route/task/event/transcript | 运行日志、事件导出、截图、3 分钟视频素材 |
+| P0-6 | 比赛材料同步 | 旧提交清单仍混有 Web/Mobile/2026-06-01 状态 | 更新 feature matrix、submission checklist、demo script、AI 协作日志 | 文档 diff 指向当前 commit 证据 |
 
-推荐合并顺序：R2 -> R4 -> R5 -> R3 -> R6A。每合一个分支立刻跑 Desktop-focused gate，再补视觉证据。
+已合入：R2 Desktop Shell IA（merge commit `698faabf`）。推荐后续合并顺序：R4 -> R5 -> R3 -> R6A。每合一个分支立刻跑 Desktop-focused gate，再补视觉证据。
 
 ## P0: Desktop 比赛闭环
 
 ### P0-A 信息架构
 
-- [ ] 合入 R2：Global Rail + Conversation Sidebar + Unified Transcript + Right Inspector + Unified Composer 的 shell 基础。
+- [x] 合入 R2：Global Rail + Conversation Sidebar + Unified Transcript + Right Inspector + Unified Composer 的 shell 基础。
 - [ ] 保证 1440x920、1280x800、390x844 无横向滚动、无文本遮挡、composer 不遮挡最后消息。
 - [ ] 保持 light-first 主方向；深色参考只用于任务队列密度和可读性验证。
 - [ ] 左侧两级导航：Global Rail 只放全局入口，Conversation Sidebar 展示 Manager/Worker/Project 群聊。
