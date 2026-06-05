@@ -33,6 +33,14 @@ function makeFile(overrides: Partial<DiffReviewFile> = {}): DiffReviewFile {
   };
 }
 
+function getLineContents(text: string): HTMLElement[] {
+  return screen.getAllByText((_, node) => (
+    node instanceof HTMLElement &&
+    node.className.includes('lineContent') &&
+    node.textContent === text
+  ));
+}
+
 describe('DiffReviewPanel', () => {
   // ── Test 1: Renders empty state when no files ──────────────────────────
   it('renders empty state when there are no files', () => {
@@ -61,15 +69,15 @@ describe('DiffReviewPanel', () => {
     render(<DiffReviewPanel files={files} />);
 
     // Context lines appear in both left and right columns
-    const contextLines = screen.getAllByText('import React from "react";');
+    const contextLines = getLineContents('import React from "react";');
     expect(contextLines.length).toBe(2); // one in each column
-    expect(screen.getAllByText('export default App;').length).toBe(2);
+    expect(getLineContents('export default App;').length).toBe(2);
 
     // Deleted line (old) should be visible in left column
-    expect(screen.getByText('const x = 1;')).toBeInTheDocument();
+    expect(getLineContents('const x = 1;')[0]).toBeInTheDocument();
 
     // Added line (new) should be visible in right column
-    expect(screen.getByText('const x = 2;')).toBeInTheDocument();
+    expect(getLineContents('const x = 2;')[0]).toBeInTheDocument();
   });
 
   // ── Test 4: Renders the Accept All and Reject All toolbar buttons ───────
@@ -160,7 +168,7 @@ describe('DiffReviewPanel', () => {
     expect(firstTab).toHaveAttribute('aria-selected', 'false');
 
     // The second file's content should be visible
-    expect(screen.getByText('new file content')).toBeInTheDocument();
+    expect(getLineContents('new file content')[0]).toBeInTheDocument();
   });
 
   // ── Test 10: Accepting a line dims it and highlights the accept button ──
