@@ -2,16 +2,19 @@ import { useCallback } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { clamp } from '@/utils/appUtils';
 import { useUIStore } from '@/stores/uiStore';
+import { useShallow } from 'zustand/shallow';
 import styles from '@/App.module.css';
 
 const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
 
 export function useSidebarResize() {
-  const { leftSidebarWidth, setLeftSidebarWidth } = useUIStore((s) => ({
-    leftSidebarWidth: s.sidebarWidth,
-    setLeftSidebarWidth: s.setSidebarWidth,
-  }));
+  const { leftSidebarWidth, setLeftSidebarWidth } = useUIStore(
+    useShallow((s) => ({
+      leftSidebarWidth: s.sidebarWidth,
+      setLeftSidebarWidth: s.setSidebarWidth,
+    })),
+  );
 
   const handleStartResize = useCallback(
     (side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {

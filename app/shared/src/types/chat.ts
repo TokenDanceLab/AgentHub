@@ -89,6 +89,10 @@ export type MessageBlock =
       expanded?: boolean;
     }
   | {
+      kind: 'status';
+      content: string;
+    }
+  | {
       kind: 'approval';
       approvalId: string;
       status: string;

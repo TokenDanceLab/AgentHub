@@ -29,7 +29,7 @@ function getSemanticTitle(toolName: string, input: Record<string, unknown>): str
   if (/bash|shell|exec|terminal|run/.test(lower)) {
     const cmd = typeof input.command === 'string' ? input.command : '';
     const lines = cmd.split('\n');
-    const firstLine = lines[0].trim();
+    const firstLine = lines[0]?.trim() ?? '';
     const display = firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine;
     return display ? `Run: ${display}` : 'Run command';
   }
