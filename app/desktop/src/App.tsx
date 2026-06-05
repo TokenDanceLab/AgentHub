@@ -15,6 +15,7 @@ import { useThreadCache } from '@/hooks/useThreadCache';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { useThreadNavigation } from '@/hooks/useThreadNavigation';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
 import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries';
@@ -33,6 +34,7 @@ import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useAuth } from '@/hooks/useAuth';
 import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
 import useShellShortcuts from '@/hooks/useShellShortcuts';
+import { useDesktopCommands } from '@/hooks/useDesktopCommands';
 import type { StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -40,10 +42,9 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
-import { useSearchStore } from '@/stores/searchStore';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { readCustomInstructions } from '@/utils/customInstructions';
-import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
+import { findRetryPrompt } from '@/utils/messageActions';
 import {
   clamp,
   isRunActiveStatus,
@@ -63,7 +64,8 @@ import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
-import TopMenuBar, { type TopMenuDefinition } from '@/components/TopMenuBar';
+import TopMenuBar from '@/components/TopMenuBar';
+import { useTopMenuConfig } from '@/hooks/useTopMenuConfig';
 import { ToastContainer } from '@/components/Toast';
 import type { SectionId as SettingsSectionId } from '@/components/SettingsPage';
 
@@ -495,71 +497,36 @@ export default function App() {
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
-  const handleSelectThread = useCallback((selection: ThreadSelectionInput) => {
-    const id = resolveThreadSelectionId(selection);
-    if (!id) return;
-    selectThread(id);
-    setLeftSidebarView('thread');
-  }, [selectThread, setLeftSidebarView]);
-  const handleThreadTitleEdited = useCallback((threadId: string) => {
-    emptyCreatedThreadIdsRef.current.delete(threadId);
-    manuallyNamedThreadIdsRef.current.add(threadId);
-  }, []);
-  const openGlobalSearch = useCallback((initialQuery = '') => {
-    useSearchStore.getState().openDialog(initialQuery);
-  }, []);
-  const handleSearchMessageSelect = useCallback((messageId: string) => {
-    setLeftSidebarView('thread');
-    window.requestAnimationFrame(() => {
-      const selector = `[data-message-id="${CSS.escape(messageId)}"]`;
-      document.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-  }, [setLeftSidebarView]);
-  const handleSearchThreadSelect = useCallback((thread: ThreadInfo) => {
-    handleSelectThread(thread.threadId);
-  }, [handleSelectThread]);
-  const handleSelectAgent = useCallback(async (agentId: string) => {
-    const store = useThreadStore.getState();
-    const agent = agents.find((a) => a.id === agentId);
-    try {
-      const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
-        addThreadToCache(thread, { empty: true });
-        store.selectAgentThread(agentId, thread.threadId);
-        setLeftSidebarView('thread');
-      queryClient.invalidateQueries({ queryKey: ['threads'] });
-    } catch {
-      // still select the agent visually even if thread creation fails
-      store.selectAgentThread(agentId, '');
-    }
-  }, [addThreadToCache, agents, queryClient, setLeftSidebarView]);
-
-  const handleStartLocalOrchestration = useCallback(async (agentId: string, draft: string) => {
-    await handleSelectAgent(agentId);
-    setViewMode('agent');
-    setPendingComposerDraft(draft);
-  }, [handleSelectAgent]);
-
-  const handleCreateThread = useCallback(async () => {
-    try {
-      const thread = await createThread(selectedAgent?.name ? `${selectedAgent.name}` : undefined);
-      addThreadToCache(thread, { empty: true });
-      if (selectedAgent?.id) {
-        selectAgentThread(selectedAgent.id, thread.threadId);
-        setLeftSidebarView('thread');
-      } else {
-        handleSelectThread(thread.threadId);
-      }
-      queryClient.invalidateQueries({ queryKey: ['threads'] });
-      focusComposer();
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addThreadToCache, addToast, handleSelectThread, queryClient, selectAgentThread, selectedAgent?.id, selectedAgent?.name, setLeftSidebarView, t]);
-
-  const handleQuickChat = useCallback(async () => {
-    await handleCreateThread();
-    focusComposer();
-  }, [handleCreateThread]);
+  const {
+    handleSelectThread,
+    handleThreadTitleEdited,
+    handleSelectAgent,
+    handleCreateThread,
+    handleQuickChat,
+    handleForkThread,
+    handleStartLocalOrchestration,
+    handleSearchThreadSelect,
+    handleSearchMessageSelect,
+    openGlobalSearch,
+  } = useThreadNavigation({
+    allMessages,
+    selectedAgentName: selectedAgent?.name,
+    selectedAgentId: selectedAgentId ?? null,
+    selectedThreadId: selectedThread?.threadId,
+    selectedThreadTitle: selectedThread?.title,
+    selectThread,
+    selectAgentThread,
+    setLeftSidebarView,
+    setViewMode,
+    setPendingComposerDraft,
+    addThreadToCache,
+    emptyCreatedThreadIdsRef,
+    manuallyNamedThreadIdsRef,
+    queryClient,
+    addToast,
+    t,
+    agents,
+  });
 
   const openSettings = useCallback((section: SettingsSectionId = 'general') => {
     setSettingsInitialSection(section);
@@ -579,26 +546,16 @@ export default function App() {
   }, [handleOpenAuth, hubAuthenticated, openSettings]);
 
   const desktopWindowAvailable = isTauriRuntime();
-  const handleWindowCommand = useCallback(async (command: 'minimize' | 'toggleMaximize' | 'close') => {
-    if (!desktopWindowAvailable) {
-      addToast({ type: 'info', message: t('menu.nativeWindowUnavailable') });
-      return;
-    }
-    try {
-      const windowHandle = getCurrentWindow();
-      if (command === 'minimize') {
-        await windowHandle.minimize();
-        return;
-      }
-      if (command === 'close') {
-        await windowHandle.close();
-        return;
-      }
-      (await windowHandle.isMaximized()) ? await windowHandle.unmaximize() : await windowHandle.maximize();
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, desktopWindowAvailable, t]);
+
+  const { handleWindowCommand, handleEditCommand, handleCopyDiagnostics } = useDesktopCommands({
+    online,
+    isConnected,
+    wsLatency,
+    healthVersion: health?.version,
+    selectedAgent,
+    selectedThread,
+    displayedRun,
+  });
 
   const handleOpenFolder = useCallback(async () => {
     if (!desktopWindowAvailable) {
@@ -617,50 +574,6 @@ export default function App() {
       addToast({ type: 'error', message: t('toast.error') });
     }
   }, [addToast, desktopWindowAvailable, t]);
-
-  const handleEditCommand = useCallback((command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll') => {
-    const active = document.activeElement;
-    if (command === 'selectAll' && active instanceof HTMLInputElement) {
-      active.select();
-      return;
-    }
-    if (command === 'selectAll' && active instanceof HTMLTextAreaElement) {
-      active.select();
-      return;
-    }
-    const commandMap = {
-      undo: 'undo',
-      redo: 'redo',
-      cut: 'cut',
-      copy: 'copy',
-      paste: 'paste',
-      delete: 'delete',
-      selectAll: 'selectAll',
-    } as const;
-    try {
-      document.execCommand(commandMap[command]);
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, t]);
-
-  const handleCopyDiagnostics = useCallback(async () => {
-    const diagnostic = [
-      'AgentHub Desktop diagnostics',
-      `Edge: ${online ? `online ${health?.version ?? 'v1'}` : 'offline'}`,
-      `WebSocket: ${isConnected ? 'connected' : 'disconnected'}`,
-      wsLatency != null ? `Latency: ${wsLatency}ms` : null,
-      selectedAgent ? `Agent: ${selectedAgent.name} (${selectedAgent.id})` : null,
-      selectedThread ? `Thread: ${selectedThread.threadId}` : null,
-      displayedRun ? `Run: ${displayedRun.runId} (${displayedRun.status})` : null,
-    ].filter(Boolean).join('\n');
-    try {
-      await navigator.clipboard.writeText(diagnostic);
-      addToast({ type: 'success', message: t('toast.copied') });
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, displayedRun, health?.version, isConnected, online, selectedAgent, selectedThread, t, wsLatency]);
 
   const handleReviewApprovalsFromHome = useCallback(() => {
     if (permissionRequests.length === 0) {
@@ -693,46 +606,6 @@ export default function App() {
     }
     await handleSend(retry.prompt, selectedAgentId ?? undefined);
   }, [addToast, allMessages, handleSend, selectedAgentId, t]);
-
-  const handleForkThread = useCallback(async (messageId?: string) => {
-    try {
-      const sourceTitle = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
-      const forkTitle = `Fork: ${sourceTitle}`.slice(0, 96);
-      const thread = await createThread(forkTitle);
-      addThreadToCache(thread, { suppressCreatedToast: true });
-      if (selectedAgent?.id) {
-        selectAgentThread(selectedAgent.id, thread.threadId);
-        setLeftSidebarView('thread');
-      } else {
-        handleSelectThread(thread.threadId);
-      }
-      queryClient.invalidateQueries({ queryKey: ['threads'] });
-      const draft = buildForkDraft({
-        sourceTitle,
-        sourceThreadId: selectedThread?.threadId ?? activeThreadId ?? undefined,
-        messages: allMessages,
-        messageId,
-      });
-      setPendingComposerDraft(draft);
-      addToast({ type: 'success', message: t('toast.forkCreated') });
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [
-    activeThreadId,
-    addThreadToCache,
-    addToast,
-    allMessages,
-    handleSelectThread,
-    queryClient,
-    selectAgentThread,
-    selectedAgent?.id,
-    selectedAgent?.name,
-    selectedThread?.threadId,
-    selectedThread?.title,
-    setLeftSidebarView,
-    t,
-  ]);
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -775,207 +648,7 @@ export default function App() {
     }
   }, [addToast, selectedAgent, selectedThread, t]);
 
-  const topMenus = useMemo<TopMenuDefinition>(() => ({
-    file: {
-      label: t('menu.file'),
-      items: [
-        {
-          id: 'close',
-          label: t('window.close'),
-          shortcut: 'Ctrl+W',
-          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
-          disabled: !desktopWindowAvailable,
-          action: () => handleWindowCommand('close'),
-        },
-        {
-          id: 'new-thread',
-          label: t('menu.file.newThread'),
-          shortcut: 'Ctrl+N',
-          detail: online ? undefined : t('menu.requiresEdge'),
-          disabled: !online,
-          action: handleCreateThread,
-        },
-        {
-          id: 'quick-chat',
-          label: t('menu.file.quickChat'),
-          shortcut: 'Alt+Ctrl+N',
-          detail: online ? undefined : t('menu.requiresEdge'),
-          disabled: !online,
-          action: handleQuickChat,
-        },
-        {
-          id: 'open-folder',
-          label: t('menu.file.openFolder'),
-          shortcut: 'Ctrl+O',
-          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
-          disabled: !desktopWindowAvailable,
-          action: handleOpenFolder,
-        },
-        {
-          id: 'settings',
-          label: t('menu.file.settings'),
-          shortcut: 'Ctrl+,',
-          separatorBefore: true,
-          action: () => openSettings('general'),
-        },
-        {
-          id: 'account',
-          label: t('menu.file.account'),
-          action: handleOpenHubAccount,
-        },
-        {
-          id: 'about',
-          label: t('menu.help.about'),
-          separatorBefore: true,
-          action: () => openSettings('general'),
-        },
-      ],
-    },
-    edit: {
-      label: t('menu.edit'),
-      items: [
-        {
-          id: 'undo',
-          label: t('menu.edit.undo'),
-          shortcut: 'Ctrl+Z',
-          action: () => handleEditCommand('undo'),
-        },
-        {
-          id: 'redo',
-          label: t('menu.edit.redo'),
-          shortcut: 'Ctrl+Y',
-          action: () => handleEditCommand('redo'),
-        },
-        {
-          id: 'cut',
-          label: t('menu.edit.cut'),
-          shortcut: 'Ctrl+X',
-          separatorBefore: true,
-          action: () => handleEditCommand('cut'),
-        },
-        {
-          id: 'copy',
-          label: t('menu.edit.copy'),
-          shortcut: 'Ctrl+C',
-          action: () => handleEditCommand('copy'),
-        },
-        {
-          id: 'paste',
-          label: t('menu.edit.paste'),
-          shortcut: 'Ctrl+V',
-          action: () => handleEditCommand('paste'),
-        },
-        {
-          id: 'delete',
-          label: t('menu.edit.delete'),
-          action: () => handleEditCommand('delete'),
-        },
-        {
-          id: 'select-all',
-          label: t('menu.edit.selectAll'),
-          shortcut: 'Ctrl+A',
-          separatorBefore: true,
-          action: () => handleEditCommand('selectAll'),
-        },
-      ],
-    },
-    view: {
-      label: t('menu.view'),
-      items: [
-        {
-          id: 'toggle-sidebar',
-          label: leftSidebarCollapsed ? t('menu.view.showSidebar') : t('menu.view.hideSidebar'),
-          shortcut: 'Ctrl+B',
-          action: () => setLeftSidebarCollapsed(!leftSidebarCollapsed),
-        },
-        {
-          id: 'toggle-run-detail',
-          label: rightPanelOpen ? t('menu.view.hideRunDetail') : t('menu.view.showRunDetail'),
-          detail: displayedRun ? undefined : t('menu.requiresRun'),
-          shortcut: 'Ctrl+J',
-          disabled: !displayedRun,
-          action: () => setRightPanelOpen(!rightPanelOpen),
-        },
-        {
-          id: 'toggle-workspace',
-          label: workspaceExpanded ? t('menu.view.restoreWorkspace') : t('menu.view.expandWorkspace'),
-          action: () => setWorkspaceExpanded((value) => !value),
-        },
-        {
-          id: 'tasks',
-          label: t('menu.view.tasks'),
-          separatorBefore: true,
-          action: () => openSettings('tasks'),
-        },
-        {
-          id: 'team-runs',
-          label: t('menu.view.teamRuns'),
-          action: () => openSettings('agentScheduling'),
-        },
-        {
-          id: 'theme',
-          label: theme === 'dark' ? t('theme.light') : t('theme.dark'),
-          separatorBefore: true,
-          action: toggleTheme,
-        },
-      ],
-    },
-    window: {
-      label: t('menu.window'),
-      items: [
-        {
-          id: 'minimize',
-          label: t('window.minimize'),
-          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
-          disabled: !desktopWindowAvailable,
-          action: () => handleWindowCommand('minimize'),
-        },
-        {
-          id: 'toggle-maximize',
-          label: t('window.maximize'),
-          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
-          disabled: !desktopWindowAvailable,
-          action: () => handleWindowCommand('toggleMaximize'),
-        },
-        {
-          id: 'close',
-          label: t('window.close'),
-          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
-          disabled: !desktopWindowAvailable,
-          separatorBefore: true,
-          danger: true,
-          action: () => handleWindowCommand('close'),
-        },
-      ],
-    },
-    help: {
-      label: t('menu.help'),
-      items: [
-        {
-          id: 'shortcuts',
-          label: t('menu.help.shortcuts'),
-          shortcut: '?',
-          action: () => setShortcutHelpOpen(true),
-        },
-        {
-          id: 'diagnostics',
-          label: t('menu.help.copyDiagnostics'),
-          separatorBefore: true,
-          action: handleCopyDiagnostics,
-        },
-        {
-          id: 'desktop-settings',
-          label: t('menu.help.desktopSettings'),
-          action: () => openSettings('general'),
-        },
-        {
-          id: 'about',
-          label: t('menu.help.about'),
-          action: () => openSettings('general'),
-        },
-      ],
-    },
-  }), [
+  const topMenus = useTopMenuConfig({
     desktopWindowAvailable,
     displayedRun,
     handleCopyDiagnostics,
@@ -991,11 +664,13 @@ export default function App() {
     rightPanelOpen,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
+    setShortcutHelpOpen,
+    setWorkspaceExpanded,
     t,
     theme,
     toggleTheme,
     workspaceExpanded,
-  ]);
+  });
 
   useShellShortcuts({
     online,
