@@ -3,6 +3,11 @@
 
 export type AuthorityType = 'hub' | 'edge' | 'hybrid';
 
+export interface IMMessageMention {
+  agentId: string;
+  agentName: string;
+}
+
 export interface IMMessage {
   id: string;
   sessionId: string;
@@ -20,6 +25,8 @@ export interface IMMessage {
   readAt?: string;
   readSeq?: number;
   actionError?: string;
+  /** Agents @mentioned in this message (from structured content envelope). */
+  mentions?: IMMessageMention[];
 }
 
 export interface IMMessageWithHubState extends IMMessage {

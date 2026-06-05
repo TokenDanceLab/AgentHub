@@ -117,6 +117,17 @@ const IMMessageBubble = memo(function IMMessageBubble({
         <MarkdownRenderer content={message.content} />
       </div>
 
+      {/* Mention badges */}
+      {message.mentions && message.mentions.length > 0 && (
+        <div className={styles.mentionBadges}>
+          {message.mentions.map((m) => (
+            <span key={m.agentId} className={styles.mentionBadge}>
+              @{m.agentName}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className={styles.messageMeta}>
         <time className={styles.timestamp} dateTime={message.timestamp}>
           {formatTime(message.timestamp, label)}

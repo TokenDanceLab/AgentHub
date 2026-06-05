@@ -16,7 +16,7 @@ describe('IMMessageInput', () => {
     const textarea = screen.getByPlaceholderText('Type a message...');
     fireEvent.change(textarea, { target: { value: 'Hello!' } });
     fireEvent.click(screen.getByLabelText('Send message'));
-    expect(onSend).toHaveBeenCalledWith('Hello!');
+    expect(onSend).toHaveBeenCalledWith('Hello!', undefined);
   });
 
   it('calls onSend on Enter key', () => {
@@ -25,7 +25,7 @@ describe('IMMessageInput', () => {
     const textarea = screen.getByPlaceholderText('Type a message...');
     fireEvent.change(textarea, { target: { value: 'Test' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
-    expect(onSend).toHaveBeenCalledWith('Test');
+    expect(onSend).toHaveBeenCalledWith('Test', undefined);
   });
 
   it('does not send on Shift+Enter', () => {
@@ -68,7 +68,7 @@ describe('IMMessageInput', () => {
     const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'Keep me' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
-    await waitFor(() => expect(onSend).toHaveBeenCalledWith('Keep me'));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('Keep me', undefined));
     expect(textarea.value).toBe('Keep me');
   });
 
@@ -104,6 +104,6 @@ describe('IMMessageInput', () => {
     const textarea = screen.getByPlaceholderText('Type a message...');
     fireEvent.change(textarea, { target: { value: '  Hello  ' } });
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
-    expect(onSend).toHaveBeenCalledWith('Hello');
+    expect(onSend).toHaveBeenCalledWith('Hello', undefined);
   });
 });
