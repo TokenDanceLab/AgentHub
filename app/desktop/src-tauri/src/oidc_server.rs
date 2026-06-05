@@ -35,9 +35,9 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
 
     // Spawn background thread to accept connections
     std::thread::spawn(move || {
-        listener
-            .set_nonblocking(true)
-            .expect("set_nonblocking on callback listener");
+        if let Err(e) = listener.set_nonblocking(true) {
+            log::error!("set_nonblocking on callback listener failed: {e}. Falling back to blocking mode.");
+        }
 
         let start = std::time::Instant::now();
 
