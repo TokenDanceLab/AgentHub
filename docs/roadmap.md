@@ -57,9 +57,9 @@
 
 ---
 
-## Next: Edge 持久化 + 构建体验
+## Next: Edge 持久化 + 架构健康度
 
-> 目标: Edge 从内存临时态升级到持久化存储，为离线/远程/同步打基础；开发者从源码到运行的时间大幅缩短
+> 目标: Edge 从内存临时态升级到持久化存储；修复架构剖析发现的 P0/P1 问题；为离线/远程/同步打基础
 
 ### E1: Edge SQLite 持久化层
 
@@ -85,6 +85,39 @@
 
 ---
 
+## 架构健康度（来自 2026-06-05 深度剖析）
+
+> 以下来自对 Edge / Desktop / Hub / 集成层的全面架构审查。按优先级排列。
+
+### P0 — 必须修复
+
+- [ ] **Edge auth token 明文日志** — `server.go` 将自动生成的 `aght_` token 以 `slog.Info` 打到 stdout，生产环境日志聚合会泄漏凭据。改为 debug 级别或仅输出前 8 位
+- [ ] **Edge FileStore 同步 persist 瓶颈** — 每次写操作同步 JSON marshal + file write + rename，高写入下是串行瓶颈。改为 async persist + write-behind batching
+- [ ] **Hub workspace migration vs model schema 不一致** — migration `0009` 的 `workspaces` 表（`device_id, local_path`）与 `model/workspace.go`（`name, description, owner_id`）完全不同，启动可能报错或数据丢失
+- [ ] **Desktop App.tsx 拆分** — 1838 行单组件混合布局/连接/消息/菜单/快捷键/窗口管理，40+ useState，开发已到瓶颈。拆为 LayoutShell、ChatController、MenuProvider 等独立模块
+
+### P1 — 应该修复
+
+- [ ] **Hub N+1 查询** — `repository/session.go` 的 session list 用 correlated subquery 算 member_count（每行一次）；`service/agent.go` dispatch 时逐个查 CustomAgent。改为 JOIN / Preload
+- [ ] **Hub 缺索引** — `agent_team_tasks(team_run_id)`、`agent_team_assignments(team_run_id)`、`notifications(user_id)` 无索引，查询走全表扫描
+- [ ] **Desktop Rust 后端零测试** — `src-tauri/src/` 下 0 个 `#[test]`，commands.rs 945 行、oidc_server.rs 278 行完全无覆盖。至少覆盖 path validation、OIDC callback 解析、edge lifecycle
+- [ ] **Desktop SettingsPage/AuthPage/HomeDashboard lazy-load** — 这三组组件 ~200KB+ 均在 App.tsx 顶部 eager import，但只在特定条件下渲染。改为 `React.lazy()` 动态加载
+- [ ] **Edge 双重 dispatch 路径清理** — `orchestrator.go` 的 text scan + `orchestrator_dispatch.go` 的 NDJSON event 两条独立 dispatch 检测路径，可能重复 spawn sub-agent。统一为一条
+- [ ] **Edge Output 截断无通知** — stdout/stderr 1MB cap + PayloadLimitEmitter 1MB 截断均为静默操作，用户不知道数据被截断。截断时发 `run.output.truncated` 事件
+- [ ] **Hub agent.go 拆分** — 1371 行单文件混合 custom agent CRUD + task lifecycle + dispatch + event normalization。拆为 `agent_custom.go`、`agent_task.go`、`agent_dispatch.go`、`agent_events.go`
+- [ ] **Edge ProcessExecutor 拆分** — 1413 行单文件混合 spawn/cancel/hub-callback/output/env/emitter。拆为 `executor_spawn.go`、`executor_cancel.go`、`executor_hub.go`、`executor_output.go`
+
+### P2 — 改善
+
+- [ ] **OpenAPI spec → 类型生成** — `api/openapi.yaml` 5590 行手动维护，前端 `@shared/types.ts` 独立维护可漂移。引入代码生成（openapi-generator / ogen）消除手工同步
+- [ ] **Hub migration 双系统统一** — 当前 15 个 golang-migrate SQL 文件 + GORM AutoMigrate 双系统并存（agent_teams 等表无 migration 文件）。统一走 golang-migrate，关掉 AutoMigrate
+- [ ] **Hub OIDC blacklist 写入失败静默忽略** — Redis 不可用时旧 refresh token 不被加入黑名单，可被重放。改为失败时记录到 DB 补偿队列
+- [ ] **Edge `internal/runners` 死代码清理** — README 标注为 "legacy"，保留仅为旧 UI 兼容。确认无调用方后移除
+- [ ] **Desktop OIDC 超时不一致** — `CALLBACK_TIMEOUT_SECS = 60` 但错误消息写 "5 minutes"（oidc_server.rs:16 vs :206）
+- [ ] **Desktop Edge 端口硬编码** — Rust 侧 `port: 3210` 写死，前端 config.ts 有优先级链但默认也是 3210。引入配置同步机制
+
+---
+
 ## 已完成
 
 | 批次 | 内容 | 完成日期 |
@@ -100,25 +133,30 @@
 | 文档体系 | ADR 11 篇 + 竞品调研 25 项目 + 架构三合一 | 2026-06-02 |
 | v0.2.0 | Sidecar edge + Updater + NSIS/DMG + 安全加固 + CI 签名 | 2026-06-05 |
 | 构建优化 | 去除 keyring turso/tantivy（-213 crate）+ dev profile + bundle 拆分 | 2026-06-05 |
+| 架构剖析 | Edge / Desktop / Hub / 集成层全面审查，产出 P0×4 + P1×8 + P2×6 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
 ---
 
-## 已知缺口 (来自 B6/B8)
+## 已知缺口
 
 | # | 问题 | 优先级 |
 |---|------|:------:|
 | B6 (9项) | Desktop IM 对接真实 Hub session/message/WS 事件 | High |
 | @Agent | Desktop IM @mention 完全缺失，核心差异化 | High |
 | Edge 持久化 | 内存 FileStore 重启丢数据，缺搜索/同步/离线队列 | High |
+| App.tsx 债务 | 1838 行万能组件，开发效率瓶颈 | High |
+| Hub N+1 + 缺索引 | session list / agent dispatch 慢查询；team_run_id 等无索引 | Medium |
 | AgentTeam | Hub 模型已有，缺 E2E live smoke | Medium |
-| Orchestrator | 文本扫描 JSON dispatch 脆弱，内存队列崩溃丢数据 | Medium |
+| Orchestrator | 双重 dispatch 路径 + 文本扫描 JSON dispatch 脆弱 | Medium |
+| Rust 零测试 | Desktop Tauri 后端无任何测试覆盖 | Medium |
 | OIDC | 后端已通，前端部署态 login/logout 证据待补 | Low |
+| Spec 漂移 | OpenAPI 手动维护，shared types 可独立漂移 | Low |
 
 ---
 
-## P2 远期
+## P3 远期
 
 - [ ] 部署发布 — 聊天中"部署"指令，返回部署状态卡片
 - [ ] Agent 商店 — 搜索、安装、使用自定义 Agent
@@ -126,15 +164,16 @@
 - [ ] Mobile 轻量端 — 查看/审批/预览
 - [ ] Content Pool — SHA-256 + zstd 文件内容去重（参考 Opcode checkpoint）
 - [ ] 远程 Edge — SSH / Tailscale / Hub Relay 连接远程 Desktop
+- [ ] shared API client 真正共享 — 当前 desktop/web/mobile 各自独立实现 HTTP client，仅共享类型
 
 ---
 
 ## 技术栈速查
 
-| 层 | 技术 | 存储 | 测试 |
-|----|------|------|------|
-| Desktop | React 19 + Tauri 2 + Zustand + TanStack Query | 平台 Credential Store | `pnpm test && pnpm typecheck` |
-| Edge Server | Go + gorilla/websocket + NDJSON | **JSON 快照 → SQLite + FTS5 (规划中)** | `go test ./... -short -race` |
-| Hub Server | Go + Gin + GORM + Redis + PG | PostgreSQL 16 | `go test ./... -short -race` |
-| 协议 | REST JSON + WebSocket NDJSON | — | — |
-| CI | GitHub Actions (Win + macOS) | — | `scripts/verify-ci-gates.ps1` |
+| 层 | 技术 | 存储 | 代码量 | 测试 |
+|----|------|------|--------|------|
+| Desktop | React 19 + Tauri 2 + Zustand + TanStack Query | 平台 Credential Store | Rust 2,113 行 / TS ~40 组件 | `pnpm test && pnpm typecheck` |
+| Edge Server | Go + gorilla/websocket + NDJSON | **JSON 快照 → SQLite + FTS5** | 15,509 行 | `go test ./... -short -race` |
+| Hub Server | Go + Gin + GORM + Redis + PG | PostgreSQL 16 | ~46,000 行 | `go test ./... -short -race` |
+| 协议 | REST JSON + WebSocket NDJSON | — | OpenAPI 5,590 行 | — |
+| CI | GitHub Actions (Win + macOS) | — | — | `scripts/verify-ci-gates.ps1` |
