@@ -14,7 +14,7 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 - 先真实演示闭环，后长期工程债。SQLite、Web、Mobile、Remote Edge 等重要但不能阻塞 TeamRun Demo。
 - 每个完成项必须有证据：focused tests、截图、真实运行日志、TeamRun export、录屏片段或当前 PR 状态。
 - Roadmap 记录优先级、依赖、验收和长期方向，不写人工日程表。
-- 子代理只做窄任务：sonnet 做 Desktop UI/视觉，haiku 做 Go/Edge 小 blocker，opus 做架构/安全/审查。
+- 子代理只做窄任务：Codex GPT-5.5 做强实现/强审查，Claude sonnet 做窄范围代码，Claude haiku 做多模态视觉 QA，Claude opus 做长上下文推理/研究。
 
 ## 当前最高优先级
 
@@ -194,9 +194,11 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 | 角色 | 适合任务 | 禁止事项 |
 |---|---|---|
-| 主 Agent / opus | 架构判断、PR 顺序、合并、roadmap、比赛材料、安全审查 | 不把未验证分支当完成 |
-| sonnet | Desktop UI、CSS、截图 QA、React focused tests、多模态视觉审查 | 不碰 Web/Mobile 大重组，不扩大写入范围 |
-| haiku | Go/Edge/Hub 小型 blocker、测试生成、业务逻辑修复 | 不接大面积读仓或前端 UI |
+| 主 Agent | 架构判断、PR 顺序、合并、roadmap、比赛材料、最终验收 | 不把未验证分支当完成 |
+| Codex GPT-5.5 subagent | 全方面强；中等上下文内的核心实现、跨模块小集成、关键 code review | 不承担超过 256k 的超大仓库研究 |
+| Claude opus = DeepSeek-V4-Pro | 1M 长上下文推理、竞品仓库研究、架构/安全审查 | 不做机械批量改文件 |
+| Claude sonnet = GLM-5.1 | 代码和 agentic 能力强；窄范围 Go/TS 实现、测试修复 | 不接大面积读仓；每次只给必要文件 |
+| Claude haiku = mimo-v2.5 | 多模态、看图、视觉 QA、竞品截图复核 | 不作为代码主力 |
 
 每次派工必须写清：允许路径、禁止范围、验收命令、证据输出。subagent 交付后由主 Agent 复核 diff 和测试。
 
