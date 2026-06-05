@@ -108,12 +108,12 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 | 分支 | 状态 | 验证 | 合并前注意 |
 |---|---|---|---|
-| `phase-r1/teamrun-e2e` | 已推送，证据链分支待合并 | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | commit `b6ad3481`；不是最终录屏；合并后继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
-| `phase-r2/desktop-shell` | 已推送，PR 待开/待合并 | `uiStore.test.ts` 4/4；`git diff --check` 通过 | 需视觉 QA；typecheck 仍受旧债阻断 |
-| `phase-r3/transcript-contract` | 已推送，PR 待开/待合并 | `IMBlockRenderer.test.tsx` + `IMMessageView.test.tsx` 31/31；`git diff --check` 通过 | 合并时留意 R6A 对 IM message view 的相邻改动 |
-| `phase-r4/right-inspector` | 已推送，PR 待开/待合并 | `RightInspector.test.tsx` 23/23；`git diff --check` 通过 | 先以 props-only 组件接入，避免在同一 PR 重写 shell grid |
-| `phase-r5/composer-convergence` | 已推送，PR 待开/待合并 | `useComposerCore`/`attachment`/`IMMessageInput` focused tests 44/44；`git diff --check` 通过 | 不引入巨型 `UnifiedComposer`；PromptInput 现有全量测试受 shared React patch 版本问题影响 |
-| `phase-r6/im-optimistic` | 已推送，PR 待开/待合并 | `useIMChat.test.ts` + `IMMessageView.test.tsx` 37/37；`git diff --check` 通过；顺手清掉 `useIMChat` mention typecheck 旧债 | 只完成 R6A 乐观发送；approval 一致性另起切片 |
+| `phase-r1/teamrun-e2e` | PR #270 已开，非 draft，mergeable | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | head `abb86137`；不是最终录屏；合并后继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
+| `phase-r2/desktop-shell` | draft PR #271 已开 | `uiStore.test.ts` 4/4；`git diff --check` 通过 | 需视觉 QA；typecheck 仍受旧债阻断 |
+| `phase-r3/transcript-contract` | draft PR #272 已开 | `IMBlockRenderer.test.tsx` + `IMMessageView.test.tsx` 31/31；`git diff --check` 通过 | 合并时留意 R6A 对 IM message view 的相邻改动 |
+| `phase-r4/right-inspector` | draft PR #273 已开 | `RightInspector.test.tsx` 23/23；`git diff --check` 通过 | 先以 props-only 组件接入，避免在同一 PR 重写 shell grid；与 R2 组合后补截图 |
+| `phase-r5/composer-convergence` | draft PR #274 已开 | `useComposerCore`/`attachment`/`IMMessageInput` focused tests 44/44；`git diff --check` 通过 | 不引入巨型 `UnifiedComposer`；PromptInput 现有全量测试受 shared React patch 版本问题影响 |
+| `phase-r6/im-optimistic` | draft PR #275 已开 | `useIMChat.test.ts` + `IMMessageView.test.tsx` 37/37；`git diff --check` 通过；顺手清掉 `useIMChat` mention typecheck 旧债 | 只完成 R6A 乐观发送；approval 一致性另起切片 |
 
 主线 `dev/delicious233` 当前只含 R0 文档合同和分支状态同步，尚未合入上述功能分支。后续 agent 不要重复实现 R1/R2/R3/R4/R5/R6A，应优先开 PR、做冲突审查、跑视觉 QA，或者继续补 R1 的真实录屏与事件导出。
 
