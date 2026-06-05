@@ -335,6 +335,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 | **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
 | **比赛评审评估** | 6 维度全评(AI协作22/30+功能15.5/25+生成效果12/20+代码理解12/15+创新8/10，总分69.5/100) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) + 提分路径 + Demo 3 分钟策略 | 2026-06-05 |
+| **前端深度审计** | P0×5+P1×29+P2×19 问题清单；IM/主聊天双系统分离（群聊零 Agent 分派能力）竞品对比(Jean/Kanna/CCUI)；右侧面板 Diff/Preview/Tool/Artifact 逐组件审计；综合评分 4.5/10；修复路线 Phase 0-3 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
@@ -429,21 +430,64 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | 16 | Diff 无语法高亮 | DiffViewer/DiffCard | 竞品 Jean/CCUI 均有 Prism/Shiki 高亮 |
 | 17 | 虚拟滚动 estimateSize 静态值 | ChatView | 消息高度偏差大时滚动位置跳动 |
 | 18 | Thread 删除后无自动导航 | ThreadPanel | 删除当前 thread 后用户卡在空白 |
+| 19 | **IM 和主聊天是完全分离的两套系统** | `useIMChat.ts` vs `useChatMessages.ts` | 零代码共享，Edge→Hub 路径完全不同 |
+| 20 | **群聊 IM 无 @Agent 分派能力** | `IMMessageInput` 是纯 textarea，无 useMention | 比赛核心差异化功能在 IM 侧完全缺失 |
+| 21 | IM 消息无乐观更新 | `useIMChat.sendMessage()` | REST 确认后才显示，发送有感知延迟 |
+| 22 | Diff 大文件无虚拟化 | DiffViewer + DiffReviewPanel | 10000+ 行 diff 全量 DOM 渲染，卡顿 |
+| 23 | iframe sandbox 同时允许 scripts+same-origin | ArtifactPreview/ArtifactCard/ArtifactBrowser 三处 | 安全沙箱被绕过 |
+| 24 | Diff 解析逻辑重复两份 | `shared/diff.ts` + `desktop/utils/parseGitDiff.ts` | 同名 `parseUnifiedDiff` 实现不同，边缘 case 行为分歧 |
+| 25 | 嵌套 Tool 调用无层级渲染 | `ToolUseBlock` 只有 `children: ToolResultBlock[]` | 无递归渲染，子工具被扁平化 |
+| 26 | Artifact 正则提取仅支持英文 | `ArtifactBrowser.tsx:125-143` | 中文/JSON 输出的文件路径完全丢失 |
+| 27 | Blob URL 内存泄漏 | `ArtifactBrowser.tsx:558-570` | 下载后不 revokeObjectURL |
+| 28 | Tool 参数无深度截断 | `ToolGroup.tsx:162` JSON.stringify 无 max depth | 嵌套/base64 数据爆 DOM |
+| 29 | 右侧面板 resize 功能未实现 | `useSidebarResize.ts` 只处理 left | rightPanelWidth 存了但没应用 |
 
 ### P2 问题清单（打磨级）
 
 | # | 问题 | 文件 |
 |---|------|------|
-| 19 | 缺少 Markdown 数学公式支持（竞品 CCUI 有 remarkMath + rehypeKatex） | MarkdownRenderer |
-| 20 | 无消息骨架屏/Streaming ticker（竞品 Jean 有 CompactStreamingTicker） | ChatView |
-| 21 | Tool 标题 `summarizeInput` 截断到 40 字符（竞品 Kanna 按 toolKind 生成语义标题） | ToolUseBlock |
-| 22 | PromptInput 1522 行未 memo 包装 | PromptInput.tsx |
-| 23 | useChatMessages 1485 行单一 hook 职责过重 | hooks/useChatMessages.ts |
-| 24 | useIMChat 1297 行单一 hook | hooks/useIMChat.ts |
-| 25 | App.tsx 1440 行尚未拆分（A4 Wave 2 待做） | App.tsx |
-| 26 | 懒加载组件 fallback 为 null | AuthPage/HomeDashboard/SettingsPage |
-| 27 | Toast store nextId HMR 时可能重置 | toastStore.ts |
-| 28 | 装饰性 Nav 按钮无功能 | `App.tsx:1049-1052` |
+| 30 | 缺少 Markdown 数学公式支持（竞品 CCUI 有 remarkMath + rehypeKatex） | MarkdownRenderer |
+| 31 | 无消息骨架屏/Streaming ticker（竞品 Jean 有 CompactStreamingTicker） | ChatView |
+| 32 | Tool 标题 `summarizeInput` 截断到 40 字符（竞品 Kanna 按 toolKind 生成语义标题） | ToolUseBlock |
+| 33 | PromptInput 1522 行未 memo 包装 | PromptInput.tsx |
+| 34 | useChatMessages 1485 行单一 hook 职责过重 | hooks/useChatMessages.ts |
+| 35 | useIMChat 1297 行单一 hook | hooks/useIMChat.ts |
+| 36 | App.tsx 1440 行尚未拆分（A4 Wave 2 待做） | App.tsx |
+| 37 | 懒加载组件 fallback 为 null | AuthPage/HomeDashboard/SettingsPage |
+| 38 | Toast store nextId HMR 时可能重置 | toastStore.ts |
+| 39 | 装饰性 Nav 按钮无功能 | `App.tsx:1049-1052` |
+| 40 | Diff 长行无 word-break 水平溢出 | DiffViewer.tsx |
+| 41 | Diff focusedFilePath 用 endsWith 子串匹配 | DiffReviewPanel.tsx |
+| 42 | Artifact HTML 分类靠路径启发式 | ArtifactBrowser.tsx |
+| 43 | IM 消息搜索完全缺失 | useIMChat 无搜索 |
+| 44 | IM 群聊 leave/dissolve/成员管理 API 存在但无 UI 按钮 | IMView |
+| 45 | Typing indicator API 存在但从未调用 | HubWSHandle.sendTyping() |
+| 46 | Diff Accept/Reject 仅 UI 状态无持久化 | DiffViewer.tsx |
+| 47 | 面板关闭动画 220ms 内可能闪更新内容 | App.tsx:349-356 |
+| 48 | iframe retry 不换 URL 大概率重复失败 | ArtifactPreview.tsx |
+
+### IM 工作流完整性评估
+
+> 两条消息系统对比：主聊天（Edge 驱动）vs IM 聊天（Hub 驱动）
+
+| 能力 | 主聊天 (Edge) | IM 聊天 (Hub) | 差距 |
+|------|:-----------:|:-----------:|------|
+| 消息发送/接收 | ✅ REST+WS 流式 | ✅ REST+WS（无流式） | IM 侧无流式渲染 |
+| @Agent 分派 | ✅ useMention 完整 | ❌ 纯 textarea | **核心缺失** |
+| Agent Profile 选择 | ✅ MentionPopover | ❌ 不存在 | **核心缺失** |
+| Tool Call 可视化 | ✅ ToolUseBlock+ToolGroup | ❌ 不存在 | **核心缺失** |
+| Diff 内联 | ✅ DiffCard | ❌ 不存在 | **核心缺失** |
+| 思考过程展示 | ✅ ThinkingBlock | ❌ 不存在 | — |
+| 子 Agent 卡片 | ✅ ChildAgentBlock+RouteDecision | ❌ 不存在 | **核心缺失** |
+| 群聊创建 | N/A | ✅ createGroupSession | IM 独有 |
+| 好友/联系人 | N/A | ✅ listContacts+好友请求 | IM 独有 |
+| 未读计数 | ✅ badge | ✅ unreadCount | 对等 |
+| 消息搜索 | ✅ MessageSearchPanel | ❌ 缺失 | IM 缺失 |
+| 乐观更新 | ✅ 流式即时 | ❌ REST 确认后 | 体验差距 |
+| 审批 | ✅ PermissionDialog+ApprovalCard | ✅ TeamApprovalPanel | 两条路径不一致 |
+| TeamRun | N/A | ✅ 4-tab console（Member/Task/Approve/Event） | IM 侧更完整 |
+
+**核心问题：IM 聊天是纯文字聊天，无法在群聊中分派 Agent 任务。比赛评分项"AI 协作能力 30%"的核心差异化在 IM 侧完全缺失。**
 
 ### 竞品关键差距（AgentHub vs 标杆）
 
@@ -460,23 +504,34 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 ### 前端修复优先路线（按性价比排序）
 
+**Phase 0 — IM 核心打通（最高优先，~5 天）— 比赛核心差异化**
+
+1. **IM 聊天集成 Agent 分派** — IMMessageInput 接入 useMention + Agent Profile 选择，群聊中 @Agent 触发任务
+2. **IM 消息支持富类型渲染** — 将 BlockRenderer/ToolUseBlock/DiffCard 适配到 IMMessageView
+3. **IM 消息乐观更新** — sendMessage 发送前先插入 optimistic message
+4. **统一主聊天与 IM 审批路径** — Edge permission + Team approval 合并为一致体验
+
 **Phase 1 — 紧急止血（本周，~3 天）**
 
-1. **修复 block key 稳定性** — `text-${index}` → `text-${contentHash}`，消除流式闪烁
-2. **清理 Mock 数据** — AgentMarketSection 移除或标注 "Coming Soon"
-3. **替换 `document.execCommand`** → `navigator.clipboard` + Selection API
-4. **z-index 统一到 tokens.css** — 所有硬编码值改用 CSS 变量
+5. **修复 block key 稳定性** — `text-${index}` → `text-${contentHash}`，消除流式闪烁
+6. **清理 Mock 数据** — AgentMarketSection 移除或标注 "Coming Soon"
+7. **替换 `document.execCommand`** → `navigator.clipboard` + Selection API
+8. **z-index 统一到 tokens.css** — 所有硬编码值改用 CSS 变量
+9. **修复 iframe sandbox** — 移除 `allow-same-origin`，仅保留 `allow-scripts`
+10. **Diff 语法高亮** — DiffViewer 接入 react-syntax-highlighter (Prism)
 
 **Phase 2 — 架构重构（本月，~7 天）**
 
-5. **拆分 ChatView.tsx** — 提取 ChatMessageList、ChatScrollBehavior、ChatConnectionBanner（参考 Jean 70+ 文件拆法）
-6. **统一运行状态** — 消除三源同步，runStore 为唯一权威
-7. **引入消息预处理层** — 参考 Kanna `buildTranscriptRenderItems`，在渲染前合并 tool group
-8. **简化 scroll-to-bottom** — 评估 LegendList 替代 tanstack virtual
+11. **拆分 ChatView.tsx** — 提取 ChatMessageList、ChatScrollBehavior、ChatConnectionBanner（参考 Jean 70+ 文件拆法）
+12. **统一运行状态** — 消除三源同步，runStore 为唯一权威
+13. **引入消息预处理层** — 参考 Kanna `buildTranscriptRenderItems`，在渲染前合并 tool group
+14. **简化 scroll-to-bottom** — 评估 LegendList 替代 tanstack virtual
+15. **合并 Diff 解析** — 统一 parseUnifiedDiff 为一份实现
 
 **Phase 3 — 体验增强（下月，~5 天）**
 
-9. **Diff 语法高亮** — 引入 react-syntax-highlighter (Prism)
-10. **Tool 渲染配置化** — 参考 CCUI `toolConfigs` 注册表
-11. **Tool 卡片颜色编码** — 参考 CCUI 左边框色标
-12. **Tool 标题语义化** — 参考 Kanna 按 toolKind 生成
+16. **Tool 渲染配置化** — 参考 CCUI `toolConfigs` 注册表
+17. **Tool 卡片颜色编码** — 参考 CCUI 左边框色标
+18. **Tool 标题语义化** — 参考 Kanna 按 toolKind 生成
+19. **Artifact 提取改结构化** — 从正则迁移到 tool output metadata
+20. **右侧面板 resize 实现** — useSidebarResize 补全 right 侧逻辑
