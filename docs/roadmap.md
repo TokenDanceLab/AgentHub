@@ -20,7 +20,7 @@
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 ████████░░  45%  ← 当前 (Wave 1 完成，Wave 2 进行中)
+Phase A: 工程基础设施 █████████░  50%  ← 当前 (A0/A1/A3 ✅, A2 进行中)
 Phase B: 持久化 + 性能  ░░░░░░░░░░   0%
 Phase C: IM 核心闭环   ░░░░░░░░░░   0%
 Phase D: 高级功能      ░░░░░░░░░░   0%
@@ -34,6 +34,13 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
      └── App.tsx 拆分 (A4) ──────────────────┘ 前端解耦是 IM 开发前提
 ```
 
+### 分支策略
+
+- `master` — 受保护，只接受 PR
+- `dev/delicious233` — 主开发分支，日常 commit 目标，定期 PR → master
+- `phase-aN/xxx` — 临时 feature 分支，在 `.worktrees/` 下开发，完成后合回 dev 后删除
+- 协作者分支 (`dev/johnny`, `dev/trump`) — 独立开发线
+
 ---
 
 ## Phase A: 工程基础设施 + 安全修复
@@ -41,7 +48,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 > **目标**: 建立可观测性基座（错误码/日志/调试），修复安全与稳定性隐患，解耦前端开发瓶颈
 >
 > **入场条件**: ✅ v0.2.0 已发布，架构剖析已完成
-> **出场条件**: Edge/Hub 统一错误码 + 请求追踪；无凭据泄漏；App.tsx 拆为独立模块
+> **出场条件**: Edge/Hub 统一错误码 + 请求追踪 + 调试端点；无凭据泄漏；App.tsx 拆为独立模块
 
 ### A0: 错误码体系收口 `errcode` ✅
 
@@ -51,17 +58,17 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [x] Edge handlers 重构 — 删除 `errorResponse()`，52 个调用点改用 errcode
 - [x] 前端适配 — `app/shared/src/errors.ts` 已兼容，零改动
 
-### A1: 请求日志与追踪 `reqlog` 🔧
+### A1: 请求日志与追踪 `reqlog` ✅
 
-- [ ] `pkg/reqlog` 共享中间件 — trace ID 生成/传播，统一字段（request_id/method/path/status/duration_ms）
-- [ ] Edge 接入 — 生成 X-Request-ID，替换现有 AccessLog
-- [ ] Hub 接入 — 统一已有 RequestID + AccessLog 为 reqlog 版
-- [ ] 跨服务追踪 — Edge→Hub API 透传 X-Request-ID
+- [x] `pkg/reqlog` 共享中间件 — trace ID 生成/传播，统一字段（request_id/method/path/status/duration_ms）
+- [x] Edge 接入 — `reqlog.AccessLog` 替换现有 AccessLog 中间件
+- [x] Hub 接入 — `reqlog.AccessLogGin()` 统一已有 RequestID + AccessLog
+- [x] 跨服务追踪 — Edge→Hub API 透传 X-Request-ID（Hub RequestID 中间件复用）
 
-### A2: 调试端点 `debug`
+### A2: 调试端点 `debug` ← 当前
 
 - [ ] `pkg/debug` 模块 — health + pprof + 脱敏配置转储
-- [ ] Hub `/debug/` — DB+Redis 连通性 + pprof (admin auth) + config dump
+- [ ] Hub `/debug/` — 替换现有 admin server pprof 注册 + config dump
 - [ ] Edge `/debug/` — store+bus 状态 + pprof (local auth) + config dump
 
 ### A3: 安全与稳定性 P0 修复 ✅
@@ -103,7 +110,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 > **目标**: Edge 从内存临时态升级到 SQLite 持久化；修复 Hub 性能瓶颈；大文件拆分提升可维护性
 >
-> **入场条件**: Phase A 出场（错误码 + 日志 + P0 修复完成）
+> **入场条件**: Phase A 出场（错误码 + 日志 + 调试 + P0 修复完成）
 > **出场条件**: Edge 重启不丢数据 + FTS5 搜索；Hub 无 N+1 查询 + 全索引覆盖
 
 ### B0: Edge SQLite 持久化
@@ -212,12 +219,12 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 ---
 
-## Quick Wins（随时可做）
+## Quick Wins
 
 > 不依赖特定 Phase，发现即修。trivial 修复直接执行，无需等 Phase 排期。
 
-- [ ] Desktop OIDC 超时不一致 — `CALLBACK_TIMEOUT_SECS = 60` 但错误消息写 "5 minutes"
-- [ ] Desktop Edge 端口硬编码 — Rust `port: 3210` 写死，前端 config.ts 默认也是 3210
+- [x] ~~Desktop OIDC 超时不一致~~ — `CALLBACK_TIMEOUT_SECS` 60→300，对齐 "5 minutes" 消息
+- [x] ~~Desktop Edge 端口硬编码~~ — 提取 `DEFAULT_EDGE_PORT` 常量（Rust 侧）
 - [ ] 补齐 OpenAPI 缺失端点 — DELETE thread、model-catalog 等
 - [ ] Web 包定位决策 — 要么启动要么最小化
 
@@ -243,8 +250,10 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | 错误码统一 (Hub) | pkg/errcode 共享模块 + Hub re-export + 统一 envelope + traceId | 2026-06-05 |
 | 安全修复 | Orchestrator bypassPermissions 硬编码移除 | 2026-06-05 |
 | **A0 Edge errcode** | 14 域错误码 + 52 handlers 调用点重构 + 前端已兼容 | 2026-06-05 |
+| **A1 请求日志** | pkg/reqlog + Edge/Hub 接入 + context ID 传播 + 6 tests | 2026-06-05 |
 | **A3 P0 安全** | Auth token Debug 日志 + FileStore async persist (50ms debounce) | 2026-06-05 |
 | **A4 前端解耦** | App.tsx 1837→1525 (-17%)，5 模块拆出 + 3 组件 lazy-load | 2026-06-05 |
+| **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
