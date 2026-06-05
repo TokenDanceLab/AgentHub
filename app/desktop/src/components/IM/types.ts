@@ -1,7 +1,15 @@
 // IM (Instant Messaging) shared types for Hub WS message integration.
 // Extended with Trump's IM enhancements (PR #220): recall, read receipts, friend/notification types.
+// Extended with rich message rendering: optional blocks for Tool/Diff/Thinking/Approval (Sprint #2).
+
+import type { MessageBlock } from '../ChatView.types';
 
 export type AuthorityType = 'hub' | 'edge' | 'hybrid';
+
+export interface IMMessageMention {
+  agentId: string;
+  agentName: string;
+}
 
 export interface IMMessage {
   id: string;
@@ -12,6 +20,9 @@ export interface IMMessage {
   senderType: 'user' | 'agent';
   authority: AuthorityType;
   content: string;
+  /** Optional structured blocks for rich rendering (Sprint #2).
+   *  When present, IMBlockRenderer renders blocks instead of parsing content. */
+  blocks?: MessageBlock[];
   timestamp: string;
   replyToId?: string;
   recalled?: boolean;
@@ -20,6 +31,8 @@ export interface IMMessage {
   readAt?: string;
   readSeq?: number;
   actionError?: string;
+  /** Agents @mentioned in this message (from structured content envelope). */
+  mentions?: IMMessageMention[];
 }
 
 export interface IMMessageWithHubState extends IMMessage {
