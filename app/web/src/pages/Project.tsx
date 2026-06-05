@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { FolderKanban, CheckSquare, FileText, Play, AlertTriangle, Search, User } from 'lucide-react';
+import { FolderKanban, CheckSquare, FileText, Play, Search, User } from 'lucide-react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { queryClient } from '@/api/queryClient';

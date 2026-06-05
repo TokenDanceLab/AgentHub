@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Bot, Search, Sparkles, Star } from 'lucide-react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -14,7 +14,7 @@ function AgentSquarePage() {
   const { t } = useTranslation('agentSquare');
   const { hasSession, token } = useHubSession();
 
-  const { data: agentData, isLoading: agentLoading } = useAgentList(true);
+  const { data: agentData } = useAgentList(true);
   const agents: AgentInfo[] = agentData?.items ?? [];
 
   const hubCustomAgents = useHubCustomAgents(token);
