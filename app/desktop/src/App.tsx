@@ -7,9 +7,11 @@ import {
   Suspense,
   lazy,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useHiddenMessages } from '@/hooks/useHiddenMessages';
+import { useSidebarResize } from '@/hooks/useSidebarResize';
+import { useThreadCache } from '@/hooks/useThreadCache';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
@@ -31,7 +33,7 @@ import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useAuth } from '@/hooks/useAuth';
 import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
 import useShellShortcuts from '@/hooks/useShellShortcuts';
-import type { ListResponse, StartRunRequest, ThreadInfo } from '@shared/types';
+import type { StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -48,14 +50,10 @@ import {
   getActiveRunConflictId,
   focusComposer,
   setComposerDraft,
-  readHiddenMessageIds,
-  writeHiddenMessageIds,
   hideMessages,
   isTeamRunActiveStatus,
   isPendingTeamApprovalStatus,
   isTauriRuntime,
-  HIDDEN_MESSAGES_STORAGE_PREFIX,
-  hiddenMessagesStorageKey,
 } from '@/utils/appUtils';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@shared/ui';
@@ -172,47 +170,15 @@ export default function App() {
 
   const { data: threadData } = useThreads();
   const threads = threadData?.items ?? [];
-  const pendingCreatedThreadIdsRef = useRef<Set<string>>(new Set());
-  const emptyCreatedThreadIdsRef = useRef<Set<string>>(new Set());
-  const manuallyNamedThreadIdsRef = useRef<Set<string>>(new Set());
-  const silentCreatedThreadToastIdsRef = useRef<Set<string>>(new Set());
-  const addThreadToCache = useCallback((thread: ThreadInfo, opts?: { suppressCreatedToast?: boolean; empty?: boolean }) => {
-    pendingCreatedThreadIdsRef.current.add(thread.threadId);
-    if (opts?.empty) {
-      emptyCreatedThreadIdsRef.current.add(thread.threadId);
-    }
-    if (opts?.suppressCreatedToast) {
-      silentCreatedThreadToastIdsRef.current.add(thread.threadId);
-    }
-    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
-      if (!current) return current;
-      if (current.items.some((item) => item.threadId === thread.threadId)) return current;
-      return { ...current, items: [thread, ...current.items] };
-    });
-  }, [queryClient]);
-  const updateThreadInCache = useCallback((thread: ThreadInfo) => {
-    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
-      if (!current) return current;
-      let found = false;
-      const items = current.items.map((item) => {
-        if (item.threadId !== thread.threadId) return item;
-        found = true;
-        return { ...item, ...thread };
-      });
-      return { ...current, items: found ? items : [thread, ...items] };
-    });
-  }, [queryClient]);
-  const setThreadTitleInCache = useCallback((threadId: string, title: string) => {
-    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        items: current.items.map((thread) =>
-          thread.threadId === threadId ? { ...thread, title } : thread,
-        ),
-      };
-    });
-  }, [queryClient]);
+  const {
+    addThreadToCache,
+    updateThreadInCache,
+    setThreadTitleInCache,
+    pendingCreatedThreadIdsRef,
+    emptyCreatedThreadIdsRef,
+    manuallyNamedThreadIdsRef,
+    silentCreatedThreadToastIdsRef,
+  } = useThreadCache();
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -256,7 +222,7 @@ export default function App() {
       ? t('workspace.teamRunsActive', { count: agentTeamSummary.activeRuns })
       : t('settings.agentScheduling');
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
-  const [hiddenMessageIds, setHiddenMessageIds] = useState<Set<string>>(() => readHiddenMessageIds(activeThreadId));
+  const { hiddenMessageIds, hideMessage } = useHiddenMessages(activeThreadId);
   const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
@@ -270,7 +236,6 @@ export default function App() {
     leftSidebarView,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
-    setLeftSidebarWidth,
     setLeftSidebarView,
   } = useUIStore(
     useShallow((s) => ({
@@ -280,10 +245,10 @@ export default function App() {
       leftSidebarView: s.leftSidebarView,
       setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
       setRightPanelOpen: s.setRightPanelOpen,
-      setLeftSidebarWidth: s.setSidebarWidth,
       setLeftSidebarView: s.setLeftSidebarView,
     })),
   );
+  const { handleStartResize, handleResizeKeyDown } = useSidebarResize();
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
   const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
@@ -324,10 +289,6 @@ export default function App() {
     }
     prevThreadIdsRef.current = currentIds;
   }, [threads, online, addToast, t]);
-
-  useEffect(() => {
-    setHiddenMessageIds(readHiddenMessageIds(activeThreadId));
-  }, [activeThreadId]);
 
   useEffect(() => {
     if (!threadData?.items) return;
@@ -710,47 +671,6 @@ export default function App() {
     if (displayedRun) setRightPanelOpen(true);
   }, [displayedRun, openSettings, permissionRequests.length, setLeftSidebarView, setRightPanelOpen]);
 
-  const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const initialLeft = leftSidebarWidth;
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      if (side === 'left') {
-        const nextLeft = clamp(initialLeft + moveEvent.clientX - startX, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
-        setLeftSidebarWidth(nextLeft);
-      }
-    };
-
-    const handleUp = () => {
-      document.body.classList.remove(styles.resizing ?? '');
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-    };
-
-    document.body.classList.add(styles.resizing ?? '');
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp, { once: true });
-  }, [leftSidebarWidth, setLeftSidebarWidth]);
-
-  const handleResizeKeyDown = useCallback((side: 'left' | 'right') => (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 40 : 16;
-    let nextWidth: number | null = null;
-
-    if (side === 'left') {
-      if (event.key === 'ArrowLeft') nextWidth = leftSidebarWidth - step;
-      if (event.key === 'ArrowRight') nextWidth = leftSidebarWidth + step;
-      if (event.key === 'Home') nextWidth = LEFT_SIDEBAR_MIN;
-      if (event.key === 'End') nextWidth = LEFT_SIDEBAR_MAX;
-      if (nextWidth != null) {
-        event.preventDefault();
-        const clamped = clamp(nextWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
-        setLeftSidebarWidth(clamped);
-      }
-      return;
-    }
-  }, [leftSidebarWidth, setLeftSidebarWidth]);
-
   const handleDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     const request = permissionRequests.find((item) => item.requestId === requestId);
     if (!request?.runId) {
@@ -816,13 +736,8 @@ export default function App() {
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
-    setHiddenMessageIds((prev) => {
-      const next = new Set(prev);
-      next.add(messageId);
-      writeHiddenMessageIds(activeThreadId, next);
-      return next;
-    });
-  }, [activeThreadId]);
+    hideMessage(messageId);
+  }, [hideMessage]);
 
   useEffect(() => {
     if (!pendingComposerDraft || leftSidebarView === 'home' || viewMode !== 'agent') return undefined;
