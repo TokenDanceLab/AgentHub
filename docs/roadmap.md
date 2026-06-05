@@ -334,7 +334,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 | **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
-| **比赛评审评估** | 5 维度深度评估(AI协作22/30+功能15.5/25+代码理解12/15+创新8/10+Demo策略) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) | 2026-06-05 |
+| **比赛评审评估** | 6 维度全评(AI协作22/30+功能15.5/25+生成效果12/20+代码理解12/15+创新8/10，总分69.5/100) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) + 提分路径 + Demo 3 分钟策略 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
@@ -352,7 +352,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | 代码理解 | 15% | **12/15** | AGENTS.md 渐进式加载竞品独一无二；workspace fail-closed 领先；MCP 仅 Server 端缺 Client(-1)、Skill 仅 Codex 格式(-1)、上下文预算未可视化(-1) |
 | 创新与产品感 | 10% | **8/10** | IM-native 多 Agent "无人竞争"(UNCONTESTED)；三层架构本地优先独树一帜；Agent Profile 四层模型比竞品成熟；短板：多 Agent IM 交互缺原型验证(-1)、Profile 配置界面未落地(-1) |
 
-**当前已评总分：57.5/80（已评维度）** | 生成效果待补
+**总分：69.5/100** | AI协作22 + 功能15.5 + 生成效果12 + 代码理解12 + 创新8 = 69.5
 
 ### 比赛提分关键路径（按性价比排序）
 
