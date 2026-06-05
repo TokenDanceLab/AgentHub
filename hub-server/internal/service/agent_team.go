@@ -322,11 +322,27 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 
 	// Allow owner or team member (user who owns any agent profile in the team).
 	if team.OwnerID != userID {
+		// Batch query all custom agents referenced by team members.
+		var authAgentIDs []string
+		for _, m := range members {
+			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
+				authAgentIDs = append(authAgentIDs, *m.AgentProfileID)
+			}
+		}
+		authAgentMap := make(map[string]*model.CustomAgent)
+		if len(authAgentIDs) > 0 {
+			var authAgents []model.CustomAgent
+			if err := s.db.Where("id IN ? AND deleted_at IS NULL", authAgentIDs).Find(&authAgents).Error; err == nil {
+				for i := range authAgents {
+					authAgentMap[authAgents[i].ID] = &authAgents[i]
+				}
+			}
+		}
 		isMember := false
 		for _, m := range members {
 			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
-				ca, caErr := repository.GetCustomAgentByID(s.db, *m.AgentProfileID)
-				if caErr == nil && ca.OwnerUserID == userID {
+				ca, ok := authAgentMap[*m.AgentProfileID]
+				if ok && ca.OwnerUserID == userID {
 					isMember = true
 					break
 				}
