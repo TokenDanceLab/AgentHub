@@ -9,7 +9,7 @@
 [![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
 
-[中文文档](README.md) &nbsp;·&nbsp; [Get Started](docs/getting-started/GOAL.md) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
+[中文文档](README.md) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
 
 </div>
 
