@@ -289,6 +289,13 @@ func (p *NDJSONStreamParser) parseResult(scope map[string]any, msg *claudeSDKMes
 		if p.budget != nil {
 			p.budget.Track(int(msg.Usage.InputTokens + msg.Usage.OutputTokens))
 		}
+		// Emit context_usage event for budgeting and dashboards (parity with Codex/OpenCode adapters).
+		if success {
+			p.emit(scope, BusEventContextUsage, map[string]any{
+				"inputTokens":  msg.Usage.InputTokens,
+				"outputTokens": msg.Usage.OutputTokens,
+			})
+		}
 	}
 	if !success {
 		payload["errors"] = msg.Errors
