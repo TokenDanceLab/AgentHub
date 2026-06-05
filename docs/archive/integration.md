@@ -1,4 +1,5 @@
 # AgentHub 集成架构
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 日期：2026-05-24
 状态：当前（M3a/M3b 已完成，M4 已完成）

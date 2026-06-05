@@ -1,4 +1,5 @@
 # Desktop Run Workbench Live Smoke - 2026-05-31
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 ## Scope
 
