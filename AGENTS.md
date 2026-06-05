@@ -18,9 +18,7 @@
 人类同学先读：
 
 1. `README.md`
-2. `docs/architecture/system-design/product-requirements.md`
-3. `docs/architecture/system-design/system-architecture.md`
-4. `docs/architecture/system-design/implementation-guide.md`
+2. `docs/architecture.md`
 
 Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
