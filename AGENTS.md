@@ -314,7 +314,7 @@ feat/* → dev/delicious233 → master
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
-P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P1/P2 的 TokenDance ID、多端、Hub replay 和远程审批仍按 `docs/tutorials/roadmap.md` 的部分闭环继续推进。
+P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P1/P2 的 TokenDance ID、多端、Hub replay 和远程审批仍按 `docs/architecture.md` 路线图摘要的部分闭环继续推进。
 
 进度同步：
 
