@@ -19,11 +19,11 @@ type OIDCService interface {
 }
 
 type OIDCHandler struct {
-	svc OIDCService
+	service OIDCService
 }
 
-func NewOIDCHandler(svc OIDCService) *OIDCHandler {
-	return &OIDCHandler{svc: svc}
+func NewOIDCHandler(service OIDCService) *OIDCHandler {
+	return &OIDCHandler{service: service}
 }
 
 type oidcAuthorizeReq struct {
@@ -53,7 +53,7 @@ func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
 		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
 		return
 	}
-	result, err := h.svc.GenerateAuthorizationURL(c.Request.Context(),
+	result, err := h.service.GenerateAuthorizationURL(c.Request.Context(),
 		req.CodeChallenge, req.CodeChallengeMethod, deviceType, deviceID, strings.TrimSpace(req.RedirectURI))
 	if err != nil {
 		slog.Error("oidc authorize service error", "request_id", middleware.GetRequestID(c), "error", err)
@@ -130,7 +130,7 @@ func (h *OIDCHandler) handleCallback(c *gin.Context, code, state, codeVerifier, 
 		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
 		return
 	}
-	result, err := h.svc.HandleCallback(c.Request.Context(),
+	result, err := h.service.HandleCallback(c.Request.Context(),
 		code, state, codeVerifier, dt, did, strings.TrimSpace(redirectURI))
 	if err != nil {
 		slog.Error("oidc callback service error", "request_id", middleware.GetRequestID(c), "error", err)
