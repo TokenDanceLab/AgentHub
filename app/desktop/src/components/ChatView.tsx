@@ -944,6 +944,8 @@ function blockKey(block: MessageBlock, index: number): string {
       return `cite-${block.url ?? block.text ?? index}`;
     case 'compact':
       return `compact-${index}`;
+    case 'status':
+      return `status-${index}`;
     default:
       return `block-${index}`;
   }
@@ -1014,6 +1016,8 @@ const BlockRenderer = memo(function BlockRenderer({
       return <CitationBlock block={block} />;
     case 'compact':
       return null;
+    case 'status':
+      return <StatusRow label={block.content} />;
     case 'approval':
       return (
         <ApprovalCard
@@ -1063,6 +1067,8 @@ function extractMessageText(msg: ChatMessage): string {
           return `Context usage: total=${block.total ?? '?'} input=${block.input ?? '?'} output=${block.output ?? '?'} percent=${block.usagePercent ?? '?'}`;
         case 'error':
           return `${block.category ? `[${block.category}] ` : ''}Error: ${block.message}`;
+        case 'status':
+          return block.content;
         default:
           return '';
       }
@@ -1095,6 +1101,8 @@ function hasVisibleBlock(block: MessageBlock): boolean {
     case 'citation':
       return true;
     case 'error':
+      return true;
+    case 'status':
       return true;
     default:
       return false;
