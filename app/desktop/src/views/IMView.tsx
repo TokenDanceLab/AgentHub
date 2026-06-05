@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, CheckCheck, MessageCircle, RefreshCw, X } from 'lucide-react';
-import type { IMContact, IMMessage } from '@/components/IM/types';
+import type { AgentInfo } from '@shared/types';
+import type { IMContact, IMMessage, IMMessageMention } from '@/components/IM/types';
 import IMContactList from '@/components/IM/IMContactList';
 import IMMessageView from '@/components/IM/IMMessageView';
 import IMMessageInput from '@/components/IM/IMMessageInput';
@@ -52,6 +53,7 @@ export default function IMView(props: ViewProps) {
   );
   const hubWS = (props.hubWS ?? null) as HubWSHandle | null;
   const hubClient = (props.hubClient ?? null) as HubClient | null;
+  const agents = (props.agents as AgentInfo[]) ?? [];
   const {
     getSessionMessages,
     loadSessionMessages,
@@ -95,9 +97,9 @@ export default function IMView(props: ViewProps) {
   }, [loadSessionMessages]);
 
   const handleSend = useCallback(
-    async (content: string) => {
+    async (content: string, mentions?: IMMessageMention[]) => {
       if (!activeSessionId) return false;
-      const result = await sendMessage(activeSessionId, content);
+      const result = await sendMessage(activeSessionId, content, undefined, mentions);
       return result?.ok !== false;
     },
     [activeSessionId, sendMessage],
@@ -296,6 +298,7 @@ export default function IMView(props: ViewProps) {
                 onSend={handleSend}
                 disabled={!activeSessionId || activeContact.dissolved}
                 placeholder={activeContact.dissolved ? label('im.input.sessionDissolved', 'This Hub session is dissolved') : undefined}
+                agents={agents}
               />
             </div>
           </>

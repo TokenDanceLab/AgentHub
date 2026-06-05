@@ -368,7 +368,7 @@ function PreviewPanel({
               a.href = url;
               a.download = artifact.title;
               a.click();
-              URL.revokeObjectURL(url);
+              setTimeout(() => URL.revokeObjectURL(url), 100);
             }}
             title={t('run.artifact.download')}
           >
@@ -407,7 +407,7 @@ function PreviewPanel({
                 src={artifact.artifactUrl}
                 title={artifact.title}
                 className={styles.previewIframe}
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts"
               />
             ) : (
               <div className={styles.previewPlaceholder}>
@@ -566,7 +566,7 @@ export default function ArtifactBrowser({
                   a.href = url;
                   a.download = artifact.title;
                   a.click();
-                  URL.revokeObjectURL(url);
+                  setTimeout(() => URL.revokeObjectURL(url), 100);
                 }}
                 title={t('run.artifact.download')}
               >

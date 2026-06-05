@@ -1,6 +1,6 @@
 # 07 - AionUi vs AgentHub 针对性差距报告
 
-> 对照 AgentHub 当前 UI/客户端问题（来源：`docs/roadmaps/client.md`、`docs/handoff/desktop-agent.md`、`docs/handoff/STATE.md`），
+> 对照 AgentHub 当前 UI/客户端问题（来源：`docs/roadmap.md`、`docs/handoffs/STATE.md`），
 > 逐项给出 AionUi 的解决方式和 AgentHub 的具体采纳建议。
 
 ---
@@ -23,7 +23,7 @@ AionUi 在**10 个关键问题上领先 AgentHub 6-12 个月**。尤其值得关
 
 ## 1. P0：状态架构混乱
 
-### AgentHub 当前问题（`docs/roadmaps/client.md` L28-33）
+### AgentHub 当前问题（`docs/roadmap.md`）
 
 | 问题 | 严重度 |
 |------|:--:|

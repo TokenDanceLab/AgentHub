@@ -18,12 +18,12 @@ type AuditService interface {
 
 // AuditHandler handles HTTP endpoints for audit event queries.
 type AuditHandler struct {
-	svc AuditService
+	service AuditService
 }
 
 // NewAuditHandler creates a new AuditHandler.
-func NewAuditHandler(svc AuditService) *AuditHandler {
-	return &AuditHandler{svc: svc}
+func NewAuditHandler(service AuditService) *AuditHandler {
+	return &AuditHandler{service: service}
 }
 
 // ListAuditEvents handles GET requests for audit event listing.
@@ -56,7 +56,7 @@ func (h *AuditHandler) ListAuditEvents(c *gin.Context) {
 
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 
-	result, err := h.svc.Query(c.Request.Context(), callerUserID, isAdmin,
+	result, err := h.service.Query(c.Request.Context(), callerUserID, isAdmin,
 		c.Query("event_type"), c.Query("severity"),
 		since, until, c.Query("pageCursor"), pageSize)
 	if err != nil {

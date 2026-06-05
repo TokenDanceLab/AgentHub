@@ -12,44 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResponseBody_Structure(t *testing.T) {
-	// Verify the responseBody struct has correct JSON tags
-	rb := responseBody{
-		Code:    "TEST_CODE",
-		Message: "test message",
-		Data:    map[string]string{"key": "value"},
-	}
-
-	data, err := json.Marshal(rb)
-	require.NoError(t, err)
-
-	var parsed map[string]interface{}
-	err = json.Unmarshal(data, &parsed)
-	require.NoError(t, err)
-
-	assert.Equal(t, "TEST_CODE", parsed["code"])
-	assert.Equal(t, "test message", parsed["message"])
-	assert.NotNil(t, parsed["data"])
-}
-
-func TestResponseBody_OmitsEmptyData(t *testing.T) {
-	// When Data is nil, it should be omitted from JSON
-	rb := responseBody{
-		Code:    "TEST_CODE",
-		Message: "test message",
-		Data:    nil,
-	}
-
-	data, err := json.Marshal(rb)
-	require.NoError(t, err)
-
-	var parsed map[string]interface{}
-	err = json.Unmarshal(data, &parsed)
-	require.NoError(t, err)
-
-	// Data should be omitted when nil
-	_, hasData := parsed["data"]
-	assert.False(t, hasData, "data field should be omitted when nil")
+// errorResp mirrors the unified error envelope for test assertions.
+type errorResp struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		TraceID string `json:"traceId"`
+	} `json:"error"`
 }
 
 func TestFailHelper_ResponseFormat(t *testing.T) {
@@ -64,12 +33,12 @@ func TestFailHelper_ResponseFormat(t *testing.T) {
 	assert.True(t, c.IsAborted())
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
-	var resp responseBody
+	var resp errorResp
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "BAD_REQUEST", resp.Code)
-	assert.NotEmpty(t, resp.Message)
+	assert.Equal(t, "BAD_REQUEST", resp.Error.Code)
+	assert.NotEmpty(t, resp.Error.Message)
 }
 
 func TestFailHelper_VariousErrorCodes(t *testing.T) {
@@ -118,10 +87,10 @@ func TestFailHelper_VariousErrorCodes(t *testing.T) {
 			assert.True(t, c.IsAborted())
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
-			var resp responseBody
+			var resp errorResp
 			err := json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedCode, resp.Code)
+			assert.Equal(t, tt.expectedCode, resp.Error.Code)
 		})
 	}
 }

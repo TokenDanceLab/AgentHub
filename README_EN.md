@@ -4,12 +4,12 @@
 
 > Claude Code, Codex, OpenCode — collaborating in one IM workspace
 
-[![status](https://img.shields.io/badge/v0.1.0-Active_Development-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
+[![status](https://img.shields.io/badge/v0.3.0-Active_Development-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
 [![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
 [![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
 
-[中文文档](README.md) &nbsp;·&nbsp; [User Guide](docs/guides/user-guide.md) &nbsp;·&nbsp; [FAQ](docs/guides/faq.md) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
+[中文文档](README.md) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
 
 </div>
 
@@ -17,7 +17,7 @@
 
 <!-- Screenshot placeholder: Desktop main UI dark theme -->
 <p align="center">
-  <img src="screenshots/hero-desktop.png" alt="AgentHub Desktop main UI" width="80%">
+  <img src="screenshots/web-app.png" alt="AgentHub Desktop main UI" width="80%">
 </p>
 
 ---
@@ -58,7 +58,7 @@ pnpm dev
 # 5. Open http://localhost:5173
 ```
 
-> Requires Go 1.25+, Node.js 20+, and pnpm. See [User Guide](docs/guides/user-guide.md) for details.
+> Requires Go 1.25+, Node.js 20+, and pnpm. See [Architecture](docs/architecture.md) for details.
 
 <br>
 
@@ -141,9 +141,14 @@ AgentHub/
 ├── hub-server/           # Hub central service
 ├── api/                  # API contracts (OpenAPI + WebSocket events)
 ├── docs/                 # Documentation
-│   ├── guides/           # User guide, FAQ, keyboard shortcuts
-│   ├── architecture/     # Product requirements, system architecture, implementation guide
-│   └── roadmaps/         # Roadmaps and competitive analysis
+│   ├── architecture.md   # Product positioning, system architecture, implementation status
+│   ├── adr/              # Architecture decision records
+│   ├── designs/          # Component design docs
+│   ├── handoffs/         # Project status and handoff
+│   ├── governance/       # Security risk register, branch governance, doc standards
+│   ├── reference/        # Research and competitive analysis
+│   ├── operations/       # Operations docs
+│   └── archive/          # Historical reviews and archived documents
 └── scripts/              # Setup scripts, git hooks
 ```
 
@@ -153,11 +158,9 @@ AgentHub/
 
 | Document | Audience |
 |------|------|
-| [User Guide](docs/guides/user-guide.md) | Users who want to get things done with AgentHub |
-| [FAQ](docs/guides/faq.md) | Common questions |
-| [Keyboard Shortcuts](docs/guides/keyboard-shortcuts.md) | Keyboard reference card |
-| [Product Requirements](docs/architecture/product-requirements.md) | Product positioning and phase goals |
-| [System Architecture](docs/architecture/system-architecture.md) | Technical architecture and core concepts |
+| [Get Started](docs/getting-started/GOAL.md) | New users and FAQ |
+| [Product Requirements](docs/architecture/system-design/product-requirements.md) | Product positioning and phase goals |
+| [System Architecture](docs/architecture/system-design/system-architecture.md) | Technical architecture and core concepts |
 | [API Contract](api/) | REST + WebSocket interface definitions |
 | [Security Risk Register](docs/governance/security-risk-register.md) | Security risk tracking |
 
@@ -173,8 +176,7 @@ Local execution works without login. TokenDance ID unified login is required for
 
 <p align="center">
   <a href="README.md">中文文档</a> &nbsp;·&nbsp;
-  <a href="docs/guides/user-guide.md">User Guide</a> &nbsp;·&nbsp;
-  <a href="docs/guides/faq.md">FAQ</a> &nbsp;·&nbsp;
-  <a href="docs/architecture/system-architecture.md">Architecture</a> &nbsp;·&nbsp;
+  <a href="docs/getting-started/GOAL.md">Get Started</a> &nbsp;·&nbsp;
+  <a href="docs/architecture/system-design/system-architecture.md">Architecture</a> &nbsp;·&nbsp;
   <a href="api/">API</a>
 </p>

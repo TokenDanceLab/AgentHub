@@ -577,7 +577,6 @@ export function useHubIntegration(
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        console.error(`[useHubIntegration] Failed to start Edge run for task ${taskId}:`, errorMsg);
         store.getState().updateTask(taskId, {
           status: 'failed',
           error: errorMsg,

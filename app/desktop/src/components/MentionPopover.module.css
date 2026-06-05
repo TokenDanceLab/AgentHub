@@ -1,6 +1,6 @@
 .popover {
   position: fixed;
-  z-index: var(--z-popover, 45);
+  z-index: var(--z-popover);
   pointer-events: auto;
   background: rgb(34, 34, 42);
   border: 1px solid var(--glass-border-strong);

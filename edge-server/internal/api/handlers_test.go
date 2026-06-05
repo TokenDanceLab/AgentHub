@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -65,6 +66,15 @@ func (f *fakeRunExecutor) Cancel(runID string) lifecycle.CancelResult {
 	return f.cancel
 }
 
+func fallbackHomeDir(t *testing.T) string {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	if err == nil && home != "" {
+		return home
+	}
+	return t.TempDir()
+}
+
 func TestGetHealth(t *testing.T) {
 	h := newTestHandler()
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
@@ -80,6 +90,7 @@ func TestGetHealth(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	if body["status"] != "ok" {
 		t.Errorf("expected status=ok, got %v", body["status"])
@@ -223,6 +234,7 @@ func TestGetHealthDegradesWhenNoRunnerAvailable(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "degraded" {
 		t.Fatalf("overall status = %v, want degraded", body["status"])
 	}
@@ -258,6 +270,7 @@ func TestGetHealthDegradesWhenRunnerRegistryMissing(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "degraded" {
 		t.Fatalf("overall status = %v, want degraded", body["status"])
 	}
@@ -286,6 +299,7 @@ func TestGetRunners(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	items, ok := body["items"].([]any)
 	if !ok {
@@ -319,6 +333,7 @@ func TestGetRuns(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	items, ok := body["items"].([]any)
 	if !ok {
@@ -359,6 +374,7 @@ func TestProjectThreadRoutes(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	items := body["items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("expected one thread, got %d", len(items))
@@ -394,6 +410,7 @@ func TestThreadUpdateArchiveDeleteRoutes(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode patch body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["title"] != "Renamed" || body["status"] != "active" {
 		t.Fatalf("patch body = %#v, want renamed active thread", body)
 	}
@@ -471,6 +488,7 @@ func TestPostRuns(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	runID, ok := body["runId"].(string)
 	if !ok || !strings.HasPrefix(runID, "run_") {
@@ -532,6 +550,7 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["projectId"] != "proj_local" || body["threadId"] != "thread_bound" {
 		t.Fatalf("run binding response = %#v, want proj_local/thread_bound", body)
 	}
@@ -663,10 +682,7 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	h.ensureDefaults()
 
 	// Allow the workDir used by this test to pass workspace validation.
-	workDir := filepath.Join(t.TempDir(), "AgentHub")
-	if err := os.MkdirAll(workDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll returned error: %v", err)
-	}
+	workDir := t.TempDir()
 	h.WorkspaceAllowlist = []string{workDir}
 
 	body, err := json.Marshal(map[string]any{
@@ -684,8 +700,8 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 		"systemPrompt":           "You are a careful reviewer.",
 		"appendSystemPrompt":     "Keep output concise.",
 		"allowedTools":           []string{"Read", "Grep"},
-		"configOverrides":        map[string]any{"reasoning_summary": "auto"},
-		"agentDefinitions":       map[string]any{
+		"configOverrides":        map[string]string{"reasoning_summary": "auto"},
+		"agentDefinitions": map[string]any{
 			"reviewer": map[string]any{
 				"description": "Review code",
 				"prompt":      "Check correctness",
@@ -693,9 +709,9 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 				"model":       "sonnet",
 			},
 		},
-		"mcpConfig":              `{"servers":{"filesystem":{"command":"node"}}}`,
-		"hubTaskId":              "task_hub_1",
-		"ephemeral":              true,
+		"mcpConfig": `{"servers":{"filesystem":{"command":"node"}}}`,
+		"hubTaskId": "task_hub_1",
+		"ephemeral": true,
 	})
 	if err != nil {
 		t.Fatalf("json.Marshal returned error: %v", err)
@@ -822,7 +838,7 @@ func TestPostRunsRejectsWorkDirOutsideWorkspaceAllowlist(t *testing.T) {
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", resp)
 	}
-	if errObj["code"] != "workspace_not_allowed" {
+	if errObj["code"] != "WORKSPACE_NOT_ALLOWED" {
 		t.Fatalf("error code = %#v, want workspace_not_allowed", errObj["code"])
 	}
 	if len(executor.started) != 0 {
@@ -885,17 +901,12 @@ func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
 	// This is the fail-closed security behavior for AH-SR-006.
 	h.WorkspaceAllowlist = []string{} // explicitly empty; nil would behave the same
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil || homeDir == "" {
-		homeDir = t.TempDir()
-	}
-
 	tests := []struct {
 		name    string
 		workDir string
 	}{
 		{"any valid dir", t.TempDir()},
-		{"home directory", homeDir},
+		{"home directory", fallbackHomeDir(t)},
 		{"root filesystem", string(filepath.Separator)},
 	}
 
@@ -925,7 +936,7 @@ func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
 			if !ok {
 				t.Fatalf("error body = %#v, want error object", resp)
 			}
-			if errObj["code"] != "workspace_not_allowed" {
+			if errObj["code"] != "WORKSPACE_NOT_ALLOWED" {
 				t.Fatalf("error code = %#v, want workspace_not_allowed", errObj["code"])
 			}
 			msg, ok := errObj["message"].(string)
@@ -1017,11 +1028,12 @@ func TestPostRunsReturnsErrorWhenExecutorStartFails(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	errObj, ok := body["error"].(map[string]any)
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", body)
 	}
-	if errObj["code"] != "executor_start_failed" {
+	if errObj["code"] != "EXECUTOR_START_FAILED" {
 		t.Fatalf("error code = %#v, want executor_start_failed", errObj["code"])
 	}
 }
@@ -1070,11 +1082,12 @@ func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode duplicate active run body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	errObj, ok := body["error"].(map[string]any)
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", body)
 	}
-	if errObj["code"] != "active_run_exists" {
+	if errObj["code"] != "ACTIVE_RUN_EXISTS" {
 		t.Fatalf("error code = %#v, want active_run_exists", errObj["code"])
 	}
 	if body["runId"] != firstRunID {
@@ -1215,6 +1228,7 @@ func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&runBody); err != nil {
 		t.Fatalf("failed to decode run body: %v", err)
 	}
+	runBody = unwrapSuccess(runBody)
 	runID := runBody["runId"].(string)
 
 	req = httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID, nil)
@@ -1234,6 +1248,7 @@ func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&itemBody); err != nil {
 		t.Fatalf("failed to decode item body: %v", err)
 	}
+	itemBody = unwrapSuccess(itemBody)
 	items := itemBody["items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("expected one run item, got %d", len(items))
@@ -1253,10 +1268,14 @@ func TestPostThreadMessageCreatesItem(t *testing.T) {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
 
-	var item store.Item
-	if err := json.NewDecoder(rec.Body).Decode(&item); err != nil {
-		t.Fatalf("failed to decode item body: %v", err)
+		var itemRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
+				t.Fatalf("failed to decode item body: %v", err)
 	}
+	itemRaw = unwrapSuccess(itemRaw)
+	itemBytes, _ := json.Marshal(itemRaw)
+	var item store.Item
+	json.Unmarshal(itemBytes, &item)
 	if !strings.HasPrefix(item.ID, "item_") {
 		t.Fatalf("item ID = %q, want item_ prefix", item.ID)
 	}
@@ -1291,10 +1310,14 @@ func TestPostThreadMessageUsesRequestedRole(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
-	var item store.Item
-	if err := json.NewDecoder(rec.Body).Decode(&item); err != nil {
-		t.Fatalf("failed to decode item body: %v", err)
+		var itemRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
+				t.Fatalf("failed to decode item body: %v", err)
 	}
+	itemRaw = unwrapSuccess(itemRaw)
+	itemBytes, _ := json.Marshal(itemRaw)
+	var item store.Item
+	json.Unmarshal(itemBytes, &item)
 	if item.Role != "assistant" {
 		t.Fatalf("item role = %q, want assistant", item.Role)
 	}
@@ -1376,6 +1399,7 @@ func TestPostCancelRun(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	if body["runId"] != "run_test123" {
 		t.Errorf("expected runId=run_test123, got %v", body["runId"])
@@ -1416,6 +1440,7 @@ func TestPostCancelRunUsesExecutor(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "cancelling" {
 		t.Fatalf("status = %#v, want cancelling", body["status"])
 	}
@@ -1446,6 +1471,7 @@ func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) 
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != run.Status {
 		t.Fatalf("status = %#v, want %q", body["status"], run.Status)
 	}
@@ -1461,32 +1487,35 @@ func TestPostPermissionDecideRejectsInvalidDecision(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "bad_request")
+	assertErrorCode(t, rec.Body.String(), "INVALID_DECISION")
 }
 
 func TestPostPermissionDecideRequiresRunAndRequest(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-	}{
-		{"missing run", `{"requestId":"req_1","decision":"allow"}`},
-		{"missing request", `{"runId":"run_1","decision":"allow"}`},
-	}
+	t.Run("missing_run", func(t *testing.T) {
+		h := newTestHandler()
+		req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"requestId":"req_1","decision":"allow"}`))
+		rec := httptest.NewRecorder()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHandler()
-			req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(tt.body))
-			rec := httptest.NewRecorder()
+		h.PostPermissionDecide(rec, req)
 
-			h.PostPermissionDecide(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+		}
+		assertErrorCode(t, rec.Body.String(), "RUN_ID_REQUIRED")
+	})
 
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
-			}
-			assertErrorCode(t, rec.Body.String(), "bad_request")
-		})
-	}
+	t.Run("missing_request", func(t *testing.T) {
+		h := newTestHandler()
+		req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","decision":"allow"}`))
+		rec := httptest.NewRecorder()
+
+		h.PostPermissionDecide(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+		}
+		assertErrorCode(t, rec.Body.String(), "REQUEST_ID_REQUIRED")
+	})
 }
 
 func TestPostPermissionDecideRejectsUnknownRequest(t *testing.T) {
@@ -1499,7 +1528,7 @@ func TestPostPermissionDecideRejectsUnknownRequest(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
 }
 
 func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
@@ -1516,7 +1545,7 @@ func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
 	if _, ok := h.PermissionRegistry.Consume("run_real", "req_1"); !ok {
 		t.Fatal("wrong-run decision consumed the real pending request")
 	}
@@ -1545,6 +1574,7 @@ func TestPostPermissionDecideConsumesPendingRequestAndPublishesEvent(t *testing.
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "ok" {
 		t.Fatalf("body status = %#v, want ok", body["status"])
 	}
@@ -1591,7 +1621,7 @@ func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("second status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
 }
 
 func TestPostPermissionDecideRejectsExpiredRequestWithoutPublishing(t *testing.T) {
@@ -1617,7 +1647,7 @@ func TestPostPermissionDecideRejectsExpiredRequestWithoutPublishing(t *testing.T
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
 	if got := h.Bus.HistoryLen(); got != 0 {
 		t.Fatalf("event history len = %d, want 0", got)
 	}
@@ -1638,8 +1668,8 @@ func TestMuxPermissionDecideWrongMethod(t *testing.T) {
 }
 
 func TestErrorResponseFormat(t *testing.T) {
-	errResp := errorResponse("TEST_ERROR", "something went wrong")
-	data, _ := json.Marshal(errResp)
+	errBody := errcode.ErrorBody(errcode.ErrNotFound.WithMessage("something went wrong"))
+	data, _ := json.Marshal(errBody)
 
 	var body map[string]any
 	if err := json.Unmarshal(data, &body); err != nil {
@@ -1650,11 +1680,14 @@ func TestErrorResponseFormat(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected error object, got %T", body["error"])
 	}
-	if errObj["code"] != "TEST_ERROR" {
-		t.Errorf("expected code=TEST_ERROR, got %v", errObj["code"])
+	if errObj["code"] != "NOT_FOUND" {
+		t.Errorf("expected code=NOT_FOUND, got %v", errObj["code"])
 	}
 	if errObj["message"] != "something went wrong" {
 		t.Errorf("expected message, got %v", errObj["message"])
+	}
+	if errObj["traceId"] == nil || errObj["traceId"].(string) == "" {
+		t.Error("expected non-empty traceId")
 	}
 }
 
@@ -1925,7 +1958,7 @@ func TestGetHealthWrongMethod(t *testing.T) {
 	var body map[string]any
 	json.NewDecoder(rec.Body).Decode(&body)
 	errObj := body["error"].(map[string]any)
-	if errObj["code"] != "method_not_allowed" {
+	if errObj["code"] != "METHOD_NOT_ALLOWED" {
 		t.Errorf("expected method_not_allowed, got %v", errObj["code"])
 	}
 }
@@ -2055,6 +2088,7 @@ func TestMuxGetProjectsRoute(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	items, ok := body["items"].([]any)
 	if !ok {
 		t.Fatalf("expected items array, got %T", body["items"])
@@ -2082,6 +2116,7 @@ func TestMuxPostProjectsRoute(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	project = unwrapSuccess(project)
 	if project["projectId"] != "proj_manual" {
 		t.Fatalf("projectId = %v, want proj_manual", project["projectId"])
 	}
@@ -2119,6 +2154,7 @@ func TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent(t *testing.T
 	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
 		t.Fatalf("failed to decode duplicate body: %v", err)
 	}
+	project = unwrapSuccess(project)
 	if project["name"] != "Manual Project" {
 		t.Fatalf("duplicate project name = %v, want original Manual Project", project["name"])
 	}
@@ -2146,6 +2182,7 @@ func TestMuxPostProjectsAutoID(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	project = unwrapSuccess(project)
 	id, ok := project["projectId"].(string)
 	if !ok || !strings.HasPrefix(id, "proj_") {
 		t.Fatalf("projectId = %v, want proj_ prefix", project["projectId"])
@@ -2350,6 +2387,7 @@ func TestMuxGetAgentsEmptyRegistry(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	items, ok := body["items"].([]any)
 	if !ok {
 		t.Fatalf("expected items array, got %T", body["items"])
@@ -2436,4 +2474,16 @@ func assertErrorCode(t *testing.T, body string, want string) {
 	if errObj["code"] != want {
 		t.Fatalf("error code = %#v, want %q", errObj["code"], want)
 	}
+}
+
+// unwrapSuccess extracts data from the unified {"code":"OK","data":...} envelope.
+// Returns the inner data map when an envelope is present, or body unchanged for
+// backward compatibility with raw/non-envelope responses (e.g. error responses).
+func unwrapSuccess(body map[string]any) map[string]any {
+	if body["code"] == "OK" {
+		if data, ok := body["data"].(map[string]any); ok {
+			return data
+		}
+	}
+	return body
 }

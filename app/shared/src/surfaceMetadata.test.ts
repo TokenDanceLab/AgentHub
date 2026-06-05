@@ -3,7 +3,6 @@ import {
   SURFACE_METADATA,
   SURFACE_STATUS_METADATA,
   getSurfaceByDesktopSectionId,
-  getSurfaceByWebRoute,
   getSurfaceMetadata,
   getSurfaceStatusMetadata,
   getSurfacesByCategory,
@@ -83,25 +82,6 @@ describe('surfaceMetadata', () => {
     });
   });
 
-  it('matches web root and parameterized group/project routes', () => {
-    expect(getSurfaceByWebRoute('/')).toMatchObject({
-      id: 'web.workbench',
-      defaultStatus: 'error',
-    });
-    expect(getSurfaceByWebRoute('/agent-square')).toMatchObject({
-      id: 'web.agentSquare',
-      defaultStatus: 'catalogFallback',
-    });
-    expect(getSurfaceByWebRoute('/group/abc')).toMatchObject({
-      id: 'web.groupWorkspace',
-      defaultStatus: 'demoFallback',
-    });
-    expect(getSurfaceByWebRoute('/project/foo')).toMatchObject({
-      id: 'web.projectPreview',
-      defaultStatus: 'demoFallback',
-    });
-  });
-
   it('looks up categories and known statuses', () => {
     expect(getSurfaceMetadata('desktop.settings.agentMarket')).toMatchObject({
       category: 'catalog',
@@ -114,8 +94,6 @@ describe('surfaceMetadata', () => {
     expect(getSurfacesByCategory('communication').map((surface) => surface.id)).toEqual([
       'desktop.settings.onlineIm',
       'desktop.settings.groupChat',
-      'web.privateChats',
-      'web.groupWorkspace',
       'mobile.threads',
       'mobile.chat',
     ]);

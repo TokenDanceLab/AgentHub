@@ -10,18 +10,20 @@ description: "自主开发推进引擎——ROADMAP 驱动、模型分配、并�
 
 ## 模型分配策略
 
-> 最后更新：2026-05-24。与 AGENTS.md 保持同步。
+> 最后更新：2026-06-05。与 AGENTS.md 保持同步。`opus` / `sonnet` / `haiku` 是 Claude CLI 路由别名；Codex 自带 agent 工具单独建模。
 
-| 别名 | 实际模型 | 上下文 | 角色 | 派发策略 |
-|---|---|---|---|---|
-| **opus** | DeepSeek-V4-Pro | 1M | 推理/架构/审查 | 主 Agent 决策、安全审查、DI 重构、复杂跨文件变更 |
-| **sonnet** | Kimi-K2.6 | 256k | 前端/多模态/快速并行 | Desktop UI、IM 界面、视觉审查、批量格式化/重命名 |
-| **haiku** | GLM-5.1 | 200k | 高智力编码/业务逻辑 | Go 后端编码、bug 修复、测试生成、算法实现。优先用，失败换 opus |
+| 入口 | 别名/模型 | 上下文 | 强项 | 派发策略 |
+|---|---|---:|---|---|
+| Codex 自带 agent 工具 | GPT-5.5 | 256k | 全方面强，代码、agentic 执行、审查都稳 | 中等上下文内的核心实现、跨前后端小集成、关键 review |
+| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 长上下文推理、架构、竞品仓库研究、安全/方案审查 | 大范围阅读、路线图/架构判断、复杂设计评审 |
+| Claude CLI | **sonnet** = GLM-5.1 | 200k | 代码和 agentic 能力强，上下文短 | 窄范围代码实现、测试修复、Go/TS 小切片 |
+| Claude CLI | **haiku** = mimo-v2.5 | 适中 | 多模态、看图、视觉判断 | 竞品截图复核、Desktop 视觉 QA、UI 可读性/布局审查 |
 
-- **主 Agent**：opus — 设计决策、审查输出、编辑核心文件（AGENTS.md/ROADMAP.md）
-- **前端 subagent**：sonnet — UI 组件、CSS、多模态视觉审查
-- **后端 subagent**：haiku — Go 编码 + 测试。实际失败才换 opus
-- **批量机械**：sonnet — 翻译、格式化、重命名、测试生成
+- **主 Agent**：设计决策、审查输出、编辑核心文件（AGENTS.md/STATE.md/ROADMAP.md）。
+- **Codex GPT-5.5 subagent**：工具可用时优先派给高价值代码实现和强 review；不要给超 256k 的大仓库研究。
+- **Claude opus**：长上下文推理、竞品研究、安全/架构审查。
+- **Claude sonnet**：明确路径内的实现和 focused tests；prompt 精简，只传必要文件。
+- **Claude haiku**：截图/多模态/UI 视觉审查，不作为代码主力。
 
 ## CC 原生工具配合
 
@@ -44,7 +46,7 @@ dev-loop 配合两个 CC 内置命令使用效果最好：
 ## 标准工作循环
 
 ### 1. 理解
-- 读 `AGENTS.md` / `docs/handoff/STATE.md` / `docs/roadmap.md`
+- 读 `AGENTS.md` / `docs/handoffs/STATE.md` / `docs/roadmap.md`
 - 理解现有架构、约定、当前进度
 - STATE.md 是跨 session 状态文件，每次接手先读
 
@@ -56,21 +58,22 @@ dev-loop 配合两个 CC 内置命令使用效果最好：
 - 不确定的设计先做轻量探索（只读 agent）
 
 ### 3. 执行
-- **自己（opus 主 session）**：设计决策、审查输出、编辑核心文件（AGENTS.md/STATE.md/ROADMAP.md）
-- **派 opus subagent**：复杂功能、架构重构、安全审查、多维度审计
-- **派 sonnet subagent**：批量机械工作（翻译、格式化、测试生成、重命名）
-- **派 haiku subagent**：编码实现、bug 修复、算法。优先用 haiku，实际失败才换 opus
+- **自己（主 session）**：设计决策、审查输出、编辑核心文件（AGENTS.md/STATE.md/ROADMAP.md）
+- **派 Codex GPT-5.5 subagent**：中等上下文内的核心实现、跨模块小集成、关键代码 review
+- **派 Claude opus**：复杂架构推理、长上下文研究、安全审查、多维度审计
+- **派 Claude sonnet**：窄范围编码实现、bug 修复、focused tests
+- **派 Claude haiku**：截图/多模态视觉 QA、UI 对比和可读性审查
 - 每次 subagent 完成后审查其输出
 
 ### 4. 审查
-- 完成一批变更后启动交叉审查：4-5 个 opus agent 并行
-- 维度：结构、文档、安全、架构、易用性
+- 完成一批变更后启动交叉审查：按维度混用 Codex GPT-5.5、Claude opus、Claude sonnet、Claude haiku
+- 维度：结构、文档、安全、架构、易用性、视觉 QA
 - 让其他 agent 提问题："审查这个变更，列出你担心的问题"
 - 修复高优先级项
 
 ### 5. 同步
 - AGENTS.md / CLAUDE.md（规则变更）
-- `docs/handoff/STATE.md`（事实变更：进度/阻塞/部署状态）
+- `docs/handoffs/STATE.md`（事实变更：进度/阻塞/部署状态）
 - ROADMAP.md（标记完成、记录阻塞、写下一步）
 - 运行 `neat-freak` 清理过时文档
 - 运行 `memory-management` 同步 memory（如有跨系统需求）

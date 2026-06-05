@@ -267,8 +267,8 @@ func teamTestFixtures(t *testing.T, db *gorm.DB) (string, string, string) {
 // assertCode checks the API response envelope code field.
 func assertCode(t *testing.T, r apiResp, want, context string) {
 	t.Helper()
-	if r.Code != want {
-		t.Fatalf("%s: expected code=%q, got code=%q message=%q", context, want, r.Code, r.Message)
+	if r.GetCode() != want {
+		t.Fatalf("%s: expected code=%q, got code=%q message=%q", context, want, r.GetCode(), r.GetMsg())
 	}
 }
 
@@ -623,8 +623,8 @@ func TestTeamRunSmoke(t *testing.T) {
 			})
 		r := parse(resp)
 		// Non-existent approval -> BAD_REQUEST (not found in state)
-		assert.True(t, r.Code == "BAD_REQUEST" || r.Code == "AGENT_TASK_NOT_FOUND",
-			"non-existent approval should fail, got code=%q message=%q", r.Code, r.Message)
+		assert.True(t, r.GetCode() == "BAD_REQUEST" || r.GetCode() == "AGENT_TASK_NOT_FOUND",
+			"non-existent approval should fail, got code=%q message=%q", r.GetCode(), r.GetMsg())
 	})
 
 	t.Run("DecideApproval_InvalidDecision_Fails", func(t *testing.T) {

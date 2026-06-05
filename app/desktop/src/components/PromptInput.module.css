@@ -905,8 +905,7 @@
 .sendBtn,
 .stopBtn {
   position: relative;
-  z-index: 1;
-  width: var(--composer-control-h);
+  z-index: var(--z-base);
   height: var(--composer-control-h);
   border-radius: 999px;
   border: none;

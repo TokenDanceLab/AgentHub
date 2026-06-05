@@ -1,0 +1,712 @@
+/* IMBlockRenderer — rich block styles for IM chat flow */
+/* Sprint #2: Tool/Diff/Thinking block rendering for IM */
+
+/* ── Recalled state ──────────────────────────── */
+
+.recalled {
+  font-style: italic;
+  opacity: 0.5;
+}
+
+/* ── Tool Use Block ───────────────────────────*/
+
+.toolUse {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #0f172a);
+}
+
+.toolUseHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.toolUseHeader:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.03));
+}
+
+.toolIcon {
+  display: flex;
+  align-items: center;
+  color: var(--accent, #3b82f6);
+  flex-shrink: 0;
+}
+
+.toolName {
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+  flex-shrink: 0;
+}
+
+.toolSummary {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 11px;
+}
+
+.toolStatus {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.toolStatusPending {
+  background: var(--glass-tint-amber, rgba(251, 191, 36, 0.15));
+  color: var(--warning, #f59e0b);
+}
+
+.toolStatusRunning {
+  background: var(--glass-tint-sky, rgba(59, 130, 246, 0.15));
+  color: var(--primary, #3b82f6);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.toolStatusDone {
+  background: var(--glass-tint-moss, rgba(34, 197, 94, 0.15));
+  color: var(--success, #22c55e);
+}
+
+.toolStatusFailed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--destructive, #ef4444);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.chevron {
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.chevronDown {
+  transform: rotate(90deg);
+}
+
+.toolBody {
+  padding: 0 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toolResultRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted-foreground, #94a3b8);
+  overflow: hidden;
+}
+
+.toolResultRow code {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolStdout {
+  display: block;
+  font-size: 10px;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  padding: 4px 8px;
+  background: var(--surface-raised, #1e293b);
+  border-radius: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.toolStderr {
+  color: var(--destructive, #ef4444);
+}
+
+.exitCode {
+  font-size: 10px;
+  color: var(--muted-foreground, #94a3b8);
+  margin-left: auto;
+}
+
+/* ── Diff Card ──────────────────────────────── */
+
+.diffCard {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface, #0f172a);
+}
+
+.diffHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  background: var(--surface-raised, #1e293b);
+  border-bottom: 1px solid var(--border-color, #334155);
+}
+
+.diffPath {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--foreground);
+}
+
+.diffAdded {
+  color: var(--success, #22c55e);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.diffDeleted {
+  color: var(--destructive, #ef4444);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.diffPreview {
+  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  font-size: 10px;
+  line-height: 1.5;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.lineAdded {
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--success, #22c55e);
+  padding: 0 8px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineDeleted {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--destructive, #ef4444);
+  padding: 0 8px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineContext {
+  color: var(--muted-foreground, #94a3b8);
+  padding: 0 8px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.linePrefix {
+  display: inline-block;
+  width: 12px;
+  opacity: 0.5;
+  user-select: none;
+}
+
+.lineContent {
+  display: inline;
+}
+
+/* ── Thinking Block ─────────────────────────── */
+
+.thinking {
+  margin: var(--space-xs) 0;
+}
+
+.thinkingToggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.thinkingToggle:hover {
+  opacity: 1;
+}
+
+.thinkingContent {
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: var(--surface-raised, #1e293b);
+  border-radius: 6px;
+  border-left: 2px solid var(--border-color, #334155);
+  font-size: 12px;
+  color: var(--muted-foreground, #94a3b8);
+  line-height: 1.5;
+}
+
+/* ── Approval Notice ────────────────────────── */
+
+.approvalNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-xs) 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #334155);
+  background: var(--surface, #0f172a);
+  font-size: 11px;
+}
+
+.approvalIcon {
+  display: flex;
+  color: var(--warning, #f59e0b);
+}
+
+.approvalLabel {
+  font-weight: 600;
+  color: var(--foreground);
+  margin-right: 2px;
+}
+
+.approvalAgent {
+  color: var(--accent, #3b82f6);
+}
+
+.approvalTool {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 10px;
+}
+
+.approvalRisk {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.riskLow {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success, #22c55e);
+}
+
+.riskMedium {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warning, #f59e0b);
+}
+
+.riskHigh {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+}
+
+.riskCritical {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--destructive, #ef4444);
+}
+
+.approvalStatus {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.approvalPending {
+  background: var(--glass-tint-amber, rgba(251, 191, 36, 0.15));
+  color: var(--warning, #f59e0b);
+}
+
+.approvalApproved {
+  background: var(--glass-tint-moss, rgba(34, 197, 94, 0.15));
+  color: var(--success, #22c55e);
+}
+
+.approvalDenied {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--destructive, #ef4444);
+}
+
+.approvalTimeout {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted-foreground, #94a3b8);
+}
+
+/* ── File Change Block ──────────────────────── */
+
+.fileChange {
+  margin: var(--space-xs) 0;
+}
+
+.fileChangeHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 6px;
+  background: var(--surface, #0f172a);
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.fileChangeHeader:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.03));
+}
+
+.fileChangeAction {
+  text-transform: capitalize;
+  font-weight: 500;
+  color: var(--accent, #3b82f6);
+}
+
+.fileChangePath {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.fileChangeAdd {
+  color: var(--success, #22c55e);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.fileChangeDel {
+  color: var(--destructive, #ef4444);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.fileChangeDiff {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: var(--surface-raised, #1e293b);
+  border-radius: 4px;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+/* ── Agent Task ─────────────────────────────── */
+
+.agentTask {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-xs) 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #334155);
+  background: var(--surface, #0f172a);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.agentTaskSummary {
+  width: 100%;
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Error Block ────────────────────────────── */
+
+.errorBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: var(--space-xs) 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--destructive, #ef4444);
+  font-size: 11px;
+}
+
+.errorCategory {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.15);
+  font-size: 9px;
+  text-transform: uppercase;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── Status Row ─────────────────────────────── */
+
+.statusRow {
+  font-size: 11px;
+  color: var(--muted-foreground, #94a3b8);
+  font-style: italic;
+}
+
+/* ── Child Agent Block ──────────────────────── */
+
+.childAgent {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #0f172a);
+}
+
+.childAgentHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.childAgentHeader:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.03));
+}
+
+.childAgentIcon {
+  color: var(--accent, #3b82f6);
+  flex-shrink: 0;
+}
+
+.childAgentTitle {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.childAgentName {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 10px;
+}
+
+.childAgentBody {
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--border-color, #334155);
+  font-size: 11px;
+}
+
+.childAgentError {
+  color: var(--destructive, #ef4444);
+  margin-bottom: 4px;
+}
+
+.childAgentResult {
+  color: var(--muted-foreground, #94a3b8);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+/* ── Route Decision Block ───────────────────── */
+
+.routeDecision {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #0f172a);
+}
+
+.routeDecisionHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.routeDecisionHeader:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.03));
+}
+
+.routeAction {
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+}
+
+.routeWorker {
+  font-size: 10px;
+  color: var(--muted-foreground, #94a3b8);
+}
+
+.routeBlocked {
+  font-size: 10px;
+  color: var(--destructive, #ef4444);
+}
+
+.routeDecisionBody {
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--border-color, #334155);
+  font-size: 11px;
+  color: var(--muted-foreground, #94a3b8);
+}
+
+.routeSummary {
+  margin-bottom: 4px;
+}
+
+.routeInstructions {
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.routeReasoning {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* ── Artifact Block ─────────────────────────── */
+
+.artifact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-xs) 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #334155);
+  background: var(--surface, #0f172a);
+  font-size: 11px;
+}
+
+.artifactType {
+  text-transform: uppercase;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--glass-tint-sky, rgba(59, 130, 246, 0.15));
+  color: var(--primary, #3b82f6);
+}
+
+.artifactTitle {
+  font-weight: 500;
+}
+
+.artifactLink {
+  font-size: 10px;
+  color: var(--primary, #3b82f6);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifactSize {
+  font-size: 10px;
+  color: var(--muted-foreground, #94a3b8);
+  margin-left: auto;
+}
+
+/* ── Deploy Card Block ──────────────────────── */
+
+.deployCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-xs) 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #334155);
+  background: var(--surface, #0f172a);
+  font-size: 11px;
+}
+
+.deployLabel {
+  font-weight: 600;
+}
+
+.deployStatus {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.deploySuccess {
+  background: var(--glass-tint-moss, rgba(34, 197, 94, 0.15));
+  color: var(--success, #22c55e);
+}
+
+.deployFailed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--destructive, #ef4444);
+}
+
+.deployRunning {
+  background: var(--glass-tint-sky, rgba(59, 130, 246, 0.15));
+  color: var(--primary, #3b82f6);
+}
+
+.deployPending {
+  background: var(--glass-tint-amber, rgba(251, 191, 36, 0.15));
+  color: var(--warning, #f59e0b);
+}
+
+.deployMessage {
+  font-size: 10px;
+  color: var(--muted-foreground, #94a3b8);
+}
+
+.deployUrl {
+  font-size: 10px;
+  color: var(--primary, #3b82f6);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

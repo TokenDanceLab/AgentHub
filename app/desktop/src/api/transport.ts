@@ -182,8 +182,8 @@ export class WebSocketTransport implements Transport {
         } else {
           (handler as TransportMessageHandler)(data);
         }
-      } catch (e) {
-        console.error(`Transport handler error for event "${event}":`, e);
+      } catch (error) {
+        console.error('[WebSocketTransport] Handler error ignored', error);
       }
     }
   }
