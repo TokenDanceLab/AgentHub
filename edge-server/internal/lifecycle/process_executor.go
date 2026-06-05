@@ -475,6 +475,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if ctx.Err() != nil {
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()
+			_, _ = cmd.Process.Wait()
 		}
 		e.publishCancelled(run)
 		return
