@@ -59,9 +59,9 @@
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 ████████████  85%  ← A0-A3✅, A4 Wave2 6/7, A6.2✅, A6.3✅
+Phase A: 工程基础设施 ████████████  95%  ← A0-A3✅, A4 Wave2 7/7✅, A6.2✅, A6.3✅
 Phase B: 持久化 + 性能  ██░░░░░░░░  15%  ← B2 N+1 ✅
-Phase C: IM 核心闭环   ░░░░░░░░░░   0%
+Phase C: IM 核心闭环   ██░░░░░░░░  15%  ← Sprint #1 @Agent✅, Sprint #2 富消息✅
 Phase D: 高级功能      ░░░░░░░░░░   0%
 ```
 
@@ -142,7 +142,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
   - [x] `useTopMenuConfig.ts` — 菜单定义 221 行（低难度）✅
   - [x] `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）✅
   - [x] `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）✅
-  - [ ] `useSendRun.ts` — 发送/启动 run 116 行（高难度，最后）← 最后一个
+  - [x] `useSendRun.ts` — 发送/启动 run 116 行（高难度）✅
   - 执行顺序：E→F→G→A（阶段1低风险）→ D→C（阶段2）→ B（阶段3核心）
 - [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖
 
@@ -362,11 +362,13 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **A1 请求日志** | pkg/reqlog + Edge/Hub 接入 + context ID 传播 + 6 tests | 2026-06-05 |
 | **A3 P0 安全** | Auth token Debug 日志 + FileStore async persist (50ms debounce) | 2026-06-05 |
 | **A2 调试端点** | pkg/debug 共享模块 + Hub/Edge 统一注册 + health/pprof/metrics/config/state + 11 tests | 2026-06-05 |
-| **A4 Wave 2 (6/7)** | App.tsx 1525→~1130，6 hooks 拆出 + block key 稳定化 | 2026-06-05 |
+| **A4 Wave 2 complete** | App.tsx 1525→991 (-35%)，7 hooks 全部拆出 + block key 稳定化 | 2026-06-05 |
 | **A6.2 统一信封** | Edge writeSuccess + unwrapEdgeResponse 双格式兼容 | 2026-06-05 |
 | **A6.3 DB TLS** | AGENTHUB_DB_SSLMODE 环境变量 + Validate 白名单 | 2026-06-05 |
 | **B2 N+1 修复** | Session list/StartTeamRun/dispatchTask + Migration 0041 索引 | 2026-06-05 |
 | **前端 P0 block key** | ChatView blockKey index→content hash，消除流式闪烁 | 2026-06-05 |
+| **Sprint #1 IM @Agent** | 群聊 @Agent 分派 — useMention + MentionPopover + mention 编解码 | 2026-06-05 |
+| **Sprint #2 IM 富消息** | IMBlockRenderer — Tool/Diff/Thinking/Approval 投影到 IM 聊天流 | 2026-06-05 |
 | **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 | **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
