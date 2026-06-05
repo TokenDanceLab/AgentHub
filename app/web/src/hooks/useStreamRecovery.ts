@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useCallback } from 'react';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { createHubClient, type AgentRunEvent } from '@/api/hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
 import { mergeAgentRunEvents } from '@/utils/hubAdapters';
 
 /**
@@ -34,7 +33,6 @@ export function useStreamRecovery({
   isConnected: boolean;
 }) {
   const { t } = useTranslation();
-  const recoveryState = useConnectionStore((s) => s.recoveryState);
   const setRecoveryState = useConnectionStore((s) => s.setRecoveryState);
   const setRecoveryError = useConnectionStore((s) => s.setRecoveryError);
   const setLastEventSeq = useConnectionStore((s) => s.setLastEventSeq);
