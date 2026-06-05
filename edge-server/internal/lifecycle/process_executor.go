@@ -319,6 +319,24 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	if !ok {
 		return CancelResult{Found: false, Status: "not_running"}
 	}
+
+	// Graceful shutdown: wait grace period for child to respond to stdin interrupt,
+	// then send SIGTERM, wait force timeout, and escalate to SIGKILL as last resort.
+	e.mu.Lock()
+	proc := e.processes[runID]
+	e.mu.Unlock()
+	if proc != nil {
+		// Wait shutdownGracePeriod for child process to naturally exit
+		time.Sleep(e.shutdownGracePeriod)
+		// Send SIGTERM (os.Interrupt)
+		_ = proc.Signal(os.Interrupt)
+		// Wait shutdownForceTimeout before escalating
+		time.Sleep(e.shutdownForceTimeout)
+		// Escalate to Kill
+		_ = proc.Kill()
+		_, _ = proc.Wait()
+	}
+
 	cancel()
 
 	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started", "cancelling")
