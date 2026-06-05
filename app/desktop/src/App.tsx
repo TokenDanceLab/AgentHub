@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   Suspense,
+  lazy,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
@@ -62,13 +63,16 @@ import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import AuthPage from '@/components/AuthPage';
-import HomeDashboard from '@/components/HomeDashboard';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
 import TopMenuBar, { type TopMenuDefinition } from '@/components/TopMenuBar';
 import { ToastContainer } from '@/components/Toast';
-import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
+import type { SectionId as SettingsSectionId } from '@/components/SettingsPage';
+
+// Lazy-loaded non-critical components
+const AuthPage = lazy(() => import('@/components/AuthPage'));
+const HomeDashboard = lazy(() => import('@/components/HomeDashboard'));
+const SettingsPage = lazy(() => import('@/components/SettingsPage'));
 import {
   AlertTriangle,
   ChevronLeft,
@@ -1177,11 +1181,13 @@ export default function App() {
       />
 
       {settingsOpen ? (
+        <Suspense fallback={null}>
         <SettingsPage
           initialSection={settingsInitialSection}
           onBack={() => setSettingsOpen(false)}
           onOpenAuth={handleOpenAuth}
         />
+        </Suspense>
       ) : (
       <>
 
@@ -1393,6 +1399,7 @@ export default function App() {
             {/* Chat area */}
             <div className={styles.chatArea}>
               {leftSidebarView === 'home' ? (
+                <Suspense fallback={null}>
                 <HomeDashboard
                   onNewThread={async () => {
                     try {
@@ -1433,6 +1440,7 @@ export default function App() {
                   onSelectAgent={handleSelectAgent}
                   onStartLocalOrchestration={handleStartLocalOrchestration}
                 />
+                </Suspense>
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
@@ -1501,10 +1509,12 @@ export default function App() {
       {showAuthModal && (
         <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>
           <div className={styles.authModal} onClick={(e) => e.stopPropagation()}>
+            <Suspense fallback={null}>
             <AuthPage
               onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
               onClose={() => useHubStore.getState().setShowAuthModal(false)}
             />
+            </Suspense>
           </div>
         </div>
       )}
