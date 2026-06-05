@@ -60,27 +60,73 @@ export function useDesktopCommands(deps: UseDesktopCommandsDeps): UseDesktopComm
 
   const handleEditCommand = useCallback((command: EditCommand) => {
     const active = document.activeElement;
-    if (command === 'selectAll' && active instanceof HTMLInputElement) {
-      active.select();
+
+    // selectAll: use native .select() for input/textarea
+    if (command === 'selectAll') {
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+        active.select();
+        return;
+      }
+      try {
+        document.execCommand('selectAll');
+      } catch {
+        addToast({ type: 'error', message: t('toast.error') });
+      }
       return;
     }
-    if (command === 'selectAll' && active instanceof HTMLTextAreaElement) {
-      active.select();
+
+    // undo/redo: execCommand is the only reliable trigger, no modern alternative
+    if (command === 'undo' || command === 'redo') {
+      try {
+        document.execCommand(command);
+      } catch {
+        addToast({ type: 'error', message: t('toast.error') });
+      }
       return;
     }
-    const commandMap = {
-      undo: 'undo',
-      redo: 'redo',
-      cut: 'cut',
-      copy: 'copy',
-      paste: 'paste',
-      delete: 'delete',
-      selectAll: 'selectAll',
-    } as const;
-    try {
-      document.execCommand(commandMap[command]);
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
+
+    // cut/copy/paste/delete: prefer modern APIs with execCommand fallback
+    switch (command) {
+      case 'copy': {
+        const selection = window.getSelection();
+        if (selection?.toString()) {
+          navigator.clipboard.writeText(selection.toString()).catch(() => {
+            document.execCommand('copy');
+          });
+        }
+        break;
+      }
+      case 'cut': {
+        const selection = window.getSelection();
+        if (selection?.toString()) {
+          const text = selection.toString();
+          navigator.clipboard.writeText(text).then(() => {
+            selection.deleteFromDocument();
+          }).catch(() => {
+            document.execCommand('cut');
+          });
+        }
+        break;
+      }
+      case 'paste': {
+        navigator.clipboard.readText().then((text) => {
+          if (text) {
+            document.execCommand('insertText', false, text);
+          }
+        }).catch(() => {
+          document.execCommand('paste');
+        });
+        break;
+      }
+      case 'delete': {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          selection.deleteFromDocument();
+        } else {
+          document.execCommand('delete');
+        }
+        break;
+      }
     }
   }, [addToast, t]);
 
