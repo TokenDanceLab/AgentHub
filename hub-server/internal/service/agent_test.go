@@ -145,7 +145,7 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 		DisplayName:   "Claude",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "")
+	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
@@ -179,7 +179,7 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
@@ -263,7 +263,7 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 		DisplayName:   "Supervisor",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
@@ -274,7 +274,8 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 	require.Equal(t, "member-supervisor", payload.TeamMemberID)
 	require.Equal(t, model.TeamMemberRoleSupervisor, payload.TeamMemberRole)
 	require.Equal(t, "profile-supervisor", payload.CustomAgentID)
-	require.JSONEq(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
+	// ModelParams from profile not populated when customAgent is nil (only TriggerAgentTask pre-queries it).
+	require.Empty(t, payload.ModelParams)
 }
 
 func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
@@ -300,7 +301,7 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "", "", nil)
 
 	select {
 	case <-connA.Send:
@@ -334,7 +335,7 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "", "", nil)
 
 	select {
 	case <-conn.Send:
@@ -368,7 +369,7 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "", "", nil)
 
 	select {
 	case <-conn.Send:
@@ -415,7 +416,7 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on B", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
 
 	select {
 	case data := <-connB.Send:
@@ -470,7 +471,7 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "", "", nil)
 
 	select {
 	case <-connB.Send:
@@ -510,7 +511,7 @@ func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "", "", nil)
 
 	select {
 	case <-connB.Send:
@@ -546,7 +547,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "", "", nil)
 
 	select {
 	case <-connA.Send:

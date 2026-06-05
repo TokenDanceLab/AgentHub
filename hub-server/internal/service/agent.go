@@ -365,9 +365,18 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		return nil, err
 	}
 
+	// Pre-query the CustomAgent to avoid a DB query inside the dispatch goroutine.
+	var customAgent *model.CustomAgent
+	if ai.CustomAgentID != nil && *ai.CustomAgentID != "" {
+		ca, err := repository.GetCustomAgentByID(s.db, *ai.CustomAgentID)
+		if err == nil {
+			customAgent = ca
+		}
+	}
+
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
 	// cancelled when the HTTP handler's request context is cancelled.
-	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams, targetType)
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams, targetType, customAgent)
 
 	return task, nil
 }
@@ -429,7 +438,7 @@ func promptFromMessage(msg *model.Message) string {
 	return msg.Content
 }
 
-func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string) {
+func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
 	dp := dispatchPayload{
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
@@ -443,12 +452,11 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	}
 
 	if ai.CustomAgentID != nil && *ai.CustomAgentID != "" {
-		ca, err := repository.GetCustomAgentByID(s.db, *ai.CustomAgentID)
-		if err == nil {
-			dp.CustomAgentID = *ai.CustomAgentID
-			dp.SystemPrompt = ca.SystemPrompt
-			dp.ModelParams = ca.ModelParams
-			dp.ToolWhitelist = ca.ToolWhitelist
+		dp.CustomAgentID = *ai.CustomAgentID
+		if customAgent != nil {
+			dp.SystemPrompt = customAgent.SystemPrompt
+			dp.ModelParams = customAgent.ModelParams
+			dp.ToolWhitelist = customAgent.ToolWhitelist
 		}
 	}
 	dp.ModelParams = mergeModelParams(dp.ModelParams, modelParams)
