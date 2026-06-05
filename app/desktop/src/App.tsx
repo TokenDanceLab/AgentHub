@@ -33,6 +33,7 @@ import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useAuth } from '@/hooks/useAuth';
 import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
 import useShellShortcuts from '@/hooks/useShellShortcuts';
+import { useDesktopCommands } from '@/hooks/useDesktopCommands';
 import type { StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -580,26 +581,16 @@ export default function App() {
   }, [handleOpenAuth, hubAuthenticated, openSettings]);
 
   const desktopWindowAvailable = isTauriRuntime();
-  const handleWindowCommand = useCallback(async (command: 'minimize' | 'toggleMaximize' | 'close') => {
-    if (!desktopWindowAvailable) {
-      addToast({ type: 'info', message: t('menu.nativeWindowUnavailable') });
-      return;
-    }
-    try {
-      const windowHandle = getCurrentWindow();
-      if (command === 'minimize') {
-        await windowHandle.minimize();
-        return;
-      }
-      if (command === 'close') {
-        await windowHandle.close();
-        return;
-      }
-      (await windowHandle.isMaximized()) ? await windowHandle.unmaximize() : await windowHandle.maximize();
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, desktopWindowAvailable, t]);
+
+  const { handleWindowCommand, handleEditCommand, handleCopyDiagnostics } = useDesktopCommands({
+    online,
+    isConnected,
+    wsLatency,
+    healthVersion: health?.version,
+    selectedAgent,
+    selectedThread,
+    displayedRun,
+  });
 
   const handleOpenFolder = useCallback(async () => {
     if (!desktopWindowAvailable) {
@@ -618,50 +609,6 @@ export default function App() {
       addToast({ type: 'error', message: t('toast.error') });
     }
   }, [addToast, desktopWindowAvailable, t]);
-
-  const handleEditCommand = useCallback((command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll') => {
-    const active = document.activeElement;
-    if (command === 'selectAll' && active instanceof HTMLInputElement) {
-      active.select();
-      return;
-    }
-    if (command === 'selectAll' && active instanceof HTMLTextAreaElement) {
-      active.select();
-      return;
-    }
-    const commandMap = {
-      undo: 'undo',
-      redo: 'redo',
-      cut: 'cut',
-      copy: 'copy',
-      paste: 'paste',
-      delete: 'delete',
-      selectAll: 'selectAll',
-    } as const;
-    try {
-      document.execCommand(commandMap[command]);
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, t]);
-
-  const handleCopyDiagnostics = useCallback(async () => {
-    const diagnostic = [
-      'AgentHub Desktop diagnostics',
-      `Edge: ${online ? `online ${health?.version ?? 'v1'}` : 'offline'}`,
-      `WebSocket: ${isConnected ? 'connected' : 'disconnected'}`,
-      wsLatency != null ? `Latency: ${wsLatency}ms` : null,
-      selectedAgent ? `Agent: ${selectedAgent.name} (${selectedAgent.id})` : null,
-      selectedThread ? `Thread: ${selectedThread.threadId}` : null,
-      displayedRun ? `Run: ${displayedRun.runId} (${displayedRun.status})` : null,
-    ].filter(Boolean).join('\n');
-    try {
-      await navigator.clipboard.writeText(diagnostic);
-      addToast({ type: 'success', message: t('toast.copied') });
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, displayedRun, health?.version, isConnected, online, selectedAgent, selectedThread, t, wsLatency]);
 
   const handleReviewApprovalsFromHome = useCallback(() => {
     if (permissionRequests.length === 0) {
