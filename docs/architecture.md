@@ -27,14 +27,35 @@ AgentHub = 本地 Agent 工作台 + IM 式多 Agent 协作 + Hub 网络同步与
 
 ## 3. 核心体验
 
+Desktop 的第一屏目标是 **IM-first Command Center**：它必须像 IM 一样好理解，同时像 IDE 工作台一样能承载执行证据。参考竞品界面的正确取舍不是复制视觉样式，而是采用清晰的信息架构：左侧找人和找会话，中间看完整 transcript，右侧看进度与产物，底部只保留一个可执行输入入口。
+
 ```text
-左侧：Project / Thread
-中间：IM 消息流、Agent 进度、审批卡片
-右侧：Changed Files / Diff / Preview / Logs / Artifact
-底部：输入框，支持 @Agent Profile，详情显示 Runtime / Model / Execution Target
+Global Rail      ：图标式全局模式切换，消息 / 项目 / Agent / TeamRun / 设置
+Conversation 列表：当前会话、Manager 私聊、Worker 私聊、Project 群聊、搜索和筛选
+Unified Transcript：用户消息、Agent 回复、Thinking、Tool、Diff、Approval、Artifact、Deploy 事件
+Right Inspector  ：Run 进度、TeamRun 任务、Tool 时间线、审批、Changed Files、工作文件夹
+Unified Composer ：@Agent、附件、工作目录、审批模式、发送 / 派发 / 部署指令
 ```
 
 用户直接选择和管理的是 Agent Profile。Profile 由 Agent Runtime、模型、Agent Configuration、Workspace、Skill/MCP、审批策略和 Execution Target 组成。
+
+### Desktop 信息架构规则
+
+| 区域 | 职责 | 规则 |
+|---|---|---|
+| Global Rail | App 级导航，只放图标和状态点 | 不承载 dense 数据；所有按钮必须有 tooltip / aria-label |
+| Conversation 列表 | 联系人、Agent 私聊、Project 群聊、当前会话 | 会话对象和执行对象分离：Claude Code/Codex/OpenCode 是 Runtime，列表展示 Profile / Team / Project |
+| Unified Transcript | 单一消息流渲染合同 | Hub IM、Edge Chat、TeamRun event 都必须投影成同一类 block；禁止新增第二套 Markdown-only 聊天流 |
+| Right Inspector | 证据面板 | 它不是装饰卡片；必须能看到进度、步骤、Tool、Diff、Artifact、工作文件夹和失败原因 |
+| Unified Composer | 唯一任务入口 | `PromptInput` 和 `IMMessageInput` 后续收敛为共享 composer 或共享 adapter；@Agent、文件、workdir、approval mode 语义一致 |
+
+### 渲染和状态收敛规则
+
+- `viewRegistry` 的 slot 边界保持稳定：`shell`、`sidebar`、`centerSidebar`、`center`、`rightPanel`、`agentOverlay`、`modal` 是 Desktop 重组的约束，不为了单页效果绕开 registry。
+- `IMBlockRenderer` 已证明 IM 流可以承载 Tool、Diff、Thinking、Approval 等富 block。下一步不是再做一套渲染器，而是让主 Chat 和 IM 围绕同一 Transcript block contract 收敛。
+- `RunDetail`、`TeamRunDock`、`TeamRunConsole` 的信息要分层：右侧 Inspector 显示摘要、进度和证据；Console 可以作为深度工作台，不应成为唯一可见证据。
+- 右侧面板在窄屏收起时必须给用户明确入口；Desktop 宽屏必须优先保证 Transcript 和 Inspector 同屏可见。
+- 比赛 Demo 不以完整远程/云场景为前置。只要本地 Desktop 能展示真实 Runtime Profile 协作、富消息产物和可追溯执行证据，就优先服务 3 分钟演示闭环。
 
 ### 当前可演示流
 
@@ -352,21 +373,23 @@ Project -> Conversation -> Thread -> Turn / AgentRun -> Item -> Artifact / Appro
 
 > 摘要自 `docs/roadmap.md`（最后更新 2026-06-05），详细进展见该文件。
 
-**当前状态**：P0 全部完成。Desktop 1166/1166 tests、Edge 17/17 Go packages、Hub 17/17 Go packages、i18n 1560 zh/en keys。集成分支 `dev/delicious233`。
+**当前状态**：比赛冲刺进入 Desktop IM-first Command Center 重组阶段。Phase A 约 95%，Phase B 约 25%，Phase C 约 35%。`dev/delicious233` 是当前集成事实源。
 
-**近期完成（2026-06-01 Sprint）**：
-- E2E 测试 27/27 全部通过
-- Claude Code adapter NDJSON 事件补齐、Codex adapter 能力标记补齐、OpenCode adapter --thinking 修复 + Diff 引擎 Go 移植
-- Edge Server --remote-mode 8 执行场景全部打通
-- OIDC 全链路验证脚本 + 8 处配置修复
-- Agent 决策循环（DecisionLoop）14 tests
-- WS 自动重连（指数退避+jitter）
-- Draining 状态全栈、RAF 流式渲染、三级审批
-- ErrorBoundary chunk recovery、虚拟滚动、6-theme engine
+**近期完成（2026-06-05 Sprint）**：
+- A0/A1/A2/A3 工程基础设施完成：Edge/Hub 错误码、请求日志、调试端点、P0 安全与 FileStore 稳定性修复。
+- A4 Wave 2 完成：App.tsx 拆出 7 个 hook，`viewRegistry` slot 体系已成为 Desktop 重组边界。
+- A6.2/A6.3 完成：Edge 成功响应信封、DB TLS 配置落地。
+- B2/B3 部分完成：Hub N+1 查询和索引修复，`agent.go` 已拆分。
+- Sprint #1 完成：IM `@Agent` mention 接入 `useMention` / `MentionPopover`，消息可携带 mentions。
+- Sprint #2 完成：`IMBlockRenderer` 将 Tool、Diff、Thinking、Approval 等富 block 投影到 IM 聊天流。
+- Sprint #4 与前端止血完成：Tool 卡片语义化、execCommand 替换、Mock/iframe/z-index/console 等阻断项已关闭。
 
-**P1 进行中**：AgentTeam / TeamRun / TeamTask / TeamEvent（Hub 后端已落地，双真实 Runtime Profile 群组 E2E 待完成）
-
-**P2 进行中**：Identity + Edge-Hub Sync（Hub OIDC code exchange 已落地，部署态 login/logout/reconnect 证据待补）
+**近期最高优先级**：
+1. Desktop Shell 信息架构重组：Global Rail + Conversation 列表 + Unified Transcript + Right Inspector + Unified Composer。
+2. TeamRun E2E transcript：两个真实 Runtime Profile 在同一群聊 / TeamRun 中协作，保留 route/task/event 证据。
+3. Transcript 渲染合同收敛：主 Chat 与 IM 不再维护两套互相漂移的 block 渲染路径。
+4. Right Inspector 证据面板：把 RunDetail、TeamRun 摘要、Tool timeline、Artifact 和工作文件夹放到同一右侧检查面。
+5. 比赛材料同步：Demo 脚本、功能矩阵、截图和 AI 协作记录不得沿用 2026-06-01 的过期缺口。
 
 ## 23. 当前验收命令
 
