@@ -394,3 +394,89 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | Hub Server | Go + Gin + GORM + Redis + PG | PostgreSQL 16 | ~46,000 行 | `go test ./... -short -race` |
 | 协议 | REST JSON + WebSocket NDJSON | — | OpenAPI 5,590 行 | — |
 | CI | GitHub Actions (Win + macOS) | — | — | `scripts/verify-ci-gates.ps1` |
+
+---
+
+## Desktop 前端深度审计
+
+> 2026-06-05 基于竞品对比 + 代码实证的深度审查。聚焦 ChatView/IM/渲染/交互四大方向。
+> 综合评分：**4.5/10** — 核心功能可用但体验粗糙，多处开发态残留和交互 Bug。
+
+### P0 问题清单（阻断级）
+
+| # | 问题 | 文件 | 影响 |
+|---|------|------|------|
+| 1 | **ChatView.tsx 1786 行单文件巨石** | `components/ChatView.tsx` | 可维护性极差，任何改动都有连锁风险 |
+| 2 | **运行状态三源同步** | `App.tsx` + `useChatMessages.reducer` + `runStore` | 同一 Run 状态分散 3 处，任一同步遗漏导致 UI 卡死/显示错误 |
+| 3 | **block key 依赖 index 不稳定** | ChatView `blockKey()` | `text-${index}` 流式渲染时 DOM 反复卸载/挂载，闪烁 |
+| 4 | **Agent Market 硬编码 Mock 数据** | `AgentMarketSection.tsx:72-169` | 6 个 mock agents 无法安装使用，欺骗性 UI |
+| 5 | **已弃用 `document.execCommand`** | `App.tsx:641`, `clipboard.ts:18` | undo/redo/copy 在现代浏览器可能静默失败 |
+
+### P1 问题清单（体验级）
+
+| # | 问题 | 文件 | 影响 |
+|---|------|------|------|
+| 6 | memo 签名过于简化，只比长度和标志位 | `messageBlockSignature` | 内容变化但签名相同时丢失更新 |
+| 7 | scroll-to-bottom 3 次 setTimeout + double rAF | ChatView 滚动逻辑 | CPU 飙升、布局抖动 |
+| 8 | 在线状态双重维护（3 处） | `connectionStore` + `useChatMessages` + `App.tsx` | 短暂不一致导致连接 banner 闪烁 |
+| 9 | Agent 切换每次创建新线程 | `App.tsx:521-533` | 误点产生大量空线程；catch 创建空字符串映射 |
+| 10 | z-index 硬编码违规（6 处） | `FileExplorer:998/999`, `ModelDropdown:9999`, `AgentCreationWizard:1000` | 弹窗堆叠冲突 |
+| 11 | 亮色主题 CSS 定义不完整 | `themes.css` | `[data-theme="light"]` 缺完整变量块 |
+| 12 | console.log/error 生产残留（53 处） | 多文件 | 信息泄漏、控制台噪音 |
+| 13 | `useHubStore.authenticated` 永远恢复 false | `hubStore.ts:17-18` | Hub 认证状态被拆分到两个不通信的模块 |
+| 14 | 右侧面板在窄屏突然消失无通知 | `App.tsx:311` | `runCardConstrained` 隐藏面板但无解释 |
+| 15 | Tool 结果统一截断无差异化 | `ToolUseBlock` | Bash/Diff/图片无区别展示，竞品按 toolKind 定制 |
+| 16 | Diff 无语法高亮 | DiffViewer/DiffCard | 竞品 Jean/CCUI 均有 Prism/Shiki 高亮 |
+| 17 | 虚拟滚动 estimateSize 静态值 | ChatView | 消息高度偏差大时滚动位置跳动 |
+| 18 | Thread 删除后无自动导航 | ThreadPanel | 删除当前 thread 后用户卡在空白 |
+
+### P2 问题清单（打磨级）
+
+| # | 问题 | 文件 |
+|---|------|------|
+| 19 | 缺少 Markdown 数学公式支持（竞品 CCUI 有 remarkMath + rehypeKatex） | MarkdownRenderer |
+| 20 | 无消息骨架屏/Streaming ticker（竞品 Jean 有 CompactStreamingTicker） | ChatView |
+| 21 | Tool 标题 `summarizeInput` 截断到 40 字符（竞品 Kanna 按 toolKind 生成语义标题） | ToolUseBlock |
+| 22 | PromptInput 1522 行未 memo 包装 | PromptInput.tsx |
+| 23 | useChatMessages 1485 行单一 hook 职责过重 | hooks/useChatMessages.ts |
+| 24 | useIMChat 1297 行单一 hook | hooks/useIMChat.ts |
+| 25 | App.tsx 1440 行尚未拆分（A4 Wave 2 待做） | App.tsx |
+| 26 | 懒加载组件 fallback 为 null | AuthPage/HomeDashboard/SettingsPage |
+| 27 | Toast store nextId HMR 时可能重置 | toastStore.ts |
+| 28 | 装饰性 Nav 按钮无功能 | `App.tsx:1049-1052` |
+
+### 竞品关键差距（AgentHub vs 标杆）
+
+| 维度 | AgentHub | 竞品标杆 | 差距 |
+|------|---------|---------|------|
+| Chat 组件分层 | ChatView.tsx 单文件 1786 行 | Jean 70+ 文件、Kanna ChatPage+TranscriptViewport+20 消息组件 | 架构差距巨大 |
+| block key 稳定性 | `text-${index}` | CCUI `WeakMap+Set` 稳定 key；Kanna ID-based key | 流式闪烁根因 |
+| 虚拟滚动 | useVirtualizer + 3次 scrollToBottom + 手动 ResizeObserver | Kanna LegendList `maintainScrollAtEnd` 零手动代码 | 滚动体验差 |
+| Tool 渲染 | switch-case 硬编码 | CCUI ToolRenderer 配置驱动注册表 | 扩展性差 |
+| Diff 语法高亮 | 无 | CCUI Prism+oneDark、Jean 自定义 | 完全缺失 |
+| Tool 标题 | 截断 40 字符 | Kanna 按 toolKind 语义化（"Find \`pattern\` in files"） | 可读性差 |
+| 消息预处理 | 无（运行时内联分组） | Kanna `buildTranscriptRenderItems` 两阶段预处理 | 渲染层复杂 |
+| Tool 颜色编码 | 无 | CCUI 按类别左边框色标（edit=amber, bash=green, agent=purple） | 视觉扫描差 |
+
+### 前端修复优先路线（按性价比排序）
+
+**Phase 1 — 紧急止血（本周，~3 天）**
+
+1. **修复 block key 稳定性** — `text-${index}` → `text-${contentHash}`，消除流式闪烁
+2. **清理 Mock 数据** — AgentMarketSection 移除或标注 "Coming Soon"
+3. **替换 `document.execCommand`** → `navigator.clipboard` + Selection API
+4. **z-index 统一到 tokens.css** — 所有硬编码值改用 CSS 变量
+
+**Phase 2 — 架构重构（本月，~7 天）**
+
+5. **拆分 ChatView.tsx** — 提取 ChatMessageList、ChatScrollBehavior、ChatConnectionBanner（参考 Jean 70+ 文件拆法）
+6. **统一运行状态** — 消除三源同步，runStore 为唯一权威
+7. **引入消息预处理层** — 参考 Kanna `buildTranscriptRenderItems`，在渲染前合并 tool group
+8. **简化 scroll-to-bottom** — 评估 LegendList 替代 tanstack virtual
+
+**Phase 3 — 体验增强（下月，~5 天）**
+
+9. **Diff 语法高亮** — 引入 react-syntax-highlighter (Prism)
+10. **Tool 渲染配置化** — 参考 CCUI `toolConfigs` 注册表
+11. **Tool 卡片颜色编码** — 参考 CCUI 左边框色标
+12. **Tool 标题语义化** — 参考 Kanna 按 toolKind 生成
