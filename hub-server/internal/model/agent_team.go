@@ -122,7 +122,7 @@ const (
 // AgentTeamAssignment represents a structured delegation from one team member to another.
 type AgentTeamAssignment struct {
 	ID           string    `gorm:"primaryKey;type:uuid" json:"id"`
-	TeamRunID    string    `gorm:"type:uuid;not null" json:"team_run_id"`
+	TeamRunID    string    `gorm:"type:uuid;not null;index" json:"team_run_id"`
 	FromMemberID string    `gorm:"type:uuid;not null" json:"from_member_id"`
 	ToMemberID   string    `gorm:"type:uuid;not null" json:"to_member_id"`
 	Type         string    `gorm:"type:varchar(20);not null;default:delegate" json:"type"`
@@ -168,7 +168,7 @@ const (
 // created from a route decision and later bound to a concrete Edge/Hub run.
 type AgentTeamTask struct {
 	ID               string    `gorm:"primaryKey;type:uuid" json:"id"`
-	TeamRunID        string    `gorm:"type:uuid;not null" json:"team_run_id"`
+	TeamRunID        string    `gorm:"type:uuid;not null;index" json:"team_run_id"`
 	AssignmentID     *string   `gorm:"type:uuid" json:"assignment_id,omitempty"`
 	AssigneeMemberID string    `gorm:"type:uuid;not null" json:"assignee_member_id"`
 	ParentTaskID     *string   `gorm:"type:uuid" json:"parent_task_id,omitempty"`
