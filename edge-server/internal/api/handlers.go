@@ -197,6 +197,15 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
+// writeSuccess writes a unified success envelope: {"code":"OK","data":...}
+// This aligns Edge Server success responses with the Hub Server format.
+func writeSuccess(w http.ResponseWriter, status int, data any) {
+	writeJSON(w, status, map[string]any{
+		"code": "OK",
+		"data": data,
+	})
+}
+
 // ---------------------------------------------------------------------------
 // genID generates random IDs with a given prefix.
 // ---------------------------------------------------------------------------
@@ -255,7 +264,7 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	writeSuccess(w, http.StatusOK, map[string]any{
 		"status":  status,
 		"version": "v1",
 		"edgeId":  "local",
@@ -269,7 +278,7 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetRunners(w http.ResponseWriter, r *http.Request) {
 	list := h.Registry.List()
-	writeJSON(w, http.StatusOK, listResponse(list))
+	writeSuccess(w, http.StatusOK, listResponse(list))
 }
 
 func runnerHealthCheck(registry *runners.Registry) map[string]any {
@@ -350,7 +359,7 @@ func isAvailableRunnerStatus(status string) bool {
 // ---------------------------------------------------------------------------
 
 func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, listResponse(ensureStore(h).ListProjects()))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListProjects()))
 }
 
 func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
@@ -367,17 +376,17 @@ func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
 	}
 	project, err := ensureStore(h).CreateProject(req.ProjectID, req.Name)
 	if errors.Is(err, store.ErrProjectExists) {
-		writeJSON(w, http.StatusOK, project)
+		writeSuccess(w, http.StatusOK, project)
 		return
 	}
 	h.Bus.Publish("project.created", map[string]any{"projectId": project.ID}, project)
-	writeJSON(w, http.StatusCreated, project)
+	writeSuccess(w, http.StatusCreated, project)
 }
 
 func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	projectID := strings.TrimPrefix(r.URL.Path, "/v1/projects/")
 	if project, ok := ensureStore(h).GetProject(projectID); ok {
-		writeJSON(w, http.StatusOK, project)
+		writeSuccess(w, http.StatusOK, project)
 		return
 	}
 	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project not found")))
@@ -385,7 +394,7 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 	projectID := r.URL.Query().Get("projectId")
-	writeJSON(w, http.StatusOK, listResponse(ensureStore(h).ListThreads(projectID)))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListThreads(projectID)))
 }
 
 func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
@@ -413,13 +422,13 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 		"projectId": thread.ProjectID,
 		"threadId":  thread.ID,
 	}, thread)
-	writeJSON(w, http.StatusCreated, thread)
+	writeSuccess(w, http.StatusCreated, thread)
 }
 
 func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
 	threadID := strings.TrimPrefix(r.URL.Path, "/v1/threads/")
 	if thread, ok := ensureStore(h).GetThread(threadID); ok {
-		writeJSON(w, http.StatusOK, thread)
+		writeSuccess(w, http.StatusOK, thread)
 		return
 	}
 	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
@@ -455,7 +464,7 @@ func (h *Handler) PatchThread(w http.ResponseWriter, r *http.Request, threadID s
 		"projectId": thread.ProjectID,
 		"threadId":  thread.ID,
 	}, thread)
-	writeJSON(w, http.StatusOK, thread)
+	writeSuccess(w, http.StatusOK, thread)
 }
 
 func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request, threadID string) {
@@ -478,7 +487,7 @@ func (h *Handler) ArchiveThread(w http.ResponseWriter, r *http.Request, threadID
 		"projectId": thread.ProjectID,
 		"threadId":  thread.ID,
 	}, thread)
-	writeJSON(w, http.StatusAccepted, thread)
+	writeSuccess(w, http.StatusAccepted, thread)
 }
 
 func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadID string) {
@@ -487,7 +496,7 @@ func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadI
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
 		return
 	}
-	writeJSON(w, http.StatusOK, listResponse(repository.ListThreadItems(threadID)))
+	writeSuccess(w, http.StatusOK, listResponse(repository.ListThreadItems(threadID)))
 }
 
 func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, threadID string) {
@@ -516,13 +525,13 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 	}
 	h.Bus.Publish("message.created", scope, item)
 	h.Bus.Publish("item.created", scope, item)
-	writeJSON(w, http.StatusCreated, item)
+	writeSuccess(w, http.StatusCreated, item)
 }
 
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	itemID := strings.TrimPrefix(r.URL.Path, "/v1/items/")
 	if item, ok := ensureStore(h).GetItem(itemID); ok {
-		writeJSON(w, http.StatusOK, item)
+		writeSuccess(w, http.StatusOK, item)
 		return
 	}
 	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("item not found")))
@@ -538,7 +547,7 @@ func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.AdapterRegistry == nil {
-		writeJSON(w, http.StatusOK, listResponse([]any{}))
+		writeSuccess(w, http.StatusOK, listResponse([]any{}))
 		return
 	}
 	metadataList := h.AdapterRegistry.List()
@@ -562,7 +571,7 @@ func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 		}
 		agents = append(agents, info)
 	}
-	writeJSON(w, http.StatusOK, listResponse(agents))
+	writeSuccess(w, http.StatusOK, listResponse(agents))
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +580,7 @@ func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetRuns(w http.ResponseWriter, r *http.Request) {
 	threadID := r.URL.Query().Get("threadId")
-	writeJSON(w, http.StatusOK, listResponse(ensureStore(h).ListRuns(threadID)))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListRuns(threadID)))
 }
 
 // ---------------------------------------------------------------------------
@@ -787,7 +796,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
+	writeSuccess(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
 }
 
 // ---------------------------------------------------------------------------
@@ -810,13 +819,13 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 			// #108: align cancel response with OpenAPI spec
 			// Terminal runs (finished/failed/cancelled) are already done; return OK with current status
 			if isTerminalRunStatus(result.Status) {
-				writeJSON(w, http.StatusOK, acceptedResponse(map[string]any{
+				writeSuccess(w, http.StatusOK, acceptedResponse(map[string]any{
 					"runId":  runID,
 					"status": result.Status,
 				}))
 				return
 			}
-			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
+			writeSuccess(w, http.StatusAccepted, acceptedResponse(map[string]any{
 				"runId":  runID,
 				"status": result.Status,
 			}))
@@ -826,7 +835,7 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 	// #108: check store as fallback; return 404 for missing run instead of silently accepting
 	if repository := ensureStore(h); repository != nil {
 		if run, ok := repository.GetRun(runID); ok {
-			writeJSON(w, http.StatusOK, acceptedResponse(map[string]any{
+			writeSuccess(w, http.StatusOK, acceptedResponse(map[string]any{
 				"runId":  runID,
 				"status": run.Status,
 			}))
@@ -1168,7 +1177,7 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	})
 
 	slog.Info("permission decided by Desktop", "requestId", req.RequestID, "decision", req.Decision)
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	writeSuccess(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
 // ---------------------------------------------------------------------------
@@ -1182,7 +1191,7 @@ func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.AgentRegistry == nil {
-		writeJSON(w, http.StatusOK, listResponse([]any{}))
+		writeSuccess(w, http.StatusOK, listResponse([]any{}))
 		return
 	}
 	statusFilter := r.URL.Query().Get("status")
@@ -1198,7 +1207,7 @@ func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
 		instances = h.AgentRegistry.List()
 	}
 
-	writeJSON(w, http.StatusOK, listResponse(instances))
+	writeSuccess(w, http.StatusOK, listResponse(instances))
 }
 
 // GetAgentInstance returns a single agent instance by ID.
@@ -1216,7 +1225,7 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
 		return
 	}
-	writeJSON(w, http.StatusOK, inst)
+	writeSuccess(w, http.StatusOK, inst)
 }
 
 // ---------------------------------------------------------------------------
@@ -1312,7 +1321,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		if r.Method == http.MethodGet {
 			runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
 			if run, ok := ensureStore(h).GetRun(runID); ok {
-				writeJSON(w, http.StatusOK, runToResponse(run))
+				writeSuccess(w, http.StatusOK, runToResponse(run))
 				return
 			}
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
