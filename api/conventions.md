@@ -85,39 +85,79 @@ Response:
 
 ## 5. 错误格式
 
-所有 REST error 使用统一格式：
+所有 REST 错误使用统一 envelope（Edge Server 和 Hub Server 完全相同）：
 
 ```json
 {
   "error": {
-    "code": "runner_offline",
-    "message": "Runner 不在线",
-    "traceId": "trace_123",
-    "details": {}
+    "code": "NOT_FOUND",
+    "message": "resource not found",
+    "traceId": "trace_000001"
   }
 }
 ```
 
-常用错误码：
+规则：
+
+- `code` 使用 `SCREAMING_SNAKE_CASE`（全大写+下划线），面向程序，必须稳定。
+- `message` 英文，人类可读描述，不含内部路径、密钥或主机名。
+- `traceId` 每次错误自动生成（`trace_` 前缀 + 6 位递增序号），可通过 `X-Request-ID` 串联请求链路。
+- 成功响应沿用现有格式不变：Hub 返回 `{"code":"OK","data":{...}}`，Edge 返回裸 JSON 对象或数组。
+- 实现位于共享模块 `pkg/errcode`（`github.com/agenthub/pkg/errcode`），Edge 和 Hub 各自 `internal/errcode/codes.go` 做 type-alias re-export + 域代码定义。
+- 前端解析：`app/shared/src/errors.ts` 的 `parseError()` 已统一处理 `body.error.code` / `body.error.message` / `body.error.traceId`。
+
+### 错误码表
+
+#### 通用码（pkg/errcode/codes.go）
+
+Edge 和 Hub 共享，不可各自重定义：
 
 | code | HTTP | 含义 |
 |---|---:|---|
-| `bad_request` | 400 | 请求字段非法 |
-| `unauthorized` | 401 | 未登录或 token 无效 |
-| `forbidden` | 403 | 无权限访问 |
-| `not_found` | 404 | 资源不存在 |
-| `conflict` | 409 | 状态冲突，例如重复 apply |
-| `approval_required` | 409 | 操作需要审批 |
-| `runner_offline` | 409 | 目标 Runner 不在线 |
-| `rate_limited` | 429 | 触发限流 |
-| `internal_error` | 500 | 服务内部错误 |
+| `INTERNAL_ERROR` | 500 | 未知服务端错误 |
+| `BAD_REQUEST` | 400 | 请求参数无效 |
+| `NOT_FOUND` | 404 | 资源不存在 |
+| `METHOD_NOT_ALLOWED` | 405 | HTTP 方法不支持 |
+| `REQUEST_TIMEOUT` | 504 | 请求超时 |
+| `NOT_IMPLEMENTED` | 501 | 端点未实现 |
+| `TOO_MANY_REQUESTS` | 429 | 触发限流 |
+| `UNAUTHORIZED` | 401 | 需要认证 |
+| `FORBIDDEN` | 403 | 权限不足 |
+| `INVALID_TOKEN` | 401 | Token 无效 |
+| `TOKEN_EXPIRED` | 401 | Token 已过期 |
+| `INVALID_JSON` | 400 | JSON 解析失败 |
+| `VALIDATION_ERROR` | 400 | 字段校验失败 |
+| `CONTENT_REQUIRED` | 400 | 内容字段缺失 |
+| `PAYLOAD_TOO_LARGE` | 413 | 请求体过大 |
+| `CONFLICT` | 409 | 资源冲突 |
+| `ALREADY_EXISTS` | 409 | 资源已存在 |
 
-规则：
+#### Edge 域码（edge-server/internal/errcode/codes.go）
 
-- `message` 面向人类，可中文。
-- `code` 面向程序，必须稳定。
-- `traceId` 用于日志追踪。
-- `details` 可包含字段级错误，但不要依赖它做主流程判断。
+| code | HTTP | 含义 |
+|---|---:|---|
+| `WORKSPACE_NOT_ALLOWED` | 403 | 工作目录不在白名单 |
+| `INVALID_PERMISSION_MODE` | 400 | 权限模式参数无效 |
+| `INVALID_DECISION` | 400 | 审批决策值非法 |
+| `EXECUTOR_UNAVAILABLE` | 503 | 无 Agent Runtime 执行器 |
+| `EXECUTOR_START_FAILED` | 500 | Run 启动失败 |
+| `TOO_MANY_CONCURRENT_RUNS` | 429 | 并发 Run 数达上限 |
+| `ACTIVE_RUN_EXISTS` | 409 | Thread 已有活跃 Run |
+| `INVALID_AGENT_ID` | 400 | Agent 适配器未知 |
+| `AGENT_REGISTRY_NOT_CONFIGURED` | 404 | Agent 注册表未配置 |
+| `AGENT_INSTANCE_NOT_FOUND` | 404 | Agent 实例未找到 |
+| `PERMISSION_REQUEST_NOT_FOUND` | 404 | 权限请求不存在 |
+| `RUN_ID_REQUIRED` | 400 | runId 缺失 |
+| `REQUEST_ID_REQUIRED` | 400 | requestId 缺失 |
+| `NOT_CONFIGURED` | 503 | 资源未配置 |
+
+#### Hub 域码（hub-server/internal/errcode/codes.go）
+
+Hub 域码完整列表见 `hub-server/internal/errcode/codes.go`。域码遵循 `{DOMAIN}_{ENTITY}_{EVENT}` 三段式命名，如 `MSG_NOT_FOUND`、`SESSION_NOT_MEMBER`、`AGENT_TASK_TIMEOUT`。
+
+### Hub 成功响应格式（现状）
+
+Hub 成功响应使用 `{"code":"OK","data":{...}}` 格式（注：与错误 envelope 不同，没有外层 `error` wrapper）。Edge 成功响应返回裸 JSON 对象或数组。统一成功响应格式的工作留待后续阶段。
 
 ## 6. 权限标记
 
