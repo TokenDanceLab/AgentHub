@@ -25,7 +25,6 @@ func TestOK(t *testing.T) {
 		var resp Response
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		assert.Equal(t, errcode.OK.Code, resp.Code)
-		assert.Equal(t, "", resp.Message)
 		assert.Nil(t, resp.Data)
 	})
 
@@ -72,6 +71,15 @@ func TestOK(t *testing.T) {
 		_, ok := resp.Data.([]interface{})
 		assert.True(t, ok)
 	})
+}
+
+// errorEnvelope mirrors the new unified error response format.
+type errorEnvelope struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		TraceID string `json:"traceId"`
+	} `json:"error"`
 }
 
 func TestFail(t *testing.T) {
@@ -149,11 +157,10 @@ func TestFail(t *testing.T) {
 			Fail(c, tt.err)
 
 			assert.Equal(t, tt.wantStatus, w.Code)
-			var resp Response
-			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			assert.Equal(t, tt.wantCode, resp.Code)
-			assert.Equal(t, tt.wantMsg, resp.Message)
-			assert.Nil(t, resp.Data)
+			var env errorEnvelope
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
+			assert.Equal(t, tt.wantCode, env.Error.Code)
+			assert.Equal(t, tt.wantMsg, env.Error.Message)
 		})
 	}
 }
@@ -168,11 +175,10 @@ func TestFailWithMessage(t *testing.T) {
 		FailWithMessage(c, errcode.ErrBadRequest, customMsg)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		var resp Response
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Equal(t, errcode.ErrBadRequest.Code, resp.Code)
-		assert.Equal(t, customMsg, resp.Message)
-		assert.Nil(t, resp.Data)
+		var env errorEnvelope
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
+		assert.Equal(t, errcode.ErrBadRequest.Code, env.Error.Code)
+		assert.Equal(t, customMsg, env.Error.Message)
 	})
 
 	t.Run("internal error with custom message", func(t *testing.T) {
@@ -182,10 +188,10 @@ func TestFailWithMessage(t *testing.T) {
 		FailWithMessage(c, errcode.ErrInternal, customMsg)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		var resp Response
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Equal(t, errcode.ErrInternal.Code, resp.Code)
-		assert.Equal(t, customMsg, resp.Message)
+		var env errorEnvelope
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
+		assert.Equal(t, errcode.ErrInternal.Code, env.Error.Code)
+		assert.Equal(t, customMsg, env.Error.Message)
 	})
 
 	t.Run("empty custom message", func(t *testing.T) {
@@ -194,9 +200,9 @@ func TestFailWithMessage(t *testing.T) {
 		FailWithMessage(c, errcode.ErrBadRequest, "")
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		var resp Response
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Equal(t, errcode.ErrBadRequest.Code, resp.Code)
-		assert.Equal(t, "", resp.Message)
+		var env errorEnvelope
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &env))
+		assert.Equal(t, errcode.ErrBadRequest.Code, env.Error.Code)
+		assert.Equal(t, "", env.Error.Message)
 	})
 }

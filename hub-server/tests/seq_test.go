@@ -126,8 +126,8 @@ func TestConcurrentSendNoDuplicateSeq(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			r := sendMsg(t, a.Token, sid, clientMsgIDs[idx], fmt.Sprintf("concurrent-msg-%d", idx))
-			if r.Code != "OK" {
-				errCh <- fmt.Errorf("send %d failed: %s %s", idx, r.Code, r.Message)
+			if r.GetCode() != "OK" {
+				errCh <- fmt.Errorf("send %d failed: %s %s", idx, r.GetCode(), r.GetMsg())
 			}
 		}(i)
 	}
