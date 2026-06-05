@@ -143,8 +143,8 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       for (const fn of handlers) {
         try {
           fn(payload);
-        } catch (e) {
-          console.error(`HubWS handler error for "${frameType}":`, e);
+        } catch (_e) {
+          // Handler errors are silently ignored — one broken listener must not break others
         }
       }
     }
@@ -153,8 +153,8 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     for (const fn of anyHandlers) {
       try {
         fn(frameType, payload);
-      } catch (e) {
-        console.error(`HubWS any handler error for "${frameType}":`, e);
+      } catch (_e) {
+        // Handler errors are silently ignored — one broken listener must not break others
       }
     }
   });
