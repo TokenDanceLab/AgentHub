@@ -1,6 +1,6 @@
 import { useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Loader2, AlertTriangle } from 'lucide-react';
 import IMBlockRenderer from './IMBlockRenderer';
 import type { IMMessage } from './types';
 import styles from './IMMessageView.module.css';
@@ -133,10 +133,22 @@ const IMMessageBubble = memo(function IMMessageBubble({
       )}
 
       <div className={styles.messageMeta}>
+        {message.sendState === 'pending' && (
+          <span className={styles.sendPending} aria-label={label('im.message.sending', 'Sending...')}>
+            <Loader2 size={10} className={styles.spinner} />
+            {label('im.message.sending', 'Sending...')}
+          </span>
+        )}
+        {message.sendState === 'failed' && (
+          <span className={styles.sendFailed} role="alert">
+            <AlertTriangle size={10} />
+            {message.sendError ?? label('im.message.sendFailed', 'Send failed')}
+          </span>
+        )}
         <time className={styles.timestamp} dateTime={message.timestamp}>
           {formatTime(message.timestamp, label)}
         </time>
-        {message.recalled || isRecalled ? (
+        {!message.sendState && (message.recalled || isRecalled ? (
           <span>{label('im.message.recalledStatus', 'Recalled on Hub')}</span>
         ) : message.read ? (
           <span>
@@ -146,11 +158,11 @@ const IMMessageBubble = memo(function IMMessageBubble({
           </span>
         ) : isOwn ? (
           <span>{label('im.message.sentStatus', 'Sent through Hub')}</span>
-        ) : null}
+        ) : null)}
         {message.actionError ? (
           <span className={styles.actionError} role="alert">{message.actionError}</span>
         ) : null}
-        {isOwn && message.authority === 'hub' && !message.recalled && !isRecalled ? (
+        {isOwn && message.authority === 'hub' && !message.sendState && !message.recalled && !isRecalled ? (
           <button
             type="button"
             className={styles.metaAction}
