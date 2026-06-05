@@ -71,7 +71,7 @@ func RegisterEndpoints(mux *http.ServeMux, cfg MuxConfig) {
 	}
 
 	if cfg.MetricsHandler != nil {
-		mux.Handle("/metrics", cfg.MetricsHandler)
+		mux.Handle("/metrics", authWrap(cfg.Auth, cfg.MetricsHandler))
 	}
 
 	if cfg.ConfigDumper != nil {
