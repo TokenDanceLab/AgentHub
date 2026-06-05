@@ -9,7 +9,7 @@
 [![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
 
-[English](README_EN.md) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
+[English](README_EN.md) &nbsp;·&nbsp; [快速上手](docs/getting-started/GOAL.md) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
 
 </div>
 
@@ -58,7 +58,7 @@ pnpm dev
 # 5. 打开 http://localhost:5173 开始使用
 ```
 
-> 需要先安装 Go 1.25+、Node.js 20+ 和 pnpm。详见 [架构文档](docs/architecture.md)。
+> 需要先安装 Go 1.25+、Node.js 20+ 和 pnpm。详见 [快速上手](docs/getting-started/GOAL.md)。
 
 <br>
 
@@ -141,14 +141,26 @@ AgentHub/
 ├── hub-server/           # Hub 中心服务
 ├── api/                  # API 契约（OpenAPI + WebSocket events）
 ├── docs/                 # 文档
-│   ├── architecture.md   # 产品定位 + 系统架构 + 实现状态
-│   ├── adr/              # 架构决策记录
-│   ├── designs/          # 组件设计文档
-│   ├── handoffs/         # 项目状态与交接
+<<<<<<< HEAD
+│   ├── getting-started/  # 快速上手指南
+│   ├── tutorials/        # 路线图与学习路径
+│   ├── architecture/     # 产品需求、系统架构、实现指南、设计文档、决策记录
 │   ├── governance/       # 安全台账、分支治理、文档标准
+│   ├── development/      # 项目状态与交接
+│   ├── archive/          # 历史评审与归档
 │   ├── reference/        # 调研与竞品分析
-│   ├── operations/       # 运维文档
-│   └── archive/          # 历史评审与归档
+│   ├── operations/       # 桌面端 QA SOP、运维
+=======
+│   ├── guides/           # 用户手册、FAQ、快捷键、本地开发指南
+│   ├── architecture/     # 产品需求、系统架构、实现指南、设计文档、决策记录
+│   ├── roadmaps/         # 路线图与竞品分析
+│   ├── governance/       # 安全台账、分支治理、文档标准
+│   ├── handoff/          # 项目状态与交接
+│   ├── inbox/            # 待分类文档
+│   ├── operations/       # 桌面端 QA SOP、运维
+│   ├── research/         # 调研与竞品分析
+│   ├── review/           # 评审记录
+>>>>>>> origin/master
 └── scripts/              # 初始化脚本、git hooks
 ```
 
@@ -158,10 +170,16 @@ AgentHub/
 
 | 文档 | 面向 |
 |------|------|
-| [架构文档](docs/architecture.md) | 产品定位、系统架构、实现状态（首选入口） |
+| [快速上手](docs/getting-started/GOAL.md) | 新用户入门和常见问题 |
+| [产品需求](docs/architecture/system-design/product-requirements.md) | 产品定位与阶段目标 |
+| [系统架构](docs/architecture/system-design/system-architecture.md) | 技术架构与核心概念 |
 | [API 契约](api/) | REST + WebSocket 接口定义 |
 | [安全风险台账](docs/governance/security-risk-register.md) | 安全风险登记与追踪 |
-| [项目交接](docs/handoffs/) | 项目状态与交接文档 |
+<<<<<<< HEAD
+| [项目交接](docs/development/handoffs/) | 项目状态与交接文档 |
+=======
+| [项目交接](docs/handoff/) | 项目状态与交接文档 |
+>>>>>>> origin/master
 
 <br>
 
@@ -175,6 +193,7 @@ AgentHub/
 
 <p align="center">
   <a href="README_EN.md">English</a> &nbsp;·&nbsp;
-  <a href="docs/architecture.md">系统架构</a> &nbsp;·&nbsp;
+  <a href="docs/getting-started/GOAL.md">快速上手</a> &nbsp;·&nbsp;
+  <a href="docs/architecture/system-design/system-architecture.md">系统架构</a> &nbsp;·&nbsp;
   <a href="api/">API 契约</a>
 </p>

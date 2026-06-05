@@ -40,8 +40,8 @@ This file maps TokenDance system governance into AgentHub execution items. Agent
 ## Sync Checklist
 
 - Update this file when a queue ID moves from open to partial or done.
-- Update `docs/roadmap.md` when major features or batches complete.
-- Update `docs/handoffs/STATE.md` for deployment version and commit hash changes.
+- Update `docs/tutorials/roadmap.md` when major features or batches complete.
+- Update `docs/development/handoffs/STATE.md` for deployment version and commit hash changes.
 - Update `docs/governance/security-risk-register.md` for new findings, mitigations, or deployment verification.
 - Update root `docs/identity/identity-auth.md` / `docs/identity/authorization-model.md` when Hub session or token rules change.
 - Update `api/openapi.yaml` and `api/events.md` for API contract changes.
