@@ -4,12 +4,9 @@ import {
   useCallback,
   useMemo,
   useRef,
-  useId,
   Suspense,
-  type ButtonHTMLAttributes,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
@@ -45,6 +42,23 @@ import { useSearchStore } from '@/stores/searchStore';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { readCustomInstructions } from '@/utils/customInstructions';
 import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
+import {
+  clamp,
+  isRunActiveStatus,
+  getActiveRunConflictId,
+  isEditableShortcutTarget,
+  focusComposer,
+  setComposerDraft,
+  readHiddenMessageIds,
+  writeHiddenMessageIds,
+  hideMessages,
+  isTeamRunActiveStatus,
+  isPendingTeamApprovalStatus,
+  isTauriRuntime,
+  FOCUS_NAVIGATION_KEYS,
+  HIDDEN_MESSAGES_STORAGE_PREFIX,
+  hiddenMessagesStorageKey,
+} from '@/utils/appUtils';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@shared/ui';
 import { useToastStore } from '@/stores/toastStore';
@@ -97,7 +111,7 @@ import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/thr
 import { buildTeamLocalExecutions, normalizeTeamTasks } from '@/utils/teamLocalExecution';
 import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import ShellIconButton from '@/components/ShellIconButton';
 import styles from '@/App.module.css';
 
 interface OptimisticRun {
@@ -137,90 +151,6 @@ const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
 const RUN_CARD_MIN_WORKSPACE_WIDTH = 760;
 const TOP_MENU_ORDER: TopMenuId[] = ['file', 'edit', 'view', 'window', 'help'];
-const HIDDEN_MESSAGES_STORAGE_PREFIX = 'agenthub.chat.hiddenMessages.';
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function isRunActiveStatus(status: string | undefined): boolean {
-  if (!status) return false;
-  return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
-}
-
-function getActiveRunConflictId(error: unknown): string | undefined {
-  if (!(error instanceof AppError)) return undefined;
-  if (error.status !== 409 || error.code !== 'active_run_exists') return undefined;
-  const runId = error.details?.runId;
-  return typeof runId === 'string' && runId.length > 0 ? runId : undefined;
-}
-
-function isEditableShortcutTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
-}
-
-function focusComposer() {
-  const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label], textarea[placeholder]');
-  if (!textarea) return;
-  textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  window.setTimeout(() => textarea.focus(), 120);
-}
-
-function setComposerDraft(text: string) {
-  window.dispatchEvent(new CustomEvent('agenthub:set-composer-draft', { detail: { text } }));
-}
-
-function hiddenMessagesStorageKey(threadId: string): string {
-  return `${HIDDEN_MESSAGES_STORAGE_PREFIX}${threadId}`;
-}
-
-function readHiddenMessageIds(threadId: string | null | undefined): Set<string> {
-  if (!threadId || typeof window === 'undefined') return new Set();
-  try {
-    const raw = window.localStorage.getItem(hiddenMessagesStorageKey(threadId));
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((value): value is string => typeof value === 'string' && value.length > 0));
-  } catch {
-    return new Set();
-  }
-}
-
-function writeHiddenMessageIds(threadId: string | null | undefined, ids: Set<string>): void {
-  if (!threadId || typeof window === 'undefined') return;
-  try {
-    const key = hiddenMessagesStorageKey(threadId);
-    if (ids.size === 0) {
-      window.localStorage.removeItem(key);
-      return;
-    }
-    window.localStorage.setItem(key, JSON.stringify([...ids]));
-  } catch {
-    // localStorage can be unavailable in restricted browser contexts; in-memory hiding still works.
-  }
-}
-
-function hideMessages(messages: ChatMessage[], hiddenIds: Set<string>): ChatMessage[] {
-  if (hiddenIds.size === 0) return messages;
-  return messages.filter((message) => !hiddenIds.has(message.id));
-}
-
-function isTeamRunActiveStatus(status: string | undefined): boolean {
-  if (!status) return false;
-  return [
-    'queued',
-    'planning',
-    'dispatching',
-    'running',
-    'waiting_for_approval',
-    'merging',
-  ].includes(status);
-}
-
-function isPendingTeamApprovalStatus(status: string | undefined): boolean {
-  if (!status) return false;
-  return ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(status.toLowerCase());
-}
 
 function summarizeAgentTeamOverview(overview?: AgentTeamOverview) {
   const runs = overview?.bundles.flatMap((bundle) => bundle.runs) ?? [];
@@ -304,40 +234,6 @@ function DesktopHubTaskBridgeActive() {
   const hubRealtime = useHubEventStream(getAccessToken);
   useHubIntegration({ hubWS: hubRealtime.hubWS, hubClient });
   return null;
-}
-
-type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
-
-interface ShellIconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> {
-  label: string;
-  ariaLabel?: string;
-  tooltipSide?: TooltipSide;
-  children: ReactNode;
-}
-
-function ShellIconButton({
-  label,
-  ariaLabel,
-  tooltipSide = 'bottom',
-  className,
-  children,
-  type = 'button',
-  ...buttonProps
-}: ShellIconButtonProps) {
-  const tooltipId = useId();
-  return (
-    <button
-      {...buttonProps}
-      type={type}
-      className={`${className ?? ''} ${styles.iconTooltipHost}`}
-      aria-label={ariaLabel ?? label}
-      aria-describedby={tooltipId}
-      data-tooltip-side={tooltipSide}
-    >
-      <span className={styles.iconTooltipGlyph} aria-hidden="true">{children}</span>
-      <span id={tooltipId} role="tooltip" className={styles.iconTooltip}>{label}</span>
-    </button>
-  );
 }
 
 export default function App() {
