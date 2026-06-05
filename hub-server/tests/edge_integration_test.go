@@ -134,7 +134,7 @@ func TestEdgeDeviceRegister(t *testing.T) {
 	}
 	resp := parseEdgeResp(t, w)
 	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.deviceID != testDeviceID {
 		t.Errorf("deviceID = %q, want %s", captured.deviceID, testDeviceID)
@@ -225,7 +225,7 @@ func TestEdgeAgentTaskAck(t *testing.T) {
 	}
 	resp := parseEdgeResp(t, w)
 	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if ackedTaskID != "task-001" {
 		t.Errorf("acked task ID = %q, want task-001", ackedTaskID)
@@ -297,7 +297,7 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 	}
 	resp := parseEdgeResp(t, w)
 	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.taskID != "task-002" {
 		t.Errorf("taskID = %q, want task-002", captured.taskID)
@@ -414,7 +414,7 @@ func TestEdgeAgentTaskDone(t *testing.T) {
 	}
 	resp := parseEdgeResp(t, w)
 	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.taskID != "task-005" {
 		t.Errorf("taskID = %q, want task-005", captured.taskID)
@@ -510,7 +510,7 @@ func TestEdgeAgentTaskFail(t *testing.T) {
 	}
 	resp := parseEdgeResp(t, w)
 	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
 	if captured.taskID != "task-008" {
 		t.Errorf("taskID = %q, want task-008", captured.taskID)
