@@ -20,7 +20,7 @@
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 ██████████  60%  ← 当前 (A0/A1/A3 ✅, A2/A4/A5 部分完成, A6 待开始)
+Phase A: 工程基础设施 ████████████  70%  ← 当前 (A0/A1/A2/A3 ✅, A4 部分完成, A5/A6 待开始)
 Phase B: 持久化 + 性能  ░░░░░░░░░░   0%
 Phase C: IM 核心闭环   ░░░░░░░░░░   0%
 Phase D: 高级功能      ░░░░░░░░░░   0%
@@ -65,21 +65,22 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [x] Hub 接入 — `reqlog.AccessLogGin()` 统一已有 RequestID + AccessLog
 - [x] 跨服务追踪 — Edge→Hub API 透传 X-Request-ID（Hub RequestID 中间件复用）
 
-### A2: 调试端点 `debug` ← 当前
+### A2: 调试端点 `debug` ✅
 
-- [ ] `pkg/debug` 模块 — 统一注册接口 + 认证辅助（BasicAuth / BearerToken）
-  - `MuxConfig` 结构体：HealthChecker / EnablePprof / MetricsHandler / ConfigDumper / StateDumper / AuthWrapper
-  - `RegisterDebugEndpoints(mux, cfg)` — 注册 /health, /debug/pprof/*, /metrics, /debug/config, /debug/state
-  - `BasicAuthMiddleware` + `BearerAuthMiddleware` — 认证辅助
-- [ ] Hub `/debug/` — 用 pkg/debug 替换 `app.go` 的 `newAdminMux()`（801-812 行）
-  - 保留独立 admin 端口 + `AGENTHUB_PPROF_USER/PASS` 认证
-  - 新增 `/debug/config` — 复用 `slog.LogValuer` 脱敏（DB/Redis/JWT/S3/TokenDanceID 各字段）
-  - 新增 `/debug/state` — DB pool stats / WS connections / EventBus queue / Redis pool hits
-- [ ] Edge `/debug/` — 在 `httpserver.Run()` 的 mux 上注册
-  - 新增 pprof — 当前完全缺失，仅 dev 环境可无认证，生产需 LocalAuthToken
-  - 新增 `/debug/config` — 脱敏（LocalAuthToken / HubJWTSecret / HubToken → `[REDACTED]`）
-  - 新增 `/debug/state` — store 统计（projects/threads/runs/items 计数）+ bus 状态（history_len/dropped）
-  - 去重 `/metrics` — 当前 `server.go:116` 和 `pkg/debug` 都注册，统一走 debug 模块
+- [x] `pkg/debug` 模块 — 统一注册接口 + 认证辅助（BasicAuth / BearerToken）
+  - `MuxConfig` 结构体：HealthChecker / EnablePprof / MetricsHandler / ConfigDumper / StateDumper / Auth
+  - `RegisterEndpoints(mux, cfg)` — 注册 /health, /ready, /debug/pprof/*, /metrics, /debug/config, /debug/state
+  - `BasicAuth` + `BearerAuth` — 认证辅助 + `SanitizeConfig` 递归脱敏
+  - 11 个测试覆盖全部端点 + 认证 + 脱敏
+- [x] Hub `/debug/` — 用 pkg/debug 替换 `app.go` 的 `newAdminMux()`
+  - 保留独立 admin 端口 + `AGENTHUB_PPROF_USER/PASS` BasicAuth 认证
+  - 新增 `/debug/config` — SanitizeConfig 脱敏（DB/Redis/JWT/S3/TokenDanceID 各字段）
+  - 新增 `/debug/state` — DB pool stats + WS connections
+- [x] Edge `/debug/` — 在 `httpserver.Run()` 的 mux 上注册
+  - 新增 pprof — dev 环境无认证，生产 BearerAuth(LocalAuthToken)
+  - 新增 `/debug/config` — 脱敏（LocalAuthToken / HubJWTSecret / HubToken）
+  - 新增 `/debug/state` — store 统计（project count）+ bus 状态（history_len）
+  - 去重 `/metrics` — 统一走 debug 模块，带 auth 保护
 
 ### A3: 安全与稳定性 P0 修复 ✅
 
@@ -94,13 +95,13 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [x] **App.tsx 拆分 Wave 1** — 1837→1525 行（-17%），已拆出 ShellIconButton、useFocusSourceTracking、DesktopHubTaskBridge、TopMenuBar、useShellShortcuts
 - [x] **lazy-load** — SettingsPage、AuthPage、HomeDashboard 已改为 `React.lazy()`
 - [ ] **Wave 2 拆分** — 目标 1525→~926 行（-39%），7 个自定义 Hook：
-  - `useTopMenuConfig.ts` — 菜单定义 221 行（低难度，优先）
-  - `useSendRun.ts` — 发送/启动 run 116 行（高难度，最后）
-  - `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）
-  - `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）
-  - `useThreadCache.ts` — React Query 缓存操作 37 行 + 4 个 ref（低难度）
-  - `useSidebarResize.ts` — 侧边栏拖拽缩放 40 行（低难度）
-  - `useHiddenMessages.ts` — 隐藏消息 ID 管理 30 行（低难度）
+  - [x] `useHiddenMessages.ts` — 隐藏消息 ID 管理 30 行（低难度）✅
+  - [x] `useSidebarResize.ts` — 侧边栏拖拽缩放 40 行（低难度）✅
+  - [x] `useThreadCache.ts` — React Query 缓存操作 37 行 + 4 个 ref（低难度）✅
+  - [ ] `useTopMenuConfig.ts` — 菜单定义 221 行（低难度，优先）← 下一步
+  - [ ] `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）
+  - [ ] `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）
+  - [ ] `useSendRun.ts` — 发送/启动 run 116 行（高难度，最后）
   - 执行顺序：E→F→G→A（阶段1低风险）→ D→C（阶段2）→ B（阶段3核心）
 - [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖
 
@@ -328,11 +329,12 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **A0 Edge errcode** | 14 域错误码 + 52 handlers 调用点重构 + 前端已兼容 | 2026-06-05 |
 | **A1 请求日志** | pkg/reqlog + Edge/Hub 接入 + context ID 传播 + 6 tests | 2026-06-05 |
 | **A3 P0 安全** | Auth token Debug 日志 + FileStore async persist (50ms debounce) | 2026-06-05 |
-| **A4 前端解耦** | App.tsx 1837→1525 (-17%)，5 模块拆出 + 3 组件 lazy-load | 2026-06-05 |
+| **A2 调试端点** | pkg/debug 共享模块 + Hub/Edge 统一注册 + health/pprof/metrics/config/state + 11 tests | 2026-06-05 |
+| **A4 Wave 2 (3/7)** | App.tsx 1525→1440 行，useHiddenMessages/useSidebarResize/useThreadCache 拆出 | 2026-06-05 |
 | **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 | **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
-| **比赛评审评估** | 5 维度深度评估(AI协作22/30+功能15.5/25+代码理解12/15+创新8/10+Demo策略) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) | 2026-06-05 |
+| **比赛评审评估** | 6 维度全评(AI协作22/30+功能15.5/25+生成效果12/20+代码理解12/15+创新8/10，总分69.5/100) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) + 提分路径 + Demo 3 分钟策略 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
@@ -346,11 +348,11 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 |------|:----:|:-------:|---------|
 | AI 协作能力 | 30% | **22/30** | 结构化委派+IM 双模独有；七层 guardrails 业界唯一；短板：Edge/Hub 双轨未统一(-2)、无跨 Run 记忆(-1)、故障恢复不完整(-1) |
 | 功能完整度 | 25% | **15.5/25** | P0 执行闭环 80%、P1 IM 55%、P2 Hub 35%；核心短板：TeamRun E2E 未打通(-3)、Edge 无持久化(-2)、P2 远程场景未实现(-2) |
-| 生成效果 | 20% | 待评 | subagent 后台运行中 |
+| 生成效果 | 20% | **12/20** | Diff 基础可用但无语法高亮(-2)、Tool Call 7/10、流式仅文本块级非 token 级且 Codex 无流式(-2)、Artifact 正则提取脆弱(-1)、Preview 无 dev server(-2) |
 | 代码理解 | 15% | **12/15** | AGENTS.md 渐进式加载竞品独一无二；workspace fail-closed 领先；MCP 仅 Server 端缺 Client(-1)、Skill 仅 Codex 格式(-1)、上下文预算未可视化(-1) |
 | 创新与产品感 | 10% | **8/10** | IM-native 多 Agent "无人竞争"(UNCONTESTED)；三层架构本地优先独树一帜；Agent Profile 四层模型比竞品成熟；短板：多 Agent IM 交互缺原型验证(-1)、Profile 配置界面未落地(-1) |
 
-**当前已评总分：57.5/80（已评维度）** | 生成效果待补
+**总分：69.5/100** | AI协作22 + 功能15.5 + 生成效果12 + 代码理解12 + 创新8 = 69.5
 
 ### 比赛提分关键路径（按性价比排序）
 
