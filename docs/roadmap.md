@@ -15,18 +15,20 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 - 每个完成项必须有证据：focused tests、截图、真实运行日志、TeamRun export、录屏片段或当前 PR 状态。
 - Roadmap 记录优先级、依赖、验收和长期方向，不写人工日程表。
 - 子代理只做窄任务：Codex GPT-5.5 做强实现/强审查，Claude sonnet 做窄范围代码，Claude haiku 做多模态视觉 QA，Claude opus 做长上下文推理/研究。
+- R 系列 Desktop 小 PR 只作为来源分支；当前主线改为一个 Desktop P0 集成 PR，避免 PR 周转吞时间。
+- `docs/review/` 是外部审查输入，不是第二套 backlog。只把高价值结论合并进本 roadmap，重复项归档或并入既有 P0/P1/P3。
 
 ## 当前最高优先级
 
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
-| P0-1 | R5 Composer Convergence | PR #274 draft，head `7d9bcd54` | rebase 到 R4 后保持共享 core，小切片合并 | composer focused tests，@Agent/附件/approval mode 截图 |
-| P0-2 | R3 Transcript Contract | PR #272 draft，head `30894536` | 在 R5 后合；避免 IM/Chat 出现第三套 renderer | Tool/Diff/Thinking/Approval/Artifact block 回归测试 |
-| P0-3 | R6A Optimistic IM | PR #275 draft，head `89ade593` | 在 R3 后合；approval 一致性另起小切片 | pending/failed 气泡测试，失败回滚截图 |
-| P0-4 | 真实 TeamRun E2E | PR #270 已合入证据链基础，最终录屏/导出未完成 | 跑两个真实 Runtime Profile；导出 route/task/event/transcript | 运行日志、事件导出、截图、3 分钟视频素材 |
-| P0-5 | 比赛材料同步 | 旧提交清单仍混有 Web/Mobile/2026-06-01 状态 | 更新 feature matrix、submission checklist、demo script、AI 协作日志 | 文档 diff 指向当前 commit 证据 |
+| P0-1 | Desktop P0 集成 PR（R5 + R3 + R6A） | `integration/desktop-p0` 已合入来源分支；替代 #272/#274/#275 单独推进 | 推单一 PR，完成 review 后合入 `dev/delicious233` | `git diff --check`；focused vitest 91/91；Desktop typecheck |
+| P0-2 | Desktop 视觉 QA | 集成后立刻做；竞品截图只作为密度/布局参考 | 1440x920、1280x800、390x844 截图；检查横向滚动、遮挡、composer 底部空间 | 截图路径、问题清单、必要 CSS 修复 |
+| P0-3 | 真实 TeamRun E2E | PR #270 已合入证据链基础，最终录屏/导出未完成 | 跑两个真实 Runtime Profile；导出 route/task/event/transcript；让 correlation/task 链在 UI 可见 | 运行日志、事件导出、截图、3 分钟视频素材 |
+| P0-4 | 比赛材料同步 | 旧提交清单仍混有 Web/Mobile/2026-06-01 状态 | 更新 feature matrix、submission checklist、demo script、AI 协作日志 | 文档 diff 指向当前 commit 证据 |
+| P0-5 | `docs/review/` triage | Round 1/2 报告已读入 | P0 只吸收 TeamRun/视觉/renderer 证据相关项；长期项放 P1/P3/P4 | roadmap 条目被合并，不产生新散列表 |
 
-已合入：R2 Desktop Shell IA（merge commit `698faabf`）、R4 Right Inspector（merge commit `dfe68692`）。推荐后续合并顺序：R5 -> R3 -> R6A。每合一个分支立刻跑 Desktop-focused gate，再补视觉证据。
+已合入：R2 Desktop Shell IA（merge commit `698faabf`）、R4 Right Inspector（merge commit `dfe68692`）。R3/R5/R6A 不再逐个合小 PR，统一进入 Desktop P0 集成 PR；旧 draft PR 关闭或标记 superseded。
 
 ## P0: Desktop 比赛闭环
 
@@ -42,7 +44,7 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 - [x] IM @Agent 输入：`IMMessageInput` 已接入 `useMention` / `MentionPopover`。
 - [x] IM 富消息基础：`IMBlockRenderer` 已支持 Tool/Diff/Thinking/Approval 摘要。
-- [ ] 合入 R3：主 Chat 与 IM 共享 block/normalization 约束，避免 renderer 漂移。
+- [ ] 合入 Desktop P0 集成 PR：主 Chat 与 IM 共享 block/normalization 约束，避免 renderer 漂移。
 - [ ] child_agent、route_decision、artifact、deploy block 进入 IM 流。
 - [ ] Diff/Preview/Tool/Artifact 卡片既能在消息流可见，也能在右侧 Inspector 汇总。
 
@@ -55,8 +57,8 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 ### P0-D Composer 和协作动作
 
-- [ ] 合入 R5：`PromptInput` / `IMMessageInput` 的 @Agent、附件、workdir、approval mode 语义一致。
-- [ ] 合入 R6A：IM 发送立即出现 pending 气泡，失败可回滚并展示错误。
+- [ ] 合入 Desktop P0 集成 PR：`PromptInput` / `IMMessageInput` 的 @Agent、附件、workdir、approval mode 语义一致。
+- [ ] 合入 Desktop P0 集成 PR：IM 发送立即出现 pending 气泡，失败可回滚并展示错误。
 - [ ] 统一 Edge permission approval 和 Team approval 的视觉路径。
 - [ ] Enter 发送、Shift+Enter 换行、disabled/loading、附件入口都有测试。
 
@@ -80,6 +82,10 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 | scroll-to-bottom 简化 | 前端审计 P1 | 中 | 用户上滑历史时不被强制滚回底部 |
 | Blob URL revoke | 前端审计 P1 | 中 | 下载后释放 object URL |
 | 消息骨架屏/streaming ticker | 前端审计 P2 | 中 | 流式等待态可读，不闪烁 |
+| 共享 Tool/Icon/Input summarizer utilities | `docs/review` Round 2 | 中 | `ChatView`、`IMBlockRenderer`、`ToolGroup` 不再重复 `TOOL_ICON_MAP` / `summarizeInput` |
+| TeamRun correlation/task 链可视化 | Codeg ACP 对比 | 中 | IM/Inspector 能看到父子任务、correlation_id 或等价调用链 |
+| per-thread draft persistence | 前端架构审计 P1 | 中 | 切换 thread 不丢 composer 草稿 |
+| context meter / token budget 提示 | 多模态 UI 审计 | 中 | 长任务录屏时能说明上下文状态，不只在日志里出现 |
 | Markdown 数学公式 | 前端审计 P2 | 低 | 仅在 demo/文档生成需要时做 |
 
 ## P2: IM 产品完整性
@@ -149,6 +155,7 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 - [ ] OpenAPI 补齐：`POST /cloud/edge/register`。
 - [ ] OpenAPI 补齐：`GET /client/auth/oidc/callback`。
 - [ ] events.md 修正：`run.agent.sub_agent_status` / `task_dispatch_failed` / `friend.accepted` / `message.delta` 与代码一致。
+- [ ] Desktop 全量测试基线治理：shared UI 测试的 React 版本/路径重复问题，edge-real 测试对统一信封和错误码的旧断言。
 - [ ] Release workflow 加分支限制，避免任意分支推 `v*` tag 触发发布。
 - [ ] gosec/golangci-lint 从 warning 变成可解释的 gate；不要用降级规则换绿。
 - [ ] macOS CI 的 `continue-on-error` 要么取消，要么写明跳过原因。
