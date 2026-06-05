@@ -7,10 +7,10 @@ import {
   Suspense,
   lazy,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHiddenMessages } from '@/hooks/useHiddenMessages';
+import { useSidebarResize } from '@/hooks/useSidebarResize';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
@@ -267,7 +267,6 @@ export default function App() {
     leftSidebarView,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
-    setLeftSidebarWidth,
     setLeftSidebarView,
   } = useUIStore(
     useShallow((s) => ({
@@ -277,10 +276,10 @@ export default function App() {
       leftSidebarView: s.leftSidebarView,
       setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
       setRightPanelOpen: s.setRightPanelOpen,
-      setLeftSidebarWidth: s.setSidebarWidth,
       setLeftSidebarView: s.setLeftSidebarView,
     })),
   );
+  const { handleStartResize, handleResizeKeyDown } = useSidebarResize();
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
   const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
@@ -702,47 +701,6 @@ export default function App() {
     setLeftSidebarView('thread');
     if (displayedRun) setRightPanelOpen(true);
   }, [displayedRun, openSettings, permissionRequests.length, setLeftSidebarView, setRightPanelOpen]);
-
-  const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const initialLeft = leftSidebarWidth;
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      if (side === 'left') {
-        const nextLeft = clamp(initialLeft + moveEvent.clientX - startX, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
-        setLeftSidebarWidth(nextLeft);
-      }
-    };
-
-    const handleUp = () => {
-      document.body.classList.remove(styles.resizing ?? '');
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-    };
-
-    document.body.classList.add(styles.resizing ?? '');
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp, { once: true });
-  }, [leftSidebarWidth, setLeftSidebarWidth]);
-
-  const handleResizeKeyDown = useCallback((side: 'left' | 'right') => (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 40 : 16;
-    let nextWidth: number | null = null;
-
-    if (side === 'left') {
-      if (event.key === 'ArrowLeft') nextWidth = leftSidebarWidth - step;
-      if (event.key === 'ArrowRight') nextWidth = leftSidebarWidth + step;
-      if (event.key === 'Home') nextWidth = LEFT_SIDEBAR_MIN;
-      if (event.key === 'End') nextWidth = LEFT_SIDEBAR_MAX;
-      if (nextWidth != null) {
-        event.preventDefault();
-        const clamped = clamp(nextWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
-        setLeftSidebarWidth(clamped);
-      }
-      return;
-    }
-  }, [leftSidebarWidth, setLeftSidebarWidth]);
 
   const handleDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     const request = permissionRequests.find((item) => item.requestId === requestId);
