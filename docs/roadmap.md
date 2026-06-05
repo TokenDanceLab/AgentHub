@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 (五维 Review + 七项深研) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
+> 最后更新: 2026-06-05 (五维 Review + 七项深研 + 比赛评审评估) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
 ## 课题目标
 
@@ -332,12 +332,58 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 | **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
+| **比赛评审评估** | 5 维度深度评估(AI协作22/30+功能15.5/25+代码理解12/15+创新8/10+Demo策略) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
 ---
 
-## 技术栈速查
+## 比赛评审维度评估
+
+> 2026-06-05 基于代码实证 + 竞品对比的预估得分。总分满分 100。
+
+| 维度 | 权重 | 预估得分 | 关键发现 |
+|------|:----:|:-------:|---------|
+| AI 协作能力 | 30% | **22/30** | 结构化委派+IM 双模独有；七层 guardrails 业界唯一；短板：Edge/Hub 双轨未统一(-2)、无跨 Run 记忆(-1)、故障恢复不完整(-1) |
+| 功能完整度 | 25% | **15.5/25** | P0 执行闭环 80%、P1 IM 55%、P2 Hub 35%；核心短板：TeamRun E2E 未打通(-3)、Edge 无持久化(-2)、P2 远程场景未实现(-2) |
+| 生成效果 | 20% | 待评 | subagent 后台运行中 |
+| 代码理解 | 15% | **12/15** | AGENTS.md 渐进式加载竞品独一无二；workspace fail-closed 领先；MCP 仅 Server 端缺 Client(-1)、Skill 仅 Codex 格式(-1)、上下文预算未可视化(-1) |
+| 创新与产品感 | 10% | **8/10** | IM-native 多 Agent "无人竞争"(UNCONTESTED)；三层架构本地优先独树一帜；Agent Profile 四层模型比竞品成熟；短板：多 Agent IM 交互缺原型验证(-1)、Profile 配置界面未落地(-1) |
+
+**当前已评总分：57.5/80（已评维度）** | 生成效果待补
+
+### 比赛提分关键路径（按性价比排序）
+
+1. **打通 TeamRun E2E**（+3 分，~3 天）— 核心差异化唯一证据，用真实 Runtime 完成群聊多 Agent 协作
+2. **Edge SQLite 持久化 B0**（+2 分，~3 天）— Demo 经得起重启
+3. **修复 102 个失败测试 + Preview 增强**（+1.5 分，~1.5 天）— 测试 91%→100%、网页/文件预览
+4. **Edge→Hub 模式统一**（+2 分 AI 协作，~5 天）— 消除双轨并行，补齐审计链
+
+### 竞品威胁更新（2026-06-05）
+
+| 竞品 | 威胁级别 | 关键动态 |
+|------|:-------:|---------|
+| **Codeg v0.14.7** | **HIGH** | 最接近 AgentHub 的开源项目——多 CLI Agent 聚合 + Telegram/Lark IM + 多 Agent 协作 |
+| **Claude Code Agent View** | **MEDIUM→HIGH** | 从单 Agent 演进到多 Session 管理面板；/bg 后台派遣 |
+| **Cursor 3.2** | HIGH | /multitask 异步子代理 + /best-of-n 多模型并行 + Cursor SDK |
+| **GitHub Copilot SDK** | HIGH | 6 语言 SDK GA + Sub-agents + Cloud Automations + Copilot Memory |
+| **CodeBanana** | MEDIUM | 商用发布"群聊+Agent+Workspace"，36 氪获奖 |
+| **Devin Desktop + ACP** | MEDIUM | Windsurf 更名为 Devin Desktop，发布 Agent Client Protocol |
+
+**核心差异化窗口在缩窄**：IM 多 Agent 不再无人竞争。剩余壁垒：Tauri 2 原生桌面 + Hub-Edge-Runner 分布式 + 开源社区
+
+### 调整建议
+
+- 飞书/Telegram IM 桥接从 P1 提升为 **P0 加速**（Codeg 已证明可行）
+- 新增 **Agent Adapter SDK** 为 P0（参考 Copilot/Cursor SDK，降低第三方 CLI 接入门槛）
+- 新增 **后台 Agent 调度器** 为 P1（Claude Code /bg、Codex Goal Mode、Copilot Automations 成为标配）
+
+### Demo 3 分钟策略
+
+- **场景**：三 Agent（Architect/Builder/Reviewer）协作修复 Dashboard 性能问题，三种 Runtime 各司其职
+- **时间轴**：开场钩子(25s) → Claude Code 分析+审批(30s) → Codex 执行+Diff(35s) → OpenCode 审查+聚合(40s) → 总结对比(50s)
+- **三个最亮点**：(1) Thinking 面板+审批弹窗 (2) Diff 内联+FileChangeGroup (3) 三 Agent 产出聚合
+- **P0 打磨项**：BlockRenderer 6 个 null case(~30 行) + Agent Profile 预设(~50 行) + @mention Runtime 信息(~20 行) + Diff 稳定渲染(~30 行)
 
 | 层 | 技术 | 存储 | 代码量 | 测试 |
 |----|------|------|--------|------|
