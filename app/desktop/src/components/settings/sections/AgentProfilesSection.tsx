@@ -7,6 +7,7 @@ import SummaryCard from '../primitives/SummaryCard';
 import EmptyBlock from '../primitives/EmptyBlock';
 import RuntimeInventoryCard from '../cards/RuntimeInventoryCard';
 import LocalAgentProfileCard from '../cards/LocalAgentProfileCard';
+import styles from '../primitives/primitives.module.css';
 
 interface AgentProfilesSectionProps {
   agents: AgentInfo[];
@@ -21,7 +22,7 @@ export default function AgentProfilesSection({ agents, edgeOnline, runnerSummary
   return (
     <>
       <Panel title={t('settings.runtimeInventory')} description={t('settings.runtimeInventoryDesc')}>
-        <div className="summaryGrid">
+        <div className={`${styles.summaryGrid} ${styles.profileGridSpacious}`}>
           <SummaryCard
             icon={<Bot size={18} />}
             label={t('settings.profileAvailable')}
@@ -36,7 +37,7 @@ export default function AgentProfilesSection({ agents, edgeOnline, runnerSummary
           />
         </div>
         {agents.length > 0 ? (
-          <div className="profileGrid">
+          <div className={`${styles.profileGrid} ${styles.profileGridSpacious}`}>
             {agents.map((agent) => <RuntimeInventoryCard key={agent.id} agent={agent} />)}
           </div>
         ) : (
@@ -46,7 +47,7 @@ export default function AgentProfilesSection({ agents, edgeOnline, runnerSummary
 
       <Panel title={t('settings.agentProfiles')} description={t('settings.profileCompositionDesc')}>
         {localAgentProfiles.length > 0 ? (
-          <div className="profileGrid">
+          <div className={`${styles.profileGrid} ${styles.profileGridSpacious}`}>
             {localAgentProfiles.map((profile) => (
               <LocalAgentProfileCard
                 key={`profile-${profile.agent.id}`}
