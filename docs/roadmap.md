@@ -59,9 +59,9 @@
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 ████████████  95%  ← A0-A3✅, A4 Wave2 7/7✅, A6.2✅, A6.3✅
+Phase A: 工程基础设施 ████████████  95%  ← A0-A3✅, A4✅, A6.2✅, A6.3✅, 前端止血完成
 Phase B: 持久化 + 性能  ██░░░░░░░░  15%  ← B2 N+1 ✅
-Phase C: IM 核心闭环   ██░░░░░░░░  15%  ← Sprint #1 @Agent✅, Sprint #2 富消息✅
+Phase C: IM 核心闭环   ███░░░░░░░  25%  ← Sprint #1-4✅, 前端打磨完成
 Phase D: 高级功能      ░░░░░░░░░░   0%
 ```
 
@@ -366,7 +366,11 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **A6.2 统一信封** | Edge writeSuccess + unwrapEdgeResponse 双格式兼容 | 2026-06-05 |
 | **A6.3 DB TLS** | AGENTHUB_DB_SSLMODE 环境变量 + Validate 白名单 | 2026-06-05 |
 | **B2 N+1 修复** | Session list/StartTeamRun/dispatchTask + Migration 0041 索引 | 2026-06-05 |
-| **前端 P0 block key** | ChatView blockKey index→content hash，消除流式闪烁 | 2026-06-05 |
+| **Sprint #4 Tool 打磨** | Tool 卡片颜色编码（5 类）+ 标题语义化 | 2026-06-05 |
+| **前端 P0 execCommand** | copy/cut/paste → Clipboard API + Selection API | 2026-06-05 |
+| **前端 P0 Mock+iframe** | Agent Market mock→Coming Soon + iframe sandbox 移除 same-origin | 2026-06-05 |
+| **前端 P1 z-index** | 16 处硬编码 z-index → CSS 变量层级 | 2026-06-05 |
+| **前端 P1 console** | 30 处 console.error 残留清理 | 2026-06-05 |
 | **Sprint #1 IM @Agent** | 群聊 @Agent 分派 — useMention + MentionPopover + mention 编解码 | 2026-06-05 |
 | **Sprint #2 IM 富消息** | IMBlockRenderer — Tool/Diff/Thinking/Approval 投影到 IM 聊天流 | 2026-06-05 |
 | **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |

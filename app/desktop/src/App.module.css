@@ -110,7 +110,7 @@
 
 .iconTooltip {
   position: absolute;
-  z-index: 40;
+  z-index: var(--z-tooltip);
   max-width: 220px;
   padding: 5px 8px 6px;
   border: 1px solid var(--glass-border);
@@ -430,7 +430,7 @@
 /* ── Nav icons (bottom of sidebar) ─────────── */
 .sidebarFooter {
   position: relative;
-  z-index: 5;
+  z-index: var(--z-base);
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -720,7 +720,7 @@
   position: absolute;
   top: 48px;
   right: 16px;
-  z-index: 35;
+  z-index: var(--z-overlay);
   width: var(--right-panel-width, 360px);
   max-width: min(var(--right-panel-width, 360px), calc(100% - 32px));
   max-height: calc(100% - 64px);
@@ -764,7 +764,7 @@
   flex-shrink: 0;
   border-bottom: 1px solid var(--glass-border-subtle);
   position: relative;
-  z-index: 2;
+  z-index: var(--z-base);
 }
 
 /* Segmented control — juice capsule style */
@@ -839,7 +839,7 @@
 
 .topBar {
   position: relative;
-  z-index: 90;
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -966,7 +966,7 @@
 
 .topMenuPanel {
   position: absolute;
-  z-index: 120;
+  z-index: var(--z-popover);
   top: calc(100% + 4px);
   left: 0;
   display: grid;

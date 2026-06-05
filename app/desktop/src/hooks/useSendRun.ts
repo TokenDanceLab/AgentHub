@@ -200,7 +200,6 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
           updateThreadInCache(renamedThread);
         } catch (renameError) {
           queryClient.invalidateQueries({ queryKey: ['threads'] });
-          console.error('Failed to auto-rename thread:', renameError);
         }
       }
       if (renameThreadId) emptyCreatedThreadIdsRef.current.delete(renameThreadId);
@@ -217,7 +216,6 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
       }
       setOptimisticRun(null);
       addToast({ type: 'error', message: t('error.startRunFailed') });
-      console.error('Failed to start run:', e);
       return false;
     } finally {
       setRunStartPending(false);
