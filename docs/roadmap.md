@@ -441,6 +441,13 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | 27 | Blob URL 内存泄漏 | `ArtifactBrowser.tsx:558-570` | 下载后不 revokeObjectURL |
 | 28 | Tool 参数无深度截断 | `ToolGroup.tsx:162` JSON.stringify 无 max depth | 嵌套/base64 数据爆 DOM |
 | 29 | 右侧面板 resize 功能未实现 | `useSidebarResize.ts` 只处理 left | rightPanelWidth 存了但没应用 |
+| 30 | `summarizeInput` null input 崩溃 | `ChatView.tsx:110`, `ToolGroup.tsx:63` | WebSocket 畸形 tool_use 事件 input:null 导致渲染 crash |
+| 31 | `capOutputText` 静默丢弃输出头部 | `useChatMessages.ts:128-133` | >20K 字符输出只保留尾部，无截断提示 |
+| 32 | `hasVisibleBlock` 缺 `tool_group` 分支 | `ChatView.tsx:1079-1108` | 潜在 Bug：若 tool_group 被持久化/回放，整条消息消失 |
+| 33 | `mergeBlock` O(n²) 数组分配 | `useChatMessages.ts:93-109` | 高频流式时每次 delta 复制全量 blocks，GC 压力大 |
+| 34 | tool_group 内联合成每次渲染创建新对象 | `ChatView.tsx:1188-1206` | 已沉淀消息也不跳过，BlockRenderer memo 失效 |
+| 35 | `AgentTextBlock` 未 memo 化 | `ChatView.tsx:247-287` | 流式输出时每个 RAF tick 重新解析/渲染 Markdown |
+| 36 | scroll-to-bottom 3 次延时覆盖用户滚动位置 | `ChatView.tsx:1410-1430` | 用户上滑查看历史时被强制滚回底部 |
 
 ### P2 问题清单（打磨级）
 
