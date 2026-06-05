@@ -68,11 +68,16 @@ type DBConfig struct {
 	User     string `mapstructure:"user"`
 	Password string `mapstructure:"password"`
 	Name     string `mapstructure:"name"`
+	SSLMode  string `mapstructure:"sslmode"`
 }
 
 func (d DBConfig) DSN() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		d.Host, d.Port, d.User, d.Password, d.Name)
+	sslmode := d.SSLMode
+	if sslmode == "" {
+		sslmode = "disable"
+	}
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		d.Host, d.Port, d.User, d.Password, d.Name, sslmode)
 }
 
 // LogValue implements slog.LogValuer to redact secrets when config is logged.
@@ -83,6 +88,7 @@ func (d DBConfig) LogValue() slog.Value {
 		slog.String("user", d.User),
 		slog.String("password", "[REDACTED]"),
 		slog.String("name", d.Name),
+		slog.String("sslmode", d.SSLMode),
 	)
 }
 
@@ -282,6 +288,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetEnvPrefix("AGENTHUB")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	v.SetDefault("db.sslmode", "disable")
 	setAgentTeamDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
@@ -398,6 +405,10 @@ func (c *Config) Validate() error {
 	}
 	if c.DB.Name == "" {
 		return errors.New("db.name is required")
+	}
+	validSSL := map[string]bool{"disable": true, "require": true, "verify-ca": true, "verify-full": true}
+	if c.DB.SSLMode != "" && !validSSL[c.DB.SSLMode] {
+		return fmt.Errorf("db.sslmode must be one of disable, require, verify-ca, verify-full; got %q", c.DB.SSLMode)
 	}
 
 	// Redis: host and port must be plausible.
