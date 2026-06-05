@@ -1,6 +1,6 @@
 // GitHub-style diff viewer with file tree, collapsible hunks, and line numbers
 // Enhanced with git integration: tab switcher for Agent changes vs Git changes,
-// and commit preview panel for staged/unstaged diffs.
+// commit preview panel for staged/unstaged diffs, and syntax highlighting.
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,7 +13,9 @@ import {
   MessageSquareText,
 } from 'lucide-react';
 import type { FileDiff, DiffHunk } from './ChatView.types';
+import { highlightLine, languageFromPath } from '@shared/ui/syntaxHighlight';
 import styles from './DiffViewer.module.css';
+import 'prismjs/themes/prism-tomorrow.css';
 
 interface Props {
   /** Agent-produced file changes (from tool calls) */
@@ -419,7 +421,7 @@ function FileDiffSection({
       {expanded && (
         <div className={styles.fileBody}>
           {file.hunks.map((hunk, i) => (
-            <HunkRenderer key={i} hunk={hunk} />
+            <HunkRenderer key={i} hunk={hunk} filePath={file.filePath} />
           ))}
         </div>
       )}
@@ -427,8 +429,9 @@ function FileDiffSection({
   );
 }
 
-function HunkRenderer({ hunk }: { hunk: DiffHunk }) {
+function HunkRenderer({ hunk, filePath }: { hunk: DiffHunk; filePath: string }) {
   const [collapsed, setCollapsed] = useState(false);
+  const lang = languageFromPath(filePath);
 
   return (
     <div className={styles.hunk}>
@@ -468,7 +471,12 @@ function HunkRenderer({ hunk }: { hunk: DiffHunk }) {
                     ? '-'
                     : ''}
               </span>
-              <span className={styles.lineContent}>{line.content}</span>
+              <span
+                className={styles.lineContent}
+                dangerouslySetInnerHTML={{
+                  __html: highlightLine(line.content, lang),
+                }}
+              />
             </div>
           ))}
         </div>
