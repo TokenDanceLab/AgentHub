@@ -68,6 +68,7 @@ const HomeDashboard = lazy(() => import('@/components/HomeDashboard'));
 const SettingsPage = lazy(() => import('@/components/SettingsPage'));
 import {
   AlertTriangle,
+  Bot,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -206,7 +207,6 @@ export default function App() {
       : t('settings.agentScheduling');
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const { hiddenMessageIds, hideMessage } = useHiddenMessages(activeThreadId);
-  const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -216,19 +216,21 @@ export default function App() {
     leftSidebarCollapsed,
     rightPanelOpen,
     leftSidebarWidth,
-    leftSidebarView,
+    activeRailView,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
     setLeftSidebarView,
+    setActiveRailView,
   } = useUIStore(
     useShallow((s) => ({
       leftSidebarCollapsed: s.leftSidebarCollapsed,
       rightPanelOpen: s.rightPanelOpen,
       leftSidebarWidth: s.sidebarWidth,
-      leftSidebarView: s.leftSidebarView,
+      activeRailView: s.activeRailView,
       setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
       setRightPanelOpen: s.setRightPanelOpen,
       setLeftSidebarView: s.setLeftSidebarView,
+      setActiveRailView: s.setActiveRailView,
     })),
   );
   const { handleStartResize, handleResizeKeyDown } = useSidebarResize();
@@ -293,6 +295,9 @@ export default function App() {
   const runCardConstrained = workspaceWidth > 0 && workspaceWidth < RUN_CARD_MIN_WORKSPACE_WIDTH;
   const effectiveRightPanelOpen = rightPanelOpen && !runCardConstrained;
   const showRunCardSpace = !!displayedRun && effectiveRightPanelOpen && !isMobile && !workspaceExpanded;
+  const effectiveSidebarCollapsed = leftSidebarCollapsed
+    || activeRailView === 'messages'
+    || activeRailView === 'team';
   const composerLocked = runStartPending || runIsActive;
   const persistedMessages = useMemo(
     () => buildChatMessagesFromThreadItems(threadItemData?.items ?? []),
@@ -382,6 +387,17 @@ export default function App() {
     t,
   });
 
+  const setViewModeCompat = useCallback((mode: 'agent' | 'im') => {
+    setActiveRailView(mode === 'im' ? 'messages' : 'agents');
+  }, [setActiveRailView]);
+
+  const setLeftSidebarViewCompat = useCallback((v: 'home' | 'thread') => {
+    setLeftSidebarView(v);
+    if (v === 'thread' && activeRailView === 'home') {
+      setActiveRailView('agents');
+    }
+  }, [activeRailView, setActiveRailView, setLeftSidebarView]);
+
   const {
     handleSelectThread,
     handleThreadTitleEdited,
@@ -401,8 +417,8 @@ export default function App() {
     selectedThreadTitle: selectedThread?.title,
     selectThread,
     selectAgentThread,
-    setLeftSidebarView,
-    setViewMode,
+    setLeftSidebarView: setLeftSidebarViewCompat,
+    setViewMode: setViewModeCompat,
     setPendingComposerDraft,
     addThreadToCache,
     emptyCreatedThreadIdsRef,
@@ -466,8 +482,9 @@ export default function App() {
       return;
     }
     setLeftSidebarView('thread');
+    setActiveRailView('agents');
     if (displayedRun) setRightPanelOpen(true);
-  }, [displayedRun, openSettings, permissionRequests.length, setLeftSidebarView, setRightPanelOpen]);
+  }, [displayedRun, openSettings, permissionRequests.length, setActiveRailView, setLeftSidebarView, setRightPanelOpen]);
 
   const handleDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     const request = permissionRequests.find((item) => item.requestId === requestId);
@@ -489,7 +506,7 @@ export default function App() {
   }, [hideMessage]);
 
   useEffect(() => {
-    if (!pendingComposerDraft || leftSidebarView === 'home' || viewMode !== 'agent') return undefined;
+    if (!pendingComposerDraft || activeRailView !== 'agents') return undefined;
     let attempts = 0;
     let timer: number | undefined;
     const tryApplyDraft = () => {
@@ -507,7 +524,7 @@ export default function App() {
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [leftSidebarView, pendingComposerDraft, viewMode]);
+  }, [activeRailView, pendingComposerDraft]);
 
   const handleShareWorkspace = useCallback(async () => {
     const title = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
@@ -701,22 +718,86 @@ export default function App() {
       )}
 
       <div className={styles.body} style={shellStyle}>
-        {/* Single sidebar — agents + threads grouped */}
-        {!isMobile && !workspaceExpanded && !leftSidebarCollapsed && (
+        {/* Global Rail — icon-only navigation */}
+        {!isMobile && !workspaceExpanded && (
+          <div className={styles.leftRail}>
+            <ShellIconButton
+              className={`${styles.railBtn} ${activeRailView === 'home' ? styles.navIconBtnActive : ''}`}
+              onClick={() => setActiveRailView('home')}
+              label={t('nav.home')}
+              tooltipSide="right"
+              aria-pressed={activeRailView === 'home'}
+            >
+              <Home size={16} />
+            </ShellIconButton>
+            <ShellIconButton
+              className={`${styles.railBtn} ${activeRailView === 'messages' ? styles.navIconBtnActive : ''}`}
+              onClick={() => setActiveRailView('messages')}
+              label={t('im.groupChat')}
+              tooltipSide="right"
+              aria-pressed={activeRailView === 'messages'}
+            >
+              <MessageSquareText size={16} />
+            </ShellIconButton>
+            <ShellIconButton
+              className={`${styles.railBtn} ${activeRailView === 'agents' ? styles.navIconBtnActive : ''}`}
+              onClick={() => setActiveRailView('agents')}
+              label={t('nav.agent')}
+              tooltipSide="right"
+              aria-pressed={activeRailView === 'agents'}
+            >
+              <Bot size={16} />
+            </ShellIconButton>
+            <ShellIconButton
+              className={`${styles.railBtn} ${activeRailView === 'team' ? styles.navIconBtnActive : ''}`}
+              onClick={() => setActiveRailView('team')}
+              label={teamRunButtonLabel}
+              tooltipSide="right"
+              aria-pressed={activeRailView === 'team'}
+            >
+              <span className={styles.iconBadgeHostInline}>
+                <Route size={16} />
+                {teamRunBadgeCount > 0 ? (
+                  <span className={styles.iconBadge} aria-label={teamRunButtonLabel}>
+                    {teamRunBadgeCount > 9 ? '9+' : teamRunBadgeCount}
+                  </span>
+                ) : null}
+              </span>
+            </ShellIconButton>
+            <div className={styles.railSpacer} />
+            <ShellIconButton
+              className={styles.railBtn}
+              onClick={() => openSettings('general')}
+              label={t('nav.settings')}
+              tooltipSide="right"
+            >
+              <Settings size={16} />
+            </ShellIconButton>
+            <ShellIconButton
+              className={styles.railBtn}
+              onClick={handleOpenHubAccount}
+              label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+              tooltipSide="right"
+              aria-pressed={hubAuthenticated}
+            >
+              {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <UserCircle size={16} />}
+            </ShellIconButton>
+            <ShellIconButton
+              className={styles.railBtn}
+              onClick={toggleTheme}
+              label={theme === 'dark' ? t('theme.light') : t('theme.dark')}
+              tooltipSide="right"
+              aria-pressed={theme === 'dark'}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </ShellIconButton>
+          </div>
+        )}
+
+        {/* Conversation Sidebar — agents + threads */}
+        {!isMobile && !workspaceExpanded && !effectiveSidebarCollapsed && (
           <>
           <div className={styles.sidebar}>
-            {/* Home nav */}
-            <div className={styles.sidebarHomeNav}>
-              <ShellIconButton
-                className={`${styles.navIconBtn} ${leftSidebarView === 'home' ? styles.navIconBtnActive : ''}`}
-                onClick={() => setLeftSidebarView('home')}
-                label={t('nav.home')}
-                tooltipSide="right"
-              >
-                <Home size={16} />
-              </ShellIconButton>
-            </div>
-
             {/* Global search */}
             <button
               type="button"
@@ -740,25 +821,6 @@ export default function App() {
               <div className={styles.sidebarScroll}>
                 <Slot name="thread-panel" online={online} selectedId={activeThreadId ?? undefined} onSelect={handleSelectThread} onCreate={handleCreateThread} onThreadTitleEdited={handleThreadTitleEdited} runs={allRunsData?.items ?? []} />
               </div>
-            </div>
-
-            {/* Sidebar footer */}
-            <div className={styles.sidebarFooter}>
-              <ShellIconButton className={styles.navIconBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="top">
-                <Settings size={16} />
-              </ShellIconButton>
-              <ShellIconButton
-                className={styles.navIconBtn}
-                onClick={handleOpenHubAccount}
-                label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
-                tooltipSide="top"
-                aria-pressed={hubAuthenticated}
-              >
-                {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <UserCircle size={16} />}
-              </ShellIconButton>
-              <ShellIconButton className={styles.navIconBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} tooltipSide="top" aria-pressed={theme === 'dark'}>
-                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-              </ShellIconButton>
             </div>
           </div>
           <div
@@ -798,35 +860,11 @@ export default function App() {
                 </ShellIconButton>
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
-                  onClick={() => setViewMode((mode) => (mode === 'agent' ? 'im' : 'agent'))}
-                  label={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
-                  tooltipSide="bottom"
-                  aria-pressed={viewMode === 'im'}
-                >
-                  <MessageSquareText size={15} />
-                </ShellIconButton>
-                <ShellIconButton
-                  className={styles.workspaceHeaderBtn}
                   onClick={() => openSettings('tasks')}
                   label={t('settings.tasks')}
                   tooltipSide="bottom"
                 >
                   <ClipboardList size={15} />
-                </ShellIconButton>
-                <ShellIconButton
-                  className={styles.workspaceHeaderBtn}
-                  onClick={() => openSettings('agentScheduling')}
-                  label={teamRunButtonLabel}
-                  tooltipSide="bottom"
-                >
-                  <span className={styles.iconBadgeHostInline}>
-                    <Route size={15} />
-                    {teamRunBadgeCount > 0 ? (
-                      <span className={styles.iconBadge} aria-label={teamRunButtonLabel}>
-                        {teamRunBadgeCount > 9 ? '9+' : teamRunBadgeCount}
-                      </span>
-                    ) : null}
-                  </span>
                 </ShellIconButton>
                 {displayedRun && !effectiveRightPanelOpen && (
                   <ShellIconButton
@@ -862,103 +900,111 @@ export default function App() {
               </div>
             </div>
 
-            {/* Chat area */}
-            <div className={styles.chatArea}>
-              {leftSidebarView === 'home' ? (
-                <Suspense fallback={null}>
-                <HomeDashboard
-                  onNewThread={async () => {
-                    try {
-                      const thread = await createThread();
-                      addThreadToCache(thread, { empty: true });
-                      handleSelectThread(thread.threadId);
-                    } catch {
-                      // continue
-                    }
-                  }}
-                  onSelectThread={handleSelectThread}
-                  onQuickStart={async (prompt) => {
-                    const title = buildAutomaticThreadTitle(prompt);
-                    try {
-                      const thread = await createThread(title ?? undefined);
-                      addThreadToCache(thread);
-                      handleSelectThread(thread.threadId);
-                      await handleSend(prompt, selectedAgentId ?? undefined, {
-                        threadId: thread.threadId,
-                        threadInfo: thread,
-                        createdEmptyThread: true,
-                      });
-                    } catch {
-                      addToast({ type: 'error', message: t('toast.error') });
-                    }
-                  }}
-                  onViewRuns={() => openSettings('tasks')}
-                  onReviewApprovals={handleReviewApprovalsFromHome}
-                  onViewAllThreads={() => setLeftSidebarView('thread')}
-                  onOpenTeamRuns={() => openSettings('agentScheduling')}
-                  onOpenHubAccount={handleOpenHubAccount}
-                  permissionCount={permissionRequests.length}
-                  agentTeamOverview={agentTeamsQuery.data}
-                  agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
-                  agentTeamsSignedIn={hubInventoryEnabled}
-                  agents={agents}
-                  selectedAgentId={selectedAgentId ?? undefined}
-                  onSelectAgent={handleSelectAgent}
-                  onStartLocalOrchestration={handleStartLocalOrchestration}
-                />
-                </Suspense>
-              ) : viewMode === 'im' ? (
-                <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" agents={agents} /></Suspense></ErrorBoundary>
-              ) : (
-                <Slot
-                  name="main-view"
-                  messages={messages}
-                  allMessages={allMessages}
-                  threadsCount={threads.length}
-                  isStreaming={composerLocked}
-                  isConnected={isConnected}
-                  agents={agents}
-                  selectedAgentId={selectedAgentId}
-                  onSelectAgent={handleSelectAgent}
-                  onRetry={handleRetry}
-                  onFork={handleForkThread}
-                  onDelete={handleDelete}
-                  onSendMessage={handleSend}
-                />
+            {/* Content: transcript + inline inspector */}
+            <div className={styles.workspaceContent}>
+              <div className={styles.transcriptArea}>
+                {/* Transcript */}
+                <div className={styles.chatArea}>
+                  {activeRailView === 'home' ? (
+                    <Suspense fallback={null}>
+                    <HomeDashboard
+                      onNewThread={async () => {
+                        try {
+                          const thread = await createThread();
+                          addThreadToCache(thread, { empty: true });
+                          handleSelectThread(thread.threadId);
+                        } catch {
+                          // continue
+                        }
+                      }}
+                      onSelectThread={handleSelectThread}
+                      onQuickStart={async (prompt) => {
+                        const title = buildAutomaticThreadTitle(prompt);
+                        try {
+                          const thread = await createThread(title ?? undefined);
+                          addThreadToCache(thread);
+                          handleSelectThread(thread.threadId);
+                          await handleSend(prompt, selectedAgentId ?? undefined, {
+                            threadId: thread.threadId,
+                            threadInfo: thread,
+                            createdEmptyThread: true,
+                          });
+                        } catch {
+                          addToast({ type: 'error', message: t('toast.error') });
+                        }
+                      }}
+                      onViewRuns={() => openSettings('tasks')}
+                      onReviewApprovals={handleReviewApprovalsFromHome}
+                      onViewAllThreads={() => setActiveRailView('agents')}
+                      onOpenTeamRuns={() => setActiveRailView('team')}
+                      onOpenHubAccount={handleOpenHubAccount}
+                      permissionCount={permissionRequests.length}
+                      agentTeamOverview={agentTeamsQuery.data}
+                      agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
+                      agentTeamsSignedIn={hubInventoryEnabled}
+                      agents={agents}
+                      selectedAgentId={selectedAgentId ?? undefined}
+                      onSelectAgent={handleSelectAgent}
+                      onStartLocalOrchestration={handleStartLocalOrchestration}
+                    />
+                    </Suspense>
+                  ) : activeRailView === 'messages' ? (
+                    <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" agents={agents} /></Suspense></ErrorBoundary>
+                  ) : activeRailView === 'team' ? (
+                    <ErrorBoundary><Suspense fallback={null}><Slot name="teamrun-console" /></Suspense></ErrorBoundary>
+                  ) : (
+                    <Slot
+                      name="main-view"
+                      messages={messages}
+                      allMessages={allMessages}
+                      threadsCount={threads.length}
+                      isStreaming={composerLocked}
+                      isConnected={isConnected}
+                      agents={agents}
+                      selectedAgentId={selectedAgentId}
+                      onSelectAgent={handleSelectAgent}
+                      onRetry={handleRetry}
+                      onFork={handleForkThread}
+                      onDelete={handleDelete}
+                      onSendMessage={handleSend}
+                    />
+                  )}
+                </div>
+
+                {/* Input area — only for agent chat */}
+                {activeRailView === 'agents' && (
+                  <div className={styles.inputArea}>
+                    <Slot name="prompt-input" agents={agents} threads={threads} executionTargets={executionTargetsQuery.data?.items ?? []} modelCatalog={modelCatalogQuery.data} modelDisplayNames={modelsDevDisplayNamesQuery.data} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={activeThreadId ?? undefined} onRetryLast={handleRetry} onForkThread={handleForkThread} />
+                  </div>
+                )}
+              </div>
+
+              {/* Inline Inspector Panel */}
+              {!isMobile && !workspaceExpanded && displayedRun && rightPanelMounted && (
+                <div
+                  className={`${styles.inspectorPanel} ${effectiveRightPanelOpen ? styles.inspectorPanelOpen : styles.inspectorPanelClosing}`}
+                  role="complementary"
+                  aria-label={t('run.title')}
+                  aria-hidden={!effectiveRightPanelOpen}
+                >
+                  <div className={styles.inspectorPanelBody}>
+                    <ErrorBoundary>
+                      <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
+                        <Slot
+                          name="run-detail"
+                          run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
+                          outputText={displayedRun?.outputText ?? ''}
+                          toolCalls={displayedRun?.toolCalls ?? []}
+                          changedFiles={displayedRun?.changedFiles ?? []}
+                          onCancel={handleCancel}
+                          chatMessages={allMessages}
+                        />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </div>
+                </div>
               )}
             </div>
-
-            {/* Input area */}
-            {leftSidebarView !== 'home' && viewMode === 'agent' && (
-              <div className={styles.inputArea}>
-                <Slot name="prompt-input" agents={agents} threads={threads} executionTargets={executionTargetsQuery.data?.items ?? []} modelCatalog={modelCatalogQuery.data} modelDisplayNames={modelsDevDisplayNamesQuery.data} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={activeThreadId ?? undefined} onRetryLast={handleRetry} onForkThread={handleForkThread} />
-              </div>
-            )}
-
-            {!isMobile && !workspaceExpanded && displayedRun && rightPanelMounted && (
-              <div
-                className={`${styles.rightPanel} ${effectiveRightPanelOpen ? styles.rightPanelOpen : styles.rightPanelClosing}`}
-                role="dialog"
-                aria-label={t('run.title')}
-                aria-hidden={!effectiveRightPanelOpen}
-              >
-                <div className={styles.rightPanelBody}>
-                  <ErrorBoundary>
-                    <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
-                      <Slot
-                        name="run-detail"
-                        run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
-                        outputText={displayedRun?.outputText ?? ''}
-                        toolCalls={displayedRun?.toolCalls ?? []}
-                        changedFiles={displayedRun?.changedFiles ?? []}
-                        onCancel={handleCancel}
-                        chatMessages={allMessages}
-                      />
-                    </Suspense>
-                  </ErrorBoundary>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

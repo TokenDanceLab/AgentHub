@@ -19,6 +19,7 @@ interface UIState {
   leftSidebarCollapsed: boolean;
   rightPanelOpen: boolean;
   leftSidebarView: 'home' | 'thread';
+  activeRailView: 'home' | 'messages' | 'agents' | 'team';
   // Mobile toggles
   mobileSidebarOpen: boolean;
   mobileRightPanelOpen: boolean;
@@ -27,6 +28,7 @@ interface UIState {
   setLeftSidebarCollapsed: (v: boolean) => void;
   setRightPanelOpen: (v: boolean) => void;
   setLeftSidebarView: (v: 'home' | 'thread') => void;
+  setActiveRailView: (v: 'home' | 'messages' | 'agents' | 'team') => void;
   setMobileSidebarOpen: (v: boolean) => void;
   setMobileRightPanelOpen: (v: boolean) => void;
   toggleLeftSidebar: () => void;
@@ -44,6 +46,7 @@ export const useUIStore = create<UIState>()(
         leftSidebarCollapsed: false,
         rightPanelOpen: false,
         leftSidebarView: 'home',
+        activeRailView: 'home',
         mobileSidebarOpen: false,
         mobileRightPanelOpen: false,
 
@@ -52,6 +55,7 @@ export const useUIStore = create<UIState>()(
         setLeftSidebarCollapsed: (v) => set({ leftSidebarCollapsed: v }),
         setRightPanelOpen: (v) => set({ rightPanelOpen: v }),
         setLeftSidebarView: (v) => set({ leftSidebarView: v }),
+        setActiveRailView: (v) => set({ activeRailView: v }),
         setMobileSidebarOpen: (v) => set({ mobileSidebarOpen: v }),
         setMobileRightPanelOpen: (v) => set({ mobileRightPanelOpen: v }),
         toggleLeftSidebar: () => set((s) => ({ leftSidebarCollapsed: !s.leftSidebarCollapsed })),
@@ -61,7 +65,7 @@ export const useUIStore = create<UIState>()(
       }),
       {
         name: 'agenthub-ui-shell',
-        version: 2,
+        version: 3,
         migrate: (persisted) => {
           const state = (persisted && typeof persisted === 'object' && 'state' in persisted)
             ? (persisted as { state?: Partial<UIState> }).state
@@ -73,6 +77,8 @@ export const useUIStore = create<UIState>()(
             leftSidebarCollapsed: Boolean(state?.leftSidebarCollapsed),
             rightPanelOpen: Boolean(state?.rightPanelOpen),
             leftSidebarView: (state?.leftSidebarView === 'thread' ? 'thread' : 'home') as 'home' | 'thread',
+            activeRailView: (['home', 'messages', 'agents', 'team'].includes(state?.activeRailView as string)
+              ? state?.activeRailView : 'home') as UIState['activeRailView'],
             mobileSidebarOpen: false,
             mobileRightPanelOpen: false,
           };
@@ -83,6 +89,7 @@ export const useUIStore = create<UIState>()(
           leftSidebarCollapsed: s.leftSidebarCollapsed,
           rightPanelOpen: s.rightPanelOpen,
           leftSidebarView: s.leftSidebarView,
+          activeRailView: s.activeRailView,
         }),
       },
     ),
