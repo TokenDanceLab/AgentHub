@@ -7,6 +7,8 @@ use tauri_plugin_shell::ShellExt;
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
+const DEFAULT_EDGE_PORT: u16 = 3210;
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EdgeStatus {
     pub running: bool,
@@ -43,7 +45,7 @@ impl EdgeManager {
             edge_path,
             store_path,
             local_auth_token: generate_local_auth_token()?,
-            port: 3210,
+            port: DEFAULT_EDGE_PORT,
         })
     }
 
@@ -56,7 +58,7 @@ impl EdgeManager {
             edge_path,
             store_path,
             local_auth_token: String::new(),
-            port: 3210,
+            port: DEFAULT_EDGE_PORT,
         }
     }
 
