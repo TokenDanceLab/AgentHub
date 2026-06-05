@@ -274,7 +274,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 8px 5px;
   border: 1px solid var(--glass-border-subtle);
   border-radius: 14px;
@@ -283,8 +283,9 @@
   -webkit-backdrop-filter: blur(16px);
 }
 
-.rightRail {
-  justify-content: flex-start;
+.railSpacer {
+  flex: 1;
+  min-height: 8px;
 }
 
 .railStatusDot {
@@ -710,6 +711,56 @@
 /* ── Input area ────────────────────────────── */
 .inputArea {
   flex-shrink: 0;
+}
+
+/* ── Workspace content: transcript + inspector ─ */
+.workspaceContent {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.transcriptArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* ── Inline Inspector Panel ──────────────── */
+.inspectorPanel {
+  width: var(--right-panel-width, 320px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--glass-border-subtle);
+  background: var(--sidebar-bg);
+  overflow: hidden;
+  transition: opacity 0.18s ease;
+}
+
+[data-theme='dark'] .inspectorPanel {
+  background: var(--glass-panel);
+  border-left-color: var(--glass-border);
+}
+
+.inspectorPanelBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+}
+
+.inspectorPanelOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.inspectorPanelClosing {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1289,20 +1340,39 @@
    Responsive
    ═══════════════════════════════════════════════ */
 
+@media (max-width: 1279px) {
+  .sidebar { width: min(var(--left-sidebar-width, 320px), 28vw); }
+  .inspectorPanel { width: min(var(--right-panel-width, 320px), 35vw); }
+}
+
 @media (max-width: 1023px) {
   .sidebar { width: min(var(--left-sidebar-width, 320px), 34vw); }
-  .rightPanel {
-    right: 12px;
-    width: min(var(--right-panel-width, 320px), 40vw);
-    max-height: calc(100% - 60px);
-  }
+  .inspectorPanel { width: min(var(--right-panel-width, 280px), 40vw); }
 }
 
 @media (max-width: 767px) {
+  .topBar {
+    height: 28px;
+    justify-content: flex-end;
+    padding-inline: 8px;
+  }
+
+  .topBarLeft {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .topBarNavCluster,
+  .appMenu,
+  .statusBadge,
+  .topBarDim {
+    display: none;
+  }
+
   .body { flex-direction: column; padding: 0; gap: 0; }
   .sidebar { display: none; }
   .leftRail, .rightRail, .resizeHandle { display: none; }
-  .rightPanel { display: none; }
+  .inspectorPanel { display: none; }
   .workspace { border-radius: 0; }
   .nav { display: flex; }
   .mobileToolbar { display: flex; }
