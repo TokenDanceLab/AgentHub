@@ -63,6 +63,7 @@ export { default as ArtifactPreview } from './ArtifactPreview';
 export type { ArtifactPreviewProps, ArtifactType } from './ArtifactPreview';
 export { default as DeployCard } from './DeployCard';
 export type { DeployCardProps } from './DeployCard';
+export { default as LinkCard } from './LinkCard';
 // export { default as FileChangeGroup } from './FileChangeGroup';
 // export type { FileChangeGroupProps, FileChangeItem } from './FileChangeGroup';
 // export { default as ArtifactVersionTimeline } from './ArtifactVersionTimeline';
