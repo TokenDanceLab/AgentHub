@@ -480,6 +480,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.stdins[run.ID] = stdin
 		e.mu.Unlock()
 	}
+t	setResourceLimits(cmd)
 	slog.Debug("executor.subprocess.starting", "runId", run.ID, "command", cmdPath, "args", args)
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {
