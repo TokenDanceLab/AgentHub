@@ -60,6 +60,59 @@ func TestIsTrustedLocalOrigin(t *testing.T) {
 	}
 }
 
+func TestIsTrustedLocalHost(t *testing.T) {
+	tests := []struct {
+		name string
+		host string
+		want bool
+	}{
+		{"localhost", "localhost", true},
+		{"localhost with port", "localhost:3210", true},
+		{"ipv4 loopback", "127.0.0.1:3210", true},
+		{"ipv6 loopback", "[::1]:3210", true},
+		{"tauri localhost", "tauri.localhost", true},
+		{"uppercase localhost", "LOCALHOST:3210", true},
+		{"lan ip", "192.168.1.20:3210", false},
+		{"remote hostname", "edge.example.com:3210", false},
+		{"empty host", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsTrustedLocalHost(tt.host)
+			if got != tt.want {
+				t.Fatalf("IsTrustedLocalHost(%q) = %v, want %v", tt.host, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsTrustedOriginRemoteMode(t *testing.T) {
+	tests := []struct {
+		name   string
+		origin string
+		want   bool
+	}{
+		{"https remote", "https://edge.example.com", true},
+		{"http remote", "http://edge.example.com:3210", true},
+		{"localhost still allowed", "http://localhost:5173", true},
+		{"empty origin rejected", "", false},
+		{"invalid url rejected", "://bad", false},
+		{"file scheme rejected", "file:///tmp/index.html", false},
+		{"extension scheme rejected", "chrome-extension://abc", false},
+		{"tauri remote host rejected", "tauri://edge.example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsTrustedOrigin(tt.origin, true)
+			if got != tt.want {
+				t.Fatalf("IsTrustedOrigin(%q, true) = %v, want %v", tt.origin, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateLocalListenAddr(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -92,6 +145,39 @@ func TestValidateLocalListenAddr(t *testing.T) {
 			}
 			if !tt.wantErr && err != nil {
 				t.Fatalf("ValidateLocalListenAddr(%q) returned error: %v", tt.addr, err)
+			}
+		})
+	}
+}
+
+func TestValidateRemoteListenAddr(t *testing.T) {
+	tests := []struct {
+		name       string
+		addr       string
+		wantErr    bool
+		errSnippet string
+	}{
+		{"wildcard host", ":3210", false, ""},
+		{"ipv4 wildcard", "0.0.0.0:3210", false, ""},
+		{"ipv6 wildcard", "[::]:3210", false, ""},
+		{"lan ip", "192.168.1.10:3210", false, ""},
+		{"remote hostname", "edge.example.com:3210", false, ""},
+		{"loopback remains valid", "127.0.0.1:3210", false, ""},
+		{"empty addr", "", true, "required"},
+		{"missing port", "edge.example.com", true, "host:port"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateRemoteListenAddr(tt.addr)
+			if tt.wantErr && err == nil {
+				t.Fatalf("ValidateRemoteListenAddr(%q) returned nil error", tt.addr)
+			}
+			if tt.errSnippet != "" && (err == nil || !strings.Contains(err.Error(), tt.errSnippet)) {
+				t.Fatalf("ValidateRemoteListenAddr(%q) error = %v, want snippet %q", tt.addr, err, tt.errSnippet)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("ValidateRemoteListenAddr(%q) returned error: %v", tt.addr, err)
 			}
 		})
 	}

@@ -159,7 +159,7 @@ export default function RunDetail({
   const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
 
   const [summary, setSummary] = useState<AgentRunEventSummary | null>(null);
-  const [summaryError, setSummaryError] = useState(false);
+  const [, setSummaryError] = useState(false);
 
   useEffect(() => {
     const taskId = run?.runId;

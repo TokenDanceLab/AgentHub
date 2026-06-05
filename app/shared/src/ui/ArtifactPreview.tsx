@@ -14,7 +14,7 @@ import {
   Download,
   ArrowRight,
 } from 'lucide-react';
-import Modal from '@shared/ui/Modal';
+import Modal from './Modal';
 import styles from './ArtifactPreview.module.css';
 
 export type ArtifactType = 'iframe' | 'page' | 'image' | 'file';
