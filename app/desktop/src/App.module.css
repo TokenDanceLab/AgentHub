@@ -1351,6 +1351,24 @@
 }
 
 @media (max-width: 767px) {
+  .topBar {
+    height: 28px;
+    justify-content: flex-end;
+    padding-inline: 8px;
+  }
+
+  .topBarLeft {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .topBarNavCluster,
+  .appMenu,
+  .statusBadge,
+  .topBarDim {
+    display: none;
+  }
+
   .body { flex-direction: column; padding: 0; gap: 0; }
   .sidebar { display: none; }
   .leftRail, .rightRail, .resizeHandle { display: none; }
