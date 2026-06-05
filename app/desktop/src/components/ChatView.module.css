@@ -281,7 +281,7 @@
   font-size: 13px;
   line-height: 1.45;
   animation: bannerSlideIn 0.25s ease-out;
-  z-index: 5;
+  z-index: var(--z-base);
 }
 
 .connectionBannerReconnecting {
@@ -429,7 +429,7 @@
 /* Ensure content sits above any overlay */
 .message > * {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
 }
 
 /* ── Agent avatar + name ──────────────────── */
@@ -2027,7 +2027,7 @@
   justify-content: flex-end;
   padding: 8px 0;
   pointer-events: none;
-  z-index: 10;
+  z-index: var(--z-dropdown);
 }
 
 .scrollToBottomBtn {
@@ -2319,7 +2319,7 @@
   max-width: 760px;
   margin: 0 auto;
   padding: 6px var(--chat-side-pad, 30px);
-  z-index: 10;
+  z-index: var(--z-dropdown);
 }
 
 .toolbarBtn,
