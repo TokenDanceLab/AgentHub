@@ -56,8 +56,7 @@ export const useConnectionStore = create<ConnectionState>()(
       })),
     clearLastEventSeq: (taskId) =>
       set((s) => {
-        const next = { ...s.lastEventSeq };
-        delete next[taskId];
+        const { [taskId]: _removed, ...next } = s.lastEventSeq;
         return { lastEventSeq: next };
       }),
     setRecoveryState: (v) => set({ recoveryState: v }),

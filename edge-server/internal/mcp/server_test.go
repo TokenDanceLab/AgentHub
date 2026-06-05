@@ -3,10 +3,13 @@ package mcp
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -67,6 +70,73 @@ func parseResponse(t *testing.T, rec *httptest.ResponseRecorder) jsonrpcResponse
 		t.Fatalf("failed to parse response: %v\nbody: %s", err, rec.Body.String())
 	}
 	return resp
+}
+
+func parseToolResult(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+	resp := parseResponse(t, rec)
+	if resp.Error != nil {
+		t.Fatalf("unexpected JSON-RPC error: %+v", resp.Error)
+	}
+	result, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("result is not a map: %T", resp.Result)
+	}
+	if result["isError"] == true {
+		t.Fatalf("unexpected tool error: %+v", result)
+	}
+	content, ok := result["content"].([]any)
+	if !ok || len(content) == 0 {
+		t.Fatalf("missing tool content: %+v", result)
+	}
+	contentMap, ok := content[0].(map[string]any)
+	if !ok {
+		t.Fatalf("content[0] is not a map: %T", content[0])
+	}
+	text, ok := contentMap["text"].(string)
+	if !ok {
+		t.Fatalf("content text is not a string: %T", contentMap["text"])
+	}
+	var data map[string]any
+	if err := json.Unmarshal([]byte(text), &data); err != nil {
+		t.Fatalf("failed to parse tool result: %v\ntext: %s", err, text)
+	}
+	return data
+}
+
+func assertToolError(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+	resp := parseResponse(t, rec)
+	if resp.Error != nil {
+		t.Fatalf("unexpected JSON-RPC error: %+v", resp.Error)
+	}
+	result, ok := resp.Result.(map[string]any)
+	if !ok {
+		t.Fatalf("result is not a map: %T", resp.Result)
+	}
+	if result["isError"] != true {
+		t.Fatalf("expected tool error, got %+v", result)
+	}
+	return result
+}
+
+type recordingRunExecutor struct {
+	started  []store.Run
+	contexts []lifecycle.RunProcessContext
+	startErr error
+	cancel   lifecycle.CancelResult
+	cancels  []string
+}
+
+func (e *recordingRunExecutor) Start(run store.Run, ctx lifecycle.RunProcessContext) error {
+	e.started = append(e.started, run)
+	e.contexts = append(e.contexts, ctx)
+	return e.startErr
+}
+
+func (e *recordingRunExecutor) Cancel(runID string) lifecycle.CancelResult {
+	e.cancels = append(e.cancels, runID)
+	return e.cancel
 }
 
 func TestInitialize(t *testing.T) {
@@ -594,6 +664,143 @@ func TestStartRunRequiresExecutor(t *testing.T) {
 	}
 }
 
+func TestToolStartRunCreatesRunMessageAndStartsExecutor(t *testing.T) {
+	srv, s := newTestServer(t)
+	executor := &recordingRunExecutor{}
+	srv.executor = executor
+
+	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "start_run",
+		"arguments": map[string]any{
+			"projectId": "proj_test",
+			"threadId":  "thread_test",
+			"prompt":    "Build the CI patch",
+			"agentId":   "codex",
+			"model":     "gpt-5",
+			"workDir":   "/tmp/agenthub",
+		},
+	})
+
+	data := parseToolResult(t, rec)
+	runID, ok := data["runId"].(string)
+	if !ok || runID == "" {
+		t.Fatalf("runId = %v, want non-empty string", data["runId"])
+	}
+	if data["projectId"] != "proj_test" {
+		t.Fatalf("projectId = %v, want proj_test", data["projectId"])
+	}
+	if data["threadId"] != "thread_test" {
+		t.Fatalf("threadId = %v, want thread_test", data["threadId"])
+	}
+	if data["status"] != "started" {
+		t.Fatalf("status = %v, want started", data["status"])
+	}
+
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+	if executor.started[0].ID != runID {
+		t.Fatalf("executor run = %q, want %q", executor.started[0].ID, runID)
+	}
+	ctx := executor.contexts[0]
+	if ctx.Run.ID != runID {
+		t.Fatalf("context run = %q, want %q", ctx.Run.ID, runID)
+	}
+	if ctx.Prompt != "Build the CI patch" {
+		t.Fatalf("prompt = %q", ctx.Prompt)
+	}
+	if ctx.AgentID != "codex" {
+		t.Fatalf("agentID = %q", ctx.AgentID)
+	}
+	if ctx.Model != "gpt-5" {
+		t.Fatalf("model = %q", ctx.Model)
+	}
+	if ctx.WorkDir != "/tmp/agenthub" {
+		t.Fatalf("workDir = %q", ctx.WorkDir)
+	}
+	if ctx.SessionID != "mcp_thread_test" {
+		t.Fatalf("sessionID = %q, want mcp_thread_test", ctx.SessionID)
+	}
+	if !ctx.ContinueLast {
+		t.Fatal("ContinueLast = false, want true")
+	}
+
+	run, ok := s.GetRun(runID)
+	if !ok {
+		t.Fatalf("run %q was not persisted", runID)
+	}
+	if run.Status != "queued" {
+		t.Fatalf("persisted run status = %q, want queued", run.Status)
+	}
+	items := s.ListThreadItems("thread_test")
+	if len(items) != 1 {
+		t.Fatalf("thread items = %d, want 1", len(items))
+	}
+	if items[0].RunID != runID {
+		t.Fatalf("message runID = %q, want %q", items[0].RunID, runID)
+	}
+	if items[0].Type != "user_message" || items[0].Role != "user" {
+		t.Fatalf("message type/role = %q/%q, want user_message/user", items[0].Type, items[0].Role)
+	}
+	if items[0].Content != "Build the CI patch" {
+		t.Fatalf("message content = %q", items[0].Content)
+	}
+}
+
+func TestToolStartRunRejectsActiveRun(t *testing.T) {
+	srv, s := newTestServer(t)
+	srv.executor = &recordingRunExecutor{}
+	if _, err := s.CreateRun("run_active", "proj_test", "thread_test"); err != nil {
+		t.Fatalf("failed to create active run: %v", err)
+	}
+
+	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "start_run",
+		"arguments": map[string]any{
+			"projectId": "proj_test",
+			"threadId":  "thread_test",
+			"prompt":    "Should wait",
+		},
+	})
+
+	result := assertToolError(t, rec)
+	content := result["content"].([]any)[0].(map[string]any)
+	text := content["text"].(string)
+	if !strings.Contains(text, "thread already has an active run") {
+		t.Fatalf("error text = %q", text)
+	}
+}
+
+func TestToolStartRunMarksRunFailedWhenExecutorFails(t *testing.T) {
+	srv, s := newTestServer(t)
+	srv.executor = &recordingRunExecutor{startErr: errors.New("executor offline")}
+
+	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "start_run",
+		"arguments": map[string]any{
+			"projectId": "proj_test",
+			"threadId":  "thread_test",
+			"prompt":    "Start and fail",
+		},
+	})
+
+	assertToolError(t, rec)
+	runs := s.ListRuns("thread_test")
+	if len(runs) != 1 {
+		t.Fatalf("runs = %d, want 1", len(runs))
+	}
+	if runs[0].Status != "failed" {
+		t.Fatalf("run status = %q, want failed", runs[0].Status)
+	}
+	items := s.ListThreadItems("thread_test")
+	if len(items) != 1 {
+		t.Fatalf("thread items = %d, want 1", len(items))
+	}
+	if items[0].Content != "Start and fail" {
+		t.Fatalf("message content = %q", items[0].Content)
+	}
+}
+
 func TestCancelRunRequiresExecutor(t *testing.T) {
 	srv, _ := newTestServer(t)
 	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
@@ -610,6 +817,32 @@ func TestCancelRunRequiresExecutor(t *testing.T) {
 	}
 	if result["isError"] != true {
 		t.Error("expected isError when executor is nil")
+	}
+}
+
+func TestToolCancelRunSuccess(t *testing.T) {
+	srv, _ := newTestServer(t)
+	executor := &recordingRunExecutor{
+		cancel: lifecycle.CancelResult{Found: true, Status: "cancelling"},
+	}
+	srv.executor = executor
+
+	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "cancel_run",
+		"arguments": map[string]any{
+			"runId": "run_cancel",
+		},
+	})
+
+	data := parseToolResult(t, rec)
+	if data["runId"] != "run_cancel" {
+		t.Fatalf("runId = %v, want run_cancel", data["runId"])
+	}
+	if data["status"] != "cancelling" {
+		t.Fatalf("status = %v, want cancelling", data["status"])
+	}
+	if len(executor.cancels) != 1 || executor.cancels[0] != "run_cancel" {
+		t.Fatalf("cancels = %#v, want [run_cancel]", executor.cancels)
 	}
 }
 
@@ -631,6 +864,70 @@ func TestApproveActionRequiresPermission(t *testing.T) {
 	}
 	if result["isError"] != true {
 		t.Error("expected isError when permission not found")
+	}
+}
+
+func TestToolApproveActionSuccessPublishesDecision(t *testing.T) {
+	srv, _ := newTestServer(t)
+	if !srv.permissionRegistry.Register(api.PendingPermission{
+		ProjectID: "proj_test",
+		ThreadID:  "thread_test",
+		RunID:     "run_test",
+		RequestID: "req_test",
+		ToolName:  "shell",
+		ToolUseID: "toolu_test",
+	}) {
+		t.Fatal("failed to register pending permission")
+	}
+	_, ch, replay := srv.bus.Subscribe(0)
+	if len(replay) != 0 {
+		t.Fatalf("replay events = %d, want 0", len(replay))
+	}
+
+	rec := doJSONRPC(t, srv, "tools/call", 1, map[string]any{
+		"name": "approve_action",
+		"arguments": map[string]any{
+			"runId":     "run_test",
+			"requestId": "req_test",
+			"decision":  "allow",
+			"reason":    "trusted test command",
+		},
+	})
+
+	data := parseToolResult(t, rec)
+	if data["status"] != "ok" {
+		t.Fatalf("status = %v, want ok", data["status"])
+	}
+	if data["decision"] != "allow" {
+		t.Fatalf("decision = %v, want allow", data["decision"])
+	}
+	if data["toolName"] != "shell" {
+		t.Fatalf("toolName = %v, want shell", data["toolName"])
+	}
+	if _, ok := srv.permissionRegistry.Consume("run_test", "req_test"); ok {
+		t.Fatal("permission request was not consumed")
+	}
+
+	select {
+	case evt := <-ch:
+		if evt.Type != adapters.BusEventPermissionDecided {
+			t.Fatalf("event type = %q, want %q", evt.Type, adapters.BusEventPermissionDecided)
+		}
+		if evt.Scope["projectId"] != "proj_test" {
+			t.Fatalf("event projectId = %v, want proj_test", evt.Scope["projectId"])
+		}
+		payload, ok := evt.Payload.(map[string]any)
+		if !ok {
+			t.Fatalf("payload is %T, want map", evt.Payload)
+		}
+		if payload["decision"] != "allow" {
+			t.Fatalf("payload decision = %v, want allow", payload["decision"])
+		}
+		if payload["reason"] != "trusted test command" {
+			t.Fatalf("payload reason = %v", payload["reason"])
+		}
+	default:
+		t.Fatal("permission decision event was not published")
 	}
 }
 
