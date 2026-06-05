@@ -407,7 +407,7 @@ function PreviewPanel({
                 src={artifact.artifactUrl}
                 title={artifact.title}
                 className={styles.previewIframe}
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts"
               />
             ) : (
               <div className={styles.previewPlaceholder}>
