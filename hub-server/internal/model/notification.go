@@ -18,7 +18,7 @@ const (
 
 type Notification struct {
 	ID        string    `gorm:"primaryKey;type:uuid" json:"id"`
-	UserID    string    `gorm:"type:uuid;not null" json:"user_id"`
+	UserID    string    `gorm:"type:uuid;not null;index" json:"user_id"`
 	Type      string    `gorm:"type:varchar(32);not null" json:"type"`
 	Payload   string    `gorm:"type:jsonb;not null" json:"payload"`
 	Read      bool      `gorm:"not null;default:false" json:"read"`

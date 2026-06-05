@@ -21,12 +21,12 @@ type MarketService interface {
 
 // MarketHandler handles agent market endpoints.
 type MarketHandler struct {
-	svc MarketService
+	service MarketService
 }
 
 // NewMarketHandler creates a new MarketHandler.
-func NewMarketHandler(svc MarketService) *MarketHandler {
-	return &MarketHandler{svc: svc}
+func NewMarketHandler(service MarketService) *MarketHandler {
+	return &MarketHandler{service: service}
 }
 
 // rateReq is the request body for rating a profile.
@@ -42,7 +42,7 @@ func (h *MarketHandler) SearchMarketProfiles(c *gin.Context) {
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 
-	result, err := h.svc.SearchMarket(c.Request.Context(), runtimeID, q, sortBy, cursor, pageSize)
+	result, err := h.service.SearchMarket(c.Request.Context(), runtimeID, q, sortBy, cursor, pageSize)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -60,7 +60,7 @@ func (h *MarketHandler) SearchMarketProfiles(c *gin.Context) {
 // GetMarketProfile handles GET /web/market/profiles/:id.
 func (h *MarketHandler) GetMarketProfile(c *gin.Context) {
 	id := c.Param("id")
-	profile, err := h.svc.GetPublic(c.Request.Context(), id)
+	profile, err := h.service.GetPublic(c.Request.Context(), id)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -77,7 +77,7 @@ func (h *MarketHandler) InstallMarketProfile(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	profile, err := h.svc.Install(c.Request.Context(), id, userID)
+	profile, err := h.service.Install(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -100,7 +100,7 @@ func (h *MarketHandler) RateMarketProfile(c *gin.Context) {
 		return
 	}
 
-	newAvg, newCount, err := h.svc.Rate(c.Request.Context(), id, userID, req.Score)
+	newAvg, newCount, err := h.service.Rate(c.Request.Context(), id, userID, req.Score)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)

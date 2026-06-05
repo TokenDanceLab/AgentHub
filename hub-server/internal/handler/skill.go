@@ -24,11 +24,11 @@ type SkillService interface {
 }
 
 type SkillHandler struct {
-	svc SkillService
+	service SkillService
 }
 
-func NewSkillHandler(svc SkillService) *SkillHandler {
-	return &SkillHandler{svc: svc}
+func NewSkillHandler(service SkillService) *SkillHandler {
+	return &SkillHandler{service: service}
 }
 
 type createSkillReq struct {
@@ -57,7 +57,7 @@ func (h *SkillHandler) CreateSkill(c *gin.Context) {
 		ConfigSchema: req.ConfigSchema,
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, skill)
+	result, err := h.service.Create(c.Request.Context(), userID, skill)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -72,7 +72,7 @@ func (h *SkillHandler) CreateSkill(c *gin.Context) {
 func (h *SkillHandler) GetSkill(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
-	skill, err := h.svc.Get(c.Request.Context(), id, userID)
+	skill, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -91,7 +91,7 @@ func (h *SkillHandler) ListSkills(c *gin.Context) {
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 
-	result, err := h.svc.List(c.Request.Context(), userID, q, skillType, cursor, pageSize)
+	result, err := h.service.List(c.Request.Context(), userID, q, skillType, cursor, pageSize)
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
@@ -112,7 +112,7 @@ func (h *SkillHandler) UpdateSkill(c *gin.Context) {
 		return
 	}
 
-	skill, err := h.svc.Update(c.Request.Context(), id, userID, &updates)
+	skill, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -128,7 +128,7 @@ func (h *SkillHandler) DeleteSkill(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Delete(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -143,7 +143,7 @@ func (h *SkillHandler) PublishSkill(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Publish(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Publish(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -158,7 +158,7 @@ func (h *SkillHandler) UnpublishSkill(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Unpublish(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Unpublish(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return

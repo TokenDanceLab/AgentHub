@@ -323,7 +323,7 @@ func TestAgentTaskCallbacks(t *testing.T) {
 		"trigger_message_id": extract(msg.Data, "message_id"),
 	}))
 	taskID := extract(tr.Data, "id")
-	t.Logf("trigger task result: code=%s taskID=%s", tr.Code, taskID)
+	t.Logf("trigger task result: code=%s taskID=%s", tr.GetCode(), taskID)
 	if taskID == "" {
 		t.Skip("no task created (agent needs edge online)")
 		return
@@ -337,21 +337,21 @@ func TestAgentTaskCallbacks(t *testing.T) {
 
 	t.Run("TaskAck", func(t *testing.T) {
 		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/ack", deskTok, nil))
-		t.Logf("task ack: code=%s", r.Code)
+		t.Logf("task ack: code=%s", r.GetCode())
 	})
 
 	t.Run("TaskStream", func(t *testing.T) {
 		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/stream", deskTok, map[string]string{
 			"content": "streaming output...",
 		}))
-		t.Logf("task stream: code=%s", r.Code)
+		t.Logf("task stream: code=%s", r.GetCode())
 	})
 
 	t.Run("TaskDone", func(t *testing.T) {
 		r := parse(postAuth("/edge/agent-tasks/"+taskID+"/done", deskTok, map[string]string{
 			"content": "all done!",
 		}))
-		t.Logf("task done: code=%s", r.Code)
+		t.Logf("task done: code=%s", r.GetCode())
 	})
 
 	t.Run("CancelTask", func(t *testing.T) {
@@ -365,7 +365,7 @@ func TestAgentTaskCallbacks(t *testing.T) {
 		tid2 := extract(tr2.Data, "id")
 		if tid2 != "" {
 			r := parse(postAuth("/web/agent-tasks/"+tid2+"/cancel", alice.Token, nil))
-			t.Logf("cancel task: code=%s", r.Code)
+			t.Logf("cancel task: code=%s", r.GetCode())
 		} else {
 			t.Log("no second task to cancel")
 		}
@@ -384,7 +384,7 @@ func TestAgentTaskCallbacks(t *testing.T) {
 			r := parse(postAuth("/edge/agent-tasks/"+tid3+"/fail", deskTok, map[string]string{
 				"error": "boom",
 			}))
-			t.Logf("task fail: code=%s", r.Code)
+			t.Logf("task fail: code=%s", r.GetCode())
 		} else {
 			t.Log("no third task to fail")
 		}

@@ -7,14 +7,13 @@ import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search,
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff, ReplyTarget } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import { CodePreviewCard, DisclosureRow, EmptyState, DeployCard, ArtifactPreview } from '@shared/ui';
+import { CodePreviewCard, DisclosureRow, EmptyState, DeployCard, ArtifactPreview, LinkCard } from '@shared/ui';
 import type { ArtifactType } from '@shared/ui';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
 import { TextShimmer } from '@shared/ui';
 import ApprovalCard from './ApprovalCard';
-import LinkCard from './LinkCard';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock, ReplyTarget };

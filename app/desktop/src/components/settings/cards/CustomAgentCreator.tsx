@@ -6,9 +6,9 @@ import {
   Variable, BookOpen, ChevronLeft, ChevronRight, Check,
 } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
-import type { AgentTemplate } from '../agentCreation/agentCreationTypes';
-import { saveCustomAgent, loadCustomAgents, type StoredCustomAgent } from '../agentCreation/agentStore';
-import { emojiOptions, modelOptions, reasoningOptions, capabilityLabels } from '../agentCreation/agentTemplates';
+import type { AgentTemplate } from '../agent-creation/agentCreationTypes';
+import { saveCustomAgent, loadCustomAgents, type StoredCustomAgent } from '../agent-creation/agentStore';
+import { emojiOptions, modelOptions, reasoningOptions, capabilityLabels } from '../agent-creation/agentTemplates';
 import type { CustomAgentMarketItem } from '../sections/AgentMarketSection';
 import PublishAgentModal from './PublishAgentModal';
 import styles from '../primitives/primitives.module.css';
