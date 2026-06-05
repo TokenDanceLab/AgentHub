@@ -16,7 +16,7 @@ import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { useNotificationStore, type Notification, type NotificationType } from '@/stores/notificationStore';
 import { useToastStore } from '@/stores/toastStore';
-import type { IMMessage, IMContact, AuthorityType } from '@/components/IM/types';
+import type { IMMessage, IMContact, AuthorityType, IMMessageMention } from '@/components/IM/types';
 
 type IMStatus = 'idle' | 'loading' | 'ready' | 'error';
 type IMMessageWithHubState = IMMessage & {
@@ -92,6 +92,43 @@ function readTextContent(content: string): string {
   return content;
 }
 
+/**
+ * Extract mentions array from a structured JSON content envelope.
+ * The envelope has shape: { text: string, mentions?: Array<{ agentId: string, agentName: string }> }
+ */
+function readMentions(content: string): IMMessageMention[] | undefined {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      Array.isArray((parsed as Record<string, unknown>).mentions)
+    ) {
+      const mentions = (parsed as Record<string, unknown>).mentions as Array<Record<string, unknown>>;
+      return mentions
+        .filter(
+          (m): m is IMMessageMention =>
+            typeof m.agentId === 'string' &&
+            m.agentId.length > 0 &&
+            typeof m.agentName === 'string' &&
+            m.agentName.length > 0,
+        );
+    }
+  } catch {
+    // Plain text or non-JSON.
+  }
+  return undefined;
+}
+
+/**
+ * Encode a message with its agent mentions into a JSON content envelope.
+ * Plain text without mentions is sent as-is for backward compat.
+ */
+function encodeMessageContent(text: string, mentions?: IMMessageMention[]): string {
+  if (!mentions || mentions.length === 0) return text;
+  return JSON.stringify({ text, mentions });
+}
+
 function sessionIdOf(session: Session): string {
   return session.session_id ?? session.id ?? '';
 }
@@ -109,6 +146,7 @@ function hubMessageToIMMessage(
   recalledLabel = '[Message recalled]',
 ): IMMessage {
   const record = msg as unknown as Record<string, unknown>;
+  const rawContent = msg.content;
   const message: IMMessageWithHubState = {
     id: msg.id,
     sessionId: msg.session_id,
@@ -117,13 +155,14 @@ function hubMessageToIMMessage(
     senderName: msg.sender_id,
     senderType: msg.sender_type === 'agent' ? 'agent' : 'user',
     authority,
-    content: msg.recalled ? recalledLabel : readTextContent(msg.content),
+    content: msg.recalled ? recalledLabel : readTextContent(rawContent),
     timestamp: msg.created_at ?? new Date().toISOString(),
     replyToId: msg.reply_to_message_id,
     recalled: msg.recalled,
     seqId: readNumber(record.seq_id),
     read: Boolean(record.read),
     readAt: readString(record.read_at),
+    mentions: msg.recalled ? undefined : readMentions(rawContent),
   };
   return message;
 }
@@ -523,7 +562,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   }, [activeHubWS, authenticated, upsertContact]);
 
   const sendMessage = useCallback(
-    async (sessionId: string, content: string, replyToId?: string): Promise<SendIMMessageResult> => {
+    async (
+      sessionId: string,
+      content: string,
+      replyToId?: string,
+      mentions?: IMMessageMention[],
+    ): Promise<SendIMMessageResult> => {
       if (!authenticated) {
         addToast({ type: 'error', message: t('hub.toast.connectToSend') });
         return { ok: false };
@@ -535,11 +579,13 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       }
 
       const clientMsgId = makeClientMessageId();
+      // Encode mentions into a JSON content envelope; plain text otherwise
+      const wireContent = encodeMessageContent(content, mentions);
       try {
         const response = await client.sendMessage(sessionId, {
           client_msg_id: clientMsgId,
           content_type: 'text',
-          content,
+          content: wireContent,
           ...(replyToId ? { reply_to_message_id: replyToId } : {}),
         });
         const confirmed: IMMessageWithHubState = {
@@ -556,6 +602,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           seqId: response.seq_id,
           read: false,
           replyToId,
+          mentions,
         };
         setMessages((prev) => {
           const next = new Map(prev);
