@@ -179,18 +179,20 @@ git status --short --branch       # 确认只改了允许的路径
 
 ### 模型分配策略
 
-> 实际后端模型映射，AgentHub 项目专用。dev-loop skill 同步更新。
+> AgentHub 项目专用。这里的 `opus` / `sonnet` / `haiku` 是本地 Claude CLI 路由别名，不等于公开 Claude 模型名；Codex 自带 agent 工具单独建模。dev-loop skill 同步更新。
 
-| 别名 | 实际模型 | 上下文 | 角色 | 适用场景 |
-|---|---|---|---|---|
-| **opus** | DeepSeek-V4-Pro | 1M | 推理/架构/审查/复杂重构 | 主 Agent、架构设计、安全审查、DI 重构 |
-| **sonnet** | Kimi-K2.6 | 256k | 前端/多模态/快速并行 | Desktop UI、IM 界面、视觉审查、批量编码 |
-| **haiku** | GLM-5.1 | 200k | 高智力编码/业务逻辑 | 算法实现、bug 修复、Go 后端编码、测试生成 |
+| 入口 | 别名/模型 | 上下文 | 强项 | 优先使用场景 |
+|---|---|---:|---|---|
+| Codex 自带 agent 工具 | GPT-5.5 | 256k | 全方面强，代码、agentic 执行、审查都稳 | 中等上下文内的核心实现、跨前后端小集成、主 Agent 复核前的强力 sidecar |
+| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 长上下文推理、架构、竞品仓库研究、安全/方案审查 | 大范围阅读、路线图/架构判断、复杂设计评审 |
+| Claude CLI | **sonnet** = GLM-5.1 | 200k | 代码和 agentic 能力强，但上下文短 | 窄范围代码实现、测试修复、Go/TS 小切片、明确文件集的重构 |
+| Claude CLI | **haiku** = mimo-v2.5 | 适中 | 多模态、看图、视觉判断 | 竞品截图复核、Desktop 视觉 QA、UI 可读性/布局审查 |
 
-- **主 Agent（本 session）** 使用 opus 做决策、审查、编辑核心文件
-- **前端 subagent** 派 sonnet（多模态 UI 能力）
-- **后端 subagent** 派 haiku（Go 编码 + 测试），失败才换 opus
-- **批量机械工作**（格式化、重命名、翻译）派 sonnet
+- **主 Agent（本 session）**：负责决策、分支治理、提交、roadmap、比赛材料和最终验收。
+- **Codex GPT-5.5 subagent**：工具可用时优先用于高价值代码实现或关键 review；上下文 256k，不承担超大仓库研究。
+- **Claude opus**：用于长上下文推理、竞品仓库研究、架构/安全审查。
+- **Claude sonnet**：用于明确路径内的代码实现和 focused tests；每次只给必要文件，避免 200k 上下文溢出。
+- **Claude haiku**：用于截图、多模态视觉审查和 UI/UX 对比，不派它做代码主力。
 
 ### Agent 间文件通信
 
