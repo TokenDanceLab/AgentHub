@@ -31,6 +31,7 @@ import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
+import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
 import type { ListResponse, StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -55,7 +56,6 @@ import {
   isTeamRunActiveStatus,
   isPendingTeamApprovalStatus,
   isTauriRuntime,
-  FOCUS_NAVIGATION_KEYS,
   HIDDEN_MESSAGES_STORAGE_PREFIX,
   hiddenMessagesStorageKey,
 } from '@/utils/appUtils';
@@ -112,6 +112,7 @@ import { buildTeamLocalExecutions, normalizeTeamTasks } from '@/utils/teamLocalE
 import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
 import ShellIconButton from '@/components/ShellIconButton';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
 
 interface OptimisticRun {
@@ -167,50 +168,6 @@ function summarizeAgentTeamOverview(overview?: AgentTeamOverview) {
     pendingConflicts,
     blockingCount: pendingApprovals + pendingConflicts,
   };
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
-}
-
-const FOCUS_NAVIGATION_KEYS = new Set([
-  'Tab',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'Home',
-  'End',
-  'PageUp',
-  'PageDown',
-]);
-
-function useFocusSourceTracking() {
-  useEffect(() => {
-    const root = document.documentElement;
-    const setPointerSource = () => {
-      root.dataset.focusSource = 'pointer';
-    };
-    const setKeyboardSource = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (FOCUS_NAVIGATION_KEYS.has(event.key)) {
-        root.dataset.focusSource = 'keyboard';
-      }
-    };
-
-    root.dataset.focusSource ||= 'keyboard';
-    window.addEventListener('pointerdown', setPointerSource, true);
-    window.addEventListener('mousedown', setPointerSource, true);
-    window.addEventListener('touchstart', setPointerSource, true);
-    window.addEventListener('keydown', setKeyboardSource, true);
-
-    return () => {
-      window.removeEventListener('pointerdown', setPointerSource, true);
-      window.removeEventListener('mousedown', setPointerSource, true);
-      window.removeEventListener('touchstart', setPointerSource, true);
-      window.removeEventListener('keydown', setKeyboardSource, true);
-    };
-  }, []);
 }
 
 function DesktopHubTaskBridge() {
