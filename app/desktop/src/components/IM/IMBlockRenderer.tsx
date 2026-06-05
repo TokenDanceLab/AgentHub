@@ -19,9 +19,13 @@ import {
   ChevronRight,
   Shield,
   AlertTriangle,
+  GitBranch,
+  Package,
+  Rocket,
 } from 'lucide-react';
 import type { MessageBlock, ToolResultBlock, FileDiff, DiffLine } from '../ChatView.types';
 import MarkdownRenderer from '../MarkdownRenderer';
+import { formatBytes } from '@/utils/attachment';
 import styles from './IMBlockRenderer.module.css';
 
 // ── Tool icon map (same as ChatView) ─────────────────
@@ -366,6 +370,167 @@ const IMErrorBlock = memo(function IMErrorBlock({
   );
 });
 
+// ── Child Agent Block ──────────────────────────────
+
+const IMChildAgentBlock = memo(function IMChildAgentBlock({
+  block,
+}: {
+  block: Extract<MessageBlock, { kind: 'child_agent' }>;
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const hasDetail = !!(block.result || block.error);
+
+  return (
+    <div className={styles.childAgent}>
+      <button
+        className={styles.childAgentHeader}
+        onClick={() => hasDetail && setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        type="button"
+      >
+        <Bot size={13} className={styles.childAgentIcon} />
+        <span className={styles.childAgentTitle}>{block.title || block.childId}</span>
+        {block.agentName && <span className={styles.childAgentName}>{block.agentName}</span>}
+        <span className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}>
+          {t(`chat.taskStatus.${block.status}`, { defaultValue: block.status })}
+        </span>
+        {hasDetail && (
+          <ChevronRight
+            size={12}
+            className={`${styles.chevron} ${expanded ? styles.chevronDown : ''}`}
+          />
+        )}
+      </button>
+      {expanded && hasDetail && (
+        <div className={styles.childAgentBody}>
+          {block.error && <div className={styles.childAgentError}>{block.error}</div>}
+          {block.result && <div className={styles.childAgentResult}>{block.result}</div>}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ── Route Decision Block ──────────────────────────
+
+const IMRouteDecisionBlock = memo(function IMRouteDecisionBlock({
+  block,
+}: {
+  block: Extract<MessageBlock, { kind: 'route_decision' }>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasDetail = !!(block.reasoning || block.instructions || block.summary);
+
+  return (
+    <div className={styles.routeDecision}>
+      <button
+        className={styles.routeDecisionHeader}
+        onClick={() => hasDetail && setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        type="button"
+      >
+        <GitBranch size={13} />
+        <span className={styles.routeAction}>{block.action}</span>
+        {block.nextWorker && (
+          <span className={styles.routeWorker}>{block.nextWorker}</span>
+        )}
+        {block.blockedReason && (
+          <span className={styles.routeBlocked}>{block.blockedReason}</span>
+        )}
+        {hasDetail && (
+          <ChevronRight
+            size={12}
+            className={`${styles.chevron} ${expanded ? styles.chevronDown : ''}`}
+          />
+        )}
+      </button>
+      {expanded && hasDetail && (
+        <div className={styles.routeDecisionBody}>
+          {block.summary && <div className={styles.routeSummary}>{block.summary}</div>}
+          {block.instructions && (
+            <div className={styles.routeInstructions}>{block.instructions}</div>
+          )}
+          {block.reasoning && (
+            <div className={styles.routeReasoning}>{block.reasoning}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ── Artifact Block ────────────────────────────────
+
+const IMArtifactBlock = memo(function IMArtifactBlock({
+  block,
+}: {
+  block: Extract<MessageBlock, { kind: 'artifact' }>;
+}) {
+  return (
+    <div className={styles.artifact}>
+      <Package size={13} />
+      <span className={styles.artifactType}>{block.artifactType}</span>
+      <span className={styles.artifactTitle}>{block.title}</span>
+      {block.artifactUrl && (
+        <a
+          className={styles.artifactLink}
+          href={block.artifactUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {block.artifactUrl}
+        </a>
+      )}
+      {block.size != null && (
+        <span className={styles.artifactSize}>{formatBytes(block.size)}</span>
+      )}
+    </div>
+  );
+});
+
+// ── Deploy Card Block ─────────────────────────────
+
+const IMDeployCardBlock = memo(function IMDeployCardBlock({
+  block,
+}: {
+  block: Extract<MessageBlock, { kind: 'deploy_card' }>;
+}) {
+  const statusClass =
+    block.status === 'success'
+      ? styles.deploySuccess
+      : block.status === 'failed'
+        ? styles.deployFailed
+        : block.status === 'running'
+          ? styles.deployRunning
+          : styles.deployPending;
+
+  return (
+    <div className={styles.deployCard}>
+      <Rocket size={13} />
+      <span className={styles.deployLabel}>Deploy</span>
+      {block.status && (
+        <span className={`${styles.deployStatus} ${statusClass}`}>
+          {block.status}
+        </span>
+      )}
+      {block.statusMessage && (
+        <span className={styles.deployMessage}>{block.statusMessage}</span>
+      )}
+      {block.url && (
+        <a
+          className={styles.deployUrl}
+          href={block.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {block.url}
+        </a>
+      )}
+    </div>
+  );
+});
+
 // ── Content Parser: detect rich content in plain text ──
 
 interface ParsedRichContent {
@@ -534,15 +699,23 @@ const IMBlockItem = memo(function IMBlockItem({
         </>
       );
 
+    case 'child_agent':
+      return <IMChildAgentBlock block={block} />;
+
+    case 'route_decision':
+      return <IMRouteDecisionBlock block={block} />;
+
+    case 'artifact':
+      return <IMArtifactBlock block={block} />;
+
+    case 'deploy_card':
+      return <IMDeployCardBlock block={block} />;
+
     // Blocks that don't need IM rendering
     case 'result':
     case 'context_usage':
     case 'session_init':
     case 'compact':
-    case 'route_decision':
-    case 'child_agent':
-    case 'artifact':
-    case 'deploy_card':
     case 'link_card':
     case 'citation':
       return null;
