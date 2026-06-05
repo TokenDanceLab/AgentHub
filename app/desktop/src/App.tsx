@@ -33,12 +33,10 @@ import { useAuth } from '@/hooks/useAuth';
 import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
 import useShellShortcuts from '@/hooks/useShellShortcuts';
 import { useDesktopCommands } from '@/hooks/useDesktopCommands';
-import type { ThreadInfo } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useUIStore } from '@/stores/uiStore';
-import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import {
   clamp,
   isRunActiveStatus,
@@ -105,7 +103,6 @@ import {
   mergeChatMessages,
 } from '@/utils/chatMessages';
 import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
-import { buildTeamLocalExecutions, normalizeTeamTasks } from '@/utils/teamLocalExecution';
 import { buildAutomaticThreadTitle } from '@/utils/threadTitle';
 import ShellIconButton from '@/components/ShellIconButton';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -182,23 +179,12 @@ export default function App() {
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
   const { data: agentData } = useAgentList(online);
   const agents = agentData?.items ?? [];
-  const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const modelCatalogQuery = useModelCatalog(online);
   const modelsDevDisplayNamesQuery = useModelsDevDisplayNames(true);
   const agentTeamSummary = useMemo(
     () => summarizeAgentTeamOverview(agentTeamsQuery.data),
     [agentTeamsQuery.data],
   );
-  const teamLocalExecutions = useMemo(() => {
-    const overview = agentTeamsQuery.data;
-    return buildTeamLocalExecutions({
-      selectedRunId: overview?.selectedRun?.id,
-      bridgeTasks: bridgedTasks,
-      tasks: normalizeTeamTasks(overview?.state, overview?.tasks ?? []),
-      assignments: overview?.state?.assignments ?? [],
-      events: overview?.state?.run_events ?? [],
-    });
-  }, [agentTeamsQuery.data, bridgedTasks]);
   const teamRunBadgeCount = agentTeamSummary.blockingCount || agentTeamSummary.activeRuns;
   const teamRunButtonLabel = agentTeamSummary.blockingCount > 0
     ? t('workspace.teamRunsWithBlocks', { count: agentTeamSummary.blockingCount })
@@ -245,13 +231,11 @@ export default function App() {
 
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
-  const healthRef = useRef(health);
-  healthRef.current = health;
   useEffect(() => {
     if (prevOnlineRef.current === online) return;
     prevOnlineRef.current = online;
-    setOnline(online, healthRef.current);
-  }, [online, setOnline]);
+    setOnline(online, health);
+  }, [health, online, setOnline]);
 
   // Sync isConnected → connection store
   useEffect(() => {
@@ -590,8 +574,14 @@ export default function App() {
     if (target.closest('button, input, select, a')) return;
     try {
       const w = getCurrentWindow();
-      (await w.isMaximized()) ? w.unmaximize() : w.maximize();
-    } catch {}
+      if (await w.isMaximized()) {
+        await w.unmaximize();
+      } else {
+        await w.maximize();
+      }
+    } catch {
+      // Tauri window APIs are unavailable in browser-only test environments.
+    }
   }, []);
 
   // ── Render ─────────────────────────────────
@@ -635,7 +625,11 @@ export default function App() {
             </ShellIconButton>
             <ShellIconButton className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
-              (await w.isMaximized()) ? w.unmaximize() : w.maximize();
+              if (await w.isMaximized()) {
+                await w.unmaximize();
+              } else {
+                await w.maximize();
+              }
             }} label={t('window.maximize')} tooltipSide="bottom">
               <Square size={11} />
             </ShellIconButton>
