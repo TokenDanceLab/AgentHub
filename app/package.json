@@ -28,14 +28,15 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
+    "@types/prismjs": "^1.26.6",
     "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^10.4.0",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.8.3",
-    "typescript-eslint": "^8.59.4",
     "stylelint": "^16.21.0",
     "stylelint-config-standard": "^38.0.0",
+    "typescript-eslint": "^8.59.4",
     "vitest": "^4.1.7"
   },
   "dependencies": {
@@ -50,6 +51,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "i18next": "^26.3.0",
     "jsdom": "^29.1.1",
+    "prismjs": "^1.30.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-i18next": "^17.0.8",
