@@ -104,15 +104,17 @@ function readMentions(content: string): IMMessageMention[] | undefined {
       typeof parsed === 'object' &&
       Array.isArray((parsed as Record<string, unknown>).mentions)
     ) {
-      const mentions = (parsed as Record<string, unknown>).mentions as Array<Record<string, unknown>>;
-      return mentions
-        .filter(
-          (m): m is IMMessageMention =>
-            typeof m.agentId === 'string' &&
-            m.agentId.length > 0 &&
-            typeof m.agentName === 'string' &&
-            m.agentName.length > 0,
-        );
+      const mentions = (parsed as Record<string, unknown>).mentions as unknown[];
+      return mentions.flatMap((mention): IMMessageMention[] => {
+        if (!mention || typeof mention !== 'object') return [];
+        const record = mention as Record<string, unknown>;
+        return typeof record.agentId === 'string' &&
+          record.agentId.length > 0 &&
+          typeof record.agentName === 'string' &&
+          record.agentName.length > 0
+          ? [{ agentId: record.agentId, agentName: record.agentName }]
+          : [];
+      });
     }
   } catch {
     // Plain text or non-JSON.
