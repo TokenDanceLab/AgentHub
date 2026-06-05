@@ -1,4 +1,5 @@
 # Desktop Fix & Redesign Master Plan
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 > Generated: 2026-05-25 | Team Lead Synthesis
 > Based on audits from: Agent 1 (Codebase), Agent 2 (Icons/Visual), Agent 3 (UX Flow), Agent 4 (Edge Adapters), Agent 5 (Architecture Alignment)
