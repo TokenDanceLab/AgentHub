@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
+> 最后更新: 2026-06-05 (五维 Review + 七项深研) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
 ## 课题目标
 
@@ -20,7 +20,7 @@
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 █████████░  50%  ← 当前 (A0/A1/A3 ✅, A2 进行中)
+Phase A: 工程基础设施 ██████████  60%  ← 当前 (A0/A1/A3 ✅, A2/A4/A5 部分完成, A6 待开始)
 Phase B: 持久化 + 性能  ░░░░░░░░░░   0%
 Phase C: IM 核心闭环   ░░░░░░░░░░   0%
 Phase D: 高级功能      ░░░░░░░░░░   0%
@@ -67,9 +67,19 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 ### A2: 调试端点 `debug` ← 当前
 
-- [ ] `pkg/debug` 模块 — health + pprof + 脱敏配置转储
-- [ ] Hub `/debug/` — 替换现有 admin server pprof 注册 + config dump
-- [ ] Edge `/debug/` — store+bus 状态 + pprof (local auth) + config dump
+- [ ] `pkg/debug` 模块 — 统一注册接口 + 认证辅助（BasicAuth / BearerToken）
+  - `MuxConfig` 结构体：HealthChecker / EnablePprof / MetricsHandler / ConfigDumper / StateDumper / AuthWrapper
+  - `RegisterDebugEndpoints(mux, cfg)` — 注册 /health, /debug/pprof/*, /metrics, /debug/config, /debug/state
+  - `BasicAuthMiddleware` + `BearerAuthMiddleware` — 认证辅助
+- [ ] Hub `/debug/` — 用 pkg/debug 替换 `app.go` 的 `newAdminMux()`（801-812 行）
+  - 保留独立 admin 端口 + `AGENTHUB_PPROF_USER/PASS` 认证
+  - 新增 `/debug/config` — 复用 `slog.LogValuer` 脱敏（DB/Redis/JWT/S3/TokenDanceID 各字段）
+  - 新增 `/debug/state` — DB pool stats / WS connections / EventBus queue / Redis pool hits
+- [ ] Edge `/debug/` — 在 `httpserver.Run()` 的 mux 上注册
+  - 新增 pprof — 当前完全缺失，仅 dev 环境可无认证，生产需 LocalAuthToken
+  - 新增 `/debug/config` — 脱敏（LocalAuthToken / HubJWTSecret / HubToken → `[REDACTED]`）
+  - 新增 `/debug/state` — store 统计（projects/threads/runs/items 计数）+ bus 状态（history_len/dropped）
+  - 去重 `/metrics` — 当前 `server.go:116` 和 `pkg/debug` 都注册，统一走 debug 模块
 
 ### A3: 安全与稳定性 P0 修复 ✅
 
@@ -83,7 +93,15 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 - [x] **App.tsx 拆分 Wave 1** — 1837→1525 行（-17%），已拆出 ShellIconButton、useFocusSourceTracking、DesktopHubTaskBridge、TopMenuBar、useShellShortcuts
 - [x] **lazy-load** — SettingsPage、AuthPage、HomeDashboard 已改为 `React.lazy()`
-- [ ] **继续拆分** — LayoutShell、ConnectionManager、ChatController 等核心模块
+- [ ] **Wave 2 拆分** — 目标 1525→~926 行（-39%），7 个自定义 Hook：
+  - `useTopMenuConfig.ts` — 菜单定义 221 行（低难度，优先）
+  - `useSendRun.ts` — 发送/启动 run 116 行（高难度，最后）
+  - `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）
+  - `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）
+  - `useThreadCache.ts` — React Query 缓存操作 37 行 + 4 个 ref（低难度）
+  - `useSidebarResize.ts` — 侧边栏拖拽缩放 40 行（低难度）
+  - `useHiddenMessages.ts` — 隐藏消息 ID 管理 30 行（低难度）
+  - 执行顺序：E→F→G→A（阶段1低风险）→ D→C（阶段2）→ B（阶段3核心）
 - [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖
 
 ### A5: 开发者构建体验
@@ -97,12 +115,28 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 ### A6: Review 发现的安全加固（新增）
 
-> 来自 2026-06-05 五维度深度 Review（架构/API/前端/后端/DevOps）。
+> 来自 2026-06-05 五维度深度 Review + 七项深研。
+> 优先级排序：API 密钥(P0) > 统一信封(P1) > DB TLS(P1) > .env 加固(P2)
 
-- [ ] **统一响应信封** — Hub `{code,data}` vs Edge 裸 JSON，前端需两套解析。统一为一方
-- [ ] **API 密钥迁移到 secure_store** — 当前 base64 弱混淆存 localStorage，Tauri secure_store 已实现但未使用
-- [ ] **DB TLS 可配置** — Hub `sslmode=disable` 硬编码，改为环境变量，默认 `require`
-- [ ] **.env 密钥轮换 + secret guard 加固** — 加 pre-commit hook 防泄漏，密钥迁移到 OS secret manager
+- [ ] **API 密钥迁移到 secure_store** (P0 — 最高安全优先)
+  - 当前: `modelSettingsStore.ts` 的 `obscureApiKey`/`revealApiKey`（base64 + 静态 salt `ah-creds-v1`，167-188 行）
+  - 目标: `secure_store.rs` 已有 keyring 集成（当前仅存 Hub 令牌），新增 `store_model_credential`/`read_model_credential`/`clear_model_credential`
+  - 迁移: Zustand store 初始化时检测 localStorage 旧格式 → 写入 keychain → 清除 localStorage
+  - Web 端无 `ProviderCredential` 字段，不受影响
+- [ ] **统一响应信封** (P1 — 低风险，Edge 对齐 Hub)
+  - Hub: `handler/response.go` 的 `OK(c,data)` 返回 `{code:"OK", data:...}`，19 个 handler 文件使用
+  - Edge: `api/handlers.go` 的 `writeJSON` 直接返回裸 JSON，约 23 处成功返回点
+  - 方案: Edge 加 `successResponse(data)` wrapper，前端 `edgeClient.ts` 加 `unwrapEdgeResponse`
+  - 错误格式已统一（共享 `pkg/errcode`），仅成功格式需对齐
+- [ ] **DB TLS 可配置** (P1 — ~20 行改动)
+  - `config.go:73-76` 的 `DSN()` 硬编码 `sslmode=disable`
+  - `DBConfig` 新增 `SSLMode` 字段，默认 `"disable"` 保持向后兼容
+  - `Validate()` 加有效值校验，`Load()` 加 `AGENTHUB_DB_SSLMODE` 环境变量覆盖
+  - 更新 3 个 `.env.example` 文件
+- [ ] **.env 密钥轮换 + secret guard 加固** (P2 — 增量改进)
+  - 密钥轮换: 轮换 .env 中真实云服务密钥；`config.go` `Validate()` 扩展弱密码拒绝到 DB/Redis/TokenDanceID
+  - pre-commit 加固: 新增 `scripts/git-hooks/pre-commit` 调用 `check-secrets.sh --staged`（当前仅在 commit-msg 运行）
+  - Secret Guard 扩展: 增加 base64 解码检测、二进制密钥文件检测（`*.p12`/`*.jks`）
 
 ---
 
@@ -119,8 +153,12 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 - [ ] JSONL 事件流 — append-only 日志替代 JSON 快照，写操作先 append 再更新内存
 - [ ] SQLite Schema — projects / threads / runs / items 四张表 + 索引
+  - 现有接口 `store.Reader` / `store.Writer` / `store.Repository` 保持不变，上层零改动
+  - 当前内存结构：`map[string]*Project` + `map[string]*Thread` + `map[string]*Run` + `map[string]*Item`
+  - FileStore 消费者：`api/handlers.go`（读写）、`lifecycle/process_executor.go`（写）、`events/bus.go`（读）
 - [ ] FTS5 搜索 — `session_messages_fts` 虚拟表，BM25 排序，`snippet()` 高亮
 - [ ] 数据迁移 — 启动时检测旧 JSON 快照，自动导入 SQLite
+  - 回退方案：检测 SQLite 损坏时 fallback 到 JSON 快照或空 store
 
 > 参考: `docs/archive/build-specs-backend-03-eventstore-memory.md`
 
@@ -131,14 +169,37 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 ### B2: Hub 性能治理
 
-- [ ] **N+1 查询** — session list 的 correlated subquery + agent dispatch 逐个查 CustomAgent → JOIN / Preload
-- [ ] **缺索引** — `agent_team_tasks(team_run_id)`、`agent_team_assignments(team_run_id)`、`notifications(user_id)`
-- [ ] **migration 双系统统一** — golang-migrate + GORM AutoMigrate 并存 → 统一走 golang-migrate，关掉 AutoMigrate
+- [ ] **N+1 查询 — Session list correlated subquery** (`repository/session.go:54-79`)
+  - `ListUserSessions` 和 `SearchSessions` 的 `(SELECT COUNT(*) FROM session_members WHERE session_id = s.id)` 逐行执行
+  - 修复: 改为 `LEFT JOIN (SELECT session_id, COUNT(*) GROUP BY session_id) mc ON mc.session_id = s.id`
+- [ ] **N+1 查询 — StartTeamRun 逐条查 CustomAgent** (`service/agent_team.go:323-334`)
+  - for 循环内逐个 `GetCustomAgentByID` 做鉴权，同函数后半段已正确批量查询
+  - 修复: 批量查询提前到鉴权循环前，`WHERE id IN ?` 一次取出，构建 map 复用
+- [ ] **N+1 查询 — dispatchTask 逐次查 CustomAgent** (`service/agent.go:445-452`)
+  - 每个 dispatch goroutine 独立查询，TeamRun 并发场景形成隐式 N+1
+  - 修复: `TriggerAgentTask` 预查询 CustomAgent，通过参数传入 `dispatchTask`
+- [ ] **缺索引 — GORM model tag 缺 index 标记**（migration SQL 已有索引，但 AutoMigrate 路径会丢失）
+  - `agent_team_tasks.team_run_id` — `model/agent_team.go:172`
+  - `agent_team_assignments.team_run_id` — `model/agent_team.go:126`
+  - `notifications.user_id` — `model/notification.go:21`
+  - 修复: 补 GORM `index:` tag + 新增 `0041_ensure_performance_indexes` migration（IF NOT EXISTS）
+- [ ] **migration 双系统统一** — golang-migrate 唯一生产路径（`repository/migrate.go:15`），AutoMigrate 仅在测试中使用
+  - 风险: model tag 和 migration SQL 默认值/FK/索引可能不同步
+  - 修复: model 包加文档注释声明 golang-migrate 唯一性；清理测试中的 `db.AutoMigrate()` 调用；CI 加 migration 完整性检查
 
 ### B3: 大文件拆分
 
-- [ ] **Hub agent.go** — 1371 行 → `agent_custom.go` / `agent_task.go` / `agent_dispatch.go` / `agent_events.go`
-- [ ] **Edge ProcessExecutor** — 1413 行 → `executor_spawn.go` / `executor_cancel.go` / `executor_hub.go` / `executor_output.go`
+- [ ] **Hub agent.go** — 1371 行 → 5 个文件（同 package，无新接口）
+  - `agent.go` — 保留核心：struct + 构造 + `AddAgentToSession` + `allocateSeq` + 6 个仓库包装（~200 行）
+  - `agent_custom.go` — CustomAgent CRUD：Create/Get/List/Update/Delete（~80 行）
+  - `agent_dispatch.go` — 任务调度全链路：TriggerAgentTask + dispatchTask + CancelTask + 辅助函数（~500 行）
+  - `agent_edge_callback.go` — Edge 回调：HandleTaskAck/Stream/Done/Fail + authorizeTaskEdgeCallback（~310 行）
+  - `agent_run_event.go` — 运行时事件查询 + 校验：ListTaskRunEvents + summarizeAgentRunEvents + normalizeRunEventInput（~310 行）
+- [ ] **Edge ProcessExecutor** — 1413 行 → 4 个文件（同 package，无新接口）
+  - `process_executor.go` — 保留核心：struct + Start/Cancel/run + envForRun + finish + publishFailed/Cancelled（~500 行）
+  - `process_output.go` — 输出聚合：publishOutput + publishStructuredOutput + runOutputLimiter + threadTranscriptEmitter（~250 行）
+  - `process_hub_callback.go` — Hub 回调：fireHubAck/Stream/Done/Fail + hubCallbackEmitter + hubOutputCollector（~350 行）
+  - `process_subagent.go` — 子 Agent 编排：SpawnSubAgent + sendSubAgentResult + childBudget（~170 行）
 
 ### B4: Edge 行为修正
 
@@ -202,10 +263,12 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 ### D1: 安全增强
 
 - [ ] Hub OIDC blacklist 写入失败补偿 — Redis 不可用时旧 refresh token 可被重放
-- [ ] Edge `internal/runners` 死代码清理
-- [ ] Hub 端点加 `/v1/` 版本前缀（或显式文档声明策略）
-- [ ] Release workflow 加分支限制
-- [ ] 收紧 golangci-lint + gosec 为硬阻断
+- [ ] Edge `internal/runners` 死代码清理 — 仍在 `httpserver/server.go` 被 import
+- [ ] Hub 端点加 `/v1/` 版本前缀（或显式文档声明策略）— 当前 Hub 用 `/client/`/`/edge/`/`/web/` 无版本
+- [ ] Release workflow 加分支限制 — `release.yml` 任何分支推 `v*` tag 都触发发布
+- [ ] 收紧 golangci-lint + gosec 为硬阻断 — 当前 `continue-on-error: true` 无约束力
+- [ ] Tauri CSP 策略收紧 — `connect-src` 端口通配符改为具体端口（3210/8080），移除 `unsafe-inline`
+- [ ] macOS CI 测试取消 `continue-on-error` — 或明确记录跳过原因
 - [ ] 配置 Renovate/Dependabot + CODEOWNERS
 
 ### D2: 产品扩展
@@ -225,8 +288,21 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 - [x] ~~Desktop OIDC 超时不一致~~ — `CALLBACK_TIMEOUT_SECS` 60→300，对齐 "5 minutes" 消息
 - [x] ~~Desktop Edge 端口硬编码~~ — 提取 `DEFAULT_EDGE_PORT` 常量（Rust 侧）
-- [ ] 补齐 OpenAPI 缺失端点 — DELETE thread、model-catalog 等
-- [ ] Web 包定位决策 — 要么启动要么最小化
+- [ ] 补齐 OpenAPI 缺失端点（文档-代码漂移）：
+  - `GET /v1/model-catalog` — 代码已实现，OpenAPI 完全缺失
+  - `GET /v1/agent-instances/{id}` — 代码已实现，OpenAPI 仅定义集合端点
+  - `DELETE /v1/threads/{threadId}` — 代码已实现，OpenAPI 路径定义缺失（头注释提及但无路径）
+  - `POST /v1/threads/{threadId}:archive` — 代码已实现，OpenAPI 标记 planned（不准确）
+  - `POST /v1/agent-instances` — OpenAPI 标记 implemented 但代码只注册 GET（自相矛盾）
+  - `POST /cloud/edge/register` — Hub 代码已实现（router.go:174），OpenAPI 完全缺失
+  - `GET /client/auth/oidc/callback` — Hub 代码已实现（router.go:69），OpenAPI 缺失
+- [ ] 修复事件文档漂移（events.md vs 代码）：
+  - `run.agent.sub_agent_status` — 代码用此名，文档定义为 `sub_agents_complete`（语义不同）
+  - `run.agent.task_dispatch_failed` — 代码中发布，events.md 完全缺失
+  - `friend.accepted` — 文档列为可用事件，代码从未发布（缺 "not yet emitted" 标记）
+  - `message.delta` — 文档标 P0 但从未实现，建议降级为 P1
+- [ ] Web 包定位决策 — 当前 App.tsx 仅 13 行空壳，但基础设施 ~32K 行已就绪（~80%）
+  - 推荐：轻量 wiring（5-8 天），接入 slot 机制 + Hub 连接 + IM 消息流，暂缓未实现功能
 
 ---
 
@@ -255,6 +331,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **A4 前端解耦** | App.tsx 1837→1525 (-17%)，5 模块拆出 + 3 组件 lazy-load | 2026-06-05 |
 | **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
+| **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
