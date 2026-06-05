@@ -226,7 +226,11 @@ function mergeMessages(existing: IMMessage[], incoming: IMMessage[]): IMMessage[
   for (const message of incoming) {
     const key = message.clientMsgId ?? message.id;
     const previous = byKey.get(message.id) ?? byKey.get(key);
-    const merged = previous ? { ...previous, ...message } : message;
+    let merged = previous ? { ...previous, ...message } : message;
+    if (previous?.sendState && previous.id !== message.id) {
+      const { sendState: _, sendError: __, ...rest } = merged as IMMessage & { sendState?: string; sendError?: string };
+      merged = rest as IMMessage;
+    }
     byKey.set(key, merged);
     byKey.set(message.id, merged);
   }
@@ -579,8 +583,29 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       }
 
       const clientMsgId = makeClientMessageId();
-      // Encode mentions into a JSON content envelope; plain text otherwise
       const wireContent = encodeMessageContent(content, mentions);
+
+      // Insert optimistic pending message immediately
+      const pending: IMMessage = {
+        id: clientMsgId,
+        sessionId,
+        clientMsgId,
+        senderId: userId ?? 'me',
+        senderName: userId ?? 'Me',
+        senderType: 'user',
+        authority: 'hub',
+        content,
+        timestamp: new Date().toISOString(),
+        sendState: 'pending',
+        replyToId,
+        mentions,
+      };
+      setMessages((prev) => {
+        const next = new Map(prev);
+        next.set(sessionId, [...(next.get(sessionId) ?? []), pending]);
+        return next;
+      });
+
       try {
         const response = await client.sendMessage(sessionId, {
           client_msg_id: clientMsgId,
@@ -588,6 +613,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           content: wireContent,
           ...(replyToId ? { reply_to_message_id: replyToId } : {}),
         });
+
+        // Replace pending with confirmed server message
         const confirmed: IMMessageWithHubState = {
           id: response.message_id,
           sessionId,
@@ -606,11 +633,29 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         };
         setMessages((prev) => {
           const next = new Map(prev);
-          next.set(sessionId, mergeMessages(next.get(sessionId) ?? [], [confirmed]));
+          next.set(
+            sessionId,
+            (next.get(sessionId) ?? []).map((msg) =>
+              msg.clientMsgId === clientMsgId ? confirmed : msg,
+            ),
+          );
           return next;
         });
         return { ok: true };
       } catch (err) {
+        const errorMsg = err instanceof Error && err.message ? err.message : 'Send failed';
+        setMessages((prev) => {
+          const next = new Map(prev);
+          next.set(
+            sessionId,
+            (next.get(sessionId) ?? []).map((msg) =>
+              msg.clientMsgId === clientMsgId
+                ? { ...msg, sendState: 'failed' as const, sendError: errorMsg }
+                : msg,
+            ),
+          );
+          return next;
+        });
         addToast({ type: 'error', message: t('hub.toast.sendMessageFailed') });
         return { ok: false };
       }
