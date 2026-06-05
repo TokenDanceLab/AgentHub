@@ -78,22 +78,40 @@ export interface ModelCatalogResponse {
 
 const BASE = getEdgeBaseUrl().replace(/\/+$/, '');
 
+/**
+ * Extracts the .data field from a unified {@code {"code":"OK","data":...}} envelope.
+ * Returns the raw input unchanged when no envelope is present, preserving backward
+ * compatibility with Edge Servers that have not yet adopted the envelope format.
+ */
+function unwrapEdgeResponse(raw: unknown): unknown {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    'code' in raw &&
+    'data' in raw &&
+    (raw as Record<string, unknown>).code === 'OK'
+  ) {
+    return (raw as Record<string, unknown>).data;
+  }
+  return raw;
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   const res = await fetch(`${BASE}/v1/health`);
   if (!res.ok) throw await parseError(res);
-  return safeParse(HealthResponseSchema, await res.json(), 'health');
+  return safeParse(HealthResponseSchema, unwrapEdgeResponse(await res.json()), 'health');
 }
 
 export async function fetchRunners(): Promise<ListResponse<Runner>> {
   const res = await fetch(`${BASE}/v1/runners`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
-  return safeParse(listResponseSchema(RunnerSchema), await res.json(), 'runners');
+  return safeParse(listResponseSchema(RunnerSchema), unwrapEdgeResponse(await res.json()), 'runners');
 }
 
 export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
   const res = await fetch(`${BASE}/v1/agents`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
-  const raw = await res.json();
+  const raw = unwrapEdgeResponse(await res.json());
   const normalized = normalizeAgentList(raw);
   return safeParse(listResponseSchema(AgentInfoSchema), normalized, 'agents');
 }
@@ -101,7 +119,7 @@ export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
 export async function fetchModelCatalog(): Promise<ModelCatalogResponse> {
   const res = await fetch(`${BASE}/v1/model-catalog`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
-  return safeParse(ModelCatalogResponseSchema, await res.json(), 'modelCatalog');
+  return safeParse(ModelCatalogResponseSchema, unwrapEdgeResponse(await res.json()), 'modelCatalog');
 }
 
 function normalizeAgentList(raw: unknown): unknown {
@@ -137,7 +155,7 @@ export async function fetchThreads(projectId?: string): Promise<ListResponse<Thr
   const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
   const res = await fetch(`${BASE}/v1/threads${params}`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
-  return safeParse(listResponseSchema(ThreadInfoSchema), await res.json(), 'threads');
+  return safeParse(listResponseSchema(ThreadInfoSchema), unwrapEdgeResponse(await res.json()), 'threads');
 }
 
 export interface CreateThreadRequest {
@@ -160,7 +178,7 @@ export async function createThread(input?: string | CreateThreadRequest, threadI
     }),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(ThreadInfoSchema, await res.json(), 'createThread');
+  return safeParse(ThreadInfoSchema, unwrapEdgeResponse(await res.json()), 'createThread');
 }
 
 export async function fetchThreadItems(threadId: string): Promise<ListResponse<ThreadItemInfo>> {
@@ -168,7 +186,7 @@ export async function fetchThreadItems(threadId: string): Promise<ListResponse<T
     headers: edgeAuthHeaders(),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(listResponseSchema(ThreadItemInfoSchema), await res.json(), 'threadItems');
+  return safeParse(listResponseSchema(ThreadItemInfoSchema), unwrapEdgeResponse(await res.json()), 'threadItems');
 }
 
 export async function fetchRuns(projectId?: string, threadId?: string): Promise<ListResponse<RunInfo>> {
@@ -178,7 +196,7 @@ export async function fetchRuns(projectId?: string, threadId?: string): Promise<
   const qs = params.toString();
   const res = await fetch(`${BASE}/v1/runs${qs ? `?${qs}` : ''}`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
-  return safeParse(listResponseSchema(RunInfoSchema), await res.json(), 'runs');
+  return safeParse(listResponseSchema(RunInfoSchema), unwrapEdgeResponse(await res.json()), 'runs');
 }
 
 export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
@@ -188,7 +206,7 @@ export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
     body: req ? JSON.stringify(req) : undefined,
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(RunInfoSchema, await res.json(), 'startRun');
+  return safeParse(RunInfoSchema, unwrapEdgeResponse(await res.json()), 'startRun');
 }
 
 export async function cancelRun(runId: string): Promise<RunInfo> {
@@ -197,7 +215,7 @@ export async function cancelRun(runId: string): Promise<RunInfo> {
     headers: edgeAuthHeaders(),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(RunInfoSchema, await res.json(), 'cancelRun');
+  return safeParse(RunInfoSchema, unwrapEdgeResponse(await res.json()), 'cancelRun');
 }
 
 export async function fetchRunDiff(runId: string): Promise<RunDiff> {
@@ -205,19 +223,19 @@ export async function fetchRunDiff(runId: string): Promise<RunDiff> {
     headers: edgeAuthHeaders(),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(RunDiffSchema, await res.json(), 'runDiff');
+  return safeParse(RunDiffSchema, unwrapEdgeResponse(await res.json()), 'runDiff');
 }
 
 export async function fetchArtifacts(): Promise<ListResponse<Artifact>> {
   const res = await fetch(`${BASE}/v1/artifacts`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
-  return safeParse(listResponseSchema(ArtifactSchema), await res.json(), 'artifacts');
+  return safeParse(listResponseSchema(ArtifactSchema), unwrapEdgeResponse(await res.json()), 'artifacts');
 }
 
 export async function fetchPreviews(): Promise<ListResponse<Preview>> {
   const res = await fetch(`${BASE}/v1/previews`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
-  return safeParse(listResponseSchema(PreviewSchema), await res.json(), 'previews');
+  return safeParse(listResponseSchema(PreviewSchema), unwrapEdgeResponse(await res.json()), 'previews');
 }
 
 export async function renameThread(threadId: string, title: string): Promise<ThreadInfo> {
@@ -227,7 +245,7 @@ export async function renameThread(threadId: string, title: string): Promise<Thr
     body: JSON.stringify({ title }),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(ThreadInfoSchema, await res.json(), 'renameThread');
+  return safeParse(ThreadInfoSchema, unwrapEdgeResponse(await res.json()), 'renameThread');
 }
 
 export async function updateThreadStatus(threadId: string, status: 'active' | 'archived'): Promise<ThreadInfo> {
@@ -237,7 +255,7 @@ export async function updateThreadStatus(threadId: string, status: 'active' | 'a
     body: JSON.stringify({ status }),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(ThreadInfoSchema, await res.json(), 'updateThreadStatus');
+  return safeParse(ThreadInfoSchema, unwrapEdgeResponse(await res.json()), 'updateThreadStatus');
 }
 
 export async function archiveThread(threadId: string): Promise<ThreadInfo> {
@@ -246,7 +264,7 @@ export async function archiveThread(threadId: string): Promise<ThreadInfo> {
     headers: edgeAuthHeaders(),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(ThreadInfoSchema, await res.json(), 'archiveThread');
+  return safeParse(ThreadInfoSchema, unwrapEdgeResponse(await res.json()), 'archiveThread');
 }
 
 export async function deleteThread(threadId: string): Promise<'deleted' | 'archived'> {
