@@ -1,6 +1,6 @@
 # TeamRun E2E Evidence Plan
 
-> Status: R1 evidence branch. This document records the verified bridge chain and the remaining proof needed for the competition demo. It does not claim that a recorded two-runtime demo is complete.
+> Status: merged into `dev/delicious233` via PR #270. This document records the verified bridge chain and the remaining proof needed for the competition demo. It does not claim that a recorded two-runtime demo is complete.
 
 ## Goal
 
