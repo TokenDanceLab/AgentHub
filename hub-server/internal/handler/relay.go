@@ -20,12 +20,12 @@ type RelayService interface {
 
 // RelayHandler handles HTTP requests for relay commands between Hub and Edge.
 type RelayHandler struct {
-	svc RelayService
+	service RelayService
 }
 
 // NewRelayHandler creates a new RelayHandler.
-func NewRelayHandler(svc RelayService) *RelayHandler {
-	return &RelayHandler{svc: svc}
+func NewRelayHandler(service RelayService) *RelayHandler {
+	return &RelayHandler{service: service}
 }
 
 type createRelayReq struct {
@@ -65,7 +65,7 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
-	cmd, err := h.svc.CreateCommand(c.Request.Context(), targetEdgeID, strings.TrimSpace(req.CommandType), req.Payload, userID)
+	cmd, err := h.service.CreateCommand(c.Request.Context(), targetEdgeID, strings.TrimSpace(req.CommandType), req.Payload, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -80,7 +80,7 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 // GetCommand handles GET /web/relay/commands/:id — retrieves a relay command.
 func (h *RelayHandler) GetCommand(c *gin.Context) {
 	id := c.Param("id")
-	cmd, err := h.svc.GetCommand(c.Request.Context(), id)
+	cmd, err := h.service.GetCommand(c.Request.Context(), id)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -95,7 +95,7 @@ func (h *RelayHandler) GetCommand(c *gin.Context) {
 // AckCommand handles POST /web/relay/commands/:id/ack — acknowledges a relay command.
 func (h *RelayHandler) AckCommand(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.svc.AckCommand(c.Request.Context(), id); err != nil {
+	if err := h.service.AckCommand(c.Request.Context(), id); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return

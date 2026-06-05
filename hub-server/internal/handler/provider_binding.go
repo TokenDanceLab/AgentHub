@@ -21,11 +21,11 @@ type ProviderBindingService interface {
 }
 
 type ProviderBindingHandler struct {
-	svc ProviderBindingService
+	service ProviderBindingService
 }
 
-func NewProviderBindingHandler(svc ProviderBindingService) *ProviderBindingHandler {
-	return &ProviderBindingHandler{svc: svc}
+func NewProviderBindingHandler(service ProviderBindingService) *ProviderBindingHandler {
+	return &ProviderBindingHandler{service: service}
 }
 
 type createProviderBindingReq struct {
@@ -42,7 +42,7 @@ func (h *ProviderBindingHandler) List(c *gin.Context) {
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 
-	result, err := h.svc.List(c.Request.Context(), userID, cursor, pageSize)
+	result, err := h.service.List(c.Request.Context(), userID, cursor, pageSize)
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
@@ -72,7 +72,7 @@ func (h *ProviderBindingHandler) Create(c *gin.Context) {
 		pb.IsAvailable = *req.IsAvailable
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, pb)
+	result, err := h.service.Create(c.Request.Context(), userID, pb)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -94,7 +94,7 @@ func (h *ProviderBindingHandler) Update(c *gin.Context) {
 		return
 	}
 
-	pb, err := h.svc.Update(c.Request.Context(), id, userID, &updates)
+	pb, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -110,7 +110,7 @@ func (h *ProviderBindingHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Delete(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
