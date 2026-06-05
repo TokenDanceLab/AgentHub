@@ -1,18 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [
-    react(),
-    visualizer({
-      filename: 'stats.html',
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    }),
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -30,5 +21,16 @@ export default defineConfig({
     target: ['es2021', 'chrome100', 'safari13'],
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-tanstack': ['@tanstack/react-query', '@tanstack/react-virtual'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm', 'react-syntax-highlighter'],
+          'vendor-ui': ['lucide-react', 'clsx', 'class-variance-authority'],
+          'vendor-i18n': ['i18next', 'react-i18next'],
+        },
+      },
+    },
   },
 });
