@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: var(--z-modal, 40);
+  z-index: var(--z-modal);
   display: flex;
   justify-content: center;
   padding-top: 15vh;
