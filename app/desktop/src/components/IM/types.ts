@@ -11,6 +11,8 @@ export interface IMMessageMention {
   agentName: string;
 }
 
+export type IMSendState = 'pending' | 'failed';
+
 export interface IMMessage {
   id: string;
   sessionId: string;
@@ -33,11 +35,21 @@ export interface IMMessage {
   actionError?: string;
   /** Agents @mentioned in this message (from structured content envelope). */
   mentions?: IMMessageMention[];
+  /** Optimistic send state: 'pending' while awaiting server, 'failed' on error. Undefined once confirmed. */
+  sendState?: IMSendState;
+  /** Error message when sendState is 'failed'. */
+  sendError?: string;
 }
 
 export interface IMMessageWithHubState extends IMMessage {
   hubSent?: boolean;
   hubError?: string;
+}
+
+/** Richer payload built by IMMessageInput internally. Backward-compatible with onSend(content, mentions). */
+export interface ComposerPayload {
+  content: string;
+  mentions?: IMMessageMention[];
 }
 
 export interface IMContact {
