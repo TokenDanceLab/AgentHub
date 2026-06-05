@@ -32,7 +32,7 @@
 | TeamRun 已有可用产品面，但缺真实 transcript | `TeamRunDock` / `TeamRunConsole` / Hub AgentTeam API 已存在；比赛需要两个真实 Runtime Profile 的群组协作录屏、截图和 route/task/event 导出 |
 | Desktop 需要从功能拼接改为 IM-first Command Center | 参考竞品正确吸收四栏信息架构：Global Rail、Conversation 列表、Unified Transcript、Right Inspector、Unified Composer；不要再只局部美化单个组件 |
 | 6 月 1 终审中的部分缺口已被后续修复 | Run summary、Hub thread history 注入、Web stream recovery、IM @Agent、IM 富消息等已有代码路径；后续只补测试/部署态/截图证据，不重复规划成"完全不存在" |
-| 当前已有多条 phase 分支待合并 | R2/R3/R4/R5/R6A 已推送到独立分支；后续并行先做 PR/冲突/视觉 QA 或领取 R1/R6B，不要在同一批 Desktop shell / IM renderer 文件上重复分派 |
+| 当前已有多条 phase 分支待合并 | R1/R2/R3/R4/R5/R6A 已推送到独立分支；后续并行先做 PR/冲突/视觉 QA 或领取 R6B/R7，不要在同一批 Desktop shell / IM renderer 文件上重复分派 |
 
 ### 比赛 Sprint 顺序（从 2026-06-05 当前 HEAD 继续）
 
@@ -40,7 +40,7 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 | Rank | 任务 | 状态 | 为什么排这里 | 验收证据 |
 |---:|---|---|---|---|
-| 1 | **真实 TeamRun E2E transcript**：两个真实 Runtime Profile 在同一 group/team run 中协作，含 Orchestrator route、子任务、产出聚合、失败/审批处理 | 证据分支就绪，真实录屏待做 | AgentHub 最大差异化证据；没有 transcript 时"多 Agent 协作"仍像后端能力声明 | `phase-r1/teamrun-e2e` 已补 Desktop bridge nested context 测试和证据链文档；还需录屏、截图、运行日志、事件导出 |
+| 1 | **真实 TeamRun E2E transcript**：两个真实 Runtime Profile 在同一 group/team run 中协作，含 Orchestrator route、子任务、产出聚合、失败/审批处理 | 证据分支就绪，真实录屏待做 | AgentHub 最大差异化证据；没有 transcript 时"多 Agent 协作"仍像后端能力声明 | `phase-r1/teamrun-e2e` 已推送，含 Desktop bridge nested context 测试和证据链文档；还需录屏、截图、运行日志、事件导出 |
 | 2 | **Desktop Shell 信息架构重组**：Global Rail + Conversation 列表 + Unified Transcript + Right Inspector + Unified Composer | 分支就绪 | 竞品截图暴露的是工作台信息架构差距；比赛生成效果和产品感需要第一屏直接成立 | `phase-r2/desktop-shell` 已推送；合并后补 1440x920、1280x800、390x844 截图；无重叠；右侧 Inspector 与 IM 同屏 |
 | 3 | **Transcript 渲染合同收敛**：主 Chat 与 IM 共享 block/normalization 约束，避免两套 renderer 漂移 | 分支就绪 | `IMBlockRenderer` 已落地，但 ChatView/IM 仍可能双系统分离；后续富消息必须可持续扩展 | `phase-r3/transcript-contract` 已推送；focused tests 通过；旧 Markdown-only fallback 不吞 block |
 | 4 | **Right Inspector 证据面板**：RunDetail + TeamRun 摘要 + Tool timeline + Changed Files + 工作文件夹 | 分支就绪 | 评审需要在右侧看到任务完成度、命令、文件和产物，而不是只看气泡文本 | `phase-r4/right-inspector` 已推送；RightInspector focused tests 23/23；合并后补截图 |
@@ -80,12 +80,14 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 这轮参考图只吸收工作台信息密度和证据组织方式，不照搬头像、品牌、背景纹理或无关装饰。R2/R4/R7 合并验收时按以下规则检查：
 
-- 左侧必须是两级导航：窄 Global Rail 固定 48-56px，只放头像和 icon action；Conversation Sidebar 固定 280-320px，包含搜索、Manager/Worker/Project 分组、未读/时间/状态，不能把联系人散落到主内容区。
-- 中间 transcript 以真实对话为主，不做 landing hero。完成摘要、过程统计、回复/引用/重新生成、部署/产物卡必须在消息流中可见；长文本最大宽度收敛到可读范围，避免横跨整屏。
+- 左侧必须是两级导航：窄 Global Rail 固定 48-56px，只放头像和 icon action；Conversation Sidebar 固定 280-320px，包含搜索、Manager/Worker/Project 分组、未读/时间/状态，不能把联系人散落到主内容区。Agent 行必须显示头像、名称和能力标签；Claude Code/Codex/OpenCode 只可作为 Runtime badge，不可替代 Agent Profile 身份。
+- Conversation Sidebar 需要验证最近活跃排序、置顶、归档/隐藏状态和空状态；Project 群聊与 Manager/Worker 私聊的层级必须一眼可分。
+- 中间 transcript 以真实对话为主，不做 landing hero。每条 Agent/子 Agent 消息必须显示发送者身份；完成摘要、过程统计、回复/引用/重新生成、复制/应用 Diff、部署/产物卡必须在消息流中可见；长文本最大宽度收敛到可读范围，避免横跨整屏。
+- Transcript 必须覆盖进行中和失败态：streaming/thinking/tool running、route decision、dispatch、tool error、agent error 都要有可读卡片；inline artifact/preview/diff 卡留在消息流中，Right Inspector 只是证据汇总，不是唯一入口。
 - 右侧 Inspector 固定为证据列，宽屏约 300-340px：顶部状态 + 进度条，其下是任务规划/工具事件卡，再下是工作文件夹和最近产物。它要能回答“做了几步、跑了哪些工具、改了哪些文件、产物在哪”。
 - Composer 固定在底部并预留稳定高度，含 `+`、文件、附件、@Agent、审批/权限等 icon action；发送按钮有 disabled/pending 状态，不因输入内容或附件列表造成布局跳动。
 - 视觉风格保持 light-first、低边框、小圆角、弱阴影、高对比文本；可以有轻微网格/玻璃感，但不能变成低可读度背景或营销页。
-- 截图验收必须覆盖 1440x920、1280x800、390x844；检查无横向滚动、右侧列不压正文、底部 composer 不遮挡最后一条消息、icon-only 控件有 aria-label/tooltip。
+- 截图验收必须覆盖 1440x920、1280x800、390x844；检查无横向滚动、右侧列不压正文、底部 composer 不遮挡最后一条消息、icon-only 控件有 aria-label/tooltip。390x844 必须明确 list -> transcript -> inspector/approval 的折叠路径，不能只隐藏关键证据。
 
 ### 执行队列
 
@@ -106,14 +108,14 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 | 分支 | 状态 | 验证 | 合并前注意 |
 |---|---|---|---|
-| `phase-r1/teamrun-e2e` | 已推送，证据链分支待合并 | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | 不是最终录屏；合并后继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
+| `phase-r1/teamrun-e2e` | 已推送，证据链分支待合并 | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | commit `b6ad3481`；不是最终录屏；合并后继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
 | `phase-r2/desktop-shell` | 已推送，PR 待开/待合并 | `uiStore.test.ts` 4/4；`git diff --check` 通过 | 需视觉 QA；typecheck 仍受旧债阻断 |
 | `phase-r3/transcript-contract` | 已推送，PR 待开/待合并 | `IMBlockRenderer.test.tsx` + `IMMessageView.test.tsx` 31/31；`git diff --check` 通过 | 合并时留意 R6A 对 IM message view 的相邻改动 |
 | `phase-r4/right-inspector` | 已推送，PR 待开/待合并 | `RightInspector.test.tsx` 23/23；`git diff --check` 通过 | 先以 props-only 组件接入，避免在同一 PR 重写 shell grid |
 | `phase-r5/composer-convergence` | 已推送，PR 待开/待合并 | `useComposerCore`/`attachment`/`IMMessageInput` focused tests 44/44；`git diff --check` 通过 | 不引入巨型 `UnifiedComposer`；PromptInput 现有全量测试受 shared React patch 版本问题影响 |
 | `phase-r6/im-optimistic` | 已推送，PR 待开/待合并 | `useIMChat.test.ts` + `IMMessageView.test.tsx` 37/37；`git diff --check` 通过；顺手清掉 `useIMChat` mention typecheck 旧债 | 只完成 R6A 乐观发送；approval 一致性另起切片 |
 
-截至主线 `2ee96eee`，`dev/delicious233` 只含 R0 文档合同和分支状态同步，尚未合入上述功能分支。后续 agent 不要重复实现 R1/R2/R3/R4/R5/R6A，应优先开 PR、做冲突审查、跑视觉 QA，或者继续补 R1 的真实录屏与事件导出。
+主线 `dev/delicious233` 当前只含 R0 文档合同和分支状态同步，尚未合入上述功能分支。后续 agent 不要重复实现 R1/R2/R3/R4/R5/R6A，应优先开 PR、做冲突审查、跑视觉 QA，或者继续补 R1 的真实录屏与事件导出。
 
 ### R2-R4 落地细化
 
