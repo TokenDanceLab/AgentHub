@@ -1,7 +1,7 @@
 # AgentHub Desktop Client -- 参考项目模式与采纳映射
 
-> 从 `docs/roadmap.md` 提取的参考项目模式、竞品对比、采纳映射表。
-> 原文路线图仅保留任务清单和依赖关系，详见 `docs/roadmap.md`。
+> 从 `docs/tutorials/roadmap.md` 提取的参考项目模式、竞品对比、采纳映射表。
+> 原文路线图仅保留任务清单和依赖关系，详见 `docs/tutorials/roadmap.md`。
 
 ---
 
