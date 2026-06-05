@@ -902,17 +902,35 @@ function CitationBlock({ block }: { block: Extract<MessageBlock, { kind: 'citati
   );
 }
 
+// ── Stable hash (djb2-derived, 32-bit) ──────────
+// Used for stream-stable block keys: hashing a content prefix means the key
+// stays the same while text is appended during streaming.
+function stableHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; // keep within 32-bit signed int
+  }
+  return Math.abs(hash);
+}
+
+function contentHash(content: string): string {
+  // Use first 64 chars — stable across streamed appends
+  return stableHash(content.slice(0, 64)).toString(36);
+}
+
 // ── Stable block key generation ──────────────
 function blockKey(block: MessageBlock, index: number): string {
   switch (block.kind) {
     case 'tool_use':
       return `tool-${block.callId}`;
     case 'text':
-      return `text-${index}`;
+      return `text-${contentHash(block.content)}`;
     case 'thinking':
-      return `thinking-${index}`;
+      return `thinking-${contentHash(block.content)}`;
     case 'code':
-      return `code-${index}`;
+      return `code-${contentHash(block.content)}`;
     case 'result':
       return `result-${block.error ?? 'success'}-${index}`;
     case 'file_change':
@@ -938,13 +956,13 @@ function blockKey(block: MessageBlock, index: number): string {
     case 'tool_group':
       return `toolgroup-${block.blocks[0]?.callId ?? index}`;
     case 'error':
-      return `error-${index}`;
+      return `error-${block.category ?? ''}-${block.message.slice(0, 32)}`;
     case 'citation':
       return `cite-${block.url ?? block.text ?? index}`;
     case 'compact':
       return `compact-${index}`;
     case 'status':
-      return `status-${index}`;
+      return `status-${contentHash(block.content)}`;
     default:
       return `block-${index}`;
   }
