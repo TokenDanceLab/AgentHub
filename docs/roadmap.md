@@ -60,7 +60,7 @@
 
 ```
 Phase A: 工程基础设施 ████████████  95%  ← A0-A3✅, A4✅, A6.2✅, A6.3✅, 前端止血完成
-Phase B: 持久化 + 性能  ██░░░░░░░░  15%  ← B2 N+1 ✅
+Phase B: 持久化 + 性能  ███░░░░░░░  25%  ← B2 N+1✅, B3 agent.go 拆分✅
 Phase C: IM 核心闭环   ███░░░░░░░  25%  ← Sprint #1-4✅, 前端打磨完成
 Phase D: 高级功能      ░░░░░░░░░░   0%
 ```
@@ -218,14 +218,10 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
   - `agent_team_tasks.team_run_id`, `agent_team_assignments.team_run_id`, `notifications.user_id`
 - [ ] **migration 双系统统一** — golang-migrate 唯一生产路径（`repository/migrate.go`），AutoMigrate 仅在测试中使用
 
-### B3: 大文件拆分
+### B3: 大文件拆分 🔧
 
-- [ ] **Hub agent.go** — 1371 行 → 5 个文件（同 package，无新接口）
-  - `agent.go` — 保留核心：struct + 构造 + `AddAgentToSession` + `allocateSeq` + 6 个仓库包装（~200 行）
-  - `agent_custom.go` — CustomAgent CRUD：Create/Get/List/Update/Delete（~80 行）
-  - `agent_dispatch.go` — 任务调度全链路：TriggerAgentTask + dispatchTask + CancelTask + 辅助函数（~500 行）
-  - `agent_edge_callback.go` — Edge 回调：HandleTaskAck/Stream/Done/Fail + authorizeTaskEdgeCallback（~310 行）
-  - `agent_run_event.go` — 运行时事件查询 + 校验：ListTaskRunEvents + summarizeAgentRunEvents + normalizeRunEventInput（~310 行）
+- [x] **Hub agent.go** ✅ — 1371 行 → 5 个文件（同 package，无新接口）
+  - `agent.go`(161) + `agent_custom.go`(91) + `agent_dispatch.go`(546) + `agent_edge_callback.go`(327) + `agent_run_event.go`(313)
 - [ ] **Edge ProcessExecutor** — 1413 行 → 4 个文件（同 package，无新接口）
   - `process_executor.go` — 保留核心：struct + Start/Cancel/run + envForRun + finish + publishFailed/Cancelled（~500 行）
   - `process_output.go` — 输出聚合：publishOutput + publishStructuredOutput + runOutputLimiter + threadTranscriptEmitter（~250 行）
