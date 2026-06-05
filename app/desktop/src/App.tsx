@@ -15,6 +15,7 @@ import { useThreadCache } from '@/hooks/useThreadCache';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { useThreadNavigation } from '@/hooks/useThreadNavigation';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
 import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries';
@@ -41,10 +42,9 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
-import { useSearchStore } from '@/stores/searchStore';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { readCustomInstructions } from '@/utils/customInstructions';
-import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
+import { findRetryPrompt } from '@/utils/messageActions';
 import {
   clamp,
   isRunActiveStatus,
@@ -497,71 +497,36 @@ export default function App() {
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
-  const handleSelectThread = useCallback((selection: ThreadSelectionInput) => {
-    const id = resolveThreadSelectionId(selection);
-    if (!id) return;
-    selectThread(id);
-    setLeftSidebarView('thread');
-  }, [selectThread, setLeftSidebarView]);
-  const handleThreadTitleEdited = useCallback((threadId: string) => {
-    emptyCreatedThreadIdsRef.current.delete(threadId);
-    manuallyNamedThreadIdsRef.current.add(threadId);
-  }, []);
-  const openGlobalSearch = useCallback((initialQuery = '') => {
-    useSearchStore.getState().openDialog(initialQuery);
-  }, []);
-  const handleSearchMessageSelect = useCallback((messageId: string) => {
-    setLeftSidebarView('thread');
-    window.requestAnimationFrame(() => {
-      const selector = `[data-message-id="${CSS.escape(messageId)}"]`;
-      document.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-  }, [setLeftSidebarView]);
-  const handleSearchThreadSelect = useCallback((thread: ThreadInfo) => {
-    handleSelectThread(thread.threadId);
-  }, [handleSelectThread]);
-  const handleSelectAgent = useCallback(async (agentId: string) => {
-    const store = useThreadStore.getState();
-    const agent = agents.find((a) => a.id === agentId);
-    try {
-      const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
-        addThreadToCache(thread, { empty: true });
-        store.selectAgentThread(agentId, thread.threadId);
-        setLeftSidebarView('thread');
-      queryClient.invalidateQueries({ queryKey: ['threads'] });
-    } catch {
-      // still select the agent visually even if thread creation fails
-      store.selectAgentThread(agentId, '');
-    }
-  }, [addThreadToCache, agents, queryClient, setLeftSidebarView]);
-
-  const handleStartLocalOrchestration = useCallback(async (agentId: string, draft: string) => {
-    await handleSelectAgent(agentId);
-    setViewMode('agent');
-    setPendingComposerDraft(draft);
-  }, [handleSelectAgent]);
-
-  const handleCreateThread = useCallback(async () => {
-    try {
-      const thread = await createThread(selectedAgent?.name ? `${selectedAgent.name}` : undefined);
-      addThreadToCache(thread, { empty: true });
-      if (selectedAgent?.id) {
-        selectAgentThread(selectedAgent.id, thread.threadId);
-        setLeftSidebarView('thread');
-      } else {
-        handleSelectThread(thread.threadId);
-      }
-      queryClient.invalidateQueries({ queryKey: ['threads'] });
-      focusComposer();
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addThreadToCache, addToast, handleSelectThread, queryClient, selectAgentThread, selectedAgent?.id, selectedAgent?.name, setLeftSidebarView, t]);
-
-  const handleQuickChat = useCallback(async () => {
-    await handleCreateThread();
-    focusComposer();
-  }, [handleCreateThread]);
+  const {
+    handleSelectThread,
+    handleThreadTitleEdited,
+    handleSelectAgent,
+    handleCreateThread,
+    handleQuickChat,
+    handleForkThread,
+    handleStartLocalOrchestration,
+    handleSearchThreadSelect,
+    handleSearchMessageSelect,
+    openGlobalSearch,
+  } = useThreadNavigation({
+    allMessages,
+    selectedAgentName: selectedAgent?.name,
+    selectedAgentId: selectedAgentId ?? null,
+    selectedThreadId: selectedThread?.threadId,
+    selectedThreadTitle: selectedThread?.title,
+    selectThread,
+    selectAgentThread,
+    setLeftSidebarView,
+    setViewMode,
+    setPendingComposerDraft,
+    addThreadToCache,
+    emptyCreatedThreadIdsRef,
+    manuallyNamedThreadIdsRef,
+    queryClient,
+    addToast,
+    t,
+    agents,
+  });
 
   const openSettings = useCallback((section: SettingsSectionId = 'general') => {
     setSettingsInitialSection(section);
@@ -641,46 +606,6 @@ export default function App() {
     }
     await handleSend(retry.prompt, selectedAgentId ?? undefined);
   }, [addToast, allMessages, handleSend, selectedAgentId, t]);
-
-  const handleForkThread = useCallback(async (messageId?: string) => {
-    try {
-      const sourceTitle = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
-      const forkTitle = `Fork: ${sourceTitle}`.slice(0, 96);
-      const thread = await createThread(forkTitle);
-      addThreadToCache(thread, { suppressCreatedToast: true });
-      if (selectedAgent?.id) {
-        selectAgentThread(selectedAgent.id, thread.threadId);
-        setLeftSidebarView('thread');
-      } else {
-        handleSelectThread(thread.threadId);
-      }
-      queryClient.invalidateQueries({ queryKey: ['threads'] });
-      const draft = buildForkDraft({
-        sourceTitle,
-        sourceThreadId: selectedThread?.threadId ?? activeThreadId ?? undefined,
-        messages: allMessages,
-        messageId,
-      });
-      setPendingComposerDraft(draft);
-      addToast({ type: 'success', message: t('toast.forkCreated') });
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [
-    activeThreadId,
-    addThreadToCache,
-    addToast,
-    allMessages,
-    handleSelectThread,
-    queryClient,
-    selectAgentThread,
-    selectedAgent?.id,
-    selectedAgent?.name,
-    selectedThread?.threadId,
-    selectedThread?.title,
-    setLeftSidebarView,
-    t,
-  ]);
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
