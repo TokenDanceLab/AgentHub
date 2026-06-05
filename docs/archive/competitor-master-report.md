@@ -1,4 +1,5 @@
 # Competitive Analysis Master Report: AgentHub Desktop
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 > Synthesized from 5 parallel competitor deep-dives on 2026-05-25
 
