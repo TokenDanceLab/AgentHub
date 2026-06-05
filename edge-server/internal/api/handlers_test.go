@@ -81,6 +81,7 @@ func TestGetHealth(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	if body["status"] != "ok" {
 		t.Errorf("expected status=ok, got %v", body["status"])
@@ -224,6 +225,7 @@ func TestGetHealthDegradesWhenNoRunnerAvailable(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "degraded" {
 		t.Fatalf("overall status = %v, want degraded", body["status"])
 	}
@@ -259,6 +261,7 @@ func TestGetHealthDegradesWhenRunnerRegistryMissing(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "degraded" {
 		t.Fatalf("overall status = %v, want degraded", body["status"])
 	}
@@ -287,6 +290,7 @@ func TestGetRunners(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	items, ok := body["items"].([]any)
 	if !ok {
@@ -320,6 +324,7 @@ func TestGetRuns(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	items, ok := body["items"].([]any)
 	if !ok {
@@ -360,6 +365,7 @@ func TestProjectThreadRoutes(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	items := body["items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("expected one thread, got %d", len(items))
@@ -395,6 +401,7 @@ func TestThreadUpdateArchiveDeleteRoutes(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode patch body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["title"] != "Renamed" || body["status"] != "active" {
 		t.Fatalf("patch body = %#v, want renamed active thread", body)
 	}
@@ -472,6 +479,7 @@ func TestPostRuns(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	runID, ok := body["runId"].(string)
 	if !ok || !strings.HasPrefix(runID, "run_") {
@@ -533,6 +541,7 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["projectId"] != "proj_local" || body["threadId"] != "thread_bound" {
 		t.Fatalf("run binding response = %#v, want proj_local/thread_bound", body)
 	}
@@ -999,6 +1008,7 @@ func TestPostRunsReturnsErrorWhenExecutorStartFails(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	errObj, ok := body["error"].(map[string]any)
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", body)
@@ -1052,6 +1062,7 @@ func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode duplicate active run body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	errObj, ok := body["error"].(map[string]any)
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", body)
@@ -1197,6 +1208,7 @@ func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&runBody); err != nil {
 		t.Fatalf("failed to decode run body: %v", err)
 	}
+	runBody = unwrapSuccess(runBody)
 	runID := runBody["runId"].(string)
 
 	req = httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID, nil)
@@ -1216,6 +1228,7 @@ func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&itemBody); err != nil {
 		t.Fatalf("failed to decode item body: %v", err)
 	}
+	itemBody = unwrapSuccess(itemBody)
 	items := itemBody["items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("expected one run item, got %d", len(items))
@@ -1235,10 +1248,14 @@ func TestPostThreadMessageCreatesItem(t *testing.T) {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
 
-	var item store.Item
-	if err := json.NewDecoder(rec.Body).Decode(&item); err != nil {
-		t.Fatalf("failed to decode item body: %v", err)
+		var itemRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
+				t.Fatalf("failed to decode item body: %v", err)
 	}
+	itemRaw = unwrapSuccess(itemRaw)
+	itemBytes, _ := json.Marshal(itemRaw)
+	var item store.Item
+	json.Unmarshal(itemBytes, &item)
 	if !strings.HasPrefix(item.ID, "item_") {
 		t.Fatalf("item ID = %q, want item_ prefix", item.ID)
 	}
@@ -1273,10 +1290,14 @@ func TestPostThreadMessageUsesRequestedRole(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
-	var item store.Item
-	if err := json.NewDecoder(rec.Body).Decode(&item); err != nil {
-		t.Fatalf("failed to decode item body: %v", err)
+		var itemRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
+				t.Fatalf("failed to decode item body: %v", err)
 	}
+	itemRaw = unwrapSuccess(itemRaw)
+	itemBytes, _ := json.Marshal(itemRaw)
+	var item store.Item
+	json.Unmarshal(itemBytes, &item)
 	if item.Role != "assistant" {
 		t.Fatalf("item role = %q, want assistant", item.Role)
 	}
@@ -1358,6 +1379,7 @@ func TestPostCancelRun(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 
 	if body["runId"] != "run_test123" {
 		t.Errorf("expected runId=run_test123, got %v", body["runId"])
@@ -1398,6 +1420,7 @@ func TestPostCancelRunUsesExecutor(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "cancelling" {
 		t.Fatalf("status = %#v, want cancelling", body["status"])
 	}
@@ -1428,6 +1451,7 @@ func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) 
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != run.Status {
 		t.Fatalf("status = %#v, want %q", body["status"], run.Status)
 	}
@@ -1530,6 +1554,7 @@ func TestPostPermissionDecideConsumesPendingRequestAndPublishesEvent(t *testing.
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	if body["status"] != "ok" {
 		t.Fatalf("body status = %#v, want ok", body["status"])
 	}
@@ -2043,6 +2068,7 @@ func TestMuxGetProjectsRoute(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	items, ok := body["items"].([]any)
 	if !ok {
 		t.Fatalf("expected items array, got %T", body["items"])
@@ -2070,6 +2096,7 @@ func TestMuxPostProjectsRoute(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	project = unwrapSuccess(project)
 	if project["projectId"] != "proj_manual" {
 		t.Fatalf("projectId = %v, want proj_manual", project["projectId"])
 	}
@@ -2107,6 +2134,7 @@ func TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent(t *testing.T
 	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
 		t.Fatalf("failed to decode duplicate body: %v", err)
 	}
+	project = unwrapSuccess(project)
 	if project["name"] != "Manual Project" {
 		t.Fatalf("duplicate project name = %v, want original Manual Project", project["name"])
 	}
@@ -2134,6 +2162,7 @@ func TestMuxPostProjectsAutoID(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	project = unwrapSuccess(project)
 	id, ok := project["projectId"].(string)
 	if !ok || !strings.HasPrefix(id, "proj_") {
 		t.Fatalf("projectId = %v, want proj_ prefix", project["projectId"])
@@ -2338,6 +2367,7 @@ func TestMuxGetAgentsEmptyRegistry(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode body: %v", err)
 	}
+	body = unwrapSuccess(body)
 	items, ok := body["items"].([]any)
 	if !ok {
 		t.Fatalf("expected items array, got %T", body["items"])
@@ -2424,4 +2454,16 @@ func assertErrorCode(t *testing.T, body string, want string) {
 	if errObj["code"] != want {
 		t.Fatalf("error code = %#v, want %q", errObj["code"], want)
 	}
+}
+
+// unwrapSuccess extracts data from the unified {"code":"OK","data":...} envelope.
+// Returns the inner data map when an envelope is present, or body unchanged for
+// backward compatibility with raw/non-envelope responses (e.g. error responses).
+func unwrapSuccess(body map[string]any) map[string]any {
+	if body["code"] == "OK" {
+		if data, ok := body["data"].(map[string]any); ok {
+			return data
+		}
+	}
+	return body
 }
