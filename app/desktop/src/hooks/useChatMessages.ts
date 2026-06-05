@@ -1106,6 +1106,160 @@ function processEvent(state: State, event: EventEnvelope): State {
       break;
     }
 
+    case 'run.agent.auth_status': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `认证状态: ${(event.payload.output as string) || '正在认证...'}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.api_retry': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `API 重试中 (第${(event.payload.attempt as number) || '?'}次)`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.rate_limit': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `速率限制: 利用率 ${(event.payload.utilization as number | string) || '?'}%`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.compact_boundary': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: '上下文压缩中...',
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.status_change': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `运行状态: ${(event.payload.status as string) || 'unknown'}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.hook_started': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `Hook 执行: ${(event.payload.hookName as string) || 'unknown'}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.hook_progress': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `Hook: ${(event.payload.output as string) || '...'}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.hook_response': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `Hook 完成: ${(event.payload.hookName as string) || 'unknown'}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.tool_use_summary': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `工具使用摘要: ${(event.payload.summary as string) || '...'}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.session_state_changed': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `会话状态: ${(event.payload.state as string) || 'unknown'}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
+    case 'run.agent.sub_agent_status': {
+      const block: MessageBlock = {
+        kind: 'status',
+        content: `子Agent: ${(event.payload.status as string) || 'unknown'}${event.payload.agentName ? ` (${event.payload.agentName})` : ''}`,
+      };
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'system') {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
+      } else {
+        messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
+      }
+      break;
+    }
+
     default:
       break;
   }
