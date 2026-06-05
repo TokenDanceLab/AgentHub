@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 | 唯一事实源 | 旧版归档: [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> 最后更新: 2026-06-05 | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
 ## 课题目标
 
@@ -17,132 +17,193 @@
 
 ---
 
-## 当前 Sprint: IM 工作流 + Agent 可视化
+## 总体进度
 
-> 目标: 打通 IM 核心闭环，Desktop 前端可用，Agent 操作在 ChatView 中可视化
+```
+Phase A: 工程基础设施 ████░░░░░░  20%  ← 当前
+Phase B: 持久化 + 性能  ░░░░░░░░░░   0%
+Phase C: IM 核心闭环   ░░░░░░░░░░   0%
+Phase D: 高级功能      ░░░░░░░░░░   0%
+```
 
-### S1: IM 对话核心工作流
+### Phase 依赖关系
 
-- [ ] **对话列表** — 新建/置顶/归档/搜索，按最近活跃排序
-- [ ] **加好友** — 搜索用户 → 发送请求 → 接受/拒绝 → 成为联系人
-- [ ] **单聊模式** — 选中联系人/Agent → 1v1 对话，发送消息收到回复
-- [ ] **群聊模式** — 创建群组 → 邀请多 Agent → @Agent 分派任务
-- [ ] **消息类型** — 文本、代码块、图片、文件附件、Diff 视图卡片、网页预览卡片
-- [ ] **消息操作** — 回复、引用、复制代码、展开预览
-- [ ] **上下文管理** — 聊天历史自动传递，支持 pin 关键消息
-
-### S2: ChatView Agent 操作可视化
-
-- [ ] **Agent 运行状态** — 思考中/工具调用中/生成中等实时状态指示
-- [ ] **工具调用可视化** — ToolUseBlock 展示工具名、参数、结果
-- [ ] **代码 Diff 内联** — Agent 产出代码时展示 Diff 视图卡片，支持一键应用
-- [ ] **文件操作可视化** — Agent 读写文件的实时展示
-- [ ] **多 Agent 并行流** — 群聊中多个 Agent 依次/并行回复的可视化
-- [ ] **审批面板** — 高风险操作弹窗确认，Agent 等待审批后继续
-
-### S3: Orchestrator 协调器
-
-- [ ] **意图理解 + 任务拆解** — 群聊模式自动理解用户意图，拆解并分派子任务
-- [ ] **子 Agent 调度** — 并行调度，失败降级
-- [ ] **产出聚合** — 子 Agent 完成后在聊天流中汇报结果
-- [ ] **冲突处理** — 多 Agent 修改同一文件时的冲突检测
-
-### S4: Desktop 前端优化
-
-- [ ] **对话列表 UI 打磨** — 未读计数、最后消息预览、在线状态
-- [ ] **消息气泡优化** — 头像、时间戳、发送状态、Agent 标识
-- [ ] **输入体验** — @Agent 弹窗选择、文件拖拽、快捷键
-- [ ] **侧边栏** — 会话/联系人/Agent 商店导航
-- [ ] **响应式适配** — 窄屏/宽屏自适应布局
+```
+A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──→ D (高级功能)
+     │                                      ↑
+     └── App.tsx 拆分 (A4) ──────────────────┘ 前端解耦是 IM 开发前提
+```
 
 ---
 
-## 工程基础设施（进行中）
+## Phase A: 工程基础设施 + 安全修复
 
-> 统一错误码、日志追踪、调试端点。设计文档: [designs/unified-error-logging-debug.md](designs/unified-error-logging-debug.md)
+> **目标**: 建立可观测性基座（错误码/日志/调试），修复安全与稳定性隐患，解耦前端开发瓶颈
+>
+> **入场条件**: ✅ v0.2.0 已发布，架构剖析已完成
+> **出场条件**: Edge/Hub 统一错误码 + 请求追踪；无凭据泄漏；App.tsx 拆为独立模块
 
-### I1: 统一错误码体系
+### A0: 错误码体系收口 `errcode`
 
-- [x] **共享 pkg/errcode 模块** — `github.com/agenthub/pkg/errcode`，Error 类型 + 统一 envelope + 通用 codes
-- [x] **go.work workspace** — 链接 pkg + edge-server + hub-server
-- [x] **Hub 迁移** — re-export 共享类型 + 统一 envelope `{"error":{"code":"...","message":"...","traceId":"..."}}` + 测试全绿
-- [ ] **Edge 域错误码** — 创建 `internal/errcode/codes.go`（EXECUTOR_UNAVAILABLE 等域代码）
-- [ ] **Edge handlers 重构** — 删除 `errorResponse()` + `genID()`，改用 `errcode.WriteError()` + typed errors
-- [ ] **前端适配** — Desktop 错误处理从 `response.code` 改为 `response.error.code`
+- [x] 共享 `pkg/errcode` 模块 + `go.work` workspace
+- [x] Hub 迁移完成：统一 envelope `{"error":{"code":"...","message":"...","traceId":"..."}}`
+- [ ] Edge 域错误码 — 创建 `internal/errcode/codes.go`（EXECUTOR_UNAVAILABLE 等）
+- [ ] Edge handlers 重构 — 删除 `errorResponse()` + `genID()`，改用 `errcode.WriteError()`
+- [ ] 前端适配 — Desktop 错误处理从 `response.code` 改为 `response.error.code`
 
-### I2: 日志与请求追踪
+### A1: 请求日志与追踪 `reqlog`
 
-- [ ] **pkg/reqlog 共享中间件** — trace ID 生成/传播，统一字段命名（request_id/method/path/status/duration_ms/client_ip）
-- [ ] **Edge 接入 reqlog** — 生成 X-Request-ID，注入 context，替换现有 AccessLog
-- [ ] **Hub 接入 reqlog** — 已有 RequestID + AccessLog，统一为 reqlog 版
-- [ ] **Edge→Hub 跨服务追踪** — Edge 调 Hub API 时透传 X-Request-ID，Hub 复用
+- [ ] `pkg/reqlog` 共享中间件 — trace ID 生成/传播，统一字段（request_id/method/path/status/duration_ms）
+- [ ] Edge 接入 — 生成 X-Request-ID，替换现有 AccessLog
+- [ ] Hub 接入 — 统一已有 RequestID + AccessLog 为 reqlog 版
+- [ ] 跨服务追踪 — Edge→Hub API 透传 X-Request-ID
 
-### I3: 调试端点
+### A2: 调试端点 `debug`
 
-- [ ] **pkg/debug 模块** — 健康检查 + pprof + 脱敏配置转储
-- [ ] **Hub /debug/** — health（DB+Redis 连通性）+ pprof（需 admin auth）+ config dump
-- [ ] **Edge /debug/** — health（store+bus 状态）+ pprof（需 local auth）+ config dump
+- [ ] `pkg/debug` 模块 — health + pprof + 脱敏配置转储
+- [ ] Hub `/debug/` — DB+Redis 连通性 + pprof (admin auth) + config dump
+- [ ] Edge `/debug/` — store+bus 状态 + pprof (local auth) + config dump
 
----
+### A3: 安全与稳定性 P0 修复
 
-## Next: Edge 持久化 + 架构健康度
+- [ ] **Edge auth token 明文日志** — `server.go` 的 `aght_` token 以 `slog.Info` 输出到 stdout。改为 debug 级别或仅输出前 8 位
+- [ ] **Edge FileStore 同步 persist 瓶颈** — 每次写操作同步 JSON marshal + write + rename。改为 async persist + write-behind batching
+- [ ] **Hub workspace schema 不一致** — migration `0009`（device_id, local_path）vs model（name, description, owner_id）完全不同，启动可能报错
 
-> 目标: Edge 从内存临时态升级到持久化存储；修复架构剖析发现的 P0/P1 问题；为离线/远程/同步打基础
+### A4: 前端架构解耦
 
-### E1: Edge SQLite 持久化层
+> **关键路径**: App.tsx 拆分是 Phase C (IM 闭环) 的前置条件。不拆分，所有前端开发都在 1838 行里挤。
 
-当前 Edge 用内存 + JSON 快照（`FileStore`），重启丢数据、无法搜索、无法同步。按架构文档决策（`build-specs-backend-02` / `build-specs-backend-03`）升级为 `modernc.org/sqlite`（纯 Go，FTS5 内置，无 CGO）。
+- [ ] **App.tsx 拆分** — 1838 行 / 40+ useState，拆为 LayoutShell、ChatController、MenuProvider、ConnectionManager、ShortcutHandler 等独立模块
+- [ ] **SettingsPage/AuthPage/HomeDashboard lazy-load** — ~200KB+ eager import → `React.lazy()` 动态加载
+- [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖（path validation、OIDC callback、edge lifecycle）
 
-- [ ] **JSONL 事件流** — append-only 事件日志替代 JSON 快照，写操作先 append 再更新内存，保证不丢数据
-- [ ] **SQLite Schema** — projects / threads / runs / items 四张表 + 索引，替代内存 map
-- [ ] **FTS5 搜索索引** — `session_messages_fts` 虚拟表，porter + unicode61 tokenizer，BM25 排序，`snippet()` 高亮
-- [ ] **数据迁移** — 启动时检测旧 JSON 快照，自动导入 SQLite
-- [ ] **离线队列** — Hub 断连时写操作入队，重连后批量同步
-- [ ] **Cursor 同步协议** — Hub ↔ Edge 增量同步：`?cursor=<last_seq>` 拉取增量变更
+### A5: 开发者构建体验
 
-> 参考: `docs/archive/build-specs-backend-03-eventstore-memory.md`（JSONL + content_pool + FTS5 混合方案）
-
-### E2: 开发者构建体验
-
-- [x] **移除 keyring v4 重依赖** — 去除 turso/tantivy（-213 crate），改用平台原生 credential store
-- [x] **Cargo dev profile 优化** — `opt-level=1` 加速增量编译
-- [x] **前端 bundle 拆分** — vendor chunks 分离，首次加载更快
-- [ ] **Edge 自动构建** — `tauri dev` 时检测 edge-server 源码变更自动 `go build`，无需手动拷贝二进制
-- [ ] **sccache / 缓存共享** — CI 和本地共享 Rust 编译缓存
-- [ ] **开发文档** — 冷启动时间预期、前置依赖、troubleshooting
+- [x] 移除 keyring v4 重依赖（-213 crate）
+- [x] Cargo dev profile 优化（`opt-level=1`）
+- [x] 前端 vendor bundle 拆分
+- [ ] Edge 自动构建 — `tauri dev` 检测 edge-server 变更自动 `go build`
+- [ ] sccache / CI 缓存共享
+- [ ] 开发文档 — 冷启动预期、前置依赖、troubleshooting
 
 ---
 
-## 架构健康度（来自 2026-06-05 深度剖析）
+## Phase B: Edge 持久化 + 性能治理
 
-> 以下来自对 Edge / Desktop / Hub / 集成层的全面架构审查。按优先级排列。
+> **目标**: Edge 从内存临时态升级到 SQLite 持久化；修复 Hub 性能瓶颈；大文件拆分提升可维护性
+>
+> **入场条件**: Phase A 出场（错误码 + 日志 + P0 修复完成）
+> **出场条件**: Edge 重启不丢数据 + FTS5 搜索；Hub 无 N+1 查询 + 全索引覆盖
 
-### P0 — 必须修复
+### B0: Edge SQLite 持久化
 
-- [ ] **Edge auth token 明文日志** — `server.go` 将自动生成的 `aght_` token 以 `slog.Info` 打到 stdout，生产环境日志聚合会泄漏凭据。改为 debug 级别或仅输出前 8 位
-- [ ] **Edge FileStore 同步 persist 瓶颈** — 每次写操作同步 JSON marshal + file write + rename，高写入下是串行瓶颈。改为 async persist + write-behind batching
-- [ ] **Hub workspace migration vs model schema 不一致** — migration `0009` 的 `workspaces` 表（`device_id, local_path`）与 `model/workspace.go`（`name, description, owner_id`）完全不同，启动可能报错或数据丢失
-- [ ] **Desktop App.tsx 拆分** — 1838 行单组件混合布局/连接/消息/菜单/快捷键/窗口管理，40+ useState，开发已到瓶颈。拆为 LayoutShell、ChatController、MenuProvider 等独立模块
+当前 Edge 用内存 + JSON 快照（FileStore），重启丢数据、无搜索、无同步。升级为 `modernc.org/sqlite`（纯 Go，FTS5 内置，无 CGO）。
 
-### P1 — 应该修复
+- [ ] JSONL 事件流 — append-only 日志替代 JSON 快照，写操作先 append 再更新内存
+- [ ] SQLite Schema — projects / threads / runs / items 四张表 + 索引
+- [ ] FTS5 搜索 — `session_messages_fts` 虚拟表，BM25 排序，`snippet()` 高亮
+- [ ] 数据迁移 — 启动时检测旧 JSON 快照，自动导入 SQLite
 
-- [ ] **Hub N+1 查询** — `repository/session.go` 的 session list 用 correlated subquery 算 member_count（每行一次）；`service/agent.go` dispatch 时逐个查 CustomAgent。改为 JOIN / Preload
-- [ ] **Hub 缺索引** — `agent_team_tasks(team_run_id)`、`agent_team_assignments(team_run_id)`、`notifications(user_id)` 无索引，查询走全表扫描
-- [ ] **Desktop Rust 后端零测试** — `src-tauri/src/` 下 0 个 `#[test]`，commands.rs 945 行、oidc_server.rs 278 行完全无覆盖。至少覆盖 path validation、OIDC callback 解析、edge lifecycle
-- [ ] **Desktop SettingsPage/AuthPage/HomeDashboard lazy-load** — 这三组组件 ~200KB+ 均在 App.tsx 顶部 eager import，但只在特定条件下渲染。改为 `React.lazy()` 动态加载
-- [ ] **Edge 双重 dispatch 路径清理** — `orchestrator.go` 的 text scan + `orchestrator_dispatch.go` 的 NDJSON event 两条独立 dispatch 检测路径，可能重复 spawn sub-agent。统一为一条
-- [ ] **Edge Output 截断无通知** — stdout/stderr 1MB cap + PayloadLimitEmitter 1MB 截断均为静默操作，用户不知道数据被截断。截断时发 `run.output.truncated` 事件
-- [ ] **Hub agent.go 拆分** — 1371 行单文件混合 custom agent CRUD + task lifecycle + dispatch + event normalization。拆为 `agent_custom.go`、`agent_task.go`、`agent_dispatch.go`、`agent_events.go`
-- [ ] **Edge ProcessExecutor 拆分** — 1413 行单文件混合 spawn/cancel/hub-callback/output/env/emitter。拆为 `executor_spawn.go`、`executor_cancel.go`、`executor_hub.go`、`executor_output.go`
+> 参考: `docs/archive/build-specs-backend-03-eventstore-memory.md`
 
-### P2 — 改善
+### B1: Edge 离线与同步
 
-- [ ] **OpenAPI spec → 类型生成** — `api/openapi.yaml` 5590 行手动维护，前端 `@shared/types.ts` 独立维护可漂移。引入代码生成（openapi-generator / ogen）消除手工同步
-- [ ] **Hub migration 双系统统一** — 当前 15 个 golang-migrate SQL 文件 + GORM AutoMigrate 双系统并存（agent_teams 等表无 migration 文件）。统一走 golang-migrate，关掉 AutoMigrate
-- [ ] **Hub OIDC blacklist 写入失败静默忽略** — Redis 不可用时旧 refresh token 不被加入黑名单，可被重放。改为失败时记录到 DB 补偿队列
-- [ ] **Edge `internal/runners` 死代码清理** — README 标注为 "legacy"，保留仅为旧 UI 兼容。确认无调用方后移除
-- [ ] **Desktop OIDC 超时不一致** — `CALLBACK_TIMEOUT_SECS = 60` 但错误消息写 "5 minutes"（oidc_server.rs:16 vs :206）
-- [ ] **Desktop Edge 端口硬编码** — Rust 侧 `port: 3210` 写死，前端 config.ts 有优先级链但默认也是 3210。引入配置同步机制
+- [ ] 离线队列 — Hub 断连时写操作入队，重连后批量同步
+- [ ] Cursor 同步协议 — `?cursor=<last_seq>` 增量拉取
+
+### B2: Hub 性能治理
+
+- [ ] **N+1 查询** — session list 的 correlated subquery + agent dispatch 逐个查 CustomAgent → JOIN / Preload
+- [ ] **缺索引** — `agent_team_tasks(team_run_id)`、`agent_team_assignments(team_run_id)`、`notifications(user_id)`
+- [ ] **migration 双系统统一** — golang-migrate + GORM AutoMigrate 并存 → 统一走 golang-migrate，关掉 AutoMigrate
+
+### B3: 大文件拆分
+
+- [ ] **Hub agent.go** — 1371 行 → `agent_custom.go` / `agent_task.go` / `agent_dispatch.go` / `agent_events.go`
+- [ ] **Edge ProcessExecutor** — 1413 行 → `executor_spawn.go` / `executor_cancel.go` / `executor_hub.go` / `executor_output.go`
+
+### B4: Edge 行为修正
+
+- [ ] **双重 dispatch 路径统一** — `orchestrator.go` text scan + `orchestrator_dispatch.go` NDJSON event 两条路径 → 统一
+- [ ] **Output 截断通知** — stdout/stderr 1MB 截断时发 `run.output.truncated` 事件
+
+---
+
+## Phase C: IM 核心闭环
+
+> **目标**: 打通 IM 核心工作流，Desktop 前端可用，Agent 操作可视化
+>
+> **入场条件**: Phase B 出场（Edge 持久化完成 + App.tsx 已拆分）
+> **出场条件**: 用户可以在 Desktop 中与 Agent 进行完整的 IM 对话
+
+### C0: 对话核心
+
+- [ ] 对话列表 — 新建/置顶/归档/搜索，按最近活跃排序
+- [ ] 单聊模式 — 选中联系人/Agent → 1v1 对话
+- [ ] 群聊模式 — 创建群组 → 邀请多 Agent → @Agent 分派任务
+- [ ] 消息类型 — 文本、代码块、图片、文件附件、Diff 视图卡片、网页预览卡片
+- [ ] 消息操作 — 回复、引用、复制代码、展开预览
+- [ ] 上下文管理 — 聊天历史自动传递，支持 pin 关键消息
+
+### C1: Agent 可视化
+
+- [ ] Agent 运行状态 — 思考中/工具调用中/生成中等实时指示
+- [ ] 工具调用可视化 — ToolUseBlock 展示工具名、参数、结果
+- [ ] 代码 Diff 内联 — Agent 产出代码时展示 Diff 视图卡片，一键应用
+- [ ] 文件操作可视化 — Agent 读写文件的实时展示
+- [ ] 多 Agent 并行流 — 群聊中多 Agent 依次/并行回复的可视化
+- [ ] 审批面板 — 高风险操作弹窗确认
+
+### C2: 前端打磨
+
+- [ ] 对话列表 UI — 未读计数、最后消息预览、在线状态
+- [ ] 消息气泡 — 头像、时间戳、发送状态、Agent 标识
+- [ ] 输入体验 — @Agent 弹窗选择、文件拖拽、快捷键
+- [ ] 侧边栏 — 会话/联系人/Agent 商店导航
+- [ ] 响应式适配 — 窄屏/宽屏自适应
+
+### C3: Orchestrator 协调器
+
+- [ ] 意图理解 + 任务拆解 — 群聊模式自动理解用户意图
+- [ ] 子 Agent 调度 — 并行调度，失败降级
+- [ ] 产出聚合 — 子 Agent 完成后在聊天流中汇报
+- [ ] 冲突处理 — 多 Agent 修改同一文件时的冲突检测
+
+---
+
+## Phase D: 高级功能
+
+> **入场条件**: Phase C 出场（IM 闭环可用）
+> **目标**: 产品差异化与生态扩展
+
+### D0: 代码生成与 API 契约
+
+- [ ] OpenAPI spec → 类型生成 — 消除手工维护 openapi.yaml + types.ts 的漂移
+- [ ] shared API client 共享 — desktop/web/mobile 统一 HTTP client
+
+### D1: 安全增强
+
+- [ ] Hub OIDC blacklist 写入失败补偿 — Redis 不可用时旧 refresh token 可被重放
+- [ ] Edge `internal/runners` 死代码清理
+
+### D2: 产品扩展
+
+- [ ] 部署发布 — 聊天中"部署"指令，返回部署状态卡片
+- [ ] Agent 商店 — 搜索、安装、使用自定义 Agent
+- [ ] 版本历史 — Checkpoint + Diff 对比 + 回滚
+- [ ] Mobile 轻量端 — 查看/审批/预览
+- [ ] Content Pool — SHA-256 + zstd 文件内容去重
+- [ ] 远程 Edge — SSH / Tailscale / Hub Relay 连接远程 Desktop
+
+---
+
+## Quick Wins（随时可做）
+
+> 不依赖特定 Phase，发现即修。trivial 修复直接执行，无需等 Phase 排期。
+
+- [ ] Desktop OIDC 超时不一致 — `CALLBACK_TIMEOUT_SECS = 60` 但错误消息写 "5 minutes"
+- [ ] Desktop Edge 端口硬编码 — Rust `port: 3210` 写死，前端 config.ts 默认也是 3210
 
 ---
 
@@ -161,41 +222,12 @@
 | 文档体系 | ADR 11 篇 + 竞品调研 25 项目 + 架构三合一 | 2026-06-02 |
 | v0.2.0 | Sidecar edge + Updater + NSIS/DMG + 安全加固 + CI 签名 | 2026-06-05 |
 | 构建优化 | 去除 keyring turso/tantivy（-213 crate）+ dev profile + bundle 拆分 | 2026-06-05 |
-| 架构剖析 | Edge / Desktop / Hub / 集成层全面审查，产出 P0×4 + P1×8 + P2×6 | 2026-06-05 |
+| 架构剖析 | Edge / Desktop / Hub / 集成层全面审查，P0×4 + P1×8 + P2×6 | 2026-06-05 |
 | 全局死链清理 | 20 文件 docs/tutorials→docs/roadmap 等路径修复 + 端口 5199→5173 | 2026-06-05 |
 | 错误码统一 (Hub) | pkg/errcode 共享模块 + Hub re-export + 统一 envelope + traceId | 2026-06-05 |
 | 安全修复 | Orchestrator bypassPermissions 硬编码移除 | 2026-06-05 |
 
-> 详细历史见 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
-
----
-
-## 已知缺口
-
-| # | 问题 | 优先级 |
-|---|------|:------:|
-| B6 (9项) | Desktop IM 对接真实 Hub session/message/WS 事件 | High |
-| @Agent | Desktop IM @mention 完全缺失，核心差异化 | High |
-| Edge 持久化 | 内存 FileStore 重启丢数据，缺搜索/同步/离线队列 | High |
-| App.tsx 债务 | 1838 行万能组件，开发效率瓶颈 | High |
-| Hub N+1 + 缺索引 | session list / agent dispatch 慢查询；team_run_id 等无索引 | Medium |
-| AgentTeam | Hub 模型已有，缺 E2E live smoke | Medium |
-| Orchestrator | 双重 dispatch 路径 + 文本扫描 JSON dispatch 脆弱 | Medium |
-| Rust 零测试 | Desktop Tauri 后端无任何测试覆盖 | Medium |
-| OIDC | 后端已通，前端部署态 login/logout 证据待补 | Low |
-| Spec 漂移 | OpenAPI 手动维护，shared types 可独立漂移 | Low |
-
----
-
-## P3 远期
-
-- [ ] 部署发布 — 聊天中"部署"指令，返回部署状态卡片
-- [ ] Agent 商店 — 搜索、安装、使用自定义 Agent
-- [ ] 版本历史 — Checkpoint + Diff 对比 + 回滚
-- [ ] Mobile 轻量端 — 查看/审批/预览
-- [ ] Content Pool — SHA-256 + zstd 文件内容去重（参考 Opcode checkpoint）
-- [ ] 远程 Edge — SSH / Tailscale / Hub Relay 连接远程 Desktop
-- [ ] shared API client 真正共享 — 当前 desktop/web/mobile 各自独立实现 HTTP client，仅共享类型
+> 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
 ---
 
