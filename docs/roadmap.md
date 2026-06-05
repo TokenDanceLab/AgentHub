@@ -20,8 +20,8 @@
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 ████████████  70%  ← 当前 (A0/A1/A2/A3 ✅, A4 部分完成, A5/A6 待开始)
-Phase B: 持久化 + 性能  ░░░░░░░░░░   0%
+Phase A: 工程基础设施 ████████████  80%  ← 当前 (A0-A3 ✅, A4 Wave2 5/7, A6.3 ✅)
+Phase B: 持久化 + 性能  ██░░░░░░░░  15%  ← B2 N+1 ✅
 Phase C: IM 核心闭环   ░░░░░░░░░░   0%
 Phase D: 高级功能      ░░░░░░░░░░   0%
 ```
@@ -99,7 +99,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
   - [x] `useSidebarResize.ts` — 侧边栏拖拽缩放 40 行（低难度）✅
   - [x] `useThreadCache.ts` — React Query 缓存操作 37 行 + 4 个 ref（低难度）✅
   - [ ] `useTopMenuConfig.ts` — 菜单定义 221 行（低难度，优先）← 下一步
-  - [ ] `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）
+  - [x] `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）✅
   - [ ] `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）
   - [ ] `useSendRun.ts` — 发送/启动 run 116 行（高难度，最后）
   - 执行顺序：E→F→G→A（阶段1低风险）→ D→C（阶段2）→ B（阶段3核心）
@@ -168,25 +168,17 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [ ] 离线队列 — Hub 断连时写操作入队，重连后批量同步
 - [ ] Cursor 同步协议 — `?cursor=<last_seq>` 增量拉取
 
-### B2: Hub 性能治理
+### B2: Hub 性能治理 🔧
 
-- [ ] **N+1 查询 — Session list correlated subquery** (`repository/session.go:54-79`)
-  - `ListUserSessions` 和 `SearchSessions` 的 `(SELECT COUNT(*) FROM session_members WHERE session_id = s.id)` 逐行执行
-  - 修复: 改为 `LEFT JOIN (SELECT session_id, COUNT(*) GROUP BY session_id) mc ON mc.session_id = s.id`
-- [ ] **N+1 查询 — StartTeamRun 逐条查 CustomAgent** (`service/agent_team.go:323-334`)
-  - for 循环内逐个 `GetCustomAgentByID` 做鉴权，同函数后半段已正确批量查询
-  - 修复: 批量查询提前到鉴权循环前，`WHERE id IN ?` 一次取出，构建 map 复用
-- [ ] **N+1 查询 — dispatchTask 逐次查 CustomAgent** (`service/agent.go:445-452`)
-  - 每个 dispatch goroutine 独立查询，TeamRun 并发场景形成隐式 N+1
-  - 修复: `TriggerAgentTask` 预查询 CustomAgent，通过参数传入 `dispatchTask`
-- [ ] **缺索引 — GORM model tag 缺 index 标记**（migration SQL 已有索引，但 AutoMigrate 路径会丢失）
-  - `agent_team_tasks.team_run_id` — `model/agent_team.go:172`
-  - `agent_team_assignments.team_run_id` — `model/agent_team.go:126`
-  - `notifications.user_id` — `model/notification.go:21`
-  - 修复: 补 GORM `index:` tag + 新增 `0041_ensure_performance_indexes` migration（IF NOT EXISTS）
-- [ ] **migration 双系统统一** — golang-migrate 唯一生产路径（`repository/migrate.go:15`），AutoMigrate 仅在测试中使用
-  - 风险: model tag 和 migration SQL 默认值/FK/索引可能不同步
-  - 修复: model 包加文档注释声明 golang-migrate 唯一性；清理测试中的 `db.AutoMigrate()` 调用；CI 加 migration 完整性检查
+- [x] **N+1 查询 — Session list correlated subquery** (`repository/session.go`)
+  - `ListUserSessions` 和 `SearchSessions` → LEFT JOIN 批量查询
+- [x] **N+1 查询 — StartTeamRun 逐条查 CustomAgent** (`service/agent_team.go`)
+  - 批量查询 `WHERE id IN ?` + map 复用
+- [x] **N+1 查询 — dispatchTask 逐次查 CustomAgent** (`service/agent.go`)
+  - `TriggerAgentTask` 预查询，参数传入 `dispatchTask`
+- [x] **缺索引 — GORM model 补 index tag** + Migration 0041
+  - `agent_team_tasks.team_run_id`, `agent_team_assignments.team_run_id`, `notifications.user_id`
+- [ ] **migration 双系统统一** — golang-migrate 唯一生产路径（`repository/migrate.go`），AutoMigrate 仅在测试中使用
 
 ### B3: 大文件拆分
 
@@ -459,7 +451,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | 33 | PromptInput 1522 行未 memo 包装 | PromptInput.tsx |
 | 34 | useChatMessages 1485 行单一 hook 职责过重 | hooks/useChatMessages.ts |
 | 35 | useIMChat 1297 行单一 hook | hooks/useIMChat.ts |
-| 36 | App.tsx 1440 行尚未拆分（A4 Wave 2 待做） | App.tsx |
+| 36 | App.tsx 1190 行，A4 Wave 2 还剩 2 个 hook | App.tsx |
 | 37 | 懒加载组件 fallback 为 null | AuthPage/HomeDashboard/SettingsPage |
 | 38 | Toast store nextId HMR 时可能重置 | toastStore.ts |
 | 39 | 装饰性 Nav 按钮无功能 | `App.tsx:1049-1052` |
