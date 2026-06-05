@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Plug } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
+import { formatRuntimeDescription } from '../utils';
 import styles from '../primitives/primitives.module.css';
 
 export default function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
@@ -14,7 +15,7 @@ export default function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
         </div>
         <div>
           <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.mcpRuntimeDefaultDesc')}</span>
+          <span>{formatRuntimeDescription(agent, t, 'settings.mcpRuntimeDefaultDesc')}</span>
         </div>
         <em className={`${styles.profileStatus} ${mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
           {mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}

@@ -18,9 +18,16 @@ import CustomAgentCreator, { readCustomAgentDrafts } from '../cards/CustomAgentC
 import PublishAgentModal from '../cards/PublishAgentModal';
 import type { PublishAgentPayload } from '../cards/PublishAgentModal';
 import { deleteCustomAgent, loadCustomAgents } from '../agentCreation/agentStore';
-import { agentTemplates, capabilityLabels } from '../agentCreation/agentTemplates';
+import { agentTemplates } from '../agentCreation/agentTemplates';
 import type { AgentTemplate } from '../agentCreation/agentCreationTypes';
-import { countAgentCapabilities, statusLabelFromQuery, readUnknownString, readUnknownArray } from '../utils';
+import {
+  countAgentCapabilities,
+  formatMarketCapability,
+  formatMarketTool,
+  statusLabelFromQuery,
+  readUnknownString,
+  readUnknownArray,
+} from '../utils';
 import styles from '../primitives/primitives.module.css';
 
 export interface CustomAgentMarketItem {
@@ -52,6 +59,15 @@ export interface CommunityAgentItem {
   createdAt: string;
   updatedAt: string;
   iconUrl?: string;
+}
+
+type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
+
+interface CommunityAgentView extends CommunityAgentItem {
+  displayName: string;
+  displayDescription: string;
+  displaySystemPrompt: string;
+  displayCapabilities: Array<{ id: string; label: string }>;
 }
 
 function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketItem {
@@ -184,6 +200,26 @@ const ALL_CAPABILITY_TAGS = Array.from(
   new Set(MOCK_COMMUNITY_AGENTS.flatMap((a) => a.capabilities)),
 ).sort();
 
+function localizeCommunityAgent(agent: CommunityAgentItem, t: TranslateFn): CommunityAgentView {
+  return {
+    ...agent,
+    displayName: t(`settings.marketAgent.${agent.id}.name`, { defaultValue: agent.name }),
+    displayDescription: t(`settings.marketAgent.${agent.id}.description`, { defaultValue: agent.description }),
+    displaySystemPrompt: t(`settings.marketAgent.${agent.id}.systemPrompt`, { defaultValue: agent.systemPrompt }),
+    displayCapabilities: agent.capabilities.map((id) => ({ id, label: formatMarketCapability(id, t) })),
+  };
+}
+
+function localizeAgentTemplate(template: AgentTemplate, t: TranslateFn): AgentTemplate {
+  return {
+    ...template,
+    name: t(`settings.agentTemplate.${template.id}.name`, { defaultValue: template.name }),
+    category: t(`settings.agentTemplateCategory.${template.category}`, { defaultValue: template.category }),
+    description: t(`settings.agentTemplate.${template.id}.description`, { defaultValue: template.description }),
+    systemPrompt: t(`settings.agentTemplate.${template.id}.systemPrompt`, { defaultValue: template.systemPrompt }),
+  };
+}
+
 const INSTALLED_AGENTS_STORAGE_KEY = 'agenthub-settings.installedCommunityAgents';
 
 function readInstalledCommunityAgentIds(): string[] {
@@ -231,7 +267,7 @@ export default function AgentMarketSection({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCapabilityTags, setSelectedCapabilityTags] = useState<string[]>([]);
   const [showTagFilter, setShowTagFilter] = useState(false);
-  const [detailAgent, setDetailAgent] = useState<CommunityAgentItem | null>(null);
+  const [detailAgent, setDetailAgent] = useState<CommunityAgentView | null>(null);
   const [installedIds, setInstalledIds] = useState<string[]>(readInstalledCommunityAgentIds);
   const [showCreator, setShowCreator] = useState(false);
   const [templateToUse, setTemplateToUse] = useState<AgentTemplate | null>(null);
@@ -248,6 +284,16 @@ export default function AgentMarketSection({
     return readCustomAgentDrafts();
   }, [localDraftsVersion]);
 
+  const communityAgentViews = useMemo(
+    () => MOCK_COMMUNITY_AGENTS.map((agent) => localizeCommunityAgent(agent, t)),
+    [t],
+  );
+
+  const localizedAgentTemplates = useMemo(
+    () => agentTemplates.map((template) => localizeAgentTemplate(template, t)),
+    [t],
+  );
+
   const customAgents = rawAgents.map(normalizeCustomAgent);
   const marketPublishReady = customAgents.length + localCustomAgents.length;
   const marketCapabilityCount = countAgentCapabilities(agents as unknown as { capabilities: Record<string, boolean | undefined> }[]);
@@ -259,15 +305,18 @@ export default function AgentMarketSection({
   // ── Browse tab: filter community agents ──
   const filteredCommunityAgents = useMemo(() => {
     if (!hubSessionActive) return [];
-    let results = MOCK_COMMUNITY_AGENTS;
+    let results = communityAgentViews;
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       results = results.filter((a) =>
         a.name.toLowerCase().includes(q) ||
+        a.displayName.toLowerCase().includes(q) ||
         a.description.toLowerCase().includes(q) ||
+        a.displayDescription.toLowerCase().includes(q) ||
         a.author.toLowerCase().includes(q) ||
         a.agentType.toLowerCase().includes(q) ||
-        a.capabilities.some((c) => c.toLowerCase().includes(q)),
+        a.capabilities.some((c) => c.toLowerCase().includes(q)) ||
+        a.displayCapabilities.some((c) => c.label.toLowerCase().includes(q)),
       );
     }
     if (selectedCapabilityTags.length > 0) {
@@ -276,13 +325,13 @@ export default function AgentMarketSection({
       );
     }
     return results;
-  }, [hubSessionActive, searchQuery, selectedCapabilityTags]);
+  }, [communityAgentViews, hubSessionActive, searchQuery, selectedCapabilityTags]);
 
   const installedCommunityAgents = useMemo(() => {
-    return MOCK_COMMUNITY_AGENTS.filter((a) => installedIds.includes(a.id));
-  }, [installedIds]);
+    return communityAgentViews.filter((a) => installedIds.includes(a.id));
+  }, [communityAgentViews, installedIds]);
 
-  const handleInstall = useCallback((agent: CommunityAgentItem) => {
+  const handleInstall = useCallback((agent: CommunityAgentView) => {
     const added = toggleInstalledCommunityAgent(agent.id);
     setInstalledIds((prev) => {
       if (added) return [...prev, agent.id];
@@ -296,9 +345,9 @@ export default function AgentMarketSection({
       if (existingIdx < 0) {
         const item: CustomAgentMarketItem = {
           id: agent.id,
-          name: agent.name,
+          name: agent.displayName,
           agentType: agent.agentType,
-          systemPrompt: agent.systemPrompt,
+          systemPrompt: agent.displaySystemPrompt,
           capabilities: agent.capabilities,
           source: 'hub-community',
           updatedAt: now,
@@ -538,7 +587,7 @@ export default function AgentMarketSection({
                   onClick={() => handleToggleTag(tag)}
                 >
                   <Tag size={11} />
-                  {tag}
+                  {formatMarketCapability(tag, t)}
                 </button>
               ))}
             </div>
@@ -561,7 +610,7 @@ export default function AgentMarketSection({
               </button>
             </div>
             <div className={styles.templateGrid}>
-              {agentTemplates.map((tmpl) => {
+              {localizedAgentTemplates.map((tmpl) => {
                 const toolCount = Object.entries(tmpl.capabilities).filter(([, v]) => v).length;
                 return (
                   <div
@@ -580,7 +629,7 @@ export default function AgentMarketSection({
                     <div className={styles.templateCardBottom}>
                       <div className={styles.templateCardTools}>
                         {Object.entries(tmpl.capabilities).filter(([, v]) => v).slice(0, 3).map(([key]) => (
-                          <span key={key} className={styles.templateCardToolBadge}>{capabilityLabels[key] ?? key}</span>
+                          <span key={key} className={styles.templateCardToolBadge}>{formatMarketCapability(key, t)}</span>
                         ))}
                         {toolCount > 3 && (
                           <span className={styles.templateCardToolBadge}>+{toolCount - 3}</span>
@@ -622,7 +671,7 @@ export default function AgentMarketSection({
                         <Bot size={20} />
                       </div>
                       <div className={styles.marketAgentTitle}>
-                        <strong>{agent.name}</strong>
+                        <strong>{agent.displayName}</strong>
                         <span>{agent.author}</span>
                       </div>
                       <div className={styles.marketAgentRating}>
@@ -631,20 +680,20 @@ export default function AgentMarketSection({
                         <small>{agent.installs.toLocaleString()}</small>
                       </div>
                     </div>
-                    <p className={styles.marketAgentDesc}>{agent.description}</p>
+                    <p className={styles.marketAgentDesc}>{agent.displayDescription}</p>
                     <div className={styles.marketAgentTags}>
                       <span className={styles.marketAgentTypeTag}>
                         <SlidersHorizontal size={10} />
                         {t(`settings.agentCreator.type${agent.agentType.charAt(0).toUpperCase()}${agent.agentType.slice(1)}`, { defaultValue: agent.agentType })}
                       </span>
-                      {agent.capabilities.slice(0, 3).map((cap) => (
-                        <span key={cap} className={styles.marketAgentCapTag}>
+                      {agent.displayCapabilities.slice(0, 3).map((cap) => (
+                        <span key={cap.id} className={styles.marketAgentCapTag}>
                           <Tag size={10} />
-                          {cap}
+                          {cap.label}
                         </span>
                       ))}
-                      {agent.capabilities.length > 3 && (
-                        <span className={styles.marketAgentCapTag}>+{agent.capabilities.length - 3}</span>
+                      {agent.displayCapabilities.length > 3 && (
+                        <span className={styles.marketAgentCapTag}>+{agent.displayCapabilities.length - 3}</span>
                       )}
                     </div>
                     <div className={styles.marketAgentMeta}>
@@ -740,11 +789,11 @@ export default function AgentMarketSection({
                         <Download size={20} />
                       </div>
                       <div className={styles.marketAgentTitle}>
-                        <strong>{agent.name}</strong>
+                        <strong>{agent.displayName}</strong>
                         <span>{agent.author}</span>
                       </div>
                     </div>
-                    <p className={styles.marketAgentDesc}>{agent.description}</p>
+                    <p className={styles.marketAgentDesc}>{agent.displayDescription}</p>
                     <div className={styles.marketAgentActions}>
                       <button
                         type="button"
@@ -833,7 +882,7 @@ export default function AgentMarketSection({
                   <Bot size={20} />
                 </div>
                 <div>
-                  <h2>{detailAgent.name}</h2>
+                  <h2>{detailAgent.displayName}</h2>
                   <span>{t('settings.authorsBy', { author: detailAgent.author })}</span>
                 </div>
               </div>
@@ -868,12 +917,12 @@ export default function AgentMarketSection({
 
               <div className={styles.marketDetailSection}>
                 <strong>{t('settings.marketDescription')}</strong>
-                <p>{detailAgent.description}</p>
+                <p>{detailAgent.displayDescription}</p>
               </div>
 
               <div className={styles.marketDetailSection}>
                 <strong>{t('settings.agentCreator.promptTemplate')}</strong>
-                <pre className={styles.marketDetailPrompt}>{detailAgent.systemPrompt}</pre>
+                <pre className={styles.marketDetailPrompt}>{detailAgent.displaySystemPrompt}</pre>
               </div>
 
               <div className={styles.marketDetailSection}>
@@ -882,7 +931,7 @@ export default function AgentMarketSection({
                   {detailAgent.tools.map((tool) => (
                     <span key={tool} className={styles.marketDetailChip}>
                       <Wrench size={11} />
-                      {tool}
+                      {formatMarketTool(tool, t)}
                     </span>
                   ))}
                 </div>
@@ -891,10 +940,10 @@ export default function AgentMarketSection({
               <div className={styles.marketDetailSection}>
                 <strong>{t('settings.agentCapabilityTags')}</strong>
                 <div className={styles.marketDetailTags}>
-                  {detailAgent.capabilities.map((cap) => (
-                    <span key={cap} className={styles.marketDetailChip}>
+                  {detailAgent.displayCapabilities.map((cap) => (
+                    <span key={cap.id} className={styles.marketDetailChip}>
                       <Tag size={11} />
-                      {cap}
+                      {cap.label}
                     </span>
                   ))}
                 </div>

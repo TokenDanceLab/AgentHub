@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Bot, Pencil, Trash2, Globe2 } from 'lucide-react';
 import type { CustomAgentMarketItem } from '../sections/AgentMarketSection';
-import { formatTimestamp } from '../utils';
+import { formatMarketCapability, formatMarketSource, formatTimestamp } from '../utils';
 import styles from '../primitives/primitives.module.css';
 
 export default function AgentMarketCard({
@@ -17,6 +17,10 @@ export default function AgentMarketCard({
 }) {
   const { t } = useTranslation();
   const isLocalDraft = agent.source === 'local';
+  const agentTypeLabel = t(
+    `settings.agentCreator.type${agent.agentType.charAt(0).toUpperCase()}${agent.agentType.slice(1)}`,
+    { defaultValue: agent.agentType },
+  );
   return (
     <div className={styles.profileCard}>
       <div className={styles.profileHeader}>
@@ -33,14 +37,14 @@ export default function AgentMarketCard({
       </div>
       <div className={styles.profileMeta}>
         <span>{t('settings.marketCustomAgentId')}: {agent.id}</span>
-        <span>{t('settings.marketAgentType')}: {agent.agentType}</span>
-        <span>{t('settings.marketInstallSource')}: {agent.source}</span>
+        <span>{t('settings.marketAgentType')}: {agentTypeLabel}</span>
+        <span>{t('settings.marketInstallSource')}: {formatMarketSource(agent.source, t)}</span>
         <span>{t('settings.marketPublishStatus')}: {t('settings.statusReady')}</span>
         {agent.updatedAt ? <span>{t('settings.marketUpdatedAt')}: {formatTimestamp(agent.updatedAt)}</span> : null}
       </div>
       <div className={styles.profileMeta}>
         {agent.capabilities.length > 0 ? (
-          agent.capabilities.map((name) => <span key={name}>{name}</span>)
+          agent.capabilities.map((name) => <span key={name}>{formatMarketCapability(name, t)}</span>)
         ) : (
           <span>{t('settings.marketNoCapabilityTags')}</span>
         )}

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Bot } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
+import { formatRuntimeDescription } from '../utils';
 import styles from '../primitives/primitives.module.css';
 
 export default function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
@@ -13,7 +14,7 @@ export default function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
         </div>
         <div>
           <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.runtimeDefaultDesc')}</span>
+          <span>{formatRuntimeDescription(agent, t)}</span>
         </div>
         <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
           {t(`agent.status.${agent.status}`)}

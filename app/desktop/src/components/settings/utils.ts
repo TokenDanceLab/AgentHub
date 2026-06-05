@@ -152,6 +152,117 @@ export function statusLabelFromQuery({
   return t('settings.status.snapshot');
 }
 
+type RuntimeDescriptionAgent = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
+
+export function runtimeDescriptionKey(agent: RuntimeDescriptionAgent): string | undefined {
+  const tokens = [agent.id, agent.name, agent.description]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.toLowerCase())
+    .join(' ');
+
+  if (tokens.includes('orchestrator') || tokens.includes('decomposes tasks')) {
+    return 'settings.runtimeDescription.orchestrator';
+  }
+  if (tokens.includes('claude-code') || tokens.includes('claude code')) {
+    return 'settings.runtimeDescription.claudeCode';
+  }
+  if (tokens.includes('opencode') || tokens.includes('open code')) {
+    return 'settings.runtimeDescription.opencode';
+  }
+  if (tokens.includes('codex')) {
+    return 'settings.runtimeDescription.codex';
+  }
+  return undefined;
+}
+
+export function formatRuntimeDescription(
+  agent: RuntimeDescriptionAgent,
+  t: TranslateFn,
+  fallbackKey = 'settings.runtimeDefaultDesc',
+) {
+  const key = runtimeDescriptionKey(agent);
+  if (key) return t(key, { defaultValue: agent.description || t(fallbackKey) });
+  return agent.description || t(fallbackKey);
+}
+
+const MARKET_CAPABILITY_KEYS: Record<string, string> = {
+  read: 'settings.marketCapability.read',
+  write: 'settings.marketCapability.write',
+  bash: 'settings.marketCapability.bash',
+  webSearch: 'settings.marketCapability.webSearch',
+  grep: 'settings.marketCapability.grep',
+  thinking: 'settings.marketCapability.thinking',
+  fileChanges: 'settings.marketCapability.fileChanges',
+  mcpIntegration: 'settings.marketCapability.mcpIntegration',
+  subAgentSpawn: 'settings.marketCapability.subAgentSpawn',
+  'code review': 'settings.marketCapability.codeReview',
+  'security audit': 'settings.marketCapability.securityAudit',
+  'style check': 'settings.marketCapability.styleCheck',
+  refactoring: 'settings.marketCapability.refactoring',
+  'ci/cd': 'settings.marketCapability.cicd',
+  docker: 'settings.marketCapability.docker',
+  kubernetes: 'settings.marketCapability.kubernetes',
+  infrastructure: 'settings.marketCapability.infrastructure',
+  automation: 'settings.marketCapability.automation',
+  'api design': 'settings.marketCapability.apiDesign',
+  openapi: 'settings.marketCapability.openapi',
+  graphql: 'settings.marketCapability.graphql',
+  rest: 'settings.marketCapability.rest',
+  documentation: 'settings.marketCapability.documentation',
+  'project management': 'settings.marketCapability.projectManagement',
+  agile: 'settings.marketCapability.agile',
+  scrum: 'settings.marketCapability.scrum',
+  planning: 'settings.marketCapability.planning',
+  'data analysis': 'settings.marketCapability.dataAnalysis',
+  'machine learning': 'settings.marketCapability.machineLearning',
+  statistics: 'settings.marketCapability.statistics',
+  visualization: 'settings.marketCapability.visualization',
+  python: 'settings.marketCapability.python',
+  'ui/ux': 'settings.marketCapability.uiux',
+  accessibility: 'settings.marketCapability.accessibility',
+  'design review': 'settings.marketCapability.designReview',
+  css: 'settings.marketCapability.css',
+};
+
+const MARKET_TOOL_KEYS: Record<string, string> = {
+  read_file: 'settings.marketTool.readFile',
+  write_file: 'settings.marketTool.writeFile',
+  edit_file: 'settings.marketTool.editFile',
+  execute_command: 'settings.marketTool.executeCommand',
+  web_search: 'settings.marketTool.webSearch',
+  web_fetch: 'settings.marketTool.webFetch',
+  glob: 'settings.marketTool.glob',
+  grep: 'settings.marketTool.grep',
+  browser: 'settings.marketTool.browser',
+};
+
+const MARKET_SOURCE_KEYS: Record<string, string> = {
+  local: 'settings.marketSource.local',
+  'hub-community': 'settings.marketSource.hubCommunity',
+  '/web/custom-agents': 'settings.marketSource.hubCustomAgents',
+};
+
+export function formatMarketCapability(value: string, t: TranslateFn) {
+  const key = MARKET_CAPABILITY_KEYS[value];
+  return key ? t(key, { defaultValue: value }) : value;
+}
+
+export function formatMarketTool(value: string, t: TranslateFn) {
+  const key = MARKET_TOOL_KEYS[value];
+  return key ? t(key, { defaultValue: value }) : value;
+}
+
+export function formatMarketSource(value: string, t: TranslateFn) {
+  const key = MARKET_SOURCE_KEYS[value];
+  return key ? t(key, { defaultValue: value }) : value;
+}
+
 // ---------------------------------------------------------------------------
 // Feature Flags — centralized `available=false` stubs for unimplemented sections
 // ---------------------------------------------------------------------------
