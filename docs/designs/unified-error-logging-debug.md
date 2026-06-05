@@ -171,7 +171,51 @@ MSG_NOT_FOUND, SESSION_NOT_FOUND, AGENT_OFFLINE, FRIEND_ALREADY, OIDC_* 等 — 
 
 ## 5. 请求追踪与日志
 
-### 5.1 Trace ID 传播
+### 5.1 模块接口设计
+
+`pkg/reqlog` 提供两套中间件适配器：
+
+```go
+// pkg/reqlog/trace.go — 共享逻辑
+
+// 关键 context key 类型，不可导出以避免外部包直接读写。
+type traceIDKey struct{}
+type requestIDKey struct{}
+
+// NewRequestID 生成 request_ 前缀 UUIDv7（请求级别唯一）。
+func NewRequestID() string
+
+// NewTraceID 生成 trace_ 前缀递增 ID（错误级别唯一，短且有序）。
+func NewTraceID() string
+
+// GetRequestID 从 context 提取 X-Request-ID。
+func GetRequestID(ctx context.Context) string
+
+// GetTraceID 从 context 提取当前 trace ID。
+func GetTraceID(ctx context.Context) string
+
+// WithRequestID 将 request ID 注入 context。
+func WithRequestID(ctx context.Context, id string) context.Context
+```
+
+```go
+// pkg/reqlog/nethttp.go — net/http 中间件（Edge 用）
+// 签名: func AccessLog(next http.Handler) http.Handler
+// 行为:
+//   1. 从请求头提取 X-Request-ID，无则调用 NewRequestID() 生成
+//   2. 注入 context: ctx = WithRequestID(ctx, requestID)
+//   3. 设置响应头 X-Request-ID
+//   4. 记录: request_id, method, path, status, duration_ms, client_ip
+//   5. 字段名统一: request_id（不是 requestId 或 reqID）
+```
+
+```go
+// pkg/reqlog/gin.go — Gin 中间件（Hub 用）
+// 签名: func AccessLog() gin.HandlerFunc
+// 行为: 同 nethttp 版，但适配 gin.Context
+```
+
+### 5.2 Trace ID 传播
 
 ```
 客户端 → [X-Request-ID: req_xxx] → Edge/Hub 中间件
@@ -218,7 +262,36 @@ Edge 调用 Hub API 时，将当前请求的 X-Request-ID 通过 `X-Request-ID` 
 
 ## 6. 调试端点
 
-### 6.1 路由
+### 6.1 模块接口设计
+
+```go
+// pkg/debug/debug.go
+
+// Config 暴露脱敏后的配置快照。
+type ConfigProvider func() map[string]any
+
+// Handler 注册调试路由到 http.ServeMux（Edge）或 gin.Engine（Hub）。
+// prefix 为路由前缀，如 "/debug"。auth 为 nil 时 health/ready 公开，其余需要认证。
+type Handler struct {
+    Health  HealthChecker
+    Config  ConfigProvider
+    Auth    func(r *http.Request) bool
+}
+
+// HealthChecker 执行各依赖的健康检查。
+type HealthChecker struct {
+    Checks map[string]func(context.Context) error
+}
+
+// Check 运行所有健康检查，返回 {"status":"ok"} 或 {"status":"degraded","checks":{...}}。
+func (h *HealthChecker) Check(ctx context.Context) *HealthResult
+
+// Register 注册全部子路由。
+// 路由: <prefix>/health, <prefix>/ready, <prefix>/pprof/, <prefix>/vars, <prefix>/config
+func (h *Handler) Register(mux *http.ServeMux, prefix string)
+```
+
+### 6.2 路由
 
 两个服务器都注册以下路由（需要管理员认证）：
 
@@ -358,20 +431,20 @@ errcode.WriteErrorWithTrace(w, errcode.ErrNotFound.WithMessage(msgProjectNotFoun
 
 ## 9. 实施顺序
 
-| 阶段 | 内容 | 文件 |
-|------|------|------|
-| 1 | pkg/errcode 共享模块 | `pkg/errcode/*.go` |
-| 2 | go.work workspace | `go.work` |
-| 3 | Hub errcode re-export | `hub-server/internal/errcode/codes.go` |
-| 4 | Hub envelope + traceId | `hub-server/internal/handler/response.go`, `middleware/response.go` |
-| 5 | Edge errcode 包 | `edge-server/internal/errcode/codes.go` |
-| 6 | Edge handlers 迁移 | `edge-server/internal/api/handlers.go` |
-| 7 | pkg/reqlog 追踪中间件 | `pkg/reqlog/*.go` |
-| 8 | Edge/Hub 接入 reqlog | 两边 server.go / router |
-| 9 | pkg/debug 调试端点 | `pkg/debug/*.go` |
-| 10 | 两边接入 debug | Edge server.go, Hub router |
-| 11 | 前端适配 envelope 变更 | `app/desktop/src/` |
-| 12 | 测试 + commit | 全部 |
+| 阶段 | 内容 | 状态 |
+|------|------|:----:|
+| 1 | pkg/errcode 共享模块 | ✅ |
+| 2 | go.work workspace | ✅ |
+| 3 | Hub errcode re-export | ✅ |
+| 4 | Hub envelope + traceId | ✅ |
+| 5 | Edge errcode 包（14 域错误码） | ✅ |
+| 6 | Edge handlers 迁移（52 调用点） | ✅ |
+| 7 | pkg/reqlog 追踪中间件 | 🔧 |
+| 8 | Edge/Hub 接入 reqlog | — |
+| 9 | pkg/debug 调试端点 | — |
+| 10 | 两边接入 debug | — |
+| 11 | 前端适配 envelope 变更 | ✅ 已兼容 |
+| 12 | 测试 + commit | 持续 |
 
 ---
 
