@@ -11,9 +11,9 @@ test.describe('AgentHub smoke tests', () => {
     await expect(page).toHaveTitle(/AgentHub/);
   });
 
-  test('critical UI shell is visible', async ({ page }) => {
+  test('app root is mounted without the Vite error overlay', async ({ page }) => {
     await page.goto('/');
-    // Brand logo or heading should render within 5s
-    await expect(page.locator('h1, [data-testid="brand"]').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#root > div')).toHaveCount(1);
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   });
 });

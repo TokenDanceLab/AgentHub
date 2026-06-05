@@ -329,10 +329,10 @@ export function getSurfaceByDesktopSectionId(sectionId: string): SurfaceMetadata
 }
 
 export function getSurfaceByWebRoute(route: string): SurfaceMetadata | undefined {
-  return SURFACE_METADATA.find(
+  return (SURFACE_METADATA as readonly SurfaceMetadata[]).find(
     (surface) =>
       surface.platform === 'web' &&
-      'webRoutePattern' in surface &&
+      typeof surface.webRoutePattern === 'string' &&
       matchesRoutePattern(route, surface.webRoutePattern),
   );
 }
