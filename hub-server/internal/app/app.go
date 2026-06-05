@@ -2,12 +2,10 @@ package app
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,6 +26,7 @@ import (
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/ws"
+	debugpkg "github.com/agenthub/pkg/debug"
 )
 
 // App is the top-level DI container for the Hub Server.
@@ -600,7 +599,7 @@ func (a *App) startWebSocketCleanup(ctx context.Context) {
 	a.mgr.StartHeartbeat()
 }
 
-// startAdminServer starts the admin HTTP server with pprof and /metrics endpoints.
+// startAdminServer starts the admin HTTP server with pprof, /metrics, /debug/config, /debug/state endpoints.
 func (a *App) startAdminServer() {
 	adminPort := a.Config.Server.AdminPort
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
@@ -609,10 +608,34 @@ func (a *App) startAdminServer() {
 		slog.Error("admin server not started: AGENTHUB_PPROF_USER and AGENTHUB_PPROF_PASS must both be set")
 		return
 	}
-	adminHandler := pprofBasicAuth(newAdminMux(), pprofUser, pprofPass)
+
+	metrics.Register()
+	adminMux := http.NewServeMux()
+	debugpkg.RegisterEndpoints(adminMux, debugpkg.MuxConfig{
+		HealthCheckers: map[string]debugpkg.HealthChecker{
+			"database": func(ctx context.Context) error {
+				sqlDB, err := a.DB.DB()
+				if err != nil {
+					return err
+				}
+				return sqlDB.PingContext(ctx)
+			},
+			"redis": func(ctx context.Context) error {
+				return a.CacheClient.GetRDB().Ping(ctx).Err()
+			},
+		},
+		EnablePprof:    true,
+		MetricsHandler: promhttp.Handler(),
+		Auth:           debugpkg.BasicAuth(pprofUser, pprofPass),
+		ConfigDumper:   a.hubConfigDumper(),
+		StateDumper:    a.hubStateDumper(),
+		Version:        "dev",
+		StartTime:      a.startTime,
+	})
+
 	a.AdminServer = &http.Server{
 		Addr:              adminListenAddr(adminPort),
-		Handler:           adminHandler,
+		Handler:           adminMux,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
 		ReadTimeout:       config.DefaultServerReadTimeout,
 		WriteTimeout:      config.DefaultServerWriteTimeout,
@@ -624,6 +647,43 @@ func (a *App) startAdminServer() {
 			slog.Error("admin server failed", "error", err)
 		}
 	}()
+}
+
+func (a *App) hubConfigDumper() debugpkg.ConfigDumper {
+	return func() map[string]any {
+		cfg := a.Config
+		return map[string]any{
+			"server_port":    cfg.Server.Port,
+			"admin_port":     cfg.Server.AdminPort,
+			"db_host":        cfg.DB.Host,
+			"db_port":        cfg.DB.Port,
+			"db_name":        cfg.DB.Name,
+			"db_user":        cfg.DB.User,
+			"db_password":    cfg.DB.Password,
+			"redis_addr":     cfg.Redis.Addr,
+			"redis_password": cfg.Redis.Password,
+			"jwt_secret":     cfg.JWT.Secret,
+		}
+	}
+}
+
+func (a *App) hubStateDumper() debugpkg.StateDumper {
+	return func() map[string]any {
+		state := map[string]any{}
+		if a.DB != nil {
+			if sqlDB, err := a.DB.DB(); err == nil {
+				state["db_pool"] = map[string]any{
+					"open_connections": sqlDB.Stats().OpenConnections,
+					"in_use":           sqlDB.Stats().InUse,
+					"idle":             sqlDB.Stats().Idle,
+				}
+			}
+		}
+		if a.mgr != nil {
+			state["ws_connections"] = a.mgr.Count()
+		}
+		return state
+	}
 }
 
 // startMetricsCollector periodically reports DB pool, WS connections, Redis hits, and bus queue length.
@@ -798,34 +858,9 @@ func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online b
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-func newAdminMux() http.Handler {
-	metrics.Register()
-
-	adminMux := http.NewServeMux()
-	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
-	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	adminMux.Handle("/metrics", promhttp.Handler())
-	return adminMux
-}
-
 func adminListenAddr(adminPort int) string {
 	if adminPort == 0 {
 		adminPort = 6060
 	}
 	return fmt.Sprintf("127.0.0.1:%d", adminPort)
-}
-
-func pprofBasicAuth(next http.Handler, user, pass string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, p, ok := r.BasicAuth()
-		if !ok || subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 || subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="pprof"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
