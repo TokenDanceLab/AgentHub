@@ -1,7 +1,7 @@
 import { useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RotateCcw } from 'lucide-react';
-import MarkdownRenderer from '@/components/MarkdownRenderer';
+import IMBlockRenderer from './IMBlockRenderer';
 import type { IMMessage } from './types';
 import styles from './IMMessageView.module.css';
 
@@ -114,7 +114,11 @@ const IMMessageBubble = memo(function IMMessageBubble({
 
       {/* Content */}
       <div className={`${styles.content} ${isRecalled ? styles.recalled : ''}`}>
-        <MarkdownRenderer content={message.content} />
+        <IMBlockRenderer
+          content={message.content}
+          blocks={message.blocks}
+          isRecalled={isRecalled}
+        />
       </div>
 
       {/* Mention badges */}
