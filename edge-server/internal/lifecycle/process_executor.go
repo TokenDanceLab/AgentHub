@@ -319,6 +319,24 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	if !ok {
 		return CancelResult{Found: false, Status: "not_running"}
 	}
+
+	// Graceful shutdown: wait grace period for child to respond to stdin interrupt,
+	// then send SIGTERM, wait force timeout, and escalate to SIGKILL as last resort.
+	e.mu.Lock()
+	proc := e.processes[runID]
+	e.mu.Unlock()
+	if proc != nil {
+		// Wait shutdownGracePeriod for child process to naturally exit
+		time.Sleep(e.shutdownGracePeriod)
+		// Send SIGTERM (os.Interrupt)
+		_ = proc.Signal(os.Interrupt)
+		// Wait shutdownForceTimeout before escalating
+		time.Sleep(e.shutdownForceTimeout)
+		// Escalate to Kill
+		_ = proc.Kill()
+		_, _ = proc.Wait()
+	}
+
 	cancel()
 
 	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started", "cancelling")
@@ -462,9 +480,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.stdins[run.ID] = stdin
 		e.mu.Unlock()
 	}
+		setResourceLimits(cmd)
 	slog.Debug("executor.subprocess.starting", "runId", run.ID, "command", cmdPath, "args", args)
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {
+			if cmd.Process != nil {
+				_, _ = cmd.Process.Wait()
+			}
 			e.publishCancelled(run)
 			return
 		}
@@ -475,6 +497,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if ctx.Err() != nil {
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()
+			_, _ = cmd.Process.Wait()
 		}
 		e.publishCancelled(run)
 		return
@@ -910,6 +933,12 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	if e.decisionLoopFactory != nil {
 		emitter = e.decisionLoopFactory.Wrap(stdin, emitter, run)
 	}
+
+	// Wrap emitter with security hooks (PreToolUse / PostToolUse).
+	// This is the unified security layer: all three adapters (Claude Code,
+	// Codex, OpenCode) are covered at the ProcessExecutor level, regardless
+	// of whether they use NDJSONStreamParser or emit events directly.
+	emitter = adapters.NewSecureEmitter(ctx, emitter, adapters.HookChain{adapters.NewSecurityHook()})
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)

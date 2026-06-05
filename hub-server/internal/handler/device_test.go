@@ -89,15 +89,20 @@ func TestDeviceHandler_Register_InvalidDeviceID(t *testing.T) {
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
-	var resp handler.Response
+	var resp struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.Code != "BAD_REQUEST" {
-		t.Fatalf("expected BAD_REQUEST, got %s", resp.Code)
+	if resp.Error.Code != "BAD_REQUEST" {
+		t.Fatalf("expected BAD_REQUEST, got %s", resp.Error.Code)
 	}
-	if resp.Message != "device_id must be a UUID" {
-		t.Fatalf("unexpected message %q", resp.Message)
+	if resp.Error.Message != "device_id must be a UUID" {
+		t.Fatalf("unexpected message %q", resp.Error.Message)
 	}
 }
 

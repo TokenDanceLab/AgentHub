@@ -1,6 +1,10 @@
+# =============================================================================
 # Dependencies
+# =============================================================================
 node_modules/
 .pnpm-store/
+vendor/
+
 # Per-workspace lockfiles (only root app/pnpm-lock.yaml is tracked)
 app/desktop/pnpm-lock.yaml
 app/shared/pnpm-lock.yaml
@@ -14,53 +18,71 @@ app/web/package-lock.json
 app/mobile/package-lock.json
 app/shared/package-lock.json
 
-# Build output
+# =============================================================================
+# Build Output
+# =============================================================================
 dist/
 build/
+output/
 .next/
 .vite/
+*.tgz
+app/desktop/app/
+
+# =============================================================================
+# Test & Coverage
+# =============================================================================
 coverage/
 playwright-report/
 test-results/
-*.tgz
-
-# Generated reports and local test artifacts
-app/desktop/stats.html
 **/coverage.out
 **/coverage.html
 **/coverage
 **/.golangci.bck.yml
 edge-server/cov_full
-edge-server/$covPath
 hub-server/tests/uploads/
+test_store.json
 
-# Go
-server-hub-linux
+# =============================================================================
+# Go Binaries
+# =============================================================================
 server-hub-*
-agenthub-edge
 agenthub-edge-*
 *.exe
 *.exe~
 *.test
 *.out
 *.coverprofile
-vendor/
 
+# =============================================================================
 # Rust / Tauri
+# =============================================================================
 target/
 app/desktop/src-tauri/target/
 
-# IDE
+# Tauri Android generated (source tracked, builds ignored by inner .gitignore)
+# app/desktop/src-tauri/gen/android/ is committed
+app/mobile/src-tauri/gen/
+
+# =============================================================================
+# IDE & Editors
+# =============================================================================
 .vscode/
 .idea/
+.cursor/
+.continue/
 *.swp
 *.swo
 
-# OS
+# =============================================================================
+# OS Generated
+# =============================================================================
 .DS_Store
 Thumbs.db
 
-# Secrets
+# =============================================================================
+# Secrets & Credentials
+# =============================================================================
 .env
 .env.local
 .env.*
@@ -79,14 +101,18 @@ secrets/
 private/
 *.secret.*
 
+# =============================================================================
 # Logs
+# =============================================================================
 *.log
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local databases and dumps
+# =============================================================================
+# Databases & Dumps
+# =============================================================================
 *.db
 *.sqlite
 *.sqlite3
@@ -96,30 +122,31 @@ yarn-error.log*
 *.backup
 *.sql.gz
 
-# AgentHub deployment state (production)
+# =============================================================================
+# Deployment State
+# =============================================================================
 hub-server/deployments/.env.production
 hub-server/deployments/.env
 hub-server/deployments/backups/
 backups/
 
-# Local temp files
+# =============================================================================
+# Docs — local dev state (not for shared repo)
+# =============================================================================
+docs/handoffs/
+
+# =============================================================================
+# Temp & Cache
+# =============================================================================
 .tmp/
+tmp/
 .claude-flow/
 .od/
 .swarm/
-tmp/
 
-# Competition and competitive-analysis materials (not open-source)
-docs/competition/
-docs/competitive-gap/
-docs/COMPETITIVE-GAP.md
-
-# TypeScript compiler output
-**/tsc-output.txt
-
-# Local machine and agent state
-.worktrees/
-docs/review/
+# =============================================================================
+# Agent / Tool State
+# =============================================================================
 .agenthub-runtime/
 .agenthub/memory/
 .agenthub/local/
@@ -127,6 +154,9 @@ docs/review/
 .agenthub/secrets/
 .claude/
 .codex/*
+.worktrees/
+
+# Agents directory — ignore all except specific tracked skills
 .agents/*
 !.agents/
 !.agents/skills/
@@ -141,13 +171,14 @@ docs/review/
 !.agents/skills/integration-test/**
 !.agents/skills/adapter-dev/
 !.agents/skills/adapter-dev/**
-!.agents/skills/env-sandbox/
-!.agents/skills/env-sandbox/**
 !.agents/skills/ui-screenshot/
 !.agents/skills/ui-screenshot/**
 !.agents/skills/dev-team/
 !.agents/skills/dev-team/**
-# Screenshots and raster images — dev artifacts, not production assets
+
+# =============================================================================
+# Screenshots & Raster Images (dev artifacts, not production assets)
+# =============================================================================
 screenshots/
 **/screenshots/
 *.png
@@ -155,15 +186,35 @@ screenshots/
 *.jpeg
 *.webp
 *.gif
+
 # Tauri app icons (must be tracked for builds)
 !app/desktop/src-tauri/icons/
 !app/mobile/src-tauri/icons/
-.cursor/
-.continue/
+
+# =============================================================================
+# Docs & Local Files
+# =============================================================================
+# Competition docs: keep sanitized Markdown evidence tracked; generated/private
+# screenshots, recordings, exports, and submission bundles stay ignored by the
+# artifact/media rules above and by the scoped rules below.
+docs/competition/*
+!docs/competition/
+!docs/competition/**/
+!docs/competition/**/*.md
+docs/competition/**/artifacts/
+docs/competition/**/exports/
+docs/competition/**/screenshots/
+docs/competition/**/videos/
+docs/competitive-gap/
+docs/COMPETITIVE-GAP.md
 
 # Agent inbox — reports dropped by other agents, local only
 docs/inbox/*
 !docs/inbox/README.md
+
+# Review reports — cross-review and audit outputs
+docs/review/*
+!docs/review/README.md
 
 # Local dev tracking (not for repo)
 docs/GOAL.md
@@ -171,23 +222,14 @@ docs/GOAL.md
 # Local ops docs — deployment details, SSH, server addresses (not for repo)
 .ops/
 
-# Review reports — cross-review and audit outputs
-docs/review/*
-!docs/review/README.md
-
 # Cloned reference repos (at repo root only)
 /reference/*
 !/reference/INDEX.md
 /chat-verify/
-test_store.json
 
-# Hub server temp
-hub-server/.tmp/
-
-# Tauri Android generated (source tracked, builds ignored by inner .gitignore)
-# app/desktop/src-tauri/gen/android/ is committed
-app/mobile/src-tauri/gen/
-
-# Build output / generated artifacts
-output/
-app/desktop/app/
+# =============================================================================
+# Generated Files & Compiler Output
+# =============================================================================
+**/tsc-output.txt
+app/desktop/stats.html
+.handoff.md

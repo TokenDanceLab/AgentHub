@@ -1,95 +1,81 @@
 package errcode
 
-import "net/http"
+import (
+	"net/http"
 
-type Error struct {
-	Code       string `json:"code"`
-	Message    string `json:"message"`
-	HTTPStatus int    `json:"-"`
-}
+	sharederr "github.com/agenthub/pkg/errcode"
+)
 
-func (e *Error) Error() string {
-	return e.Code + ": " + e.Message
-}
+// Error re-exports the shared error type so all existing code using
+// *errcode.Error continues to compile without changes.
+type Error = sharederr.Error
 
-func (e *Error) Is(target error) bool {
-	other, ok := target.(*Error)
-	return ok && e.Code == other.Code
-}
-
-// WithMessage returns a copy of the Error with a custom message,
-// preserving the code and HTTP status.
-func (e *Error) WithMessage(msg string) *Error {
-	return &Error{
-		Code:       e.Code,
-		Message:    msg,
-		HTTPStatus: e.HTTPStatus,
-	}
-}
-
+// New re-exports the shared constructor for domain-specific codes.
 func New(code, message string, httpStatus int) *Error {
-	return &Error{Code: code, Message: message, HTTPStatus: httpStatus}
+	return sharederr.New(code, message, httpStatus)
 }
+
+// --- Common codes (re-exported) ---
 
 var (
-	OK            = &Error{Code: "OK", Message: "", HTTPStatus: http.StatusOK}
-	ErrInternal   = &Error{Code: "INTERNAL_ERROR", Message: "internal server error", HTTPStatus: http.StatusInternalServerError}
-	ErrBadRequest = &Error{Code: "BAD_REQUEST", Message: "invalid request", HTTPStatus: http.StatusBadRequest}
-	ErrTimeout    = &Error{Code: "REQUEST_TIMEOUT", Message: "request timed out", HTTPStatus: http.StatusGatewayTimeout}
+	OK              = &Error{Code: "OK", Message: "", HTTPStatus: http.StatusOK}
+	ErrInternal     = sharederr.ErrInternal
+	ErrBadRequest   = sharederr.ErrBadRequest
+	ErrTimeout      = sharederr.ErrTimeout
+	ErrNotImplemented = sharederr.ErrNotImplemented
+)
 
-	AuthInvalidToken       = &Error{Code: "AUTH_INVALID_TOKEN", Message: "token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
-	AuthInvalidCredentials = &Error{Code: "AUTH_INVALID_CREDENTIALS", Message: "invalid username or password", HTTPStatus: http.StatusUnauthorized}
-	AuthTokenExpired       = &Error{Code: "AUTH_TOKEN_EXPIRED", Message: "token has expired", HTTPStatus: http.StatusUnauthorized}
-	AuthDeviceMismatch     = &Error{Code: "AUTH_DEVICE_MISMATCH", Message: "device type not allowed for this endpoint", HTTPStatus: http.StatusForbidden}
-	AuthRefreshInvalid     = &Error{Code: "AUTH_REFRESH_INVALID", Message: "refresh token is invalid or revoked", HTTPStatus: http.StatusUnauthorized}
+// --- Hub domain-specific codes ---
 
-	MsgNotFound          = &Error{Code: "MSG_NOT_FOUND", Message: "message not found", HTTPStatus: http.StatusNotFound}
-	MsgRecallTimeout     = &Error{Code: "MSG_RECALL_TIMEOUT", Message: "recall window has expired", HTTPStatus: http.StatusBadRequest}
-	MsgPinLimitExceeded  = &Error{Code: "MSG_PIN_LIMIT_EXCEEDED", Message: "pin limit exceeded for this session", HTTPStatus: http.StatusBadRequest}
-	MsgBlockedByReceiver = &Error{Code: "MSG_BLOCKED_BY_RECEIVER", Message: "you have been blocked by the receiver", HTTPStatus: http.StatusForbidden}
+var (
+	AuthInvalidToken       = New("AUTH_INVALID_TOKEN", "token is invalid or expired", http.StatusUnauthorized)
+	AuthInvalidCredentials = New("AUTH_INVALID_CREDENTIALS", "invalid username or password", http.StatusUnauthorized)
+	AuthTokenExpired       = New("AUTH_TOKEN_EXPIRED", "token has expired", http.StatusUnauthorized)
+	AuthDeviceMismatch     = New("AUTH_DEVICE_MISMATCH", "device type not allowed for this endpoint", http.StatusForbidden)
+	AuthRefreshInvalid     = New("AUTH_REFRESH_INVALID", "refresh token is invalid or revoked", http.StatusUnauthorized)
 
-	SessionNotFound  = &Error{Code: "SESSION_NOT_FOUND", Message: "session not found", HTTPStatus: http.StatusNotFound}
-	SessionDissolved = &Error{Code: "SESSION_DISSOLVED", Message: "session has been dissolved", HTTPStatus: http.StatusGone}
-	SessionNotMember = &Error{Code: "SESSION_NOT_MEMBER", Message: "you are not a member of this session", HTTPStatus: http.StatusForbidden}
+	MsgNotFound          = New("MSG_NOT_FOUND", "message not found", http.StatusNotFound)
+	MsgRecallTimeout     = New("MSG_RECALL_TIMEOUT", "recall window has expired", http.StatusBadRequest)
+	MsgPinLimitExceeded  = New("MSG_PIN_LIMIT_EXCEEDED", "pin limit exceeded for this session", http.StatusBadRequest)
+	MsgBlockedByReceiver = New("MSG_BLOCKED_BY_RECEIVER", "you have been blocked by the receiver", http.StatusForbidden)
 
-	AgentNotFound      = &Error{Code: "AGENT_NOT_FOUND", Message: "agent not found", HTTPStatus: http.StatusNotFound}
-	AgentOffline       = &Error{Code: "AGENT_OFFLINE", Message: "agent runner is offline", HTTPStatus: http.StatusServiceUnavailable}
-	AgentTaskNotFound  = &Error{Code: "AGENT_TASK_NOT_FOUND", Message: "agent task not found", HTTPStatus: http.StatusNotFound}
-	AgentTaskCancelled = &Error{Code: "AGENT_TASK_CANCELLED", Message: "task has been cancelled", HTTPStatus: http.StatusGone}
-	AgentTaskTimeout   = &Error{Code: "AGENT_TASK_TIMEOUT", Message: "task has timed out", HTTPStatus: http.StatusGone}
-	TargetNotFound     = &Error{Code: "TARGET_NOT_FOUND", Message: "execution target not found", HTTPStatus: http.StatusNotFound}
-	TargetNotRoutable  = &Error{Code: "TARGET_NOT_ROUTABLE", Message: "execution target is not routable", HTTPStatus: http.StatusConflict}
+	SessionNotFound  = New("SESSION_NOT_FOUND", "session not found", http.StatusNotFound)
+	SessionDissolved = New("SESSION_DISSOLVED", "session has been dissolved", http.StatusGone)
+	SessionNotMember = New("SESSION_NOT_MEMBER", "you are not a member of this session", http.StatusForbidden)
 
-	GroupNotOwner         = &Error{Code: "GROUP_NOT_OWNER", Message: "only group owner can perform this action", HTTPStatus: http.StatusForbidden}
-	GroupOwnerCannotLeave = &Error{Code: "GROUP_OWNER_CANNOT_LEAVE", Message: "group owner cannot leave, transfer or dissolve first", HTTPStatus: http.StatusBadRequest}
-	GroupAlreadyMember    = &Error{Code: "GROUP_ALREADY_MEMBER", Message: "user is already a member", HTTPStatus: http.StatusConflict}
+	AgentNotFound      = New("AGENT_NOT_FOUND", "agent not found", http.StatusNotFound)
+	AgentOffline       = New("AGENT_OFFLINE", "agent runner is offline", http.StatusServiceUnavailable)
+	AgentTaskNotFound  = New("AGENT_TASK_NOT_FOUND", "agent task not found", http.StatusNotFound)
+	AgentTaskCancelled = New("AGENT_TASK_CANCELLED", "task has been cancelled", http.StatusGone)
+	AgentTaskTimeout   = New("AGENT_TASK_TIMEOUT", "task has timed out", http.StatusGone)
+	TargetNotFound     = New("TARGET_NOT_FOUND", "execution target not found", http.StatusNotFound)
+	TargetNotRoutable  = New("TARGET_NOT_ROUTABLE", "execution target is not routable", http.StatusConflict)
 
-	UserNotFound      = &Error{Code: "USER_NOT_FOUND", Message: "user not found", HTTPStatus: http.StatusNotFound}
-	UserUsernameTaken = &Error{Code: "USER_USERNAME_TAKEN", Message: "username is already taken", HTTPStatus: http.StatusConflict}
-	UserInvalidParam  = &Error{Code: "USER_INVALID_PARAM", Message: "invalid user parameters", HTTPStatus: http.StatusBadRequest}
+	GroupNotOwner         = New("GROUP_NOT_OWNER", "only group owner can perform this action", http.StatusForbidden)
+	GroupOwnerCannotLeave = New("GROUP_OWNER_CANNOT_LEAVE", "group owner cannot leave, transfer or dissolve first", http.StatusBadRequest)
+	GroupAlreadyMember    = New("GROUP_ALREADY_MEMBER", "user is already a member", http.StatusConflict)
 
-	FriendAlready         = &Error{Code: "FRIEND_ALREADY", Message: "already friends", HTTPStatus: http.StatusConflict}
-	FriendBlocked         = &Error{Code: "FRIEND_BLOCKED", Message: "blocked by user", HTTPStatus: http.StatusForbidden}
-	FriendRequestNotFound = &Error{Code: "FRIEND_REQUEST_NOT_FOUND", Message: "friend request not found", HTTPStatus: http.StatusNotFound}
+	UserNotFound      = New("USER_NOT_FOUND", "user not found", http.StatusNotFound)
+	UserUsernameTaken = New("USER_USERNAME_TAKEN", "username is already taken", http.StatusConflict)
+	UserInvalidParam  = New("USER_INVALID_PARAM", "invalid user parameters", http.StatusBadRequest)
 
-	FriendRemarkNoRow = &Error{Code: "FRIEND_REMARK_NO_ROW", Message: "remark update affected no rows, friendship may not exist", HTTPStatus: http.StatusNotFound}
+	FriendAlready         = New("FRIEND_ALREADY", "already friends", http.StatusConflict)
+	FriendBlocked         = New("FRIEND_BLOCKED", "blocked by user", http.StatusForbidden)
+	FriendRequestNotFound = New("FRIEND_REQUEST_NOT_FOUND", "friend request not found", http.StatusNotFound)
+	FriendRemarkNoRow     = New("FRIEND_REMARK_NO_ROW", "remark update affected no rows, friendship may not exist", http.StatusNotFound)
+	FriendNotFriend       = New("FRIEND_NOT_FRIEND", "you are not friends with this user", http.StatusForbidden)
 
-	FriendNotFriend = &Error{Code: "FRIEND_NOT_FRIEND", Message: "you are not friends with this user", HTTPStatus: http.StatusForbidden}
+	AttachNotFound     = New("ATTACH_NOT_FOUND", "attachment not found", http.StatusNotFound)
+	AttachTooLarge     = New("ATTACH_TOO_LARGE", "file exceeds maximum size", http.StatusRequestEntityTooLarge)
+	AttachHashMismatch = New("ATTACH_HASH_MISMATCH", "file hash does not match", http.StatusBadRequest)
 
-	AttachNotFound     = &Error{Code: "ATTACH_NOT_FOUND", Message: "attachment not found", HTTPStatus: http.StatusNotFound}
-	AttachTooLarge     = &Error{Code: "ATTACH_TOO_LARGE", Message: "file exceeds maximum size", HTTPStatus: http.StatusRequestEntityTooLarge}
-	AttachHashMismatch = &Error{Code: "ATTACH_HASH_MISMATCH", Message: "file hash does not match", HTTPStatus: http.StatusBadRequest}
+	NotifNotFound = New("NOTIF_NOT_FOUND", "notification not found", http.StatusNotFound)
 
-	NotifNotFound = &Error{Code: "NOTIF_NOT_FOUND", Message: "notification not found", HTTPStatus: http.StatusNotFound}
+	WsAuthTimeout = New("WS_AUTH_TIMEOUT", "ws authentication timeout", http.StatusUnauthorized)
+	WsAuthFailed  = New("WS_AUTH_FAILED", "ws authentication failed", http.StatusUnauthorized)
 
-	WsAuthTimeout = &Error{Code: "WS_AUTH_TIMEOUT", Message: "ws authentication timeout", HTTPStatus: http.StatusUnauthorized}
-	WsAuthFailed  = &Error{Code: "WS_AUTH_FAILED", Message: "ws authentication failed", HTTPStatus: http.StatusUnauthorized}
-
-	ErrNotImplemented = &Error{Code: "NOT_IMPLEMENTED", Message: "endpoint not yet implemented", HTTPStatus: http.StatusNotImplemented}
-
-	// OIDC errors
-	OIDCInvalidState       = &Error{Code: "OIDC_INVALID_STATE", Message: "state is invalid or expired", HTTPStatus: http.StatusBadRequest}
-	OIDCCodeExchangeFailed = &Error{Code: "OIDC_CODE_EXCHANGE_FAILED", Message: "failed to exchange authorization code", HTTPStatus: http.StatusBadRequest}
-	OIDCIDTokenInvalid     = &Error{Code: "OIDC_ID_TOKEN_INVALID", Message: "id token validation failed", HTTPStatus: http.StatusBadRequest}
-	OIDCSubNotFound        = &Error{Code: "OIDC_SUB_NOT_FOUND", Message: "no sub claim in id token", HTTPStatus: http.StatusBadRequest}
+	OIDCInvalidState       = New("OIDC_INVALID_STATE", "state is invalid or expired", http.StatusBadRequest)
+	OIDCCodeExchangeFailed = New("OIDC_CODE_EXCHANGE_FAILED", "failed to exchange authorization code", http.StatusBadRequest)
+	OIDCIDTokenInvalid     = New("OIDC_ID_TOKEN_INVALID", "id token validation failed", http.StatusBadRequest)
+	OIDCSubNotFound        = New("OIDC_SUB_NOT_FOUND", "no sub claim in id token", http.StatusBadRequest)
 )

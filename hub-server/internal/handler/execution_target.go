@@ -25,11 +25,11 @@ type ExecutionTargetService interface {
 }
 
 type ExecutionTargetHandler struct {
-	svc ExecutionTargetService
+	service ExecutionTargetService
 }
 
-func NewExecutionTargetHandler(svc ExecutionTargetService) *ExecutionTargetHandler {
-	return &ExecutionTargetHandler{svc: svc}
+func NewExecutionTargetHandler(service ExecutionTargetService) *ExecutionTargetHandler {
+	return &ExecutionTargetHandler{service: service}
 }
 
 type createTargetReq struct {
@@ -108,7 +108,7 @@ func (h *ExecutionTargetHandler) CreateTarget(c *gin.Context) {
 		target.DeviceID = &req.DeviceID
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, target)
+	result, err := h.service.Create(c.Request.Context(), userID, target)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -126,7 +126,7 @@ func (h *ExecutionTargetHandler) CreateTarget(c *gin.Context) {
 func (h *ExecutionTargetHandler) GetTarget(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
-	target, err := h.svc.Get(c.Request.Context(), id, userID)
+	target, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -144,7 +144,7 @@ func (h *ExecutionTargetHandler) ListTargets(c *gin.Context) {
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 
-	result, err := h.svc.List(c.Request.Context(), userID, targetType, cursor, pageSize)
+	result, err := h.service.List(c.Request.Context(), userID, targetType, cursor, pageSize)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -190,7 +190,7 @@ func (h *ExecutionTargetHandler) UpdateTarget(c *gin.Context) {
 		updates.DeviceID = &req.DeviceID
 	}
 
-	target, err := h.svc.Update(c.Request.Context(), id, userID, &updates)
+	target, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -206,7 +206,7 @@ func (h *ExecutionTargetHandler) DeleteTarget(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Delete(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -221,7 +221,7 @@ func (h *ExecutionTargetHandler) PingTarget(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Ping(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Ping(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return

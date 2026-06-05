@@ -34,7 +34,7 @@ func TestOIDCAuthorize_MissingFields(t *testing.T) {
 		"device_type": "web",
 	}, "")
 	r := parse(resp)
-	if r.Code == "OK" {
+	if r.GetCode() == "OK" {
 		t.Fatal("expected error for missing fields")
 	}
 }
@@ -123,7 +123,7 @@ func TestAgentProfile_UpdateAndDelete(t *testing.T) {
 	// GET after delete should return error.
 	w = get("/web/agent-profiles/"+profileID, u.Token)
 	r = parse(w)
-	if r.Code == "OK" {
+	if r.GetCode() == "OK" {
 		t.Fatal("expected error after delete, got OK")
 	}
 }
@@ -220,7 +220,7 @@ func TestMCPServer_RejectsSecretInAuthConfig(t *testing.T) {
 		"auth_config": `{"api_key": "sk-very-secret-key-12345"}`,
 	})
 	r := parse(w)
-	if r.Code == "OK" {
+	if r.GetCode() == "OK" {
 		t.Fatal("expected error for plaintext api_key in auth_config, got OK")
 	}
 
@@ -232,7 +232,7 @@ func TestMCPServer_RejectsSecretInAuthConfig(t *testing.T) {
 		"auth_config": `{"secret": "my-secret-value"}`,
 	})
 	r = parse(w)
-	if r.Code == "OK" {
+	if r.GetCode() == "OK" {
 		t.Fatal("expected error for plaintext secret in auth_config, got OK")
 	}
 

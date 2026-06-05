@@ -138,5 +138,5 @@ TokenDance ID / Hub OIDC 结构检查：
 - API 契约：[../../api/README.md](../../api/README.md)
 - Edge Server：[../../edge-server/README.md](../../edge-server/README.md)
 - Hub Server：[../../hub-server/README.md](../../hub-server/README.md)
-- 系统架构：[../../docs/architecture/system-architecture.md](../../docs/architecture/system-architecture.md)
+- 系统架构：[../../docs/architecture/system-design/system-architecture.md](../../docs/architecture/system-design/system-architecture.md)
 - Desktop UI QA SOP：[../../docs/operations/desktop-ui-qa-sop.md](../../docs/operations/desktop-ui-qa-sop.md)

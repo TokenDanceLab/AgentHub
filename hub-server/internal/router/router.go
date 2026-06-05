@@ -9,6 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/middleware"
+	"github.com/agenthub/pkg/reqlog"
 )
 
 func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler) {
@@ -17,19 +18,23 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
 	r.Use(middleware.GlobalRateLimit(cacheClient))
 	r.Use(middleware.RequestID())
-	r.Use(middleware.AccessLog())
+	r.Use(reqlog.AccessLogGin())
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.Timeout(config.DefaultRequestTimeout))
 	r.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, handler.Response{
-			Code:    "NOT_FOUND",
-			Message: "route not found",
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"code":    "NOT_FOUND",
+				"message": "route not found",
+			},
 		})
 	})
 	r.NoMethod(func(c *gin.Context) {
-		c.JSON(http.StatusMethodNotAllowed, handler.Response{
-			Code:    "METHOD_NOT_ALLOWED",
-			Message: "method not allowed",
+		c.JSON(http.StatusMethodNotAllowed, gin.H{
+			"error": gin.H{
+				"code":    "METHOD_NOT_ALLOWED",
+				"message": "method not allowed",
+			},
 		})
 	})
 

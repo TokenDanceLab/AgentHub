@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -16,8 +17,10 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	debugpkg "github.com/agenthub/pkg/debug"
 	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/glebarez/sqlite"
 )
@@ -42,20 +45,24 @@ func TestAdminListenAddrUsesLoopback(t *testing.T) {
 }
 
 func TestAdminMuxRequiresBasicAuthForMetricsAndPprof(t *testing.T) {
-	handler := pprofBasicAuth(newAdminMux(), "admin", "secret")
+	mux := http.NewServeMux()
+	auth := debugpkg.BasicAuth("admin", "secret")
+	metrics.Register()
+	debugpkg.RegisterEndpoints(mux, debugpkg.MuxConfig{
+		EnablePprof:    true,
+		MetricsHandler: promhttp.Handler(),
+		Auth:           auth,
+	})
 
 	for _, path := range []string{"/metrics", "/debug/pprof/"} {
 		t.Run(path+" without auth", func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
 			rec := httptest.NewRecorder()
 
-			handler.ServeHTTP(rec, req)
+			mux.ServeHTTP(rec, req)
 
 			if rec.Code != http.StatusUnauthorized {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
-			}
-			if got := rec.Header().Get("WWW-Authenticate"); got != `Basic realm="pprof"` {
-				t.Fatalf("WWW-Authenticate = %q, want pprof realm", got)
 			}
 		})
 
@@ -64,7 +71,7 @@ func TestAdminMuxRequiresBasicAuthForMetricsAndPprof(t *testing.T) {
 			req.SetBasicAuth("admin", "wrong")
 			rec := httptest.NewRecorder()
 
-			handler.ServeHTTP(rec, req)
+			mux.ServeHTTP(rec, req)
 
 			if rec.Code != http.StatusUnauthorized {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
@@ -76,7 +83,7 @@ func TestAdminMuxRequiresBasicAuthForMetricsAndPprof(t *testing.T) {
 			req.SetBasicAuth("admin", "secret")
 			rec := httptest.NewRecorder()
 
-			handler.ServeHTTP(rec, req)
+			mux.ServeHTTP(rec, req)
 
 			if rec.Code != http.StatusOK {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)

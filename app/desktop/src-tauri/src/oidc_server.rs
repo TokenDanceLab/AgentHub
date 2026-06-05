@@ -9,16 +9,19 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tauri::Emitter;
 
-const CALLBACK_TIMEOUT_SECS: u64 = 300; // 5 minutes
+static OIDC_STOPPED: AtomicBool = AtomicBool::new(false);
+
+const CALLBACK_TIMEOUT_SECS: u64 = 300;
 
 /// Starts an HTTP server on a random port that listens for ONE OIDC callback.
 /// Returns the port number immediately.
 /// When the callback arrives, emits either `oidc-callback` or `oidc-callback-error`.
 #[tauri::command]
 pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, String> {
+    OIDC_STOPPED.store(true, Ordering::Relaxed); // stop any previous instance
+
     let listener = TcpListener::bind("127.0.0.1:0")
         .map_err(|e| format!("failed to bind callback server: {e}"))?;
 
@@ -27,25 +30,25 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
         .map(|a| a.port())
         .map_err(|e| format!("failed to get local address: {e}"))?;
 
-    let stopped = Arc::new(AtomicBool::new(false));
-    let stopped_clone = stopped.clone();
+    // Reset for new instance
+    OIDC_STOPPED.store(false, Ordering::Relaxed);
 
     // Spawn background thread to accept connections
     std::thread::spawn(move || {
-        listener
-            .set_nonblocking(true)
-            .expect("set_nonblocking on callback listener");
+        if let Err(e) = listener.set_nonblocking(true) {
+            log::error!("set_nonblocking on callback listener failed: {e}. Falling back to blocking mode.");
+        }
 
         let start = std::time::Instant::now();
 
         loop {
-            if stopped_clone.load(Ordering::Relaxed) {
+            if OIDC_STOPPED.load(Ordering::Relaxed) {
                 return;
             }
 
             match listener.accept() {
                 Ok((mut stream, _addr)) => {
-                    if stopped_clone.load(Ordering::Relaxed) {
+                    if OIDC_STOPPED.load(Ordering::Relaxed) {
                         return;
                     }
 
@@ -142,7 +145,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                                 "description": error_desc,
                             }),
                         );
-                        stopped_clone.store(true, Ordering::Relaxed);
+                        OIDC_STOPPED.store(true, Ordering::Relaxed);
                         return;
                     }
 
@@ -165,7 +168,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                                 "description": "Missing code or state in callback URL",
                             }),
                         );
-                        stopped_clone.store(true, Ordering::Relaxed);
+                        OIDC_STOPPED.store(true, Ordering::Relaxed);
                         return;
                     }
 
@@ -191,7 +194,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                             "state": state,
                         }),
                     );
-                    stopped_clone.store(true, Ordering::Relaxed);
+                    OIDC_STOPPED.store(true, Ordering::Relaxed);
                     return;
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -227,9 +230,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
 /// Stop the OIDC callback server (for cancellation).
 #[tauri::command]
 pub async fn stop_oidc_callback_server() -> Result<(), String> {
-    // The server thread checks the stopped flag and exits naturally.
-    // We can't easily reach the flag from this command without shared state.
-    // For now, the server stops automatically after receiving one callback or timing out.
+    OIDC_STOPPED.store(true, Ordering::Relaxed);
     Ok(())
 }
 

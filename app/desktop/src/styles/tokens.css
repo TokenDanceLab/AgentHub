@@ -61,14 +61,14 @@
   --shadow-none: 0 0 0 0 transparent;
 
   /* ── Z-Index ─────────────────────────────────────────────────────── */
-  --z-base: 0;
-  --z-dropdown: 10;
-  --z-sticky: 20;
-  --z-overlay: 30;
-  --z-modal: 40;
-  --z-popover: 45;
-  --z-toast: 50;
-  --z-tooltip: 60;
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-tooltip: 600;
+  --z-toast: 700;
 
   /* ── Focus Ring ──────────────────────────────────────────────────── */
   --ring-width: 2px;

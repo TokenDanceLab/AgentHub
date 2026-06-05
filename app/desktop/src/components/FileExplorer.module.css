@@ -155,12 +155,12 @@
 .contextOverlay {
   position: fixed;
   inset: 0;
-  z-index: 998;
+  z-index: var(--z-overlay);
 }
 
 .contextMenu {
   position: fixed;
-  z-index: 999;
+  z-index: var(--z-popover);
   background: var(--color-surface-elevated, #252526);
   border: 1px solid var(--color-border, #454545);
   border-radius: 6px;
