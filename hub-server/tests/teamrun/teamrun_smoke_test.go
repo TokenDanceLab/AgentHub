@@ -28,14 +28,33 @@ type apiResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    json.RawMessage `json:"data"`
+	Error   *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		TraceID string `json:"traceId"`
+	} `json:"error"`
+}
+
+func (r apiResp) GetCode() string {
+	if r.Error != nil {
+		return r.Error.Code
+	}
+	return r.Code
+}
+
+func (r apiResp) GetMsg() string {
+	if r.Error != nil {
+		return r.Error.Message
+	}
+	return r.Message
 }
 
 func ptrStr(s string) *string { return &s }
 
 func assertCode(t *testing.T, r apiResp, want, context string) {
 	t.Helper()
-	if r.Code != want {
-		t.Fatalf("%s: expected code=%q, got code=%q message=%q", context, want, r.Code, r.Message)
+	if r.GetCode() != want {
+		t.Fatalf("%s: expected code=%q, got code=%q message=%q", context, want, r.GetCode(), r.GetMsg())
 	}
 }
 
@@ -646,8 +665,8 @@ func TestTeamRunSmoke(t *testing.T) {
 			})
 		r := parse(resp)
 		// Non-existent approval -> BAD_REQUEST (not found in state)
-		assert.True(t, r.Code == "BAD_REQUEST" || r.Code == "AGENT_TASK_NOT_FOUND",
-			"non-existent approval should fail, got code=%q message=%q", r.Code, r.Message)
+		assert.True(t, r.GetCode() == "BAD_REQUEST" || r.GetCode() == "AGENT_TASK_NOT_FOUND",
+			"non-existent approval should fail, got code=%q message=%q", r.GetCode(), r.GetMsg())
 	})
 
 	t.Run("DecideApproval_InvalidDecision_Fails", func(t *testing.T) {
@@ -674,8 +693,8 @@ func TestTeamRunSmoke(t *testing.T) {
 			})
 		r := parse(resp)
 		// Without actual conflicting artifacts, returns empty or BAD_REQUEST
-		if r.Code != "" && r.Code != "BAD_REQUEST" {
-			t.Fatalf("resolve conflict: want BAD_REQUEST or empty, got code=%q message=%q", r.Code, r.Message)
+		if r.GetCode() != "" && r.GetCode() != "BAD_REQUEST" {
+			t.Fatalf("resolve conflict: want BAD_REQUEST or empty, got code=%q message=%q", r.GetCode(), r.GetMsg())
 		}
 	})
 

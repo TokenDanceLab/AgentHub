@@ -21,15 +21,19 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.Timeout(config.DefaultRequestTimeout))
 	r.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, handler.Response{
-			Code:    "NOT_FOUND",
-			Message: "route not found",
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"code":    "NOT_FOUND",
+				"message": "route not found",
+			},
 		})
 	})
 	r.NoMethod(func(c *gin.Context) {
-		c.JSON(http.StatusMethodNotAllowed, handler.Response{
-			Code:    "METHOD_NOT_ALLOWED",
-			Message: "method not allowed",
+		c.JSON(http.StatusMethodNotAllowed, gin.H{
+			"error": gin.H{
+				"code":    "METHOD_NOT_ALLOWED",
+				"message": "method not allowed",
+			},
 		})
 	})
 
