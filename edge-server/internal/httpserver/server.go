@@ -105,9 +105,9 @@ func Run(cfg Config) error {
 			return fmt.Errorf("failed to generate local auth token: %w", err)
 		}
 		cfg.LocalAuthToken = "aght_" + hex.EncodeToString(tokenBytes)
-		slog.Info("auto-generated local auth token for Edge Server API protection; "+
+		slog.Debug("auto-generated local auth token for Edge Server API protection; "+
 			"pass this token via Authorization: Bearer <token> header or ?access_token=<token> query parameter for WebSocket connections",
-			"token_prefix", cfg.LocalAuthToken[:16]+"...")
+			"token_prefix", cfg.LocalAuthToken[:8]+"...")
 	}
 
 	mux := http.NewServeMux()
