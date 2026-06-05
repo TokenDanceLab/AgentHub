@@ -232,3 +232,24 @@
     max-width: 90%;
   }
 }
+
+/* ── Mention badges ──────────────────────── */
+
+.mentionBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.mentionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--primary) 15%, transparent);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+}
