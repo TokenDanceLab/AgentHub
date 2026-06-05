@@ -13,7 +13,7 @@ use tauri::Emitter;
 
 static OIDC_STOPPED: AtomicBool = AtomicBool::new(false);
 
-const CALLBACK_TIMEOUT_SECS: u64 = 60;
+const CALLBACK_TIMEOUT_SECS: u64 = 300;
 
 /// Starts an HTTP server on a random port that listens for ONE OIDC callback.
 /// Returns the port number immediately.
