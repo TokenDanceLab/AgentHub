@@ -57,29 +57,29 @@ describe('Web mock convergence states', () => {
     vi.restoreAllMocks();
   });
 
-  it('labels Project fallback data as demo/mock when Edge has no snapshot', () => {
+  it('locks Project when there is no Web Hub session', () => {
     render(<ProjectPageInteractive />);
 
-    expect(screen.getAllByText('Demo / mock fallback').length).toBeGreaterThan(0);
-    expect(screen.getByText('Demo active tasks')).toBeInTheDocument();
-    expect(screen.getByText('Demo shared files')).toBeInTheDocument();
-    expect(screen.queryByText('source.mockFallback')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Hub session required').length).toBeGreaterThan(0);
+    expect(screen.getByText('Please sign in to Hub to view project data and milestones.')).toBeInTheDocument();
+    expect(screen.queryByText('Demo / mock fallback')).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo active tasks')).not.toBeInTheDocument();
   });
 
-  it('labels Group Workspace fallback counts as demo when Edge has no snapshot', () => {
+  it('locks Group Workspace when there is no Web Hub session', () => {
     render(<GroupWorkspacePageInteractive />);
 
-    expect(screen.getAllByText('Demo / mock fallback').length).toBeGreaterThan(0);
-    expect(screen.getByText('Demo online members')).toBeInTheDocument();
-    expect(screen.getByText('Demo shared tasks')).toBeInTheDocument();
-    expect(screen.getByText('Demo workspace files')).toBeInTheDocument();
+    expect(screen.getAllByText('Local workspace ready').length).toBeGreaterThan(0);
+    expect(screen.getByText('Please sign in to Hub to view group workspace data.')).toBeInTheDocument();
+    expect(screen.queryByText('Demo / mock fallback')).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo online members')).not.toBeInTheDocument();
   });
 
   it('locks Private Chats when there is no Web Hub session', () => {
     render(<PrivateChatsPageInteractive />);
 
     expect(screen.getAllByText('Hub session required').length).toBeGreaterThan(0);
-    expect(screen.getByText(/will not show mock conversations/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/will not show mock conversations/i).length).toBeGreaterThan(0);
     expect(screen.queryByText('Local mock')).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
