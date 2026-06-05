@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useIMChat } from '@/hooks/useIMChat';
+import { useIMChat, type SendIMMessageResult } from '@/hooks/useIMChat';
 import { useNotificationStore } from '@/stores/notificationStore';
 import type { HubClient } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
@@ -286,7 +286,45 @@ describe('useIMChat', () => {
     });
   });
 
-  it('does not add a fake message when REST send fails', async () => {
+  it('inserts optimistic pending message immediately on send', async () => {
+    const ws = createMockHubWS();
+    let resolveSend!: (v: unknown) => void;
+    const hubClient = createMockHubClient({
+      sendMessage: vi.fn(() => new Promise((r) => { resolveSend = r; })),
+    });
+
+    const { result } = renderHook(() => useIMChat({ hubClient, hubWS: ws }));
+    await waitFor(() => expect(result.current.contacts).toHaveLength(1));
+
+    let sendPromise!: Promise<SendIMMessageResult>;
+    act(() => {
+      sendPromise = result.current.sendMessage('sess-1', 'Optimistic');
+    });
+
+    // Pending message appears before REST resolves
+    await waitFor(() => expect(result.current.getSessionMessages('sess-1')).toHaveLength(1));
+    const pending = result.current.getSessionMessages('sess-1')[0];
+    expect(pending).toMatchObject({
+      content: 'Optimistic',
+      sendState: 'pending',
+      senderType: 'user',
+    });
+    expect(pending.clientMsgId).toBeTruthy();
+
+    // Resolve REST — pending replaced with confirmed
+    resolveSend({ message_id: 'm-opt', seq_id: 3, created_at: '2026-05-25T00:05:00.000Z' });
+    await act(async () => { await sendPromise; });
+
+    const confirmed = result.current.getSessionMessages('sess-1')[0];
+    expect(confirmed).toMatchObject({
+      id: 'm-opt',
+      content: 'Optimistic',
+    });
+    expect(confirmed.sendState).toBeUndefined();
+    expect(confirmed.clientMsgId).toBe(pending.clientMsgId);
+  });
+
+  it('marks optimistic message as failed when REST send fails', async () => {
     const ws = createMockHubWS();
     const hubClient = createMockHubClient({
       sendMessage: vi.fn(async () => {
@@ -301,11 +339,37 @@ describe('useIMChat', () => {
       await result.current.sendMessage('sess-1', 'Lost');
     });
 
-    expect(result.current.getSessionMessages('sess-1')).toHaveLength(0);
+    const msgs = result.current.getSessionMessages('sess-1');
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({
+      content: 'Lost',
+      sendState: 'failed',
+      sendError: 'network down',
+      senderType: 'user',
+    });
     expect(addToast).toHaveBeenCalledWith({ type: 'error', message: 'hub.toast.sendMessageFailed' });
   });
 
-  it('deduplicates message.new against a REST-confirmed client message', async () => {
+  it('does not add a message when send is rejected before optimistic insert', async () => {
+    const ws = createMockHubWS();
+    const hubClient = createMockHubClient();
+
+    const { result } = renderHook(() => useIMChat({ hubClient, hubWS: ws }));
+    await waitFor(() => expect(result.current.contacts).toHaveLength(1));
+
+    // Dissolve the session so sendMessage early-returns before inserting optimistic
+    act(() => {
+      fire(ws, HUB_EVENTS.SESSION_DISSOLVED, { session_id: 'sess-1' });
+    });
+
+    await act(async () => {
+      await result.current.sendMessage('sess-1', 'Blocked');
+    });
+
+    expect(result.current.getSessionMessages('sess-1')).toHaveLength(0);
+  });
+
+  it('deduplicates message.new against an optimistic pending message', async () => {
     const ws = createMockHubWS();
     const hubClient = createMockHubClient();
 
