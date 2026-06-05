@@ -264,7 +264,7 @@ export default function PublishAgentModal({
                 </div>
                 <div className={styles.marketAgentMeta}>
                   <span><Cpu size={11} />{agent.model}</span>
-                  <span><Wrench size={11} />{agent.tools.length} tools</span>
+                  <span><Wrench size={11} />{t('settings.marketPublish.toolCount', { count: agent.tools.length })}</span>
                 </div>
               </div>
 

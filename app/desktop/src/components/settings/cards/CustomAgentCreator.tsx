@@ -32,12 +32,12 @@ export interface CustomAgentDraft {
 const STORAGE_KEY = 'agenthub-settings.customAgentDrafts';
 
 const VARIABLES = [
-  { key: '$user', label: 'Current user name' },
-  { key: '$project', label: 'Project root path' },
-  { key: '$date', label: 'Current date/time' },
-  { key: '$files', label: 'Currently open files' },
-  { key: '$language', label: 'Primary project language' },
-  { key: '$os', label: 'Operating system' },
+  { key: '$user', labelKey: 'settings.agentCreator.variableUser' },
+  { key: '$project', labelKey: 'settings.agentCreator.variableProject' },
+  { key: '$date', labelKey: 'settings.agentCreator.variableDate' },
+  { key: '$files', labelKey: 'settings.agentCreator.variableFiles' },
+  { key: '$language', labelKey: 'settings.agentCreator.variableLanguage' },
+  { key: '$os', labelKey: 'settings.agentCreator.variableOs' },
 ] as const;
 
 const AGENT_TYPES = [
@@ -68,7 +68,7 @@ const MODEL_CHOICES = [
   { model: 'deepseek-v4-pro', provider: 'tokendance-gateway', label: 'DeepSeek V4 Pro (Opus)' },
   { model: 'deepseek-v4-flash', provider: 'tokendance-gateway', label: 'DeepSeek V4 Flash (Sonnet)' },
   { model: 'glm-5.1', provider: 'tokendance-gateway', label: 'GLM 5.1 (Haiku)' },
-  { model: 'custom', provider: '', label: 'Custom model' },
+  { model: 'custom', provider: '', labelKey: 'settings.agentCreator.customModel' },
 ] as const;
 
 interface WizardStep {
@@ -495,7 +495,7 @@ export default function CustomAgentCreator({
                   <label>{t('settings.agentCreator.promptTemplate')}</label>
                   <div className={styles.creatorVariableBar}>
                     {VARIABLES.map((v) => (
-                      <button key={v.key} type="button" className={styles.creatorVariableChip} onClick={() => insertVariable(v.key)} title={v.label}>
+                      <button key={v.key} type="button" className={styles.creatorVariableChip} onClick={() => insertVariable(v.key)} title={t(v.labelKey)}>
                         <Variable size={11} />{v.key}
                       </button>
                     ))}
@@ -530,7 +530,7 @@ export default function CustomAgentCreator({
                   }}
                 >
                   {MODEL_CHOICES.map((m) => (
-                    <option key={m.model} value={`${m.provider}:${m.model}`}>{m.label}</option>
+                    <option key={m.model} value={`${m.provider}:${m.model}`}>{'labelKey' in m ? t(m.labelKey) : m.label}</option>
                   ))}
                 </select>
               </div>
