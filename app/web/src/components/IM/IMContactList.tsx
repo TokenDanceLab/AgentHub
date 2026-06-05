@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, memo } from 'react';
-import { MessageSquare, Plus, SearchX, Pin } from 'lucide-react';
+import { MessageSquare, Plus, Pin } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@shared/ui';
 import type { IMContact } from './types';

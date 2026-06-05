@@ -14,6 +14,7 @@ import { useHubAgentTeams, useCreateAgentTeam, useStartTeamRun, useDecideTeamApp
 import { createHubClient } from '@/api/hubClient';
 import type {
   AgentTeamDetail,
+  AgentTeamEvent,
   AgentTeamRun,
   AgentTeamTask,
   TeamRunState,
@@ -30,8 +31,6 @@ import type { ViewProps } from '@/viewRegistryConfig';
 import styles from './TeamRunConsole.module.css';
 
 // ── helpers ──
-
-type TeamRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 function statusLabelKey(status: string): string {
   return `teamRun.status.${status}`;
@@ -110,7 +109,7 @@ export default function TeamRunConsole(_props: ViewProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('members');
   const [localState, setLocalState] = useState<TeamRunState | null>(null);
   const [localTasks, setLocalTasks] = useState<AgentTeamTask[]>([]);
-  const [localEvents, setLocalEvents] = useState<any[]>([]);
+  const [localEvents, setLocalEvents] = useState<AgentTeamEvent[]>([]);
   const [stateLoading, setStateLoading] = useState(false);
   const [decidingIds, setDecidingIds] = useState<Set<string>>(new Set());
   const [insetTeam, setInsetTeam] = useState<AgentTeamDetail | null>(null);
