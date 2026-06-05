@@ -125,9 +125,11 @@ function capMessages(messages: ChatMessage[]): ChatMessage[] {
   return messages;
 }
 
+const TRUNCATION_NOTICE = '[... output truncated, showing last 20K chars ...]\n\n';
+
 function capOutputText(text: string): string {
   if (text.length > MAX_OUTPUT_TEXT) {
-    return text.slice(text.length - MAX_OUTPUT_TEXT);
+    return TRUNCATION_NOTICE + text.slice(text.length - MAX_OUTPUT_TEXT);
   }
   return text;
 }

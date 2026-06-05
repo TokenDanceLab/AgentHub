@@ -368,7 +368,7 @@ function PreviewPanel({
               a.href = url;
               a.download = artifact.title;
               a.click();
-              URL.revokeObjectURL(url);
+              setTimeout(() => URL.revokeObjectURL(url), 100);
             }}
             title={t('run.artifact.download')}
           >
@@ -566,7 +566,7 @@ export default function ArtifactBrowser({
                   a.href = url;
                   a.download = artifact.title;
                   a.click();
-                  URL.revokeObjectURL(url);
+                  setTimeout(() => URL.revokeObjectURL(url), 100);
                 }}
                 title={t('run.artifact.download')}
               >
