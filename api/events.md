@@ -2,9 +2,9 @@
 
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
 
-> **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
+> **Implementation Status (2026-06-05)**: Edge Server events (run.*, runner.*) are
 > the primary event system and are documented in sections 1-6 below. Hub Server
-> WebSocket events are documented in [section 7](#7-hub-websocket-events) (added 2026-05-25).
+> WebSocket events are documented in [section 7](#7-hub-websocket-events).
 
 ## 1. 连接
 
@@ -142,7 +142,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `preview.stopped` | P1 | 预览停止 (planned) |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
-| `run.cancelled` | P1 | AgentRun 已取消（已实现，补文档） |
+| `run.cancelled` | P0 | AgentRun 已取消（已实现） |
 | `run.agent.text_delta` | P0 | Agent 流式文本增量（CLI-agnostic） |
 | `run.agent.text_block` | P0 | Agent 完整文本块 |
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |

@@ -4,12 +4,10 @@ import {
   useCallback,
   useMemo,
   useRef,
-  useId,
   Suspense,
-  type ButtonHTMLAttributes,
+  lazy,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
@@ -20,7 +18,6 @@ import { useAgentList } from '@/api/agentQueries';
 import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useModelsDevDisplayNames } from '@/api/modelsDevCatalog';
-import { createHubClient } from '@/api/hubClient';
 import {
   startRun,
   cancelRun,
@@ -31,9 +28,9 @@ import {
 import { useThreads, useThreadMessages } from '@/api/threadQueries';
 import { useRuns } from '@/api/runQueries';
 import { useHubExecutionTargets } from '@/api/executionTargetQueries';
-import { getAccessToken, useAuth } from '@/hooks/useAuth';
-import { useHubEventStream } from '@/hooks/useHubEventStream';
-import { useHubIntegration } from '@/hooks/useHubIntegration';
+import { useAuth } from '@/hooks/useAuth';
+import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
+import useShellShortcuts from '@/hooks/useShellShortcuts';
 import type { ListResponse, StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -45,17 +42,37 @@ import { useSearchStore } from '@/stores/searchStore';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { readCustomInstructions } from '@/utils/customInstructions';
 import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
+import {
+  clamp,
+  isRunActiveStatus,
+  getActiveRunConflictId,
+  focusComposer,
+  setComposerDraft,
+  readHiddenMessageIds,
+  writeHiddenMessageIds,
+  hideMessages,
+  isTeamRunActiveStatus,
+  isPendingTeamApprovalStatus,
+  isTauriRuntime,
+  HIDDEN_MESSAGES_STORAGE_PREFIX,
+  hiddenMessagesStorageKey,
+} from '@/utils/appUtils';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@shared/ui';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import AuthPage from '@/components/AuthPage';
-import HomeDashboard from '@/components/HomeDashboard';
 import ConnectionStatus from '@/components/ConnectionStatus';
+import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
+import TopMenuBar, { type TopMenuDefinition } from '@/components/TopMenuBar';
 import { ToastContainer } from '@/components/Toast';
-import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
+import type { SectionId as SettingsSectionId } from '@/components/SettingsPage';
+
+// Lazy-loaded non-critical components
+const AuthPage = lazy(() => import('@/components/AuthPage'));
+const HomeDashboard = lazy(() => import('@/components/HomeDashboard'));
+const SettingsPage = lazy(() => import('@/components/SettingsPage'));
 import {
   AlertTriangle,
   ChevronLeft,
@@ -95,8 +112,8 @@ import {
 } from '@/utils/chatMessages';
 import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
 import { buildTeamLocalExecutions, normalizeTeamTasks } from '@/utils/teamLocalExecution';
-import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
+import ShellIconButton from '@/components/ShellIconButton';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
 
@@ -120,107 +137,9 @@ interface SendRunOptions {
   createdEmptyThread?: boolean;
 }
 
-interface TopMenuItem {
-  id: string;
-  label: string;
-  detail?: string;
-  shortcut?: string;
-  disabled?: boolean;
-  danger?: boolean;
-  separatorBefore?: boolean;
-  action: () => void | Promise<void>;
-}
-
-type TopMenuDefinition = Record<TopMenuId, { label: string; items: TopMenuItem[] }>;
-
 const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
 const RUN_CARD_MIN_WORKSPACE_WIDTH = 760;
-const TOP_MENU_ORDER: TopMenuId[] = ['file', 'edit', 'view', 'window', 'help'];
-const HIDDEN_MESSAGES_STORAGE_PREFIX = 'agenthub.chat.hiddenMessages.';
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function isRunActiveStatus(status: string | undefined): boolean {
-  if (!status) return false;
-  return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
-}
-
-function getActiveRunConflictId(error: unknown): string | undefined {
-  if (!(error instanceof AppError)) return undefined;
-  if (error.status !== 409 || error.code !== 'active_run_exists') return undefined;
-  const runId = error.details?.runId;
-  return typeof runId === 'string' && runId.length > 0 ? runId : undefined;
-}
-
-function isEditableShortcutTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
-}
-
-function focusComposer() {
-  const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label], textarea[placeholder]');
-  if (!textarea) return;
-  textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  window.setTimeout(() => textarea.focus(), 120);
-}
-
-function setComposerDraft(text: string) {
-  window.dispatchEvent(new CustomEvent('agenthub:set-composer-draft', { detail: { text } }));
-}
-
-function hiddenMessagesStorageKey(threadId: string): string {
-  return `${HIDDEN_MESSAGES_STORAGE_PREFIX}${threadId}`;
-}
-
-function readHiddenMessageIds(threadId: string | null | undefined): Set<string> {
-  if (!threadId || typeof window === 'undefined') return new Set();
-  try {
-    const raw = window.localStorage.getItem(hiddenMessagesStorageKey(threadId));
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((value): value is string => typeof value === 'string' && value.length > 0));
-  } catch {
-    return new Set();
-  }
-}
-
-function writeHiddenMessageIds(threadId: string | null | undefined, ids: Set<string>): void {
-  if (!threadId || typeof window === 'undefined') return;
-  try {
-    const key = hiddenMessagesStorageKey(threadId);
-    if (ids.size === 0) {
-      window.localStorage.removeItem(key);
-      return;
-    }
-    window.localStorage.setItem(key, JSON.stringify([...ids]));
-  } catch {
-    // localStorage can be unavailable in restricted browser contexts; in-memory hiding still works.
-  }
-}
-
-function hideMessages(messages: ChatMessage[], hiddenIds: Set<string>): ChatMessage[] {
-  if (hiddenIds.size === 0) return messages;
-  return messages.filter((message) => !hiddenIds.has(message.id));
-}
-
-function isTeamRunActiveStatus(status: string | undefined): boolean {
-  if (!status) return false;
-  return [
-    'queued',
-    'planning',
-    'dispatching',
-    'running',
-    'waiting_for_approval',
-    'merging',
-  ].includes(status);
-}
-
-function isPendingTeamApprovalStatus(status: string | undefined): boolean {
-  if (!status) return false;
-  return ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(status.toLowerCase());
-}
 
 function summarizeAgentTeamOverview(overview?: AgentTeamOverview) {
   const runs = overview?.bundles.flatMap((bundle) => bundle.runs) ?? [];
@@ -237,107 +156,6 @@ function summarizeAgentTeamOverview(overview?: AgentTeamOverview) {
     pendingConflicts,
     blockingCount: pendingApprovals + pendingConflicts,
   };
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
-}
-
-const FOCUS_NAVIGATION_KEYS = new Set([
-  'Tab',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'Home',
-  'End',
-  'PageUp',
-  'PageDown',
-]);
-
-function useFocusSourceTracking() {
-  useEffect(() => {
-    const root = document.documentElement;
-    const setPointerSource = () => {
-      root.dataset.focusSource = 'pointer';
-    };
-    const setKeyboardSource = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (FOCUS_NAVIGATION_KEYS.has(event.key)) {
-        root.dataset.focusSource = 'keyboard';
-      }
-    };
-
-    root.dataset.focusSource ||= 'keyboard';
-    window.addEventListener('pointerdown', setPointerSource, true);
-    window.addEventListener('mousedown', setPointerSource, true);
-    window.addEventListener('touchstart', setPointerSource, true);
-    window.addEventListener('keydown', setKeyboardSource, true);
-
-    return () => {
-      window.removeEventListener('pointerdown', setPointerSource, true);
-      window.removeEventListener('mousedown', setPointerSource, true);
-      window.removeEventListener('touchstart', setPointerSource, true);
-      window.removeEventListener('keydown', setKeyboardSource, true);
-    };
-  }, []);
-}
-
-function DesktopHubTaskBridge() {
-  const hubAuth = useAuth();
-
-  useEffect(() => {
-    if (!hubAuth.isAuthenticated && !hubAuth.token) {
-      void hubAuth.tryAutoLogin();
-    }
-  }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
-
-  if (!hubAuth.isAuthenticated || !hubAuth.token) {
-    return null;
-  }
-
-  return <DesktopHubTaskBridgeActive />;
-}
-
-function DesktopHubTaskBridgeActive() {
-  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
-  const hubRealtime = useHubEventStream(getAccessToken);
-  useHubIntegration({ hubWS: hubRealtime.hubWS, hubClient });
-  return null;
-}
-
-type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
-
-interface ShellIconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> {
-  label: string;
-  ariaLabel?: string;
-  tooltipSide?: TooltipSide;
-  children: ReactNode;
-}
-
-function ShellIconButton({
-  label,
-  ariaLabel,
-  tooltipSide = 'bottom',
-  className,
-  children,
-  type = 'button',
-  ...buttonProps
-}: ShellIconButtonProps) {
-  const tooltipId = useId();
-  return (
-    <button
-      {...buttonProps}
-      type={type}
-      className={`${className ?? ''} ${styles.iconTooltipHost}`}
-      aria-label={ariaLabel ?? label}
-      aria-describedby={tooltipId}
-      data-tooltip-side={tooltipSide}
-    >
-      <span className={styles.iconTooltipGlyph} aria-hidden="true">{children}</span>
-      <span id={tooltipId} role="tooltip" className={styles.iconTooltip}>{label}</span>
-    </button>
-  );
 }
 
 export default function App() {
@@ -445,8 +263,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
   const [pendingComposerDraft, setPendingComposerDraft] = useState('');
-  const [openTopMenu, setOpenTopMenu] = useState<TopMenuId | null>(null);
-  const [hoverOpenedTopMenu, setHoverOpenedTopMenu] = useState<TopMenuId | null>(null);
   const {
     leftSidebarCollapsed,
     rightPanelOpen,
@@ -473,8 +289,6 @@ export default function App() {
   const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
-  const topMenuRef = useRef<HTMLElement | null>(null);
-  const hoverOpenedTopMenuRef = useRef<TopMenuId | null>(null);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
@@ -579,31 +393,6 @@ export default function App() {
     const timer = window.setTimeout(() => setRightPanelMounted(false), 220);
     return () => window.clearTimeout(timer);
   }, [effectiveRightPanelOpen]);
-
-  useEffect(() => {
-    if (!openTopMenu) return undefined;
-
-    const closeOnPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && topMenuRef.current?.contains(target)) return;
-      setOpenTopMenu(null);
-      setHoverOpenedTopMenu(null);
-      hoverOpenedTopMenuRef.current = null;
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setOpenTopMenu(null);
-      setHoverOpenedTopMenu(null);
-      hoverOpenedTopMenuRef.current = null;
-    };
-
-    window.addEventListener('pointerdown', closeOnPointerDown, true);
-    window.addEventListener('keydown', closeOnEscape, true);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnPointerDown, true);
-      window.removeEventListener('keydown', closeOnEscape, true);
-    };
-  }, [openTopMenu]);
 
   useEffect(() => {
     const node = workspaceRef.current;
@@ -1293,63 +1082,24 @@ export default function App() {
     workspaceExpanded,
   ]);
 
-  // Global shell shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setNavPanelOpen(false);
-      }
-      if (isEditableShortcutTarget(e.target)) return;
-
-      const shellModifier = e.ctrlKey || e.metaKey;
-      if (shortcutHelpOpen && !(e.key === '?' && !shellModifier)) return;
-      if (e.key === '?' && !shellModifier) {
-        e.preventDefault();
-        setShortcutHelpOpen((v) => !v);
-      }
-      if (shellModifier && e.altKey && e.key.toLowerCase() === 'n' && online) {
-        e.preventDefault();
-        void handleQuickChat();
-      } else if (shellModifier && e.key.toLowerCase() === 'n' && online) {
-        e.preventDefault();
-        void handleCreateThread();
-      } else if (shellModifier && e.key.toLowerCase() === 'o') {
-        e.preventDefault();
-        void handleOpenFolder();
-      } else if (shellModifier && e.key === ',') {
-        e.preventDefault();
-        openSettings('general');
-      } else if (shellModifier && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        void handleWindowCommand('close');
-      }
-      if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
-        e.preventDefault();
-        setLeftSidebarCollapsed(!leftSidebarCollapsed);
-      }
-      if (shellModifier && e.key.toLowerCase() === 'j' && displayedRun && !workspaceExpanded && !isMobile) {
-        e.preventDefault();
-        setRightPanelOpen(!rightPanelOpen);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
+  useShellShortcuts({
+    online,
+    isMobile,
+    workspaceExpanded,
+    leftSidebarCollapsed,
+    rightPanelOpen,
+    shortcutHelpOpen,
     displayedRun,
     handleCreateThread,
-    handleOpenFolder,
     handleQuickChat,
-    handleWindowCommand,
-    isMobile,
-    leftSidebarCollapsed,
-    online,
-    openSettings,
-    rightPanelOpen,
+    handleOpenFolder,
+    handleWindowCommand: handleWindowCommand as (command: string) => Promise<void>,
+    openSettings: openSettings as (section?: string) => void,
+    setNavPanelOpen,
+    setShortcutHelpOpen,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
-    shortcutHelpOpen,
-    workspaceExpanded,
-  ]);
+  });
 
   // ── Double-click top bar → toggle maximize/restore
   const handleTopBarDoubleClick = useCallback(async (e: React.MouseEvent) => {
@@ -1385,75 +1135,7 @@ export default function App() {
             <span className={styles.topBarNavBtn}><ChevronLeft size={14} /></span>
             <span className={styles.topBarNavBtn}><ChevronRight size={14} /></span>
           </div>
-          <nav className={styles.appMenu} aria-label={t('menu.title')} ref={topMenuRef}>
-            {TOP_MENU_ORDER.map((menuId) => {
-              const menu = topMenus[menuId];
-              const expanded = openTopMenu === menuId;
-              const panelId = `top-menu-${menuId}`;
-              return (
-                <div
-                  key={menuId}
-                  className={styles.topMenuGroup}
-                  onMouseEnter={() => {
-                    if (!openTopMenu) return;
-                    setHoverOpenedTopMenu(menuId);
-                    hoverOpenedTopMenuRef.current = menuId;
-                  }}
-                >
-                  <button
-                    type="button"
-                    className={`${styles.topMenuTrigger} ${expanded ? styles.topMenuTriggerActive : ''}`}
-                    aria-haspopup="menu"
-                    aria-expanded={expanded}
-                    aria-controls={expanded ? panelId : undefined}
-                    onClick={() => {
-                      setOpenTopMenu((current) => resolveTopMenuClickState(current, menuId, hoverOpenedTopMenuRef.current ?? hoverOpenedTopMenu));
-                      setHoverOpenedTopMenu(null);
-                      hoverOpenedTopMenuRef.current = null;
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        setOpenTopMenu(menuId);
-                        setHoverOpenedTopMenu(null);
-                        hoverOpenedTopMenuRef.current = null;
-                      }
-                    }}
-                  >
-                    {menu.label}
-                  </button>
-                  {expanded && (
-                    <div id={panelId} className={styles.topMenuPanel} role="menu" aria-label={menu.label}>
-                      {menu.items.map((item) => (
-                        <div key={item.id} className={styles.topMenuItemWrap}>
-                          {item.separatorBefore && <div className={styles.topMenuSeparator} role="separator" />}
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className={`${styles.topMenuItem} ${item.danger ? styles.topMenuItemDanger : ''}`}
-                            disabled={item.disabled}
-                            aria-disabled={item.disabled ? true : undefined}
-                            title={item.disabled && item.detail ? item.detail : undefined}
-                            onClick={() => {
-                              if (item.disabled) return;
-                              const result = item.action();
-                              setOpenTopMenu(null);
-                              setHoverOpenedTopMenu(null);
-                              hoverOpenedTopMenuRef.current = null;
-                              if (result instanceof Promise) void result;
-                            }}
-                          >
-                            <span className={styles.topMenuItemLabel}>{item.label}</span>
-                            {item.shortcut && <kbd>{item.shortcut}</kbd>}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
+          <TopMenuBar menus={topMenus} ariaLabel={t('menu.title')} />
           <span className={styles.statusBadge}>
             <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
             {online ? `Edge ${health?.version ?? 'v1'}` : t('status.offline')}
@@ -1499,11 +1181,13 @@ export default function App() {
       />
 
       {settingsOpen ? (
+        <Suspense fallback={null}>
         <SettingsPage
           initialSection={settingsInitialSection}
           onBack={() => setSettingsOpen(false)}
           onOpenAuth={handleOpenAuth}
         />
+        </Suspense>
       ) : (
       <>
 
@@ -1715,6 +1399,7 @@ export default function App() {
             {/* Chat area */}
             <div className={styles.chatArea}>
               {leftSidebarView === 'home' ? (
+                <Suspense fallback={null}>
                 <HomeDashboard
                   onNewThread={async () => {
                     try {
@@ -1755,6 +1440,7 @@ export default function App() {
                   onSelectAgent={handleSelectAgent}
                   onStartLocalOrchestration={handleStartLocalOrchestration}
                 />
+                </Suspense>
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
@@ -1823,10 +1509,12 @@ export default function App() {
       {showAuthModal && (
         <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>
           <div className={styles.authModal} onClick={(e) => e.stopPropagation()}>
+            <Suspense fallback={null}>
             <AuthPage
               onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
               onClose={() => useHubStore.getState().setShowAuthModal(false)}
             />
+            </Suspense>
           </div>
         </div>
       )}
