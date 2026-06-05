@@ -439,9 +439,9 @@ errcode.WriteErrorWithTrace(w, errcode.ErrNotFound.WithMessage(msgProjectNotFoun
 | 4 | Hub envelope + traceId | ✅ |
 | 5 | Edge errcode 包（14 域错误码） | ✅ |
 | 6 | Edge handlers 迁移（52 调用点） | ✅ |
-| 7 | pkg/reqlog 追踪中间件 | 🔧 |
-| 8 | Edge/Hub 接入 reqlog | — |
-| 9 | pkg/debug 调试端点 | — |
+| 7 | pkg/reqlog 追踪中间件 | ✅ |
+| 8 | Edge/Hub 接入 reqlog | ✅ |
+| 9 | pkg/debug 调试端点 | 🔧 |
 | 10 | 两边接入 debug | — |
 | 11 | 前端适配 envelope 变更 | ✅ 已兼容 |
 | 12 | 测试 + commit | 持续 |
