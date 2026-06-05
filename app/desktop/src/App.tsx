@@ -17,7 +17,6 @@ import { useAgentList } from '@/api/agentQueries';
 import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useModelsDevDisplayNames } from '@/api/modelsDevCatalog';
-import { createHubClient } from '@/api/hubClient';
 import {
   startRun,
   cancelRun,
@@ -28,9 +27,7 @@ import {
 import { useThreads, useThreadMessages } from '@/api/threadQueries';
 import { useRuns } from '@/api/runQueries';
 import { useHubExecutionTargets } from '@/api/executionTargetQueries';
-import { getAccessToken, useAuth } from '@/hooks/useAuth';
-import { useHubEventStream } from '@/hooks/useHubEventStream';
-import { useHubIntegration } from '@/hooks/useHubIntegration';
+import { useAuth } from '@/hooks/useAuth';
 import useFocusSourceTracking from '@/hooks/useFocusSourceTracking';
 import type { ListResponse, StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
@@ -68,6 +65,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
 import HomeDashboard from '@/components/HomeDashboard';
 import ConnectionStatus from '@/components/ConnectionStatus';
+import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
@@ -168,29 +166,6 @@ function summarizeAgentTeamOverview(overview?: AgentTeamOverview) {
     pendingConflicts,
     blockingCount: pendingApprovals + pendingConflicts,
   };
-}
-
-function DesktopHubTaskBridge() {
-  const hubAuth = useAuth();
-
-  useEffect(() => {
-    if (!hubAuth.isAuthenticated && !hubAuth.token) {
-      void hubAuth.tryAutoLogin();
-    }
-  }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
-
-  if (!hubAuth.isAuthenticated || !hubAuth.token) {
-    return null;
-  }
-
-  return <DesktopHubTaskBridgeActive />;
-}
-
-function DesktopHubTaskBridgeActive() {
-  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
-  const hubRealtime = useHubEventStream(getAccessToken);
-  useHubIntegration({ hubWS: hubRealtime.hubWS, hubClient });
-  return null;
 }
 
 export default function App() {
