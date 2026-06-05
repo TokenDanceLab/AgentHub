@@ -39,7 +39,8 @@ const MODE_LABELS: Record<ApprovalMode, string> = {
 
 const MODE_ORDER: ApprovalMode[] = ['yolo', 'auto', 'manual'];
 
-function summarizeInput(input: Record<string, unknown>): string {
+function summarizeInput(input: Record<string, unknown> | null | undefined): string {
+  if (!input) return '(no input)';
   if (typeof input.file_path === 'string') return `file: ${input.file_path}`;
   if (typeof input.path === 'string') return `path: ${input.path}`;
   if (typeof input.command === 'string') return input.command.slice(0, 100);
