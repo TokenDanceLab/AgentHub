@@ -84,11 +84,9 @@ func TestRateLimitPanicsOnNilClient(t *testing.T) {
 }
 
 func TestResponseBodyStructure(t *testing.T) {
-	var b responseBody
-	b.Code = "TEST_CODE"
-	b.Message = "test message"
-	assert.Equal(t, "TEST_CODE", b.Code)
-	assert.Equal(t, "test message", b.Message)
+	e := errcode.New("TEST_CODE", "test message", 400)
+	assert.Equal(t, "TEST_CODE", e.Code)
+	assert.Equal(t, "test message", e.Message)
 }
 
 func TestFailWithErrcodeError(t *testing.T) {

@@ -223,6 +223,27 @@ type apiResp struct {
 	Code    string          `json:"code"`
 	Message string          `json:"message"`
 	Data    json.RawMessage `json:"data"`
+	Error   *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		TraceID string `json:"traceId"`
+	} `json:"error"`
+}
+
+// GetCode returns the response code from either success or error envelope.
+func (r apiResp) GetCode() string {
+	if r.Error != nil {
+		return r.Error.Code
+	}
+	return r.Code
+}
+
+// GetMsg returns the message from either success or error envelope.
+func (r apiResp) GetMsg() string {
+	if r.Error != nil {
+		return r.Error.Message
+	}
+	return r.Message
 }
 
 func parse(resp *http.Response) apiResp {
@@ -254,11 +275,11 @@ func register(t *testing.T, username, password, nickname string) testUser {
 		"username": username, "password": password, "nickname": nickname,
 	})
 	r := parse(w)
-	if r.Code == "USER_USERNAME_TAKEN" {
+	if r.GetCode() == "USER_USERNAME_TAKEN" {
 		return loginAndGetUser(t, username, password)
 	}
-	if r.Code != "OK" {
-		t.Fatalf("register %s failed: %s", username, r.Code)
+	if r.GetCode() != "OK" {
+		t.Fatalf("register %s failed: %s", username, r.GetCode())
 	}
 	return loginAndGetUser(t, username, password)
 }
@@ -270,15 +291,15 @@ func loginAndGetUser(t *testing.T, username, password string) testUser {
 		"device_type": "web", "device_id": testDeviceID(username, "web"),
 	})
 	r := parse(w)
-	if r.Code != "OK" {
-		t.Fatalf("login %s failed: %s", username, r.Code)
+	if r.GetCode() != "OK" {
+		t.Fatalf("login %s failed: %s", username, r.GetCode())
 	}
 	tok := extract(r.Data, "access_token")
 
 	w = get("/client/auth/me", tok)
 	r = parse(w)
-	if r.Code != "OK" {
-		t.Fatalf("me %s failed: %s", username, r.Code)
+	if r.GetCode() != "OK" {
+		t.Fatalf("me %s failed: %s", username, r.GetCode())
 	}
 	id := extract(r.Data, "id")
 	return testUser{Username: username, Password: password, Token: tok, ID: id}
@@ -295,14 +316,14 @@ func testDeviceID(username, deviceType string) string {
 
 func mustOK(t *testing.T, r apiResp, msg string) {
 	t.Helper()
-	if r.Code != "OK" {
-		t.Fatalf("%s: expected OK got %s: %s", msg, r.Code, r.Message)
+	if r.GetCode() != "OK" {
+		t.Fatalf("%s: expected OK got %s: %s", msg, r.GetCode(), r.GetMsg())
 	}
 }
 
 func mustCode(t *testing.T, r apiResp, code, msg string) {
 	t.Helper()
-	if r.Code != code {
-		t.Fatalf("%s: expected %s got %s: %s", msg, code, r.Code, r.Message)
+	if r.GetCode() != code {
+		t.Fatalf("%s: expected %s got %s: %s", msg, code, r.GetCode(), r.GetMsg())
 	}
 }

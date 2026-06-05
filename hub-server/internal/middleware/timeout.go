@@ -178,8 +178,10 @@ func writeTimeout(w gin.ResponseWriter) {
 		header.Set("Content-Type", "application/json; charset=utf-8")
 	}
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(responseBody{
-		Code:    errcode.ErrTimeout.Code,
-		Message: errcode.ErrTimeout.Message,
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"error": map[string]any{
+			"code":    errcode.ErrTimeout.Code,
+			"message": errcode.ErrTimeout.Message,
+		},
 	})
 }
