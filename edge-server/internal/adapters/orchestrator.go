@@ -51,7 +51,7 @@ type OrchestratorAdapter struct {
 func NewOrchestratorAdapter(claudePath, model, systemPrompt string, subAgents []string) *OrchestratorAdapter {
 	_ = subAgents
 	return &OrchestratorAdapter{
-		inner:        NewClaudeCodeAdapter(claudePath, model, "bypassPermissions"),
+		inner:        NewClaudeCodeAdapter(claudePath, model, ""),
 		systemPrompt: escapePromptLiteral(systemPrompt),
 		depth:        0,
 	}
