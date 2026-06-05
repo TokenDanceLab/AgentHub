@@ -24,11 +24,11 @@ type MCPService interface {
 }
 
 type MCPServerHandler struct {
-	svc MCPService
+	service MCPService
 }
 
-func NewMCPServerHandler(svc MCPService) *MCPServerHandler {
-	return &MCPServerHandler{svc: svc}
+func NewMCPServerHandler(service MCPService) *MCPServerHandler {
+	return &MCPServerHandler{service: service}
 }
 
 type createMCPServerReq struct {
@@ -63,7 +63,7 @@ func (h *MCPServerHandler) CreateMCPServer(c *gin.Context) {
 		ToolSchema: req.ToolSchema,
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, srv)
+	result, err := h.service.Create(c.Request.Context(), userID, srv)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -78,7 +78,7 @@ func (h *MCPServerHandler) CreateMCPServer(c *gin.Context) {
 func (h *MCPServerHandler) GetMCPServer(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
-	srv, err := h.svc.Get(c.Request.Context(), id, userID)
+	srv, err := h.service.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -97,7 +97,7 @@ func (h *MCPServerHandler) ListMCPServers(c *gin.Context) {
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
 
-	result, err := h.svc.List(c.Request.Context(), userID, q, transport, cursor, pageSize)
+	result, err := h.service.List(c.Request.Context(), userID, q, transport, cursor, pageSize)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -122,7 +122,7 @@ func (h *MCPServerHandler) UpdateMCPServer(c *gin.Context) {
 		return
 	}
 
-	srv, err := h.svc.Update(c.Request.Context(), id, userID, &updates)
+	srv, err := h.service.Update(c.Request.Context(), id, userID, &updates)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -138,7 +138,7 @@ func (h *MCPServerHandler) DeleteMCPServer(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Delete(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Delete(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -153,7 +153,7 @@ func (h *MCPServerHandler) PublishMCPServer(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Publish(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Publish(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -168,7 +168,7 @@ func (h *MCPServerHandler) UnpublishMCPServer(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 
-	if err := h.svc.Unpublish(c.Request.Context(), id, userID); err != nil {
+	if err := h.service.Unpublish(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
