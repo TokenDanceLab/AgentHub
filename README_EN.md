@@ -58,7 +58,7 @@ pnpm dev
 # 5. Open http://localhost:5173
 ```
 
-> Requires Go 1.25+, Node.js 20+, and pnpm. See [Get Started](docs/getting-started/GOAL.md) for details.
+> Requires Go 1.25+, Node.js 20+, and pnpm. See [Architecture](docs/architecture.md) for details.
 
 <br>
 
@@ -141,14 +141,14 @@ AgentHub/
 ├── hub-server/           # Hub central service
 ├── api/                  # API contracts (OpenAPI + WebSocket events)
 ├── docs/                 # Documentation
-│   ├── getting-started/  # Quick start guide
-│   ├── tutorials/        # Roadmaps and learning paths
-│   ├── architecture/     # Product requirements, system architecture, implementation guide, design docs, ADR
+│   ├── architecture.md   # Product positioning, system architecture, implementation status
+│   ├── adr/              # Architecture decision records
+│   ├── designs/          # Component design docs
+│   ├── handoffs/         # Project status and handoff
 │   ├── governance/       # Security risk register, branch governance, doc standards
-│   ├── development/      # Project status and handoff
-│   ├── archive/          # Historical reviews and archived documents
 │   ├── reference/        # Research and competitive analysis
-│   ├── operations/       # Desktop QA SOP, operations
+│   ├── operations/       # Operations docs
+│   └── archive/          # Historical reviews and archived documents
 └── scripts/              # Setup scripts, git hooks
 ```
 
