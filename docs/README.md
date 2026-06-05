@@ -17,7 +17,7 @@
 | 需要 | 去看 |
 |------|------|
 | 某个架构决策的背景 | [adr/](adr/) — 11 篇 ADR |
-| 某个组件的设计方案 | [designs/](designs/) — 7 篇设计文档 |
+| 某个组件的设计方案 | [designs/](designs/) — 4 篇设计文档 |
 | 竞品怎么做的 | [reference/projects/](reference/projects/) — 25 个竞品深度调研 |
 | 分支规则、安全风险 | [governance/](governance/) — 分支治理、文档标准、安全风险登记 |
 | 历史方案、旧审查 | [archive/](archive/) — 完整归档索引见 [archive/INDEX.md](archive/INDEX.md) |
