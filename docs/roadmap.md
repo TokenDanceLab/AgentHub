@@ -17,11 +17,50 @@
 
 ---
 
+## 比赛冲刺覆盖层（2026-06-05 Codex 架构审核）
+
+> 结论：长期 Phase A/B/C/D 方向基本正确，但比赛前的优先级必须覆盖为 **IM 多 Agent 可演示闭环 > 生成效果显性证据 > 工程治理收尾**。赛题权重里 AI 协作 30%、功能完整度 25%、生成效果 20% 合计 75%，不能让 SQLite、统一信封、全量重构或远程/云场景阻塞 TeamRun Demo。
+>
+> 赛题原文在 workspace 根目录 `../docs/competition/bytedance.md`，提交检查清单截止日期为 2026-06-10（见 `../docs/competition/SUBMISSION-CHECKLIST.md`）。AgentHub 仓内 agent 如果只读本仓库，需要显式跳到 workspace 根目录读取比赛材料。
+
+### 当前优先级判断
+
+| 判断 | 处理 |
+|---|---|
+| Phase C 不能再等 Phase B 全部完成 | C0/C1 的比赛最小闭环只依赖 A4 足够解耦和现有 Hub/Edge API；B0 SQLite/FTS5 保留为加分项，不是 IM Demo 入场门槛 |
+| IM 侧仍未承载比赛核心差异化 | `IMMessageInput` 仍是纯 textarea；`IMMessageView` 只渲染 Markdown。必须把 @Agent 分派、Agent task、Tool/Diff/Thinking/Approval 投影接入 IM 流 |
+| TeamRun 已有可用产品面，但缺真实 transcript | `TeamRunDock` / `TeamRunConsole` / Hub AgentTeam API 已存在；比赛需要两个真实 Runtime Profile 的群组协作录屏、截图和 transcript |
+| 6 月 1 终审中的部分缺口已被后续修复 | Run summary、Hub thread history 注入、Web stream recovery 等已有代码路径；后续只需要补测试/部署态证据，不应重复规划成"完全不存在" |
+| 当前并行 worktree 不要重复分派 | `phase-a4/thread-nav` 正在改 A4 thread navigation；`phase-a6/envelope` 正在改 Edge success envelope；`phase-fe/blockkey-stable` 正在改 block key。主线只验收和合并，不另开同路径任务 |
+
+### 比赛 Sprint 顺序
+
+| Rank | 任务 | 为什么排这里 | 验收证据 |
+|---:|---|---|---|
+| 1 | **IM @Agent 分派接入**：把 `PromptInput` 的 `useMention` / `MentionPopover` 能力移植或抽象给 `IMMessageInput`，群聊消息能指定 Agent Profile 并触发 Hub agent task / TeamRun | 直接对应赛题"群聊协作、@ 多个 Agent、Orchestrator 分派"，影响 AI 协作 30% | 单测覆盖 @Agent 选择；Desktop/Web IM 截图；一次 Hub group session 中 @Agent 触发任务 |
+| 2 | **IM 富消息投影**：`IMMessageView` 渲染 Agent task、Tool call、Thinking、Diff/File change、Approval/Artifact 摘要，不再只是 Markdown 气泡 | 对应生成效果 20% 和功能完整度 25%；评审必须在聊天流中看见产物 | 单测覆盖富 block；截图覆盖 Tool/Diff/Approval/Artifact；不再只靠右侧 RunDetail |
+| 3 | **真实 TeamRun E2E transcript**：两个真实 Runtime Profile 在同一 group/team run 中协作，含 Orchestrator route、子任务、产出聚合、失败/审批处理 | AgentHub 最大差异化证据；没有 transcript 时"多 Agent 协作"仍像后端能力声明 | 录屏脚本、截图、运行日志、任务事件导出；写入 `docs/handoffs/STATE.md` 或比赛证据文档 |
+| 4 | **Demo 生成效果打磨**：Diff 高亮、Artifact/Preview 可见入口、Tool 卡片状态和标题语义化，优先服务 3 分钟脚本 | 提升生成效果评分；避免 UI 看起来只是文本转发 | Desktop 截图覆盖 Diff/Preview/Tool；关键 null/long output 不崩溃 |
+| 5 | **部署态最小 smoke**：如果 Demo 走 Hub/Web，补 login -> Hub session -> WS auth -> task stream -> logout/reconnect；如果 Demo 只走本地 Desktop，明确 caveat | 可运行 Demo 和答辩可信度要求；但不能压过 IM/TeamRun | smoke 命令、截图、失败 caveat |
+| 6 | **比赛资料同步**：把最新完成/未完成状态同步到提交清单、功能矩阵、Demo 脚本和 AI 协作日志 | 防止答辩材料沿用 6 月 1 的过期缺口或夸大能力 | 文档 diff；证据路径都指向当前 commit |
+
+### 比赛前不要阻塞的事项
+
+这些方向重要，但不应挡住上面的 Sprint：
+
+- B0 Edge SQLite + FTS5 完整化：可作为重启不丢数据的加分项，不能作为 C0 入场门槛。
+- A6 Edge 成功响应统一信封、DB TLS、secret guard 扩展：有 worktree 可继续，但比赛主线只要求不暴露密钥、不破坏现有 API。
+- ChatView 全量拆分、LegendList 替换、运行状态全局重构：只做 demo 必要的低风险切片。
+- Remote Edge / Cloud Edge / Hub Relay / Web->Cloud：保持架构规划和 caveat，不承诺比赛前完成。
+- Agent Market、Feishu/Lark、完整部署发布：不进入 3 分钟核心演示，除非已有可验证最小闭环。
+
+---
+
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 ████████████  70%  ← 当前 (A0/A1/A2/A3 ✅, A4 部分完成, A5/A6 待开始)
-Phase B: 持久化 + 性能  ░░░░░░░░░░   0%
+Phase A: 工程基础设施 ████████████  85%  ← A0-A3✅, A4 Wave2 6/7, A6.2✅, A6.3✅
+Phase B: 持久化 + 性能  ██░░░░░░░░  15%  ← B2 N+1 ✅
 Phase C: IM 核心闭环   ░░░░░░░░░░   0%
 Phase D: 高级功能      ░░░░░░░░░░   0%
 ```
@@ -33,6 +72,8 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
      │                                      ↑
      └── App.tsx 拆分 (A4) ──────────────────┘ 前端解耦是 IM 开发前提
 ```
+
+比赛冲刺例外：C0/C1 的最小演示闭环不等待 B0 完整出场；B0 只提升稳定性和重启恢复，不是 @Agent 群聊、TeamRun transcript、富消息投影的前置条件。
 
 ### 分支策略
 
@@ -98,10 +139,10 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
   - [x] `useHiddenMessages.ts` — 隐藏消息 ID 管理 30 行（低难度）✅
   - [x] `useSidebarResize.ts` — 侧边栏拖拽缩放 40 行（低难度）✅
   - [x] `useThreadCache.ts` — React Query 缓存操作 37 行 + 4 个 ref（低难度）✅
-  - [ ] `useTopMenuConfig.ts` — 菜单定义 221 行（低难度，优先）← 下一步
-  - [ ] `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）
-  - [ ] `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）
-  - [ ] `useSendRun.ts` — 发送/启动 run 116 行（高难度，最后）
+  - [x] `useTopMenuConfig.ts` — 菜单定义 221 行（低难度）✅
+  - [x] `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）✅
+  - [x] `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）✅
+  - [ ] `useSendRun.ts` — 发送/启动 run 116 行（高难度，最后）← 最后一个
   - 执行顺序：E→F→G→A（阶段1低风险）→ D→C（阶段2）→ B（阶段3核心）
 - [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖
 
@@ -124,16 +165,13 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
   - 目标: `secure_store.rs` 已有 keyring 集成（当前仅存 Hub 令牌），新增 `store_model_credential`/`read_model_credential`/`clear_model_credential`
   - 迁移: Zustand store 初始化时检测 localStorage 旧格式 → 写入 keychain → 清除 localStorage
   - Web 端无 `ProviderCredential` 字段，不受影响
-- [ ] **统一响应信封** (P1 — 低风险，Edge 对齐 Hub)
-  - Hub: `handler/response.go` 的 `OK(c,data)` 返回 `{code:"OK", data:...}`，19 个 handler 文件使用
-  - Edge: `api/handlers.go` 的 `writeJSON` 直接返回裸 JSON，约 23 处成功返回点
-  - 方案: Edge 加 `successResponse(data)` wrapper，前端 `edgeClient.ts` 加 `unwrapEdgeResponse`
-  - 错误格式已统一（共享 `pkg/errcode`），仅成功格式需对齐
-- [ ] **DB TLS 可配置** (P1 — ~20 行改动)
-  - `config.go:73-76` 的 `DSN()` 硬编码 `sslmode=disable`
-  - `DBConfig` 新增 `SSLMode` 字段，默认 `"disable"` 保持向后兼容
-  - `Validate()` 加有效值校验，`Load()` 加 `AGENTHUB_DB_SSLMODE` 环境变量覆盖
-  - 更新 3 个 `.env.example` 文件
+- [x] **统一响应信封** (P1 ✅ — Edge 对齐 Hub)
+  - Edge `writeSuccess()` 包装 `{code,data}`
+  - 前端 `unwrapEdgeResponse()` 双格式兼容
+  - 错误格式已统一（`pkg/errcode`），成功格式已对齐
+- [x] **DB TLS 可配置** (P1 ✅)
+  - `SSLMode` 字段 + `AGENTHUB_DB_SSLMODE` 环境变量
+  - 默认 `disable` 向后兼容，Validate 白名单
 - [ ] **.env 密钥轮换 + secret guard 加固** (P2 — 增量改进)
   - 密钥轮换: 轮换 .env 中真实云服务密钥；`config.go` `Validate()` 扩展弱密码拒绝到 DB/Redis/TokenDanceID
   - pre-commit 加固: 新增 `scripts/git-hooks/pre-commit` 调用 `check-secrets.sh --staged`（当前仅在 commit-msg 运行）
@@ -168,25 +206,17 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [ ] 离线队列 — Hub 断连时写操作入队，重连后批量同步
 - [ ] Cursor 同步协议 — `?cursor=<last_seq>` 增量拉取
 
-### B2: Hub 性能治理
+### B2: Hub 性能治理 🔧
 
-- [ ] **N+1 查询 — Session list correlated subquery** (`repository/session.go:54-79`)
-  - `ListUserSessions` 和 `SearchSessions` 的 `(SELECT COUNT(*) FROM session_members WHERE session_id = s.id)` 逐行执行
-  - 修复: 改为 `LEFT JOIN (SELECT session_id, COUNT(*) GROUP BY session_id) mc ON mc.session_id = s.id`
-- [ ] **N+1 查询 — StartTeamRun 逐条查 CustomAgent** (`service/agent_team.go:323-334`)
-  - for 循环内逐个 `GetCustomAgentByID` 做鉴权，同函数后半段已正确批量查询
-  - 修复: 批量查询提前到鉴权循环前，`WHERE id IN ?` 一次取出，构建 map 复用
-- [ ] **N+1 查询 — dispatchTask 逐次查 CustomAgent** (`service/agent.go:445-452`)
-  - 每个 dispatch goroutine 独立查询，TeamRun 并发场景形成隐式 N+1
-  - 修复: `TriggerAgentTask` 预查询 CustomAgent，通过参数传入 `dispatchTask`
-- [ ] **缺索引 — GORM model tag 缺 index 标记**（migration SQL 已有索引，但 AutoMigrate 路径会丢失）
-  - `agent_team_tasks.team_run_id` — `model/agent_team.go:172`
-  - `agent_team_assignments.team_run_id` — `model/agent_team.go:126`
-  - `notifications.user_id` — `model/notification.go:21`
-  - 修复: 补 GORM `index:` tag + 新增 `0041_ensure_performance_indexes` migration（IF NOT EXISTS）
-- [ ] **migration 双系统统一** — golang-migrate 唯一生产路径（`repository/migrate.go:15`），AutoMigrate 仅在测试中使用
-  - 风险: model tag 和 migration SQL 默认值/FK/索引可能不同步
-  - 修复: model 包加文档注释声明 golang-migrate 唯一性；清理测试中的 `db.AutoMigrate()` 调用；CI 加 migration 完整性检查
+- [x] **N+1 查询 — Session list correlated subquery** (`repository/session.go`)
+  - `ListUserSessions` 和 `SearchSessions` → LEFT JOIN 批量查询
+- [x] **N+1 查询 — StartTeamRun 逐条查 CustomAgent** (`service/agent_team.go`)
+  - 批量查询 `WHERE id IN ?` + map 复用
+- [x] **N+1 查询 — dispatchTask 逐次查 CustomAgent** (`service/agent.go`)
+  - `TriggerAgentTask` 预查询，参数传入 `dispatchTask`
+- [x] **缺索引 — GORM model 补 index tag** + Migration 0041
+  - `agent_team_tasks.team_run_id`, `agent_team_assignments.team_run_id`, `notifications.user_id`
+- [ ] **migration 双系统统一** — golang-migrate 唯一生产路径（`repository/migrate.go`），AutoMigrate 仅在测试中使用
 
 ### B3: 大文件拆分
 
@@ -213,14 +243,16 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 > **目标**: 打通 IM 核心工作流，Desktop 前端可用，Agent 操作可视化
 >
-> **入场条件**: Phase B 出场（Edge 持久化完成 + App.tsx 已拆分）
-> **出场条件**: 用户可以在 Desktop 中与 Agent 进行完整的 IM 对话
+> **长期入场条件**: Phase B 出场（Edge 持久化完成 + App.tsx 已拆分）
+> **比赛冲刺入场条件**: A4 已拆到足够降低冲突风险，且不改正在进行的 `phase-a4/thread-nav` / `phase-fe/blockkey-stable` 同路径 worktree；C0/C1 可以并行推进，不等待 B0 SQLite 完成。
+> **出场条件**: 用户可以在 Desktop 中与 Agent 进行完整的 IM 对话；比赛版至少要能在群聊中 @Agent 触发真实任务，并在 IM 流中展示 Agent 任务、Tool/Diff/Thinking/Approval/Artifact 证据。
 
 ### C0: 对话核心
 
 - [ ] 对话列表 — 新建/置顶/归档/搜索，按最近活跃排序
 - [ ] 单聊模式 — 选中联系人/Agent → 1v1 对话
-- [ ] 群聊模式 — 创建群组 → 邀请多 Agent → @Agent 分派任务
+- [ ] **比赛 P0: 群聊 @Agent 分派** — `IMMessageInput` 接入 mention 能力，选择 Agent Profile 后触发 Hub agent task / TeamRun；复用已有 `PromptInput` / `useMention` / `MentionPopover` 行为和测试思路
+- [ ] **比赛 P0: IM 富消息投影** — `IMMessageView` 从纯 Markdown 升级为富消息流，至少展示 Agent task、Tool/Thinking、Diff/File change、Approval/Artifact 摘要
 - [ ] 消息类型 — 文本、代码块、图片、文件附件、Diff 视图卡片、网页预览卡片
 - [ ] 消息操作 — 回复、引用、复制代码、展开预览
 - [ ] 上下文管理 — 聊天历史自动传递，支持 pin 关键消息
@@ -231,7 +263,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [ ] 工具调用可视化 — ToolUseBlock 展示工具名、参数、结果
 - [ ] 代码 Diff 内联 — Agent 产出代码时展示 Diff 视图卡片，一键应用
 - [ ] 文件操作可视化 — Agent 读写文件的实时展示
-- [ ] 多 Agent 并行流 — 群聊中多 Agent 依次/并行回复的可视化
+- [ ] **比赛 P0: 多 Agent TeamRun transcript** — 群聊中两个真实 Runtime Profile 依次/并行回复，并保留可答辩的 route/task/event 证据
 - [ ] 审批面板 — 高风险操作弹窗确认
 
 ### C2: 前端打磨
@@ -330,11 +362,16 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | **A1 请求日志** | pkg/reqlog + Edge/Hub 接入 + context ID 传播 + 6 tests | 2026-06-05 |
 | **A3 P0 安全** | Auth token Debug 日志 + FileStore async persist (50ms debounce) | 2026-06-05 |
 | **A2 调试端点** | pkg/debug 共享模块 + Hub/Edge 统一注册 + health/pprof/metrics/config/state + 11 tests | 2026-06-05 |
-| **A4 Wave 2 (3/7)** | App.tsx 1525→1440 行，useHiddenMessages/useSidebarResize/useThreadCache 拆出 | 2026-06-05 |
+| **A4 Wave 2 (6/7)** | App.tsx 1525→~1130，6 hooks 拆出 + block key 稳定化 | 2026-06-05 |
+| **A6.2 统一信封** | Edge writeSuccess + unwrapEdgeResponse 双格式兼容 | 2026-06-05 |
+| **A6.3 DB TLS** | AGENTHUB_DB_SSLMODE 环境变量 + Validate 白名单 | 2026-06-05 |
+| **B2 N+1 修复** | Session list/StartTeamRun/dispatchTask + Migration 0041 索引 | 2026-06-05 |
+| **前端 P0 block key** | ChatView blockKey index→content hash，消除流式闪烁 | 2026-06-05 |
 | **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
 | **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 | **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
 | **比赛评审评估** | 6 维度全评(AI协作22/30+功能15.5/25+生成效果12/20+代码理解12/15+创新8/10，总分69.5/100) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) + 提分路径 + Demo 3 分钟策略 | 2026-06-05 |
+| **前端深度审计** | P0×5+P1×29+P2×19 问题清单；IM/主聊天双系统分离（群聊零 Agent 分派能力）竞品对比(Jean/Kanna/CCUI)；右侧面板 Diff/Preview/Tool/Artifact 逐组件审计；综合评分 4.5/10；修复路线 Phase 0-3 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
@@ -356,10 +393,12 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 ### 比赛提分关键路径（按性价比排序）
 
-1. **打通 TeamRun E2E**（+3 分，~3 天）— 核心差异化唯一证据，用真实 Runtime 完成群聊多 Agent 协作
-2. **Edge SQLite 持久化 B0**（+2 分，~3 天）— Demo 经得起重启
-3. **修复 102 个失败测试 + Preview 增强**（+1.5 分，~1.5 天）— 测试 91%→100%、网页/文件预览
-4. **Edge→Hub 模式统一**（+2 分 AI 协作，~5 天）— 消除双轨并行，补齐审计链
+1. **IM @Agent + TeamRun E2E**（+3~4 分，~3 天）— 核心差异化唯一证据；必须在 IM 群聊里由 @Agent 触发真实 Runtime Profile 协作，而不只是 TeamRun 设置页/后端模型
+2. **IM 富消息 + 生成效果可视化**（+2 分，~2 天）— Tool/Thinking/Diff/Approval/Artifact 必须进入聊天流；评审看到的是产物，不是后端 JSON 字段
+3. **Edge SQLite 持久化 B0**（+1~2 分，~3 天）— Demo 经得起重启；但只在 IM/TeamRun 最小闭环后推进
+4. **Preview / Diff 稳定渲染**（+1.5 分，~1.5 天）— Diff 高亮、Artifact/Preview 入口、null/long-output 防崩溃
+5. **部署态 Hub smoke 或明确本地 Demo caveat**（+1 分，~1 天）— 如果 Demo 走 Hub/Web，补 login/session/WS auth/task stream；如果只走 Desktop 本地，提交材料要明确边界
+6. **Edge→Hub 模式统一**（+2 分 AI 协作，~5 天）— 长期正确，但比赛前只做会暴露在 Demo 中的路径
 
 ### 竞品威胁更新（2026-06-05）
 
@@ -394,3 +433,150 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | Hub Server | Go + Gin + GORM + Redis + PG | PostgreSQL 16 | ~46,000 行 | `go test ./... -short -race` |
 | 协议 | REST JSON + WebSocket NDJSON | — | OpenAPI 5,590 行 | — |
 | CI | GitHub Actions (Win + macOS) | — | — | `scripts/verify-ci-gates.ps1` |
+
+---
+
+## Desktop 前端深度审计
+
+> 2026-06-05 基于竞品对比 + 代码实证的深度审查。聚焦 ChatView/IM/渲染/交互四大方向。
+> 综合评分：**4.5/10** — 核心功能可用但体验粗糙，多处开发态残留和交互 Bug。
+
+### P0 问题清单（阻断级）
+
+| # | 问题 | 文件 | 影响 |
+|---|------|------|------|
+| 1 | **ChatView.tsx 1786 行单文件巨石** | `components/ChatView.tsx` | 可维护性极差，任何改动都有连锁风险 |
+| 2 | **运行状态三源同步** | `App.tsx` + `useChatMessages.reducer` + `runStore` | 同一 Run 状态分散 3 处，任一同步遗漏导致 UI 卡死/显示错误 |
+| 3 | **block key 依赖 index 不稳定** | ChatView `blockKey()` | `text-${index}` 流式渲染时 DOM 反复卸载/挂载，闪烁 |
+| 4 | **Agent Market 硬编码 Mock 数据** | `AgentMarketSection.tsx:72-169` | 6 个 mock agents 无法安装使用，欺骗性 UI |
+| 5 | **已弃用 `document.execCommand`** | `App.tsx:641`, `clipboard.ts:18` | undo/redo/copy 在现代浏览器可能静默失败 |
+
+### P1 问题清单（体验级）
+
+| # | 问题 | 文件 | 影响 |
+|---|------|------|------|
+| 6 | memo 签名过于简化，只比长度和标志位 | `messageBlockSignature` | 内容变化但签名相同时丢失更新 |
+| 7 | scroll-to-bottom 3 次 setTimeout + double rAF | ChatView 滚动逻辑 | CPU 飙升、布局抖动 |
+| 8 | 在线状态双重维护（3 处） | `connectionStore` + `useChatMessages` + `App.tsx` | 短暂不一致导致连接 banner 闪烁 |
+| 9 | Agent 切换每次创建新线程 | `App.tsx:521-533` | 误点产生大量空线程；catch 创建空字符串映射 |
+| 10 | z-index 硬编码违规（6 处） | `FileExplorer:998/999`, `ModelDropdown:9999`, `AgentCreationWizard:1000` | 弹窗堆叠冲突 |
+| 11 | 亮色主题 CSS 定义不完整 | `themes.css` | `[data-theme="light"]` 缺完整变量块 |
+| 12 | console.log/error 生产残留（53 处） | 多文件 | 信息泄漏、控制台噪音 |
+| 13 | `useHubStore.authenticated` 永远恢复 false | `hubStore.ts:17-18` | Hub 认证状态被拆分到两个不通信的模块 |
+| 14 | 右侧面板在窄屏突然消失无通知 | `App.tsx:311` | `runCardConstrained` 隐藏面板但无解释 |
+| 15 | Tool 结果统一截断无差异化 | `ToolUseBlock` | Bash/Diff/图片无区别展示，竞品按 toolKind 定制 |
+| 16 | Diff 无语法高亮 | DiffViewer/DiffCard | 竞品 Jean/CCUI 均有 Prism/Shiki 高亮 |
+| 17 | 虚拟滚动 estimateSize 静态值 | ChatView | 消息高度偏差大时滚动位置跳动 |
+| 18 | Thread 删除后无自动导航 | ThreadPanel | 删除当前 thread 后用户卡在空白 |
+| 19 | **IM 和主聊天是完全分离的两套系统** | `useIMChat.ts` vs `useChatMessages.ts` | 零代码共享，Edge→Hub 路径完全不同 |
+| 20 | **群聊 IM 无 @Agent 分派能力** | `IMMessageInput` 是纯 textarea，无 useMention | 比赛核心差异化功能在 IM 侧完全缺失 |
+| 21 | IM 消息无乐观更新 | `useIMChat.sendMessage()` | REST 确认后才显示，发送有感知延迟 |
+| 22 | Diff 大文件无虚拟化 | DiffViewer + DiffReviewPanel | 10000+ 行 diff 全量 DOM 渲染，卡顿 |
+| 23 | iframe sandbox 同时允许 scripts+same-origin | ArtifactPreview/ArtifactCard/ArtifactBrowser 三处 | 安全沙箱被绕过 |
+| 24 | Diff 解析逻辑重复两份 | `shared/diff.ts` + `desktop/utils/parseGitDiff.ts` | 同名 `parseUnifiedDiff` 实现不同，边缘 case 行为分歧 |
+| 25 | 嵌套 Tool 调用无层级渲染 | `ToolUseBlock` 只有 `children: ToolResultBlock[]` | 无递归渲染，子工具被扁平化 |
+| 26 | Artifact 正则提取仅支持英文 | `ArtifactBrowser.tsx:125-143` | 中文/JSON 输出的文件路径完全丢失 |
+| 27 | Blob URL 内存泄漏 | `ArtifactBrowser.tsx:558-570` | 下载后不 revokeObjectURL |
+| 28 | Tool 参数无深度截断 | `ToolGroup.tsx:162` JSON.stringify 无 max depth | 嵌套/base64 数据爆 DOM |
+| 29 | 右侧面板 resize 功能未实现 | `useSidebarResize.ts` 只处理 left | rightPanelWidth 存了但没应用 |
+| 30 | `summarizeInput` null input 崩溃 | `ChatView.tsx:110`, `ToolGroup.tsx:63` | WebSocket 畸形 tool_use 事件 input:null 导致渲染 crash |
+| 31 | `capOutputText` 静默丢弃输出头部 | `useChatMessages.ts:128-133` | >20K 字符输出只保留尾部，无截断提示 |
+| 32 | `hasVisibleBlock` 缺 `tool_group` 分支 | `ChatView.tsx:1079-1108` | 潜在 Bug：若 tool_group 被持久化/回放，整条消息消失 |
+| 33 | `mergeBlock` O(n²) 数组分配 | `useChatMessages.ts:93-109` | 高频流式时每次 delta 复制全量 blocks，GC 压力大 |
+| 34 | tool_group 内联合成每次渲染创建新对象 | `ChatView.tsx:1188-1206` | 已沉淀消息也不跳过，BlockRenderer memo 失效 |
+| 35 | `AgentTextBlock` 未 memo 化 | `ChatView.tsx:247-287` | 流式输出时每个 RAF tick 重新解析/渲染 Markdown |
+| 36 | scroll-to-bottom 3 次延时覆盖用户滚动位置 | `ChatView.tsx:1410-1430` | 用户上滑查看历史时被强制滚回底部 |
+
+### P2 问题清单（打磨级）
+
+| # | 问题 | 文件 |
+|---|------|------|
+| 30 | 缺少 Markdown 数学公式支持（竞品 CCUI 有 remarkMath + rehypeKatex） | MarkdownRenderer |
+| 31 | 无消息骨架屏/Streaming ticker（竞品 Jean 有 CompactStreamingTicker） | ChatView |
+| 32 | Tool 标题 `summarizeInput` 截断到 40 字符（竞品 Kanna 按 toolKind 生成语义标题） | ToolUseBlock |
+| 33 | PromptInput 1522 行未 memo 包装 | PromptInput.tsx |
+| 34 | useChatMessages 1485 行单一 hook 职责过重 | hooks/useChatMessages.ts |
+| 35 | useIMChat 1297 行单一 hook | hooks/useIMChat.ts |
+| 36 | App.tsx 1190 行，A4 Wave 2 还剩 2 个 hook | App.tsx |
+| 37 | 懒加载组件 fallback 为 null | AuthPage/HomeDashboard/SettingsPage |
+| 38 | Toast store nextId HMR 时可能重置 | toastStore.ts |
+| 39 | 装饰性 Nav 按钮无功能 | `App.tsx:1049-1052` |
+| 40 | Diff 长行无 word-break 水平溢出 | DiffViewer.tsx |
+| 41 | Diff focusedFilePath 用 endsWith 子串匹配 | DiffReviewPanel.tsx |
+| 42 | Artifact HTML 分类靠路径启发式 | ArtifactBrowser.tsx |
+| 43 | IM 消息搜索完全缺失 | useIMChat 无搜索 |
+| 44 | IM 群聊 leave/dissolve/成员管理 API 存在但无 UI 按钮 | IMView |
+| 45 | Typing indicator API 存在但从未调用 | HubWSHandle.sendTyping() |
+| 46 | Diff Accept/Reject 仅 UI 状态无持久化 | DiffViewer.tsx |
+| 47 | 面板关闭动画 220ms 内可能闪更新内容 | App.tsx:349-356 |
+| 48 | iframe retry 不换 URL 大概率重复失败 | ArtifactPreview.tsx |
+
+### IM 工作流完整性评估
+
+> 两条消息系统对比：主聊天（Edge 驱动）vs IM 聊天（Hub 驱动）
+
+| 能力 | 主聊天 (Edge) | IM 聊天 (Hub) | 差距 |
+|------|:-----------:|:-----------:|------|
+| 消息发送/接收 | ✅ REST+WS 流式 | ✅ REST+WS（无流式） | IM 侧无流式渲染 |
+| @Agent 分派 | ✅ useMention 完整 | ❌ 纯 textarea | **核心缺失** |
+| Agent Profile 选择 | ✅ MentionPopover | ❌ 不存在 | **核心缺失** |
+| Tool Call 可视化 | ✅ ToolUseBlock+ToolGroup | ❌ 不存在 | **核心缺失** |
+| Diff 内联 | ✅ DiffCard | ❌ 不存在 | **核心缺失** |
+| 思考过程展示 | ✅ ThinkingBlock | ❌ 不存在 | — |
+| 子 Agent 卡片 | ✅ ChildAgentBlock+RouteDecision | ❌ 不存在 | **核心缺失** |
+| 群聊创建 | N/A | ✅ createGroupSession | IM 独有 |
+| 好友/联系人 | N/A | ✅ listContacts+好友请求 | IM 独有 |
+| 未读计数 | ✅ badge | ✅ unreadCount | 对等 |
+| 消息搜索 | ✅ MessageSearchPanel | ❌ 缺失 | IM 缺失 |
+| 乐观更新 | ✅ 流式即时 | ❌ REST 确认后 | 体验差距 |
+| 审批 | ✅ PermissionDialog+ApprovalCard | ✅ TeamApprovalPanel | 两条路径不一致 |
+| TeamRun | N/A | ✅ 4-tab console（Member/Task/Approve/Event） | IM 侧更完整 |
+
+**核心问题：IM 聊天是纯文字聊天，无法在群聊中分派 Agent 任务。比赛评分项"AI 协作能力 30%"的核心差异化在 IM 侧完全缺失。**
+
+### 竞品关键差距（AgentHub vs 标杆）
+
+| 维度 | AgentHub | 竞品标杆 | 差距 |
+|------|---------|---------|------|
+| Chat 组件分层 | ChatView.tsx 单文件 1786 行 | Jean 70+ 文件、Kanna ChatPage+TranscriptViewport+20 消息组件 | 架构差距巨大 |
+| block key 稳定性 | `text-${index}` | CCUI `WeakMap+Set` 稳定 key；Kanna ID-based key | 流式闪烁根因 |
+| 虚拟滚动 | useVirtualizer + 3次 scrollToBottom + 手动 ResizeObserver | Kanna LegendList `maintainScrollAtEnd` 零手动代码 | 滚动体验差 |
+| Tool 渲染 | switch-case 硬编码 | CCUI ToolRenderer 配置驱动注册表 | 扩展性差 |
+| Diff 语法高亮 | 无 | CCUI Prism+oneDark、Jean 自定义 | 完全缺失 |
+| Tool 标题 | 截断 40 字符 | Kanna 按 toolKind 语义化（"Find \`pattern\` in files"） | 可读性差 |
+| 消息预处理 | 无（运行时内联分组） | Kanna `buildTranscriptRenderItems` 两阶段预处理 | 渲染层复杂 |
+| Tool 颜色编码 | 无 | CCUI 按类别左边框色标（edit=amber, bash=green, agent=purple） | 视觉扫描差 |
+
+### 前端修复优先路线（按性价比排序）
+
+**Phase 0 — IM 核心打通（最高优先，~5 天）— 比赛核心差异化**
+
+1. **IM 聊天集成 Agent 分派** — IMMessageInput 接入 useMention + Agent Profile 选择，群聊中 @Agent 触发任务
+2. **IM 消息支持富类型渲染** — 将 BlockRenderer/ToolUseBlock/DiffCard 适配到 IMMessageView
+3. **IM 消息乐观更新** — sendMessage 发送前先插入 optimistic message
+4. **统一主聊天与 IM 审批路径** — Edge permission + Team approval 合并为一致体验
+
+**Phase 1 — 紧急止血（本周，~3 天）**
+
+5. **修复 block key 稳定性** — `text-${index}` → `text-${contentHash}`，消除流式闪烁
+6. **清理 Mock 数据** — AgentMarketSection 移除或标注 "Coming Soon"
+7. **替换 `document.execCommand`** → `navigator.clipboard` + Selection API
+8. **z-index 统一到 tokens.css** — 所有硬编码值改用 CSS 变量
+9. **修复 iframe sandbox** — 移除 `allow-same-origin`，仅保留 `allow-scripts`
+10. **Diff 语法高亮** — DiffViewer 接入 react-syntax-highlighter (Prism)
+
+**Phase 2 — 架构重构（本月，~7 天）**
+
+11. **拆分 ChatView.tsx** — 提取 ChatMessageList、ChatScrollBehavior、ChatConnectionBanner（参考 Jean 70+ 文件拆法）
+12. **统一运行状态** — 消除三源同步，runStore 为唯一权威
+13. **引入消息预处理层** — 参考 Kanna `buildTranscriptRenderItems`，在渲染前合并 tool group
+14. **简化 scroll-to-bottom** — 评估 LegendList 替代 tanstack virtual
+15. **合并 Diff 解析** — 统一 parseUnifiedDiff 为一份实现
+
+**Phase 3 — 体验增强（下月，~5 天）**
+
+16. **Tool 渲染配置化** — 参考 CCUI `toolConfigs` 注册表
+17. **Tool 卡片颜色编码** — 参考 CCUI 左边框色标
+18. **Tool 标题语义化** — 参考 Kanna 按 toolKind 生成
+19. **Artifact 提取改结构化** — 从正则迁移到 tool output metadata
+20. **右侧面板 resize 实现** — useSidebarResize 补全 right 侧逻辑
