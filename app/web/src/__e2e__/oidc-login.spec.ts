@@ -25,7 +25,6 @@ interface MockOIDCParams {
 function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
   const {
     state = 'web-test-state-mock-12345',
-    code = 'web-test-auth-code-67890',
     authError,
     tokenError,
     deviceId = '00000000-0000-0000-0000-000000000002',
@@ -139,7 +138,7 @@ test.describe('Web OIDC Login — Happy Path', () => {
   });
 
   test('callback URL completes full OIDC login cycle', async ({ page }) => {
-    const counters = mockOIDCFlow(page);
+    mockOIDCFlow(page);
 
     // Plant pending PKCE data in sessionStorage
     await page.goto('/');
