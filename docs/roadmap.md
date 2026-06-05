@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 (R2 Desktop shell QA + 比赛视觉验收校准) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
+> 最后更新: 2026-06-05 (R2 CI 基线修复 + 比赛视觉验收校准) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
 ## 课题目标
 
@@ -85,6 +85,8 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 - 中间 transcript 以真实对话为主，不做 landing hero。每条 Agent/子 Agent 消息必须显示发送者身份；完成摘要、过程统计、回复/引用/重新生成、复制/应用 Diff、部署/产物卡必须在消息流中可见；长文本最大宽度收敛到可读范围，避免横跨整屏。
 - Transcript 必须覆盖进行中和失败态：streaming/thinking/tool running、route decision、dispatch、tool error、agent error 都要有可读卡片；inline artifact/preview/diff 卡留在消息流中，Right Inspector 只是证据汇总，不是唯一入口。
 - 右侧 Inspector 固定为证据列，宽屏约 300-340px：顶部状态 + 进度条，其下是任务规划/工具事件卡，再下是工作文件夹和最近产物。它要能回答“做了几步、跑了哪些工具、改了哪些文件、产物在哪”。
+- 第二张深色频道式参考图只吸收协作密度，不改变 light-first 主方向：左侧 channel/team roster 可以作为 R7 dark screenshot 的候选，但核心必须是 AgentHub 自己的 `research-team`/TeamRun 证据，而不是 Discord/Slack 复刻。右侧可以采用 `Active / Done / Warning` segmented queue：每个 Agent 任务卡显示角色、当前 tool、进度、耗时、暂停/取消/审批/详情入口，排队任务不能和正在执行任务混在一起。
+- 顶部 channel header 需要同时表达当前会话、参与 Agent、运行级别/模型状态和搜索/设置入口；状态 badge 应该是可操作过滤或详情入口，不做纯装饰。底部 status bar 可以保留连接状态、Agent 数、正在运行数、完成数、token 消耗和系统负载，但不得抢占 composer 高度。
 - Composer 固定在底部并预留稳定高度，含 `+`、文件、附件、@Agent、审批/权限等 icon action；发送按钮有 disabled/pending 状态，不因输入内容或附件列表造成布局跳动。
 - 视觉风格保持 light-first、低边框、小圆角、弱阴影、高对比文本；可以有轻微网格/玻璃感，但不能变成低可读度背景或营销页。
 - 截图验收必须覆盖 1440x920、1280x800、390x844；检查无横向滚动、右侧列不压正文、底部 composer 不遮挡最后一条消息、icon-only 控件有 aria-label/tooltip。390x844 必须明确 list -> transcript -> inspector/approval 的折叠路径，不能只隐藏关键证据。
@@ -109,7 +111,7 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 | 分支 | 状态 | 验证 | 合并前注意 |
 |---|---|---|---|
 | `phase-r1/teamrun-e2e` | PR #270 已 squash 合并 | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | 不是最终录屏；继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
-| `phase-r2/desktop-shell` | PR #271 已 ready；head `0b8e6701`；R2 代码 ready 但合并受 CI 基线阻塞 | `uiStore.test.ts` 4/4；Desktop `pnpm typecheck` 通过；`eslint src/App.tsx` 0 errors；Playwright console 无 ErrorBoundary；light 1440/1280/390 shell 截图已生成；Claude sonnet 只读 review PASS；队列 focused tests 128/128；`git diff --check` 通过 | 不在 CI 红灯下合并；先处理 `eventClient`/`transport`/`hubClient` 测试基线、frontend-desktop pnpm lockfile gate，以及 web/mobile/go/Docker 既有红项；最终比赛截图仍需 R3/R4/R7 叠加真实 transcript、右侧证据列和 Demo 运行产物 |
+| `phase-r2/desktop-shell` | PR #271 已 ready；head `d84f8681`；R2 代码 ready，主线已提交 Desktop/validate CI 基线修复，等待 PR 同步和 CI 复跑 | `uiStore.test.ts` 4/4；Desktop `pnpm typecheck` 通过；`eslint src/App.tsx` 0 errors；Playwright console 无 ErrorBoundary；light 1440/1280/390 shell 截图已生成；Claude sonnet 只读 review PASS；队列 focused tests 128/128；`git diff --check` 通过 | 不在 CI 红灯下合并；先让 R2 合入主线 CI 基线修复并复跑 Actions；web/mobile/go/Docker 既有红项仍需另行治理；最终比赛截图仍需 R3/R4/R7 叠加真实 transcript、右侧证据列和 Demo 运行产物 |
 | `phase-r3/transcript-contract` | draft PR #272 已开；integration dry-run 无冲突 | `IMBlockRenderer.test.tsx` + `IMMessageView.test.tsx` 31/31；队列 focused tests 128/128；`git diff --check` 通过 | R5 建议先于 R6A；R3 与 R6A 相邻但已验证自动合并 |
 | `phase-r4/right-inspector` | draft PR #273 已开；integration dry-run 无冲突 | `RightInspector.test.tsx` 23/23；队列 focused tests 128/128；`git diff --check` 通过 | 先以 props-only 组件接入，避免在同一 PR 重写 shell grid；与 R2 组合后补截图 |
 | `phase-r5/composer-convergence` | draft PR #274 已开；integration dry-run 无冲突 | `useComposerCore`/`attachment`/`IMMessageInput` focused tests 44/44；队列 focused tests 128/128；`git diff --check` 通过 | 不引入巨型 `UnifiedComposer`；建议在 R6A 前合并 |
@@ -119,15 +121,16 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 ### CI 基线阻塞（2026-06-05）
 
-R2 已经达到本地代码 review 门槛，但 GitHub Actions 当前不是可合并状态。后续 agent 先修或显式处置 CI 基线，不要绕过红灯合并：
+R2 已经达到本地代码 review 门槛；主线已修复 `frontend-desktop` / `validate` 的直接 CI 基线并本地通过，R2 仍需同步主线后等待 GitHub Actions 复跑。后续 agent 不要绕过红灯合并：
 
-- Desktop full test：`eventClient` / `transport` 的 `console.error` 断言在 `dev/delicious233` 本地同样失败；`hubClient` 在无根目录 `.env` 的 CI/worktree 环境失败，因为测试期望 `https://api.hub.vectorcontrol.tech`，而 `config.ts` dev default 是 `http://localhost:8080`。
-- Validate：`scripts/verify-ci-gates.ps1` 报 `frontend-desktop must cache the correct pnpm lockfile`。
+- Desktop full test：`eventClient` / `transport` 的 `console.error` 断言已通过恢复异常日志修复；`hubClient` 已改为断言 `HUB_URL` 配置值，不再依赖本机 `.env.local`。
+- Desktop shared UI test：Desktop Vite/Vitest 已强制 React peer 单例解析，`DiffReviewPanel` 测试已适配语法高亮 token span；`vitest.shared-ci.config.ts` 排除 `shared/src/components/__tests__` 中引用已不存在组件的陈旧测试，保留当前 shared `ui` 与 `StatusBadge` 测试。
+- Validate：`scripts/verify-ci-gates.ps1` 已对齐 workspace 事实，Desktop 使用 `app/pnpm-lock.yaml`，不再要求不存在的 `app/desktop/pnpm-lock.yaml`。
 - Web/Mobile/Go/Docker：当前 CI 还有 web lint、mobile typecheck、edge test、hub docker build、E2E smoke 等红项；这些不是 R2 touched files 引起，但会阻止 PR 自动合并。
 
 ### R2-R4 落地细化
 
-- R2 Shell 产出：固定布局 zones（rail / conversation / transcript / inspector / composer），rail 只放 icon action，conversation 宽度使用稳定响应式约束；不在这一步重写消息数据流。QA 发现并修复两类 shell 基础问题：Zustand 对象 selector 未 shallow 导致的 `useSyncExternalStore` 循环风险，以及 390px 视口仍显示桌面菜单造成的顶部挤压。R2 不再新增 `App.tsx` lint error，但 GitHub Actions 仍被仓库级 CI 基线红项阻塞，不能在红灯下合并。
+- R2 Shell 产出：固定布局 zones（rail / conversation / transcript / inspector / composer），rail 只放 icon action，conversation 宽度使用稳定响应式约束；不在这一步重写消息数据流。QA 发现并修复两类 shell 基础问题：Zustand 对象 selector 未 shallow 导致的 `useSyncExternalStore` 循环风险，以及 390px 视口仍显示桌面菜单造成的顶部挤压。R2 不再新增 `App.tsx` lint error；主线已修复 Desktop/validate 直接 CI 基线，R2 合并前必须同步后复跑 Actions。
 - R3 Transcript 产出：明确共享 `TranscriptBlock`/normalizer 或等价 adapter，保留 `IMBlockRenderer` 已有能力，把 `child_agent`、`route_decision`、`artifact`、`deploy_card` 从 null fallback 变为可见卡片。
 - R4 Inspector 产出：至少包含 Progress、Task Plan、Tool Timeline、Artifacts、Work Folder 五个区块；`TeamRunConsole` 作为深挖视图，右侧 Inspector 必须先给摘要证据；事件卡显示动作、工具名、路径/产物、完成状态，不堆无意义大卡片。
 
