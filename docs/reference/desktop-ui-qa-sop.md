@@ -12,12 +12,12 @@ Desktop UI 修复不能只停在“看起来好了”。满足以下条件后，
 2. 修复落在 `app/desktop/**`，或明确记录为 Desktop-only 阻塞。
 3. 至少有一个聚焦单元测试、Playwright 交互脚本或 DOM probe 覆盖本次变化。
 4. 修复后截一张客户端 viewport 图，不用整屏系统截图验收普通 UI。
-5. `docs/development/handoffs/STATE.md` 记录脱敏证据：截图路径、命令结果、手动点击路径和剩余风险。
+5. `docs/handoffs/STATE.md` 记录脱敏证据：截图路径、命令结果、手动点击路径和剩余风险。
 6. 所有启用按钮都必须真实有效；未接线功能必须禁用、隐藏或展示明确不可用/恢复态，不能保留 no-op 控件。
 
 ## 1. 接手检查
 
-1. 先读 `AGENTS.md`、`docs/development/handoffs/STATE.md`、`docs/tutorials/roadmap.md` 和本文件。
+1. 先读 `AGENTS.md`、`docs/handoffs/STATE.md`、`docs/roadmap.md` 和本文件。
 2. 在 AgentHub 仓库根目录检查分支和脏工作区：
 
 ```powershell
@@ -55,7 +55,7 @@ git diff --cached --name-status
    - 消息行不能带 virtualizer `translateY(...)`；
    - 相邻消息矩形不能重叠；
    - 新消息后容器应保持在底部或接近底部，除非用户手动滚离底部。
-7. 在 `docs/development/handoffs/STATE.md` 写脱敏证据：
+7. 在 `docs/handoffs/STATE.md` 写脱敏证据：
    - `.tmp/...` 截图路径；
    - runtime 名称和 thread 状态；
    - row count、overlap、transform、console error 摘要；
@@ -200,7 +200,7 @@ Thread/session 修复必须证明选择、新建、重命名、删除和 runtime
 - Sidebar 或 toolbar 的全局搜索入口必须打开真实 SearchDialog，并至少能搜索 thread 与 message。没有真实联系人数据源前，搜索入口和空态不得写“联系人 / contacts”。
 - 如果按钮打开菜单，验证菜单在客户端 viewport 内、焦点行为正常，且每个启用项会触发真实状态变化或 API 调用。
 - 如果功能尚未接线，展示 disabled、unavailable 或 recovery state，不保留假开关。
-- 未解决控件写入 `docs/development/handoffs/STATE.md`，标清文件 owner 和下一步验证方式。
+- 未解决控件写入 `docs/handoffs/STATE.md`，标清文件 owner 和下一步验证方式。
 - Settings 导航搜索不能出现空白导航区；无结果时必须显示明确空态，并用 probe 记录 `navButtonCount=0`、空态文案、无 raw i18n key、无全局水平溢出。
 - 不要用只有 chevron 的 `SettingRow action` 表示“以后可进入”。如果某行看起来像二级入口，必须提供真实编辑器、导航或 disabled 状态说明。典型例子：`个性化 / 自定义指令` 必须能保存本地设置，并在 `/v1/runs.appendSystemPrompt` 中验证，不得只显示箭头。
 - 顶栏 `文件 / 编辑 / 查看 / 窗口 / 帮助` 必须像应用菜单一样可打开下拉；每个 enabled 菜单项要触发真实 UI 状态、API 或剪贴板动作。浏览器 QA 无法执行的 Tauri 窗口命令必须 disabled 并显示 Desktop-only 说明。参考 QA 脚本：`.tmp/desktop-top-menu-qa.mjs`；参考证据：`.tmp/desktop-top-menu-qa.json` 与 `.tmp/desktop-top-menu-*-pw.png`。
@@ -225,7 +225,7 @@ Thread/session 修复必须证明选择、新建、重命名、删除和 runtime
 
 ## 9. Handoff 模板
 
-Desktop 证据建议按这个结构写入 `docs/development/handoffs/STATE.md`：
+Desktop 证据建议按这个结构写入 `docs/handoffs/STATE.md`：
 
 ```markdown
 - **Desktop QA `<topic>` (2026-05-27)**:
@@ -294,7 +294,7 @@ git diff --name-only -- docs app/desktop | % { Select-String -Path $_ -Pattern "
 
 ## 12. 交接清单
 
-停止或交接 Desktop UI 工作前，更新 `docs/development/handoffs/STATE.md`：
+停止或交接 Desktop UI 工作前，更新 `docs/handoffs/STATE.md`：
 
 - 当前分支和 dirty-tree 边界；
 - 本轮有意触碰的 Desktop 文件；

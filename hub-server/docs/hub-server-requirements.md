@@ -1,4 +1,4 @@
-> ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/development/handoffs/STATE.md` and `docs/tutorials/roadmap.md` for current status.**
+> ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/handoffs/STATE.md` and `docs/roadmap.md` for current status.**
 > Most planned work in this document has been completed. This file is retained as a historical reference.
 
 # AgentHub Hub Server 需求文档

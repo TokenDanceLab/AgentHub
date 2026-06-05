@@ -422,7 +422,7 @@ two-path pattern: relative alias first, absolute fallback second.
 **3. AgentHub MCP server.**
 Build a minimal stdio MCP server (mirroring `mcp.ts`) that exposes AgentHub project state:
 - `get_active_context` -- which project/thread/branch is currently active
-- `get_state` -- read `docs/development/handoffs/STATE.md` as a structured resource
+- `get_state` -- read `docs/handoffs/STATE.md` as a structured resource
 - `get_roadmap` -- read current roadmap tasks
 - `list_skills` -- enumerate `.agents/skills/`
 - `get_skill` -- read a specific SKILL.md body
