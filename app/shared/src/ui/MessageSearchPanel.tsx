@@ -37,6 +37,7 @@ function extractMessageText(msg: ChatMessage): string {
         case 'child_agent': return `${block.title} ${block.result ?? ''} ${block.error ?? ''}`;
         case 'route_decision': return `${block.action} ${block.instructions ?? block.summary ?? ''} ${block.reasoning ?? ''}`;
         case 'error': return block.message ?? '';
+        case 'status': return block.content;
         default: return '';
       }
     })
