@@ -663,30 +663,44 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	h.ensureDefaults()
 
 	// Allow the workDir used by this test to pass workspace validation.
-	h.WorkspaceAllowlist = []string{`D:\Code\TokenDance\AgentHub`}
+	workDir := filepath.Join(t.TempDir(), "AgentHub")
+	if err := os.MkdirAll(workDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	h.WorkspaceAllowlist = []string{workDir}
 
-	body := `{
-		"projectId":"proj_local",
-		"threadId":"thread_local",
-		"prompt":"review this patch",
-		"agentId":"codex",
-		"model":"gpt-5.5",
-		"reasoningEffort":"high",
-		"thinkingMode":"adaptive",
-		"permissionMode":"plan",
-		"workDir":"D:\\Code\\TokenDance\\AgentHub",
-		"includePartial":true,
-		"structuredOutputSchema":"{\"type\":\"object\"}",
-		"systemPrompt":"You are a careful reviewer.",
-		"appendSystemPrompt":"Keep output concise.",
-		"allowedTools":["Read","Grep"],
-		"configOverrides":{"reasoning_summary":"auto"},
-		"agentDefinitions":{"reviewer":{"description":"Review code","prompt":"Check correctness","tools":["Read"],"model":"sonnet"}},
-		"mcpConfig":"{\"servers\":{\"filesystem\":{\"command\":\"node\"}}}",
-		"hubTaskId":"task_hub_1",
-		"ephemeral":true
-	}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(body))
+	body, err := json.Marshal(map[string]any{
+		"projectId":              "proj_local",
+		"threadId":               "thread_local",
+		"prompt":                 "review this patch",
+		"agentId":                "codex",
+		"model":                  "gpt-5.5",
+		"reasoningEffort":        "high",
+		"thinkingMode":           "adaptive",
+		"permissionMode":         "plan",
+		"workDir":                workDir,
+		"includePartial":         true,
+		"structuredOutputSchema": `{"type":"object"}`,
+		"systemPrompt":           "You are a careful reviewer.",
+		"appendSystemPrompt":     "Keep output concise.",
+		"allowedTools":           []string{"Read", "Grep"},
+		"configOverrides":        map[string]any{"reasoning_summary": "auto"},
+		"agentDefinitions":       map[string]any{
+			"reviewer": map[string]any{
+				"description": "Review code",
+				"prompt":      "Check correctness",
+				"tools":       []string{"Read"},
+				"model":       "sonnet",
+			},
+		},
+		"mcpConfig":              `{"servers":{"filesystem":{"command":"node"}}}`,
+		"hubTaskId":              "task_hub_1",
+		"ephemeral":              true,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
 	rec := httptest.NewRecorder()
 
 	h.PostRuns(rec, req)
@@ -704,7 +718,7 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	if ctx.ReasoningEffort != "high" || ctx.ThinkingMode != "adaptive" || ctx.PermissionMode != "plan" {
 		t.Fatalf("runtime policy context = %#v", ctx)
 	}
-	if ctx.WorkDir != `D:\Code\TokenDance\AgentHub` || !ctx.IncludePartial || !ctx.Ephemeral {
+	if ctx.WorkDir != workDir || !ctx.IncludePartial || !ctx.Ephemeral {
 		t.Fatalf("execution context = %#v", ctx)
 	}
 	if ctx.StructuredOutputSchema != `{"type":"object"}` {
@@ -871,12 +885,17 @@ func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
 	// This is the fail-closed security behavior for AH-SR-006.
 	h.WorkspaceAllowlist = []string{} // explicitly empty; nil would behave the same
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil || homeDir == "" {
+		homeDir = t.TempDir()
+	}
+
 	tests := []struct {
 		name    string
 		workDir string
 	}{
 		{"any valid dir", t.TempDir()},
-		{"home directory", os.Getenv("USERPROFILE")},
+		{"home directory", homeDir},
 		{"root filesystem", string(filepath.Separator)},
 	}
 
