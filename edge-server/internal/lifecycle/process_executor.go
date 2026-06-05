@@ -483,6 +483,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	slog.Debug("executor.subprocess.starting", "runId", run.ID, "command", cmdPath, "args", args)
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {
+			if cmd.Process != nil {
+				_, _ = cmd.Process.Wait()
+			}
 			e.publishCancelled(run)
 			return
 		}
