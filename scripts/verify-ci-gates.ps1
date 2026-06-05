@@ -65,7 +65,7 @@ Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $false
 Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $false
 
 foreach ($job in @(
-    @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/desktop/pnpm-lock.yaml" },
+    @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "frontend-web"; Body = $web; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "frontend-mobile"; Body = $mobile; Lockfile = "app/pnpm-lock.yaml" },
     @{ Name = "e2e-smoke"; Body = $e2e; Lockfile = "app/pnpm-lock.yaml" }
