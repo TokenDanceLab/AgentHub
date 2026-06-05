@@ -76,6 +76,17 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 | Right Inspector | 进度、任务计划、Tool timeline、Changed Files、Artifact、工作文件夹 | `RunDetail`、`TeamRunDock`、`TeamRunConsole`、`FileExplorer` | 宽屏常驻；窄屏可收起但必须有入口；它是证据面板，不是装饰卡 |
 | Unified Composer | @Agent、附件、工作目录、审批模式、发送/部署 | `PromptInput`、`IMMessageInput`、`useMention` | 后续抽共享 composer adapter；IM 与本地 Run 的 payload 语义一致 |
 
+### 竞品截图复核后的视觉验收
+
+这轮参考图只吸收工作台信息密度和证据组织方式，不照搬头像、品牌、背景纹理或无关装饰。R2/R4/R7 合并验收时按以下规则检查：
+
+- 左侧必须是两级导航：窄 Global Rail 固定 48-56px，只放头像和 icon action；Conversation Sidebar 固定 280-320px，包含搜索、Manager/Worker/Project 分组、未读/时间/状态，不能把联系人散落到主内容区。
+- 中间 transcript 以真实对话为主，不做 landing hero。完成摘要、过程统计、回复/引用/重新生成、部署/产物卡必须在消息流中可见；长文本最大宽度收敛到可读范围，避免横跨整屏。
+- 右侧 Inspector 固定为证据列，宽屏约 300-340px：顶部状态 + 进度条，其下是任务规划/工具事件卡，再下是工作文件夹和最近产物。它要能回答“做了几步、跑了哪些工具、改了哪些文件、产物在哪”。
+- Composer 固定在底部并预留稳定高度，含 `+`、文件、附件、@Agent、审批/权限等 icon action；发送按钮有 disabled/pending 状态，不因输入内容或附件列表造成布局跳动。
+- 视觉风格保持 light-first、低边框、小圆角、弱阴影、高对比文本；可以有轻微网格/玻璃感，但不能变成低可读度背景或营销页。
+- 截图验收必须覆盖 1440x920、1280x800、390x844；检查无横向滚动、右侧列不压正文、底部 composer 不遮挡最后一条消息、icon-only 控件有 aria-label/tooltip。
+
 ### 执行队列
 
 执行顺序以 Sprint Rank 为准，R-ID 只是派发和追踪编号。R0 先完成文档合同；R1 和 R2 可并行，但 R1 的 TeamRun 证据不能被 R2-R5 的视觉重组压后。
@@ -107,7 +118,7 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 - R2 Shell 产出：固定布局 zones（rail / conversation / transcript / inspector / composer），rail 只放 icon action，conversation 宽度使用稳定响应式约束；不在这一步重写消息数据流。
 - R3 Transcript 产出：明确共享 `TranscriptBlock`/normalizer 或等价 adapter，保留 `IMBlockRenderer` 已有能力，把 `child_agent`、`route_decision`、`artifact`、`deploy_card` 从 null fallback 变为可见卡片。
-- R4 Inspector 产出：至少包含 Progress、Task Plan、Tool Timeline、Artifacts、Work Folder 五个区块；`TeamRunConsole` 作为深挖视图，右侧 Inspector 必须先给摘要证据。
+- R4 Inspector 产出：至少包含 Progress、Task Plan、Tool Timeline、Artifacts、Work Folder 五个区块；`TeamRunConsole` 作为深挖视图，右侧 Inspector 必须先给摘要证据；事件卡显示动作、工具名、路径/产物、完成状态，不堆无意义大卡片。
 
 ### Subagent 分派规则
 
