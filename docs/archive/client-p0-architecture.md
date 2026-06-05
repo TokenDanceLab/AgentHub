@@ -1,4 +1,5 @@
 # AgentHub Desktop Client -- P0 架构实施详情
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 > 从 `docs/roadmap.md` 提取的 Phase 0 实施细节：代码片段、风险评估、测试要求、验收标准。
 > 原文路线图仅保留任务清单和依赖关系，详见 `docs/roadmap.md`。

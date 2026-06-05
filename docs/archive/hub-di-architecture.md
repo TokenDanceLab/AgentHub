@@ -1,4 +1,5 @@
 # Hub Server 依赖注入架构设计
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 > 目标：消除 `config.Cfg`、`repository.DB`、`cache.RDB` 三个全局单例，实现 Manual DI（手动依赖注入）。
 >

@@ -1,4 +1,5 @@
 # Frontend Issue Closeout Evidence - 2026-06-01
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 This note records which open frontend/client issues are already covered by current Desktop tests after PR #229 landed on `dev/delicious233`.
 

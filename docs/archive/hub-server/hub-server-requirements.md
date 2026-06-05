@@ -1,4 +1,5 @@
 > ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/handoffs/STATE.md` and `docs/roadmap.md` for current status.**
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 > Most planned work in this document has been completed. This file is retained as a historical reference.
 
 # AgentHub Hub Server 需求文档

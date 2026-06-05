@@ -18,6 +18,8 @@ func TestFileStoreStartsEmptyAndCreatesSnapshotWhenFileDoesNotExist(t *testing.T
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
+	defer s.Close()
+
 	if got := s.ListProjects(); len(got) != 0 {
 		t.Fatalf("ListProjects = %#v, want empty", got)
 	}
@@ -61,10 +63,14 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
 	}
 
+	s.Flush()
+	s.Close()
+
 	restored, err := NewFile(path)
 	if err != nil {
 		t.Fatalf("NewFile restored returned error: %v", err)
 	}
+	defer restored.Close()
 
 	if got := restored.ListProjects(); len(got) != 2 || got[0].ID != "proj_b" || got[1].ID != "proj_a" {
 		t.Fatalf("ListProjects = %#v, want proj_b then proj_a", got)
@@ -127,10 +133,15 @@ func TestFileStoreCleanupRunsPersistsRemovedRunsAndItems(t *testing.T) {
 		t.Fatalf("CleanupRuns result = %#v, want one removed run and item", result)
 	}
 
+	s.Flush()
+	s.Close()
+
 	restored, err := NewFile(path)
 	if err != nil {
 		t.Fatalf("NewFile restored returned error: %v", err)
 	}
+	defer restored.Close()
+
 	if _, ok := restored.GetRun(run.ID); ok {
 		t.Fatal("removed run was restored from snapshot")
 	}
@@ -195,6 +206,8 @@ func TestFileStoreTreatsEmptySnapshotAsEmptyStore(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewFile returned error: %v", err)
 			}
+			defer s.Close()
+
 			if got := s.ListProjects(); len(got) != 0 {
 				t.Fatalf("ListProjects = %#v, want empty", got)
 			}
@@ -212,6 +225,8 @@ func TestFileStoreRestoresEmptyJSONObjectAsEmptyStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
+	defer s.Close()
+
 	if got := s.ListProjects(); len(got) != 0 {
 		t.Fatalf("ListProjects = %#v, want empty", got)
 	}
@@ -261,6 +276,8 @@ func TestFileStoreFillsMissingOrderFromSnapshotMaps(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
+	defer s.Close()
+
 	if got := s.ListProjects(); len(got) != 2 || got[0].ID != "proj_b" || got[1].ID != "proj_a" {
 		t.Fatalf("ListProjects = %#v, want existing valid order then sorted missing", got)
 	}
@@ -286,7 +303,10 @@ func TestFileStoreDoesNotLeaveTempFilesAfterSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
+	defer s.Close()
+
 	_, _ = s.CreateProject("proj_test", "Test Project")
+	s.Flush()
 
 	matches, err := filepath.Glob(filepath.Join(dir, "store.json.tmp-*"))
 	if err != nil {
@@ -337,6 +357,8 @@ func TestFileStoreLastPersistErrorTracksSaveFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
+	defer s.Close()
+
 	if err := os.Remove(path); err != nil {
 		t.Fatalf("Remove returned error: %v", err)
 	}
@@ -345,6 +367,8 @@ func TestFileStoreLastPersistErrorTracksSaveFailure(t *testing.T) {
 	}
 
 	_, _ = s.CreateProject("proj_test", "Test Project")
+	s.Flush()
+
 	if err := s.LastPersistError(); err == nil {
 		t.Fatal("LastPersistError returned nil after persist failure")
 	}
