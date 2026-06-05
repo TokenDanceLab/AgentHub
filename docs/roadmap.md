@@ -1,114 +1,217 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 | 5 天 Desktop 比赛交付指挥盘
-> 历史长版已归档: [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md), [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> 最后更新: 2026-06-05 | 按优先级持续推进 | 历史长版: [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md), [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
-## 目标和评分约束
+## 目标
 
-AgentHub 是 IM 形态的多 Agent 协作平台。比赛前唯一主线是把 Desktop/Tauri 做成可运行、可录屏、可解释的 IM-first Command Center：用户像用飞书/微信一样发消息、@ 多个 Agent，由 Orchestrator 分派任务，Agent 在同一 transcript 内返回文本、工具过程、Diff、Preview、Approval、产物和部署状态。
+AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞书/微信一样发消息、@ 多个 Agent，由 Orchestrator 分派任务，Agent 在同一 transcript 内返回文本、工具过程、Diff、Preview、Approval、产物和部署状态。比赛前以 Desktop/Tauri 为主力交付面；Web/Mobile 在 Desktop 闭环跑通后迁移共享能力。
 
-评分权重决定当前优先级：
+赛题材料在 workspace 根目录：`../docs/competition/bytedance.md`、`../docs/competition/SUBMISSION-CHECKLIST.md`。评分权重：AI 协作能力 30%，功能完整度 25%，生成效果 20%，代码理解 15%，创新与产品感 10%。
 
-| 权重 | 对 AgentHub 的落地要求 |
-|---:|---|
-| AI 协作能力 30% | 展示 spec/rules/roadmap/subagent 协作记录，以及真实 TeamRun 多 Agent transcript |
-| 功能完整度 25% | IM 单聊/群聊、@Agent、Orchestrator route、上下文、产物内联、审批路径可演示 |
-| 生成效果 20% | 第一屏是工作台，不是空壳；Diff/Preview/Tool/Artifact 卡片在消息流和右侧证据列可见 |
-| 代码理解 15% | 架构边界清晰：Desktop -> Edge -> Runtime，Hub 只在账号/同步/远程审计场景进入 |
-| 产品感 10% | 信息密度、稳定 composer、任务队列、证据列、移动折叠路径都像真实工具 |
+## 推进规则
 
-比赛材料在 workspace 根目录：`../docs/competition/bytedance.md`、`../docs/competition/SUBMISSION-CHECKLIST.md`。截止日期是 2026-06-10。
-
-## 当前结论
-
-- Desktop 先做完；Web/Mobile 只在 Desktop 验收后迁移共享能力。现在两线推进会稀释比赛主分。
-- 不再把 Phase A/B/C/D 长期 backlog 放进主路线图。长期工程债保留在 archive 和专题 docs，不能驱动 2026-06-10 前的派工。
-- R2/R4/R5/R3/R6A 是当前 Desktop 队列；R2 先合入，再叠右侧 Inspector、Composer、Transcript contract、乐观消息。
-- Repo-wide Go/Web/Mobile/Docker/E2E 红项是独立基线债。除非阻塞 Desktop 演示或必需检查合并，否则不在本冲刺展开。
-- 所有“完成”必须有当前 commit 可验证证据：focused tests、截图、真实运行日志、TeamRun export 或录屏片段。静态 mock 截图不能冒充真实多 Agent 协作。
-
-## 5 天交付计划
-
-| 日期 | Day | 目标 | 完成判定 |
-|---|---:|---|---|
-| 2026-06-05 | D0 | 路线图治理；确认比赛约束；锁定 Desktop 队列；R2 合并策略 | `docs/roadmap.md` 小于 220 行；archive 有完整历史；R2 blocker 被明确分类 |
-| 2026-06-06 | D1 | 合入 R2 Desktop shell；叠 R4 Right Inspector；补 1440/1280/390 shell 截图 | Global Rail + Conversation Sidebar + Transcript + Right Inspector + Composer 同屏成立 |
-| 2026-06-07 | D2 | 合入 R5 Composer 和 R3 Transcript contract；消除 IM/Chat 双 renderer 漂移 | @Agent、附件、approval mode、Tool/Diff/Approval/Artifact block 在主流路径一致 |
-| 2026-06-08 | D3 | 合入 R6A optimistic IM；补 approval 一致性最小切片；跑真实 TeamRun | 两个真实 Runtime Profile 的 route/task/event/transcript/export 可录屏 |
-| 2026-06-09 | D4 | Demo polish；视觉 QA；比赛文档和 AI 协作日志同步 | 3 分钟脚本可连续演示；截图集覆盖 light/dark、宽屏/窄屏、成功/失败/审批态 |
-| 2026-06-10 | D5 | 提交包冻结；只修 P0 演示崩溃和文案事实错误 | README、技术文档、产品文档、Demo、协作日志、视频、证据索引一致 |
+- 先 Desktop，后 Web/Mobile。当前不做双线 UI 重组。
+- 先真实演示闭环，后长期工程债。SQLite、Web、Mobile、Remote Edge 等重要但不能阻塞 TeamRun Demo。
+- 每个完成项必须有证据：focused tests、截图、真实运行日志、TeamRun export、录屏片段或当前 PR 状态。
+- Roadmap 记录优先级、依赖、验收和长期方向，不写人工日程表。
+- 子代理只做窄任务：sonnet 做 Desktop UI/视觉，haiku 做 Go/Edge 小 blocker，opus 做架构/安全/审查。
 
 ## 当前最高优先级
 
-| Rank | 工作 | 状态 | 下一步 |
-|---:|---|---|---|
-| 1 | R2 Desktop Shell IA | PR #271 open, ready, head `0048be84`; `frontend-desktop` 和 `validate` 绿，merge state `UNSTABLE` | 判断 repo-wide 红项是否可豁免；若不能，单独记录合并阻塞，不转去修 Web/Mobile |
-| 2 | R4 Right Inspector | PR #273 draft, head `b71d9a5c`; focused tests 曾绿，GitHub 当前红 | 等 R2 后 rebase；接入 progress、tool timeline、changed files、workspace evidence |
-| 3 | R5 Composer Convergence | PR #274 draft, head `7d9bcd54`; focused tests 曾绿，GitHub 当前红 | 等 R2/R4 后 rebase；保持共享 core，小切片合并 |
-| 4 | R3 Transcript Contract | PR #272 draft, head `30894536`; focused tests 曾绿，GitHub 当前红 | 在 R5 后合；避免新增第三套 renderer |
-| 5 | R6A Optimistic IM | PR #275 draft, head `89ade593`; focused tests 曾绿，GitHub 当前红 | 在 R3 后合；approval 一致性另起小切片 |
-| 6 | 真实 TeamRun 证据 | PR #270 已合入证据链基础，但还缺最终录屏和导出 | 跑两个真实 Runtime Profile；输出 transcript、task route、events、截图、视频素材 |
-| 7 | 比赛材料同步 | 旧提交清单含 Web/Mobile 和 2026-06-01 状态，需压缩为 Desktop 证据优先 | 更新 feature matrix、submission checklist、demo script、AI collaboration log |
+| Rank | 任务 | 状态 | 下一步 | 验收证据 |
+|---:|---|---|---|---|
+| P0-1 | R2 Desktop Shell IA | PR #271 ready，head `0048be84`；`frontend-desktop`/`validate` 绿，repo-wide checks 红 | 合并或明确必需检查豁免；不转去修 Web/Mobile/Go/Docker 基线债 | Desktop typecheck/focused tests，1440/1280/390 shell 截图 |
+| P0-2 | R4 Right Inspector | PR #273 draft，head `b71d9a5c` | 等 R2 后 rebase；接入 progress、tool timeline、changed files、workspace evidence | RightInspector focused tests，右侧证据列截图 |
+| P0-3 | R5 Composer Convergence | PR #274 draft，head `7d9bcd54` | 等 R2/R4 后 rebase；保持共享 core，小切片合并 | composer focused tests，@Agent/附件/approval mode 截图 |
+| P0-4 | R3 Transcript Contract | PR #272 draft，head `30894536` | 在 R5 后合；避免 IM/Chat 出现第三套 renderer | Tool/Diff/Thinking/Approval/Artifact block 回归测试 |
+| P0-5 | R6A Optimistic IM | PR #275 draft，head `89ade593` | 在 R3 后合；approval 一致性另起小切片 | pending/failed 气泡测试，失败回滚截图 |
+| P0-6 | 真实 TeamRun E2E | PR #270 已合入证据链基础，最终录屏/导出未完成 | 跑两个真实 Runtime Profile；导出 route/task/event/transcript | 运行日志、事件导出、截图、3 分钟视频素材 |
+| P0-7 | 比赛材料同步 | 旧提交清单仍混有 Web/Mobile/2026-06-01 状态 | 更新 feature matrix、submission checklist、demo script、AI 协作日志 | 文档 diff 指向当前 commit 证据 |
 
-推荐合并顺序：R2 -> R4 -> R5 -> R3 -> R6A。每合一个分支立刻跑 Desktop-focused gate，不等待“大而全”的 repo 治理。
+推荐合并顺序：R2 -> R4 -> R5 -> R3 -> R6A。每合一个分支立刻跑 Desktop-focused gate，再补视觉证据。
 
-## Desktop 分支队列
+## P0: Desktop 比赛闭环
 
-| ID | PR | 分支 | 写入范围 | Desktop 验收 |
-|---|---|---|---|---|
-| R2 | #271 | `phase-r2/desktop-shell` | `app/desktop/src/App.tsx`, `App.module.css`, `config/viewRegistry.ts`, `views/IMView.tsx`, tests | 四栏 IA 成立；无横向滚动；right panel 有明确入口；1440/1280/390 截图 |
-| R4 | #273 | `phase-r4/right-inspector` | `RunDetail*`, `RightInspector*`, `TeamRunDock*`, `TeamRunConsole*`, `FileExplorer*`, `uiStore.ts` | 右侧显示状态、进度、Active/Done/Warning queue、tools、changed files、workspace |
-| R5 | #274 | `phase-r5/composer-convergence` | `PromptInput*`, `IMMessageInput*`, `hooks/useMention.ts`, composer tests | Enter/Shift+Enter、@Agent、附件、workdir、approval mode、disabled/pending 状态一致 |
-| R3 | #272 | `phase-r3/transcript-contract` | `components/IM/*`, `components/ChatView*`, `ChatView.types.ts`, block tests | Tool/Diff/Thinking/Approval/Artifact/child_agent/route_decision 不被 Markdown fallback 吞掉 |
-| R6A | #275 | `phase-r6/im-optimistic` | `hooks/useIMChat.ts`, `components/IM/*`, approval UI/API tests | 发送立即出现 pending 气泡；失败可回滚；审批卡和子 Agent 路由卡进入 IM 流 |
+### P0-A 信息架构
 
-## Desktop 视觉和 Demo 验收
+- [ ] 合入 R2：Global Rail + Conversation Sidebar + Unified Transcript + Right Inspector + Unified Composer 的 shell 基础。
+- [ ] 保证 1440x920、1280x800、390x844 无横向滚动、无文本遮挡、composer 不遮挡最后消息。
+- [ ] 保持 light-first 主方向；深色参考只用于任务队列密度和可读性验证。
+- [ ] 左侧两级导航：Global Rail 只放全局入口，Conversation Sidebar 展示 Manager/Worker/Project 群聊。
+- [ ] 顶部 header 展示当前会话、参与 Agent、运行/模型状态、搜索/设置入口。
 
-竞品截图只吸收信息架构，不复制品牌、头像、背景纹理或暗色装饰。AgentHub 自己的 Desktop 必须满足：
+### P0-B IM transcript 和富消息
 
-- 左侧两级导航：48-56px Global Rail + 280-320px Conversation Sidebar。Manager 私聊、Worker 私聊、Project 群聊层级清晰，支持搜索、最近活跃、置顶/归档/空状态。
-- 中间是 Unified Transcript，不做 landing hero。每条 Agent/子 Agent 消息显示身份、Runtime badge、时间、工具状态和可操作卡片。
-- 右侧是证据列，不是装饰 summary。宽屏 300-340px 常驻；包含 progress、Active/Done/Warning queue、tool timeline、changed files、workspace、artifacts。
-- 底部 Unified Composer 高度稳定；`+`、文件、附件、@Agent、审批/权限、发送按钮使用 icon action，并具备 disabled/pending/错误态。
-- 消息流同时覆盖成功、进行中、失败和审批：thinking/tool running、route decision、dispatch、tool error、agent error、approval required 都有可读卡片。
-- 1440x920、1280x800、390x844 必须无横向滚动、无文本遮挡、composer 不盖住最后一条消息。390x844 明确 list -> transcript -> inspector/approval 的折叠路径。
-- 真实 TeamRun 截图必须来自当前运行，不用 mock 数据伪装。演示中至少能看到两个 Runtime/Profile 协作、Orchestrator route、子任务、工具过程、产物和最终摘要。
+- [x] IM @Agent 输入：`IMMessageInput` 已接入 `useMention` / `MentionPopover`。
+- [x] IM 富消息基础：`IMBlockRenderer` 已支持 Tool/Diff/Thinking/Approval 摘要。
+- [ ] 合入 R3：主 Chat 与 IM 共享 block/normalization 约束，避免 renderer 漂移。
+- [ ] child_agent、route_decision、artifact、deploy block 进入 IM 流。
+- [ ] Diff/Preview/Tool/Artifact 卡片既能在消息流可见，也能在右侧 Inspector 汇总。
 
-## 24 小时执行队列
+### P0-C Right Inspector 证据列
 
-| 顺序 | Owner | 任务 | 产出 |
-|---:|---|---|---|
-| 1 | 主 Agent | 完成本文件治理，提交并推送 | `docs/roadmap.md` 精简版 + archive 快照 |
-| 2 | 主 Agent | 复核 PR #271 必需检查策略 | 合并 R2，或在 PR/roadmap 写明 Desktop 绿但 repo-wide 基线阻塞 |
-| 3 | sonnet | R4 rebase 到 R2 后修 Desktop UI 接入 | Right Inspector 截图和 focused tests |
-| 4 | sonnet | R5/R3 按顺序 rebase，减少 renderer/composer 漂移 | Composer + transcript focused tests |
-| 5 | haiku | 只在真实 TeamRun 被 Go/Edge 小 bug 阻塞时介入 | 最小 Go 修复 + `go test ./... -short -count=1` 对应包 |
-| 6 | opus | 审查合并后 IA、评分覆盖和 demo script | 3 分钟脚本、证据索引、答辩要点 |
+- [ ] 合入 R4：宽屏右侧常驻证据列，窄屏可折叠但入口明确。
+- [ ] 展示 progress、Active/Done/Warning queue、tool timeline、changed files、workspace、artifacts。
+- [ ] 任务卡显示 Agent 角色、当前 tool、进度、耗时、暂停/取消/审批/详情入口。
+- [ ] 右侧列回答“做了几步、跑了哪些工具、改了哪些文件、产物在哪”。
 
-## Subagent 分派规则
+### P0-D Composer 和协作动作
 
-- sonnet：Desktop UI、多模态截图审查、CSS/React 小切片。允许路径优先限制在 `app/desktop/src/` 和必要的 `app/shared/src/ui/`。
-- haiku：Go/Edge/Hub 的小型阻塞修复。只在 Desktop TeamRun 真实运行被后端问题卡住时派发，不做后台治理大扫除。
-- opus：架构判断、安全/权限审查、PR 顺序和比赛材料一致性审查。重要合并前至少一次只读 review。
-- 每个 subagent prompt 必须写清允许路径、禁止范围、验收命令和“不碰 Web/Mobile/Go/Docker 基线债”的边界。
-- subagent 交付后主 Agent 复核 diff、运行 targeted checks，再决定是否合并。
+- [ ] 合入 R5：`PromptInput` / `IMMessageInput` 的 @Agent、附件、workdir、approval mode 语义一致。
+- [ ] 合入 R6A：IM 发送立即出现 pending 气泡，失败可回滚并展示错误。
+- [ ] 统一 Edge permission approval 和 Team approval 的视觉路径。
+- [ ] Enter 发送、Shift+Enter 换行、disabled/loading、附件入口都有测试。
 
-## 暂不做
+### P0-E 真实 TeamRun
 
-这些方向继续保留，但不进入 2026-06-10 前 Desktop 主线：
+- [ ] 至少两个真实 Runtime/Profile 在同一 group/team run 中协作。
+- [ ] Orchestrator route、子任务、工具过程、失败/审批处理、产出聚合进入同一 transcript。
+- [ ] 导出 Hub state/events/tasks/assignments 或等价无密证据。
+- [ ] 录制 3 分钟脚本素材：开场、分派、执行、Diff/Preview、审批、总结。
 
-- Web 工作台重组、Web visual QA、Web lint/typecheck 基线治理。
-- Mobile Tauri/OIDC 深链、移动端截图补全。
-- Go repo-wide 测试基线、Docker build、cross-platform build、E2E smoke 的系统性治理。
-- Edge SQLite/FTS5 完整持久化、Remote Edge、Cloud Edge、Hub Relay。
-- Feishu/Lark、Agent Market、完整部署发布、公开站 SEO/i18n。
-- ChatView 全量重写、LegendList 替换、全局状态大重构。
+## P1: 生成效果和 Desktop 稳定性
 
-如果以上事项成为 Desktop Demo 的直接 P0 blocker，先写明 blocker、最小修复范围和回退方案，再单独派发；不能把它们重新塞回主路线图。
+| 任务 | 来源 | 优先级 | 验收 |
+|---|---|---:|---|
+| Diff 语法高亮和长行处理 | 前端审计 P1/P2 | 高 | 大文件不卡顿，长行不水平溢出 |
+| Diff 解析统一 | 前端审计 P1 | 高 | `shared/diff.ts` 与 desktop parser 收敛为一套行为 |
+| Artifact/Preview 稳定提取 | 前端审计 P1 | 高 | 中文/JSON/tool metadata 输出能识别文件和预览入口 |
+| Tool 参数深度截断 | 前端审计 P1 | 高 | 嵌套/base64 数据不爆 DOM，有明确截断提示 |
+| null/畸形 tool input 防崩溃 | 前端审计 P1 | 高 | `summarizeInput`、ToolGroup、ChatView 对 null 安全 |
+| output 截断提示 | Phase B4 + 前端审计 | 高 | >20K 或 1MB 输出有 `truncated` 事件/提示，不静默丢头部 |
+| scroll-to-bottom 简化 | 前端审计 P1 | 中 | 用户上滑历史时不被强制滚回底部 |
+| Blob URL revoke | 前端审计 P1 | 中 | 下载后释放 object URL |
+| 消息骨架屏/streaming ticker | 前端审计 P2 | 中 | 流式等待态可读，不闪烁 |
+| Markdown 数学公式 | 前端审计 P2 | 低 | 仅在 demo/文档生成需要时做 |
 
-## 归档和治理规则
+## P2: IM 产品完整性
 
-- 主 `docs/roadmap.md` 只保留当前 5 天可执行命令、分支队列、验收条件和禁止范围，目标控制在 220 行以内。
-- 历史 Phase A/B/C/D、Quick Wins、长期安全/性能/架构债、深度竞品审计和评审长文归档到 `docs/archive/`，不再重复粘贴。
-- 更新 roadmap 时用替换和合并，不追加第二套状态叙事。每次状态变化只改当前表格的一行。
-- 与比赛提交相关的事实最终同步到 `docs/competition/*`；与当前接手状态相关的事实同步到 `docs/handoffs/STATE.md`。
+### P2-A 会话核心
+
+- [ ] 对话列表：新建、置顶、归档、搜索，按最近活跃排序。
+- [ ] 单聊模式：选中联系人或 Agent 后进入 1v1 对话。
+- [ ] 群聊模式：项目群聊、Manager 私聊、Worker 私聊层级清晰。
+- [ ] 消息操作：回复、引用、复制代码、重新生成、展开预览。
+- [ ] 上下文管理：聊天历史自动传递，支持 pin 关键消息。
+- [ ] IM 搜索：按消息、Agent、任务状态检索。
+- [ ] IM 群聊管理：leave、dissolve、成员管理 API 有 UI 入口。
+- [ ] Typing indicator：HubWSHandle.sendTyping 接入 UI。
+
+### P2-B Agent 可视化
+
+- [ ] Agent 运行状态：思考中、工具调用中、生成中、等待审批、失败。
+- [ ] Agent Profile 与 Runtime badge 分离：Profile 是“谁”，Runtime 是“用什么跑”。
+- [ ] 文件操作可视化：Agent 读写文件的实时展示。
+- [ ] 子 Agent / RouteDecision 卡片在 IM 和主 Chat 都可见。
+- [ ] 高风险操作审批弹窗和消息流 ApprovalCard 统一。
+
+### P2-C Orchestrator
+
+- [ ] 群聊意图理解和任务拆解。
+- [ ] 子 Agent 并行调度和失败降级。
+- [ ] 多 Agent 产出聚合。
+- [ ] 多 Agent 修改同一文件时的冲突检测。
+- [ ] 后台 Agent 调度器：参考 Claude Code `/bg`、Cursor multitask、Copilot Automations。
+
+## P3: 工程稳定性和安全
+
+### P3-A Phase A 剩余基础设施
+
+- [x] A0/A1/A2/A3：错误码、请求日志、调试端点、安全 P0 已完成。
+- [x] A4：App.tsx Wave 2 拆分完成，主线保守口径约 991 行。
+- [ ] Desktop Rust 基础测试：commands.rs / oidc_server.rs 核心路径覆盖。
+- [ ] A5 Edge 自动构建：`tauri dev` 检测 edge-server 变更自动 `go build`。
+- [ ] A5 sccache / CI 缓存共享。
+- [ ] A5 开发文档：冷启动预期、前置依赖、troubleshooting。
+- [ ] A6 API 密钥迁移到 secure_store：模型 provider key 从 localStorage 迁到 keyring。
+- [ ] A6 secret guard 加固：pre-commit staged scan、base64 检测、二进制密钥文件检测。
+
+### P3-B Phase B Edge 持久化和性能
+
+- [ ] B0 JSONL 事件流：append-only 日志替代 JSON 快照。
+- [ ] B0 SQLite schema：projects / threads / runs / items + 索引，保持 store interface 不变。
+- [ ] B0 FTS5 搜索：BM25 排序，snippet 高亮。
+- [ ] B0 数据迁移：旧 JSON 快照自动导入 SQLite，损坏时可回退。
+- [ ] B1 离线队列：Hub 断连时写操作入队，重连后批量同步。
+- [ ] B1 Cursor 同步协议：`?cursor=<last_seq>` 增量拉取。
+- [x] B2 N+1 修复：Session list、StartTeamRun、dispatchTask 已关闭。
+- [ ] B2 migration 双系统统一：golang-migrate 作为唯一生产路径，AutoMigrate 仅测试使用。
+- [x] B3 Hub agent.go 拆分完成。
+- [ ] B3 Edge ProcessExecutor 拆分为 executor/output/hub_callback/subagent 四个文件。
+- [ ] B4 双重 dispatch 路径统一：text scan 与 NDJSON event 合并。
+- [ ] B4 输出截断事件：stdout/stderr 超限时发 `run.output.truncated`。
+
+### P3-C API、事件和 CI 治理
+
+- [ ] OpenAPI 补齐：`GET /v1/model-catalog`。
+- [ ] OpenAPI 补齐：`GET /v1/agent-instances/{id}`。
+- [ ] OpenAPI 修正：`DELETE /v1/threads/{threadId}`。
+- [ ] OpenAPI 修正：`POST /v1/threads/{threadId}:archive` 不再标 planned。
+- [ ] OpenAPI 修正：`POST /v1/agent-instances` 与代码注册状态一致。
+- [ ] OpenAPI 补齐：`POST /cloud/edge/register`。
+- [ ] OpenAPI 补齐：`GET /client/auth/oidc/callback`。
+- [ ] events.md 修正：`run.agent.sub_agent_status` / `task_dispatch_failed` / `friend.accepted` / `message.delta` 与代码一致。
+- [ ] Release workflow 加分支限制，避免任意分支推 `v*` tag 触发发布。
+- [ ] gosec/golangci-lint 从 warning 变成可解释的 gate；不要用降级规则换绿。
+- [ ] macOS CI 的 `continue-on-error` 要么取消，要么写明跳过原因。
+- [ ] Renovate/Dependabot + CODEOWNERS。
+
+### P3-D 安全增强
+
+- [ ] Hub OIDC blacklist 写入失败补偿：Redis 不可用时不能让旧 refresh token 被重放。
+- [ ] Edge `internal/runners` 死代码清理或明确兼容边界。
+- [ ] Hub API 路由版本策略：加 `/v1/` 或文档声明 `/client`/`/edge`/`/web` 的版本边界。
+- [ ] Tauri CSP 收紧：`connect-src` 固定端口，移除不必要 `unsafe-inline`。
+- [ ] 配置弱密码校验扩展到 DB/Redis/TokenDanceID。
+
+## P4: 长期产品和生态
+
+- [ ] Web 工作台：等 Desktop 跑通后迁移共享 transcript/composer/inspector，不另起一套体验。
+- [ ] Mobile 轻量端：查看、审批、预览，不承担比赛主力。
+- [ ] Remote Edge：SSH / Tailscale / Hub Relay 连接远程 Desktop。
+- [ ] Cloud Edge：云端执行目标和审计。
+- [ ] Agent Adapter SDK：参考 Copilot SDK / Cursor SDK，降低第三方 CLI 接入成本。
+- [ ] Feishu/Lark/Telegram IM 桥接：作为协作入口，不变成第二套登录系统。
+- [ ] Agent Market：搜索、安装、使用自定义 Agent。
+- [ ] 部署发布：聊天中“部署”指令，返回部署状态卡片和预览 URL。
+- [ ] 版本历史：Checkpoint + Diff 对比 + 回滚。
+- [ ] Content Pool：SHA-256 + zstd 文件内容去重。
+- [ ] OpenAPI spec -> 类型生成；desktop/web/mobile 共享 API client。
+
+## 暂缓规则
+
+这些不是废弃项，但在 Desktop 演示闭环前不抢 P0：
+
+- Web/Mobile 大重组。
+- Go repo-wide、Docker、cross-platform、E2E 的系统性基线治理。
+- Edge SQLite/FTS5 完整落地。
+- Feishu/Lark、Agent Market、Remote/Cloud Edge。
+- ChatView 全量重写或全局状态大重构。
+
+如果暂缓项成为 Desktop Demo 的直接 blocker，必须写清 blocker、最小修复范围和回退方案，再单独派发。
+
+## 分支和派工
+
+| 角色 | 适合任务 | 禁止事项 |
+|---|---|---|
+| 主 Agent / opus | 架构判断、PR 顺序、合并、roadmap、比赛材料、安全审查 | 不把未验证分支当完成 |
+| sonnet | Desktop UI、CSS、截图 QA、React focused tests、多模态视觉审查 | 不碰 Web/Mobile 大重组，不扩大写入范围 |
+| haiku | Go/Edge/Hub 小型 blocker、测试生成、业务逻辑修复 | 不接大面积读仓或前端 UI |
+
+每次派工必须写清：允许路径、禁止范围、验收命令、证据输出。subagent 交付后由主 Agent 复核 diff 和测试。
+
+## 已完成基线
+
+- A0 Edge errcode、A1 reqlog、A2 debug endpoints、A3 P0 security、A4 App.tsx Wave 2。
+- A6.2 Edge 成功响应统一信封、A6.3 DB TLS。
+- B2 Hub N+1 修复和索引。
+- Sprint #1 IM @Agent，Sprint #2 IM 富消息，Sprint #4 Tool 卡片颜色/标题。
+- 前端止血：execCommand、Agent Market mock、iframe sandbox、z-index、console 噪音。
+- PR #270 TeamRun E2E 证据链基础已合入，但最终真实录屏和导出仍是 P0。
+
+## 归档规则
+
+- 主 roadmap 保留优先级、依赖、长期任务、当前分支队列和验收标准。
+- 历史分析、已完成流水、竞品长文、深度审计明细放 `docs/archive/`。
+- 更新时改现有条目，不追加第二套状态叙事。
+- 比赛提交事实同步到 `docs/competition/*`；接手状态同步到 `docs/handoffs/STATE.md`。
