@@ -29,10 +29,10 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 5. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
-8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
+8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
 9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
 10. 持续开发和任务拆解读 `docs/architecture.md`（路线图摘要）和当前分支路线图。
-11. 客户端 M1 任务读 `docs/roadmaps/client.md`。
+11. 客户端任务读 `docs/roadmap.md` 和 `docs/architecture.md`。
 12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
@@ -203,7 +203,7 @@ dev-loop 主 Agent 每次循环开始时检查交接目录，按优先级处理�
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
-- `docs/architecture.md` 路线图摘要和 `docs/roadmaps/` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
+- `docs/architecture.md` 路线图摘要和 `docs/roadmap.md` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
 - 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
 
 ## 3. 技术主线
@@ -342,7 +342,7 @@ P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P
 
 - 主文档只保留一份：`docs/architecture.md`。
 - `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
-- `docs/roadmaps/client.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
+- `docs/roadmap.md` 是 Sprint 目标和待办清单；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。

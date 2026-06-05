@@ -350,7 +350,7 @@ Project -> Conversation -> Thread -> Turn / AgentRun -> Item -> Artifact / Appro
 
 ## 22. 当前路线图摘要
 
-> 摘要自 `docs/tutorials/roadmap.md`（最后更新 2026-06-02），详细进展见该文件。
+> 摘要自 `docs/roadmap.md`（最后更新 2026-06-05），详细进展见该文件。
 
 **当前状态**：P0 全部完成。Desktop 1166/1166 tests、Edge 17/17 Go packages、Hub 17/17 Go packages、i18n 1560 zh/en keys。集成分支 `dev/delicious233`。
 
