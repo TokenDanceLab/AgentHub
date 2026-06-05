@@ -1,0 +1,461 @@
+/* RightInspector — tabbed evidence panel for the right inspector slot */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--glass-bg-subtle);
+  border-left: 1px solid var(--glass-border-subtle);
+}
+
+[data-theme='light'] .root {
+  border-left-color: var(--glass-border);
+  background: var(--glass-bg-light);
+}
+
+/* ── Tab bar ── */
+
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--glass-border-subtle);
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+[data-theme='light'] .tabBar {
+  border-bottom-color: var(--glass-border);
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-weaker);
+  cursor: pointer;
+  flex: 1 1 0;
+  min-width: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--foreground);
+  background: var(--glass-bg-light);
+}
+
+.tabActive {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.tabActive:hover {
+  color: var(--primary);
+}
+
+.tabBadge {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--primary);
+  color: var(--background);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+/* ── Tab panel ── */
+
+.tabPanel {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* ── Section content ── */
+
+.sectionContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Empty states ── */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--text-weakest);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ── Progress section ── */
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusLabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.statusDone    { color: var(--success); }
+.statusFailed  { color: var(--destructive); }
+.statusRunning { color: var(--primary); }
+.statusPending { color: var(--text-weaker); }
+
+.iconDone    { color: var(--success); }
+.iconFailed  { color: var(--destructive); }
+.iconRunning { color: var(--primary); animation: spin 1s linear infinite; }
+.iconPending { color: var(--text-weaker); }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.runIdBadge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--glass-bg-light);
+  color: var(--text-weaker);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.cancelBtn {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border: 1px solid var(--destructive);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--destructive);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: color-mix(in oklch, var(--destructive) 12%, transparent);
+}
+
+/* ── Approvals ── */
+
+.approvalList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.approvalItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--glass-bg-light);
+}
+
+.approvalActions {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.actionAllow {
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--success);
+  cursor: pointer;
+}
+
+.actionDeny {
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--destructive);
+  cursor: pointer;
+}
+
+/* ── Task plan ── */
+
+.teamHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.teamName {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--foreground);
+}
+
+.taskSummary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-weaker);
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.taskItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--glass-bg-light);
+  font-size: 12px;
+}
+
+.taskStatusIcon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--text-weaker);
+}
+
+.taskStatus_completed .taskStatusIcon { color: var(--success); }
+.taskStatus_failed .taskStatusIcon    { color: var(--destructive); }
+.taskStatus_running .taskStatusIcon   { color: var(--primary); }
+
+.taskTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.taskAssignee {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--glass-bg-subtle);
+  color: var(--text-weaker);
+  font-size: 10px;
+}
+
+/* ── Tool timeline ── */
+
+.toolSummary {
+  font-size: 11px;
+  color: var(--text-weaker);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timelineItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  position: relative;
+}
+
+.timelineDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--text-weakest);
+}
+
+.dotDone    { background: var(--success); }
+.dotFailed  { background: var(--destructive); }
+.dotRunning { background: var(--primary); animation: pulse 1.5s ease infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.timelineContent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.toolName {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+.toolTime,
+.toolDuration {
+  font-size: 10px;
+  color: var(--text-weakest);
+}
+
+/* ── Artifacts ── */
+
+.artifactGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--glass-bg-light);
+}
+
+.fileAction {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--text-weaker);
+  text-transform: capitalize;
+}
+
+.fileStats {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-weakest);
+}
+
+.outputBlock {
+  padding: 6px;
+  border-radius: 4px;
+  background: var(--glass-bg-light);
+  color: var(--text-weaker);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Work folder ── */
+
+.folderPath {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--glass-bg-light);
+  color: var(--text-weaker);
+  font-size: 12px;
+}
+
+.fileTree {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.treeRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px calc(8px + var(--depth, 0px));
+  border-radius: 4px;
+  cursor: default;
+  font-size: 12px;
+  color: var(--text-weaker);
+}
+
+.treeRow:hover {
+  background: var(--glass-bg-light);
+}
+
+.treeIcon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--text-weakest);
+}
+
+.treeName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+/* ── Shared ── */
+
+.subHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-weaker);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--glass-bg-light);
+  color: var(--text-weaker);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.badgeActive {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--primary) 15%, transparent);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.badgeFailed {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
