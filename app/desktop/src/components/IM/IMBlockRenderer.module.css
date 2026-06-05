@@ -478,3 +478,235 @@
   color: var(--muted-foreground, #94a3b8);
   font-style: italic;
 }
+
+/* ── Child Agent Block ──────────────────────── */
+
+.childAgent {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #0f172a);
+}
+
+.childAgentHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.childAgentHeader:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.03));
+}
+
+.childAgentIcon {
+  color: var(--accent, #3b82f6);
+  flex-shrink: 0;
+}
+
+.childAgentTitle {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.childAgentName {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 10px;
+}
+
+.childAgentBody {
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--border-color, #334155);
+  font-size: 11px;
+}
+
+.childAgentError {
+  color: var(--destructive, #ef4444);
+  margin-bottom: 4px;
+}
+
+.childAgentResult {
+  color: var(--muted-foreground, #94a3b8);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+/* ── Route Decision Block ───────────────────── */
+
+.routeDecision {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #0f172a);
+}
+
+.routeDecisionHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.routeDecisionHeader:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.03));
+}
+
+.routeAction {
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+}
+
+.routeWorker {
+  font-size: 10px;
+  color: var(--muted-foreground, #94a3b8);
+}
+
+.routeBlocked {
+  font-size: 10px;
+  color: var(--destructive, #ef4444);
+}
+
+.routeDecisionBody {
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--border-color, #334155);
+  font-size: 11px;
+  color: var(--muted-foreground, #94a3b8);
+}
+
+.routeSummary {
+  margin-bottom: 4px;
+}
+
+.routeInstructions {
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.routeReasoning {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* ── Artifact Block ─────────────────────────── */
+
+.artifact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-xs) 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #334155);
+  background: var(--surface, #0f172a);
+  font-size: 11px;
+}
+
+.artifactType {
+  text-transform: uppercase;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--glass-tint-sky, rgba(59, 130, 246, 0.15));
+  color: var(--primary, #3b82f6);
+}
+
+.artifactTitle {
+  font-weight: 500;
+}
+
+.artifactLink {
+  font-size: 10px;
+  color: var(--primary, #3b82f6);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifactSize {
+  font-size: 10px;
+  color: var(--muted-foreground, #94a3b8);
+  margin-left: auto;
+}
+
+/* ── Deploy Card Block ──────────────────────── */
+
+.deployCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-xs) 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #334155);
+  background: var(--surface, #0f172a);
+  font-size: 11px;
+}
+
+.deployLabel {
+  font-weight: 600;
+}
+
+.deployStatus {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.deploySuccess {
+  background: var(--glass-tint-moss, rgba(34, 197, 94, 0.15));
+  color: var(--success, #22c55e);
+}
+
+.deployFailed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--destructive, #ef4444);
+}
+
+.deployRunning {
+  background: var(--glass-tint-sky, rgba(59, 130, 246, 0.15));
+  color: var(--primary, #3b82f6);
+}
+
+.deployPending {
+  background: var(--glass-tint-amber, rgba(251, 191, 36, 0.15));
+  color: var(--warning, #f59e0b);
+}
+
+.deployMessage {
+  font-size: 10px;
+  color: var(--muted-foreground, #94a3b8);
+}
+
+.deployUrl {
+  font-size: 10px;
+  color: var(--primary, #3b82f6);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
