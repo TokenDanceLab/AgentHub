@@ -24,11 +24,11 @@ import (
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/mcp"
 	"github.com/agenthub/edge-server/internal/metrics"
-	"github.com/agenthub/edge-server/internal/middleware"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/pkg/reqlog"
 )
 
 // ctxKey is a private context key type for injecting auth identity.
@@ -123,7 +123,7 @@ func Run(cfg Config) error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: middleware.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
+		Handler: reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
