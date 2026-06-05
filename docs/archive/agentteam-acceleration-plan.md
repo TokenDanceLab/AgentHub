@@ -1,4 +1,5 @@
 # AgentTeam 加速实现计划
+n> ⚠️ 已归档（2026-06-05）：内容过时/已迁移。当前权威文档见 `docs/architecture.md` 和 `docs/roadmap.md`。
 
 > 驱动：竞品动态追踪 2026-05-27——AionUI 已发布"团战"模式、Claude Code SDK 有 Teams 原语、Teamily AI 3M 用户
 > 状态：草案，待确认
