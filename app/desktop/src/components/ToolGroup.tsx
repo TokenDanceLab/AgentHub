@@ -12,6 +12,74 @@ interface Props {
   isStreaming?: boolean;
 }
 
+// ── Tool category color ──────────────────────
+function getToolCategoryColor(toolName: string): string {
+  const lower = toolName.toLowerCase();
+  if (/edit|write|replace|insert|patch|multi/.test(lower)) return 'var(--tool-edit)';
+  if (/bash|shell|exec|terminal|run/.test(lower)) return 'var(--tool-bash)';
+  if (/agent|subagent|delegate|spawn|task|todo/.test(lower)) return 'var(--tool-agent)';
+  if (/read|grep|glob|search|find|list|cat/.test(lower)) return 'var(--tool-read)';
+  return 'var(--tool-default)';
+}
+
+// ── Semantic title generation ────────────────
+function getSemanticTitle(toolName: string, input: Record<string, unknown>): string {
+  const lower = toolName.toLowerCase();
+
+  if (/bash|shell|exec|terminal|run/.test(lower)) {
+    const cmd = typeof input.command === 'string' ? input.command : '';
+    const lines = cmd.split('\n');
+    const firstLine = lines[0].trim();
+    const display = firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine;
+    return display ? `Run: ${display}` : 'Run command';
+  }
+
+  if (/read|cat/.test(lower)) {
+    const fp = typeof input.file_path === 'string' ? input.file_path : '';
+    return fp ? `Read: ${fp}` : 'Read file';
+  }
+
+  if (/edit|write|replace|insert|patch|multi/.test(lower)) {
+    const fp = typeof input.file_path === 'string' ? input.file_path
+      : typeof input.path === 'string' ? input.path
+      : '';
+    return fp ? `Edit: ${fp}` : 'Edit file';
+  }
+
+  if (/grep/.test(lower)) {
+    const pat = typeof input.pattern === 'string' ? input.pattern : '';
+    return pat ? `Search: ${pat}` : 'Search';
+  }
+
+  if (/glob/.test(lower)) {
+    const pat = typeof input.pattern === 'string' ? input.pattern : '';
+    return pat ? `Find files: ${pat}` : 'Find files';
+  }
+
+  if (/agent|subagent|delegate|spawn|task/.test(lower)) {
+    const desc = typeof input.description === 'string' ? input.description
+      : typeof input.prompt === 'string' ? input.prompt
+      : typeof input.title === 'string' ? input.title
+      : '';
+    const summary = desc.length > 50 ? desc.slice(0, 50) + '...' : desc;
+    return summary ? `Delegate: ${summary}` : 'Delegate task';
+  }
+
+  if (/search|find/.test(lower)) {
+    const pat = typeof input.pattern === 'string' ? input.pattern
+      : typeof input.query === 'string' ? input.query
+      : '';
+    return pat ? `Search: ${pat}` : 'Search';
+  }
+
+  if (/list/.test(lower)) {
+    const path = typeof input.path === 'string' ? input.path : '';
+    return path ? `List: ${path}` : 'List';
+  }
+
+  return toolName;
+}
+
 // ── Category mapping ─────────────────────────
 type Category = 'read' | 'edit' | 'command' | 'tool';
 
@@ -126,17 +194,21 @@ function GroupedToolCard({ block }: { block: ToolUseBlock }) {
   const [showParams, setShowParams] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const iconEl = resolveToolIcon(block.toolName);
+  const borderColor = getToolCategoryColor(block.toolName);
+  const title = getSemanticTitle(block.toolName, block.input);
 
   return (
-    <div className={styles.toolCard}>
+    <div
+      className={styles.toolCard}
+      style={{ borderLeft: `3px solid ${borderColor}` }}
+    >
       <button
         className={styles.toolCardHeader}
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
         <span className={styles.toolCardIcon}>{iconEl}</span>
-        <span className={styles.toolCardName}>{block.toolName}</span>
-        <span className={styles.toolCardSummary}>{summarizeInput(block.input)}</span>
+        <span className={styles.toolCardTitle}>{title}</span>
         <span className={`${styles.toolCardStatus} ${statusClass(block.status)}`}>
           {t(`chat.toolStatus.${block.status}`, { defaultValue: block.status })}
         </span>
