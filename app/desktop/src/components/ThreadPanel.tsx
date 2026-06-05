@@ -161,7 +161,6 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect, onCreat
       const msg = threadActionErrorMessage(err, t, 'thread.deleteUnsupported');
       setActionError(msg);
       addToast({ type: 'error', message: msg });
-      console.error('Failed to delete thread:', err);
     }
   };
 
