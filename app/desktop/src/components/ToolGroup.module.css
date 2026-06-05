@@ -125,9 +125,11 @@
   gap: 6px;
   width: 100%;
   min-height: 26px;
-  padding: 3px 8px 3px 6px;
+  padding: 3px 8px 3px 9px;
   border: none;
   border-radius: 6px;
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
   background: transparent;
   color: color-mix(in oklch, var(--foreground) 56%, transparent);
   cursor: pointer;
@@ -151,17 +153,12 @@
   opacity: 0.58;
 }
 
-.toolCardName {
-  font-weight: 620;
-  white-space: nowrap;
-}
-
-.toolCardSummary {
+.toolCardTitle {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: 0.5;
-  flex: 0 1 auto;
+  font-weight: 540;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
