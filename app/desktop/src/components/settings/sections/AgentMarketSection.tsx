@@ -69,116 +69,7 @@ function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketIt
 }
 
 // ── Community / Hub agent shape for marketplace browse ──
-const MOCK_COMMUNITY_AGENTS: CommunityAgentItem[] = [
-  {
-    id: 'hub-code-reviewer',
-    name: 'Code Reviewer Pro',
-    author: 'TokenDance Labs',
-    description: 'Thorough code review agent with security audit capable. Performs static analysis, pattern matching, and style enforcement across 12+ languages.',
-    systemPrompt: 'You are an expert Code Reviewer. Review code for correctness, security, performance, and style. Focus on actionable, specific feedback with line references.',
-    agentType: 'reviewer',
-    capabilities: ['code review', 'security audit', 'style check', 'refactoring'],
-    tools: ['read_file', 'edit_file', 'grep', 'glob', 'execute_command'],
-    model: 'deepseek-v4-pro',
-    provider: 'tokendance-gateway',
-    rating: 4.8,
-    installs: 3420,
-    version: '2.1.0',
-    runtimeRequired: 'Edge Runtime 1.2+',
-    createdAt: '2026-05-10T00:00:00Z',
-    updatedAt: '2026-05-28T08:30:00Z',
-  },
-  {
-    id: 'hub-devops-assistant',
-    name: 'DevOps Assistant',
-    author: 'CloudNative Guild',
-    description: 'CI/CD pipeline assistant, Docker/K8s config generator, deployment automation. Integrates with GitHub Actions, GitLab CI, and ArgoCD.',
-    systemPrompt: 'You are a DevOps automation specialist. Help users write CI/CD pipeline configs, Dockerfiles, K8s manifests, and troubleshoot deployment issues. Always validate YAML/JSON syntax and explain security implications.',
-    agentType: 'assistant',
-    capabilities: ['ci/cd', 'docker', 'kubernetes', 'infrastructure', 'automation'],
-    tools: ['read_file', 'write_file', 'edit_file', 'execute_command', 'glob', 'grep'],
-    model: 'glm-5.1',
-    provider: 'tokendance-gateway',
-    rating: 4.6,
-    installs: 2100,
-    version: '1.3.2',
-    runtimeRequired: 'Edge Runtime 1.0+',
-    createdAt: '2026-05-01T00:00:00Z',
-    updatedAt: '2026-05-25T12:00:00Z',
-  },
-  {
-    id: 'hub-api-architect',
-    name: 'API Architect',
-    author: 'TokenDance',
-    description: 'RESTful and GraphQL API design agent. Generates OpenAPI specs, handles auth patterns, rate limiting, and produces thorough documentation.',
-    systemPrompt: 'You are an API architecture specialist. Design RESTful and GraphQL APIs following best practices. Generate OpenAPI/Swagger specs, handle versioning, auth, rate limiting, and produce thorough documentation.',
-    agentType: 'coder',
-    capabilities: ['api design', 'openapi', 'graphql', 'rest', 'documentation'],
-    tools: ['read_file', 'write_file', 'edit_file', 'web_search', 'glob'],
-    model: 'deepseek-v4-flash',
-    provider: 'tokendance-gateway',
-    rating: 4.7,
-    installs: 1890,
-    version: '1.5.0',
-    runtimeRequired: 'Edge Runtime 1.0+',
-    createdAt: '2026-04-20T00:00:00Z',
-    updatedAt: '2026-05-30T16:00:00Z',
-  },
-  {
-    id: 'hub-pm-scrum-master',
-    name: 'Scrum Master',
-    author: 'AgileOps',
-    description: 'Project management agent for sprint planning, backlog grooming, stand-up summaries, and ticket generation. Integrates with Jira and Linear.',
-    systemPrompt: 'You are a Scrum Master and project management specialist. Help plan sprints, groom backlogs, run stand-ups, write user stories, track velocity, and generate retrospective reports.',
-    agentType: 'assistant',
-    capabilities: ['project management', 'agile', 'scrum', 'planning'],
-    tools: ['read_file', 'write_file', 'web_search', 'web_fetch'],
-    model: 'deepseek-v4-flash',
-    provider: 'tokendance-gateway',
-    rating: 4.4,
-    installs: 1560,
-    version: '2.0.0',
-    runtimeRequired: 'Edge Runtime 1.2+',
-    createdAt: '2026-05-05T00:00:00Z',
-    updatedAt: '2026-05-29T10:00:00Z',
-  },
-  {
-    id: 'hub-data-scientist',
-    name: 'Data Scientist',
-    author: 'ML Commons',
-    description: 'Exploratory data analysis, feature engineering, and ML pipeline design. Supports Python, R, SQL notebooks. Visualization and statistical analysis.',
-    systemPrompt: 'You are a data science specialist. Help with EDA, feature engineering, statistical analysis, ML model selection, and result interpretation. Write clean, documented Python/R code with visualization.',
-    agentType: 'researcher',
-    capabilities: ['data analysis', 'machine learning', 'statistics', 'visualization', 'python'],
-    tools: ['read_file', 'write_file', 'execute_command', 'glob', 'web_search'],
-    model: 'deepseek-v4-pro',
-    provider: 'tokendance-gateway',
-    rating: 4.5,
-    installs: 980,
-    version: '1.0.1',
-    runtimeRequired: 'Edge Runtime 1.0+',
-    createdAt: '2026-05-15T00:00:00Z',
-    updatedAt: '2026-05-28T20:00:00Z',
-  },
-  {
-    id: 'hub-ux-critic',
-    name: 'UX Critic',
-    author: 'Design Guild',
-    description: 'UI/UX review agent that checks accessibility (WCAG), usability heuristics, responsive design patterns, and provides actionable design recommendations.',
-    systemPrompt: 'You are a UI/UX expert. Review user interfaces for accessibility (WCAG 2.1), usability heuristics, responsive design, and visual consistency. Provide specific, prioritized recommendations.',
-    agentType: 'reviewer',
-    capabilities: ['ui/ux', 'accessibility', 'design review', 'css'],
-    tools: ['read_file', 'web_fetch', 'browser', 'edit_file'],
-    model: 'deepseek-v4-flash',
-    provider: 'tokendance-gateway',
-    rating: 4.3,
-    installs: 720,
-    version: '1.2.0',
-    runtimeRequired: 'Edge Runtime 1.0+',
-    createdAt: '2026-05-08T00:00:00Z',
-    updatedAt: '2026-05-27T14:00:00Z',
-  },
-];
+const MOCK_COMMUNITY_AGENTS: CommunityAgentItem[] = [];
 
 const ALL_CAPABILITY_TAGS = Array.from(
   new Set(MOCK_COMMUNITY_AGENTS.flatMap((a) => a.capabilities)),
@@ -601,101 +492,20 @@ export default function AgentMarketSection({
             </div>
           </div>
 
-          {/* Community agent grid */}
-          {filteredCommunityAgents.length > 0 ? (
-            <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--settings-muted)', background: 'var(--settings-chip-bg)', border: '1px solid var(--settings-chip-border)', padding: '2px 8px', borderRadius: 6 }}>
+          {/* Community agent grid — Coming Soon */}
+          <div className={styles.marketAgentGrid} style={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--settings-muted)', background: 'var(--settings-chip-bg)', border: '1px solid var(--settings-chip-border)', padding: '2px 8px', borderRadius: 6, display: 'inline-block', marginBottom: 12 }}>
                 {t('settings.marketComingSoon', 'Coming Soon')}
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--settings-muted)' }}>
-                {t('settings.marketPreviewData', 'Preview data — Hub API integration pending')}
-              </span>
+              </div>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--settings-text)' }}>
+                {t('settings.marketComingSoonTitle', 'Community Agent Marketplace')}
+              </p>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--settings-muted)', maxWidth: 360 }}>
+                {t('settings.marketComingSoonDesc', 'Browse and install community agents. Hub API integration is in progress.')}
+              </p>
             </div>
-            <div className={styles.marketAgentGrid}>
-              {filteredCommunityAgents.map((agent) => {
-                const installed = installedIds.includes(agent.id);
-                return (
-                  <div key={agent.id} className={styles.marketAgentCard}>
-                    <div className={styles.marketAgentCardHeader}>
-                      <div className={styles.marketAgentIcon}>
-                        <Bot size={20} />
-                      </div>
-                      <div className={styles.marketAgentTitle}>
-                        <strong>{agent.name}</strong>
-                        <span>{agent.author}</span>
-                      </div>
-                      <div className={styles.marketAgentRating}>
-                        <Star size={12} />
-                        <span>{agent.rating}</span>
-                        <small>{agent.installs.toLocaleString()}</small>
-                      </div>
-                    </div>
-                    <p className={styles.marketAgentDesc}>{agent.description}</p>
-                    <div className={styles.marketAgentTags}>
-                      <span className={styles.marketAgentTypeTag}>
-                        <SlidersHorizontal size={10} />
-                        {t(`settings.agentCreator.type${agent.agentType.charAt(0).toUpperCase()}${agent.agentType.slice(1)}`, { defaultValue: agent.agentType })}
-                      </span>
-                      {agent.capabilities.slice(0, 3).map((cap) => (
-                        <span key={cap} className={styles.marketAgentCapTag}>
-                          <Tag size={10} />
-                          {cap}
-                        </span>
-                      ))}
-                      {agent.capabilities.length > 3 && (
-                        <span className={styles.marketAgentCapTag}>+{agent.capabilities.length - 3}</span>
-                      )}
-                    </div>
-                    <div className={styles.marketAgentMeta}>
-                      <span><Cpu size={11} />{agent.model.split('-').slice(0, 2).join('-')}</span>
-                      <span><Download size={11} />{agent.installs.toLocaleString()}</span>
-                      <span><Clock size={11} />v{agent.version}</span>
-                    </div>
-                    <div className={styles.marketAgentActions}>
-                      <button
-                        type="button"
-                        className={styles.secondaryBtn}
-                        onClick={() => setDetailAgent(agent)}
-                      >
-                        <Eye size={13} />
-                        {t('settings.marketViewDetails')}
-                      </button>
-                      <button
-                        type="button"
-                        className={installed ? styles.primaryBtn : styles.secondaryBtn}
-                        onClick={() => installed ? handleUninstall(agent.id) : handleInstall(agent)}
-                      >
-                        {installed ? (
-                          <>
-                            <X size={13} />
-                            {t('settings.marketUninstall')}
-                          </>
-                        ) : (
-                          <>
-                            <Download size={13} />
-                            {t('settings.marketInstall')}
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    {installed && (
-                      <div className={styles.marketInstalledBadge}>
-                        <Check size={12} />
-                        {t('settings.marketInstalled')}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            </>
-          ) : (
-            <EmptyBlock
-              title={hasActiveFilters ? t('settings.marketNoResults') : t('settings.marketLoading')}
-              description={hasActiveFilters ? t('settings.marketNoResultsDesc') : t('settings.marketLoadingDesc')}
-            />
-          )}
+          </div>
         </>
       )}
 

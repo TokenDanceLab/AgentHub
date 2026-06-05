@@ -301,8 +301,13 @@
   min-width: 0;
   padding: 0 var(--space-md) 0 var(--space-xs);
   white-space: pre;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-x: auto;
+  color: #e0e0e0;
+}
+
+/* Syntax highlighting token overrides — ensure no backgrounds bleed */
+.lineContent [class*="token"] {
+  background: transparent !important;
 }
 
 /* ── Line actions (accept/reject) ─────────────────────────────── */

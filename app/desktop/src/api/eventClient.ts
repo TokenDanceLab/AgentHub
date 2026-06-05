@@ -182,8 +182,8 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
       try {
         const data = JSON.parse(event.data as string);
         handleMessage(data);
-      } catch (e) {
-        console.error('Failed to parse event:', e);
+      } catch (_e) {
+        // Parse errors are silently ignored — malformed frames are dropped
       }
     };
 
