@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import type { DiffFile, DiffHunk, DiffLine } from '../diff';
+import { highlightLine, languageFromPath } from './syntaxHighlight';
 import styles from './DiffReviewPanel.module.css';
 
 // ── Side-by-side row types ──────────────────────────────────────────────
@@ -224,6 +225,12 @@ export function DiffReviewPanel({
     return activeFile.hunks.flatMap((hunk) => buildSideBySideRows(hunk));
   }, [activeFile]);
 
+  // Detect language for syntax highlighting
+  const activeLang = useMemo(
+    () => (activeFile ? languageFromPath(activeFile.filePath) : ''),
+    [activeFile],
+  );
+
   // Compute modified lines count
   const modifiedCount = useMemo(() => {
     if (!activeFile) return 0;
@@ -409,9 +416,12 @@ export function DiffReviewPanel({
                   <span className={styles.lineNum}>
                     {row.left?.lineNumber != null ? row.left.lineNumber : ''}
                   </span>
-                  <span className={styles.lineContent}>
-                    {row.left?.content ?? ' '}
-                  </span>
+                  <span
+                    className={styles.lineContent}
+                    dangerouslySetInnerHTML={{
+                      __html: highlightLine(row.left?.content ?? ' ', activeLang),
+                    }}
+                  />
                   {row.rowType !== 'context' && (
                     <div className={styles.lineActions}>
                       <button
@@ -473,9 +483,12 @@ export function DiffReviewPanel({
                   <span className={styles.lineNum}>
                     {row.right?.lineNumber != null ? row.right.lineNumber : ''}
                   </span>
-                  <span className={styles.lineContent}>
-                    {row.right?.content ?? ' '}
-                  </span>
+                  <span
+                    className={styles.lineContent}
+                    dangerouslySetInnerHTML={{
+                      __html: highlightLine(row.right?.content ?? ' ', activeLang),
+                    }}
+                  />
                   {row.rowType !== 'context' && (
                     <div className={styles.lineActions}>
                       <button
