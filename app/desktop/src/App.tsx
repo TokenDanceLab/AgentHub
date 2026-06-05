@@ -66,6 +66,7 @@ import AuthPage from '@/components/AuthPage';
 import HomeDashboard from '@/components/HomeDashboard';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
+import TopMenuBar, { type TopMenuDefinition } from '@/components/TopMenuBar';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
@@ -107,7 +108,6 @@ import {
 } from '@/utils/chatMessages';
 import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
 import { buildTeamLocalExecutions, normalizeTeamTasks } from '@/utils/teamLocalExecution';
-import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
 import ShellIconButton from '@/components/ShellIconButton';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -133,23 +133,9 @@ interface SendRunOptions {
   createdEmptyThread?: boolean;
 }
 
-interface TopMenuItem {
-  id: string;
-  label: string;
-  detail?: string;
-  shortcut?: string;
-  disabled?: boolean;
-  danger?: boolean;
-  separatorBefore?: boolean;
-  action: () => void | Promise<void>;
-}
-
-type TopMenuDefinition = Record<TopMenuId, { label: string; items: TopMenuItem[] }>;
-
 const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
 const RUN_CARD_MIN_WORKSPACE_WIDTH = 760;
-const TOP_MENU_ORDER: TopMenuId[] = ['file', 'edit', 'view', 'window', 'help'];
 
 function summarizeAgentTeamOverview(overview?: AgentTeamOverview) {
   const runs = overview?.bundles.flatMap((bundle) => bundle.runs) ?? [];
@@ -273,8 +259,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
   const [pendingComposerDraft, setPendingComposerDraft] = useState('');
-  const [openTopMenu, setOpenTopMenu] = useState<TopMenuId | null>(null);
-  const [hoverOpenedTopMenu, setHoverOpenedTopMenu] = useState<TopMenuId | null>(null);
   const {
     leftSidebarCollapsed,
     rightPanelOpen,
@@ -301,8 +285,6 @@ export default function App() {
   const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
-  const topMenuRef = useRef<HTMLElement | null>(null);
-  const hoverOpenedTopMenuRef = useRef<TopMenuId | null>(null);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
@@ -407,31 +389,6 @@ export default function App() {
     const timer = window.setTimeout(() => setRightPanelMounted(false), 220);
     return () => window.clearTimeout(timer);
   }, [effectiveRightPanelOpen]);
-
-  useEffect(() => {
-    if (!openTopMenu) return undefined;
-
-    const closeOnPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && topMenuRef.current?.contains(target)) return;
-      setOpenTopMenu(null);
-      setHoverOpenedTopMenu(null);
-      hoverOpenedTopMenuRef.current = null;
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setOpenTopMenu(null);
-      setHoverOpenedTopMenu(null);
-      hoverOpenedTopMenuRef.current = null;
-    };
-
-    window.addEventListener('pointerdown', closeOnPointerDown, true);
-    window.addEventListener('keydown', closeOnEscape, true);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnPointerDown, true);
-      window.removeEventListener('keydown', closeOnEscape, true);
-    };
-  }, [openTopMenu]);
 
   useEffect(() => {
     const node = workspaceRef.current;
@@ -1213,75 +1170,7 @@ export default function App() {
             <span className={styles.topBarNavBtn}><ChevronLeft size={14} /></span>
             <span className={styles.topBarNavBtn}><ChevronRight size={14} /></span>
           </div>
-          <nav className={styles.appMenu} aria-label={t('menu.title')} ref={topMenuRef}>
-            {TOP_MENU_ORDER.map((menuId) => {
-              const menu = topMenus[menuId];
-              const expanded = openTopMenu === menuId;
-              const panelId = `top-menu-${menuId}`;
-              return (
-                <div
-                  key={menuId}
-                  className={styles.topMenuGroup}
-                  onMouseEnter={() => {
-                    if (!openTopMenu) return;
-                    setHoverOpenedTopMenu(menuId);
-                    hoverOpenedTopMenuRef.current = menuId;
-                  }}
-                >
-                  <button
-                    type="button"
-                    className={`${styles.topMenuTrigger} ${expanded ? styles.topMenuTriggerActive : ''}`}
-                    aria-haspopup="menu"
-                    aria-expanded={expanded}
-                    aria-controls={expanded ? panelId : undefined}
-                    onClick={() => {
-                      setOpenTopMenu((current) => resolveTopMenuClickState(current, menuId, hoverOpenedTopMenuRef.current ?? hoverOpenedTopMenu));
-                      setHoverOpenedTopMenu(null);
-                      hoverOpenedTopMenuRef.current = null;
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        setOpenTopMenu(menuId);
-                        setHoverOpenedTopMenu(null);
-                        hoverOpenedTopMenuRef.current = null;
-                      }
-                    }}
-                  >
-                    {menu.label}
-                  </button>
-                  {expanded && (
-                    <div id={panelId} className={styles.topMenuPanel} role="menu" aria-label={menu.label}>
-                      {menu.items.map((item) => (
-                        <div key={item.id} className={styles.topMenuItemWrap}>
-                          {item.separatorBefore && <div className={styles.topMenuSeparator} role="separator" />}
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className={`${styles.topMenuItem} ${item.danger ? styles.topMenuItemDanger : ''}`}
-                            disabled={item.disabled}
-                            aria-disabled={item.disabled ? true : undefined}
-                            title={item.disabled && item.detail ? item.detail : undefined}
-                            onClick={() => {
-                              if (item.disabled) return;
-                              const result = item.action();
-                              setOpenTopMenu(null);
-                              setHoverOpenedTopMenu(null);
-                              hoverOpenedTopMenuRef.current = null;
-                              if (result instanceof Promise) void result;
-                            }}
-                          >
-                            <span className={styles.topMenuItemLabel}>{item.label}</span>
-                            {item.shortcut && <kbd>{item.shortcut}</kbd>}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
+          <TopMenuBar menus={topMenus} ariaLabel={t('menu.title')} />
           <span className={styles.statusBadge}>
             <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
             {online ? `Edge ${health?.version ?? 'v1'}` : t('status.offline')}
