@@ -128,7 +128,8 @@ function resolveToolIcon(toolName: string) {
   return <Icon size={13} />;
 }
 
-function summarizeInput(input: Record<string, unknown>): string {
+function summarizeInput(input: Record<string, unknown> | null | undefined): string {
+  if (!input) return '(no input)';
   const parts: string[] = [];
   if (typeof input.file_path === 'string') parts.push(input.file_path);
   else if (typeof input.path === 'string') parts.push(input.path);
