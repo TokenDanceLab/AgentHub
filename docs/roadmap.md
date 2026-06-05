@@ -20,7 +20,7 @@
 ## 总体进度
 
 ```
-Phase A: 工程基础设施 ████░░░░░░  20%  ← 当前
+Phase A: 工程基础设施 ████████░░  45%  ← 当前 (Wave 1 完成，Wave 2 进行中)
 Phase B: 持久化 + 性能  ░░░░░░░░░░   0%
 Phase C: IM 核心闭环   ░░░░░░░░░░   0%
 Phase D: 高级功能      ░░░░░░░░░░   0%
@@ -43,15 +43,15 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 > **入场条件**: ✅ v0.2.0 已发布，架构剖析已完成
 > **出场条件**: Edge/Hub 统一错误码 + 请求追踪；无凭据泄漏；App.tsx 拆为独立模块
 
-### A0: 错误码体系收口 `errcode`
+### A0: 错误码体系收口 `errcode` ✅
 
 - [x] 共享 `pkg/errcode` 模块 + `go.work` workspace
 - [x] Hub 迁移完成：统一 envelope `{"error":{"code":"...","message":"...","traceId":"..."}}`
-- [ ] Edge 域错误码 — 创建 `internal/errcode/codes.go`（EXECUTOR_UNAVAILABLE 等）
-- [ ] Edge handlers 重构 — 删除 `errorResponse()` + `genID()`，改用 `errcode.WriteError()`
-- [ ] 前端适配 — Desktop 错误处理从 `response.code` 改为 `response.error.code`
+- [x] Edge 域错误码 — 14 个 Edge 专属错误码（EXECUTOR_UNAVAILABLE 等）
+- [x] Edge handlers 重构 — 删除 `errorResponse()`，52 个调用点改用 errcode
+- [x] 前端适配 — `app/shared/src/errors.ts` 已兼容，零改动
 
-### A1: 请求日志与追踪 `reqlog`
+### A1: 请求日志与追踪 `reqlog` 🔧
 
 - [ ] `pkg/reqlog` 共享中间件 — trace ID 生成/传播，统一字段（request_id/method/path/status/duration_ms）
 - [ ] Edge 接入 — 生成 X-Request-ID，替换现有 AccessLog
@@ -64,19 +64,20 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [ ] Hub `/debug/` — DB+Redis 连通性 + pprof (admin auth) + config dump
 - [ ] Edge `/debug/` — store+bus 状态 + pprof (local auth) + config dump
 
-### A3: 安全与稳定性 P0 修复
+### A3: 安全与稳定性 P0 修复 ✅
 
-- [ ] **Edge auth token 明文日志** — `server.go` 的 `aght_` token 以 `slog.Info` 输出到 stdout。改为 debug 级别或仅输出前 8 位
-- [ ] **Edge FileStore 同步 persist 瓶颈** — 每次写操作同步 JSON marshal + write + rename。改为 async persist + write-behind batching
-- [ ] **Hub workspace schema 不一致** — migration `0009`（device_id, local_path）vs model（name, description, owner_id）完全不同，启动可能报错
+- [x] **Edge auth token 明文日志** — `slog.Info` → `slog.Debug`，前缀 16→8 字符
+- [x] **Edge FileStore async persist** — 同步 persist → 异步 50ms debounce + background goroutine + `Close()`/`Flush()`
+- ~~Hub workspace schema 不一致~~ — 验证 0016 migration 已完整桥接，误报关闭
 
-### A4: 前端架构解耦
+### A4: 前端架构解耦 🔧
 
-> **关键路径**: App.tsx 拆分是 Phase C (IM 闭环) 的前置条件。不拆分，所有前端开发都在 1838 行里挤。
+> **关键路径**: App.tsx 拆分是 Phase C (IM 闭环) 的前置条件。
 
-- [ ] **App.tsx 拆分** — 1838 行 / 40+ useState，拆为 LayoutShell、ChatController、MenuProvider、ConnectionManager、ShortcutHandler 等独立模块
-- [ ] **SettingsPage/AuthPage/HomeDashboard lazy-load** — ~200KB+ eager import → `React.lazy()` 动态加载
-- [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖（path validation、OIDC callback、edge lifecycle）
+- [x] **App.tsx 拆分 Wave 1** — 1837→1525 行（-17%），已拆出 ShellIconButton、useFocusSourceTracking、DesktopHubTaskBridge、TopMenuBar、useShellShortcuts
+- [x] **lazy-load** — SettingsPage、AuthPage、HomeDashboard 已改为 `React.lazy()`
+- [ ] **继续拆分** — LayoutShell、ConnectionManager、ChatController 等核心模块
+- [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖
 
 ### A5: 开发者构建体验
 
@@ -86,6 +87,15 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 - [ ] Edge 自动构建 — `tauri dev` 检测 edge-server 变更自动 `go build`
 - [ ] sccache / CI 缓存共享
 - [ ] 开发文档 — 冷启动预期、前置依赖、troubleshooting
+
+### A6: Review 发现的安全加固（新增）
+
+> 来自 2026-06-05 五维度深度 Review（架构/API/前端/后端/DevOps）。
+
+- [ ] **统一响应信封** — Hub `{code,data}` vs Edge 裸 JSON，前端需两套解析。统一为一方
+- [ ] **API 密钥迁移到 secure_store** — 当前 base64 弱混淆存 localStorage，Tauri secure_store 已实现但未使用
+- [ ] **DB TLS 可配置** — Hub `sslmode=disable` 硬编码，改为环境变量，默认 `require`
+- [ ] **.env 密钥轮换 + secret guard 加固** — 加 pre-commit hook 防泄漏，密钥迁移到 OS secret manager
 
 ---
 
@@ -186,6 +196,10 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 - [ ] Hub OIDC blacklist 写入失败补偿 — Redis 不可用时旧 refresh token 可被重放
 - [ ] Edge `internal/runners` 死代码清理
+- [ ] Hub 端点加 `/v1/` 版本前缀（或显式文档声明策略）
+- [ ] Release workflow 加分支限制
+- [ ] 收紧 golangci-lint + gosec 为硬阻断
+- [ ] 配置 Renovate/Dependabot + CODEOWNERS
 
 ### D2: 产品扩展
 
@@ -204,6 +218,8 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 - [ ] Desktop OIDC 超时不一致 — `CALLBACK_TIMEOUT_SECS = 60` 但错误消息写 "5 minutes"
 - [ ] Desktop Edge 端口硬编码 — Rust `port: 3210` 写死，前端 config.ts 默认也是 3210
+- [ ] 补齐 OpenAPI 缺失端点 — DELETE thread、model-catalog 等
+- [ ] Web 包定位决策 — 要么启动要么最小化
 
 ---
 
@@ -226,6 +242,10 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 | 全局死链清理 | 20 文件 docs/tutorials→docs/roadmap 等路径修复 + 端口 5199→5173 | 2026-06-05 |
 | 错误码统一 (Hub) | pkg/errcode 共享模块 + Hub re-export + 统一 envelope + traceId | 2026-06-05 |
 | 安全修复 | Orchestrator bypassPermissions 硬编码移除 | 2026-06-05 |
+| **A0 Edge errcode** | 14 域错误码 + 52 handlers 调用点重构 + 前端已兼容 | 2026-06-05 |
+| **A3 P0 安全** | Auth token Debug 日志 + FileStore async persist (50ms debounce) | 2026-06-05 |
+| **A4 前端解耦** | App.tsx 1837→1525 (-17%)，5 模块拆出 + 3 组件 lazy-load | 2026-06-05 |
+| **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
 
@@ -235,7 +255,7 @@ A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──
 
 | 层 | 技术 | 存储 | 代码量 | 测试 |
 |----|------|------|--------|------|
-| Desktop | React 19 + Tauri 2 + Zustand + TanStack Query | 平台 Credential Store | Rust 2,113 行 / TS ~40 组件 | `pnpm test && pnpm typecheck` |
+| Desktop | React 19 + Tauri 2 + Zustand + TanStack Query | 平台 Credential Store | Rust 2,113 行 / TS ~45 组件 | `pnpm test && pnpm typecheck` |
 | Edge Server | Go + gorilla/websocket + NDJSON | **JSON 快照 → SQLite + FTS5** | 15,509 行 | `go test ./... -short -race` |
 | Hub Server | Go + Gin + GORM + Redis + PG | PostgreSQL 16 | ~46,000 行 | `go test ./... -short -race` |
 | 协议 | REST JSON + WebSocket NDJSON | — | OpenAPI 5,590 行 | — |
