@@ -1,7 +1,7 @@
 import { useRef, useEffect, memo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { MessageSquareText, CornerUpLeft, Forward, RotateCcw, X } from 'lucide-react';
+import { MessageSquareText, CornerUpLeft, Forward, RotateCcw } from 'lucide-react';
 import { EmptyState, MessageBubble } from '@shared/ui';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import type { IMMessage } from './types';

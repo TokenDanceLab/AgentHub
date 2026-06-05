@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { queryClient } from '@/api/queryClient';
 import { useHubIMSnapshot } from '@/hooks/useHubIMSnapshot';
 import { useHubSession } from '@/hooks/useHubSession';
+import { renderHubContent } from '@/utils/hubAdapters';
 import { EmptyState, SectionHeader, ActivityCard } from '@shared/ui';
 import { useState, useMemo } from 'react';
 import type { TFunction } from 'i18next';
@@ -34,14 +35,19 @@ function PrivateChatsPage() {
     if (!hasSession || snapshot.status !== 'ready') return [];
     return snapshot.sessions
       .filter((s) => s.type === 'private')
-      .map((s) => ({
-        id: s.session_id ?? s.id ?? '',
-        name: s.name ?? t('hub.privateSessionFallback'),
-        lastMessage: s.last_message?.content ?? t('hub.noRecentMessages'),
-        time: formatRelativeTime(s.last_message_at, t),
-        unread: s.unread_count ?? 0,
-        online: true,
-      }));
+      .map((s) => {
+        const sessionId = s.session_id ?? s.id ?? '';
+        const messages = snapshot.messagesBySessionId[sessionId] ?? [];
+        const latestMessage = messages.length > 0 ? messages[messages.length - 1] : undefined;
+        return {
+          id: sessionId,
+          name: s.name ?? t('hub.privateSessionFallback'),
+          lastMessage: renderHubContent(latestMessage?.content ?? s.last_message?.content) || t('hub.noRecentMessages'),
+          time: formatRelativeTime(latestMessage?.created_at ?? s.last_message_at, t),
+          unread: s.unread_count ?? 0,
+          online: true,
+        };
+      });
   }, [hasSession, snapshot, t]);
 
   const filteredChats = searchQuery
@@ -88,7 +94,14 @@ function PrivateChatsPage() {
             />
           </div>
 
-          {filteredChats.length === 0 ? (
+          {snapshot.status === 'error' ? (
+            <EmptyState
+              title={t('error.title')}
+              description={t('error.description', { error: snapshot.error ?? t('status.error') })}
+              icon={<MessageSquare size={24} />}
+              titleLevel={3}
+            />
+          ) : filteredChats.length === 0 ? (
             <EmptyState
               title={t('sidebar.emptyTitle')}
               description={t('sidebar.empty')}
