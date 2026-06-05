@@ -53,7 +53,7 @@ Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri
 共享边界：
 
 - API 契约写在 `api/`。
-- Edge Server 同时连接前端和 Hub，改动前先看 `docs/architecture/system-design/system-architecture.md`。
+- Edge Server 同时连接前端和 Hub，改动前先看 `docs/architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
 
@@ -231,7 +231,7 @@ dev-loop 主 Agent 每次循环开始时检查交接目录，按优先级处理�
 
 **类型检查**：`pnpm typecheck` 在 desktop 和 web 各跑一次。当前 `app/shared/src/ui` 存在 React 类型解析 / pnpm 跨包虚拟存储的既有限制；提交说明必须区分既有 shared-ui 限制和本次新增错误。
 
-前端架构详见 `docs/architecture/system-design/system-architecture.md` 前端章节。
+前端架构详见 `docs/architecture.md`。
 
 ## 4. Git 规则
 
@@ -340,8 +340,8 @@ P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P
 
 ## 5. 文档规则
 
-- 主文档只保留三份：产品需求、系统架构、功能实现。
-- `docs/tutorials/roadmap.md` 和 `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
+- 主文档只保留一份：`docs/architecture.md`。
+- `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
 - `docs/roadmaps/client.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
