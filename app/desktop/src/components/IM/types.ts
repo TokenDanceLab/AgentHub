@@ -40,6 +40,12 @@ export interface IMMessageWithHubState extends IMMessage {
   hubError?: string;
 }
 
+/** Richer payload built by IMMessageInput internally. Backward-compatible with onSend(content, mentions). */
+export interface ComposerPayload {
+  content: string;
+  mentions?: IMMessageMention[];
+}
+
 export interface IMContact {
   id: string;
   name: string;
