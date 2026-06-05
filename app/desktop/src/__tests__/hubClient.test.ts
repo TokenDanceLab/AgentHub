@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHubClient, HubError } from '../api/hubClient';
 import type { AuthResponse, UserProfile } from '../api/hubClient';
 import { createHubAuth } from '../api/hubAuth';
+import { HUB_URL } from '../config';
 import {
   clearStoredHubAccessToken,
   clearStoredHubRefreshToken,
@@ -516,13 +517,13 @@ describe('hubClient', () => {
       expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://test.local/client/auth/me');
     });
 
-    it('uses the Desktop HUB_URL default when baseUrl is omitted', async () => {
+    it('uses the Desktop HUB_URL config value when baseUrl is omitted', async () => {
       const client = createHubClient();
       const fetchSpy = mockFetch(200, mockUser);
 
       await client.me();
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://api.hub.vectorcontrol.tech/client/auth/me');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`${HUB_URL.replace(/\/+$/, '')}/client/auth/me`);
     });
   });
 });
