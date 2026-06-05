@@ -198,6 +198,12 @@
   padding: 15px 18px;
 }
 
+.summaryCardExpandable {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 32px;
+  align-items: flex-start;
+}
+
 .summaryIcon,
 .profileIcon,
 .targetIcon {
@@ -211,13 +217,61 @@
   color: color-mix(in oklch, var(--settings-accent) 86%, white);
 }
 
-.summaryCard div:last-child,
+.summaryContent,
 .profileHeader div:nth-child(2) {
   display: flex;
   min-width: 0;
   flex: 1;
   flex-direction: column;
   gap: 4px;
+}
+
+.summaryExpandBtn {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--settings-muted);
+  cursor: pointer;
+}
+
+.summaryExpandBtn:hover {
+  background: var(--glass-panel-strong);
+  color: var(--foreground);
+}
+
+.summaryExpandBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+:global(html[data-focus-source='pointer']) .summaryExpandBtn:focus-visible {
+  box-shadow: none;
+}
+
+.summaryExpandedDetail {
+  grid-column: 2 / -1;
+  min-width: 0;
+  margin-top: 6px;
+}
+
+.summaryExpandedCode {
+  display: block;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--settings-card-border);
+  border-radius: 8px;
+  background: var(--settings-glass-bg);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .summaryCard span,
