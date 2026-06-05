@@ -57,6 +57,34 @@
 
 ---
 
+## 工程基础设施（进行中）
+
+> 统一错误码、日志追踪、调试端点。设计文档: [designs/unified-error-logging-debug.md](designs/unified-error-logging-debug.md)
+
+### I1: 统一错误码体系
+
+- [x] **共享 pkg/errcode 模块** — `github.com/agenthub/pkg/errcode`，Error 类型 + 统一 envelope + 通用 codes
+- [x] **go.work workspace** — 链接 pkg + edge-server + hub-server
+- [x] **Hub 迁移** — re-export 共享类型 + 统一 envelope `{"error":{"code":"...","message":"...","traceId":"..."}}` + 测试全绿
+- [ ] **Edge 域错误码** — 创建 `internal/errcode/codes.go`（EXECUTOR_UNAVAILABLE 等域代码）
+- [ ] **Edge handlers 重构** — 删除 `errorResponse()` + `genID()`，改用 `errcode.WriteError()` + typed errors
+- [ ] **前端适配** — Desktop 错误处理从 `response.code` 改为 `response.error.code`
+
+### I2: 日志与请求追踪
+
+- [ ] **pkg/reqlog 共享中间件** — trace ID 生成/传播，统一字段命名（request_id/method/path/status/duration_ms/client_ip）
+- [ ] **Edge 接入 reqlog** — 生成 X-Request-ID，注入 context，替换现有 AccessLog
+- [ ] **Hub 接入 reqlog** — 已有 RequestID + AccessLog，统一为 reqlog 版
+- [ ] **Edge→Hub 跨服务追踪** — Edge 调 Hub API 时透传 X-Request-ID，Hub 复用
+
+### I3: 调试端点
+
+- [ ] **pkg/debug 模块** — 健康检查 + pprof + 脱敏配置转储
+- [ ] **Hub /debug/** — health（DB+Redis 连通性）+ pprof（需 admin auth）+ config dump
+- [ ] **Edge /debug/** — health（store+bus 状态）+ pprof（需 local auth）+ config dump
+
+---
+
 ## Next: Edge 持久化 + 架构健康度
 
 > 目标: Edge 从内存临时态升级到持久化存储；修复架构剖析发现的 P0/P1 问题；为离线/远程/同步打基础
@@ -134,6 +162,9 @@
 | v0.2.0 | Sidecar edge + Updater + NSIS/DMG + 安全加固 + CI 签名 | 2026-06-05 |
 | 构建优化 | 去除 keyring turso/tantivy（-213 crate）+ dev profile + bundle 拆分 | 2026-06-05 |
 | 架构剖析 | Edge / Desktop / Hub / 集成层全面审查，产出 P0×4 + P1×8 + P2×6 | 2026-06-05 |
+| 全局死链清理 | 20 文件 docs/tutorials→docs/roadmap 等路径修复 + 端口 5199→5173 | 2026-06-05 |
+| 错误码统一 (Hub) | pkg/errcode 共享模块 + Hub re-export + 统一 envelope + traceId | 2026-06-05 |
+| 安全修复 | Orchestrator bypassPermissions 硬编码移除 | 2026-06-05 |
 
 > 详细历史见 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
