@@ -176,7 +176,9 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
         selectThread(started.threadId);
       }
       const renameThreadId = started.threadId || requestThreadId;
-      const runtimeNames = agents.map((item) => item.name);
+      const runtimeNames = agents
+        .map((item) => item.name)
+        .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
       const currentThreadItemCount = threadItemCount;
       const wasLocallyCreatedEmptyThread = Boolean(renameThreadId && emptyCreatedThreadIdsRef.current.has(renameThreadId));
       const wasManuallyNamedThread = Boolean(renameThreadId && manuallyNamedThreadIdsRef.current.has(renameThreadId));
