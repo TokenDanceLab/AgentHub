@@ -1,6 +1,7 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 | 按优先级持续推进 | 历史长版: [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md), [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> 最后更新: 2026-06-06 | 按优先级持续推进 | 历史长版: [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md), [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> Review 采纳: Round 1+2 (2026-06-06) — 10 份报告在 [docs/review/](review/)
 
 ## 目标
 
@@ -22,13 +23,13 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
-| P0-1 | Desktop P0 集成 PR（R5 + R3 + R6A） | `integration/desktop-p0` 已合入来源分支；替代 #272/#274/#275 单独推进 | 推单一 PR，完成 review 后合入 `dev/delicious233` | `git diff --check`；focused vitest 91/91；Desktop typecheck |
+| P0-1 | Desktop P0 集成（R5 + R3 + R6A） | PR #278 已合入 `dev/delicious233`；#272/#274/#275 已关闭 | 进入视觉 QA，不再逐个小 PR 周转 | `git diff --check`；focused vitest 91/91；Desktop typecheck；frontend-desktop CI |
 | P0-2 | Desktop 视觉 QA | 集成后立刻做；竞品截图只作为密度/布局参考 | 1440x920、1280x800、390x844 截图；检查横向滚动、遮挡、composer 底部空间 | 截图路径、问题清单、必要 CSS 修复 |
-| P0-3 | 真实 TeamRun E2E | PR #270 已合入证据链基础，最终录屏/导出未完成 | 跑两个真实 Runtime Profile；导出 route/task/event/transcript；让 correlation/task 链在 UI 可见 | 运行日志、事件导出、截图、3 分钟视频素材 |
+| P0-3 | 真实 TeamRun E2E | ⚠️ Backend 6147 行完备但零真实运行证据（Review R1+R2 判定为比赛生死线） | 跑两个真实 Runtime Profile；导出 route/task/event/transcript；让 correlation/task 链在 UI 可见 | 运行日志、事件导出、截图、3 分钟视频素材 |
 | P0-4 | 比赛材料同步 | 旧提交清单仍混有 Web/Mobile/2026-06-01 状态 | 更新 feature matrix、submission checklist、demo script、AI 协作日志 | 文档 diff 指向当前 commit 证据 |
 | P0-5 | `docs/review/` triage | Round 1/2 报告已读入 | P0 只吸收 TeamRun/视觉/renderer 证据相关项；长期项放 P1/P3/P4 | roadmap 条目被合并，不产生新散列表 |
 
-已合入：R2 Desktop Shell IA（merge commit `698faabf`）、R4 Right Inspector（merge commit `dfe68692`）。R3/R5/R6A 不再逐个合小 PR，统一进入 Desktop P0 集成 PR；旧 draft PR 关闭或标记 superseded。
+已合入：R2 Desktop Shell IA（merge commit `698faabf`）、R4 Right Inspector（merge commit `dfe68692`）、Desktop P0 集成 PR #278。R3/R5/R6A 后续只作为来源分支引用，不再单独推进。
 
 ## P0: Desktop 比赛闭环
 
@@ -44,25 +45,28 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 - [x] IM @Agent 输入：`IMMessageInput` 已接入 `useMention` / `MentionPopover`。
 - [x] IM 富消息基础：`IMBlockRenderer` 已支持 Tool/Diff/Thinking/Approval 摘要。
-- [ ] 合入 Desktop P0 集成 PR：主 Chat 与 IM 共享 block/normalization 约束，避免 renderer 漂移。
-- [ ] child_agent、route_decision、artifact、deploy block 进入 IM 流。
+- [x] 合入 #278：主 Chat 与 IM 共享 block/normalization 约束，避免 renderer 漂移。
+- [x] child_agent、route_decision、artifact、deploy block 进入 IM 流。
 - [ ] Diff/Preview/Tool/Artifact 卡片既能在消息流可见，也能在右侧 Inspector 汇总。
 
 ### P0-C Right Inspector 证据列
 
 - [x] 合入 R4：宽屏右侧常驻证据列，窄屏可折叠但入口明确。
+- [ ] 接线 RightInspector：`run-detail` slot 当前仍指向 `RunDetail`，`useRightInspectorData` 仍是空数据 hook；视觉 QA 前先接真实 panel。
 - [ ] 展示 progress、Active/Done/Warning queue、tool timeline、changed files、workspace、artifacts。
 - [ ] 任务卡显示 Agent 角色、当前 tool、进度、耗时、暂停/取消/审批/详情入口。
 - [ ] 右侧列回答“做了几步、跑了哪些工具、改了哪些文件、产物在哪”。
 
 ### P0-D Composer 和协作动作
 
-- [ ] 合入 Desktop P0 集成 PR：`PromptInput` / `IMMessageInput` 的 @Agent、附件、workdir、approval mode 语义一致。
-- [ ] 合入 Desktop P0 集成 PR：IM 发送立即出现 pending 气泡，失败可回滚并展示错误。
+- [x] 合入 #278：`PromptInput` / `IMMessageInput` 的 @Agent、附件、workdir、approval mode 语义一致。
+- [x] 合入 #278：IM 发送立即出现 pending 气泡，失败可回滚并展示错误。
 - [ ] 统一 Edge permission approval 和 Team approval 的视觉路径。
 - [ ] Enter 发送、Shift+Enter 换行、disabled/loading、附件入口都有测试。
 
-### P0-E 真实 TeamRun
+### P0-E 真实 TeamRun（⚠️ 比赛生死线）
+
+> Review 2026-06-06 判定：backend 6147 行完备但零真实运行证据，比赛就绪度 4/10。这是最高 ROI 单项。
 
 - [ ] 至少两个真实 Runtime/Profile 在同一 group/team run 中协作。
 - [ ] Orchestrator route、子任务、工具过程、失败/审批处理、产出聚合进入同一 transcript。
@@ -87,6 +91,10 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 | per-thread draft persistence | 前端架构审计 P1 | 中 | 切换 thread 不丢 composer 草稿 |
 | context meter / token budget 提示 | 多模态 UI 审计 | 中 | 长任务录屏时能说明上下文状态，不只在日志里出现 |
 | Markdown 数学公式 | 前端审计 P2 | 低 | 仅在 demo/文档生成需要时做 |
+| Kanna 跨 Turn session 复用 | Review R2 Kanna 对比 | 中 | 跨 Turn 复用 CLI session 降低延迟和成本 |
+| Turn 边界分组 | Review R2 UI 审计 | 中 | user/agent 消息视觉分组，参考 CCUI turn 级 |
+| ChatView 巨石拆分 | Review R1 前端审计 | 中 | 1786→22 文件，机械提取 ~2 天 |
+| 双渲染器收敛 | Review R1 前端审计 | 中 | ChatView + IMBlockRenderer → shared block contract |
 
 ## P2: IM 产品完整性
 
@@ -132,12 +140,15 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 ### P3-B Phase B Edge 持久化和性能
 
+> Review 2026-06-06：B0 SQLite 在 Desktop 单机单用户场景非紧急，先加 JSON compaction 控制文件膨胀即可。SQLite 作为 P3 正常推进。
+
 - [ ] B0 JSONL 事件流：append-only 日志替代 JSON 快照。
 - [ ] B0 SQLite schema：projects / threads / runs / items + 索引，保持 store interface 不变。
 - [ ] B0 FTS5 搜索：BM25 排序，snippet 高亮。
 - [ ] B0 数据迁移：旧 JSON 快照自动导入 SQLite，损坏时可回退。
 - [ ] B1 离线队列：Hub 断连时写操作入队，重连后批量同步。
 - [ ] B1 Cursor 同步协议：`?cursor=<last_seq>` 增量拉取。
+- [ ] EventBus debounce + signature 去重：16ms batch，相同 payload 只广播一次，降低高频流式 fanout。
 - [x] B2 N+1 修复：Session list、StartTeamRun、dispatchTask 已关闭。
 - [ ] B2 migration 双系统统一：golang-migrate 作为唯一生产路径，AutoMigrate 仅测试使用。
 - [x] B3 Hub agent.go 拆分完成。
@@ -220,5 +231,6 @@ AgentHub 是 IM 形态的多 Agent 协作平台。核心体验是用户像用飞
 
 - 主 roadmap 保留优先级、依赖、长期任务、当前分支队列和验收标准。
 - 历史分析、已完成流水、竞品长文、深度审计明细放 `docs/archive/`。
+- **Review 报告**：活跃发现放 `docs/review/`，采纳进 roadmap 后标记 "已采纳"。过期不等于归档。
 - 更新时改现有条目，不追加第二套状态叙事。
 - 比赛提交事实同步到 `docs/competition/*`；接手状态同步到 `docs/handoffs/STATE.md`。
