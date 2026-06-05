@@ -34,8 +34,11 @@ pub fn run() {
     let edge_path = resolve_edge_path();
     let store_path = std::env::temp_dir().join("agenthub-edge-store.json");
     let edge = Arc::new(Mutex::new(
-        EdgeManager::new(edge_path, store_path)
-            .expect("failed to initialize local Edge auth token"),
+        EdgeManager::new(edge_path.clone(), store_path.clone())
+            .unwrap_or_else(|e| {
+                log::error!("Failed to initialize local Edge auth token: {e}. Edge connections will not authenticate.");
+                EdgeManager::new_fallback(edge_path, store_path)
+            }),
     ));
 
     let close_to_tray = Arc::new(AtomicBool::new(true));

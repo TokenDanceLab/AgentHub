@@ -47,6 +47,19 @@ impl EdgeManager {
         })
     }
 
+    /// Fallback constructor used when cryptographically-random token generation
+    /// fails. Uses an empty token — Edge connections won't authenticate, but
+    /// the app stays running instead of panicking.
+    pub fn new_fallback(edge_path: PathBuf, store_path: PathBuf) -> Self {
+        Self {
+            child: None,
+            edge_path,
+            store_path,
+            local_auth_token: String::new(),
+            port: 3210,
+        }
+    }
+
     pub async fn start<R: Runtime>(
         &mut self,
         app_handle: &tauri::AppHandle<R>,
