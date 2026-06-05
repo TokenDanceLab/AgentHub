@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronDown, AlertTriangle, ExternalLink, RefreshCcw, Reply, X } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, AlertTriangle, ExternalLink, RefreshCcw, Reply } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff, ReplyTarget } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
@@ -588,7 +588,7 @@ function extractMessageText(msg: ChatMessage): string {
 }
 
 // ── ChatView ────────────────────────────────
-export default function ChatView({ messages, isStreaming, onRetry, onDelete, onReply, onRegenerate, replyTo, onCancelReply }: Props) {
+export default function ChatView({ messages, isStreaming, onRetry, onDelete, onReply, onRegenerate, replyTo }: Props) {
   const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
