@@ -108,7 +108,7 @@ Sprint #1 `IM @Agent`、Sprint #2 `IM 富消息`、Sprint #4 `Tool 打磨` 已�
 
 | 分支 | 状态 | 验证 | 合并前注意 |
 |---|---|---|---|
-| `phase-r1/teamrun-e2e` | PR #270 已开，非 draft，mergeable | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | head `153ac27a`；不是最终录屏；合并后继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
+| `phase-r1/teamrun-e2e` | PR #270 已开，非 draft，mergeable | `useHubIntegration.test.ts` 37/37；`git diff --check` 通过；OpenAPI YAML parse 通过 | 不在 roadmap 追踪易变 head SHA；不是最终录屏；合并后继续补真实双 Runtime Demo、截图和 Hub state/events/tasks/assignments 导出 |
 | `phase-r2/desktop-shell` | draft PR #271 已开 | `uiStore.test.ts` 4/4；`git diff --check` 通过 | 需视觉 QA；typecheck 仍受旧债阻断 |
 | `phase-r3/transcript-contract` | draft PR #272 已开 | `IMBlockRenderer.test.tsx` + `IMMessageView.test.tsx` 31/31；`git diff --check` 通过 | 合并时留意 R6A 对 IM message view 的相邻改动 |
 | `phase-r4/right-inspector` | draft PR #273 已开 | `RightInspector.test.tsx` 23/23；`git diff --check` 通过 | 先以 props-only 组件接入，避免在同一 PR 重写 shell grid；与 R2 组合后补截图 |
