@@ -225,7 +225,7 @@ export default function AllowlistEditor({ entries, onEntriesChange }: AllowlistE
   );
 
   return (
-    <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className={styles.taskSectionHeader}>
         <strong>{t('settings.allowlistTitle', 'Workspace Allowlist')}</strong>
         <span>{t('settings.allowlistDesc', 'Pre-approved directories, file patterns, and tool permissions.')}</span>

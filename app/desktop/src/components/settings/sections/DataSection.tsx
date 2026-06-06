@@ -183,7 +183,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
 
   return (
     <Panel title={t('settings.data')} description={t('settings.dataDesc')}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
         <div style={panelStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <HardDrive size={18} />
@@ -206,7 +206,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <SettingRow
           title={t('settings.dataExport')}
           description={t('settings.dataExportDesc')}
@@ -312,7 +312,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
 
       <Callout title={t('settings.dataClearCacheConfirmTitle')} body={t('settings.dataClearCacheConfirmDesc')} />
 
-      <div style={{ marginTop: 24 }}>
+      <div>
         <div style={{ marginBottom: 12 }}>
           <strong style={{ fontSize: 15, display: 'block', marginBottom: 2 }}>{t('settings.dataKeyDetail')}</strong>
           <span style={mutedStyle}>{t('settings.dataKeyDetailDesc')}</span>
