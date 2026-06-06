@@ -3,6 +3,7 @@ import { AtSign, FileText, Paperclip, X } from 'lucide-react';
 import type {
   ApprovalMode,
   ComposerAction,
+  ComposerAttachment,
   ComposerMention,
   ComposerMode,
   ComposerState,
@@ -32,6 +33,7 @@ export interface UnifiedComposerProps {
   composer: ComposerState;
   dispatchComposer: React.Dispatch<ComposerAction>;
   mentionableAgents?: ComposerMention[];
+  onPickLocalAttachments?: (() => Promise<ComposerAttachment[]>) | undefined;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
 }
 
@@ -39,10 +41,12 @@ export function UnifiedComposer({
   composer,
   dispatchComposer,
   mentionableAgents = [],
+  onPickLocalAttachments,
   onSubmit,
 }: UnifiedComposerProps): React.ReactElement {
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
+  const [isPickingAttachments, setIsPickingAttachments] = useState(false);
   const isSubmitting = composer.submitState === 'submitting';
   const selectedMentionIds = useMemo(
     () => new Set(composer.mentions.map((mention) => mention.id)),
@@ -56,6 +60,23 @@ export function UnifiedComposer({
     const attachments = await browserFilesToComposerAttachments(files);
     attachments.forEach((attachment) => dispatchComposer({ type: 'addAttachment', attachment }));
     input.value = '';
+  }
+
+  async function handleAttachButtonClick(): Promise<void> {
+    if (!onPickLocalAttachments) {
+      attachmentInputRef.current?.click();
+      return;
+    }
+
+    setIsPickingAttachments(true);
+    try {
+      const attachments = await onPickLocalAttachments();
+      attachments.forEach((attachment) => dispatchComposer({ type: 'addAttachment', attachment }));
+    } catch {
+      // Keep the composer interactive if the native picker is unavailable or cancelled by the host.
+    } finally {
+      setIsPickingAttachments(false);
+    }
   }
 
   function toggleMention(mention: ComposerMention): void {
@@ -212,11 +233,11 @@ export function UnifiedComposer({
           ) : null}
         </div>
         <button
-          aria-label="添加附件"
+          aria-label={onPickLocalAttachments ? '添加本机附件' : '添加附件'}
           className={styles.attachButton}
-          disabled={isSubmitting}
-          onClick={() => attachmentInputRef.current?.click()}
-          title="添加附件"
+          disabled={isSubmitting || isPickingAttachments}
+          onClick={() => void handleAttachButtonClick()}
+          title={onPickLocalAttachments ? '添加本机附件' : '添加附件'}
           type="button"
         >
           <Paperclip aria-hidden="true" />

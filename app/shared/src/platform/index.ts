@@ -3,6 +3,7 @@ export type { MockPlatform, MockPlatformSeed } from './createMockPlatform';
 export type {
   AgentHubPlatform,
   AgentHubSurface,
+  AttachmentPort,
   ConversationKind,
   ConversationPort,
   RunPort,

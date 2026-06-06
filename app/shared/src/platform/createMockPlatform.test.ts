@@ -42,4 +42,23 @@ describe('createMockPlatform', () => {
       }),
     ]);
   });
+
+  it('can expose a mock attachment picker port', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      pickFiles: async () => [{
+        id: 'desktop-1',
+        name: 'notes.md',
+        source: 'desktop',
+        path: 'D:\\Code\\TokenDance\\AgentHub\\notes.md',
+      }],
+    });
+
+    await expect(platform.attachments?.pickFiles()).resolves.toEqual([
+      expect.objectContaining({
+        name: 'notes.md',
+        source: 'desktop',
+      }),
+    ]);
+  });
 });

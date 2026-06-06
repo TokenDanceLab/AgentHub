@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   browserFilesToComposerAttachments,
+  desktopPathsToComposerAttachments,
   formatComposerAttachmentContext,
   formatComposerAttachmentSize,
   formatComposerPromptWithAttachments,
   shouldPreviewComposerFile,
+  shouldPreviewComposerFileName,
 } from './attachments';
 import type { ComposerAttachment } from './types';
 
@@ -41,6 +43,7 @@ describe('composer attachments', () => {
     const imageFile = new File(['raw'], 'image.png', { type: 'image/png' });
 
     expect(shouldPreviewComposerFile(textFile)).toBe(true);
+    expect(shouldPreviewComposerFileName('notes.ts')).toBe(true);
     expect(shouldPreviewComposerFile(imageFile)).toBe(false);
 
     const attachments = await browserFilesToComposerAttachments([textFile]);
@@ -49,5 +52,30 @@ describe('composer attachments', () => {
       source: 'browser',
       contentPreview: 'attachment-token',
     }));
+  });
+
+  it('converts desktop paths and reads previews only for text-like names', async () => {
+    const reads: string[] = [];
+    const attachments = await desktopPathsToComposerAttachments(
+      ['D:\\Code\\TokenDance\\AgentHub\\notes.md', 'D:\\Code\\TokenDance\\AgentHub\\image.png'],
+      async (path) => {
+        reads.push(path);
+        return 'desktop attachment token';
+      },
+    );
+
+    expect(reads).toEqual(['D:\\Code\\TokenDance\\AgentHub\\notes.md']);
+    expect(attachments[0]).toEqual(expect.objectContaining({
+      name: 'notes.md',
+      path: 'D:\\Code\\TokenDance\\AgentHub\\notes.md',
+      source: 'desktop',
+      contentPreview: 'desktop attachment token',
+    }));
+    expect(attachments[1]).toEqual(expect.objectContaining({
+      name: 'image.png',
+      path: 'D:\\Code\\TokenDance\\AgentHub\\image.png',
+      source: 'desktop',
+    }));
+    expect(attachments[1]?.contentPreview).toBeUndefined();
   });
 });

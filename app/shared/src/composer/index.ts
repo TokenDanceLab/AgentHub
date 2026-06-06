@@ -1,9 +1,11 @@
 export {
   browserFilesToComposerAttachments,
+  desktopPathsToComposerAttachments,
   formatComposerAttachmentContext,
   formatComposerAttachmentSize,
   formatComposerPromptWithAttachments,
   shouldPreviewComposerFile,
+  shouldPreviewComposerFileName,
 } from './attachments';
 export {
   formatComposerMentionContext,
