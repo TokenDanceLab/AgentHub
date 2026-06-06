@@ -279,9 +279,16 @@ function permissionDecidedBlock(event: EventEnvelope): TranscriptBlock | null {
 
 function artifactCreatedBlock(event: EventEnvelope): TranscriptBlock | null {
   const artifactId = stringField(event.payload.artifactId) ?? event.id;
+  const path = stringField(event.payload.path);
+  const uri =
+    stringField(event.payload.uri) ??
+    stringField(event.payload.url) ??
+    stringField(event.payload.href);
+  const mimeType = stringField(event.payload.mimeType) ?? stringField(event.payload.mediaType);
   const title =
-    stringField(event.payload.path) ??
+    path ??
     stringField(event.payload.title) ??
+    uri ??
     stringField(event.payload.kind) ??
     artifactId;
   const runId = eventRunId(event);
@@ -294,6 +301,9 @@ function artifactCreatedBlock(event: EventEnvelope): TranscriptBlock | null {
         kind: 'artifact',
         label: title,
         status: 'completed',
+        ...(path ? { path } : {}),
+        ...(uri ? { uri } : {}),
+        ...(mimeType ? { mimeType } : {}),
       },
     ]),
     kind: 'artifact',
@@ -352,6 +362,7 @@ function fileEvidence(path: string): EvidenceRef {
     id: `file-${path}`,
     kind: 'file',
     label: path,
+    path,
   };
 }
 

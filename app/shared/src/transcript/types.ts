@@ -14,6 +14,9 @@ export interface EvidenceRef {
   kind: EvidenceRefKind;
   label: string;
   status?: EvidenceRefStatus;
+  path?: string;
+  uri?: string;
+  mimeType?: string;
 }
 
 interface TranscriptBlockBase {

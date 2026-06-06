@@ -86,6 +86,7 @@ describe('normalizeEdgeEventsToTranscript', () => {
             id: 'file-app/shared/src/transcript/normalizeEdgeEvents.ts',
             kind: 'file',
             label: 'app/shared/src/transcript/normalizeEdgeEvents.ts',
+            path: 'app/shared/src/transcript/normalizeEdgeEvents.ts',
           },
         ],
       }),
@@ -105,6 +106,7 @@ describe('normalizeEdgeEventsToTranscript', () => {
             id: 'artifact-artifact-1',
             kind: 'artifact',
             label: 'app/desktop/.tmp/visual-smoke-desktop.png',
+            path: 'app/desktop/.tmp/visual-smoke-desktop.png',
             status: 'completed',
           },
         ],
@@ -153,6 +155,30 @@ describe('normalizeEdgeEventsToTranscript', () => {
       kind: 'text',
       text: 'first',
     }));
+  });
+
+  it('keeps artifact preview metadata for platform adapters', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-preview-artifact', 1, 'artifact.created', {
+        runId: 'run-preview',
+        artifactId: 'artifact-preview',
+        title: '本地预览',
+        url: 'http://127.0.0.1:3210/artifacts/preview',
+        mimeType: 'text/html',
+      }),
+    ]);
+
+    expect(blocks[0]?.evidenceRefs).toEqual([
+      { id: 'run-run-preview', kind: 'run', label: 'Run run-preview', status: 'running' },
+      {
+        id: 'artifact-artifact-preview',
+        kind: 'artifact',
+        label: '本地预览',
+        mimeType: 'text/html',
+        status: 'completed',
+        uri: 'http://127.0.0.1:3210/artifacts/preview',
+      },
+    ]);
   });
 });
 
