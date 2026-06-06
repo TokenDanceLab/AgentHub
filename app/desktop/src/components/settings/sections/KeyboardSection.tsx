@@ -5,7 +5,6 @@ import Panel from '../primitives/Panel';
 import {
   KEYBOARD_SHORTCUT_GROUPS,
   type KeyboardShortcut,
-  type KeyboardShortcutGroup,
   type CustomKeybinding,
   getResolvedShortcutGroups,
   hasCustomKeybindings,
@@ -121,45 +120,62 @@ export default function KeyboardSection() {
   }, []);
 
   const hasCustom = hasCustomKeybindings();
+  const renderHeaderActions = (inert = false) => (
+    <>
+      <button
+        type="button"
+        className={styles.primaryBtn}
+        onClick={() => setEditing(true)}
+        disabled={inert}
+        tabIndex={inert ? -1 : undefined}
+      >
+        {t('settings.keyboardCustomize')}
+      </button>
+      {hasCustom && (
+        <button
+          type="button"
+          className={styles.secondaryBtn}
+          onClick={handleReset}
+          disabled={inert}
+          tabIndex={inert ? -1 : undefined}
+        >
+          <RotateCcw size={14} />
+          {t('settings.keyboardReset')}
+        </button>
+      )}
+    </>
+  );
 
   return (
-    <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
-      <div className={styles.shortcutTable}>
-        {!editing ? (
-          <>
-            {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
-              <div key={group.id} className={styles.shortcutGroup}>
-                <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
-                {group.shortcuts.map((shortcut) => (
-                  <div key={shortcut.id} className={styles.shortcutRow}>
-                    <span>{t(shortcut.labelKey)}</span>
-                    <div>
-                      {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-            <div className={styles.shortcutActions}>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setEditing(true)}
-            >
-              {t('settings.keyboardCustomize')}
-            </button>
-            {hasCustom && (
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={handleReset}
-              >
-                <RotateCcw size={14} />
-                {t('settings.keyboardReset')}
-              </button>
-            )}
+    <Panel
+      title={t('settings.keyboard')}
+      description={t('settings.keyboardDesc')}
+      actions={
+        !editing ? (
+          renderHeaderActions()
+        ) : (
+          <div className={styles.panelHeaderActionPlaceholder} aria-hidden="true">
+            {renderHeaderActions(true)}
           </div>
-        </>
+        )
+      }
+    >
+      {!editing ? (
+        <div className={styles.shortcutTable}>
+          {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
+            <div key={group.id} className={styles.shortcutGroup}>
+              <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
+              {group.shortcuts.map((shortcut) => (
+                <div key={shortcut.id} className={styles.shortcutRow}>
+                  <span>{t(shortcut.labelKey)}</span>
+                  <div>
+                    {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           <div className={styles.shortcutEditTable}>
@@ -271,7 +287,6 @@ export default function KeyboardSection() {
           </div>
         </>
       )}
-    </div>
-  </Panel>
+    </Panel>
   );
 }

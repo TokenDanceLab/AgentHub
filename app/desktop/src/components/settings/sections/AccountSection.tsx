@@ -45,7 +45,16 @@ export default function AccountSection({
       <div className={styles.summaryGrid}>
         <SummaryCard icon={<LockKeyhole size={18} />} label={t('settings.hubSession')} value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')} detail={hubSessionActive ? t('settings.hubSessionDesc') : t('settings.hubSessionSignedOutDesc')} />
         <SummaryCard icon={<Globe2 size={18} />} label="TokenDance ID" value={tokenSource === 'tokendance' ? t('settings.enabled') : t('settings.statusInProgress')} detail={tokenSource === 'tokendance' ? t('settings.tokenDanceSessionDesc') : t('settings.tokenDanceOidcPendingDesc')} />
-        <SummaryCard icon={<Monitor size={18} />} label={t('settings.desktopDevice')} value={desktopDeviceStatus} detail={deviceRegistration.status === 'error' ? deviceRegistration.error ?? t('settings.desktopDeviceRegisterFailed') : deviceId ? shortId(deviceId) : t('settings.desktopDeviceMissingDesc')} />
+        <SummaryCard
+          icon={<Monitor size={18} />}
+          label={t('settings.desktopDevice')}
+          value={desktopDeviceStatus}
+          detail={deviceRegistration.status === 'error' ? deviceRegistration.error ?? t('settings.desktopDeviceRegisterFailed') : deviceId ? shortId(deviceId) : t('settings.desktopDeviceMissingDesc')}
+          expandedDetail={deviceId ? <code className={styles.summaryExpandedCode}>{deviceId}</code> : undefined}
+          expandedDetailPlacement="detail"
+          expandLabel={t('settings.desktopDeviceShowFull')}
+          collapseLabel={t('settings.desktopDeviceHideFull')}
+        />
         <SummaryCard icon={<Route size={18} />} label={t('settings.syncScope')} value={deviceRegistration.status === 'registered' ? t('settings.enabled') : t('settings.signedOut')} detail={t('settings.syncScopeDesc')} />
       </div>
       <div className={styles.taskSection}>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bot, ChevronDown, ChevronUp, Globe, Wrench  } from 'lucide-react';
+import { Bot, ChevronDown, ChevronUp } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import type { ResolvedRunModelSettings } from '@/stores/modelSettingsStore';
 import {
@@ -44,6 +44,8 @@ interface LocalAgentProfileCardProps {
   route: ResolvedRunModelSettings;
   edgeOnline: boolean;
 }
+
+type SelectOption = readonly [string, string];
 
 // ── Tool catalog ────────────────────────────────────
 
@@ -158,6 +160,21 @@ function estimateTokens(text: string): number {
   return Math.max(1, Math.round(cjk + ascii / 4));
 }
 
+function withCurrentOptions(options: readonly SelectOption[], currentValues: Array<string | undefined>): SelectOption[] {
+  const next = [...options];
+  for (const value of currentValues) {
+    const trimmed = value?.trim();
+    if (trimmed && !next.some(([optionValue]) => optionValue === trimmed)) {
+      next.unshift([trimmed, trimmed]);
+    }
+  }
+  return next;
+}
+
+function labelForOption(options: readonly SelectOption[], value: string): string {
+  return options.find(([optionValue]) => optionValue === value)?.[1] ?? value;
+}
+
 // ── Component ───────────────────────────────────────
 
 export default function LocalAgentProfileCard({
@@ -245,6 +262,24 @@ export default function LocalAgentProfileCard({
   }, []);
 
   const enabledToolCount = profile.tools.filter((t) => t.enabled).length;
+  const modelOptions = useMemo(
+    () => withCurrentOptions(MODEL_OPTIONS.filter(([value]) => value !== 'auto'), [profile.modelOverride, route.model]),
+    [profile.modelOverride, route.model],
+  );
+  const providerOptions = useMemo(
+    () => withCurrentOptions(PROVIDER_OPTIONS, [profile.providerOverride, route.provider]),
+    [profile.providerOverride, route.provider],
+  );
+  const reasoningOptions = useMemo(
+    () => withCurrentOptions(REASONING_OPTIONS, [profile.reasoningOverride, route.reasoningEffort]),
+    [profile.reasoningOverride, route.reasoningEffort],
+  );
+  const activeModel = profile.modelOverride || route.model || '';
+  const activeProvider = profile.providerOverride || route.provider || '';
+  const hasProfileModelChoice = Boolean(profile.modelOverride || profile.providerOverride || profile.reasoningOverride);
+  const autoLabel = t('prompt.routeAuto');
+  const modelLabel = activeModel ? labelForOption(modelOptions, activeModel) : autoLabel;
+  const providerLabel = activeProvider ? labelForOption(providerOptions, activeProvider) : autoLabel;
 
   return (
     <div className={styles.profileCard}>
@@ -272,13 +307,10 @@ export default function LocalAgentProfileCard({
           </em>
         </div>
         <div className={styles.profileMeta}>
-          <span>{t('settings.profileRuntime')}: {agent.id}</span>
-          <span>{t('settings.profileModel')}: {route.model ?? t('prompt.routeAuto')}</span>
-          <span>{t('settings.modelAliasProvider')}: {route.provider ?? t('prompt.routeAuto')}</span>
-          <span>{t('settings.modelAliasReasoning')}: {route.reasoningEffort ?? t('prompt.routeAuto')}</span>
-          {alias ? <span>{t('settings.profileAlias')}: {alias}</span> : null}
-          <span>{t('settings.executionTargets')}: {t('settings.targetLocalEdge')}</span>
-          <span>{t('settings.profileConfigSource')}: AGENTS.md / memory / skills</span>
+          <span>{t('settings.agentProfileSummaryModel', { model: modelLabel })}</span>
+          <span>{t('settings.agentProfileSummaryProvider', { provider: providerLabel })}</span>
+          <span>{hasProfileModelChoice ? t('settings.agentProfileSummaryCustom') : t('settings.agentProfileSummaryDefault')}</span>
+          <span>{t('settings.agentProfileSummaryTarget')}</span>
         </div>
         <div className={styles.profileExpandArrow}>
           {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
@@ -374,33 +406,33 @@ export default function LocalAgentProfileCard({
                   onChange={(e) => setProfile((prev) => ({ ...prev, modelOverride: e.target.value }))}
                 >
                   <option value="">{t('settings.agentProfileUseDefault', { defaultValue: 'Use default' })}</option>
-                  {MODEL_OPTIONS.filter(([v]) => v !== 'auto').map(([value, label]) => (
+                  {modelOptions.map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
               </label>
               <label className={styles.profileEditorMiniLabel}>
-                <span>{t('settings.modelAliasProvider')}</span>
+                <span>{t('settings.agentProfileProvider')}</span>
                 <select
                   className={styles.select}
                   value={profile.providerOverride}
                   onChange={(e) => setProfile((prev) => ({ ...prev, providerOverride: e.target.value }))}
                 >
                   <option value="">{t('settings.agentProfileUseDefault', { defaultValue: 'Use default' })}</option>
-                  {PROVIDER_OPTIONS.map(([value, label]) => (
+                  {providerOptions.map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
               </label>
               <label className={styles.profileEditorMiniLabel}>
-                <span>{t('settings.modelAliasReasoning')}</span>
+                <span>{t('settings.agentProfileReasoning')}</span>
                 <select
                   className={styles.select}
                   value={profile.reasoningOverride}
                   onChange={(e) => setProfile((prev) => ({ ...prev, reasoningOverride: e.target.value }))}
                 >
                   <option value="">{t('settings.agentProfileUseDefault', { defaultValue: 'Use default' })}</option>
-                  {REASONING_OPTIONS.map(([value, label]) => (
+                  {reasoningOptions.map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
@@ -557,7 +589,7 @@ export default function LocalAgentProfileCard({
           <div className={styles.profileEditorActions}>
             <div className={styles.profileEditorActionsLeft}>
               <span className={styles.profileEditorSource}>
-                {t('settings.agentProfileStorage', { defaultValue: 'Saved to localStorage' })}: {agentProfileKey(agent.id)}
+                {t('settings.agentProfileStorage', { defaultValue: 'Saved on this device' })}
               </span>
               <button
                 type="button"

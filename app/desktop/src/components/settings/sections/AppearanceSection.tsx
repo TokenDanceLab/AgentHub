@@ -4,8 +4,6 @@ import { THEME_PRESETS, THEME_PRESET_META, type ThemePreset } from '@/contexts/T
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import SelectControl from '../primitives/SelectControl';
-import Switch from '../primitives/Switch';
-import { writeStoredValue } from '../utils';
 import styles from '../primitives/primitives.module.css';
 
 type ThemeMode = 'dark' | 'light' | 'system';
@@ -13,8 +11,6 @@ type ThemeMode = 'dark' | 'light' | 'system';
 interface AppearanceSectionProps {
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
-  compactMode: boolean;
-  setCompactMode: (value: boolean) => void;
   themePreset: ThemePreset | undefined;
   setThemePreset: (preset: ThemePreset | undefined) => void;
 }
@@ -25,7 +21,7 @@ const LANGUAGE_OPTIONS: Array<[string, string]> = [
 ];
 
 export default function AppearanceSection({
-  themeMode, setThemeMode, compactMode, setCompactMode,
+  themeMode, setThemeMode,
   themePreset, setThemePreset,
 }: AppearanceSectionProps) {
   const { t } = useTranslation();
@@ -100,13 +96,6 @@ export default function AppearanceSection({
               onChange={(value) => setLanguage(value as 'en' | 'zh')}
             />
           }
-        />
-      </Panel>
-      <Panel title={t('settings.density')}>
-        <SettingRow
-          title={t('settings.compactMode')}
-          description={t('settings.compactModeDesc')}
-          control={<Switch checked={compactMode} onChange={(v) => { setCompactMode(v); writeStoredValue('compactMode', v); }} />}
         />
       </Panel>
     </>
