@@ -215,11 +215,15 @@ app/desktop/src-tauri/src/
 - Create: `app/shared/src/inspector/PreviewPanel.tsx`
 - Test: `app/shared/src/inspector/*.test.tsx`
 
-- [ ] 聚合 `EvidenceRef` 为 progress、tool timeline、changed files、artifacts。
-- [ ] 支持 overview/browser/files 三种 v4 inspector tab。
+- [ ] 聚合 `EvidenceRef` 为 progress、tool timeline、changed files、artifacts；首片已新增 `buildInspectorEvidenceModel`，把 evidence 分组为 run/tool/file/artifact 并统计 status。
+- [x] 支持 overview/browser/files 三种 v4 inspector tab。
 - [ ] 支持 collapse/resize 状态由 workbench 控制。
-- [ ] 文件/浏览器预览通过 platform capability 决定可用性。
+- [ ] 文件/浏览器预览通过 platform capability 决定可用性；首片已显示 changed files list/empty state 和 browser preview capability 状态，真实打开动作后续接 platform adapter。
 - [ ] 覆盖空状态、失败状态、长文件名、窄屏。
+
+执行记录：
+- 2026-06-07：新增 `app/shared/src/inspector/inspectorEvidence.ts`、`app/shared/src/inspector/index.ts` 和 focused tests；`RightInspector` 已从占位文本升级为 overview summary、run/tool/artifact evidence sections、changed files tab 和 browser capability card。
+- 2026-06-07：`collectTranscriptEvidence` 保持首次出现顺序，同时用后续同 ID evidence 更新最新 status，避免 live Edge run 状态被早期 pending/running evidence 卡住；shared focused tests 更新为 7 个文件 / 19 个测试通过。
 
 ### Task 7: Desktop platform adapter
 
@@ -258,7 +262,7 @@ app/desktop/src-tauri/src/
 - Test: `app/web/src/platform/*.test.ts`
 
 - [ ] 把 Hub session、conversation、message、remote run 包装为 shared ports。
-- [ ] Web `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`。
+- [ ] Web `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`；首片已渲染 shared workbench，并补齐 `lucide-react` alias 防止 shared workbench 图标在 Web Vitest 中加载到第二份 React。
 - [ ] Web 不引入 Tauri 或 Local Edge 私有能力。
 - [ ] 跑 Web typecheck/build/focused tests。
 

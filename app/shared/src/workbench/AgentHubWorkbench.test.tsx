@@ -19,7 +19,25 @@ describe('AgentHubWorkbench', () => {
       author: { id: 'builder', name: 'Builder', role: 'agent' },
       toolName: 'Read',
       status: 'completed',
-      evidenceRefs: [{ id: 'ev-tool', kind: 'tool', label: 'Read desktop/index.html', status: 'completed' }],
+      evidenceRefs: [
+        { id: 'run-v4', kind: 'run', label: 'Run v4', status: 'running' },
+        { id: 'ev-tool', kind: 'tool', label: 'Read desktop/index.html', status: 'completed' },
+      ],
+    },
+    {
+      id: 'diff-1',
+      kind: 'diff',
+      author: { id: 'builder', name: 'Builder', role: 'agent' },
+      title: 'app/shared/src/workbench/RightInspector.tsx',
+      files: ['app/shared/src/workbench/RightInspector.tsx'],
+      evidenceRefs: [{ id: 'ev-file', kind: 'file', label: 'app/shared/src/workbench/RightInspector.tsx' }],
+    },
+    {
+      id: 'artifact-1',
+      kind: 'artifact',
+      author: { id: 'builder', name: 'Builder', role: 'agent' },
+      title: 'visual-smoke-desktop.png',
+      evidenceRefs: [{ id: 'ev-artifact', kind: 'artifact', label: 'visual-smoke-desktop.png', status: 'completed' }],
     },
   ];
 
@@ -49,6 +67,27 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
     expect(screen.getByText('Read desktop/index.html')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '浏览器预览' })).toBeDisabled();
+  });
+
+  it('renders v4 inspector overview, changed files, and browser capability state', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(<AgentHubWorkbench platform={platform} conversations={platform.seed.conversations} transcript={transcript} />);
+
+    expect(screen.getByRole('list', { name: '运行 evidence' })).toHaveTextContent('Run v4');
+    expect(screen.getByRole('list', { name: '工具 evidence' })).toHaveTextContent('Read desktop/index.html');
+    expect(screen.getByRole('list', { name: '产物 evidence' })).toHaveTextContent('visual-smoke-desktop.png');
+
+    fireEvent.click(screen.getByRole('tab', { name: '文件' }));
+    expect(screen.getByRole('list', { name: 'Changed files' })).toHaveTextContent('app/shared/src/workbench/RightInspector.tsx');
+
+    fireEvent.click(screen.getByRole('tab', { name: '浏览器' }));
+    expect(screen.getByText('浏览器预览已启用')).toBeInTheDocument();
+    expect(screen.getByText('检测到 1 个产物，后续由 platform adapter 打开预览。')).toBeInTheDocument();
   });
 
   it('submits composer intents through the platform adapter', async () => {
