@@ -122,46 +122,49 @@ export default function KeyboardSection() {
   const hasCustom = hasCustomKeybindings();
 
   return (
-    <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
-      {!editing ? (
-        <>
-          <div className={styles.shortcutToolbar}>
-            <div className={styles.shortcutActions}>
-              {hasCustom && (
-                <button
-                  type="button"
-                  className={styles.secondaryBtn}
-                  onClick={handleReset}
-                >
-                  <RotateCcw size={14} />
-                  {t('settings.keyboardReset')}
-                </button>
-              )}
+    <Panel
+      title={t('settings.keyboard')}
+      description={t('settings.keyboardDesc')}
+      actions={
+        !editing ? (
+          <div className={styles.shortcutActions}>
+            {hasCustom && (
               <button
                 type="button"
-                className={styles.primaryBtn}
-                onClick={() => setEditing(true)}
+                className={styles.secondaryBtn}
+                onClick={handleReset}
               >
-                {t('settings.keyboardCustomize')}
+                <RotateCcw size={14} />
+                {t('settings.keyboardReset')}
               </button>
-            </div>
+            )}
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() => setEditing(true)}
+            >
+              {t('settings.keyboardCustomize')}
+            </button>
           </div>
-          <div className={styles.shortcutTable}>
-            {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
-              <div key={group.id} className={styles.shortcutGroup}>
-                <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
-                {group.shortcuts.map((shortcut) => (
-                  <div key={shortcut.id} className={styles.shortcutRow}>
-                    <span>{t(shortcut.labelKey)}</span>
-                    <div>
-                      {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
-                    </div>
+        ) : null
+      }
+    >
+      {!editing ? (
+        <div className={styles.shortcutTable}>
+          {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
+            <div key={group.id} className={styles.shortcutGroup}>
+              <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
+              {group.shortcuts.map((shortcut) => (
+                <div key={shortcut.id} className={styles.shortcutRow}>
+                  <span>{t(shortcut.labelKey)}</span>
+                  <div>
+                    {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
                   </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           <div className={styles.shortcutEditTable}>

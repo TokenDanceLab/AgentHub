@@ -14,18 +14,18 @@ describe('KeyboardSection', () => {
     localStorage.clear();
   });
 
-  it('places default shortcut actions in a toolbar before the shortcut table', () => {
+  it('places default shortcut actions in the panel header', () => {
     const { container } = render(<KeyboardSection />);
 
     const customize = screen.getByRole('button', { name: 'settings.keyboardCustomize' });
-    const toolbar = customize.closest('[class*="shortcutToolbar"]');
+    const header = customize.closest('[class*="panelHeader"]');
     const actions = customize.closest('[class*="shortcutActions"]');
     const table = container.querySelector('[class*="shortcutTable"]');
 
-    expect(toolbar).toBeInTheDocument();
+    expect(header).toBeInTheDocument();
     expect(actions).toBeInTheDocument();
     expect(table).toBeInTheDocument();
-    expect(toolbar!.compareDocumentPosition(table!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(header!.compareDocumentPosition(table!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('renders edit controls without undefined classes after customizing', () => {
@@ -64,7 +64,6 @@ describe('KeyboardSection', () => {
     );
 
     [
-      'shortcutToolbar',
       'shortcutActions',
       'shortcutEditTable',
       'shortcutEditGroup',
