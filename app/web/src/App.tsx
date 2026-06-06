@@ -6,9 +6,8 @@ import { useAgentList } from '@/api/agentQueries';
 import {
   createWebPlatform,
   resolveWebWorkbenchAgents,
-  webConversations,
-  webTranscript,
 } from '@/platform/webPlatform';
+import { useWebWorkbenchModel } from '@/platform/useWebWorkbenchModel';
 
 const webPlatform = createWebPlatform();
 
@@ -24,15 +23,16 @@ export default function App() {
 
 function WebWorkbenchRoot() {
   const agentList = useAgentList(true);
+  const workbench = useWebWorkbenchModel();
   const agents = resolveWebWorkbenchAgents(agentList.data?.items);
 
   return (
     <AgentHubWorkbench
-      activeConversationId="agent-collab"
+      activeConversationId={workbench.activeConversationId}
       agents={agents}
-      conversations={webConversations}
+      conversations={workbench.conversations}
       platform={webPlatform}
-      transcript={webTranscript}
+      transcript={workbench.transcript}
     />
   );
 }

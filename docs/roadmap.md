@@ -28,7 +28,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 完成计划、问题清单、架构与 roadmap 同步 | `git diff --check`；活跃文档无旧主线冲突 |
 | P0-2 | shared UI 工作台边界 | 进行中 | 补 Hub normalize、block renderer 和 design token bridge | shared focused tests 30 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
 | P0-3 | Desktop v4 shell 接入 | 进行中 | 继续替换剩余静态 smoke 数据，并补 inspector resize/collapse | Desktop App v4 focused tests 4 passed；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过，且读取真实 Edge thread 列表、persisted items、live Edge event evidence，可从 v4 composer 提交 Edge run，并在 shared inspector 展示 run/tool/file/artifact evidence；v4 composer approval/workDir/@Agent/浏览器文件附件/Desktop 原生文件附件上下文已传入 Edge `startRun`；files/browser inspector 已通过 platform preview port 打开 evidence target |
-| P0-4 | Web v4 shell 接入 | 进行中 | 继续接 Hub sessions/messages/WS 和 remote run submit | Web App focused test 通过；Web typecheck/build 通过；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles` |
+| P0-4 | Web v4 shell 接入 | 进行中 | 继续接 Hub WS 和 remote run submit | Web App focused test 通过；Web typecheck/build 通过；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles`；Web v4 conversations/transcript 已接 Hub sessions/messages |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
 | P0-6 | 旧 UI 清理门禁 | 未开始 | 删除或归档旧 UI 入口，禁止旧文件继续承载活跃路径 | `rg` 旧入口扫描；无双主工作台 |
 
@@ -48,7 +48,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 - [ ] `app/shared/src/ui/`：清理 exports，明确基础组件的 public API。
 - [ ] `app/shared/src/workbench/`：已新增 `AgentHubWorkbench` shared shell，并拆出 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`TranscriptView`、`UnifiedComposer`、`RightInspector`；下一步补 `WorkbenchRoutes` 和 design token bridge。
-- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock normalize；下一步补 Hub message normalize 与 block renderer。
+- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock、Hub message -> TranscriptBlock normalize；下一步补 Hub WS event normalize 与 block renderer。
 - [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer、v4 modes、approval mode、workDir、结构化 @Agent mention、浏览器文件附件和 Desktop 原生文件附件上下文；下一步补 per-conversation draft persistence。
 - [ ] `app/shared/src/inspector/`：首片已建立 evidence 聚合模型，shared workbench 的 overview/browser/files tabs 已显示 run/tool/file/artifact summary、changed files 空/列表状态和 browser capability 状态，并已接入 files/browser evidence preview 打开动作；下一步补 resize/collapse 和更完整 tool timeline。
 - [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface、mock platform、附件 picker port 和 preview port；Desktop/Web 已接实际 adapter，下一步接 Hub REST/WS 数据 adapter。
@@ -61,6 +61,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - 2026-06-07：补齐 workbench 子组件、workspace tabs、inspector tabs 和 composer modes 后，focused tests 更新为 4 个文件 / 10 个测试通过；新增 workbench 子组件 targeted TypeScript 编译通过。
 - 2026-06-07：新增 `normalizeThreadItemsToTranscript`，把 Edge persisted thread items 投影到 shared `TranscriptBlock` 和 `EvidenceRef(kind="run")`；`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\normalizeThreadItems.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，5 个文件 / 12 个测试通过。
 - 2026-06-07：新增 `normalizeEdgeEventsToTranscript`，把 live Edge `run.started`、`run.output(.batch)`、`run.agent.text_*`、`run.agent.tool_*`、`run.agent.file_change`、`run.agent.permission_*`、`artifact.created`、`run.finished/failed/cancelled` 投影到 shared `TranscriptBlock` 和 `EvidenceRef`；`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\normalizeThreadItems.test.ts src\transcript\normalizeEdgeEvents.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，6 个文件 / 14 个测试通过。
+- 2026-06-07：新增 `normalizeHubMessagesToTranscript`，把 Hub session messages 投影到 shared `TranscriptBlock`，避免 v4 Web 继续依赖旧 `ChatView` 消息转换；`cd app/shared; corepack.cmd pnpm exec vitest run src\transcript\normalizeHubMessages.test.ts src\transcript\normalizeEdgeEvents.test.ts src\transcript\normalizeThreadItems.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，4 个文件 / 15 个测试通过。
 - 2026-06-07：shared workbench submit 失败时保留草稿并退出 submitting 状态，防止 Desktop 无真实 Edge thread 时假提交；focused shared tests 更新为 6 个文件 / 15 个测试通过。
 - 2026-06-07：新增 `app/shared/src/inspector/inspectorEvidence.ts`，把 `EvidenceRef` 聚合为 run/tool/file/artifact inspector model；`collectTranscriptEvidence` 现在保留首次出现顺序但更新同一 evidence 的最新状态，避免 live run 状态卡在 pending/running；shared focused tests 更新为 7 个文件 / 19 个测试通过。
 - 2026-06-07：shared `UnifiedComposer` 增加 approval mode 和 workDir 控件，`ComposerIntent` 会携带 trim 后的 `workDir`；focused shared tests 仍为 7 个文件 / 19 个测试通过，并覆盖 platform intent 中的 `approvalMode/workDir`。
@@ -102,12 +103,13 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 目标：Web 使用同一套工作台，只替换 platform adapter 和数据来源。
 
-- [ ] 建立 `app/web/src/platform/webPlatform.ts`，首片已提供 static Web adapter 和 `preview.openEvidence()` 浏览器打开 port，并补齐 Web Vite/Vitest 的 `lucide-react` alias 以支持 shared workbench 图标双端解析；v4 workbench 的 @Agent 列表已接 Hub `GET /web/agent-profiles`，未登录或无数据时才使用 preview fallback；下一步接入 Hub sessions/messages、Hub WS 和远程 run submit。
+- [ ] 建立 `app/web/src/platform/webPlatform.ts`，首片已提供 static Web adapter 和 `preview.openEvidence()` 浏览器打开 port，并补齐 Web Vite/Vitest 的 `lucide-react` alias 以支持 shared workbench 图标双端解析；v4 workbench 的 @Agent 列表已接 Hub `GET /web/agent-profiles`，conversations/transcript 已在 Hub session 下接 `/client/sessions` 和 `/client/sessions/{id}/messages`，未登录时才使用 preview fallback；下一步接入 Hub WS 和远程 run submit。
 - [ ] 用 `AgentHubWorkbench` 替换 Web 旧 `ChatView`、`PromptInput`、`ThreadPanel`、`RunDetail`；首片已让 Web App 根入口渲染 shared workbench。
 - [x] Web transcript 与 Desktop transcript 使用同一 block renderer。
 - [x] Web inspector 与 Desktop inspector 使用同一组件，差异只来自 adapter capability。
 - [ ] Web build/typecheck 和核心 UI tests 进入验收门禁；首片证据：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx --reporter=dot`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 均通过；Playwright visual smoke 通过并生成 `.tmp/visual-smoke-web.png`。
 - 2026-06-07：Web `App` 在 `QueryClientProvider` 内通过 `useAgentList(true)` 读取 Hub Agent Profiles，并把 Hub `AgentInfo` 映射为 shared `WorkbenchAgent` 供 v4 composer @Agent 菜单使用；未登录或 Hub 无 profile 数据时保留 preview fallback；同时恢复 `app/web/src/api/edgeClient.ts` Hub-only/stubbed 兼容面，保证浏览器端不重新引入 Local Edge；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 7 个测试通过，`corepack.cmd pnpm typecheck` 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
+- 2026-06-07：新增 `useWebWorkbenchModel()`，Web v4 workbench 在 Hub 登录态读取 Hub sessions/messages，并把 session 映射为 shared conversation、message 映射为 shared transcript；登录但暂无会话时显示明确 Hub 空态，未登录才使用 preview fallback；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 9 个测试通过，Web typecheck/build 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
 
 ## P4: Tauri Host API 重构
 
