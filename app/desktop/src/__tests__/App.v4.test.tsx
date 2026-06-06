@@ -245,6 +245,9 @@ describe('Desktop App v4 root', () => {
     fireEvent.change(screen.getByLabelText('Composer input'), {
       target: { value: '跑一下 v4 smoke' },
     });
+    fireEvent.click(screen.getByRole('button', { name: '@Agent' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /@Builder/ }));
+    expect(screen.getByRole('button', { name: '移除提及 Builder' })).toBeInTheDocument();
     const file = new File(['attachment-token: desktop'], 'notes.txt', { type: 'text/plain' });
     fireEvent.change(screen.getByTestId('composer-attachment-input'), {
       target: { files: [file] },
@@ -259,14 +262,22 @@ describe('Desktop App v4 root', () => {
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
 
     await waitFor(() => {
-      expect(createRunMutateAsync).toHaveBeenCalledWith({
-        permissionMode: 'acceptEdits',
-        projectId: 'project-1',
-        prompt: expect.stringContaining('attachment-token: desktop'),
-        threadId: 'thread-real',
-        workDir: 'D:\\Code\\TokenDance\\AgentHub',
-      });
+      expect(createRunMutateAsync).toHaveBeenCalledTimes(1);
     });
+
+    const submittedRun = createRunMutateAsync.mock.calls[0]?.[0];
+    expect(submittedRun).toEqual({
+      permissionMode: 'acceptEdits',
+      projectId: 'project-1',
+      prompt: expect.any(String),
+      threadId: 'thread-real',
+      workDir: 'D:\\Code\\TokenDance\\AgentHub',
+    });
+    expect(submittedRun.prompt).toContain('Mentioned agents:');
+    expect(submittedRun.prompt).toContain('Builder (id: builder)');
+    expect(submittedRun.prompt).toContain('Model: glm-5.1');
+    expect(submittedRun.prompt).toContain('Attached files:');
+    expect(submittedRun.prompt).toContain('attachment-token: desktop');
     expect(screen.getByLabelText('Composer input')).toHaveValue('');
   });
 });

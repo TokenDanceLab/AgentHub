@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { queryClient } from '@/api/queryClient';
-import { createWebPlatform, webConversations, webTranscript } from '@/platform/webPlatform';
+import { createWebPlatform, webAgents, webConversations, webTranscript } from '@/platform/webPlatform';
 
 const webPlatform = createWebPlatform();
 
@@ -12,6 +12,7 @@ export default function App() {
       <ThemeProvider>
         <AgentHubWorkbench
           activeConversationId="agent-collab"
+          agents={webAgents}
           conversations={webConversations}
           platform={webPlatform}
           transcript={webTranscript}

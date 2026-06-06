@@ -2,10 +2,11 @@ import React, { FormEvent, useReducer } from 'react';
 import {
   buildComposerIntent,
   canSubmitComposer,
+  type ComposerMention,
   composerReducer,
   createInitialComposerState,
 } from '../composer';
-import type { AgentHubPlatform, WorkbenchConversation } from '../platform';
+import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '../platform';
 import { collectTranscriptEvidence } from '../transcript';
 import type { TranscriptBlock } from '../transcript';
 import { ConversationSidebar } from './ConversationSidebar';
@@ -19,6 +20,7 @@ import styles from './AgentHubWorkbench.module.css';
 export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
   conversations: WorkbenchConversation[];
+  agents?: WorkbenchAgent[];
   activeConversationId?: string;
   transcript: TranscriptBlock[];
 }
@@ -26,6 +28,7 @@ export interface AgentHubWorkbenchProps {
 export function AgentHubWorkbench({
   platform,
   conversations,
+  agents = [],
   activeConversationId,
   transcript,
 }: AgentHubWorkbenchProps): React.ReactElement {
@@ -38,6 +41,14 @@ export function AgentHubWorkbench({
   );
   const evidence = collectTranscriptEvidence(transcript);
   const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
+  const mentionableAgents: ComposerMention[] = agents.map((agent) => ({
+    id: agent.id,
+    label: agent.name,
+    ...(agent.description ? { description: agent.description } : {}),
+    ...(agent.status ? { status: agent.status } : {}),
+    ...(agent.model ? { model: agent.model } : {}),
+    ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
+  }));
 
   async function submitComposer(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -69,6 +80,7 @@ export function AgentHubWorkbench({
         <UnifiedComposer
           composer={composer}
           dispatchComposer={dispatchComposer}
+          mentionableAgents={mentionableAgents}
           onSubmit={submitComposer}
         />
       </main>

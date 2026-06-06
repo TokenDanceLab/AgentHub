@@ -1,6 +1,12 @@
-import React, { type ChangeEvent, type FormEvent, useRef } from 'react';
-import { FileText, Paperclip, X } from 'lucide-react';
-import type { ApprovalMode, ComposerAction, ComposerMode, ComposerState } from '../composer';
+import React, { type ChangeEvent, type FormEvent, useMemo, useRef, useState } from 'react';
+import { AtSign, FileText, Paperclip, X } from 'lucide-react';
+import type {
+  ApprovalMode,
+  ComposerAction,
+  ComposerMention,
+  ComposerMode,
+  ComposerState,
+} from '../composer';
 import {
   browserFilesToComposerAttachments,
   canSubmitComposer,
@@ -25,16 +31,23 @@ const approvalModes: Array<{ mode: ApprovalMode; label: string }> = [
 export interface UnifiedComposerProps {
   composer: ComposerState;
   dispatchComposer: React.Dispatch<ComposerAction>;
+  mentionableAgents?: ComposerMention[];
   onSubmit(event: FormEvent<HTMLFormElement>): void;
 }
 
 export function UnifiedComposer({
   composer,
   dispatchComposer,
+  mentionableAgents = [],
   onSubmit,
 }: UnifiedComposerProps): React.ReactElement {
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
   const isSubmitting = composer.submitState === 'submitting';
+  const selectedMentionIds = useMemo(
+    () => new Set(composer.mentions.map((mention) => mention.id)),
+    [composer.mentions],
+  );
 
   async function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const input = event.currentTarget;
@@ -43,6 +56,22 @@ export function UnifiedComposer({
     const attachments = await browserFilesToComposerAttachments(files);
     attachments.forEach((attachment) => dispatchComposer({ type: 'addAttachment', attachment }));
     input.value = '';
+  }
+
+  function toggleMention(mention: ComposerMention): void {
+    if (selectedMentionIds.has(mention.id)) {
+      dispatchComposer({ type: 'removeMention', mentionId: mention.id });
+    } else {
+      dispatchComposer({ type: 'addMention', mention });
+    }
+    setMentionMenuOpen(false);
+  }
+
+  function handleMentionPickerBlur(event: React.FocusEvent<HTMLDivElement>): void {
+    const nextTarget = event.relatedTarget;
+    if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+      setMentionMenuOpen(false);
+    }
   }
 
   return (
@@ -101,6 +130,25 @@ export function UnifiedComposer({
           />
         </label>
       </div>
+      {composer.mentions.length > 0 ? (
+        <div aria-label="Mentioned agents" className={styles.mentionTray}>
+          {composer.mentions.map((mention) => (
+            <span className={styles.mentionChip} key={mention.id}>
+              <AtSign aria-hidden="true" className={styles.mentionIcon} />
+              <span className={styles.mentionName}>{mention.label}</span>
+              {mention.model ? <span className={styles.mentionMeta}>{mention.model}</span> : null}
+              <button
+                aria-label={`移除提及 ${mention.label}`}
+                className={styles.removeAttachmentButton}
+                onClick={() => dispatchComposer({ type: 'removeMention', mentionId: mention.id })}
+                type="button"
+              >
+                <X aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
       {composer.attachments.length > 0 ? (
         <div aria-label="Selected attachments" className={styles.attachmentTray}>
           {composer.attachments.map((attachment) => (
@@ -130,6 +178,39 @@ export function UnifiedComposer({
           onChange={(event) => dispatchComposer({ type: 'setText', text: event.target.value })}
           value={composer.text}
         />
+        <div className={styles.mentionPicker} onBlur={handleMentionPickerBlur}>
+          <button
+            aria-expanded={mentionMenuOpen}
+            aria-haspopup="menu"
+            aria-label="@Agent"
+            className={styles.attachButton}
+            disabled={isSubmitting || mentionableAgents.length === 0}
+            onClick={() => setMentionMenuOpen((current) => !current)}
+            title="@Agent"
+            type="button"
+          >
+            <AtSign aria-hidden="true" />
+          </button>
+          {mentionMenuOpen && mentionableAgents.length > 0 ? (
+            <div aria-label="@Agent" className={styles.mentionMenu} role="menu">
+              {mentionableAgents.map((agent) => (
+                <button
+                  aria-checked={selectedMentionIds.has(agent.id)}
+                  className={styles.mentionOption}
+                  key={agent.id}
+                  onClick={() => toggleMention(agent)}
+                  role="menuitemcheckbox"
+                  type="button"
+                >
+                  <span className={styles.mentionOptionTitle}>@{agent.label}</span>
+                  <span className={styles.mentionOptionMeta}>
+                    {[agent.model, agent.runtimeId, agent.status].filter(Boolean).join(' · ')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <button
           aria-label="添加附件"
           className={styles.attachButton}

@@ -302,6 +302,8 @@ export {
   createInitialComposerState,
   formatComposerAttachmentContext,
   formatComposerAttachmentSize,
+  formatComposerMentionContext,
+  formatComposerPromptWithContext,
   formatComposerPromptWithAttachments,
   shouldPreviewComposerFile,
 } from './composer';
@@ -310,6 +312,7 @@ export type {
   ComposerAction,
   ComposerAttachment,
   ComposerIntent,
+  ComposerMention,
   ComposerMode,
   ComposerState,
   ComposerSubmitResult,
@@ -336,6 +339,7 @@ export type {
   MockPlatformSeed,
   RunPort,
   SurfaceCapabilities,
+  WorkbenchAgent,
   WorkbenchConversation,
 } from './platform';
 

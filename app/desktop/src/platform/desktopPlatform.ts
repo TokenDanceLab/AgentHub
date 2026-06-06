@@ -1,6 +1,6 @@
-import { formatComposerPromptWithAttachments } from '@shared/composer';
+import { formatComposerPromptWithContext } from '@shared/composer';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
-import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
+import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
 
@@ -25,6 +25,33 @@ export const desktopConversations: WorkbenchConversation[] = [
     title: 'Reviewer',
     kind: 'direct',
     subtitle: 'DeepSeek-V4-Pro review',
+  },
+];
+
+export const desktopAgents: WorkbenchAgent[] = [
+  {
+    id: 'builder',
+    name: 'Builder',
+    description: '本地代码实现和 focused tests',
+    status: 'available',
+    model: 'glm-5.1',
+    runtimeId: 'claude-code',
+  },
+  {
+    id: 'reviewer',
+    name: 'Reviewer',
+    description: '长上下文架构整理和复杂复核',
+    status: 'available',
+    model: 'deepseek-v4-pro',
+    runtimeId: 'claude-code',
+  },
+  {
+    id: 'quick-check',
+    name: 'Quick Check',
+    description: '快速日志和小范围检查',
+    status: 'available',
+    model: 'deepseek-v4-flash',
+    runtimeId: 'claude-code',
   },
 ];
 
@@ -97,7 +124,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Age
           const run = await options.submitRun({
             projectId: options.activeProjectId,
             threadId: options.activeThreadId,
-            prompt: formatComposerPromptWithAttachments(intent.text, intent.attachments),
+            prompt: formatComposerPromptWithContext(intent.text, intent.attachments, intent.mentions),
             ...edgePermissionMode(intent),
             ...edgeWorkDir(intent),
           });

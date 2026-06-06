@@ -7,5 +7,6 @@ export type {
   ConversationPort,
   RunPort,
   SurfaceCapabilities,
+  WorkbenchAgent,
   WorkbenchConversation,
 } from './types';

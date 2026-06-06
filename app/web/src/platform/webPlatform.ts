@@ -1,4 +1,4 @@
-import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
+import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
 
@@ -15,6 +15,25 @@ export const webConversations: WorkbenchConversation[] = [
     title: 'Builder',
     kind: 'direct',
     subtitle: 'Claude Code',
+  },
+];
+
+export const webAgents: WorkbenchAgent[] = [
+  {
+    id: 'builder',
+    name: 'Builder',
+    description: 'Web v4 代码实现',
+    status: 'available',
+    model: 'glm-5.1',
+    runtimeId: 'claude-code',
+  },
+  {
+    id: 'reviewer',
+    name: 'Reviewer',
+    description: '架构和文档复核',
+    status: 'available',
+    model: 'deepseek-v4-pro',
+    runtimeId: 'claude-code',
   },
 ];
 

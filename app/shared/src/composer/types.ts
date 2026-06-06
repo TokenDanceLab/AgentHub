@@ -2,6 +2,15 @@ export type ComposerMode = 'ask' | 'plan' | 'code' | 'review' | 'deploy';
 export type ComposerSubmitState = 'idle' | 'submitting' | 'error';
 export type ApprovalMode = 'suggest' | 'workspace-write' | 'read-only';
 
+export interface ComposerMention {
+  id: string;
+  label: string;
+  description?: string;
+  status?: 'available' | 'unavailable' | 'configuring';
+  model?: string;
+  runtimeId?: string;
+}
+
 export interface ComposerAttachment {
   id: string;
   name: string;
@@ -18,7 +27,7 @@ export interface ComposerState {
   conversationId: string;
   text: string;
   mode: ComposerMode;
-  mentions: string[];
+  mentions: ComposerMention[];
   attachments: ComposerAttachment[];
   approvalMode: ApprovalMode;
   workDir: string;
@@ -29,7 +38,7 @@ export interface ComposerIntent {
   conversationId: string;
   text: string;
   mode: ComposerMode;
-  mentions: string[];
+  mentions: ComposerMention[];
   attachments: ComposerAttachment[];
   approvalMode: ApprovalMode;
   workDir?: string;
@@ -42,8 +51,8 @@ export interface ComposerSubmitResult {
 export type ComposerAction =
   | { type: 'setText'; text: string }
   | { type: 'setMode'; mode: ComposerMode }
-  | { type: 'addMention'; agentId: string }
-  | { type: 'removeMention'; agentId: string }
+  | { type: 'addMention'; mention: ComposerMention }
+  | { type: 'removeMention'; mentionId: string }
   | { type: 'setApprovalMode'; approvalMode: ApprovalMode }
   | { type: 'setWorkDir'; workDir: string }
   | { type: 'setSubmitState'; submitState: ComposerSubmitState }
