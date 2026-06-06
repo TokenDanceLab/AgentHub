@@ -11,12 +11,12 @@ description: 多 Team 并行开发引擎 — 大规模 Issue 修复、跨模块�
 
 ```
 你（主 Agent）
-  ├── Team Leader 1 (Codex GPT-5.5 或 Claude opus) → Worktree A
-  │     ├── Worker 1 (GPT-5.5 / Claude sonnet) → 修 1-3 issues
-  │     ├── Worker 2 (GPT-5.5 / Claude sonnet) → 修 1-3 issues
+  ├── Team Leader 1 (主 Agent 或 GPT-5.5 xhigh) → Worktree A
+  │     ├── Worker 1 (Claude opus / GPT-5.5 low-mid) → 修 1-3 issues
+  │     ├── Worker 2 (Claude opus / GPT-5.5 low-mid) → 修 1-3 issues
   │     ├── Worker 3 (Claude haiku) → 快速检查 / 轻量 review（如需要）
-  │     └── Worker 4 (GPT-5.5 / opus) → 测试 + 审查
-  ├── Team Leader 2 (Codex GPT-5.5 或 Claude opus) → Worktree B
+  │     └── Worker 4 (GPT-5.5 xhigh / 主 Agent) → 测试 + 审查
+  ├── Team Leader 2 (主 Agent 或 GPT-5.5 xhigh) → Worktree B
   │     └── ... (同上)
   └── ... (最多 5 个 Team 并行)
 ```
@@ -25,9 +25,10 @@ description: 多 Team 并行开发引擎 — 大规模 Issue 修复、跨模块�
 
 | Agent | 上下文 | 定位 |
 |---|---:|---|
-| Codex GPT-5.5 subagent | 256k | 全方面强，适合核心实现、跨模块小集成、强代码 review |
-| Claude opus = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文；适合架构、安全、竞品仓库研究 |
-| Claude sonnet = GLM-5.1 | 200k | 强代码和 agentic 能力；适合明确文件范围内的实现和测试 |
+| GPT-5.5 low/mid | 256k | 前端、看图、截图对比、常规 UI/UX 判断 |
+| GPT-5.5 xhigh | 256k | 复杂架构、关键方案、高风险设计复核 |
+| Claude sonnet = DeepSeek-V4-Pro | 1M | 长文本、找东西、简单文档、架构整理、大范围归纳 |
+| Claude opus = GLM-5.1 | 200k | 强代码和 agentic 能力；适合明确文件范围内的实现和测试 |
 | Claude haiku = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈；适合快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
 
 ## 何时使用
@@ -91,10 +92,11 @@ You are Team Leader for {team_name}. Fix {N} issues ({batch_name}).
 1. Create worktree: git worktree add .worktrees/{worktree_name} -b feat/{branch_name}
 2. Read key source files: {file_list}
 3. Spawn workers by task type:
-   - Codex GPT-5.5: core implementation / integration review (<=256k context)
-   - Claude sonnet: narrow code fixes with explicit file whitelist
+   - GPT-5.5 low/mid: frontend, screenshots, visual/UI review
+   - GPT-5.5 xhigh: complex architecture and high-risk review
+   - Claude sonnet: long-text search, docs, architecture整理
+   - Claude opus: narrow code fixes with explicit file whitelist
    - Claude haiku: fast lightweight checks and narrow UI readability review
-   - Claude opus: long-context architecture/security review
 4. Each worker: read → write failing test → implement fix → go test passes
 5. Review all work, resolve conflicts, go test -race, commit
 6. Push branch
@@ -152,7 +154,7 @@ git branch -d feat/team-*
 ```
 输入：129 个 Issue，按 label 分组为 5 个批次
 Team 数：5
-每个 Team：1 Leader + 3-4 Workers，按任务类型混用 GPT-5.5 / opus / sonnet / haiku
+每个 Team：1 Leader + 3-4 Workers，按任务类型混用 GPT-5.5 low/mid/xhigh、opus、sonnet、haiku
 总 agent 数：约 20-25
 Worktree 数：5
 
