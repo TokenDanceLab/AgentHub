@@ -46,10 +46,10 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 目标：全面参考 `agenthub-design/index.html` 和 `agenthub-design/desktop/`，把真实 UI 壳子拆成 AgentHub 内部可复用 UI 系统，让 Desktop/Web 共用同一套产品工作台。
 
 - [ ] `app/shared/src/ui/`：清理 exports，明确基础组件的 public API。
-- [ ] `app/shared/src/workbench/`：首片已新增 `AgentHubWorkbench` shared shell；下一步拆 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`WorkbenchRoutes`。
+- [ ] `app/shared/src/workbench/`：已新增 `AgentHubWorkbench` shared shell，并拆出 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`TranscriptView`、`UnifiedComposer`、`RightInspector`；下一步补 `WorkbenchRoutes` 和 design token bridge。
 - [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs；下一步补 Edge/Hub normalize 与 block renderer。
-- [ ] `app/shared/src/composer/`：首片已定义共享 composer 状态、intent 和 reducer；下一步补 `UnifiedComposer`、附件和 @Agent 交互。
-- [ ] `app/shared/src/inspector/`：定义 evidence panel、tool timeline、changed files、preview/browser/file panes。
+- [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer 和 v4 modes；下一步补附件和 @Agent 交互。
+- [ ] `app/shared/src/inspector/`：首片已在 shared workbench 中建立 overview/browser/files tabs 和 evidence panel；下一步补 tool timeline、changed files、preview/browser pane。
 - [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface 和 mock platform；下一步接 Desktop/Web 实际 adapter。
 - [ ] 所有共享模块配 focused tests，复杂视觉组件配 stories 或截图场景。
 
@@ -57,6 +57,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - 2026-06-07：`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，4 个文件 / 9 个测试通过。
 - 2026-06-07：新增 `composer/platform/transcript/workbench` 模块 targeted TypeScript 编译通过。
 - 2026-06-07：`cd app/shared; corepack.cmd pnpm lint` 仍失败，但失败不在新增模块；当前阻塞是既有 Storybook 类型缺失、旧 components 测试引用缺失、部分旧 UI 测试 TS strict 问题和 SVG module declaration 缺失。
+- 2026-06-07：补齐 workbench 子组件、workspace tabs、inspector tabs 和 composer modes 后，focused tests 更新为 4 个文件 / 10 个测试通过；新增 workbench 子组件 targeted TypeScript 编译通过。
 
 ## P2: Desktop v4 接入
 

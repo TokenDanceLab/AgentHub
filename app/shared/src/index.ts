@@ -345,9 +345,20 @@ export type {
 
 export {
   AgentHubWorkbench,
+  ConversationSidebar,
+  GlobalRail,
+  RightInspector,
+  TranscriptView,
+  UnifiedComposer,
+  WorkspaceHeader,
 } from './workbench';
 export type {
   AgentHubWorkbenchProps,
+  ConversationSidebarProps,
+  RightInspectorProps,
+  TranscriptViewProps,
+  UnifiedComposerProps,
+  WorkspaceHeaderProps,
 } from './workbench';
 
 export {

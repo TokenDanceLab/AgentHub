@@ -1,2 +1,13 @@
 export { AgentHubWorkbench } from './AgentHubWorkbench';
+export { ConversationSidebar } from './ConversationSidebar';
+export { GlobalRail } from './GlobalRail';
+export { RightInspector } from './RightInspector';
+export { TranscriptView } from './TranscriptView';
+export { UnifiedComposer } from './UnifiedComposer';
+export { WorkspaceHeader } from './WorkspaceHeader';
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
+export type { ConversationSidebarProps } from './ConversationSidebar';
+export type { RightInspectorProps } from './RightInspector';
+export type { TranscriptViewProps } from './TranscriptView';
+export type { UnifiedComposerProps } from './UnifiedComposer';
+export type { WorkspaceHeaderProps } from './WorkspaceHeader';
