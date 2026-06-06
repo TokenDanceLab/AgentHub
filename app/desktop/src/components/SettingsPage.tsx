@@ -726,7 +726,7 @@ export default function SettingsPage({
           {active === 'data' && (
             <DataSection
               t={t}
-              addToast={() => { return ''; }}
+              addToast={(_input) => { return ''; }}
               resetModelSettings={() => {
                 setDefaultModel('auto');
                 setDefaultProvider('tokendance-gateway');
