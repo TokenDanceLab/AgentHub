@@ -23,17 +23,18 @@
 Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
-2. 读 `docs/handoffs/STATE.md` — 当前项目状态、阻塞、部署信息（新 Agent 接手必读）。
-3. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
-5. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
-6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
-8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
-9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
-10. 持续开发和任务拆解读 `docs/architecture.md`（路线图摘要）和当前分支路线图。
-11. 客户端任务读 `docs/roadmap.md` 和 `docs/architecture.md`。
-12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
+2. 读 `docs/roadmap.md` 和 `docs/architecture.md` — 当前目标、架构边界和实现阶段。
+3. 做 Desktop/Web v4 重构时，继续读 `docs/desktop-web-v4-clean-rebuild-plan.md` 和 `docs/v4-clean-rebuild-decision-questions.md`。
+4. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
+5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
+6. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
+7. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
+8. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
+9. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
+10. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
+11. 持续开发和任务拆解读 `docs/architecture.md`（路线图摘要）和当前分支路线图。
+12. 客户端任务读 `docs/roadmap.md` 和 `docs/architecture.md`。
+13. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
 
@@ -194,10 +195,9 @@ git status --short --branch       # 确认只改了允许的路径
 - **Claude sonnet**：用于明确路径内的代码实现和 focused tests；每次只给必要文件，避免 200k 上下文溢出。
 - **Claude haiku**：用于截图、多模态视觉审查和 UI/UX 对比，不派它做代码主力。
 
-### Agent 间文件通信
+### Agent 间进度同步
 
-其他 Agent（或人类）通过 `docs/handoffs/` 投递报告。规则见 `docs/handoffs/STATE.md`。
-dev-loop 主 Agent 每次循环开始时检查交接目录，按优先级处理，处理后归档到 `docs/reference/`。
+当前活跃进度以 `docs/roadmap.md`、`docs/architecture.md` 和相关计划文档为准。其他 Agent 或人类提交的结论进入对应 roadmap、design plan、governance 或 `docs/reference/`，不要新增长期状态目录。
 
 ### 仓库级 Skill
 
@@ -297,9 +297,8 @@ feat/* → dev/delicious233 → master
 | master | PR-only 稳定快照，v0.1.0 已同步 | ✅ 当前 |
 | origin/dev/trump | Trump 独立分支，与主线大幅分叉（截至 2026-06 快照），代码已过期不建议合入 | 保留，不自动合并 |
 | origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
-| origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
 | ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
-| ~~origin/chore/oidc-handoff-save-20260526~~ | OIDC handoff 保存点已被 STATE/roadmap 覆盖 | ✅ 已删除 |
+| ~~OIDC 旧保存分支~~ | 旧保存点已被主文档覆盖 | ✅ 已删除 |
 | ~~codex/johnny-fork~~ | Codex 实验分支 | ✅ 已清理 |
 | ~~codex/trump-ui-fork~~ | Codex UI fork | ✅ 已清理 |
 | ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
@@ -312,7 +311,7 @@ feat/* → dev/delicious233 → master
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
 - `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
-- Trump、Johnny 聚合和旧 Web parity 残留分支不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
+- Trump、Johnny 和旧 Web parity 残留内容不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
