@@ -5,9 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 
 const useAgentListMock = vi.hoisted(() => vi.fn());
+const useWebWorkbenchModelMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api/agentQueries', () => ({
   useAgentList: useAgentListMock,
+}));
+
+vi.mock('@/platform/useWebWorkbenchModel', () => ({
+  useWebWorkbenchModel: useWebWorkbenchModelMock,
 }));
 
 function visibleText(container: HTMLElement) {
@@ -20,6 +25,21 @@ describe('Web app root', () => {
   beforeEach(() => {
     useAgentListMock.mockReturnValue({
       data: undefined,
+    });
+    useWebWorkbenchModelMock.mockReturnValue({
+      activeConversationId: 'agent-collab',
+      conversations: [
+        { id: 'agent-collab', title: 'Agent 协作群', kind: 'group', subtitle: '共享 v4 Web 工作台' },
+        { id: 'builder', title: 'Builder', kind: 'direct', subtitle: 'Claude Code' },
+      ],
+      transcript: [
+        {
+          id: 'web-msg-1',
+          kind: 'text',
+          author: { id: 'system', name: 'AgentHub', role: 'system' },
+          text: 'Web 已接入 shared v4 workbench。',
+        },
+      ],
     });
   });
 
@@ -40,6 +60,29 @@ describe('Web app root', () => {
     expect(text).not.toMatch(/shell\.(?:brand|toolbar|status|sidebar|statusPanel|workspace|page|source)/);
     expect(text).not.toMatch(/synced|marketplace connected|session active/i);
     expect(useAgentListMock).toHaveBeenCalledWith(true);
+    expect(useWebWorkbenchModelMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Hub sessions and messages projected into the shared workbench', () => {
+    useWebWorkbenchModelMock.mockReturnValue({
+      activeConversationId: 'hub-session-1',
+      conversations: [
+        { id: 'hub-session-1', title: '真实 Hub 会话', kind: 'group', subtitle: 'Hub group' },
+      ],
+      transcript: [
+        {
+          id: 'hub-message-1',
+          kind: 'text',
+          author: { id: 'hub-user', name: '用户', role: 'human' },
+          text: '来自 Hub session 的真实消息',
+        },
+      ],
+    });
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: '真实 Hub 会话' })).toBeInTheDocument();
+    expect(screen.getByText('来自 Hub session 的真实消息')).toBeInTheDocument();
   });
 
   it('uses Hub Agent Profiles for the shared @Agent menu when available', () => {
