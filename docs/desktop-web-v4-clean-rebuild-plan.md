@@ -271,10 +271,13 @@ app/desktop/src-tauri/src/
 - Modify: `app/web/src/main.tsx`
 - Test: `app/web/src/platform/*.test.ts`
 
-- [ ] 把 Hub session、conversation、message、remote run 包装为 shared ports。
-- [ ] Web `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`；首片已渲染 shared workbench，Web adapter 已提供浏览器 `preview.openEvidence()` port，并补齐 `lucide-react` alias 防止 shared workbench 图标在 Web Vitest 中加载到第二份 React。
+- [ ] 把 Hub session、conversation、message、remote run 包装为 shared ports；首片已把 Hub `GET /web/agent-profiles` 接入 v4 workbench @Agent 列表，剩余 sessions/messages/WS/remote run submit。
+- [ ] Web `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`；首片已渲染 shared workbench，Web adapter 已提供浏览器 `preview.openEvidence()` port，`App` 已在 `QueryClientProvider` 内读取 Hub Agent Profiles，并补齐 `lucide-react` alias 防止 shared workbench 图标在 Web Vitest 中加载到第二份 React。
 - [ ] Web 不引入 Tauri 或 Local Edge 私有能力。
 - [ ] 跑 Web typecheck/build/focused tests。
+
+执行记录：
+- 2026-06-07：新增 `resolveWebWorkbenchAgents()` / `agentInfoToWorkbenchAgent()`，Web `App` 通过 `useAgentList(true)` 读取 Hub Agent Profiles 并映射为 shared `WorkbenchAgent`；未登录或 Hub 无 profile 数据时保留 preview fallback；恢复 `app/web/src/api/edgeClient.ts` Hub-only/stubbed 兼容面，保持 Web 不直连 Local Edge；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 7 个测试通过，Web typecheck 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
 
 ### Task 9: Tauri Host API 拆分
 

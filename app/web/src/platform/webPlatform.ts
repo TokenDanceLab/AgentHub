@@ -1,6 +1,7 @@
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
+import type { AgentInfo } from '@shared/types';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
 
 export const webConversations: WorkbenchConversation[] = [
@@ -56,6 +57,22 @@ export const webTranscript: TranscriptBlock[] = [
     ],
   },
 ];
+
+export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
+  return {
+    id: agent.profileId ?? agent.id,
+    name: agent.name,
+    ...(agent.description ? { description: agent.description } : {}),
+    status: agent.status,
+    ...(agent.model ? { model: agent.model } : {}),
+    ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
+  };
+}
+
+export function resolveWebWorkbenchAgents(hubAgents: AgentInfo[] | undefined): WorkbenchAgent[] {
+  const mapped = hubAgents?.map(agentInfoToWorkbenchAgent) ?? [];
+  return mapped.length > 0 ? mapped : webAgents;
+}
 
 export function createWebPlatform(): AgentHubPlatform {
   const submittedIntents: ComposerIntent[] = [];
