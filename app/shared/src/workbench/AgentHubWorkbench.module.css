@@ -639,7 +639,8 @@
   list-style: none;
 }
 
-.fileRow {
+.fileRow,
+.browserArtifactButton {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
@@ -652,6 +653,23 @@
   background: var(--ahv4-panel-solid);
   color: inherit;
   text-align: left;
+}
+
+.fileRow:not(:disabled),
+.browserArtifactButton:not(:disabled) {
+  cursor: pointer;
+}
+
+.fileRow:not(:disabled):hover,
+.browserArtifactButton:not(:disabled):hover {
+  border-color: var(--ahv4-primary);
+  background: var(--ahv4-primary-soft);
+}
+
+.fileRow:disabled,
+.browserArtifactButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .fileName {
@@ -683,6 +701,15 @@
   color: var(--ahv4-muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.browserArtifactList {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .inspectorEmpty {

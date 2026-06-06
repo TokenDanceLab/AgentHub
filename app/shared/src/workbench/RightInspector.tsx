@@ -16,11 +16,15 @@ const inspectorTabs: Array<{ mode: InspectorMode; label: string; icon: LucideIco
 export interface RightInspectorProps {
   evidence: EvidenceRef[];
   browserPreviewEnabled: boolean;
+  canOpenPreview?: ((evidence: EvidenceRef) => boolean) | undefined;
+  onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
 }
 
 export function RightInspector({
   evidence,
   browserPreviewEnabled,
+  canOpenPreview,
+  onOpenPreview,
 }: RightInspectorProps): React.ReactElement {
   const [activeMode, setActiveMode] = useState<InspectorMode>('overview');
   const model = buildInspectorEvidenceModel(evidence);
@@ -53,10 +57,18 @@ export function RightInspector({
           <OverviewPanel model={model} />
         ) : null}
         {activeMode === 'browser' ? (
-          <BrowserPanel artifactCount={model.artifacts.length} />
+          <BrowserPanel
+            artifacts={model.artifacts}
+            canOpenPreview={canOpenPreview}
+            onOpenPreview={onOpenPreview}
+          />
         ) : null}
         {activeMode === 'files' ? (
-          <FilesPanel files={model.files} />
+          <FilesPanel
+            canOpenPreview={canOpenPreview}
+            files={model.files}
+            onOpenPreview={onOpenPreview}
+          />
         ) : null}
       </div>
     </aside>
@@ -146,38 +158,103 @@ function EvidenceSection({
   );
 }
 
-function FilesPanel({ files }: { files: EvidenceRef[] }): React.ReactElement {
+function FilesPanel({
+  canOpenPreview,
+  files,
+  onOpenPreview,
+}: {
+  canOpenPreview?: ((evidence: EvidenceRef) => boolean) | undefined;
+  files: EvidenceRef[];
+  onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
+}): React.ReactElement {
   if (files.length === 0) {
     return <p className={styles.inspectorEmpty}>暂无变更文件</p>;
   }
 
   return (
     <ul aria-label="Changed files" className={styles.fileList}>
-      {files.map((file) => (
-        <li key={file.id}>
-          <button className={styles.fileRow} type="button">
-            <FileText aria-hidden="true" className={styles.fileIcon} />
-            <span className={styles.fileName}>{file.label}</span>
-            <span className={styles.fileMeta}>变更</span>
-          </button>
-        </li>
-      ))}
+      {files.map((file) => {
+        const canOpen = canOpenEvidence(file, onOpenPreview, canOpenPreview);
+        return (
+          <li key={file.id}>
+            <button
+              aria-label={`打开文件 ${file.label}`}
+              className={styles.fileRow}
+              disabled={!canOpen}
+              onClick={() => {
+                if (!canOpen) return;
+                void onOpenPreview?.(file).catch(() => {});
+              }}
+              type="button"
+            >
+              <FileText aria-hidden="true" className={styles.fileIcon} />
+              <span className={styles.fileName}>{file.label}</span>
+              <span className={styles.fileMeta}>{canOpen ? '打开' : '待接入'}</span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-function BrowserPanel({ artifactCount }: { artifactCount: number }): React.ReactElement {
+function BrowserPanel({
+  artifacts,
+  canOpenPreview,
+  onOpenPreview,
+}: {
+  artifacts: EvidenceRef[];
+  canOpenPreview?: ((evidence: EvidenceRef) => boolean) | undefined;
+  onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
+}): React.ReactElement {
+  if (artifacts.length > 0) {
+    return (
+      <div className={styles.browserPreviewCard}>
+        <Globe aria-hidden="true" className={styles.browserPreviewIcon} />
+        <strong>浏览器预览已启用</strong>
+        <span>{`检测到 ${artifacts.length} 个可预览产物。`}</span>
+        <ul aria-label="Preview artifacts" className={styles.browserArtifactList}>
+          {artifacts.map((artifact) => {
+            const canOpen = canOpenEvidence(artifact, onOpenPreview, canOpenPreview);
+            return (
+              <li key={artifact.id}>
+                <button
+                  aria-label={`打开产物 ${artifact.label}`}
+                  className={styles.browserArtifactButton}
+                  disabled={!canOpen}
+                  onClick={() => {
+                    if (!canOpen) return;
+                    void onOpenPreview?.(artifact).catch(() => {});
+                  }}
+                  type="button"
+                >
+                  <Package aria-hidden="true" className={styles.fileIcon} />
+                  <span className={styles.fileName}>{artifact.label}</span>
+                  <span className={styles.fileMeta}>{canOpen ? '打开' : '待接入'}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.browserPreviewCard}>
       <Globe aria-hidden="true" className={styles.browserPreviewIcon} />
       <strong>浏览器预览已启用</strong>
-      <span>
-        {artifactCount > 0
-          ? `检测到 ${artifactCount} 个产物，后续由 platform adapter 打开预览。`
-          : '等待 run 产出可预览地址或 artifact。'}
-      </span>
+      <span>等待 run 产出可预览地址或 artifact。</span>
     </div>
   );
+}
+
+function canOpenEvidence(
+  evidence: EvidenceRef,
+  onOpenPreview: ((evidence: EvidenceRef) => Promise<void>) | undefined,
+  canOpenPreview: ((evidence: EvidenceRef) => boolean) | undefined,
+): boolean {
+  return Boolean(onOpenPreview) && (canOpenPreview?.(evidence) ?? true);
 }
 
 function renderEvidence(item: EvidenceRef): React.ReactElement {
