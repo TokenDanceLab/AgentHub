@@ -110,6 +110,11 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
       target: { value: '开始 v4 shared workbench' },
     });
+    const file = new File(['attachment-token: shared'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('composer-attachment-input'), {
+      target: { files: [file] },
+    });
+    expect(await screen.findByText('notes.txt')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Code' }));
     fireEvent.change(screen.getByLabelText('Approval mode'), {
       target: { value: 'workspace-write' },
@@ -124,12 +129,43 @@ describe('AgentHubWorkbench', () => {
         expect.objectContaining({
           approvalMode: 'workspace-write',
           conversationId: 'team',
+          attachments: [
+            expect.objectContaining({
+              contentPreview: 'attachment-token: shared',
+              name: 'notes.txt',
+              source: 'browser',
+            }),
+          ],
           mode: 'code',
           text: '开始 v4 shared workbench',
           workDir: 'D:\\Code\\TokenDance\\AgentHub',
         }),
       ]);
     });
+  });
+
+  it('removes selected attachments before submit', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    const file = new File(['remove-me'], 'remove-me.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('composer-attachment-input'), {
+      target: { files: [file] },
+    });
+    expect(await screen.findByText('remove-me.txt')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '移除附件 remove-me.txt' }));
+    expect(screen.queryByText('remove-me.txt')).not.toBeInTheDocument();
   });
 
   it('keeps the draft editable when platform submit fails', async () => {

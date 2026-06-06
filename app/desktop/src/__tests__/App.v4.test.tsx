@@ -245,6 +245,11 @@ describe('Desktop App v4 root', () => {
     fireEvent.change(screen.getByLabelText('Composer input'), {
       target: { value: '跑一下 v4 smoke' },
     });
+    const file = new File(['attachment-token: desktop'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId('composer-attachment-input'), {
+      target: { files: [file] },
+    });
+    expect(await screen.findByText('notes.txt')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Approval mode'), {
       target: { value: 'workspace-write' },
     });
@@ -257,7 +262,7 @@ describe('Desktop App v4 root', () => {
       expect(createRunMutateAsync).toHaveBeenCalledWith({
         permissionMode: 'acceptEdits',
         projectId: 'project-1',
-        prompt: '跑一下 v4 smoke',
+        prompt: expect.stringContaining('attachment-token: desktop'),
         threadId: 'thread-real',
         workDir: 'D:\\Code\\TokenDance\\AgentHub',
       });
