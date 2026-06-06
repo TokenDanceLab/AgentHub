@@ -98,6 +98,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Age
             threadId: options.activeThreadId,
             prompt: intent.text,
             ...edgePermissionMode(intent),
+            ...edgeWorkDir(intent),
           });
           return {
             intentId: run.runId,
@@ -122,4 +123,9 @@ function edgePermissionMode(intent: ComposerIntent): Pick<StartRunRequest, 'perm
     default:
       return {};
   }
+}
+
+function edgeWorkDir(intent: ComposerIntent): Pick<StartRunRequest, 'workDir'> {
+  const workDir = intent.workDir?.trim();
+  return workDir ? { workDir } : {};
 }

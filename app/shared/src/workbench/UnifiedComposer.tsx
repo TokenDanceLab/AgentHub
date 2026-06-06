@@ -1,5 +1,5 @@
 import React, { type FormEvent } from 'react';
-import type { ComposerAction, ComposerMode, ComposerState } from '../composer';
+import type { ApprovalMode, ComposerAction, ComposerMode, ComposerState } from '../composer';
 import { canSubmitComposer } from '../composer';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -9,6 +9,12 @@ const composerModes: Array<{ mode: ComposerMode; label: string }> = [
   { mode: 'code', label: 'Code' },
   { mode: 'review', label: 'Review' },
   { mode: 'deploy', label: 'Deploy' },
+];
+
+const approvalModes: Array<{ mode: ApprovalMode; label: string }> = [
+  { mode: 'suggest', label: '建议' },
+  { mode: 'read-only', label: '只读' },
+  { mode: 'workspace-write', label: '可写' },
 ];
 
 export interface UnifiedComposerProps {
@@ -36,6 +42,37 @@ export function UnifiedComposer({
             {item.label}
           </button>
         ))}
+      </div>
+      <div className={styles.composerControls}>
+        <label className={styles.composerSelectLabel}>
+          <span>权限</span>
+          <select
+            aria-label="Approval mode"
+            className={styles.composerSelect}
+            onChange={(event) => dispatchComposer({
+              type: 'setApprovalMode',
+              approvalMode: event.target.value as ApprovalMode,
+            })}
+            value={composer.approvalMode}
+          >
+            {approvalModes.map((item) => (
+              <option key={item.mode} value={item.mode}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.workDirLabel}>
+          <span>目标目录</span>
+          <input
+            aria-label="Work directory"
+            className={styles.workDirInput}
+            onChange={(event) => dispatchComposer({ type: 'setWorkDir', workDir: event.target.value })}
+            placeholder="默认 Local Edge 目录"
+            spellCheck={false}
+            value={composer.workDir}
+          />
+        </label>
       </div>
       <div className={styles.composerRow}>
         <textarea

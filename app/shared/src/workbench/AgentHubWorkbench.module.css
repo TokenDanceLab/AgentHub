@@ -231,6 +231,43 @@
   margin-top: 8px;
 }
 
+.composerControls {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.composerSelectLabel,
+.workDirLabel {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.composerSelectLabel span,
+.workDirLabel span {
+  color: var(--ahv4-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.composerSelect,
+.workDirInput {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--ahv4-line-strong);
+  border-radius: 8px;
+  background: var(--ahv4-panel-solid);
+  color: var(--ahv4-text);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.workDirInput {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .workspaceTab,
 .inspectorTab,
 .composerModeButton {
@@ -528,5 +565,9 @@
   .workspace,
   .inspector {
     grid-column: 1 / -1;
+  }
+
+  .composerControls {
+    grid-template-columns: 1fr;
   }
 }

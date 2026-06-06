@@ -245,13 +245,21 @@ describe('Desktop App v4 root', () => {
     fireEvent.change(screen.getByLabelText('Composer input'), {
       target: { value: '跑一下 v4 smoke' },
     });
+    fireEvent.change(screen.getByLabelText('Approval mode'), {
+      target: { value: 'workspace-write' },
+    });
+    fireEvent.change(screen.getByLabelText('Work directory'), {
+      target: { value: 'D:\\Code\\TokenDance\\AgentHub' },
+    });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
 
     await waitFor(() => {
       expect(createRunMutateAsync).toHaveBeenCalledWith({
+        permissionMode: 'acceptEdits',
         projectId: 'project-1',
-        threadId: 'thread-real',
         prompt: '跑一下 v4 smoke',
+        threadId: 'thread-real',
+        workDir: 'D:\\Code\\TokenDance\\AgentHub',
       });
     });
     expect(screen.getByLabelText('Composer input')).toHaveValue('');
