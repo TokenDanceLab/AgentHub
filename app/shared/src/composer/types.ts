@@ -15,6 +15,7 @@ export interface ComposerState {
   mentions: string[];
   attachments: ComposerAttachment[];
   approvalMode: ApprovalMode;
+  workDir: string;
   submitState: ComposerSubmitState;
 }
 
@@ -25,6 +26,7 @@ export interface ComposerIntent {
   mentions: string[];
   attachments: ComposerAttachment[];
   approvalMode: ApprovalMode;
+  workDir?: string;
 }
 
 export interface ComposerSubmitResult {
@@ -37,6 +39,7 @@ export type ComposerAction =
   | { type: 'addMention'; agentId: string }
   | { type: 'removeMention'; agentId: string }
   | { type: 'setApprovalMode'; approvalMode: ApprovalMode }
+  | { type: 'setWorkDir'; workDir: string }
   | { type: 'setSubmitState'; submitState: ComposerSubmitState }
   | { type: 'addAttachment'; attachment: ComposerAttachment }
   | { type: 'removeAttachment'; attachmentId: string }

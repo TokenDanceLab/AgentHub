@@ -62,6 +62,8 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('tab', { name: '浏览器' })).toBeDisabled();
     expect(screen.getByRole('tab', { name: '文件' })).toBeInTheDocument();
     expect(screen.getByRole('toolbar', { name: 'Composer modes' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Approval mode')).toHaveValue('suggest');
+    expect(screen.getByLabelText('Work directory')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Deploy' })).toBeInTheDocument();
     expect(screen.getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
@@ -109,11 +111,23 @@ describe('AgentHubWorkbench', () => {
       target: { value: '开始 v4 shared workbench' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Code' }));
+    fireEvent.change(screen.getByLabelText('Approval mode'), {
+      target: { value: 'workspace-write' },
+    });
+    fireEvent.change(screen.getByLabelText('Work directory'), {
+      target: { value: 'D:\\Code\\TokenDance\\AgentHub' },
+    });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
 
     await waitFor(() => {
       expect(platform.submittedIntents).toEqual([
-        expect.objectContaining({ conversationId: 'team', text: '开始 v4 shared workbench', mode: 'code' }),
+        expect.objectContaining({
+          approvalMode: 'workspace-write',
+          conversationId: 'team',
+          mode: 'code',
+          text: '开始 v4 shared workbench',
+          workDir: 'D:\\Code\\TokenDance\\AgentHub',
+        }),
       ]);
     });
   });
