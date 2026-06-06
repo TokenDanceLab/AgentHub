@@ -268,6 +268,79 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.hiddenAttachmentInput {
+  display: none;
+}
+
+.attachmentTray {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.attachmentChip {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, auto) auto auto;
+  align-items: center;
+  max-width: min(100%, 360px);
+  min-height: 28px;
+  gap: 6px;
+  border: 1px solid var(--ahv4-line);
+  border-radius: 8px;
+  background: var(--ahv4-panel-solid);
+  padding: 4px 6px;
+}
+
+.attachmentIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--ahv4-muted);
+}
+
+.attachmentName {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentMeta {
+  color: var(--ahv4-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.removeAttachmentButton,
+.attachButton {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--ahv4-line-strong);
+  border-radius: 8px;
+  background: var(--ahv4-panel-solid);
+  color: var(--ahv4-muted);
+}
+
+.removeAttachmentButton {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+}
+
+.removeAttachmentButton svg,
+.attachButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.attachButton:hover,
+.removeAttachmentButton:hover {
+  color: var(--ahv4-text);
+}
+
 .workspaceTab,
 .inspectorTab,
 .composerModeButton {
@@ -316,7 +389,8 @@
 }
 
 .previewButton:disabled,
-.sendButton:disabled {
+.sendButton:disabled,
+.attachButton:disabled {
   color: var(--ahv4-subtle);
   cursor: not-allowed;
 }
@@ -350,8 +424,9 @@
 
 .composerRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 38px auto;
   gap: 10px;
+  align-items: stretch;
 }
 
 .composerModes {

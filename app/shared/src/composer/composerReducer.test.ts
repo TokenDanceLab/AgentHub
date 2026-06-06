@@ -39,6 +39,12 @@ describe('composerReducer', () => {
     const empty = createInitialComposerState('team');
     expect(canSubmitComposer(empty)).toBe(false);
 
+    const withAttachment = composerReducer(empty, {
+      type: 'addAttachment',
+      attachment: { id: 'attachment-1', name: 'notes.txt', source: 'browser' },
+    });
+    expect(canSubmitComposer(withAttachment)).toBe(true);
+
     const ready = composerReducer(empty, { type: 'setText', text: '  build v4  ' });
     expect(canSubmitComposer(ready)).toBe(true);
     expect(buildComposerIntent(ready)).toEqual(
