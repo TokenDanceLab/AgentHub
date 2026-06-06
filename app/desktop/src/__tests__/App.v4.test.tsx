@@ -1,18 +1,30 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import type { EventEnvelope } from '@shared/events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
+import { createEventStream } from '@/api/eventClient';
 import { useThreadMessages, useThreads } from '@/api/threadQueries';
+import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
+
+vi.mock('@/api/eventClient', () => ({
+  createEventStream: vi.fn(),
+}));
 
 vi.mock('@/api/threadQueries', () => ({
   useThreadMessages: vi.fn(),
   useThreads: vi.fn(),
 }));
 
+const eventHandlers: EventHandler[] = [];
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
+const mockedCreateEventStream = vi.mocked(createEventStream);
 
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    eventHandlers.length = 0;
+    mockedCreateEventStream.mockReturnValue(createMockEventStream());
     mockedUseThreads.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreads>);
@@ -91,4 +103,122 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByText('Run run-real')).toBeInTheDocument();
     expect(mockedUseThreadMessages).toHaveBeenCalledWith('thread-real');
   });
+
+  it('merges live Edge events into the shared v4 transcript and evidence', () => {
+    mockedUseThreads.mockReturnValue({
+      data: {
+        items: [
+          {
+            threadId: 'thread-live',
+            projectId: 'project-1',
+            title: 'Live Edge 会话',
+            status: 'active',
+            createdAt: '2026-06-07T03:00:00Z',
+            updatedAt: '2026-06-07T03:00:00Z',
+          },
+        ],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreads>);
+    mockedUseThreadMessages.mockReturnValue({
+      data: {
+        items: [],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreadMessages>);
+
+    const { rerender } = render(<App />);
+
+    act(() => {
+      emitEdgeEvent({
+        version: 'v1',
+        id: 'evt-tool',
+        seq: 1,
+        type: 'run.agent.tool_call',
+        scope: { threadId: 'thread-live', runId: 'run-live' },
+        sentAt: '2026-06-07T03:00:01Z',
+        payload: {
+          runId: 'run-live',
+          callId: 'call-rg',
+          toolName: 'rg',
+          status: 'running',
+        },
+      });
+      emitEdgeEvent({
+        version: 'v1',
+        id: 'evt-text',
+        seq: 2,
+        type: 'run.agent.text_block',
+        scope: { runId: 'run-live' },
+        sentAt: '2026-06-07T03:00:02Z',
+        payload: {
+          runId: 'run-live',
+          content: '持久化前的实时回答',
+        },
+      });
+      emitEdgeEvent({
+        version: 'v1',
+        id: 'evt-text',
+        seq: 2,
+        type: 'run.agent.text_block',
+        scope: { runId: 'run-live' },
+        sentAt: '2026-06-07T03:00:02Z',
+        payload: {
+          runId: 'run-live',
+          content: '持久化前的实时回答',
+        },
+      });
+    });
+
+    expect(screen.getByRole('heading', { name: 'Live Edge 会话' })).toBeInTheDocument();
+    expect(screen.getAllByText('rg')).toHaveLength(2);
+    expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
+    expect(screen.getByText('Run run-live')).toBeInTheDocument();
+
+    mockedUseThreadMessages.mockReturnValue({
+      data: {
+        items: [
+          {
+            itemId: 'item-agent-live',
+            projectId: 'project-1',
+            threadId: 'thread-live',
+            runId: 'run-live',
+            type: 'agent_message',
+            role: 'agent',
+            status: 'completed',
+            content: '持久化前的实时回答',
+            createdAt: '2026-06-07T03:00:03Z',
+            updatedAt: '2026-06-07T03:00:03Z',
+          },
+        ],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreadMessages>);
+    rerender(<App />);
+
+    expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
+    expect(mockedCreateEventStream).toHaveBeenCalledTimes(1);
+  });
 });
+
+function createMockEventStream(): StreamHandle {
+  return {
+    subscribe(handler: EventHandler) {
+      eventHandlers.push(handler);
+      return () => {
+        const index = eventHandlers.indexOf(handler);
+        if (index >= 0) eventHandlers.splice(index, 1);
+      };
+    },
+    onStatusChange(_handler: StatusHandler) {
+      return () => {};
+    },
+    send: vi.fn(),
+    getLatency: () => null,
+    close: vi.fn(),
+  };
+}
+
+function emitEdgeEvent(event: EventEnvelope): void {
+  for (const handler of eventHandlers) handler(event);
+}
