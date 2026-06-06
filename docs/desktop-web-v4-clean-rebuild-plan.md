@@ -61,7 +61,7 @@ app/shared/src/
     WorkbenchRoutes.tsx
   transcript/
     types.ts
-    normalizeEdgeEvent.ts
+    normalizeEdgeEvents.ts
     normalizeHubMessage.ts
     TranscriptView.tsx
     TranscriptBlockRenderer.tsx
@@ -169,7 +169,7 @@ app/desktop/src-tauri/src/
 **Files:**
 
 - Create: `app/shared/src/transcript/types.ts`
-- Create: `app/shared/src/transcript/normalizeEdgeEvent.ts`
+- Create: `app/shared/src/transcript/normalizeEdgeEvents.ts`
 - Create: `app/shared/src/transcript/normalizeHubMessage.ts`
 - Create: `app/shared/src/transcript/TranscriptView.tsx`
 - Create: `app/shared/src/transcript/TranscriptBlockRenderer.tsx`
@@ -177,13 +177,14 @@ app/desktop/src-tauri/src/
 
 - [ ] 定义 `TranscriptBlock` discriminated union。
 - [ ] 定义 `EvidenceRef`，供 inspector 聚合。
-- [ ] 从 Edge runtime events 归一化 text/tool/diff/approval/artifact；首片已支持 persisted thread items，live WebSocket events 仍待接入。
+- [x] 从 Edge runtime events 归一化 text/tool/diff/approval/artifact；首片已支持 persisted thread items 和 live WebSocket events。
 - [ ] 从 Hub message 归一化 IM text/agent/status/team events。
 - [ ] renderer 复用 shared UI 卡片，不复制 Desktop 旧 renderer。
 - [ ] 覆盖 null/畸形 tool input、长输出截断、未知 block fallback。
 
 执行记录：
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeThreadItems.ts` 和测试，把 Edge persisted thread items 映射为 shared `TranscriptBlock`，并为 `runId` 生成 `EvidenceRef(kind="run")`。
+- 2026-06-07：新增 `app/shared/src/transcript/normalizeEdgeEvents.ts` 和测试，把 live Edge `run.*`、`run.agent.*`、`artifact.created` 事件映射为 shared `TranscriptBlock` 与 run/tool/file/artifact evidence；focused shared tests 更新为 6 个文件 / 14 个测试通过。
 
 ### Task 5: composer 收敛
 
@@ -231,7 +232,7 @@ app/desktop/src-tauri/src/
 - [ ] 把 Local Edge status/start/stop 包装成 `RunPort` / `HostPort`。
 - [ ] 把 Tauri invoke 包装成 typed `DesktopHostPort`。
 - [x] Desktop `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`。
-- [ ] 保留真实 Edge 数据接入，不用 mock 冒充完成；首片已通过 `useThreads` / `useThreadMessages` 接入真实 Edge thread list 和 persisted items，live run/tool/file events 仍待接入。
+- [x] 保留真实 Edge 数据接入，不用 mock 冒充完成；首片已通过 `useThreads` / `useThreadMessages` 接入真实 Edge thread list 和 persisted items，并通过 `createEventStream` 接入当前 thread live run/tool/file/approval/artifact events。
 - [x] 跑 Desktop typecheck 和 focused tests。
 
 执行记录：
@@ -239,6 +240,7 @@ app/desktop/src-tauri/src/
 - 2026-06-07：`app/desktop/src/App.tsx` 已替换为 shared `AgentHubWorkbench` 装配入口。
 - 2026-06-07：Desktop v4 focused test、Desktop typecheck/build、1440x920 Playwright visual smoke 均通过。
 - 2026-06-07：新增 `app/desktop/src/platform/useDesktopWorkbenchModel.ts`，Desktop root 已在有 Edge thread 数据时显示真实会话和 persisted transcript；fallback transcript 只在没有 Edge thread 数据时使用。
+- 2026-06-07：新增 `app/desktop/src/platform/useDesktopEdgeEvents.ts`，Desktop root 已订阅 live Edge event stream，过滤当前 thread 并把 live blocks 合并进 shared v4 transcript；Desktop App focused tests 更新为 1 个文件 / 3 个测试通过。
 
 ### Task 8: Web platform adapter
 

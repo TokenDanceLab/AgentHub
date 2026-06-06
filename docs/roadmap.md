@@ -25,8 +25,8 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 完成计划、问题清单、架构与 roadmap 同步 | `git diff --check`；活跃文档无旧主线冲突 |
-| P0-2 | shared UI 工作台边界 | 进行中 | 补 Hub normalize、block renderer 和 design token bridge | shared focused tests 12 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
-| P0-3 | Desktop v4 shell 接入 | 进行中 | 接入 live run/tool/file evidence 和 composer submit，替换剩余静态 smoke 数据 | Desktop App v4 focused tests 通过；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过，且读取真实 Edge thread 列表 |
+| P0-2 | shared UI 工作台边界 | 进行中 | 补 Hub normalize、block renderer 和 design token bridge | shared focused tests 14 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
+| P0-3 | Desktop v4 shell 接入 | 进行中 | 接入 composer submit、完整 run inspector 和 changed files 面板，继续替换剩余静态 smoke 数据 | Desktop App v4 focused tests 3 passed；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过，且读取真实 Edge thread 列表、persisted items 和 live Edge event evidence |
 | P0-4 | Web v4 shell 接入 | 进行中 | 把 static web adapter 替换为 Hub session/REST/WS 数据 adapter | Web App focused test 通过；Web typecheck 通过；Web build 通过 |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
 | P0-6 | 旧 UI 清理门禁 | 未开始 | 删除或归档旧 UI 入口，禁止旧文件继续承载活跃路径 | `rg` 旧入口扫描；无双主工作台 |
@@ -47,7 +47,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 - [ ] `app/shared/src/ui/`：清理 exports，明确基础组件的 public API。
 - [ ] `app/shared/src/workbench/`：已新增 `AgentHubWorkbench` shared shell，并拆出 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`TranscriptView`、`UnifiedComposer`、`RightInspector`；下一步补 `WorkbenchRoutes` 和 design token bridge。
-- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock normalize；下一步补 live Edge event、Hub message normalize 与 block renderer。
+- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock normalize；下一步补 Hub message normalize 与 block renderer。
 - [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer 和 v4 modes；下一步补附件和 @Agent 交互。
 - [ ] `app/shared/src/inspector/`：首片已在 shared workbench 中建立 overview/browser/files tabs 和 evidence panel；下一步补 tool timeline、changed files、preview/browser pane。
 - [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface 和 mock platform；下一步接 Desktop/Web 实际 adapter。
@@ -59,6 +59,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - 2026-06-07：`cd app/shared; corepack.cmd pnpm lint` 仍失败，但失败不在新增模块；当前阻塞是既有 Storybook 类型缺失、旧 components 测试引用缺失、部分旧 UI 测试 TS strict 问题和 SVG module declaration 缺失。
 - 2026-06-07：补齐 workbench 子组件、workspace tabs、inspector tabs 和 composer modes 后，focused tests 更新为 4 个文件 / 10 个测试通过；新增 workbench 子组件 targeted TypeScript 编译通过。
 - 2026-06-07：新增 `normalizeThreadItemsToTranscript`，把 Edge persisted thread items 投影到 shared `TranscriptBlock` 和 `EvidenceRef(kind="run")`；`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\normalizeThreadItems.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，5 个文件 / 12 个测试通过。
+- 2026-06-07：新增 `normalizeEdgeEventsToTranscript`，把 live Edge `run.started`、`run.output(.batch)`、`run.agent.text_*`、`run.agent.tool_*`、`run.agent.file_change`、`run.agent.permission_*`、`artifact.created`、`run.finished/failed/cancelled` 投影到 shared `TranscriptBlock` 和 `EvidenceRef`；`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\normalizeThreadItems.test.ts src\transcript\normalizeEdgeEvents.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，6 个文件 / 14 个测试通过。
 
 ## P2: Desktop v4 接入
 
@@ -66,8 +67,8 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 - [x] 建立 `app/desktop/src/platform/desktopPlatform.ts` 首片 adapter，声明 Local Edge、本机文件和浏览器预览能力；当前 fallback transcript 只在没有 Edge thread 数据时使用。
 - [x] 用 `AgentHubWorkbench` 替换旧 `App.tsx` 主 shell，旧 Desktop 巨石 UI 不再控制 active route。
-- [ ] 迁移真实 Edge event/message/run 数据到 shared transcript contract；首片已接 Edge persisted thread list 和 thread item normalize，live WebSocket run/tool/file events 仍待接入。
-- [ ] 迁移右侧 inspector 的真实 run、tool、changed file、artifact 数据。
+- [ ] 迁移真实 Edge event/message/run 数据到 shared transcript contract；首片已接 Edge persisted thread list、thread item normalize 和 live WebSocket run/tool/file/approval/artifact event normalize。
+- [ ] 迁移右侧 inspector 的真实 run、tool、changed file、artifact 数据；首片已通过 shared `EvidenceRef` 聚合 live run/tool/file/artifact evidence。
 - [ ] 替换旧 composer，保留 Enter/Shift+Enter、附件、workdir、approval mode 和 pending/error 体验。
 - [ ] 删除旧 Desktop 主路径，旧组件只允许在迁移 commit 中短期存在，最终不得作为 active route。
 
@@ -79,6 +80,8 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - 2026-06-07：Desktop `App` 新增 `useDesktopWorkbenchModel`，通过 `useThreads` / `useThreadMessages` 读取真实 Edge thread 列表和 persisted thread items，投影到 shared workbench；fallback 只在无 Edge thread 数据时使用。
 - 2026-06-07：Desktop 1440x920 Playwright visual smoke 复测通过，并确认 long thread list 在 sidebar 内部滚动、document 高度锁定到 viewport。
 - 2026-06-07：`sonnet` 代码审查 subagent 对当前 diff 返回 `NO_FINDINGS`。
+- 2026-06-07：新增 `useDesktopEdgeEvents`，Desktop root 通过 `createEventStream` 订阅当前 thread live Edge events，并合并 persisted transcript 与 live transcript；`cd app/desktop; corepack.cmd pnpm exec vitest run --config vitest.desktop-tsx-ci.config.ts src\__tests__\App.v4.test.tsx --reporter=dot`，1 个文件 / 3 个测试通过。
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm typecheck` 通过；`cd app/desktop; corepack.cmd pnpm build` 通过；`cd app/desktop; node .\.tmp\visual_smoke_desktop.mjs http://127.0.0.1:5173` 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 51480 bytes。
 
 ## P3: Web v4 接入
 

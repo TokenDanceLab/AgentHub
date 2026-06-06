@@ -1,4 +1,5 @@
 export { collectTranscriptEvidence } from './transcriptEvidence';
+export { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents';
 export { normalizeThreadItemsToTranscript } from './normalizeThreadItems';
 export type { ThreadTranscriptItemInput } from './normalizeThreadItems';
 export type {
