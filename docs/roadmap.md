@@ -25,7 +25,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 完成计划、问题清单、架构与 roadmap 同步 | `git diff --check`；活跃文档无旧主线冲突 |
-| P0-2 | shared UI 工作台边界 | 未开始 | 定义 `app/shared` 下 shell/transcript/composer/inspector 的文件结构和 public exports | focused tests 设计清单；Storybook/visual QA 场景 |
+| P0-2 | shared UI 工作台边界 | 进行中 | 拆分 workbench 子组件、inspector 和 shared UI public API | 首片 focused tests 9 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
 | P0-3 | Desktop v4 shell 接入 | 未开始 | 用共享工作台替换旧 Desktop 主 UI，平台差异进入 Desktop adapter | Desktop typecheck；1440/1280/390 截图；Tauri smoke |
 | P0-4 | Web v4 shell 接入 | 未开始 | 用同一共享工作台替换 Web 旧 Chat/Thread/Run 组件 | Web typecheck；Web build；Desktop/Web 截图对齐 |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
@@ -46,12 +46,17 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 目标：全面参考 `agenthub-design/index.html` 和 `agenthub-design/desktop/`，把真实 UI 壳子拆成 AgentHub 内部可复用 UI 系统，让 Desktop/Web 共用同一套产品工作台。
 
 - [ ] `app/shared/src/ui/`：清理 exports，明确基础组件的 public API。
-- [ ] `app/shared/src/workbench/`：新增 `AgentHubWorkbench`、`GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`WorkbenchRoutes`。
-- [ ] `app/shared/src/transcript/`：定义 `TranscriptBlock`、`MessageItem`、`ToolBlock`、`DiffBlock`、`ApprovalBlock`、`ArtifactBlock`、`DeployBlock`。
-- [ ] `app/shared/src/composer/`：定义共享 composer 状态、模式、附件、@Agent、approval mode 和草稿持久化。
+- [ ] `app/shared/src/workbench/`：首片已新增 `AgentHubWorkbench` shared shell；下一步拆 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`WorkbenchRoutes`。
+- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs；下一步补 Edge/Hub normalize 与 block renderer。
+- [ ] `app/shared/src/composer/`：首片已定义共享 composer 状态、intent 和 reducer；下一步补 `UnifiedComposer`、附件和 @Agent 交互。
 - [ ] `app/shared/src/inspector/`：定义 evidence panel、tool timeline、changed files、preview/browser/file panes。
-- [ ] `app/shared/src/platform/`：定义 Desktop/Web 平台 adapter interface，UI 不直接调用 Tauri 或 Hub/Edge 私有实现。
+- [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface 和 mock platform；下一步接 Desktop/Web 实际 adapter。
 - [ ] 所有共享模块配 focused tests，复杂视觉组件配 stories 或截图场景。
+
+验证记录：
+- 2026-06-07：`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，4 个文件 / 9 个测试通过。
+- 2026-06-07：新增 `composer/platform/transcript/workbench` 模块 targeted TypeScript 编译通过。
+- 2026-06-07：`cd app/shared; corepack.cmd pnpm lint` 仍失败，但失败不在新增模块；当前阻塞是既有 Storybook 类型缺失、旧 components 测试引用缺失、部分旧 UI 测试 TS strict 问题和 SVG module declaration 缺失。
 
 ## P2: Desktop v4 接入
 
