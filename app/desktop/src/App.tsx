@@ -59,6 +59,11 @@ import TopMenuBar from '@/components/TopMenuBar';
 import { useTopMenuConfig } from '@/hooks/useTopMenuConfig';
 import { ToastContainer } from '@/components/Toast';
 import type { SectionId as SettingsSectionId } from '@/components/SettingsPage';
+import { useStoredValueState } from '@/components/settings/utils';
+import {
+  DEFAULT_AGENT_AUTO,
+  resolveAvailableDefaultAgentId,
+} from '@/utils/defaultAgent';
 
 // Lazy-loaded non-critical components
 const AuthPage = lazy(() => import('@/components/AuthPage'));
@@ -178,7 +183,7 @@ export default function App() {
   const activeThreadId = resolveThreadSelectionId(selectedThreadId as ThreadSelectionInput);
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
   const { data: agentData } = useAgentList(online);
-  const agents = agentData?.items ?? [];
+  const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
   const modelCatalogQuery = useModelCatalog(online);
   const modelsDevDisplayNamesQuery = useModelsDevDisplayNames(true);
   const agentTeamSummary = useMemo(
@@ -197,6 +202,7 @@ export default function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
+  const [defaultAgent, setDefaultAgent] = useStoredValueState<string>('defaultAgent', DEFAULT_AGENT_AUTO);
   const [pendingComposerDraft, setPendingComposerDraft] = useState('');
   const {
     leftSidebarCollapsed,
@@ -273,7 +279,13 @@ export default function App() {
   const selectedThread = threads.find((th) => th.threadId === activeThreadId);
   const { data: threadItemData } = useThreadMessages(activeThreadId);
   const { data: allRunsData } = useRuns(undefined, undefined, { enabled: online });
-  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+  const validDefaultAgentId = useMemo(
+    () => resolveAvailableDefaultAgentId(defaultAgent, agents),
+    [agents, defaultAgent],
+  );
+  const effectiveSelectedAgentId = selectedAgentId ?? validDefaultAgentId;
+  const selectedAgent = agents.find((a) => a.id === effectiveSelectedAgentId);
+  const manuallySelectedAgent = selectedAgentId ? agents.find((a) => a.id === selectedAgentId) : undefined;
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
   const runCardConstrained = workspaceWidth > 0 && workspaceWidth < RUN_CARD_MIN_WORKSPACE_WIDTH;
@@ -352,7 +364,7 @@ export default function App() {
     activeThreadId,
     threads,
     agents,
-    selectedAgentId,
+    selectedAgentId: effectiveSelectedAgentId,
     optimisticRun,
     currentRun,
     allMessages,
@@ -395,7 +407,7 @@ export default function App() {
     openGlobalSearch,
   } = useThreadNavigation({
     allMessages,
-    selectedAgentName: selectedAgent?.name,
+    selectedAgentName: manuallySelectedAgent?.name,
     selectedAgentId: selectedAgentId ?? null,
     selectedThreadId: selectedThread?.threadId,
     selectedThreadTitle: selectedThread?.title,
@@ -663,6 +675,8 @@ export default function App() {
           initialSection={settingsInitialSection}
           onBack={() => setSettingsOpen(false)}
           onOpenAuth={handleOpenAuth}
+          defaultAgent={defaultAgent}
+          setDefaultAgent={setDefaultAgent}
         />
         </Suspense>
       ) : (
@@ -698,7 +712,7 @@ export default function App() {
             <div className={styles.mobileNavPanel}>
               <div className={styles.sidebarSection}>
                 <div className={styles.sidebarScroll}>
-                  <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+                  <Slot name="agent-list" agents={agents} online={online} selectedId={effectiveSelectedAgentId} onSelect={handleSelectAgent} />
                 </div>
               </div>
               <div className={`${styles.sidebarSection} ${styles.threadSection}`}>
@@ -806,7 +820,7 @@ export default function App() {
             {/* Agents section */}
             <div className={styles.sidebarSection}>
               <div className={styles.sidebarScroll}>
-                <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+                <Slot name="agent-list" agents={agents} online={online} selectedId={effectiveSelectedAgentId} onSelect={handleSelectAgent} />
               </div>
             </div>
 
@@ -918,7 +932,7 @@ export default function App() {
                           const thread = await createThread(title ?? undefined);
                           addThreadToCache(thread);
                           handleSelectThread(thread.threadId);
-                          await handleSend(prompt, selectedAgentId ?? undefined, {
+                          await handleSend(prompt, effectiveSelectedAgentId ?? undefined, {
                             threadId: thread.threadId,
                             threadInfo: thread,
                             createdEmptyThread: true,
@@ -937,7 +951,7 @@ export default function App() {
                       agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
                       agentTeamsSignedIn={hubInventoryEnabled}
                       agents={agents}
-                      selectedAgentId={selectedAgentId ?? undefined}
+                      selectedAgentId={effectiveSelectedAgentId ?? undefined}
                       onSelectAgent={handleSelectAgent}
                       onStartLocalOrchestration={handleStartLocalOrchestration}
                     />
@@ -955,7 +969,7 @@ export default function App() {
                       isStreaming={composerLocked}
                       isConnected={isConnected}
                       agents={agents}
-                      selectedAgentId={selectedAgentId}
+                      selectedAgentId={effectiveSelectedAgentId ?? undefined}
                       onSelectAgent={handleSelectAgent}
                       onRetry={handleRetry}
                       onFork={handleForkThread}
@@ -968,7 +982,7 @@ export default function App() {
                 {/* Input area — only for agent chat */}
                 {activeRailView === 'agents' && (
                   <div className={styles.inputArea}>
-                    <Slot name="prompt-input" agents={agents} threads={threads} executionTargets={executionTargetsQuery.data?.items ?? []} modelCatalog={modelCatalogQuery.data} modelDisplayNames={modelsDevDisplayNamesQuery.data} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={activeThreadId ?? undefined} onRetryLast={handleRetry} onForkThread={handleForkThread} />
+                    <Slot name="prompt-input" agents={agents} threads={threads} executionTargets={executionTargetsQuery.data?.items ?? []} modelCatalog={modelCatalogQuery.data} modelDisplayNames={modelsDevDisplayNamesQuery.data} selectedAgentId={effectiveSelectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={activeThreadId ?? undefined} onRetryLast={handleRetry} onForkThread={handleForkThread} />
                   </div>
                 )}
               </div>
