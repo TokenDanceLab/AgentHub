@@ -295,6 +295,62 @@ export type {
 } from './surfaceMetadata';
 
 export {
+  buildComposerIntent,
+  canSubmitComposer,
+  composerReducer,
+  createInitialComposerState,
+} from './composer';
+export type {
+  ApprovalMode,
+  ComposerAction,
+  ComposerAttachment,
+  ComposerIntent,
+  ComposerMode,
+  ComposerState,
+  ComposerSubmitResult,
+  ComposerSubmitState,
+} from './composer';
+
+export {
+  createMockPlatform,
+} from './platform';
+export type {
+  AgentHubPlatform,
+  AgentHubSurface,
+  ConversationKind,
+  ConversationPort,
+  MockPlatform,
+  MockPlatformSeed,
+  RunPort,
+  SurfaceCapabilities,
+  WorkbenchConversation,
+} from './platform';
+
+export {
+  collectTranscriptEvidence,
+} from './transcript';
+export type {
+  ApprovalTranscriptBlock,
+  ArtifactTranscriptBlock,
+  DiffTranscriptBlock,
+  EvidenceRef,
+  EvidenceRefKind,
+  EvidenceRefStatus,
+  TextTranscriptBlock,
+  ToolCallTranscriptBlock,
+  TranscriptAuthor,
+  TranscriptAuthorRole,
+  TranscriptBlock,
+} from './transcript';
+
+export {
+  AgentHubWorkbench,
+} from './workbench';
+export type {
+  AgentHubWorkbenchProps,
+} from './workbench';
+
+export {
   mockProject,
   mockProjects,
   mockThreads,

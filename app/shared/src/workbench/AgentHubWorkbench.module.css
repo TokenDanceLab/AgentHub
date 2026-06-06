@@ -1,0 +1,170 @@
+.shell {
+  display: grid;
+  grid-template-columns: 64px minmax(192px, 260px) minmax(0, 1fr) minmax(220px, 300px);
+  min-height: 640px;
+  background: var(--td-surface, #f6f7f8);
+  color: var(--td-text, #14161a);
+}
+
+.rail,
+.sidebar,
+.inspector {
+  border-right: 1px solid rgba(20, 22, 26, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 10px;
+}
+
+.mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 8px;
+  background: #14161a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.sidebar,
+.inspector {
+  padding: 18px;
+}
+
+.sidebarTitle,
+.inspectorTitle {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.conversationList,
+.evidenceList,
+.transcript {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversationButton {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(20, 22, 26, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+}
+
+.conversationButton[aria-current='true'] {
+  border-color: rgba(0, 113, 227, 0.4);
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.conversationTitle,
+.conversationSubtitle,
+.evidenceLabel,
+.blockAuthor {
+  display: block;
+}
+
+.conversationTitle,
+.evidenceLabel {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.conversationSubtitle,
+.blockAuthor,
+.blockMeta {
+  color: #5b6472;
+  font-size: 12px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 18px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 14px;
+}
+
+.previewButton,
+.sendButton {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(20, 22, 26, 0.14);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+.previewButton:disabled,
+.sendButton:disabled {
+  color: #8b94a3;
+  cursor: not-allowed;
+}
+
+.transcriptRegion {
+  min-width: 0;
+  overflow: auto;
+}
+
+.block {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(20, 22, 26, 0.08);
+}
+
+.blockText,
+.blockTitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.composerInput {
+  min-height: 40px;
+  resize: vertical;
+  border: 1px solid rgba(20, 22, 26, 0.14);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.evidenceItem {
+  padding: 10px;
+  border: 1px solid rgba(20, 22, 26, 0.1);
+  border-radius: 8px;
+  background: #fff;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .workspace,
+  .inspector {
+    grid-column: 1 / -1;
+  }
+}
