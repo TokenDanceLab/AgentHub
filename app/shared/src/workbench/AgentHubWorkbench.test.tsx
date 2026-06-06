@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '../platform/createMockPlatform';
 import type { TranscriptBlock } from '../transcript/types';
 import { AgentHubWorkbench } from './AgentHubWorkbench';
@@ -77,5 +77,33 @@ describe('AgentHubWorkbench', () => {
         expect.objectContaining({ conversationId: 'team', text: '开始 v4 shared workbench', mode: 'code' }),
       ]);
     });
+  });
+
+  it('keeps the draft editable when platform submit fails', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+    platform.runs.submitComposerIntent = vi.fn().mockRejectedValue(new Error('no active Edge thread'));
+
+    render(
+      <AgentHubWorkbench
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: '没有真实 thread 时不要假提交' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+    await waitFor(() => {
+      expect(platform.runs.submitComposerIntent).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole('textbox', { name: 'Composer input' })).toHaveValue('没有真实 thread 时不要假提交');
+    expect(screen.getByRole('button', { name: '发送消息' })).not.toBeDisabled();
   });
 });
