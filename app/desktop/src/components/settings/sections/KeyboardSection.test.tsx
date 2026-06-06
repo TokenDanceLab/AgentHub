@@ -22,6 +22,19 @@ describe('KeyboardSection', () => {
     localStorage.clear();
   });
 
+  it('places default shortcut actions in the panel header', () => {
+    const { container } = render(<KeyboardSection />);
+
+    const customize = screen.getByRole('button', { name: 'settings.keyboardCustomize' });
+    const header = customize.closest('[class*="panelHeader"]');
+    const table = container.querySelector('[class*="shortcutTable"]');
+
+    expect(header).toBeInTheDocument();
+    expect(table).toBeInTheDocument();
+    expect(header!.compareDocumentPosition(table!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(table!.querySelector('button')).not.toBeInTheDocument();
+  });
+
   it('keeps the custom shortcut editor in a styled table layout', () => {
     const { container } = render(<KeyboardSection />);
 
