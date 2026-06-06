@@ -26,8 +26,8 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 完成计划、问题清单、架构与 roadmap 同步 | `git diff --check`；活跃文档无旧主线冲突 |
-| P0-2 | shared UI 工作台边界 | 进行中 | 补 Hub normalize、block renderer 和 design token bridge | shared focused tests 26 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
-| P0-3 | Desktop v4 shell 接入 | 进行中 | 接入 Desktop 原生文件选择、真实 preview 打开能力，继续替换剩余静态 smoke 数据 | Desktop App v4 focused tests 4 passed；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过，且读取真实 Edge thread 列表、persisted items、live Edge event evidence，可从 v4 composer 提交 Edge run，并在 shared inspector 展示 run/tool/file/artifact evidence；v4 composer approval/workDir/@Agent/浏览器文件附件上下文已传入 Edge `startRun` |
+| P0-2 | shared UI 工作台边界 | 进行中 | 补 Hub normalize、block renderer 和 design token bridge | shared focused tests 30 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
+| P0-3 | Desktop v4 shell 接入 | 进行中 | 接入真实 preview 打开能力，继续替换剩余静态 smoke 数据 | Desktop App v4 focused tests 4 passed；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过，且读取真实 Edge thread 列表、persisted items、live Edge event evidence，可从 v4 composer 提交 Edge run，并在 shared inspector 展示 run/tool/file/artifact evidence；v4 composer approval/workDir/@Agent/浏览器文件附件/Desktop 原生文件附件上下文已传入 Edge `startRun` |
 | P0-4 | Web v4 shell 接入 | 进行中 | 把 static web adapter 替换为 Hub session/REST/WS 数据 adapter | Web App focused test 通过；Web typecheck 通过；Web build 通过；Web Vite/Vitest 已对齐 shared lucide 依赖解析 |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
 | P0-6 | 旧 UI 清理门禁 | 未开始 | 删除或归档旧 UI 入口，禁止旧文件继续承载活跃路径 | `rg` 旧入口扫描；无双主工作台 |
@@ -49,9 +49,9 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - [ ] `app/shared/src/ui/`：清理 exports，明确基础组件的 public API。
 - [ ] `app/shared/src/workbench/`：已新增 `AgentHubWorkbench` shared shell，并拆出 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`TranscriptView`、`UnifiedComposer`、`RightInspector`；下一步补 `WorkbenchRoutes` 和 design token bridge。
 - [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock normalize；下一步补 Hub message normalize 与 block renderer。
-- [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer、v4 modes、approval mode、workDir、结构化 @Agent mention 和浏览器文件附件上下文；下一步补 Desktop 原生文件选择和 per-conversation draft persistence。
+- [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer、v4 modes、approval mode、workDir、结构化 @Agent mention、浏览器文件附件和 Desktop 原生文件附件上下文；下一步补 per-conversation draft persistence。
 - [ ] `app/shared/src/inspector/`：首片已建立 evidence 聚合模型，shared workbench 的 overview/browser/files tabs 已显示 run/tool/file/artifact summary、changed files 空/列表状态和 browser capability 状态；下一步补真实 preview 打开、resize/collapse 和更完整 tool timeline。
-- [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface 和 mock platform；下一步接 Desktop/Web 实际 adapter。
+- [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface、mock platform 和附件 picker port；下一步接 Desktop/Web 实际 adapter。
 - [ ] 所有共享模块配 focused tests，复杂视觉组件配 stories 或截图场景。
 
 验证记录：
@@ -66,6 +66,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - 2026-06-07：shared `UnifiedComposer` 增加 approval mode 和 workDir 控件，`ComposerIntent` 会携带 trim 后的 `workDir`；focused shared tests 仍为 7 个文件 / 19 个测试通过，并覆盖 platform intent 中的 `approvalMode/workDir`。
 - 2026-06-07：shared `UnifiedComposer` 增加浏览器文件附件入口、附件 chip、删除动作和文本预览上下文；新增 `composer/attachments.ts`，Desktop submit 会把附件上下文拼进 Edge `startRun.prompt`；focused shared tests 更新为 8 个文件 / 23 个测试通过。
 - 2026-06-07：shared `UnifiedComposer` 增加 @Agent 菜单、mention chip、删除动作和结构化 mention intent；新增 `composer/mentions.ts`，Desktop submit 会把 mention 名称、id、模型、runtime 拼进 Edge `startRun.prompt`；focused shared tests 更新为 9 个文件 / 26 个测试通过。
+- 2026-06-07：shared platform 新增 `attachments.pickFiles()` port；Desktop 通过 Tauri dialog 和既有 `read_file` command 选择本机文件并生成 desktop attachment preview，Web 继续回退浏览器 file input；focused shared tests 更新为 9 个文件 / 30 个测试通过。
 
 ## P2: Desktop v4 接入
 
@@ -75,7 +76,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - [x] 用 `AgentHubWorkbench` 替换旧 `App.tsx` 主 shell，旧 Desktop 巨石 UI 不再控制 active route。
 - [ ] 迁移真实 Edge event/message/run 数据到 shared transcript contract；首片已接 Edge persisted thread list、thread item normalize 和 live WebSocket run/tool/file/approval/artifact event normalize。
 - [ ] 迁移右侧 inspector 的真实 run、tool、changed file、artifact 数据；首片已通过 shared `EvidenceRef` 聚合 live run/tool/file/artifact evidence，并在 overview/files/browser tab 展示聚合后的运行、工具、文件、产物与平台 preview 状态。
-- [ ] 替换旧 composer，保留 Enter/Shift+Enter、附件、workdir、approval mode、@Agent 和 pending/error 体验；首片已把 v4 composer submit 接到当前 Edge thread 的 `startRun`，并把 approval mode、workDir、@Agent 和浏览器文件附件上下文传入 Edge run request。
+- [ ] 替换旧 composer，保留 Enter/Shift+Enter、附件、workdir、approval mode、@Agent 和 pending/error 体验；首片已把 v4 composer submit 接到当前 Edge thread 的 `startRun`，并把 approval mode、workDir、@Agent、浏览器文件附件和 Desktop 原生文件附件上下文传入 Edge run request。
 - [ ] 删除旧 Desktop 主路径，旧组件只允许在迁移 commit 中短期存在，最终不得作为 active route。
 
 验证记录：
@@ -93,6 +94,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - 2026-06-07：Desktop v4 composer 的 `approvalMode=workspace-write` 映射为 Edge `permissionMode=acceptEdits`，`workDir` 原样传入 `startRun`；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 57029 bytes，DOM 检查确认权限/目标目录控件可操作且无页面级 overflow。
 - 2026-06-07：Desktop v4 composer 的浏览器文件附件会读取文本预览并拼接为 prompt 附件上下文，继续通过真实 Edge `startRun(prompt)` 发送；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 57703 bytes，DOM 检查确认附件 chip 可添加/删除且无页面级 overflow。
 - 2026-06-07：Desktop v4 composer 的 @Agent 结构化 mention 会随 prompt 上下文发送到真实 Edge `startRun(prompt)`；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 58526 bytes，DOM 检查确认 @Agent 菜单可添加/删除 chip 且无页面级 overflow。
+- 2026-06-07：Desktop v4 composer 接入原生文件选择，`desktopPlatform` 暴露 `attachments.pickFiles()` 并复用 Tauri dialog/read_file 生成 desktop attachment；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，Desktop/Web typecheck/build 通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 58526 bytes，DOM 检查确认“添加本机附件”可见且无页面级 overflow。
 
 ## P3: Web v4 接入
 
