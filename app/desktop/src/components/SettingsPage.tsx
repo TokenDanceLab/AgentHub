@@ -484,7 +484,7 @@ export default function SettingsPage({
             <ConfigurationSection
               defaultAgent={defaultAgentValue}
               setDefaultAgent={setDefaultAgent}
-              routing={t('settings.routingAuto')}
+              routing="auto"
               setRouting={NOOP}
               approvalMode={approvalMode}
               setApprovalMode={setApprovalMode}
