@@ -14,7 +14,7 @@ description: 多 Team 并行开发引擎 — 大规模 Issue 修复、跨模块�
   ├── Team Leader 1 (Codex GPT-5.5 或 Claude opus) → Worktree A
   │     ├── Worker 1 (GPT-5.5 / Claude sonnet) → 修 1-3 issues
   │     ├── Worker 2 (GPT-5.5 / Claude sonnet) → 修 1-3 issues
-  │     ├── Worker 3 (Claude haiku) → 截图 / 视觉 QA（如需要）
+  │     ├── Worker 3 (Claude haiku) → 快速检查 / 轻量 review（如需要）
   │     └── Worker 4 (GPT-5.5 / opus) → 测试 + 审查
   ├── Team Leader 2 (Codex GPT-5.5 或 Claude opus) → Worktree B
   │     └── ... (同上)
@@ -26,9 +26,9 @@ description: 多 Team 并行开发引擎 — 大规模 Issue 修复、跨模块�
 | Agent | 上下文 | 定位 |
 |---|---:|---|
 | Codex GPT-5.5 subagent | 256k | 全方面强，适合核心实现、跨模块小集成、强代码 review |
-| Claude opus = DeepSeek-V4-Pro | 1M | 长上下文推理、架构、安全、竞品仓库研究 |
-| Claude sonnet = GLM-5.1 | 200k | 代码和 agentic 能力强，适合明确文件范围内的实现和测试 |
-| Claude haiku = mimo-v2.5 | 适中 | 多模态，看图、视觉 QA、UI 对比 |
+| Claude opus = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文；适合架构、安全、竞品仓库研究 |
+| Claude sonnet = GLM-5.1 | 200k | 强代码和 agentic 能力；适合明确文件范围内的实现和测试 |
+| Claude haiku = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈；适合快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
 
 ## 何时使用
 
@@ -93,7 +93,7 @@ You are Team Leader for {team_name}. Fix {N} issues ({batch_name}).
 3. Spawn workers by task type:
    - Codex GPT-5.5: core implementation / integration review (<=256k context)
    - Claude sonnet: narrow code fixes with explicit file whitelist
-   - Claude haiku: screenshot or visual QA
+   - Claude haiku: fast lightweight checks and narrow UI readability review
    - Claude opus: long-context architecture/security review
 4. Each worker: read → write failing test → implement fix → go test passes
 5. Review all work, resolve conflicts, go test -race, commit
