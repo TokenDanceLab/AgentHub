@@ -60,6 +60,7 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'Inspector tabs' })).toBeInTheDocument();
     expect(screen.getByRole('toolbar', { name: 'Composer modes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '添加本机附件' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '浏览器预览' })).not.toBeDisabled();
     expect(screen.getByText('Desktop 已切入 shared v4 workbench。旧 Desktop 主 UI 不再控制 active route。')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '本地 Agent 协作群' })).toBeInTheDocument();

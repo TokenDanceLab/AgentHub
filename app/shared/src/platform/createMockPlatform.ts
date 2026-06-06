@@ -1,4 +1,4 @@
-import type { ComposerIntent, ComposerSubmitResult } from '../composer/types';
+import type { ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
 import type {
   AgentHubPlatform,
   AgentHubSurface,
@@ -10,6 +10,7 @@ export interface MockPlatformSeed {
   surface?: AgentHubSurface;
   capabilities?: Partial<SurfaceCapabilities>;
   conversations?: WorkbenchConversation[];
+  pickFiles?: () => Promise<ComposerAttachment[]>;
 }
 
 export interface MockPlatform extends AgentHubPlatform {
@@ -44,6 +45,13 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
         return conversations;
       },
     },
+    ...(seed.pickFiles
+      ? {
+          attachments: {
+            pickFiles: seed.pickFiles,
+          },
+        }
+      : {}),
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         submittedIntents.push(intent);
