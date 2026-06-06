@@ -1,4 +1,4 @@
-export type ComposerMode = 'ask' | 'code';
+export type ComposerMode = 'ask' | 'plan' | 'code' | 'review' | 'deploy';
 export type ComposerSubmitState = 'idle' | 'submitting' | 'error';
 export type ApprovalMode = 'suggest' | 'workspace-write' | 'read-only';
 
