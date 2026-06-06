@@ -1,6 +1,6 @@
 # 分支治理
 
-最后更新：2026-05-27（fork 远端清理，文档治理）
+最后更新：2026-06-07（v4 文档分支前远端清理）
 
 ## 合并规则
 
@@ -19,9 +19,10 @@ feat/* -> dev/delicious233 -> master
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，当前已推送到 origin | 活跃 |
+| docs/desktop-web-v4-clean-rebuild | v4 clean rebuild 文档架构分支，从 `dev/delicious233` 创建 | 当前工作 |
 | master | 稳定发布，PR only | 保留 |
 | feat/web-desktop-parity | 早期 Web parity 本地分支，唯一提交 `797983e`；已导出 patch 后删除本地分支 | 已归档 |
-| worktree-feat+web-desktop-parity | 早期 Web handoff 本地/远端分支已删除；本地 patch 归档只作参考 | 已归档 |
+| worktree-feat+web-desktop-parity | 早期 Web parity 本地/远端分支已删除；本地 patch 归档只作参考 | 已归档 |
 
 当前登记 worktree 只有主工作树 `D:/Code/TokenDance/AgentHub`。旧残留目录 `.worktrees/codex-trump-fork` 已移动到 `.worktrees/.trash/codex-trump-fork-archived-20260526`，未直接删除。
 
@@ -39,9 +40,8 @@ feat/* -> dev/delicious233 -> master
 |---|---|
 | `origin/dev/trump` | Trump 独立开发线；用户明确要求不信其进度。当前相对 `origin/dev/delicious233` 为 `115/51` 分叉，不能作为稳定进度来源；只允许逐提交 cherry-pick 并重新验证 |
 | `origin/dev/johnny` | Johnny 开发线；当前相对 `origin/dev/delicious233` 为 `122/2` 分叉，仍有 `9cf5c95` 与 `58239fc` 等独有内容；只单独审，不直合 |
-| `origin/feat/team-johnny-merge` | Johnny 聚合 merge；当前相对 `origin/dev/delicious233` 为 `122/1` 分叉，包含大 diff 与冲突风险；只单独审，不直合 |
 
-当前 `origin` 仅保留 `dev/delicious233`、`master`、`dev/trump`、`dev/johnny`、`feat/team-johnny-merge` 五个 heads。旧 `origin/worktree-feat+web-desktop-parity` 与 `origin/chore/oidc-handoff-save-20260526` 已删除；不要继续在 AGENTS/roadmap 中引用它们作为活跃远端。
+当前 `origin` 仅保留 `dev/delicious233`、`master`、`dev/trump`、`dev/johnny` 四个 heads。过时的 `feat/*`、`fix/*`、`phase-*`、`integration/*` 远端分支已按用户要求删除；不要继续在 AGENTS/roadmap 中引用它们作为活跃远端。
 
 ## 2026-05-27 已清理
 
@@ -62,14 +62,14 @@ feat/* -> dev/delicious233 -> master
 | Web parity 本地残留 | 本地 `feat/web-desktop-parity`、`worktree-feat+web-desktop-parity` 已删除；相关 commit/stash 已导出到 `.worktrees/.trash/feat-web-desktop-parity-archive-20260526/`；远端 `origin/worktree-feat+web-desktop-parity` 已删除 |
 | team authz/reliability/adapter | `feat/team-hub-authz`、`feat/team-hub-reliability`、`feat/team-adapter-compat` 已独立合入 `dev/delicious233`，远端分支已删除 |
 | integration sweep | PR #197 已关闭；`feat/team-integration-sweep` 本地 worktree、本地分支、远端分支已删除 |
-| OIDC handoff | 本地 worktree/分支和远端保存分支均已删除；当前状态以 `dev/delicious233`、STATE 和 root governance docs 为准 |
+| OIDC 旧保存点 | 本地 worktree/分支和远端保存分支均已删除；当前状态以 `dev/delicious233`、roadmap 和 root governance docs 为准 |
 | 已合入历史 team 分支 | `team-auth-guard`、`team-data-shield`、`team-edge-*`、`team-oidc-*`、`team-security-*`、`team-session-lifecycle`、`team-tokendance-deep-integration`、`team-validation-wall` 等远端分支已删除 |
 | Runtime live smoke | `test(runtime): 验证真实 Runtime smoke` 已合入并推送；`chore/runtime-live-smoke` worktree/本地分支已删除 |
 | Web typed runtime payload | `feat(web): 展示 Hub Runtime 结构化消息` 已合入并推送；`feat/web-typed-hub-events` worktree/本地分支已删除 |
-| 旧远端保存/备份 | `origin/chore/oidc-handoff-save-20260526` 与 `origin/worktree-feat+web-desktop-parity` 已删除；前者内容被当前 handoff/root docs 覆盖且包含本地 artifact 路径，不再保留为公开远端分支 |
+| 旧远端保存/备份 | OIDC 旧保存分支与 `origin/worktree-feat+web-desktop-parity` 已删除；前者内容被当前主文档/root docs 覆盖且包含本地 artifact 路径，不再保留为公开远端分支 |
 
 ## 后续原则
 
-- 新工作必须从 `dev/delicious233` 新建独立 worktree，不再多人共住主工作树。
-- Trump/Jonny/旧 Web parity 只按单独审查结论 cherry-pick 或重做，不做大分支直合。
+- 新工作必须从 `dev/delicious233` 新建独立分支；多人并行或大范围实现优先使用独立 worktree。
+- Trump/Johnny/旧 Web parity 只按单独审查结论 cherry-pick 或重做，不做大分支直合。
 - 公开 PR/issue 不写本机路径、私有服务器、token、生产日志或截图中的敏感信息。
