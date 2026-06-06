@@ -7,7 +7,13 @@ import {
 } from '../composer';
 import type { AgentHubPlatform, WorkbenchConversation } from '../platform';
 import { collectTranscriptEvidence } from '../transcript';
-import type { EvidenceRef, TranscriptBlock } from '../transcript';
+import type { TranscriptBlock } from '../transcript';
+import { ConversationSidebar } from './ConversationSidebar';
+import { GlobalRail } from './GlobalRail';
+import { RightInspector } from './RightInspector';
+import { TranscriptView } from './TranscriptView';
+import { UnifiedComposer } from './UnifiedComposer';
+import { WorkspaceHeader } from './WorkspaceHeader';
 import styles from './AgentHubWorkbench.module.css';
 
 export interface AgentHubWorkbenchProps {
@@ -31,6 +37,7 @@ export function AgentHubWorkbench({
     createInitialComposerState,
   );
   const evidence = collectTranscriptEvidence(transcript);
+  const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
 
   async function submitComposer(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -43,106 +50,29 @@ export function AgentHubWorkbench({
 
   return (
     <div className={styles.shell}>
-      <nav aria-label="Global rail" className={styles.rail}>
-        <span aria-hidden="true" className={styles.mark}>AH</span>
-      </nav>
-
-      <aside aria-label="Conversation sidebar" className={styles.sidebar}>
-        <h2 className={styles.sidebarTitle}>Conversations</h2>
-        <ul className={styles.conversationList}>
-          {conversations.map((conversation) => (
-            <li key={conversation.id}>
-              <button
-                aria-current={conversation.id === currentConversationId}
-                className={styles.conversationButton}
-                type="button"
-              >
-                <span className={styles.conversationTitle}>{conversation.title}</span>
-                {conversation.subtitle ? (
-                  <span className={styles.conversationSubtitle}>{conversation.subtitle}</span>
-                ) : null}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+      <GlobalRail />
+      <ConversationSidebar
+        activeConversationId={currentConversationId}
+        conversations={conversations}
+      />
 
       <main aria-label="Workspace" className={styles.workspace} data-surface={platform.surface}>
-        <div className={styles.toolbar}>
-          <button
-            className={styles.previewButton}
-            disabled={!platform.capabilities.browserPreview}
-            type="button"
-          >
-            浏览器预览
-          </button>
-        </div>
-
-        <section aria-label="Transcript" className={styles.transcriptRegion}>
-          <ol className={styles.transcript}>
-            {transcript.map((block) => (
-              <li className={styles.block} key={block.id}>
-                <span className={styles.blockAuthor}>{block.author.name}</span>
-                {renderTranscriptBlock(block)}
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <form className={styles.composer} onSubmit={submitComposer}>
-          <textarea
-            aria-label="Composer input"
-            className={styles.composerInput}
-            onChange={(event) => dispatchComposer({ type: 'setText', text: event.target.value })}
-            value={composer.text}
-          />
-          <button
-            className={styles.sendButton}
-            disabled={!canSubmitComposer(composer) || composer.submitState === 'submitting'}
-            type="submit"
-          >
-            发送消息
-          </button>
-        </form>
+        <WorkspaceHeader
+          activeConversation={activeConversation}
+          browserPreviewEnabled={platform.capabilities.browserPreview}
+        />
+        <TranscriptView transcript={transcript} />
+        <UnifiedComposer
+          composer={composer}
+          dispatchComposer={dispatchComposer}
+          onSubmit={submitComposer}
+        />
       </main>
 
-      <aside aria-label="Right inspector" className={styles.inspector}>
-        <h2 className={styles.inspectorTitle}>Evidence</h2>
-        <ul className={styles.evidenceList}>
-          {evidence.map((item) => (
-            <li className={styles.evidenceItem} key={item.id}>
-              {renderEvidence(item)}
-            </li>
-          ))}
-        </ul>
-      </aside>
+      <RightInspector
+        browserPreviewEnabled={platform.capabilities.browserPreview}
+        evidence={evidence}
+      />
     </div>
-  );
-}
-
-function renderTranscriptBlock(block: TranscriptBlock): React.ReactElement {
-  switch (block.kind) {
-    case 'text':
-      return <p className={styles.blockText}>{block.text}</p>;
-    case 'tool_call':
-      return (
-        <p className={styles.blockTitle}>
-          {block.toolName}
-          <span className={styles.blockMeta}> · {block.status}</span>
-        </p>
-      );
-    case 'artifact':
-    case 'diff':
-    case 'approval':
-      return <p className={styles.blockTitle}>{block.title}</p>;
-  }
-}
-
-function renderEvidence(item: EvidenceRef): React.ReactElement {
-  return (
-    <>
-      <span className={styles.evidenceLabel}>{item.label}</span>
-      <span className={styles.blockMeta}>{item.kind}</span>
-    </>
   );
 }

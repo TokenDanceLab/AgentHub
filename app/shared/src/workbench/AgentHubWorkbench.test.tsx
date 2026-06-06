@@ -36,6 +36,16 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('complementary', { name: 'Conversation sidebar' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '消息' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '云文档' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Inspector tabs' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '概览' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '浏览器' })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: '文件' })).toBeInTheDocument();
+    expect(screen.getByRole('toolbar', { name: 'Composer modes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Deploy' })).toBeInTheDocument();
     expect(screen.getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
     expect(screen.getByText('Read desktop/index.html')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '浏览器预览' })).toBeDisabled();
@@ -59,11 +69,12 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
       target: { value: '开始 v4 shared workbench' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Code' }));
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
 
     await waitFor(() => {
       expect(platform.submittedIntents).toEqual([
-        expect.objectContaining({ conversationId: 'team', text: '开始 v4 shared workbench' }),
+        expect.objectContaining({ conversationId: 'team', text: '开始 v4 shared workbench', mode: 'code' }),
       ]);
     });
   });
