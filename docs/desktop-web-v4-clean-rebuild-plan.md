@@ -177,10 +177,13 @@ app/desktop/src-tauri/src/
 
 - [ ] 定义 `TranscriptBlock` discriminated union。
 - [ ] 定义 `EvidenceRef`，供 inspector 聚合。
-- [ ] 从 Edge runtime events 归一化 text/tool/diff/approval/artifact。
+- [ ] 从 Edge runtime events 归一化 text/tool/diff/approval/artifact；首片已支持 persisted thread items，live WebSocket events 仍待接入。
 - [ ] 从 Hub message 归一化 IM text/agent/status/team events。
 - [ ] renderer 复用 shared UI 卡片，不复制 Desktop 旧 renderer。
 - [ ] 覆盖 null/畸形 tool input、长输出截断、未知 block fallback。
+
+执行记录：
+- 2026-06-07：新增 `app/shared/src/transcript/normalizeThreadItems.ts` 和测试，把 Edge persisted thread items 映射为 shared `TranscriptBlock`，并为 `runId` 生成 `EvidenceRef(kind="run")`。
 
 ### Task 5: composer 收敛
 
@@ -228,13 +231,14 @@ app/desktop/src-tauri/src/
 - [ ] 把 Local Edge status/start/stop 包装成 `RunPort` / `HostPort`。
 - [ ] 把 Tauri invoke 包装成 typed `DesktopHostPort`。
 - [x] Desktop `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`。
-- [ ] 保留真实 Edge 数据接入，不用 mock 冒充完成。
+- [ ] 保留真实 Edge 数据接入，不用 mock 冒充完成；首片已通过 `useThreads` / `useThreadMessages` 接入真实 Edge thread list 和 persisted items，live run/tool/file events 仍待接入。
 - [x] 跑 Desktop typecheck 和 focused tests。
 
 执行记录：
 - 2026-06-07：已建立 `app/desktop/src/platform/desktopPlatform.ts` 首片 adapter，先声明 Desktop capability 并提供 active route smoke transcript；真实 Edge event/message/run normalize 仍是后续任务，不把静态首片当完成。
 - 2026-06-07：`app/desktop/src/App.tsx` 已替换为 shared `AgentHubWorkbench` 装配入口。
 - 2026-06-07：Desktop v4 focused test、Desktop typecheck/build、1440x920 Playwright visual smoke 均通过。
+- 2026-06-07：新增 `app/desktop/src/platform/useDesktopWorkbenchModel.ts`，Desktop root 已在有 Edge thread 数据时显示真实会话和 persisted transcript；fallback transcript 只在没有 Edge thread 数据时使用。
 
 ### Task 8: Web platform adapter
 

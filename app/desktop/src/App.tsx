@@ -1,19 +1,18 @@
 import { AgentHubWorkbench } from '@shared/workbench';
-import {
-  createDesktopPlatform,
-  desktopConversations,
-  desktopTranscript,
-} from '@/platform/desktopPlatform';
+import { createDesktopPlatform } from '@/platform/desktopPlatform';
+import { useDesktopWorkbenchModel } from '@/platform/useDesktopWorkbenchModel';
 
 const desktopPlatform = createDesktopPlatform();
 
 export default function App() {
+  const workbench = useDesktopWorkbenchModel();
+
   return (
     <AgentHubWorkbench
-      activeConversationId="local-agent-team"
-      conversations={desktopConversations}
+      activeConversationId={workbench.activeConversationId}
+      conversations={workbench.conversations}
       platform={desktopPlatform}
-      transcript={desktopTranscript}
+      transcript={workbench.transcript}
     />
   );
 }
