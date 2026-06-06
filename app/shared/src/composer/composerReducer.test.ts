@@ -11,17 +11,26 @@ describe('composerReducer', () => {
     let state = createInitialComposerState('team');
 
     state = composerReducer(state, { type: 'setText', text: '请 @Builder 重构 shared shell' });
-    state = composerReducer(state, { type: 'setMode', mode: 'code' });
+    state = composerReducer(state, { type: 'setMode', mode: 'review' });
     state = composerReducer(state, { type: 'addMention', agentId: 'builder' });
     state = composerReducer(state, { type: 'setApprovalMode', approvalMode: 'workspace-write' });
 
     expect(state).toMatchObject({
       conversationId: 'team',
       text: '请 @Builder 重构 shared shell',
-      mode: 'code',
+      mode: 'review',
       mentions: ['builder'],
       approvalMode: 'workspace-write',
     });
+  });
+
+  it('supports the v4 composer modes from the design shell', () => {
+    const initial = createInitialComposerState('team');
+    const modes = ['ask', 'plan', 'code', 'review', 'deploy'] as const;
+
+    for (const mode of modes) {
+      expect(composerReducer(initial, { type: 'setMode', mode }).mode).toBe(mode);
+    }
   });
 
   it('only submits non-empty text or attachments and builds a platform intent', () => {
