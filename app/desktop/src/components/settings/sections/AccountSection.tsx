@@ -51,6 +51,7 @@ export default function AccountSection({
           value={desktopDeviceStatus}
           detail={deviceRegistration.status === 'error' ? deviceRegistration.error ?? t('settings.desktopDeviceRegisterFailed') : deviceId ? shortId(deviceId) : t('settings.desktopDeviceMissingDesc')}
           expandedDetail={deviceId ? <code className={styles.summaryExpandedCode}>{deviceId}</code> : undefined}
+          expandedDetailPlacement="detail"
           expandLabel={t('settings.desktopDeviceShowFull')}
           collapseLabel={t('settings.desktopDeviceHideFull')}
         />
