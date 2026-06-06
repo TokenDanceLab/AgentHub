@@ -26,7 +26,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 |---:|---|---|---|---|
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 完成计划、问题清单、架构与 roadmap 同步 | `git diff --check`；活跃文档无旧主线冲突 |
 | P0-2 | shared UI 工作台边界 | 进行中 | 拆分 workbench 子组件、inspector 和 shared UI public API | 首片 focused tests 9 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
-| P0-3 | Desktop v4 shell 接入 | 未开始 | 用共享工作台替换旧 Desktop 主 UI，平台差异进入 Desktop adapter | Desktop typecheck；1440/1280/390 截图；Tauri smoke |
+| P0-3 | Desktop v4 shell 接入 | 进行中 | 接入真实 Edge event/message/run 数据，替换静态首片 transcript | Desktop App v4 focused test 通过；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过 |
 | P0-4 | Web v4 shell 接入 | 进行中 | 把 static web adapter 替换为 Hub session/REST/WS 数据 adapter | Web App focused test 通过；Web typecheck 通过；Web build 通过 |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
 | P0-6 | 旧 UI 清理门禁 | 未开始 | 删除或归档旧 UI 入口，禁止旧文件继续承载活跃路径 | `rg` 旧入口扫描；无双主工作台 |
@@ -63,12 +63,18 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 目标：Desktop 只保留平台能力、Local Edge 和 Tauri shell；主 UI 由 shared workbench 驱动。
 
-- [ ] 建立 `app/desktop/src/platform/desktopPlatform.ts`，封装 Tauri invoke、Local Edge、文件/窗口/凭据能力。
-- [ ] 用 `AgentHubWorkbench` 替换旧 `App.tsx` 主 shell。
+- [x] 建立 `app/desktop/src/platform/desktopPlatform.ts` 首片 adapter，声明 Local Edge、本机文件和浏览器预览能力；当前 transcript 是 active route smoke 数据，真实 Edge normalize 后续接入。
+- [x] 用 `AgentHubWorkbench` 替换旧 `App.tsx` 主 shell，旧 Desktop 巨石 UI 不再控制 active route。
 - [ ] 迁移真实 Edge event/message/run 数据到 shared transcript contract。
 - [ ] 迁移右侧 inspector 的真实 run、tool、changed file、artifact 数据。
 - [ ] 替换旧 composer，保留 Enter/Shift+Enter、附件、workdir、approval mode 和 pending/error 体验。
 - [ ] 删除旧 Desktop 主路径，旧组件只允许在迁移 commit 中短期存在，最终不得作为 active route。
+
+验证记录：
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm exec vitest run --config vitest.desktop-tsx-ci.config.ts src\__tests__\App.v4.test.tsx --reporter=dot`，1 个文件 / 1 个测试通过，确认 Desktop 根入口渲染 shared v4 workbench、`data-surface="desktop"` 和 Desktop browser preview capability。
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm typecheck` 通过。
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm build` 通过。
+- 2026-06-07：Desktop 1440x920 临时 Playwright visual smoke 通过，截图写入 `.tmp/visual-smoke-desktop.png`；同时修复 shared sidebar 标题/副标题 grid 自动放置导致的文本粘连。
 
 ## P3: Web v4 接入
 

@@ -227,9 +227,14 @@ app/desktop/src-tauri/src/
 
 - [ ] 把 Local Edge status/start/stop 包装成 `RunPort` / `HostPort`。
 - [ ] 把 Tauri invoke 包装成 typed `DesktopHostPort`。
-- [ ] Desktop `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`。
+- [x] Desktop `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`。
 - [ ] 保留真实 Edge 数据接入，不用 mock 冒充完成。
-- [ ] 跑 Desktop typecheck 和 focused tests。
+- [x] 跑 Desktop typecheck 和 focused tests。
+
+执行记录：
+- 2026-06-07：已建立 `app/desktop/src/platform/desktopPlatform.ts` 首片 adapter，先声明 Desktop capability 并提供 active route smoke transcript；真实 Edge event/message/run normalize 仍是后续任务，不把静态首片当完成。
+- 2026-06-07：`app/desktop/src/App.tsx` 已替换为 shared `AgentHubWorkbench` 装配入口。
+- 2026-06-07：Desktop v4 focused test、Desktop typecheck/build、1440x920 Playwright visual smoke 均通过。
 
 ### Task 8: Web platform adapter
 
