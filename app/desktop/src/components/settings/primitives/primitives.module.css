@@ -29,6 +29,7 @@
 .panelBody {
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
 /* ── Mode Card ──────────────────────────────────────────────────────── */
@@ -165,12 +166,10 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  margin-bottom: 12px;
 }
 
 .profileGridSpacious {
   gap: 14px;
-  margin-bottom: 16px;
 }
 
 .summaryCard,
@@ -705,7 +704,7 @@
 }
 
 .taskSection {
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 .taskSectionHeader {
@@ -771,7 +770,6 @@
   border: 1px solid var(--settings-card-border);
   background: var(--settings-card-bg);
   border-radius: 11px;
-  margin-bottom: 10px;
   box-shadow: var(--settings-card-shadow);
   transition:
     background 0.18s ease,
@@ -1077,7 +1075,6 @@
   display: flex;
   gap: 12px;
   padding: 14px 16px;
-  margin-top: 12px;
   border: 1px solid var(--settings-card-border);
   border-radius: 12px;
   background:
@@ -1153,7 +1150,6 @@
   padding: 16px 18px;
   border: 1px solid var(--settings-card-border);
   border-radius: 11px;
-  margin-top: 8px;
   background: var(--settings-card-bg);
 }
 
