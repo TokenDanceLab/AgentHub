@@ -1,3 +1,4 @@
+import { formatComposerPromptWithAttachments } from '@shared/composer';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript';
@@ -96,7 +97,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Age
           const run = await options.submitRun({
             projectId: options.activeProjectId,
             threadId: options.activeThreadId,
-            prompt: intent.text,
+            prompt: formatComposerPromptWithAttachments(intent.text, intent.attachments),
             ...edgePermissionMode(intent),
             ...edgeWorkDir(intent),
           });
