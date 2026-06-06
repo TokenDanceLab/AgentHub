@@ -5,7 +5,7 @@ import styles from './AgentHubWorkbench.module.css';
 const workspaceTabs = ['消息', '云文档'] as const;
 
 export interface WorkspaceHeaderProps {
-  activeConversation?: WorkbenchConversation;
+  activeConversation: WorkbenchConversation | undefined;
   browserPreviewEnabled: boolean;
 }
 

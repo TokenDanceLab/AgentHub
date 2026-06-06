@@ -27,7 +27,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 完成计划、问题清单、架构与 roadmap 同步 | `git diff --check`；活跃文档无旧主线冲突 |
 | P0-2 | shared UI 工作台边界 | 进行中 | 拆分 workbench 子组件、inspector 和 shared UI public API | 首片 focused tests 9 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
 | P0-3 | Desktop v4 shell 接入 | 未开始 | 用共享工作台替换旧 Desktop 主 UI，平台差异进入 Desktop adapter | Desktop typecheck；1440/1280/390 截图；Tauri smoke |
-| P0-4 | Web v4 shell 接入 | 未开始 | 用同一共享工作台替换 Web 旧 Chat/Thread/Run 组件 | Web typecheck；Web build；Desktop/Web 截图对齐 |
+| P0-4 | Web v4 shell 接入 | 进行中 | 把 static web adapter 替换为 Hub session/REST/WS 数据 adapter | Web App focused test 通过；Web typecheck 通过；Web build 通过 |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
 | P0-6 | 旧 UI 清理门禁 | 未开始 | 删除或归档旧 UI 入口，禁止旧文件继续承载活跃路径 | `rg` 旧入口扫描；无双主工作台 |
 
@@ -74,11 +74,11 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 目标：Web 使用同一套工作台，只替换 platform adapter 和数据来源。
 
-- [ ] 建立 `app/web/src/platform/webPlatform.ts`，封装 Hub session、Hub REST/WS、Web 权限和远程审批能力。
-- [ ] 用 `AgentHubWorkbench` 替换 Web 旧 `ChatView`、`PromptInput`、`ThreadPanel`、`RunDetail`。
-- [ ] Web transcript 与 Desktop transcript 使用同一 block renderer。
-- [ ] Web inspector 与 Desktop inspector 使用同一组件，差异只来自 adapter capability。
-- [ ] Web build/typecheck 和核心 UI tests 进入验收门禁。
+- [ ] 建立 `app/web/src/platform/webPlatform.ts`，首片已提供 static Web adapter；下一步接入 Hub session、Hub REST/WS、Web 权限和远程审批能力。
+- [ ] 用 `AgentHubWorkbench` 替换 Web 旧 `ChatView`、`PromptInput`、`ThreadPanel`、`RunDetail`；首片已让 Web App 根入口渲染 shared workbench。
+- [x] Web transcript 与 Desktop transcript 使用同一 block renderer。
+- [x] Web inspector 与 Desktop inspector 使用同一组件，差异只来自 adapter capability。
+- [ ] Web build/typecheck 和核心 UI tests 进入验收门禁；首片证据：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx --reporter=dot`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 均通过。
 
 ## P4: Tauri Host API 重构
 
