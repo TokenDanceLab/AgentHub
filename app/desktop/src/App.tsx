@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { useCreateRun } from '@/api/runQueries';
-import { createDesktopPlatform } from '@/platform/desktopPlatform';
+import { createDesktopPlatform, desktopAgents } from '@/platform/desktopPlatform';
 import { useDesktopWorkbenchModel } from '@/platform/useDesktopWorkbenchModel';
 
 export default function App() {
@@ -16,6 +16,7 @@ export default function App() {
   return (
     <AgentHubWorkbench
       activeConversationId={workbench.activeConversationId}
+      agents={desktopAgents}
       conversations={workbench.conversations}
       platform={desktopPlatform}
       transcript={workbench.transcript}

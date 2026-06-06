@@ -12,7 +12,10 @@ describe('composerReducer', () => {
 
     state = composerReducer(state, { type: 'setText', text: '请 @Builder 重构 shared shell' });
     state = composerReducer(state, { type: 'setMode', mode: 'review' });
-    state = composerReducer(state, { type: 'addMention', agentId: 'builder' });
+    state = composerReducer(state, {
+      type: 'addMention',
+      mention: { id: 'builder', label: 'Builder', model: 'glm-5.1' },
+    });
     state = composerReducer(state, { type: 'setApprovalMode', approvalMode: 'workspace-write' });
     state = composerReducer(state, { type: 'setWorkDir', workDir: '  D:\\Code\\TokenDance\\AgentHub  ' });
 
@@ -20,7 +23,7 @@ describe('composerReducer', () => {
       conversationId: 'team',
       text: '请 @Builder 重构 shared shell',
       mode: 'review',
-      mentions: ['builder'],
+      mentions: [{ id: 'builder', label: 'Builder', model: 'glm-5.1' }],
       approvalMode: 'workspace-write',
       workDir: '  D:\\Code\\TokenDance\\AgentHub  ',
     });
@@ -66,10 +69,12 @@ describe('composerReducer', () => {
 
   it('resets text and transient submit state after successful submit', () => {
     let state = composerReducer(createInitialComposerState('team'), { type: 'setText', text: 'ship' });
+    state = composerReducer(state, { type: 'addMention', mention: { id: 'builder', label: 'Builder' } });
     state = composerReducer(state, { type: 'setSubmitState', submitState: 'submitting' });
     state = composerReducer(state, { type: 'resetAfterSubmit' });
 
     expect(state.text).toBe('');
+    expect(state.mentions).toEqual([]);
     expect(state.submitState).toBe('idle');
   });
 });

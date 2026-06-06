@@ -2,10 +2,30 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '../platform/createMockPlatform';
+import type { WorkbenchAgent } from '../platform/types';
 import type { TranscriptBlock } from '../transcript/types';
 import { AgentHubWorkbench } from './AgentHubWorkbench';
 
 describe('AgentHubWorkbench', () => {
+  const agents: WorkbenchAgent[] = [
+    {
+      id: 'builder',
+      name: 'Builder',
+      description: '代码实现',
+      status: 'available',
+      model: 'glm-5.1',
+      runtimeId: 'claude-code',
+    },
+    {
+      id: 'reviewer',
+      name: 'Reviewer',
+      description: '架构复核',
+      status: 'available',
+      model: 'deepseek-v4-pro',
+      runtimeId: 'claude-code',
+    },
+  ];
+
   const transcript: TranscriptBlock[] = [
     {
       id: 'msg-1',
@@ -48,7 +68,14 @@ describe('AgentHubWorkbench', () => {
       conversations: [{ id: 'builder', title: 'Builder', kind: 'direct', subtitle: 'Claude Code' }],
     });
 
-    render(<AgentHubWorkbench platform={platform} conversations={platform.seed.conversations} transcript={transcript} />);
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
 
     expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Conversation sidebar' })).toBeInTheDocument();
@@ -62,6 +89,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('tab', { name: '浏览器' })).toBeDisabled();
     expect(screen.getByRole('tab', { name: '文件' })).toBeInTheDocument();
     expect(screen.getByRole('toolbar', { name: 'Composer modes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '@Agent' })).toBeInTheDocument();
     expect(screen.getByLabelText('Approval mode')).toHaveValue('suggest');
     expect(screen.getByLabelText('Work directory')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument();
@@ -78,7 +106,14 @@ describe('AgentHubWorkbench', () => {
       conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
     });
 
-    render(<AgentHubWorkbench platform={platform} conversations={platform.seed.conversations} transcript={transcript} />);
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
 
     expect(screen.getByRole('list', { name: '运行 evidence' })).toHaveTextContent('Run v4');
     expect(screen.getByRole('list', { name: '工具 evidence' })).toHaveTextContent('Read desktop/index.html');
@@ -100,6 +135,7 @@ describe('AgentHubWorkbench', () => {
 
     render(
       <AgentHubWorkbench
+        agents={agents}
         platform={platform}
         conversations={platform.seed.conversations}
         activeConversationId="team"
@@ -110,6 +146,9 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
       target: { value: '开始 v4 shared workbench' },
     });
+    fireEvent.click(screen.getByRole('button', { name: '@Agent' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /@Builder/ }));
+    expect(screen.getByRole('button', { name: '移除提及 Builder' })).toBeInTheDocument();
     const file = new File(['attachment-token: shared'], 'notes.txt', { type: 'text/plain' });
     fireEvent.change(screen.getByTestId('composer-attachment-input'), {
       target: { files: [file] },
@@ -129,6 +168,13 @@ describe('AgentHubWorkbench', () => {
         expect.objectContaining({
           approvalMode: 'workspace-write',
           conversationId: 'team',
+          mentions: [
+            expect.objectContaining({
+              id: 'builder',
+              label: 'Builder',
+              model: 'glm-5.1',
+            }),
+          ],
           attachments: [
             expect.objectContaining({
               contentPreview: 'attachment-token: shared',
@@ -144,6 +190,29 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
+  it('removes selected @Agent mentions before submit', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '@Agent' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /@Reviewer/ }));
+    expect(screen.getByRole('button', { name: '移除提及 Reviewer' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '移除提及 Reviewer' }));
+    expect(screen.queryByRole('button', { name: '移除提及 Reviewer' })).not.toBeInTheDocument();
+  });
+
   it('removes selected attachments before submit', async () => {
     const platform = createMockPlatform({
       surface: 'web',
@@ -152,6 +221,7 @@ describe('AgentHubWorkbench', () => {
 
     render(
       <AgentHubWorkbench
+        agents={agents}
         platform={platform}
         conversations={platform.seed.conversations}
         activeConversationId="team"
@@ -177,6 +247,7 @@ describe('AgentHubWorkbench', () => {
 
     render(
       <AgentHubWorkbench
+        agents={agents}
         platform={platform}
         conversations={platform.seed.conversations}
         activeConversationId="team"
