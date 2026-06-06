@@ -312,6 +312,14 @@ export type {
 } from './composer';
 
 export {
+  buildInspectorEvidenceModel,
+  evidenceStatusLabel,
+} from './inspector';
+export type {
+  InspectorEvidenceModel,
+} from './inspector';
+
+export {
   createMockPlatform,
 } from './platform';
 export type {
