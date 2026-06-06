@@ -6,7 +6,7 @@ export interface TranscriptAuthor {
   role: TranscriptAuthorRole;
 }
 
-export type EvidenceRefKind = 'tool' | 'file' | 'artifact';
+export type EvidenceRefKind = 'tool' | 'file' | 'artifact' | 'run';
 export type EvidenceRefStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export interface EvidenceRef {
