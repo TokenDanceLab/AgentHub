@@ -72,10 +72,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 
-import {
-  useModelSettingsStore,
-  type ResolvedRunModelSettings,
-} from '@/stores/modelSettingsStore';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import styles from './SettingsPage.module.css';
 import {
   useStoredBooleanState,
@@ -452,8 +449,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <AppearanceSection
               themeMode={themeMode}
               setThemeMode={setThemeMode}
-              compactMode={compactMode}
-              setCompactMode={setCompactMode}
               themePreset={themePreset}
               setThemePreset={setThemePreset}
             />
@@ -710,7 +705,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'data' && (
             <DataSection
               t={t}
-              addToast={(input) => { return ''; }}
+              addToast={() => { return ''; }}
               resetModelSettings={() => {
                 setDefaultModel('auto');
                 setDefaultProvider('tokendance-gateway');
