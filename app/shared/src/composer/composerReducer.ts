@@ -8,6 +8,7 @@ export function createInitialComposerState(conversationId: string): ComposerStat
     mentions: [],
     attachments: [],
     approvalMode: 'suggest',
+    workDir: '',
     submitState: 'idle',
   };
 }
@@ -42,6 +43,11 @@ export function composerReducer(
       return {
         ...state,
         approvalMode: action.approvalMode,
+      };
+    case 'setWorkDir':
+      return {
+        ...state,
+        workDir: action.workDir,
       };
     case 'setSubmitState':
       return {
@@ -85,5 +91,6 @@ export function buildComposerIntent(state: ComposerState): ComposerIntent {
     mentions: [...state.mentions],
     attachments: [...state.attachments],
     approvalMode: state.approvalMode,
+    ...(state.workDir.trim() ? { workDir: state.workDir.trim() } : {}),
   };
 }
