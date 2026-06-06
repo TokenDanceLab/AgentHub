@@ -71,10 +71,7 @@ import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
-import {
-  useModelSettingsStore,
-  type ResolvedRunModelSettings,
-} from '@/stores/modelSettingsStore';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import {
   DEFAULT_AGENT_AUTO,
   buildDefaultAgentOptions,
@@ -731,7 +728,7 @@ export default function SettingsPage({
           {active === 'data' && (
             <DataSection
               t={t}
-              addToast={(input) => { return ''; }}
+              addToast={(_input) => { return ''; }}
               resetModelSettings={() => {
                 setDefaultModel('auto');
                 setDefaultProvider('tokendance-gateway');
