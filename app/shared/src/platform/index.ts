@@ -1,4 +1,5 @@
 export { createMockPlatform } from './createMockPlatform';
+export { resolveEvidencePreviewTarget } from './previewTargets';
 export type { MockPlatform, MockPlatformSeed } from './createMockPlatform';
 export type {
   AgentHubPlatform,
@@ -6,6 +7,7 @@ export type {
   AttachmentPort,
   ConversationKind,
   ConversationPort,
+  PreviewPort,
   RunPort,
   SurfaceCapabilities,
   WorkbenchAgent,

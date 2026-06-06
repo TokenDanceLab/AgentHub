@@ -1,4 +1,5 @@
 import type { ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
+import type { EvidenceRef } from '../transcript';
 import type {
   AgentHubPlatform,
   AgentHubSurface,
@@ -11,12 +12,14 @@ export interface MockPlatformSeed {
   capabilities?: Partial<SurfaceCapabilities>;
   conversations?: WorkbenchConversation[];
   pickFiles?: () => Promise<ComposerAttachment[]>;
+  openEvidence?: (evidence: EvidenceRef) => Promise<void>;
 }
 
 export interface MockPlatform extends AgentHubPlatform {
   seed: {
     conversations: WorkbenchConversation[];
   };
+  openedEvidence: EvidenceRef[];
   submittedIntents: ComposerIntent[];
 }
 
@@ -28,6 +31,7 @@ const defaultCapabilities: SurfaceCapabilities = {
 
 export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
   const conversations = seed.conversations ?? [];
+  const openedEvidence: EvidenceRef[] = [];
   const submittedIntents: ComposerIntent[] = [];
 
   return {
@@ -39,6 +43,7 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
     seed: {
       conversations,
     },
+    openedEvidence,
     submittedIntents,
     conversations: {
       async list() {
@@ -49,6 +54,16 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
       ? {
           attachments: {
             pickFiles: seed.pickFiles,
+          },
+        }
+      : {}),
+    ...(seed.openEvidence
+      ? {
+          preview: {
+            async openEvidence(evidence: EvidenceRef): Promise<void> {
+              openedEvidence.push(evidence);
+              await seed.openEvidence?.(evidence);
+            },
           },
         }
       : {}),
