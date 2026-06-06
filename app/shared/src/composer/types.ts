@@ -5,7 +5,13 @@ export type ApprovalMode = 'suggest' | 'workspace-write' | 'read-only';
 export interface ComposerAttachment {
   id: string;
   name: string;
+  source?: 'browser' | 'desktop';
   kind?: string;
+  path?: string;
+  size?: number;
+  mime?: string;
+  contentPreview?: string;
+  truncated?: boolean;
 }
 
 export interface ComposerState {
