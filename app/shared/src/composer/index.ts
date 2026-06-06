@@ -6,6 +6,10 @@ export {
   shouldPreviewComposerFile,
 } from './attachments';
 export {
+  formatComposerMentionContext,
+  formatComposerPromptWithContext,
+} from './mentions';
+export {
   buildComposerIntent,
   canSubmitComposer,
   composerReducer,
@@ -16,6 +20,7 @@ export type {
   ComposerAction,
   ComposerAttachment,
   ComposerIntent,
+  ComposerMention,
   ComposerMode,
   ComposerState,
   ComposerSubmitResult,

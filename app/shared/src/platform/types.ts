@@ -18,6 +18,15 @@ export interface WorkbenchConversation {
   unreadCount?: number;
 }
 
+export interface WorkbenchAgent {
+  id: string;
+  name: string;
+  description?: string;
+  status?: 'available' | 'unavailable' | 'configuring';
+  model?: string;
+  runtimeId?: string;
+}
+
 export interface ConversationPort {
   list(): Promise<WorkbenchConversation[]>;
 }

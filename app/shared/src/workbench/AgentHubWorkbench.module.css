@@ -272,6 +272,7 @@
   display: none;
 }
 
+.mentionTray,
 .attachmentTray {
   display: flex;
   min-width: 0;
@@ -279,6 +280,7 @@
   gap: 6px;
 }
 
+.mentionChip,
 .attachmentChip {
   display: inline-grid;
   grid-template-columns: auto minmax(0, auto) auto auto;
@@ -292,12 +294,14 @@
   padding: 4px 6px;
 }
 
+.mentionIcon,
 .attachmentIcon {
   width: 14px;
   height: 14px;
   color: var(--ahv4-muted);
 }
 
+.mentionName,
 .attachmentName {
   min-width: 0;
   overflow: hidden;
@@ -307,9 +311,63 @@
   white-space: nowrap;
 }
 
+.mentionMeta,
 .attachmentMeta {
   color: var(--ahv4-muted);
   font-size: 11px;
+  white-space: nowrap;
+}
+
+.mentionPicker {
+  position: relative;
+  min-width: 0;
+}
+
+.mentionMenu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  display: grid;
+  width: min(280px, 72vw);
+  gap: 4px;
+  border: 1px solid var(--ahv4-line-strong);
+  border-radius: 8px;
+  background: var(--ahv4-panel-solid);
+  box-shadow: 0 16px 36px rgb(15 23 42 / 16%);
+  padding: 6px;
+}
+
+.mentionOption {
+  display: grid;
+  gap: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ahv4-text);
+  padding: 8px;
+  text-align: left;
+}
+
+.mentionOption:hover,
+.mentionOption[aria-checked="true"] {
+  background: color-mix(in oklch, var(--ahv4-accent) 10%, transparent);
+}
+
+.mentionOptionTitle {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mentionOptionMeta {
+  min-height: 14px;
+  overflow: hidden;
+  color: var(--ahv4-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -424,7 +482,7 @@
 
 .composerRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px auto;
+  grid-template-columns: minmax(0, 1fr) 38px 38px auto;
   gap: 10px;
   align-items: stretch;
 }

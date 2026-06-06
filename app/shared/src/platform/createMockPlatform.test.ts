@@ -28,14 +28,18 @@ describe('createMockPlatform', () => {
       conversationId: 'team',
       text: '重构 shared workbench',
       mode: 'code',
-      mentions: ['builder'],
+      mentions: [{ id: 'builder', label: 'Builder' }],
       attachments: [],
       approvalMode: 'workspace-write',
     });
 
     expect(result.intentId).toMatch(/^mock-intent-/);
     expect(platform.submittedIntents).toEqual([
-      expect.objectContaining({ conversationId: 'team', mode: 'code', mentions: ['builder'] }),
+      expect.objectContaining({
+        conversationId: 'team',
+        mode: 'code',
+        mentions: [{ id: 'builder', label: 'Builder' }],
+      }),
     ]);
   });
 });
