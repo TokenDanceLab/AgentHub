@@ -65,23 +65,23 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
-  function keyCategoryLabel(key: string): string {
+  function keyCategoryLabelKey(key: string): string {
     const lower = key.toLowerCase();
-    if (lower.startsWith('agenthub-settings.')) return 'Settings';
-    if (lower.startsWith('agenthub-model-settings')) return 'Model Settings';
-    if (lower.startsWith('agenthub-theme') || lower.startsWith('agenthub-language')) return 'Appearance';
-    if (lower.startsWith('agenthub_hub_') || lower.includes(':edge_auth')) return 'Auth';
-    if (lower.startsWith('agenthub_device_id')) return 'Device';
-    if (lower.startsWith('agenthub_edge_url') || lower.startsWith('agenthub_hub_url')) return 'Config';
-    if (lower.startsWith('agenthub-keybindings')) return 'Shortcuts';
-    if (lower.includes('customagent') || lower.includes('installedagent')) return 'Agents';
-    if (lower.startsWith('agenthub.workspace')) return 'Workspace';
-    if (lower.startsWith('draft_')) return 'Draft';
-    if (lower.startsWith('agenthub:offline_queue')) return 'Offline Queue';
-    if (lower.startsWith('agenthub-thread-selection')) return 'Thread State';
-    if (lower.startsWith('agenthub-ui-shell')) return 'UI State';
-    if (lower.startsWith('agenthub.prompt.')) return 'Prompt Cache';
-    return 'Other';
+    if (lower.startsWith('agenthub-settings.')) return 'settings.dataCategory.settings';
+    if (lower.startsWith('agenthub-model-settings')) return 'settings.dataCategory.modelSettings';
+    if (lower.startsWith('agenthub-theme') || lower.startsWith('agenthub-language')) return 'settings.dataCategory.appearance';
+    if (lower.startsWith('agenthub_hub_') || lower.includes(':edge_auth')) return 'settings.dataCategory.auth';
+    if (lower.startsWith('agenthub_device_id')) return 'settings.dataCategory.device';
+    if (lower.startsWith('agenthub_edge_url') || lower.startsWith('agenthub_hub_url')) return 'settings.dataCategory.config';
+    if (lower.startsWith('agenthub-keybindings')) return 'settings.dataCategory.shortcuts';
+    if (lower.includes('customagent') || lower.includes('installedagent')) return 'settings.dataCategory.agents';
+    if (lower.startsWith('agenthub.workspace')) return 'settings.dataCategory.workspace';
+    if (lower.startsWith('draft_')) return 'settings.dataCategory.draft';
+    if (lower.startsWith('agenthub:offline_queue')) return 'settings.dataCategory.offlineQueue';
+    if (lower.startsWith('agenthub-thread-selection')) return 'settings.dataCategory.threadState';
+    if (lower.startsWith('agenthub-ui-shell')) return 'settings.dataCategory.uiState';
+    if (lower.startsWith('agenthub.prompt.')) return 'settings.dataCategory.promptCache';
+    return 'settings.dataCategory.other';
   }
 
   const handleExport = useCallback(() => {
@@ -338,7 +338,7 @@ export default function DataSection({ t, addToast, resetModelSettings }: DataSec
                   <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{item.key}</code>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
                     <span style={{ fontSize: 11, color: 'var(--settings-muted)', background: 'var(--settings-chip-bg)', padding: '1px 6px', borderRadius: 4 }}>
-                      {keyCategoryLabel(item.key)}
+                      {t(keyCategoryLabelKey(item.key))}
                     </span>
                     {item.isCache && (
                       <span style={{ fontSize: 11, color: 'var(--settings-status-warning)', background: 'var(--settings-status-warning-bg)', padding: '1px 6px', borderRadius: 4 }}>
