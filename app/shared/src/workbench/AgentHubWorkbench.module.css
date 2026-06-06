@@ -88,8 +88,9 @@
 
 .conversationButton {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: 4px 8px;
+  align-items: center;
   width: 100%;
   padding: 10px;
   border: 1px solid var(--ahv4-line);
@@ -112,6 +113,15 @@
 }
 
 .conversationTitle,
+.conversationSubtitle {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationTitle,
 .evidenceLabel {
   font-size: 13px;
   font-weight: 650;
@@ -126,6 +136,7 @@
 
 .unreadBadge {
   display: grid;
+  grid-column: 2;
   min-width: 20px;
   height: 20px;
   place-items: center;
