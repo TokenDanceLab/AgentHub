@@ -5,7 +5,6 @@ import Panel from '../primitives/Panel';
 import {
   KEYBOARD_SHORTCUT_GROUPS,
   type KeyboardShortcut,
-  type KeyboardShortcutGroup,
   type CustomKeybinding,
   getResolvedShortcutGroups,
   hasCustomKeybindings,
@@ -124,9 +123,30 @@ export default function KeyboardSection() {
 
   return (
     <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
-      <div className={styles.shortcutTable}>
-        {!editing ? (
-          <>
+      {!editing ? (
+        <>
+          <div className={styles.shortcutToolbar}>
+            <div className={styles.shortcutActions}>
+              {hasCustom && (
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={handleReset}
+                >
+                  <RotateCcw size={14} />
+                  {t('settings.keyboardReset')}
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => setEditing(true)}
+              >
+                {t('settings.keyboardCustomize')}
+              </button>
+            </div>
+          </div>
+          <div className={styles.shortcutTable}>
             {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
               <div key={group.id} className={styles.shortcutGroup}>
                 <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
@@ -140,24 +160,6 @@ export default function KeyboardSection() {
                 ))}
               </div>
             ))}
-            <div className={styles.shortcutActions}>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setEditing(true)}
-            >
-              {t('settings.keyboardCustomize')}
-            </button>
-            {hasCustom && (
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={handleReset}
-              >
-                <RotateCcw size={14} />
-                {t('settings.keyboardReset')}
-              </button>
-            )}
           </div>
         </>
       ) : (
@@ -271,7 +273,6 @@ export default function KeyboardSection() {
           </div>
         </>
       )}
-    </div>
-  </Panel>
+    </Panel>
   );
 }
