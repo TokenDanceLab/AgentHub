@@ -71,11 +71,15 @@ import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
-
 import {
   useModelSettingsStore,
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
+import {
+  DEFAULT_AGENT_AUTO,
+  buildDefaultAgentOptions,
+  resolveAvailableDefaultAgentId,
+} from '@/utils/defaultAgent';
 import styles from './SettingsPage.module.css';
 import {
   useStoredBooleanState,
@@ -129,6 +133,8 @@ interface Props {
   onBack: () => void;
   onOpenAuth: () => void;
   initialSection?: SectionId;
+  defaultAgent: string;
+  setDefaultAgent: (value: string) => void;
 }
 
 interface NavItem {
@@ -138,7 +144,13 @@ interface NavItem {
   group: 'workspace' | 'automation' | 'system';
 }
 
-export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
+export default function SettingsPage({
+  onBack,
+  onOpenAuth,
+  initialSection = 'general',
+  defaultAgent,
+  setDefaultAgent,
+}: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode, themePreset, setThemePreset } = useTheme();
   const hubAuth = useAuth();
@@ -232,7 +244,16 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
 
-  const agents = agentData?.items ?? [];
+  const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
+  const defaultAgentAutoLabel = t('settings.defaultAgent.auto');
+  const defaultAgentOptions = useMemo(
+    () => buildDefaultAgentOptions(agents, defaultAgentAutoLabel),
+    [agents, defaultAgentAutoLabel],
+  );
+  const defaultAgentValue = useMemo(
+    () => resolveAvailableDefaultAgentId(defaultAgent, agents) ?? DEFAULT_AGENT_AUTO,
+    [agents, defaultAgent],
+  );
   const localAgentProfiles = useMemo(
     () => agents.map((agent) => ({
       agent,
@@ -461,13 +482,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'configuration' && (
             <ConfigurationSection
-              defaultAgent="Auto"
-              setDefaultAgent={NOOP}
+              defaultAgent={defaultAgentValue}
+              setDefaultAgent={setDefaultAgent}
               routing={t('settings.routingAuto')}
               setRouting={NOOP}
               approvalMode={approvalMode}
               setApprovalMode={setApprovalMode}
-              defaultAgentOptions={[['Auto', 'Auto']]}
+              defaultAgentOptions={defaultAgentOptions}
               routingOptions={[['auto', t('settings.routingAuto')]]}
             />
           )}
