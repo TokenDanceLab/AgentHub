@@ -8,7 +8,19 @@
 }
 
 .panelHeader {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 13px;
+}
+
+.panelHeaderCopy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
 .panelHeader h2 {
@@ -24,6 +36,16 @@
   color: var(--settings-muted);
   font-size: 14px;
   line-height: 1.45;
+}
+
+.panelHeaderActions {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .panelBody {
@@ -1810,6 +1832,15 @@
 
   .taskSectionTitleRow {
     flex-direction: column;
+  }
+
+  .panelHeader {
+    flex-direction: column;
+  }
+
+  .panelHeaderActions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .taskSectionActions {
