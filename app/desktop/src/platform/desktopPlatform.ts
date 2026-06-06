@@ -1,0 +1,89 @@
+import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
+import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
+import type { TranscriptBlock } from '@shared/transcript';
+
+export const desktopConversations: WorkbenchConversation[] = [
+  {
+    id: 'local-agent-team',
+    title: '本地 Agent 协作群',
+    kind: 'group',
+    subtitle: 'Desktop v4 / Local Edge',
+    unreadCount: 3,
+  },
+  {
+    id: 'builder',
+    title: 'Builder',
+    kind: 'direct',
+    subtitle: 'GLM-5.1 coding',
+  },
+  {
+    id: 'reviewer',
+    title: 'Reviewer',
+    kind: 'direct',
+    subtitle: 'DeepSeek-V4-Pro review',
+  },
+];
+
+export const desktopTranscript: TranscriptBlock[] = [
+  {
+    id: 'desktop-msg-1',
+    kind: 'text',
+    author: { id: 'system', name: 'AgentHub', role: 'system' },
+    text: 'Desktop 已切入 shared v4 workbench。旧 Desktop 主 UI 不再控制 active route。',
+  },
+  {
+    id: 'desktop-tool-1',
+    kind: 'tool_call',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    toolName: 'LocalEdgeAdapter',
+    status: 'running',
+    evidenceRefs: [
+      {
+        id: 'desktop-local-edge-capability',
+        kind: 'tool',
+        label: 'Desktop platform exposes Local Edge capability',
+        status: 'running',
+      },
+    ],
+  },
+  {
+    id: 'desktop-artifact-1',
+    kind: 'artifact',
+    author: { id: 'reviewer', name: 'Reviewer', role: 'agent' },
+    title: 'v4 Desktop shell adapter',
+    evidenceRefs: [
+      {
+        id: 'desktop-shared-workbench',
+        kind: 'artifact',
+        label: 'shared v4 workbench active route',
+        status: 'completed',
+      },
+    ],
+  },
+];
+
+export function createDesktopPlatform(): AgentHubPlatform {
+  const submittedIntents: ComposerIntent[] = [];
+
+  return {
+    surface: 'desktop',
+    capabilities: {
+      localEdge: true,
+      localFiles: true,
+      browserPreview: true,
+    },
+    conversations: {
+      async list(): Promise<WorkbenchConversation[]> {
+        return desktopConversations;
+      },
+    },
+    runs: {
+      async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
+        submittedIntents.push(intent);
+        return {
+          intentId: `desktop-intent-${submittedIntents.length}`,
+        };
+      },
+    },
+  };
+}
