@@ -296,6 +296,7 @@ export type {
 
 export {
   browserFilesToComposerAttachments,
+  desktopPathsToComposerAttachments,
   buildComposerIntent,
   canSubmitComposer,
   composerReducer,
@@ -306,6 +307,7 @@ export {
   formatComposerPromptWithContext,
   formatComposerPromptWithAttachments,
   shouldPreviewComposerFile,
+  shouldPreviewComposerFileName,
 } from './composer';
 export type {
   ApprovalMode,
@@ -333,6 +335,7 @@ export {
 export type {
   AgentHubPlatform,
   AgentHubSurface,
+  AttachmentPort,
   ConversationKind,
   ConversationPort,
   MockPlatform,

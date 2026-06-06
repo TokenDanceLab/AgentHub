@@ -1,6 +1,7 @@
 import type { ComposerAttachment } from './types';
 
-const MAX_BROWSER_ATTACHMENT_PREVIEW = 12_000;
+const MAX_COMPOSER_ATTACHMENT_PREVIEW = 12_000;
+const PREVIEW_FILE_NAME_PATTERN = /\.(txt|md|markdown|json|jsonl|csv|tsv|yaml|yml|toml|xml|html|css|scss|js|jsx|ts|tsx|go|rs|py|java|c|cpp|h|hpp|log)$/i;
 
 export function formatComposerAttachmentSize(value: number | undefined): string | undefined {
   if (value == null) return undefined;
@@ -40,8 +41,12 @@ export function formatComposerPromptWithAttachments(
 }
 
 export function shouldPreviewComposerFile(file: File): boolean {
-  if (file.type.startsWith('text/')) return true;
-  return /\.(txt|md|markdown|json|jsonl|csv|tsv|yaml|yml|toml|xml|html|css|scss|js|jsx|ts|tsx|go|rs|py|java|c|cpp|h|hpp|log)$/i.test(file.name);
+  return shouldPreviewComposerFileName(file.name, file.type);
+}
+
+export function shouldPreviewComposerFileName(name: string, mime?: string): boolean {
+  if (mime?.startsWith('text/')) return true;
+  return PREVIEW_FILE_NAME_PATTERN.test(name);
 }
 
 export async function browserFilesToComposerAttachments(files: File[]): Promise<ComposerAttachment[]> {
@@ -51,8 +56,8 @@ export async function browserFilesToComposerAttachments(files: File[]): Promise<
     if (shouldPreviewComposerFile(file) && typeof file.text === 'function') {
       try {
         const text = await file.text();
-        contentPreview = text.slice(0, MAX_BROWSER_ATTACHMENT_PREVIEW);
-        truncated = text.length > MAX_BROWSER_ATTACHMENT_PREVIEW;
+        contentPreview = text.slice(0, MAX_COMPOSER_ATTACHMENT_PREVIEW);
+        truncated = text.length > MAX_COMPOSER_ATTACHMENT_PREVIEW;
       } catch {
         contentPreview = undefined;
       }
@@ -67,4 +72,37 @@ export async function browserFilesToComposerAttachments(files: File[]): Promise<
       ...(contentPreview ? { contentPreview, truncated } : {}),
     };
   }));
+}
+
+export async function desktopPathsToComposerAttachments(
+  paths: string[],
+  readText: (path: string) => Promise<string>,
+): Promise<ComposerAttachment[]> {
+  return Promise.all(paths.map(async (path, index) => {
+    const name = composerPathBasename(path);
+    let contentPreview: string | undefined;
+    let truncated = false;
+
+    if (shouldPreviewComposerFileName(name)) {
+      try {
+        const text = await readText(path);
+        contentPreview = text.slice(0, MAX_COMPOSER_ATTACHMENT_PREVIEW);
+        truncated = text.length > MAX_COMPOSER_ATTACHMENT_PREVIEW;
+      } catch {
+        contentPreview = undefined;
+      }
+    }
+
+    return {
+      id: `desktop-${Date.now()}-${index}-${name}`,
+      name,
+      source: 'desktop',
+      path,
+      ...(contentPreview ? { contentPreview, truncated } : {}),
+    };
+  }));
+}
+
+function composerPathBasename(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 }

@@ -238,6 +238,83 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByText('remove-me.txt')).not.toBeInTheDocument();
   });
 
+  it('adds local file attachments through the platform attachment port', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { localFiles: true },
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+      pickFiles: async () => [{
+        id: 'desktop-attachment-1',
+        name: 'desktop.md',
+        source: 'desktop',
+        path: 'D:\\Code\\TokenDance\\AgentHub\\desktop.md',
+        contentPreview: 'desktop native token',
+      }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '添加本机附件' }));
+    expect(await screen.findByText('desktop.md')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: '读取本机附件' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+    await waitFor(() => {
+      expect(platform.submittedIntents).toEqual([
+        expect.objectContaining({
+          attachments: [
+            expect.objectContaining({
+              contentPreview: 'desktop native token',
+              name: 'desktop.md',
+              path: 'D:\\Code\\TokenDance\\AgentHub\\desktop.md',
+              source: 'desktop',
+            }),
+          ],
+        }),
+      ]);
+    });
+  });
+
+  it('keeps the composer usable when the platform attachment picker fails', async () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { localFiles: true },
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+      pickFiles: vi.fn().mockRejectedValue(new Error('dialog unavailable')),
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '添加本机附件' }));
+
+    await waitFor(() => {
+      expect(platform.attachments?.pickFiles).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: '添加本机附件' })).not.toBeDisabled();
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: '继续输入' },
+    });
+    expect(screen.getByRole('textbox', { name: 'Composer input' })).toHaveValue('继续输入');
+  });
+
   it('keeps the draft editable when platform submit fails', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
