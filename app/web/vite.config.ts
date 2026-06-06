@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@shared': path.resolve(__dirname, '..', 'shared', 'src'),
+      'lucide-react': path.resolve(__dirname, 'node_modules', 'lucide-react'),
       'react': path.resolve(__dirname, 'node_modules', 'react'),
       'react-dom': path.resolve(__dirname, 'node_modules', 'react-dom'),
       'react-i18next': path.resolve(__dirname, 'node_modules', 'react-i18next'),
@@ -22,5 +23,14 @@ export default defineConfig({
   },
   build: {
     target: ['es2021', 'chrome100', 'safari15'],
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-ui': ['lucide-react'],
+          'vendor-i18n': ['i18next', 'react-i18next'],
+        },
+      },
+    },
   },
 });

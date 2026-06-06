@@ -60,4 +60,36 @@ describe('collectTranscriptEvidence', () => {
 
     expect(collectTranscriptEvidence(blocks)).toHaveLength(1);
   });
+
+  it('keeps first occurrence order while updating repeated evidence status', () => {
+    const blocks: TranscriptBlock[] = [
+      {
+        id: 'run-started',
+        kind: 'text',
+        author: { id: 'edge', name: 'Edge', role: 'system' },
+        text: 'Run started',
+        evidenceRefs: [{ id: 'run-1', kind: 'run', label: 'Run 1', status: 'running' }],
+      },
+      {
+        id: 'tool',
+        kind: 'tool_call',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        toolName: 'Shell',
+        status: 'completed',
+        evidenceRefs: [{ id: 'tool-1', kind: 'tool', label: 'Shell', status: 'completed' }],
+      },
+      {
+        id: 'run-finished',
+        kind: 'text',
+        author: { id: 'edge', name: 'Edge', role: 'system' },
+        text: 'Run finished',
+        evidenceRefs: [{ id: 'run-1', kind: 'run', label: 'Run 1', status: 'completed' }],
+      },
+    ];
+
+    expect(collectTranscriptEvidence(blocks)).toEqual([
+      { id: 'run-1', kind: 'run', label: 'Run 1', status: 'completed' },
+      { id: 'tool-1', kind: 'tool', label: 'Shell', status: 'completed' },
+    ]);
+  });
 });

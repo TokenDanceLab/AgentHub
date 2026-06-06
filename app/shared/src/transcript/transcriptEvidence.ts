@@ -1,13 +1,20 @@
 import type { EvidenceRef, TranscriptBlock } from './types';
 
 export function collectTranscriptEvidence(blocks: TranscriptBlock[]): EvidenceRef[] {
-  const seen = new Set<string>();
   const evidence: EvidenceRef[] = [];
+  const indexById = new Map<string, number>();
 
   for (const block of blocks) {
     for (const ref of block.evidenceRefs ?? []) {
-      if (seen.has(ref.id)) continue;
-      seen.add(ref.id);
+      const existingIndex = indexById.get(ref.id);
+      if (existingIndex !== undefined) {
+        evidence[existingIndex] = {
+          ...evidence[existingIndex],
+          ...ref,
+        };
+        continue;
+      }
+      indexById.set(ref.id, evidence.length);
       evidence.push(ref);
     }
   }

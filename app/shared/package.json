@@ -13,6 +13,7 @@
     "./hubEvents": "./src/hubEvents.ts",
     "./hubClient": "./src/hubClient.ts",
     "./composer": "./src/composer/index.ts",
+    "./inspector": "./src/inspector/index.ts",
     "./platform": "./src/platform/index.ts",
     "./transcript": "./src/transcript/index.ts",
     "./workbench": "./src/workbench/index.ts",
