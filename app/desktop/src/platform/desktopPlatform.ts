@@ -2,9 +2,11 @@ import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript';
 
+export const DESKTOP_FALLBACK_CONVERSATION_ID = 'local-agent-team';
+
 export const desktopConversations: WorkbenchConversation[] = [
   {
-    id: 'local-agent-team',
+    id: DESKTOP_FALLBACK_CONVERSATION_ID,
     title: '本地 Agent 协作群',
     kind: 'group',
     subtitle: 'Desktop v4 / Local Edge',
