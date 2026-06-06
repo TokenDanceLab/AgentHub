@@ -88,7 +88,9 @@ export function AgentHubWorkbench({
 
       <RightInspector
         browserPreviewEnabled={platform.capabilities.browserPreview}
+        canOpenPreview={platform.preview?.canOpenEvidence}
         evidence={evidence}
+        onOpenPreview={platform.preview?.openEvidence}
       />
     </div>
   );

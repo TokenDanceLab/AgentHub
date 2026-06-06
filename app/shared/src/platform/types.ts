@@ -1,4 +1,5 @@
 import type { ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
+import type { EvidenceRef } from '../transcript';
 
 export type AgentHubSurface = 'desktop' | 'web';
 
@@ -39,10 +40,16 @@ export interface AttachmentPort {
   pickFiles(): Promise<ComposerAttachment[]>;
 }
 
+export interface PreviewPort {
+  canOpenEvidence?(evidence: EvidenceRef): boolean;
+  openEvidence(evidence: EvidenceRef): Promise<void>;
+}
+
 export interface AgentHubPlatform {
   surface: AgentHubSurface;
   capabilities: SurfaceCapabilities;
   conversations: ConversationPort;
   attachments?: AttachmentPort;
+  preview?: PreviewPort;
   runs: RunPort;
 }
