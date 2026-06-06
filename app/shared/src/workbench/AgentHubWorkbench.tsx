@@ -81,6 +81,7 @@ export function AgentHubWorkbench({
           composer={composer}
           dispatchComposer={dispatchComposer}
           mentionableAgents={mentionableAgents}
+          onPickLocalAttachments={platform.attachments?.pickFiles}
           onSubmit={submitComposer}
         />
       </main>

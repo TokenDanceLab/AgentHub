@@ -3,6 +3,7 @@ import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
+import { pickDesktopComposerAttachments } from './desktopAttachments';
 
 export const DESKTOP_FALLBACK_CONVERSATION_ID = 'local-agent-team';
 
@@ -96,6 +97,7 @@ export const desktopTranscript: TranscriptBlock[] = [
 export interface DesktopPlatformOptions {
   activeProjectId?: string;
   activeThreadId?: string;
+  pickLocalAttachments?: NonNullable<AgentHubPlatform['attachments']>['pickFiles'];
   submitRun?: (request: StartRunRequest) => Promise<RunInfo>;
 }
 
@@ -113,6 +115,9 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Age
       async list(): Promise<WorkbenchConversation[]> {
         return desktopConversations;
       },
+    },
+    attachments: {
+      pickFiles: options.pickLocalAttachments ?? pickDesktopComposerAttachments,
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {

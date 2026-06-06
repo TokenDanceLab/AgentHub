@@ -1,4 +1,4 @@
-import type { ComposerIntent, ComposerSubmitResult } from '../composer/types';
+import type { ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
 
 export type AgentHubSurface = 'desktop' | 'web';
 
@@ -35,9 +35,14 @@ export interface RunPort {
   submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult>;
 }
 
+export interface AttachmentPort {
+  pickFiles(): Promise<ComposerAttachment[]>;
+}
+
 export interface AgentHubPlatform {
   surface: AgentHubSurface;
   capabilities: SurfaceCapabilities;
   conversations: ConversationPort;
+  attachments?: AttachmentPort;
   runs: RunPort;
 }
