@@ -1,6 +1,7 @@
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript';
+import type { RunInfo, StartRunRequest } from '@shared/types';
 
 export const DESKTOP_FALLBACK_CONVERSATION_ID = 'local-agent-team';
 
@@ -64,7 +65,13 @@ export const desktopTranscript: TranscriptBlock[] = [
   },
 ];
 
-export function createDesktopPlatform(): AgentHubPlatform {
+export interface DesktopPlatformOptions {
+  activeProjectId?: string;
+  activeThreadId?: string;
+  submitRun?: (request: StartRunRequest) => Promise<RunInfo>;
+}
+
+export function createDesktopPlatform(options: DesktopPlatformOptions = {}): AgentHubPlatform {
   const submittedIntents: ComposerIntent[] = [];
 
   return {
@@ -82,10 +89,37 @@ export function createDesktopPlatform(): AgentHubPlatform {
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         submittedIntents.push(intent);
+        if (options.submitRun) {
+          if (!options.activeProjectId || !options.activeThreadId) {
+            throw new Error('Desktop v4 composer requires an active Edge thread');
+          }
+          const run = await options.submitRun({
+            projectId: options.activeProjectId,
+            threadId: options.activeThreadId,
+            prompt: intent.text,
+            ...edgePermissionMode(intent),
+          });
+          return {
+            intentId: run.runId,
+          };
+        }
+
         return {
           intentId: `desktop-intent-${submittedIntents.length}`,
         };
       },
     },
   };
+}
+
+function edgePermissionMode(intent: ComposerIntent): Pick<StartRunRequest, 'permissionMode'> {
+  switch (intent.approvalMode) {
+    case 'workspace-write':
+      return { permissionMode: 'acceptEdits' };
+    case 'read-only':
+      return { permissionMode: 'plan' };
+    case 'suggest':
+    default:
+      return {};
+  }
 }

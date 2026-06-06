@@ -44,8 +44,12 @@ export function AgentHubWorkbench({
     if (!canSubmitComposer(composer)) return;
 
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
-    await platform.runs.submitComposerIntent(buildComposerIntent(composer));
-    dispatchComposer({ type: 'resetAfterSubmit' });
+    try {
+      await platform.runs.submitComposerIntent(buildComposerIntent(composer));
+      dispatchComposer({ type: 'resetAfterSubmit' });
+    } catch {
+      dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
+    }
   }
 
   return (
