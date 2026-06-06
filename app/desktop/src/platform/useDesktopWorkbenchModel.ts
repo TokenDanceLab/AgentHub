@@ -12,6 +12,8 @@ import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
 
 export interface DesktopWorkbenchModel {
   activeConversationId: string;
+  activeProjectId?: string;
+  activeThreadId?: string;
   conversations: WorkbenchConversation[];
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
 }
@@ -42,6 +44,8 @@ export function useDesktopWorkbenchModel(): DesktopWorkbenchModel {
 
   return {
     activeConversationId,
+    activeProjectId: activeThread?.projectId,
+    activeThreadId: activeThread?.threadId,
     conversations,
     transcript,
   };
