@@ -85,4 +85,21 @@ describe('ConfigurationSection default agent', () => {
     expect(setDefaultAgent).toHaveBeenCalledWith('codex');
     expect(localStorage.getItem('agenthub-settings.defaultAgent')).toBe('codex');
   });
+
+  it('shows the selected routing label when the stored value matches an option', () => {
+    render(
+      <ConfigurationSection
+        defaultAgent="auto"
+        setDefaultAgent={vi.fn()}
+        routing="auto"
+        setRouting={vi.fn()}
+        approvalMode="ask"
+        setApprovalMode={vi.fn()}
+        defaultAgentOptions={[['auto', 'Auto select']]}
+        routingOptions={[['auto', 'settings.routingAuto']]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'settings.routingAuto' })).toBeInTheDocument();
+  });
 });
