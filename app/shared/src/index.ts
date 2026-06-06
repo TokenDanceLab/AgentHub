@@ -295,10 +295,15 @@ export type {
 } from './surfaceMetadata';
 
 export {
+  browserFilesToComposerAttachments,
   buildComposerIntent,
   canSubmitComposer,
   composerReducer,
   createInitialComposerState,
+  formatComposerAttachmentContext,
+  formatComposerAttachmentSize,
+  formatComposerPromptWithAttachments,
+  shouldPreviewComposerFile,
 } from './composer';
 export type {
   ApprovalMode,

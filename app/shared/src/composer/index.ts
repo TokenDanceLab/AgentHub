@@ -1,4 +1,11 @@
 export {
+  browserFilesToComposerAttachments,
+  formatComposerAttachmentContext,
+  formatComposerAttachmentSize,
+  formatComposerPromptWithAttachments,
+  shouldPreviewComposerFile,
+} from './attachments';
+export {
   buildComposerIntent,
   canSubmitComposer,
   composerReducer,
