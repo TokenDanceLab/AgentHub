@@ -2,6 +2,7 @@ import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@s
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { AgentInfo } from '@shared/types';
+import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
 
 export const webConversations: WorkbenchConversation[] = [
@@ -58,6 +59,22 @@ export const webTranscript: TranscriptBlock[] = [
   },
 ];
 
+export const webHubEmptyConversation: WorkbenchConversation = {
+  id: 'hub-empty-workspace',
+  title: 'Hub 工作台',
+  kind: 'group',
+  subtitle: '暂无 Hub 会话',
+};
+
+export const webHubEmptyTranscript: TranscriptBlock[] = [
+  {
+    id: 'web-hub-empty',
+    kind: 'text',
+    author: { id: 'hub', name: 'Hub', role: 'system' },
+    text: 'Hub session 已连接，暂无可显示会话。',
+  },
+];
+
 export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
   return {
     id: agent.profileId ?? agent.id,
@@ -72,6 +89,35 @@ export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
 export function resolveWebWorkbenchAgents(hubAgents: AgentInfo[] | undefined): WorkbenchAgent[] {
   const mapped = hubAgents?.map(agentInfoToWorkbenchAgent) ?? [];
   return mapped.length > 0 ? mapped : webAgents;
+}
+
+export function hubSessionToWorkbenchConversation(session: Session): WorkbenchConversation | null {
+  const id = session.id ?? session.session_id;
+  if (!id) return null;
+  const isPrivate = session.type === 'private';
+  const fallbackTitle = isPrivate ? 'Hub 私聊' : 'Hub 群聊';
+
+  return {
+    id,
+    title: session.name?.trim() || fallbackTitle,
+    kind: isPrivate ? 'direct' : 'group',
+    subtitle: session.member_count != null
+      ? `Hub ${session.type} · ${session.member_count} members`
+      : `Hub ${session.type}`,
+    ...(session.unread_count ? { unreadCount: session.unread_count } : {}),
+  };
+}
+
+export function resolveWebWorkbenchConversations(
+  sessions: Session[] | undefined,
+  hubAuthenticated: boolean,
+): WorkbenchConversation[] {
+  if (!hubAuthenticated) return webConversations;
+
+  const mapped = sessions
+    ?.map(hubSessionToWorkbenchConversation)
+    .filter((conversation): conversation is WorkbenchConversation => Boolean(conversation)) ?? [];
+  return mapped.length > 0 ? mapped : [webHubEmptyConversation];
 }
 
 export function createWebPlatform(): AgentHubPlatform {
