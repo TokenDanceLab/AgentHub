@@ -120,6 +120,31 @@ export default function KeyboardSection() {
   }, []);
 
   const hasCustom = hasCustomKeybindings();
+  const renderHeaderActions = (inert = false) => (
+    <>
+      <button
+        type="button"
+        className={styles.primaryBtn}
+        onClick={() => setEditing(true)}
+        disabled={inert}
+        tabIndex={inert ? -1 : undefined}
+      >
+        {t('settings.keyboardCustomize')}
+      </button>
+      {hasCustom && (
+        <button
+          type="button"
+          className={styles.secondaryBtn}
+          onClick={handleReset}
+          disabled={inert}
+          tabIndex={inert ? -1 : undefined}
+        >
+          <RotateCcw size={14} />
+          {t('settings.keyboardReset')}
+        </button>
+      )}
+    </>
+  );
 
   return (
     <Panel
@@ -127,26 +152,12 @@ export default function KeyboardSection() {
       description={t('settings.keyboardDesc')}
       actions={
         !editing ? (
-          <>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setEditing(true)}
-            >
-              {t('settings.keyboardCustomize')}
-            </button>
-            {hasCustom && (
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={handleReset}
-              >
-                <RotateCcw size={14} />
-                {t('settings.keyboardReset')}
-              </button>
-            )}
-          </>
-        ) : null
+          renderHeaderActions()
+        ) : (
+          <div className={styles.panelHeaderActionPlaceholder} aria-hidden="true">
+            {renderHeaderActions(true)}
+          </div>
+        )
       }
     >
       {!editing ? (
