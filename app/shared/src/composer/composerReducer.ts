@@ -29,15 +29,15 @@ export function composerReducer(
         mode: action.mode,
       };
     case 'addMention':
-      if (state.mentions.includes(action.agentId)) return state;
+      if (state.mentions.some((mention) => mention.id === action.mention.id)) return state;
       return {
         ...state,
-        mentions: [...state.mentions, action.agentId],
+        mentions: [...state.mentions, action.mention],
       };
     case 'removeMention':
       return {
         ...state,
-        mentions: state.mentions.filter((agentId) => agentId !== action.agentId),
+        mentions: state.mentions.filter((mention) => mention.id !== action.mentionId),
       };
     case 'setApprovalMode':
       return {
@@ -71,6 +71,7 @@ export function composerReducer(
       return {
         ...state,
         text: '',
+        mentions: [],
         attachments: [],
         submitState: 'idle',
       };

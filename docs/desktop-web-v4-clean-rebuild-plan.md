@@ -196,7 +196,7 @@ app/desktop/src-tauri/src/
 - Test: `app/shared/src/composer/*.test.tsx`
 
 - [ ] 实现 mode：Ask / Plan / Code / Review / Deploy。
-- [ ] 实现 @Agent mention、附件、workdir、approval mode；首片已实现 approval mode、workDir 控件和浏览器文件附件，并写入 `ComposerIntent`。
+- [ ] 实现 @Agent mention、附件、workdir、approval mode；首片已实现 approval mode、workDir 控件、浏览器文件附件和结构化 @Agent mention，并写入 `ComposerIntent`。
 - [ ] 实现 per conversation draft persistence interface。
 - [ ] 实现 Enter 发送、Shift+Enter 换行、disabled/loading/error；首片已覆盖平台提交失败时保留草稿并退出 submitting 状态。
 - [x] submit 只发出 intent，由 platform adapter 执行；Desktop 首片已把 intent 转成当前 Edge thread 的 `startRun` 请求。
@@ -205,6 +205,7 @@ app/desktop/src-tauri/src/
 - 2026-06-07：shared `AgentHubWorkbench` 在 platform submit 失败时保留 composer 草稿并恢复可编辑状态；focused shared tests 更新为 6 个文件 / 15 个测试通过。
 - 2026-06-07：shared `UnifiedComposer` 增加 approval mode 下拉和 workDir 输入；`buildComposerIntent` 会输出 trim 后的 `workDir`，但不会把空 workDir 写入 intent；focused shared tests 更新为 7 个文件 / 19 个测试通过。
 - 2026-06-07：新增 shared `composer/attachments.ts`，支持浏览器文件转附件、文本预览截断、附件上下文格式化和 attachment-only prompt；`UnifiedComposer` 已显示附件入口/chip/删除动作，focused shared tests 更新为 8 个文件 / 23 个测试通过。
+- 2026-06-07：新增 shared `composer/mentions.ts`，`UnifiedComposer` 已支持 @Agent 菜单、mention chip、移除动作和结构化 mention intent；Desktop submit 会把 mention 名称、id、模型、runtime 拼进 Edge prompt；focused shared tests 更新为 9 个文件 / 26 个测试通过。
 
 ### Task 6: inspector 收敛
 
@@ -242,7 +243,7 @@ app/desktop/src-tauri/src/
 - [ ] 把 Tauri invoke 包装成 typed `DesktopHostPort`。
 - [x] Desktop `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`。
 - [x] 保留真实 Edge 数据接入，不用 mock 冒充完成；首片已通过 `useThreads` / `useThreadMessages` 接入真实 Edge thread list 和 persisted items，并通过 `createEventStream` 接入当前 thread live run/tool/file/approval/artifact events。
-- [x] v4 composer submit 通过 Desktop platform adapter 调用真实 Edge `startRun`，并传递 `permissionMode/workDir`，浏览器文件附件通过 prompt 上下文传递。
+- [x] v4 composer submit 通过 Desktop platform adapter 调用真实 Edge `startRun`，并传递 `permissionMode/workDir`，@Agent mention 和浏览器文件附件通过 prompt 上下文传递。
 - [x] 跑 Desktop typecheck 和 focused tests。
 
 执行记录：
@@ -253,7 +254,7 @@ app/desktop/src-tauri/src/
 - 2026-06-07：新增 `app/desktop/src/platform/useDesktopEdgeEvents.ts`，Desktop root 已订阅 live Edge event stream，过滤当前 thread 并把 live blocks 合并进 shared v4 transcript；Desktop App focused tests 更新为 1 个文件 / 3 个测试通过。
 - 2026-06-07：`app/desktop/src/App.tsx` 通过 `useCreateRun` 把真实 Edge run mutation 注入 `desktopPlatform`；v4 composer submit 会提交 `{ projectId, threadId, prompt }` 到 active Edge thread，没有真实 Edge thread 时不再假成功；Desktop App focused tests 更新为 1 个文件 / 4 个测试通过。
 - 2026-06-07：`desktopPlatform` 将 shared composer 的 `workspace-write/read-only/suggest` 映射为 Edge `acceptEdits/plan/默认`，并把非空 `workDir` 传入 `startRun`；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，Desktop typecheck/build 通过。
-- 2026-06-07：`desktopPlatform` 使用 shared `formatComposerPromptWithAttachments`，把浏览器文件附件的名称、来源、大小、MIME 和文本预览拼进 Edge prompt；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，Desktop typecheck/build 通过。
+- 2026-06-07：`desktopPlatform` 使用 shared `formatComposerPromptWithContext`，把 @Agent mention 的名称、id、模型、runtime 和浏览器文件附件上下文拼进 Edge prompt；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，Desktop typecheck/build 通过。
 
 ### Task 8: Web platform adapter
 
