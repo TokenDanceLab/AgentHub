@@ -5,7 +5,6 @@ import Panel from '../primitives/Panel';
 import {
   KEYBOARD_SHORTCUT_GROUPS,
   type KeyboardShortcut,
-  type KeyboardShortcutGroup,
   type CustomKeybinding,
   getResolvedShortcutGroups,
   hasCustomKeybindings,
