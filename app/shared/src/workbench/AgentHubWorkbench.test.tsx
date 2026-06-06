@@ -100,10 +100,12 @@ describe('AgentHubWorkbench', () => {
   });
 
   it('renders v4 inspector overview, changed files, and browser capability state', () => {
+    const openEvidence = vi.fn().mockResolvedValue(undefined);
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
       conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+      openEvidence,
     });
 
     render(
@@ -121,10 +123,23 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: '文件' }));
     expect(screen.getByRole('list', { name: 'Changed files' })).toHaveTextContent('app/shared/src/workbench/RightInspector.tsx');
+    fireEvent.click(screen.getByRole('button', { name: '打开文件 app/shared/src/workbench/RightInspector.tsx' }));
+    expect(openEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'ev-file',
+      kind: 'file',
+      label: 'app/shared/src/workbench/RightInspector.tsx',
+    }));
 
     fireEvent.click(screen.getByRole('tab', { name: '浏览器' }));
     expect(screen.getByText('浏览器预览已启用')).toBeInTheDocument();
-    expect(screen.getByText('检测到 1 个产物，后续由 platform adapter 打开预览。')).toBeInTheDocument();
+    expect(screen.getByText('检测到 1 个可预览产物。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '打开产物 visual-smoke-desktop.png' }));
+    expect(openEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'ev-artifact',
+      kind: 'artifact',
+      label: 'visual-smoke-desktop.png',
+    }));
+    expect(platform.openedEvidence).toHaveLength(2);
   });
 
   it('submits composer intents through the platform adapter', async () => {

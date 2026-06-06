@@ -1,6 +1,7 @@
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
+import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
 
 export const webConversations: WorkbenchConversation[] = [
   {
@@ -70,6 +71,10 @@ export function createWebPlatform(): AgentHubPlatform {
       async list(): Promise<WorkbenchConversation[]> {
         return webConversations;
       },
+    },
+    preview: {
+      canOpenEvidence: canOpenWebEvidencePreview,
+      openEvidence: openWebEvidencePreview,
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
