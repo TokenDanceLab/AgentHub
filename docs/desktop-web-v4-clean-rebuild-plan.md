@@ -178,13 +178,14 @@ app/desktop/src-tauri/src/
 - [ ] 定义 `TranscriptBlock` discriminated union。
 - [ ] 定义 `EvidenceRef`，供 inspector 聚合。
 - [x] 从 Edge runtime events 归一化 text/tool/diff/approval/artifact；首片已支持 persisted thread items 和 live WebSocket events。
-- [ ] 从 Hub message 归一化 IM text/agent/status/team events。
+- [ ] 从 Hub message 归一化 IM text/agent/status/team events；首片已支持 Hub session message -> shared text transcript，后续补 Hub WS/team runtime events。
 - [ ] renderer 复用 shared UI 卡片，不复制 Desktop 旧 renderer。
 - [ ] 覆盖 null/畸形 tool input、长输出截断、未知 block fallback。
 
 执行记录：
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeThreadItems.ts` 和测试，把 Edge persisted thread items 映射为 shared `TranscriptBlock`，并为 `runId` 生成 `EvidenceRef(kind="run")`。
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeEdgeEvents.ts` 和测试，把 live Edge `run.*`、`run.agent.*`、`artifact.created` 事件映射为 shared `TranscriptBlock` 与 run/tool/file/artifact evidence；focused shared tests 更新为 6 个文件 / 14 个测试通过。
+- 2026-06-07：新增 `app/shared/src/transcript/normalizeHubMessages.ts` 和测试，把 Hub session messages 映射为 shared `TranscriptBlock`，Web v4 不再依赖旧 `ChatView` 消息转换；focused shared tests 中相关 4 个文件 / 15 个测试通过。
 
 ### Task 5: composer 收敛
 
@@ -271,13 +272,14 @@ app/desktop/src-tauri/src/
 - Modify: `app/web/src/main.tsx`
 - Test: `app/web/src/platform/*.test.ts`
 
-- [ ] 把 Hub session、conversation、message、remote run 包装为 shared ports；首片已把 Hub `GET /web/agent-profiles` 接入 v4 workbench @Agent 列表，剩余 sessions/messages/WS/remote run submit。
+- [ ] 把 Hub session、conversation、message、remote run 包装为 shared ports；首片已把 Hub `GET /web/agent-profiles` 接入 v4 workbench @Agent 列表，并已把 Hub `/client/sessions`、`/client/sessions/{id}/messages` 接入 shared conversations/transcript；剩余 Hub WS/remote run submit。
 - [ ] Web `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`；首片已渲染 shared workbench，Web adapter 已提供浏览器 `preview.openEvidence()` port，`App` 已在 `QueryClientProvider` 内读取 Hub Agent Profiles，并补齐 `lucide-react` alias 防止 shared workbench 图标在 Web Vitest 中加载到第二份 React。
 - [ ] Web 不引入 Tauri 或 Local Edge 私有能力。
 - [ ] 跑 Web typecheck/build/focused tests。
 
 执行记录：
 - 2026-06-07：新增 `resolveWebWorkbenchAgents()` / `agentInfoToWorkbenchAgent()`，Web `App` 通过 `useAgentList(true)` 读取 Hub Agent Profiles 并映射为 shared `WorkbenchAgent`；未登录或 Hub 无 profile 数据时保留 preview fallback；恢复 `app/web/src/api/edgeClient.ts` Hub-only/stubbed 兼容面，保持 Web 不直连 Local Edge；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 7 个测试通过，Web typecheck 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
+- 2026-06-07：新增 `useWebWorkbenchModel()`，Web `App` 在 Hub 登录态读取 Hub sessions/messages 并映射到 shared `WorkbenchConversation` / `TranscriptBlock`；登录但暂无会话时显示 Hub 空态，未登录才使用 preview fallback；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 9 个测试通过，Web typecheck/build 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
 
 ### Task 9: Tauri Host API 拆分
 
