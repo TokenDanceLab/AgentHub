@@ -1,8 +1,9 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { EventEnvelope } from '@shared/events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { createEventStream } from '@/api/eventClient';
+import { useCreateRun } from '@/api/runQueries';
 import { useThreadMessages, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
 
@@ -15,16 +16,32 @@ vi.mock('@/api/threadQueries', () => ({
   useThreads: vi.fn(),
 }));
 
+vi.mock('@/api/runQueries', () => ({
+  useCreateRun: vi.fn(),
+}));
+
 const eventHandlers: EventHandler[] = [];
+const createRunMutateAsync = vi.fn();
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedCreateEventStream = vi.mocked(createEventStream);
+const mockedUseCreateRun = vi.mocked(useCreateRun);
 
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     eventHandlers.length = 0;
     mockedCreateEventStream.mockReturnValue(createMockEventStream());
+    createRunMutateAsync.mockResolvedValue({
+      runId: 'run-created',
+      projectId: 'project-1',
+      threadId: 'thread-real',
+      status: 'queued',
+      createdAt: '2026-06-07T04:00:01Z',
+    });
+    mockedUseCreateRun.mockReturnValue({
+      mutateAsync: createRunMutateAsync,
+    } as ReturnType<typeof useCreateRun>);
     mockedUseThreads.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreads>);
@@ -198,6 +215,46 @@ describe('Desktop App v4 root', () => {
 
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
     expect(mockedCreateEventStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits composer text to the active Edge thread through the v4 platform adapter', async () => {
+    mockedUseThreads.mockReturnValue({
+      data: {
+        items: [
+          {
+            threadId: 'thread-real',
+            projectId: 'project-1',
+            title: '真实 Edge 会话',
+            status: 'active',
+            createdAt: '2026-06-07T04:00:00Z',
+            updatedAt: '2026-06-07T04:00:00Z',
+          },
+        ],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreads>);
+    mockedUseThreadMessages.mockReturnValue({
+      data: {
+        items: [],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreadMessages>);
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('Composer input'), {
+      target: { value: '跑一下 v4 smoke' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+    await waitFor(() => {
+      expect(createRunMutateAsync).toHaveBeenCalledWith({
+        projectId: 'project-1',
+        threadId: 'thread-real',
+        prompt: '跑一下 v4 smoke',
+      });
+    });
+    expect(screen.getByLabelText('Composer input')).toHaveValue('');
   });
 });
 

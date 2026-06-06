@@ -16,7 +16,7 @@
 - 一个 worktree = 一个短分支 = 一个 PR。不同 Agent 永远不会共享同一个 worktree。
 - 创建前必须同步 master：`git switch master && git pull --ff-only`。
 - Subagent 只能在当前 worktree 的指定路径内工作，不能访问其他 worktree 或项目外路径。
-- Dev Loop 引擎定义入口感知的 subagent 分配策略：Codex GPT-5.5 负责中等上下文内的强实现/强审查，Claude opus 负责长上下文架构/安全/竞品研究，Claude sonnet 负责窄范围代码实现，Claude haiku 负责多模态视觉 QA。
+- Dev Loop 引擎定义入口感知的 subagent 分配策略：Codex GPT-5.5 low/mid 负责前端、看图和局部视觉判断，Codex GPT-5.5 xhigh 负责复杂架构和高风险设计复核，Claude opus 负责长文本、找东西和架构整理，Claude sonnet 负责窄范围代码实现，Claude haiku 负责快速轻量检查。
 - 完成后执行验收命令、push 分支、开 PR，合并后删除 worktree。
 
 ## 后果

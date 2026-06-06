@@ -90,6 +90,7 @@ export function useCreateRun() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['runs'] });
       qc.invalidateQueries({ queryKey: ['threads'] });
+      qc.invalidateQueries({ queryKey: ['threadItems'] });
     },
   });
 }
