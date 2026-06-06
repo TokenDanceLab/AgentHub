@@ -10,20 +10,20 @@ description: "自主开发推进引擎——ROADMAP 驱动、模型分配、并�
 
 ## 模型分配策略
 
-> 最后更新：2026-06-05。与 AGENTS.md 保持同步。`opus` / `sonnet` / `haiku` 是 Claude CLI 路由别名；Codex 自带 agent 工具单独建模。
+> 最后更新：2026-06-07。与 AGENTS.md 保持同步。`opus` / `sonnet` / `haiku` 是 Claude CLI 路由别名；Codex 自带 agent 工具单独建模。
 
 | 入口 | 别名/模型 | 上下文 | 强项 | 派发策略 |
 |---|---|---:|---|---|
 | Codex 自带 agent 工具 | GPT-5.5 | 256k | 全方面强，代码、agentic 执行、审查都稳 | 中等上下文内的核心实现、跨前后端小集成、关键 review |
-| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 长上下文推理、架构、竞品仓库研究、安全/方案审查 | 大范围阅读、路线图/架构判断、复杂设计评审 |
-| Claude CLI | **sonnet** = GLM-5.1 | 200k | 代码和 agentic 能力强，上下文短 | 窄范围代码实现、测试修复、Go/TS 小切片 |
-| Claude CLI | **haiku** = mimo-v2.5 | 适中 | 多模态、看图、视觉判断 | 竞品截图复核、Desktop 视觉 QA、UI 可读性/布局审查 |
+| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文 | 大范围阅读、路线图/架构判断、复杂设计评审、安全/方案审查 |
+| Claude CLI | **sonnet** = GLM-5.1 | 200k | 强代码和 agentic 能力 | 窄范围代码实现、测试修复、Go/TS 小切片 |
+| Claude CLI | **haiku** = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈 | 快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
 
 - **主 Agent**：设计决策、审查输出、编辑核心文件（AGENTS.md/STATE.md/ROADMAP.md）。
 - **Codex GPT-5.5 subagent**：工具可用时优先派给高价值代码实现和强 review；不要给超 256k 的大仓库研究。
-- **Claude opus**：长上下文推理、竞品研究、安全/架构审查。
-- **Claude sonnet**：明确路径内的实现和 focused tests；prompt 精简，只传必要文件。
-- **Claude haiku**：截图/多模态/UI 视觉审查，不作为代码主力。
+- **Claude opus**：DeepSeek-V4-Pro，1M 上下文，长上下文推理、竞品研究、安全/架构审查。
+- **Claude sonnet**：GLM-5.1，200k 上下文，明确路径内的实现和 focused tests；prompt 精简，只传必要文件。
+- **Claude haiku**：DeepSeek-V4-Flash，200k 上下文，快速检查、轻量 review、日志/文档/小范围 UI 可读性审查，不作为代码主力。
 
 ## CC 原生工具配合
 
@@ -62,7 +62,7 @@ dev-loop 配合两个 CC 内置命令使用效果最好：
 - **派 Codex GPT-5.5 subagent**：中等上下文内的核心实现、跨模块小集成、关键代码 review
 - **派 Claude opus**：复杂架构推理、长上下文研究、安全审查、多维度审计
 - **派 Claude sonnet**：窄范围编码实现、bug 修复、focused tests
-- **派 Claude haiku**：截图/多模态视觉 QA、UI 对比和可读性审查
+- **派 Claude haiku**：快速检查、轻量 review、日志/文档/小范围 UI 可读性审查
 - 每次 subagent 完成后审查其输出
 
 ### 4. 审查
