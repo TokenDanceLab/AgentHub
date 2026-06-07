@@ -2747,6 +2747,91 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
 
+  # ── Projects backed by Hub workspaces ──
+
+  /web/projects:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListProjects
+      summary: List Hub projects backed by owner-scoped workspaces.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Case-insensitive search over project name and description.
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateProject
+      summary: Create a Hub project workspace.
+      description: Current behavior returns a 200 OK Hub envelope; status-code migration is intentionally out of scope for this slice.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceProjectRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /web/projects/{id}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetProject
+      summary: Get a Hub project workspace.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateProject
+      summary: Update a Hub project workspace.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceProjectRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
   # ── Audit Events ──
 
   /web/audit-events:
@@ -4842,6 +4927,43 @@ components:
         updated_at:
           type: string
           format: date-time
+    WorkspaceProject:
+      type: object
+      required: [id, name, owner_id, created_at, updated_at]
+      description: Web-owned Hub project projection backed by the current workspaces table.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateWorkspaceProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+    UpdateWorkspaceProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
     CreateExecutionTargetRequest:
       type: object
       required: [name]
