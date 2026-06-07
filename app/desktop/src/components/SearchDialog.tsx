@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, User, Bot, MessageSquareText } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import type { ThreadInfo } from '@shared/types';
 import { matchesBinding, getBinding } from '@/utils/keyboardShortcuts';
 import styles from './SearchDialog.module.css';

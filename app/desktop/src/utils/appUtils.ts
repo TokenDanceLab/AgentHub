@@ -4,7 +4,7 @@
  * Functions that don't depend on React state — pure helpers, localStorage
  * readers/writers, and small predicates.
  */
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 
 // ── Numeric ──
 

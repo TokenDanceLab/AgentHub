@@ -1,0 +1,485 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   FilePreview — v4 Read-only Code Editor Panel
+   Converts .readonly-editor / .editor-toolbar / .editor-meta / .editor-code
+   from demo to CSS Modules using ONLY v4 custom properties.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Root panel ── */
+.pane {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: none;
+  animation: editorIn var(--dur-medium) var(--ease-spring);
+}
+
+/* ── Top toolbar ── */
+.toolbar {
+  min-height: 40px;
+  padding: 6px 8px 5px 10px;
+  border-bottom: 1px solid var(--bdr);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+}
+
+/* ── File title block (icon + name + type) ── */
+.fileTitle {
+  grid-column: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.modeTabs {
+  grid-column: 2;
+  justify-self: end;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  border: 1px solid var(--bdr);
+}
+
+.modeTab {
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: calc(var(--r-sm) - 1px);
+  background: transparent;
+  color: var(--text-2);
+  font: 500 0.6875rem/1 var(--font-sans);
+  cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.modeTab:hover:not(:disabled) {
+  color: var(--text-1);
+  background: var(--surface-high);
+}
+
+.modeTab[aria-selected='true'] {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.modeTab:disabled {
+  display: none;
+  color: var(--text-3);
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.openWithWrap {
+  grid-column: 3;
+  position: relative;
+  flex: 0 0 auto;
+  justify-self: end;
+}
+
+.openWithBtn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.openWithBtn:hover,
+.openWithBtn[aria-expanded='true'] {
+  color: var(--text-1);
+  background: var(--surface-high);
+}
+
+.openWithMenu {
+  position: absolute;
+  z-index: var(--z-context-menu);
+  top: calc(100% + 6px);
+  right: 0;
+  width: 212px;
+  max-height: 284px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 94%, var(--surface-low) 6%);
+  box-shadow: var(--e-3);
+  opacity: 0;
+  transform: translateY(4px) scale(0.985);
+  animation: fileMenuIn var(--dur-medium) var(--ease-panel) forwards;
+}
+
+.openWithMenu button {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  color: var(--text-1);
+  text-align: left;
+  font: 500 0.8125rem var(--font-sans);
+  cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    transform var(--dur-pop, var(--dur-medium)) var(--ease-press, var(--ease));
+}
+
+.openWithMenu button:hover {
+  background: var(--surface-high);
+  transform: translateX(1px);
+}
+
+.openWithIcon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+}
+
+.openWithIcon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.brandIconImage,
+.brandIconSvg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.brandIconImage {
+  object-fit: contain;
+}
+
+.openWithLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vendorDefault,
+.vendorTerminal,
+.vendorFolder {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.85;
+}
+
+.vendorDefault {
+  color: var(--text-3);
+}
+
+.vendorTerminal {
+  color: var(--text-1);
+}
+
+.vendorFolder {
+  fill: var(--warning-light);
+  stroke: var(--warning);
+}
+
+.fileIcon {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.fileIcon svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+.fileTitleName {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 0.8125rem/1.2 var(--font-sans);
+  color: var(--text-1);
+}
+
+.fileTitleLang {
+  display: block;
+  margin-top: 2px;
+  font: 500 0.6875rem var(--font-sans);
+  color: var(--text-3);
+}
+
+/* ── Close button ── */
+.closeBtn {
+  grid-column: 4;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.closeBtn:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+  box-shadow: none;
+}
+
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.closeBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Meta bar (workspace, encoding, lines) ── */
+.meta {
+  min-height: 22px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--surface-low) 62%, var(--surface) 38%);
+  font: 500 0.625rem var(--font-sans);
+  overflow: hidden;
+}
+
+.metaItem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Adjacent sibling dot separator */
+.metaItem + .metaItem::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  margin-right: 8px;
+  border-radius: var(--r-full);
+  background: var(--bdr-strong);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ── Code area ── */
+.code {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  background: color-mix(in srgb, var(--surface-low) 72%, var(--surface) 28%);
+  color: var(--text-1);
+  font: 400 0.6875rem/1.45 var(--font-mono);
+  tab-size: 2;
+}
+
+.code:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+.codeInner {
+  display: block;
+  min-width: max-content;
+  padding: 8px 0;
+}
+
+/* ── Single code line (grid: line-number | content) ── */
+.line {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  min-height: 17px;
+}
+
+.line:hover {
+  background: var(--primary-light);
+}
+
+/* ── Line number ── */
+.lineNum {
+  padding-right: 8px;
+  color: var(--text-3);
+  text-align: right;
+  font-style: normal;
+  user-select: none;
+  border-right: 1px solid var(--bdr);
+}
+
+/* ── Line content ── */
+.lineContent {
+  padding: 0 10px;
+  font-weight: 400;
+  white-space: pre;
+}
+
+.lineContent :global(.token.comment),
+.lineContent :global(.token.prolog),
+.lineContent :global(.token.doctype),
+.lineContent :global(.token.cdata) {
+  color: var(--text-3);
+}
+
+.lineContent :global(.token.keyword),
+.lineContent :global(.token.atrule),
+.lineContent :global(.token.selector) {
+  color: var(--primary);
+}
+
+.lineContent :global(.token.function),
+.lineContent :global(.token.class-name) {
+  color: color-mix(in srgb, var(--primary) 78%, var(--text-1) 22%);
+}
+
+.lineContent :global(.token.string),
+.lineContent :global(.token.attr-value) {
+  color: var(--success);
+}
+
+.lineContent :global(.token.number),
+.lineContent :global(.token.boolean),
+.lineContent :global(.token.constant) {
+  color: var(--warning);
+}
+
+.lineContent :global(.token.operator),
+.lineContent :global(.token.punctuation) {
+  color: var(--text-2);
+}
+
+.diffAdd {
+  background: var(--diff-add);
+  color: var(--success);
+}
+
+.diffDel {
+  background: var(--diff-del);
+  color: var(--danger);
+}
+
+.markdownPreview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 24px;
+  background: color-mix(in srgb, var(--surface-low) 72%, var(--surface) 28%);
+  color: var(--text-1);
+  font: var(--body);
+  line-height: 1.48;
+}
+
+.markdownPreview h1 {
+  margin: 0 0 10px;
+  color: var(--text-1);
+  font: 700 1.125rem/1.2 var(--font-sans);
+}
+
+.markdownPreview h2 {
+  margin: 13px 0 6px;
+  color: var(--text-1);
+  font: 650 0.9375rem/1.35 var(--font-sans);
+}
+
+.markdownPreview p {
+  margin: 0 0 6px;
+  color: var(--text-2);
+}
+
+.markdownListItem {
+  position: relative;
+  padding-left: 16px;
+}
+
+.markdownListItem::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.72em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.markdownGap {
+  height: 5px;
+}
+
+/* ── Entry animation ── */
+@keyframes editorIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fileMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
