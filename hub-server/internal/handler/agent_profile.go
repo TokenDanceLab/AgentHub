@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -38,13 +40,13 @@ type createProfileReq struct {
 	Model             string `json:"model"`
 	Provider          string `json:"provider"`
 	ReasoningEffort   string `json:"reasoning_effort"`
-	ModelMapping      string `json:"model_mapping"`
-	Skills            string `json:"skills"`
-	MCPServers        string `json:"mcp_servers"`
-	ToolAllowlist     string `json:"tool_allowlist"`
-	ApprovalPolicy    string `json:"approval_policy"`
+	ModelMapping      any    `json:"model_mapping"`
+	Skills            any    `json:"skills"`
+	MCPServers        any    `json:"mcp_servers"`
+	ToolAllowlist     any    `json:"tool_allowlist"`
+	ApprovalPolicy    any    `json:"approval_policy"`
 	PermissionMode    string `json:"permission_mode"`
-	TargetPreferences string `json:"target_preferences"`
+	TargetPreferences any    `json:"target_preferences"`
 	ContextBudget     int    `json:"context_budget_max_tokens"`
 }
 
@@ -61,23 +63,53 @@ func (h *AgentProfileHandler) CreateProfile(c *gin.Context) {
 		Model: req.Model, Provider: req.Provider, ReasoningEffort: req.ReasoningEffort,
 		PermissionMode: req.PermissionMode, ContextBudgetMaxTokens: req.ContextBudget,
 	}
-	if req.ModelMapping != "" {
-		profile.ModelMapping = req.ModelMapping
+	modelMapping, normErr := normalizeAgentProfileJSONField("model_mapping", req.ModelMapping, true)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
 	}
-	if req.Skills != "" {
-		profile.Skills = req.Skills
+	if modelMapping != "" {
+		profile.ModelMapping = modelMapping
 	}
-	if req.MCPServers != "" {
-		profile.MCPServers = req.MCPServers
+	skills, normErr := normalizeAgentProfileJSONField("skills", req.Skills, false)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
 	}
-	if req.ToolAllowlist != "" {
-		profile.ToolAllowlist = req.ToolAllowlist
+	if skills != "" {
+		profile.Skills = skills
 	}
-	if req.ApprovalPolicy != "" {
-		profile.ApprovalPolicy = req.ApprovalPolicy
+	mcpServers, normErr := normalizeAgentProfileJSONField("mcp_servers", req.MCPServers, false)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
 	}
-	if req.TargetPreferences != "" {
-		profile.TargetPreferences = req.TargetPreferences
+	if mcpServers != "" {
+		profile.MCPServers = mcpServers
+	}
+	toolAllowlist, normErr := normalizeAgentProfileJSONField("tool_allowlist", req.ToolAllowlist, false)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
+	}
+	if toolAllowlist != "" {
+		profile.ToolAllowlist = toolAllowlist
+	}
+	approvalPolicy, normErr := normalizeAgentProfileJSONField("approval_policy", req.ApprovalPolicy, true)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
+	}
+	if approvalPolicy != "" {
+		profile.ApprovalPolicy = approvalPolicy
+	}
+	targetPreferences, normErr := normalizeAgentProfileJSONField("target_preferences", req.TargetPreferences, true)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
+	}
+	if targetPreferences != "" {
+		profile.TargetPreferences = targetPreferences
 	}
 
 	result, err := h.service.Create(c.Request.Context(), userID, profile)
@@ -134,6 +166,10 @@ func (h *AgentProfileHandler) UpdateProfile(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	if err := normalizeAgentProfileUpdateJSONFields(updates); err != nil {
+		Fail(c, err)
+		return
+	}
 
 	profile, err := h.service.Update(c.Request.Context(), id, userID, updates)
 	if err != nil {
@@ -145,6 +181,65 @@ func (h *AgentProfileHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 	OK(c, profile)
+}
+
+func normalizeAgentProfileUpdateJSONFields(updates map[string]interface{}) *errcode.Error {
+	for _, field := range []string{"model_mapping", "approval_policy", "target_preferences"} {
+		normalized, err := normalizeAgentProfileJSONField(field, updates[field], true)
+		if err != nil {
+			return err
+		}
+		if normalized != "" {
+			updates[field] = normalized
+		}
+	}
+	for _, field := range []string{"skills", "mcp_servers", "tool_allowlist"} {
+		normalized, err := normalizeAgentProfileJSONField(field, updates[field], false)
+		if err != nil {
+			return err
+		}
+		if normalized != "" {
+			updates[field] = normalized
+		}
+	}
+	return nil
+}
+
+func normalizeAgentProfileJSONField(field string, value any, wantObject bool) (string, *errcode.Error) {
+	if value == nil {
+		return "", nil
+	}
+	if s, ok := value.(string); ok {
+		if s == "" {
+			return "", nil
+		}
+		if wantObject {
+			var obj map[string]any
+			if err := json.Unmarshal([]byte(s), &obj); err != nil {
+				return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON object", field))
+			}
+			return s, nil
+		}
+		var arr []any
+		if err := json.Unmarshal([]byte(s), &arr); err != nil {
+			return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON array", field))
+		}
+		return s, nil
+	}
+	if wantObject {
+		if _, ok := value.(map[string]any); !ok {
+			return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON object", field))
+		}
+	} else {
+		if _, ok := value.([]any); !ok {
+			return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON array", field))
+		}
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s is not valid JSON", field))
+	}
+	return string(encoded), nil
 }
 
 func (h *AgentProfileHandler) DeleteProfile(c *gin.Context) {
