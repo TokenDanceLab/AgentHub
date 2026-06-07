@@ -100,7 +100,8 @@ export async function fetchAgentTeamOverview(
     details.map(async (team) => {
       try {
         const runs = await client.listTeamRuns(team.id);
-        return { team, runs, latestRun: newestRun(runs) };
+        const latestRun = newestRun(runs);
+        return latestRun ? { team, runs, latestRun } : { team, runs };
       } catch {
         return { team, runs: [] };
       }
@@ -122,7 +123,7 @@ export async function fetchAgentTeamOverview(
       teams: details,
       bundles,
       customAgents,
-      selectedTeam,
+      ...(selectedTeam ? { selectedTeam } : {}),
       tasks: [],
       events: [],
     };
@@ -140,7 +141,7 @@ export async function fetchAgentTeamOverview(
     customAgents,
     selectedTeam,
     selectedRun,
-    state,
+    ...(state ? { state } : {}),
     tasks,
     events,
   };
@@ -149,14 +150,14 @@ export async function fetchAgentTeamOverview(
 export function useHubAgentTeams(enabledOrOptions: boolean | UseHubAgentTeamsOptions) {
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const options = typeof enabledOrOptions === 'boolean'
-    ? { enabled: enabledOrOptions, preferHub: hubAuthenticated, getToken: getAccessToken, baseUrl: undefined }
+    ? { enabled: enabledOrOptions, preferHub: hubAuthenticated, getToken: getAccessToken }
     : {
         enabled: enabledOrOptions.enabled,
         preferHub: enabledOrOptions.enabled,
         getToken: enabledOrOptions.getToken ?? getAccessToken,
-        baseUrl: enabledOrOptions.baseUrl,
-        selectedTeamId: enabledOrOptions.selectedTeamId,
-        selectedRunId: enabledOrOptions.selectedRunId,
+        ...(enabledOrOptions.baseUrl ? { baseUrl: enabledOrOptions.baseUrl } : {}),
+        ...(enabledOrOptions.selectedTeamId ? { selectedTeamId: enabledOrOptions.selectedTeamId } : {}),
+        ...(enabledOrOptions.selectedRunId ? { selectedRunId: enabledOrOptions.selectedRunId } : {}),
       };
 
   return useQuery<AgentTeamOverview>({

@@ -252,11 +252,14 @@ export default function SettingsPage({
     [agents, defaultAgent],
   );
   const localAgentProfiles = useMemo(
-    () => agents.map((agent) => ({
-      agent,
-      alias: preferredProfileAlias(agent),
-      route: resolveRunRequestOptions({ model: preferredProfileAlias(agent) }),
-    })),
+    () => agents.map((agent) => {
+      const alias = preferredProfileAlias(agent);
+      return {
+        agent,
+        alias,
+        route: resolveRunRequestOptions(alias ? { model: alias } : {}),
+      };
+    }),
     [
       agents,
       defaultModel,
@@ -725,7 +728,7 @@ export default function SettingsPage({
           {active === 'archived' && <ArchivedSection />}
           {active === 'data' && (
             <DataSection
-              t={t}
+              t={(key, options) => options ? t(key, options) : t(key)}
               addToast={(_input) => { return ''; }}
               resetModelSettings={() => {
                 setDefaultModel('auto');

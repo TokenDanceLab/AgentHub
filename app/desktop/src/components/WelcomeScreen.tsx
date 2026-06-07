@@ -110,7 +110,7 @@ export default memo(function WelcomeScreen({
   const profileAlias = activeAgent ? preferredProfileAlias(activeAgent) : undefined;
   const route = useMemo(() => {
     void routeSettingsKey;
-    return resolveRunRequestOptions({ model: profileAlias });
+    return resolveRunRequestOptions(profileAlias ? { model: profileAlias } : {});
   }, [profileAlias, resolveRunRequestOptions, routeSettingsKey]);
 
   // Fade-in animation on mount

@@ -20,12 +20,16 @@ export interface TeamLocalExecution {
   createdAt?: string;
 }
 
+function compactRecord<T>(value: Record<string, unknown>): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 export function normalizeTeamTasks(
   state: TeamRunState | undefined,
   tasks: AgentTeamTask[],
 ): TeamTaskState[] {
   if (state?.tasks && state.tasks.length > 0) return state.tasks;
-  return tasks.map((task) => ({
+  return tasks.map((task) => compactRecord<TeamTaskState>({
     task_id: task.id,
     assignment_id: task.assignment_id,
     assignee_member_id: task.assignee_member_id,
@@ -75,7 +79,7 @@ export function buildTeamLocalExecutions({
       rows.set(next.id, next);
       return;
     }
-    rows.set(previousKey ?? next.id, {
+    rows.set(previousKey ?? next.id, compactRecord<TeamLocalExecution>({
       ...previous,
       source: previous.source === 'desktopBridge' ? previous.source : next.source,
       status: previous.source === 'desktopBridge' ? previous.status : next.status,
@@ -90,7 +94,7 @@ export function buildTeamLocalExecutions({
       eventCount: Math.max(previous.eventCount, next.eventCount),
       error: previous.error ?? next.error,
       createdAt: previous.createdAt ?? next.createdAt,
-    });
+    }));
   };
 
   bridgeTasks
@@ -99,7 +103,7 @@ export function buildTeamLocalExecutions({
       const hubTask = findProjectedTeamTask(bridgeTask, tasks);
       const assignment = findProjectedAssignment(bridgeTask, assignments);
       const executionEvents = matchingEvents(bridgeTask.taskId, bridgeTask.runId);
-      addOrMerge({
+      addOrMerge(compactRecord<TeamLocalExecution>({
         id: keyFor(bridgeTask.taskId, bridgeTask.runId),
         source: 'desktopBridge',
         status: bridgeTask.status,
@@ -114,7 +118,7 @@ export function buildTeamLocalExecutions({
         eventCount: executionEvents.length,
         error: bridgeTask.error,
         createdAt: bridgeTask.createdAt,
-      });
+      }));
     });
 
   tasks.forEach((task) => {
@@ -126,7 +130,7 @@ export function buildTeamLocalExecutions({
       || (agentTaskId && item.agent_task_id === agentTaskId)
       || (edgeRunId && (item.edge_run_id === edgeRunId || item.run_id === edgeRunId)));
     const executionEvents = matchingEvents(agentTaskId, edgeRunId);
-    addOrMerge({
+    addOrMerge(compactRecord<TeamLocalExecution>({
       id: keyFor(agentTaskId, edgeRunId, task.task_id),
       source: 'hubProjection',
       status: task.status,
@@ -139,7 +143,7 @@ export function buildTeamLocalExecutions({
       memberId: task.assignee_member_id ?? assignment?.to_member_id,
       latestEventType: executionEvents[executionEvents.length - 1]?.event_type,
       eventCount: executionEvents.length,
-    });
+    }));
   });
 
   assignments.forEach((assignment) => {
@@ -147,7 +151,7 @@ export function buildTeamLocalExecutions({
     const edgeRunId = assignment.edge_run_id ?? assignment.run_id;
     if (!agentTaskId && !edgeRunId) return;
     const executionEvents = matchingEvents(agentTaskId, edgeRunId);
-    addOrMerge({
+    addOrMerge(compactRecord<TeamLocalExecution>({
       id: keyFor(agentTaskId, edgeRunId, assignment.assignment_id),
       source: 'hubProjection',
       status: assignment.status || 'dispatched',
@@ -159,12 +163,12 @@ export function buildTeamLocalExecutions({
       memberId: assignment.to_member_id,
       latestEventType: executionEvents[executionEvents.length - 1]?.event_type,
       eventCount: executionEvents.length,
-    });
+    }));
   });
 
   events.forEach((event) => {
     if (!event.agent_task_id && !event.edge_run_id) return;
-    addOrMerge({
+    addOrMerge(compactRecord<TeamLocalExecution>({
       id: keyFor(event.agent_task_id, event.edge_run_id, `${event.event_seq}`),
       source: 'hubProjection',
       status: event.event_type,
@@ -175,7 +179,7 @@ export function buildTeamLocalExecutions({
       latestEventType: event.event_type,
       eventCount: 1,
       createdAt: event.created_at,
-    });
+    }));
   });
 
   return [...rows.values()].sort((a, b) =>

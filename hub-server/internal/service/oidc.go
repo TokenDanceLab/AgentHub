@@ -284,12 +284,17 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		// Truncate body to avoid logging potentially sensitive token exchange data.
+		bodyPreview := string(body)
+		if len(bodyPreview) > 128 {
+			bodyPreview = bodyPreview[:128] + "...(truncated)"
+		}
 		slog.Error("oidc token endpoint returned non-200",
 			"status", resp.StatusCode,
-			"response_body", string(body),
+			"response_body_preview", bodyPreview,
 			"redirect_uri_sent", redirectURI,
 		)
-		return nil, fmt.Errorf("token endpoint returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("token endpoint returned %d", resp.StatusCode)
 	}
 
 	var tokenResp tokenEndpointResponse

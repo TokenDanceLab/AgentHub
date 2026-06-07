@@ -52,7 +52,7 @@ export default function AgentProfilesSection({ agents, edgeOnline, runnerSummary
               <LocalAgentProfileCard
                 key={`profile-${profile.agent.id}`}
                 agent={profile.agent}
-                alias={profile.alias}
+                {...(profile.alias ? { alias: profile.alias } : {})}
                 route={profile.route}
                 edgeOnline={edgeOnline}
               />
