@@ -119,6 +119,16 @@ export const ThreadItemInfoSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const ThreadPinInfoSchema = z.object({
+  threadId: z.string(),
+  itemId: z.string(),
+  pinnedBy: z.string().optional(),
+  pinnedAt: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  item: ThreadItemInfoSchema.optional(),
+});
+
 // ── Run ─────────────────────────────────────────
 
 export const RunInfoSchema = z.object({
@@ -167,11 +177,11 @@ export const PreviewSchema = z.object({
   createdAt: z.string(),
 });
 
-export function safeParse<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
+export function safeParse<T>(schema: z.ZodTypeAny, data: unknown, label: string): T {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     console.warn(`[schema] ${label} schema drift detected:`, parsed.error.issues, 'raw:', data);
     return data as T;
   }
-  return parsed.data;
+  return parsed.data as T;
 }

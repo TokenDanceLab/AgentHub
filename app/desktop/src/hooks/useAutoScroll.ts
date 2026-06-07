@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, type RefObject } from 'react';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 
 interface UseAutoScrollOptions {
   /** Custom scroll-to-bottom implementation (e.g. virtualizer.scrollToIndex).

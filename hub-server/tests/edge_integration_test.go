@@ -23,12 +23,12 @@ type mockEdgeAgentService struct {
 	handleTaskDoneFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
 	handleTaskFailFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 
-	addAgentFn    func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
+	addAgentFn    func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	triggerTaskFn func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
 	cancelTaskFn  func(ctx context.Context, userID, taskID string) error
 }
 
-func (m *mockEdgeAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
+func (m *mockEdgeAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
 	return m.addAgentFn(ctx, userID, sessionID, agentType, customAgentID, displayName)
 }
 func (m *mockEdgeAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {

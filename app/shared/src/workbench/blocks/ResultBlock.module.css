@@ -1,0 +1,98 @@
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.block {
+  --_agent-inset: var(--agent-inset, 34px);
+  --_bubble-col: var(--bubble-col, 100%);
+
+  width: min(calc(100% - var(--_agent-inset)), var(--_bubble-col));
+  max-width: calc(100% - var(--_agent-inset));
+  margin-left: var(--_agent-inset);
+  padding: 11px 13px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.block:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+/* ── Success / failed state borders and backgrounds ── */
+.completed {
+  border-color: color-mix(in srgb, var(--success) 20%, var(--bdr));
+  background: var(--success-bg);
+}
+
+.completed:hover {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--bdr));
+}
+
+.failed {
+  border-color: color-mix(in srgb, var(--danger) 20%, var(--bdr));
+  background: var(--danger-bg);
+}
+
+.failed:hover {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--bdr));
+}
+
+/* ── Header row ── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  min-height: 22px;
+}
+
+.headTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 0.8125rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.completed .headTitle {
+  color: var(--success);
+}
+
+.failed .headTitle {
+  color: var(--danger);
+}
+
+.headStatus {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  font: 600 0.6875rem var(--font-sans);
+  font-style: normal;
+  flex-shrink: 0;
+}
+
+.statusSuccess {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.statusFailed {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* ── Summary text ── */
+.summary {
+  margin-top: 7px;
+  color: var(--text-2);
+  font: 400 0.75rem/1.55 var(--font-sans);
+}

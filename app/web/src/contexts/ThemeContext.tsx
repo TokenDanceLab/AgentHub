@@ -1,7 +1,16 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import {
+  applyAgentHubTheme,
+  getStoredAgentHubThemeMode,
+  getSystemAgentHubTheme,
+  persistAgentHubThemeMode,
+  resolveAgentHubTheme,
+  type AgentHubTheme,
+  type AgentHubThemeMode,
+} from '@shared/theme';
 
-type Theme = 'dark' | 'light';
-type ThemeMode = Theme | 'system';
+type Theme = AgentHubTheme;
+type ThemeMode = AgentHubThemeMode;
 
 interface ThemeContextValue {
   /** The resolved theme currently applied (dark or light). */
@@ -16,30 +25,20 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = 'agenthub-theme';
-
 function getStoredMode(): ThemeMode {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
-  } catch {
-    /* localStorage unavailable */
-  }
-  return 'dark';
+  return getStoredAgentHubThemeMode();
 }
 
 function getSystemTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  return getSystemAgentHubTheme();
 }
 
 function resolveTheme(mode: ThemeMode): Theme {
-  if (mode === 'system') return getSystemTheme();
-  return mode;
+  return resolveAgentHubTheme(mode);
 }
 
 function applyTheme(theme: Theme) {
-  document.documentElement.setAttribute('data-theme', theme);
+  applyAgentHubTheme(theme);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -49,11 +48,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Persist to localStorage and resolve
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
-    try {
-      localStorage.setItem(STORAGE_KEY, mode);
-    } catch {
-      /* localStorage unavailable */
-    }
+    persistAgentHubThemeMode(mode);
   }, []);
 
   // Keep resolvedTheme in sync with themeMode + system changes

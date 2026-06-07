@@ -1,0 +1,85 @@
+.card {
+  width: 100%;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--bdr);
+  background: var(--surface);
+}
+
+.header {
+  padding: 8px 12px;
+  font: 500 0.75rem var(--font-sans);
+  color: var(--text-2);
+  background: var(--surface-low);
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fileIcon {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.filename {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat {
+  margin-left: auto;
+  font: 400 0.625rem var(--font-mono);
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.line {
+  padding: 4px 12px;
+  font: 400 0.75rem var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  border-left: 0;
+}
+
+.add {
+  composes: line;
+  background: var(--diff-add);
+  color: var(--success);
+}
+
+.add::before {
+  content: "+";
+  display: inline-block;
+  width: 1.1em;
+  opacity: 0.9;
+}
+
+.del {
+  composes: line;
+  background: var(--diff-del);
+  color: var(--danger);
+}
+
+.del::before {
+  content: "-";
+  display: inline-block;
+  width: 1.1em;
+  opacity: 0.9;
+}
+
+.ctx {
+  composes: line;
+  color: var(--text-2);
+  background: transparent;
+}

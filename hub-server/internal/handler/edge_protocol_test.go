@@ -69,8 +69,8 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 				Status:            model.TaskStatusDispatched,
 			}, nil
 		},
-		addAgentFn: func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
-			return nil
+		addAgentFn: func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
+			return &model.AgentInstance{}, nil
 		},
 		handleAckFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 			mu.Lock()
@@ -445,7 +445,7 @@ func TestTaskEventSummaryReturnsRuntimeSummary(t *testing.T) {
 type mockAgentService struct {
 	triggerTaskFn           func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
 	triggerTaskWithTargetFn func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
-	addAgentFn              func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
+	addAgentFn              func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	cancelTaskFn            func(ctx context.Context, userID, taskID string) error
 	handleAckFn             func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
 	handleStreamFn          func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
@@ -455,11 +455,11 @@ type mockAgentService struct {
 	taskRunEventSummaryFn   func(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error)
 }
 
-func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
+func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
 	if m.addAgentFn != nil {
 		return m.addAgentFn(ctx, userID, sessionID, agentType, customAgentID, displayName)
 	}
-	return nil
+	return &model.AgentInstance{}, nil
 }
 func (m *mockAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	if m.triggerTaskWithTargetFn != nil {

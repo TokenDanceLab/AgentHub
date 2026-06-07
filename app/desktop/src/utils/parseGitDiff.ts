@@ -2,7 +2,7 @@
  * Parse unified diff output (from `git diff` / `git diff --cached`) into
  * structured FileDiff objects suitable for DiffViewer rendering.
  */
-import type { FileDiff, DiffHunk, DiffLine } from '@/components/ChatView.types';
+import type { FileDiff, DiffHunk, DiffLine } from '@shared/types/chat';
 
 /**
  * Parses raw unified diff output into an array of FileDiff objects.

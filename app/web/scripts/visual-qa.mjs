@@ -2,7 +2,7 @@ import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const baseUrl = process.env.WEB_QA_URL ?? "http://127.0.0.1:5175/";
+const baseUrl = process.env.WEB_QA_URL ?? "http://127.0.0.1:5174/";
 const outDir = path.resolve("screenshots");
 const desktopViewport = { width: 1440, height: 920 };
 const mobileViewport = { width: 390, height: 844 };

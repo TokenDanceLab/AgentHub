@@ -46,31 +46,31 @@ func (s *AgentService) SetRelayService(relay relayDispatcher) {
 }
 
 // AddAgentToSession adds an agent instance to a session (invite agent into group).
-func (s *AgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
+func (s *AgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
 	session, err := repository.GetSessionByID(s.db, sessionID)
 	if err != nil {
-		return errcode.SessionNotFound
+		return nil, errcode.SessionNotFound
 	}
 	if session.Type != model.SessionTypeGroup {
-		return errcode.ErrBadRequest
+		return nil, errcode.ErrBadRequest
 	}
 	if session.Dissolved {
-		return errcode.SessionDissolved
+		return nil, errcode.SessionDissolved
 	}
 
 	active, _ := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if !active {
-		return errcode.SessionNotMember
+		return nil, errcode.SessionNotMember
 	}
 
 	// validate custom agent if provided
 	if customAgentID != "" {
 		ca, err := repository.GetCustomAgentByID(s.db, customAgentID)
 		if err != nil {
-			return errcode.AgentNotFound
+			return nil, errcode.AgentNotFound
 		}
 		if ca.OwnerUserID != userID {
-			return errcode.AgentNotFound
+			return nil, errcode.AgentNotFound
 		}
 		if agentType == "" {
 			agentType = ca.AgentType
@@ -100,10 +100,10 @@ func (s *AgentService) AddAgentToSession(ctx context.Context, userID, sessionID,
 		return repository.CreateSessionMember(tx, member)
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return ai, nil
 }
 
 // allocateSeq returns the next message sequence number for a session.

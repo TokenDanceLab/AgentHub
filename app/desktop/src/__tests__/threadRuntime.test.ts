@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentInfo } from '@shared/types';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import { inferAgentIdFromThreadMessages } from '@/utils/threadRuntime';
 
 const agents: AgentInfo[] = [

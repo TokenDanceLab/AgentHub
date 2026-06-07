@@ -3,7 +3,7 @@ import { createHubClient, type MessageResponse } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import { getAccessToken } from '@/hooks/useAuth';
 import { HUB_EVENTS } from '@shared/hubEvents';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import {
   hubMessageToChatMessage,
   mergeChatMessages,

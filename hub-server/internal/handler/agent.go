@@ -15,7 +15,7 @@ import (
 
 // AgentService is the subset of *service.AgentService used by AgentHandler.
 type AgentService interface {
-	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
+	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
 	CancelTask(ctx context.Context, userID, taskID string) error
 	HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
@@ -49,7 +49,8 @@ func (h *AgentHandler) AddAgentToSession(c *gin.Context) {
 	}
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
-	if err := h.service.AddAgentToSession(c.Request.Context(), userID, sessionID, req.AgentType, req.CustomAgentID, req.DisplayName); err != nil {
+	agent, err := h.service.AddAgentToSession(c.Request.Context(), userID, sessionID, req.AgentType, req.CustomAgentID, req.DisplayName)
+	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -57,7 +58,7 @@ func (h *AgentHandler) AddAgentToSession(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, nil)
+	OK(c, agent)
 }
 
 type triggerTaskReq struct {

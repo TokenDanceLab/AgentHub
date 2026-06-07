@@ -39,7 +39,7 @@ const IMMessageInput = memo(function IMMessageInput({
         id: `agent:${agent.id}`,
         kind: 'agent' as const,
         label: agent.name,
-        description: agent.description,
+        ...(agent.description ? { description: agent.description } : {}),
         status: agent.status,
         keywords: [agent.id, agent.name, 'agent', 'runtime'],
         replacementText: '',

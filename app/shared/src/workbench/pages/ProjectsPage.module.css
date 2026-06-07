@@ -1,0 +1,976 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   ProjectsPage — v4 Design Tokens
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Root layout: workbench-page pattern ── */
+.page {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  color: var(--text-1);
+  overflow: hidden;
+}
+
+/* ── Left nav (310px) ── */
+.nav {
+  width: 310px;
+  flex: 0 0 310px;
+  padding: 30px 12px 14px;
+  border-right: 1px solid var(--bdr);
+  background: var(--surface-low);
+  overflow-y: auto;
+}
+
+.navTitle {
+  padding: 0;
+  font: 600 1.375rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+}
+
+.navHeader {
+  min-height: 40px;
+  padding: 0 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.search {
+  width: 100%;
+  height: 40px;
+  margin: 0 0 10px;
+  padding: 0 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-1);
+  outline: none;
+  font: 400 0.875rem var(--font-sans);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.search::placeholder {
+  color: var(--text-3);
+}
+
+.search:focus {
+  border-color: var(--bdr-focus);
+  box-shadow: var(--focus-ring);
+}
+
+/* ── Nav caption ── */
+.navCaption {
+  margin: 18px 12px 8px;
+  color: var(--text-3);
+  font: 500 0.75rem var(--font-sans);
+}
+
+/* ── Project nav row ── */
+.navRow {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  margin: 2px 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-1);
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.navRow:hover {
+  background: var(--surface-high);
+  border-color: var(--bdr);
+}
+
+.navRowActive {
+  background: var(--surface-high);
+  border-color: var(--bdr);
+  box-shadow: none;
+  color: var(--text-1);
+}
+
+.navRowIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  background: var(--surface-high);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.navRowActive .navRowIcon {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.navRowIcon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.navRowCopy {
+  min-width: 0;
+}
+
+.navRowName {
+  display: block;
+  font: 600 0.8125rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navRowDesc {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navRowStatus {
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* ── Filter list ── */
+.filterList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filterBtn {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font: 500 0.8125rem var(--font-sans);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.filterBtn:hover,
+.filterBtnActive {
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.filterBtnIcon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.filterBtnIcon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Right main ── */
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 42px;
+  overflow: auto;
+  background: var(--surface);
+}
+
+/* ── Detail head ── */
+.detailHead {
+  min-height: 58px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.detailHead h1 {
+  font: 650 1.5rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.detailHead p {
+  margin-top: 4px;
+  color: var(--text-2);
+  font: 400 0.875rem var(--font-sans);
+}
+
+/* ── Head actions ── */
+.headActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.statusBadge {
+  padding: 4px 9px;
+  border-radius: var(--r-full);
+  color: var(--primary);
+  background: var(--primary-light);
+  font: 600 0.75rem var(--font-sans);
+  white-space: nowrap;
+}
+
+.newProjectBtn {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 148px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--primary);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--primary);
+  font: 500 0.875rem var(--font-sans);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--dur-normal) var(--ease);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.newProjectBtn:hover {
+  background: var(--primary-light);
+  box-shadow: var(--e-1);
+}
+
+.newProjectBtn:active {
+  box-shadow: none;
+}
+
+.navNewProjectBtn {
+  height: 30px;
+  padding: 0 10px;
+  border-color: var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: 0.75rem;
+}
+
+/* ── Tabs ── */
+.tabs {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--bdr);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tabBtn {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 37px;
+  padding: 0 1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 0.8125rem var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.tabBtn svg {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tabBtn:hover {
+  color: var(--text-1);
+}
+
+.tabBtnActive {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ── Detail layout grid ── */
+.detailLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+  gap: 12px;
+  max-width: 1180px;
+}
+
+/* ── Announcement (full width) ── */
+.announcement {
+  grid-column: 1 / -1;
+  min-height: 52px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 94%, var(--primary-light) 6%);
+  box-shadow: var(--e-1);
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.announcementMark {
+  width: 20px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--state-thinking);
+  flex-shrink: 0;
+}
+
+.announcementBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.announcementLabel {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 0.8125rem var(--font-sans);
+}
+
+.announcementLabel svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -2px;
+}
+
+.announcementText {
+  min-width: 0;
+  color: var(--text-2);
+  font: 400 0.8125rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.announcementEditBtn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--primary);
+  font: 600 0.75rem var(--font-sans);
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition:
+    background var(--dur-normal) var(--ease);
+}
+
+.announcementEditBtn:hover {
+  background: var(--primary-light);
+}
+
+/* ── Members card (full width) ── */
+.membersCard {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--e-1);
+}
+
+.sectionHead {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.sectionHead h2 {
+  font: 600 0.9375rem var(--font-sans);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sectionHead h2 svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -2px;
+}
+
+.sectionHead span {
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+}
+
+.memberChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.memberChip {
+  min-height: 30px;
+  padding: 3px 7px 3px 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-low);
+  border: 1px solid var(--bdr);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 0.6875rem var(--font-sans);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.memberChip[data-profile-kind='agent'] {
+  background: color-mix(in srgb, var(--surface) 86%, var(--member-avatar-color, var(--primary)) 14%);
+}
+
+.memberAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  background: var(--member-avatar-color, var(--surface-highest));
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 650 0.625rem/1 var(--font-sans);
+  letter-spacing: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 26%, transparent);
+  flex-shrink: 0;
+}
+
+.memberName {
+  max-width: 118px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberKind {
+  color: var(--text-3);
+  font: 500 0.625rem var(--font-sans);
+  font-style: normal;
+}
+
+.profilePill {
+  width: 92px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-sans);
+}
+
+.profileAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-full);
+  background: var(--profile-avatar-color, var(--surface-highest));
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 650 0.5625rem/1 var(--font-sans);
+  letter-spacing: 0;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 24%, transparent);
+}
+
+.profilePill[data-profile-kind='user'] .profileAvatar {
+  color: var(--text-3);
+}
+
+.profileName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Detail panel (left / right columns) ── */
+.detailPanel {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
+  box-shadow: var(--e-1);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+/* ── Runs panel ── */
+.runsPanel {
+  min-height: 202px;
+}
+
+/* ── State dot ── */
+.stateDot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-full);
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+
+.stateRunning {
+  background: var(--state-running);
+}
+
+.stateCompleted,
+.stateReady {
+  background: var(--success);
+}
+
+.stateThinking {
+  background: var(--state-thinking);
+}
+
+.stateWaiting,
+.stateQueued {
+  background: var(--warning);
+}
+
+.stateFailed {
+  background: var(--state-failed);
+}
+
+.stateCancelled {
+  background: var(--state-cancelled);
+}
+
+/* ── Run row ── */
+.runRow {
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  min-height: 38px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-1);
+  font-family: inherit;
+  border: 1px solid transparent;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    background var(--dur-normal) var(--ease);
+}
+
+.runRow:hover {
+  background: var(--surface-low);
+  border-color: var(--bdr);
+}
+
+.runRow + .runRow {
+  margin-top: 2px;
+}
+
+.runName {
+  flex: 1;
+  min-width: 0;
+  font: 500 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runOwner {
+  width: 76px;
+  color: var(--text-2);
+  font: 400 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runMeta {
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+  font-style: normal;
+}
+
+/* ── Artifact row ── */
+.artifactRow {
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  min-height: 38px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-1);
+  font-family: inherit;
+  border: 1px solid transparent;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    background var(--dur-normal) var(--ease);
+}
+
+.artifactRow:hover {
+  background: var(--surface-low);
+  border-color: var(--bdr);
+}
+
+.artifactRow + .artifactRow {
+  margin-top: 2px;
+}
+
+.fileIcon {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.fileIcon svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+.artifactName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 0.75rem var(--font-sans);
+}
+
+/* ── Feed panel (full width) ── */
+.feedPanel {
+  grid-column: 1 / -1;
+}
+
+.previewPanel {
+  grid-column: 1 / -1;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
+  overflow: hidden;
+  box-shadow: var(--e-1);
+}
+
+.previewHead {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.previewHead div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.previewHead span,
+.previewHead em {
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.previewHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-1);
+  font: 600 0.8125rem var(--font-sans);
+}
+
+.feedRow {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--bdr);
+  color: var(--text-2);
+  font: 400 0.75rem var(--font-sans);
+}
+
+.feedRow:first-child {
+  border-top: 0;
+}
+
+.sectionHead + .feedRow {
+  border-top: 0;
+}
+
+.feedTime {
+  width: 42px;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-mono);
+  flex-shrink: 0;
+}
+
+/* ── Tab detail rows ── */
+.summaryRows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryRow,
+.metaRow,
+.archiveRow,
+.settingRow {
+  min-height: 38px;
+  padding: 7px 8px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-1);
+  font-family: inherit;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
+}
+
+.summaryRow:hover,
+.metaRow:hover,
+.archiveRow:hover,
+.settingRow:hover {
+  background: var(--surface-low);
+  border-color: var(--bdr);
+}
+
+.summaryRow strong,
+.archiveRow strong {
+  flex: 1;
+  min-width: 0;
+  font: 500 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryRow em,
+.archiveRow em {
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.metaRow span {
+  width: 24px;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-mono);
+  flex-shrink: 0;
+}
+
+.metaRow strong {
+  width: 82px;
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow em {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1);
+  font: 500 0.75rem var(--font-sans);
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archiveRow small {
+  width: 88px;
+  color: var(--text-2);
+  font: 400 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsPanel {
+  min-height: 202px;
+}
+
+.settingRow {
+  min-height: 38px;
+  justify-content: space-between;
+}
+
+.settingRow + .settingRow {
+  margin-top: 2px;
+}
+
+.settingRow div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settingRow strong,
+.settingRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingRow strong {
+  font: 500 0.75rem var(--font-sans);
+}
+
+.settingRow small {
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+}
+
+.settingRow span {
+  max-width: 46%;
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.settingsSidePanel {
+  min-height: 202px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search,
+  .navRow,
+  .navRowIcon,
+  .filterBtn,
+  .newProjectBtn,
+  .tabBtn,
+  .announcement,
+  .announcementEditBtn,
+  .memberChip,
+  .detailPanel,
+  .runRow,
+  .artifactRow,
+  .summaryRow,
+  .metaRow,
+  .archiveRow,
+  .settingRow {
+    transition: none;
+  }
+}
