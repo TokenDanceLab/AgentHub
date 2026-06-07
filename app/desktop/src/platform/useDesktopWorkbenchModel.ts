@@ -79,8 +79,8 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
 
   const liveModel = {
     activeConversationId,
-    activeProjectId: activeThread?.projectId,
-    activeThreadId: activeThread?.threadId,
+    ...(activeThread?.projectId ? { activeProjectId: activeThread.projectId } : {}),
+    ...(activeThread?.threadId ? { activeThreadId: activeThread.threadId } : {}),
     conversations,
     transcript,
   };

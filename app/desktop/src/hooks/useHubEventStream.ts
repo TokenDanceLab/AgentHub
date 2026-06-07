@@ -56,7 +56,10 @@ export function useHubEventStream(
   const [hubWS, setHubWS] = useState<HubWSHandle | null>(null);
 
   useEffect(() => {
-    const handle = createHubWS({ getToken, url });
+    const handle = createHubWS({
+      getToken,
+      ...(url ? { url } : {}),
+    });
     handleRef.current = handle;
     queueMicrotask(() => setHubWS(handle));
 

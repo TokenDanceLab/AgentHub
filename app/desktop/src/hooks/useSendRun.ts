@@ -144,14 +144,15 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
         }
         queryClient.invalidateQueries({ queryKey: ['threads'] });
       }
+      const modelSettingsInput = {
+        ...(opts?.model ? { model: opts.model } : {}),
+        ...(opts?.provider ? { provider: opts.provider } : {}),
+        ...(opts?.modelAlias ? { modelAlias: opts.modelAlias } : {}),
+        ...(opts?.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
+      };
       const req: StartRunRequest = {
         prompt,
-        ...useModelSettingsStore.getState().resolveRunRequestOptions({
-          model: opts?.model,
-          provider: opts?.provider,
-          modelAlias: opts?.modelAlias,
-          reasoningEffort: opts?.reasoningEffort,
-        }),
+        ...useModelSettingsStore.getState().resolveRunRequestOptions(modelSettingsInput),
       };
       const customInstructions = readCustomInstructions();
       if (customInstructions) req.appendSystemPrompt = customInstructions;
@@ -184,13 +185,13 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
       const wasManuallyNamedThread = Boolean(renameThreadId && manuallyNamedThreadIdsRef.current.has(renameThreadId));
       const canAutoRenameThread = canAutoRenameThreadTitle({
         createdThreadForPrompt,
-        currentThreadItemCount,
+        ...(currentThreadItemCount !== undefined ? { currentThreadItemCount } : {}),
         manuallyNamedThread: wasManuallyNamedThread,
         locallyCreatedEmptyThread: wasLocallyCreatedEmptyThread,
       });
       const autoTitle = canAutoRenameThread
         ? getAutomaticThreadTitle({
-          currentTitle: requestThread?.title,
+          ...(requestThread?.title ? { currentTitle: requestThread.title } : {}),
           prompt,
           runtimeNames,
         })

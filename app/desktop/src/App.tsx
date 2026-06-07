@@ -10,8 +10,8 @@ export default function App() {
   const workbench = useDesktopWorkbenchModel(selectedConversationId);
   const createRun = useCreateRun();
   const desktopPlatform = useMemo(() => createDesktopPlatform({
-    activeProjectId: workbench.activeProjectId,
-    activeThreadId: workbench.activeThreadId,
+    ...(workbench.activeProjectId ? { activeProjectId: workbench.activeProjectId } : {}),
+    ...(workbench.activeThreadId ? { activeThreadId: workbench.activeThreadId } : {}),
     submitRun: createRun.mutateAsync,
   }), [createRun.mutateAsync, workbench.activeProjectId, workbench.activeThreadId]);
 

@@ -126,9 +126,9 @@ export function useThreadNavigation(deps: UseThreadNavigationDeps): UseThreadNav
       queryClient.invalidateQueries({ queryKey: ['threads'] });
       const draft = buildForkDraft({
         sourceTitle,
-        sourceThreadId: selectedThreadId,
+        ...(selectedThreadId ? { sourceThreadId: selectedThreadId } : {}),
         messages: allMessages,
-        messageId,
+        ...(messageId ? { messageId } : {}),
       });
       setPendingComposerDraft(draft);
       addToast({ type: 'success', message: t('toast.forkCreated') });

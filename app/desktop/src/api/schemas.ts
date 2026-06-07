@@ -177,11 +177,11 @@ export const PreviewSchema = z.object({
   createdAt: z.string(),
 });
 
-export function safeParse<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
+export function safeParse<T>(schema: z.ZodTypeAny, data: unknown, label: string): T {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     console.warn(`[schema] ${label} schema drift detected:`, parsed.error.issues, 'raw:', data);
     return data as T;
   }
-  return parsed.data;
+  return parsed.data as T;
 }
