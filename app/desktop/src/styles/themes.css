@@ -4,8 +4,21 @@
    Primary: blue (#6985e8 dark / #5063e8 light)
    ═════════════════════════════════════════════════════════════════════ */
 
+html[data-theme-sync='true'],
+html[data-theme-sync='true'] *,
+html[data-theme-sync='true'] *::before,
+html[data-theme-sync='true'] *::after {
+  transition-property: none !important;
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+  animation-duration: 0ms !important;
+  animation-delay: 0ms !important;
+}
+
 /* ── Dark Theme ──────────────────────────────────────────────────────── */
 [data-theme='dark'] {
+  color-scheme: dark;
+
   /* Core surface */
   --app-bg: #1a1a20;
   --background: #1a1a20;
@@ -181,6 +194,8 @@
 /* ── Light Theme (default) ───────────────────────────────────────────── */
 :root:not([data-theme='dark']),
 [data-theme='light'] {
+  color-scheme: light;
+
   /* Core surface */
   --app-bg: #f7f6f9;
   --background: #f7f6f9;
