@@ -98,7 +98,7 @@
 .input:focus,
 .textarea:focus {
   outline: none;
-  border-color: var(--color-primary, #6366f1);
+  border-color: var(--color-primary, #0071BC);
 }
 
 .textarea {
@@ -115,7 +115,7 @@
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
-  background: var(--color-primary, #6366f1);
+  background: var(--color-primary, #0071BC);
   color: var(--primary-foreground);
   cursor: pointer;
   transition: opacity 0.15s;
@@ -174,7 +174,7 @@
 .teamItem:hover { background: var(--color-surface-variant, rgba(255, 255, 255, 0.03)); }
 .teamItemActive {
   background: var(--color-surface-variant, rgba(255, 255, 255, 0.04));
-  border-bottom-color: var(--color-primary, #6366f1);
+  border-bottom-color: var(--color-primary, #0071BC);
 }
 
 .teamItemHeader {
@@ -366,8 +366,8 @@
 .tab:hover { color: var(--color-text, #e5e7eb); }
 
 .tabActive {
-  color: var(--color-primary, #6366f1);
-  border-bottom-color: var(--color-primary, #6366f1);
+  color: var(--color-primary, #0071BC);
+  border-bottom-color: var(--color-primary, #0071BC);
 }
 
 .badge {

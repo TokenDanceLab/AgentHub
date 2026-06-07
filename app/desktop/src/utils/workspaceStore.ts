@@ -9,6 +9,10 @@ const STORAGE_KEY = 'agenthub.workspaces.recent';
 const WORK_DIR_STORAGE_KEY = 'agenthub.prompt.workDir';
 const MAX_ENTRIES = 10;
 
+function compactRecord<T>(value: Record<string, unknown>): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 function normalizePath(value: string): string {
   return (value ?? '').trim().replace(/^["']|["']$/g, '').trim();
 }
@@ -35,7 +39,7 @@ export function readRecentWorkspaces(): WorkspaceEntry[] {
           typeof (item as WorkspaceEntry).path === 'string' &&
           (item as WorkspaceEntry).path.trim().length > 0,
       )
-      .map((item) => ({
+      .map((item) => compactRecord<WorkspaceEntry>({
         name: item.name || pathBasename(item.path),
         path: normalizePath(item.path),
         lastOpenedAt: typeof item.lastOpenedAt === 'number' ? item.lastOpenedAt : Date.now(),
@@ -65,12 +69,12 @@ export function addRecentWorkspace(entry: Pick<WorkspaceEntry, 'path'> & Partial
   const existing = readRecentWorkspaces();
   const filtered = existing.filter((item) => !samePath(item.path, normalized));
 
-  const newEntry: WorkspaceEntry = {
+  const newEntry: WorkspaceEntry = compactRecord<WorkspaceEntry>({
     name: entry.name || pathBasename(normalized),
     path: normalized,
     lastOpenedAt: Date.now(),
     branch: entry.branch,
-  };
+  });
 
   const next = [newEntry, ...filtered].slice(0, MAX_ENTRIES);
   writeRecentWorkspaces(next);
@@ -194,11 +198,11 @@ export function readWorkspaceSettings(workspacePath: string): WorkspaceSettings 
     const parsed: unknown = JSON.parse(raw);
     if (parsed == null || typeof parsed !== 'object') return {};
     const obj = parsed as Record<string, unknown>;
-    return {
+    return compactRecord<WorkspaceSettings>({
       defaultModel: typeof obj.defaultModel === 'string' ? obj.defaultModel : undefined,
       permissionMode: typeof obj.permissionMode === 'string' ? obj.permissionMode : undefined,
       customInstructions: typeof obj.customInstructions === 'string' ? obj.customInstructions : undefined,
-    };
+    });
   } catch {
     return {};
   }
@@ -262,19 +266,20 @@ export async function syncWorkspacesToBackend(): Promise<void> {
     const workspaces = readRecentWorkspaces();
     const entries: RustWorkspaceStoreEntry[] = workspaces.map((ws) => {
       const settings = readWorkspaceSettings(ws.path);
-      return {
+      const rustSettings = (settings.defaultModel || settings.permissionMode || settings.customInstructions)
+        ? compactRecord<NonNullable<RustWorkspaceStoreEntry['settings']>>({
+            default_model: settings.defaultModel,
+            permission_mode: settings.permissionMode,
+            custom_instructions: settings.customInstructions,
+          })
+        : undefined;
+      return compactRecord<RustWorkspaceStoreEntry>({
         name: ws.name,
         path: ws.path,
         last_opened_at: ws.lastOpenedAt,
         branch: ws.branch,
-        settings: (settings.defaultModel || settings.permissionMode || settings.customInstructions)
-          ? {
-              default_model: settings.defaultModel,
-              permission_mode: settings.permissionMode,
-              custom_instructions: settings.customInstructions,
-            }
-          : undefined,
-      };
+        settings: rustSettings,
+      });
     });
     await invoke('write_workspace_store', { data: { workspaces: entries } });
   } catch {
@@ -298,19 +303,19 @@ export async function restoreWorkspacesFromBackend(): Promise<void> {
 
     for (const entry of data.workspaces) {
       if (!entry.path || existingPaths.has(entry.path.toLowerCase())) continue;
-      const ws: WorkspaceEntry = {
+      const ws: WorkspaceEntry = compactRecord<WorkspaceEntry>({
         name: entry.name || pathBasename(entry.path),
         path: normalizePath(entry.path),
         lastOpenedAt: entry.last_opened_at || Date.now(),
         branch: entry.branch,
-      };
+      });
       existing.push(ws);
       if (entry.settings) {
-        writeWorkspaceSettings(entry.path, {
+        writeWorkspaceSettings(entry.path, compactRecord<WorkspaceSettings>({
           defaultModel: entry.settings.default_model,
           permissionMode: entry.settings.permission_mode,
           customInstructions: entry.settings.custom_instructions,
-        });
+        }));
       }
     }
     if (existing.length > 0) {

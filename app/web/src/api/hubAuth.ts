@@ -53,13 +53,6 @@ interface BrowserOIDCPending {
   createdAt: number;
 }
 
-// ── Tauri detect ─────────────────────────────────
-
-type TauriWindow = Window & { __TAURI_INTERNALS__?: unknown };
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && typeof (window as TauriWindow).__TAURI_INTERNALS__ !== 'undefined';
-}
-
 // ── PKCE helpers ──────────────────────────────────
 
 function generateCodeVerifier(): string {
@@ -271,7 +264,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
         authorizeResp = await authClient.oidcAuthorize({
           code_challenge: codeChallenge,
           code_challenge_method: 'S256',
-          device_type: isTauri() ? 'desktop' : 'web',
+          device_type: 'web',
           device_id: deviceId,
           redirect_uri: redirectUri,
         });
@@ -335,7 +328,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
             browserCallback.code,
             browserCallback.state,
             pending.codeVerifier,
-            isTauri() ? 'desktop' : 'web',
+            'web',
             pending.deviceId,
             pending.redirectUri,
           );

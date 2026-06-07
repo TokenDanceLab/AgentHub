@@ -7,7 +7,7 @@
     0 14px 34px rgba(15, 23, 42, 0.045);
   --settings-chip-bg: rgba(0, 0, 0, 0.04);
   --settings-chip-border: rgba(0, 0, 0, 0.06);
-  --settings-icon-bg: rgba(99, 102, 241, 0.13);
+  --settings-icon-bg: rgba(0, 113, 188, 0.13);
   --settings-sidebar-bg: rgba(246, 246, 248, 0.72);
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
@@ -27,7 +27,7 @@
     0 18px 44px rgba(0, 0, 0, 0.16);
   --settings-chip-bg: rgba(255, 255, 255, 0.04);
   --settings-chip-border: rgba(255, 255, 255, 0.05);
-  --settings-icon-bg: rgba(99, 102, 241, 0.16);
+  --settings-icon-bg: rgba(0, 113, 188, 0.16);
   --settings-sidebar-bg: rgba(22, 22, 28, 0.72);
   background: var(--app-bg);
 }
@@ -335,7 +335,7 @@
   width: fit-content;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(99, 102, 241, 0.12);
+  background: rgba(0, 113, 188, 0.12);
   color: var(--primary);
   font-size: 11px;
   font-style: normal;
@@ -681,8 +681,8 @@
 
 .modeCardActive,
 [data-theme='dark'] .modeCardActive {
-  border-color: rgba(99, 102, 241, 0.34);
-  background: rgba(99, 102, 241, 0.13);
+  border-color: rgba(0, 113, 188, 0.34);
+  background: rgba(0, 113, 188, 0.13);
 }
 
 .modeCard span {
@@ -1137,9 +1137,9 @@
   gap: 12px;
   padding: 14px 16px;
   margin-top: 12px;
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(0, 113, 188, 0.2);
   border-radius: 12px;
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(0, 113, 188, 0.08);
   color: var(--foreground);
   font-size: 13px;
   line-height: 1.4;

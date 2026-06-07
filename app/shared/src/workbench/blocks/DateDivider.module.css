@@ -1,0 +1,8 @@
+.divider {
+  text-align: center;
+  font: 400 0.625rem var(--font-sans);
+  color: var(--text-3);
+  padding: 4px 0;
+  width: var(--chat-col, min(100%, 820px));
+  align-self: center;
+}

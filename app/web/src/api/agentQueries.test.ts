@@ -96,14 +96,14 @@ describe('web agent profile queries', () => {
     });
   });
 
-  it('keeps the explicit preview fallback when there is no Hub token', async () => {
+  it('returns an empty list without calling Hub when there is no Hub token', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     const res = await fetchAgentList(true);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(res.items).toHaveLength(3);
-    expect(res.items[0]?.name).toBe('Claude Code');
+    expect(res.items).toHaveLength(0);
+    expect(res.page.hasMore).toBe(false);
   });
 });

@@ -69,6 +69,15 @@ function parseRecord(value: unknown): Record<string, unknown> {
   }
 }
 
+function compactRecord<T>(value: Record<string, unknown>): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
+function edgeRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): RequestInit {
+  const headers = edgeAuthHeaders(baseHeaders);
+  return headers ? { ...init, headers } : init;
+}
+
 /** Extract a string value that may be in a legacy DispatchPayload shape. */
 function getString(data: Record<string, unknown>, key: string): string {
   const v = data[key];
@@ -133,7 +142,7 @@ function normalizeRouteDecision(value: unknown): CoordinatorRouteDecision | null
     return null;
   }
 
-  return {
+  return compactRecord<CoordinatorRouteDecision>({
     action,
     next_worker: getFirstString(source.next_worker, source.nextWorker),
     instructions: getFirstString(source.instructions),
@@ -144,7 +153,7 @@ function normalizeRouteDecision(value: unknown): CoordinatorRouteDecision | null
     summary: getFirstString(source.summary),
     blocked_reason: getFirstString(source.blocked_reason, source.blockedReason),
     correlation_id: getFirstString(source.correlation_id, source.correlationId),
-  };
+  });
 }
 
 function routeDecisionFromRuntimePayload(payload: Record<string, unknown>): CoordinatorRouteDecision | null {
@@ -182,11 +191,11 @@ function getTeamRouteContext(task: AgentTask): TeamRouteContext | null {
   const teamId = getFirstString(data.team_id, data.teamId, nested.team_id, nested.teamId);
   const teamRunId = getFirstString(data.team_run_id, data.teamRunId, nested.team_run_id, nested.teamRunId);
   if (!teamId || !teamRunId) return null;
-  return {
+  return compactRecord<TeamRouteContext>({
     teamId,
     teamRunId,
     teamMemberRole: getFirstString(data.team_member_role, data.teamMemberRole, nested.team_member_role, nested.teamMemberRole),
-  };
+  });
 }
 
 function routeDecisionKey(taskId: string, decision: CoordinatorRouteDecision): string {
@@ -217,12 +226,12 @@ function parsePermissionDecisionControl(payload: unknown): EdgePermissionDecisio
     return null;
   }
 
-  return {
+  return compactRecord<EdgePermissionDecisionControl>({
     runId,
     requestId,
     decision,
     reason: getFirstString(source.reason, data.reason),
-  };
+  });
 }
 
 function permissionDecisionControlKey(control: EdgePermissionDecisionControl): string {
@@ -238,11 +247,10 @@ async function postEdgePermissionDecision(
   edgeBaseUrl: string,
   control: EdgePermissionDecisionControl,
 ): Promise<void> {
-  const resp = await fetch(`${edgeBaseUrl}/v1/permissions/decide`, {
+  const resp = await fetch(`${edgeBaseUrl}/v1/permissions/decide`, edgeRequestInit({
     method: 'POST',
-    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(control),
-  });
+  }, { 'Content-Type': 'application/json' }));
   if (!resp.ok) {
     const errorText = await resp.text().catch(() => 'Unknown error');
     throw new Error(`Edge POST /v1/permissions/decide returned ${resp.status}: ${errorText}`);
@@ -265,7 +273,7 @@ function buildEdgeRunBody(data: Record<string, unknown>, threadId: string, promp
     ?? parseStringArray(modelParams.allowed_tools)
     ?? parseStringArray(modelParams.allowedTools);
 
-  return {
+  return compactRecord<Record<string, unknown>>({
     threadId,
     prompt: prompt || undefined,
     agentId: agentId || undefined,
@@ -282,19 +290,18 @@ function buildEdgeRunBody(data: Record<string, unknown>, threadId: string, promp
     allowedTools,
     configOverrides: parseStringRecord(modelParams.config_overrides) ?? parseStringRecord(modelParams.configOverrides),
     ephemeral: getFirstBoolean(modelParams.ephemeral, data.ephemeral),
-  };
+  });
 }
 
 async function ensureEdgeThread(edgeBaseUrl: string, threadId: string, title: string): Promise<void> {
-  const resp = await fetch(`${edgeBaseUrl}/v1/threads`, {
+  const resp = await fetch(`${edgeBaseUrl}/v1/threads`, edgeRequestInit({
     method: 'POST',
-    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       projectId: 'proj_local',
       threadId,
       title,
     }),
-  });
+  }, { 'Content-Type': 'application/json' }));
   if (!resp.ok) {
     const errorText = await resp.text().catch(() => 'Unknown error');
     throw new Error(`Edge POST /v1/threads returned ${resp.status}: ${errorText}`);
@@ -547,11 +554,10 @@ export function useHubIntegration(
           getString(data, 'display_name') || 'Hub dispatch',
         );
 
-        const runResp = await fetch(`${edgeBaseUrl}/v1/runs`, {
+        const runResp = await fetch(`${edgeBaseUrl}/v1/runs`, edgeRequestInit({
           method: 'POST',
-          headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(buildEdgeRunBody(data, threadId, prompt, agentId)),
-        });
+        }, { 'Content-Type': 'application/json' }));
 
         if (!runResp.ok) {
           const errorText = await runResp.text().catch(() => 'Unknown error');
@@ -595,10 +601,9 @@ export function useHubIntegration(
       if (!runId) return;
 
       try {
-        await fetch(`${edgeBaseUrl}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
+        await fetch(`${edgeBaseUrl}/v1/runs/${encodeURIComponent(runId)}:cancel`, edgeRequestInit({
           method: 'POST',
-          headers: edgeAuthHeaders(),
-        });
+        }));
         store.getState().updateTask(taskId, {
           status: 'failed',
           error: 'Cancelled by Hub',

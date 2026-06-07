@@ -8,12 +8,14 @@ export interface SelectProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  ariaLabel?: string;
 }
 
-export function Select({ value, options, onChange, placeholder, className }: SelectProps) {
+export function Select({ value, options, onChange, placeholder, className, ariaLabel }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [focusIdx, setFocusIdx] = useState(0);
   const [position, setPosition] = useState<'down' | 'up'>('down');
+  const [triggerWidth, setTriggerWidth] = useState(158);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
@@ -44,6 +46,7 @@ export function Select({ value, options, onChange, placeholder, className }: Sel
   useEffect(() => {
     if (!open || !triggerRef.current) return;
     const anchorRect = triggerRef.current.getBoundingClientRect();
+    setTriggerWidth(anchorRect.width);
     const spaceBelow = window.innerHeight - anchorRect.bottom;
     // Estimate panel height ~ 40px * min(6, options.length) + 16px padding
     const approxPanelH = Math.min(6, options.length) * 40 + 16;
@@ -104,6 +107,7 @@ export function Select({ value, options, onChange, placeholder, className }: Sel
         onKeyDown={handleKey}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel}
       >
         <span className={selectedLabel ? styles.label : styles.placeholder}>
           {selectedLabel || placeholder || ' '}
@@ -131,6 +135,8 @@ export function Select({ value, options, onChange, placeholder, className }: Sel
                 ? {
                     position: 'absolute',
                     left: triggerRef.current.getBoundingClientRect().left,
+                    minWidth: triggerWidth,
+                    width: triggerWidth,
                     [position === 'up' ? 'bottom' : 'top']:
                       position === 'up'
                         ? window.innerHeight - triggerRef.current.getBoundingClientRect().top + 6

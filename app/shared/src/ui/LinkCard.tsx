@@ -1,9 +1,17 @@
 import { ExternalLink, Globe } from 'lucide-react';
-import type { MessageBlock } from '../types/chat';
 import styles from './LinkCard.module.css';
 
+interface LinkCardBlock {
+  kind: 'link_card';
+  url: string;
+  title?: string | undefined;
+  siteName?: string | undefined;
+  description?: string | undefined;
+  thumbnailUrl?: string | undefined;
+}
+
 interface Props {
-  block: Extract<MessageBlock, { kind: 'link_card' }>;
+  block: LinkCardBlock;
 }
 
 export default function LinkCard({ block }: Props) {

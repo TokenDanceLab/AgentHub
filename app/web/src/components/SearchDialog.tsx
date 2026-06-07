@@ -4,7 +4,7 @@ import { Search, User, Bot } from 'lucide-react';
 import { EmptyState, SelectableRow } from '@shared/ui';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import styles from './SearchDialog.module.css';
 
 interface Props {
