@@ -277,16 +277,17 @@ describe('AgentHubWorkbench', () => {
     const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
 
     expect(inspector.getByRole('button', { name: '任务' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('Run v4')).toBeInTheDocument();
-    expect(screen.getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
+    expect(screen.getByText('生成迁移顺序与回滚脚本')).toBeInTheDocument();
+    expect(screen.getAllByText('sqlite-migration-plan.md').length).toBeGreaterThan(0);
     expect(inspector.getByRole('button', { name: '产物' })).toHaveAttribute('aria-expanded', 'true');
 
-    fireEvent.click(inspector.getByRole('button', { name: '打开 app/shared/src/workbench/RightInspector.tsx 只读预览' }));
+    fireEvent.click(inspector.getByRole('button', { name: '打开 sqlite-migration-plan.md 只读预览' }));
     expect(screen.getByRole('tab', { name: /文件/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('region', {
-      name: 'app/shared/src/workbench/RightInspector.tsx 只读预览',
+      name: 'sqlite-migration-plan.md 只读预览',
     })).toBeInTheDocument();
-    expect(screen.getByText('builder')).toBeInTheDocument();
+    expect(screen.getAllByText('sqlite-migration-plan.md').length).toBeGreaterThan(0);
+    expect(screen.getByText('只读 · MD')).toBeInTheDocument();
     expect(screen.getByText('Read only')).toBeInTheDocument();
     expect(openEvidence).not.toHaveBeenCalledWith(expect.objectContaining({
       id: 'ev-file',
