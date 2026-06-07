@@ -22,7 +22,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { TeamArtifactState } from '@/api/hubClient';
-import type { ChatMessage, MessageBlock } from './ChatView.types';
+import type { ChatMessage, MessageBlock } from '@shared/types/chat';
 import styles from './ArtifactBrowser.module.css';
 
 // ── Types ──────────────────────────────────────

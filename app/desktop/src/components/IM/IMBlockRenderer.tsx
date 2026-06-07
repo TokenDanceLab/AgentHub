@@ -23,7 +23,7 @@ import {
   Package,
   Rocket,
 } from 'lucide-react';
-import type { MessageBlock, ToolResultBlock, FileDiff, DiffLine } from '../ChatView.types';
+import type { MessageBlock, ToolResultBlock, FileDiff, DiffLine } from '@shared/types/chat';
 import MarkdownRenderer from '../MarkdownRenderer';
 import { formatBytes } from '@/utils/attachment';
 import styles from './IMBlockRenderer.module.css';

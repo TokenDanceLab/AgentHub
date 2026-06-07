@@ -1,6 +1,6 @@
 import { Reply, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ReplyTarget } from './ChatView.types';
+import type { ReplyTarget } from '@shared/types/chat';
 import styles from './ReplyPreviewBar.module.css';
 
 interface Props {
