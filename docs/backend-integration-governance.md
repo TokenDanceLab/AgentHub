@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 02:52 +08:00
+> 最后更新：2026-06-08 03:22 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -82,8 +82,8 @@ next: <1-3 steps>
 
 1. **B. Hub callback 错误脱敏**：已合入 `dev/delicious233`，提交 `9d43b18d fix(edge): redact hub callback response bodies`。范围只有 `edge-server/internal/hub/callback.go` 和 `edge-server/internal/hub/callback_test.go`；验证 `go test ./internal/hub -count=1` 和 `edge-server go test ./... -short -count=1` 通过。
 2. **A0+A. Codex adapter 运行时修复 + 启动日志脱敏**：已在 `codex/integrate-codex-adapter` 集成分支提交 `3de37f25 fix(edge): harden codex adapter runtime events`。范围为 `api/events.md`、Codex adapter、file_change/path-safety、lifecycle parser context、argv/command 日志摘要和 cmd skills-dir 传播；验证 focused Go tests、`go test ./internal/adapters ./internal/lifecycle ./internal/httpserver ./cmd/agenthub-edge -short -count=1`、`edge-server go test ./... -short -count=1`、`git diff --cached --check` 通过。真实 Codex smoke 尚未重跑，只能作为 readiness gate，不能宣称 runtime production-ready。
-3. **C1. Edge runtime smoke 脚本硬化**：下一片只合 `scripts/edge-runtime-smoke.ps1`、`scripts/integration-e2e.ps1`、`tests/scripts/edge-runtime-smoke.ps1`。验证脚本测试，不和 adapter 改动混在一起。
-4. **C2. OIDC 诊断脱敏**：再合 `scripts/verify-oidc-flow.ps1`、`tests/scripts/verify-oidc-flow.ps1`。脚本本体可能访问本地 TD/Hub 服务，主线验证先跑 fake/static harness。
+3. **C1. Edge runtime smoke 脚本硬化**：已在 `codex/integrate-backend-c-scripts` 提交 `32cd688a test(scripts): harden edge runtime smoke gate`。范围只有 `scripts/edge-runtime-smoke.ps1`、`scripts/integration-e2e.ps1`、`tests/scripts/edge-runtime-smoke.ps1`；默认行为改为 CI-safe fake process fixture，真实 CLI/model 只能显式传 `-RealCli` opt-in，`-SkipCli` 仅保留兼容语义。验证 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\edge-runtime-smoke.ps1` 和 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\edge-runtime-smoke.ps1 -Port 34990 -TimeoutSec 20` 通过。
+4. **C2. OIDC 诊断脱敏**：已在 `codex/integrate-backend-c-scripts` 提交 `09aef187 test(oidc): redact diagnostics output`。范围只有 `scripts/verify-oidc-flow.ps1`、`tests/scripts/verify-oidc-flow.ps1`；OIDC env 和 authorization URL 诊断只输出脱敏摘要，`RepoRoot` 默认初始化已移出 `param()` 并覆盖“不传 `-RepoRoot`”回归。验证 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-oidc-flow.ps1 -RepoRoot .`、`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-oidc-flow.ps1 -SkipHub -SkipTD`、`pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-oidc-flow.ps1 -SkipHub -SkipTD` 通过；Windows PowerShell 5.1 中文显示仍可能 mojibake，但退出码和断言通过。
 5. **D1/D2/D3. CI / release / real CLI gates**：延后。`checks.yml` 依赖的 backend E2E tests 必须先进入主线；`release.yml` 是发布流程变更；`real-cli-e2e.yml` 只能在专用 runner、预算和 artifact 脱敏确认后 opt-in/nightly。
 6. **E. Docs / handoff / skills / ignore 规则**：收尾合文档、`.gitignore`、`dev-team-codex`。措辞只写“入口、边界、待办、证据”，不能把 opt-in 或计划写成已完成。
 
@@ -163,7 +163,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 将 `codex/integrate-codex-adapter` 的 A0+A 提交合入 `dev/delicious233`，再推送主线。
-2. 按 C1、C2 分片抽取脚本硬化，不合完整 `feat/backend-edge-hub`。
+1. 将 `codex/integrate-backend-c-scripts` 的 C1/C2 两个提交合入 `dev/delicious233`，再推送主线。
+2. 单独 review/合入 `codex/integrate-dev-team-skill` 的 E 文档/skill 切片，不和脚本或 CI 混合。
 3. D1/D2/D3 单独排期；真实 CLI/model gate 必须先修 artifact 脱敏和预算/runner 策略。
 4. 开始建立 Edge SQL store 和 Hub DB-backed product surfaces 的 schema/mutation/test 队列。
