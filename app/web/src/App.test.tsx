@@ -5,10 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 
 const useAgentListMock = vi.hoisted(() => vi.fn());
+const useCreateAgentProfileMock = vi.hoisted(() => vi.fn());
+const useUpdateAgentProfileMock = vi.hoisted(() => vi.fn());
+const useDeleteAgentProfileMock = vi.hoisted(() => vi.fn());
 const useWebWorkbenchModelMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/api/agentQueries', () => ({
   useAgentList: useAgentListMock,
+  useCreateAgentProfile: useCreateAgentProfileMock,
+  useUpdateAgentProfile: useUpdateAgentProfileMock,
+  useDeleteAgentProfile: useDeleteAgentProfileMock,
 }));
 
 vi.mock('@/platform/useWebWorkbenchModel', () => ({
@@ -25,6 +31,18 @@ describe('Web app root', () => {
   beforeEach(() => {
     useAgentListMock.mockReturnValue({
       data: undefined,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    useCreateAgentProfileMock.mockReturnValue({
+      mutateAsync: vi.fn(),
+    });
+    useUpdateAgentProfileMock.mockReturnValue({
+      mutateAsync: vi.fn(),
+    });
+    useDeleteAgentProfileMock.mockReturnValue({
+      mutateAsync: vi.fn(),
     });
     useWebWorkbenchModelMock.mockReturnValue({
       activeConversationId: 'agent-collab',
