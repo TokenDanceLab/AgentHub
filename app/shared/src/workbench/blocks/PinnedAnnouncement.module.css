@@ -13,6 +13,14 @@
   background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
   box-shadow: 0 4px 14px rgba(18, 18, 32, 0.045);
   pointer-events: auto;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.card:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-2);
 }
 
 /* ── Orange pin icon ── */
@@ -92,7 +100,9 @@
   flex: 0 0 auto;
   cursor: pointer;
   padding: 0;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .action:hover {

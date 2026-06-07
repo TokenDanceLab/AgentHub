@@ -37,20 +37,20 @@ export const ContextUsageBlock: React.FC<ContextUsageBlockProps> = ({
 
   return (
     <div className={styles.row}>
-      <div className={styles.block} data-card-surface>
+      <div className={`${styles.block} context-usage-block`} data-card-surface>
         <div className={styles.head}>
           <strong className={styles.headTitle}>上下文使用</strong>
           <em className={styles.headPercent}>{Math.round(clampedPercent)}%</em>
         </div>
 
-        <div className={styles.bar}>
+        <div className={`${styles.bar} context-bar`}>
           <span
             className={styles.barFill}
             style={{ width: `${clampedPercent}%` }}
           />
         </div>
 
-        <div className={styles.stats}>
+        <div className={`${styles.stats} context-stats`}>
           <span>
             input{' '}
             <strong>{fmt(inputTokens)}</strong>

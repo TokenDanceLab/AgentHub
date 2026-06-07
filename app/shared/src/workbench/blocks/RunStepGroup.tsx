@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DesignNavIcon } from '../designIcons';
 import styles from './RunStepGroup.module.css';
 
 interface RunStepGroupProps {
@@ -54,27 +55,32 @@ export const RunStepGroup: React.FC<RunStepGroupProps> = ({
     <section
       className={[
         styles.step,
+        'run-step',
         statusClass(status),
+        status,
         open ? styles.open : '',
+        open ? 'is-open' : '',
       ].filter(Boolean).join(' ')}
       data-run-step
     >
       <button
         aria-expanded={open}
-        className={styles.toggle}
+        className={`${styles.toggle} run-step-toggle`}
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
-        <span className={styles.icon}>{icon}</span>
-        <span className={styles.copy}>
+        <span className={`${styles.icon} run-step-icon`}>{icon}</span>
+        <span className={`${styles.copy} run-step-copy`}>
           <strong>{title}</strong>
           {meta && <small>{meta}</small>}
         </span>
-        <span className={styles.status}>{statusLabel(status)}</span>
-        <span className={styles.chevron}>⌄</span>
+        <span className={`${styles.status} run-step-status`}>{statusLabel(status)}</span>
+        <span className={`${styles.chevron} run-step-chevron`} aria-hidden="true">
+          <DesignNavIcon name="chevron" size={14} />
+        </span>
       </button>
-      <div className={styles.detail}>
-        <div className={styles.detailInner}>{children}</div>
+      <div className={`${styles.detail} run-step-detail`}>
+        <div className={`${styles.detailInner} run-step-detail-inner`}>{children}</div>
       </div>
     </section>
   );

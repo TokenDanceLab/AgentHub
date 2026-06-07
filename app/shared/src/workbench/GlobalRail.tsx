@@ -133,12 +133,6 @@ export function GlobalRail({
           { label: '我的个人名片' },
           { label: '我的二维码与链接' },
           { label: '登录更多账号' },
-          { label: 'divider', divider: true },
-          { label: '帮助与客服', trail: 'external' },
-          { label: '设置' },
-          { label: '退出登录', style: 'danger' },
-          { label: 'divider', divider: true },
-          { label: '管理后台', trail: 'external' },
         ]}
         actions={[
           { label: '编辑资料' },
@@ -153,15 +147,8 @@ export function GlobalRail({
         onAccountMenu={handleProfileAction}
         onAction={handleProfileAction}
         onClose={() => setProfileOpen(false)}
-        onSignatureEdit={() => showToast('签名编辑会在账号设置中完成')}
         onStatusToggle={() => showToast('状态已保持在线')}
         org="TokenDance"
-        signature="输入你的个性签名..."
-        spaces={[
-          { name: 'AgentHub Desktop', description: '桌面设计 demo' },
-          { name: 'TokenDance', description: '组织空间' },
-          { name: 'Delicious233', description: '当前用户' },
-        ]}
         status="在线"
         variant="account"
       />
@@ -182,14 +169,8 @@ function profileActionLabel(action: string): string {
       return '已打开二维码与链接';
     case '登录更多账号':
       return '已打开账号登录入口';
-    case '帮助与客服':
-      return '已打开帮助与客服';
     case '设置':
       return '已打开设置';
-    case '管理后台':
-      return '已打开 TokenDance 管理后台';
-    case '退出登录':
-      return '已进入退出登录确认流程';
     default:
       return action;
   }

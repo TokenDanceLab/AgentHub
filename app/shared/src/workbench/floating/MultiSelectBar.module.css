@@ -14,6 +14,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: nowrap;
   overflow: auto hidden;
   scrollbar-width: none;
 }
@@ -23,10 +24,12 @@
 }
 
 .count {
-  min-width: 88px;
+  flex: 0 0 auto;
+  min-width: 72px;
   color: var(--text-2);
   font: 600 0.75rem var(--font-sans);
   padding: 0 var(--sp-sm);
+  white-space: nowrap;
 }
 
 .countNum {
@@ -41,6 +44,7 @@
 }
 
 .action {
+  flex: 0 0 auto;
   height: 34px;
   padding: 0 10px;
   border: 0;
@@ -52,6 +56,13 @@
   gap: 6px;
   font: 600 0.75rem var(--font-sans);
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.action span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -73,6 +84,7 @@
 }
 
 .action svg {
+  flex: 0 0 auto;
   width: 15px;
   height: 15px;
   fill: none;
@@ -80,4 +92,29 @@
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+@media (max-width: 720px) {
+  .bar {
+    max-width: min(calc(var(--selectbar-width, 100vw) - 24px), 620px);
+    padding-right: 5px;
+  }
+
+  .count {
+    min-width: 54px;
+  }
+
+  .countTotal {
+    display: none;
+  }
+
+  .action {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .action span {
+    display: none;
+  }
 }

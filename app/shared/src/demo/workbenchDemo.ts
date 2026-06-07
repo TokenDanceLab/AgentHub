@@ -1,3 +1,4 @@
+import type { ComposerIntent, ComposerSubmitResult } from '../composer';
 import type { WorkbenchAgent, WorkbenchConversation } from '../platform';
 import type { TranscriptBlock } from '../transcript';
 
@@ -17,12 +18,23 @@ export interface WorkbenchDemoStore {
   pins: WorkbenchDemoMessagePin[];
 }
 
+export interface WorkbenchDemoRuntimeStore {
+  getSnapshot(): WorkbenchDemoStore;
+  subscribe(listener: () => void): () => void;
+  resolveTranscript(conversationId: string): TranscriptBlock[];
+  submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult>;
+  pinMessage(conversationId: string, messageId: string, pinnedBy?: string): void;
+  unpinMessage(conversationId: string, messageId: string): void;
+}
+
 const ROLE_BUILDER = '#5e8dcc';
 const ROLE_REVIEWER = '#409467';
 const ROLE_DEPLOYER = '#2b8a9e';
 const ROLE_ORCHESTRATOR = '#5063e8';
 
 export const WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID = 'builder';
+const BUILDER_PINNED_ANNOUNCEMENT =
+  '前端重构任务已置顶，Builder 正在整理 B0 SQLite 迁移方案，Reviewer 和 Deployer 后续跟进验收。';
 
 const demoConversationsBase: WorkbenchConversation[] = [
   {
@@ -161,7 +173,11 @@ const builderTranscript: TranscriptBlock[] = [
     kind: 'text',
     createdAt: '2026-06-06T14:43:00+08:00',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
-    text: '收到，我会先做运行隔离和代码定位\n这次任务会按真实执行流推进：建立 worktree、加载调试和验证 skill、读取消息块类型、搜索 SQLite/FTS 入口，再生成迁移草案。',
+    text: '收到，我会先做运行隔离和代码定位。这次任务会按真实执行流推进：建立 worktree、加载调试和验证 skill、读取消息块类型、搜索 SQLite/FTS 入口，再生成迁移草案。',
+    displayTitle: '收到，我会先做运行隔离和代码定位',
+    displayDetail: '这次任务会按真实执行流推进：建立 worktree、加载调试和验证 skill、读取消息块类型、搜索 SQLite/FTS 入口，再生成迁移草案。',
+    badgeLabel: '运行中',
+    badgeVariant: 'thinking',
     evidenceRefs: [
       { id: 'run-b0-sqlite-msg', kind: 'run', label: 'Builder 正在运行', status: 'running' },
     ],
@@ -270,6 +286,10 @@ const builderTranscript: TranscriptBlock[] = [
     createdAt: '2026-06-06T14:49:00+08:00',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
     text: '找到迁移边界。消息正文、工具调用、文件变更、审批、上下文使用和子 Agent 事件需要保留 block kind。搜索只走 text/code/status/citation 的摘要字段，其他结构保持 JSON。',
+    displayTitle: '找到迁移边界',
+    displayDetail: '消息正文、工具调用、文件变更、审批、上下文使用和子 Agent 事件需要保留 block kind。搜索只走 text/code/status/citation 的摘要字段，其他结构保持 JSON。',
+    badgeLabel: '定位完成',
+    badgeVariant: 'success',
   },
   {
     id: 'builder-subagent-1',
@@ -285,7 +305,7 @@ const builderTranscript: TranscriptBlock[] = [
     id: 'builder-route-1',
     kind: 'route_decision',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
-    action: 'fanout',
+    action: 'continue',
     targetAgent: 'Builder',
     summary: 'Builder 继续产出迁移 SQL；Reviewer 并行复核风险；Browser QA 等待 UI 历史消息块验证。',
   },
@@ -297,7 +317,8 @@ const builderTranscript: TranscriptBlock[] = [
     inputTokens: 38400,
     outputTokens: 6200,
     contextLimit: 128000,
-    usagePercent: 0.31,
+    cost: '$0.31',
+    usagePercent: 35,
   },
   {
     id: 'builder-writing-1',
@@ -305,6 +326,10 @@ const builderTranscript: TranscriptBlock[] = [
     createdAt: '2026-06-06T14:53:00+08:00',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
     text: '生成迁移草案。我会新增线程表、消息块表和 FTS shadow index。回滚点放在切换查询路径之前，避免旧历史消息不可读。',
+    displayTitle: '生成迁移草案',
+    displayDetail: '我会新增线程表、消息块表和 FTS shadow index。回滚点放在切换查询路径之前，避免旧历史消息不可读。',
+    badgeLabel: '写入中',
+    badgeVariant: 'thinking',
   },
   {
     id: 'builder-edit-step-1',
@@ -379,10 +404,10 @@ const builderTranscript: TranscriptBlock[] = [
     ],
   },
   {
-    id: 'builder-approval-1',
+    id: 'approval_b0_sqlite_write',
     kind: 'approval',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
-    title: 'Write File',
+    title: '部署/写入审批',
     status: 'pending',
     toolName: 'Write File',
     risk: 'medium',
@@ -419,6 +444,7 @@ const builderTranscript: TranscriptBlock[] = [
     status: 'completed',
     summary: 'Desktop 历史消息中 thinking、tool、subagent、diff、approval 块均可见，左边缘已按消息列对齐。',
     runId: 'browser-qa-b0',
+    parentRunId: 'run_b0_sqlite_1849',
   },
   {
     id: 'builder-final-1',
@@ -426,6 +452,10 @@ const builderTranscript: TranscriptBlock[] = [
     createdAt: '2026-06-06T14:57:00+08:00',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
     text: '迁移方案已完成。产物包括迁移 SQL、线程导航 hook 调整、回滚说明和验证清单。下一步交给 Reviewer 做风险复核，确认后再由 Deployer 做预览发布。',
+    displayTitle: '迁移方案已完成',
+    displayDetail: '产物包括迁移 SQL、线程导航 hook 调整、回滚说明和验证清单。下一步交给 Reviewer 做风险复核，确认后再由 Deployer 做预览发布。',
+    badgeLabel: '完成',
+    badgeVariant: 'success',
   },
   {
     id: 'builder-run-complete',
@@ -463,20 +493,128 @@ export function createWorkbenchDemoStore(): WorkbenchDemoStore {
   };
 }
 
+export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore = createWorkbenchDemoStore()): WorkbenchDemoRuntimeStore {
+  let transcripts = cloneTranscripts(initialStore.transcripts);
+  let pins = initialStore.pins.map((pin) => ({ ...pin }));
+  let sequence = 0;
+  const listeners = new Set<() => void>();
+  let currentSnapshot = createSnapshot();
+
+  function emit(): void {
+    currentSnapshot = createSnapshot();
+    for (const listener of listeners) listener();
+  }
+
+  function createSnapshot(): WorkbenchDemoStore {
+    return {
+      conversations: demoConversationsBase.map((conversation) => conversationWithPins(conversation, transcripts, pins)),
+      agents: demoWorkbenchAgents.map((agent) => ({ ...agent })),
+      transcripts: cloneTranscripts(transcripts),
+      pins: pins.map((pin) => ({ ...pin })),
+    };
+  }
+
+  return {
+    getSnapshot: () => currentSnapshot,
+    subscribe(listener: () => void): () => void {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    resolveTranscript(conversationId: string): TranscriptBlock[] {
+      return transcripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
+    },
+    async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
+      sequence += 1;
+      const now = new Date().toISOString();
+      const userMessageId = `demo-user-${sequence}`;
+      const agentMessageId = `demo-agent-${sequence}`;
+      const current = transcripts[intent.conversationId] ?? createConversationPreviewTranscript(intent.conversationId);
+      transcripts = {
+        ...transcripts,
+        [intent.conversationId]: [
+          ...current,
+          {
+            id: userMessageId,
+            kind: 'text',
+            createdAt: now,
+            author: { id: 'delicious233', name: 'Delicious233', role: 'human' },
+            text: intent.text,
+          },
+          {
+            id: agentMessageId,
+            kind: 'text',
+            createdAt: now,
+            author: { id: 'demo-agent', name: 'AgentHub Demo', role: 'agent' },
+            text: `已收到 mock 输入：${intent.text}`,
+            displayTitle: 'Demo 模式已记录输入',
+            displayDetail: '这条回复由 shared demo runtime store 生成，用于前端开发时验证消息追加、滚动、选择和 inspector evidence 行为。',
+            badgeLabel: 'mock',
+            badgeVariant: 'thinking',
+          },
+        ],
+      };
+      emit();
+      return { intentId: agentMessageId };
+    },
+    pinMessage(conversationId: string, messageId: string, pinnedBy = 'Demo'): void {
+      const current = transcripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
+      const exists = current.some((block) => block.id === messageId);
+      if (!exists) return;
+      if (!transcripts[conversationId]) {
+        transcripts = {
+          ...transcripts,
+          [conversationId]: current,
+        };
+      }
+      const nextPin = {
+        conversationId,
+        messageId,
+        pinnedBy,
+        pinnedAt: new Date().toISOString(),
+      };
+      pins = [
+        nextPin,
+        ...pins.filter((pin) => pin.conversationId !== conversationId || pin.messageId !== messageId),
+      ];
+      emit();
+    },
+    unpinMessage(conversationId: string, messageId: string): void {
+      const nextPins = pins.filter((pin) => pin.conversationId !== conversationId || pin.messageId !== messageId);
+      if (nextPins.length === pins.length) return;
+      pins = nextPins;
+      emit();
+    },
+  };
+}
+
+export const workbenchDemoRuntimeStore = createWorkbenchDemoRuntimeStore();
+
 export function resolveDemoWorkbenchTranscript(conversationId: string): TranscriptBlock[] {
   return demoWorkbenchTranscripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
 }
 
 function conversationWithDemoPin(conversation: WorkbenchConversation): WorkbenchConversation {
-  const pin = demoWorkbenchPins.find((item) => item.conversationId === conversation.id);
+  return conversationWithPins(conversation, demoWorkbenchTranscripts, demoWorkbenchPins);
+}
+
+function conversationWithPins(
+  conversation: WorkbenchConversation,
+  transcripts: Record<string, TranscriptBlock[]>,
+  pins: WorkbenchDemoMessagePin[],
+): WorkbenchConversation {
+  const pin = pins.find((item) => item.conversationId === conversation.id);
   if (!pin) return { ...conversation };
-  const message = demoWorkbenchTranscripts[conversation.id]?.find((block) => block.id === pin.messageId);
+  const conversationTranscript = transcripts[conversation.id] ?? createConversationPreviewTranscript(conversation.id);
+  const message = conversationTranscript.find((block) => block.id === pin.messageId);
   if (!message || !('text' in message)) return { ...conversation };
+  const content = conversation.id === WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID
+    ? BUILDER_PINNED_ANNOUNCEMENT
+    : message.text;
   return {
     ...conversation,
     pinnedAnnouncement: {
       title: conversation.title,
-      content: message.text,
+      content,
       author: pin.pinnedBy,
       time: formatDemoPinTime(pin.pinnedAt),
       sourceId: pin.messageId,
@@ -484,10 +622,24 @@ function conversationWithDemoPin(conversation: WorkbenchConversation): Workbench
   };
 }
 
+function cloneTranscripts(source: Record<string, TranscriptBlock[]>): Record<string, TranscriptBlock[]> {
+  return Object.fromEntries(
+    Object.entries(source).map(([conversationId, transcript]) => [
+      conversationId,
+      transcript.map((block) => ({ ...block })),
+    ]),
+  );
+}
+
 function createConversationPreviewTranscript(conversationId: string): TranscriptBlock[] {
   const conversation = demoConversationsBase.find((item) => item.id === conversationId);
   const agentName = conversation?.title ?? 'AgentHub';
   const subtitle = conversation?.subtitle ?? 'AgentHub v4 会话';
+  const replyRole = conversation?.kind === 'group'
+    ? 'system'
+    : isDemoHumanContact(conversationId)
+      ? 'human'
+      : 'agent';
   return [
     {
       id: `${conversationId}-user-1`,
@@ -498,7 +650,7 @@ function createConversationPreviewTranscript(conversationId: string): Transcript
     {
       id: `${conversationId}-reply-1`,
       kind: 'text',
-      author: { id: conversationId, name: agentName, role: conversation?.kind === 'group' ? 'system' : 'agent' },
+      author: { id: conversationId, name: agentName, role: replyRole },
       text: `${subtitle}。当前预览会话已切换，消息区、右侧概览和输入目标都应跟随左侧选择更新。`,
     },
     {
@@ -511,6 +663,10 @@ function createConversationPreviewTranscript(conversationId: string): Transcript
       runId: `run_${conversationId.replace(/[^a-z0-9]+/gi, '_')}_preview`,
     },
   ];
+}
+
+function isDemoHumanContact(conversationId: string): boolean {
+  return ['johnny', 'trump'].includes(conversationId);
 }
 
 function formatDemoPinTime(timestamp: string): string | undefined {

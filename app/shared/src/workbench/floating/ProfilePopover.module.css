@@ -5,7 +5,7 @@
   z-index: var(--z-profile-popover);
   width: 352px;
   max-width: calc(100vw - 24px);
-  padding: var(--sp-md);
+  padding: 12px;
   border: 1px solid var(--bdr-strong);
   border-radius: var(--r-md);
   background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
@@ -14,7 +14,9 @@
   opacity: 0;
   transform: translateY(4px) scale(0.985);
   transform-origin: top left;
-  transition: opacity var(--dur-normal) var(--ease), transform var(--dur-normal) var(--ease);
+  transition:
+    opacity var(--dur-normal) var(--ease),
+    transform var(--dur-normal) var(--ease);
   outline: none;
 }
 
@@ -29,7 +31,7 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding-bottom: var(--sp-md);
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -106,7 +108,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-sm);
-  padding: var(--sp-md) 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -212,7 +214,7 @@
   flex: 0 0 auto;
   font: 600 0.6875rem var(--font-sans);
   cursor: pointer;
-  transition: filter var(--dur-fast) var(--ease);
+  transition: filter var(--dur-normal) var(--ease);
 }
 
 .accountStatus:hover {
@@ -245,6 +247,11 @@
   text-align: left;
   font: 400 0.75rem/1.35 var(--font-sans);
   cursor: text;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .accountSignature:hover {
@@ -286,7 +293,6 @@
   text-align: left;
   font: 500 0.8125rem var(--font-sans);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
 }
 
 .accountMenuRow:hover {
@@ -372,7 +378,11 @@
 /* ── Reduced motion ── */
 
 @media (prefers-reduced-motion: reduce) {
-  .popover {
+  .popover,
+  .actions button,
+  .accountStatus,
+  .accountSignature,
+  .accountMenuRow {
     transition: none;
   }
 }

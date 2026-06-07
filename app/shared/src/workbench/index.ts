@@ -6,7 +6,14 @@ export { TranscriptView } from './TranscriptView';
 export { UnifiedComposer } from './UnifiedComposer';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
+export * from './mockData';
 export {
+  DESIGN_FILE_ICON_RADIUS,
+  DESIGN_FILE_ICON_SIZE,
+  DESIGN_NAV_GLYPH_SIZE,
+  DESIGN_NAV_GLYPH_STROKE_WIDTH,
+  DESIGN_NAV_ICON_SIZE,
+  DESIGN_NAV_ICON_STROKE_WIDTH,
   DesignFileIcon,
   DesignNavIcon,
   getDesignFileIconColor,

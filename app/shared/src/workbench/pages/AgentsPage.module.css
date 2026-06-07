@@ -25,7 +25,13 @@
 }
 
 .agent-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
   padding: var(--wb-main-y) var(--wb-main-x);
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--surface);
 }
 
 /* ── Workbench nav (shared with other pages but scoped here) ── */
@@ -57,6 +63,10 @@
   color: var(--text-1);
   outline: none;
   font: 400 0.875rem var(--font-sans);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .workbench-search:focus {
@@ -137,12 +147,15 @@
 /* ── Workbench head ── */
 
 .workbench-head {
+  width: 100%;
   min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: nowrap;
   gap: 16px;
   margin-bottom: 24px;
+  overflow: hidden;
 }
 
 .workbench-head h1 {
@@ -157,6 +170,9 @@
 }
 
 .outline-action {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 176px;
   height: 36px;
   padding: 0 14px;
   border: 1px solid var(--primary);
@@ -169,13 +185,24 @@
   align-items: center;
   gap: 7px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .outline-action:hover {
   background: var(--primary-light);
+  box-shadow: var(--e-1);
+}
+
+.outline-action:active {
+  box-shadow: none;
 }
 
 .outline-action svg {
+  flex: 0 0 auto;
   width: 15px;
   height: 15px;
   fill: none;
@@ -188,6 +215,7 @@
 /* ── Agent summary strip ── */
 
 .agent-summary-strip {
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -202,6 +230,15 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.agent-stat:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
 }
 
 .agent-stat span {
@@ -214,7 +251,7 @@
   display: block;
   margin-top: 5px;
   color: var(--text-1);
-  font: 700 1.125rem/1.1 var(--font-mono);
+  font: 650 1.0625rem/1.1 var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -233,6 +270,7 @@
 /* ── Agent layout (list + edit panel) ── */
 
 .agent-layout {
+  width: 100%;
   display: grid;
   grid-template-columns: minmax(520px, 1fr) minmax(380px, 420px);
   gap: 14px;
@@ -244,11 +282,15 @@
   border-radius: var(--r-lg);
   background: var(--surface);
   padding: 14px;
-  transition: box-shadow var(--dur-medium) var(--ease);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
 }
 
 .agent-section:hover {
-  box-shadow: var(--e-2);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
 }
 
 .section-title-row {
@@ -285,18 +327,22 @@
 
 .agent-config-row {
   width: 100%;
-  min-height: 72px;
-  padding: 10px;
+  min-height: 66px;
+  padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: var(--r-md);
   background: transparent;
   color: var(--text-1);
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 150px 14px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(116px, 148px) 14px;
   align-items: center;
   gap: 10px;
   text-align: left;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
 }
 
 .agent-config-row:hover,
@@ -338,18 +384,53 @@
   white-space: nowrap;
 }
 
-/* ── Agent symbol ── */
+/* ── Agent avatar ── */
+
+.agent-avatar {
+  border: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 0.75rem var(--font-sans);
+  flex-shrink: 0;
+  cursor: pointer;
+  outline: none;
+  transition: box-shadow var(--dur-normal) var(--ease),
+    filter var(--dur-normal) var(--ease);
+}
 
 .agent-symbol {
   width: 34px;
   height: 34px;
   border-radius: var(--r-sm);
   color: white;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   font: 700 0.75rem var(--font-sans);
   flex-shrink: 0;
+}
+
+.agent-config-row span.agent-avatar,
+.detail-head span.agent-avatar {
+  margin-top: 0;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 0.75rem var(--font-sans);
+}
+
+.agent-avatar:hover {
+  filter: brightness(0.96);
+}
+
+.agent-avatar:focus-visible {
+  box-shadow: var(--focus-ring);
 }
 
 /* ── State dot ── */
@@ -378,18 +459,28 @@
   border-radius: var(--r-lg);
   background: var(--surface);
   padding: 16px;
-  transition: box-shadow var(--dur-medium) var(--ease);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.agent-detail > * {
+  width: min(100%, 392px);
 }
 
 .agent-detail:hover {
-  box-shadow: var(--e-2);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
 }
 
 .detail-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-bottom: 14px;
+  padding: 0 0 14px;
   border-bottom: 1px solid var(--bdr);
 }
 
@@ -478,10 +569,14 @@
   justify-content: center;
   gap: 5px;
   font: 500 0.6875rem var(--font-sans);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .agent-edit-grid input,
-.agent-edit-grid select {
+.field-select {
   width: 100%;
   min-width: 0;
   border: 0;
@@ -491,8 +586,11 @@
   font: 600 0.75rem var(--font-sans);
 }
 
-.agent-edit-grid select {
-  cursor: pointer;
+.field-select {
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  box-shadow: none;
 }
 
 .agent-edit-grid label:focus-within {
@@ -505,6 +603,9 @@
 
 .agent-skill-editor {
   padding-top: 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   margin-bottom: 14px;
 }
 
@@ -523,6 +624,10 @@
   color: var(--text-2);
   font: 600 0.75rem var(--font-sans);
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .skill-chip:hover {
@@ -540,6 +645,10 @@
 
 .editable-tools {
   margin-top: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .scope-row {
@@ -551,6 +660,10 @@
   border-top: 1px solid var(--bdr);
   color: var(--text-2);
   font: 400 0.75rem var(--font-sans);
+}
+
+.scope-row:first-of-type {
+  border-top: 0;
 }
 
 .scope-row.editable {
@@ -582,6 +695,10 @@
   color: var(--text-3);
   font: 600 0.6875rem var(--font-sans);
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .permission-segment button:hover {
@@ -616,6 +733,8 @@
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--bdr);
+  border-radius: 0;
+  background: transparent;
 }
 
 .agent-mini-log > div:not(.section-title-row) {
@@ -653,7 +772,7 @@
   border: none;
   cursor: pointer;
   transition: background var(--dur-normal), color var(--dur-normal),
-    transform var(--dur-normal), box-shadow var(--dur-normal);
+    box-shadow var(--dur-normal);
   white-space: nowrap;
 }
 
@@ -687,7 +806,7 @@
 }
 
 .btn:active {
-  transform: translateY(1px);
+  box-shadow: none;
 }
 
 .btn[disabled] {
@@ -710,11 +829,16 @@
 .market-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 12px;
   margin-top: -6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .market-search {
+  flex: 0 1 320px;
+  min-width: 120px;
   width: 320px;
   height: 38px;
   padding: 0 13px;
@@ -732,14 +856,23 @@
 }
 
 .market-cats {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
   min-width: 0;
-  overflow: hidden;
+  overflow: auto hidden;
+  scrollbar-width: none;
+}
+
+.market-cats::-webkit-scrollbar {
+  display: none;
 }
 
 .market-cats button {
+  flex: 0 0 auto;
+  max-width: 112px;
   height: 30px;
   padding: 0 10px;
   border: 1px solid transparent;
@@ -749,6 +882,8 @@
   font: 500 0.75rem var(--font-sans);
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .market-cats button:hover {
@@ -786,12 +921,14 @@
   flex-direction: column;
   gap: 9px;
   transition: box-shadow var(--dur-medium) var(--ease),
-    background var(--dur-normal) var(--ease);
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
 }
 
 .market-card:hover {
   background: var(--surface);
-  box-shadow: var(--e-2);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
 }
 
 .market-card-head {
@@ -850,6 +987,8 @@
   color: var(--primary);
   font: 600 0.75rem var(--font-sans);
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease);
 }
 
 .market-card button:hover {
@@ -878,6 +1017,9 @@
   gap: 12px;
   text-align: left;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
 }
 
 .market-list-row:hover {
@@ -951,6 +1093,9 @@
   gap: 10px;
   text-align: left;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
 }
 
 .agent-rule-row:hover {
@@ -1212,7 +1357,8 @@
   grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: flex-start;
-  transition: box-shadow var(--dur-medium) var(--ease);
+  transition:
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .model-card:hover {
@@ -1265,6 +1411,9 @@
   gap: 10px;
   text-align: left;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
 }
 
 .model-route-row:hover {
@@ -1390,10 +1539,37 @@
   color: var(--text-1);
   text-align: left;
   cursor: pointer;
+  transition: background var(--dur-normal) var(--ease);
 }
 
 .audit-row:hover {
   background: var(--surface-high);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workbench-search,
+  .nav-row,
+  .doc-shortcut,
+  .outline-action,
+  .agent-stat,
+  .agent-section,
+  .agent-config-row,
+  .agent-avatar,
+  .agent-symbol,
+  .agent-detail,
+  .agent-edit-grid label,
+  .skill-chip,
+  .permission-segment button,
+  .btn,
+  .market-card,
+  .market-card button,
+  .market-list-row,
+  .agent-rule-row,
+  .model-card,
+  .model-route-row,
+  .audit-row {
+    transition: none;
+  }
 }
 
 .audit-row time {
