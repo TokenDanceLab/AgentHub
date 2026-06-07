@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-07 | 当前主线：Desktop/Web v4 clean rebuild | 历史长版见 [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md) 和 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> 最后更新：2026-06-08 01:56 +08:00 | 当前主线：v4 shared UI 已入 `dev/delicious233`，进入后端切片合并、Desktop/Edge、Web/Hub、DB-backed product surfaces 和端到端联调 | 历史长版见 [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md) 和 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
 ## 当前目标
 
@@ -8,7 +8,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以当前 shared work
 
 当前目标不是重新设计，而是以当前 shared workbench 和 mock/demo 为新标准继续收口。`D:\Code\TokenDance\agenthub-design\desktop` 仅作为历史原型和视觉参考；任何新增控件、视觉层级、卡片布局或颜色 token，都应优先符合 shared workbench 当前信息架构、运行态约束和 v4 设计 token。
 
-本轮文档和架构设计已冻结，当前进入 v4 实现收口、合并准备和生产接入规划阶段。旧 Desktop 冲刺计划、旧 ChatView/PromptInput 补丁路线、Desktop 先行再迁移 Web 的路线不再作为当前主线。
+Desktop/Web v4 shared workbench 已通过 PR #291 合入 `dev/delicious233`，并通过 PR #292 晋级 `master`。当前主线从 UI clean rebuild 切换为完整产品闭环：逐步合并后端 `feat/backend-edge-hub` 切片，完成 Desktop+Local Edge、Web+Hub、Hub+exact Edge routing、Edge+CLI adapters、Hub/Edge DB-backed state、artifact/diff/preview、permission/approval、TeamRun ID 和真实 E2E 验证。
 
 已确认决策：旧 UI 主路径最终彻底删除；Desktop/Web 同步进入 v4；实现分支允许短期打断旧 UI，但每阶段必须有新 UI 证据。
 
@@ -23,32 +23,35 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以当前 shared work
 - 旧实现是迁移素材，不是永久架构。`ChatView`、`PromptInput`、`IMBlockRenderer`、`RunDetail`、`ThreadPanel`、旧 `viewRegistry` 和千行 hooks 都是替换或拆除对象。
 - 当前处于快速开发阶段，测试优先级降为护栏：每个阶段至少跑 `git diff --check`、旧 UI active path 扫描和必要的 focused smoke；full vitest、typecheck、截图矩阵和 Playwright 回归在视觉对齐节点集中补齐。
 - 文档不写第二套事实源。当前目标写在本文件；架构边界写在 [architecture.md](architecture.md)；执行计划写在 [desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md)；待用户确认的问题写在 [v4-clean-rebuild-decision-questions.md](v4-clean-rebuild-decision-questions.md)。
-- 分支保持干净：`dev/delicious233` 是开发事实源；协作者分支 `origin/dev/trump` 和 `origin/dev/johnny` 保留但不自动合并。
+- 分支保持干净：`dev/delicious233` 是开发事实源；协作者分支 `origin/dev/trump` 和 `origin/dev/johnny` 保留但不自动合并；后端按 [backend-integration-governance.md](backend-integration-governance.md) 切片进入主线。
 - subagent 分工按当前目标执行：前端设计和看图交给 GPT-5.5 low/mid，复杂架构交给 GPT-5.5 xhigh，大部分代码实现并行交给 GLM-5.1 对应的 Claude CLI 路由。`opus`/`sonnet`/`haiku` 是本地别名，派任务前以 `claude-subagent` JSON probe 或当前 skill 记录确认实际模型，不按公开模型名或自然语言别名猜测。
+  当前总协调默认使用项目级 `dev-team-codex`：主负责人负责分支、计划、验证和合并；gpt-5.5 high/xhigh subagent 只做明确写入范围或只读审计。
 
 ## 当前执行快照
 
 | 项 | 当前事实 |
 |---|---|
-| 主工作树 | `D:\Code\TokenDance\AgentHub` |
-| 当前分支 | `feat/desktop-web-v4-clean-rebuild` |
-| 并行 worktree | 摘要：`.worktrees/backend` = `feat/backend-edge-hub`；`.worktrees/johnny-dev` = detached HEAD。完整实时列表以 `git worktree list` 为准，当前存在多条 backend 0607 并行 worktree |
+| 主工作树 | 当前为 `dev/delicious233` |
+| 当前提交 | `cbdda7b1`（Desktop/Web v4 合入点；`master` 已通过 PR #292 晋级到后续稳定快照） |
+| 并行 worktree | 摘要：`.worktrees/backend` = `feat/backend-edge-hub`；多条 `.worktrees/backend-*-0607` 为后端历史切片；`.worktrees/johnny-dev` = detached HEAD。完整实时列表以 `git worktree list` 为准 |
 | UI 基准 | 当前分支 `app/shared/src/workbench` + mock/demo 运行态；`D:\Code\TokenDance\agenthub-design\desktop` 为只读历史参考 |
 | Desktop/Web 端口 | Desktop `5173`，Web `5174` |
 | Mobile 端口 | `5175`，不阻塞本轮 |
-| 当前策略 | 后端主线隔离；主工作树推进 Desktop/Web shared UI 收口、mock/demo 基准固化和设计系统统一。UI 分支只接受明确归属的 Web Hub / Edge contract 小切片，合并前必须分类 backend/mobile 并行改动 |
+| 当前策略 | 后端不再整包隔离等待，改为 AH-SYNC + 切片 ready-for-review + 主负责人合并；Desktop/Web 继续保持 shared UI，生产对接按 Desktop/Edge 与 Web/Hub 两条线联调 |
 | GLM 报告处理 | 只作为风险索引吸收；采纳“未跟踪 blocks/floating/inspector/pages 需要接线和测试”、CSS token/z-index/对比度和废弃组件清理提示；拒绝“首屏恢复 @Agent/权限/workDir/附件工具条”等违反当前 shared workbench 首屏信息架构和固定控制区规则的建议 |
 
 ## 当前最高优先级
 
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
-| P0-1 | v4 clean rebuild 文档架构 | 进行中 | 保持 roadmap/plan/design audit/branch governance 事实同步 | `git diff --check`；活跃文档无旧主线冲突 |
+| P0-1 | 总控治理与分支收口 | 进行中 | 固化 AH-SYNC、后端切片合并、临时 worktree 清理和主线门禁；清除旧 UI PR 前状态描述 | `git diff --check`；branch governance 与 live worktree 一致 |
 | P0-2 | shared UI 工作台边界 | 冻结整理中 | 以当前 shared workbench/mock demo 为标准整理剩余 block/inspector/floating 的 hover/focus、窄屏和截图矩阵；把关键对比脚本纳入后续视觉回归护栏；新增功能必须套进 v4 固定控制区规则，不得用换行撑高 toolbar/tab/action | Desktop/Web 已共用 `app/shared/src/workbench` 主壳子，tokens/themes 已同步，rail pages、transcript blocks、profile popover、toast、context menu、多选条、RightInspector、FilePreview、固定控制区和 demo runtime 已接入；当前不声明全量完成，Agents 市场/字段密度、真实 provider/avatar、platform action、tool timeline、CRUD mutation 和正式截图矩阵仍是后续债务 |
 | P0-3 | Desktop v4 shell 接入 | 进行中 | 继续替换剩余静态 smoke 数据，并补 TeamRun/IM 入口证据；复核左右侧栏拖到极窄后可恢复 | Desktop App v4 focused tests 4 passed；Desktop typecheck/build 通过；5173 已补 Desktop-only 32px window chrome，根布局与 5176 一致为 `y=32,height=888`；Desktop fallback transcript 已按 design demo 显式拆分 agent 气泡标题/详情/badge，并收敛到完整 B0 运行流；1440x920 Playwright smoke 通过，当前覆盖 active Edge thread happy path：读取真实 Edge thread 列表、persisted items、live Edge event evidence，可从 v4 composer 提交 Edge run，并在 shared inspector 展示 run/tool/file/artifact evidence；v4 composer approval/workDir/@Agent/浏览器文件附件/Desktop 原生文件附件上下文已传入 Edge `startRun`；files/browser inspector 已通过 platform preview port 打开 evidence target；shared inspector 已支持 collapse/keyboard resize；demo/mock preview 下无真实 Edge thread 时，5173 发送会回落到 demo runtime，追加用户消息和 mock reply，不再点击无响应；这不代表 full production facade、全量 CRUD、host 文件动作、异常恢复或正式 E2E 已完成，生产对接继续归入 P0-5 |
 | P0-4 | Web v4 shell 接入 | 进行中 | 继续补 Web v4 TeamRun/IM 子页在 shared workbench 内的正式入口 | Web App focused test 通过；Web typecheck/build 通过；5174 使用同一套 shared workbench，但明确不显示 Desktop fake window chrome，根布局为 `y=0,height=920`；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles`；Web v4 首片登录态 happy path 已接 Hub sessions/messages；Hub WS 已接 v4 query invalidation；Hub `agent.stream` runtime events 已直接投影到 shared transcript；composer submit 已改为真实 Hub message + optional `/web/agent-tasks`；Hub message 已有 optimistic cache 插入/确认/失败回滚；@Agent submit 已先创建并缓存 Hub session `AgentInstance`，再用 exact `agent_instance_id` 触发 `/web/agent-tasks`；demo/mock preview 下 5174 发送同样追加用户消息和 mock reply；这不代表 TeamRun/IM、全量 mutation、正式鉴权错误态或回滚矩阵已经冻结完成 |
-| P0-5 | Desktop Edge / Web Hub 生产对接 | 已部分落地，facade/host 拆分待实现 | 按 [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) 先建 Desktop runtime facade，再拆 Tauri host modules，并收紧 Web Hub-only boundary | 当前 `App.tsx` 已是薄入口；Desktop 已有 EdgeManager/Edge REST/WS 基础；Web 已走 Hub adapter；`desktopHost.ts` / `localEdgeRuntime.ts` 和 Tauri `host/*` 尚未落地；下一步验证以 Desktop/Web platform focused tests、Rust host tests、`verify-web-hub-boundary.ps1` 和旧 UI active path 为门禁 |
+| P0-5 | Desktop Edge / Web Hub 生产对接 | 已部分落地，facade/host 拆分待实现 | 按 [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) 和 [backend-integration-governance.md](backend-integration-governance.md) 推进 Desktop+Local Edge、Web+Hub、Hub+exact Edge routing | 当前 `App.tsx` 已是薄入口；Desktop 已有 EdgeManager/Edge REST/WS 基础；Web 已走 Hub adapter；`desktopHost.ts` / `localEdgeRuntime.ts` 和 Tauri `host/*` 尚未落地；下一步验证以 Desktop/Web platform focused tests、Rust host tests、`verify-web-hub-boundary.ps1`、Edge focused tests 和 Hub fake callback DB/WS gate 为门禁 |
 | P0-6 | 旧 UI 清理门禁 | 旧主路径已完成，迁移债务继续 | 清理剩余 Search/Diff/Artifact 迁移素材并把可复用逻辑转入 shared | 已删除旧 Desktop `ChatView/PromptInput/ThreadPanel/useChatMessages/useIMChat/IMBlockRenderer/IMMessageView` 及对应旧测试/CSS；已删除旧 Web `ChatView/PromptInput/ThreadPanel/RunDetail/ReplyPreviewBar/IMMessageView` 及对应旧测试/CSS；Web runtime projection 已从 `RunDetail*` 改为 run evidence 命名；`scripts/verify-v4-old-ui-active-paths.ps1` 44/44 通过；无双主工作台 active import |
+| P0-7 | 后端切片合并进 dev | 新增 | 等 backend ready-for-review 后按 Runtime adapter、E2E harness、Hub callback、API/events、CI/docs、DB persistence 分片审查合并 | 每片有 scope、验证、风险、回滚说明；禁止整包直合 |
+| P0-8 | Shared data contract + DB-backed state | 新增 | 先扩 `AgentHubPlatform` data ports，禁止 real mode 静默 demo fallback；Contacts/Docs/Tasks/Projects/Settings、AgentProfile、ExecutionTarget 逐页定义 owner/schema/mutation/loading/error/empty，再替换 UI mock | Hub PG/Redis gate、Edge SQL store tests、前端 mutation/error/empty focused tests |
 
 2026-06-07 追加旧客户端清单：仍留在源码树里的旧 Desktop/Web 文件已整理到 [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md)。当前结论是：旧主 UI active path 已删除，但 `TeamRunConsole`、旧 `DiffViewer`、`ArtifactBrowser`、Web `hubAdapters`、duplicate stores/hooks 和 Tauri `commands.rs` 仍是迁移素材或删除候选；后续不得把它们重新接回 v4 active route。
 
@@ -82,6 +85,10 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以当前 shared work
 2026-06-07 夜间 Web 边界收紧：`app/web` 已移除 Tauri 类型 shim，Web OIDC `device_type` 固定为 `web`，用户可见 i18n JSON 中的 Local Edge / Workbench Edge 文案已改为 Hub runtime 语义；`verify-web-hub-boundary.ps1` 现在扫描 JSON、禁止 Web 引入 Tauri/Desktop runtime 引用，并正向断言 `webPlatform.ts` 的 `localEdge:false/localFiles:false`。验证：`verify-web-hub-boundary.ps1` 15/15 passed；`app/web` focused tests `hubAuth.test.ts + webPlatform.test.ts` 2 files / 14 tests passed；Web typecheck passed。
 
 2026-06-08 合并收口：已按 owner 分组提交并推送 `feat/desktop-web-v4-clean-rebuild`，创建 draft PR [#291](https://github.com/TokenDanceLab/AgentHub/pull/291)。本 PR 包含 shared UI freeze、Desktop adapter、Web Hub-only boundary 和 durable docs；本地剩余 `edge-server/**`、`BACKEND-MERGE-PLAN.md`、`app/mobile/**`、`docs/review-2026-06-07-glm-5.1/**` 未纳入 UI PR。PR 仍需刷新到最新 `dev/delicious233` 后才能 ready。
+
+2026-06-08 01:56 +08:00 总控更新：PR #291 已合入 `dev/delicious233`，PR #292 已把 dev 晋级到 `master`；当前 roadmap 进入后端切片合并和端到端联调阶段。新增 [backend-integration-governance.md](backend-integration-governance.md) 作为 AH-SYNC、后端切片、分支清理、Desktop/Edge、Web/Hub、DB-backed state 和真实 CLI gate 的执行规则。下一步不整包合并 `feat/backend-edge-hub`，先处理 backend ready-for-review 的 test harness/adapter/API/CI 小切片，再推进 Edge SQL 和 Hub DB-backed product surfaces。
+
+2026-06-08 02:00 +08:00 前端对接审计补充：v4 shell 已统一，但生产数据接线只覆盖聊天主链路。Contacts、Docs、Agents、Tasks/Runs、Projects、Settings 和 RightInspector evidence 仍有大量 demo/mock 数据。下一步先补 shared data contract 和 real mode 错误语义，再逐页接 Hub/Edge DB/API；不要继续只做 UI 表皮。
 
 ## P0: 文档与架构冻结
 
