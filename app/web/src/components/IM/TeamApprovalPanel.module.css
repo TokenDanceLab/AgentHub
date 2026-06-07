@@ -244,7 +244,7 @@
   border: none;
   font-size: 12px;
   font-weight: 500;
-  background: var(--color-primary, #6366f1);
+  background: var(--color-primary, #0071BC);
   color: var(--primary-foreground);
   cursor: pointer;
 }

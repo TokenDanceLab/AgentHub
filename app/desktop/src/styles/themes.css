@@ -1,7 +1,7 @@
 /* ═════════════════════════════════════════════════════════════════════
    AgentHub Theme Variables — v4 Design System
    Light (default :root) + Dark ([data-theme='dark'])
-   Primary: blue (#6985e8 dark / #5063e8 light)
+   Primary: AgentHub logo blue (#29ABE2 dark / #0071BC light)
    ═════════════════════════════════════════════════════════════════════ */
 
 html[data-theme-sync='true'],
@@ -42,13 +42,13 @@ html[data-theme-sync='true'] *::after {
   /* Borders */
   --bdr: rgba(255,255,255,0.06);
   --bdr-strong: rgba(255,255,255,0.10);
-  --bdr-focus: #6985e8;
+  --bdr-focus: #29ABE2;
 
-  /* Primary — blue */
-  --primary: #6985e8;
-  --primary-hover: #849af0;
-  --primary-light: rgba(105,133,232,0.08);
-  --primary-soft: rgba(105,133,232,0.14);
+  /* Primary — AgentHub logo blue */
+  --primary: #29ABE2;
+  --primary-hover: #55BDE9;
+  --primary-light: rgba(41,171,226,0.08);
+  --primary-soft: rgba(41,171,226,0.14);
 
   /* Status */
   --success: #69c967;
@@ -61,10 +61,10 @@ html[data-theme-sync='true'] *::after {
   --info-bg: rgba(106,147,212,0.06);
 
   /* Ring / focus */
-  --ring: rgba(105,133,232,0.25);
+  --ring: rgba(41,171,226,0.25);
 
   /* Thinking */
-  --thinking-bg: rgba(105,133,232,0.08);
+  --thinking-bg: rgba(41,171,226,0.08);
 
   /* Diff */
   --diff-add: rgba(105,201,103,0.06);
@@ -138,7 +138,7 @@ html[data-theme-sync='true'] *::after {
   --surface-raised: var(--surface);
   --surface-raised-hover: var(--surface-high);
   --surface-hover: rgba(255,255,255,0.035);
-  --surface-selected: rgba(105,133,232,0.16);
+  --surface-selected: rgba(41,171,226,0.16);
   --border-subtle: rgba(0,0,0,0.14);
 
   --color-primary: var(--primary);
@@ -219,13 +219,13 @@ html[data-theme-sync='true'] *::after {
   /* Borders */
   --bdr: rgba(0,0,0,0.055);
   --bdr-strong: rgba(0,0,0,0.095);
-  --bdr-focus: #5063e8;
+  --bdr-focus: #0071BC;
 
-  /* Primary — blue */
-  --primary: #5063e8;
-  --primary-hover: #3f4fcc;
-  --primary-light: rgba(80,99,232,0.06);
-  --primary-soft: rgba(80,99,232,0.11);
+  /* Primary — AgentHub logo blue */
+  --primary: #0071BC;
+  --primary-hover: #005F9F;
+  --primary-light: rgba(0,113,188,0.06);
+  --primary-soft: rgba(0,113,188,0.11);
 
   /* Status */
   --success: #409467;
@@ -238,7 +238,7 @@ html[data-theme-sync='true'] *::after {
   --info-bg: rgba(94,141,204,0.06);
 
   /* Ring / focus */
-  --ring: rgba(80,99,232,0.22);
+  --ring: rgba(0,113,188,0.22);
 
   /* Thinking */
   --thinking-bg: rgba(94,141,204,0.06);
@@ -315,7 +315,7 @@ html[data-theme-sync='true'] *::after {
   --surface-raised: var(--surface);
   --surface-raised-hover: var(--surface-dim);
   --surface-hover: var(--surface-high);
-  --surface-selected: rgba(80,99,232,0.10);
+  --surface-selected: rgba(0,113,188,0.10);
   --border-subtle: var(--bdr);
 
   --color-primary: var(--primary);
@@ -386,7 +386,7 @@ html[data-theme-sync='true'] *::after {
   --glass-panel-strong: rgba(255,255,255,0.92);
   --glass-panel-overlay: rgba(255,255,255,0.97);
 
-  --glass-tint-plum: rgba(80,99,232,0.08);
+  --glass-tint-plum: rgba(0,113,188,0.08);
   --glass-tint-moss: rgba(34,197,94,0.08);
   --glass-tint-danger: rgba(239,68,68,0.07);
   --glass-tint-amber: rgba(245,158,11,0.08);
