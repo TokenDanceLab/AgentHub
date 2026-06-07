@@ -81,6 +81,7 @@ describe('webPlatform workbench agent mapping', () => {
     });
 
     expect(resolveWebWorkbenchConversations(undefined, false)).toBe(webConversations);
+    expect(resolveWebWorkbenchConversations(undefined, false, 'real')).toEqual([webHubEmptyConversation]);
     expect(resolveWebWorkbenchConversations([], true)).toEqual([webHubEmptyConversation]);
   });
 
