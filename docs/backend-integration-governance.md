@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 01:56 +08:00
+> 最后更新：2026-06-08 02:52 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -63,12 +63,15 @@ next: <1-3 steps>
 
 | Slice | 范围 | 可先合入条件 | 最低验证 |
 |---|---|---|---|
-| A. Runtime adapter | `edge-server/internal/adapters/`、必要的 `lifecycle` 参数摘要 | 不改变公共 API；只增强 Codex/Claude/OpenCode 归一事件和路径脱敏 | `go test ./internal/adapters ./internal/lifecycle -short -count=1` |
-| B. Edge E2E harness | `scripts/edge-runtime-*.ps1`、`tests/scripts/edge-runtime-*.ps1` | 默认不跑真实 CLI；TODO 场景必须显式失败，不伪装完成 | `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\edge-runtime-e2e.ps1` |
-| C. Hub/Edge callback | `edge-server/internal/hub/`、Hub callback fake DB/WS gate | fake callback 可证明 DB/WS 写入；真实 CLI 留 self-hosted gate | Hub/Edge focused Go tests |
-| D. API/events contract | `api/events.md`、`api/openapi.yaml` | schema 向前兼容；Web/Desktop 消费字段清楚 | OpenAPI parse + contract tests |
-| E. CI/release gates | `.github/workflows/`、`scripts/verify-*.ps1` | 不降低检查强度，不把真实 CLI 变成普通 PR 硬依赖 | `pwsh -NoProfile -File .\scripts\verify-ci-gates.ps1` |
-| F. Docs/governance | `docs/`、`AGENTS.md`、项目 skill | 不创建第二事实源；不写本机隐私或私有日志 | `git diff --check -- AGENTS.md docs` |
+| A0. Runtime log privacy | `edge-server/internal/lifecycle/process_executor*` | CLI argv、command path、config value 不进入启动日志；只保留摘要 | focused lifecycle tests |
+| A. Codex runtime adapter | `edge-server/internal/adapters/codex*`、`api/events.md`、必要 cmd config | 只增强 Codex 事件归一、file_change/path-safety 和 skills-dir 传播；真实 CLI smoke 不阻塞代码合入 | adapter/lifecycle/cmd focused tests + edge-server short gate |
+| B. Hub callback redaction | `edge-server/internal/hub/` | callback 失败不包含原始 response body；4xx/5xx 行为不变 | Hub focused tests + edge-server short gate |
+| C1. Runtime smoke scripts | `scripts/edge-runtime-smoke.ps1`、`scripts/integration-e2e.ps1`、`tests/scripts/edge-runtime-smoke.ps1` | 默认不跑真实 CLI；脚本测试证明兼容性 | script tests |
+| C2. OIDC diagnostics | `scripts/verify-oidc-flow.ps1`、`tests/scripts/verify-oidc-flow.ps1` | 诊断输出脱敏；本体访问本地服务，测试只做 fake/static | OIDC script tests |
+| D1. Backend E2E CI gate | `.github/workflows/checks.yml`、`scripts/verify-ci-gates.ps1` 和依赖 tests | 依赖测试先进入主线；不能单合 workflow 让 CI 变红 | Hub tests + CI policy gate |
+| D2. Release preflight | `.github/workflows/release.yml` | 发布流程变更单独审批，不和普通脚本硬化混合 | release dry policy review |
+| D3. Real CLI/model E2E | `.github/workflows/real-cli-e2e.yml`、real CLI 脚本 | 只在专用 runner、预算和 artifact 脱敏确认后手动/夜间运行 | opt-in real CLI evidence |
+| E. Docs/governance | `docs/`、`AGENTS.md`、项目 skill | 不创建第二事实源；不写本机隐私或私有日志 | `git diff --check -- AGENTS.md docs` |
 | G. DB persistence | Edge SQL store、Hub migrations、repository tests | migration 可回滚或有兼容路径；mock 数据替换为 DB 合同 | Hub PG/Redis gate + Edge store tests |
 
 每个切片进入主线前必须回答三件事：它解决什么用户可见问题、它触碰哪个权威边界、失败时怎么回滚或降级。
@@ -78,11 +81,11 @@ next: <1-3 steps>
 当前 dirty diff 的首轮推荐顺序：
 
 1. **B. Hub callback 错误脱敏**：已合入 `dev/delicious233`，提交 `9d43b18d fix(edge): redact hub callback response bodies`。范围只有 `edge-server/internal/hub/callback.go` 和 `edge-server/internal/hub/callback_test.go`；验证 `go test ./internal/hub -count=1` 和 `edge-server go test ./... -short -count=1` 通过。
-2. **A. Codex adapter 运行时修复**：再合 `edge-server/internal/adapters/*`、必要的 lifecycle 参数摘要、cmd tests 和 `api/events.md`。验证 focused Go tests；真实 Codex smoke 只跑一次作为收口证据。
-3. **C. Edge runtime smoke / OIDC 脚本硬化**：独立合 `scripts/edge-runtime-smoke.ps1`、`scripts/verify-oidc-flow.ps1` 和 `tests/scripts/*`。验证脚本测试，不和 adapter 改动混在一起。
-4. **D. Real CLI opt-in E2E**：合 `scripts/edge-runtime-e2e.ps1`、`tests/scripts/edge-runtime-e2e.ps1`、`real-cli-e2e.yml` 和 README。必须写清这是 opt-in/self-hosted/nightly，不是普通 PR 硬门禁。
-5. **E. CI / release gate policy**：最后让 `checks.yml`、`release.yml`、`verify-ci-gates.ps1` 依赖新 gate。只有目标测试在 PG/Redis 和 CI 时间限制下稳定后才进入。
-6. **F. Docs / handoff / skills / ignore 规则**：收尾合文档、`.gitignore`、`dev-team-codex`。措辞只写“入口、边界、待办、证据”，不能把 opt-in 或计划写成已完成。
+2. **A0+A. Codex adapter 运行时修复 + 启动日志脱敏**：已在 `codex/integrate-codex-adapter` 集成分支提交 `3de37f25 fix(edge): harden codex adapter runtime events`。范围为 `api/events.md`、Codex adapter、file_change/path-safety、lifecycle parser context、argv/command 日志摘要和 cmd skills-dir 传播；验证 focused Go tests、`go test ./internal/adapters ./internal/lifecycle ./internal/httpserver ./cmd/agenthub-edge -short -count=1`、`edge-server go test ./... -short -count=1`、`git diff --cached --check` 通过。真实 Codex smoke 尚未重跑，只能作为 readiness gate，不能宣称 runtime production-ready。
+3. **C1. Edge runtime smoke 脚本硬化**：下一片只合 `scripts/edge-runtime-smoke.ps1`、`scripts/integration-e2e.ps1`、`tests/scripts/edge-runtime-smoke.ps1`。验证脚本测试，不和 adapter 改动混在一起。
+4. **C2. OIDC 诊断脱敏**：再合 `scripts/verify-oidc-flow.ps1`、`tests/scripts/verify-oidc-flow.ps1`。脚本本体可能访问本地 TD/Hub 服务，主线验证先跑 fake/static harness。
+5. **D1/D2/D3. CI / release / real CLI gates**：延后。`checks.yml` 依赖的 backend E2E tests 必须先进入主线；`release.yml` 是发布流程变更；`real-cli-e2e.yml` 只能在专用 runner、预算和 artifact 脱敏确认后 opt-in/nightly。
+6. **E. Docs / handoff / skills / ignore 规则**：收尾合文档、`.gitignore`、`dev-team-codex`。措辞只写“入口、边界、待办、证据”，不能把 opt-in 或计划写成已完成。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -160,7 +163,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 等 backend 线程把 `verify-oidc-flow` harness 小修发送 `ready-for-review`。
-2. 根据 backend diff 切片审查结果，先合入低风险的 test harness / adapter contract，再处理 Hub/DB/CI 大切片。
-3. 同步更新 `docs/roadmap.md` 中 P0/P1 为端到端联调，而不是继续记录旧 UI PR 前状态。
+1. 将 `codex/integrate-codex-adapter` 的 A0+A 提交合入 `dev/delicious233`，再推送主线。
+2. 按 C1、C2 分片抽取脚本硬化，不合完整 `feat/backend-edge-hub`。
+3. D1/D2/D3 单独排期；真实 CLI/model gate 必须先修 artifact 脱敏和预算/runner 策略。
 4. 开始建立 Edge SQL store 和 Hub DB-backed product surfaces 的 schema/mutation/test 队列。

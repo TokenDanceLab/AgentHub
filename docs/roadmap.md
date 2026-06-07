@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 01:56 +08:00 | 当前主线：v4 shared UI 已入 `dev/delicious233`，进入后端切片合并、Desktop/Edge、Web/Hub、DB-backed product surfaces 和端到端联调 | 历史长版见 [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md) 和 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> 最后更新：2026-06-08 02:52 +08:00 | 当前主线：v4 shared UI 已入 `dev/delicious233`，进入后端切片合并、Desktop/Edge、Web/Hub、DB-backed product surfaces 和端到端联调 | 历史长版见 [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md) 和 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
 ## 当前目标
 
@@ -52,6 +52,7 @@ Desktop/Web v4 shared workbench 已通过 PR #291 合入 `dev/delicious233`，�
 | P0-6 | 旧 UI 清理门禁 | 旧主路径已完成，迁移债务继续 | 清理剩余 Search/Diff/Artifact 迁移素材并把可复用逻辑转入 shared | 已删除旧 Desktop `ChatView/PromptInput/ThreadPanel/useChatMessages/useIMChat/IMBlockRenderer/IMMessageView` 及对应旧测试/CSS；已删除旧 Web `ChatView/PromptInput/ThreadPanel/RunDetail/ReplyPreviewBar/IMMessageView` 及对应旧测试/CSS；Web runtime projection 已从 `RunDetail*` 改为 run evidence 命名；`scripts/verify-v4-old-ui-active-paths.ps1` 44/44 通过；无双主工作台 active import |
 | P0-7 | 后端切片合并进 dev | 新增 | 等 backend ready-for-review 后按 Runtime adapter、E2E harness、Hub callback、API/events、CI/docs、DB persistence 分片审查合并 | 每片有 scope、验证、风险、回滚说明；禁止整包直合 |
 | P0-8 | Shared data contract + DB-backed state | 新增 | 先扩 `AgentHubPlatform` data ports，禁止 real mode 静默 demo fallback；Contacts/Docs/Tasks/Projects/Settings、AgentProfile、ExecutionTarget 逐页定义 owner/schema/mutation/loading/error/empty，再替换 UI mock | Hub PG/Redis gate、Edge SQL store tests、前端 mutation/error/empty focused tests |
+| P2-1 | Mobile v4 IM / Remote Client 支线 | 新增低优先级 | 在 `codex/mobile-v4-im-redesign` 独立 worktree 研究和规划；Mobile 以飞书移动 IM 为主参考、Codex 手机 chat 为辅参考，定位为 Hub-mediated IM/remote-control client | 规划文档、mobile IA/remote-control 边界、5175 visual QA；禁止 Web/Desktop/Backend 源码混入 mobile 支线 |
 
 2026-06-07 追加旧客户端清单：仍留在源码树里的旧 Desktop/Web 文件已整理到 [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md)。当前结论是：旧主 UI active path 已删除，但 `TeamRunConsole`、旧 `DiffViewer`、`ArtifactBrowser`、Web `hubAdapters`、duplicate stores/hooks 和 Tauri `commands.rs` 仍是迁移素材或删除候选；后续不得把它们重新接回 v4 active route。
 
@@ -91,6 +92,10 @@ Desktop/Web v4 shared workbench 已通过 PR #291 合入 `dev/delicious233`，�
 2026-06-08 02:00 +08:00 前端对接审计补充：v4 shell 已统一，但生产数据接线只覆盖聊天主链路。Contacts、Docs、Agents、Tasks/Runs、Projects、Settings 和 RightInspector evidence 仍有大量 demo/mock 数据。下一步先补 shared data contract 和 real mode 错误语义，再逐页接 Hub/Edge DB/API；不要继续只做 UI 表皮。
 
 2026-06-08 02:22 +08:00 后端切片合并进展：B `Hub callback 错误脱敏` 已从 `feat/backend-edge-hub` path-level 抽取并合入 `dev/delicious233`，提交 `9d43b18d fix(edge): redact hub callback response bodies`。验证：`go test ./internal/hub -count=1`、`edge-server go test ./... -short -count=1`、`git diff --check`。下一片按顺序审 A `Codex adapter 运行时修复`，不整包 cherry-pick `74431e85`。
+
+2026-06-08 02:52 +08:00 后端切片合并进展：A0+A `Codex adapter 运行时修复 + 启动日志脱敏` 已在 `codex/integrate-codex-adapter` 提交 `3de37f25 fix(edge): harden codex adapter runtime events`。本片只包含 Codex argv/runtime events、file_change 每文件事件、path-safety、parser workDir context、argv/command 启动日志脱敏、cmd skills-dir 传播和 `api/events.md` contract；验证：focused Go tests、`go test ./internal/adapters ./internal/lifecycle ./internal/httpserver ./cmd/agenthub-edge -short -count=1`、`edge-server go test ./... -short -count=1`、`git diff --cached --check`。真实 Codex CLI/model smoke 未在本片重跑，只作为 readiness gate；下一片按 C1 runtime smoke scripts、C2 OIDC diagnostics 拆窄合并，D1/D2/D3 CI/release/real CLI 延后。
+
+2026-06-08 02:52 +08:00 Mobile 支线编排：已从 `dev/delicious233` 创建 `.worktrees/mobile-v4-im-redesign` / `codex/mobile-v4-im-redesign`。Mobile 方向降级为 P2 支线，以飞书移动 IM 为主参考、Codex 手机 chat 为辅参考，采用 IM-first shell、消息列表首页、聊天 drill-in、平板双栏；远程控制只做 Hub-mediated 发任务、看运行流、审批、停止，禁止 Mobile 直连 Local Edge。相关研究/规划由 subagent 团队在 mobile worktree 推进，不混入当前后端切片。
 
 ## P0: 文档与架构冻结
 
