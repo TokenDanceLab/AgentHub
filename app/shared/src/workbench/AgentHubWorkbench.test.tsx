@@ -667,7 +667,7 @@ describe('AgentHubWorkbench', () => {
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'agents');
     expect(screen.getAllByText('Builder').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('DeepSeek-V4-Pro').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('glm-5.1').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '项目' }));
@@ -694,6 +694,45 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(projectScope.getByRole('button', { name: '设置' }));
     expect(screen.getByRole('heading', { name: '项目设置' })).toBeInTheDocument();
     expect(screen.getAllByText('成员策略').length).toBeGreaterThan(0);
+  });
+
+  it('renders supplied Hub AgentProfiles on the Agents rail page instead of mock agents', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={[{
+          id: 'hub-agent-architect',
+          name: 'Hub Architect',
+          description: 'Architecture owner',
+          status: 'available',
+          runtimeId: 'codex',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          approvalPolicy: 'on-request',
+          permissionMode: 'workspace-write',
+          reasoningEffort: 'high',
+          skills: ['Architecture', 'Review'],
+          toolAllowlist: ['Read File'],
+        }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    expect(within(page).getAllByText('Hub Architect').length).toBeGreaterThan(0);
+    expect(within(page).getAllByText('openai / gpt-5.5').length).toBeGreaterThan(0);
+    expect(within(page).getByText('Architecture · Review')).toBeInTheDocument();
+    expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
+    expect(within(page).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
   });
 
   it('renders supplied Hub contacts on the Contacts rail page', () => {

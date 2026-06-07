@@ -73,6 +73,7 @@ function capabilitiesForProfile(profile: AgentProfile): AgentCapabilities {
 export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo {
   const runtimeID = normalizeRuntimeID(profile.runtime_id);
   const modelHint = [profile.provider, profile.model].filter(Boolean).join('/');
+  const skills = parseStringArray(profile.skills);
   const toolAllowlist = parseStringArray(profile.tool_allowlist);
   const targetPreferences = parseJSONObject(profile.target_preferences);
   const descriptionParts = [
@@ -89,7 +90,9 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
     ...(profile.model ? { model: profile.model } : {}),
     ...(profile.provider ? { provider: profile.provider } : {}),
     ...(profile.reasoning_effort ? { reasoningEffort: profile.reasoning_effort } : {}),
+    ...(profile.approval_policy ? { approvalPolicy: profile.approval_policy } : {}),
     ...(profile.permission_mode ? { permissionMode: profile.permission_mode } : {}),
+    ...(skills ? { skills } : {}),
     ...(toolAllowlist ? { toolAllowlist } : {}),
     ...(targetPreferences ? { targetPreferences } : {}),
     ...(descriptionParts.length > 0 ? { description: descriptionParts.join(' - ') } : {}),

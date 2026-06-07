@@ -72,11 +72,21 @@ export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
     status: agent.status,
     ...(agent.model ? { model: agent.model } : {}),
     ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
+    ...(agent.provider ? { provider: agent.provider } : {}),
+    ...(agent.approvalPolicy ? { approvalPolicy: agent.approvalPolicy } : {}),
+    ...(agent.permissionMode ? { permissionMode: agent.permissionMode } : {}),
+    ...(agent.reasoningEffort ? { reasoningEffort: agent.reasoningEffort } : {}),
+    ...(agent.skills ? { skills: agent.skills } : {}),
+    ...(agent.toolAllowlist ? { toolAllowlist: agent.toolAllowlist } : {}),
   };
 }
 
-export function resolveWebWorkbenchAgents(hubAgents: AgentInfo[] | undefined): WorkbenchAgent[] {
+export function resolveWebWorkbenchAgents(
+  hubAgents: AgentInfo[] | undefined,
+  dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
+): WorkbenchAgent[] {
   const mapped = hubAgents?.map(agentInfoToWorkbenchAgent) ?? [];
+  if (dataMode === 'real') return mapped;
   return mapped.length > 0 ? mapped : webAgents;
 }
 
