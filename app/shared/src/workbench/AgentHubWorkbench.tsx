@@ -25,6 +25,7 @@ import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointer
 import type { FileItem } from './inspector';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
+import type { WorkbenchContactsData } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
@@ -75,6 +76,7 @@ export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
   conversations: WorkbenchConversation[];
   agents?: WorkbenchAgent[];
+  contacts?: WorkbenchContactsData | undefined;
   activeConversationId?: string;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
   transcript: TranscriptBlock[];
@@ -84,6 +86,7 @@ export function AgentHubWorkbench({
   platform,
   conversations,
   agents = [],
+  contacts,
   activeConversationId,
   onActiveConversationChange,
   transcript,
@@ -971,6 +974,7 @@ export function AgentHubWorkbench({
             <WorkbenchRoutes
               activePage={activePage}
               agents={agents}
+              contacts={contacts}
               focusedAgentId={focusedAgentId}
               onAgentProfileOpen={openAgentProfileFromConfig}
             />

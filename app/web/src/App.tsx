@@ -32,6 +32,7 @@ function WebWorkbenchRoot() {
     <AgentHubWorkbench
       activeConversationId={workbench.activeConversationId}
       agents={agents}
+      contacts={workbench.contacts}
       conversations={workbench.conversations}
       onActiveConversationChange={setSelectedConversationId}
       platform={webPlatform}

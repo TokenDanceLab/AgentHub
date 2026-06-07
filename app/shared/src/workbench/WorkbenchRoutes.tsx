@@ -13,12 +13,15 @@ import {
 import type { WorkbenchAgent } from '../platform';
 import type {
   ContactsPane,
+  ContactGroup,
+  ContactMember,
   DocRow,
   DocsPane,
   ProjectArtifact,
   ProjectFilter,
   ProjectTab,
   SettingsPaneId,
+  ServiceDesk,
   TaskGroup,
   TaskItem,
   TaskStatus,
@@ -73,8 +76,21 @@ const TASK_STATUS_SEQUENCE: TaskStatus[] = ['未开始', '进行中', '待评审
 export interface WorkbenchRoutesProps {
   activePage: WorkbenchPage;
   agents: WorkbenchAgent[];
+  contacts?: WorkbenchContactsData | undefined;
   focusedAgentId?: string | undefined;
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
+}
+
+export interface WorkbenchContactsData {
+  members: ContactMember[];
+  externalContacts?: ContactMember[] | undefined;
+  pendingContacts?: ContactMember[] | undefined;
+  starredContacts?: ContactMember[] | undefined;
+  groups?: ContactGroup[] | undefined;
+  serviceDesks?: ServiceDesk[] | undefined;
+  recentShortcuts?: string[] | undefined;
+  orgName?: string | undefined;
+  orgInitials?: string | undefined;
 }
 
 function persistDataModeLabel(value: string): void {
@@ -324,6 +340,7 @@ function createLocalTask(index: number): TaskItem {
 export function WorkbenchRoutes({
   activePage,
   agents,
+  contacts,
   focusedAgentId,
   onAgentProfileOpen,
 }: WorkbenchRoutesProps): React.ReactElement {
@@ -355,10 +372,21 @@ export function WorkbenchRoutes({
 
   void agents;
   const agentConfigs = WORKBENCH_MOCK_AGENT_CONFIGS;
+  const contactsData = contacts ?? {
+    members: WORKBENCH_MOCK_CONTACT_MEMBERS,
+    externalContacts: WORKBENCH_MOCK_EXTERNAL_CONTACTS,
+    pendingContacts: WORKBENCH_MOCK_PENDING_CONTACTS,
+    starredContacts: WORKBENCH_MOCK_CONTACT_MEMBERS.slice(0, 2),
+    groups: WORKBENCH_MOCK_CONTACT_GROUPS,
+    serviceDesks: WORKBENCH_MOCK_SERVICE_DESKS,
+    recentShortcuts: WORKBENCH_MOCK_CONTACT_SHORTCUTS,
+    orgName: 'TokenDance',
+    orgInitials: 'TD',
+  };
   const profileSources = useMemo(() => [
     ...agentConfigs.map((agent) => ({ ...agent, kind: 'agent' as const })),
-    ...WORKBENCH_MOCK_CONTACT_MEMBERS.map((member) => ({ ...member, kind: 'user' as const })),
-  ], [agentConfigs]);
+    ...contactsData.members.map((member) => ({ ...member, kind: 'user' as const })),
+  ], [agentConfigs, contactsData.members]);
   const effectiveSelectedAgentId = selectedAgentId ?? agentConfigs[0]?.id ?? '';
 
   React.useEffect(() => {
@@ -583,16 +611,16 @@ export function WorkbenchRoutes({
       return (
         <ContactsPage
           activePane={contactsPane}
-          externalContacts={WORKBENCH_MOCK_EXTERNAL_CONTACTS}
-          groups={WORKBENCH_MOCK_CONTACT_GROUPS}
-          members={WORKBENCH_MOCK_CONTACT_MEMBERS}
+          externalContacts={contactsData.externalContacts ?? []}
+          groups={contactsData.groups ?? []}
+          members={contactsData.members}
           onPaneChange={setContactsPane}
-          orgInitials="TD"
-          orgName="TokenDance"
-          pendingContacts={WORKBENCH_MOCK_PENDING_CONTACTS}
-          recentShortcuts={WORKBENCH_MOCK_CONTACT_SHORTCUTS}
-          serviceDesks={WORKBENCH_MOCK_SERVICE_DESKS}
-          starredContacts={WORKBENCH_MOCK_CONTACT_MEMBERS.slice(0, 2)}
+          orgInitials={contactsData.orgInitials ?? 'TD'}
+          orgName={contactsData.orgName ?? 'TokenDance'}
+          pendingContacts={contactsData.pendingContacts ?? []}
+          recentShortcuts={contactsData.recentShortcuts ?? []}
+          serviceDesks={contactsData.serviceDesks ?? []}
+          starredContacts={contactsData.starredContacts ?? []}
         />
       );
     case 'docs':
