@@ -354,6 +354,7 @@ cd app/web; corepack.cmd pnpm typecheck
 - 2026-06-07：删除 Desktop/Web 旧 registry、旧 `MainView/IMView` active route、Desktop 旧 `RunDetail/RightInspector/PermissionDialog` 和 Web 孤儿 `PermissionDialog`；新增 `scripts/verify-v4-old-ui-active-paths.ps1`，阻断 active Desktop/Web source 重新 import 旧 `ChatView`、`PromptInput`、`RunDetail`、`ThreadPanel`、`IMBlockRenderer`、`useChatMessages`、`useIMChat` 或旧 `viewRegistry`。验证：Desktop typecheck/build 通过；Web focused tests 6 个文件 / 32 个测试通过；Web typecheck/build 通过；Desktop App v4 focused tests 1 个文件 / 4 个测试通过；Web Hub-only boundary 12/12 通过；v4 old UI active path boundary 16/16 通过；Desktop/Web 1440x920 Playwright smoke 通过。
 - 2026-06-07：只读 `opus` 子代理盘点剩余旧 UI 债务，结论是先迁移 shared `ChatMessage/FileDiff` 兼容合同，再删除旧 Chat/Prompt/Thread/IM hook 本体；该输出仅作为架构辅助，不作为测试证据。
 - 2026-06-07：旧 `ChatView.types` 类型 import 已迁到 shared `types/chat.ts`，门禁脚本新增旧类型 active import 检查并通过 17/17；下一步可删除旧 `ChatView.types.ts` 文件和依赖它的旧组件本体/旧测试。
+- 2026-06-07：删除旧 Desktop `ChatView/PromptInput/ThreadPanel/useChatMessages/useIMChat/IMBlockRenderer/IMMessageView` 及对应旧测试/CSS；删除旧 Web `ChatView/PromptInput/ThreadPanel/RunDetail/ReplyPreviewBar/useIMChat/IMMessageView` 及对应旧测试/CSS；IM index 不再导出旧 message view/renderer；Desktop E2E 旧 PromptInput/ThreadPanel 断言改为 v4 composer/sidebar 语义。验证：Desktop typecheck 通过；Web typecheck 通过；Desktop App v4 focused tests 1 文件 / 4 测试通过；Web App focused tests 1 文件 / 3 测试通过；v4 old UI active path boundary 44/44 通过；`git diff --check` 通过。
 
 ## 6. 验收命令
 

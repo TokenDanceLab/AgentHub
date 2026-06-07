@@ -2,9 +2,9 @@
 <#
 Verify that Desktop/Web v4 do not route through the retired main workbench UI.
 
-Old components may still exist temporarily as migration material, tests, or type
-fixtures. Active app source must not import the old ChatView/PromptInput/
-RunDetail/ThreadPanel/viewRegistry path.
+Old utility components may still exist temporarily as migration material, tests,
+or type fixtures. The retired Chat/Prompt/Thread/IM hook files must stay
+deleted, and active app source must not import old workbench paths.
 #>
 
 [CmdletBinding()]
@@ -47,7 +47,34 @@ $RemovedActiveFiles = @(
     "app/web/src/viewRegistryConfig.ts",
     "app/web/src/views/viewRegistry.tsx",
     "app/web/src/views/MainView.tsx",
-    "app/web/src/views/IMView.tsx"
+    "app/web/src/views/IMView.tsx",
+    "app/desktop/src/components/ChatView.tsx",
+    "app/desktop/src/components/ChatView.module.css",
+    "app/desktop/src/components/ChatView.types.ts",
+    "app/desktop/src/components/PromptInput.tsx",
+    "app/desktop/src/components/PromptInput.module.css",
+    "app/desktop/src/components/ThreadPanel.tsx",
+    "app/desktop/src/components/ThreadPanel.module.css",
+    "app/desktop/src/hooks/useChatMessages.ts",
+    "app/desktop/src/hooks/useIMChat.ts",
+    "app/desktop/src/components/IM/IMBlockRenderer.tsx",
+    "app/desktop/src/components/IM/IMBlockRenderer.module.css",
+    "app/desktop/src/components/IM/IMMessageView.tsx",
+    "app/desktop/src/components/IM/IMMessageView.module.css",
+    "app/web/src/components/ChatView.tsx",
+    "app/web/src/components/ChatView.module.css",
+    "app/web/src/components/ChatView.types.ts",
+    "app/web/src/components/PromptInput.tsx",
+    "app/web/src/components/PromptInput.module.css",
+    "app/web/src/components/ThreadPanel.tsx",
+    "app/web/src/components/ThreadPanel.module.css",
+    "app/web/src/components/RunDetail.tsx",
+    "app/web/src/components/RunDetail.module.css",
+    "app/web/src/components/ReplyPreviewBar.tsx",
+    "app/web/src/components/ReplyPreviewBar.module.css",
+    "app/web/src/hooks/useIMChat.ts",
+    "app/web/src/components/IM/IMMessageView.tsx",
+    "app/web/src/components/IM/IMMessageView.module.css"
 )
 
 foreach ($relativePath in $RemovedActiveFiles) {
