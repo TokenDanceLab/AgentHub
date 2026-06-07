@@ -80,6 +80,7 @@ type App struct {
 	MarketHandler          *handler.MarketHandler
 	ProviderBindingHandler *handler.ProviderBindingHandler
 	ExecutionTargetHandler *handler.ExecutionTargetHandler
+	WorkspaceHandler       *handler.WorkspaceHandler
 	AuditHandler           *handler.AuditHandler
 	AgentTeamHandler       *handler.AgentTeamHandler
 
@@ -195,6 +196,10 @@ func (a *App) Run(ctx context.Context) error {
 	targetSvc := service.NewExecutionTargetService(a.DB)
 	targetSvc.SetCache(a.CacheClient)
 	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
+
+	// Workspace service
+	workspaceSvc := service.NewWorkspaceService(a.DB)
+	a.WorkspaceHandler = handler.NewWorkspaceHandler(workspaceSvc)
 
 	// Audit service
 	auditSvc := service.NewAuditService(a.DB, &service.AuditServiceConfig{
@@ -369,6 +374,7 @@ func (a *App) setupRouter() *gin.Engine {
 		a.AuditHandler,
 		a.RelayHandler,
 		a.AgentTeamHandler,
+		a.WorkspaceHandler,
 	)
 	return r
 }
