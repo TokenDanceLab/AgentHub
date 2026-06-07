@@ -515,6 +515,19 @@ func TestBuildConfigAgentFlags(t *testing.T) {
 	}
 }
 
+func TestBuildConfigSkillsDirs(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--skills-dir", "first",
+		"--skills-dir", "second",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if len(cfg.SkillsDirs) != 2 || cfg.SkillsDirs[0] != "first" || cfg.SkillsDirs[1] != "second" {
+		t.Fatalf("SkillsDirs = %#v, want [first second]", []string(cfg.SkillsDirs))
+	}
+}
+
 // --- Environment variable fallback tests ---
 
 func TestBuildConfigEnvVarAddr(t *testing.T) {

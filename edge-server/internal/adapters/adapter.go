@@ -144,6 +144,10 @@ type ctxKey string
 // so the permission handler can include it in permission events.
 const CtxSessionID ctxKey = "agenthub-session-id"
 
+// CtxWorkDir is used to pass the run workspace to stream parsers that need to
+// redact or relativize paths from CLI-native events.
+const CtxWorkDir ctxKey = "agenthub-work-dir"
+
 // --- Stream parse error handling ---
 
 // ParseStreamError wraps an error from ParseStream with a recoverability flag.
@@ -155,7 +159,7 @@ const CtxSessionID ctxKey = "agenthub-session-id"
 // entry, calls recordTurnFailed), OpenCode prompt.ts:1281-1290 (orphaned
 // interrupted tools handling — logs warning, exits loop cleanly).
 type ParseStreamError struct {
-	err        error
+	err         error
 	recoverable bool
 }
 
