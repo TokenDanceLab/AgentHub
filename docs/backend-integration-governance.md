@@ -90,7 +90,7 @@ next: <1-3 steps>
 7. **D1b/D2/D3. 剩余 CI / release / real CLI gates**：延后。D1b 只在新增依赖测试已进入主线且不会让 CI 变红时再拆；`release.yml` 是发布流程变更；`real-cli-e2e.yml` 只能在专用 runner、环境审批、预算和 artifact 脱敏确认后 opt-in/nightly。
 8. **F. Edge local Thread pins**：已合入 `dev/delicious233`，提交 `75bcf144 feat(edge): add local thread item pins`。范围只有 `edge-server/internal/store/`、`edge-server/internal/api/`、`api/openapi.yaml`、`api/events.md` 和本文档/roadmap；实现 `/v1/threads/{threadId}/pins` GET/POST/DELETE、`ThreadPin` snapshot 持久化、thread delete/run cleanup 级联清理、事件 `thread.pin.created/deleted` 和 OpenAPI 合同。验证 store/API focused tests、`edge-server go test ./... -short -count=1`、OpenAPI YAML parse 和 diff check 通过；未运行真实 CLI/model。
 9. **API/Event route summary alias**：已合入 `dev/delicious233`，提交 `51ac4b8c fix(api): add agent task summary alias`。独立切片只补 Hub `GET /web/agent-tasks/:id/summary` 到既有 `TaskEventSummary`，并在 OpenAPI 增加 `/web/agent-tasks/{id}/summary` 兼容 alias；不改前端、Edge、runtime schema 或真实 CLI gate。
-10. **G1. Hub AgentProfile read-through**：本前端切片 `codex/g1-agentprofile-readthrough` 只把 Hub `/web/agent-profiles` 投影到 shared Agents 页已安装列表和 `WorkbenchAgent` 字段，阻断 Web real mode demo agent fallback；不做 AgentProfile CRUD、自建 Agent、市场闭环、TeamRun Orchestrator、Edge SQL 或真实 CLI/model gate。
+10. **G1. Hub AgentProfile read-through**：已合入 `dev/delicious233`，提交 `c30cbeec feat(web): 接入 Hub AgentProfile 到 Agents 页`。该前端切片只把 Hub `/web/agent-profiles` 投影到 shared Agents 页已安装列表和 `WorkbenchAgent` 字段，阻断 Web real mode demo agent fallback；不做 AgentProfile CRUD、自建 Agent、市场闭环、TeamRun Orchestrator、Edge SQL 或真实 CLI/model gate。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -98,7 +98,7 @@ next: <1-3 steps>
 
 - **D1a fixture-only CI gate**：已合入 `dev/delicious233`。后续 D1b 只能在新增依赖测试已进入主线且不会让 CI 变红时再拆，并继续断言不含 `-RealCli`、Docker、root `go test ./tests -count=1` 或真实 CLI/auth secret。
 - **D3 real CLI/model gate**：继续 blocked。候选 workflow 缺 GitHub `environment` approval、预算/请求上限控制，且 redaction validation 失败后仍可能上传 artifact；修复前不得合入。
-- **G1 DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 正在 `codex/g1-agentprofile-readthrough` 前端切片实现。该片只读消费 Hub-owned AgentProfile，不改 Hub schema、Edge store 或 AgentProfile CRUD。
+- **G1 DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入。该片只读消费 Hub-owned AgentProfile，不改 Hub schema、Edge store 或 AgentProfile CRUD。
 - **API/Event contract sync**：`codex/api-event-summary-alias` 已把 Web client 已用的 `/web/agent-tasks/{id}/summary` 声明为 Hub/OpenAPI 兼容 alias，复用既有 `/web/agent-tasks/{id}/events/summary` response contract；不混入 Edge pins。
 - **Runtime adapter roadmap**：Codex `exec --json` adapter 仍是 Phase 1 batch 模式；完整 multi-turn、turn steer/interrupt、approval、subagent 和 diff patch delta 需要后续 Codex app-server 通道，不应在当前能力声明中写成已完成。
 
@@ -176,7 +176,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 先审 `codex/g1-agentprofile-readthrough`，确认 shared Agents 页消费 Hub AgentProfile 且 Web real mode 不回退 demo agents；该片不消费真实 CLI/model。
-2. 再审后端 G0 `codex/edge-store-contract`，它是 Edge store contract harness，不等于 SQL store 上线。
+1. 先审后端 G0 `codex/edge-store-contract`，它是 Edge store contract harness，不等于 SQL store 上线。
+2. 再决定下一片是 AgentProfile CRUD/empty/error、ExecutionTarget inventory、Hub Projects backed by workspaces，还是 Edge SQL store proposal。
 3. D1b/D2/D3 单独排期；D3 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge。
