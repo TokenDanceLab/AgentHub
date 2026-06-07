@@ -25,9 +25,10 @@ import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointer
 import type { FileItem } from './inspector';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
-import type { WorkbenchContactsData } from './WorkbenchRoutes';
+import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
+import type { AgentConfig } from './pages';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
@@ -76,9 +77,14 @@ export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
   conversations: WorkbenchConversation[];
   agents?: WorkbenchAgent[];
+  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
   activeConversationId?: string;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
+  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
+  onAgentsRetry?: (() => void) | undefined;
   transcript: TranscriptBlock[];
 }
 
@@ -86,9 +92,14 @@ export function AgentHubWorkbench({
   platform,
   conversations,
   agents,
+  agentProfilesStatus,
   contacts,
   activeConversationId,
   onActiveConversationChange,
+  onAgentCreate,
+  onAgentUpdate,
+  onAgentDelete,
+  onAgentsRetry,
   transcript,
 }: AgentHubWorkbenchProps): React.ReactElement {
   const fallbackConversationId = conversations[0]?.id ?? 'default';
@@ -974,8 +985,13 @@ export function AgentHubWorkbench({
             <WorkbenchRoutes
               activePage={activePage}
               agents={agents}
+              agentProfilesStatus={agentProfilesStatus}
               contacts={contacts}
               focusedAgentId={focusedAgentId}
+              onAgentCreate={onAgentCreate}
+              onAgentUpdate={onAgentUpdate}
+              onAgentDelete={onAgentDelete}
+              onAgentsRetry={onAgentsRetry}
               onAgentProfileOpen={openAgentProfileFromConfig}
             />
           </section>
