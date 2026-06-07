@@ -28,7 +28,7 @@ export type { GlobalRailProps, GlobalRailPage } from './GlobalRail';
 export type { RightInspectorProps } from './RightInspector';
 export type { TranscriptViewProps } from './TranscriptView';
 export type { UnifiedComposerProps } from './UnifiedComposer';
-export type { WorkbenchRoutesProps } from './WorkbenchRoutes';
+export type { WorkbenchContactsData, WorkbenchRoutesProps } from './WorkbenchRoutes';
 export type { WorkspaceHeaderProps } from './WorkspaceHeader';
 export type {
   DesignFileIconType,

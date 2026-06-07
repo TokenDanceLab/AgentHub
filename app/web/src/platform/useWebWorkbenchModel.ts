@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { ContactMember, WorkbenchContactsData } from '@shared/workbench';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   getWorkbenchDataModeOverrideSnapshot,
@@ -16,6 +17,7 @@ import {
   type TranscriptBlock,
 } from '@shared/transcript';
 import { createHubClient } from '@/api/hubClient';
+import type { ContactInfo } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import {
@@ -91,6 +93,14 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     placeholderData: (previous) => previous,
   });
 
+  const contacts = useQuery({
+    queryKey: ['web-v4', 'hub-contacts', hubReady],
+    queryFn: () => hubClient.listContacts(),
+    enabled: hubReady,
+    staleTime: 10_000,
+    placeholderData: (previous) => previous,
+  });
+
   const resolvedConversations = hubReady && activeHubSessionId
     ? conversations.map((conversation) =>
       conversation.id === activeHubSessionId
@@ -111,9 +121,64 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
 
   return {
     activeConversationId,
+    contacts: resolveWebWorkbenchContacts(contacts.data, hubReady, dataMode),
     conversations: resolvedConversations,
     transcript,
   };
+}
+
+const webHubEmptyContacts: WorkbenchContactsData = {
+  members: [],
+  externalContacts: [],
+  pendingContacts: [],
+  starredContacts: [],
+  groups: [],
+  recentShortcuts: [],
+  orgName: 'TokenDance',
+  orgInitials: 'TD',
+};
+
+function contactInfoToMember(contact: ContactInfo): ContactMember {
+  const displayName = contact.remark?.trim() || contact.nickname?.trim() || contact.username || contact.user_id;
+  return {
+    id: contact.user_id,
+    name: displayName,
+    initials: contactInitials(displayName),
+    org: contact.type === 'external' ? '外部联系人' : 'TokenDance',
+    status: contact.online ? '在线' : '离线',
+    tag: contact.type === 'external' ? 'External' : 'Hub',
+  };
+}
+
+export function resolveWebWorkbenchContacts(
+  contacts: ContactInfo[] | undefined,
+  hubReady: boolean,
+  dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
+): WorkbenchContactsData | undefined {
+  if (!hubReady) {
+    return dataMode === 'real' ? webHubEmptyContacts : undefined;
+  }
+  const members = contacts?.map(contactInfoToMember) ?? [];
+  return {
+    ...webHubEmptyContacts,
+    members,
+    starredContacts: members.slice(0, 2),
+    recentShortcuts: members.slice(0, 3).map((member) => member.name),
+  };
+}
+
+function contactInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'U';
+  const chars = Array.from(trimmed);
+  const asciiWords = trimmed.match(/[A-Za-z0-9]+/g);
+  if (asciiWords && asciiWords.length > 0) {
+    return asciiWords
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() ?? '')
+      .join('') || 'U';
+  }
+  return chars.slice(0, 2).join('').toUpperCase();
 }
 
 export function resolveWebWorkbenchTranscript(

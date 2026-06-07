@@ -696,6 +696,52 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getAllByText('成员策略').length).toBeGreaterThan(0);
   });
 
+  it('renders supplied Hub contacts on the Contacts rail page', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        contacts={{
+          members: [{
+            id: 'hub-user-1',
+            name: 'Hub 联系人',
+            initials: 'HU',
+            org: 'TokenDance',
+            status: '在线',
+            tag: 'Hub',
+          }],
+          recentShortcuts: ['Hub 联系人'],
+          orgName: 'TokenDance',
+          orgInitials: 'TD',
+        }}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '联系人' }));
+
+    const contactsPage = screen.getByRole('heading', { name: '组织内联系人' }).closest('main')!;
+    expect(within(contactsPage).getByText('Hub 联系人')).toBeInTheDocument();
+    expect(within(contactsPage).queryByText('Delicious233')).not.toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: '新的联系人' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '新的联系人' }));
+    const pendingPage = screen.getByRole('heading', { name: '新的联系人' }).closest('main')!;
+    expect(within(pendingPage).queryByText('Nora Wang')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '服务台' }));
+    const servicePage = screen.getByRole('heading', { name: '服务台' }).closest('main')!;
+    expect(within(servicePage).queryByText('账号与权限')).not.toBeInTheDocument();
+  });
+
   it('keeps the Tasks rail page interactive without leaving the v4 table shell', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
