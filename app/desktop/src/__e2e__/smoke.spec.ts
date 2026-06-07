@@ -18,7 +18,7 @@ test.describe('AgentHub Desktop smoke', () => {
     await expect(statusBar).toHaveAttribute('aria-atomic', 'true');
   });
 
-  test('PromptInput is visible and has textarea', async ({ page }) => {
+  test('v4 composer is visible and has textarea', async ({ page }) => {
     await page.goto('/');
     // The textarea exists but may be disabled when the backend is offline.
     // Verify it is present in the DOM and visible.
@@ -28,9 +28,9 @@ test.describe('AgentHub Desktop smoke', () => {
     await expect(textarea).toHaveValue('');
   });
 
-  test('agent selector button exists', async ({ page }) => {
+  test('agent mention button exists', async ({ page }) => {
     await page.goto('/');
-    // The PromptInput renders a button that shows @Agent (or @<name>) to open the agent selector
+    // The v4 composer renders a button that shows @Agent (or @<name>) to open the agent selector.
     const agentBtn = page.locator('button').filter({ hasText: '@' });
     await expect(agentBtn).toBeVisible();
     // The button displays the current agent or the placeholder "@Agent"
@@ -38,13 +38,12 @@ test.describe('AgentHub Desktop smoke', () => {
     expect(btnText).toMatch(/@(Agent|\w+)/);
   });
 
-  test('ThreadPanel is rendered', async ({ page }) => {
+  test('v4 sidebar navigation is rendered', async ({ page }) => {
     await page.goto('/');
-    // Both ThreadPanel and AgentList render <nav> elements.
-    // Verify at least one nav is present as evidence of panel rendering.
+    // Verify shared workbench navigation is present.
     const navs = page.getByRole('navigation');
     await expect(navs.first()).toBeVisible();
-    // There should be at least 2 nav elements: ThreadPanel sidebar + AgentList sidebar
+    // v4 rail and conversation sidebar both expose navigation landmarks.
     await expect(navs).toHaveCount(2);
   });
 });
