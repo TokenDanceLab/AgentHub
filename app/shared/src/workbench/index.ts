@@ -6,6 +6,13 @@ export { TranscriptView } from './TranscriptView';
 export { UnifiedComposer } from './UnifiedComposer';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
+export {
+  DesignFileIcon,
+  DesignNavIcon,
+  getDesignFileIconColor,
+  getDesignFileIconType,
+  profileActionIconName,
+} from './designIcons';
 
 /* ── Types ── */
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
@@ -16,6 +23,10 @@ export type { TranscriptViewProps } from './TranscriptView';
 export type { UnifiedComposerProps } from './UnifiedComposer';
 export type { WorkbenchRoutesProps } from './WorkbenchRoutes';
 export type { WorkspaceHeaderProps } from './WorkspaceHeader';
+export type {
+  DesignFileIconType,
+  DesignNavIconName,
+} from './designIcons';
 
 /* ═══ Pages ═══ */
 export {

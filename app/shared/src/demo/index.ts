@@ -1,4 +1,11 @@
 export {
+  normalizeWorkbenchDataMode,
+} from './dataMode';
+export type {
+  WorkbenchDataMode,
+} from './dataMode';
+
+export {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   createWorkbenchDemoStore,
   demoWorkbenchAgents,

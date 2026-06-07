@@ -223,8 +223,7 @@
 .fileIcon {
   width: 17px;
   height: 17px;
-  border-radius: 0;
-  color: inherit !important;
+  border-radius: 3px;
   flex-shrink: 0;
   display: flex;
   align-items: center;

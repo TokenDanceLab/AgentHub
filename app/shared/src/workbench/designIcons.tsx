@@ -6,15 +6,62 @@ type IconProps = {
   type?: string | undefined;
 };
 
-function normalizeFileType(type: string | undefined, name: string | undefined): string {
+export type DesignFileIconType =
+  | 'css'
+  | 'csv'
+  | 'db'
+  | 'file'
+  | 'git'
+  | 'html'
+  | 'js'
+  | 'link'
+  | 'markdown'
+  | 'md'
+  | 'powershell'
+  | 'ps1'
+  | 'sql'
+  | 'ts'
+  | 'tsx'
+  | 'xlsx'
+  | 'yaml'
+  | 'yml';
+
+const DESIGN_FILE_ICON_TYPES = new Set<DesignFileIconType>([
+  'css',
+  'csv',
+  'db',
+  'file',
+  'git',
+  'html',
+  'js',
+  'link',
+  'markdown',
+  'md',
+  'powershell',
+  'ps1',
+  'sql',
+  'ts',
+  'tsx',
+  'xlsx',
+  'yaml',
+  'yml',
+]);
+
+export function getDesignFileIconType(
+  type: string | undefined,
+  name: string | undefined,
+): DesignFileIconType {
   const fileName = (name ?? '').toLowerCase();
   if (fileName === '.gitignore' || fileName.startsWith('.git')) return 'git';
 
   const ext = fileName.match(/\.([a-z0-9]+)$/)?.[1];
-  return (ext || type || 'file').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const normalized = (ext || type || 'file').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  return DESIGN_FILE_ICON_TYPES.has(normalized as DesignFileIconType)
+    ? normalized as DesignFileIconType
+    : 'file';
 }
 
-function fileIconColor(type: string): string {
+export function getDesignFileIconColor(type: DesignFileIconType): string {
   switch (type) {
     case 'md':
     case 'markdown':
@@ -48,7 +95,7 @@ function fileIconColor(type: string): string {
   }
 }
 
-function fileSvg(type: string): React.ReactElement {
+function fileSvg(type: DesignFileIconType): React.ReactElement {
   const common = {
     'aria-hidden': true,
     viewBox: '0 0 24 24',
@@ -181,12 +228,13 @@ export function DesignFileIcon({
   name,
   type,
 }: IconProps): React.ReactElement {
-  const normalized = normalizeFileType(type, name);
+  const normalized = getDesignFileIconType(type, name);
   return (
     <span
       aria-hidden="true"
       className={className}
-      style={{ color: fileIconColor(normalized) }}
+      data-design-file-icon={normalized}
+      style={{ color: getDesignFileIconColor(normalized) }}
     >
       {fileSvg(normalized)}
     </span>

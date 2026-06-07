@@ -2,7 +2,9 @@ import type { QueryClient } from '@tanstack/react-query';
 import {
   createWorkbenchDemoStore,
   demoWorkbenchAgents,
+  normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
+  type WorkbenchDataMode,
 } from '@shared/demo';
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
@@ -118,8 +120,9 @@ export function webConversationWithPinnedMessages(
 export function resolveWebWorkbenchConversations(
   sessions: Session[] | undefined,
   hubAuthenticated: boolean,
+  dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
 ): WorkbenchConversation[] {
-  if (!hubAuthenticated) return webConversations;
+  if (!hubAuthenticated) return dataMode === 'real' ? [webHubEmptyConversation] : webConversations;
 
   const mapped = sessions
     ?.map(hubSessionToWorkbenchConversation)

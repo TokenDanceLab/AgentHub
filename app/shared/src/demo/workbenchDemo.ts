@@ -19,8 +19,8 @@ export interface WorkbenchDemoStore {
 
 const ROLE_BUILDER = '#5e8dcc';
 const ROLE_REVIEWER = '#409467';
-const ROLE_DEPLOYER = '#f59e0b';
-const ROLE_ORCHESTRATOR = '#6366f1';
+const ROLE_DEPLOYER = '#2b8a9e';
+const ROLE_ORCHESTRATOR = '#5063e8';
 
 export const WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID = 'builder';
 
@@ -161,7 +161,10 @@ const builderTranscript: TranscriptBlock[] = [
     kind: 'text',
     createdAt: '2026-06-06T14:43:00+08:00',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
-    text: '收到，我会先做运行隔离和代码定位。这次任务会按真实执行流推进：建立 worktree、加载调试和验证 skill、读取消息块类型、搜索 SQLite/FTS 入口，再生成迁移草案。',
+    text: '收到，我会先做运行隔离和代码定位\n这次任务会按真实执行流推进：建立 worktree、加载调试和验证 skill、读取消息块类型、搜索 SQLite/FTS 入口，再生成迁移草案。',
+    evidenceRefs: [
+      { id: 'run-b0-sqlite-msg', kind: 'run', label: 'Builder 正在运行', status: 'running' },
+    ],
   },
   {
     id: 'builder-run-1',
@@ -206,6 +209,9 @@ const builderTranscript: TranscriptBlock[] = [
         author: { id: 'builder', name: 'Builder', role: 'agent' },
         content: '正在分析当前 Desktop 消息模型、Edge Server 会话表和本地缓存边界。需要避免把搜索索引和用户草稿放进同一事务。',
         isThinking: true,
+        evidenceRefs: [
+          { id: 'run-b0-sqlite-thinking', kind: 'run', label: '深度思考 · B0 SQLite', status: 'running' },
+        ],
       },
     ],
   },
@@ -228,6 +234,9 @@ const builderTranscript: TranscriptBlock[] = [
         status: 'completed',
         target: 'app/desktop/src/components/ChatView.types.ts',
         summary: '读取 MessageBlock 联合类型和 ToolResultBlock 子类型。',
+        evidenceRefs: [
+          { id: 'ev-read-types', kind: 'tool', label: 'Read ChatView.types.ts', status: 'completed' },
+        ],
       },
       {
         id: 'builder-tool-2',
@@ -237,6 +246,9 @@ const builderTranscript: TranscriptBlock[] = [
         status: 'completed',
         target: 'MessageBlock|tool_use|context_usage|approval',
         summary: '确认 Desktop 历史消息里会出现的结构化块类型。',
+        evidenceRefs: [
+          { id: 'ev-grep-blocks', kind: 'tool', label: 'rg MessageBlock|tool_use|approval', status: 'completed' },
+        ],
       },
       {
         id: 'builder-tool-3',
@@ -246,26 +258,174 @@ const builderTranscript: TranscriptBlock[] = [
         status: 'completed',
         target: 'thread_messages|chat_messages|fts|sqlite',
         summary: '定位 Hub/Edge/Desktop 侧的消息持久化和搜索入口。',
+        evidenceRefs: [
+          { id: 'ev-rg-persistence', kind: 'tool', label: 'rg thread_messages|chat_messages|fts|sqlite', status: 'completed' },
+        ],
       },
     ],
+  },
+  {
+    id: 'builder-found-boundary',
+    kind: 'text',
+    createdAt: '2026-06-06T14:49:00+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    text: '找到迁移边界。消息正文、工具调用、文件变更、审批、上下文使用和子 Agent 事件需要保留 block kind。搜索只走 text/code/status/citation 的摘要字段，其他结构保持 JSON。',
+  },
+  {
+    id: 'builder-subagent-1',
+    kind: 'subagent',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    title: 'Reviewer 复核 schema 风险',
+    worker: 'Reviewer',
+    status: 'running',
+    summary: '检查历史消息、附件索引、搜索回放和审批记录是否会被迁移破坏。',
+    runId: 'review-b0-migration',
   },
   {
     id: 'builder-route-1',
     kind: 'route_decision',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
     action: 'fanout',
-    targetAgent: 'Reviewer',
-    summary: '把 schema 风险、历史消息回放和审批状态恢复拆给 Reviewer 并行复核。',
+    targetAgent: 'Builder',
+    summary: 'Builder 继续产出迁移 SQL；Reviewer 并行复核风险；Browser QA 等待 UI 历史消息块验证。',
+  },
+  {
+    id: 'builder-context-1',
+    kind: 'context_usage',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    modelLabel: 'DeepSeek / DeepSeek-V4-Pro',
+    inputTokens: 38400,
+    outputTokens: 6200,
+    contextLimit: 128000,
+    usagePercent: 0.31,
+  },
+  {
+    id: 'builder-writing-1',
+    kind: 'text',
+    createdAt: '2026-06-06T14:53:00+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    text: '生成迁移草案。我会新增线程表、消息块表和 FTS shadow index。回滚点放在切换查询路径之前，避免旧历史消息不可读。',
+  },
+  {
+    id: 'builder-edit-step-1',
+    kind: 'run_step_group',
+    createdAt: '2026-06-06T14:54:00+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    icon: 'E',
+    title: '已编辑 2 个文件',
+    meta: '生成迁移 SQL，并把线程导航切到新的 updated_at 顺序',
+    status: 'completed',
+    open: true,
+    children: [
+      {
+        id: 'builder-file-1',
+        kind: 'artifact',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        title: 'migrations/0007_chat_threads.sql',
+        action: 'created',
+        additions: 86,
+        deletions: 0,
+        evidenceRefs: [
+          {
+            id: 'file-chat-threads-sql',
+            kind: 'file',
+            label: 'migrations/0007_chat_threads.sql',
+            path: 'migrations/0007_chat_threads.sql',
+            status: 'completed',
+          },
+        ],
+      },
+      {
+        id: 'builder-file-2',
+        kind: 'artifact',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        title: 'hooks/useThreadNavigation.ts',
+        action: 'modified',
+        additions: 24,
+        deletions: 8,
+        evidenceRefs: [
+          {
+            id: 'file-thread-navigation',
+            kind: 'file',
+            label: 'hooks/useThreadNavigation.ts',
+            path: 'hooks/useThreadNavigation.ts',
+            status: 'completed',
+          },
+        ],
+      },
+      {
+        id: 'builder-diff-1',
+        kind: 'diff',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        title: 'migrations/0007_chat_threads.sql',
+        files: ['migrations/0007_chat_threads.sql'],
+        additions: 86,
+        deletions: 0,
+        lines: [
+          {
+            type: 'add',
+            content: 'CREATE TABLE chat_threads (id TEXT PRIMARY KEY, title TEXT NOT NULL, updated_at INTEGER NOT NULL);',
+          },
+          {
+            type: 'add',
+            content: "CREATE VIRTUAL TABLE chat_messages_fts USING fts5(thread_id, author, body, tokenize='unicode61');",
+          },
+          {
+            type: 'add',
+            content: 'CREATE INDEX idx_chat_threads_updated ON chat_threads(updated_at DESC);',
+          },
+        ],
+      },
+    ],
   },
   {
     id: 'builder-approval-1',
     kind: 'approval',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
-    title: '部署/写入审批',
+    title: 'Write File',
     status: 'pending',
     toolName: 'Write File',
     risk: 'medium',
-    reason: '确认 FTS5 只索引可搜索摘要字段',
+    reason: '生成迁移 SQL 和导航 hook 更新，需要写入工作区文件。',
+  },
+  {
+    id: 'builder-verify-step-1',
+    kind: 'run_step_group',
+    createdAt: '2026-06-06T14:56:00+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    icon: 'T',
+    title: '已验证历史消息渲染',
+    meta: 'ChatView snapshot、timeline 展开态、回滚说明均通过',
+    status: 'completed',
+    open: false,
+    children: [
+      {
+        id: 'builder-tool-verify-1',
+        kind: 'tool_call',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        toolName: 'Shell',
+        status: 'completed',
+        target: 'pnpm test ChatView --runInBand',
+        summary: '验证历史消息块、timeline snapshot 和回滚说明渲染。',
+      },
+    ],
+  },
+  {
+    id: 'builder-browser-qa-1',
+    kind: 'child_agent',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    title: 'Browser QA 截图验证',
+    agent: 'Browser QA',
+    status: 'completed',
+    summary: 'Desktop 历史消息中 thinking、tool、subagent、diff、approval 块均可见，左边缘已按消息列对齐。',
+    runId: 'browser-qa-b0',
+  },
+  {
+    id: 'builder-final-1',
+    kind: 'text',
+    createdAt: '2026-06-06T14:57:00+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    text: '迁移方案已完成。产物包括迁移 SQL、线程导航 hook 调整、回滚说明和验证清单。下一步交给 Reviewer 做风险复核，确认后再由 Deployer 做预览发布。',
   },
   {
     id: 'builder-run-complete',
@@ -275,6 +435,9 @@ const builderTranscript: TranscriptBlock[] = [
     duration: '8m12s',
     turns: 7,
     summary: '输入 38.4k · 输出 6.2k · 工具 7 次 · 子 Agent 2 个 · 耗时 8m12s',
+    evidenceRefs: [
+      { id: 'run-b0-sqlite-done', kind: 'run', label: '迁移 SQL · 线程导航 hook · 回滚说明', status: 'completed' },
+    ],
   },
 ];
 

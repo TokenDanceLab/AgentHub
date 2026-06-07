@@ -193,7 +193,7 @@
 .conversationCopy {
   grid-column: 2;
   display: grid;
-  gap: 1px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -995,6 +995,7 @@
   margin: 0;
   font: var(--body);
   line-height: 1.6;
+  white-space: pre-line;
 }
 
 .agentBlockRow {
@@ -1019,6 +1020,48 @@
 
 .nestedTranscriptBlock {
   display: contents;
+}
+
+.runStepThinkingDetail {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--state-thinking) 16%, transparent);
+  border-radius: var(--r-md);
+  background: var(--thinking-bg);
+}
+
+.runStepThinkingHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.runStepThinkingHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--state-thinking);
+  font: 600 0.8125rem var(--font-sans);
+}
+
+.runStepThinkingHead em {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  background: var(--surface-high);
+  color: var(--text-2);
+  font: 600 0.6875rem var(--font-sans);
+  font-style: normal;
+}
+
+.runStepThinkingDetail p {
+  margin: 7px 0 0;
+  color: var(--text-2);
+  font: 400 0.75rem/1.55 var(--font-sans);
 }
 
 /* ── Bubble content typography (mirrors .inline-title / .inline-muted from design demo) ── */
