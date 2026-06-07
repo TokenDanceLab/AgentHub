@@ -28,7 +28,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 完成计划、问题清单、架构与 roadmap 同步 | `git diff --check`；活跃文档无旧主线冲突 |
 | P0-2 | shared UI 工作台边界 | 进行中 | 补 Hub normalize、block renderer 和 design token bridge | shared focused tests 30 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
 | P0-3 | Desktop v4 shell 接入 | 进行中 | 继续替换剩余静态 smoke 数据，并补 inspector resize/collapse | Desktop App v4 focused tests 4 passed；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过，且读取真实 Edge thread 列表、persisted items、live Edge event evidence，可从 v4 composer 提交 Edge run，并在 shared inspector 展示 run/tool/file/artifact evidence；v4 composer approval/workDir/@Agent/浏览器文件附件/Desktop 原生文件附件上下文已传入 Edge `startRun`；files/browser inspector 已通过 platform preview port 打开 evidence target |
-| P0-4 | Web v4 shell 接入 | 进行中 | 继续接 Hub WS 和 remote run submit | Web App focused test 通过；Web typecheck/build 通过；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles`；Web v4 conversations/transcript 已接 Hub sessions/messages |
+| P0-4 | Web v4 shell 接入 | 进行中 | 继续补 Hub task runtime event projection、乐观消息和 Agent Profile -> exact AgentInstance 映射 | Web App focused test 通过；Web typecheck/build 通过；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles`；Web v4 conversations/transcript 已接 Hub sessions/messages；Hub WS 已接 v4 query invalidation；composer submit 已改为真实 Hub message + optional `/web/agent-tasks` |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
 | P0-6 | 旧 UI 清理门禁 | 未开始 | 删除或归档旧 UI 入口，禁止旧文件继续承载活跃路径 | `rg` 旧入口扫描；无双主工作台 |
 
@@ -51,7 +51,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock、Hub message -> TranscriptBlock normalize；下一步补 Hub WS event normalize 与 block renderer。
 - [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer、v4 modes、approval mode、workDir、结构化 @Agent mention、浏览器文件附件和 Desktop 原生文件附件上下文；下一步补 per-conversation draft persistence。
 - [ ] `app/shared/src/inspector/`：首片已建立 evidence 聚合模型，shared workbench 的 overview/browser/files tabs 已显示 run/tool/file/artifact summary、changed files 空/列表状态和 browser capability 状态，并已接入 files/browser evidence preview 打开动作；下一步补 resize/collapse 和更完整 tool timeline。
-- [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface、mock platform、附件 picker port 和 preview port；Desktop/Web 已接实际 adapter，下一步接 Hub REST/WS 数据 adapter。
+- [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface、mock platform、附件 picker port 和 preview port；Desktop/Web 已接实际 adapter；Web 已接 Hub REST session/message/profile、Hub WS query invalidation 和 Hub message/task submit，下一步补 Hub runtime event projection 与 Agent Profile exact dispatch。
 - [ ] 所有共享模块配 focused tests，复杂视觉组件配 stories 或截图场景。
 
 验证记录：
@@ -103,13 +103,14 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 目标：Web 使用同一套工作台，只替换 platform adapter 和数据来源。
 
-- [ ] 建立 `app/web/src/platform/webPlatform.ts`，首片已提供 static Web adapter 和 `preview.openEvidence()` 浏览器打开 port，并补齐 Web Vite/Vitest 的 `lucide-react` alias 以支持 shared workbench 图标双端解析；v4 workbench 的 @Agent 列表已接 Hub `GET /web/agent-profiles`，conversations/transcript 已在 Hub session 下接 `/client/sessions` 和 `/client/sessions/{id}/messages`，未登录时才使用 preview fallback；下一步接入 Hub WS 和远程 run submit。
+- [ ] 建立 `app/web/src/platform/webPlatform.ts`，首片已提供 static Web adapter 和 `preview.openEvidence()` 浏览器打开 port，并补齐 Web Vite/Vitest 的 `lucide-react` alias 以支持 shared workbench 图标双端解析；v4 workbench 的 @Agent 列表已接 Hub `GET /web/agent-profiles`，conversations/transcript 已在 Hub session 下接 `/client/sessions` 和 `/client/sessions/{id}/messages`，未登录时才使用 preview fallback；Hub WS 已接入 sessions/messages query invalidation，composer submit 已改为 Hub `sendMessage` + 选择 @Agent 时触发 `/web/agent-tasks`。下一步补 Hub runtime event projection、乐观消息和 Agent Profile -> exact AgentInstance 映射。
 - [ ] 用 `AgentHubWorkbench` 替换 Web 旧 `ChatView`、`PromptInput`、`ThreadPanel`、`RunDetail`；首片已让 Web App 根入口渲染 shared workbench。
 - [x] Web transcript 与 Desktop transcript 使用同一 block renderer。
 - [x] Web inspector 与 Desktop inspector 使用同一组件，差异只来自 adapter capability。
 - [ ] Web build/typecheck 和核心 UI tests 进入验收门禁；首片证据：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx --reporter=dot`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 均通过；Playwright visual smoke 通过并生成 `.tmp/visual-smoke-web.png`。
 - 2026-06-07：Web `App` 在 `QueryClientProvider` 内通过 `useAgentList(true)` 读取 Hub Agent Profiles，并把 Hub `AgentInfo` 映射为 shared `WorkbenchAgent` 供 v4 composer @Agent 菜单使用；未登录或 Hub 无 profile 数据时保留 preview fallback；同时恢复 `app/web/src/api/edgeClient.ts` Hub-only/stubbed 兼容面，保证浏览器端不重新引入 Local Edge；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 7 个测试通过，`corepack.cmd pnpm typecheck` 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
 - 2026-06-07：新增 `useWebWorkbenchModel()`，Web v4 workbench 在 Hub 登录态读取 Hub sessions/messages，并把 session 映射为 shared conversation、message 映射为 shared transcript；登录但暂无会话时显示明确 Hub 空态，未登录才使用 preview fallback；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 9 个测试通过，Web typecheck/build 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
+- 2026-06-07：新增 `webHubRealtime`，Web v4 在 Hub 登录态连接 `/client/ws`，对 `message.*`、`session.*` 和 `agent.*` 事件执行 `web-v4` sessions/messages query invalidation；`createWebPlatform().runs.submitComposerIntent` 不再本地假提交，改为向 Hub session 发送 message，选择 @Agent 时再以 mention runtime 触发 `/web/agent-tasks` 并把 v4 mode/approval/workDir/attachments 写入 `model_params`；没有 runtimeId 的 @Agent 会在发 Hub 消息前失败并保留草稿。验证：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\platform\webHubRealtime.test.ts src\api\agentQueries.test.ts src\api\hubClient.test.ts --reporter=dot`，5 个文件 / 22 个测试通过；`corepack.cmd pnpm typecheck` 通过；`corepack.cmd pnpm build` 通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/web-v4-hub-realtime-submit-smoke.png` 大小 49494 bytes，DOM 检查确认 shared v4 workspace/composer/inspector 存在、旧 shell 文案不存在且无横向 overflow。
 
 ## P4: Tauri Host API 重构
 
