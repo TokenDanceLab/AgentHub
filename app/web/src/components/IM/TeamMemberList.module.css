@@ -87,7 +87,7 @@
 
 .progressFill {
   height: 100%;
-  background: var(--color-primary, #6366f1);
+  background: var(--color-primary, #0071BC);
   border-radius: 3px;
   transition: width 0.3s ease;
 }
@@ -109,7 +109,7 @@
 }
 
 .roleSupervisor {
-  background: rgba(99, 102, 241, 0.15);
+  background: rgba(0, 113, 188, 0.15);
   color: var(--primary);
 }
 

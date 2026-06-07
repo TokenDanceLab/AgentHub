@@ -8,7 +8,7 @@ import {
   mergeChatMessages,
   sanitizeAgentOutputText,
 } from '@/utils/chatMessages';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 
 describe('chat message projection', () => {
   it('projects persisted Edge user_message items into user bubbles', () => {

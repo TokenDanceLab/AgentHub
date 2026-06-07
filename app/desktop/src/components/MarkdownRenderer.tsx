@@ -46,7 +46,7 @@ function CodeBlock({
   children,
   ...rest
 }: {
-  className?: string;
+  className?: string | undefined;
   children?: React.ReactNode;
 }) {
   const match = /language-(\S+)/.exec(className ?? '');
@@ -85,7 +85,7 @@ function CodeBlock({
 
 // ── Custom component map ──────────────────────────
 const components: Components = {
-  code: CodeBlock as Components['code'],
+  code: CodeBlock,
 };
 
 interface MarkdownRendererProps {

@@ -140,23 +140,23 @@
       "applyGate": "应用关卡",
       "ownerApprovalRequired": "需要 Owner 审批才能应用/丢弃。",
       "noPendingRequest": "没有待处理的审批请求。",
-      "decisionSource": "决策状态来自 Edge API 或 WebSocket 事件。"
+      "decisionSource": "决策状态来自 Hub API 或 WebSocket 事件。"
     },
     "empty": {
       "artifacts": "此 Run 未返回产物。",
       "diffArtifacts": "此 Run 尚未创建产物。",
-      "logs": "Edge 未返回 Run 日志。"
+      "logs": "Hub 未返回 Run 日志。"
     }
   },
   "error": {
-    "edgeUnavailable": "Edge 不可用",
-    "edgeApiTimeout": "Edge API 无响应，请检查 Edge 是否运行在 127.0.0.1:3210。",
-    "edgeEventStream": "Edge 事件流错误"
+    "edgeUnavailable": "Hub runtime 不可用",
+    "edgeApiTimeout": "Hub API 无响应，请检查登录会话和 Hub 连接。",
+    "edgeEventStream": "Hub 事件流错误"
   },
   "state": {
-    "loading": "正在加载 Edge 快照。Reducer 拿到真实数据前，写入操作会保持锁定。",
-    "offlineSnapshot": "Edge 已离线。当前显示最后一次 reducer 快照，写入操作已锁定。",
-    "offlineEmpty": "Edge 不可用，且尚未加载任何快照。页面不会展示伪造的成功状态。",
-    "empty": "尚无 Edge 快照数据。请启动 Edge 以加载项目、线程、Runner 和 Run。"
+    "loading": "正在加载 Hub 快照。Reducer 拿到真实数据前，写入操作会保持锁定。",
+    "offlineSnapshot": "Hub 已离线。当前显示最后一次 reducer 快照，写入操作已锁定。",
+    "offlineEmpty": "Hub 不可用，且尚未加载任何快照。页面不会展示伪造的成功状态。",
+    "empty": "尚无 Hub 快照数据。请登录并连接 Hub 以加载项目、线程、Agent 和 Run。"
   }
 }

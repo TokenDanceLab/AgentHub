@@ -55,20 +55,42 @@ foreach ($relativePath in $RemovedEdgeFiles) {
 $SourceFiles = Get-ChildItem -LiteralPath $WebSrc -Recurse -File |
     Where-Object { $_.Extension -in @(".ts", ".tsx", ".js", ".jsx") }
 
+$BoundaryFiles = Get-ChildItem -LiteralPath $WebSrc -Recurse -File |
+    Where-Object { $_.Extension -in @(".ts", ".tsx", ".js", ".jsx", ".json") }
+
+$JsonFiles = Get-ChildItem -LiteralPath $WebSrc -Recurse -File |
+    Where-Object { $_.Extension -eq ".json" }
+
 $ForbiddenPatterns = @(
     @{ Pattern = "127\.0\.0\.1:3210|localhost:3210"; Label = "Local Edge loopback URL" },
     @{ Pattern = "/v1/events|/v1/runs"; Label = "Local Edge event/run API" },
-    @{ Pattern = "edgeBaseUrl|edgeAuthHeaders|withEdgeAuthQuery|createEventStream"; Label = "legacy Edge bridge helper" }
+    @{ Pattern = "edgeBaseUrl|edgeAuthHeaders|withEdgeAuthQuery|createEventStream"; Label = "legacy Edge bridge helper" },
+    @{ Pattern = "@tauri-apps/|app/desktop/|src-tauri|desktopHost|localEdgeRuntime"; Label = "Desktop/Tauri import or runtime reference" }
 )
 
 foreach ($entry in $ForbiddenPatterns) {
-    $matches = $SourceFiles | Select-String -Pattern $entry.Pattern
+    $matches = $BoundaryFiles | Select-String -Pattern $entry.Pattern
     if ($matches) {
         foreach ($match in $matches) {
             Fail "$($entry.Label) found in $(Relative $match.Path):$($match.LineNumber)"
         }
     } else {
         Pass "$($entry.Label) absent from app/web/src"
+    }
+}
+
+$ForbiddenJsonCopyPatterns = @(
+    @{ Pattern = "Local Edge|本地 Edge|Workbench Edge|工作台 Edge|Edge unavailable/error|Edge 不可用/错误|Edge API did not respond"; Label = "Local Edge user-facing copy" }
+)
+
+foreach ($entry in $ForbiddenJsonCopyPatterns) {
+    $matches = $JsonFiles | Select-String -Pattern $entry.Pattern
+    if ($matches) {
+        foreach ($match in $matches) {
+            Fail "$($entry.Label) found in $(Relative $match.Path):$($match.LineNumber)"
+        }
+    } else {
+        Pass "$($entry.Label) absent from app/web/src JSON"
     }
 }
 
@@ -87,6 +109,18 @@ if (-not (Test-Path -LiteralPath $EdgeClientPath)) {
         Pass "app/web/src/api/edgeClient.ts labels runtime inventory as Hub-only stubbed"
     } else {
         Fail "app/web/src/api/edgeClient.ts must label runtime inventory as Hub-only stubbed"
+    }
+}
+
+$WebPlatformPath = Join-Path $RepoRoot "app/web/src/platform/webPlatform.ts"
+if (-not (Test-Path -LiteralPath $WebPlatformPath)) {
+    Fail "app/web/src/platform/webPlatform.ts missing"
+} else {
+    $webPlatform = Get-Content -Raw -LiteralPath $WebPlatformPath
+    if ($webPlatform.Contains("localEdge: false") -and $webPlatform.Contains("localFiles: false")) {
+        Pass "app/web/src/platform/webPlatform.ts declares no Local Edge or local file capability"
+    } else {
+        Fail "app/web/src/platform/webPlatform.ts must declare localEdge: false and localFiles: false"
     }
 }
 

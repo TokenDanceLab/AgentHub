@@ -22,6 +22,18 @@ const PERMISSION_MODE_OPTIONS: Array<[string, string]> = [
   ['dontAsk', "Don't Ask"],
 ];
 
+function workspaceSettingsFromValues(
+  defaultModel: string,
+  permissionMode: string,
+  customInstructions: string,
+) {
+  return {
+    ...(defaultModel ? { defaultModel } : {}),
+    ...(permissionMode ? { permissionMode } : {}),
+    ...(customInstructions ? { customInstructions } : {}),
+  };
+}
+
 interface WorktreeSectionProps {
   worktreeIsolation: boolean;
   setWorktreeIsolation: (value: boolean) => void;
@@ -63,33 +75,21 @@ export default function WorktreeSection({ worktreeIsolation, setWorktreeIsolatio
   const handleDefaultModelChange = (value: string) => {
     setWorkspaceDefaultModel(value);
     if (currentWorkspace) {
-      writeWorkspaceSettings(currentWorkspace.path, {
-        defaultModel: value || undefined,
-        permissionMode: workspacePermissionMode || undefined,
-        customInstructions: workspaceCustomInstructions || undefined,
-      });
+      writeWorkspaceSettings(currentWorkspace.path, workspaceSettingsFromValues(value, workspacePermissionMode, workspaceCustomInstructions));
     }
   };
 
   const handlePermissionModeChange = (value: string) => {
     setWorkspacePermissionMode(value);
     if (currentWorkspace) {
-      writeWorkspaceSettings(currentWorkspace.path, {
-        defaultModel: workspaceDefaultModel || undefined,
-        permissionMode: value || undefined,
-        customInstructions: workspaceCustomInstructions || undefined,
-      });
+      writeWorkspaceSettings(currentWorkspace.path, workspaceSettingsFromValues(workspaceDefaultModel, value, workspaceCustomInstructions));
     }
   };
 
   const handleCustomInstructionsChange = (value: string) => {
     setWorkspaceCustomInstructions(value);
     if (currentWorkspace) {
-      writeWorkspaceSettings(currentWorkspace.path, {
-        defaultModel: workspaceDefaultModel || undefined,
-        permissionMode: workspacePermissionMode || undefined,
-        customInstructions: value || undefined,
-      });
+      writeWorkspaceSettings(currentWorkspace.path, workspaceSettingsFromValues(workspaceDefaultModel, workspacePermissionMode, value));
     }
   };
 

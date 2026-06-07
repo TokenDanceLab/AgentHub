@@ -35,8 +35,11 @@ import { TeamTaskBoard } from '@/components/IM/TeamTaskBoard';
 import type { TeamTaskDisplay } from '@/components/IM/TeamTaskBoard';
 import { TeamApprovalPanel } from '@/components/IM/TeamApprovalPanel';
 import { TeamEventTimeline } from '@/components/IM/TeamEventTimeline';
-import type { ViewProps } from '@/config/viewRegistry';
 import styles from './TeamRunConsole.module.css';
+
+interface TeamRunConsoleProps {
+  [key: string]: unknown;
+}
 
 // ── helpers ──
 
@@ -67,7 +70,7 @@ function mapMemberDisplays(
     const detail = detailMembers.find((dm) => dm.id === m.member_id);
     return {
       memberId: m.member_id,
-      agentProfileId: m.agent_profile_id,
+      ...(m.agent_profile_id ? { agentProfileId: m.agent_profile_id } : {}),
       role: m.role,
       displayName: detail?.agent_profile_id?.slice(0, 8) ?? m.member_id.slice(0, 8),
       activeTasks: m.active_tasks ?? 0,
@@ -80,16 +83,19 @@ function mapTaskDisplays(
   tasks: AgentTeamTask[],
   memberNames: Record<string, string>,
 ): TeamTaskDisplay[] {
-  return tasks.map((t) => ({
-    taskId: t.id,
-    objective: t.objective ?? '',
-    status: t.status,
-    assigneeMemberId: t.assignee_member_id,
-    assigneeName: t.assignee_member_id ? memberNames[t.assignee_member_id] : undefined,
-    runId: t.run_id,
-    riskLevel: t.risk_level,
-    attempt: t.attempt,
-  }));
+  return tasks.map((t) => {
+    const assigneeName = t.assignee_member_id ? memberNames[t.assignee_member_id] : undefined;
+    return {
+      taskId: t.id,
+      objective: t.objective ?? '',
+      status: t.status,
+      ...(t.assignee_member_id ? { assigneeMemberId: t.assignee_member_id } : {}),
+      ...(assigneeName ? { assigneeName } : {}),
+      ...(t.run_id ? { runId: t.run_id } : {}),
+      ...(t.risk_level ? { riskLevel: t.risk_level } : {}),
+      ...(t.attempt !== undefined ? { attempt: t.attempt } : {}),
+    };
+  });
 }
 
 function activeTaskStatuses(): Set<string> {
@@ -102,7 +108,7 @@ type ConsoleTab = 'members' | 'tasks' | 'approvals' | 'events';
 
 // ── Component ──
 
-export default function TeamRunConsole(_props: ViewProps) {
+export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const { t } = useTranslation();
   const hubAuthenticated = useHubStore((s) => s.authenticated);
 
@@ -129,8 +135,8 @@ export default function TeamRunConsole(_props: ViewProps) {
   const agentTeamsQuery = useHubAgentTeams({
     enabled: hubAuthenticated,
     getToken: tokenGetter,
-    selectedTeamId: selectedTeamId ?? undefined,
-    selectedRunId: selectedRunId ?? undefined,
+    ...(selectedTeamId ? { selectedTeamId } : {}),
+    ...(selectedRunId ? { selectedRunId } : {}),
   });
 
   const teams = agentTeamsQuery.data?.teams ?? [];
@@ -230,7 +236,11 @@ export default function TeamRunConsole(_props: ViewProps) {
   const handleCreateTeam = useCallback(async () => {
     if (!newTeamName.trim()) return;
     try {
-      await createTeamMut.mutateAsync({ name: newTeamName.trim(), description: newTeamDesc.trim() || undefined });
+      const description = newTeamDesc.trim();
+      await createTeamMut.mutateAsync({
+        name: newTeamName.trim(),
+        ...(description ? { description } : {}),
+      });
       setNewTeamName('');
       setNewTeamDesc('');
       setShowCreateTeam(false);

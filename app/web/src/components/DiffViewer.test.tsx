@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '@/i18n';
 import DiffViewer from './DiffViewer';
-import type { FileDiff } from './ChatView.types';
+import type { FileDiff } from '@shared/types/chat';
 
 const sampleDiff: FileDiff = {
   filePath: 'app/web/src/components/DiffViewer.tsx',

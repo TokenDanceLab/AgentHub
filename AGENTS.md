@@ -24,9 +24,9 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
 2. 读 `docs/roadmap.md` 和 `docs/architecture.md` — 当前目标、架构边界和实现阶段。
-3. 做 Desktop/Web v4 重构时，继续读 `docs/desktop-web-v4-clean-rebuild-plan.md` 和 `docs/v4-clean-rebuild-decision-questions.md`。
+3. 做 Desktop/Web v4 重构时，继续读 `docs/desktop-web-v4-clean-rebuild-plan.md`、`docs/v4-frontend-progress-2026-06-07.md` 和 `docs/v4-clean-rebuild-decision-questions.md`。
 4. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
+5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，默认先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行；但本轮 Desktop/Web v4 clean rebuild 用户已明确要求不用 dev-loop，按 `docs/roadmap.md` 和 `docs/desktop-web-v4-clean-rebuild-plan.md` 直接推进。短任务（单文件修复、小改动）不需要。
 6. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
 7. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 8. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
@@ -58,19 +58,20 @@ Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
 
-### Desktop / Mobile 端口与资源分配
+### Desktop / Web / Mobile 端口与资源分配
 
-两个 Tauri 项目独立运行，不得互相占用端口或修改对方配置。
+Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能互相抢占。Mobile 不进入本轮 v4 重构，只保留独立预览端口。
 
-| 资源 | Desktop | Mobile |
-|---|---|---|
-| Tauri 项目 | `app/desktop/src-tauri/` | `app/mobile/src-tauri/` |
-| Vite 开发端口 | **5173** (strict) | **5174** (strict) |
-| Rust crate | `agenthub-desktop` | `agenthub-mobile` |
-| Tauri identifier | `com.agenthub.desktop` | `com.agenthub.mobile` |
-| 前端源码 | `app/desktop/src/` | `app/mobile/src/` |
-| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) |
-| Storybook | 6006 | 无（共用 desktop 的 Storybook） |
+| 资源 | Desktop/Tauri | Web | Mobile |
+|---|---|---|---|
+| Vite 开发端口 | **5173** (strict) | **5174** (strict) | **5175** (strict，非本轮主线) |
+| 前端源码 | `app/desktop/src/` | `app/web/src/` | `app/mobile/src/` |
+| 平台入口 | `app/desktop/src/App.tsx` + Tauri host adapter | `app/web/src/App.tsx` + Hub/Web adapter | Mobile native adaptation |
+| Tauri 项目 | `app/desktop/src-tauri/` | 无 | `app/mobile/src-tauri/` |
+| Rust crate | `agenthub-desktop` | 无 | `agenthub-mobile` |
+| Tauri identifier | `com.agenthub.desktop` | 无 | `com.agenthub.mobile` |
+| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) | 稳定子集 |
+| Storybook | 6006 | 共用 shared/desktop story | 无 |
 
 其他固定端口：
 
@@ -80,14 +81,14 @@ Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri
 | Edge Server (本地) | 3210 | Desktop 本地 Edge |
 | OIDC callback (Desktop) | 随机 (127.0.0.1:0) | Rust TcpListener 动态分配 |
 | OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
-| Web 工作台 | 5175 (预留) | 尚未开发 |
+| Web 工作台 | 5174 | `app/web/vite.config.ts` |
 
 Rust/Tauri 隔离规则：
 
 - **Desktop Agent 只能修改** `app/desktop/src-tauri/`，**Mobile Agent 只能修改** `app/mobile/src-tauri/`。
 - 任何 Agent 不得修改对方的 `tauri.conf.json`、`Cargo.toml`、`lib.rs`。
 - 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate，两边各自在 `Cargo.toml` 中 `[dependencies]` 引用。
-- Desktop 特有功能（tray、Edge 进程管理、keyring）不往 mobile 移植；Mobile 特有功能（deep link、platform secure store）不往 desktop 移植。
+- Desktop 特有功能（tray、Edge 进程管理、keyring）不往 Web/Mobile 移植；Web 只能通过 Hub/Web adapter 访问远端能力；Mobile 特有功能（deep link、platform secure store）不往 desktop 移植。
 - 共享的前端代码（类型、hooks、i18n、UI 组件）放 `app/shared/`，两个项目通过 `workspace:*` 引用。
 
 ### AgentHub 产品术语边界
@@ -181,18 +182,21 @@ git status --short --branch       # 确认只改了允许的路径
 ### 模型分配策略
 
 > AgentHub 项目专用。这里的 `opus` / `sonnet` / `haiku` 是本地 Claude CLI 路由别名，不等于公开 Claude 模型名；Codex 自带 agent 工具单独建模。dev-loop skill 同步更新。
+> 本轮 Desktop/Web v4 clean rebuild 的代码实现主力是 **GLM-5.1 对应的本地 Claude CLI 路由**。如果用户或网关把某个 alias 重新指向 GLM-5.1，派任务前用 `claude -p ... --output-format json` 或 `claude-subagent` skill 的探针确认实际路由，再写入任务卡；不要按公开模型名猜测。
 
 | 入口 | 别名/模型 | 上下文 | 强项 | 优先使用场景 |
 |---|---|---:|---|---|
-| Codex 自带 agent 工具 | GPT-5.5 | 256k | 全方面强，代码、agentic 执行、审查都稳 | 中等上下文内的核心实现、跨前后端小集成、主 Agent 复核前的强力 sidecar |
-| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文 | 大范围阅读、路线图/架构判断、复杂设计评审、安全/方案审查 |
+| Codex 自带 agent 工具 | GPT-5.5 low/mid | 256k | 前端、看图、UI/视觉判断、常规实现和审查 | 前端 UI、截图对比、局部体验判断、常规 code review |
+| Codex 自带 agent 工具 | GPT-5.5 xhigh | 256k | 最强架构推理和复杂工程设计 | 复杂架构、关键方案、跨模块取舍、主 Agent 复核前的高强度 sidecar |
+| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文 | 大范围阅读、文档整理、roadmap/architecture 归纳、竞品/仓库查找、复杂方案审查 |
 | Claude CLI | **sonnet** = GLM-5.1 | 200k | 强代码和 agentic 能力 | 窄范围代码实现、测试修复、Go/TS 小切片、明确文件集的重构 |
 | Claude CLI | **haiku** = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈 | 快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
 
-- **主 Agent（本 session）**：负责决策、分支治理、提交、roadmap、比赛材料和最终验收。
-- **Codex GPT-5.5 subagent**：工具可用时优先用于高价值代码实现或关键 review；上下文 256k，不承担超大仓库研究。
-- **Claude opus**：DeepSeek-V4-Pro，1M 上下文，用于长上下文推理、竞品仓库研究、架构/安全审查。
-- **Claude sonnet**：GLM-5.1，200k 上下文，用于明确路径内的代码实现和 focused tests；每次只给必要文件。
+- **主 Agent（本 session）**：负责架构设计、规划、分支治理、文档、开发进度管理、整体工程化设计和任务拆解。
+- **Codex GPT-5.5 low/mid**：用于看图、前端 UI、截图对比和常规前端判断。
+- **Codex GPT-5.5 xhigh**：用于复杂架构推理、关键方案和高风险设计复核。
+- **Claude opus**：DeepSeek-V4-Pro，1M 上下文，速度快、强推理，用于长文本、找东西、简单文档、架构整理、大范围归纳和复杂方案审查。
+- **Claude sonnet**：GLM-5.1，200k 上下文，强代码模型，用于明确路径内的代码实现和 focused tests；每次只给必要文件。
 - **Claude haiku**：DeepSeek-V4-Flash，200k 上下文，用于快速检查、轻量 review、日志/文档/小范围 UI 可读性审查，不派它做代码主力。
 
 ### Agent 间进度同步
@@ -202,7 +206,7 @@ git status --short --branch       # 确认只改了允许的路径
 ### 仓库级 Skill
 
 - 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`。
-- 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
+- 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）默认先读 `.agents/skills/dev-loop/SKILL.md`；本轮 Desktop/Web v4 clean rebuild 是用户明确排除 dev-loop 的例外，按 roadmap/plan 直接推进。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
 - `docs/architecture.md` 路线图摘要和 `docs/roadmap.md` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
@@ -293,16 +297,20 @@ feat/* → dev/delicious233 → master
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
+| **feat/desktop-web-v4-clean-rebuild** | 当前 Desktop/Web v4 shared UI 主工作树，最终合回 `dev/delicious233` | 当前工作 |
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
 | master | PR-only 稳定快照，v0.1.0 已同步 | ✅ 当前 |
-| origin/dev/trump | Trump 独立分支，与主线大幅分叉（截至 2026-06 快照），代码已过期不建议合入 | 保留，不自动合并 |
-| origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
+| origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线，本轮 Desktop/Web UI 暂不合并 | 隔离 |
+| origin/dev/trump | Trump 分支当前落后主线，无独有提交；不作为本轮 UI 来源 | 保留，不自动合并 |
+| origin/dev/johnny | Johnny 开发线仍有少量独有提交但大幅落后 | 单独审，不直合 |
 | ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
 | ~~OIDC 旧保存分支~~ | 旧保存点已被主文档覆盖 | ✅ 已删除 |
 | ~~codex/johnny-fork~~ | Codex 实验分支 | ✅ 已清理 |
 | ~~codex/trump-ui-fork~~ | Codex UI fork | ✅ 已清理 |
 | ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
 | ~~feat/web-agent-closeout-20260526~~ | WebAgent 收尾 | ✅ 已合入并删除 |
+
+接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按本表直接推断可提交范围。
 | ~~feat/team-hub-authz / team-hub-reliability / team-adapter-compat~~ | 授权、可靠性、adapter 修复 | ✅ 已合入并删除 |
 
 规则：
@@ -315,7 +323,7 @@ feat/* → dev/delicious233 → master
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
-P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P1/P2 的 TokenDance ID、多端、Hub replay 和远程审批仍按 `docs/architecture.md` 路线图摘要的部分闭环继续推进。
+历史本地执行主链路和旧里程碑的已验收子项已合入主线；当前 Desktop/Web v4 clean rebuild 以 `docs/roadmap.md`、`docs/architecture.md` 和 `docs/desktop-web-v4-clean-rebuild-plan.md` 为准。
 
 进度同步：
 
@@ -342,8 +350,7 @@ P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P
 ## 5. 文档规则
 
 - 主文档只保留一份：`docs/architecture.md`。
-- `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
-- `docs/roadmap.md` 是 Sprint 目标和待办清单；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
+- `docs/roadmap.md` 记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。

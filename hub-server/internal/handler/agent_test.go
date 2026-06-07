@@ -15,20 +15,20 @@ import (
 )
 
 type mockAgentService struct {
-	addAgentToSession    func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
-	triggerAgentTask     func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
-	cancelTask           func(ctx context.Context, userID, taskID string) error
-	handleTaskAck        func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
-	handleTaskStream     func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
-	handleTaskDone       func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
-	handleTaskFail       func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
-	listTaskRunEvents    func(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error)
+	addAgentToSession      func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
+	triggerAgentTask       func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
+	cancelTask             func(ctx context.Context, userID, taskID string) error
+	handleTaskAck          func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
+	handleTaskStream       func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
+	handleTaskDone         func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
+	handleTaskFail         func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
+	listTaskRunEvents      func(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error)
 	getTaskRunEventSummary func(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error)
 }
 
-func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
+func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
 	if m.addAgentToSession == nil {
-		return nil
+		return &model.AgentInstance{}, nil
 	}
 	return m.addAgentToSession(ctx, userID, sessionID, agentType, customAgentID, displayName)
 }
@@ -95,13 +95,19 @@ func TestAgentHandler_AddAgentToSession(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		called := false
 		svc := &mockAgentService{
-			addAgentToSession: func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
+			addAgentToSession: func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
 				called = true
 				assert.Equal(t, "user-1", userID)
 				assert.Equal(t, "session-1", sessionID)
 				assert.Equal(t, "coder", agentType)
 				assert.Equal(t, "Code Agent", displayName)
-				return nil
+				return &model.AgentInstance{
+					ID:            "agent-instance-1",
+					AgentType:     agentType,
+					SessionID:     sessionID,
+					InviterUserID: userID,
+					DisplayName:   displayName,
+				}, nil
 			},
 		}
 		h := NewAgentHandler(svc)
@@ -120,6 +126,7 @@ func TestAgentHandler_AddAgentToSession(t *testing.T) {
 
 		require.True(t, called)
 		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "agent-instance-1")
 	})
 
 	t.Run("bad request - missing required fields", func(t *testing.T) {
@@ -143,8 +150,8 @@ func TestAgentHandler_AddAgentToSession(t *testing.T) {
 
 	t.Run("service error", func(t *testing.T) {
 		svc := &mockAgentService{
-			addAgentToSession: func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
-				return errcode.SessionNotFound
+			addAgentToSession: func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
+				return nil, errcode.SessionNotFound
 			},
 		}
 		h := NewAgentHandler(svc)

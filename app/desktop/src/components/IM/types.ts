@@ -2,7 +2,7 @@
 // Extended with Trump's IM enhancements (PR #220): recall, read receipts, friend/notification types.
 // Extended with rich message rendering: optional blocks for Tool/Diff/Thinking/Approval (Sprint #2).
 
-import type { MessageBlock } from '../ChatView.types';
+import type { MessageBlock } from '@shared/types/chat';
 
 export type AuthorityType = 'hub' | 'edge' | 'hybrid';
 
@@ -23,7 +23,7 @@ export interface IMMessage {
   authority: AuthorityType;
   content: string;
   /** Optional structured blocks for rich rendering (Sprint #2).
-   *  When present, IMBlockRenderer renders blocks instead of parsing content. */
+   *  When present, v4 transcript renderers can consume blocks instead of parsing content. */
   blocks?: MessageBlock[];
   timestamp: string;
   replyToId?: string;

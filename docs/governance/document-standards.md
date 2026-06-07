@@ -8,7 +8,7 @@
 |------|------|------|:--:|
 | **路线图** | `docs/roadmap.md` | Sprint 目标 + 待办清单 + 已完成汇总 | Delicious233 |
 | **架构** | `docs/architecture.md` | 产品定位 + 三层架构 + 数据流 + 实现状态 | 三人协商 |
-| **阶段计划** | `docs/<topic>-plan.md` | 当前阶段的实施边界、任务、验收和风险 | 任务负责人 |
+| **阶段计划/进度** | `docs/<topic>-plan.md` / `docs/<topic>-progress-YYYY-MM-DD.md` | 当前阶段的实施边界、任务、验收、风险和阶段性接手摘要 | 任务负责人 |
 | **ADR** | `docs/adr/` | 架构决策记录（11 篇） | 任何人 |
 | **设计** | `docs/designs/` | 组件设计文档（4 篇） | 任何人 |
 | **治理** | `docs/governance/` | 分支规范、文档标准、安全风险 | 三人协商 |
@@ -18,6 +18,7 @@
 ## 命名和格式
 
 - 文件名用小写和连字符：`product-requirements.md`
+- 阶段性进度收口使用 `*-progress-YYYY-MM-DD.md`，必须由 `docs/README.md`、`roadmap.md` 或当前阶段计划链接，不另建状态目录
 - 中文优先，代码标识保持英文
 - 每个文件开头标注最后更新日期
 - 不写绝对路径（`D:\Code\...`）
