@@ -16,7 +16,7 @@
 | 本地相对远端 feature | ahead 3 |
 | 本地相对 `dev/delicious233` | 31 ahead / 11 behind |
 | 工作树 | index 已清空；仍有大量 tracked 和 untracked 工作区变更，必须按 owner 分组 stage |
-| 当前 GitHub PR | 未创建；`gh pr list --head feat/desktop-web-v4-clean-rebuild --base dev/delicious233` 返回空 |
+| 当前 GitHub PR | Draft PR [#291](https://github.com/TokenDanceLab/AgentHub/pull/291) |
 
 本地 ahead 3 个提交：
 
@@ -153,7 +153,7 @@ cd app\desktop; corepack.cmd pnpm exec node .\.tmp\v4_subpage_compare.mjs
 
 ## 合并策略
 
-- 推荐先开 draft PR，标题：`feat(ui): migrate desktop and web to v4 shared workbench`。
+- 已创建 draft PR [#291](https://github.com/TokenDanceLab/AgentHub/pull/291)，标题：`feat(ui): migrate desktop and web to v4 shared workbench`。
 - PR base：`dev/delicious233`。
 - PR head：`feat/desktop-web-v4-clean-rebuild`。
 - 等验证和非前端路径归属确认后再标记 ready。
