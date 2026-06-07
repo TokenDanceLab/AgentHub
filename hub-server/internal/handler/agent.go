@@ -221,7 +221,7 @@ func (h *AgentHandler) TaskEvents(c *gin.Context) {
 	OK(c, events)
 }
 
-// TaskEventSummary GET /web/agent-tasks/:id/events/summary
+// TaskEventSummary GET /web/agent-tasks/:id/events/summary or /web/agent-tasks/:id/summary
 func (h *AgentHandler) TaskEventSummary(c *gin.Context) {
 	userID := c.GetString("user_id")
 	taskID := c.Param("id")
