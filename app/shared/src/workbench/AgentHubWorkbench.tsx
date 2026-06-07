@@ -85,7 +85,7 @@ export interface AgentHubWorkbenchProps {
 export function AgentHubWorkbench({
   platform,
   conversations,
-  agents = [],
+  agents,
   contacts,
   activeConversationId,
   onActiveConversationChange,
@@ -158,7 +158,7 @@ export function AgentHubWorkbench({
   }, [sidebarWidth]);
   const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
   const isChatPage = activePage === 'chat';
-  const mentionableAgents: ComposerMention[] = agents.map((agent) => ({
+  const mentionableAgents: ComposerMention[] = (agents ?? []).map((agent) => ({
     id: agent.id,
     label: agent.name,
     ...(agent.description ? { description: agent.description } : {}),
@@ -499,7 +499,7 @@ export function AgentHubWorkbench({
 
   function agentProfileByName(agentName: string): Omit<AgentProfileState, 'anchor'> | null {
     const normalized = agentName.toLowerCase();
-    const runtimeAgent = agents.find((agent) => agent.name.toLowerCase() === normalized);
+    const runtimeAgent = (agents ?? []).find((agent) => agent.name.toLowerCase() === normalized);
     const configured = configuredAgentProfiles().find((agent) => (
       agent.name.toLowerCase() === normalized || agent.id.toLowerCase() === normalized
     ));

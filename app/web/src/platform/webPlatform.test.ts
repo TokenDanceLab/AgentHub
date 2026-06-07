@@ -37,7 +37,13 @@ describe('webPlatform workbench agent mapping', () => {
       description: 'Runtime: claude-code - Model: glm-5.1',
       profileId: 'agent-profile-1',
       runtimeId: 'claude-code',
+      provider: 'zhipu',
       model: 'glm-5.1',
+      approvalPolicy: 'on-request',
+      permissionMode: 'workspace-write',
+      reasoningEffort: 'high',
+      skills: ['Code', 'Review'],
+      toolAllowlist: ['Read File'],
       status: 'available',
       capabilities: {
         streaming: true,
@@ -56,14 +62,25 @@ describe('webPlatform workbench agent mapping', () => {
       name: 'Hub Builder',
       description: 'Runtime: claude-code - Model: glm-5.1',
       runtimeId: 'claude-code',
+      provider: 'zhipu',
       model: 'glm-5.1',
+      approvalPolicy: 'on-request',
+      permissionMode: 'workspace-write',
+      reasoningEffort: 'high',
+      skills: ['Code', 'Review'],
+      toolAllowlist: ['Read File'],
       status: 'available',
     });
   });
 
-  it('keeps preview fallback agents until Hub profiles are available', () => {
+  it('keeps preview fallback agents until Hub profiles are available in demo-capable modes', () => {
     expect(resolveWebWorkbenchAgents(undefined)).toBe(webAgents);
     expect(resolveWebWorkbenchAgents([])).toBe(webAgents);
+  });
+
+  it('does not fall back to demo agents in real mode', () => {
+    expect(resolveWebWorkbenchAgents(undefined, 'real')).toEqual([]);
+    expect(resolveWebWorkbenchAgents([], 'real')).toEqual([]);
   });
 
   it('maps Hub sessions into shared workbench conversations', () => {
