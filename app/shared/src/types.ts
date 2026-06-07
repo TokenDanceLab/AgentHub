@@ -195,7 +195,9 @@ export interface AgentInfo {
   model?: string;
   provider?: string;
   reasoningEffort?: string;
+  approvalPolicy?: string;
   permissionMode?: string;
+  skills?: string[];
   toolAllowlist?: string[];
   targetPreferences?: Record<string, unknown>;
   status: 'available' | 'unavailable' | 'configuring';
