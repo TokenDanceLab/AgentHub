@@ -29,7 +29,6 @@ import {
   RefreshCw,
   Loader2,
 } from 'lucide-react';
-import type { ViewProps } from '@/config/viewRegistry';
 import { gitStatusChar, type GitStatus } from '@/hooks/useGitStatus';
 import styles from './FileExplorer.module.css';
 
@@ -49,11 +48,12 @@ interface ContextMenuState {
   isDir: boolean;
 }
 
-interface FileExplorerProps extends Partial<ViewProps> {
+interface FileExplorerProps {
   rootDir?: string;
   onFileSelect?: (path: string) => void;
   className?: string;
   gitStatus?: GitStatus | null;
+  [key: string]: unknown;
 }
 
 // ── File extension -> icon mapping ──
@@ -134,7 +134,7 @@ function getFileIcon(filename: string): { Icon: React.ComponentType<{ size?: num
   const ext = getExtension(filename);
   const Icon = FILE_ICON_MAP[ext] || File;
   const color = FILE_COLOR_MAP[ext];
-  return { Icon, color };
+  return color ? { Icon, color } : { Icon };
 }
 
 // ── Component ──

@@ -11,17 +11,25 @@ description: 多 Team 并行开发引擎 — 大规模 Issue 修复、跨模块�
 
 ```
 你（主 Agent）
-  ├── Team Leader 1 (Opus) → Worktree A
-  │     ├── Worker 1 → 修 2-3 issues
-  │     ├── Worker 2 → 修 2-3 issues
-  │     ├── Worker 3 → 修 2-3 issues
-  │     └── Worker 4 → 测试 + 审查
-  ├── Team Leader 2 (Opus) → Worktree B
+  ├── Team Leader 1 (主 Agent 或 GPT-5.5 xhigh) → Worktree A
+  │     ├── Worker 1 (Claude sonnet / GPT-5.5 low-mid) → 修 1-3 issues
+  │     ├── Worker 2 (Claude sonnet / GPT-5.5 low-mid) → 修 1-3 issues
+  │     ├── Worker 3 (Claude haiku) → 快速检查 / 轻量 review（如需要）
+  │     └── Worker 4 (GPT-5.5 xhigh / 主 Agent) → 测试 + 审查
+  ├── Team Leader 2 (主 Agent 或 GPT-5.5 xhigh) → Worktree B
   │     └── ... (同上)
   └── ... (最多 5 个 Team 并行)
 ```
 
 每个 Team 在自己的 worktree 中独立开发，文件范围完全不重叠。
+
+| Agent | 上下文 | 定位 |
+|---|---:|---|
+| GPT-5.5 low/mid | 256k | 前端、看图、截图对比、常规 UI/UX 判断 |
+| GPT-5.5 xhigh | 256k | 复杂架构、关键方案、高风险设计复核 |
+| Claude opus = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文；适合长文本、找东西、简单文档、架构整理、大范围归纳 |
+| Claude sonnet = GLM-5.1 | 200k | 强代码和 agentic 能力；适合明确文件范围内的实现和测试 |
+| Claude haiku = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈；适合快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
 
 ## 何时使用
 
@@ -83,11 +91,12 @@ You are Team Leader for {team_name}. Fix {N} issues ({batch_name}).
 
 1. Create worktree: git worktree add .worktrees/{worktree_name} -b feat/{branch_name}
 2. Read key source files: {file_list}
-3. Spawn 4 Opus workers (Agent tool, mode="bypassPermissions", run_in_background=true)
-   - Worker 1: {issue_list_1}
-   - Worker 2: {issue_list_2}
-   - Worker 3: {issue_list_3}
-   - Worker 4: {issue_list_4}
+3. Spawn workers by task type:
+   - GPT-5.5 low/mid: frontend, screenshots, visual/UI review
+   - GPT-5.5 xhigh: complex architecture and high-risk review
+   - Claude opus: long-text search, docs, architecture整理
+   - Claude sonnet: narrow code fixes with explicit file whitelist
+   - Claude haiku: fast lightweight checks and narrow UI readability review
 4. Each worker: read → write failing test → implement fix → go test passes
 5. Review all work, resolve conflicts, go test -race, commit
 6. Push branch
@@ -145,8 +154,8 @@ git branch -d feat/team-*
 ```
 输入：129 个 Issue，按 label 分组为 5 个批次
 Team 数：5
-每个 Team：1 Leader + 4 Workers = 5 Opus agents
-总 agent 数：25
+每个 Team：1 Leader + 3-4 Workers，按任务类型混用 GPT-5.5 low/mid/xhigh、opus、sonnet、haiku
+总 agent 数：约 20-25
 Worktree 数：5
 
 文件隔离验证（零重叠）:

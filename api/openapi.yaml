@@ -2415,7 +2415,7 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubAddAgentToSession
-      summary: Add an agent to a session.
+      summary: Add an agent instance to a Hub session.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -2430,12 +2430,30 @@ paths:
           application/json:
             schema:
               type: object
-              required: [agent_id]
+              required: [agent_type, display_name]
               properties:
-                agent_id: { type: string }
+                agent_type:
+                  type: string
+                  description: Agent Runtime adapter id such as codex, claude-code, or opencode.
+                custom_agent_id:
+                  type: string
+                  description: Optional legacy CustomAgent id when dispatching a CustomAgent-backed instance.
+                display_name:
+                  type: string
+                  description: User-visible name for this session agent instance.
       responses:
-        "201":
-          $ref: "#/components/responses/Created"
+        "200":
+          description: Created session agent instance.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: ok
+                  data:
+                    $ref: "#/components/schemas/AgentInstance"
 
   /client/sessions/search:
     get:
@@ -4646,6 +4664,35 @@ components:
           type: object
           additionalProperties: true
           description: Capability flags (streaming, toolCalls, fileChanges, etc.).
+    AgentInstance:
+      type: object
+      required: [id, agent_type, session_id, inviter_user_id, display_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Exact Hub AgentInstance id used by /web/agent-tasks agent_instance_id dispatch.
+        agent_type:
+          type: string
+          description: Agent Runtime adapter id such as codex, claude-code, or opencode.
+        custom_agent_id:
+          type: string
+          format: uuid
+          description: Optional legacy CustomAgent id.
+        session_id:
+          type: string
+          format: uuid
+        inviter_user_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
     ExecutionTarget:
       type: object
       required: [id, owner_id, name, target_type, is_online]

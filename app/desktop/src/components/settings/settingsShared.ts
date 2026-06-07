@@ -3,6 +3,7 @@ export const STORAGE_PREFIX = 'agenthub-settings.';
 export const MODEL_OPTIONS = [
   ['auto', 'Auto'],
   ['opus[1m]', 'opus[1m]'],
+  ['newapi/deepseek-v4-pro', 'newapi/deepseek-v4-pro'],
   ['deepseek-v4-pro', 'deepseek-v4-pro'],
   ['deepseek-v4-flash', 'deepseek-v4-flash'],
   ['gpt-5.5', 'gpt-5.5'],

@@ -117,6 +117,41 @@ const (
 	sqlmUpdateTask = `UPDATE "pending_agent_tasks" SET`
 )
 
+func TestAddAgentToSessionReturnsCreatedInstance(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.Session{}, &model.SessionMember{}, &model.AgentInstance{}))
+
+	userID := "00000000-0000-0000-0000-00000000a101"
+	session := &model.Session{
+		Type:        model.SessionTypeGroup,
+		OwnerUserID: &userID,
+	}
+	require.NoError(t, db.Create(session).Error)
+	require.NoError(t, db.Create(&model.SessionMember{
+		SessionID:   session.ID,
+		MemberType:  model.MemberTypeUser,
+		MemberID:    userID,
+		Role:        model.MemberRoleOwner,
+		LastReadSeq: 0,
+	}).Error)
+
+	svc := &AgentService{db: db}
+	agent, err := svc.AddAgentToSession(context.Background(), userID, session.ID, "claude-code", "", "Hub Builder")
+
+	require.NoError(t, err)
+	require.NotNil(t, agent)
+	require.NotEmpty(t, agent.ID)
+	assert.Equal(t, "claude-code", agent.AgentType)
+	assert.Equal(t, session.ID, agent.SessionID)
+	assert.Equal(t, userID, agent.InviterUserID)
+	assert.Equal(t, "Hub Builder", agent.DisplayName)
+
+	var member model.SessionMember
+	require.NoError(t, db.Where("session_id = ? AND member_type = ? AND member_id = ?", session.ID, model.MemberTypeAgent, agent.ID).First(&member).Error)
+	assert.Equal(t, model.MemberRoleMember, member.Role)
+}
+
 func TestPromptFromMessage_TextPayload(t *testing.T) {
 	msg := &model.Message{
 		ContentType: model.ContentTypeText,
