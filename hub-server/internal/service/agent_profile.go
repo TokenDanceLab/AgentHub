@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 
 	"gorm.io/gorm"
 
@@ -101,53 +103,108 @@ func (s *AgentProfileService) Update(ctx context.Context, id, ownerID string, up
 
 	// Apply updates to model fields
 	if v, ok := updates["name"]; ok {
-		if name, ok2 := v.(string); ok2 {
-			p.Name = name
+		name, err := stringUpdateValue("name", v)
+		if err != nil {
+			return nil, err
 		}
+		p.Name = name
 	}
 	if v, ok := updates["description"]; ok {
-		p.Description = v.(string)
+		description, err := stringUpdateValue("description", v)
+		if err != nil {
+			return nil, err
+		}
+		p.Description = description
 	}
 	if v, ok := updates["runtime_id"]; ok {
-		p.RuntimeID = v.(string)
+		runtimeID, err := stringUpdateValue("runtime_id", v)
+		if err != nil {
+			return nil, err
+		}
+		p.RuntimeID = runtimeID
 	}
 	if v, ok := updates["model"]; ok {
-		p.Model = v.(string)
+		modelName, err := stringUpdateValue("model", v)
+		if err != nil {
+			return nil, err
+		}
+		p.Model = modelName
 	}
 	if v, ok := updates["provider"]; ok {
-		p.Provider = v.(string)
+		provider, err := stringUpdateValue("provider", v)
+		if err != nil {
+			return nil, err
+		}
+		p.Provider = provider
 	}
 	if v, ok := updates["reasoning_effort"]; ok {
-		p.ReasoningEffort = v.(string)
+		reasoningEffort, err := stringUpdateValue("reasoning_effort", v)
+		if err != nil {
+			return nil, err
+		}
+		p.ReasoningEffort = reasoningEffort
 	}
 	if v, ok := updates["permission_mode"]; ok {
-		p.PermissionMode = v.(string)
+		permissionMode, err := stringUpdateValue("permission_mode", v)
+		if err != nil {
+			return nil, err
+		}
+		p.PermissionMode = permissionMode
 	}
 	// JSONB fields — validate before applying
 	if v, ok := updates["model_mapping"]; ok {
-		p.ModelMapping = v.(string)
+		modelMapping, err := jsonUpdateValue("model_mapping", v, true)
+		if err != nil {
+			return nil, err
+		}
+		p.ModelMapping = modelMapping
 	}
 	if v, ok := updates["skills"]; ok {
-		p.Skills = v.(string)
+		skills, err := jsonUpdateValue("skills", v, false)
+		if err != nil {
+			return nil, err
+		}
+		p.Skills = skills
 	}
 	if v, ok := updates["mcp_servers"]; ok {
-		p.MCPServers = v.(string)
+		mcpServers, err := jsonUpdateValue("mcp_servers", v, false)
+		if err != nil {
+			return nil, err
+		}
+		p.MCPServers = mcpServers
 	}
 	if v, ok := updates["tool_allowlist"]; ok {
-		p.ToolAllowlist = v.(string)
+		toolAllowlist, err := jsonUpdateValue("tool_allowlist", v, false)
+		if err != nil {
+			return nil, err
+		}
+		p.ToolAllowlist = toolAllowlist
 	}
 	if v, ok := updates["approval_policy"]; ok {
-		p.ApprovalPolicy = v.(string)
+		approvalPolicy, err := jsonUpdateValue("approval_policy", v, true)
+		if err != nil {
+			return nil, err
+		}
+		p.ApprovalPolicy = approvalPolicy
 	}
 	if v, ok := updates["target_preferences"]; ok {
-		p.TargetPreferences = v.(string)
+		targetPreferences, err := jsonUpdateValue("target_preferences", v, true)
+		if err != nil {
+			return nil, err
+		}
+		p.TargetPreferences = targetPreferences
 	}
 	if v, ok := updates["context_budget_max_tokens"]; ok {
 		switch val := v.(type) {
 		case float64:
+			if math.Trunc(val) != val {
+				return nil, errcode.ErrBadRequest.WithMessage("context_budget_max_tokens must be an integer")
+			}
 			p.ContextBudgetMaxTokens = int(val)
 		case int:
 			p.ContextBudgetMaxTokens = val
+		default:
+			return nil, errcode.ErrBadRequest.WithMessage("context_budget_max_tokens must be an integer")
 		}
 	}
 
@@ -278,4 +335,48 @@ func (s *AgentProfileService) Rate(ctx context.Context, profileID, raterID strin
 		return 0, 0, err
 	}
 	return newAvg, newCount, nil
+}
+
+func stringUpdateValue(field string, value any) (string, error) {
+	v, ok := value.(string)
+	if !ok {
+		return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a string", field))
+	}
+	return v, nil
+}
+
+func jsonUpdateValue(field string, value any, wantObject bool) (string, error) {
+	if value == nil {
+		return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must not be null", field))
+	}
+	if s, ok := value.(string); ok {
+		if wantObject {
+			var obj map[string]any
+			if err := json.Unmarshal([]byte(s), &obj); err != nil {
+				return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON object", field))
+			}
+			return s, nil
+		}
+		var arr []any
+		if err := json.Unmarshal([]byte(s), &arr); err != nil {
+			return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON array", field))
+		}
+		return s, nil
+	}
+	if wantObject {
+		if _, ok := value.(map[string]any); !ok {
+			return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON object", field))
+		}
+	} else {
+		switch value.(type) {
+		case []any, []string:
+		default:
+			return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s must be a JSON array", field))
+		}
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return "", errcode.ErrBadRequest.WithMessage(fmt.Sprintf("%s is not valid JSON", field))
+	}
+	return string(encoded), nil
 }
