@@ -1,11 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { useCreateRun } from '@/api/runQueries';
+import { DesktopChrome } from '@/components/DesktopChrome';
 import { createDesktopPlatform, desktopAgents } from '@/platform/desktopPlatform';
 import { useDesktopWorkbenchModel } from '@/platform/useDesktopWorkbenchModel';
 
 export default function App() {
-  const workbench = useDesktopWorkbenchModel();
+  const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
+  const workbench = useDesktopWorkbenchModel(selectedConversationId);
   const createRun = useCreateRun();
   const desktopPlatform = useMemo(() => createDesktopPlatform({
     activeProjectId: workbench.activeProjectId,
@@ -14,12 +16,15 @@ export default function App() {
   }), [createRun.mutateAsync, workbench.activeProjectId, workbench.activeThreadId]);
 
   return (
-    <AgentHubWorkbench
-      activeConversationId={workbench.activeConversationId}
-      agents={desktopAgents}
-      conversations={workbench.conversations}
-      platform={desktopPlatform}
-      transcript={workbench.transcript}
-    />
+    <DesktopChrome>
+      <AgentHubWorkbench
+        activeConversationId={workbench.activeConversationId}
+        agents={desktopAgents}
+        conversations={workbench.conversations}
+        onActiveConversationChange={setSelectedConversationId}
+        platform={desktopPlatform}
+        transcript={workbench.transcript}
+      />
+    </DesktopChrome>
   );
 }

@@ -7,6 +7,7 @@ import {
   hubSessionToWorkbenchConversation,
   resolveWebWorkbenchAgents,
   resolveWebWorkbenchConversations,
+  webConversationWithPinnedMessages,
   webAgents,
   webConversations,
   webHubEmptyConversation,
@@ -81,6 +82,40 @@ describe('webPlatform workbench agent mapping', () => {
 
     expect(resolveWebWorkbenchConversations(undefined, false)).toBe(webConversations);
     expect(resolveWebWorkbenchConversations([], true)).toEqual([webHubEmptyConversation]);
+  });
+
+  it('maps Hub pinned messages into the active workbench conversation', () => {
+    const conversation = {
+      id: 'hub-session-1',
+      title: '真实 Hub 会话',
+      kind: 'group' as const,
+      pinnedAnnouncement: {
+        title: 'stale',
+        content: 'stale pin',
+      },
+    };
+
+    expect(webConversationWithPinnedMessages(conversation, [{
+      id: 'message-pin-1',
+      session_id: 'hub-session-1',
+      seq_id: 2,
+      client_msg_id: 'client-pin-1',
+      sender_type: 'user',
+      sender_id: 'delicious233',
+      content_type: 'text',
+      content: 'Hub 会话自己的置顶',
+      created_at: '2026-06-07T06:49:00Z',
+    }])).toMatchObject({
+      id: 'hub-session-1',
+      pinnedAnnouncement: {
+        title: '真实 Hub 会话',
+        content: 'Hub 会话自己的置顶',
+        author: 'delicious233',
+        sourceId: 'message-pin-1',
+      },
+    });
+
+    expect(webConversationWithPinnedMessages(conversation, [])).not.toHaveProperty('pinnedAnnouncement');
   });
 
   it('submits Hub session messages and triggers the mentioned runtime agent', async () => {

@@ -1,4 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { queryClient } from '@/api/queryClient';
@@ -22,8 +23,9 @@ export default function App() {
 }
 
 function WebWorkbenchRoot() {
+  const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const agentList = useAgentList(true);
-  const workbench = useWebWorkbenchModel();
+  const workbench = useWebWorkbenchModel(selectedConversationId);
   const agents = resolveWebWorkbenchAgents(agentList.data?.items);
 
   return (
@@ -31,6 +33,7 @@ function WebWorkbenchRoot() {
       activeConversationId={workbench.activeConversationId}
       agents={agents}
       conversations={workbench.conversations}
+      onActiveConversationChange={setSelectedConversationId}
       platform={webPlatform}
       transcript={workbench.transcript}
     />

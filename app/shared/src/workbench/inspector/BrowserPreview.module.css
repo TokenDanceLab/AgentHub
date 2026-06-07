@@ -1,0 +1,171 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   BrowserPreview — v4 Browser Chrome Panel
+   Converts .browser-preview-pane / .browser-toolbar / .browser-address /
+   .browser-frame-shell / .browser-frame / .browser-status from demo
+   to CSS Modules using ONLY v4 custom properties.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Root pane ── */
+.pane {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--e-1);
+  animation: editorIn var(--dur-medium) var(--ease);
+}
+
+/* ── Toolbar (back / forward / refresh / address / close) ── */
+.toolbar {
+  min-height: 46px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+}
+
+/* ── Navigation buttons (back, forward, refresh) ── */
+.navBtn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.navBtn:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.navBtn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Address bar ── */
+.address {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-full);
+  background: var(--surface-low);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.addressIcon {
+  width: 15px;
+  height: 15px;
+  display: inline-flex;
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+
+.addressIcon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.addressText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 0.75rem var(--font-mono);
+}
+
+/* ── Iframe shell ── */
+.frameShell {
+  flex: 1;
+  min-height: 0;
+  background: var(--surface-low);
+}
+
+.frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: white;
+}
+
+/* ── Status bar ── */
+.status {
+  min-height: 30px;
+  padding: 0 12px;
+  border-top: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-3);
+  background: var(--surface-low);
+  font: 500 0.6875rem var(--font-sans);
+}
+
+.statusItem {
+  white-space: nowrap;
+}
+
+/* ── Close button (in toolbar) ── */
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.closeBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Entry animation (shared with FilePreview) ── */
+@keyframes editorIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

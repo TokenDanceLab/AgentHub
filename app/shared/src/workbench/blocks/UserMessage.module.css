@@ -1,0 +1,30 @@
+.row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: var(--sp-sm);
+  width: 100%;
+}
+
+.bubble {
+  max-width: 72%;
+  padding: 8px 14px;
+  border-radius: var(--r-lg);
+  background: var(--primary);
+  color: var(--text-inv);
+  font: 400 0.875rem/1.5 var(--font-sans);
+}
+
+/* Mirrors .user-avatar from design demo */
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-highest);
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 0.6875rem var(--font-sans);
+  flex-shrink: 0;
+}
