@@ -4,7 +4,7 @@ import { Check, X, ChevronRight, FileCode } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { EmptyState } from '@shared/ui';
-import type { FileDiff, DiffHunk } from './ChatView.types';
+import type { FileDiff, DiffHunk } from '@shared/types/chat';
 import styles from './DiffViewer.module.css';
 
 interface Props {

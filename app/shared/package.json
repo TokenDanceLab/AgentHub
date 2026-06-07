@@ -12,6 +12,13 @@
     "./errors": "./src/errors.ts",
     "./hubEvents": "./src/hubEvents.ts",
     "./hubClient": "./src/hubClient.ts",
+    "./theme": "./src/theme.ts",
+    "./composer": "./src/composer/index.ts",
+    "./i18n": "./src/i18n/index.ts",
+    "./inspector": "./src/inspector/index.ts",
+    "./platform": "./src/platform/index.ts",
+    "./transcript": "./src/transcript/index.ts",
+    "./workbench": "./src/workbench/index.ts",
     "./surfaceMetadata": "./src/surfaceMetadata.ts",
     "./workbenchState": "./src/workbenchState.ts",
     "./tree": "./src/tree.ts",
@@ -32,14 +39,17 @@
   },
   "peerDependencies": {
     "lucide-react": ">=0.400.0 <2.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-i18next": "^15.0.0"
+    "react": ">=19.2.7",
+    "react-dom": ">=19.2.7",
+    "react-i18next": ">=15.0.0"
   },
   "dependencies": {
+    "@lobehub/icons": "5.10.0",
     "@pierre/diffs": "^1.1.0-beta.18",
+    "devicon": "^2.17.0",
     "diff": "^8.0.2",
-    "prismjs": "^1.30.0"
+    "prismjs": "^1.30.0",
+    "simple-icons": "^16.23.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -50,8 +60,8 @@
     "@types/react-dom": "^19.1.0",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.16.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "~5.8.0",
     "vitest": "^4.1.7"
   }

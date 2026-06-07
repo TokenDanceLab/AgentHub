@@ -14,6 +14,7 @@ import { useHubAgentTeams, useCreateAgentTeam, useStartTeamRun, useDecideTeamApp
 import { createHubClient } from '@/api/hubClient';
 import type {
   AgentTeamDetail,
+  AgentTeamEvent,
   AgentTeamRun,
   AgentTeamTask,
   TeamRunState,
@@ -26,12 +27,13 @@ import { TeamTaskBoard } from '@/components/IM/TeamTaskBoard';
 import type { TeamTaskDisplay } from '@/components/IM/TeamTaskBoard';
 import { TeamApprovalPanel } from '@/components/IM/TeamApprovalPanel';
 import { TeamEventTimeline } from '@/components/IM/TeamEventTimeline';
-import type { ViewProps } from '@/viewRegistryConfig';
 import styles from './TeamRunConsole.module.css';
 
-// ── helpers ──
+interface TeamRunConsoleProps {
+  [key: string]: unknown;
+}
 
-type TeamRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+// ── helpers ──
 
 function statusLabelKey(status: string): string {
   return `teamRun.status.${status}`;
@@ -93,7 +95,7 @@ type ConsoleTab = 'members' | 'tasks' | 'approvals' | 'events';
 
 // ── Component ──
 
-export default function TeamRunConsole(_props: ViewProps) {
+export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const { t } = useTranslation();
   const hubAuthenticated = useHubStore((s) => s.authenticated);
 
@@ -110,7 +112,7 @@ export default function TeamRunConsole(_props: ViewProps) {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('members');
   const [localState, setLocalState] = useState<TeamRunState | null>(null);
   const [localTasks, setLocalTasks] = useState<AgentTeamTask[]>([]);
-  const [localEvents, setLocalEvents] = useState<any[]>([]);
+  const [localEvents, setLocalEvents] = useState<AgentTeamEvent[]>([]);
   const [stateLoading, setStateLoading] = useState(false);
   const [decidingIds, setDecidingIds] = useState<Set<string>>(new Set());
   const [insetTeam, setInsetTeam] = useState<AgentTeamDetail | null>(null);

@@ -1,0 +1,388 @@
+/* ── ProfilePopover — v4 token-only ── */
+
+.popover {
+  position: fixed;
+  z-index: var(--z-profile-popover);
+  width: 352px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  border: 1px solid var(--bdr-strong);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
+  box-shadow: var(--e-3);
+  color: var(--text-1);
+  opacity: 0;
+  transform: translateY(4px) scale(0.985);
+  transform-origin: top left;
+  transition:
+    opacity var(--dur-normal) var(--ease),
+    transform var(--dur-normal) var(--ease);
+  outline: none;
+}
+
+.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ── Head ── */
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bdr);
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  color: var(--text-inv);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  font: 700 0.9375rem var(--font-sans);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+/* Group variant: muted avatar with primary border */
+.group .avatar {
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  box-shadow: none;
+}
+
+.identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  min-width: 0;
+}
+
+.titleRow h3 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 650 0.9375rem/1.25 var(--font-sans);
+}
+
+.badge {
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 0 var(--sp-sm);
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  background: var(--primary-light);
+  color: var(--primary);
+  font: 600 0.6875rem var(--font-sans);
+}
+
+/* Agent variant: warning-colored badge */
+.agent .badge {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.identity p {
+  margin-top: 3px;
+  color: var(--text-2);
+  font: 400 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Actions ── */
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-sm);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bdr);
+}
+
+.actions button {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font: 600 0.75rem var(--font-sans);
+  cursor: pointer;
+  transition: background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.actions button:hover {
+  background: var(--primary-light);
+  border-color: transparent;
+  color: var(--primary);
+}
+
+.actions button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.actions svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Meta ── */
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 9px;
+}
+
+.metaRow {
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  color: var(--text-3);
+  font: 400 0.75rem/1.45 var(--font-sans);
+}
+
+.metaRow strong {
+  min-width: 0;
+  color: var(--text-1);
+  font: 500 0.75rem/1.45 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Account variant
+   ══════════════════════════════════════════════════════════════════ */
+
+.account {
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface) 97%, white 3%);
+  box-shadow: 0 16px 42px rgba(16, 24, 40, 0.12), 0 2px 8px rgba(16, 24, 40, 0.06);
+}
+
+.accountHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: var(--sp-xs) var(--sp-xs) 10px;
+}
+
+.accountAvatar {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+  border-radius: var(--r-md);
+}
+
+.accountStatus {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--success) 22%, var(--bdr));
+  border-radius: var(--r-full);
+  background: var(--success-bg);
+  color: var(--success);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  font: 600 0.6875rem var(--font-sans);
+  cursor: pointer;
+  transition: filter var(--dur-normal) var(--ease);
+}
+
+.accountStatus:hover {
+  filter: brightness(0.95);
+}
+
+.accountStatus:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.accountStatus svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.accountSignature {
+  width: 100%;
+  min-height: 34px;
+  padding: var(--sp-sm) 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-3);
+  text-align: left;
+  font: 400 0.75rem/1.35 var(--font-sans);
+  cursor: text;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.accountSignature:hover {
+  border-color: var(--bdr-strong);
+  color: var(--text-2);
+  background: var(--surface);
+}
+
+.accountSignature:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.accountActions {
+  padding: 10px 0;
+}
+
+/* ── Account Menu ── */
+
+.accountMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0;
+}
+
+.accountMenuRow {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--sp-sm);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-1);
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+  font: 500 0.8125rem var(--font-sans);
+  cursor: pointer;
+}
+
+.accountMenuRow:hover {
+  background: var(--surface-low);
+}
+
+.accountMenuRow:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.accountMenuRow.danger {
+  color: var(--danger);
+}
+
+.menuIcon,
+.menuTail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  opacity: 0.78;
+}
+
+.menuIcon svg,
+.menuTail svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.menuTail {
+  justify-self: end;
+  color: var(--text-3);
+}
+
+.menuSep {
+  height: 1px;
+  margin: 5px 2px;
+  background: var(--bdr);
+}
+
+/* ── Account Spaces ── */
+
+.accountSpaces {
+  margin-top: 7px;
+  padding: var(--sp-sm) 9px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface-low) 74%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.accountSpaceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  min-height: 22px;
+}
+
+.accountSpaceRow strong {
+  min-width: 0;
+  color: var(--text-1);
+  font: 600 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountSpaceRow span {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+}
+
+/* ── Reduced motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .popover,
+  .actions button,
+  .accountStatus,
+  .accountSignature,
+  .accountMenuRow {
+    transition: none;
+  }
+}

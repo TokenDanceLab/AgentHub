@@ -22,7 +22,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { TeamArtifactState } from '@/api/hubClient';
-import type { ChatMessage, MessageBlock } from './ChatView.types';
+import type { ChatMessage, MessageBlock } from '@shared/types/chat';
 import styles from './ArtifactBrowser.module.css';
 
 // ── Types ──────────────────────────────────────
@@ -43,6 +43,10 @@ export interface ArtifactItem {
   diffApplied?: boolean;
   action?: string;
   status?: string;
+}
+
+function compactRecord<T>(value: Record<string, unknown>): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
 }
 
 interface Props {
@@ -185,7 +189,7 @@ function extractArtifactsFromMessages(messages: ChatMessage[] | undefined): Arti
       const artBlock = block as Extract<MessageBlock, { kind: 'artifact' }>;
       const category = mapArtifactBlockType(artBlock.artifactType);
 
-      artifacts.push({
+      artifacts.push(compactRecord<ArtifactItem>({
         id: artBlock.artifactId,
         title: artBlock.title,
         path: artBlock.title,
@@ -195,7 +199,7 @@ function extractArtifactsFromMessages(messages: ChatMessage[] | undefined): Arti
         previewUrl: artBlock.previewUrl,
         canApplyDiff: artBlock.canApplyDiff,
         diffApplied: artBlock.diffApplied,
-      });
+      }));
     }
   }
 
@@ -215,7 +219,7 @@ function mapArtifactBlockType(type: string): ArtifactCategory {
 function extractArtifactsFromTeamState(teamArtifacts: TeamArtifactState[]): ArtifactItem[] {
   return teamArtifacts
     .filter((a) => a.path)
-    .map((a, i) => ({
+    .map((a, i) => compactRecord<ArtifactItem>({
       id: `ta-${a.event_seq ?? i}-${a.path}`,
       title: titleFromPath(a.path),
       path: a.path,
@@ -368,7 +372,7 @@ function PreviewPanel({
               a.href = url;
               a.download = artifact.title;
               a.click();
-              URL.revokeObjectURL(url);
+              setTimeout(() => URL.revokeObjectURL(url), 100);
             }}
             title={t('run.artifact.download')}
           >
@@ -566,7 +570,7 @@ export default function ArtifactBrowser({
                   a.href = url;
                   a.download = artifact.title;
                   a.click();
-                  URL.revokeObjectURL(url);
+                  setTimeout(() => URL.revokeObjectURL(url), 100);
                 }}
                 title={t('run.artifact.download')}
               >
@@ -611,7 +615,7 @@ export default function ArtifactBrowser({
         <PreviewPanel
           artifact={selectedArtifact}
           onClose={() => setSelectedArtifact(null)}
-          onApplyDiff={onApplyDiff}
+          {...(onApplyDiff ? { onApplyDiff } : {})}
         />
       )}
     </section>

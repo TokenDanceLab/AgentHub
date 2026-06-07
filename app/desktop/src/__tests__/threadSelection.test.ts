@@ -7,7 +7,7 @@ describe('resolveThreadSelectionId', () => {
     expect(resolveThreadSelectionId('thread_local')).toBe('thread_local');
   });
 
-  it('accepts ThreadPanel ThreadInfo objects', () => {
+  it('accepts thread info objects from UI shortcuts', () => {
     expect(resolveThreadSelectionId({ threadId: 'thread_local', title: 'Local Thread' })).toBe('thread_local');
   });
 

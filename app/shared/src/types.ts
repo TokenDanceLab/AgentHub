@@ -110,6 +110,16 @@ export interface Message {
   createdAt: string;
 }
 
+export interface ThreadPinInfo {
+  threadId: string;
+  itemId: string;
+  pinnedBy?: string;
+  pinnedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  item?: ThreadItemInfo;
+}
+
 // ── Execution / Runner ─────────────────────────
 
 export interface Runner {

@@ -12,7 +12,7 @@ import {
   GitCommit,
   MessageSquareText,
 } from 'lucide-react';
-import type { FileDiff, DiffHunk } from './ChatView.types';
+import type { FileDiff, DiffHunk } from '@shared/types/chat';
 import { highlightLine, languageFromPath } from '@shared/ui/syntaxHighlight';
 import styles from './DiffViewer.module.css';
 import 'prismjs/themes/prism-tomorrow.css';
@@ -294,12 +294,8 @@ export default function DiffViewer({
                 file={file}
                 expanded={expandedFiles.has(file.filePath)}
                 onToggle={() => toggleFile(file.filePath)}
-                onAcceptFile={
-                  activeTab === 'agent' ? onAcceptFile : undefined
-                }
-                onRejectFile={
-                  activeTab === 'agent' ? onRejectFile : undefined
-                }
+                {...(activeTab === 'agent' && onAcceptFile ? { onAcceptFile } : {})}
+                {...(activeTab === 'agent' && onRejectFile ? { onRejectFile } : {})}
               />
             ))}
           </div>

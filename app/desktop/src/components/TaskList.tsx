@@ -1,6 +1,6 @@
 import { Bot, CheckSquare, GitFork } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { MessageBlock } from './ChatView.types';
+import type { MessageBlock } from '@shared/types/chat';
 import styles from './TaskList.module.css';
 
 type TaskStatus = 'pending' | 'running' | 'completed' | 'failed';

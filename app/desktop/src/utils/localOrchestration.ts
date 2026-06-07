@@ -30,8 +30,8 @@ export function resolveLocalOrchestration(
 
   return {
     available: Boolean(orchestrator && orchestrator.status === 'available'),
-    orchestratorId: orchestrator?.id,
-    orchestratorName: orchestrator?.name,
+    ...(orchestrator?.id ? { orchestratorId: orchestrator.id } : {}),
+    ...(orchestrator?.name ? { orchestratorName: orchestrator.name } : {}),
     availableSubAgents,
     selected: Boolean(orchestrator && selectedAgentId === orchestrator.id),
   };

@@ -1,0 +1,111 @@
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 0 2px;
+}
+
+.avatar {
+  border: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 10px var(--font-sans);
+  color: white;
+  flex-shrink: 0;
+  background: var(--surface-highest);
+  cursor: pointer;
+  outline: none;
+  transition: box-shadow var(--dur-normal) var(--ease),
+    filter var(--dur-normal) var(--ease);
+}
+
+.avatar:hover {
+  filter: brightness(0.96);
+}
+
+.avatar:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.name {
+  font: 500 0.75rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.time {
+  font: 400 0.625rem var(--font-mono);
+  color: var(--text-3);
+}
+
+/* ── Status badges (mirrors .badge-* from design demo) ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  font: 500 0.75rem var(--font-sans);
+  white-space: nowrap;
+}
+
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.badgeThinking {
+  background: var(--thinking-bg);
+  color: var(--state-thinking);
+}
+
+.badgeSuccess {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.badgeWarning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badgeDanger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.badgePrimary {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.bubble {
+  --_agent-inset: var(--agent-inset, 34px);
+  --_bubble-col: var(--bubble-col, 100%);
+
+  width: min(calc(100% - var(--_agent-inset)), var(--_bubble-col));
+  max-width: calc(100% - var(--_agent-inset));
+  margin-left: var(--_agent-inset);
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  font: var(--body);
+  line-height: 1.6;
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  color: var(--text-1);
+  box-shadow: var(--e-1);
+}

@@ -1,4 +1,4 @@
-// Health polling hook. Periodically checks Edge availability.
+// Health polling hook. Reports browser Hub runtime availability.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { HealthResponse } from '@shared/types';
@@ -32,7 +32,7 @@ export function useHealth(): HealthState {
         edgeId: 'web-hub-only',
         checks: {
           executor: { status: 'stubbed', message: 'Web connects through Hub.' },
-          runners: { status: 'stubbed', message: 'Runtime readiness is reported by Desktop/Local Edge.', total: 0, available: 0, items: [] },
+          runners: { status: 'stubbed', message: 'Runtime readiness is reported by Hub Agent Profiles and registered execution targets.', total: 0, available: 0, items: [] },
         },
       });
       setOnline(true);

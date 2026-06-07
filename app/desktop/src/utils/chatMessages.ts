@@ -1,4 +1,4 @@
-import type { ChatMessage, MessageRole } from '@/components/ChatView.types';
+import type { ChatMessage, MessageRole } from '@shared/types/chat';
 
 export interface ThreadItemLike {
   id?: string;

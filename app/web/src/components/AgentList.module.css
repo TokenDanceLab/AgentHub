@@ -273,7 +273,7 @@
 
 /* ── Highlight ─────────────────────────────── */
 .highlight {
-  background: rgba(99,102,241,0.15);
+  background: rgba(0,113,188,0.15);
   color: var(--primary);
   border-radius: 2px;
   padding: 0 1px;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { MessageBlock, ToolResultBlock } from './ChatView.types';
+import type { MessageBlock, ToolResultBlock } from '@shared/types/chat';
 import { FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench } from 'lucide-react';
 import styles from './ToolGroup.module.css';
 
@@ -29,7 +29,7 @@ function getSemanticTitle(toolName: string, input: Record<string, unknown>): str
   if (/bash|shell|exec|terminal|run/.test(lower)) {
     const cmd = typeof input.command === 'string' ? input.command : '';
     const lines = cmd.split('\n');
-    const firstLine = lines[0].trim();
+    const firstLine = lines[0]?.trim() ?? '';
     const display = firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine;
     return display ? `Run: ${display}` : 'Run command';
   }
@@ -128,7 +128,8 @@ function resolveToolIcon(toolName: string) {
   return <Icon size={13} />;
 }
 
-function summarizeInput(input: Record<string, unknown>): string {
+function summarizeInput(input: Record<string, unknown> | null | undefined): string {
+  if (!input) return '(no input)';
   const parts: string[] = [];
   if (typeof input.file_path === 'string') parts.push(input.file_path);
   else if (typeof input.path === 'string') parts.push(input.path);

@@ -1,4 +1,4 @@
-// Transport abstraction layer for AgentHub Desktop.
+// Transport abstraction layer for AgentHub Web.
 // Hides connection details behind a common interface with built-in
 // offline queue, exponential backoff reconnection, and localStorage persistence.
 

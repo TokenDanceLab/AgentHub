@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import DiffViewer from '@/components/DiffViewer';
-import type { FileDiff } from '@/components/ChatView.types';
+import type { FileDiff } from '@shared/types/chat';
 
 function makeHunk(overrides: Partial<FileDiff['hunks'][number]> = {}) {
   return {
