@@ -175,6 +175,8 @@ tmp/
 !.agents/skills/ui-screenshot/**
 !.agents/skills/dev-team/
 !.agents/skills/dev-team/**
+!.agents/skills/dev-team-codex/
+!.agents/skills/dev-team-codex/**
 
 # =============================================================================
 # Screenshots & Raster Images (dev artifacts, not production assets)
