@@ -41,8 +41,8 @@
 }
 
 .badgePrimary {
-  background: var(--primary-soft, rgba(80,99,232,0.11));
-  color: var(--primary, #5063e8);
+  background: var(--primary-soft, rgba(0,113,188,0.11));
+  color: var(--primary, #0071BC);
 }
 
 .badgeDanger {
@@ -82,7 +82,7 @@
 
 .url {
   font: 400 0.6875rem var(--font-mono, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace);
-  color: var(--primary, #5063e8);
+  color: var(--primary, #0071BC);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -117,12 +117,12 @@
 }
 
 .previewBtn {
-  background: var(--primary, #5063e8);
+  background: var(--primary, #0071BC);
   color: var(--text-inv, #ffffff);
 }
 
 .previewBtn:hover {
-  background: var(--primary-hover, #3f4fcc);
+  background: var(--primary-hover, #005F9F);
   box-shadow: var(--e-1, 0 1px 2px rgba(0,0,0,0.05));
 }
 

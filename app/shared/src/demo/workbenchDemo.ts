@@ -30,7 +30,7 @@ export interface WorkbenchDemoRuntimeStore {
 const ROLE_BUILDER = '#5e8dcc';
 const ROLE_REVIEWER = '#409467';
 const ROLE_DEPLOYER = '#2b8a9e';
-const ROLE_ORCHESTRATOR = '#5063e8';
+const ROLE_ORCHESTRATOR = '#0071BC';
 
 export const WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID = 'builder';
 const BUILDER_PINNED_ANNOUNCEMENT =

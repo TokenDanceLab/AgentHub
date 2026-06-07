@@ -172,7 +172,7 @@
   /* ═══════════════════════════════════════════════════════════════════════
      v4 Role Colors
      ═══════════════════════════════════════════════════════════════════════ */
-  --role-orchestrator: #5063e8;
+  --role-orchestrator: #0071BC;
   --role-builder:      #5e8dcc;
   --role-reviewer:     #409467;
   --role-deployer:     #2b8a9e;
@@ -211,7 +211,7 @@
   --glass-panel-overlay: rgba(30, 30, 37, 0.98);
 
   /* Tinted glass */
-  --glass-tint-plum: rgba(99, 102, 241, 0.12);
+  --glass-tint-plum: rgba(0, 113, 188, 0.12);
   --glass-tint-moss: rgba(34, 197, 94, 0.12);
   --glass-tint-danger: rgba(239, 68, 68, 0.1);
   --glass-tint-amber: rgba(245, 158, 11, 0.12);
