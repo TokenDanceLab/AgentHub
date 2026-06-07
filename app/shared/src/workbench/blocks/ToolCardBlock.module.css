@@ -1,0 +1,86 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.card:hover {
+  background: var(--surface);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+.icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--primary-light);
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+  font: 700 0.6875rem var(--font-mono);
+  transition: background var(--dur-normal) var(--ease);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font: 500 0.8125rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.path {
+  font: 400 0.6875rem var(--font-sans);
+  color: var(--text-3);
+}
+
+.description {
+  margin-top: 4px;
+  color: var(--text-2);
+  font: 400 0.75rem/1.45 var(--font-sans);
+}
+
+.status {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  background: var(--surface-high);
+  color: var(--text-2);
+  font: 600 0.6875rem var(--font-sans);
+  white-space: nowrap;
+}
+
+.statusCompleted {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.statusRunning {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.statusFailed {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.statusPending {
+  background: var(--warning-bg);
+  color: var(--warning);
+}

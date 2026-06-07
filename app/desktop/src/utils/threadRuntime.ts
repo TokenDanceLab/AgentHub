@@ -1,5 +1,5 @@
 import type { AgentInfo } from '@shared/types';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 
 const STOP_TOKENS = new Set(['agent', 'adapter', 'code', 'local', 'runtime']);
 

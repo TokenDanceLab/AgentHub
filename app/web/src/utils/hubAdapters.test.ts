@@ -3,8 +3,8 @@ import {
   agentRunEventToChatMessage,
   hubMessageToChatMessage,
   mergeAgentRunEvents,
-  projectRunDetail,
-  projectRunEvents,
+  projectRunEvidence,
+  projectRunEventEvidence,
 } from './hubAdapters';
 
 describe('hubMessageToChatMessage runtime payloads', () => {
@@ -107,7 +107,7 @@ describe('hubMessageToChatMessage runtime payloads', () => {
     expect(message.blocks).toEqual([{ kind: 'text', content: 'not a tool result' }]);
   });
 
-  it('projects runtime blocks into RunDetail data', () => {
+  it('projects runtime blocks into run evidence data', () => {
     const messages = [
       hubMessageToChatMessage({
         id: 'msg-text',
@@ -157,7 +157,7 @@ describe('hubMessageToChatMessage runtime payloads', () => {
       }),
     ];
 
-    expect(projectRunDetail(messages)).toEqual({
+    expect(projectRunEvidence(messages)).toEqual({
       outputText: 'analysis complete',
       toolCalls: [
         {
@@ -178,7 +178,7 @@ describe('hubMessageToChatMessage runtime payloads', () => {
     });
   });
 
-  it('projects typed Hub run events into RunDetail data', () => {
+  it('projects typed Hub run events into run evidence data', () => {
     const events = [
       {
         id: 'evt-1',
@@ -224,7 +224,7 @@ describe('hubMessageToChatMessage runtime payloads', () => {
       },
     ];
 
-    expect(projectRunEvents(events)).toEqual({
+    expect(projectRunEventEvidence(events)).toEqual({
       outputText: 'Hello from Codex',
       toolCalls: [
         {
@@ -266,7 +266,7 @@ describe('hubMessageToChatMessage runtime payloads', () => {
   });
 
   it('projects stdout run.output.batch chunks from typed run events', () => {
-    expect(projectRunEvents([
+    expect(projectRunEventEvidence([
       {
         id: 'evt-output',
         task_id: 'task-1',

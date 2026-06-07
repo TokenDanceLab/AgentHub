@@ -1,0 +1,199 @@
+.step {
+  width: min(calc(100% - var(--agent-inset)), var(--bubble-col));
+  max-width: calc(100% - var(--agent-inset));
+  margin-left: var(--agent-inset);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.open {
+  border-color: var(--bdr);
+  background: var(--surface);
+  box-shadow: var(--e-1);
+}
+
+.toggle {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13.3333px;
+  line-height: normal;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.toggle:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.toggle:active {
+  background: var(--surface-low);
+}
+
+.toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--bdr);
+  color: var(--text-3);
+  font: 700 0.6875rem var(--font-mono);
+}
+
+.running .icon {
+  color: var(--state-thinking);
+  border-color: color-mix(in srgb, var(--state-thinking) 28%, var(--bdr));
+  background: var(--thinking-bg);
+}
+
+.completed .icon {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 24%, var(--bdr));
+  background: var(--success-bg);
+}
+
+.failed .icon {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--bdr));
+  background: var(--danger-bg);
+}
+
+.copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.copy strong {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  font: 500 0.8125rem var(--font-sans);
+}
+
+.copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font: 400 0.75rem var(--font-sans);
+}
+
+.open .copy strong,
+.toggle:hover .copy strong {
+  color: var(--text-1);
+}
+
+.status {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  display: block;
+  background: transparent;
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+  flex: 0 0 auto;
+}
+
+.completed .status {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.running .status {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.failed .status {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.chevron {
+  width: 20px;
+  height: 20px;
+  margin-left: 0;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--text-3);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-medium) var(--ease-panel);
+}
+
+.chevron svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.toggle:hover .chevron {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.open .chevron {
+  transform: rotate(180deg);
+}
+
+.detail {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    grid-template-rows var(--dur-panel) var(--ease-panel),
+    opacity var(--dur-medium) var(--ease),
+    transform var(--dur-medium) var(--ease);
+}
+
+.open .detail {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.detailInner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
