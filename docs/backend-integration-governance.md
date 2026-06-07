@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 05:25 +08:00
+> 最后更新：2026-06-08 05:34 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -91,7 +91,7 @@ next: <1-3 steps>
 8. **F. Edge local Thread pins**：已合入 `dev/delicious233`，提交 `75bcf144 feat(edge): add local thread item pins`。范围只有 `edge-server/internal/store/`、`edge-server/internal/api/`、`api/openapi.yaml`、`api/events.md` 和本文档/roadmap；实现 `/v1/threads/{threadId}/pins` GET/POST/DELETE、`ThreadPin` snapshot 持久化、thread delete/run cleanup 级联清理、事件 `thread.pin.created/deleted` 和 OpenAPI 合同。验证 `go test ./internal/store -run "ThreadPin|Pins|CleanupRuns|FileStore" -count=1`、`go test ./internal/api -run "ThreadPin|ThreadPins|PostThreadMessage" -count=1`、`go test ./internal/api ./internal/store -short -count=1`、`edge-server go test ./... -short -count=1`、OpenAPI YAML parse 和 diff check 通过；未运行真实 CLI/model。
 9. **API/Event route summary alias**：已合入 `dev/delicious233`，提交 `51ac4b8c fix(api): add agent task summary alias`。该片只补 Hub `GET /web/agent-tasks/:id/summary` 到既有 `TaskEventSummary`，并在 OpenAPI 增加 `/web/agent-tasks/{id}/summary` 兼容 alias；不改前端、Edge、runtime schema 或真实 CLI gate。
 10. **G1. Hub AgentProfile read-through**：已合入 `dev/delicious233`，提交 `c30cbeec feat(web): 接入 Hub AgentProfile 到 Agents 页`。该前端切片只把 Hub `/web/agent-profiles` 投影到 shared Agents 页已安装列表和 `WorkbenchAgent` 字段，阻断 Web real mode demo agent fallback；不做 AgentProfile CRUD、自建 Agent、市场闭环、TeamRun Orchestrator、Edge SQL 或真实 CLI/model gate。
-11. **G0. Edge repository contract harness**：独立切片 `codex/edge-store-contract` 只新增 `edge-server/internal/store/store_contract_test.go`，让 in-memory `Store` 与 JSON `FileStore` 共跑生命周期、pins、thread delete cascade、run cleanup cascade 和 snapshot restore 合同；不引入 SQL、migration、Hub DB 或 API schema 变化。
+11. **G0. Edge repository contract harness**：已合入 `dev/delicious233`，提交 `4a5ccaf3 test(edge): add store repository contract harness`。该片只新增 `edge-server/internal/store/store_contract_test.go` 并更新本文档/roadmap，让 in-memory `Store` 与 JSON `FileStore` 共跑生命周期、pins、thread delete cascade、run cleanup cascade、FileStore 删除持久化和 snapshot restore 合同；不引入 SQL、migration、Hub DB 或 API schema 变化。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -177,7 +177,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 先完成 `codex/edge-store-contract` 复验和合入；该片只加 Edge store 合同测试，不消费真实 CLI/model，不等于 SQL store 上线。
-2. 再决定下一片是 AgentProfile CRUD/empty/error、ExecutionTarget inventory、Hub Projects backed by `workspaces`，还是 Edge SQL store proposal；涉及 schema 的都需要先发 AH-SYNC proposal，明确 ownership、migration/rollback 和 artifact/diff/preview out-of-scope。
+1. 决定下一片是 AgentProfile CRUD/empty/error、ExecutionTarget inventory、Hub Projects backed by `workspaces`，还是 Edge SQL store proposal；涉及 schema 的都需要先发 AH-SYNC proposal，明确 ownership、migration/rollback 和 artifact/diff/preview out-of-scope。
+2. `codex/event-contract-docs` 是后端新提交的 docs/test-only 候选，可在 G0 之后独立 review；不要把它解释为 runtime schema rename 或真实 CLI/model readiness。
 3. D1b/D2/D3 单独排期；D3 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge。
