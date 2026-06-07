@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '@/i18n';
 import ChatView from './ChatView';
 import IMMessageView from './IM/IMMessageView';
-import type { ChatMessage } from './ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import type { IMMessage } from './IM/types';
 
 vi.mock('@tanstack/react-virtual', () => ({

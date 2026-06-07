@@ -77,6 +77,7 @@ $ForbiddenImports = @(
     @{ Pattern = "from ['""]@/components/IM/IMBlockRenderer['""]|import\(['""]@/components/IM/IMBlockRenderer['""]\)"; Label = "old IMBlockRenderer import" },
     @{ Pattern = "from ['""]@/hooks/useChatMessages['""]|import\(['""]@/hooks/useChatMessages['""]\)"; Label = "old useChatMessages import" },
     @{ Pattern = "from ['""]@/hooks/useIMChat['""]|import\(['""]@/hooks/useIMChat['""]\)"; Label = "old useIMChat import" },
+    @{ Pattern = "from ['""](@/components/ChatView\.types|\./ChatView\.types|\.\./ChatView\.types)['""]|import\(['""](@/components/ChatView\.types|\./ChatView\.types|\.\./ChatView\.types)['""]\)"; Label = "old ChatView.types import" },
     @{ Pattern = "from ['""]@/(config/viewRegistry|viewRegistryConfig|views/viewRegistry)['""]|import\(['""]@/(config/viewRegistry|viewRegistryConfig|views/viewRegistry)['""]\)"; Label = "old viewRegistry import" }
 )
 

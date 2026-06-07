@@ -12,7 +12,7 @@ import {
   GitCommit,
   MessageSquareText,
 } from 'lucide-react';
-import type { FileDiff, DiffHunk } from './ChatView.types';
+import type { FileDiff, DiffHunk } from '@shared/types/chat';
 import { highlightLine, languageFromPath } from '@shared/ui/syntaxHighlight';
 import styles from './DiffViewer.module.css';
 import 'prismjs/themes/prism-tomorrow.css';

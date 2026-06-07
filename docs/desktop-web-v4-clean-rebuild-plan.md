@@ -194,6 +194,7 @@ app/desktop/src-tauri/src/
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeEdgeEvents.ts` 和测试，把 live Edge `run.*`、`run.agent.*`、`artifact.created` 事件映射为 shared `TranscriptBlock` 与 run/tool/file/artifact evidence；focused shared tests 更新为 6 个文件 / 14 个测试通过。
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeHubMessages.ts` 和测试，把 Hub session messages 映射为 shared `TranscriptBlock`，Web v4 不再依赖旧 `ChatView` 消息转换；focused shared tests 中相关 4 个文件 / 15 个测试通过。
 - 2026-06-07：新增 `normalizeHubRuntimeEventsToTranscript`，复用 Edge runtime normalizer，把 Hub WS `agent.stream` payload 的 `event_type/payload/edge_run_id/session_id` 投影成 shared transcript blocks，并保留 run/tool/artifact preview evidence；focused shared tests 更新为 11 个文件 / 36 个测试通过。
+- 2026-06-07：shared `types/chat.ts` 升级为旧 `ChatView.types` 迁移兼容合同，新增 `ReplyTarget`、显式 `undefined` 兼容字段和 `chat.test.ts`；Desktop/Web/shared 的旧 `ChatView.types` 类型 import 已迁到 shared，`verify-v4-old-ui-active-paths.ps1` 已新增旧 `ChatView.types` active import 回归检查。验证：shared `src\types\chat.test.ts` + `src\ui\MessageSearchPanel.test.tsx` 2 文件 / 13 测试通过；Desktop typecheck 通过；Web typecheck 通过；Web Diff/MessageTime focused tests 2 文件 / 4 测试通过；Desktop Diff/Search focused tests 2 文件 / 25 测试通过；v4 old UI active path boundary 17/17 通过。
 
 ### Task 5: composer 收敛
 
@@ -352,6 +353,7 @@ cd app/web; corepack.cmd pnpm typecheck
 执行记录：
 - 2026-06-07：删除 Desktop/Web 旧 registry、旧 `MainView/IMView` active route、Desktop 旧 `RunDetail/RightInspector/PermissionDialog` 和 Web 孤儿 `PermissionDialog`；新增 `scripts/verify-v4-old-ui-active-paths.ps1`，阻断 active Desktop/Web source 重新 import 旧 `ChatView`、`PromptInput`、`RunDetail`、`ThreadPanel`、`IMBlockRenderer`、`useChatMessages`、`useIMChat` 或旧 `viewRegistry`。验证：Desktop typecheck/build 通过；Web focused tests 6 个文件 / 32 个测试通过；Web typecheck/build 通过；Desktop App v4 focused tests 1 个文件 / 4 个测试通过；Web Hub-only boundary 12/12 通过；v4 old UI active path boundary 16/16 通过；Desktop/Web 1440x920 Playwright smoke 通过。
 - 2026-06-07：只读 `opus` 子代理盘点剩余旧 UI 债务，结论是先迁移 shared `ChatMessage/FileDiff` 兼容合同，再删除旧 Chat/Prompt/Thread/IM hook 本体；该输出仅作为架构辅助，不作为测试证据。
+- 2026-06-07：旧 `ChatView.types` 类型 import 已迁到 shared `types/chat.ts`，门禁脚本新增旧类型 active import 检查并通过 17/17；下一步可删除旧 `ChatView.types.ts` 文件和依赖它的旧组件本体/旧测试。
 
 ## 6. 验收命令
 
