@@ -30,12 +30,14 @@ describe('normalizeHubMessagesToTranscript', () => {
       {
         id: 'hub-message-message-user',
         author: { id: 'user-1', name: 'Delicious233', role: 'human' },
+        createdAt: '2026-06-07T07:00:01Z',
         kind: 'text',
         text: '从 Hub session 发来的消息',
       },
       {
         id: 'hub-message-message-agent',
         author: { id: 'agent-1', name: 'Hub Builder', role: 'agent' },
+        createdAt: '2026-06-07T07:00:02Z',
         kind: 'text',
         text: '来自 Hub Agent 的回复',
       },
