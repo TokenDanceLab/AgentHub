@@ -182,6 +182,13 @@ app/desktop/src-tauri/src/
 - [ ] renderer 复用 shared UI 卡片，不复制 Desktop 旧 renderer。
 - [ ] 覆盖 null/畸形 tool input、长输出截断、未知 block fallback。
 
+合同边界：
+
+- `TranscriptBlock` 是 v4 渲染目标合同；Desktop/Web 新工作台不得继续以旧 `ChatView.types` 作为跨端目标模型。
+- `app/shared/src/types/chat.ts` 只作为旧消息视图兼容合同，服务 Search、Diff、artifact 提取、旧测试迁移和旧组件删除前的过渡。
+- 下一批实现先补齐 shared `ChatMessage/MessageBlock/FileDiff` 兼容类型和缺失 block kind，再把 Desktop/Web 的 `import type { ... } from '@/components/ChatView.types'` 迁到 shared 类型。
+- 旧 `ChatView.types.ts` 不新增字段、不作为 fallback 根；类型迁移完成后与旧组件本体一起删除。
+
 执行记录：
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeThreadItems.ts` 和测试，把 Edge persisted thread items 映射为 shared `TranscriptBlock`，并为 `runId` 生成 `EvidenceRef(kind="run")`。
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeEdgeEvents.ts` 和测试，把 live Edge `run.*`、`run.agent.*`、`artifact.created` 事件映射为 shared `TranscriptBlock` 与 run/tool/file/artifact evidence；focused shared tests 更新为 6 个文件 / 14 个测试通过。
@@ -325,8 +332,26 @@ app/desktop/src-tauri/src/
 - [x] 运行旧入口扫描；新增 `scripts/verify-v4-old-ui-active-paths.ps1`。
 - [x] 跑 full Desktop/Web typecheck。
 
+下一批安全顺序：
+
+1. **类型合同迁移**：补齐 `app/shared/src/types/chat.ts` 或抽出 `app/shared/src/types/diff.ts`，覆盖 `ChatMessage`、`MessageBlock`、`ToolResultBlock`、`FileDiff`、`DiffHunk`、`DiffLine`、Web `ReplyTarget`。
+2. **导入迁移**：把 Desktop/Web active source 和仍需要保留的测试从旧 `ChatView.types` 改到 shared 类型，零行为改变。
+3. **门禁加强**：在 `scripts/verify-v4-old-ui-active-paths.ps1` 增加旧 `ChatView.types` active import 检查。
+4. **组件删除**：删除 Desktop/Web `ChatView`、`PromptInput`、`ThreadPanel`、Web `RunDetail`、Desktop IM `IMBlockRenderer`、旧 hooks 和对应旧测试/CSS。
+5. **功能迁移**：`DiffViewer`、`ArtifactBrowser`、Search/Dialog、Web `hubAdapters` 中仍有价值的逻辑只迁到 shared inspector/transcript/diff contract，不接回旧 UI。
+
+验证命令：
+
+```powershell
+cd app/shared; corepack.cmd pnpm exec vitest run src\types --reporter=dot
+cd app/desktop; corepack.cmd pnpm typecheck
+cd app/web; corepack.cmd pnpm typecheck
+.\scripts\verify-v4-old-ui-active-paths.ps1
+```
+
 执行记录：
 - 2026-06-07：删除 Desktop/Web 旧 registry、旧 `MainView/IMView` active route、Desktop 旧 `RunDetail/RightInspector/PermissionDialog` 和 Web 孤儿 `PermissionDialog`；新增 `scripts/verify-v4-old-ui-active-paths.ps1`，阻断 active Desktop/Web source 重新 import 旧 `ChatView`、`PromptInput`、`RunDetail`、`ThreadPanel`、`IMBlockRenderer`、`useChatMessages`、`useIMChat` 或旧 `viewRegistry`。验证：Desktop typecheck/build 通过；Web focused tests 6 个文件 / 32 个测试通过；Web typecheck/build 通过；Desktop App v4 focused tests 1 个文件 / 4 个测试通过；Web Hub-only boundary 12/12 通过；v4 old UI active path boundary 16/16 通过；Desktop/Web 1440x920 Playwright smoke 通过。
+- 2026-06-07：只读 `opus` 子代理盘点剩余旧 UI 债务，结论是先迁移 shared `ChatMessage/FileDiff` 兼容合同，再删除旧 Chat/Prompt/Thread/IM hook 本体；该输出仅作为架构辅助，不作为测试证据。
 
 ## 6. 验收命令
 
