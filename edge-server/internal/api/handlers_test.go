@@ -47,6 +47,15 @@ func (r *recordingRepository) CreateProject(id, name string) (store.Project, err
 	return r.Repository.CreateProject(id, name)
 }
 
+type corruptPinRepository struct {
+	store.Repository
+	pins []store.ThreadPin
+}
+
+func (r *corruptPinRepository) ListThreadPins(threadID string) []store.ThreadPin {
+	return append([]store.ThreadPin(nil), r.pins...)
+}
+
 type fakeRunExecutor struct {
 	started  []store.Run
 	contexts []lifecycle.RunProcessContext
@@ -1268,9 +1277,9 @@ func TestPostThreadMessageCreatesItem(t *testing.T) {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
 
-		var itemRaw map[string]any
+	var itemRaw map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
-				t.Fatalf("failed to decode item body: %v", err)
+		t.Fatalf("failed to decode item body: %v", err)
 	}
 	itemRaw = unwrapSuccess(itemRaw)
 	itemBytes, _ := json.Marshal(itemRaw)
@@ -1310,9 +1319,9 @@ func TestPostThreadMessageUsesRequestedRole(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
-		var itemRaw map[string]any
+	var itemRaw map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
-				t.Fatalf("failed to decode item body: %v", err)
+		t.Fatalf("failed to decode item body: %v", err)
 	}
 	itemRaw = unwrapSuccess(itemRaw)
 	itemBytes, _ := json.Marshal(itemRaw)
@@ -1320,6 +1329,160 @@ func TestPostThreadMessageUsesRequestedRole(t *testing.T) {
 	json.Unmarshal(itemBytes, &item)
 	if item.Role != "assistant" {
 		t.Fatalf("item role = %q, want assistant", item.Role)
+	}
+}
+
+func TestThreadPinsPersistPerThreadItem(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	_, ch, _ := h.Bus.Subscribe(0)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages", strings.NewReader(`{"content":"pin this message"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
+	}
+	var itemRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
+		t.Fatalf("failed to decode item body: %v", err)
+	}
+	itemRaw = unwrapSuccess(itemRaw)
+	itemID := itemRaw["itemId"].(string)
+	drainEvents(t, ch, 2)
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/pins", strings.NewReader(`{"itemId":"`+itemID+`","pinnedBy":" Delicious233 "}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads/thread_local/pins status = %d, want 201 body=%s", rec.Code, rec.Body.String())
+	}
+	assertNextEvent(t, ch, "thread.pin.created", "thread_local", itemID)
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/pins", strings.NewReader(`{"itemId":"`+itemID+`","pinnedBy":"AgentHub"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST duplicate /pins status = %d, want 201 body=%s", rec.Code, rec.Body.String())
+	}
+	assertNextEvent(t, ch, "thread.pin.created", "thread_local", itemID)
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/threads/thread_local/pins", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads/thread_local/pins status = %d, want 200", rec.Code)
+	}
+	var pinsRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&pinsRaw); err != nil {
+		t.Fatalf("failed to decode pins body: %v", err)
+	}
+	pinsRaw = unwrapSuccess(pinsRaw)
+	pins := pinsRaw["items"].([]any)
+	if len(pins) != 1 {
+		t.Fatalf("pins = %d, want 1", len(pins))
+	}
+	pin := pins[0].(map[string]any)
+	if pin["itemId"] != itemID || pin["pinnedBy"] != "AgentHub" {
+		t.Fatalf("pin = %#v, want updated pinned item metadata", pin)
+	}
+	item := pin["item"].(map[string]any)
+	if item["content"] != "pin this message" {
+		t.Fatalf("pin item content = %q", item["content"])
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/v1/threads/thread_local/pins?itemId="+itemID, nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("DELETE /v1/threads/thread_local/pins status = %d, want 204", rec.Code)
+	}
+	assertNextEvent(t, ch, "thread.pin.deleted", "thread_local", itemID)
+	if pins := h.Store.ListThreadPins("thread_local"); len(pins) != 0 {
+		t.Fatalf("stored pins = %#v, want empty", pins)
+	}
+}
+
+func TestThreadPinsRejectInvalidRequests(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	item, err := h.Store.CreateThreadMessage("item_local", "thread_local", "user", "hello")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+	_, _ = h.Store.CreateThread("thread_other", "proj_local", "Other")
+	otherItem, err := h.Store.CreateThreadMessage("item_other", "thread_other", "user", "other")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage other returned error: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		want   int
+	}{
+		{name: "get unknown thread", method: http.MethodGet, path: "/v1/threads/thread_missing/pins", want: http.StatusNotFound},
+		{name: "post bad json", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{"itemId":`, want: http.StatusBadRequest},
+		{name: "post missing item", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{}`, want: http.StatusBadRequest},
+		{name: "post unknown item", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{"itemId":"item_missing"}`, want: http.StatusNotFound},
+		{name: "post cross thread item", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{"itemId":"` + otherItem.ID + `"}`, want: http.StatusNotFound},
+		{name: "delete missing item id", method: http.MethodDelete, path: "/v1/threads/thread_local/pins", want: http.StatusBadRequest},
+		{name: "delete missing pin", method: http.MethodDelete, path: "/v1/threads/thread_local/pins?itemId=" + item.ID, want: http.StatusNotFound},
+		{name: "wrong method", method: http.MethodPatch, path: "/v1/threads/thread_local/pins", want: http.StatusMethodNotAllowed},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != tt.want {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.method, tt.path, rec.Code, tt.want, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestThreadPinsSkipCrossThreadSnapshotPin(t *testing.T) {
+	base := store.New()
+	_, _ = base.CreateProject("proj_local", "Local")
+	_, _ = base.CreateThread("thread_local", "proj_local", "Local")
+	_, _ = base.CreateThread("thread_other", "proj_local", "Other")
+	otherItem, err := base.CreateThreadMessage("item_other", "thread_other", "user", "other")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage other returned error: %v", err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	h := newTestHandler()
+	h.Store = &corruptPinRepository{
+		Repository: base,
+		pins: []store.ThreadPin{{
+			ThreadID:  "thread_local",
+			ItemID:    otherItem.ID,
+			PinnedAt:  now,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/threads/thread_local/pins", nil)
+	rec := httptest.NewRecorder()
+	h.GetThreadPins(rec, req, "thread_local")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads/thread_local/pins status = %d, want 200", rec.Code)
+	}
+	var pinsRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&pinsRaw); err != nil {
+		t.Fatalf("failed to decode pins body: %v", err)
+	}
+	pinsRaw = unwrapSuccess(pinsRaw)
+	pins := pinsRaw["items"].([]any)
+	if len(pins) != 0 {
+		t.Fatalf("pins = %#v, want cross-thread snapshot pin skipped", pins)
 	}
 }
 
@@ -2059,6 +2222,32 @@ func TestPostThreadMessageGeneratesEvents(t *testing.T) {
 	}
 	if messageCreated == nil {
 		t.Fatal("message.created payload was not captured")
+	}
+}
+
+func drainEvents(t *testing.T, ch <-chan events.EventEnvelope, count int) {
+	t.Helper()
+	for i := 0; i < count; i++ {
+		select {
+		case <-ch:
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("timed out draining event %d of %d", i+1, count)
+		}
+	}
+}
+
+func assertNextEvent(t *testing.T, ch <-chan events.EventEnvelope, wantType, wantThreadID, wantItemID string) {
+	t.Helper()
+	select {
+	case evt := <-ch:
+		if evt.Type != wantType {
+			t.Fatalf("event type = %q, want %q", evt.Type, wantType)
+		}
+		if evt.Scope["threadId"] != wantThreadID || evt.Scope["itemId"] != wantItemID {
+			t.Fatalf("event scope = %#v, want thread/item", evt.Scope)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("timed out waiting for %s event", wantType)
 	}
 }
 
