@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
+import { createWorkbenchDemoRuntimeStore } from '@shared/demo';
 import type { AgentInfo } from '@shared/types';
 import {
   agentInfoToWorkbenchAgent,
@@ -117,6 +118,33 @@ describe('webPlatform workbench agent mapping', () => {
     });
 
     expect(webConversationWithPinnedMessages(conversation, [])).not.toHaveProperty('pinnedAnnouncement');
+  });
+
+  it('routes auto unauthenticated submits into the demo runtime store', async () => {
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const platform = createWebPlatform({
+      demoRuntimeStore,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: '验证 demo runtime 写入',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).resolves.toEqual({ intentId: expect.stringMatching(/^demo-agent-/) });
+
+    expect(demoRuntimeStore.resolveTranscript('builder')).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        author: expect.objectContaining({ role: 'human' }),
+        text: '验证 demo runtime 写入',
+      }),
+      expect.objectContaining({
+        author: expect.objectContaining({ name: 'AgentHub Demo' }),
+        displayTitle: 'Demo 模式已记录输入',
+      }),
+    ]));
   });
 
   it('submits Hub session messages and triggers the mentioned runtime agent', async () => {

@@ -1,5 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE, sharedWorkbenchResources } from '@shared/i18n';
 
 import zhCommon from './locales/zh/common.json';
 import zhStatus from './locales/zh/status.json';
@@ -64,6 +65,7 @@ i18n.use(initReactI18next).init({
       common: zhCommon,
       status: zhStatus,
       workbench: zhWorkbench,
+      [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.zh,
       agentSquare: zhAgentSquare,
       privateChats: zhPrivateChats,
       groupWorkspace: zhGroupWorkspace,
@@ -73,13 +75,14 @@ i18n.use(initReactI18next).init({
       common: enCommon,
       status: enStatus,
       workbench: enWorkbench,
+      [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.en,
       agentSquare: enAgentSquare,
       privateChats: enPrivateChats,
       groupWorkspace: enGroupWorkspace,
       project: enProject,
     },
   },
-  ns: ['common', 'status', 'workbench', 'agentSquare', 'privateChats', 'groupWorkspace', 'project'],
+  ns: ['common', 'status', 'workbench', SHARED_WORKBENCH_I18N_NAMESPACE, 'agentSquare', 'privateChats', 'groupWorkspace', 'project'],
   defaultNS: 'common',
   lng: getInitialLanguage(),
   fallbackLng: 'en',

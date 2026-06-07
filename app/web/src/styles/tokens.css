@@ -128,22 +128,25 @@
   /* ═══════════════════════════════════════════════════════════════════════
      v4 Animation
      ═══════════════════════════════════════════════════════════════════════ */
-  --dur-fast:   80ms;
-  --dur-normal: 140ms;
-  --dur-medium: 200ms;
-  --dur-panel:  430ms;
+  --dur-fast:   90ms;
+  --dur-normal: 180ms;
+  --dur-medium: 260ms;
+  --dur-panel:  520ms;
+  --dur-enter:  360ms;
+  --dur-pop:    220ms;
 
   /* Backward-compat duration (aliased to v4) */
   --duration-fast:    var(--dur-fast);
   --duration-normal:  var(--dur-normal);
   --duration-medium:  var(--dur-medium);
-  --duration-slow:    300ms;
-  --duration-glacial: 500ms;
+  --duration-slow:    var(--dur-enter);
+  --duration-glacial: var(--dur-panel);
 
   /* v4 easing */
   --ease:        cubic-bezier(0.2, 0, 0, 1);
-  --ease-spring: cubic-bezier(0.15, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.18, 0.86, 0.24, 1);
   --ease-panel:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press:  cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Backward-compat easing (aliased to v4) */
   --ease-out:        var(--ease);

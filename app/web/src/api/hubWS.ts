@@ -1,4 +1,4 @@
-// Hub WebSocket client for AgentHub Desktop.
+// Hub WebSocket client for AgentHub Web.
 // Manages auth-frame handshake, typed event routing, and reconnection
 // via the Transport abstraction.
 //
