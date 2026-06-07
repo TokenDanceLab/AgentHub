@@ -1,6 +1,6 @@
 # Draft PR: Desktop/Web v4 Shared Workbench
 
-> 当前没有远端 PR。此草稿用于工作树收口、rebase 和验证完成后创建 draft PR。
+> Draft PR 已创建：[TokenDanceLab/AgentHub#291](https://github.com/TokenDanceLab/AgentHub/pull/291)。
 > 暂不创建 ready PR：本地分支仍需与最新 `dev/delicious233` 对齐，并且 backend/mobile 并行改动不纳入本 UI PR。
 
 ## Title

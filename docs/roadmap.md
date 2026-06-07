@@ -81,6 +81,8 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以当前 shared work
 
 2026-06-07 夜间 Web 边界收紧：`app/web` 已移除 Tauri 类型 shim，Web OIDC `device_type` 固定为 `web`，用户可见 i18n JSON 中的 Local Edge / Workbench Edge 文案已改为 Hub runtime 语义；`verify-web-hub-boundary.ps1` 现在扫描 JSON、禁止 Web 引入 Tauri/Desktop runtime 引用，并正向断言 `webPlatform.ts` 的 `localEdge:false/localFiles:false`。验证：`verify-web-hub-boundary.ps1` 15/15 passed；`app/web` focused tests `hubAuth.test.ts + webPlatform.test.ts` 2 files / 14 tests passed；Web typecheck passed。
 
+2026-06-08 合并收口：已按 owner 分组提交并推送 `feat/desktop-web-v4-clean-rebuild`，创建 draft PR [#291](https://github.com/TokenDanceLab/AgentHub/pull/291)。本 PR 包含 shared UI freeze、Desktop adapter、Web Hub-only boundary 和 durable docs；本地剩余 `edge-server/**`、`BACKEND-MERGE-PLAN.md`、`app/mobile/**`、`docs/review-2026-06-07-glm-5.1/**` 未纳入 UI PR。PR 仍需刷新到最新 `dev/delicious233` 后才能 ready。
+
 ## P0: 文档与架构冻结
 
 - [x] 清理本地过时分支，只保留 `dev/delicious233` 作为本地主线。
