@@ -177,6 +177,19 @@ const builderTranscript: TranscriptBlock[] = [
     ],
   },
   {
+    id: 'builder-timeline-1',
+    kind: 'agent_timeline',
+    createdAt: '2026-06-06T14:44:05+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    title: '运行时间线',
+    items: [
+      { status: 'completed', label: '初始化会话', detail: '模型、工具权限和当前项目上下文已加载' },
+      { status: 'completed', label: '创建隔离 worktree', detail: 'AgentHub/.worktrees/b0-sqlite' },
+      { status: 'completed', label: '加载 skill', detail: 'systematic-debugging · verification-before-completion' },
+      { status: 'running', label: '进入代码定位阶段', detail: '读取消息模型和 SQLite 索引入口' },
+    ],
+  },
+  {
     id: 'builder-thinking-step-1',
     kind: 'run_step_group',
     createdAt: '2026-06-06T14:44:10+08:00',
