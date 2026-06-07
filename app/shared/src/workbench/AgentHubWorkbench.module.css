@@ -26,7 +26,7 @@
 .shell[data-page='contacts'],
 .shell[data-page='docs'],
 .shell[data-page='agents'],
-.shell[data-page='tasks'],
+.shell[data-page='runs'],
 .shell[data-page='projects'],
 .shell[data-page='settings'] {
   grid-template-columns: 52px minmax(0, 1fr);
@@ -150,7 +150,7 @@
   align-items: center;
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--r-md);
   background: transparent;
   color: var(--text-1);
@@ -165,7 +165,6 @@
 
 .conversationButton[aria-current='true'] {
   background: var(--primary-light);
-  border-color: transparent;
 }
 
 .conversationButton[data-unread='true'] .conversationTitle {
@@ -582,6 +581,7 @@
   display: flex;
   flex-direction: column;
   width: var(--inspector-w);
+  flex: 0 0 var(--inspector-w);
   min-width: 0;
   overflow: hidden;
   background: var(--surface-low);
@@ -595,6 +595,7 @@
 
 .shell[data-inspector-collapsed='true'] .inspector {
   width: 0;
+  flex-basis: 0;
   border-left-color: transparent;
   clip-path: inset(0 0 0 100%);
   pointer-events: none;
@@ -716,6 +717,7 @@
 .inspectorTab[aria-selected='true'] {
   background: var(--primary-light);
   color: var(--primary);
+  box-shadow: none;
 }
 
 .inspectorTab:disabled {
@@ -755,6 +757,11 @@
   opacity: 1;
 }
 
+.inspectorTab[aria-selected='true'] .inspectorTabMark {
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  opacity: 1;
+}
+
 .inspectorTab:hover .inspectorTabMark svg {
   display: none;
 }
@@ -769,7 +776,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;

@@ -343,7 +343,7 @@ export function WorkbenchRoutes({ activePage, agents }: WorkbenchRoutesProps): R
           toolMatrixTools={AGENT_TOOL_OPTIONS}
         />
       );
-    case 'tasks':
+    case 'runs':
       return (
         <TasksPage
           activePane={tasksPane}
