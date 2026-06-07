@@ -20,6 +20,9 @@ type Workspace struct {
 }
 
 func (w *Workspace) BeforeCreate(tx *gorm.DB) error {
+	if w.ID != "" {
+		return nil
+	}
 	id, err := uuidv7.New()
 	if err != nil {
 		return err
