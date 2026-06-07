@@ -1,8 +1,16 @@
+import type { QueryClient } from '@tanstack/react-query';
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { AgentInfo } from '@shared/types';
-import { createHubClient, type HubClient, type PendingAgentTask, type SendMessageResponse } from '@/api/hubClient';
+import { queryClient as defaultQueryClient } from '@/api/queryClient';
+import {
+  createHubClient,
+  type HubClient,
+  type MessageResponse,
+  type PendingAgentTask,
+  type SendMessageResponse,
+} from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
@@ -11,7 +19,9 @@ type WebRunHubClient = Pick<HubClient, 'sendMessage' | 'triggerAgentTask'>;
 
 export interface WebPlatformOptions {
   hubClient?: WebRunHubClient;
+  queryClient?: QueryClient;
   createClientMessageId?: () => string;
+  now?: () => string;
 }
 
 const defaultHubClient = createHubClient({ getToken: getAccessToken });
@@ -133,7 +143,9 @@ export function resolveWebWorkbenchConversations(
 
 export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPlatform {
   const hubClient = options.hubClient ?? defaultHubClient;
+  const queryClient = options.queryClient ?? defaultQueryClient;
   const createClientMessageId = options.createClientMessageId ?? newClientMessageId;
+  const now = options.now ?? (() => new Date().toISOString());
 
   return {
     surface: 'web',
@@ -153,23 +165,41 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
-        return submitWebComposerIntent(hubClient, createClientMessageId, intent);
+        return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
       },
     },
   };
+}
+
+export interface SubmitWebComposerIntentOptions {
+  queryClient?: QueryClient;
+  now?: () => string;
 }
 
 export async function submitWebComposerIntent(
   hubClient: WebRunHubClient,
   createClientMessageId: () => string,
   intent: ComposerIntent,
+  options: SubmitWebComposerIntentOptions = {},
 ): Promise<ComposerSubmitResult> {
   const mention = intent.mentions[0];
   if (mention && !mention.runtimeId) {
     throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
   }
 
-  const message = await sendComposerMessage(hubClient, createClientMessageId, intent);
+  const clientMessageId = createClientMessageId();
+  const optimisticMessage = optimisticHubMessageFromIntent(intent, clientMessageId, options.now?.() ?? new Date().toISOString());
+  upsertHubMessage(options.queryClient, optimisticMessage);
+
+  let message: SendMessageResponse;
+  try {
+    message = await sendComposerMessage(hubClient, clientMessageId, intent);
+    confirmOptimisticHubMessage(options.queryClient, intent.conversationId, clientMessageId, message);
+  } catch (error) {
+    removeOptimisticHubMessage(options.queryClient, intent.conversationId, clientMessageId);
+    throw error;
+  }
+
   if (!mention) {
     return { intentId: message.message_id };
   }
@@ -180,14 +210,81 @@ export async function submitWebComposerIntent(
 
 async function sendComposerMessage(
   hubClient: WebRunHubClient,
-  createClientMessageId: () => string,
+  clientMessageId: string,
   intent: ComposerIntent,
 ): Promise<SendMessageResponse> {
   return hubClient.sendMessage(intent.conversationId, {
-    client_msg_id: createClientMessageId(),
+    client_msg_id: clientMessageId,
     content_type: 'text',
     content: buildHubComposerPrompt(intent),
   });
+}
+
+export function optimisticHubMessageFromIntent(
+  intent: ComposerIntent,
+  clientMessageId: string,
+  createdAt: string,
+): MessageResponse {
+  return {
+    id: clientMessageId,
+    session_id: intent.conversationId,
+    seq_id: Number.MAX_SAFE_INTEGER,
+    client_msg_id: clientMessageId,
+    sender_type: 'user',
+    sender_id: 'web-current-user',
+    content_type: 'text',
+    content: buildHubComposerPrompt(intent),
+    created_at: createdAt,
+  };
+}
+
+export function upsertHubMessage(
+  queryClient: QueryClient | undefined,
+  message: MessageResponse,
+): void {
+  queryClient?.setQueryData<MessageResponse[]>(
+    hubMessagesQueryKey(message.session_id),
+    (current = []) => [
+      ...current.filter((item) => item.client_msg_id !== message.client_msg_id && item.id !== message.id),
+      message,
+    ],
+  );
+}
+
+export function confirmOptimisticHubMessage(
+  queryClient: QueryClient | undefined,
+  sessionId: string,
+  clientMessageId: string,
+  response: SendMessageResponse,
+): void {
+  queryClient?.setQueryData<MessageResponse[]>(
+    hubMessagesQueryKey(sessionId),
+    (current = []) => current.map((message) =>
+      message.client_msg_id === clientMessageId
+        ? {
+            ...message,
+            id: response.message_id,
+            seq_id: response.seq_id,
+            created_at: response.created_at,
+          }
+        : message,
+    ),
+  );
+}
+
+export function removeOptimisticHubMessage(
+  queryClient: QueryClient | undefined,
+  sessionId: string,
+  clientMessageId: string,
+): void {
+  queryClient?.setQueryData<MessageResponse[]>(
+    hubMessagesQueryKey(sessionId),
+    (current = []) => current.filter((message) => message.client_msg_id !== clientMessageId),
+  );
+}
+
+function hubMessagesQueryKey(sessionId: string): [string, string, string] {
+  return ['web-v4', 'hub-messages', sessionId];
 }
 
 async function triggerMentionedAgent(
