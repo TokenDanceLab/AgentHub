@@ -20,6 +20,7 @@ Claude Code、Codex、OpenCode 是 Agent Runtime，不是用户直接管理的�
 4. `app/desktop` 和 `app/web` 只提供 platform adapter、启动入口和平台专属能力。
 5. 旧 Desktop/Web UI 文件是迁移素材，不是长期架构。
 6. Tauri Host API 必须从巨石 command 文件拆成可测试、可审计的能力模块。
+7. v4 目标消息合同是 shared `TranscriptBlock` / `EvidenceRef`；旧 `ChatView.types`、旧 `ChatMessage` 和旧 `FileDiff` 只能作为迁移输入或测试素材，不能继续作为 Desktop/Web 的目标跨端模型。
 
 ## 3. v4 工作台信息架构
 
@@ -108,7 +109,7 @@ Workbench 只依赖 shared contracts 和 platform adapter，不直接调用 Taur
 Conversation -> Message -> TranscriptBlock -> EvidenceRef
 ```
 
-核心 block 类型：
+目标 block 类型：
 
 - `text`
 - `thinking`
@@ -124,6 +125,15 @@ Conversation -> Message -> TranscriptBlock -> EvidenceRef
 - `error`
 
 Desktop Edge events、Hub IM messages、TeamRun events 和 Web remote task events 都必须 normalize 到该合同后再渲染。禁止新增 Markdown-only 第二消息流。
+
+当前实现已落地 `text`、`tool_call`、`diff`、`approval`、`artifact` 和 `EvidenceRef` 聚合；剩余旧 `ChatView.types` 中的 `thinking`、`tool_result`、`deploy`、`route_decision`、`child_agent`、`context_usage`、`error` 等 block kind 必须先补进 shared contract 或映射为现有 `TranscriptBlock` 后，才能删除旧 Chat/IM 组件本体。
+
+过渡规则：
+
+- `app/shared/src/transcript/types.ts` 是 v4 渲染合同。
+- `app/shared/src/types/chat.ts` 只保留兼容旧测试、搜索、Diff、artifact 提取和迁移工具需要的旧消息视图合同。
+- 旧 `app/desktop/src/components/ChatView.types.ts` 和 `app/web/src/components/ChatView.types.ts` 不再新增字段；下一批实现应把引用迁到 shared 类型，再删除旧类型文件。
+- Diff 类型应从旧 ChatView 类型中抽离到 shared diff contract，供 shared inspector、DiffReviewPanel、旧 DiffViewer 迁移期共用。
 
 ### `app/shared/src/composer`
 
@@ -317,6 +327,17 @@ Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 
 迁移期间可以通过小 commit 做 adapter 或 compatibility shim，但最终验收必须证明旧入口不再承载 active route。
 
+### 旧 UI 剩余债务分类
+
+| 类别 | 对象 | 处理策略 |
+|---|---|---|
+| 必须先迁入 shared contract | `ChatView.types` 中的 `ChatMessage`、`MessageBlock`、`ToolResultBlock`、`FileDiff`、`DiffHunk`、`DiffLine`、Web `ReplyTarget` | 先补齐 `app/shared/src/types/chat.ts` 和 shared diff contract，再把 Desktop/Web active/test 类型引用迁走 |
+| 可删除组件本体 | Desktop/Web `ChatView`、`PromptInput`、`ThreadPanel`、Web `RunDetail`、Desktop IM `IMBlockRenderer`、旧 hooks | active import 已被扫描门禁阻断；等类型引用迁完后删除组件、CSS 和旧测试 |
+| 暂缓但必须隔离 | Desktop `DiffViewer`、`ArtifactBrowser`、Search/Dialog 类旧视图工具、Web `hubAdapters` 的旧 IM 转换路径 | 保留为功能参考或迁移输入；不得重新接回 v4 active route |
+| 已删除 active path | 旧 Desktop/Web `viewRegistry`、旧 `MainView`、旧 `IMView`、Desktop 旧 `RunDetail/RightInspector/PermissionDialog`、Web 孤儿 `PermissionDialog` | 由 `scripts/verify-v4-old-ui-active-paths.ps1` 持续阻断回归 |
+
+下一批最小安全切片是“类型合同迁移”，不是直接删组件：先把旧 `ChatMessage/FileDiff` 类型和缺失 block kind 放到 shared contract，更新 import，再用 typecheck 证明没有行为改动；之后再删旧组件本体和旧测试。
+
 ## 12. 验收门禁
 
 | 门禁 | 要求 |
@@ -334,10 +355,10 @@ Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 | 阶段 | 目标 | 状态 |
 |---|---|---|
 | D0 | 文档架构、问题清单、roadmap 对齐 | 进行中 |
-| D1 | shared workbench contract 和文件结构 | 未开始 |
-| D2 | shared transcript/composer/inspector | 未开始 |
-| D3 | Desktop platform adapter + v4 shell | 未开始 |
-| D4 | Web platform adapter + v4 shell | 未开始 |
+| D1 | shared workbench contract 和文件结构 | 进行中 |
+| D2 | shared transcript/composer/inspector | 进行中 |
+| D3 | Desktop platform adapter + v4 shell | 进行中 |
+| D4 | Web platform adapter + v4 shell | 进行中 |
 | D5 | Tauri Host API 拆分 | 未开始 |
 | D6 | 旧 UI 清理、视觉 QA、发布门禁 | 未开始 |
 
