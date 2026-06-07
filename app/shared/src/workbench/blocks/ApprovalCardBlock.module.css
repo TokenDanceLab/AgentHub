@@ -1,0 +1,123 @@
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.card {
+  --_agent-inset: var(--agent-inset, 34px);
+  --_bubble-col: var(--bubble-col, 100%);
+
+  width: min(calc(100% - var(--_agent-inset)), var(--_bubble-col));
+  max-width: calc(100% - var(--_agent-inset));
+  margin-left: var(--_agent-inset);
+  padding: 10px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+  color: var(--text-1);
+  font: 500 0.8125rem var(--font-sans);
+}
+
+.body {
+  margin-bottom: 9px;
+  color: var(--text-2);
+  font: 400 0.75rem/1.45 var(--font-sans);
+}
+
+.body code {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-mono);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  font: 500 0.6875rem var(--font-sans);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badgeSuccess {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.badgeWarning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badgeDanger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: var(--r-sm);
+  font: 500 0.8125rem var(--font-sans);
+  cursor: pointer;
+  transition:
+    background var(--dur-normal),
+    color var(--dur-normal),
+    transform var(--dur-normal),
+    box-shadow var(--dur-normal);
+  white-space: nowrap;
+}
+
+.primary {
+  background: var(--primary);
+  color: var(--text-inv);
+}
+
+.primary:hover {
+  background: var(--primary-hover);
+  box-shadow: var(--e-1);
+}
+
+.danger {
+  background: var(--danger);
+  color: white;
+}
+
+.danger:hover {
+  filter: brightness(0.92);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}

@@ -1,0 +1,318 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   OverviewPanel — v4 Inspector Overview
+   Converts .monitor-section / .monitor-task / .monitor-file from demo
+   to CSS Modules using ONLY v4 custom properties.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Section card ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition:
+    gap var(--dur-medium) var(--ease-panel),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.section:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+.sectionCollapsed {
+  gap: 0;
+}
+
+.section > :not(.sectionHead) {
+  max-height: 520px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height var(--dur-panel) var(--ease-panel),
+    opacity var(--dur-medium) var(--ease),
+    transform var(--dur-medium) var(--ease);
+}
+
+.sectionCollapsed > :not(.sectionHead) {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+
+/* ── Section head ── */
+.sectionHead {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 0 0 2px;
+  color: var(--text-1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: 500 0.75rem/1.5 var(--font-sans);
+}
+
+.sectionToggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease),
+    transform var(--dur-pop, var(--dur-medium)) var(--ease-press, var(--ease));
+}
+
+.sectionToggle:hover {
+  background: var(--surface-high);
+  color: var(--primary);
+  transform: scale(1.04);
+}
+
+.sectionToggle:active {
+  transform: scale(0.94);
+}
+
+.sectionToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ── Chevron icon wrapper ── */
+.chevron {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 0;
+  color: currentColor;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform var(--dur-medium) var(--ease-panel),
+    color var(--dur-normal) var(--ease),
+    background var(--dur-normal) var(--ease);
+}
+
+.sectionCollapsed .chevron {
+  transform: rotate(-90deg);
+}
+
+/* ── Task list ── */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* ── Individual task row ── */
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  font: 400 0.75rem/1.4 var(--font-sans);
+  color: var(--text-2);
+}
+
+.taskDone {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.taskActive {
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+/* ── Task status indicators ── */
+.taskCheck {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--success);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.taskCheck svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.taskActiveDot {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border: 2px solid var(--primary);
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.taskActiveDotInner {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--primary);
+}
+
+.taskTodoDot {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border: 1px solid var(--bdr-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+/* ── Kicker text above file list ── */
+.kicker {
+  font: 400 0.6875rem var(--font-sans);
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+/* ── Subheading label ── */
+.subhead {
+  font: 500 0.6875rem var(--font-sans);
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+/* ── File list ── */
+.fileList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* ── Individual file row ── */
+.file {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  font: 400 0.75rem var(--font-sans);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease), box-shadow var(--dur-normal) var(--ease), transform var(--dur-normal) var(--ease);
+}
+
+.file:hover,
+.fileOpen {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.file:hover {
+  transform: translateX(1px);
+}
+
+.fileOpen {
+  box-shadow: none;
+}
+
+.file:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ── Primary / deliverable file ── */
+.filePrimary {
+  color: var(--text-1);
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+/* ── File icon ── */
+.fileIcon {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  color: var(--text-3);
+  font-size: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fileIcon svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  color: var(--text-3);
+}
+
+/* ── Truncated file name ── */
+.fileName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Hover-reveal action icon ── */
+.fileAction {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  opacity: 0;
+  transform: translateX(-2px);
+  transition: opacity var(--dur-normal) var(--ease), transform var(--dur-normal) var(--ease), background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+}
+
+.file:hover .fileAction,
+.file:focus-visible .fileAction,
+.fileOpen .fileAction {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.file:hover .fileAction,
+.fileOpen .fileAction {
+  background: var(--surface-high);
+  color: var(--primary);
+}

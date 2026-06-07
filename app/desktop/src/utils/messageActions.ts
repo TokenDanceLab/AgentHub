@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 
 export function getMessageText(message: ChatMessage | undefined): string | null {
   const text = message?.blocks.find((block) => block.kind === 'text')?.content.trim();

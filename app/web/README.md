@@ -69,10 +69,10 @@ corepack.cmd pnpm dev --host 127.0.0.1
 浏览器打开：
 
 ```text
-http://127.0.0.1:5175/
+http://127.0.0.1:5174/
 ```
 
-`vite.config.ts` 使用固定端口 `5175` 和 `strictPort: true`。Mobile 固定使用 `5174`，Web 不再抢占 Mobile 端口。端口被占用时先关闭旧服务，再重新启动。
+`vite.config.ts` 使用固定端口 `5174` 和 `strictPort: true`。Desktop/Tauri 前端固定使用 `5173`，Mobile 预览让开到 `5175`。端口被占用时先关闭旧服务，再重新启动。
 
 ## Design Alignment
 
@@ -130,7 +130,7 @@ app/web/screenshots/web-mobile-account-sheet-pw-390x844.png
 app/web/screenshots/web-mobile-account-sheet-pw-390x844.probe.json
 ```
 
-`corepack.cmd pnpm --filter agenthub-web visual:qa` is the current repeatable Web visual gate. It starts from `WEB_QA_URL` (default `http://127.0.0.1:5175/`), mocks Hub REST data, captures 8 Desktop/Web/Mobile scenes, and writes matching `.probe.json` files beside the screenshots. The latest probes confirmed `scrollWidth=390`, `gradientCount=0`, `leftOnlyBorderCount=0`, `leftInsetShadowCount=0`, `smallTargets=[]`, shell TokenDance logo present, no shell brand text fallback, and no raw `agent.*` / `welcome.*` / `prompt.*` / `webShell.*` / `settings.*` / `auth.*` i18n keys on Workbench, Messages, Settings zh, Run overlay, Account sheet, Agent Square bridge, and Project bridge states. The mobile Web shell keeps a bottom surface nav for Workspace / Messages / Run / Account. Account is the rightmost phone-first identity entry and uses the shared `surface.mobile.account.*` metadata; the topbar account button is hidden on 390px screens so sign-in is not duplicated. The Account sign-in surface is a mobile bottom sheet rather than a Desktop-centered modal on 390px screens; the sheet probe confirms `width=390`, `bottom=0`, top radius `14px`, 44px+ controls, glass blur, TokenDance brand logo, TokenDance identity button icon, no raw i18n keys, and no hardcoded Chinese copy in the English view. Shared/Web source scanning also returns no `linear-gradient`, `radial-gradient`, `conic-gradient`, `border-left:`, particle canvas references, or `inset Npx 0 0` left-rail selected states under `app/web/src`, `app/mobile/src`, and `app/shared/src`.
+`corepack.cmd pnpm --filter agenthub-web visual:qa` is the current repeatable Web visual gate. It starts from `WEB_QA_URL` (default `http://127.0.0.1:5174/`), mocks Hub REST data, captures 8 Desktop/Web/Mobile scenes, and writes matching `.probe.json` files beside the screenshots. The latest probes confirmed `scrollWidth=390`, `gradientCount=0`, `leftOnlyBorderCount=0`, `smallTargets=[]`, shell TokenDance logo present, no shell brand text fallback, and no raw `agent.*` / `welcome.*` / `prompt.*` / `webShell.*` / `settings.*` / `auth.*` i18n keys on Workbench, Messages, Settings zh, Run overlay, Account sheet, Agent Square bridge, and Project bridge states. The mobile Web shell keeps a bottom surface nav for Workspace / Messages / Run / Account. Account is the rightmost phone-first identity entry and uses the shared `surface.mobile.account.*` metadata; the topbar account button is hidden on 390px screens so sign-in is not duplicated. The Account sign-in surface is a mobile bottom sheet rather than a Desktop-centered modal on 390px screens; the sheet probe confirms `width=390`, `bottom=0`, top radius `14px`, 44px+ controls, glass blur, TokenDance brand logo, TokenDance identity button icon, no raw i18n keys, and no hardcoded Chinese copy in the English view. Shared/Web source scanning also returns no `linear-gradient`, `radial-gradient`, `conic-gradient`, `border-left:`, particle canvas references, or `inset Npx 0 0` left-rail selected states under `app/web/src`, `app/mobile/src`, and `app/shared/src`.
 
 Messages-specific 390x844 evidence now covers both anonymous and authenticated visual states. `IMView` fills the Hub-locked state with session/surface/realtime cards, and the authenticated no-selection state with sessions/messages/agent-handoff cards. `IMContactList` user-visible strings are localized through `im.contact.*`; mobile add/search/contact controls are at least 44px, with the latest probe recording `addButton=44x44`, `searchInput=348x44`, `smallTargets=[]`, `gradientCount=0`, `leftOnlyBorderCount=0`, `leftInsetShadowCount=0`, and `rawI18nKeys=[]`.
 
@@ -160,7 +160,7 @@ corepack.cmd pnpm typecheck
 corepack.cmd pnpm build
 ```
 
-视觉验收（需要 5175 Web preview 已启动）：
+视觉验收（需要 5174 Web preview 已启动）：
 
 ```powershell
 cd D:\Code\TokenDance\AgentHub\app

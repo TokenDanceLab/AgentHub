@@ -1,6 +1,6 @@
 # 分支治理
 
-最后更新：2026-06-07（v4 文档分支前远端清理）
+最后更新：2026-06-07（Desktop/Web v4 clean rebuild 主工作树）
 
 ## 合并规则
 
@@ -18,13 +18,21 @@ feat/* -> dev/delicious233 -> master
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **dev/delicious233** | 主开发分支，当前已推送到 origin | 活跃 |
-| docs/desktop-web-v4-clean-rebuild | v4 clean rebuild 文档架构分支，从 `dev/delicious233` 创建 | 当前工作 |
+| **feat/desktop-web-v4-clean-rebuild** | 当前 Desktop/Web v4 clean rebuild 主工作树分支，承载 shared UI、端口、设计系统和文档同步 | 当前工作 |
+| **dev/delicious233** | 主开发事实源；当前 v4 分支最终应回到该线 | 活跃 |
 | master | 稳定发布，PR only | 保留 |
 | feat/web-desktop-parity | 早期 Web parity 本地分支，唯一提交 `797983e`；已导出 patch 后删除本地分支 | 已归档 |
 | worktree-feat+web-desktop-parity | 早期 Web parity 本地/远端分支已删除；本地 patch 归档只作参考 | 已归档 |
 
-当前登记 worktree 只有主工作树 `D:/Code/TokenDance/AgentHub`。旧残留目录 `.worktrees/codex-trump-fork` 已移动到 `.worktrees/.trash/codex-trump-fork-archived-20260526`，未直接删除。
+当前登记 worktree：
+
+| Worktree | HEAD/分支 | 用途 | 规则 |
+|---|---|---|---|
+| `D:/Code/TokenDance/AgentHub` | `feat/desktop-web-v4-clean-rebuild` | Desktop/Web v4 shared UI 主工作树 | 当前只推进前端 shared UI、设计系统、端口、文档；backend 暂不碰 |
+| `D:/Code/TokenDance/AgentHub/.worktrees/backend` | `feat/backend-edge-hub` | 后端/Edge-Hub 并行线 | 不作为本轮 UI 事实源，不从主工作树清理或重写 |
+| `D:/Code/TokenDance/AgentHub/.worktrees/johnny-dev` | detached HEAD | 协作者 Johnny 状态检查线 | 只读/隔离，不能自动合并 |
+
+旧残留目录 `.worktrees/codex-trump-fork` 已移动到 `.worktrees/.trash/codex-trump-fork-archived-20260526`，未直接删除。
 
 当前 stash 为空。旧 Web parity 相关 stash 已先导出 patch，再从本地 stash 删除：
 
@@ -36,12 +44,14 @@ feat/* -> dev/delicious233 -> master
 
 ## 当前远端未合入
 
-| 远端分支 | 处理建议 |
-|---|---|
-| `origin/dev/trump` | Trump 独立开发线；用户明确要求不信其进度。当前相对 `origin/dev/delicious233` 为 `115/51` 分叉，不能作为稳定进度来源；只允许逐提交 cherry-pick 并重新验证 |
-| `origin/dev/johnny` | Johnny 开发线；当前相对 `origin/dev/delicious233` 为 `122/2` 分叉，仍有 `9cf5c95` 与 `58239fc` 等独有内容；只单独审，不直合 |
+| 远端分支 | 相对 `origin/dev/delicious233` | 处理建议 |
+|---|---:|---|
+| `origin/feat/desktop-web-v4-clean-rebuild` | 主线 ahead 0 / 分支 ahead 28 | 当前 Desktop/Web v4 主线远端；只合回 `dev/delicious233`，不反向把旧 UI 分支合入 |
+| `origin/feat/backend-edge-hub` | 主线 ahead 104 / 分支 ahead 15 | backend 并行线；本轮 Desktop/Web shared UI 暂不合并、不清理 |
+| `origin/dev/trump` | 主线 ahead 3 / 分支 ahead 0 | Trump 线当前无独有提交但落后主线；保留，不作为本轮 UI 来源 |
+| `origin/dev/johnny` | 主线 ahead 320 / 分支 ahead 11 | Johnny 线仍有少量独有提交但大幅落后；只单独审，不直合 |
 
-当前 `origin` 仅保留 `dev/delicious233`、`master`、`dev/trump`、`dev/johnny` 四个 heads。过时的 `feat/*`、`fix/*`、`phase-*`、`integration/*` 远端分支已按用户要求删除；不要继续在 AGENTS/roadmap 中引用它们作为活跃远端。
+当前 `origin` 活跃 heads 包含 `dev/delicious233`、`master`、`dev/trump`、`dev/johnny`、`feat/desktop-web-v4-clean-rebuild`、`feat/backend-edge-hub`。已删除的过时 `feat/*`、`fix/*`、`phase-*`、`integration/*` 不得在 AGENTS/roadmap 中重新引用为活跃远端。
 
 ## 2026-05-27 已清理
 
@@ -71,5 +81,6 @@ feat/* -> dev/delicious233 -> master
 ## 后续原则
 
 - 新工作必须从 `dev/delicious233` 新建独立分支；多人并行或大范围实现优先使用独立 worktree。
+- 当前 v4 主线例外：`feat/desktop-web-v4-clean-rebuild` 已作为主工作树推进；后续子代理只在明确互不重叠的路径范围内进入该分支，或从它派生临时 worktree。
 - Trump/Johnny/旧 Web parity 只按单独审查结论 cherry-pick 或重做，不做大分支直合。
 - 公开 PR/issue 不写本机路径、私有服务器、token、生产日志或截图中的敏感信息。

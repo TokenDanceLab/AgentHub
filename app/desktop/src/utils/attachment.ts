@@ -59,8 +59,8 @@ export async function browserFilesToAttachments(files: File[]): Promise<PromptAt
       name: file.name,
       source: 'browser' as const,
       size: file.size,
-      mime: file.type || undefined,
-      contentPreview,
+      ...(file.type ? { mime: file.type } : {}),
+      ...(contentPreview ? { contentPreview } : {}),
       truncated,
     };
   }));

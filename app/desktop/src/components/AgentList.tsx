@@ -105,7 +105,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
 
       {isEmpty ? (
         <EmptyState
-          className={styles.sidebarEmpty}
+          {...(styles.sidebarEmpty ? { className: styles.sidebarEmpty } : {})}
           titleLevel={3}
           icon={
             <svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

@@ -1,0 +1,92 @@
+/* ═══════════════════════════════════════════════════════
+   RunSessionCard — v4 CSS Modules
+   Mirrors .run-session-card / .run-session-mark
+   ═══════════════════════════════════════════════════════ */
+
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.card {
+  --_agent-inset: var(--agent-inset, 34px);
+  --_bubble-col: var(--bubble-col, 100%);
+
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--e-1);
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.card:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-2);
+}
+
+/* flex child fills remaining space */
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  display: block;
+  font: 600 0.8125rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.meta {
+  color: var(--text-2);
+  font: 400 0.75rem var(--font-sans);
+}
+
+.runId {
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-mono);
+  font-style: normal;
+  flex: 0 0 auto;
+}
+
+/* ── Run marker pill ── */
+.mark {
+  width: 30px;
+  height: 22px;
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 400 0.75rem var(--font-sans);
+  flex: 0 0 auto;
+}
+
+/* default / running state */
+.markDefault {
+  background: var(--primary-light);
+  color: var(--text-2);
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.markCompleted {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 16%, transparent);
+}
+
+.markFailed {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 16%, transparent);
+}
