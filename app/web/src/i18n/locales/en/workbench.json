@@ -146,17 +146,17 @@
       "applyGate": "Apply gate",
       "ownerApprovalRequired": "Owner approval is required before apply/discard.",
       "noPendingRequest": "There is no pending approval request.",
-      "decisionSource": "Decision state comes from Edge API or WebSocket events."
+      "decisionSource": "Decision state comes from Hub API or WebSocket events."
     },
     "empty": {
       "artifacts": "No artifacts returned for this run.",
       "diffArtifacts": "No artifacts have been created for this run yet.",
-      "logs": "No run logs returned by Edge."
+      "logs": "No run logs returned by Hub."
     }
   },
   "error": {
-    "edgeUnavailable": "Edge is unavailable",
-    "edgeApiTimeout": "Edge API did not respond. Check that Edge is running on 127.0.0.1:3210.",
-    "edgeEventStream": "Edge event stream error"
+    "edgeUnavailable": "Hub runtime is unavailable",
+    "edgeApiTimeout": "Hub API did not respond. Check your session and Hub connection.",
+    "edgeEventStream": "Hub event stream error"
   }
 }
