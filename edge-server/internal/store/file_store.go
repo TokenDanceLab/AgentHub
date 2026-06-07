@@ -16,15 +16,17 @@ var _ Repository = (*FileStore)(nil)
 var _ RunLifecycleStore = (*FileStore)(nil)
 
 type fileSnapshot struct {
-	Projects map[string]Project `json:"projects"`
-	Threads  map[string]Thread  `json:"threads"`
-	Runs     map[string]Run     `json:"runs"`
-	Items    map[string]Item    `json:"items"`
+	Projects map[string]Project   `json:"projects"`
+	Threads  map[string]Thread    `json:"threads"`
+	Runs     map[string]Run       `json:"runs"`
+	Items    map[string]Item      `json:"items"`
+	Pins     map[string]ThreadPin `json:"pins"`
 
 	ProjectOrder []string `json:"projectOrder"`
 	ThreadOrder  []string `json:"threadOrder"`
 	RunOrder     []string `json:"runOrder"`
 	ItemOrder    []string `json:"itemOrder"`
+	PinOrder     []string `json:"pinOrder"`
 }
 
 // FileStore wraps the in-memory store with a JSON snapshot saved asynchronously after writes.
@@ -253,6 +255,27 @@ func (f *FileStore) GetItem(id string) (Item, bool) {
 
 func (f *FileStore) ListThreadItems(threadID string) []Item {
 	return f.store.ListThreadItems(threadID)
+}
+
+func (f *FileStore) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, error) {
+	pin, err := f.store.PinThreadItem(threadID, itemID, pinnedBy)
+	if err != nil {
+		return ThreadPin{}, err
+	}
+	f.schedulePersist()
+	return pin, nil
+}
+
+func (f *FileStore) DeleteThreadPin(threadID, itemID string) bool {
+	ok := f.store.DeleteThreadPin(threadID, itemID)
+	if ok {
+		f.schedulePersist()
+	}
+	return ok
+}
+
+func (f *FileStore) ListThreadPins(threadID string) []ThreadPin {
+	return f.store.ListThreadPins(threadID)
 }
 
 func ensureFileSnapshotDirectory(path string) error {

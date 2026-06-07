@@ -528,6 +528,75 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 	writeSuccess(w, http.StatusCreated, item)
 }
 
+func (h *Handler) GetThreadPins(w http.ResponseWriter, r *http.Request, threadID string) {
+	repository := ensureStore(h)
+	if _, ok := repository.GetThread(threadID); !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		return
+	}
+	pins := repository.ListThreadPins(threadID)
+	items := make([]map[string]any, 0, len(pins))
+	for _, pin := range pins {
+		item, ok := repository.GetItem(pin.ItemID)
+		if !ok || item.ThreadID != threadID {
+			continue
+		}
+		items = append(items, map[string]any{
+			"threadId":  pin.ThreadID,
+			"itemId":    pin.ItemID,
+			"pinnedBy":  pin.PinnedBy,
+			"pinnedAt":  pin.PinnedAt,
+			"createdAt": pin.CreatedAt,
+			"updatedAt": pin.UpdatedAt,
+			"item":      item,
+		})
+	}
+	writeSuccess(w, http.StatusOK, listResponse(items))
+}
+
+func (h *Handler) PostThreadPin(w http.ResponseWriter, r *http.Request, threadID string) {
+	var req struct {
+		ItemID   string `json:"itemId"`
+		PinnedBy string `json:"pinnedBy"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	itemID := strings.TrimSpace(req.ItemID)
+	if itemID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("itemId is required")))
+		return
+	}
+	pin, err := ensureStore(h).PinThreadItem(threadID, itemID, req.PinnedBy)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread item not found")))
+		return
+	}
+	h.Bus.Publish("thread.pin.created", map[string]any{
+		"threadId": threadID,
+		"itemId":   itemID,
+	}, pin)
+	writeSuccess(w, http.StatusCreated, pin)
+}
+
+func (h *Handler) DeleteThreadPin(w http.ResponseWriter, r *http.Request, threadID string) {
+	itemID := strings.TrimSpace(r.URL.Query().Get("itemId"))
+	if itemID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("itemId is required")))
+		return
+	}
+	if ok := ensureStore(h).DeleteThreadPin(threadID, itemID); !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread pin not found")))
+		return
+	}
+	h.Bus.Publish("thread.pin.deleted", map[string]any{
+		"threadId": threadID,
+		"itemId":   itemID,
+	}, map[string]any{"threadId": threadID, "itemId": itemID})
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	itemID := strings.TrimPrefix(r.URL.Path, "/v1/items/")
 	if item, ok := ensureStore(h).GetItem(itemID); ok {
@@ -1269,6 +1338,20 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		if strings.HasSuffix(r.URL.Path, "/items") && r.Method == http.MethodGet {
 			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/items")
 			h.GetThreadItems(w, r, threadID)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/pins") {
+			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/pins")
+			switch r.Method {
+			case http.MethodGet:
+				h.GetThreadPins(w, r, threadID)
+			case http.MethodPost:
+				h.PostThreadPin(w, r, threadID)
+			case http.MethodDelete:
+				h.DeleteThreadPin(w, r, threadID)
+			default:
+				writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			}
 			return
 		}
 		if strings.HasSuffix(r.URL.Path, "/messages") && r.Method == http.MethodPost {
