@@ -1,135 +1,187 @@
 /* ═════════════════════════════════════════════════════════════════════
-   AgentHub Theme Variables — macOS-inspired Dark & Light
-   Toggled via data-theme attribute on <html>
-   Light: macOS matte gray backdrop, floating white cards, soft shadows
-   Dark: One Dark Pro inspired — blue-gray layered system
+   AgentHub Theme Variables — v4 Design System
+   Light (default :root) + Dark ([data-theme='dark'])
+   Primary: AgentHub logo blue (#29ABE2 dark / #0071BC light)
    ═════════════════════════════════════════════════════════════════════ */
 
-/* ── Dark Theme : Codex-style Linear Glass ───────────────────────────────
-   Source target: codex-theme-v1 / linear / dark
-   accent #5d68cc, surface #25252d, ink #d7d9e1.
-   Purple is not the default atmosphere; reserve it for explicit semantic
-   states such as skills or local product accents.
-   ───────────────────────────────────────────────────────────────────── */
-:root {
-  /* Base layer — deep charcoal, not pure black */
-  --app-bg: #1f1f27;
-  --background: #1f1f27;
-  --foreground: #d7d9e1;
+html[data-theme-sync='true'],
+html[data-theme-sync='true'] *,
+html[data-theme-sync='true'] *::before,
+html[data-theme-sync='true'] *::after {
+  transition-property: none !important;
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+  animation-duration: 0ms !important;
+  animation-delay: 0ms !important;
+}
 
-  /* Cards — Codex-style translucent glass over the dark workspace */
-  --card: #25252d;
-  --card-foreground: #d7d9e1;
-  --popover: #30303a;
-  --popover-foreground: #d7d9e1;
+/* ── Dark Theme ──────────────────────────────────────────────────────── */
+[data-theme='dark'] {
+  color-scheme: dark;
 
-  /* Primary — linear Codex blue, not the old purple atmosphere */
-  --primary: #5d68cc;
-  --primary-foreground: #f4f5ff;
-  --secondary: rgba(255, 255, 255, 0.055);
-  --secondary-foreground: #d7d9e1;
-  --muted: rgba(255, 255, 255, 0.042);
-  --muted-foreground: #a2a6b1;
-  --accent: #5d68cc;
-  --accent-foreground: #f4f5ff;
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
+  /* Core surface */
+  --app-bg: #1a1a20;
+  --background: #1a1a20;
+  --foreground: #e3e4e6;
 
-  /* Borders — separators only; elevated cards use black shadow for depth. */
-  --border: rgba(0, 0, 0, 0.16);
-  --input: rgba(0, 0, 0, 0.12);
-  --ring: rgba(93, 104, 204, 0.42);
+  /* Surface layers */
+  --surface: #24242d;
+  --surface-dim: #1e1e26;
+  --surface-low: #282830;
+  --surface-high: #2e2e38;
+  --surface-highest: #383844;
+  --surface-overlay: rgba(36,36,45,0.94);
+  --surface-sidebar: rgba(30,30,38,0.92);
+
+  /* Text */
+  --text-1: #e3e4e6;
+  --text-2: #9a9aa4;
+  --text-3: #606068;
+  --text-inv: #1a1a20;
+
+  /* Borders */
+  --bdr: rgba(255,255,255,0.06);
+  --bdr-strong: rgba(255,255,255,0.10);
+  --bdr-focus: #29ABE2;
+
+  /* Primary — AgentHub logo blue */
+  --primary: #29ABE2;
+  --primary-hover: #55BDE9;
+  --primary-light: rgba(41,171,226,0.08);
+  --primary-soft: rgba(41,171,226,0.14);
 
   /* Status */
   --success: #69c967;
+  --success-bg: rgba(105,201,103,0.08);
+  --warning: #d4aa4c;
+  --warning-bg: rgba(212,170,76,0.08);
+  --danger: #e87070;
+  --danger-bg: rgba(232,112,112,0.06);
+  --info: #6a93d4;
+  --info-bg: rgba(106,147,212,0.06);
+
+  /* Ring / focus */
+  --ring: rgba(41,171,226,0.25);
+
+  /* Thinking */
+  --thinking-bg: rgba(41,171,226,0.08);
+
+  /* Diff */
+  --diff-add: rgba(105,201,103,0.06);
+  --diff-del: rgba(232,112,112,0.06);
+  --diff-add-bdr: rgba(105,201,103,0.2);
+  --diff-del-bdr: rgba(232,112,112,0.2);
+
+  /* ══ Legacy / shared tokens — mapped to v4 aesthetic ══ */
+
+  --card: var(--surface);
+  --card-foreground: var(--text-1);
+  --popover: var(--surface-high);
+  --popover-foreground: var(--text-1);
+
+  --primary-foreground: #f4f5ff;
+  --secondary: rgba(255,255,255,0.055);
+  --secondary-foreground: var(--text-1);
+  --muted: rgba(255,255,255,0.042);
+  --muted-foreground: var(--text-2);
+  --accent: var(--primary);
+  --accent-foreground: #f4f5ff;
+  --destructive: var(--danger);
+  --destructive-foreground: #FFFFFF;
+
+  --border: var(--bdr);
+  --input: rgba(0,0,0,0.12);
+
   --success-foreground: #0F172A;
-  --warning: #FBBF24;
   --warning-foreground: #0F172A;
-  --info: #60A5FA;
   --info-foreground: #0F172A;
 
-  --color-success: #69c967;
-  --color-danger: #EF4444;
-  --color-border: rgba(0, 0, 0, 0.16);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-border: var(--bdr);
 
-  --brand: #5d68cc;
+  /* Semantic accents */
+  --brand: var(--primary);
   --skill: #c2a1ff;
-  --authority-hub: #5d68cc;
-  --authority-edge: #69c967;
-  --authority-hybrid: #FBBF24;
+  --authority-hub: var(--primary);
+  --authority-edge: var(--success);
+  --authority-hybrid: var(--warning);
 
-  --run-queued: rgba(255, 255, 255, 0.08);
-  --run-starting: #5d68cc;
-  --run-running: #69c967;
-  --run-completed: #69c967;
-  --run-failed: #EF4444;
-  --run-cancelled: rgba(255, 255, 255, 0.05);
+  /* Run states */
+  --run-queued: rgba(255,255,255,0.08);
+  --run-starting: var(--primary);
+  --run-running: var(--success);
+  --run-completed: var(--success);
+  --run-failed: var(--danger);
+  --run-cancelled: rgba(255,255,255,0.05);
 
-  --diff-added-bg: rgba(105, 201, 103, 0.1);
-  --diff-added-border: #69c967;
-  --diff-removed-bg: rgba(255, 126, 120, 0.1);
-  --diff-removed-border: #ff7e78;
+  --diff-added-bg: var(--diff-add);
+  --diff-added-border: var(--success);
+  --diff-removed-bg: var(--diff-del);
+  --diff-removed-border: var(--danger);
 
-  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(255,255,255,0.1);
+  --scrollbar-thumb-hover: rgba(255,255,255,0.18);
   --scrollbar-track: transparent;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.45);
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+  --shadow-md: 0 8px 32px rgba(0,0,0,0.45);
 
-  /* Glass panels — layered depth */
-  --sidebar-bg: #1f1f27;
+  --sidebar-bg: var(--surface-dim);
 
-  --surface-base: #1f1f27;
-  --surface-default: var(--surface-base);
-  --surface-lowered: #1b1b22;
-  --surface-raised: #24242c;
-  --surface-raised-hover: #2d2d36;
-  --surface-overlay: #3c3c48;
-  --surface-hover: rgba(255, 255, 255, 0.035);
-  --surface-selected: rgba(93, 104, 204, 0.16);
-  --border-subtle: rgba(0, 0, 0, 0.14);
+  /* Surface aliases (legacy) */
+  --surface-base: var(--app-bg);
+  --surface-default: var(--surface);
+  --surface-lowered: var(--surface-dim);
+  --surface-raised: var(--surface);
+  --surface-raised-hover: var(--surface-high);
+  --surface-hover: rgba(255,255,255,0.035);
+  --surface-selected: rgba(41,171,226,0.16);
+  --border-subtle: rgba(0,0,0,0.14);
+
   --color-primary: var(--primary);
-  --hover-overlay: rgba(255, 255, 255, 0.04);
+  --hover-overlay: rgba(255,255,255,0.04);
 
-  --text-strong: #f0f2f7;
-  --text-primary: #d7d9e1;
-  --text-weaker: #858a96;
-  --text-weakest: #656a75;
+  --text-strong: var(--text-1);
+  --text-primary: var(--text-1);
+  --text-weaker: var(--text-2);
+  --text-weakest: var(--text-3);
 
   /* TokenDance cross-app aliases */
   --td-canvas: var(--app-bg);
-  --td-surface: var(--surface-raised);
-  --td-tint: var(--secondary);
-  --td-ink: var(--foreground);
-  --td-ink-muted: var(--muted-foreground);
-  --td-line: var(--border);
-  --td-plum: var(--brand);
+  --td-surface: var(--surface);
+  --td-ink: var(--text-1);
+  --td-ink-muted: var(--text-2);
+  --td-line: var(--bdr);
+  --td-plum: var(--primary);
   --td-moss: var(--success);
-  --td-danger: var(--destructive);
-  --td-focus: var(--ring);
-  --td-radius-control: var(--radius-md);
-  --td-radius-panel: var(--radius-xl);
+  --td-danger: var(--danger);
+  --td-focus: var(--bdr-focus);
+  --td-radius-control: 8px;
+  --td-radius-panel: 16px;
 
   /* ── Chat surface tokens ────────────────────── */
   --chat-agent-bg: transparent;
-  --chat-user-bg: rgba(255, 255, 255, 0.045);
-  --chat-code-bg: rgba(255, 255, 255, 0.055);
-  --chat-thinking-bg: rgba(255, 255, 255, 0.02);
-  --chat-thinking-border: rgba(0, 0, 0, 0.14);
+  --chat-user-bg: rgba(255,255,255,0.045);
+  --chat-code-bg: rgba(255,255,255,0.055);
+  --chat-thinking-bg: rgba(255,255,255,0.02);
+  --chat-thinking-border: rgba(0,0,0,0.14);
 
   /* ── Floating input panel ───────────────────── */
-  --input-panel-bg: #25252d;
-  --input-panel-border: rgba(0, 0, 0, 0.11);
-  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.14);
-  --input-ghost-btn: rgba(255, 255, 255, 0.042);
-  --input-ghost-btn-hover: rgba(255, 255, 255, 0.062);
+  --input-panel-bg: var(--surface);
+  --input-panel-border: rgba(0,0,0,0.11);
+  --input-panel-shadow: 0 -10px 30px rgba(0,0,0,0.14);
+  --input-ghost-btn: rgba(255,255,255,0.042);
+  --input-ghost-btn-hover: rgba(255,255,255,0.062);
 
+  /* ── Agent card ─────────────────────────────── */
   --agent-card-bg: transparent;
-  --agent-card-hover: rgba(255, 255, 255, 0.03);
-  --agent-card-active: rgba(255, 255, 255, 0.06);
-  --agent-dot-online: #69c967;
-  --agent-dot-online-glow: 0 0 6px rgba(105, 201, 103, 0.3);
+  --agent-card-hover: rgba(255,255,255,0.03);
+  --agent-card-active: rgba(255,255,255,0.06);
+  --agent-dot-online: var(--success);
+  --agent-dot-online-glow: 0 0 6px rgba(105,201,103,0.3);
 
   /* ── Tool category border colors ─────────────── */
   --tool-edit: #F59E0B;
@@ -139,117 +191,174 @@
   --tool-default: #71717A;
 }
 
-/* ── Light Theme — macOS matte gray ────────────────────────────────────── */
+/* ── Light Theme (default) ───────────────────────────────────────────── */
+:root:not([data-theme='dark']),
 [data-theme='light'] {
-  --app-bg: #F4F4F5;
-  --sidebar-bg: rgba(246, 246, 247, 0.75);
+  color-scheme: light;
 
-  --background: #FFFFFF;
-  --foreground: oklch(0.18 0.005 260);
-  --card: #FFFFFF;
-  --card-foreground: oklch(0.18 0.005 260);
-  --popover: rgba(255, 255, 255, 0.92);
-  --popover-foreground: oklch(0.18 0.005 260);
-  --primary: oklch(0.48 0.18 265);
-  --primary-foreground: #FFFFFF;
-  --secondary: oklch(0.96 0.003 260);
-  --secondary-foreground: oklch(0.18 0.005 260);
-  --muted: #F4F4F5;
-  --muted-foreground: #8E8E93;
-  --accent: oklch(0.96 0.003 260);
-  --accent-foreground: oklch(0.18 0.005 260);
-  --destructive: oklch(0.55 0.22 25);
+  /* Core surface */
+  --app-bg: #f7f6f9;
+  --background: #f7f6f9;
+  --foreground: #1a1a2e;
+
+  /* Surface layers */
+  --surface: #ffffff;
+  --surface-dim: #f1f0f5;
+  --surface-low: #faf9fc;
+  --surface-high: #efedf5;
+  --surface-highest: #e6e4ef;
+  --surface-overlay: rgba(255,255,255,0.88);
+  --surface-sidebar: rgba(250,249,252,0.88);
+
+  /* Text */
+  --text-1: #1a1a2e;
+  --text-2: #585870;
+  --text-3: #9595ac;
+  --text-inv: #ffffff;
+
+  /* Borders */
+  --bdr: rgba(0,0,0,0.055);
+  --bdr-strong: rgba(0,0,0,0.095);
+  --bdr-focus: #0071BC;
+
+  /* Primary — AgentHub logo blue */
+  --primary: #0071BC;
+  --primary-hover: #005F9F;
+  --primary-light: rgba(0,113,188,0.06);
+  --primary-soft: rgba(0,113,188,0.11);
+
+  /* Status */
+  --success: #409467;
+  --success-bg: rgba(64,148,103,0.08);
+  --warning: #c0883a;
+  --warning-bg: rgba(192,136,58,0.08);
+  --danger: #d15252;
+  --danger-bg: rgba(209,82,82,0.06);
+  --info: #5e8dcc;
+  --info-bg: rgba(94,141,204,0.06);
+
+  /* Ring / focus */
+  --ring: rgba(0,113,188,0.22);
+
+  /* Thinking */
+  --thinking-bg: rgba(94,141,204,0.06);
+
+  /* Diff */
+  --diff-add: #f2faf5;
+  --diff-del: #fdf5f5;
+  --diff-add-bdr: #c2e3d0;
+  --diff-del-bdr: #ebc8c8;
+
+  /* ══ Legacy / shared tokens — mapped to v4 aesthetic (light) ══ */
+
+  --card: var(--surface);
+  --card-foreground: var(--text-1);
+  --popover: rgba(255,255,255,0.92);
+  --popover-foreground: var(--text-1);
+
+  --primary-foreground: #ffffff;
+  --secondary: rgba(0,0,0,0.035);
+  --secondary-foreground: var(--text-1);
+  --muted: #f4f4f5;
+  --muted-foreground: var(--text-2);
+  --accent: var(--surface-low);
+  --accent-foreground: var(--text-1);
+  --destructive: var(--danger);
   --destructive-foreground: #FFFFFF;
-  --border: rgba(0, 0, 0, 0.06);
-  --input: rgba(0, 0, 0, 0.04);
-  --ring: rgba(99, 102, 241, 0.25);
 
-  --success: oklch(0.55 0.16 150);
+  --border: var(--bdr);
+  --input: rgba(0,0,0,0.04);
+
   --success-foreground: #FFFFFF;
-  --warning: oklch(0.68 0.17 85);
-  --warning-foreground: oklch(0.18 0.005 260);
-  --info: oklch(0.55 0.11 230);
+  --warning-foreground: var(--text-1);
   --info-foreground: #FFFFFF;
 
-  --color-success: oklch(0.55 0.16 150);
-  --color-danger: oklch(0.55 0.22 25);
-  --color-border: rgba(0, 0, 0, 0.06);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-border: var(--bdr);
 
-  --brand: oklch(0.48 0.18 265);
-  --authority-hub: oklch(0.52 0.16 250);
-  --authority-edge: oklch(0.55 0.16 150);
-  --authority-hybrid: oklch(0.62 0.17 65);
+  /* Semantic accents */
+  --brand: var(--primary);
+  --skill: #8b7ec8;
+  --authority-hub: var(--primary);
+  --authority-edge: var(--success);
+  --authority-hybrid: var(--warning);
 
-  --run-queued: oklch(0.65 0.01 260);
-  --run-starting: oklch(0.52 0.14 250);
-  --run-running: oklch(0.55 0.16 150);
-  --run-completed: oklch(0.55 0.16 150);
-  --run-failed: oklch(0.50 0.20 25);
-  --run-cancelled: oklch(0.60 0.01 260);
+  /* Run states */
+  --run-queued: rgba(0,0,0,0.06);
+  --run-starting: var(--primary);
+  --run-running: var(--success);
+  --run-completed: var(--success);
+  --run-failed: var(--danger);
+  --run-cancelled: rgba(0,0,0,0.04);
 
-  --diff-added-bg: oklch(0.94 0.04 150);
-  --diff-added-border: oklch(0.60 0.16 150);
-  --diff-removed-bg: oklch(0.94 0.04 25);
-  --diff-removed-border: oklch(0.55 0.22 25);
+  --diff-added-bg: var(--diff-add);
+  --diff-added-border: var(--success);
+  --diff-removed-bg: var(--diff-del);
+  --diff-removed-border: var(--danger);
 
-  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.20);
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(0,0,0,0.12);
+  --scrollbar-thumb-hover: rgba(0,0,0,0.20);
   --scrollbar-track: transparent;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.04), 0 2px 8px -1px rgba(0,0,0,0.02);
 
-  --surface-base: #F4F4F5;
-  --surface-default: #FFFFFF;
-  --surface-lowered: #F8F8F9;
-  --surface-raised: #FFFFFF;
-  --surface-raised-hover: #F8F8F9;
-  --surface-overlay: rgba(255, 255, 255, 0.85);
-  --surface-hover: #F3F4F6;
-  --surface-selected: #EFF6FF;
-  --border-subtle: rgba(0, 0, 0, 0.06);
+  --sidebar-bg: rgba(246,246,247,0.75);
+
+  /* Surface aliases (legacy) */
+  --surface-base: var(--app-bg);
+  --surface-default: var(--surface);
+  --surface-lowered: var(--surface-dim);
+  --surface-raised: var(--surface);
+  --surface-raised-hover: var(--surface-dim);
+  --surface-hover: var(--surface-high);
+  --surface-selected: rgba(0,113,188,0.10);
+  --border-subtle: var(--bdr);
+
   --color-primary: var(--primary);
-
-  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --hover-overlay: rgba(0,0,0,0.04);
 
   --text-strong: #111827;
-  --text-primary: #1F2937;
-  --text-weaker: #8E8E93;
-  --text-weakest: #B0B0B5;
+  --text-primary: var(--text-1);
+  --text-weaker: var(--text-2);
+  --text-weakest: var(--text-3);
 
   /* TokenDance cross-app aliases */
   --td-canvas: var(--app-bg);
-  --td-surface: var(--surface-raised);
-  --td-tint: var(--secondary);
-  --td-ink: var(--foreground);
-  --td-ink-muted: var(--muted-foreground);
-  --td-line: var(--border);
-  --td-plum: var(--brand);
+  --td-surface: var(--surface);
+  --td-ink: var(--text-1);
+  --td-ink-muted: var(--text-2);
+  --td-line: var(--bdr);
+  --td-plum: var(--primary);
   --td-moss: var(--success);
-  --td-danger: var(--destructive);
-  --td-focus: var(--ring);
-  --td-radius-control: var(--radius-md);
-  --td-radius-panel: var(--radius-xl);
+  --td-danger: var(--danger);
+  --td-focus: var(--bdr-focus);
+  --td-radius-control: 8px;
+  --td-radius-panel: 16px;
 
   /* ── Chat surface tokens ────────────────────── */
   --chat-agent-bg: transparent;
-  --chat-user-bg: rgba(0, 0, 0, 0.03);
-  --chat-code-bg: rgba(0, 0, 0, 0.03);
-  --chat-thinking-bg: rgba(0, 0, 0, 0.015);
-  --chat-thinking-border: rgba(0, 0, 0, 0.05);
+  --chat-user-bg: rgba(0,0,0,0.03);
+  --chat-code-bg: rgba(0,0,0,0.03);
+  --chat-thinking-bg: rgba(0,0,0,0.015);
+  --chat-thinking-border: rgba(0,0,0,0.05);
 
   /* ── Floating input panel ───────────────────── */
-  --input-panel-bg: rgba(255, 255, 255, 0.55);
-  --input-panel-border: rgba(0, 0, 0, 0.06);
-  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
-  --input-ghost-btn: rgba(0, 0, 0, 0.03);
-  --input-ghost-btn-hover: rgba(0, 0, 0, 0.06);
+  --input-panel-bg: rgba(255,255,255,0.55);
+  --input-panel-border: rgba(0,0,0,0.06);
+  --input-panel-shadow: 0 -4px 20px rgba(0,0,0,0.04);
+  --input-ghost-btn: rgba(0,0,0,0.03);
+  --input-ghost-btn-hover: rgba(0,0,0,0.06);
 
+  /* ── Agent card ─────────────────────────────── */
   --agent-card-bg: transparent;
-  --agent-card-hover: rgba(0, 0, 0, 0.03);
-  --agent-card-active: rgba(0, 0, 0, 0.05);
+  --agent-card-hover: rgba(0,0,0,0.03);
+  --agent-card-active: rgba(0,0,0,0.05);
   --agent-dot-online: #22c55e;
-  --agent-dot-online-glow: 0 0 6px rgba(34, 197, 94, 0.25);
+  --agent-dot-online-glow: 0 0 6px rgba(34,197,94,0.25);
 
   /* ── Tool category border colors ─────────────── */
   --tool-edit: #D97706;
@@ -258,41 +367,41 @@
   --tool-read: #2563EB;
   --tool-default: #71717A;
 
-  /* ── Glass tokens (light: dark overlay direction) ───────────────────── */
-  --glass-bg-subtle: rgba(0, 0, 0, 0.02);
-  --glass-bg-light: rgba(0, 0, 0, 0.035);
-  --glass-bg-medium: rgba(0, 0, 0, 0.05);
-  --glass-bg-strong: rgba(0, 0, 0, 0.065);
-  --glass-bg-heavy: rgba(0, 0, 0, 0.08);
+  /* ── Glass tokens (light: overlay direction) ─── */
+  --glass-bg-subtle: rgba(0,0,0,0.02);
+  --glass-bg-light: rgba(0,0,0,0.035);
+  --glass-bg-medium: rgba(0,0,0,0.05);
+  --glass-bg-strong: rgba(0,0,0,0.065);
+  --glass-bg-heavy: rgba(0,0,0,0.08);
 
-  --glass-bg-hover: rgba(0, 0, 0, 0.04);
-  --glass-bg-active: rgba(0, 0, 0, 0.06);
+  --glass-bg-hover: rgba(0,0,0,0.04);
+  --glass-bg-active: rgba(0,0,0,0.06);
 
-  --glass-border-subtle: rgba(0, 0, 0, 0.035);
-  --glass-border: rgba(0, 0, 0, 0.055);
-  --glass-border-strong: rgba(0, 0, 0, 0.08);
-  --glass-border-heavy: rgba(0, 0, 0, 0.12);
+  --glass-border-subtle: rgba(0,0,0,0.035);
+  --glass-border: rgba(0,0,0,0.055);
+  --glass-border-strong: rgba(0,0,0,0.08);
+  --glass-border-heavy: rgba(0,0,0,0.12);
 
-  --glass-panel: rgba(255, 255, 255, 0.78);
-  --glass-panel-strong: rgba(255, 255, 255, 0.92);
-  --glass-panel-overlay: rgba(255, 255, 255, 0.97);
+  --glass-panel: rgba(255,255,255,0.78);
+  --glass-panel-strong: rgba(255,255,255,0.92);
+  --glass-panel-overlay: rgba(255,255,255,0.97);
 
-  --glass-tint-plum: rgba(99, 102, 241, 0.08);
-  --glass-tint-moss: rgba(34, 197, 94, 0.08);
-  --glass-tint-danger: rgba(239, 68, 68, 0.07);
-  --glass-tint-amber: rgba(245, 158, 11, 0.08);
-  --glass-tint-sky: rgba(59, 130, 246, 0.08);
+  --glass-tint-plum: rgba(0,113,188,0.08);
+  --glass-tint-moss: rgba(34,197,94,0.08);
+  --glass-tint-danger: rgba(239,68,68,0.07);
+  --glass-tint-amber: rgba(245,158,11,0.08);
+  --glass-tint-sky: rgba(59,130,246,0.08);
 
-  --glass-shadow: rgba(0, 0, 0, 0.08);
-  --glass-shadow-subtle: rgba(0, 0, 0, 0.04);
+  --glass-shadow: rgba(0,0,0,0.08);
+  --glass-shadow-subtle: rgba(0,0,0,0.04);
 
-  --glass-text-muted: rgba(0, 0, 0, 0.45);
-  --glass-text-disabled: rgba(0, 0, 0, 0.25);
+  --glass-text-muted: rgba(0,0,0,0.45);
+  --glass-text-disabled: rgba(0,0,0,0.25);
 
-  --glass-input-bg: rgba(0, 0, 0, 0.04);
-  --glass-input-bg-hover: rgba(255, 255, 255, 0.72);
+  --glass-input-bg: rgba(0,0,0,0.04);
+  --glass-input-bg-hover: rgba(255,255,255,0.72);
 
-  --glass-light-fill: rgba(246, 247, 250, 0.92);
+  --glass-light-fill: rgba(246,247,250,0.92);
 
   --elevated-card-bg: var(--glass-panel);
   --elevated-card-border: var(--glass-border);
@@ -300,27 +409,27 @@
   --elevated-card-shadow-strong: 0 10px 26px var(--glass-shadow-subtle);
 }
 
-/* ── Shared glass/backdrop utilities ──────────────────────────────────── */
+/* ── Glass utility classes ───────────────────────────────────────────── */
 [data-theme='light'] .glass-panel {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255,255,255,0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
 [data-theme='light'] .glass-sidebar {
-  background: rgba(246, 246, 247, 0.68);
+  background: rgba(246,246,247,0.68);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 
 [data-theme='dark'] .glass-panel {
-  background: rgba(45, 45, 55, 0.45);
+  background: rgba(36,36,45,0.45);
   backdrop-filter: blur(40px) saturate(1.2);
   -webkit-backdrop-filter: blur(40px) saturate(1.2);
 }
 
 [data-theme='dark'] .glass-sidebar {
-  background: rgba(35, 35, 45, 0.55);
+  background: rgba(30,30,38,0.55);
   backdrop-filter: blur(40px) saturate(1.2);
   -webkit-backdrop-filter: blur(40px) saturate(1.2);
 }

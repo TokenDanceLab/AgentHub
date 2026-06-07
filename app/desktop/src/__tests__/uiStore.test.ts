@@ -10,6 +10,7 @@ describe('uiStore shell layout state', () => {
       leftSidebarCollapsed: false,
       rightPanelOpen: false,
       leftSidebarView: 'home',
+      activeRailView: 'home',
       mobileSidebarOpen: false,
       mobileRightPanelOpen: false,
     });
@@ -31,11 +32,25 @@ describe('uiStore shell layout state', () => {
     });
   });
 
+  it('tracks active rail view', () => {
+    const store = useUIStore.getState();
+
+    store.setActiveRailView('messages');
+    expect(useUIStore.getState().activeRailView).toBe('messages');
+
+    store.setActiveRailView('agents');
+    expect(useUIStore.getState().activeRailView).toBe('agents');
+
+    store.setActiveRailView('home');
+    expect(useUIStore.getState().activeRailView).toBe('home');
+  });
+
   it('persists only desktop shell layout fields', () => {
     const store = useUIStore.getState();
 
     store.setLeftSidebarCollapsed(true);
     store.setRightPanelOpen(true);
+    store.setActiveRailView('messages');
     store.setMobileSidebarOpen(true);
 
     const persisted = JSON.parse(localStorage.getItem('agenthub-ui-shell') ?? '{}');
@@ -46,6 +61,31 @@ describe('uiStore shell layout state', () => {
       leftSidebarCollapsed: true,
       rightPanelOpen: true,
       leftSidebarView: 'home',
+      activeRailView: 'messages',
+    });
+  });
+
+  it('migrates persisted state without activeRailView to default home', async () => {
+    localStorage.setItem('agenthub-ui-shell', JSON.stringify({
+      version: 2,
+      state: {
+        sidebarWidth: 320,
+        rightPanelWidth: 360,
+        leftSidebarCollapsed: false,
+        rightPanelOpen: false,
+        leftSidebarView: 'thread',
+      },
+    }));
+
+    await useUIStore.persist.rehydrate();
+
+    expect(useUIStore.getState()).toMatchObject({
+      sidebarWidth: 320,
+      rightPanelWidth: 360,
+      leftSidebarCollapsed: false,
+      rightPanelOpen: false,
+      leftSidebarView: 'thread',
+      activeRailView: 'home',
     });
   });
 });

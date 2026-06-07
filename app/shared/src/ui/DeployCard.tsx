@@ -1,9 +1,9 @@
-import { Rocket, ExternalLink, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { ExternalLink, Eye, Rocket, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import styles from './DeployCard.module.css';
 
 export interface DeployCardProps {
   deployId?: string | undefined;
-  status?: string | undefined;
+  status?: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
   statusMessage?: string | undefined;
   url?: string | undefined;
 }
@@ -16,52 +16,66 @@ const STATUS_ICON: Record<string, typeof Rocket> = {
   failed: XCircle,
 };
 
-const STATUS_CLASS: Record<string, string | undefined> = {
-  pending: styles.statusPending,
-  building: styles.statusBuilding,
-  deploying: styles.statusDeploying,
-  deployed: styles.statusDeployed,
-  failed: styles.statusFailed,
+const STATUS_LABEL: Record<string, string> = {
+  pending: '待部署',
+  building: '构建中',
+  deploying: '部署中',
+  deployed: '已就绪',
+  failed: '部署失败',
 };
 
 export default function DeployCard({
-  deployId,
   status,
   statusMessage,
   url,
 }: DeployCardProps) {
   const resolvedStatus = status ?? 'pending';
   const StatusIcon = STATUS_ICON[resolvedStatus] ?? Rocket;
-  const statusClass = STATUS_CLASS[resolvedStatus] ?? '';
+  const label = STATUS_LABEL[resolvedStatus] ?? resolvedStatus;
   const isSpinning = resolvedStatus === 'building' || resolvedStatus === 'deploying';
+  const isSuccess = resolvedStatus === 'deployed';
+  const isFailed = resolvedStatus === 'failed';
 
   return (
     <div className={styles.card} data-testid="deploy-card">
-      <div className={styles.header}>
-        <span className={`${styles.statusIcon} ${statusClass} ${isSpinning ? styles.spin : ''}`}>
-          <StatusIcon size={16} />
+      <div className={styles.head}>
+        <span
+          className={`${styles.badge} ${isSuccess ? styles.badgeSuccess : isFailed ? styles.badgeDanger : styles.badgePrimary}`}
+        >
+          <span className={styles.badgeDot} />
+          <StatusIcon size={12} className={isSpinning ? styles.spin : ''} />
+          {label}
         </span>
-        <div className={styles.info}>
-          <span className={styles.label}>Deploy</span>
-          <span className={`${styles.statusLabel} ${statusClass}`}>{resolvedStatus}</span>
-        </div>
-        {statusMessage && <span className={styles.message}>{statusMessage}</span>}
-        {url && (
-          <a
-            className={styles.actionBtn}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open deployment"
-            aria-label="Open deployment"
-          >
-            <ExternalLink size={14} />
-          </a>
-        )}
+        <span className={styles.title}>
+          Deploy{statusMessage ? ` · ${statusMessage}` : ''}
+        </span>
       </div>
-      {deployId && (
-        <div className={styles.footer}>
-          <code className={styles.deployId}>{deployId}</code>
+
+      {url && (
+        <div className={styles.urlBox}>
+          <span className={styles.url}>{url}</span>
+          <div className={styles.actions}>
+            {isSuccess && (
+              <button
+                className={styles.previewBtn}
+                type="button"
+                aria-label="预览"
+              >
+                <Eye size={13} />
+                <span>预览</span>
+              </button>
+            )}
+            <a
+              className={styles.openBtn}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="打开"
+            >
+              <ExternalLink size={13} />
+              <span>打开</span>
+            </a>
+          </div>
         </div>
       )}
     </div>

@@ -194,8 +194,17 @@ screenshots/
 # =============================================================================
 # Docs & Local Files
 # =============================================================================
-# Competition and competitive-analysis materials (not open-source)
-docs/competition/
+# Competition docs: keep sanitized Markdown evidence tracked; generated/private
+# screenshots, recordings, exports, and submission bundles stay ignored by the
+# artifact/media rules above and by the scoped rules below.
+docs/competition/*
+!docs/competition/
+!docs/competition/**/
+!docs/competition/**/*.md
+docs/competition/**/artifacts/
+docs/competition/**/exports/
+docs/competition/**/screenshots/
+docs/competition/**/videos/
 docs/competitive-gap/
 docs/COMPETITIVE-GAP.md
 

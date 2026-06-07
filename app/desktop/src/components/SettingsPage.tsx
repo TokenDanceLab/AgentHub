@@ -71,11 +71,12 @@ import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
-
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import {
-  useModelSettingsStore,
-  type ResolvedRunModelSettings,
-} from '@/stores/modelSettingsStore';
+  DEFAULT_AGENT_AUTO,
+  buildDefaultAgentOptions,
+  resolveAvailableDefaultAgentId,
+} from '@/utils/defaultAgent';
 import styles from './SettingsPage.module.css';
 import {
   useStoredBooleanState,
@@ -129,6 +130,8 @@ interface Props {
   onBack: () => void;
   onOpenAuth: () => void;
   initialSection?: SectionId;
+  defaultAgent: string;
+  setDefaultAgent: (value: string) => void;
 }
 
 interface NavItem {
@@ -138,7 +141,13 @@ interface NavItem {
   group: 'workspace' | 'automation' | 'system';
 }
 
-export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
+export default function SettingsPage({
+  onBack,
+  onOpenAuth,
+  initialSection = 'general',
+  defaultAgent,
+  setDefaultAgent,
+}: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode, themePreset, setThemePreset } = useTheme();
   const hubAuth = useAuth();
@@ -232,13 +241,25 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
 
-  const agents = agentData?.items ?? [];
+  const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
+  const defaultAgentAutoLabel = t('settings.defaultAgent.auto');
+  const defaultAgentOptions = useMemo(
+    () => buildDefaultAgentOptions(agents, defaultAgentAutoLabel),
+    [agents, defaultAgentAutoLabel],
+  );
+  const defaultAgentValue = useMemo(
+    () => resolveAvailableDefaultAgentId(defaultAgent, agents) ?? DEFAULT_AGENT_AUTO,
+    [agents, defaultAgent],
+  );
   const localAgentProfiles = useMemo(
-    () => agents.map((agent) => ({
-      agent,
-      alias: preferredProfileAlias(agent),
-      route: resolveRunRequestOptions({ model: preferredProfileAlias(agent) }),
-    })),
+    () => agents.map((agent) => {
+      const alias = preferredProfileAlias(agent);
+      return {
+        agent,
+        alias,
+        route: resolveRunRequestOptions(alias ? { model: alias } : {}),
+      };
+    }),
     [
       agents,
       defaultModel,
@@ -452,8 +473,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <AppearanceSection
               themeMode={themeMode}
               setThemeMode={setThemeMode}
-              compactMode={compactMode}
-              setCompactMode={setCompactMode}
               themePreset={themePreset}
               setThemePreset={setThemePreset}
             />
@@ -461,13 +480,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'configuration' && (
             <ConfigurationSection
-              defaultAgent="Auto"
-              setDefaultAgent={NOOP}
-              routing={t('settings.routingAuto')}
+              defaultAgent={defaultAgentValue}
+              setDefaultAgent={setDefaultAgent}
+              routing="auto"
               setRouting={NOOP}
               approvalMode={approvalMode}
               setApprovalMode={setApprovalMode}
-              defaultAgentOptions={[['Auto', 'Auto']]}
+              defaultAgentOptions={defaultAgentOptions}
               routingOptions={[['auto', t('settings.routingAuto')]]}
             />
           )}
@@ -709,8 +728,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'archived' && <ArchivedSection />}
           {active === 'data' && (
             <DataSection
-              t={t}
-              addToast={(input) => { return ''; }}
+              t={(key, options) => options ? t(key, options) : t(key)}
+              addToast={(_input) => { return ''; }}
               resetModelSettings={() => {
                 setDefaultModel('auto');
                 setDefaultProvider('tokendance-gateway');

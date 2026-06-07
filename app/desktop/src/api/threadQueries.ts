@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import {
   createThread,
   fetchThreadItems,
+  fetchThreadPins,
   fetchThreads,
   renameThread,
   deleteThread,
@@ -11,7 +12,7 @@ import {
   updateThreadStatus,
   type CreateThreadRequest,
 } from './edgeClient';
-import type { ListResponse, ThreadInfo, ThreadItemInfo } from '@shared/types';
+import type { ListResponse, ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
 
 export function useThreads(projectId?: string) {
   return useQuery<ListResponse<ThreadInfo>>({
@@ -176,5 +177,18 @@ export function useThreadMessages(threadId: string | null) {
     },
     enabled: !!threadId,
     staleTime: 5_000,
+  });
+}
+
+export function useThreadPins(threadId: string | null) {
+  return useQuery<ListResponse<ThreadPinInfo>>({
+    queryKey: ['threadPins', threadId],
+    queryFn: () => {
+      if (!threadId) throw new Error('threadId is required');
+      return fetchThreadPins(threadId);
+    },
+    enabled: !!threadId && threadId !== 'thread_local',
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   });
 }

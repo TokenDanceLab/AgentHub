@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
 
 function message(id: string, role: ChatMessage['role'], content: string): ChatMessage {
