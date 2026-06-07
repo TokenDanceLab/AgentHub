@@ -1,5 +1,5 @@
 import React from 'react';
-import { DesignNavIcon } from '../designIcons';
+import { DESIGN_NAV_GLYPH_STROKE_WIDTH, DesignNavIcon } from '../designIcons';
 import styles from './BrowserPreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -42,7 +42,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
           title="后退"
           disabled
         >
-          <DesignNavIcon name="back" />
+          <DesignNavIcon name="back" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
         </button>
 
         {/* Forward */}
@@ -53,7 +53,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
           title="前进"
           disabled
         >
-          <DesignNavIcon name="forward" />
+          <DesignNavIcon name="forward" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
         </button>
 
         {/* Refresh */}
@@ -63,13 +63,13 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
           aria-label="刷新"
           title="刷新"
         >
-          <DesignNavIcon name="refresh" />
+          <DesignNavIcon name="refresh" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
         </button>
 
         {/* Address bar */}
         <div className={styles.address}>
           <span className={styles.addressIcon}>
-            <DesignNavIcon name="link" />
+            <DesignNavIcon name="link" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
           </span>
           <strong className={styles.addressText}>{url}</strong>
         </div>
@@ -82,7 +82,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
           aria-label="关闭预览"
           title="关闭预览"
         >
-          <DesignNavIcon name="close" />
+          <DesignNavIcon name="close" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
         </button>
       </div>
 

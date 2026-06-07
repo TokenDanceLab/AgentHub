@@ -1,4 +1,28 @@
 import React from 'react';
+import AntigravityIcon from '@lobehub/icons/es/Antigravity/components/Color.js';
+import { siCursor, siGitforwindows, siLinux } from 'simple-icons';
+import androidStudioIcon from 'devicon/icons/androidstudio/androidstudio-original.svg';
+import visualStudioIcon from 'devicon/icons/visualstudio/visualstudio-original.svg';
+import vscodeIcon from 'devicon/icons/vscode/vscode-original.svg';
+
+export const DESIGN_FILE_ICON_SIZE = 17;
+export const DESIGN_FILE_ICON_RADIUS = 3;
+export const DESIGN_NAV_ICON_SIZE = 16;
+export const DESIGN_NAV_ICON_STROKE_WIDTH = 1.9;
+export const DESIGN_NAV_GLYPH_SIZE = 17;
+export const DESIGN_NAV_GLYPH_STROKE_WIDTH = 1.85;
+
+export type DesignOpenWithIconName =
+  | 'androidStudio'
+  | 'antigravity'
+  | 'cursor'
+  | 'defaultApp'
+  | 'folder'
+  | 'gitBash'
+  | 'terminal'
+  | 'visualStudio'
+  | 'vscode'
+  | 'wsl';
 
 type IconProps = {
   className?: string | undefined;
@@ -351,9 +375,12 @@ function navIconPaths(name: DesignNavIconName): React.ReactNode {
     case 'railAgent':
       return (
         <>
-          <rect x="3" y="11" width="18" height="10" rx="2" />
-          <circle cx="12" cy="5" r="2" />
-          <path d="M12 7v4" />
+          <rect x="4.5" y="9" width="15" height="11.5" rx="3" />
+          <path d="M12 5.5v3.5" />
+          <circle cx="12" cy="4.25" r="1.75" />
+          <path d="M3.25 13.5v3.5M20.75 13.5v3.5" />
+          <path d="M8.5 14.25h.1M15.5 14.25h.1" />
+          <path d="M9.5 17.75h5" />
         </>
       );
     case 'railProjects':
@@ -847,11 +874,13 @@ function navIconPaths(name: DesignNavIconName): React.ReactNode {
 export function DesignNavIcon({
   className,
   name = 'folder',
-  size = 16,
+  size = DESIGN_NAV_ICON_SIZE,
+  strokeWidth = DESIGN_NAV_ICON_STROKE_WIDTH,
 }: {
   className?: string | undefined;
   name?: DesignNavIconName | undefined;
   size?: number | undefined;
+  strokeWidth?: number | undefined;
 }): React.ReactElement {
   return (
     <svg
@@ -862,11 +891,80 @@ export function DesignNavIcon({
       stroke="currentColor"
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeWidth="1.9"
+      strokeWidth={strokeWidth}
       viewBox="0 0 24 24"
       width={size}
     >
       {navIconPaths(name)}
+    </svg>
+  );
+}
+
+export function DesignOpenWithIcon({
+  className,
+  imageClassName,
+  name,
+  size = 18,
+}: {
+  className?: string | undefined;
+  imageClassName?: string | undefined;
+  name: DesignOpenWithIconName;
+  size?: number | undefined;
+}): React.ReactElement {
+  switch (name) {
+    case 'vscode':
+      return <img alt="VS Code" className={imageClassName ?? className} src={vscodeIcon} />;
+    case 'visualStudio':
+      return <img alt="Visual Studio" className={imageClassName ?? className} src={visualStudioIcon} />;
+    case 'cursor':
+      return <DesignBrandPathIcon className={className} icon={siCursor} />;
+    case 'antigravity':
+      return <AntigravityIcon className={className} size={size} />;
+    case 'defaultApp':
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path d="M5 4h14v16H5z" />
+          <path d="M8 8h8M8 12h8M8 16h5" />
+        </svg>
+      );
+    case 'terminal':
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path d="M4 5h16v14H4z" />
+          <path d="m7 9 3 3-3 3M12 15h5" />
+        </svg>
+      );
+    case 'gitBash':
+      return <DesignBrandPathIcon className={className} icon={siGitforwindows} />;
+    case 'wsl':
+      return <DesignBrandPathIcon className={className} icon={siLinux} />;
+    case 'androidStudio':
+      return <img alt="Android Studio" className={imageClassName ?? className} src={androidStudioIcon} />;
+    case 'folder':
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path d="M3.5 6.5h6l2 2h9v9.5a2 2 0 0 1-2 2h-15v-13.5Z" />
+          <path d="M3.5 8.5h17" />
+        </svg>
+      );
+  }
+}
+
+function DesignBrandPathIcon({
+  className,
+  icon,
+}: {
+  className?: string | undefined;
+  icon: { hex: string; path: string; title: string };
+}): React.ReactElement {
+  return (
+    <svg
+      aria-label={icon.title}
+      className={className}
+      role="img"
+      viewBox="0 0 24 24"
+    >
+      <path d={icon.path} fill={`#${icon.hex}`} />
     </svg>
   );
 }

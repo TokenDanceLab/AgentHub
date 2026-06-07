@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import {
+  demoOverviewFiles,
+  demoOverviewTasks,
+  getDemoFileContent,
+  getDemoFileDiff,
+} from '../demo/workbenchDemoData';
 import { buildInspectorEvidenceModel } from '../inspector';
 import type { EvidenceRef } from '../transcript';
 import {
@@ -8,14 +14,42 @@ import {
   FilePreview,
   BrowserPreview,
 } from './inspector';
-import { DesignFileIcon, DesignNavIcon, type DesignNavIconName } from './designIcons';
+import {
+  DESIGN_NAV_GLYPH_SIZE,
+  DESIGN_NAV_GLYPH_STROKE_WIDTH,
+  DesignFileIcon,
+  DesignNavIcon,
+  type DesignNavIconName,
+} from './designIcons';
 import styles from './AgentHubWorkbench.module.css';
 
 type InspectorMode = 'overview' | 'browser' | 'files';
 
-function TabMark({ char, children }: { char: string; children: React.ReactElement }) {
+function TabMark({
+  char,
+  children,
+  mode,
+  onClose,
+}: {
+  char: string;
+  children: React.ReactElement;
+  mode: InspectorMode;
+  onClose: (mode: InspectorMode) => void;
+}) {
   return (
-    <span className={styles.inspectorTabMark}>
+    <span
+      aria-label={`关闭 ${inspectorTabLabel(mode)}`}
+      className={styles.inspectorTabMark}
+      data-inspector-close
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose(mode);
+      }}
+      role="button"
+      tabIndex={-1}
+      title={`关闭 ${inspectorTabLabel(mode)}`}
+    >
       {children}
       <b>{char}</b>
     </span>
@@ -37,57 +71,14 @@ const inspectorTabs: InspectorTabDef[] = [
   { mode: 'files', label: '文件', markChar: '×', icon: 'fileText' },
 ];
 
-const prototypeTasks: TaskItem[] = [
-  { label: '梳理现有会话表与消息索引', status: 'done' },
-  { label: '确认 FTS5 搜索字段边界', status: 'done' },
-  { label: '生成迁移顺序与回滚脚本', status: 'active' },
-  { label: '补充性能验证清单', status: 'todo' },
+const defaultVisibleTabs = new Set<InspectorMode>(['overview', 'browser', 'files']);
+
+const quickOpenItems = [
+  { id: 'files', label: '文件', shortcut: 'Ctrl+P', mode: 'files' as InspectorMode },
+  { id: 'chat', label: '侧边聊天', shortcut: '', mode: null },
+  { id: 'browser', label: '浏览器', shortcut: 'Ctrl+T', mode: 'browser' as InspectorMode },
+  { id: 'terminal', label: '终端', shortcut: 'Ctrl+`', mode: null },
 ];
-
-const prototypeFiles: FileItem[] = [
-  { name: 'sqlite-migration-plan.md', type: 'sql', isPrimary: true },
-  { name: 'migrations/0007_chat_threads.sql', type: 'db' },
-  { name: 'hooks/useThreadNavigation.ts', type: 'ts' },
-  { name: 'B0-SQLITE-RISKS.md', type: 'md' },
-];
-
-const prototypeFileContent: Record<string, string> = {
-  'sqlite-migration-plan.md': `# B0 SQLite 迁移方案
-
-## 目标
-- 新增 thread/message 索引，保持现有会话可回滚。
-- 使用 FTS5 支持本地消息搜索。
-- 迁移脚本必须可以重复执行并输出校验摘要。
-
-## 顺序
-1. 备份当前 SQLite 数据库。
-2. 创建 chat_threads 与 message_search 虚表。
-3. 回填历史消息索引。
-4. 写入 migration_state 并生成校验报告。`,
-  'migrations/0007_chat_threads.sql': `BEGIN;
-
-CREATE TABLE IF NOT EXISTS chat_threads (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
-CREATE VIRTUAL TABLE IF NOT EXISTS message_search
-USING fts5(thread_id, author, body);
-
-COMMIT;`,
-  'hooks/useThreadNavigation.ts': `export function useThreadNavigation(threadId: string) {
-  return {
-    activeThreadId: threadId,
-    openThread: (next: string) => next,
-  };
-}`,
-  'B0-SQLITE-RISKS.md': `# B0 SQLite 风险
-
-- 回滚脚本必须覆盖索引表与迁移状态。
-- FTS5 字段只保存可搜索摘要。
-- 导航 hook 不能改变现有 thread id。`,
-};
 
 /* ═══ Component ═══ */
 
@@ -100,6 +91,7 @@ export interface RightInspectorProps {
   maxWidth: number;
   minWidth: number;
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
+  reviewFileRequest?: FileItem | null | undefined;
   onResizeBy: (delta: number) => void;
   onResizeStart: (clientX: number) => void;
   width: number;
@@ -114,22 +106,36 @@ export function RightInspector({
   maxWidth,
   minWidth,
   onOpenPreview,
+  reviewFileRequest,
   onResizeBy,
   onResizeStart,
   width,
 }: RightInspectorProps): React.ReactElement {
   const [activeMode, setActiveMode] = useState<InspectorMode>('overview');
+  const [visibleTabs, setVisibleTabs] = useState<Set<InspectorMode>>(() => new Set(defaultVisibleTabs));
+  const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
 
   const model = buildInspectorEvidenceModel(evidence);
 
+  useEffect(() => {
+    if (!reviewFileRequest) return;
+    setVisibleTabs((current) => {
+      const next = new Set(current);
+      next.add('files');
+      return next;
+    });
+    setPreviewFile(reviewFileRequest);
+    setActiveMode('files');
+  }, [reviewFileRequest]);
+
   const overviewTasks = useMemo<TaskItem[]>(() => {
-    return prototypeTasks;
+    return demoOverviewTasks;
   }, []);
 
   const overviewFiles = useMemo<FileItem[]>(() => {
-    return prototypeFiles.map((file) => ({
+    return demoOverviewFiles.map((file) => ({
       ...file,
       isOpen: previewFile?.name === file.name,
     }));
@@ -148,11 +154,38 @@ export function RightInspector({
 
   const browserPreviewUrl = browserUrl ?? defaultBrowserUrl;
 
+  const visibleInspectorTabs = useMemo(() => (
+    inspectorTabs.filter((tab) => visibleTabs.has(tab.mode))
+  ), [visibleTabs]);
+
+  const closeInspectorTab = useCallback((mode: InspectorMode) => {
+    setVisibleTabs((current) => {
+      const next = new Set(current);
+      next.delete(mode);
+      return next;
+    });
+    setPreviewFile((current) => (mode === 'files' ? null : current));
+    setBrowserUrl((current) => (mode === 'browser' ? null : current));
+    setActiveMode((current) => {
+      if (current !== mode) return current;
+      const fallback = inspectorTabs.find((tab) => tab.mode !== mode && visibleTabs.has(tab.mode));
+      return fallback?.mode ?? 'overview';
+    });
+  }, [visibleTabs]);
+
+  const restoreInspectorTab = useCallback((mode: InspectorMode) => {
+    setVisibleTabs((current) => {
+      const next = new Set(current);
+      next.add(mode);
+      return next;
+    });
+    setActiveMode(mode);
+    setQuickOpenVisible(false);
+  }, []);
+
   const openNewInspectorWindow = useCallback(() => {
-    setPreviewFile(null);
-    setBrowserUrl(defaultBrowserUrl);
-    setActiveMode('browser');
-  }, [defaultBrowserUrl]);
+    setQuickOpenVisible((value) => !value);
+  }, []);
 
   return (
     <aside
@@ -186,7 +219,7 @@ export function RightInspector({
 
       <div className={styles.monitorHead}>
         <div aria-label="右侧工作区" className={styles.inspectorTabs} role="tablist">
-          {inspectorTabs.map((tab) => {
+          {visibleInspectorTabs.map((tab) => {
             const disabled = tab.mode === 'browser' && !browserPreviewEnabled;
             return (
               <button
@@ -196,11 +229,21 @@ export function RightInspector({
                 disabled={disabled}
                 key={tab.mode}
                 onClick={() => setActiveMode(tab.mode)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+                  event.preventDefault();
+                  closeInspectorTab(tab.mode);
+                }}
                 role="tab"
                 type="button"
               >
-                <TabMark char={tab.markChar}>
-                  <DesignNavIcon className={styles.inspectorTabIcon} name={tab.icon} size={16} />
+                <TabMark char={tab.markChar} mode={tab.mode} onClose={closeInspectorTab}>
+                  <DesignNavIcon
+                    className={styles.inspectorTabIcon}
+                    name={tab.icon}
+                    size={DESIGN_NAV_GLYPH_SIZE}
+                    strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
+                  />
                 </TabMark>
                 {tab.label}
               </button>
@@ -212,15 +255,53 @@ export function RightInspector({
             type="button"
             title="新建右侧窗口"
             aria-label="新建右侧窗口"
+            aria-expanded={quickOpenVisible}
+            aria-haspopup="menu"
             onClick={openNewInspectorWindow}
           >
             <DesignNavIcon name="plus" size={15} />
           </button>
+          {quickOpenVisible && (
+            <div className={styles.inspectorAddMenu} role="menu" aria-label="右侧窗口菜单">
+              {quickOpenItems.map((item) => (
+                <button
+                  key={item.id}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    if (item.mode) restoreInspectorTab(item.mode);
+                  }}
+                >
+                  <DesignNavIcon name={item.mode === 'browser' ? 'browser' : item.mode === 'files' ? 'fileText' : 'tools'} size={15} />
+                  <span>{item.label}</span>
+                  {item.shortcut && <em>{item.shortcut}</em>}
+                </button>
+              ))}
+              {inspectorTabs.some((tab) => !visibleTabs.has(tab.mode)) && (
+                <div className={styles.inspectorAddMenuDivider} />
+              )}
+              {inspectorTabs.filter((tab) => !visibleTabs.has(tab.mode)).map((tab) => (
+                <button
+                  key={tab.mode}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => restoreInspectorTab(tab.mode)}
+                >
+                  <DesignNavIcon name={tab.icon} size={15} />
+                  <span>{`恢复 ${tab.label}`}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       <div className={styles.inspectorPanel} role="tabpanel">
-        {activeMode === 'overview' && (
+        {visibleTabs.size === 0 && (
+          <p className={styles.inspectorEmpty}>右侧窗口已关闭。使用 + 重新打开概览、浏览器或文件。</p>
+        )}
+
+        {activeMode === 'overview' && visibleTabs.has('overview') && (
           <OverviewPanel
             tasks={overviewTasks}
             files={overviewFiles}
@@ -231,7 +312,7 @@ export function RightInspector({
           />
         )}
 
-        {activeMode === 'browser' && (
+        {activeMode === 'browser' && visibleTabs.has('browser') && (
           browserPreviewEnabled ? (
             <BrowserPreview
               url={browserPreviewUrl}
@@ -247,18 +328,21 @@ export function RightInspector({
           )
         )}
 
-        {activeMode === 'files' && (
+        {activeMode === 'files' && visibleTabs.has('files') && (
           previewFile ? (
             <FilePreview
               filename={previewFile.name}
               language={previewFile.type}
-              content={filePreviewContent(previewFile)}
+              content={getDemoFileContent(previewFile)}
+              diffContent={getDemoFileDiff(previewFile)}
               onClose={closePreview}
             />
           ) : (
             <FilesPanel
               canOpenPreview={canOpenPreview}
+              fallbackFiles={overviewFiles}
               files={model.files}
+              onFallbackFileClick={handleFileClick}
               onOpenPreview={onOpenPreview}
             />
           )
@@ -332,15 +416,46 @@ function BrowserPanelFallback({
 
 function FilesPanel({
   canOpenPreview,
+  fallbackFiles,
   files,
+  onFallbackFileClick,
   onOpenPreview,
 }: {
   canOpenPreview?: ((evidence: EvidenceRef) => boolean) | undefined;
+  fallbackFiles?: FileItem[] | undefined;
   files: EvidenceRef[];
+  onFallbackFileClick?: ((file: FileItem) => void) | undefined;
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
 }): React.ReactElement {
+  if (files.length === 0 && fallbackFiles && fallbackFiles.length > 0) {
+    return (
+      <ul aria-label="Changed files" className={styles.fileList}>
+        {fallbackFiles.map((file) => (
+          <li key={file.name}>
+            <button
+              aria-label={`打开文件 ${file.name}`}
+              className={styles.fileRow}
+              onClick={() => onFallbackFileClick?.(file)}
+              type="button"
+            >
+              <DesignFileIcon className={styles.fileIcon} name={file.name} type={file.type} />
+              <span className={styles.fileName}>{file.name}</span>
+              <span className={styles.fileMeta}>预览</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
   if (files.length === 0) {
-    return <p className={styles.inspectorEmpty}>暂无变更文件</p>;
+    return (
+      <div className={styles.browserPreviewCard}>
+        <DesignNavIcon className={styles.browserPreviewIcon} name="fileText" size={24} />
+        <strong>暂无变更文件</strong>
+        <span>等待 run 产出文件、diff 或 artifact evidence。</span>
+      </div>
+    );
   }
 
   return (
@@ -380,6 +495,6 @@ function canOpenEvidence(
   return Boolean(onOpenPreview) && (canOpenPreview?.(evidence) ?? true);
 }
 
-function filePreviewContent(file: FileItem): string {
-  return prototypeFileContent[file.name] ?? `${file.name}\n\n只读预览内容等待平台 adapter 提供。`;
+function inspectorTabLabel(mode: InspectorMode): string {
+  return inspectorTabs.find((tab) => tab.mode === mode)?.label ?? mode;
 }

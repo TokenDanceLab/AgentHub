@@ -21,6 +21,7 @@ import 'prismjs/components/prism-rust';
 import 'prismjs/components/prism-go';
 import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-sql';
 
 // ── Extension → Prism language mapping ───────────────────────────────────
 

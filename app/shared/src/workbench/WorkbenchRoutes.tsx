@@ -1,267 +1,377 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import {
+  normalizeWorkbenchDataMode,
+  readWorkbenchDataModeOverride,
+  writeWorkbenchDataModeOverride,
+} from '../demo';
+import {
+  composerSubmitBehaviorFromLabel,
+  composerSubmitBehaviorLabel,
+  readComposerSubmitBehavior,
+  writeComposerSubmitBehavior,
+} from './workbenchPreferences';
 import type { WorkbenchAgent } from '../platform';
 import type {
-  ContactGroup,
-  ContactMember,
   ContactsPane,
   DocRow,
   DocsPane,
+  ProjectArtifact,
   ProjectFilter,
   ProjectTab,
   SettingsPaneId,
   TaskGroup,
+  TaskItem,
+  TaskStatus,
   TasksPane,
   ViewMode,
 } from './pages';
 import {
   AgentsPage,
   ContactsPage,
-  DEFAULT_PROJECTS,
   DocsPage,
   ProjectsPage,
   SettingsPage,
   TasksPage,
 } from './pages';
-import type {
-  AgentConfig,
-  AgentsPaneId,
-  AuditEntry,
-  MarketTemplate,
-  ModelHealth,
-  ModelInfo,
-  PolicyRule,
-} from './pages/AgentsPage';
+import type { AgentConfig, AgentsPaneId } from './pages/AgentsPage';
+import type { TaskEditDraft } from './pages/TasksPage';
 import type { GlobalRailPage } from './GlobalRail';
+import {
+  fileTypeFromPreviewName,
+  previewFilenameFromTitle,
+  type WorkbenchDocumentPreview,
+} from './documentPreview';
+import {
+  WORKBENCH_MOCK_AGENT_AUDIT_ROWS,
+  WORKBENCH_MOCK_AGENT_CONFIGS,
+  WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES,
+  WORKBENCH_MOCK_AGENT_MODEL_HEALTH,
+  WORKBENCH_MOCK_AGENT_MODELS,
+  WORKBENCH_MOCK_AGENT_POLICY_RULES,
+  WORKBENCH_MOCK_AGENT_SKILL_OPTIONS,
+  WORKBENCH_MOCK_AGENT_TOOL_OPTIONS,
+  WORKBENCH_MOCK_CONTACT_GROUPS,
+  WORKBENCH_MOCK_CONTACT_MEMBERS,
+  WORKBENCH_MOCK_CONTACT_SHORTCUTS,
+  WORKBENCH_MOCK_DOC_ROWS,
+  WORKBENCH_MOCK_EXTERNAL_CONTACTS,
+  WORKBENCH_MOCK_PENDING_CONTACTS,
+  WORKBENCH_MOCK_PROJECTS,
+  WORKBENCH_MOCK_SERVICE_DESKS,
+  WORKBENCH_MOCK_SETTINGS_DEFAULTS,
+  WORKBENCH_MOCK_TASK_GROUPS,
+} from './mockData';
+import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import styles from './AgentHubWorkbench.module.css';
 
 type WorkbenchPage = Exclude<GlobalRailPage, 'chat'>;
+type TaskSortMode = 'custom' | 'due';
+type TaskGroupMode = 'custom' | 'project' | 'status';
+
+const TASK_STATUS_SEQUENCE: TaskStatus[] = ['未开始', '进行中', '待评审', '待确认', '已完成'];
 
 export interface WorkbenchRoutesProps {
   activePage: WorkbenchPage;
   agents: WorkbenchAgent[];
+  focusedAgentId?: string | undefined;
+  onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
 }
 
-const CONTACT_MEMBERS: ContactMember[] = [
-  { id: 'delicious', name: 'Delicious233', initials: 'D', tag: '当前用户', org: 'TokenDance', status: '在线' },
-  { id: 'johnny', name: 'Johnny', initials: 'J', tag: '维护者', org: 'AgentHub Desktop', status: '刚刚活跃' },
-  { id: 'trump', name: 'Trump', initials: 'T', tag: '协作者', org: '设计评审', status: '今天 10:18' },
-];
-
-const CONTACT_GROUPS: ContactGroup[] = [
-  { id: 'design-review', name: 'AgentHub 设计评审', initials: 'A', count: '8 人', latestMessage: '最近消息：云文档页需要收紧表格密度' },
-  { id: 'ai-game', name: 'AI 游戏项目', initials: 'P', count: '5 人', latestMessage: '最近消息：题材方向研究进行中' },
-  { id: 'docs-refactor', name: '文档重构', initials: 'W', count: '3 人', latestMessage: '最近消息：等待归档确认' },
-];
-
-const DOC_ROWS: DocRow[] = [
-  { id: 'desktop-design-system', title: 'AgentHub Desktop 设计系统对齐清单', tag: '内部', location: '我的文档库', owner: 'Delicious233', time: '今天 14:52' },
-  { id: 'meeting-notes', title: '智能纪要：【AgentHub 设计评审】', tag: '共享', location: '与我共享', owner: 'Johnny', time: '今天 11:08' },
-  { id: 'session-handoff', title: 'SESSION-HANDOFF-2026-06-05.md', location: '项目产物', owner: 'Codex', time: '昨天 22:40' },
-  { id: 'im-breakdown', title: 'AgentHub IM 交互拆解', tag: '内部', location: '我的文档库', owner: 'Delicious233', time: '6月4日 15:18' },
-  { id: 'design-contract', title: 'TokenDance Design Contract v3', tag: '共享', location: '知识库', owner: 'Johnny', time: '6月3日 18:33' },
-  { id: 'deep-research', title: 'AgentHub 开源项目深度研究', tag: '外部', location: '我的文档库', owner: 'Trump', time: '6月2日 19:42' },
-];
-
-const TASK_GROUPS: TaskGroup[] = [
-  {
-    label: '默认分组',
-    tasks: [
-      {
-        id: 'sqlite-plan',
-        title: 'B0 SQLite 迁移方案',
-        project: '前端重构任务',
-        assignee: 'Builder',
-        startTime: '今天 14:49',
-        dueDate: '明天 18:00',
-        creator: 'Delicious233',
-        status: '进行中',
-      },
-      {
-        id: 'embedded-docs',
-        title: '云文档内嵌子页对齐',
-        project: 'AgentHub 设计评审',
-        assignee: 'Johnny',
-        startTime: '今天 11:32',
-        dueDate: '今天 22:00',
-        creator: 'Delicious233',
-        status: '待评审',
-      },
-      {
-        id: 'project-announcement',
-        title: '项目公告收敛成群公告',
-        project: '文档重构',
-        assignee: 'Reviewer',
-        startTime: '昨天 12:20',
-        dueDate: '6月8日',
-        creator: 'Trump',
-        status: '待确认',
-      },
-      {
-        id: 'agent-market',
-        title: 'Agent 市场卡片完善',
-        project: 'Agent 配置',
-        assignee: 'Builder',
-        startTime: '6月6日',
-        dueDate: '6月9日',
-        creator: 'Johnny',
-        status: '未开始',
-      },
-    ],
-  },
-];
-
-const DEFAULT_AGENT_CONFIGS: AgentConfig[] = [
-  {
-    id: 'builder-agent',
-    name: 'Builder',
-    role: '代码实现',
-    engine: 'Claude Code',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Plan → Code',
-    approval: '写文件前确认',
-    scope: '当前项目',
-    state: 'running',
-    skills: ['Read File', 'Write File', 'Shell', 'Git Diff'],
-    tools: { 'Read File': '允许', 'Write File': '允许', Shell: '允许', 'Git Diff': '需确认', 'Browser Screenshot': '需确认' },
-  },
-  {
-    id: 'reviewer-agent',
-    name: 'Reviewer',
-    role: '审查与验收',
-    engine: 'Claude Code',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Review',
-    approval: '只读默认允许',
-    scope: '当前项目',
-    state: 'ready',
-    skills: ['Read File', 'Git Diff', 'Browser Screenshot'],
-    tools: { 'Read File': '允许', 'Write File': '禁止', Shell: '需确认', 'Git Diff': '允许', 'Browser Screenshot': '允许' },
-  },
-  {
-    id: 'researcher-agent',
-    name: 'Researcher',
-    role: '资料研究',
-    engine: 'DeepSeek',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Research',
-    approval: '外部访问前确认',
-    scope: '文档库',
-    state: 'idle',
-    skills: ['Web 摘要', '文档库', '引用整理'],
-    tools: { 'Read File': '允许', 'Write File': '需确认', Shell: '禁止', 'Git Diff': '需确认', 'Browser Screenshot': '需确认' },
-  },
-  {
-    id: 'deployer-agent',
-    name: 'Deployer',
-    role: '预览与发布',
-    engine: 'Claude Code',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Deploy',
-    approval: '生产部署前确认',
-    scope: '当前项目',
-    state: 'waiting',
-    skills: ['Shell', '构建', '预览', '产物归档'],
-    tools: { 'Read File': '允许', 'Write File': '允许', Shell: '需确认', 'Git Diff': '允许', 'Browser Screenshot': '允许' },
-  },
-];
-
-const AGENT_SKILL_OPTIONS = ['Read File', 'Write File', 'Shell', 'Git Diff', 'Browser Screenshot', 'Web 摘要', '文档库', '引用整理', '构建', '预览', '产物归档'];
-
-const AGENT_TOOL_OPTIONS = ['Read File', 'Write File', 'Shell', 'Git Diff', 'Browser Screenshot'];
-
-const AGENT_MARKET_TEMPLATES: MarketTemplate[] = [
-  { name: 'Spec Writer', description: '把聊天结论整理成需求和验收标准', category: '文档', detail: '适合需求澄清、PRD、验收标准' },
-  { name: 'Data Analyst', description: '读取表格和日志，生成趋势洞察', category: '数据', detail: '适合运营报表、成本归因、日志分析' },
-  { name: 'Browser QA', description: '用浏览器截图检查页面和交互', category: '测试', detail: '适合本地预览、视觉回归、可用性检查' },
-  { name: 'Release Captain', description: '发布检查、版本说明、回滚清单', category: '发布', detail: '适合上线前检查、公告和回滚方案' },
-  { name: 'Security Reviewer', description: '审查权限边界、密钥暴露和风险项', category: '安全', detail: '适合发布门禁、代码审计、风险登记' },
-  { name: 'Docs Librarian', description: '整理云文档、Handoff 和归档索引', category: '文档', detail: '适合知识库、项目文档和长期归档' },
-];
-
-const AGENT_POLICY_RULES: PolicyRule[] = [
-  { name: '写入工作区文件', riskLevel: '中风险', action: '需要确认', description: 'Write File / apply_patch / 格式化输出' },
-  { name: '执行 Shell 命令', riskLevel: '中风险', action: '需要确认', description: '构建、预览、轻量诊断允许进入确认队列' },
-  { name: '访问浏览器截图', riskLevel: '低风险', action: '默认允许', description: '仅用于本地 demo 视觉检查和 DOM 验证' },
-  { name: '生产部署动作', riskLevel: '高风险', action: '禁止', description: '当前 demo 不连接真实部署面' },
-];
-
-const AGENT_MODELS: ModelInfo[] = [
-  { name: 'DeepSeek-V4-Pro', state: '默认', description: '长上下文推理与代码实现', assignedAgents: 'Builder, Reviewer, Deployer' },
-  { name: 'kimi-k2.6', state: '备选', description: '前端视觉和多模态审查', assignedAgents: 'Browser QA' },
-  { name: 'glm-5.1', state: '备选', description: '中文文档和知识整理', assignedAgents: 'Docs Librarian' },
-  { name: 'gpt-5-codex', state: '实验', description: '复杂代码任务和工具编排', assignedAgents: 'Researcher' },
-];
-
-const AGENT_MODEL_HEALTH: ModelHealth[] = [
-  { name: 'DeepSeek-V4-Pro', status: '可用', meta: '延迟 680ms' },
-  { name: 'kimi-k2.6', status: '可用', meta: '视觉评审优先' },
-  { name: 'gpt-5-codex', status: '实验', meta: '需要手动选择' },
-];
-
-const AGENT_AUDIT_ROWS: AuditEntry[] = [
-  { time: '14:59', agent: 'Builder', tool: 'Write File', result: '需确认', target: 'migrations/0007_chat_threads.sql' },
-  { time: '14:57', agent: 'Reviewer', tool: 'Git Diff', result: '允许', target: 'desktop/app.js' },
-  { time: '14:52', agent: 'Browser QA', tool: 'Browser Screenshot', result: '允许', target: 'http://127.0.0.1:5176/desktop/' },
-  { time: '14:41', agent: 'Researcher', tool: 'Shell', result: '禁止', target: '外部网络检索未授权' },
-];
-
-function agentColor(agent: Pick<AgentConfig, 'id' | 'name'>): string {
-  const key = (agent.id || agent.name || '').toLowerCase();
-  if (key.includes('builder')) return 'var(--role-builder)';
-  if (key.includes('reviewer')) return 'var(--role-reviewer)';
-  if (key.includes('researcher')) return 'var(--role-researcher)';
-  if (key.includes('deployer') || key.includes('release')) return 'var(--role-deployer)';
-  if (key.includes('security')) return 'var(--danger)';
-  if (key.includes('browser')) return 'var(--role-deployer)';
-  if (key.includes('data')) return 'var(--warning)';
-  return 'var(--primary)';
+function persistDataModeLabel(value: string): void {
+  writeWorkbenchDataModeOverride(normalizeWorkbenchDataMode(value));
 }
 
-const SETTINGS_DEFAULTS = {
-  theme: '浅色',
-  density: '标准',
-  runStepDefault: '折叠',
-  animationIntensity: '标准',
-  inspectorVisible: true,
-  stackedAvatars: true,
-  taskCompleteNotify: true,
-  approvalNotifyLevel: '强提醒',
-  failureNotify: true,
-  projectGroupNotifyLevel: '提及',
-  docUpdateNotifyLevel: '重要',
-  dndWindow: '23:30 - 09:00',
-  defaultModel: 'DeepSeek-V4-Pro',
-  defaultExecutor: 'Claude Code',
-  toolCallDisplay: '摘要',
-  deepThinkingDisplay: '摘要',
-  permissions: { Read: '允许', Write: '需确认', Shell: '需确认', Browser: '允许' },
-  vitePreviewUrl: 'http://127.0.0.1:5176/desktop/',
-  workspacePath: 'D:\\Code\\TokenDance\\agenthub-design',
-  targetProjectPath: 'D:\\Code\\TokenDance\\AgentHub',
-  hrmOverlayEnabled: true,
-  visualQaMode: '按需',
-  logLevel: '标准',
-  designSystemValidation: '手动',
-  stateStrategies: { empty: true, invalid: true, missing: true },
+function dataModeLabel(): string {
+  switch (readWorkbenchDataModeOverride()) {
+    case 'demo':
+      return 'Mock';
+    case 'real':
+      return '正常';
+    case 'auto':
+    default:
+      return '自动';
+  }
+}
+
+function createDocPreview(doc: DocRow): WorkbenchDocumentPreview {
+  const filename = previewFilenameFromTitle(doc.title);
+  const tagLine = doc.tag ? `- 标签：${doc.tag}` : '- 标签：未标记';
+  return {
+    id: `doc:${doc.id}`,
+    name: filename,
+    type: fileTypeFromPreviewName(filename),
+    owner: doc.owner,
+    sourceLabel: doc.location,
+    content: [
+      `# ${doc.title}`,
+      '',
+      '## 文档信息',
+      `- 所有者：${doc.owner}`,
+      `- 位置：${doc.location}`,
+      `- 创建时间：${doc.time}`,
+      tagLine,
+      '',
+      '## 摘要',
+      '这是 AgentHub 轻量文档预览。当前内容来自文档索引，后续可由 Hub artifact store、workspace 文件或外部文档 provider 提供正文。',
+      '',
+      '## 下一步',
+      '- 接入全文搜索与项目归档索引。',
+      '- 将外部云文档 provider 映射为同一预览合同。',
+      '- 对 Markdown、Diff、表格和链接产物使用统一只读预览。',
+    ].join('\n'),
+  };
+}
+
+function createProjectArtifactPreview(projectId: string, artifact: ProjectArtifact): WorkbenchDocumentPreview {
+  const name = artifact.name ?? 'artifact.txt';
+  const type = fileTypeFromPreviewName(name);
+  return {
+    id: `project:${projectId}:${artifact.id}`,
+    name,
+    type,
+    owner: 'AgentHub',
+    sourceLabel: `项目产物 / ${projectId}`,
+    content: projectArtifactContent(projectId, name, type),
+    diffContent: projectArtifactDiff(name, type),
+  };
+}
+
+function projectArtifactContent(projectId: string, name: string, type: string): string {
+  if (type === 'xlsx') {
+    return [
+      `# ${name}`,
+      '',
+      '| 维度 | 状态 | 备注 |',
+      '|---|---|---|',
+      '| 项目 | 已索引 | ' + projectId + ' |',
+      '| 类型 | 表格产物 | 轻量预览先以 Markdown 表格呈现 |',
+      '| 后续 | 待接入 | Sheet viewer / 导出 / provider sync |',
+    ].join('\n');
+  }
+
+  if (type === 'md') {
+    return [
+      `# ${name}`,
+      '',
+      '## 项目产物',
+      `- 项目：${projectId}`,
+      '- 来源：Agent run / 项目归档',
+      '- 浏览：当前使用 AgentHub 轻量预览，后续可接 Hub artifact store 正文。',
+      '',
+      '## 内容摘要',
+      '这个文件已进入项目产物索引。项目页负责展示上下文，预览区负责阅读正文、源码和 Diff。',
+    ].join('\n');
+  }
+
+  return [
+    `// ${name}`,
+    `// project: ${projectId}`,
+    '// readonly artifact preview',
+    '',
+    'export const artifact = {',
+    `  name: ${JSON.stringify(name)},`,
+    `  projectId: ${JSON.stringify(projectId)},`,
+    '  source: "AgentHub project artifact index",',
+    '};',
+  ].join('\n');
+}
+
+function projectArtifactDiff(name: string, type: string): string | undefined {
+  if (type === 'xlsx') return undefined;
+  return [
+    `diff --git a/${name} b/${name}`,
+    `--- a/${name}`,
+    `+++ b/${name}`,
+    '@@ project artifact preview @@',
+    `+${name}`,
+    '+已接入 AgentHub 轻量项目产物预览。',
+  ].join('\n');
+}
+
+function persistedComposerSubmitBehaviorLabel(): string {
+  return composerSubmitBehaviorLabel(readComposerSubmitBehavior());
+}
+
+function createSettingsDefaults(): typeof WORKBENCH_MOCK_SETTINGS_DEFAULTS {
+  return {
+    ...WORKBENCH_MOCK_SETTINGS_DEFAULTS,
+    dataMode: dataModeLabel(),
+    composerSubmitBehavior: persistedComposerSubmitBehaviorLabel(),
+  };
+}
+
+const DESIGN_DONE_TASK: TaskItem = {
+  id: 'readme-structure-done',
+  title: 'README 结构更新',
+  project: '文档重构',
+  assignee: 'Builder',
+  startTime: '6月2日',
+  dueDate: '6月2日',
+  creator: 'Johnny',
+  status: '已完成',
 };
 
-export function WorkbenchRoutes({ activePage, agents }: WorkbenchRoutesProps): React.ReactElement {
+const WATCHING_TASK_IDS = new Set(['embedded-docs', 'project-announcement']);
+const ACTIVITY_TASK_IDS = new Set(['sqlite-plan', 'project-announcement', 'agent-market']);
+
+function flattenTaskGroups(groups: TaskGroup[]): TaskItem[] {
+  return groups.flatMap((group) => group.tasks);
+}
+
+function taskMatchesPane(task: TaskItem, pane: TasksPane): boolean {
+  switch (pane) {
+    case 'watching':
+      return WATCHING_TASK_IDS.has(task.id) || task.project === 'AgentHub 设计评审';
+    case 'activity':
+      return ACTIVITY_TASK_IDS.has(task.id) || task.startTime === '刚刚';
+    case 'created':
+      return task.creator === 'Delicious233';
+    case 'assigned':
+      return task.creator === 'Delicious233' && task.assignee !== 'Delicious233';
+    case 'done':
+      return task.status === '已完成';
+    case 'owned':
+    case 'all':
+    default:
+      return true;
+  }
+}
+
+function dueRank(label: string): number {
+  if (label.includes('今天')) return 0;
+  if (label.includes('明天')) return 1;
+  const match = /(\d+)月(\d+)日/.exec(label);
+  if (match) return Number(match[1]) * 100 + Number(match[2]);
+  return 9999;
+}
+
+function sortTasks(tasks: TaskItem[], mode: TaskSortMode): TaskItem[] {
+  if (mode === 'custom') return tasks;
+  return [...tasks].sort((a, b) => (
+    dueRank(a.dueDate) - dueRank(b.dueDate)
+    || a.title.localeCompare(b.title, 'zh-Hans-CN')
+  ));
+}
+
+function groupTasks(tasks: TaskItem[], mode: TaskGroupMode): TaskGroup[] {
+  if (mode === 'custom') return [{ label: '默认分组', tasks }];
+
+  const labels = mode === 'status'
+    ? ['进行中', '待评审', '待确认', '未开始', '已完成']
+    : Array.from(new Set(tasks.map((task) => task.project)));
+
+  return labels
+    .map((label) => ({
+      label,
+      tasks: tasks.filter((task) => (mode === 'status' ? task.status : task.project) === label),
+    }))
+    .filter((group) => group.tasks.length > 0);
+}
+
+function buildTaskGroups(
+  sourceGroups: TaskGroup[],
+  pane: TasksPane,
+  filterActive: boolean,
+  sortMode: TaskSortMode,
+  groupMode: TaskGroupMode,
+  viewMode: ViewMode,
+): TaskGroup[] {
+  const filteredGroups = sourceGroups
+    .map((group) => ({
+      ...group,
+      tasks: sortTasks(
+        group.tasks.filter((task) => (
+          taskMatchesPane(task, pane)
+          && (pane === 'done' || !filterActive || task.status !== '已完成')
+        )),
+        sortMode,
+      ),
+    }))
+    .filter((group) => group.tasks.length > 0 || (
+      groupMode === 'custom' && group.label.startsWith('自定义分组')
+    ));
+
+  let groups = filteredGroups;
+  if (pane === 'done' && flattenTaskGroups(groups).length === 0) {
+    groups = [{ label: '默认分组', tasks: [DESIGN_DONE_TASK] }];
+  }
+
+  const nextGroupMode = viewMode === 'board'
+    ? 'status'
+    : viewMode === 'dashboard'
+      ? 'project'
+      : groupMode;
+  if (nextGroupMode !== 'custom') {
+    return groupTasks(sortTasks(flattenTaskGroups(groups), sortMode), nextGroupMode);
+  }
+
+  return groups.length > 0 ? groups : [{ label: '默认分组', tasks: [] }];
+}
+
+function createLocalTask(index: number): TaskItem {
+  return {
+    id: `local-task-${index}`,
+    title: `未命名任务 ${index}`,
+    project: '前端重构任务',
+    assignee: 'Builder',
+    startTime: '刚刚',
+    dueDate: '今天 22:00',
+    creator: 'Delicious233',
+    status: '未开始',
+  };
+}
+
+export function WorkbenchRoutes({
+  activePage,
+  agents,
+  focusedAgentId,
+  onAgentProfileOpen,
+}: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
   const [docsTab, setDocsTab] = useState<DocsPane>('recent');
   const [agentsPane, setAgentsPane] = useState<AgentsPaneId>('installed');
   const [tasksPane, setTasksPane] = useState<TasksPane>('owned');
   const [taskViewMode, setTaskViewMode] = useState<ViewMode>('list');
-  const [projectId, setProjectId] = useState(DEFAULT_PROJECTS[0]?.id ?? null);
+  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>(WORKBENCH_MOCK_TASK_GROUPS);
+  const [taskFilterActive, setTaskFilterActive] = useState(true);
+  const [taskSortMode, setTaskSortMode] = useState<TaskSortMode>('custom');
+  const [taskGroupMode, setTaskGroupMode] = useState<TaskGroupMode>('custom');
+  const [taskShowCreator, setTaskShowCreator] = useState(true);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskNavMenuOpen, setTaskNavMenuOpen] = useState(false);
+  const [taskActionLabel, setTaskActionLabel] = useState('筛选已启用');
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
+  const [localTaskCounter, setLocalTaskCounter] = useState(1);
+  const [projectId, setProjectId] = useState(WORKBENCH_MOCK_PROJECTS[0]?.id ?? null);
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [projectTab, setProjectTab] = useState<ProjectTab>('overview');
+  const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
+  const [projectPreview, setProjectPreview] = useState<WorkbenchDocumentPreview | null>(null);
   const [settingsPane, setSettingsPane] = useState<SettingsPaneId>('appearance');
-  const [settings, setSettings] = useState(SETTINGS_DEFAULTS);
+  const [settings, setSettings] = useState(createSettingsDefaults);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(focusedAgentId);
 
   void agents;
-  const agentConfigs = DEFAULT_AGENT_CONFIGS;
+  const agentConfigs = WORKBENCH_MOCK_AGENT_CONFIGS;
+  const profileSources = useMemo(() => [
+    ...agentConfigs.map((agent) => ({ ...agent, kind: 'agent' as const })),
+    ...WORKBENCH_MOCK_CONTACT_MEMBERS.map((member) => ({ ...member, kind: 'user' as const })),
+  ], [agentConfigs]);
+  const effectiveSelectedAgentId = selectedAgentId ?? agentConfigs[0]?.id ?? '';
+
+  React.useEffect(() => {
+    if (focusedAgentId) setSelectedAgentId(focusedAgentId);
+  }, [focusedAgentId]);
 
   function handleSettingChange(key: string, value: string | boolean): void {
+    if (key === 'dataMode' && typeof value === 'string') {
+      persistDataModeLabel(value);
+    }
+    if (key === 'composerSubmitBehavior' && typeof value === 'string') {
+      writeComposerSubmitBehavior(composerSubmitBehaviorFromLabel(value));
+    }
     setSettings((current) => {
       if (key.startsWith('perm_')) {
         return {
@@ -280,17 +390,209 @@ export function WorkbenchRoutes({ activePage, agents }: WorkbenchRoutesProps): R
     });
   }
 
+  const visibleTaskGroups = useMemo(() => buildTaskGroups(
+    taskGroups,
+    tasksPane,
+    taskFilterActive,
+    taskSortMode,
+    taskGroupMode,
+    taskViewMode,
+  ), [taskFilterActive, taskGroupMode, taskGroups, taskSortMode, taskViewMode, tasksPane]);
+  const visibleTasks = flattenTaskGroups(visibleTaskGroups);
+  const allTasks = flattenTaskGroups(taskGroups);
+  const selectedTask = allTasks.find((task) => task.id === selectedTaskId) ?? null;
+
+  function handleTaskPaneChange(pane: TasksPane): void {
+    setTasksPane(pane);
+    setSelectedTaskId(null);
+    setEditingTaskId(null);
+    setEditingTaskDraft(null);
+    setTaskNavMenuOpen(false);
+    setTaskActionLabel(`已切换到${pane === 'owned' ? '我负责的' : pane === 'watching' ? '我关注的' : pane === 'activity' ? '动态' : pane === 'done' ? '已完成' : '任务视图'}`);
+  }
+
+  function handleCreateTask(): void {
+    const nextTask = createLocalTask(localTaskCounter);
+    setLocalTaskCounter((current) => current + 1);
+    setTaskGroups((current) => {
+      const [first, ...rest] = current;
+      if (!first) return [{ label: '默认分组', tasks: [nextTask] }];
+      return [{ ...first, tasks: [nextTask, ...first.tasks] }, ...rest];
+    });
+    setTasksPane('owned');
+    setTaskViewMode('list');
+    setSelectedTaskId(nextTask.id);
+    setEditingTaskId(nextTask.id);
+    setEditingTaskDraft({
+      title: nextTask.title,
+      project: nextTask.project,
+      assignee: nextTask.assignee,
+      startTime: nextTask.startTime,
+      dueDate: nextTask.dueDate,
+      creator: nextTask.creator,
+    });
+    setTaskActionLabel(`已创建 ${nextTask.title}`);
+  }
+
+  function handleNewTaskGroup(): void {
+    const nextIndex = taskGroups.length + 1;
+    setTaskGroups((current) => [...current, { label: `自定义分组 ${nextIndex}`, tasks: [] }]);
+    setTaskGroupMode('custom');
+    setTaskViewMode('list');
+    setTaskActionLabel(`已创建自定义分组 ${nextIndex}`);
+  }
+
+  function handleTaskList(): void {
+    setTaskViewMode('list');
+    setTaskGroupMode('custom');
+    setTaskNavMenuOpen(false);
+    setTaskActionLabel('已回到任务清单');
+  }
+
+  function handleTaskSort(): void {
+    setTaskSortMode((current) => {
+      const next = current === 'custom' ? 'due' : 'custom';
+      setTaskActionLabel(next === 'due' ? '已按截止时间排序' : '已恢复拖拽自定义排序');
+      return next;
+    });
+  }
+
+  function handleTaskGroup(): void {
+    setTaskGroupMode((current) => (
+      current === 'custom' ? 'project' : current === 'project' ? 'status' : 'custom'
+    ));
+    setTaskActionLabel('已切换任务分组方式');
+  }
+
+  function updateTask(taskId: string, patch: Partial<TaskItem>): void {
+    setTaskGroups((current) => current.map((group) => ({
+      ...group,
+      tasks: group.tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
+    })));
+  }
+
+  function startTaskEdit(task: TaskItem): void {
+    setSelectedTaskId(task.id);
+    setEditingTaskId(task.id);
+    setEditingTaskDraft({
+      title: task.title,
+      project: task.project,
+      assignee: task.assignee,
+      startTime: task.startTime,
+      dueDate: task.dueDate,
+      creator: task.creator,
+    });
+    setTaskViewMode('list');
+    setTaskActionLabel(`正在编辑 ${task.title}`);
+  }
+
+  function handleEditSelectedTask(): void {
+    if (!selectedTask) {
+      setTaskActionLabel('请先选择任务');
+      return;
+    }
+    startTaskEdit(selectedTask);
+  }
+
+  function handleEditTaskDraftChange(field: keyof TaskEditDraft, value: string): void {
+    setEditingTaskDraft((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  function handleSaveTaskEdit(): void {
+    if (!editingTaskId || !editingTaskDraft) {
+      setTaskActionLabel('没有正在编辑的任务');
+      return;
+    }
+    const title = editingTaskDraft.title.trim() || '未命名任务';
+    const nextDraft = { ...editingTaskDraft, title };
+    updateTask(editingTaskId, nextDraft);
+    setEditingTaskId(null);
+    setEditingTaskDraft(null);
+    setTaskActionLabel(`${title} 已保存`);
+  }
+
+  function handleCancelTaskEdit(): void {
+    if (editingTaskDraft) {
+      setTaskActionLabel('已取消编辑');
+    }
+    setEditingTaskId(null);
+    setEditingTaskDraft(null);
+  }
+
+  function handleDeleteSelectedTask(): void {
+    if (!selectedTask) {
+      setTaskActionLabel('请先选择任务');
+      return;
+    }
+    const deletedTitle = selectedTask.title;
+    setTaskGroups((current) => current
+      .map((group) => ({
+        ...group,
+        tasks: group.tasks.filter((task) => task.id !== selectedTask.id),
+      }))
+      .filter((group) => group.tasks.length > 0 || group.label.startsWith('自定义分组')));
+    setSelectedTaskId(null);
+    setEditingTaskId(null);
+    setEditingTaskDraft(null);
+    setTaskActionLabel(`${deletedTitle} 已删除`);
+  }
+
+  function handleCycleSelectedTaskStatus(): void {
+    if (!selectedTask) {
+      setTaskActionLabel('请先选择任务');
+      return;
+    }
+    const currentIndex = TASK_STATUS_SEQUENCE.indexOf(selectedTask.status ?? TASK_STATUS_SEQUENCE[0]!);
+    const nextStatus = TASK_STATUS_SEQUENCE[(currentIndex + 1) % TASK_STATUS_SEQUENCE.length]
+      ?? TASK_STATUS_SEQUENCE[0]!;
+    updateTask(selectedTask.id, { status: nextStatus });
+    setTaskActionLabel(`${selectedTask.title} 已推进到 ${nextStatus}`);
+  }
+
+  function handleAssignSelectedTaskToMe(): void {
+    if (!selectedTask) {
+      setTaskActionLabel('请先选择任务');
+      return;
+    }
+    updateTask(selectedTask.id, { assignee: 'Delicious233' });
+    setTaskActionLabel(`${selectedTask.title} 已指派给 Delicious233`);
+  }
+
+  function handleGroupBySelectedTaskProject(): void {
+    if (!selectedTask) {
+      setTaskActionLabel('请先选择任务');
+      return;
+    }
+    setTaskGroupMode('project');
+    setTaskViewMode('list');
+    setTaskActionLabel(`已按项目查看：${selectedTask.project}`);
+  }
+
+  function handleFilterBySelectedTaskAssignee(): void {
+    if (!selectedTask) {
+      setTaskActionLabel('请先选择任务');
+      return;
+    }
+    setTasksPane(selectedTask.assignee === 'Delicious233' ? 'owned' : 'all');
+    setTaskFilterActive(false);
+    setTaskActionLabel(`当前负责人：${selectedTask.assignee}`);
+  }
+
   switch (activePage) {
     case 'contacts':
       return (
         <ContactsPage
           activePane={contactsPane}
-          groups={CONTACT_GROUPS}
-          members={CONTACT_MEMBERS}
+          externalContacts={WORKBENCH_MOCK_EXTERNAL_CONTACTS}
+          groups={WORKBENCH_MOCK_CONTACT_GROUPS}
+          members={WORKBENCH_MOCK_CONTACT_MEMBERS}
           onPaneChange={setContactsPane}
           orgInitials="TD"
           orgName="TokenDance"
-          starredContacts={CONTACT_MEMBERS.slice(0, 2)}
+          pendingContacts={WORKBENCH_MOCK_PENDING_CONTACTS}
+          recentShortcuts={WORKBENCH_MOCK_CONTACT_SHORTCUTS}
+          serviceDesks={WORKBENCH_MOCK_SERVICE_DESKS}
+          starredContacts={WORKBENCH_MOCK_CONTACT_MEMBERS.slice(0, 2)}
         />
       );
     case 'docs':
@@ -301,7 +603,11 @@ export function WorkbenchRoutes({ activePage, agents }: WorkbenchRoutesProps): R
           navItems={[]}
           onNavChange={setDocsNav}
           onTabChange={setDocsTab}
-          rows={DOC_ROWS}
+          profiles={profileSources}
+          activePreview={docsPreview}
+          onClosePreview={() => setDocsPreview(null)}
+          onDocClick={(doc) => setDocsPreview(createDocPreview(doc))}
+          rows={WORKBENCH_MOCK_DOC_ROWS}
         />
       );
     case 'agents':
@@ -309,51 +615,112 @@ export function WorkbenchRoutes({ activePage, agents }: WorkbenchRoutesProps): R
         <AgentsPage
           activePane={agentsPane}
           agents={agentConfigs}
-          allSkills={AGENT_SKILL_OPTIONS}
-          allTools={AGENT_TOOL_OPTIONS}
-          auditEntries={AGENT_AUDIT_ROWS}
-          confirmCount={agentConfigs.reduce((total, agent) => total + AGENT_TOOL_OPTIONS.filter((tool) => agent.tools[tool] === '需确认').length, 0)}
+          allSkills={WORKBENCH_MOCK_AGENT_SKILL_OPTIONS}
+          allTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
+          auditEntries={WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
+          confirmCount={agentConfigs.reduce((total, agent) => total + WORKBENCH_MOCK_AGENT_TOOL_OPTIONS.filter((tool) => agent.tools[tool] === '需确认').length, 0)}
           defaultModelLabel="DeepSeek-V4-Pro"
           installedCount={agentConfigs.length}
-          marketFeatured={AGENT_MARKET_TEMPLATES.slice(0, 3)}
-          marketTemplates={AGENT_MARKET_TEMPLATES.slice(3)}
-          modelHealthRows={AGENT_MODEL_HEALTH}
+          marketFeatured={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(0, 3)}
+          marketTemplates={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(3)}
+          modelHealthRows={WORKBENCH_MOCK_AGENT_MODEL_HEALTH}
           modelRoutes={agentConfigs.map((agent) => ({
             agentId: agent.id,
             agentName: agent.name,
-            agentInitials: agent.name.slice(0, 1).toUpperCase(),
-            agentColor: agentColor(agent),
+            agentInitials: workbenchProfileInitials(agent.name),
+            agentColor: workbenchAgentColor(agent),
             role: agent.role,
             mode: agent.mode,
             model: agent.model,
           }))}
-          models={AGENT_MODELS}
+          models={WORKBENCH_MOCK_AGENT_MODELS}
           onPaneChange={setAgentsPane}
-          policyRules={AGENT_POLICY_RULES}
+          onAgentProfileOpen={onAgentProfileOpen}
+          onAgentSelect={setSelectedAgentId}
+          policyRules={WORKBENCH_MOCK_AGENT_POLICY_RULES}
           recentShortcuts={['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由']}
           runnableCount={agentConfigs.filter((agent) => agent.state === 'running' || agent.state === 'ready').length}
-          {...(agentConfigs[0]?.id ? { selectedAgentId: agentConfigs[0].id } : {})}
           toolMatrixAgents={agentConfigs.map((agent) => ({
             id: agent.id,
             name: agent.name,
-            initials: agent.name.slice(0, 1).toUpperCase(),
-            color: agentColor(agent),
+            initials: workbenchProfileInitials(agent.name),
+            color: workbenchAgentColor(agent),
             permissions: agent.tools,
           }))}
-          toolMatrixTools={AGENT_TOOL_OPTIONS}
+          toolMatrixTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
+          {...(effectiveSelectedAgentId ? { selectedAgentId: effectiveSelectedAgentId } : {})}
         />
       );
     case 'runs':
       return (
         <TasksPage
           activePane={tasksPane}
-          activeFilterCount={1}
-          crossProjectCount={new Set(TASK_GROUPS.flatMap((group) => group.tasks.map((task) => task.project))).size}
-          dueTodayCount={1}
-          groups={TASK_GROUPS}
-          incompleteCount={TASK_GROUPS.flatMap((group) => group.tasks).filter((task) => task.status !== '已完成').length}
-          onPaneChange={setTasksPane}
+          activeFilterCount={taskFilterActive ? 1 : 0}
+          crossProjectCount={new Set(visibleTasks.map((task) => task.project)).size}
+          dueTodayCount={visibleTasks.filter((task) => task.dueDate.includes('今天')).length}
+          fieldConfigActive={!taskShowCreator}
+          fieldConfigLabel={taskShowCreator ? '字段配置' : '字段配置 5/6'}
+          groupActive={taskGroupMode !== 'custom' || taskViewMode !== 'list'}
+          groupLabel={
+            taskViewMode === 'board'
+              ? '分组：状态看板'
+              : taskViewMode === 'dashboard'
+                ? '分组：项目仪表盘'
+                : taskGroupMode === 'project'
+                  ? '分组：所属项目'
+                  : taskGroupMode === 'status'
+                    ? '分组：任务状态'
+                    : '分组：自定义分组'
+          }
+          groups={visibleTaskGroups}
+          profiles={profileSources}
+          editingDraft={editingTaskDraft}
+          editingTaskId={editingTaskId}
+          navMenuOpen={taskNavMenuOpen}
+          incompleteCount={visibleTasks.filter((task) => task.status !== '已完成').length}
+          onAddTaskRow={handleCreateTask}
+          onAssignSelectedTaskToMe={handleAssignSelectedTaskToMe}
+          onCycleSelectedTaskStatus={handleCycleSelectedTaskStatus}
+          onCreateTask={handleCreateTask}
+          onCancelTaskEdit={handleCancelTaskEdit}
+          onDeleteSelectedTask={handleDeleteSelectedTask}
+          onEditDraftChange={handleEditTaskDraftChange}
+          onEditSelectedTask={handleEditSelectedTask}
+          onFilterBySelectedTaskAssignee={handleFilterBySelectedTaskAssignee}
+          onGroupBySelectedTaskProject={handleGroupBySelectedTaskProject}
+          onNewGroup={handleNewTaskGroup}
+          onNavMore={() => {
+            setTaskNavMenuOpen((current) => !current);
+            setTaskActionLabel('任务更多操作');
+          }}
+          onPaneChange={handleTaskPaneChange}
+          onTaskClick={(task) => {
+            setSelectedTaskId(task.id);
+            if (editingTaskId && editingTaskId !== task.id) {
+              setEditingTaskId(null);
+              setEditingTaskDraft(null);
+            }
+            setTaskActionLabel(`已选中 ${task.title}`);
+          }}
+          onSaveTaskEdit={handleSaveTaskEdit}
+          onTaskList={handleTaskList}
+          onToolbarFieldConfig={() => setTaskShowCreator((current) => {
+            setTaskActionLabel(current ? '已隐藏创建人字段' : '已显示创建人字段');
+            return !current;
+          })}
+          onToolbarFilter={() => setTaskFilterActive((current) => {
+            setTaskActionLabel(current ? '已关闭筛选' : '筛选已启用');
+            return !current;
+          })}
+          onToolbarGroup={handleTaskGroup}
+          onToolbarSort={handleTaskSort}
           onViewModeChange={setTaskViewMode}
+          selectedTaskId={selectedTaskId}
+          selectedTask={selectedTask}
+          showCreatorColumn={taskShowCreator}
+          sortActive={taskSortMode !== 'custom'}
+          sortLabel={taskSortMode === 'custom' ? '排序：拖拽自定义' : '排序：截止时间'}
+          taskActionLabel={taskActionLabel}
           viewMode={taskViewMode}
         />
       );
@@ -363,10 +730,17 @@ export function WorkbenchRoutes({ activePage, agents }: WorkbenchRoutesProps): R
           activeFilter={projectFilter}
           activeProjectId={projectId}
           activeTab={projectTab}
+          activePreview={projectPreview}
           onFilterChange={setProjectFilter}
+          profiles={profileSources}
+          onArtifactClick={(id, artifact) => {
+            setProjectId(id);
+            setProjectPreview(createProjectArtifactPreview(id, artifact));
+          }}
+          onClosePreview={() => setProjectPreview(null)}
           onProjectSelect={setProjectId}
           onTabChange={setProjectTab}
-          projects={DEFAULT_PROJECTS}
+          projects={WORKBENCH_MOCK_PROJECTS}
         />
       );
     case 'settings':

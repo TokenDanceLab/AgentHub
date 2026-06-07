@@ -23,9 +23,18 @@
 }
 
 .navTitle {
-  padding: 0 12px 20px;
+  padding: 0;
   font: 600 1.375rem/1.2 var(--font-sans);
   letter-spacing: 0;
+}
+
+.navHeader {
+  min-height: 40px;
+  padding: 0 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .search {
@@ -39,6 +48,10 @@
   color: var(--text-1);
   outline: none;
   font: 400 0.875rem var(--font-sans);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .search::placeholder {
@@ -99,6 +112,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .navRowActive .navRowIcon {
@@ -231,8 +247,10 @@
 .headActions {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 10px;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .statusBadge {
@@ -245,6 +263,9 @@
 }
 
 .newProjectBtn {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 148px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -259,10 +280,29 @@
   font-family: inherit;
   transition: background var(--dur-normal) var(--ease);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .newProjectBtn:hover {
   background: var(--primary-light);
+  box-shadow: var(--e-1);
+}
+
+.newProjectBtn:active {
+  box-shadow: none;
+}
+
+.navNewProjectBtn {
+  height: 30px;
+  padding: 0 10px;
+  border-color: var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: 0.75rem;
 }
 
 /* ── Tabs ── */
@@ -270,12 +310,17 @@
   height: 38px;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 18px;
   margin-bottom: 18px;
   border-bottom: 1px solid var(--bdr);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .tabBtn {
+  flex: 0 1 auto;
+  min-width: 0;
   height: 37px;
   padding: 0 1px;
   border: 0;
@@ -286,6 +331,9 @@
   align-items: center;
   gap: 6px;
   font: 500 0.8125rem var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   font-family: inherit;
   transition: color var(--dur-fast) var(--ease),
@@ -293,6 +341,7 @@
 }
 
 .tabBtn svg {
+  flex: 0 0 auto;
   width: 15px;
   height: 15px;
   fill: none;
@@ -331,6 +380,9 @@
   border-radius: var(--r-lg);
   background: color-mix(in srgb, var(--surface) 94%, var(--primary-light) 6%);
   box-shadow: var(--e-1);
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .announcementMark {
@@ -388,7 +440,8 @@
   cursor: pointer;
   font-family: inherit;
   flex-shrink: 0;
-  transition: background var(--dur-normal) var(--ease);
+  transition:
+    background var(--dur-normal) var(--ease);
 }
 
 .announcementEditBtn:hover {
@@ -445,15 +498,88 @@
 }
 
 .memberChip {
-  height: 24px;
-  padding: 0 8px;
+  min-height: 30px;
+  padding: 3px 7px 3px 3px;
   border-radius: var(--r-full);
   background: var(--surface-low);
   border: 1px solid var(--bdr);
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   font: 500 0.6875rem var(--font-sans);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.memberChip[data-profile-kind='agent'] {
+  background: color-mix(in srgb, var(--surface) 86%, var(--member-avatar-color, var(--primary)) 14%);
+}
+
+.memberAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  background: var(--member-avatar-color, var(--surface-highest));
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 650 0.625rem/1 var(--font-sans);
+  letter-spacing: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 26%, transparent);
+  flex-shrink: 0;
+}
+
+.memberName {
+  max-width: 118px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberKind {
+  color: var(--text-3);
+  font: 500 0.625rem var(--font-sans);
+  font-style: normal;
+}
+
+.profilePill {
+  width: 92px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-sans);
+}
+
+.profileAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-full);
+  background: var(--profile-avatar-color, var(--surface-highest));
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 650 0.5625rem/1 var(--font-sans);
+  letter-spacing: 0;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 24%, transparent);
+}
+
+.profilePill[data-profile-kind='user'] .profileAvatar {
+  color: var(--text-3);
+}
+
+.profileName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Detail panel (left / right columns) ── */
@@ -464,6 +590,10 @@
   border-radius: var(--r-lg);
   background: var(--surface-low);
   box-shadow: var(--e-1);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 /* ── Runs panel ── */
@@ -480,7 +610,11 @@
   flex-shrink: 0;
 }
 
-.stateRunning,
+.stateRunning {
+  background: var(--state-running);
+}
+
+.stateCompleted,
 .stateReady {
   background: var(--success);
 }
@@ -517,7 +651,8 @@
   color: var(--text-1);
   font-family: inherit;
   border: 1px solid transparent;
-  transition: border-color var(--dur-normal) var(--ease),
+  transition:
+    border-color var(--dur-normal) var(--ease),
     background var(--dur-normal) var(--ease);
 }
 
@@ -557,7 +692,6 @@
 /* ── Artifact row ── */
 .artifactRow {
   width: 100%;
-  border: 0;
   background: var(--surface);
   border-radius: var(--r-sm);
   min-height: 38px;
@@ -570,7 +704,8 @@
   color: var(--text-1);
   font-family: inherit;
   border: 1px solid transparent;
-  transition: border-color var(--dur-normal) var(--ease),
+  transition:
+    border-color var(--dur-normal) var(--ease),
     background var(--dur-normal) var(--ease);
 }
 
@@ -613,6 +748,49 @@
   grid-column: 1 / -1;
 }
 
+.previewPanel {
+  grid-column: 1 / -1;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
+  overflow: hidden;
+  box-shadow: var(--e-1);
+}
+
+.previewHead {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.previewHead div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.previewHead span,
+.previewHead em {
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.previewHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-1);
+  font: 600 0.8125rem var(--font-sans);
+}
+
 .feedRow {
   min-height: 32px;
   display: flex;
@@ -627,9 +805,172 @@
   border-top: 0;
 }
 
+.sectionHead + .feedRow {
+  border-top: 0;
+}
+
 .feedTime {
   width: 42px;
   color: var(--text-3);
   font: 400 0.6875rem var(--font-mono);
   flex-shrink: 0;
+}
+
+/* ── Tab detail rows ── */
+.summaryRows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryRow,
+.metaRow,
+.archiveRow,
+.settingRow {
+  min-height: 38px;
+  padding: 7px 8px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-1);
+  font-family: inherit;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
+}
+
+.summaryRow:hover,
+.metaRow:hover,
+.archiveRow:hover,
+.settingRow:hover {
+  background: var(--surface-low);
+  border-color: var(--bdr);
+}
+
+.summaryRow strong,
+.archiveRow strong {
+  flex: 1;
+  min-width: 0;
+  font: 500 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryRow em,
+.archiveRow em {
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.metaRow span {
+  width: 24px;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-mono);
+  flex-shrink: 0;
+}
+
+.metaRow strong {
+  width: 82px;
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow em {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1);
+  font: 500 0.75rem var(--font-sans);
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archiveRow small {
+  width: 88px;
+  color: var(--text-2);
+  font: 400 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsPanel {
+  min-height: 202px;
+}
+
+.settingRow {
+  min-height: 38px;
+  justify-content: space-between;
+}
+
+.settingRow + .settingRow {
+  margin-top: 2px;
+}
+
+.settingRow div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settingRow strong,
+.settingRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingRow strong {
+  font: 500 0.75rem var(--font-sans);
+}
+
+.settingRow small {
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+}
+
+.settingRow span {
+  max-width: 46%;
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.settingsSidePanel {
+  min-height: 202px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search,
+  .navRow,
+  .navRowIcon,
+  .filterBtn,
+  .newProjectBtn,
+  .tabBtn,
+  .announcement,
+  .announcementEditBtn,
+  .memberChip,
+  .detailPanel,
+  .runRow,
+  .artifactRow,
+  .summaryRow,
+  .metaRow,
+  .archiveRow,
+  .settingRow {
+    transition: none;
+  }
 }

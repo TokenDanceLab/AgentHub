@@ -1,5 +1,18 @@
 import React, { useCallback, useState } from 'react';
-import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
+import {
+  DesignNavIcon,
+  DESIGN_NAV_GLYPH_SIZE,
+  DESIGN_NAV_GLYPH_STROKE_WIDTH,
+  type DesignNavIconName,
+} from '../designIcons';
+import {
+  WORKBENCH_MOCK_CONTACT_SHORTCUTS,
+  WORKBENCH_MOCK_EXTERNAL_CONTACTS,
+  WORKBENCH_MOCK_PENDING_CONTACTS,
+  WORKBENCH_MOCK_SERVICE_DESKS,
+} from '../mockData';
+import { ProfilePopover } from '../floating';
+import { Select } from '../../ui';
 import styles from './ContactsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -31,6 +44,38 @@ export interface ServiceDesk {
   initials: string;
   description: string;
 }
+
+type ContactProfile =
+  | {
+      id: string;
+      kind: 'member';
+      name: string;
+      initials: string;
+      subtitle: string;
+      badge: string;
+      meta: { label: string; value: string }[];
+      anchor: HTMLElement;
+    }
+  | {
+      id: string;
+      kind: 'group';
+      name: string;
+      initials: string;
+      subtitle: string;
+      badge: string;
+      meta: { label: string; value: string }[];
+      anchor: HTMLElement;
+    }
+  | {
+      id: string;
+      kind: 'service';
+      name: string;
+      initials: string;
+      subtitle: string;
+      badge: string;
+      meta: { label: string; value: string }[];
+      anchor: HTMLElement;
+    };
 
 export type ContactsPane =
   | 'internal'
@@ -99,80 +144,16 @@ export interface ContactsPageProps {
   onSendPhoneInvite?: ((countryCode: string, phone: string, note: string) => void) | undefined;
 }
 
-// ── Defaults ──
-
-const DEFAULT_SHORTCUTS = [
-  'Johnny',
-  'Trump',
-  'AgentHub 设计评审',
-  '文档重构',
-];
-
-const DEFAULT_PENDING: ContactMember[] = [
-  {
-    id: 'nora',
-    name: 'Nora Wang',
-    initials: 'N',
-    tag: '申请加入 TokenDance',
-    org: '手机号邀请',
-    status: '待确认',
-  },
-  {
-    id: 'leo',
-    name: 'Leo Xu',
-    initials: 'L',
-    tag: '外部联系人请求',
-    org: '企业链接',
-    status: '待备注',
-  },
-];
-
-const DEFAULT_EXTERNAL: ContactMember[] = [
-  {
-    id: 'alex',
-    name: 'Alex Chen',
-    initials: 'A',
-    tag: '外部 PM',
-    org: 'VectorControl 合作方',
-    status: '待同步项目权限',
-  },
-  {
-    id: 'mira',
-    name: 'Mira Lee',
-    initials: 'M',
-    tag: '设计顾问',
-    org: 'UI Review',
-    status: '可发起对话',
-  },
-];
-
-const DEFAULT_SERVICE_DESKS: ServiceDesk[] = [
-  {
-    id: 'account',
-    name: '账号与权限',
-    initials: 'S',
-    description: 'TokenDance ID / 企业成员 / 外部联系人权限',
-  },
-  {
-    id: 'agent-runtime',
-    name: 'Agent 运行支持',
-    initials: 'A',
-    description: '项目运行卡住、工具权限、模型配置',
-  },
-  {
-    id: 'docs',
-    name: '云文档支持',
-    initials: 'D',
-    description: '文档分享、归档、知识库权限',
-  },
-];
-
 // ── Design icons ──
 
 function NavGlyph({ name }: { name: DesignNavIconName }) {
   return (
     <span className={styles.navGlyph}>
-      <DesignNavIcon name={name} size={17} />
+      <DesignNavIcon
+        name={name}
+        size={DESIGN_NAV_GLYPH_SIZE}
+        strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
+      />
     </span>
   );
 }
@@ -216,22 +197,52 @@ function MemberRow({
   member,
   isGroup = false,
   onClick,
+  onAvatarClick,
+  avatarExpanded = false,
 }: {
   member: ContactMember;
   isGroup?: boolean;
   onClick?: ((member: ContactMember) => void) | undefined;
+  onAvatarClick?: ((member: ContactMember, anchor: HTMLElement) => void) | undefined;
+  avatarExpanded?: boolean;
 }) {
   const handleClick = useCallback(() => {
     onClick?.(member);
   }, [member, onClick]);
 
+  const handleAvatarClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(member, event.currentTarget);
+  }, [member, onAvatarClick]);
+
+  const handleAvatarKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(member, event.currentTarget);
+  }, [member, onAvatarClick]);
+
   return (
     <button
       type="button"
-      className={styles.memberRow}
+      className={`${styles.memberRow} member-row`}
+      data-card-surface
       onClick={handleClick}
     >
-      <div className={styles.memberAv}>{member.initials}</div>
+      <div
+        aria-expanded={avatarExpanded}
+        aria-haspopup="dialog"
+        aria-label={`查看 ${member.name} 资料`}
+        className={styles.memberAv}
+        data-profile={member.id}
+        onClick={handleAvatarClick}
+        onKeyDown={handleAvatarKeyDown}
+        role="button"
+        tabIndex={0}
+      >
+        {member.initials}
+      </div>
       <span className={styles.memberName}>{member.name}</span>
       {member.tag && <span className={styles.memberTag}>{member.tag}</span>}
       <span
@@ -247,17 +258,46 @@ function MemberRow({
 function GroupRow({
   group,
   onClick,
+  onAvatarClick,
+  avatarExpanded = false,
 }: {
   group: ContactGroup;
   onClick?: ((group: ContactGroup) => void) | undefined;
+  onAvatarClick?: ((group: ContactGroup, anchor: HTMLElement) => void) | undefined;
+  avatarExpanded?: boolean;
 }) {
   const handleClick = useCallback(() => {
     onClick?.(group);
   }, [group, onClick]);
 
+  const handleAvatarClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(group, event.currentTarget);
+  }, [group, onAvatarClick]);
+
+  const handleAvatarKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(group, event.currentTarget);
+  }, [group, onAvatarClick]);
+
   return (
-    <button type="button" className={styles.memberRow} onClick={handleClick}>
-      <div className={styles.memberAv}>{group.initials}</div>
+    <button type="button" className={`${styles.memberRow} member-row`} data-card-surface onClick={handleClick}>
+      <div
+        aria-expanded={avatarExpanded}
+        aria-haspopup="dialog"
+        aria-label={`查看 ${group.name} 资料`}
+        className={styles.memberAv}
+        data-profile={group.id}
+        onClick={handleAvatarClick}
+        onKeyDown={handleAvatarKeyDown}
+        role="button"
+        tabIndex={0}
+      >
+        {group.initials}
+      </div>
       <span className={styles.memberName}>{group.name}</span>
       <span className={styles.memberTag}>{group.count}</span>
       <span className={`${styles.memberOrg} ${styles.groupMemberOrg}`}>
@@ -271,17 +311,46 @@ function GroupRow({
 function ServiceCardRow({
   desk,
   onClick,
+  onAvatarClick,
+  avatarExpanded = false,
 }: {
   desk: ServiceDesk;
   onClick?: ((desk: ServiceDesk) => void) | undefined;
+  onAvatarClick?: ((desk: ServiceDesk, anchor: HTMLElement) => void) | undefined;
+  avatarExpanded?: boolean;
 }) {
   const handleClick = useCallback(() => {
     onClick?.(desk);
   }, [desk, onClick]);
 
+  const handleAvatarClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(desk, event.currentTarget);
+  }, [desk, onAvatarClick]);
+
+  const handleAvatarKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(desk, event.currentTarget);
+  }, [desk, onAvatarClick]);
+
   return (
-    <button type="button" className={styles.serviceCard} onClick={handleClick}>
-      <div className={styles.memberAv}>{desk.initials}</div>
+    <button type="button" className={`${styles.serviceCard} service-card`} data-card-surface onClick={handleClick}>
+      <div
+        aria-expanded={avatarExpanded}
+        aria-haspopup="dialog"
+        aria-label={`查看 ${desk.name} 资料`}
+        className={styles.memberAv}
+        data-profile={desk.id}
+        onClick={handleAvatarClick}
+        onKeyDown={handleAvatarKeyDown}
+        role="button"
+        tabIndex={0}
+      >
+        {desk.initials}
+      </div>
       <div>
         <strong className={styles.serviceCardName}>{desk.name}</strong>
         <span className={styles.serviceCardDesc}>{desk.description}</span>
@@ -413,15 +482,13 @@ function PhonePanel({
     >
       <label className={styles.phoneLabel}>手机号</label>
       <div className={styles.phoneRow}>
-        <select
-          className={styles.phoneSelect}
+        <Select
+          ariaLabel="区号"
+          className={styles.phoneSelect ?? ''}
           value={countryCode}
-          onChange={(e) => setCountryCode(e.target.value)}
-        >
-          <option>+86</option>
-          <option>+852</option>
-          <option>+1</option>
-        </select>
+          options={['+86', '+852', '+1'].map((code) => [code, code])}
+          onChange={setCountryCode}
+        />
         <input
           className={styles.phoneInput}
           placeholder="输入手机号"
@@ -540,7 +607,7 @@ export function ContactsPage({
   starredContacts,
   groups,
   serviceDesks,
-  recentShortcuts = DEFAULT_SHORTCUTS,
+  recentShortcuts = WORKBENCH_MOCK_CONTACT_SHORTCUTS,
   onAddContact,
   onCreateGroup,
   onNewTicket,
@@ -552,7 +619,59 @@ export function ContactsPage({
   onCopyInvite,
   onSendPhoneInvite,
 }: ContactsPageProps): React.ReactElement {
-  const resolvedPending = pendingContacts ?? DEFAULT_PENDING;
+  const resolvedPending = pendingContacts ?? WORKBENCH_MOCK_PENDING_CONTACTS;
+  const [activeProfile, setActiveProfile] = useState<ContactProfile | null>(null);
+
+  const openMemberProfile = useCallback((member: ContactMember, anchor: HTMLElement) => {
+    setActiveProfile({
+      id: member.id,
+      kind: 'member',
+      name: member.name,
+      initials: member.initials,
+      subtitle: member.org,
+      badge: member.tag || '联系人',
+      meta: [
+        { label: '组织', value: member.org },
+        { label: '状态', value: member.status },
+        { label: '身份', value: member.tag || '联系人' },
+      ],
+      anchor,
+    });
+  }, []);
+
+  const openGroupProfile = useCallback((group: ContactGroup, anchor: HTMLElement) => {
+    setActiveProfile({
+      id: group.id,
+      kind: 'group',
+      name: group.name,
+      initials: group.initials,
+      subtitle: group.latestMessage,
+      badge: group.count,
+      meta: [
+        { label: '成员', value: group.count },
+        { label: '最近消息', value: group.latestMessage },
+        { label: '状态', value: '打开群聊' },
+      ],
+      anchor,
+    });
+  }, []);
+
+  const openServiceProfile = useCallback((desk: ServiceDesk, anchor: HTMLElement) => {
+    setActiveProfile({
+      id: desk.id,
+      kind: 'service',
+      name: desk.name,
+      initials: desk.initials,
+      subtitle: desk.description,
+      badge: '服务台',
+      meta: [
+        { label: '入口', value: desk.name },
+        { label: '范围', value: desk.description },
+        { label: '状态', value: '进入' },
+      ],
+      anchor,
+    });
+  }, []);
 
   // ── Render main content based on active pane ──
 
@@ -563,14 +682,14 @@ export function ContactsPage({
           title: '外部联系人',
           subtitle: '客户、合作方和临时项目协作者，不进入 TokenDance 组织架构。',
           actionLabel: '添加外部联系人',
-          rows: externalContacts ?? DEFAULT_EXTERNAL,
+          rows: externalContacts ?? WORKBENCH_MOCK_EXTERNAL_CONTACTS,
           sectionTitle: '外部联系人',
         });
 
       case 'new':
         return (
-          <main className={styles.main}>
-            <div className={styles.head}>
+          <main className={`${styles.main} workbench-main`}>
+            <div className={`${styles.head} workbench-head`}>
               <div>
                 <h1 className={styles.headTitle}>新的联系人</h1>
                 <p className={styles.headSubcopy}>
@@ -579,7 +698,7 @@ export function ContactsPage({
               </div>
               <button
                 type="button"
-                className={styles.addBtn}
+                className={`${styles.addBtn} outline-action`}
                 onClick={onAddContact}
               >
                 添加联系人
@@ -589,7 +708,13 @@ export function ContactsPage({
             <div className={styles.sectionTitle}>待处理</div>
             <div className={styles.memberList}>
               {resolvedPending.map((m) => (
-                <MemberRow key={m.id} member={m} onClick={onMemberClick} />
+                <MemberRow
+                  avatarExpanded={activeProfile?.kind === 'member' && activeProfile.id === m.id}
+                  key={m.id}
+                  member={m}
+                  onAvatarClick={openMemberProfile}
+                  onClick={onMemberClick}
+                />
               ))}
             </div>
           </main>
@@ -607,8 +732,8 @@ export function ContactsPage({
 
       case 'groups':
         return (
-          <main className={styles.main}>
-            <div className={styles.head}>
+          <main className={`${styles.main} workbench-main`}>
+            <div className={`${styles.head} workbench-head`}>
               <div>
                 <h1 className={styles.headTitle}>我的群组</h1>
                 <p className={styles.headSubcopy}>
@@ -617,7 +742,7 @@ export function ContactsPage({
               </div>
               <button
                 type="button"
-                className={styles.addBtn}
+                className={`${styles.addBtn} outline-action`}
                 onClick={onCreateGroup}
               >
                 创建群组
@@ -626,7 +751,13 @@ export function ContactsPage({
             <div className={styles.sectionTitle}>TokenDance 群组</div>
             <div className={styles.memberList}>
               {(groups ?? []).map((g) => (
-                <GroupRow key={g.id} group={g} onClick={onGroupClick} />
+                <GroupRow
+                  avatarExpanded={activeProfile?.kind === 'group' && activeProfile.id === g.id}
+                  group={g}
+                  key={g.id}
+                  onAvatarClick={openGroupProfile}
+                  onClick={onGroupClick}
+                />
               ))}
             </div>
           </main>
@@ -634,8 +765,8 @@ export function ContactsPage({
 
       case 'service':
         return (
-          <main className={styles.main}>
-            <div className={styles.head}>
+          <main className={`${styles.main} workbench-main`}>
+            <div className={`${styles.head} workbench-head`}>
               <div>
                 <h1 className={styles.headTitle}>服务台</h1>
                 <p className={styles.headSubcopy}>
@@ -644,17 +775,19 @@ export function ContactsPage({
               </div>
               <button
                 type="button"
-                className={styles.addBtn}
+                className={`${styles.addBtn} outline-action`}
                 onClick={onNewTicket}
               >
                 新建工单
               </button>
             </div>
             <div className={styles.serviceGrid}>
-              {(serviceDesks ?? DEFAULT_SERVICE_DESKS).map((desk) => (
+              {(serviceDesks ?? WORKBENCH_MOCK_SERVICE_DESKS).map((desk) => (
                 <ServiceCardRow
+                  avatarExpanded={activeProfile?.kind === 'service' && activeProfile.id === desk.id}
                   key={desk.id}
                   desk={desk}
+                  onAvatarClick={openServiceProfile}
                   onClick={onServiceClick}
                 />
               ))}
@@ -692,15 +825,15 @@ export function ContactsPage({
     showQuickGrid?: boolean;
   }) {
     return (
-      <main className={styles.main}>
-        <div className={styles.head}>
+      <main className={`${styles.main} workbench-main`}>
+        <div className={`${styles.head} workbench-head`}>
           <div>
             <h1 className={styles.headTitle}>{title}</h1>
             <p className={styles.headSubcopy}>{subtitle}</p>
           </div>
           <button
             type="button"
-            className={styles.addBtn}
+            className={`${styles.addBtn} outline-action`}
             onClick={onAddContact}
           >
             {actionLabel}
@@ -710,7 +843,13 @@ export function ContactsPage({
         <div className={styles.sectionTitle}>{sectionTitle}</div>
         <div className={styles.memberList}>
           {rows.map((m) => (
-            <MemberRow key={m.id} member={m} onClick={onMemberClick} />
+            <MemberRow
+              avatarExpanded={activeProfile?.kind === 'member' && activeProfile.id === m.id}
+              key={m.id}
+              member={m}
+              onAvatarClick={openMemberProfile}
+              onClick={onMemberClick}
+            />
           ))}
         </div>
       </main>
@@ -720,12 +859,12 @@ export function ContactsPage({
   // ── Main render ──
 
   return (
-    <section className={styles.page}>
+    <section className={`${styles.page} workbench contacts-page`}>
       {/* ── Left nav ── */}
-      <aside className={styles.nav}>
-        <div className={styles.navTitle}>通讯录</div>
+      <aside className={`${styles.nav} workbench-nav`}>
+        <div className={`${styles.navTitle} workbench-title`}>通讯录</div>
         <input
-          className={styles.search}
+          className={`${styles.search} workbench-search`}
           placeholder="搜索联系人、群组或服务台"
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
@@ -773,6 +912,30 @@ export function ContactsPage({
           onClose={onModalClose}
           onCopyInvite={onCopyInvite}
           onSendPhoneInvite={onSendPhoneInvite}
+        />
+      )}
+      {activeProfile && (
+        <ProfilePopover
+          actions={[
+            { label: activeProfile.kind === 'group' ? '进入项目' : '发送消息' },
+            { label: activeProfile.kind === 'service' ? '帮助与客服' : '复制链接' },
+          ]}
+          anchorElement={activeProfile.anchor}
+          avatarColor={
+            activeProfile.kind === 'group'
+              ? 'var(--role-researcher)'
+              : activeProfile.kind === 'service'
+                ? 'var(--role-deployer)'
+                : 'linear-gradient(135deg, var(--primary), var(--success))'
+          }
+          isOpen
+          name={activeProfile.name}
+          onClose={() => setActiveProfile(null)}
+          {...(activeProfile.badge ? { badge: activeProfile.badge } : {})}
+          {...(activeProfile.initials ? { avatar: activeProfile.initials } : {})}
+          {...(activeProfile.meta ? { meta: activeProfile.meta } : {})}
+          {...(activeProfile.subtitle ? { subtitle: activeProfile.subtitle } : {})}
+          variant={activeProfile.kind === 'group' ? 'group' : 'default'}
         />
       )}
     </section>

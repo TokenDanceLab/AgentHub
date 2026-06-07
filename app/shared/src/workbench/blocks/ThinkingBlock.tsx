@@ -17,6 +17,7 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
     <div className={styles.row}>
       <section className={[
         styles.step,
+        'thinking-block',
         isThinking ? styles.running : styles.completed,
         open ? styles.open : '',
       ].filter(Boolean).join(' ')} data-card-surface>

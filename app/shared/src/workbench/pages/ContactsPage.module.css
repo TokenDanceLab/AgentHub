@@ -39,6 +39,10 @@
   color: var(--text-1);
   outline: none;
   font: 400 0.875rem var(--font-sans);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .search::placeholder {
@@ -84,6 +88,7 @@
   color: var(--primary);
   font: 500 0.75rem var(--font-sans);
   cursor: pointer;
+  transition: color var(--dur-normal) var(--ease);
 }
 
 /* ── Nav rows ── */
@@ -198,6 +203,9 @@
 
 /* ── Add button ── */
 .addBtn {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 168px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -208,11 +216,22 @@
   background: var(--surface);
   color: var(--primary);
   font: 500 0.875rem var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
 }
 
 .addBtn:hover {
   background: var(--primary-light);
+  box-shadow: var(--e-1);
+}
+
+.addBtn:active {
+  box-shadow: none;
 }
 
 /* ── Quick action grid ── */
@@ -242,6 +261,10 @@
   background: var(--surface);
   border-color: var(--bdr-strong);
   box-shadow: var(--e-1);
+}
+
+.quickBtn:active {
+  box-shadow: none;
 }
 
 .quickBtnLabel {
@@ -287,6 +310,8 @@
   cursor: pointer;
   color: var(--text-1);
   font-family: inherit;
+  transition:
+    background var(--dur-normal) var(--ease);
 }
 
 .memberRow:hover {
@@ -304,6 +329,15 @@
   justify-content: center;
   font: 600 0.75rem var(--font-sans);
   flex-shrink: 0;
+  transition:
+    box-shadow var(--dur-normal) var(--ease),
+    filter var(--dur-normal) var(--ease);
+}
+
+.memberAv:hover,
+.memberAv:focus-visible {
+  filter: brightness(0.97) saturate(1.04);
+  box-shadow: var(--focus-ring);
 }
 
 .memberName {
@@ -373,6 +407,10 @@
   box-shadow: var(--e-1);
 }
 
+.serviceCard:active {
+  box-shadow: none;
+}
+
 .serviceCardName {
   display: block;
   margin-bottom: 4px;
@@ -401,6 +439,7 @@
   padding: 32px;
   background: rgba(18, 18, 28, 0.42);
   backdrop-filter: blur(2px);
+  animation: modalBackdropIn var(--dur-medium) var(--ease) both;
 }
 
 /* ── Contact modal ── */
@@ -415,6 +454,7 @@
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: var(--e-4);
+  animation: modalPanelIn var(--dur-enter, var(--dur-medium)) var(--ease-panel) both;
 }
 
 .modalClose {
@@ -431,6 +471,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .modalClose:hover {
@@ -462,19 +505,30 @@
 .modalTabs {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 28px;
   margin: 0 36px;
   border-bottom: 1px solid var(--bdr);
+  overflow: hidden;
 }
 
 .modalTab {
+  flex: 0 1 auto;
+  min-width: 0;
   height: 42px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--text-1);
   font: 500 0.875rem var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-medium) var(--ease-panel);
 }
 
 .modalTab:hover {
@@ -707,4 +761,43 @@
   color: var(--text-inv);
   font: 600 0.8125rem var(--font-sans);
   cursor: pointer;
+}
+
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search,
+  .orgAction,
+  .navRow,
+  .navShortcut,
+  .addBtn,
+  .quickBtn,
+  .memberRow,
+  .memberAv,
+  .serviceCard,
+  .modalBackdrop,
+  .modal,
+  .modalClose,
+  .modalTab {
+    animation: none;
+    transition: none;
+  }
 }

@@ -64,22 +64,28 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
   const primaryFiles = files.filter((f) => f.isPrimary);
   const workingFiles = files.filter((f) => !f.isPrimary);
+  const taskToggleLabel = `${tasksOpen ? '折叠' : '展开'} ${taskSectionTitle}`;
+  const filesToggleLabel = `${filesOpen ? '折叠' : '展开'} 产物`;
 
   return (
     <div className={styles.panel}>
       {/* ── Tasks section ── */}
       <section className={`${styles.section} ${tasksOpen ? '' : styles.sectionCollapsed}`}>
-        <button
-          type="button"
-          className={styles.sectionHead}
-          onClick={toggleTasks}
-          aria-expanded={tasksOpen}
-        >
+        <div className={styles.sectionHead}>
           <span>{taskSectionTitle}</span>
-          <span className={styles.chevron} aria-hidden="true">
-            <DesignNavIcon name="chevron" size={14} />
-          </span>
-        </button>
+          <button
+            type="button"
+            className={styles.sectionToggle}
+            onClick={toggleTasks}
+            aria-expanded={tasksOpen}
+            aria-label={taskToggleLabel}
+            title={taskToggleLabel}
+          >
+            <span className={styles.chevron} aria-hidden="true">
+              <DesignNavIcon name="chevron" size={14} />
+            </span>
+          </button>
+        </div>
 
         <div className={styles.taskList}>
           {tasks.map((task, i) => (
@@ -112,17 +118,21 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
       {/* ── Files section ── */}
       <section className={`${styles.section} ${filesOpen ? '' : styles.sectionCollapsed}`}>
-        <button
-          type="button"
-          className={styles.sectionHead}
-          onClick={toggleFiles}
-          aria-expanded={filesOpen}
-        >
+        <div className={styles.sectionHead}>
           <span>产物</span>
-          <span className={styles.chevron} aria-hidden="true">
-            <DesignNavIcon name="chevron" size={14} />
-          </span>
-        </button>
+          <button
+            type="button"
+            className={styles.sectionToggle}
+            onClick={toggleFiles}
+            aria-expanded={filesOpen}
+            aria-label={filesToggleLabel}
+            title={filesToggleLabel}
+          >
+            <span className={styles.chevron} aria-hidden="true">
+              <DesignNavIcon name="chevron" size={14} />
+            </span>
+          </button>
+        </div>
 
         {kicker && <div className={styles.kicker}>{kicker}</div>}
 

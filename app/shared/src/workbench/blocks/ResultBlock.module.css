@@ -16,6 +16,15 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.block:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
 }
 
 /* ── Success / failed state borders and backgrounds ── */
@@ -24,9 +33,17 @@
   background: var(--success-bg);
 }
 
+.completed:hover {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--bdr));
+}
+
 .failed {
   border-color: color-mix(in srgb, var(--danger) 20%, var(--bdr));
   background: var(--danger-bg);
+}
+
+.failed:hover {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--bdr));
 }
 
 /* ── Header row ── */
@@ -71,26 +88,6 @@
 .statusFailed {
   background: var(--danger-bg);
   color: var(--danger);
-}
-
-/* ── Metadata row (duration, turns) ── */
-.meta {
-  margin-top: var(--sp-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-sm);
-  flex-wrap: wrap;
-}
-
-.metaItem {
-  color: var(--text-3);
-  font: 400 0.6875rem var(--font-sans);
-}
-
-.metaItem + .metaItem::before {
-  content: '·';
-  margin-right: var(--sp-sm);
-  color: var(--text-3);
 }
 
 /* ── Summary text ── */

@@ -10,6 +10,8 @@ interface AgentMessageProps {
   badgeLabel?: string | undefined;
   /** Badge variant determining color — matches demo badge-* classes */
   badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary' | undefined;
+  avatarExpanded?: boolean | undefined;
+  onAvatarClick?: ((name: string, anchor: HTMLElement) => void) | undefined;
   children: React.ReactNode;
 }
 
@@ -28,15 +30,38 @@ export const AgentMessage: React.FC<AgentMessageProps> = ({
   time,
   badgeLabel,
   badgeVariant,
+  avatarExpanded = false,
+  onAvatarClick,
   children,
 }) => {
+  function handleAvatarClick(event: React.MouseEvent<HTMLDivElement>): void {
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(name, event.currentTarget);
+  }
+
+  function handleAvatarKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    onAvatarClick?.(name, event.currentTarget);
+  }
+
   return (
     <div className={styles.msg}>
       <div className={styles.header}>
         {avatar && (
           <div
+            aria-expanded={avatarExpanded}
+            aria-haspopup="dialog"
+            aria-label={`查看 ${name} 资料`}
             className={styles.avatar}
+            data-agent-profile={name}
+            onClick={handleAvatarClick}
+            onKeyDown={handleAvatarKeyDown}
+            role="button"
             style={avatarColor ? { background: avatarColor } : undefined}
+            tabIndex={0}
           >
             {avatar}
           </div>
@@ -50,7 +75,7 @@ export const AgentMessage: React.FC<AgentMessageProps> = ({
         )}
         {time && <span className={styles.time}>{time}</span>}
       </div>
-      <div className={styles.bubble} data-card-surface>{children}</div>
+      <div className={styles.bubble} data-agent-bubble>{children}</div>
     </div>
   );
 };
