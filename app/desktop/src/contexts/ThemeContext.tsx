@@ -1,7 +1,16 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import {
+  AGENTHUB_THEME_STORAGE_KEY,
+  applyAgentHubTheme,
+  getStoredAgentHubThemeMode,
+  getSystemAgentHubTheme,
+  persistAgentHubThemeMode,
+  type AgentHubTheme,
+  type AgentHubThemeMode,
+} from '@shared/theme';
 
-type Theme = 'dark' | 'light';
-type ThemeMode = Theme | 'system';
+type Theme = AgentHubTheme;
+type ThemeMode = AgentHubThemeMode;
 
 export const THEME_PRESETS = [
   'classic-blue',
@@ -39,17 +48,10 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = 'agenthub-theme';
-const PRESET_STORAGE_KEY = 'agenthub-theme-preset';
+const PRESET_STORAGE_KEY = 'agenthub-v4-theme-preset';
 
 function getStoredMode(): ThemeMode {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
-  } catch {
-    /* localStorage unavailable */
-  }
-  return 'dark';
+  return getStoredAgentHubThemeMode();
 }
 
 function getStoredPreset(): ThemePreset | undefined {
@@ -63,12 +65,11 @@ function getStoredPreset(): ThemePreset | undefined {
 }
 
 function getSystemTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  return getSystemAgentHubTheme();
 }
 
 function applyTheme(theme: Theme) {
-  document.documentElement.setAttribute('data-theme', theme);
+  applyAgentHubTheme(theme);
 }
 
 function applyThemePreset(preset: ThemePreset | undefined) {
@@ -88,11 +89,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Persist to localStorage and resolve
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
-    try {
-      localStorage.setItem(STORAGE_KEY, mode);
-    } catch {
-      /* localStorage unavailable */
-    }
+    persistAgentHubThemeMode(mode);
   }, []);
 
   const setThemePreset = useCallback((preset: ThemePreset | undefined) => {

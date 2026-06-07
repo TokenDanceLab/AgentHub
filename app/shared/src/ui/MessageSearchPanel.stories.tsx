@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import MessageSearchPanel from './MessageSearchPanel';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '../types/chat';
 
 const messages: ChatMessage[] = [
   { id: 'm1', role: 'user', timestamp: '2025-06-01T10:00:00Z', blocks: [{ kind: 'text', content: 'Fix the login bug' }] },

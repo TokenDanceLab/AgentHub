@@ -64,6 +64,31 @@ export type { ErrorStats, ToastConfig, ToastSeverity } from './errorReporting';
 export { buildTree, flattenTree } from './tree';
 export type { TreeNode } from './tree';
 
+export {
+  SHARED_WORKBENCH_I18N_NAMESPACE,
+  flattenSharedWorkbenchResource,
+  sharedWorkbenchResources,
+} from './i18n';
+export type {
+  SharedWorkbenchLanguage,
+  SharedWorkbenchResourceTree,
+} from './i18n';
+
+export {
+  AGENTHUB_THEME_STORAGE_KEY,
+  applyAgentHubTheme,
+  getAppliedAgentHubTheme,
+  getStoredAgentHubThemeMode,
+  getSystemAgentHubTheme,
+  persistAgentHubThemeMode,
+  resolveAgentHubTheme,
+  toggleAppliedAgentHubTheme,
+} from './theme';
+export type {
+  AgentHubTheme,
+  AgentHubThemeMode,
+} from './theme';
+
 export { normalizeDiffs, parseUnifiedDiff } from './diff';
 export type { DiffFile, DiffHunk, DiffLine } from './diff';
 
@@ -293,6 +318,121 @@ export type {
   SurfaceStatus,
   SurfaceStatusMetadata,
 } from './surfaceMetadata';
+
+export {
+  browserFilesToComposerAttachments,
+  desktopPathsToComposerAttachments,
+  buildComposerIntent,
+  canSubmitComposer,
+  composerReducer,
+  createInitialComposerState,
+  formatComposerAttachmentContext,
+  formatComposerAttachmentSize,
+  formatComposerMentionContext,
+  formatComposerPromptWithContext,
+  formatComposerPromptWithAttachments,
+  shouldPreviewComposerFile,
+  shouldPreviewComposerFileName,
+} from './composer';
+export type {
+  ApprovalMode,
+  ComposerAction,
+  ComposerAttachment,
+  ComposerIntent,
+  ComposerMention,
+  ComposerMode,
+  ComposerState,
+  ComposerSubmitResult,
+  ComposerSubmitState,
+} from './composer';
+
+export {
+  buildInspectorEvidenceModel,
+  evidenceStatusLabel,
+} from './inspector';
+export type {
+  InspectorEvidenceModel,
+} from './inspector';
+
+export {
+  WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+  createWorkbenchDemoRuntimeStore,
+  createWorkbenchDemoStore,
+  demoWorkbenchAgents,
+  demoWorkbenchPins,
+  demoWorkbenchTranscripts,
+  normalizeWorkbenchDataMode,
+  resolveDemoWorkbenchTranscript,
+  workbenchDemoRuntimeStore,
+} from './demo';
+export type {
+  WorkbenchDemoMessagePin,
+  WorkbenchDemoRuntimeStore,
+  WorkbenchDemoStore,
+  WorkbenchDemoSurface,
+} from './demo';
+
+export {
+  createMockPlatform,
+} from './platform';
+export type {
+  AgentHubPlatform,
+  AgentHubSurface,
+  AttachmentPort,
+  ConversationKind,
+  ConversationPort,
+  MockPlatform,
+  MockPlatformSeed,
+  RunPort,
+  SurfaceCapabilities,
+  WorkbenchAgent,
+  WorkbenchConversation,
+} from './platform';
+
+export {
+  collectTranscriptEvidence,
+} from './transcript';
+export type {
+  ApprovalTranscriptBlock,
+  AgentTimelineItem,
+  AgentTimelineTranscriptBlock,
+  ArtifactTranscriptBlock,
+  ChildAgentTranscriptBlock,
+  ContextUsageTranscriptBlock,
+  DiffTranscriptBlock,
+  ResultTranscriptBlock,
+  RouteDecisionTranscriptBlock,
+  RunStepGroupTranscriptBlock,
+  EvidenceRef,
+  EvidenceRefKind,
+  EvidenceRefStatus,
+  RunSessionTranscriptBlock,
+  SubagentTranscriptBlock,
+  TextTranscriptBlock,
+  ThinkingTranscriptBlock,
+  ToolCallTranscriptBlock,
+  TranscriptAuthor,
+  TranscriptAuthorRole,
+  TranscriptBlock,
+} from './transcript';
+
+export {
+  AgentHubWorkbench,
+  ConversationSidebar,
+  GlobalRail,
+  RightInspector,
+  TranscriptView,
+  UnifiedComposer,
+  WorkspaceHeader,
+} from './workbench';
+export type {
+  AgentHubWorkbenchProps,
+  ConversationSidebarProps,
+  RightInspectorProps,
+  TranscriptViewProps,
+  UnifiedComposerProps,
+  WorkspaceHeaderProps,
+} from './workbench';
 
 export {
   mockProject,

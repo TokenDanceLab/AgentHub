@@ -1,588 +1,278 @@
 # AgentHub 路线图
 
-> 最后更新: 2026-06-05 (五维 Review + 七项深研 + 比赛评审评估) | 唯一事实源 | 旧版归档: [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
+> 最后更新：2026-06-07 | 当前主线：Desktop/Web v4 clean rebuild | 历史长版见 [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md) 和 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
-## 课题目标
+## 当前目标
 
-构建 IM 形态的多 Agent 协作平台。用户像用飞书/微信一样与 AI Agent 交互：
-- 单聊/群聊对话，@Agent 分派任务
-- Orchestrator 自动协调多 Agent 协作
-- Agent 回复内联 Diff、预览、附件等富媒体
-- 统一适配器接入 Claude Code / Codex / OpenCode
-- Desktop (Tauri) 为主力端
+AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以当前 shared workbench 和 mock/demo 运行态为主基准、参考 `agenthub-design` v4 历史原型的共享工作台系统。Desktop 和 Web 使用同一个 React UI 架构、同一套 transcript/composer/inspector 合同、同一套设计 token 和可视化验收标准；Desktop 只在 Tauri Host API、Local Edge 启动、文件系统能力和本机凭据等平台边界上有差异。
 
-**考察维度**: AI 协作能力 30% | 功能完整度 25% | 生成效果 20% | 代码理解 15% | 创新与产品感 10%
+当前目标不是重新设计，而是以当前 shared workbench 和 mock/demo 为新标准继续收口。`D:\Code\TokenDance\agenthub-design\desktop` 仅作为历史原型和视觉参考；任何新增控件、视觉层级、卡片布局或颜色 token，都应优先符合 shared workbench 当前信息架构、运行态约束和 v4 设计 token。
 
-**交付物**: 产品设计文档 + 技术文档 + 可运行 Demo + AI 协作开发记录 + 3 分钟 Demo 视频
+本轮文档和架构设计已冻结，当前进入 v4 实现收口、合并准备和生产接入规划阶段。旧 Desktop 冲刺计划、旧 ChatView/PromptInput 补丁路线、Desktop 先行再迁移 Web 的路线不再作为当前主线。
 
----
+已确认决策：旧 UI 主路径最终彻底删除；Desktop/Web 同步进入 v4；实现分支允许短期打断旧 UI，但每阶段必须有新 UI 证据。
 
-## 比赛冲刺覆盖层（2026-06-05 Codex 架构审核）
+## 推进规则
 
-> 结论：长期 Phase A/B/C/D 方向基本正确，但比赛前的优先级必须覆盖为 **IM 多 Agent 可演示闭环 > 生成效果显性证据 > 工程治理收尾**。赛题权重里 AI 协作 30%、功能完整度 25%、生成效果 20% 合计 75%，不能让 SQLite、统一信封、全量重构或远程/云场景阻塞 TeamRun Demo。
->
-> 赛题原文在 workspace 根目录 `../docs/competition/bytedance.md`，提交检查清单截止日期为 2026-06-10（见 `../docs/competition/SUBMISSION-CHECKLIST.md`）。AgentHub 仓内 agent 如果只读本仓库，需要显式跳到 workspace 根目录读取比赛材料。
+- 文档先行：架构、计划、验收和清理边界写清后再进入代码实现。
+- v4 UI 壳子的当前权威基准是 AgentHub shared workbench 与 mock/demo 运行态；`agenthub-design/index.html` 和 `agenthub-design/desktop/` 保留为只读历史原型参考，不在 AgentHub 实现分支里修改。
+- Desktop/Web 必须共用 UI 工作台。允许在实现分支短期打断旧 UI，但不允许长期保留两套主工作台。
+- 当前主工作树是 `D:\Code\TokenDance\AgentHub`，分支 `feat/desktop-web-v4-clean-rebuild`。并行工作只通过明确 worktree/路径范围进入，不能在主工作树抢同一批文件。
+- Desktop/Tauri 前端固定 `5173`，Web 前端固定 `5174`，Mobile 让到 `5175` 且不进入本轮 v4 主线。
+- 设计系统标准化顺序：先让 Desktop/Web 共享同一份 v4 token 语义、首屏 DOM/密度和 mock/demo 运行态，再接入 blocks/pages/floating 等复杂组件；不因为半成品组件存在而偏离 shared workbench 当前信息架构。
+- 旧实现是迁移素材，不是永久架构。`ChatView`、`PromptInput`、`IMBlockRenderer`、`RunDetail`、`ThreadPanel`、旧 `viewRegistry` 和千行 hooks 都是替换或拆除对象。
+- 当前处于快速开发阶段，测试优先级降为护栏：每个阶段至少跑 `git diff --check`、旧 UI active path 扫描和必要的 focused smoke；full vitest、typecheck、截图矩阵和 Playwright 回归在视觉对齐节点集中补齐。
+- 文档不写第二套事实源。当前目标写在本文件；架构边界写在 [architecture.md](architecture.md)；执行计划写在 [desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md)；待用户确认的问题写在 [v4-clean-rebuild-decision-questions.md](v4-clean-rebuild-decision-questions.md)。
+- 分支保持干净：`dev/delicious233` 是开发事实源；协作者分支 `origin/dev/trump` 和 `origin/dev/johnny` 保留但不自动合并。
+- subagent 分工按当前目标执行：前端设计和看图交给 GPT-5.5 low/mid，复杂架构交给 GPT-5.5 xhigh，大部分代码实现并行交给 GLM-5.1 对应的 Claude CLI 路由。`opus`/`sonnet`/`haiku` 是本地别名，派任务前以 `claude-subagent` JSON probe 或当前 skill 记录确认实际模型，不按公开模型名或自然语言别名猜测。
 
-### 当前优先级判断
+## 当前执行快照
 
-| 判断 | 处理 |
+| 项 | 当前事实 |
 |---|---|
-| Phase C 不能再等 Phase B 全部完成 | C0/C1 的比赛最小闭环只依赖 A4 足够解耦和现有 Hub/Edge API；B0 SQLite/FTS5 保留为加分项，不是 IM Demo 入场门槛 |
-| IM 侧仍未承载比赛核心差异化 | `IMMessageInput` 仍是纯 textarea；`IMMessageView` 只渲染 Markdown。必须把 @Agent 分派、Agent task、Tool/Diff/Thinking/Approval 投影接入 IM 流 |
-| TeamRun 已有可用产品面，但缺真实 transcript | `TeamRunDock` / `TeamRunConsole` / Hub AgentTeam API 已存在；比赛需要两个真实 Runtime Profile 的群组协作录屏、截图和 transcript |
-| 6 月 1 终审中的部分缺口已被后续修复 | Run summary、Hub thread history 注入、Web stream recovery 等已有代码路径；后续只需要补测试/部署态证据，不应重复规划成"完全不存在" |
-| 当前并行 worktree 不要重复分派 | `phase-a4/thread-nav` 正在改 A4 thread navigation；`phase-a6/envelope` 正在改 Edge success envelope；`phase-fe/blockkey-stable` 正在改 block key。主线只验收和合并，不另开同路径任务 |
-
-### 比赛 Sprint 顺序
-
-| Rank | 任务 | 为什么排这里 | 验收证据 |
-|---:|---|---|---|
-| 1 | **IM @Agent 分派接入**：把 `PromptInput` 的 `useMention` / `MentionPopover` 能力移植或抽象给 `IMMessageInput`，群聊消息能指定 Agent Profile 并触发 Hub agent task / TeamRun | 直接对应赛题"群聊协作、@ 多个 Agent、Orchestrator 分派"，影响 AI 协作 30% | 单测覆盖 @Agent 选择；Desktop/Web IM 截图；一次 Hub group session 中 @Agent 触发任务 |
-| 2 | **IM 富消息投影**：`IMMessageView` 渲染 Agent task、Tool call、Thinking、Diff/File change、Approval/Artifact 摘要，不再只是 Markdown 气泡 | 对应生成效果 20% 和功能完整度 25%；评审必须在聊天流中看见产物 | 单测覆盖富 block；截图覆盖 Tool/Diff/Approval/Artifact；不再只靠右侧 RunDetail |
-| 3 | **真实 TeamRun E2E transcript**：两个真实 Runtime Profile 在同一 group/team run 中协作，含 Orchestrator route、子任务、产出聚合、失败/审批处理 | AgentHub 最大差异化证据；没有 transcript 时"多 Agent 协作"仍像后端能力声明 | 录屏脚本、截图、运行日志、任务事件导出；写入 `docs/handoffs/STATE.md` 或比赛证据文档 |
-| 4 | **Demo 生成效果打磨**：Diff 高亮、Artifact/Preview 可见入口、Tool 卡片状态和标题语义化，优先服务 3 分钟脚本 | 提升生成效果评分；避免 UI 看起来只是文本转发 | Desktop 截图覆盖 Diff/Preview/Tool；关键 null/long output 不崩溃 |
-| 5 | **部署态最小 smoke**：如果 Demo 走 Hub/Web，补 login -> Hub session -> WS auth -> task stream -> logout/reconnect；如果 Demo 只走本地 Desktop，明确 caveat | 可运行 Demo 和答辩可信度要求；但不能压过 IM/TeamRun | smoke 命令、截图、失败 caveat |
-| 6 | **比赛资料同步**：把最新完成/未完成状态同步到提交清单、功能矩阵、Demo 脚本和 AI 协作日志 | 防止答辩材料沿用 6 月 1 的过期缺口或夸大能力 | 文档 diff；证据路径都指向当前 commit |
-
-### 比赛前不要阻塞的事项
-
-这些方向重要，但不应挡住上面的 Sprint：
-
-- B0 Edge SQLite + FTS5 完整化：可作为重启不丢数据的加分项，不能作为 C0 入场门槛。
-- A6 Edge 成功响应统一信封、DB TLS、secret guard 扩展：有 worktree 可继续，但比赛主线只要求不暴露密钥、不破坏现有 API。
-- ChatView 全量拆分、LegendList 替换、运行状态全局重构：只做 demo 必要的低风险切片。
-- Remote Edge / Cloud Edge / Hub Relay / Web->Cloud：保持架构规划和 caveat，不承诺比赛前完成。
-- Agent Market、Feishu/Lark、完整部署发布：不进入 3 分钟核心演示，除非已有可验证最小闭环。
-
----
-
-## 总体进度
-
-```
-Phase A: 工程基础设施 ████████████  95%  ← A0-A3✅, A4✅, A6.2✅, A6.3✅, 前端止血完成
-Phase B: 持久化 + 性能  ██░░░░░░░░  15%  ← B2 N+1 ✅
-Phase C: IM 核心闭环   ███░░░░░░░  25%  ← Sprint #1-4✅, 前端打磨完成
-Phase D: 高级功能      ░░░░░░░░░░   0%
-```
-
-### Phase 依赖关系
-
-```
-A (基础设施) ──→ B (持久化 + 性能) ──→ C (IM 闭环) ──→ D (高级功能)
-     │                                      ↑
-     └── App.tsx 拆分 (A4) ──────────────────┘ 前端解耦是 IM 开发前提
-```
-
-比赛冲刺例外：C0/C1 的最小演示闭环不等待 B0 完整出场；B0 只提升稳定性和重启恢复，不是 @Agent 群聊、TeamRun transcript、富消息投影的前置条件。
-
-### 分支策略
-
-- `master` — 受保护，只接受 PR
-- `dev/delicious233` — 主开发分支，日常 commit 目标，定期 PR → master
-- `phase-aN/xxx` — 临时 feature 分支，在 `.worktrees/` 下开发，完成后合回 dev 后删除
-- 协作者分支 (`dev/johnny`, `dev/trump`) — 独立开发线
-
----
-
-## Phase A: 工程基础设施 + 安全修复
-
-> **目标**: 建立可观测性基座（错误码/日志/调试），修复安全与稳定性隐患，解耦前端开发瓶颈
->
-> **入场条件**: ✅ v0.2.0 已发布，架构剖析已完成
-> **出场条件**: Edge/Hub 统一错误码 + 请求追踪 + 调试端点；无凭据泄漏；App.tsx 拆为独立模块
-
-### A0: 错误码体系收口 `errcode` ✅
-
-- [x] 共享 `pkg/errcode` 模块 + `go.work` workspace
-- [x] Hub 迁移完成：统一 envelope `{"error":{"code":"...","message":"...","traceId":"..."}}`
-- [x] Edge 域错误码 — 14 个 Edge 专属错误码（EXECUTOR_UNAVAILABLE 等）
-- [x] Edge handlers 重构 — 删除 `errorResponse()`，52 个调用点改用 errcode
-- [x] 前端适配 — `app/shared/src/errors.ts` 已兼容，零改动
-
-### A1: 请求日志与追踪 `reqlog` ✅
-
-- [x] `pkg/reqlog` 共享中间件 — trace ID 生成/传播，统一字段（request_id/method/path/status/duration_ms）
-- [x] Edge 接入 — `reqlog.AccessLog` 替换现有 AccessLog 中间件
-- [x] Hub 接入 — `reqlog.AccessLogGin()` 统一已有 RequestID + AccessLog
-- [x] 跨服务追踪 — Edge→Hub API 透传 X-Request-ID（Hub RequestID 中间件复用）
-
-### A2: 调试端点 `debug` ✅
-
-- [x] `pkg/debug` 模块 — 统一注册接口 + 认证辅助（BasicAuth / BearerToken）
-  - `MuxConfig` 结构体：HealthChecker / EnablePprof / MetricsHandler / ConfigDumper / StateDumper / Auth
-  - `RegisterEndpoints(mux, cfg)` — 注册 /health, /ready, /debug/pprof/*, /metrics, /debug/config, /debug/state
-  - `BasicAuth` + `BearerAuth` — 认证辅助 + `SanitizeConfig` 递归脱敏
-  - 11 个测试覆盖全部端点 + 认证 + 脱敏
-- [x] Hub `/debug/` — 用 pkg/debug 替换 `app.go` 的 `newAdminMux()`
-  - 保留独立 admin 端口 + `AGENTHUB_PPROF_USER/PASS` BasicAuth 认证
-  - 新增 `/debug/config` — SanitizeConfig 脱敏（DB/Redis/JWT/S3/TokenDanceID 各字段）
-  - 新增 `/debug/state` — DB pool stats + WS connections
-- [x] Edge `/debug/` — 在 `httpserver.Run()` 的 mux 上注册
-  - 新增 pprof — dev 环境无认证，生产 BearerAuth(LocalAuthToken)
-  - 新增 `/debug/config` — 脱敏（LocalAuthToken / HubJWTSecret / HubToken）
-  - 新增 `/debug/state` — store 统计（project count）+ bus 状态（history_len）
-  - 去重 `/metrics` — 统一走 debug 模块，带 auth 保护
-
-### A3: 安全与稳定性 P0 修复 ✅
-
-- [x] **Edge auth token 明文日志** — `slog.Info` → `slog.Debug`，前缀 16→8 字符
-- [x] **Edge FileStore async persist** — 同步 persist → 异步 50ms debounce + background goroutine + `Close()`/`Flush()`
-- ~~Hub workspace schema 不一致~~ — 验证 0016 migration 已完整桥接，误报关闭
-
-### A4: 前端架构解耦 🔧
-
-> **关键路径**: App.tsx 拆分是 Phase C (IM 闭环) 的前置条件。
-
-- [x] **App.tsx 拆分 Wave 1** — 1837→1525 行（-17%），已拆出 ShellIconButton、useFocusSourceTracking、DesktopHubTaskBridge、TopMenuBar、useShellShortcuts
-- [x] **lazy-load** — SettingsPage、AuthPage、HomeDashboard 已改为 `React.lazy()`
-- [ ] **Wave 2 拆分** — 目标 1525→~926 行（-39%），7 个自定义 Hook：
-  - [x] `useHiddenMessages.ts` — 隐藏消息 ID 管理 30 行（低难度）✅
-  - [x] `useSidebarResize.ts` — 侧边栏拖拽缩放 40 行（低难度）✅
-  - [x] `useThreadCache.ts` — React Query 缓存操作 37 行 + 4 个 ref（低难度）✅
-  - [x] `useTopMenuConfig.ts` — 菜单定义 221 行（低难度）✅
-  - [x] `useDesktopCommands.ts` — 窗口/编辑/诊断命令 80 行（中难度）✅
-  - [x] `useThreadNavigation.ts` — 线程选择/创建/搜索 75 行（中难度）✅
-  - [x] `useSendRun.ts` — 发送/启动 run 116 行（高难度）✅
-  - 执行顺序：E→F→G→A（阶段1低风险）→ D→C（阶段2）→ B（阶段3核心）
-- [ ] **Rust 后端基础测试** — commands.rs / oidc_server.rs 核心路径覆盖
-
-### A5: 开发者构建体验
-
-- [x] 移除 keyring v4 重依赖（-213 crate）
-- [x] Cargo dev profile 优化（`opt-level=1`）
-- [x] 前端 vendor bundle 拆分
-- [ ] Edge 自动构建 — `tauri dev` 检测 edge-server 变更自动 `go build`
-- [ ] sccache / CI 缓存共享
-- [ ] 开发文档 — 冷启动预期、前置依赖、troubleshooting
-
-### A6: Review 发现的安全加固（新增）
-
-> 来自 2026-06-05 五维度深度 Review + 七项深研。
-> 优先级排序：API 密钥(P0) > 统一信封(P1) > DB TLS(P1) > .env 加固(P2)
-
-- [ ] **API 密钥迁移到 secure_store** (P0 — 最高安全优先)
-  - 当前: `modelSettingsStore.ts` 的 `obscureApiKey`/`revealApiKey`（base64 + 静态 salt `ah-creds-v1`，167-188 行）
-  - 目标: `secure_store.rs` 已有 keyring 集成（当前仅存 Hub 令牌），新增 `store_model_credential`/`read_model_credential`/`clear_model_credential`
-  - 迁移: Zustand store 初始化时检测 localStorage 旧格式 → 写入 keychain → 清除 localStorage
-  - Web 端无 `ProviderCredential` 字段，不受影响
-- [x] **统一响应信封** (P1 ✅ — Edge 对齐 Hub)
-  - Edge `writeSuccess()` 包装 `{code,data}`
-  - 前端 `unwrapEdgeResponse()` 双格式兼容
-  - 错误格式已统一（`pkg/errcode`），成功格式已对齐
-- [x] **DB TLS 可配置** (P1 ✅)
-  - `SSLMode` 字段 + `AGENTHUB_DB_SSLMODE` 环境变量
-  - 默认 `disable` 向后兼容，Validate 白名单
-- [ ] **.env 密钥轮换 + secret guard 加固** (P2 — 增量改进)
-  - 密钥轮换: 轮换 .env 中真实云服务密钥；`config.go` `Validate()` 扩展弱密码拒绝到 DB/Redis/TokenDanceID
-  - pre-commit 加固: 新增 `scripts/git-hooks/pre-commit` 调用 `check-secrets.sh --staged`（当前仅在 commit-msg 运行）
-  - Secret Guard 扩展: 增加 base64 解码检测、二进制密钥文件检测（`*.p12`/`*.jks`）
-
----
-
-## Phase B: Edge 持久化 + 性能治理
-
-> **目标**: Edge 从内存临时态升级到 SQLite 持久化；修复 Hub 性能瓶颈；大文件拆分提升可维护性
->
-> **入场条件**: Phase A 出场（错误码 + 日志 + 调试 + P0 修复完成）
-> **出场条件**: Edge 重启不丢数据 + FTS5 搜索；Hub 无 N+1 查询 + 全索引覆盖
-
-### B0: Edge SQLite 持久化
-
-当前 Edge 用内存 + JSON 快照（FileStore），重启丢数据、无搜索、无同步。升级为 `modernc.org/sqlite`（纯 Go，FTS5 内置，无 CGO）。
-
-- [ ] JSONL 事件流 — append-only 日志替代 JSON 快照，写操作先 append 再更新内存
-- [ ] SQLite Schema — projects / threads / runs / items 四张表 + 索引
-  - 现有接口 `store.Reader` / `store.Writer` / `store.Repository` 保持不变，上层零改动
-  - 当前内存结构：`map[string]*Project` + `map[string]*Thread` + `map[string]*Run` + `map[string]*Item`
-  - FileStore 消费者：`api/handlers.go`（读写）、`lifecycle/process_executor.go`（写）、`events/bus.go`（读）
-- [ ] FTS5 搜索 — `session_messages_fts` 虚拟表，BM25 排序，`snippet()` 高亮
-- [ ] 数据迁移 — 启动时检测旧 JSON 快照，自动导入 SQLite
-  - 回退方案：检测 SQLite 损坏时 fallback 到 JSON 快照或空 store
-
-> 参考: `docs/archive/build-specs-backend-03-eventstore-memory.md`
-
-### B1: Edge 离线与同步
-
-- [ ] 离线队列 — Hub 断连时写操作入队，重连后批量同步
-- [ ] Cursor 同步协议 — `?cursor=<last_seq>` 增量拉取
-
-### B2: Hub 性能治理 🔧
-
-- [x] **N+1 查询 — Session list correlated subquery** (`repository/session.go`)
-  - `ListUserSessions` 和 `SearchSessions` → LEFT JOIN 批量查询
-- [x] **N+1 查询 — StartTeamRun 逐条查 CustomAgent** (`service/agent_team.go`)
-  - 批量查询 `WHERE id IN ?` + map 复用
-- [x] **N+1 查询 — dispatchTask 逐次查 CustomAgent** (`service/agent.go`)
-  - `TriggerAgentTask` 预查询，参数传入 `dispatchTask`
-- [x] **缺索引 — GORM model 补 index tag** + Migration 0041
-  - `agent_team_tasks.team_run_id`, `agent_team_assignments.team_run_id`, `notifications.user_id`
-- [ ] **migration 双系统统一** — golang-migrate 唯一生产路径（`repository/migrate.go`），AutoMigrate 仅在测试中使用
-
-### B3: 大文件拆分
-
-- [ ] **Hub agent.go** — 1371 行 → 5 个文件（同 package，无新接口）
-  - `agent.go` — 保留核心：struct + 构造 + `AddAgentToSession` + `allocateSeq` + 6 个仓库包装（~200 行）
-  - `agent_custom.go` — CustomAgent CRUD：Create/Get/List/Update/Delete（~80 行）
-  - `agent_dispatch.go` — 任务调度全链路：TriggerAgentTask + dispatchTask + CancelTask + 辅助函数（~500 行）
-  - `agent_edge_callback.go` — Edge 回调：HandleTaskAck/Stream/Done/Fail + authorizeTaskEdgeCallback（~310 行）
-  - `agent_run_event.go` — 运行时事件查询 + 校验：ListTaskRunEvents + summarizeAgentRunEvents + normalizeRunEventInput（~310 行）
-- [ ] **Edge ProcessExecutor** — 1413 行 → 4 个文件（同 package，无新接口）
-  - `process_executor.go` — 保留核心：struct + Start/Cancel/run + envForRun + finish + publishFailed/Cancelled（~500 行）
-  - `process_output.go` — 输出聚合：publishOutput + publishStructuredOutput + runOutputLimiter + threadTranscriptEmitter（~250 行）
-  - `process_hub_callback.go` — Hub 回调：fireHubAck/Stream/Done/Fail + hubCallbackEmitter + hubOutputCollector（~350 行）
-  - `process_subagent.go` — 子 Agent 编排：SpawnSubAgent + sendSubAgentResult + childBudget（~170 行）
-
-### B4: Edge 行为修正
-
-- [ ] **双重 dispatch 路径统一** — `orchestrator.go` text scan + `orchestrator_dispatch.go` NDJSON event 两条路径 → 统一
-- [ ] **Output 截断通知** — stdout/stderr 1MB 截断时发 `run.output.truncated` 事件
-
----
-
-## Phase C: IM 核心闭环
-
-> **目标**: 打通 IM 核心工作流，Desktop 前端可用，Agent 操作可视化
->
-> **长期入场条件**: Phase B 出场（Edge 持久化完成 + App.tsx 已拆分）
-> **比赛冲刺入场条件**: A4 已拆到足够降低冲突风险，且不改正在进行的 `phase-a4/thread-nav` / `phase-fe/blockkey-stable` 同路径 worktree；C0/C1 可以并行推进，不等待 B0 SQLite 完成。
-> **出场条件**: 用户可以在 Desktop 中与 Agent 进行完整的 IM 对话；比赛版至少要能在群聊中 @Agent 触发真实任务，并在 IM 流中展示 Agent 任务、Tool/Diff/Thinking/Approval/Artifact 证据。
-
-### C0: 对话核心
-
-- [ ] 对话列表 — 新建/置顶/归档/搜索，按最近活跃排序
-- [ ] 单聊模式 — 选中联系人/Agent → 1v1 对话
-- [ ] **比赛 P0: 群聊 @Agent 分派** — `IMMessageInput` 接入 mention 能力，选择 Agent Profile 后触发 Hub agent task / TeamRun；复用已有 `PromptInput` / `useMention` / `MentionPopover` 行为和测试思路
-- [ ] **比赛 P0: IM 富消息投影** — `IMMessageView` 从纯 Markdown 升级为富消息流，至少展示 Agent task、Tool/Thinking、Diff/File change、Approval/Artifact 摘要
-- [ ] 消息类型 — 文本、代码块、图片、文件附件、Diff 视图卡片、网页预览卡片
-- [ ] 消息操作 — 回复、引用、复制代码、展开预览
-- [ ] 上下文管理 — 聊天历史自动传递，支持 pin 关键消息
-
-### C1: Agent 可视化
-
-- [ ] Agent 运行状态 — 思考中/工具调用中/生成中等实时指示
-- [ ] 工具调用可视化 — ToolUseBlock 展示工具名、参数、结果
-- [ ] 代码 Diff 内联 — Agent 产出代码时展示 Diff 视图卡片，一键应用
-- [ ] 文件操作可视化 — Agent 读写文件的实时展示
-- [ ] **比赛 P0: 多 Agent TeamRun transcript** — 群聊中两个真实 Runtime Profile 依次/并行回复，并保留可答辩的 route/task/event 证据
-- [ ] 审批面板 — 高风险操作弹窗确认
-
-### C2: 前端打磨
-
-- [ ] 对话列表 UI — 未读计数、最后消息预览、在线状态
-- [ ] 消息气泡 — 头像、时间戳、发送状态、Agent 标识
-- [ ] 输入体验 — @Agent 弹窗选择、文件拖拽、快捷键
-- [ ] 侧边栏 — 会话/联系人/Agent 商店导航
-- [ ] 响应式适配 — 窄屏/宽屏自适应
-
-### C3: Orchestrator 协调器
-
-- [ ] 意图理解 + 任务拆解 — 群聊模式自动理解用户意图
-- [ ] 子 Agent 调度 — 并行调度，失败降级
-- [ ] 产出聚合 — 子 Agent 完成后在聊天流中汇报
-- [ ] 冲突处理 — 多 Agent 修改同一文件时的冲突检测
-
----
-
-## Phase D: 高级功能
-
-> **入场条件**: Phase C 出场（IM 闭环可用）
-> **目标**: 产品差异化与生态扩展
-
-### D0: 代码生成与 API 契约
-
-- [ ] OpenAPI spec → 类型生成 — 消除手工维护 openapi.yaml + types.ts 的漂移
-- [ ] shared API client 共享 — desktop/web/mobile 统一 HTTP client
-
-### D1: 安全增强
-
-- [ ] Hub OIDC blacklist 写入失败补偿 — Redis 不可用时旧 refresh token 可被重放
-- [ ] Edge `internal/runners` 死代码清理 — 仍在 `httpserver/server.go` 被 import
-- [ ] Hub 端点加 `/v1/` 版本前缀（或显式文档声明策略）— 当前 Hub 用 `/client/`/`/edge/`/`/web/` 无版本
-- [ ] Release workflow 加分支限制 — `release.yml` 任何分支推 `v*` tag 都触发发布
-- [ ] 收紧 golangci-lint + gosec 为硬阻断 — 当前 `continue-on-error: true` 无约束力
-- [ ] Tauri CSP 策略收紧 — `connect-src` 端口通配符改为具体端口（3210/8080），移除 `unsafe-inline`
-- [ ] macOS CI 测试取消 `continue-on-error` — 或明确记录跳过原因
-- [ ] 配置 Renovate/Dependabot + CODEOWNERS
-
-### D2: 产品扩展
-
-- [ ] 部署发布 — 聊天中"部署"指令，返回部署状态卡片
-- [ ] Agent 商店 — 搜索、安装、使用自定义 Agent
-- [ ] 版本历史 — Checkpoint + Diff 对比 + 回滚
-- [ ] Mobile 轻量端 — 查看/审批/预览
-- [ ] Content Pool — SHA-256 + zstd 文件内容去重
-- [ ] 远程 Edge — SSH / Tailscale / Hub Relay 连接远程 Desktop
-
----
-
-## Quick Wins
-
-> 不依赖特定 Phase，发现即修。trivial 修复直接执行，无需等 Phase 排期。
-
-- [x] ~~Desktop OIDC 超时不一致~~ — `CALLBACK_TIMEOUT_SECS` 60→300，对齐 "5 minutes" 消息
-- [x] ~~Desktop Edge 端口硬编码~~ — 提取 `DEFAULT_EDGE_PORT` 常量（Rust 侧）
-- [ ] 补齐 OpenAPI 缺失端点（文档-代码漂移）：
-  - `GET /v1/model-catalog` — 代码已实现，OpenAPI 完全缺失
-  - `GET /v1/agent-instances/{id}` — 代码已实现，OpenAPI 仅定义集合端点
-  - `DELETE /v1/threads/{threadId}` — 代码已实现，OpenAPI 路径定义缺失（头注释提及但无路径）
-  - `POST /v1/threads/{threadId}:archive` — 代码已实现，OpenAPI 标记 planned（不准确）
-  - `POST /v1/agent-instances` — OpenAPI 标记 implemented 但代码只注册 GET（自相矛盾）
-  - `POST /cloud/edge/register` — Hub 代码已实现（router.go:174），OpenAPI 完全缺失
-  - `GET /client/auth/oidc/callback` — Hub 代码已实现（router.go:69），OpenAPI 缺失
-- [ ] 修复事件文档漂移（events.md vs 代码）：
-  - `run.agent.sub_agent_status` — 代码用此名，文档定义为 `sub_agents_complete`（语义不同）
-  - `run.agent.task_dispatch_failed` — 代码中发布，events.md 完全缺失
-  - `friend.accepted` — 文档列为可用事件，代码从未发布（缺 "not yet emitted" 标记）
-  - `message.delta` — 文档标 P0 但从未实现，建议降级为 P1
-- [ ] Web 包定位决策 — 当前 App.tsx 仅 13 行空壳，但基础设施 ~32K 行已就绪（~80%）
-  - 推荐：轻量 wiring（5-8 天），接入 slot 机制 + Hub 连接 + IM 消息流，暂缓未实现功能
-
----
-
-## 已完成
-
-| 批次 | 内容 | 完成日期 |
-|------|------|:-------:|
-| P0-P3 | Edge 24 消息类型 + Markdown + 线程管理 + Bundle 优化 | 2026-05 |
-| M3b | AgentHook + 消息树 + 安全管道 + Context Budget | 2026-05 |
-| M4 | Hub 骨架 + OpenCode/Codex E2E + 权限门控 | 2026-05 |
-| M5 | 工程基础收敛: Edge race/metrics, Hub DI, Desktop 虚拟滚动 | 2026-05-24 |
-| M6 | 生产部署: Docker + nginx + Cloudflare + 安全加固 | 2026-05-24 |
-| M7 | Desktop P0: TanStack Query + RunState + 心跳 + viewRegistry | 2026-05-24 |
-| M8 | 安全审计: 129 Issues 修复，纯后端清零 | 2026-05-27 |
-| W22 | Desktop UI 大打磨: 40+ 验收项，Mobile/Web 对齐 | 2026-05-30 |
-| 文档体系 | ADR 11 篇 + 竞品调研 25 项目 + 架构三合一 | 2026-06-02 |
-| v0.2.0 | Sidecar edge + Updater + NSIS/DMG + 安全加固 + CI 签名 | 2026-06-05 |
-| 构建优化 | 去除 keyring turso/tantivy（-213 crate）+ dev profile + bundle 拆分 | 2026-06-05 |
-| 架构剖析 | Edge / Desktop / Hub / 集成层全面审查，P0×4 + P1×8 + P2×6 | 2026-06-05 |
-| 全局死链清理 | 20 文件 docs/tutorials→docs/roadmap 等路径修复 + 端口 5199→5173 | 2026-06-05 |
-| 错误码统一 (Hub) | pkg/errcode 共享模块 + Hub re-export + 统一 envelope + traceId | 2026-06-05 |
-| 安全修复 | Orchestrator bypassPermissions 硬编码移除 | 2026-06-05 |
-| **A0 Edge errcode** | 14 域错误码 + 52 handlers 调用点重构 + 前端已兼容 | 2026-06-05 |
-| **A1 请求日志** | pkg/reqlog + Edge/Hub 接入 + context ID 传播 + 6 tests | 2026-06-05 |
-| **A3 P0 安全** | Auth token Debug 日志 + FileStore async persist (50ms debounce) | 2026-06-05 |
-| **A2 调试端点** | pkg/debug 共享模块 + Hub/Edge 统一注册 + health/pprof/metrics/config/state + 11 tests | 2026-06-05 |
-| **A4 Wave 2 complete** | App.tsx 1525→991 (-35%)，7 hooks 全部拆出 + block key 稳定化 | 2026-06-05 |
-| **A6.2 统一信封** | Edge writeSuccess + unwrapEdgeResponse 双格式兼容 | 2026-06-05 |
-| **A6.3 DB TLS** | AGENTHUB_DB_SSLMODE 环境变量 + Validate 白名单 | 2026-06-05 |
-| **B2 N+1 修复** | Session list/StartTeamRun/dispatchTask + Migration 0041 索引 | 2026-06-05 |
-| **Sprint #4 Tool 打磨** | Tool 卡片颜色编码（5 类）+ 标题语义化 | 2026-06-05 |
-| **前端 P0 execCommand** | copy/cut/paste → Clipboard API + Selection API | 2026-06-05 |
-| **前端 P0 Mock+iframe** | Agent Market mock→Coming Soon + iframe sandbox 移除 same-origin | 2026-06-05 |
-| **前端 P1 z-index** | 16 处硬编码 z-index → CSS 变量层级 | 2026-06-05 |
-| **前端 P1 console** | 30 处 console.error 残留清理 | 2026-06-05 |
-| **Sprint #1 IM @Agent** | 群聊 @Agent 分派 — useMention + MentionPopover + mention 编解码 | 2026-06-05 |
-| **Sprint #2 IM 富消息** | IMBlockRenderer — Tool/Diff/Thinking/Approval 投影到 IM 聊天流 | 2026-06-05 |
-| **Quick Wins** | OIDC 超时 60→300 + DEFAULT_EDGE_PORT 常量提取 | 2026-06-05 |
-| **五维 Review** | 架构/API/前端/后端/DevOps 深度审查，新增 A6 安全加固 + D1 补充 | 2026-06-05 |
-| **七项深研** | A2 调试端点方案 + B2 性能治理定位(N+1×3+索引+迁移双系统) + B3 大文件拆分(process_executor→4文件, agent→5文件) + Quick Wins(OpenAPI 7缺口+事件漂移3项+Web包决策) | 2026-06-05 |
-| **比赛评审评估** | 6 维度全评(AI协作22/30+功能15.5/25+生成效果12/20+代码理解12/15+创新8/10，总分69.5/100) + 竞品动态调研(Codeg/Cursor3.2/Copilot SDK/Claude Agent View/Devin ACP) + 提分路径 + Demo 3 分钟策略 | 2026-06-05 |
-| **前端深度审计** | P0×5+P1×29+P2×19 问题清单；IM/主聊天双系统分离（群聊零 Agent 分派能力）竞品对比(Jean/Kanna/CCUI)；右侧面板 Diff/Preview/Tool/Artifact 逐组件审计；综合评分 4.5/10；修复路线 Phase 0-3 | 2026-06-05 |
-
-> 详细历史见 [archive/roadmap-v2-pre-restructure-20260605.md](archive/roadmap-v2-pre-restructure-20260605.md)
-
----
-
-## 比赛评审维度评估
-
-> 2026-06-05 基于代码实证 + 竞品对比的预估得分。总分满分 100。
-
-| 维度 | 权重 | 预估得分 | 关键发现 |
-|------|:----:|:-------:|---------|
-| AI 协作能力 | 30% | **22/30** | 结构化委派+IM 双模独有；七层 guardrails 业界唯一；短板：Edge/Hub 双轨未统一(-2)、无跨 Run 记忆(-1)、故障恢复不完整(-1) |
-| 功能完整度 | 25% | **15.5/25** | P0 执行闭环 80%、P1 IM 55%、P2 Hub 35%；核心短板：TeamRun E2E 未打通(-3)、Edge 无持久化(-2)、P2 远程场景未实现(-2) |
-| 生成效果 | 20% | **12/20** | Diff 基础可用但无语法高亮(-2)、Tool Call 7/10、流式仅文本块级非 token 级且 Codex 无流式(-2)、Artifact 正则提取脆弱(-1)、Preview 无 dev server(-2) |
-| 代码理解 | 15% | **12/15** | AGENTS.md 渐进式加载竞品独一无二；workspace fail-closed 领先；MCP 仅 Server 端缺 Client(-1)、Skill 仅 Codex 格式(-1)、上下文预算未可视化(-1) |
-| 创新与产品感 | 10% | **8/10** | IM-native 多 Agent "无人竞争"(UNCONTESTED)；三层架构本地优先独树一帜；Agent Profile 四层模型比竞品成熟；短板：多 Agent IM 交互缺原型验证(-1)、Profile 配置界面未落地(-1) |
-
-**总分：69.5/100** | AI协作22 + 功能15.5 + 生成效果12 + 代码理解12 + 创新8 = 69.5
-
-### 比赛提分关键路径（按性价比排序）
-
-1. **IM @Agent + TeamRun E2E**（+3~4 分，~3 天）— 核心差异化唯一证据；必须在 IM 群聊里由 @Agent 触发真实 Runtime Profile 协作，而不只是 TeamRun 设置页/后端模型
-2. **IM 富消息 + 生成效果可视化**（+2 分，~2 天）— Tool/Thinking/Diff/Approval/Artifact 必须进入聊天流；评审看到的是产物，不是后端 JSON 字段
-3. **Edge SQLite 持久化 B0**（+1~2 分，~3 天）— Demo 经得起重启；但只在 IM/TeamRun 最小闭环后推进
-4. **Preview / Diff 稳定渲染**（+1.5 分，~1.5 天）— Diff 高亮、Artifact/Preview 入口、null/long-output 防崩溃
-5. **部署态 Hub smoke 或明确本地 Demo caveat**（+1 分，~1 天）— 如果 Demo 走 Hub/Web，补 login/session/WS auth/task stream；如果只走 Desktop 本地，提交材料要明确边界
-6. **Edge→Hub 模式统一**（+2 分 AI 协作，~5 天）— 长期正确，但比赛前只做会暴露在 Demo 中的路径
-
-### 竞品威胁更新（2026-06-05）
-
-| 竞品 | 威胁级别 | 关键动态 |
-|------|:-------:|---------|
-| **Codeg v0.14.7** | **HIGH** | 最接近 AgentHub 的开源项目——多 CLI Agent 聚合 + Telegram/Lark IM + 多 Agent 协作 |
-| **Claude Code Agent View** | **MEDIUM→HIGH** | 从单 Agent 演进到多 Session 管理面板；/bg 后台派遣 |
-| **Cursor 3.2** | HIGH | /multitask 异步子代理 + /best-of-n 多模型并行 + Cursor SDK |
-| **GitHub Copilot SDK** | HIGH | 6 语言 SDK GA + Sub-agents + Cloud Automations + Copilot Memory |
-| **CodeBanana** | MEDIUM | 商用发布"群聊+Agent+Workspace"，36 氪获奖 |
-| **Devin Desktop + ACP** | MEDIUM | Windsurf 更名为 Devin Desktop，发布 Agent Client Protocol |
-
-**核心差异化窗口在缩窄**：IM 多 Agent 不再无人竞争。剩余壁垒：Tauri 2 原生桌面 + Hub-Edge-Runner 分布式 + 开源社区
-
-### 调整建议
-
-- 飞书/Telegram IM 桥接从 P1 提升为 **P0 加速**（Codeg 已证明可行）
-- 新增 **Agent Adapter SDK** 为 P0（参考 Copilot/Cursor SDK，降低第三方 CLI 接入门槛）
-- 新增 **后台 Agent 调度器** 为 P1（Claude Code /bg、Codex Goal Mode、Copilot Automations 成为标配）
-
-### Demo 3 分钟策略
-
-- **场景**：三 Agent（Architect/Builder/Reviewer）协作修复 Dashboard 性能问题，三种 Runtime 各司其职
-- **时间轴**：开场钩子(25s) → Claude Code 分析+审批(30s) → Codex 执行+Diff(35s) → OpenCode 审查+聚合(40s) → 总结对比(50s)
-- **三个最亮点**：(1) Thinking 面板+审批弹窗 (2) Diff 内联+FileChangeGroup (3) 三 Agent 产出聚合
-- **P0 打磨项**：BlockRenderer 6 个 null case(~30 行) + Agent Profile 预设(~50 行) + @mention Runtime 信息(~20 行) + Diff 稳定渲染(~30 行)
-
-| 层 | 技术 | 存储 | 代码量 | 测试 |
-|----|------|------|--------|------|
-| Desktop | React 19 + Tauri 2 + Zustand + TanStack Query | 平台 Credential Store | Rust 2,113 行 / TS ~45 组件 | `pnpm test && pnpm typecheck` |
-| Edge Server | Go + gorilla/websocket + NDJSON | **JSON 快照 → SQLite + FTS5** | 15,509 行 | `go test ./... -short -race` |
-| Hub Server | Go + Gin + GORM + Redis + PG | PostgreSQL 16 | ~46,000 行 | `go test ./... -short -race` |
-| 协议 | REST JSON + WebSocket NDJSON | — | OpenAPI 5,590 行 | — |
-| CI | GitHub Actions (Win + macOS) | — | — | `scripts/verify-ci-gates.ps1` |
-
----
-
-## Desktop 前端深度审计
-
-> 2026-06-05 基于竞品对比 + 代码实证的深度审查。聚焦 ChatView/IM/渲染/交互四大方向。
-> 综合评分：**4.5/10** — 核心功能可用但体验粗糙，多处开发态残留和交互 Bug。
-
-### P0 问题清单（阻断级）
-
-| # | 问题 | 文件 | 影响 |
-|---|------|------|------|
-| 1 | **ChatView.tsx 1786 行单文件巨石** | `components/ChatView.tsx` | 可维护性极差，任何改动都有连锁风险 |
-| 2 | **运行状态三源同步** | `App.tsx` + `useChatMessages.reducer` + `runStore` | 同一 Run 状态分散 3 处，任一同步遗漏导致 UI 卡死/显示错误 |
-| 3 | **block key 依赖 index 不稳定** | ChatView `blockKey()` | `text-${index}` 流式渲染时 DOM 反复卸载/挂载，闪烁 |
-| 4 | **Agent Market 硬编码 Mock 数据** | `AgentMarketSection.tsx:72-169` | 6 个 mock agents 无法安装使用，欺骗性 UI |
-| 5 | **已弃用 `document.execCommand`** | `App.tsx:641`, `clipboard.ts:18` | undo/redo/copy 在现代浏览器可能静默失败 |
-
-### P1 问题清单（体验级）
-
-| # | 问题 | 文件 | 影响 |
-|---|------|------|------|
-| 6 | memo 签名过于简化，只比长度和标志位 | `messageBlockSignature` | 内容变化但签名相同时丢失更新 |
-| 7 | scroll-to-bottom 3 次 setTimeout + double rAF | ChatView 滚动逻辑 | CPU 飙升、布局抖动 |
-| 8 | 在线状态双重维护（3 处） | `connectionStore` + `useChatMessages` + `App.tsx` | 短暂不一致导致连接 banner 闪烁 |
-| 9 | Agent 切换每次创建新线程 | `App.tsx:521-533` | 误点产生大量空线程；catch 创建空字符串映射 |
-| 10 | z-index 硬编码违规（6 处） | `FileExplorer:998/999`, `ModelDropdown:9999`, `AgentCreationWizard:1000` | 弹窗堆叠冲突 |
-| 11 | 亮色主题 CSS 定义不完整 | `themes.css` | `[data-theme="light"]` 缺完整变量块 |
-| 12 | console.log/error 生产残留（53 处） | 多文件 | 信息泄漏、控制台噪音 |
-| 13 | `useHubStore.authenticated` 永远恢复 false | `hubStore.ts:17-18` | Hub 认证状态被拆分到两个不通信的模块 |
-| 14 | 右侧面板在窄屏突然消失无通知 | `App.tsx:311` | `runCardConstrained` 隐藏面板但无解释 |
-| 15 | Tool 结果统一截断无差异化 | `ToolUseBlock` | Bash/Diff/图片无区别展示，竞品按 toolKind 定制 |
-| 16 | Diff 无语法高亮 | DiffViewer/DiffCard | 竞品 Jean/CCUI 均有 Prism/Shiki 高亮 |
-| 17 | 虚拟滚动 estimateSize 静态值 | ChatView | 消息高度偏差大时滚动位置跳动 |
-| 18 | Thread 删除后无自动导航 | ThreadPanel | 删除当前 thread 后用户卡在空白 |
-| 19 | **IM 和主聊天是完全分离的两套系统** | `useIMChat.ts` vs `useChatMessages.ts` | 零代码共享，Edge→Hub 路径完全不同 |
-| 20 | **群聊 IM 无 @Agent 分派能力** | `IMMessageInput` 是纯 textarea，无 useMention | 比赛核心差异化功能在 IM 侧完全缺失 |
-| 21 | IM 消息无乐观更新 | `useIMChat.sendMessage()` | REST 确认后才显示，发送有感知延迟 |
-| 22 | Diff 大文件无虚拟化 | DiffViewer + DiffReviewPanel | 10000+ 行 diff 全量 DOM 渲染，卡顿 |
-| 23 | iframe sandbox 同时允许 scripts+same-origin | ArtifactPreview/ArtifactCard/ArtifactBrowser 三处 | 安全沙箱被绕过 |
-| 24 | Diff 解析逻辑重复两份 | `shared/diff.ts` + `desktop/utils/parseGitDiff.ts` | 同名 `parseUnifiedDiff` 实现不同，边缘 case 行为分歧 |
-| 25 | 嵌套 Tool 调用无层级渲染 | `ToolUseBlock` 只有 `children: ToolResultBlock[]` | 无递归渲染，子工具被扁平化 |
-| 26 | Artifact 正则提取仅支持英文 | `ArtifactBrowser.tsx:125-143` | 中文/JSON 输出的文件路径完全丢失 |
-| 27 | Blob URL 内存泄漏 | `ArtifactBrowser.tsx:558-570` | 下载后不 revokeObjectURL |
-| 28 | Tool 参数无深度截断 | `ToolGroup.tsx:162` JSON.stringify 无 max depth | 嵌套/base64 数据爆 DOM |
-| 29 | 右侧面板 resize 功能未实现 | `useSidebarResize.ts` 只处理 left | rightPanelWidth 存了但没应用 |
-| 30 | `summarizeInput` null input 崩溃 | `ChatView.tsx:110`, `ToolGroup.tsx:63` | WebSocket 畸形 tool_use 事件 input:null 导致渲染 crash |
-| 31 | `capOutputText` 静默丢弃输出头部 | `useChatMessages.ts:128-133` | >20K 字符输出只保留尾部，无截断提示 |
-| 32 | `hasVisibleBlock` 缺 `tool_group` 分支 | `ChatView.tsx:1079-1108` | 潜在 Bug：若 tool_group 被持久化/回放，整条消息消失 |
-| 33 | `mergeBlock` O(n²) 数组分配 | `useChatMessages.ts:93-109` | 高频流式时每次 delta 复制全量 blocks，GC 压力大 |
-| 34 | tool_group 内联合成每次渲染创建新对象 | `ChatView.tsx:1188-1206` | 已沉淀消息也不跳过，BlockRenderer memo 失效 |
-| 35 | `AgentTextBlock` 未 memo 化 | `ChatView.tsx:247-287` | 流式输出时每个 RAF tick 重新解析/渲染 Markdown |
-| 36 | scroll-to-bottom 3 次延时覆盖用户滚动位置 | `ChatView.tsx:1410-1430` | 用户上滑查看历史时被强制滚回底部 |
-
-### P2 问题清单（打磨级）
-
-| # | 问题 | 文件 |
-|---|------|------|
-| 30 | 缺少 Markdown 数学公式支持（竞品 CCUI 有 remarkMath + rehypeKatex） | MarkdownRenderer |
-| 31 | 无消息骨架屏/Streaming ticker（竞品 Jean 有 CompactStreamingTicker） | ChatView |
-| 32 | Tool 标题 `summarizeInput` 截断到 40 字符（竞品 Kanna 按 toolKind 生成语义标题） | ToolUseBlock |
-| 33 | PromptInput 1522 行未 memo 包装 | PromptInput.tsx |
-| 34 | useChatMessages 1485 行单一 hook 职责过重 | hooks/useChatMessages.ts |
-| 35 | useIMChat 1297 行单一 hook | hooks/useIMChat.ts |
-| 36 | App.tsx 1190 行，A4 Wave 2 还剩 2 个 hook | App.tsx |
-| 37 | 懒加载组件 fallback 为 null | AuthPage/HomeDashboard/SettingsPage |
-| 38 | Toast store nextId HMR 时可能重置 | toastStore.ts |
-| 39 | 装饰性 Nav 按钮无功能 | `App.tsx:1049-1052` |
-| 40 | Diff 长行无 word-break 水平溢出 | DiffViewer.tsx |
-| 41 | Diff focusedFilePath 用 endsWith 子串匹配 | DiffReviewPanel.tsx |
-| 42 | Artifact HTML 分类靠路径启发式 | ArtifactBrowser.tsx |
-| 43 | IM 消息搜索完全缺失 | useIMChat 无搜索 |
-| 44 | IM 群聊 leave/dissolve/成员管理 API 存在但无 UI 按钮 | IMView |
-| 45 | Typing indicator API 存在但从未调用 | HubWSHandle.sendTyping() |
-| 46 | Diff Accept/Reject 仅 UI 状态无持久化 | DiffViewer.tsx |
-| 47 | 面板关闭动画 220ms 内可能闪更新内容 | App.tsx:349-356 |
-| 48 | iframe retry 不换 URL 大概率重复失败 | ArtifactPreview.tsx |
-
-### IM 工作流完整性评估
-
-> 两条消息系统对比：主聊天（Edge 驱动）vs IM 聊天（Hub 驱动）
-
-| 能力 | 主聊天 (Edge) | IM 聊天 (Hub) | 差距 |
-|------|:-----------:|:-----------:|------|
-| 消息发送/接收 | ✅ REST+WS 流式 | ✅ REST+WS（无流式） | IM 侧无流式渲染 |
-| @Agent 分派 | ✅ useMention 完整 | ❌ 纯 textarea | **核心缺失** |
-| Agent Profile 选择 | ✅ MentionPopover | ❌ 不存在 | **核心缺失** |
-| Tool Call 可视化 | ✅ ToolUseBlock+ToolGroup | ❌ 不存在 | **核心缺失** |
-| Diff 内联 | ✅ DiffCard | ❌ 不存在 | **核心缺失** |
-| 思考过程展示 | ✅ ThinkingBlock | ❌ 不存在 | — |
-| 子 Agent 卡片 | ✅ ChildAgentBlock+RouteDecision | ❌ 不存在 | **核心缺失** |
-| 群聊创建 | N/A | ✅ createGroupSession | IM 独有 |
-| 好友/联系人 | N/A | ✅ listContacts+好友请求 | IM 独有 |
-| 未读计数 | ✅ badge | ✅ unreadCount | 对等 |
-| 消息搜索 | ✅ MessageSearchPanel | ❌ 缺失 | IM 缺失 |
-| 乐观更新 | ✅ 流式即时 | ❌ REST 确认后 | 体验差距 |
-| 审批 | ✅ PermissionDialog+ApprovalCard | ✅ TeamApprovalPanel | 两条路径不一致 |
-| TeamRun | N/A | ✅ 4-tab console（Member/Task/Approve/Event） | IM 侧更完整 |
-
-**核心问题：IM 聊天是纯文字聊天，无法在群聊中分派 Agent 任务。比赛评分项"AI 协作能力 30%"的核心差异化在 IM 侧完全缺失。**
-
-### 竞品关键差距（AgentHub vs 标杆）
-
-| 维度 | AgentHub | 竞品标杆 | 差距 |
-|------|---------|---------|------|
-| Chat 组件分层 | ChatView.tsx 单文件 1786 行 | Jean 70+ 文件、Kanna ChatPage+TranscriptViewport+20 消息组件 | 架构差距巨大 |
-| block key 稳定性 | `text-${index}` | CCUI `WeakMap+Set` 稳定 key；Kanna ID-based key | 流式闪烁根因 |
-| 虚拟滚动 | useVirtualizer + 3次 scrollToBottom + 手动 ResizeObserver | Kanna LegendList `maintainScrollAtEnd` 零手动代码 | 滚动体验差 |
-| Tool 渲染 | switch-case 硬编码 | CCUI ToolRenderer 配置驱动注册表 | 扩展性差 |
-| Diff 语法高亮 | 无 | CCUI Prism+oneDark、Jean 自定义 | 完全缺失 |
-| Tool 标题 | 截断 40 字符 | Kanna 按 toolKind 语义化（"Find \`pattern\` in files"） | 可读性差 |
-| 消息预处理 | 无（运行时内联分组） | Kanna `buildTranscriptRenderItems` 两阶段预处理 | 渲染层复杂 |
-| Tool 颜色编码 | 无 | CCUI 按类别左边框色标（edit=amber, bash=green, agent=purple） | 视觉扫描差 |
-
-### 前端修复优先路线（按性价比排序）
-
-**Phase 0 — IM 核心打通（最高优先，~5 天）— 比赛核心差异化**
-
-1. **IM 聊天集成 Agent 分派** — IMMessageInput 接入 useMention + Agent Profile 选择，群聊中 @Agent 触发任务
-2. **IM 消息支持富类型渲染** — 将 BlockRenderer/ToolUseBlock/DiffCard 适配到 IMMessageView
-3. **IM 消息乐观更新** — sendMessage 发送前先插入 optimistic message
-4. **统一主聊天与 IM 审批路径** — Edge permission + Team approval 合并为一致体验
-
-**Phase 1 — 紧急止血（本周，~3 天）**
-
-5. **修复 block key 稳定性** — `text-${index}` → `text-${contentHash}`，消除流式闪烁
-6. **清理 Mock 数据** — AgentMarketSection 移除或标注 "Coming Soon"
-7. **替换 `document.execCommand`** → `navigator.clipboard` + Selection API
-8. **z-index 统一到 tokens.css** — 所有硬编码值改用 CSS 变量
-9. **修复 iframe sandbox** — 移除 `allow-same-origin`，仅保留 `allow-scripts`
-10. **Diff 语法高亮** — DiffViewer 接入 react-syntax-highlighter (Prism)
-
-**Phase 2 — 架构重构（本月，~7 天）**
-
-11. **拆分 ChatView.tsx** — 提取 ChatMessageList、ChatScrollBehavior、ChatConnectionBanner（参考 Jean 70+ 文件拆法）
-12. **统一运行状态** — 消除三源同步，runStore 为唯一权威
-13. **引入消息预处理层** — 参考 Kanna `buildTranscriptRenderItems`，在渲染前合并 tool group
-14. **简化 scroll-to-bottom** — 评估 LegendList 替代 tanstack virtual
-15. **合并 Diff 解析** — 统一 parseUnifiedDiff 为一份实现
-
-**Phase 3 — 体验增强（下月，~5 天）**
-
-16. **Tool 渲染配置化** — 参考 CCUI `toolConfigs` 注册表
-17. **Tool 卡片颜色编码** — 参考 CCUI 左边框色标
-18. **Tool 标题语义化** — 参考 Kanna 按 toolKind 生成
-19. **Artifact 提取改结构化** — 从正则迁移到 tool output metadata
-20. **右侧面板 resize 实现** — useSidebarResize 补全 right 侧逻辑
+| 主工作树 | `D:\Code\TokenDance\AgentHub` |
+| 当前分支 | `feat/desktop-web-v4-clean-rebuild` |
+| 并行 worktree | 摘要：`.worktrees/backend` = `feat/backend-edge-hub`；`.worktrees/johnny-dev` = detached HEAD。完整实时列表以 `git worktree list` 为准，当前存在多条 backend 0607 并行 worktree |
+| UI 基准 | 当前分支 `app/shared/src/workbench` + mock/demo 运行态；`D:\Code\TokenDance\agenthub-design\desktop` 为只读历史参考 |
+| Desktop/Web 端口 | Desktop `5173`，Web `5174` |
+| Mobile 端口 | `5175`，不阻塞本轮 |
+| 当前策略 | 后端主线隔离；主工作树推进 Desktop/Web shared UI 收口、mock/demo 基准固化和设计系统统一。UI 分支只接受明确归属的 Web Hub / Edge contract 小切片，合并前必须分类 backend/mobile 并行改动 |
+| GLM 报告处理 | 只作为风险索引吸收；采纳“未跟踪 blocks/floating/inspector/pages 需要接线和测试”、CSS token/z-index/对比度和废弃组件清理提示；拒绝“首屏恢复 @Agent/权限/workDir/附件工具条”等违反当前 shared workbench 首屏信息架构和固定控制区规则的建议 |
+
+## 当前最高优先级
+
+| Rank | 任务 | 状态 | 下一步 | 验收证据 |
+|---:|---|---|---|---|
+| P0-1 | v4 clean rebuild 文档架构 | 进行中 | 保持 roadmap/plan/design audit/branch governance 事实同步 | `git diff --check`；活跃文档无旧主线冲突 |
+| P0-2 | shared UI 工作台边界 | 冻结整理中 | 以当前 shared workbench/mock demo 为标准整理剩余 block/inspector/floating 的 hover/focus、窄屏和截图矩阵；把关键对比脚本纳入后续视觉回归护栏；新增功能必须套进 v4 固定控制区规则，不得用换行撑高 toolbar/tab/action | Desktop/Web 已共用 `app/shared/src/workbench` 主壳子，tokens/themes 已同步，rail pages、transcript blocks、profile popover、toast、context menu、多选条、RightInspector、FilePreview、固定控制区和 demo runtime 已接入；当前不声明全量完成，Agents 市场/字段密度、真实 provider/avatar、platform action、tool timeline、CRUD mutation 和正式截图矩阵仍是后续债务 |
+| P0-3 | Desktop v4 shell 接入 | 进行中 | 继续替换剩余静态 smoke 数据，并补 TeamRun/IM 入口证据；复核左右侧栏拖到极窄后可恢复 | Desktop App v4 focused tests 4 passed；Desktop typecheck/build 通过；5173 已补 Desktop-only 32px window chrome，根布局与 5176 一致为 `y=32,height=888`；Desktop fallback transcript 已按 design demo 显式拆分 agent 气泡标题/详情/badge，并收敛到完整 B0 运行流；1440x920 Playwright smoke 通过，当前覆盖 active Edge thread happy path：读取真实 Edge thread 列表、persisted items、live Edge event evidence，可从 v4 composer 提交 Edge run，并在 shared inspector 展示 run/tool/file/artifact evidence；v4 composer approval/workDir/@Agent/浏览器文件附件/Desktop 原生文件附件上下文已传入 Edge `startRun`；files/browser inspector 已通过 platform preview port 打开 evidence target；shared inspector 已支持 collapse/keyboard resize；demo/mock preview 下无真实 Edge thread 时，5173 发送会回落到 demo runtime，追加用户消息和 mock reply，不再点击无响应；这不代表 full production facade、全量 CRUD、host 文件动作、异常恢复或正式 E2E 已完成，生产对接继续归入 P0-5 |
+| P0-4 | Web v4 shell 接入 | 进行中 | 继续补 Web v4 TeamRun/IM 子页在 shared workbench 内的正式入口 | Web App focused test 通过；Web typecheck/build 通过；5174 使用同一套 shared workbench，但明确不显示 Desktop fake window chrome，根布局为 `y=0,height=920`；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles`；Web v4 首片登录态 happy path 已接 Hub sessions/messages；Hub WS 已接 v4 query invalidation；Hub `agent.stream` runtime events 已直接投影到 shared transcript；composer submit 已改为真实 Hub message + optional `/web/agent-tasks`；Hub message 已有 optimistic cache 插入/确认/失败回滚；@Agent submit 已先创建并缓存 Hub session `AgentInstance`，再用 exact `agent_instance_id` 触发 `/web/agent-tasks`；demo/mock preview 下 5174 发送同样追加用户消息和 mock reply；这不代表 TeamRun/IM、全量 mutation、正式鉴权错误态或回滚矩阵已经冻结完成 |
+| P0-5 | Desktop Edge / Web Hub 生产对接 | 已部分落地，facade/host 拆分待实现 | 按 [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) 先建 Desktop runtime facade，再拆 Tauri host modules，并收紧 Web Hub-only boundary | 当前 `App.tsx` 已是薄入口；Desktop 已有 EdgeManager/Edge REST/WS 基础；Web 已走 Hub adapter；`desktopHost.ts` / `localEdgeRuntime.ts` 和 Tauri `host/*` 尚未落地；下一步验证以 Desktop/Web platform focused tests、Rust host tests、`verify-web-hub-boundary.ps1` 和旧 UI active path 为门禁 |
+| P0-6 | 旧 UI 清理门禁 | 旧主路径已完成，迁移债务继续 | 清理剩余 Search/Diff/Artifact 迁移素材并把可复用逻辑转入 shared | 已删除旧 Desktop `ChatView/PromptInput/ThreadPanel/useChatMessages/useIMChat/IMBlockRenderer/IMMessageView` 及对应旧测试/CSS；已删除旧 Web `ChatView/PromptInput/ThreadPanel/RunDetail/ReplyPreviewBar/IMMessageView` 及对应旧测试/CSS；Web runtime projection 已从 `RunDetail*` 改为 run evidence 命名；`scripts/verify-v4-old-ui-active-paths.ps1` 44/44 通过；无双主工作台 active import |
+
+2026-06-07 追加旧客户端清单：仍留在源码树里的旧 Desktop/Web 文件已整理到 [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md)。当前结论是：旧主 UI active path 已删除，但 `TeamRunConsole`、旧 `DiffViewer`、`ArtifactBrowser`、Web `hubAdapters`、duplicate stores/hooks 和 Tauri `commands.rs` 仍是迁移素材或删除候选；后续不得把它们重新接回 v4 active route。
+
+2026-06-07 多代理审计补充：Mobile `5175` 仍是旁路预览，本轮 dirty tree 中的 `app/mobile/*` 属 mobile/parallel；`edge-server/*` 和 `BACKEND-MERGE-PLAN.md` 属 backend/parallel。合并或 PR 前必须按 frontend-v4、desktop-platform、web-platform、docs、backend、mobile 分组 staging，禁止 `git add .`。
+
+2026-06-07 补充：chat 首屏稳定 CSS 探针已用 `v4_style_compare.mjs` 对齐 5173/5174/5176，当前 computed-style delta 为 0；动效规则已收口为“只保留 design 源码明确存在的菜单/弹层/折叠/发送按钮/文件行动效，普通控件不扩散 translate/scale”。后续 P0-2 不再以“到处补动效”为目标，改为继续处理 platform action、真实运行数据聚合、窄屏截图和 shared public API。
+
+2026-06-07 追加保存：composer 行为已进入 shared 偏好合同。默认 `Enter` 发送、`Ctrl+Enter` / `Cmd+Enter` 换行，设置页可切到 `Ctrl+Enter 发送`；偏好 key 为 `agenthub.workbench.composerSubmitBehavior`，Desktop/Web 共用。`TranscriptView` 的 `shouldHideGroupedUserAvatar` 运行时错误已修复并有回归测试。最新 focused 验证覆盖 5173/5174 demo 发送、输入框清空、mock reply、快捷键切换和无 console/pageerror。
+
+2026-06-07 晚间追加保存：固定控制区响应式规则已落地。Toolbar、tab、header action、inspector tab、多选条、页面操作区不得通过换行适配宽度；窄宽时优先单行、截断、隐藏文字或只显示 icon，并保留 `aria-label/title`。`FilePreview` 已从右栏内嵌弹窗卡收敛为文件 tab 的单行 editor header，代码文件只显示 `源码/Diff`，Markdown 才显示 `预览`，源码/Diff 保留 Prism 语法高亮。`Child Agent` 文案收敛为 `子Agent` / `Subagent`，聊天流中的 Subagent/审批/tool/file/diff/run-step 小卡片继续压缩信息层级。最新验证：shared focused tests 2 files / 51 tests passed；Desktop/Web typecheck passed；`v4_responsive_audit.mjs` `compared=9 failures=[]`；`v4_design_compare.mjs` `compared=42 failures=[]`；旧 UI active path 44/44 passed；`git diff --check` 无 whitespace error（仅 CRLF warning）。
+
+2026-06-07 晚间继续保存 Agent 管理页收口：页面标题已改为 `Agent管理`；左侧 rail Agent 图标换成更清晰的 v4 stroke 机器人头；Agents 页原生下拉已改为 shared v4 `Select`；已安装 Agent 列表去掉 `data-card-surface` 和非设计系统彩色左描边，回到轻量列表行选中态；Agent 头像通过 `resolveWorkbenchProfile()` 渲染，当前为 34px、8px radius 的 shared profile 色块；右侧详情面板内部字段左靠并退回分段列表结构，避免嵌套卡片和贴右滚动条。验证：`app/shared` focused `AgentHubWorkbench.test.tsx` 25/25 通过；`verify_agents_page_refine.mjs` 在 5173/5174 无 console error，截图 `app/desktop/.tmp/agents-page-refine-5173.png`。后续仍需按 `agenthub-design/desktop` 继续核对 Agents 市场页首卡、字段密度、真实 Agent provider 和头像 URL。
+
+2026-06-07 冻结口径更新：前端开发和文档架构已进入冻结整理阶段。`agenthub-design` 不再是唯一验收标准，只保留为历史原型参考；当前标准以本分支 shared workbench、mock/demo 运行态和已经形成的交互合同为准。后续工作重心从 UI 继续扩展切换为 PR 拆分、合并准备、当前 worktree 复验，以及 Desktop/Tauri+Edge、Web+Hub 生产对接规划。
+
+## 合并前 PR 分组
+
+当前主工作树有 frontend、docs、backend、mobile、review artifacts 混合改动；index 已清空，剩余 tracked/untracked 改动必须按组重新 staging。合并回 `dev/delicious233` 前必须按组拆分 staging，禁止 `git add .`。
+
+| 分组 | 建议路径 | 排除项 | 合并前门禁 |
+|---|---|---|---|
+| `frontend-v4` | `app/shared/src/workbench/**`、`app/shared/src/demo/**`、`app/shared/src/ui/**`、`app/shared/src/transcript/**`、`app/shared/src/theme.ts`、`app/shared/src/i18n/**`、必要的 `app/shared/package.json` | Desktop/Web platform、backend、mobile、review dump；`app/pnpm-lock.yaml` 最后重算 | `git diff --check`、旧 UI active path、shared focused tests |
+| `desktop-platform` | `app/desktop/src/**`、`app/desktop/src/platform/desktopPlatform.test.ts` | shared 大 UI、Web、backend、mobile | Desktop platform focused tests、Desktop typecheck |
+| `web-platform` | `app/web/src/**` | Desktop、Local Edge、backend、mobile | `verify-web-hub-boundary.ps1`、Web platform tests、Web typecheck |
+| `docs` | `AGENTS.md`、`README.md`、`docs/README.md`、`docs/architecture.md`、`docs/desktop-web-v4-clean-rebuild-plan.md`、`docs/desktop-edge-web-integration-plan.md`、`docs/roadmap.md`、durable `docs/v4-*` | app/、edge-server/ 代码；审计 dump 默认不进主 PR | `git diff --check -- AGENTS.md README.md docs` |
+| `backend` | `edge-server/**`、`BACKEND-MERGE-PLAN.md` | frontend-v4、desktop/web platform、mobile | backend owner 单独验证，至少对应 Go focused tests |
+| `mobile` | `app/mobile/**` | Desktop/Web v4 主线 | mobile owner 单独 typecheck/visual QA |
+
+当前分支不应直接合并：本地 `feat/desktop-web-v4-clean-rebuild` 仍 ahead/dirty，且相对 `dev/delicious233` 有 behind 基线。当前 index 已清空，应先按 PR 分组重新 staging、拆分 PR、基于最新 `dev/delicious233` 复验，再把 PR 从 draft 切为 ready。
+
+2026-06-07 夜间 Web 边界收紧：`app/web` 已移除 Tauri 类型 shim，Web OIDC `device_type` 固定为 `web`，用户可见 i18n JSON 中的 Local Edge / Workbench Edge 文案已改为 Hub runtime 语义；`verify-web-hub-boundary.ps1` 现在扫描 JSON、禁止 Web 引入 Tauri/Desktop runtime 引用，并正向断言 `webPlatform.ts` 的 `localEdge:false/localFiles:false`。验证：`verify-web-hub-boundary.ps1` 15/15 passed；`app/web` focused tests `hubAuth.test.ts + webPlatform.test.ts` 2 files / 14 tests passed；Web typecheck passed。
+
+2026-06-08 合并收口：已按 owner 分组提交并推送 `feat/desktop-web-v4-clean-rebuild`，创建 draft PR [#291](https://github.com/TokenDanceLab/AgentHub/pull/291)。本 PR 包含 shared UI freeze、Desktop adapter、Web Hub-only boundary 和 durable docs；本地剩余 `edge-server/**`、`BACKEND-MERGE-PLAN.md`、`app/mobile/**`、`docs/review-2026-06-07-glm-5.1/**` 未纳入 UI PR。PR 仍需刷新到最新 `dev/delicious233` 后才能 ready。
+
+## P0: 文档与架构冻结
+
+- [x] 清理本地过时分支，只保留 `dev/delicious233` 作为本地主线。
+- [x] 清理 `origin` 过时分支，只保留 `dev/delicious233`、`dev/trump`、`dev/johnny`、`master`。
+- [x] 完成 [desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md) 的当前版本；后续只做事实同步，不另建第二计划。
+- [x] 完成 [v4-clean-rebuild-decision-questions.md](v4-clean-rebuild-decision-questions.md)。
+- [x] 更新 [architecture.md](architecture.md)，把 Desktop/Web 共享 UI 系统作为当前架构。
+- [x] 更新 README、docs 导航，移除旧状态入口。
+- [x] 更新治理文档中的当前分支/worktree 事实。
+- [x] 确认 active docs 不再表达“Desktop 先行，Web 以后迁移”或“ChatView 重写暂缓”。
+
+## P1: Shared UI 工作台系统
+
+目标：全面参考 `agenthub-design/index.html` 和 `agenthub-design/desktop/`，把真实 UI 壳子拆成 AgentHub 内部可复用 UI 系统，让 Desktop/Web 共用同一套产品工作台。
+
+- [ ] `app/shared/src/ui/`：清理 exports，明确基础组件的 public API。
+- [ ] `app/shared/src/workbench/`：已新增 `AgentHubWorkbench` shared shell，并拆出 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`TranscriptView`、`UnifiedComposer`、`RightInspector`、`WorkbenchRoutes`；rail pages 已接 `ContactsPage/DocsPage/AgentsPage/TasksPage/ProjectsPage/SettingsPage`，非 chat 页面按 design workbench mode 隐藏 sidebar/header/composer/inspector；visible composer 已按 design demo 收敛为输入框 + 发送按钮；profile popover/toast 已接线；`designIcons.tsx` 已覆盖 design demo nav/file/profile/menu/toolbar 首片，并补齐 `desktop/index.html` 的 GlobalRail 静态壳子专用图标路径；Projects/Agents/Contacts/Docs/Tasks/Settings 页面和 transcript file/diff 卡片已统一改用 design icons；Contacts/Docs/Tasks/Settings 已按 design demo 收齐卡片圆角、按钮样式、示例数据、Docs focus ring、Tasks `筛选 1` active 状态和 Settings 示例配置；Settings 本地开发页已补 `自动/Mock/正常` 数据模式状态卡片和 storage 持久化验证；Projects/Agents 已按 design demo 收齐 demo 数据、统计逻辑、文案、Skills 标题结构、状态点色值和首轮卡片/按钮细节；context menu / multi-select 已接入 transcript selectable cards，菜单 title/group/shortcut/chevron/danger 和多选条 count/action/退出均按 design demo 结构实现；2026-06-07 已把 `context/selected/actioned/soft-hidden` 视觉状态从外层 transcript 行收敛到真实卡片面板，并补齐复制、复制链接、删除软隐藏、多选删除和 toast 文案；晚间继续补齐固定控制区响应式规则，workspace header/tabs、RightInspector tabs、MultiSelectBar、Tasks/Agents/Docs/Projects/Contacts 的 toolbar/action/tabs 均不再通过换行挤压布局，窄宽下改为截断、横向内部 overflow 或 icon-only。下一步继续核对剩余 blocks/inspector/floating 的 hover/focus、窄屏和截图矩阵。
+- [ ] `app/shared/src/workbench/pages/AgentsPage.*`：2026-06-07 晚间已继续修正 Agent 管理页：标题为 `Agent管理`；Agent avatar 走 shared profile resolver；运行引擎/默认模型/运行模式/状态使用 shared v4 `Select`；已安装列表去掉 `data-card-surface`、彩色左描边和笨重卡片化干扰；右侧详情内部左靠并将 Skills/工具权限/最近运行退回轻量分段。下一步继续和 design demo 对齐 Agents 市场首卡、右侧字段密度和真实 Agent provider。
+- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock、Hub message -> TranscriptBlock、Hub runtime event -> TranscriptBlock normalize；`TranscriptView` 已接入 design blocks：thinking、Subagent/子Agent、route decision、context usage、result；text block 的方向判定已收敛为“当前用户右侧，其他作者左侧 incoming 卡片”，不再用 `author.role === "agent"` 决定是否显示白色消息卡片；shared `types/chat.ts` 已成为旧 `ChatView.types` 迁移兼容合同；下一步补 TeamRun runtime events 和 tool timeline 聚合。
+- [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer、v4 modes、approval mode、workDir、结构化 @Agent mention、浏览器文件附件和 Desktop 原生文件附件上下文；下一步补 per-conversation draft persistence。
+- [ ] `app/shared/src/inspector/`：首片已建立 evidence 聚合模型，shared workbench 的 overview/browser/files tabs 已显示 run/tool/file/artifact summary、changed files 空/列表状态和 browser capability 状态，并已接入 files/browser evidence preview 打开动作；已按 design prototype 补 inspector collapse、键盘 resize、tab 关闭、`+` 恢复/快捷入口；文件预览已具备源码、Markdown、Diff、语法高亮和打开方式菜单框架；晚间已把 `FilePreview` 外层卡片感收回为文件 tab 内嵌 editor，TS/SQL/JS 等代码文件不显示 Markdown `预览`，`打开方式` 降为 icon 入口。下一步补更完整 tool timeline，并把“打开方式”接入 Desktop/Web platform action。
+- [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface、mock platform、附件 picker port 和 preview port；Desktop/Web 已接实际 adapter；Web 已接 Hub REST session/message/profile、Hub WS query invalidation、Hub runtime live transcript、Hub message/task submit、optimistic message cache 和 Agent Profile -> exact AgentInstance dispatch；下一步进入旧 UI active path 清理。
+- [ ] 所有共享模块配 focused tests，复杂视觉组件配 stories 或截图场景。
+
+验证记录：
+- 2026-06-07：按右侧 inspector 拖拽挤压反馈修复 shared shell 运行态压缩策略：`AgentHubWorkbench` 不再用硬 `min-width:1180px` 顶穿真实窗口；当 inspector 拖宽导致 workspace 低于可读宽度时，左侧最近频道栏自动折叠，置顶公告和 composer 被限制在 workspace 安全边界内，滚到底部后最新消息停在 composer 上方。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 文件 / 23 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；5173/5174 Playwright 压缩验证均为 `data-sidebar-collapsed=true`、横向 overflow 0、底部 clearance 约 54px，截图为 `app/desktop/.tmp/v4-pressure-layout-desktop.png`、`app/desktop/.tmp/v4-pressure-layout-web.png`、`app/desktop/.tmp/v4-pressure-bottom-desktop.png`、`app/desktop/.tmp/v4-pressure-bottom-web.png`。
+- 2026-06-07：补齐轻量云文档/项目产物浏览闭环：新增 `workbench/documentPreview.ts` 作为 `WorkbenchDocumentPreview` 合同，Docs 行点击会在云文档页内打开只读 `FilePreview`，Projects 产物点击会在项目页内打开同一套项目产物预览；预览复用现有源码/Markdown/Diff/打开方式菜单，不新造完整协同编辑器。`architecture.md` 已记录产品边界：Project Artifacts + Document Library + File/Artifact Preview + Document Providers，当前做轻量文档中心，后续 provider 再接 Hub artifact store、本地 workspace 和飞书/Google/Tencent/WPS。验证：Desktop/Web typecheck 通过；shared focused tests 2 文件 / 29 测试通过；`v4_document_preview_smoke.mjs` failures 为空，5173/5174 均确认云文档和项目产物点击后出现预览；`v4_profile_registry_smoke.mjs`、`v4_project_tabs_smoke.mjs` failures 为空；旧 UI active path 44/44 通过。
+- 2026-06-07：RightInspector FilePreview 继续按用户反馈压缩右侧源码/预览/Diff 面板密度：文件 toolbar 收敛到 40px，meta 收敛到 22px，源码/Diff 行高收敛到 17px；打开方式菜单收敛为 212px 宽、10 项每项 30px。打开方式图标不再手写近似 logo：Antigravity 来自 `@lobehub/icons` 官方图标组件，VS Code、Visual Studio、Android Studio 来自 Devicon 官方图标资产，Cursor、Git for Windows、Linux/WSL 来自 `simple-icons` 官方品牌 path，Default app、Terminal、打开所在文件夹保留系统动作线性图标；`@lobehub/icons` 已纳入 shared，后续 AI/Agent/provider/model/application 品牌图标优先走 Lobe Icons。验证：`app/desktop/.tmp/v4_file_preview_compact_probe.mjs` 覆盖 Desktop 5173 与 Web 5174，均确认 toolbar=40、meta=22、menu=212x284、10/10 menu item 有图形资产、`missingGraphics=[]`、无 console/page error；截图 `app/desktop/.tmp/v4-file-preview-compact-desktop.png` 和 `app/web/.tmp/v4-file-preview-compact-web.png`。
+- 2026-06-07：profile/avatar 继续全局统一：`workbench/profileRegistry.ts` 扩展为可接收 Agent 与联系人 profile source，`WorkbenchRoutes` 统一构造 `profileSources` 并传入 Docs/Tasks/Projects；Docs 所有者、Tasks 负责人/创建人、Projects 运行 owner 均改为同一套 User/Agent avatar pill，`Codex` 纳入 Agent name hint，避免文档 owner 被误判为用户。新增 `app/desktop/.tmp/v4_profile_registry_smoke.mjs` 覆盖 Desktop 5173 与 Web 5174 的 Docs/Tasks/Projects profile 渲染。验证：Desktop/Web typecheck 通过；shared focused tests 2 文件 / 25 测试通过；`v4_profile_registry_smoke.mjs` failures 为空，5173/5174 均确认 Docs 6 avatars、Tasks 8 avatars、Projects 8 avatars；`v4_project_tabs_smoke.mjs` failures 为空；旧 UI active path 44/44 通过。
+- 2026-06-07：修复部分私聊会话消息卡片消失/裸文本问题：`TranscriptView` 不再用 `author.role === "agent"` 路由文本块，改为只有当前用户 `Delicious233` 使用右侧 `UserMessage`，Johnny、Trump、其他真人联系人、Agent 和 system preview 均使用左侧 `AgentMessage` 白色消息卡片；`AgentMessage` 恢复 `surface + border + shadow` 卡片视觉并新增 `data-agent-bubble` 作为 DOM 验收标记；demo preview 中 Johnny/Trump 明确标为 `human`。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx -t "Johnny|human contact|profile" --reporter=dot`，1 文件 / 3 测试通过；`cd app/shared; corepack.cmd pnpm exec vitest run src\demo\workbenchDemo.test.ts --reporter=dot`，1 文件 / 5 测试通过。
+- 2026-06-07：Projects 页继续按 `agenthub-design/desktop` 左侧项目导航语义收敛：`新建项目` 从右侧标题 action 移到左侧项目导航标题区，右侧标题只保留项目状态；成员区从纯文本 chip 升级为带头像的 User/Agent 成员胶囊，并新增 `workbench/profileRegistry.ts` 作为共享头像 initials、Agent/User 判定和 Agent 颜色解析入口，Projects、Agents、Workbench ProfilePopover、Transcript 已开始复用该入口。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx src\transcript\normalizeEdgeEvents.test.ts --reporter=dot`，2 文件 / 22 测试通过；Desktop/Web typecheck 通过；`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_project_tabs_smoke.mjs`，5173/5174 failures 为空，且确认右侧标题无 `新建项目`、左侧导航有唯一 `新建项目`、概览/设置成员头像为 5 个并区分 3 User + 2 Agent；旧 UI active path 44/44 通过。
+- 2026-06-07：Tasks 子页在保持 `agenthub-design/desktop` 默认 4 行任务表、`筛选 1` active、左侧导航和 toolbar 结构的前提下接入本地交互：pane 切换会过滤任务，`列表/看板/仪表盘` tab 会切换表格分组视角，筛选/排序/分组/字段配置按钮有可见状态，新建任务会写入本地任务行并选中，新建分组会生成空分组，任务行点击会保持选中态。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx src\transcript\normalizeEdgeEvents.test.ts --reporter=dot`，2 文件 / 21 测试通过；Desktop/Web typecheck 通过；`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_subpage_compare.mjs`，26 子页无 diff、无 console error。
+- 2026-06-07：继续完善 Tasks 子页原位交互，不引入脱离 `agenthub-design/desktop` 表格壳子的重抽屉或大弹窗：`任务更多操作` 已有轻量菜单；未选中时显示紧凑操作提示；选中任务后显示同一页面内的任务详情条，可推进状态、指派给 Delicious233、按选中项目分组、按负责人切换视角；所有反馈复用 toolbar/row 的小半径、细边框和 token 色值。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 文件 / 18 测试通过；Desktop/Web typecheck 通过。
+- 2026-06-07：Tasks 子页补齐直接 CRUD：新建任务后直接进入行内编辑态，任务标题、所属项目、负责人、开始时间、截止时间可在表格原位输入；保存写回本地任务数据，取消恢复原值，删除会从当前任务组移除并清空选中态；编辑/保存/取消/删除按钮继续使用 design demo 的 28-32px 小按钮、细边框和表格密度，不新增重弹窗。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 文件 / 20 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_subpage_compare.mjs`，26 子页无 diff、无 console error；`git diff --check` 无 whitespace error，仅 CRLF warning。
+- 2026-06-07：RightInspector overview 微密度继续按 `agenthub-design/desktop` 的 `.monitor-section-toggle svg` 与 `.monitor-file svg` 收口：section chevron wrapper 从 28px/padding 7px 回到 14px/0 padding/0 圆角，overview 文件 icon 的 svg 在该区域强制继承 `--text-3`，避免 Markdown 全局文件图标色覆盖 inspector 源码；同步把 `AgentsPageProps.selectedAgentId` 明确兼容 exact optional 下的 `undefined`，保留未选中时 fallback 到首个 Agent 的现有行为。验证：`v4_overview_metrics.mjs` 中 Desktop 与 design 的 chevron 尺寸/padding/圆角、fileIcon 颜色均一致；`v4_style_compare.mjs` 无 computed-style delta；Desktop/Web typecheck 通过；shared focused tests 2 文件 / 21 测试通过。
+- 2026-06-07：ProfilePopover 账号弹层继续按 `agenthub-design/desktop` 源码收口：shared 弹层根 padding、head padding-bottom 和 actions padding 从 token 16px 回到 design 的 12px，保留设计源码的 404px 账号菜单、签名、空间区和 7 个菜单项；新增 ignored 对比脚本 `app/desktop/.tmp/v4_profile_popover_compare.mjs`，覆盖 5173/5174/5176 的账号弹层 computed style、2 个 action、7 个菜单项、2 个 separator 和 3 个空间行；同步恢复 sidebar item grid 和 overview file icon 3px wrapper 半径，并修复多选模式 pointerUp 闭包读取旧 `selectionMode` 导致 Shift+选择不生效的问题。验证：`v4_profile_popover_compare.mjs` 无 profile popover delta；`v4_style_compare.mjs` 无 computed-style delta；shared focused tests 2 文件 / 20 测试通过。
+- 2026-06-07：针对上一条中“恢复 sidebar grid / 3px file icon”的视觉回退做 1:1 纠偏：以 `agenthub-design/desktop` 的 `.sidebar-item { display:flex; gap:10px }`、`.row-fill`、`.monitor-file svg { border-radius:0 }` 和 composer 源码为准，shared 会话侧栏改回 flex row，title/subtitle 块级化以恢复 48px 行高和 row-fill 宽度，overview 文件 icon wrapper 圆角改为 0，并移除 composer focus 时 demo 没有的额外边框、强阴影、上移和 `+` 缩放。验证：`v4_typography_audit.mjs` 已升级为硬性验收并通过，`failures=[]`；`v4_design_compare.mjs` 42 项 `failures=[]`；`v4_interaction_smoke.mjs` 和 `v4_settings_data_mode_smoke.mjs` failures 为空。
+- 2026-06-07：继续清理验收脚本自身的假信号：`v4_style_compare.mjs` 现在强制进入 `chat/overview` 基线、修正 transcript/agent header 等过时 selector、保存 `v4_style_compare.json`，并在 computed-style delta 非空时返回非零；`v4_responsive_audit.mjs` 改为 `domcontentloaded + selector wait`，强制进入 chat，修正 workspace/transcript selector，保存 `v4_responsive_audit.json`，并校验 5173/5174/5176 三端 1440/1280/390 的 chrome policy、关键区域存在、桌面无 overflow、390 保持 1180px 工作台基线和 rail/sidebar/inspector 宽度。验证：`v4_style_compare.mjs` 无 computed-style delta；`v4_responsive_audit.mjs` `compared=9`、`failures=[]`。
+- 2026-06-07：把三端多页面截图矩阵升级为硬性验收：`v4_design_compare.mjs` 现在覆盖 Desktop 5173、Web 5174、design 5176 的 `chat/contacts/docs/agents/runs/projects/settings`，并在 `1440x920` 和 `390x844` 两个视口生成 42 条结果；脚本校验 fatal/page/console error、Desktop/Web chrome policy、root/rail/workspace/primaryCard 存在、桌面无横向 overflow、窄屏保持 1180px 工作台基线、1440 根宽和 52px rail 宽，失败时返回非零退出码。验证：`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_design_compare.mjs`，`compared=42`、`failures=[]`，完整结果写入 `app/desktop/.tmp/v4_design_compare.json`，截图写入 `app/desktop/.tmp/compare-*-517{3,4,6}-*.png`。
+- 2026-06-07：复核 transcript/composer 密度时曾以 `agenthub-design/desktop/styles.css` 的静态 flow composer 为准确认 `.transcript` bottom padding 为 `28px`，防止 shared UI 回到自造大留白破坏首屏密度；该历史基线已在晚间 overlay composer 遮挡修复中被“安全滚动 padding + workspace 内 composer 浮层”取代，当前验收以最新消息不被输入框遮挡为准。本轮硬门禁确认 Desktop 5173、Web 5174 与 design 5176 在 computed style、响应式、字体密度和多页面截图矩阵均保持对齐。验证：`v4_style_compare.mjs` 无 computed-style delta；`v4_responsive_audit.mjs` `compared=9`、`failures=[]`；`v4_typography_audit.mjs` `failures=[]`；`v4_design_compare.mjs` `compared=42`、`failures=[]`；shared focused tests 3 文件 / 24 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error（仅 CRLF warning）。
+- 2026-06-07：把卡片交互 smoke 升级为硬性验收：`v4_interaction_smoke.mjs` 现在覆盖 Desktop 5173、Web 5174、design 5176 的右键菜单、13 项菜单顺序、复制 toast、多选 toolbar、actioned/selected/soft-hidden 卡片状态、`data-card-surface` 628px 宽度、soft-hidden opacity/filter 和页面 overflow；任何菜单、状态或截图关键指标回退都会返回非零退出码。验证：`v4_interaction_smoke.mjs` failures 为空并刷新 `v4-interaction-{desktop,web,design}.png`；`v4_settings_data_mode_smoke.mjs` failures 为空；shared focused tests 3 文件 / 20 测试通过。
+- 2026-06-07：Chat 首屏剩余 pin/header 微样式继续按 `agenthub-design/desktop` 收敛：确认 5173/5174 demo 模式不会被 live pin 覆盖，Builder 置顶公告文案与 5176 一致；`WorkspaceHeader` 的 title/kind/thread/model/tab/icon button computed style 与 5176 对齐；去掉 shared header tab/button 和 PinnedAnnouncement hover 中 design demo 没有的上移动效，model/thread max-width 改回 demo 的响应式 clamp。验证：`cd app/desktop; corepack.cmd pnpm exec node .tmp\v4_header_pin_audit.mjs` 确认 5173/5174/5176 无 console error，pin/header/avatar/kind/thread/model/tab/button/pin card/pin mark 半径、颜色、尺寸、transform 一致；`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 文件 / 15 测试通过；Desktop/Web typecheck 通过。
+- 2026-06-07：Composer focus 微样式继续按 `agenthub-design/desktop` 回收：shared `.composerRow` 不再在 `focus-within` 时额外抬升、加深阴影或改边框；`.composerInput` 显式覆盖 Desktop/Web 全局 focus-visible，保持 design demo 的 `border-radius:0`、`box-shadow:none`、无自身 outline。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 文件 / 14 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`cd app/desktop; corepack.cmd pnpm exec node .tmp\v4_card_mode_audit.mjs` 确认 5173/5174/5176 的 composer focus 均为 `radius=0px`、`shadow=none`、`outline=none`，card surface 宽 628px、context menu 圆角 12px 继续一致。
+- 2026-06-07：把 Settings 数据模式 smoke 升级为硬性验收：`v4_settings_data_mode_smoke.mjs` 现在检查 5173/5174/5176 三端本地开发页前四行仍为 `Vite 地址/工作区/目标项目/热更新覆盖层`，首卡和数据模式行高度保持 63-64px 设计取整范围，5173/5174 有数据模式行和状态卡、5176 对照无数据模式行，状态 badge 使用 `--r-full`/`--primary-light` 且无页面 overflow；脚本失败会返回非零退出码。同时修复 `TranscriptView` 键盘 ContextMenu 与鼠标右键共用轻量事件合同导致 Desktop/Web typecheck 失败的问题。验证：`v4_settings_data_mode_smoke.mjs` failures 为空；shared focused tests 3 文件 / 20 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过。
+- 2026-06-07：Settings 本地开发页的数据模式增量继续向 design demo 的设置列表语言收敛：`dataModeLabel()` 统一返回 `自动/Mock/正常`，状态区右侧模式值改成 design token 胶囊 badge，移除非原型分隔点，窄屏下设置行、路径控件、状态事实卡和状态组件预览改为单列以避免文本溢出。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx src\demo\dataMode.test.ts --reporter=dot`，2 文件 / 16 测试通过；`cd app/desktop; corepack.cmd pnpm typecheck` 通过；`cd app/web; corepack.cmd pnpm typecheck` 通过；`cd app/desktop; corepack.cmd pnpm exec node .tmp\settings-mode-check.mjs` 确认 5173/5174 均可进入“设置 / 本地开发 / 数据模式状态”，5174 无 console error，截图为 `app/desktop/.tmp/settings-mode-check/desktop-settings-local-1440.png` 和 `app/desktop/.tmp/settings-mode-check/web-settings-local-1440.png`。
+- 2026-06-07：Settings 本地开发页在保留其他 Agent 新增“数据模式”的前提下恢复 design demo 首卡顺序和高度：`Vite 地址/工作区/目标项目/热更新覆盖层` 继续与 `agenthub-design/desktop` 对齐，`数据模式` 作为同节末尾单行 segmented control，详细 Auto/Mock/正常解释移到独立状态区，不再撑高首卡。`demo/dataMode` 同步兼容 `自动/模拟/正常` 与 `auto/mock/demo/normal/real`，localStorage override 会优先于 env 模式。验证：`v4_subpage_compare.mjs` 26 个 Settings/rail 子页对比为 0 diff、0 console error；`v4_card_mode_audit.mjs` Desktop/Web/design 三端卡片 surface 宽度均为 628、context menu 圆角均为 12px，三端均可见 Mock mode evidence；shared focused tests 3 文件 / 19 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error（仅 CRLF warning）。
+- 2026-06-07：按 design demo 的 `.inline-title/.inline-muted loose` 显式化 agent 文本气泡合同：`TextTranscriptBlock` 新增 `displayTitle/displayDetail/badgeLabel/badgeVariant`，shared demo 和 Desktop fallback 均使用显式标题、详情和 `运行中/定位完成/写入中/完成` badge，不再靠句号/换行启发式拆分；Desktop fallback 同步补齐“找到迁移边界、生成迁移草案、已编辑 2 个文件、已验证历史消息渲染、Browser QA、迁移方案已完成”的顺序并删除旧散落 artifact/diff 重复块。验证：shared focused tests 3 文件 / 19 测试通过；Desktop/Web typecheck 通过；Desktop/Web root tests 通过；旧 UI active path 44/44 通过；5173/5174/5176 Playwright responsive audit 均无 console/page error，5173/5176 `hasWindowChrome=true`，5174 `hasWindowChrome=false`。
+- 2026-06-07：Desktop/Web shared shell 响应式行为对齐 `agenthub-design/desktop`：`AgentHubWorkbench` 增加 `min-width:1180px`，390 视口不再把 4 栏压进 390px 后裁剪，改为和 design demo 一样保持 1180px 横向工作台；Web 仍不显示 fake Desktop window chrome。验证：Desktop 5173、Web 5174、design 5176 在 1440x920、1280x800、390x844 的 Playwright responsive audit 均无 console/page error；390 下 Desktop/Web/design 均为 `scrollWidth=1180`，workspace 宽 468px，inspector x=780/宽 400px；截图 `app/desktop/.tmp/v4-responsive-desktop-390x844.png`、`app/web/.tmp/v4-responsive-web-390x844.png`、`app/desktop/.tmp/v4-responsive-design-390x844.png`。
+- 2026-06-07：5173/5174/5176 三方截图比对脚本扩展到 Desktop、Web、design demo：`app/desktop/.tmp/v4_design_compare.mjs` 现在覆盖 `chat/contacts/docs/agents/runs/projects/settings`、`1440x920` 和 `390x844`；shared rail 的任务页 route id 对齐 design 的 `data-page="runs"`，产品文案仍为“任务”。验证：`node .tmp\v4_design_compare.mjs > .tmp\v4_design_compare.json` 无 console/page error；5173/5176 chrome 均为 present，5174 chrome 为 absent；1440 下 5173/5176 root 为 `0x32x1440x888`，5174 root 为 `0x0x1440x920`；390 下三端 `scrollWidth=1180`；截图写入 `app/desktop/.tmp/compare-*-517{3,4,6}-*.png`。
+- 2026-06-07：三方截图比对脚本改为 `domcontentloaded + selector wait`，避免 Vite HMR 长连接卡住 `networkidle`；5173/5174/5176、7 个 rail 页面、2 个视口共 42 条结果全部写入 `.tmp/v4_design_compare.json`，无 console/page/fatal error。修复 Tasks `进行中/已完成` 状态图标只挂 modifier class 导致 0x0 的问题，恢复 12x12 design ring；Projects `running/completed/waiting` 状态点按 design token 对齐为蓝/绿/黄。当前三端 cards/rows/radius/action/chrome policy 指标一致，Web 5174 继续无 fake Desktop chrome。
+- 2026-06-07：按 `agenthub-design/desktop` 的 card context menu / multi-select 原型补齐 shared transcript 交互细节：真实卡片面板统一 `data-card-surface`，context/selected/actioned/soft-hidden 视觉状态落在卡片本体；菜单动作支持复制、复制消息链接、删除软隐藏和原型 toast 文案；多选条支持全选、清空、复制、转发、添加任务、导出文档、删除和退出。验证：Desktop 5173、Web 5174、design 5176 交互 smoke 均无 console/page error、无横向 overflow；三端菜单均为 13 项，toast 为 `已复制卡片内容`，soft-hidden 均落到卡片 surface 的 opacity/filter；截图 `app/desktop/.tmp/v4-interaction-desktop.png`、`app/web/.tmp/v4-interaction-web.png`、`app/desktop/.tmp/v4-interaction-design.png`。
+- 2026-06-07：Desktop/Web shared token 继续标准化到 `agenthub-design/desktop` 的 v4 层级：新增 inspector/modal/profile/context menu/multi-select/toast 的 design z-index token，保持 demo 数值 5/50/60/75/79/80/90；Docs 上传/模板橙色、Contacts QR 色和 PinnedAnnouncement pin 色改为 shared token，颜色值不变。验证：Desktop/Web `tokens.css` 内容一致；shared workbench 无剩余数字 z-index；交互 smoke 复跑通过。
+- 2026-06-07：深度核对 Desktop/Web shared UI 与 `agenthub-design/desktop` 的字体、运行步骤和 inspector overview 细节：Desktop/Web `html` root 固定 16px、`body` 使用 demo 的 `font: var(--body)` 14px/21px 和相同 font stack；RightInspector 的 B0 overview 任务恢复 demo 四步 `done/done/active/todo`，artifact evidence 映射为“最终文件”、file evidence 映射为“工作文件”；Web mock transcript 补齐同一组 B0 artifact/file evidence；inspector 内容区 padding 收敛为 demo `.insp-body` 的 16px；OverviewPanel 文件 icon 恢复 17px、0 圆角和 `--text-3` 弱化色，默认不选中最终文件，避免灰底偏离 demo；`RunStepGroup` 从旧 48px 卡片按钮收敛到 demo `.run-step-toggle` 的 38px、6px 8px padding、12px 圆角和 22px icon。验证：`v4_overview_metrics.mjs` 确认 root/body、section/head/task/file/fileIcon/subhead 的字号、行高、padding、gap、半径、颜色与 design demo 对齐，文件列表均为 `sqlite-migration-plan.md`、`migrations/0007_chat_threads.sql`、`hooks/useThreadNavigation.ts`、`B0-SQLITE-RISKS.md`；`v4_typography_audit.mjs` 确认 Desktop/Web runStepToggle 尺寸、padding、半径与 design demo 对齐，剩余 button root fontFamily 差异来自 demo 原生 button 默认 Arial，不作为强制改回项；Desktop/Web typecheck 通过；shared focused tests 2 文件 / 16 测试通过；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error（仅 CRLF warning）。
+- 2026-06-07：按设计 demo 重组 Chat 默认运行流：`TranscriptBlock` 新增 `agent_timeline` 与 `run_step_group`，`TranscriptView` 接入 `AgentTimeline` / `RunStepGroup`，Desktop fallback transcript 和 shared demo transcript 展示 `agent_timeline -> 深度思考 -> 已运行 3 条命令` 的运行结构；按用户反馈，`run_session` 元数据不再渲染为主聊天流里的大型总结卡，runtime context 改留在折叠步骤组、evidence 和 RightInspector 路径；5174 Web preview 复用 shared demo transcript，不显示 fake Desktop window chrome。验证：shared focused tests 2 文件 / 16 测试通过；Desktop typecheck 通过；Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error（仅 CRLF warning）；5173/5174/5176 Playwright responsive audit 均无 console/page error，5174 `hasWindowChrome=false`，390 下三端均 `scrollWidth=1180`；截图见 `docs/v4-design-parity-audit-2026-06-07.md`。
+- 2026-06-07：继续按用户反馈清理 Chat 主流里的非设计卡片：`TranscriptView` 过滤 visible transcript 中的 `run_session` block，不再导入/渲染 `RunSessionCard`；agent 文本气泡移除 `data-card-surface`，回到透明无边框、无圆角卡片的 inline 文本层级，避免出现“4 个子任务”“Orchestrator 工作流”式大白卡。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 文件 / 23 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error，仅 CRLF warning；`v4_subpage_compare.mjs` 最新复跑无 console error，但 Agents `已安装 Agent/市场` 首卡仍有 padding/background 残余 diff，需要后续继续对齐。
+- 2026-06-07：按用户要求补齐 inspector 可关闭窗口和 Codex-like 文件查看框架：`概览/浏览器/文件` tab 均可关闭，`+` 菜单可恢复关闭的 tab，并暴露文件、侧边聊天、浏览器、终端入口；`FilePreview` 支持源码、Markdown 预览、Diff 预览和“打开方式”菜单；修复 `+` 菜单层级，避免被 inspector panel 截获点击。当前外部打开只是 shared UI 框架，真实 VS Code/Terminal/文件夹打开需要 Desktop/Web platform adapter 后续接线。验证：shared focused test 覆盖关闭、恢复、Diff、Markdown 和打开方式；Desktop/Web typecheck 通过；5173/5174/5176 responsive audit 无 console/page error；5173/5174 inspector 点击 smoke 通过，5176 对照确认三个 close mark 存在。
+- 2026-06-07：Settings 本地开发页的数据模式设置从单行 segment 升级为可解释状态：`自动/Mock/正常` 统一写入 `agenthub.workbench.dataMode`，状态卡片明确 5173 Desktop 与 5174 Web 在当前模式下的数据来源；Desktop 侧 `useDesktopWorkbenchModel` 接受 typed data-mode override，保持与 shared storage 事件接线兼容。验证：shared focused tests 2 文件 / 15 测试通过；Desktop/Web typecheck 通过；5173/5174 设置页 data mode smoke 无 console/page error 和 overflow，Mock 状态截图写入 `app/desktop/.tmp/v4-settings-data-mode-desktop.png`、`app/web/.tmp/v4-settings-data-mode-web.png`；5176 对照无数据模式行，截图 `app/desktop/.tmp/v4-settings-data-mode-design.png`。
+- 2026-06-07：Transcript 卡片交互语言继续统一：所有 `data-selectable-card` 现在可键盘聚焦，Shift+F10/ContextMenu 打开同一套设计卡片菜单，选择模式下 Space/Enter 切换选中；`data-card-surface` 增加统一 focus-visible ring，和 context/selected/actioned 状态使用同一 primary-light 视觉层级。验证：shared workbench focused tests 1 文件 / 14 测试通过；Desktop/Web typecheck 通过；5173/5174 键盘卡片 smoke 无 console/page error 和 overflow，截图 `app/desktop/.tmp/v4-card-keyboard-desktop.png`、`app/web/.tmp/v4-card-keyboard-web.png`。
+- 2026-06-07：`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，4 个文件 / 9 个测试通过。
+- 2026-06-07：新增 `composer/platform/transcript/workbench` 模块 targeted TypeScript 编译通过。
+- 2026-06-07：`cd app/shared; corepack.cmd pnpm lint` 仍失败，但失败不在新增模块；当前阻塞是既有 Storybook 类型缺失、旧 components 测试引用缺失、部分旧 UI 测试 TS strict 问题和 SVG module declaration 缺失。
+- 2026-06-07：补齐 workbench 子组件、workspace tabs、inspector tabs 和 composer modes 后，focused tests 更新为 4 个文件 / 10 个测试通过；新增 workbench 子组件 targeted TypeScript 编译通过。
+- 2026-06-07：新增 `normalizeThreadItemsToTranscript`，把 Edge persisted thread items 投影到 shared `TranscriptBlock` 和 `EvidenceRef(kind="run")`；`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\normalizeThreadItems.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，5 个文件 / 12 个测试通过。
+- 2026-06-07：新增 `normalizeEdgeEventsToTranscript`，把 live Edge `run.started`、`run.output(.batch)`、`run.agent.text_*`、`run.agent.tool_*`、`run.agent.file_change`、`run.agent.permission_*`、`artifact.created`、`run.finished/failed/cancelled` 投影到 shared `TranscriptBlock` 和 `EvidenceRef`；`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\transcript\normalizeThreadItems.test.ts src\transcript\normalizeEdgeEvents.test.ts src\transcript\transcriptEvidence.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，6 个文件 / 14 个测试通过。
+- 2026-06-07：新增 `normalizeHubMessagesToTranscript`，把 Hub session messages 投影到 shared `TranscriptBlock`，避免 v4 Web 继续依赖旧 `ChatView` 消息转换；`cd app/shared; corepack.cmd pnpm exec vitest run src\transcript\normalizeHubMessages.test.ts src\transcript\normalizeEdgeEvents.test.ts src\transcript\normalizeThreadItems.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，4 个文件 / 15 个测试通过。
+- 2026-06-07：shared workbench submit 失败时保留草稿并退出 submitting 状态，防止 Desktop 无真实 Edge thread 时假提交；focused shared tests 更新为 6 个文件 / 15 个测试通过。
+- 2026-06-07：新增 `app/shared/src/inspector/inspectorEvidence.ts`，把 `EvidenceRef` 聚合为 run/tool/file/artifact inspector model；`collectTranscriptEvidence` 现在保留首次出现顺序但更新同一 evidence 的最新状态，避免 live run 状态卡在 pending/running；shared focused tests 更新为 7 个文件 / 19 个测试通过。
+- 2026-06-07：shared `UnifiedComposer` 增加 approval mode 和 workDir 控件，`ComposerIntent` 会携带 trim 后的 `workDir`；focused shared tests 仍为 7 个文件 / 19 个测试通过，并覆盖 platform intent 中的 `approvalMode/workDir`。
+- 2026-06-07：shared `UnifiedComposer` 增加浏览器文件附件入口、附件 chip、删除动作和文本预览上下文；新增 `composer/attachments.ts`，Desktop submit 会把附件上下文拼进 Edge `startRun.prompt`；focused shared tests 更新为 8 个文件 / 23 个测试通过。
+- 2026-06-07：shared `UnifiedComposer` 增加 @Agent 菜单、mention chip、删除动作和结构化 mention intent；新增 `composer/mentions.ts`，Desktop submit 会把 mention 名称、id、模型、runtime 拼进 Edge `startRun.prompt`；focused shared tests 更新为 9 个文件 / 26 个测试通过。
+- 2026-06-07：shared platform 新增 `attachments.pickFiles()` port；Desktop 通过 Tauri dialog 和既有 `read_file` command 选择本机文件并生成 desktop attachment preview，Web 继续回退浏览器 file input；focused shared tests 更新为 9 个文件 / 30 个测试通过。
+- 2026-06-07：shared platform 新增 `preview.openEvidence()` port，`RightInspector` 的 files/browser tabs 可点击 file/artifact evidence 并交给 platform adapter 打开；`EvidenceRef` 保留 `path/uri/mimeType` preview 元数据；focused shared tests 更新为 9 个文件 / 31 个测试通过。
+- 2026-06-07：shared `types/chat.ts` 升级为旧 `ChatView.types` 迁移兼容合同，新增 `ReplyTarget`、显式 `undefined` 兼容字段和 focused tests；Desktop/Web/shared 的旧 `ChatView.types` 类型 import 已迁到 shared。验证：shared 2 文件 / 13 测试通过；Desktop typecheck 通过；Web typecheck 通过；Web Diff/MessageTime focused tests 2 文件 / 4 测试通过；Desktop Diff/Search focused tests 2 文件 / 25 测试通过；v4 old UI active path boundary 17/17 通过。
+- 2026-06-07：shared `AgentHubWorkbench` 按 `agenthub-design/desktop` 的右侧概览交互补 inspector collapse、CSS 变量宽度和可访问 resize separator；Workspace header 增加 icon toggle，RightInspector 支持 ArrowLeft/ArrowRight 键盘调整宽度。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 个文件 / 9 个测试通过；shared `tsc --noEmit` 仍被既有 Storybook/旧 components 测试缺失阻断，错误不在本轮新增模块；Desktop/Web typecheck 和 App focused tests 通过；Desktop 1440x920 Playwright DOM/screenshot smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop-inspector.png` 大小 59767 bytes。
+- 2026-06-07：Desktop/Web `tokens.css` 和 `themes.css` 已完全同步到 v4 语义 token；shared `UnifiedComposer` 可见层已移除自造 toolbar、@Agent 按钮、权限/workDir 控件和附件 chip，只保留设计 demo 的 `.composer` / `.composer-row` / textarea / send button 首屏结构；这些能力仍保留在 composer reducer、intent 和 adapter 层，等待设计系统提供明确槽位后再可视化。
+- 2026-06-07：shared `WorkbenchRoutes` 接入 rail pages，非 chat 页面切换到 design workbench mode 并隐藏会话 sidebar、workspace header、composer 和 inspector；`TranscriptBlock` union 与 `TranscriptView` 接入 design detail blocks：`ThinkingBlock`、`SubagentBlock`、`ChildAgentBlock`、`RouteDecisionBlock`、`ContextUsageBlock`、`ResultBlock`，`run.agent.thinking/result` 和 subagent/child/route/context events 可归一化为对应 block；Desktop/Web fallback transcript 已使用同一套 v4 detail blocks。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx src\transcript\normalizeEdgeEvents.test.ts --reporter=dot`，2 个文件 / 11 个测试通过。
+- 2026-06-07：shared `designIcons.tsx` 接入 `agenthub-design/desktop/app.js` 的文件图标和 profile/nav action icon；overview/files inspector、Projects artifacts、account ProfilePopover actions/menu 已统一使用 design SVG、17px 文件图标尺寸和设计菜单结构。验证：shared workbench + Edge normalizer focused tests 2 文件 / 12 测试通过；Desktop/Web typecheck 通过；Desktop/Web/design 项目页 1440x920 smoke 均为 3 artifact rows / 3 file icons / 6 nav icons；Desktop/Web/design profile popover 均为 2 actions / 7 menu rows / 7 menu icons / 1 status icon；无 console/page error 和页面级 overflow。
+- 2026-06-07：shared `designIcons.tsx` 扩展到 design demo `navIcon()` 的完整首片集合，Projects/Agents 页面移除本地 placeholder SVG，transcript `DiffCard/FileChangeCard` 改用 `DesignFileIcon`；`ContextMenu` / `MultiSelectBar` 改成 design demo 的标题、分组、中文 aria、13 项菜单、图标、快捷键、chevron、danger、count/total 和退出结构，并在 `AgentHubWorkbench` 接入 transcript 右键菜单与多选模式。验证：shared focused tests 2 文件 / 13 测试通过；Desktop/Web typecheck 通过；5173/5174 Playwright smoke 右键菜单均为 13 项、244px 宽、12px 圆角、无 console/page error；多选条出现后 composer 隐藏，截图 `app/desktop/.tmp/v4-context-menu-desktop.png`、`app/web/.tmp/v4-context-menu-web.png`、`app/desktop/.tmp/v4-context-multiselect-desktop.png`、`app/web/.tmp/v4-context-multiselect-web.png`。
+- 2026-06-07：Contacts/Docs/Tasks/Settings 完成首轮 1:1 细节对齐，不只处理 icon：四页移除本地 SVG 并统一 `designIcons.tsx`；Docs focus ring 和 icon-action hover 回到 design demo；Contacts 默认外部联系人/服务台数据和 internal 快捷卡文案、Docs 6 行表格、Tasks 4 行任务与 `筛选 1` active 状态、Settings 示例配置均按 design demo 收齐。验证：shared focused tests 2 文件 / 13 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error；5173/5174 Playwright smoke 无 console/page error、无横向 overflow，截图 `app/desktop/.tmp/v4-detail-contacts.png`、`app/desktop/.tmp/v4-detail-docs.png`、`app/desktop/.tmp/v4-detail-tasks.png`、`app/desktop/.tmp/v4-detail-settings-states.png` 及 Web 同名 `.tmp` 文件。
+- 2026-06-07：GlobalRail 与 Projects/Agents 进入“非图标”细节对齐首轮：GlobalRail 不再保留本地 SVG，`designIcons.tsx` 补齐 `desktop/index.html` 静态 rail 专用图标；Agents 配置页固定使用 design demo 的 4 个 Agent 样例，恢复 `DeepSeek-V4-Pro` 默认模型、7 个需确认工具权限、`可运行=2` 统计、demo 文案、Skills 标题结构、market/policy/models/audit 样例；Projects 状态点色值按 design demo 的 `success/warning` 语义回收。验证：shared focused tests 2 文件 / 13 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；5173/5174/5176 Playwright Agents/Projects smoke 无 console/page error、无横向 overflow，Desktop/Web/Design 均为 Agents 4 rows / Projects 2 rows / artifacts 3 / runs 3 / 卡片半径 16px / outline 半径 12px，截图 `app/desktop/.tmp/v4-detail-agents-desktop.png`、`app/web/.tmp/v4-detail-agents-web.png`、`app/desktop/.tmp/v4-detail-projects-desktop.png`、`app/web/.tmp/v4-detail-projects-web.png`。
+- 2026-06-07：RightInspector 预览模式按 design demo 收口：`新建右侧窗口` 打开 browser preview，关闭预览回到概览，browser preview 不再被 artifact URL 默认覆盖；Desktop/Web 根高度补齐 `height:100%` 和 body overflow 边界，Web 5174 不再出现 1349px 文档级纵向溢出且仍不显示 fake desktop chrome。验证：shared focused tests 2 文件 / 16 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 仅 CRLF warning；5173/5174/5176 inspector preview smoke 均无 console/page error、无横向/纵向 overflow，截图 `app/desktop/.tmp/v4-inspector-preview-desktop.png`、`app/web/.tmp/v4-inspector-preview-web.png`、`app/desktop/.tmp/v4-inspector-preview-design.png`。
+- 2026-06-07：Chat transcript 默认 B0 流程继续按 `agenthub-design/desktop` 补完整后半段：shared demo transcript 现在展示定位完成、Reviewer subagent、route/context、生成迁移草案、`已编辑 2 个文件` 展开组、created/modified file rows、Review 按钮、SQL diff、Write File approval、验证历史消息折叠组、Browser QA 和最终 result；`ArtifactTranscriptBlock` 增加 `action/additions/deletions` 可选字段，`TranscriptView` 在 run-step 内按 design file-change card 渲染统计和 Review 按钮。验证：shared focused tests 2 文件 / 16 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 仅 CRLF warning；5173/5174/5176 transcript flow smoke 均为 4 个 run-step、深度思考展开、编辑组展开、验证组折叠、含 created/modified/Review/approval/Browser QA/result，无 console/page error 和 overflow，截图 `app/desktop/.tmp/v4-transcript-flow-desktop.png`、`app/web/.tmp/v4-transcript-flow-web.png`、`app/desktop/.tmp/v4-transcript-flow-design.png`。
+- 2026-06-07：Chat/Inspector 微样式继续按 design 源码和 computed style 收敛：Approval mini card 标题风险徽标去掉非设计 dot，ResultBlock 清理已废弃 duration/turns meta CSS，RightInspector overview 文件图标 svg 对齐为 17px、0 圆角、`--text-3` 弱化色。验证：shared focused tests 4 文件 / 20 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 仅 CRLF warning；5173/5174/5176 transcript flow smoke 无 console/page error 和 overflow。
+- 2026-06-07：保留 RightInspector `+` quick-open 菜单作为当前产品增量，同时更新 inspector preview smoke 以匹配 Desktop/Web 的菜单流程；design demo 仍按原型直接打开 browser preview。验证：`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_inspector_preview_smoke.mjs` 通过；5173、5174、5176 均打开 `http://127.0.0.1:5176/desktop/`，无 console/page error、无 horizontal/vertical overflow；截图 `app/desktop/.tmp/v4-inspector-preview-desktop.png`、`app/web/.tmp/v4-inspector-preview-web.png`、`app/desktop/.tmp/v4-inspector-preview-design.png`。
+- 2026-06-07：继续细化 FilePreview/Inspector 增量交互的设计系统一致性：`打开方式` 菜单保留图标列但不再把图标字符写进 menuitem 文本，避免 `GitGit Bash`、`⌂打开所在文件夹` 这类 DOM/可访问文本污染；菜单仍使用 v4 12px 圆角、token 背景和同一列宽。验证：`v4_inspector_interaction_smoke.mjs` 通过，5173/5174 菜单项文本为 `VS Code / Visual Studio / Cursor / Antigravity / Default app / Terminal / Git Bash / WSL / Android Studio / 打开所在文件夹`，无 console/page error；shared focused tests 2 文件 / 17 测试通过；`v4_style_compare.mjs` 无 computed-style delta；`v4_card_mode_audit.mjs` 三端卡片宽 628px、菜单圆角 12px。
+- 2026-06-07：建立 Desktop 5173 对 design demo 5176 的二级页面深度对比基线：`app/desktop/.tmp/v4_subpage_compare.mjs` 覆盖 Contacts、Docs、Agents、Tasks、Projects、Settings 共 26 个 pane，输出截图、full JSON 和 summary JSON；修复 shared demo runtime store 的 cached snapshot，避免 `useSyncExternalStore` 无限重渲染；Settings 行背景和标题 display 按 `.settings-row` 源码补齐。验证：`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_subpage_compare.mjs`，`compared=26`、`withDiffs=[]`、`withConsoleErrors=[]`；Desktop/Web typecheck 通过；shared focused tests 2 文件 / 16 测试通过；旧 UI active path 44/44 通过；`git diff --check` 通过，仅 CRLF 提示；结果文件为 `app/desktop/.tmp/v4-subpage-compare-{full,summary}.json`。
+- 2026-06-07：Settings 数据模式增量按 design demo 的 badge/spacing 语言继续收口：保留 5173/5174 的 `自动/Mock/正常` 数据模式功能，但状态头不加入原型外可见分隔符，右侧模式值使用 `--r-full` 胶囊、`--primary-light` 背景和稳定 23px 高度；5176 design demo 仍作为无数据模式行的对照基线。验证：`v4_settings_data_mode_smoke.mjs` 三端 failures 为空，5173/5174 badge 高度 23px、状态卡圆角 12px、无 overflow；`v4_style_compare.mjs` 无 computed-style delta；Desktop/Web typecheck 通过。
+- 2026-06-07：Projects 不再只渲染 overview；`运行/产物/归档/设置` 页签已补成真实项目内容，继续复用 design demo 的 `project-detail-layout`、`project-detail-panel`、`project-run`、`project-artifact`、`feed-row` 和 design file/nav icon 语言。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx src\transcript\normalizeEdgeEvents.test.ts --reporter=dot`，2 文件 / 20 测试通过；Desktop/Web typecheck 通过；`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_project_tabs_smoke.mjs`，5173/5174 的 `概览/运行/产物/归档/设置` 均有具体内容且 failures 为空。
+- 2026-06-07：Projects 子页排版继续向 design 系统收敛：移除 project detail 外层卡片的额外 hover 边框/背景/transform，保留 design demo 的行级 hover；Settings 项目设置改为 38px 单行 project-row 密度，公告无动作时不显示“编辑”，成员策略进入右侧 project detail panel；`v4_project_tabs_smoke.mjs` 已升级为内容 + 排版指标检查。验证：5173/5174 五个 Projects 页签 failures 为空，run/artifact/setting row 高度均为 38px、panel 圆角 16px、feed 第一行 border-top 为 0，Desktop/Web typecheck 通过，shared focused tests 2 文件 / 21 测试通过。
+- 2026-06-07：Contacts 页头像交互按 `agenthub-design/desktop` 的 `data-profile` 触发器收口：组织内联系人、群组和服务台卡片头像均可点击/键盘打开 `ProfilePopover`，头像使用 `role=button`、`aria-haspopup=dialog`、`aria-expanded`，点击头像不再冒泡触发行按钮，行点击语义保留。验证：shared focused tests 2 文件 / 19 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`git diff --check` 仅 CRLF warning；`cd app/desktop; corepack.cmd pnpm exec node .\.tmp\v4_contacts_profile_smoke.mjs` 通过，5173/5174 的 `Delicious233`、`AgentHub 设计评审`、`账号与权限` 资料卡均可见且无 console/page error，截图 `app/desktop/.tmp/v4-contacts-profile-desktop.png`、`app/desktop/.tmp/v4-contacts-profile-web.png`。
+- 2026-06-07：账号资料卡和 Agent 头像交互按 `agenthub-design/desktop` 纠偏：GlobalRail 账号菜单保持 design 源码的 404px、默认个性签名、7 个菜单项、2 个分隔线和 3 个空间行；Chat transcript 的 Agent 头像、Agent 配置页列表头像和详情头像均可点击/键盘打开 Agent 资料卡，资料卡提供“发送消息”和“Agent 配置”，后者会切到 Agent 页面并选中对应 Agent。验证：shared focused tests 2 文件 / 22 测试通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`v4_profile_popover_compare.mjs` 无 profile popover delta；`v4_style_compare.mjs` 无 computed-style delta；`git diff --check` 仅 CRLF warning。
+- 2026-06-07：Transcript 文件变更行的 `Review` 动作已接入右侧 inspector：点击 `migrations/0007_chat_threads.sql` 会展开右侧栏、切到 `文件` tab，并打开对应只读源码/Diff 详情；demo 的 overview 任务、文件清单、文件内容和 diff 已从 `RightInspector.tsx` 抽到结构化 `workbenchDemoData`，不再把聊天相关文件内容写死在展示组件里。验证：shared `AgentHubWorkbench.test.tsx` 17/17 通过；Desktop/Web typecheck 通过；旧 UI active path 44/44 通过；`app/desktop/.tmp/verify_review_opens_inspector.mjs` 确认 5173/5174 均 `selected=true`、`hasSqlPreview=true`、无 console error，截图 `app/desktop/.tmp/v4-review-opens-inspector-desktop.png`、`app/desktop/.tmp/v4-review-opens-inspector-web.png`。
+- 2026-06-07：Settings 状态组件页按 `agenthub-design/desktop` 的 `.settings-state-system/.state-panel` 结构和静态 hover 语言收口，移除设置行、状态卡、segment/path button 上不在原型里的位移/阴影反馈，并保留 `state-panel empty/invalid/missing` 同名 class 便于后续 computed-style 对比。验证：`node app\desktop\.tmp\v4_settings_states_smoke.mjs` 覆盖 5173/5174/5176，三端 row/panel/grid 指标一致、无 overflow、无 console/page error，截图 `v4-settings-states-{desktop,web,design}.png`。
+- 2026-06-07：从 design demo 迁移 transcript 长按多选交互到 shared Workbench：520ms 长按进入选择模式，Esc/Ctrl+A/Ctrl+C/Delete 快捷键可用，二次选择走 pointerup 以避免内部元素吞 click；`MultiSelectBar` 继续复用 shared floating 组件，Desktop/Web 共用。验证：shared `AgentHubWorkbench.test.tsx` 18/18 通过；`node app\desktop\.tmp\v4_long_press_multiselect_smoke.mjs` 确认 5173/5174 均 `selectedCount=2`、Composer 隐藏、无 console/page error，截图 `v4-long-press-multiselect-{desktop,web}.png`。
+- 2026-06-07：用户连续短时间发送多条 text 消息时，后续气泡隐藏重复头像但保留 28px 占位，保持右侧气泡边缘对齐；默认分组窗口为 5 分钟，缺失时间戳时按相邻连续 human 消息分组。验证：shared `AgentHubWorkbench.test.tsx` 新增头像分组断言并 18/18 通过，Desktop/Web typecheck 通过。
+- 2026-06-07：左侧最近频道栏进入 shared Workbench resize/collapse 基线：Chat 页使用 `--sidebar-w`，默认 260px、键盘/拖拽范围 180-360px，点击当前高亮 GlobalRail `对话` 图标折叠/展开；拖拽越过 96px 吸附阈值后自动折叠，非 Chat 页面不显示最近频道栏。右侧 inspector 同步修复拖拽到最小时残留窄栏问题，越过 96px 阈值时在 pointermove 阶段立即结束 resize 并进入 collapsed，不再等待 pointerup。验证：shared focused tests 2 文件 / 28 测试通过；Desktop/Web typecheck 通过；5173/5174 Playwright 证据保存到 `app/.tmp/v4-sidebar-resize-pass/` 和 `app/.tmp/v4-inspector-immediate-collapse-pass/`。
+- 2026-06-07：主题切换统一到 shared `applyAgentHubTheme()` 通道，`AgentHubWorkbench`、Desktop `ThemeContext`、Web `ThemeContext` 不再各自裸写 `html[data-theme]`；Desktop/Web `themes.css` 新增 `data-theme-sync=true` 两帧同步期，禁用 transition/animation 后一次性提交 `--app-bg/--surface/--text-*` token，解决深浅切换时局部先后变色。验证：shared focused tests 2 文件 / 31 测试通过；Desktop/Web typecheck 通过；5173/5174 Playwright immediate 阶段均为 `data-theme=dark`、`data-theme-sync=true`、shell `transition-property=none`，180ms 后同步标记移除；证据保存到 `app/.tmp/v4-theme-sync-pass/`。
+- 2026-06-07：新增前端负责人进度总览 `docs/v4-frontend-progress-2026-06-07.md`，汇总 5173/5174/5176 对齐状态、左右侧栏动效、主题同步、资料卡/多选交互、验证证据和下一步建议；详细逐项审计继续保留在 `docs/v4-design-parity-audit-2026-06-07.md`。
+
+## P2: Desktop v4 接入
+
+目标：Desktop 只保留平台能力、Local Edge 和 Tauri shell；主 UI 由 shared workbench 驱动。
+
+- [x] 建立 `app/desktop/src/platform/desktopPlatform.ts` 首片 adapter，声明 Local Edge、本机文件和浏览器预览能力；当前 fallback transcript 只在没有 Edge thread 数据时使用。
+- [x] 用 `AgentHubWorkbench` 替换旧 `App.tsx` 主 shell，旧 Desktop 巨石 UI 不再控制 active route。
+- [ ] 迁移真实 Edge event/message/run 数据到 shared transcript contract；首片已接 Edge persisted thread list、thread item normalize 和 live WebSocket run/tool/file/approval/artifact event normalize。
+- [ ] 迁移右侧 inspector 的真实 run、tool、changed file、artifact 数据；首片已通过 shared `EvidenceRef` 聚合 live run/tool/file/artifact evidence，并在 overview/files/browser tab 展示聚合后的运行、工具、文件、产物与平台 preview 状态；files/browser evidence 已可通过 Desktop platform preview port 打开。
+- [ ] 替换旧 composer，保留 Enter/Shift+Enter、附件、workdir、approval mode、@Agent 和 pending/error 体验；首片已把 v4 composer submit 接到当前 Edge thread 的 `startRun`，并把 approval mode、workDir、@Agent、浏览器文件附件和 Desktop 原生文件附件上下文传入 Edge run request。
+- [ ] 删除旧 Desktop 主路径，旧组件只允许在迁移 commit 中短期存在，最终不得作为 active route。
+
+验证记录：
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm exec vitest run --config vitest.desktop-tsx-ci.config.ts src\__tests__\App.v4.test.tsx --reporter=dot`，1 个文件 / 1 个测试通过，确认 Desktop 根入口渲染 shared v4 workbench、`data-surface="desktop"` 和 Desktop browser preview capability。
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm typecheck` 通过。
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm build` 通过。
+- 2026-06-07：Desktop 1440x920 临时 Playwright visual smoke 通过，截图写入 `.tmp/visual-smoke-desktop.png`；同时修复 shared sidebar 标题/副标题 grid 自动放置导致的文本粘连。
+- 2026-06-07：Desktop `App` 新增 `useDesktopWorkbenchModel`，通过 `useThreads` / `useThreadMessages` 读取真实 Edge thread 列表和 persisted thread items，投影到 shared workbench；fallback 只在无 Edge thread 数据时使用。
+- 2026-06-07：Desktop 1440x920 Playwright visual smoke 复测通过，并确认 long thread list 在 sidebar 内部滚动、document 高度锁定到 viewport。
+- 2026-06-07：`sonnet` 代码审查 subagent 对当前 diff 返回 `NO_FINDINGS`。
+- 2026-06-07：`claude -p` 最小 smoke 通过：`sonnet` alias 可返回 `CLAUDE_PRINT_OK` / `SONNET_PROBE_OK`；JSON `modelUsage` 显示 `claude-sonnet-4-6`、`contextWindow=200000`，本次输出未直接暴露 GLM-5.1 provider 名称，因此只作为 CLI/alias/window 可用证据，不作为 provider 解析证据。
+- 2026-06-07：新增 `useDesktopEdgeEvents`，Desktop root 通过 `createEventStream` 订阅当前 thread live Edge events，并合并 persisted transcript 与 live transcript；`cd app/desktop; corepack.cmd pnpm exec vitest run --config vitest.desktop-tsx-ci.config.ts src\__tests__\App.v4.test.tsx --reporter=dot`，1 个文件 / 3 个测试通过。
+- 2026-06-07：`cd app/desktop; corepack.cmd pnpm typecheck` 通过；`cd app/desktop; corepack.cmd pnpm build` 通过；`cd app/desktop; node .\.tmp\visual_smoke_desktop.mjs http://127.0.0.1:5173` 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 51480 bytes。
+- 2026-06-07：Desktop `App` 通过 `useCreateRun().mutateAsync` 注入 v4 platform，`submitComposerIntent` 会向当前 Edge `projectId/threadId` 提交 `startRun({ prompt })`，并且没有真实 Edge thread 时不再本地假提交；Desktop App v4 focused tests 更新为 1 个文件 / 4 个测试通过。
+- 2026-06-07：shared `RightInspector` 不再只显示占位 evidence list，已按 design desktop 的 overview/browser/files 模式展示 run/tool/artifact summary、changed files list/empty state 和 browser preview capability；Desktop 1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 53898 bytes，DOM 检查确认 inspector tabs 可切换、无横向/文档级纵向 overflow、浏览器 tab 无 console/page error。
+- 2026-06-07：Desktop v4 composer 的 `approvalMode=workspace-write` 映射为 Edge `permissionMode=acceptEdits`，`workDir` 原样传入 `startRun`；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 57029 bytes，DOM 检查确认权限/目标目录控件可操作且无页面级 overflow。
+- 2026-06-07：Desktop v4 composer 的浏览器文件附件会读取文本预览并拼接为 prompt 附件上下文，继续通过真实 Edge `startRun(prompt)` 发送；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 57703 bytes，DOM 检查确认附件 chip 可添加/删除且无页面级 overflow。
+- 2026-06-07：Desktop v4 composer 的 @Agent 结构化 mention 会随 prompt 上下文发送到真实 Edge `startRun(prompt)`；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 58526 bytes，DOM 检查确认 @Agent 菜单可添加/删除 chip 且无页面级 overflow。
+- 2026-06-07：Desktop v4 composer 接入原生文件选择，`desktopPlatform` 暴露 `attachments.pickFiles()` 并复用 Tauri dialog/read_file 生成 desktop attachment；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，Desktop/Web typecheck/build 通过，1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 58526 bytes，DOM 检查确认“添加本机附件”可见且无页面级 overflow。
+- 2026-06-07：Desktop `desktopPlatform` 暴露 `preview.openEvidence()`，通过 Tauri shell open 打开 shared inspector 传入的 file/artifact evidence target；Desktop App focused tests 仍为 1 个文件 / 4 个测试通过，Desktop/Web typecheck/build 通过，Desktop 1440x920 Playwright visual smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png` 大小 58526 bytes，DOM 检查确认 files/browser tabs 可切换、空态/列表状态稳定且无页面级 overflow。
+- 2026-06-07：shared inspector collapse/resize 接入 Desktop v4 壳子：header icon 可收起/展开右侧概览，resizer 支持 ArrowLeft/ArrowRight 调整宽度；Desktop 1440x920 Playwright DOM/screenshot smoke 通过，确认 resize 后 `aria-valuenow=416`、折叠/展开状态正确、无页面级横向或纵向 overflow，截图 `app/desktop/.tmp/visual-smoke-desktop-inspector.png` 大小 59767 bytes。
+
+## P3: Web v4 接入
+
+目标：Web 使用同一套工作台，只替换 platform adapter 和数据来源。
+
+- [ ] 建立 `app/web/src/platform/webPlatform.ts`，首片已提供 static Web adapter 和 `preview.openEvidence()` 浏览器打开 port，并补齐 Web Vite/Vitest 的 `lucide-react` alias 以支持 shared workbench 图标双端解析；v4 workbench 的 @Agent 列表已接 Hub `GET /web/agent-profiles`，conversations/transcript 已在 Hub session 下接 `/client/sessions` 和 `/client/sessions/{id}/messages`，未登录时才使用 preview fallback；Hub WS 已接入 sessions/messages query invalidation，Hub `agent.stream` runtime events 已直接追加到 shared transcript，composer submit 已改为 Hub `sendMessage` + 选择 @Agent 时触发 `/web/agent-tasks`，并在 sendMessage in-flight 时写入 optimistic message cache；@Agent submit 已先创建并缓存 Hub session `AgentInstance`，再用 exact `agent_instance_id` 触发任务，避免把 Agent Profile id 或 runtime id 冒充为 instance id。下一步进入旧 UI active path 清理门禁。
+- [ ] 用 `AgentHubWorkbench` 替换 Web 旧 `ChatView`、`PromptInput`、`ThreadPanel`、`RunDetail`；首片已让 Web App 根入口渲染 shared workbench。
+- [x] Web transcript 与 Desktop transcript 使用同一 block renderer。
+- [x] Web inspector 与 Desktop inspector 使用同一组件，差异只来自 adapter capability。
+- [ ] Web build/typecheck 和核心 UI tests 进入验收门禁；首片证据：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx --reporter=dot`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 均通过；Playwright visual smoke 通过并生成 `.tmp/visual-smoke-web.png`。
+- 2026-06-07：Web `App` 在 `QueryClientProvider` 内通过 `useAgentList(true)` 读取 Hub Agent Profiles，并把 Hub `AgentInfo` 映射为 shared `WorkbenchAgent` 供 v4 composer @Agent 菜单使用；未登录或 Hub 无 profile 数据时保留 preview fallback；同时恢复 `app/web/src/api/edgeClient.ts` Hub-only/stubbed 兼容面，保证浏览器端不重新引入 Local Edge；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 7 个测试通过，`corepack.cmd pnpm typecheck` 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
+- 2026-06-07：新增 `useWebWorkbenchModel()`，Web v4 workbench 在 Hub 登录态读取 Hub sessions/messages，并把 session 映射为 shared conversation、message 映射为 shared transcript；登录但暂无会话时显示明确 Hub 空态，未登录才使用 preview fallback；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 9 个测试通过，Web typecheck/build 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
+- 2026-06-07：新增 `webHubRealtime`，Web v4 在 Hub 登录态连接 `/client/ws`，对 `message.*`、`session.*` 和 `agent.*` 事件执行 `web-v4` sessions/messages query invalidation；`createWebPlatform().runs.submitComposerIntent` 不再本地假提交，改为向 Hub session 发送 message，选择 @Agent 时再以 mention runtime 触发 `/web/agent-tasks` 并把 v4 mode/approval/workDir/attachments 写入 `model_params`；没有 runtimeId 的 @Agent 会在发 Hub 消息前失败并保留草稿。验证：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\platform\webHubRealtime.test.ts src\api\agentQueries.test.ts src\api\hubClient.test.ts --reporter=dot`，5 个文件 / 22 个测试通过；`corepack.cmd pnpm typecheck` 通过；`corepack.cmd pnpm build` 通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/web-v4-hub-realtime-submit-smoke.png` 大小 49494 bytes，DOM 检查确认 shared v4 workspace/composer/inspector 存在、旧 shell 文案不存在且无横向 overflow。
+- 2026-06-07：新增 shared `normalizeHubRuntimeEventsToTranscript()`，把 Hub WS `agent.stream` payload 的 `event_type/payload/edge_run_id/session_id` 投影到 shared `TranscriptBlock` 和 run/tool/file/artifact evidence；`useWebWorkbenchModel()` 会把当前 Hub session 的 live runtime blocks 追加到 Hub message transcript，并按 event id 去重。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\platform\createMockPlatform.test.ts src\inspector\inspectorEvidence.test.ts src\transcript\normalizeThreadItems.test.ts src\transcript\normalizeEdgeEvents.test.ts src\transcript\normalizeHubMessages.test.ts src\transcript\normalizeHubRuntimeEvents.test.ts src\transcript\transcriptEvidence.test.ts src\composer\attachments.test.ts src\composer\mentions.test.ts src\composer\composerReducer.test.ts src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，11 个文件 / 36 个测试通过；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\platform\webHubRealtime.test.ts src\platform\useWebWorkbenchModel.test.ts src\api\agentQueries.test.ts src\api\hubClient.test.ts --reporter=dot`，6 个文件 / 27 个测试通过；Web build 通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/web-v4-hub-runtime-smoke.png` 大小 49507 bytes。
+- 2026-06-07：`createWebPlatform().runs.submitComposerIntent` 在调用 Hub `sendMessage` 前会把当前 composer intent 写入 `['web-v4','hub-messages', sessionId]` optimistic cache；Hub send 成功后用 `message_id/seq_id/created_at` 确认并保留 `client_msg_id` 稳定 transcript id，send 失败时回滚，task dispatch 在 message 已发送后失败时保留已确认消息。验证：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\platform\webHubRealtime.test.ts src\platform\useWebWorkbenchModel.test.ts src\api\agentQueries.test.ts src\api\hubClient.test.ts --reporter=dot`，6 个文件 / 30 个测试通过；Web typecheck/build 通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/web-v4-optimistic-message-smoke.png` 大小 49489 bytes。
+- 2026-06-07：Hub `POST /client/sessions/{id}/agents` 已返回创建后的 `AgentInstance`，OpenAPI 同步 `AgentInstance` 响应；Web v4 @Agent submit 会先按 profile/runtime 在 query cache 中确保 session agent instance，再用 exact `agent_instance_id` 调用 `/web/agent-tasks`，不再用 `agent_type` 近似触发。验证：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\platform\webHubRealtime.test.ts src\platform\useWebWorkbenchModel.test.ts src\api\agentQueries.test.ts src\api\hubClient.test.ts --reporter=dot`，6 个文件 / 32 个测试通过；`cd app/web; corepack.cmd pnpm typecheck` 通过；`cd app/web; corepack.cmd pnpm build` 通过；`cd hub-server; go test ./internal/handler ./internal/service -run "TestAgentHandler_AddAgentToSession|TestAddAgentToSessionReturnsCreatedInstance" -count=1` 通过；`python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"` 通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/visual-smoke-web.png`。
+
+## P4: Tauri Host API 重构
+
+目标：把 Desktop host 能力从巨石 command 文件拆成可测试、可审计的能力模块。
+
+生产对接总计划见 [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md)。本节只跟踪 Tauri host 拆分本身。
+
+- [ ] `src-tauri/src/host/edge.rs`：Edge start/stop/status/auth token。
+- [ ] `src-tauri/src/host/fs.rs`：文件树、读写、复制、重命名、删除、路径 allowlist。
+- [ ] `src-tauri/src/host/dialog.rs`：选择文件/目录、保存路径。
+- [ ] `src-tauri/src/host/auth.rs`：TokenDance ID loopback、session/keyring。
+- [ ] `src-tauri/src/host/window.rs`：窗口、托盘、通知、外链打开。
+- [ ] `src-tauri/src/commands.rs` 只保留 command 注册和向后兼容 shim，最终再删除 shim。
+- [ ] 为 path validation、allowlist、危险操作、Edge lifecycle 写 Rust 单测或集成测试。
+
+## P5: 清理与发布门禁
+
+- [x] 删除旧 UI 主入口和重复组件。
+- [ ] 删除旧 active docs 入口，不再要求读不存在或已归档的状态文件。
+- [ ] 先迁移旧 `ChatView.types` 类型依赖到 shared `ChatMessage/FileDiff` 兼容合同，再删除旧组件本体；禁止用保留旧 `ChatView` 作为 fallback 来解决类型引用。
+- [ ] 更新 `docs/governance/branch-governance.md` 的远端分支事实。
+- [x] 更新 README 的项目结构和文档导航。
+- [ ] 建立截图矩阵：Desktop 1440x920、1280x800、390x844；Web 1440x920、1280x800、390x844。
+- [x] 建立旧路径扫描命令并写入计划验收：`ChatView`、`PromptInput`、`IMBlockRenderer`、`RunDetail`、`ThreadPanel`、旧 `viewRegistry`、旧 hooks。
+
+验证记录：
+- 2026-06-07：删除 Desktop/Web 旧 registry 和旧 `MainView/IMView` active route；删除 Desktop 旧 `RunDetail`、`RightInspector`、`PermissionDialog` 与对应旧 tests；删除 Web 孤儿 `PermissionDialog`；新增 `scripts/verify-v4-old-ui-active-paths.ps1`，验证 active Desktop/Web source 不再 import 旧 `ChatView`、`PromptInput`、`RunDetail`、`ThreadPanel`、`IMBlockRenderer`、`useChatMessages`、`useIMChat` 或旧 `viewRegistry`。验证：Desktop typecheck/build 通过；Web focused tests 6 个文件 / 32 个测试通过；Web typecheck/build 通过；Desktop App v4 focused tests 1 个文件 / 4 个测试通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；`.\scripts\verify-v4-old-ui-active-paths.ps1` 16/16 通过；Desktop 1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png`；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/visual-smoke-web.png`。
+- 2026-06-07：只读 `opus` 子代理盘点剩余旧 UI 债务，结论是下一批先做 shared `ChatMessage/FileDiff` 类型合同迁移和旧 `ChatView.types` import 迁移，再删除旧 Chat/Prompt/Thread/IM hook 本体；该输出用于架构拆分，不作为测试证据。
+- 2026-06-07：旧 `ChatView.types` 类型 import 已迁到 shared `types/chat.ts`，旧 UI active path 边界脚本新增旧类型 import 检查并通过 17/17；下一步进入旧组件/旧测试删除。
+- 2026-06-07：删除旧 Desktop `ChatView/PromptInput/ThreadPanel/useChatMessages/useIMChat/IMBlockRenderer/IMMessageView` 及对应旧测试/CSS；删除旧 Web `ChatView/PromptInput/ThreadPanel/RunDetail/ReplyPreviewBar/useIMChat/IMMessageView` 及对应旧测试/CSS；IM index 不再导出旧 message view/renderer；Desktop E2E 旧 PromptInput/ThreadPanel 断言改为 v4 composer/sidebar 语义。验证：Desktop typecheck 通过；Web typecheck 通过；Desktop App v4 focused tests 1 文件 / 4 测试通过；Web App focused tests 1 文件 / 3 测试通过；`.\scripts\verify-v4-old-ui-active-paths.ps1` 44/44 通过；`git diff --check` 通过。
+- 2026-06-07：Web `hubAdapters` 内部 runtime 投影从旧 `RunDetailProjection/RunDetailToolCall/projectRunDetail/projectRunEvents` 改名为 `RunEvidenceProjection/RunEvidenceToolCall/projectRunEvidence/projectRunEventEvidence`，只改内部命名不改输出结构，避免旧 `RunDetail` 组件删除后继续把数据层写成旧 UI 口径。验证：`cd app/web; corepack.cmd pnpm exec vitest run src\utils\hubAdapters.test.ts --reporter=dot`，1 文件 / 10 测试通过。
+- 2026-06-07：修复 transcript 头像资料卡分流：`Johnny` 这类真人好友不再走 Agent 配置查找失败 toast，而是从联系人数据打开真人资料卡，资料卡只显示 `发送消息/复制链接`，不显示 `Agent 配置`。验证：`cd app/shared; corepack.cmd pnpm exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot`，1 文件 / 20 测试通过；Desktop/Web typecheck 通过；5173/5174 Playwright 点击 Johnny 会话头像均弹出 `Johnny 资料卡`，无 `未找到 Johnny 的 Agent 配置`，截图为 `app/desktop/.tmp/v4-human-profile-johnny-desktop.png` 和 `app/desktop/.tmp/v4-human-profile-johnny-web.png`；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error（仅 CRLF warning）。
+- 2026-06-07：补齐资料卡 `发送消息` 与 inline diff 交互语义：Agent/真人资料卡的 `发送消息` 会切回对应私聊并聚焦 composer，避免“看起来没有跳转”；transcript file-change 行把 inline diff 展开与右侧 Review 分工拆开，`Review` 只打开右侧文件预览，`展开/收起` 控制消息流内 diff，SQL diff 默认折叠并按文件路径配对到对应 `Created migrations/0007_chat_threads.sql` 行。验证：shared `AgentHubWorkbench.test.tsx` 25/25 通过；Desktop/Web typecheck 通过；5173/5174 Playwright smoke 确认资料卡发送后 Builder 会话 active 且 composer 聚焦，inline diff 初始不可见、点击 `展开` 后显示、点击 `收起` 后隐藏、`Review` 打开 `文件` tab；截图 `app/desktop/.tmp/v4-agent-send-message-focus-{desktop,web}.png`、`app/desktop/.tmp/v4-inline-diff-{closed,open}-{desktop,web}.png`；旧 UI active path 44/44 通过；`git diff --check` 无 whitespace error（仅 CRLF warning）。
+
+## 暂不做
+
+- 不在文档分支实现大规模代码改造。
+- 不修改 `agenthub-design`。
+- 不把旧 Desktop UI 当成长期 fallback。
+- 不为了快速截图复制一套 Web UI。
+- 不做 Mobile v4 重构。Mobile 后续只消费 shared workbench 的稳定子集，当前不作为重构阻塞项。
+
+## 已完成基线
+
+- Edge/Hub/Adapter 核心运行链路已经具备可用基础。
+- `app/shared/src/ui/` 已有 Button、Modal、MessageBubble、ToolTimeline、DiffReviewPanel、ArtifactCard、DeployCard 等基础组件和测试/故事素材。
+- Desktop/Web 已经通过 `@shared` 共享一部分类型、API 和 UI，但主工作台仍是分叉实现。
+- 当前最大工程风险是旧 UI 组件和 hooks 继续扩写，导致 Desktop/Web 共享 UI 迁移失败。

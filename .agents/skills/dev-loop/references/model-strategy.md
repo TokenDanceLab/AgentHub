@@ -1,73 +1,61 @@
 # 模型选择决策树
 
-最后更新：2026-05-23
+最后更新：2026-06-05
 
-## 可用模型
+## 可用 subagent 入口
 
-| 别名 | 实际后端 | 上下文 | 优势 | 限制 |
-|---|---|---|---|---|
-| **opus** | deepseek-v4-pro | 1M | 深度推理、架构设计、安全审查、复杂重构 | 慢、贵 |
-| **sonnet** | deepseek-v4-flash | 1M | 快速并行执行、批量操作、格式统一 | 编码能力不如 haiku |
-| **haiku** | glm-5.1 | **200k** | 简短复杂逻辑、业务编码、算法 | **上下文小**、不稳定 |
+| 入口 | 别名/模型 | 上下文 | 优势 | 限制 |
+|---|---|---:|---|---|
+| Codex 自带 agent 工具 | GPT-5.5 low/mid | 256k | 前端、看图、UI/视觉判断、常规实现和审查 | 不吃超大仓库研究 |
+| Codex 自带 agent 工具 | GPT-5.5 xhigh | 256k | 最强架构推理和复杂工程设计 | 上下文仍不适合超大仓库全文阅读 |
+| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文，适合找东西、长文本整理、架构整理和复杂方案审查 | 代码实现不作为首选 |
+| Claude CLI | **sonnet** = GLM-5.1 | 200k | 强代码和 agentic 能力，适合聚焦实现 | 不要给大批量阅读 |
+| Claude CLI | **haiku** = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈，适合快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 | 不作为代码主力 |
 
-## Haiku 定位
+## 选择原则
 
-haiku 专精于**短上下文内的复杂逻辑**——单个函数的精巧算法、棘手的业务规则、深度 bug 分析。不适合大批量文件操作或需要加载大量参考文档的任务。
-
-**能用 haiku 的：**
-- 单个函数/模块的复杂算法实现
-- 聚焦的 bug 修复（错误 + 相关代码 < 200k）
-- 业务逻辑审查（单个文件或小范围）
-- 代码片段优化
-
-**不能用 haiku 的：**
-- 跨文件重构（上下文不够）
-- 批量文件操作（3+ 文件可能溢出）
-- 需要加载多个参考文档的任务
-- 翻译超过 5 个文件的批次
-
-**原则：haiku = 小而精。短上下文、高复杂度、单点突破。大任务→sonnet/opus。**
-
-## Haiku Fallback
-
-haiku 编码强但不稳定。首次编码用 haiku（前提：不超 200k）。返回乱码/截断→不重试，直接换 opus。批量大上下文→用 sonnet。
+- **先看入口**：Codex 自带 agent 工具和 Claude CLI 是两套执行面，不能把别名混用。
+- **先限上下文**：超过 256k 的研究、竞品仓库阅读、跨大量文件审查优先 Claude opus；复杂架构判断优先 GPT-5.5 xhigh；明确文件集代码实现优先 Claude sonnet。
+- **先限写入范围**：任何编码 subagent 都必须有允许路径、禁止范围、验收命令和证据输出。
+- **轻量检查单独派发**：快速 sanity check、日志/文档/小范围 UI 可读性审查优先 Claude haiku，不让代码主力消耗在低风险扫读上。
 
 ## 决策流程
 
 ```
 任务类型？
-├── 设计/架构/审查类
-│   └── → opus（主 session 或 opus subagent）
-├── 批量机械操作（翻译、格式化、重命名）
-│   ├── 5 个文件以内 → sonnet subagent
-│   └── 多文件大规模 → 拆批，每批 sonnet subagent
-├── 编码实现/功能开发
-│   ├── 单文件复杂逻辑 → haiku subagent（优先）
-│   ├── 小范围业务编码（1-2 文件）→ haiku subagent
-│   ├── 多文件重构 → opus subagent（haiku 上下文不够）
-│   └── haiku 不稳定 → 换 opus
-├── 交叉审查
-│   ├── 安全/架构/业务逻辑 → opus（需深度推理）
-│   └── 结构/文档/易用性 → sonnet（机械检查）
-├── 探索/搜索
-│   ├── 单个目标明确 → 自己做（Grep/Glob）
-│   ├── 多维度搜索 → 2-3 sonnet 并行 Explore agent
-│   └── 深度代码理解 → 1 opus Explore agent
-└── 安全审查
-    └── → opus subagent（必须，不能跳过）
+├── 核心实现 / 跨前后端小集成
+│   ├── 上下文 <= 256k → GPT-5.5 low/mid 或 xhigh，按复杂度选择
+│   └── 上下文 > 256k → Claude opus 先整理，再拆给实现 agent
+├── 窄范围代码修复（明确 1-3 个文件）
+│   ├── Go/TS/测试小切片 → Claude sonnet（GLM-5.1）
+│   └── 高风险实现 review → GPT-5.5 xhigh 或主 Agent 复核
+├── 长上下文推理 / 架构 / 安全 / 竞品仓库研究
+│   └── GPT-5.5 xhigh（复杂架构）或 Claude opus（长文本/找东西/整理）
+├── 截图 / 竞品图 / 视觉 QA / UI 可读性
+│   └── Claude haiku（DeepSeek-V4-Flash，200k，快速轻量反馈）
+├── 机械批量文档或格式统一
+│   ├── 中等上下文 → GPT-5.5 low/mid
+│   └── 超大上下文或需要归纳 → Claude opus 先整理，再分片执行
+└── 交叉审查
+    ├── 安全/架构/长期方向 → GPT-5.5 xhigh
+    ├── 代码正确性/集成风险 → GPT-5.5 xhigh 或主 Agent
+    ├── 小范围实现细节 → Claude sonnet
+    └── 小范围 UI 可读性/布局文字检查 → Claude haiku
 ```
-
-## 并行度
-
-- 独立任务：最大并行数 = 任务数
-- 审查任务：4-5 维度同时跑，opus 管安全/架构，sonnet 管结构/文档/易用性
-- 翻译任务：按文件数分片，~20-40 文件/sonnet subagent
-- haiku 子任务：每次只给 1-2 个文件，prompt 精简
 
 ## 上下文管理
 
-| 模型 | 上限 | 策略 |
-|---|---|---|
-| haiku | 200k | 精简 prompt，只传必要文件，不传大型参考文档 |
-| sonnet | 1M | 可传大量文件，适合批量操作 |
-| opus | 1M | 适合深度分析大型代码库 |
+| Agent | 上限 | 策略 |
+|---|---:|---|
+| GPT-5.5 low/mid | 256k | 前端、看图、截图对比、常规 UI/UX 判断 |
+| GPT-5.5 xhigh | 256k | 复杂架构、关键方案、高风险设计复核 |
+| Claude opus | 1M | DeepSeek-V4-Pro；速度快、强推理；长文本、找东西、简单文档、架构整理、大范围归纳 |
+| Claude sonnet | 200k | GLM-5.1；强代码模型；prompt 精简，只传相关文件；适合窄范围代码和测试 |
+| Claude haiku | 200k | DeepSeek-V4-Flash；快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
+
+## 并行度
+
+- 写入范围互不重叠时才能并行。
+- R2/R4/R5/R3/R6A 这类 Desktop 队列按依赖顺序合并；只读 review 可并行。
+- 视觉 QA 可以和代码 review 并行，但修复必须由主 Agent 统一分派。
+- subagent 完成后，主 Agent 必须复核 diff、运行 targeted checks，再更新 roadmap 或合并。

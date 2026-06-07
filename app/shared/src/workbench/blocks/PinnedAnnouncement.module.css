@@ -1,0 +1,126 @@
+/* Pinned announcement — floating card with orange pin icon */
+
+.card {
+  width: 100%;
+  min-height: 46px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px 7px 11px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
+  box-shadow: 0 4px 14px rgba(18, 18, 32, 0.045);
+  pointer-events: auto;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.card:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-2);
+}
+
+/* ── Orange pin icon ── */
+
+.mark {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: var(--accent-orange);
+  color: var(--accent-orange-foreground);
+}
+
+.mark svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+/* ── Text copy area ── */
+
+.copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.line {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-1);
+  font: 400 0.8125rem/1.25 var(--font-sans);
+}
+
+.line strong {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.line span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  color: var(--text-3);
+  font: 400 0.6875rem/1.2 var(--font-sans);
+}
+
+.meta a {
+  color: var(--primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* ── Action buttons ── */
+
+.action {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.action:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.action svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.actionMuted {
+  composes: action;
+  color: var(--text-3);
+}
+
+.actionMuted:hover {
+  color: var(--text-1);
+}

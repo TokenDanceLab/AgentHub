@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { parseUnifiedDiff, inferDiffStatus } from '@/utils/parseGitDiff';
-import type { FileDiff } from '@/components/ChatView.types';
+import type { FileDiff } from '@shared/types/chat';
 
 export interface UseGitDiffReturn {
   /** Parsed unstaged diffs */

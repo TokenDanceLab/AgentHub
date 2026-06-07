@@ -9,7 +9,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SearchDialog from '@/components/SearchDialog';
 import { useSearchStore } from '@/stores/searchStore';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import type { ThreadInfo } from '@shared/types';
 
 describe('SearchDialog', () => {

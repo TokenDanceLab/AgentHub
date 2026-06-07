@@ -1,0 +1,114 @@
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.block {
+  --_agent-inset: var(--agent-inset, 34px);
+  --_bubble-col: var(--bubble-col, 100%);
+
+  width: min(calc(100% - var(--_agent-inset)), var(--_bubble-col));
+  max-width: calc(100% - var(--_agent-inset));
+  margin-left: var(--_agent-inset);
+  padding: 8px 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+/* Status-driven background */
+.running {
+  background: var(--surface-low);
+}
+
+.completed {
+  background: var(--surface);
+}
+
+.pending {
+  background: var(--surface-low);
+}
+
+.failed {
+  background: var(--surface-low);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.kind {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--primary);
+  font: 600 0.75rem var(--font-sans);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kind::after {
+  margin-left: 8px;
+  color: var(--text-3);
+  font-weight: 400;
+  content: "/";
+}
+
+.worker {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 0.8125rem var(--font-sans);
+  color: var(--text-1);
+  flex: 1;
+}
+
+.status {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--surface-high);
+  color: var(--text-2);
+  font: 600 0.6875rem var(--font-sans);
+  font-style: normal;
+  flex-shrink: 0;
+}
+
+.task {
+  margin-top: 4px;
+  color: var(--text-2);
+  font: 400 0.75rem/1.45 var(--font-sans);
+}
+
+.meta {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+}
+
+.metaCode {
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-mono);
+}
+
+.metaText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+}

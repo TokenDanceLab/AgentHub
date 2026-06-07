@@ -165,4 +165,45 @@ describe('createHubClient', () => {
       }),
     );
   });
+
+  it('returns the created Hub agent instance when adding an agent to a session', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({
+        code: 'ok',
+        data: {
+          id: 'agent-instance-1',
+          agent_type: 'claude-code',
+          session_id: 'session-1',
+          inviter_user_id: 'user-1',
+          display_name: 'Hub Builder',
+          created_at: '2026-06-07T00:00:00Z',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createHubClient({
+      baseUrl: 'https://hub.example.test',
+      getToken: () => 'hub-access',
+    });
+    const res = await client.addAgentToSession('session/1', {
+      agent_type: 'claude-code',
+      display_name: 'Hub Builder',
+    });
+
+    expect(res).toMatchObject({
+      id: 'agent-instance-1',
+      agent_type: 'claude-code',
+      session_id: 'session-1',
+      display_name: 'Hub Builder',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hub.example.test/client/sessions/session%2F1/agents',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ agent_type: 'claude-code', display_name: 'Hub Builder' }),
+      }),
+    );
+  });
 });

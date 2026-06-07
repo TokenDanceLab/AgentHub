@@ -30,8 +30,8 @@ import (
 // succeeds without a real Edge device.
 type mockTeamAgentService struct{}
 
-func (m *mockTeamAgentService) AddAgentToSession(_ context.Context, _, _, _, _, _ string) error {
-	return nil
+func (m *mockTeamAgentService) AddAgentToSession(_ context.Context, _, _, _, _, _ string) (*model.AgentInstance, error) {
+	return &model.AgentInstance{}, nil
 }
 
 func (m *mockTeamAgentService) TriggerAgentTask(_ context.Context, _, _, _, _, _, _, _ string) (*model.PendingAgentTask, error) {

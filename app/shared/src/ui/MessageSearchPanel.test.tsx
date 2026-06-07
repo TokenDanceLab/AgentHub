@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import MessageSearchPanel from './MessageSearchPanel';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '../types/chat';
 
 const baseMessages: ChatMessage[] = [
   {
@@ -29,6 +29,12 @@ const baseMessages: ChatMessage[] = [
       { kind: 'tool_use', callId: 't1', toolName: 'Read', input: { file_path: 'src/auth.ts' }, status: 'completed' },
       { kind: 'file_change', path: 'src/auth.ts', action: 'modified', diff: '+fix' },
     ],
+  },
+  {
+    id: 'm4',
+    role: 'system',
+    timestamp: '2025-06-01T10:00:15Z',
+    blocks: [{ kind: 'status', content: 'Indexing project files' }],
   },
 ];
 
@@ -129,5 +135,13 @@ describe('MessageSearchPanel', () => {
     fireEvent.change(input, { target: { value: 'issue' } });
 
     expect(await screen.findByText('Claude Code')).toBeInTheDocument();
+  });
+
+  it('searches visible status blocks', async () => {
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText('Type to search...');
+    fireEvent.change(input, { target: { value: 'Indexing project' } });
+
+    expect(await screen.findByText(/Indexing project/)).toBeInTheDocument();
   });
 });
