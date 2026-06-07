@@ -171,6 +171,8 @@ tmp/
 !.agents/skills/integration-test/**
 !.agents/skills/adapter-dev/
 !.agents/skills/adapter-dev/**
+!.agents/skills/env-sandbox/
+!.agents/skills/env-sandbox/**
 !.agents/skills/ui-screenshot/
 !.agents/skills/ui-screenshot/**
 !.agents/skills/dev-team/
