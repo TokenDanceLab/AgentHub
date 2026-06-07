@@ -2101,8 +2101,8 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateAgentProfileRequest"
       responses:
-        "201":
-          $ref: "#/components/responses/Created"
+        "200":
+          $ref: "#/components/responses/Ok"
 
   /web/custom-agents:
     get:
@@ -3765,8 +3765,8 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
-        "204":
-          description: Deleted.
+        "200":
+          $ref: "#/components/responses/Ok"
 
   /web/agent-profiles/{id}/publish:
     post:
@@ -5503,28 +5503,46 @@ components:
         permission_mode:
           type: string
         model_mapping:
-          type: object
-          additionalProperties: true
+          description: Accepts a JSON object or the current Hub-compatible JSON object string.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
         skills:
-          type: array
-          items:
-            type: string
-            format: uuid
+          description: Accepts a string array or the current Hub-compatible JSON array string.
+          oneOf:
+            - type: array
+              items:
+                type: string
+                format: uuid
+            - type: string
         mcp_servers:
-          type: array
-          items:
-            type: string
-            format: uuid
+          description: Accepts a string array or the current Hub-compatible JSON array string.
+          oneOf:
+            - type: array
+              items:
+                type: string
+                format: uuid
+            - type: string
         tool_allowlist:
-          type: array
-          items:
-            type: string
+          description: Accepts a string array or the current Hub-compatible JSON array string.
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: string
         approval_policy:
-          type: object
-          additionalProperties: true
+          description: Accepts a JSON object or the current Hub-compatible JSON object string.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
         target_preferences:
-          type: object
-          additionalProperties: true
+          description: Accepts a JSON object or the current Hub-compatible JSON object string.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
         context_budget_max_tokens:
           type: integer
         is_public:
@@ -5548,28 +5566,46 @@ components:
         permission_mode:
           type: string
         model_mapping:
-          type: object
-          additionalProperties: true
+          description: Accepts a JSON object or the current Hub-compatible JSON object string.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
         skills:
-          type: array
-          items:
-            type: string
-            format: uuid
+          description: Accepts a string array or the current Hub-compatible JSON array string.
+          oneOf:
+            - type: array
+              items:
+                type: string
+                format: uuid
+            - type: string
         mcp_servers:
-          type: array
-          items:
-            type: string
-            format: uuid
+          description: Accepts a string array or the current Hub-compatible JSON array string.
+          oneOf:
+            - type: array
+              items:
+                type: string
+                format: uuid
+            - type: string
         tool_allowlist:
-          type: array
-          items:
-            type: string
+          description: Accepts a string array or the current Hub-compatible JSON array string.
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: string
         approval_policy:
-          type: object
-          additionalProperties: true
+          description: Accepts a JSON object or the current Hub-compatible JSON object string.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
         target_preferences:
-          type: object
-          additionalProperties: true
+          description: Accepts a JSON object or the current Hub-compatible JSON object string.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
         context_budget_max_tokens:
           type: integer
         is_public:
