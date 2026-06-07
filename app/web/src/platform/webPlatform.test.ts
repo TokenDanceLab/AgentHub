@@ -86,6 +86,13 @@ describe('webPlatform workbench agent mapping', () => {
   it('submits Hub session messages and triggers the mentioned runtime agent', async () => {
     const queryClient = new QueryClient();
     const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-1',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
       sendMessage: vi.fn().mockResolvedValue({
         message_id: 'hub-message-1',
         seq_id: 12,
@@ -133,8 +140,12 @@ describe('webPlatform workbench agent mapping', () => {
     });
     const sentMessageBody = hubClient.sendMessage.mock.calls[0]?.[1];
     expect(sentMessageBody?.content).toContain('attachment context');
-    expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-1', {
+    expect(hubClient.addAgentToSession).toHaveBeenCalledWith('hub-session-1', {
       agent_type: 'claude-code',
+      display_name: 'Hub Builder',
+    });
+    expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-1', {
+      agent_instance_id: 'agent-instance-1',
       model_params: expect.any(String),
     });
     const triggerOptions = hubClient.triggerAgentTask.mock.calls[0]?.[1];
@@ -156,8 +167,67 @@ describe('webPlatform workbench agent mapping', () => {
     ]);
   });
 
+  it('reuses the cached exact Hub agent instance for repeated profile mentions', async () => {
+    const queryClient = new QueryClient();
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-cached',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn()
+        .mockResolvedValueOnce({
+          message_id: 'hub-message-cached-1',
+          seq_id: 41,
+          created_at: '2026-06-07T00:00:05Z',
+        })
+        .mockResolvedValueOnce({
+          message_id: 'hub-message-cached-2',
+          seq_id: 42,
+          created_at: '2026-06-07T00:00:06Z',
+        }),
+      triggerAgentTask: vi.fn().mockResolvedValue({
+        id: 'task-cached',
+        agent_instance_id: 'agent-instance-cached',
+        triggered_by_user_id: 'user-1',
+        trigger_message_id: 'hub-message-cached-1',
+        status: 'queued',
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      queryClient,
+      createClientMessageId: vi.fn()
+        .mockReturnValueOnce('client-message-cached-1')
+        .mockReturnValueOnce('client-message-cached-2'),
+    });
+    const baseIntent = {
+      conversationId: 'hub-session-1',
+      mode: 'code' as const,
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest' as const,
+    };
+
+    await platform.runs.submitComposerIntent({ ...baseIntent, text: '第一次触发' });
+    await platform.runs.submitComposerIntent({ ...baseIntent, text: '第二次触发' });
+
+    expect(hubClient.addAgentToSession).toHaveBeenCalledTimes(1);
+    expect(hubClient.triggerAgentTask).toHaveBeenNthCalledWith(1, 'hub-message-cached-1', {
+      agent_instance_id: 'agent-instance-cached',
+      model_params: expect.any(String),
+    });
+    expect(hubClient.triggerAgentTask).toHaveBeenNthCalledWith(2, 'hub-message-cached-2', {
+      agent_instance_id: 'agent-instance-cached',
+      model_params: expect.any(String),
+    });
+  });
+
   it('sends a Hub message without starting a task when no agent is mentioned', async () => {
     const hubClient = {
+      addAgentToSession: vi.fn(),
       sendMessage: vi.fn().mockResolvedValue({
         message_id: 'hub-message-2',
         seq_id: 13,
@@ -185,12 +255,14 @@ describe('webPlatform workbench agent mapping', () => {
       content: '只发送 Hub 消息',
     });
     expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
   });
 
   it('adds a pending Hub message optimistically while sendMessage is in flight', async () => {
     const queryClient = new QueryClient();
     const send = deferred<SendMessageResponse>();
     const hubClient = {
+      addAgentToSession: vi.fn(),
       sendMessage: vi.fn(() => send.promise),
       triggerAgentTask: vi.fn(),
     };
@@ -241,6 +313,7 @@ describe('webPlatform workbench agent mapping', () => {
   it('removes the optimistic Hub message when sendMessage fails', async () => {
     const queryClient = new QueryClient();
     const hubClient = {
+      addAgentToSession: vi.fn(),
       sendMessage: vi.fn().mockRejectedValue(new Error('send failed')),
       triggerAgentTask: vi.fn(),
     };
@@ -267,6 +340,13 @@ describe('webPlatform workbench agent mapping', () => {
   it('keeps the confirmed Hub message when task dispatch fails after sending', async () => {
     const queryClient = new QueryClient();
     const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-dispatch-failed',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
       sendMessage: vi.fn().mockResolvedValue({
         message_id: 'hub-message-dispatch-failed',
         seq_id: 31,
@@ -298,10 +378,15 @@ describe('webPlatform workbench agent mapping', () => {
         content: '消息已发送但任务失败',
       }),
     ]);
+    expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-dispatch-failed', {
+      agent_instance_id: 'agent-instance-dispatch-failed',
+      model_params: expect.any(String),
+    });
   });
 
   it('rejects runtime-less agent mentions before sending a Hub message', async () => {
     const hubClient = {
+      addAgentToSession: vi.fn(),
       sendMessage: vi.fn(),
       triggerAgentTask: vi.fn(),
     };
@@ -321,5 +406,6 @@ describe('webPlatform workbench agent mapping', () => {
 
     expect(hubClient.sendMessage).not.toHaveBeenCalled();
     expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
   });
 });
