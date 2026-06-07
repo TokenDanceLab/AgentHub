@@ -37,7 +37,6 @@
     "react-i18next": ">=15.0.0"
   },
   "dependencies": {
-    "@pierre/diffs": "^1.1.0-beta.18",
     "diff": "^8.0.2",
     "prismjs": "^1.30.0"
   },
