@@ -26,11 +26,20 @@ param(
     [switch]$Interactive,
     [string]$HubUrl = "http://localhost:8080",
     [string]$TdUrl = "http://localhost:3000",
-    [int]$TimeoutSec = 10
+    [int]$TimeoutSec = 10,
+    [string]$RepoRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $scriptDir = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        $PSScriptRoot
+    } else {
+        Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    $RepoRoot = (Resolve-Path (Join-Path $scriptDir "..")).ProviderPath
+}
 
 $Passed = 0
 $Failed = 0
@@ -107,6 +116,65 @@ function Assert-Status([int]$Actual, [int]$Expected, [string]$Label) {
     } else {
         Fail "$Label — expected HTTP $Expected, got $Actual"
     }
+}
+
+function Assert-FieldPresent([object]$Obj, [string]$Field, [string]$Label) {
+    if ($null -ne $Obj -and $Obj.$Field) {
+        Pass "$Label is present"
+    } else {
+        Fail "$Label — field '$Field' missing or empty"
+    }
+}
+
+function Get-Sha256Prefix([string]$Text) {
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text))
+        return ([BitConverter]::ToString($hash).Replace("-", "").ToLowerInvariant()).Substring(0, 12)
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
+function Redact-OidcConfigValue([string]$Name, [string]$Value) {
+    if ($Name -match "(?i)secret|token|password|key") {
+        return "<redacted len=$($Value.Length) sha256_prefix=$(Get-Sha256Prefix $Value)>"
+    }
+    return $Value
+}
+
+function Redact-UrlQuery([string]$Url) {
+    $queryStart = $Url.IndexOf("?")
+    if ($queryStart -lt 0) {
+        return $Url
+    }
+
+    $prefix = $Url.Substring(0, $queryStart)
+    $queryAndFragment = $Url.Substring($queryStart + 1)
+    $fragment = ""
+    $fragmentStart = $queryAndFragment.IndexOf("#")
+    if ($fragmentStart -ge 0) {
+        $fragment = $queryAndFragment.Substring($fragmentStart)
+        $queryAndFragment = $queryAndFragment.Substring(0, $fragmentStart)
+    }
+
+    $redactedPairs = @()
+    foreach ($pair in $queryAndFragment.Split("&")) {
+        if ([string]::IsNullOrWhiteSpace($pair)) {
+            continue
+        }
+        $key = $pair.Split("=", 2)[0]
+        if ([string]::IsNullOrWhiteSpace($key)) {
+            $redactedPairs += "<redacted>"
+        } else {
+            $redactedPairs += "$key=<redacted>"
+        }
+    }
+
+    if ($redactedPairs.Count -eq 0) {
+        return "$prefix?$fragment"
+    }
+    return "$prefix?$($redactedPairs -join '&')$fragment"
 }
 
 Banner "TokenDance ID OIDC Full-Link Smoke Verification"
@@ -232,8 +300,8 @@ if (-not $SkipHub) {
 
         if ($authData.state -and $authData.authorization_url) {
             Pass "  POST /client/auth/oidc/authorize — returns state + authorization_url"
-            Assert-Field $authData "state" "    state"
-            Assert-Field $authData "authorization_url" "    authorization_url"
+            Assert-FieldPresent $authData "state" "    state"
+            Assert-FieldPresent $authData "authorization_url" "    authorization_url"
 
             # Verify authorization URL structure
             $authUrlParsed = $authData.authorization_url
@@ -246,7 +314,7 @@ if (-not $SkipHub) {
 
             # Store for later phases
             $global:VerifyState = $authData.state
-            $global:VerifyAuthUrl = $authData.authorization_url
+            $global:VerifyAuthUrl = Redact-UrlQuery $authData.authorization_url
             $global:VerifyCodeVerifier = $codeVerifier
             $global:VerifyDeviceId = $deviceId
             Pass "  Authorization URL is well-formed OIDC PKCE request"
@@ -314,8 +382,8 @@ Step "Phase 3 — Full-Flow Diagnostics"
 
 # 3.1 Verify auth URL can be opened
 if ($global:VerifyAuthUrl) {
-    Pass "  Authorization URL generated — open in browser to complete login:"
-    Write-Host "    $($global:VerifyAuthUrl)" -ForegroundColor Cyan
+    Pass "  Authorization URL generated — redacted diagnostic form:"
+    Write-Host "    $(Redact-UrlQuery $global:VerifyAuthUrl)" -ForegroundColor Cyan
 } else {
     Warn "  Authorization URL not available (Phase 2 may have failed)"
 }
@@ -334,10 +402,11 @@ if (Test-Path $hubEnvPath) {
     foreach ($var in $envVars) {
         if ($hubEnv -match $var.Pattern) {
             $value = $Matches[1].Trim()
+            $displayValue = Redact-OidcConfigValue $var.Name $value
             if ($value -and $value -notlike "*fill in*" -and $value -notlike "*your-*" -and $value -notlike "<*") {
-                Pass "  $($var.Name) is configured ($value)"
+                Pass "  $($var.Name) is configured ($displayValue)"
             } else {
-                Fail "  $($var.Name) has placeholder value: `"$value`" — fill in real value"
+                Fail "  $($var.Name) has placeholder value: `"$displayValue`" — fill in real value"
             }
         } else {
             Fail "  $($var.Name) is not in hub-server/.env"
