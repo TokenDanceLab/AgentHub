@@ -1,6 +1,6 @@
-// Shared ChatMessage types used by cross-surface components (e.g. MessageSearchPanel).
-// Desktop and web each maintain their own richer ChatView.types.ts; this file
-// only contains the subset that shared UI code needs.
+// Shared legacy ChatMessage compatibility types used while Desktop/Web migrate
+// from old ChatView.types to the v4 TranscriptBlock contract.
+// Do not add new product UI behavior here; new rendering should use transcript/.
 
 export type MessageRole = 'user' | 'agent' | 'system';
 
