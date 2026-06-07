@@ -178,7 +178,7 @@ app/desktop/src-tauri/src/
 - [ ] 定义 `TranscriptBlock` discriminated union。
 - [ ] 定义 `EvidenceRef`，供 inspector 聚合。
 - [x] 从 Edge runtime events 归一化 text/tool/diff/approval/artifact；首片已支持 persisted thread items 和 live WebSocket events。
-- [ ] 从 Hub message 归一化 IM text/agent/status/team events；首片已支持 Hub session message -> shared text transcript，Web Hub WS 已先接 query invalidation；后续补 Hub runtime event 直接 projection、team runtime events 和乐观消息。
+- [ ] 从 Hub message 归一化 IM text/agent/status/team events；首片已支持 Hub session message -> shared text transcript，Web Hub WS 已接 query invalidation，Hub `agent.stream` runtime event 已直接 projection；后续补 team runtime events、乐观消息和更完整 renderer。
 - [ ] renderer 复用 shared UI 卡片，不复制 Desktop 旧 renderer。
 - [ ] 覆盖 null/畸形 tool input、长输出截断、未知 block fallback。
 
@@ -186,6 +186,7 @@ app/desktop/src-tauri/src/
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeThreadItems.ts` 和测试，把 Edge persisted thread items 映射为 shared `TranscriptBlock`，并为 `runId` 生成 `EvidenceRef(kind="run")`。
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeEdgeEvents.ts` 和测试，把 live Edge `run.*`、`run.agent.*`、`artifact.created` 事件映射为 shared `TranscriptBlock` 与 run/tool/file/artifact evidence；focused shared tests 更新为 6 个文件 / 14 个测试通过。
 - 2026-06-07：新增 `app/shared/src/transcript/normalizeHubMessages.ts` 和测试，把 Hub session messages 映射为 shared `TranscriptBlock`，Web v4 不再依赖旧 `ChatView` 消息转换；focused shared tests 中相关 4 个文件 / 15 个测试通过。
+- 2026-06-07：新增 `normalizeHubRuntimeEventsToTranscript`，复用 Edge runtime normalizer，把 Hub WS `agent.stream` payload 的 `event_type/payload/edge_run_id/session_id` 投影成 shared transcript blocks，并保留 run/tool/artifact preview evidence；focused shared tests 更新为 11 个文件 / 36 个测试通过。
 
 ### Task 5: composer 收敛
 
@@ -272,7 +273,7 @@ app/desktop/src-tauri/src/
 - Modify: `app/web/src/main.tsx`
 - Test: `app/web/src/platform/*.test.ts`
 
-- [ ] 把 Hub session、conversation、message、remote run 包装为 shared ports；首片已把 Hub `GET /web/agent-profiles` 接入 v4 workbench @Agent 列表，并已把 Hub `/client/sessions`、`/client/sessions/{id}/messages` 接入 shared conversations/transcript；本片已接 Hub WS query invalidation 和 Web remote submit（Hub message + optional `/web/agent-tasks`）；剩余 Hub runtime event projection、乐观消息和 Agent Profile -> exact AgentInstance 映射。
+- [ ] 把 Hub session、conversation、message、remote run 包装为 shared ports；首片已把 Hub `GET /web/agent-profiles` 接入 v4 workbench @Agent 列表，并已把 Hub `/client/sessions`、`/client/sessions/{id}/messages` 接入 shared conversations/transcript；已接 Hub WS query invalidation、Web remote submit（Hub message + optional `/web/agent-tasks`）和 Hub runtime event live projection；剩余乐观消息和 Agent Profile -> exact AgentInstance 映射。
 - [ ] Web `App.tsx` 只装配平台 adapter 和 `AgentHubWorkbench`；首片已渲染 shared workbench，Web adapter 已提供浏览器 `preview.openEvidence()` port，`App` 已在 `QueryClientProvider` 内读取 Hub Agent Profiles，并补齐 `lucide-react` alias 防止 shared workbench 图标在 Web Vitest 中加载到第二份 React。
 - [ ] Web 不引入 Tauri 或 Local Edge 私有能力。
 - [ ] 跑 Web typecheck/build/focused tests。
@@ -281,6 +282,7 @@ app/desktop/src-tauri/src/
 - 2026-06-07：新增 `resolveWebWorkbenchAgents()` / `agentInfoToWorkbenchAgent()`，Web `App` 通过 `useAgentList(true)` 读取 Hub Agent Profiles 并映射为 shared `WorkbenchAgent`；未登录或 Hub 无 profile 数据时保留 preview fallback；恢复 `app/web/src/api/edgeClient.ts` Hub-only/stubbed 兼容面，保持 Web 不直连 Local Edge；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 7 个测试通过，Web typecheck 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
 - 2026-06-07：新增 `useWebWorkbenchModel()`，Web `App` 在 Hub 登录态读取 Hub sessions/messages 并映射到 shared `WorkbenchConversation` / `TranscriptBlock`；登录但暂无会话时显示 Hub 空态，未登录才使用 preview fallback；`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\api\agentQueries.test.ts --reporter=dot`，3 个文件 / 9 个测试通过，Web typecheck/build 通过，`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过。
 - 2026-06-07：新增 `app/web/src/platform/webHubRealtime.ts`，Web v4 在 Hub 登录态通过 `/client/ws` 监听 `message.*`、`session.*` 和 `agent.*`，并失效 `web-v4` sessions/messages queries；`createWebPlatform().runs.submitComposerIntent` 改为真实 Hub submit：先写入 `/client/sessions/{id}/messages`，选择 @Agent 时用 mention `runtimeId` 触发 `/web/agent-tasks`，并通过 `model_params` 携带 v4 mode、approval、workDir、mentions 和 attachments 元数据；没有 runtimeId 的 @Agent 会在发 Hub 消息前失败并保留草稿。当前限制：Hub API 尚未提供 Agent Profile id 到 session AgentInstance 的 exact dispatch 参数，所以这片不把 profile id 冒充为 agent instance；agent stream 仍先靠 Hub 投影 message/refetch，后续再做 direct runtime block projection。验证：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\platform\webHubRealtime.test.ts src\api\agentQueries.test.ts src\api\hubClient.test.ts --reporter=dot`，5 个文件 / 22 个测试通过；Web typecheck/build 通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/web-v4-hub-realtime-submit-smoke.png` 大小 49494 bytes。
+- 2026-06-07：`useWebHubRealtime()` 已把当前 Hub session 的 `agent.stream` runtime event 交给 `useWebWorkbenchModel()`，后者追加到 shared transcript 并按 event id 去重；Web 不再只能等待 Hub 把 runtime stream 投影成 `message.new` 后 refetch。验证：`cd app/web; corepack.cmd pnpm exec vitest run src\App.test.tsx src\platform\webPlatform.test.ts src\platform\webHubRealtime.test.ts src\platform\useWebWorkbenchModel.test.ts src\api\agentQueries.test.ts src\api\hubClient.test.ts --reporter=dot`，6 个文件 / 27 个测试通过；Web build 通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/web-v4-hub-runtime-smoke.png` 大小 49507 bytes。
 
 ### Task 9: Tauri Host API 拆分
 
