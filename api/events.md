@@ -158,8 +158,10 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.api_retry` | P1 | API 重试通知 |
 | `run.agent.task_started` | P1 | 子代理任务启动 |
 | `run.agent.task_dispatched` | P1 | 子代理任务已派发 |
+| `run.agent.task_dispatch_failed` | P1 | 子代理派发失败，payload: `{ taskId, error }` |
 | `run.agent.task_progress` | P1 | 子代理任务进度 |
 | `run.agent.task_notification` | P1 | 子代理任务完成/失败 |
+| `run.agent.sub_agent_status` | P1 | 子代理运行状态更新，payload: `{ agentId, status, taskId?, runId? }` |
 | `run.agent.sub_agents_complete` | P1 | 所有子代理执行完毕，payload: `{ parentId, childCount, allComplete }` |
 | `run.agent.session_state_changed` | P1 | 会话状态变更（idle/running/requires_action） |
 | `run.agent.status_change` | P1 | Agent 适配器状态变更 |
