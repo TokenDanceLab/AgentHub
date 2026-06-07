@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -131,11 +132,19 @@ func GetMessagesBySessionAndIDs(db *gorm.DB, sessionID string, ids []string) ([]
 	return msgs, err
 }
 
+// escapeILIKE escapes ILIKE wildcards so user input cannot match arbitrary patterns.
+func escapeILIKE(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
 func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]model.Message, error) {
 	var msgs []model.Message
 	query := db.Where("session_id = ?", sessionID).
 		Where("recalled = false").
-		Where("content->>'text' ILIKE ?", "%"+q+"%")
+		Where("content->>'text' ILIKE ?", "%"+escapeILIKE(q)+"%")
 	if contentType != "" {
 		query = query.Where("content_type = ?", contentType)
 	}
@@ -156,7 +165,7 @@ func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]
 		WHERE sm.member_type = ? AND sm.member_id = ? AND sm.left_at IS NULL
 			AND m.recalled = false
 			AND m.content->>'text' ILIKE ?`
-	args := []interface{}{"user", userID, "%" + q + "%"}
+	args := []interface{}{"user", userID, "%" + escapeILIKE(q) + "%"}
 
 	if contentType != "" {
 		sql += " AND m.content_type = ?"
