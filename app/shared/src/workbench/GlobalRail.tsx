@@ -10,7 +10,7 @@ export type GlobalRailPage =
   | 'contacts'
   | 'docs'
   | 'agents'
-  | 'tasks'
+  | 'runs'
   | 'projects'
   | 'settings';
 
@@ -25,7 +25,7 @@ const topNavItems: NavItem[] = [
   { id: 'contacts', label: '联系人', icon: 'railContacts' },
   { id: 'docs', label: '云文档', icon: 'railDocs' },
   { id: 'agents', label: 'Agent', icon: 'railAgent' },
-  { id: 'tasks', label: '任务', icon: 'tasks' },
+  { id: 'runs', label: '任务', icon: 'tasks' },
   { id: 'projects', label: '项目', icon: 'railProjects' },
 ];
 

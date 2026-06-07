@@ -80,8 +80,7 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
-    expect(screen.getByText('运行时间线')).toBeInTheDocument();
-    expect(screen.getByText('进入代码定位阶段')).toBeInTheDocument();
+    expect(screen.getByText('B0 SQLite 迁移任务')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Builder' })).toBeInTheDocument();
   });
 
@@ -137,7 +136,6 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('heading', { name: '真实 Edge 会话' })).toBeInTheDocument();
     expect(screen.getByText('把 Desktop 接到真实 thread')).toBeInTheDocument();
     expect(screen.getByText('已读取 Edge thread item。')).toBeInTheDocument();
-    expect(screen.getByText('Run run-real')).toBeInTheDocument();
     expect(mockedUseThreadMessages).toHaveBeenCalledWith('thread-real');
   });
 
@@ -208,9 +206,8 @@ describe('Desktop App v4 root', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'Live Edge 会话' })).toBeInTheDocument();
-    expect(screen.getAllByText('rg')).toHaveLength(3);
+    expect(screen.getAllByText('rg')).toHaveLength(2);
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
-    expect(screen.getByText('Run run-live')).toBeInTheDocument();
 
     mockedUseThreadMessages.mockReturnValue({
       data: {

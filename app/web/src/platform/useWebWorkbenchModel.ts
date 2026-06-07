@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+  normalizeWorkbenchDataMode,
+  resolveDemoWorkbenchTranscript,
+} from '@shared/demo';
+import {
   normalizeHubMessagesToTranscript,
   normalizeHubRuntimeEventsToTranscript,
   type HubMessageTranscriptInput,
@@ -14,15 +19,15 @@ import {
   resolveWebWorkbenchConversations,
   webConversationWithPinnedMessages,
   webHubEmptyTranscript,
-  webTranscript,
 } from './webPlatform';
 import { useWebHubRealtime } from './webHubRealtime';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
 export function useWebWorkbenchModel(selectedConversationId?: string) {
+  const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
   const authenticated = useHubStore((state) => state.authenticated);
-  const hubReady = authenticated && Boolean(getAccessToken());
+  const hubReady = dataMode !== 'demo' && authenticated && Boolean(getAccessToken());
   const [liveRuntimeEvents, setLiveRuntimeEvents] = useState<HubRuntimeEventTranscriptInput[]>([]);
 
   const sessions = useQuery({
@@ -33,7 +38,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     placeholderData: (previous) => previous,
   });
 
-  const conversations = resolveWebWorkbenchConversations(sessions.data, hubReady);
+  const conversations = resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
   const activeConversationId = (
     conversations.some((conversation) => conversation.id === selectedConversationId)
       ? selectedConversationId
@@ -98,8 +103,13 @@ export function resolveWebWorkbenchTranscript(
   activeHubSessionId: string | null,
   messages: HubMessageTranscriptInput[] | undefined,
   liveRuntimeEvents: HubRuntimeEventTranscriptInput[],
+  dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
 ): TranscriptBlock[] {
-  if (!hubReady) return webTranscript;
+  if (!hubReady) {
+    return dataMode === 'real'
+      ? webHubEmptyTranscript
+      : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
+  }
   if (!activeHubSessionId) return webHubEmptyTranscript;
   return [
     ...normalizeHubMessagesToTranscript(messages),
