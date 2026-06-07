@@ -16,6 +16,8 @@ package hub
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,6 +39,17 @@ type CallbackClient struct {
 type TaskResult struct {
 	RunID        string `json:"run_id"`
 	FinalContent string `json:"final_content"`
+}
+
+func summarizeHubResponse(status int, body []byte, category string) string {
+	hash := sha256.Sum256(body)
+	return fmt.Sprintf(
+		"status=%d body_len=%d body_sha256_prefix=%s category=%s",
+		status,
+		len(body),
+		hex.EncodeToString(hash[:])[:12],
+		category,
+	)
 }
 
 // NewCallbackClient creates a new CallbackClient.
@@ -159,7 +172,7 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 			}
 			// Non-OK code from Hub is an application-level failure; do not retry
 			if hubResp.Code != "" && hubResp.Code != "OK" {
-				return fmt.Errorf("hub callback rejected: code=%s message=%s body=%s", hubResp.Code, hubResp.Message, string(respBody))
+				return fmt.Errorf("hub callback rejected: %s", summarizeHubResponse(resp.StatusCode, respBody, "app_rejected"))
 			}
 			// 2xx without JSON body — accept as success
 			return nil
@@ -167,11 +180,11 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 
 		// 4xx errors are not retryable (bad request, auth failure, etc.)
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			return fmt.Errorf("hub callback client error HTTP %d: %s", resp.StatusCode, string(respBody))
+			return fmt.Errorf("hub callback client error: %s", summarizeHubResponse(resp.StatusCode, respBody, "client_error"))
 		}
 
 		// 5xx errors are retryable
-		lastErr = fmt.Errorf("hub callback server error HTTP %d: %s", resp.StatusCode, string(respBody))
+		lastErr = fmt.Errorf("hub callback server error: %s", summarizeHubResponse(resp.StatusCode, respBody, "server_error"))
 	}
 
 	return fmt.Errorf("hub callback failed after 3 attempts: %w", lastErr)
