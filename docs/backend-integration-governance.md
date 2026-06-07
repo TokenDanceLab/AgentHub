@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 05:34 +08:00
+> 最后更新：2026-06-08 05:37 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -92,6 +92,7 @@ next: <1-3 steps>
 9. **API/Event route summary alias**：已合入 `dev/delicious233`，提交 `51ac4b8c fix(api): add agent task summary alias`。该片只补 Hub `GET /web/agent-tasks/:id/summary` 到既有 `TaskEventSummary`，并在 OpenAPI 增加 `/web/agent-tasks/{id}/summary` 兼容 alias；不改前端、Edge、runtime schema 或真实 CLI gate。
 10. **G1. Hub AgentProfile read-through**：已合入 `dev/delicious233`，提交 `c30cbeec feat(web): 接入 Hub AgentProfile 到 Agents 页`。该前端切片只把 Hub `/web/agent-profiles` 投影到 shared Agents 页已安装列表和 `WorkbenchAgent` 字段，阻断 Web real mode demo agent fallback；不做 AgentProfile CRUD、自建 Agent、市场闭环、TeamRun Orchestrator、Edge SQL 或真实 CLI/model gate。
 11. **G0. Edge repository contract harness**：已合入 `dev/delicious233`，提交 `4a5ccaf3 test(edge): add store repository contract harness`。该片只新增 `edge-server/internal/store/store_contract_test.go` 并更新本文档/roadmap，让 in-memory `Store` 与 JSON `FileStore` 共跑生命周期、pins、thread delete cascade、run cleanup cascade、FileStore 删除持久化和 snapshot restore 合同；不引入 SQL、migration、Hub DB 或 API schema 变化。
+12. **Edge runtime event docs contract**：`codex/event-contract-docs` 只补齐已在 Edge runtime 代码中发出的 `run.agent.sub_agent_status` 与 `run.agent.task_dispatch_failed` 文档，并新增测试确保 adapter event constants / known hardcoded runtime events 出现在 `api/events.md`；不重命名事件、不改 payload、不运行真实 CLI/model。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -100,7 +101,7 @@ next: <1-3 steps>
 - **D1a fixture-only CI gate**：已合入 `dev/delicious233`。后续 D1b 只能在新增依赖测试已进入主线且不会让 CI 变红时再拆，并继续断言不含 `-RealCli`、Docker、root `go test ./tests -count=1` 或真实 CLI/auth secret。
 - **D3 real CLI/model gate**：继续 blocked。候选 workflow 缺 GitHub `environment` approval、预算/请求上限控制，且 redaction validation 失败后仍可能上传 artifact；修复前不得合入。
 - **G1 DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入。该片只读消费 Hub-owned AgentProfile，不改 Hub schema、Edge store 或 AgentProfile CRUD。
-- **API/Event contract sync**：`codex/api-event-summary-alias` 已把 Web client 已用的 `/web/agent-tasks/{id}/summary` 声明为 Hub/OpenAPI 兼容 alias，复用既有 `/web/agent-tasks/{id}/events/summary` response contract；不混入 Edge pins。
+- **API/Event contract sync**：`codex/api-event-summary-alias` 已把 Web client 已用的 `/web/agent-tasks/{id}/summary` 声明为 Hub/OpenAPI 兼容 alias，复用既有 `/web/agent-tasks/{id}/events/summary` response contract；`codex/event-contract-docs` 继续做 Edge runtime event 文档/测试漂移收口，不混入 Web UI、Edge pins 或真实 CLI gate。
 - **Runtime adapter roadmap**：Codex `exec --json` adapter 仍是 Phase 1 batch 模式；完整 multi-turn、turn steer/interrupt、approval、subagent 和 diff patch delta 需要后续 Codex app-server 通道，不应在当前能力声明中写成已完成。
 
 ## 端到端联调顺序
