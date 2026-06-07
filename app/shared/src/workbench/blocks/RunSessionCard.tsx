@@ -40,8 +40,8 @@ export const RunSessionCard: React.FC<RunSessionCardProps> = ({
 }) => {
   return (
     <div className={styles.row}>
-      <div className={styles.card} data-card-surface data-run-status={status ?? 'running'}>
-        <span className={`${styles.mark} ${markClass(status)}`}>Run</span>
+      <div className={`${styles.card} run-session-card`} data-card-surface data-run-status={status ?? 'running'}>
+        <span className={`${styles.mark} run-session-mark ${markClass(status)}`}>Run</span>
 
         <div className={styles.body}>
           <strong className={styles.title}>{title}</strong>

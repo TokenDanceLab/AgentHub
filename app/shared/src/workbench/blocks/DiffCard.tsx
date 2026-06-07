@@ -27,16 +27,16 @@ export const DiffCard: React.FC<DiffCardProps> = ({
   lines,
 }) => {
   return (
-    <div className={styles.card} data-card-surface>
-      <div className={styles.header}>
-        <DesignFileIcon className={styles.fileIcon} name={filename} />
+    <div className={`${styles.card} diff-card`} data-card-surface>
+      <div className={`${styles.header} diff-header`}>
+        <DesignFileIcon className={`${styles.fileIcon} file-icon`} name={filename} />
         <span className={styles.filename}>{filename}</span>
         <span className={styles.stat}>
           +{additions} -{deletions}
         </span>
       </div>
       {lines.map((line, i) => (
-        <div key={i} className={`${styles.line} ${lineClassMap[line.type]}`}>
+        <div key={i} className={`${styles.line} diff-line ${lineClassMap[line.type]}`}>
           {line.content}
         </div>
       ))}

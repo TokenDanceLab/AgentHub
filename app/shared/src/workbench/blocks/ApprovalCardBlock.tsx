@@ -51,7 +51,6 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
         <div className={styles.title}>
           {title}
           <span className={`${styles.badge} ${riskClassMap[risk]}`}>
-            <span className={styles.dot} />
             {riskLabels[risk]}
           </span>
         </div>
@@ -59,7 +58,7 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
           <strong>{toolName ?? title}</strong>
           {' · '}
           {reason}
-          <br />
+          {' '}
           <code>{id}</code>
         </div>
         <div className={styles.actions}>

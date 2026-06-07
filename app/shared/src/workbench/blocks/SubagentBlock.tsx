@@ -29,14 +29,14 @@ export const SubagentBlock: React.FC<SubagentBlockProps> = ({
     <div className={styles.row}>
       <div className={`${styles.block} ${stateClass}`} data-card-surface>
         <div className={styles.head}>
-          <span className={styles.kind}>Subagent Task</span>
+          <span className={styles.kind}>Subagent</span>
           <strong className={styles.worker}>{heading}</strong>
           <em className={styles.status}>{statusLabel}</em>
         </div>
         {body && <p className={styles.task}>{body}</p>}
         <div className={styles.meta}>
           {runId && <code className={styles.metaCode}>{runId}</code>}
-          <span className={styles.metaText}>worker: {worker}</span>
+          <span className={styles.metaText}>子Agent: {worker}</span>
         </div>
       </div>
     </div>

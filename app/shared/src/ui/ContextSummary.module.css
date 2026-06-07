@@ -76,8 +76,15 @@
 
 .actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
+  min-width: 0;
+  overflow: auto hidden;
+  scrollbar-width: none;
+}
+
+.actions::-webkit-scrollbar {
+  display: none;
 }
 
 /* ── Responsive ─────────────────── */

@@ -35,6 +35,7 @@ interface ProfilePopoverProps {
   isOpen: boolean;
   onClose: () => void;
   anchorRef?: React.RefObject<HTMLElement | null>;
+  anchorElement?: HTMLElement | null;
   variant?: ProfileVariant;
   badge?: string;
   actions?: ProfileAction[];
@@ -59,6 +60,7 @@ export function ProfilePopover({
   isOpen,
   onClose,
   anchorRef,
+  anchorElement,
   variant = 'default',
   badge,
   actions,
@@ -77,12 +79,12 @@ export function ProfilePopover({
 
   const position = useCallback(() => {
     const popover = popoverRef.current;
-    const anchor = anchorRef?.current;
+    const anchor = anchorElement ?? anchorRef?.current;
     if (!popover || !anchor) return;
 
     const gap = 10;
     const rect = anchor.getBoundingClientRect();
-    const popWidth = variant === 'account' ? 404 : 352;
+    const popWidth = 352;
     popover.style.width = `${popWidth}px`;
 
     const measuredHeight = Math.min(
@@ -104,7 +106,7 @@ export function ProfilePopover({
 
     popover.style.left = `${Math.round(left)}px`;
     popover.style.top = `${Math.round(top)}px`;
-  }, [anchorRef, variant]);
+  }, [anchorElement, anchorRef, variant]);
 
   /* ── Position on open ── */
   useEffect(() => {
@@ -191,15 +193,6 @@ export function ProfilePopover({
           </button>
         </div>
 
-        {/* Signature */}
-        <button
-          className={styles.accountSignature}
-          type="button"
-          onClick={onSignatureEdit}
-        >
-          {signature || '输入你的个性签名...'}
-        </button>
-
         {/* Account actions */}
         {actions && actions.length > 0 && (
           <div className={`${styles.actions} ${styles.accountActions}`}>
@@ -251,17 +244,6 @@ export function ProfilePopover({
           </div>
         )}
 
-        {/* Spaces */}
-        {spaces && spaces.length > 0 && (
-          <div className={styles.accountSpaces} aria-label="账号空间">
-            {spaces.map((space) => (
-              <div key={space.name} className={styles.accountSpaceRow}>
-                <strong>{space.name}</strong>
-                <span>{space.description}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
     );
   }

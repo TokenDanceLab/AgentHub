@@ -32,3 +32,9 @@
   font: 600 0.6875rem var(--font-sans);
   flex-shrink: 0;
 }
+
+.avatarSpacer {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+}

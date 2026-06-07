@@ -1,5 +1,16 @@
 import React, { useCallback } from 'react';
-import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
+import {
+  DesignNavIcon,
+  DESIGN_NAV_GLYPH_SIZE,
+  DESIGN_NAV_GLYPH_STROKE_WIDTH,
+  type DesignNavIconName,
+} from '../designIcons';
+import type { WorkbenchDocumentPreview } from '../documentPreview';
+import { FilePreview } from '../inspector';
+import {
+  resolveWorkbenchProfile,
+  type WorkbenchProfileSource,
+} from '../profileRegistry';
 import styles from './DocsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -52,9 +63,15 @@ export interface DocsPageProps {
 
   /** Doc table rows */
   rows: DocRow[];
+  /** Agent/user profiles available for owner avatar resolution */
+  profiles?: WorkbenchProfileSource[] | undefined;
+  /** Currently selected document preview */
+  activePreview?: WorkbenchDocumentPreview | null | undefined;
 
   /** Called when a doc row is clicked */
   onDocClick?: ((doc: DocRow) => void) | undefined;
+  /** Called when document preview closes */
+  onClosePreview?: (() => void) | undefined;
 
   /** Callbacks for action buttons */
   onCreateDoc?: (() => void) | undefined;
@@ -80,7 +97,11 @@ const DEFAULT_SHORTCUTS: string[] = [
 function NavGlyph({ name }: { name: DesignNavIconName }) {
   return (
     <span className={styles.navGlyph}>
-      <DesignNavIcon name={name} size={17} />
+      <DesignNavIcon
+        name={name}
+        size={DESIGN_NAV_GLYPH_SIZE}
+        strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
+      />
     </span>
   );
 }
@@ -109,16 +130,19 @@ const DOC_TABS: { id: DocsPane; label: string }[] = [
 function DocTableRow({
   doc,
   onClick,
+  profiles = [],
 }: {
   doc: DocRow;
   onClick?: ((doc: DocRow) => void) | undefined;
+  profiles?: WorkbenchProfileSource[] | undefined;
 }) {
   const handleClick = useCallback(() => {
     onClick?.(doc);
   }, [doc, onClick]);
+  const owner = resolveWorkbenchProfile(doc.owner, profiles);
 
   return (
-    <button type="button" className={styles.docRow} onClick={handleClick}>
+    <button type="button" className={`${styles.docRow} doc-row`} data-card-surface onClick={handleClick}>
       <span className={styles.docTitle}>
         <span className={styles.docType}>
           <DesignNavIcon name="fileText" size={14} />
@@ -127,7 +151,15 @@ function DocTableRow({
         {doc.tag && <em className={styles.docTag}>{doc.tag}</em>}
       </span>
       <span>{doc.location}</span>
-      <span>{doc.owner}</span>
+      <span className={styles.ownerPill} data-profile-kind={owner.kind}>
+        <span
+          className={styles.ownerAvatar}
+          style={{ '--owner-avatar-color': owner.color } as React.CSSProperties}
+        >
+          {owner.initials}
+        </span>
+        <span>{owner.name}</span>
+      </span>
       <span>{doc.time}</span>
       <span className={styles.docMore}>
         <DesignNavIcon name="more" size={14} />
@@ -148,7 +180,10 @@ export function DocsPage({
   activeTab,
   onTabChange,
   rows,
+  profiles,
+  activePreview,
   onDocClick,
+  onClosePreview,
   onCreateDoc,
   onUploadDoc,
   onTemplateLibrary,
@@ -168,12 +203,12 @@ export function DocsPage({
         ] as DocsPageNavItem[]);
 
   return (
-    <section className={styles.page}>
+    <section className={`${styles.page} workbench docs-page`}>
       {/* ── Left nav ── */}
-      <aside className={styles.nav}>
-        <div className={styles.navTitle}>云文档</div>
+      <aside className={`${styles.nav} workbench-nav`}>
+        <div className={`${styles.navTitle} workbench-title`}>云文档</div>
         <input
-          className={styles.search}
+          className={`${styles.search} workbench-search`}
           placeholder="搜索"
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
@@ -217,13 +252,13 @@ export function DocsPage({
       </aside>
 
       {/* ── Right main ── */}
-      <main className={styles.main}>
+      <main className={`${styles.main} workbench-main`}>
         {/* Head */}
-        <div className={styles.head}>
+        <div className={`${styles.head} workbench-head`}>
           <h1 className={styles.headTitle}>主页</h1>
           <button
             type="button"
-            className={styles.iconAction}
+            className={`${styles.iconAction} icon-action`}
             aria-label="云文档设置"
             onClick={onSettings}
           >
@@ -232,10 +267,10 @@ export function DocsPage({
         </div>
 
         {/* Doc action buttons */}
-        <div className={styles.docActions}>
+        <div className={`${styles.docActions} doc-actions`}>
           <button
             type="button"
-            className={styles.docActionBtn}
+            className={`${styles.docActionBtn} doc-action-btn`}
             onClick={onCreateDoc}
           >
             <span className={`${styles.docActionIcon} ${styles.actionIconBlue}`}>
@@ -245,7 +280,7 @@ export function DocsPage({
           </button>
           <button
             type="button"
-            className={styles.docActionBtn}
+            className={`${styles.docActionBtn} doc-action-btn`}
             onClick={onUploadDoc}
           >
             <span className={`${styles.docActionIcon} ${styles.actionIconOrange}`}>
@@ -255,7 +290,7 @@ export function DocsPage({
           </button>
           <button
             type="button"
-            className={styles.docActionBtn}
+            className={`${styles.docActionBtn} doc-action-btn`}
             onClick={onTemplateLibrary}
           >
             <span className={`${styles.docActionIcon} ${styles.actionIconMulti}`}>
@@ -290,8 +325,8 @@ export function DocsPage({
         </div>
 
         {/* Doc table */}
-        <div className={styles.docTable}>
-          <div className={styles.docTableHead}>
+        <div className={`${styles.docTable} doc-table`}>
+          <div className={`${styles.docTableHead} doc-table-head`}>
             <span>标题</span>
             <span>位置</span>
             <span>所有者</span>
@@ -299,9 +334,28 @@ export function DocsPage({
             <span />
           </div>
           {rows.map((doc) => (
-            <DocTableRow key={doc.id} doc={doc} onClick={onDocClick} />
+            <DocTableRow key={doc.id} doc={doc} onClick={onDocClick} profiles={profiles} />
           ))}
         </div>
+        {activePreview && (
+          <section className={`${styles.previewPanel} doc-preview-panel`} data-card-surface>
+            <div className={styles.previewHead}>
+              <div>
+                <span>{activePreview.sourceLabel}</span>
+                <strong>{activePreview.name}</strong>
+              </div>
+              <em>轻量文档预览</em>
+            </div>
+            <FilePreview
+              filename={activePreview.name}
+              owner={activePreview.owner}
+              language={activePreview.type}
+              content={activePreview.content}
+              diffContent={activePreview.diffContent}
+              onClose={onClosePreview ?? (() => {})}
+            />
+          </section>
+        )}
       </main>
     </section>
   );

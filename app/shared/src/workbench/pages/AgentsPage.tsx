@@ -1,5 +1,13 @@
 import React from 'react';
-import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
+import {
+  DesignNavIcon,
+  DESIGN_NAV_GLYPH_SIZE,
+  DESIGN_NAV_GLYPH_STROKE_WIDTH,
+  DESIGN_NAV_ICON_SIZE,
+  type DesignNavIconName,
+} from '../designIcons';
+import { resolveWorkbenchProfile } from '../profileRegistry';
+import { Select } from '../../ui';
 import styles from './AgentsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -126,9 +134,11 @@ export interface AgentsPageProps {
   /** Installed agents */
   agents: AgentConfig[];
   /** Currently selected agent id in the installed view */
-  selectedAgentId?: string;
+  selectedAgentId?: string | undefined;
   /** Called when an agent config row is clicked */
   onAgentSelect?: ((agentId: string) => void) | undefined;
+  /** Called when an Agent avatar is clicked */
+  onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
   /** Save state label (e.g. "已同步", "未保存") */
   saveStateLabel?: string;
   /** Whether the edit panel has unsaved changes */
@@ -265,11 +275,11 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
   };
 
   return (
-    <section className={styles['agents-page']}>
-      <aside className={styles['workbench-nav']}>
-        <div className={styles['workbench-title']}>Agent</div>
+    <section className={`${styles['agents-page']} workbench agents-page`}>
+      <aside className={`${styles['workbench-nav']} workbench-nav`}>
+        <div className={`${styles['workbench-title']} workbench-title`}>Agent</div>
         <input
-          className={styles['workbench-search']}
+          className={`${styles['workbench-search']} workbench-search`}
           placeholder="搜索 Agent、模型或权限"
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
@@ -283,7 +293,11 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
             onClick={() => onPaneChange(item.id)}
           >
             <span className={styles['nav-glyph']}>
-              <DesignNavIcon name={item.icon} size={17} />
+              <DesignNavIcon
+                name={item.icon}
+                size={DESIGN_NAV_GLYPH_SIZE}
+                strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
+              />
             </span>
             {item.label}
           </button>
@@ -314,6 +328,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     agents,
     selectedAgentId,
     onAgentSelect,
+    onAgentProfileOpen,
     saveStateLabel = '已同步',
     isDirty = false,
     allSkills = [],
@@ -331,16 +346,16 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
 
   return (
-    <main className={styles['agent-main']}>
-      <div className={styles['workbench-head']}>
+    <main className={`${styles['agent-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>Agent 配置</h1>
+          <h1>Agent管理</h1>
           <p className={styles['head-subcopy']}>
             编辑 Agent 基础配置、skills 和工具权限。当前为前端 demo 内存状态。
           </p>
         </div>
         <button
-          className={styles['outline-action']}
+          className={`${styles['outline-action']} outline-action`}
           type="button"
           onClick={onAgentAdd}
         >
@@ -368,16 +383,11 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             {agents.map((agent) => (
               <button
                 key={agent.id}
-                className={`${styles['agent-config-row']} ${agent.id === selectedAgentId ? styles.selected : ''}`}
+                className={`${styles['agent-config-row']} agent-config-row ${agent.id === selectedAgentId ? styles.selected : ''}`}
                 type="button"
                 onClick={() => onAgentSelect?.(agent.id)}
               >
-                <span
-                  className={styles['agent-symbol']}
-                  style={{ background: agentColor(agent) }}
-                >
-                  {agentInitial(agent)}
-                </span>
+                <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
                 <div>
                   <strong>{agent.name}</strong>
                   <span>
@@ -405,6 +415,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             onAgentDuplicate={onAgentDuplicate}
             onAgentDelete={onAgentDelete}
             onAgentSkillToggle={onAgentSkillToggle}
+            onAgentProfileOpen={onAgentProfileOpen}
             onToolPermissionSet={onToolPermissionSet}
             onFieldChange={onAgentFieldChange}
             recentEvents={recentEvents}
@@ -441,6 +452,7 @@ interface AgentEditPanelProps {
   onAgentSave?: (() => void) | undefined;
   onAgentDuplicate?: (() => void) | undefined;
   onAgentDelete?: (() => void) | undefined;
+  onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
   onAgentSkillToggle?: ((skill: string) => void) | undefined;
   onToolPermissionSet?: ((tool: string, value: ToolPermission) => void) | undefined;
   onFieldChange?: ((field: string, value: string) => void) | undefined;
@@ -457,6 +469,7 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   onAgentSave,
   onAgentDuplicate,
   onAgentDelete,
+  onAgentProfileOpen,
   onAgentSkillToggle,
   onToolPermissionSet,
   onFieldChange,
@@ -465,12 +478,7 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
 }) => (
   <aside className={styles['agent-detail']}>
     <div className={`${styles['detail-head']} ${styles.editable}`}>
-      <span
-        className={styles['agent-symbol']}
-        style={{ background: agentColor(agent) }}
-      >
-        {agentInitial(agent)}
-      </span>
+      <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
       <div>
         <h2>{agent.name}</h2>
         <span>{agent.role} Agent</span>
@@ -507,55 +515,43 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       </label>
       <label>
         运行引擎
-        <select
+        <Select
+          ariaLabel="运行引擎"
+          className={styles['field-select'] ?? ''}
           value={agent.engine}
-          onChange={(e) => onFieldChange?.('engine', e.target.value)}
-        >
-          {['Claude Code', 'DeepSeek', 'Codex', 'Browser Worker'].map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+          options={['Claude Code', 'DeepSeek', 'Codex', 'Browser Worker'].map((opt) => [opt, opt])}
+          onChange={(value) => onFieldChange?.('engine', value)}
+        />
       </label>
       <label>
         默认模型
-        <select
+        <Select
+          ariaLabel="默认模型"
+          className={styles['field-select'] ?? ''}
           value={agent.model}
-          onChange={(e) => onFieldChange?.('model', e.target.value)}
-        >
-          {['DeepSeek-V4-Pro', 'kimi-k2.6', 'glm-5.1', 'gpt-5-codex'].map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+          options={['DeepSeek-V4-Pro', 'kimi-k2.6', 'glm-5.1', 'gpt-5-codex'].map((opt) => [opt, opt])}
+          onChange={(value) => onFieldChange?.('model', value)}
+        />
       </label>
       <label>
         运行模式
-        <select
+        <Select
+          ariaLabel="运行模式"
+          className={styles['field-select'] ?? ''}
           value={agent.mode}
-          onChange={(e) => onFieldChange?.('mode', e.target.value)}
-        >
-          {['Plan → Code', 'Review', 'Research', 'Deploy', 'Autonomous'].map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+          options={['Plan → Code', 'Review', 'Research', 'Deploy', 'Autonomous'].map((opt) => [opt, opt])}
+          onChange={(value) => onFieldChange?.('mode', value)}
+        />
       </label>
       <label>
         状态
-        <select
+        <Select
+          ariaLabel="状态"
+          className={styles['field-select'] ?? ''}
           value={agent.state}
-          onChange={(e) => onFieldChange?.('state', e.target.value)}
-        >
-          {(['running', 'ready', 'idle', 'waiting'] as AgentState[]).map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+          options={(['running', 'ready', 'idle', 'waiting'] as AgentState[]).map((opt) => [opt, opt])}
+          onChange={(value) => onFieldChange?.('state', value)}
+        />
       </label>
       <label>
         审批策略
@@ -672,15 +668,15 @@ const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
   const categories: MarketCategory[] = ['推荐', '研发', '文档', '测试', '安全', '发布'];
 
   return (
-    <main className={`${styles['agent-main']} ${styles['agent-market-main']}`}>
-      <div className={styles['workbench-head']}>
+    <main className={`${styles['agent-main']} ${styles['agent-market-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
           <h1>Agent 市场</h1>
           <p className={styles['head-subcopy']}>
             从 TokenDance 模板库安装可复用 Agent，不影响已安装配置。
           </p>
         </div>
-        <button className={styles['outline-action']} type="button" onClick={onMarketPublish}>
+        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onMarketPublish}>
           发布模板
         </button>
       </div>
@@ -767,7 +763,7 @@ const MarketCard: React.FC<{
   onInstall?: ((name: string, description: string, category: string) => void) | undefined;
   onPreview?: ((name: string) => void) | undefined;
 }> = ({ template, onInstall, onPreview }) => (
-  <article className={styles['market-card']}>
+  <article className={`${styles['market-card']} agent-card`} data-card-surface>
     <div className={styles['market-card-head']}>
       <div className={styles['market-icon']}>{marketInitials(template.name)}</div>
       <span>{template.category}</span>
@@ -814,15 +810,15 @@ const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
   ];
 
   return (
-    <main className={styles['agent-main']}>
-      <div className={styles['workbench-head']}>
+    <main className={`${styles['agent-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
           <h1>运行策略</h1>
           <p className={styles['head-subcopy']}>
             配置 Agent 执行边界、审批默认值和风险分级。这里展示前端 demo 的策略矩阵。
           </p>
         </div>
-        <button className={styles['outline-action']} type="button" onClick={onPolicyAdd}>
+        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onPolicyAdd}>
           <DesignNavIcon name="plus" size={15} />
           新增策略
         </button>
@@ -838,13 +834,14 @@ const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
             {policyRules.map((rule) => (
               <button
                 key={rule.name}
-                className={styles['agent-rule-row']}
+                className={`${styles['agent-rule-row']} agent-card`}
+                data-card-surface
                 type="button"
               >
                 <span className={styles['rule-icon']}>
                   <DesignNavIcon
                     name={rule.riskLevel === '高风险' ? 'policy' : 'tools'}
-                    size={17}
+                    size={DESIGN_NAV_ICON_SIZE}
                   />
                 </span>
                 <div>
@@ -899,15 +896,15 @@ const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
   } = props;
 
   return (
-    <main className={styles['agent-main']}>
-      <div className={styles['workbench-head']}>
+    <main className={`${styles['agent-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
           <h1>工具权限</h1>
           <p className={styles['head-subcopy']}>
             按 Agent 查看工具授权。权限值可在“Agent 配置”页直接修改，这里做集中总览。
           </p>
         </div>
-        <button className={styles['outline-action']} type="button" onClick={onToolsAddAgent}>
+        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onToolsAddAgent}>
           <DesignNavIcon name="plus" size={15} />
           添加 Agent
         </button>
@@ -987,15 +984,15 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
   } = props;
 
   return (
-    <main className={styles['agent-main']}>
-      <div className={styles['workbench-head']}>
+    <main className={`${styles['agent-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
           <h1>模型配置</h1>
           <p className={styles['head-subcopy']}>
             定义可选模型、默认用途和 Agent 分配。当前 demo 只修改前端展示状态。
           </p>
         </div>
-        <button className={styles['outline-action']} type="button" onClick={onModelAdd}>
+        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onModelAdd}>
           <DesignNavIcon name="plus" size={15} />
           添加模型
         </button>
@@ -1004,7 +1001,7 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
       {/* Model grid */}
       <div className={styles['model-grid']}>
         {models.map((model) => (
-          <article key={model.name} className={styles['model-card']}>
+          <article key={model.name} className={`${styles['model-card']} agent-card`} data-card-surface>
             <div className={styles['market-icon']}>
               {marketInitials(model.name)}
             </div>
@@ -1081,15 +1078,15 @@ const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
   const filters = ['全部', '需确认', '禁止', '今天'];
 
   return (
-    <main className={styles['agent-main']}>
-      <div className={styles['workbench-head']}>
+    <main className={`${styles['agent-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
           <h1>审计日志</h1>
           <p className={styles['head-subcopy']}>
             记录 Agent 工具调用、审批结果和目标资源，用于 demo 中展示治理闭环。
           </p>
         </div>
-        <button className={styles['outline-action']} type="button" onClick={onAuditExport}>
+        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onAuditExport}>
           <DesignNavIcon name="download" size={15} />
           导出日志
         </button>
@@ -1142,21 +1139,39 @@ const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
    Shared helpers
    ═══════════════════════════════════════════════════════════════════════ */
 
-function agentInitial(agent: AgentConfig): string {
-  return (agent.name || 'A').slice(0, 1).toUpperCase();
-}
+const AgentAvatar: React.FC<{
+  agent: AgentConfig;
+  onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
+}> = ({ agent, onAgentProfileOpen }) => {
+  const profile = resolveWorkbenchProfile(agent.id || agent.name, [agent]);
 
-function agentColor(agent: AgentConfig): string {
-  const key = (agent.id || agent.name || '').toLowerCase();
-  if (key.includes('builder')) return 'var(--role-builder)';
-  if (key.includes('reviewer')) return 'var(--role-reviewer)';
-  if (key.includes('researcher')) return 'var(--role-researcher)';
-  if (key.includes('deployer') || key.includes('release')) return 'var(--role-deployer)';
-  if (key.includes('security')) return 'var(--danger)';
-  if (key.includes('browser')) return 'var(--role-deployer)';
-  if (key.includes('data')) return 'var(--warning)';
-  return 'var(--primary)';
-}
+  return (
+    <span
+      aria-expanded={false}
+      aria-haspopup="dialog"
+      aria-label={`查看 ${profile.name} 资料`}
+      className={styles['agent-avatar']}
+      data-agent-profile={profile.name}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onAgentProfileOpen?.(agent, event.currentTarget);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        onAgentProfileOpen?.(agent, event.currentTarget);
+      }}
+      role="button"
+      style={{ background: profile.color }}
+      tabIndex={0}
+      title={`${profile.name} ${profile.label}`}
+    >
+      {profile.initials}
+    </span>
+  );
+};
 
 function stateClass(state: AgentState): string {
   if (state === 'running') return styles.running ?? '';

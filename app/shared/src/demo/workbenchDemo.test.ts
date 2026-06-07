@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+  createWorkbenchDemoRuntimeStore,
   createWorkbenchDemoStore,
   demoWorkbenchPins,
   resolveDemoWorkbenchTranscript,
 } from './workbenchDemo';
 
 describe('workbench v4 demo data source', () => {
-  it('derives pinned announcements from demo pins and transcript messages', () => {
+  it('derives the Builder pinned announcement from the design demo summary', () => {
     const store = createWorkbenchDemoStore();
     const builder = store.conversations.find((conversation) => conversation.id === 'builder');
 
@@ -16,7 +17,8 @@ describe('workbench v4 demo data source', () => {
       sourceId: demoWorkbenchPins[0]?.messageId,
       author: demoWorkbenchPins[0]?.pinnedBy,
     }));
-    expect(builder?.pinnedAnnouncement?.content).toContain('收到，我会先做运行隔离和代码定位');
+    expect(builder?.pinnedAnnouncement?.content).toContain('前端重构任务已置顶');
+    expect(builder?.pinnedAnnouncement?.content).toContain('Reviewer 和 Deployer 后续跟进验收');
   });
 
   it('keeps non-pinned demo conversations free of pinned state', () => {
@@ -34,5 +36,51 @@ describe('workbench v4 demo data source', () => {
       id: 'reviewer-user-1',
       kind: 'text',
     }));
+  });
+
+  it('mutates demo transcripts through the runtime store submit path', async () => {
+    const runtime = createWorkbenchDemoRuntimeStore();
+    const before = runtime.resolveTranscript('builder').length;
+    let emits = 0;
+    runtime.subscribe(() => {
+      emits += 1;
+    });
+
+    const result = await runtime.submitComposerIntent({
+      conversationId: 'builder',
+      text: '继续完善 mock 系统',
+      mode: 'code',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    });
+
+    const transcript = runtime.resolveTranscript('builder');
+    expect(result.intentId).toMatch(/^demo-agent-/);
+    expect(transcript).toHaveLength(before + 2);
+    expect(transcript.at(-2)).toEqual(expect.objectContaining({
+      kind: 'text',
+      text: '继续完善 mock 系统',
+    }));
+    expect(transcript.at(-1)).toEqual(expect.objectContaining({
+      kind: 'text',
+      text: expect.stringContaining('已收到 mock 输入'),
+    }));
+    expect(emits).toBe(1);
+  });
+
+  it('mutates demo pins and derives conversation pinned state from current store data', () => {
+    const runtime = createWorkbenchDemoRuntimeStore();
+
+    runtime.pinMessage('reviewer', 'reviewer-reply-1', 'Tester');
+    const reviewer = runtime.getSnapshot().conversations.find((conversation) => conversation.id === 'reviewer');
+    expect(reviewer?.pinnedAnnouncement).toEqual(expect.objectContaining({
+      author: 'Tester',
+      sourceId: 'reviewer-reply-1',
+    }));
+
+    runtime.unpinMessage('reviewer', 'reviewer-reply-1');
+    const unpinnedReviewer = runtime.getSnapshot().conversations.find((conversation) => conversation.id === 'reviewer');
+    expect(unpinnedReviewer).not.toHaveProperty('pinnedAnnouncement');
   });
 });

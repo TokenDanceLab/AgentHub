@@ -19,7 +19,10 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
-  transition: border-color var(--dur-normal) var(--ease), box-shadow var(--dur-normal) var(--ease);
+  transition:
+    gap var(--dur-medium) var(--ease-panel),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
 }
 
 .section:hover {
@@ -27,56 +30,91 @@
   box-shadow: var(--e-1);
 }
 
-.sectionCollapsed > :not(.sectionHead) {
-  display: none;
+.sectionCollapsed {
+  gap: 0;
 }
 
-/* ── Section head button ── */
+.section > :not(.sectionHead) {
+  max-height: 520px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height var(--dur-panel) var(--ease-panel),
+    opacity var(--dur-medium) var(--ease),
+    transform var(--dur-medium) var(--ease);
+}
+
+.sectionCollapsed > :not(.sectionHead) {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+
+/* ── Section head ── */
 .sectionHead {
   width: 100%;
   min-height: 30px;
   padding: 0 0 0 2px;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
   color: var(--text-1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  text-align: left;
   font: 500 0.75rem/1.5 var(--font-sans);
+}
+
+.sectionToggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease),
+    transform var(--dur-pop, var(--dur-medium)) var(--ease-press, var(--ease));
 }
 
-.sectionHead:hover {
-  background: var(--surface-low);
-  color: var(--text-1);
+.sectionToggle:hover {
+  background: var(--surface-high);
+  color: var(--primary);
+  transform: scale(1.04);
 }
 
-.sectionHead:focus-visible {
+.sectionToggle:active {
+  transform: scale(0.94);
+}
+
+.sectionToggle:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
 
 /* ── Chevron icon wrapper ── */
 .chevron {
-  width: 28px;
-  height: 28px;
-  padding: 7px;
-  border-radius: var(--r-sm);
-  color: var(--text-3);
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 0;
+  color: currentColor;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease), background var(--dur-normal) var(--ease);
-}
-
-.sectionHead:hover .chevron {
-  background: var(--surface-high);
-  color: var(--primary);
+  transition:
+    transform var(--dur-medium) var(--ease-panel),
+    color var(--dur-normal) var(--ease),
+    background var(--dur-normal) var(--ease);
 }
 
 .sectionCollapsed .chevron {
@@ -194,7 +232,7 @@
   font: 400 0.75rem var(--font-sans);
   color: var(--text-2);
   cursor: pointer;
-  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease), transform var(--dur-normal) var(--ease);
+  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease), box-shadow var(--dur-normal) var(--ease), transform var(--dur-normal) var(--ease);
 }
 
 .file:hover,
@@ -205,6 +243,10 @@
 
 .file:hover {
   transform: translateX(1px);
+}
+
+.fileOpen {
+  box-shadow: none;
 }
 
 .file:focus-visible {
@@ -224,6 +266,8 @@
   width: 17px;
   height: 17px;
   border-radius: 3px;
+  color: var(--text-3);
+  font-size: 12px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -234,6 +278,7 @@
   width: 17px;
   height: 17px;
   display: block;
+  color: var(--text-3);
 }
 
 /* ── Truncated file name ── */

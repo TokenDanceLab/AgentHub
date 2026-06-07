@@ -45,16 +45,18 @@ export const MultiSelectBar: React.FC<MultiSelectBarProps> = ({
       {actions.map((action, i) => (
         <button
           key={i}
+          aria-label={action.label}
           className={[
             styles.action,
             action.danger ? styles.danger : '',
             action.ghost ? styles.ghost : '',
           ].filter(Boolean).join(' ')}
+          title={action.label}
           type="button"
           onClick={action.onClick}
         >
           {action.icon && <DesignNavIcon name={action.icon} size={15} />}
-          {action.label}
+          <span>{action.label}</span>
         </button>
       ))}
     </div>

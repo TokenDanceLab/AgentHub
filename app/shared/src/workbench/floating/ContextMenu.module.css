@@ -16,7 +16,8 @@
   opacity: 0;
   transform: translateY(4px) scale(0.985);
   transform-origin: top left;
-  transition: opacity var(--dur-fast) var(--ease),
+  transition:
+    opacity var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
   pointer-events: none;
 }

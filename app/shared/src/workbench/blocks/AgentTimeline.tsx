@@ -69,7 +69,7 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
   items,
 }) => {
   return (
-    <section className={styles.section} aria-label={title}>
+    <section className={`${styles.section} agent-timeline timeline-block`} aria-label={title}>
       <div className={styles.head}>
         <strong className={styles.headTitle}>{title}</strong>
         <span className={styles.headCount}>{items.length} items</span>
@@ -81,7 +81,7 @@ export const AgentTimeline: React.FC<AgentTimelineProps> = ({
           return (
             <li key={idx} className={[styles.item, cls].filter(Boolean).join(' ')}>
               {/* Circular marker with inner dot */}
-              <span className={styles.marker} aria-hidden="true" />
+              <span className={`${styles.marker} timeline-marker`} aria-hidden="true" />
 
               {/* Label + optional detail */}
               <div className={styles.itemBody}>
