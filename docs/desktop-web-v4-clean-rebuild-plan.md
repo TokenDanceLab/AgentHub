@@ -319,17 +319,20 @@ app/desktop/src-tauri/src/
   - `app/desktop/src/hooks/useIMChat.ts`
   - Web duplicate Chat/Prompt/Run/Thread files
 
-- [ ] 先确认没有 active route/import。
-- [ ] 删除旧测试或重写为 shared tests。
-- [ ] 删除旧 CSS modules 或迁移必要 token。
-- [ ] 运行旧入口扫描。
-- [ ] 跑 full Desktop/Web typecheck。
+- [x] 先确认没有 active route/import；首片已删除 Desktop/Web 旧 `viewRegistry`、旧 `MainView` 和旧 `IMView`。
+- [ ] 删除旧测试或重写为 shared tests；首片已删除 Desktop 旧 `MainView/IMView/RunDetail/RightInspector/PermissionDialog` tests，剩余旧 Chat/Prompt/Thread/IM hook tests 后续随类型迁移处理。
+- [ ] 删除旧 CSS modules 或迁移必要 token；首片已删除旧 `IMView`、Desktop `RunDetail/RightInspector/PermissionDialog` 和 Web `PermissionDialog` CSS。
+- [x] 运行旧入口扫描；新增 `scripts/verify-v4-old-ui-active-paths.ps1`。
+- [x] 跑 full Desktop/Web typecheck。
+
+执行记录：
+- 2026-06-07：删除 Desktop/Web 旧 registry、旧 `MainView/IMView` active route、Desktop 旧 `RunDetail/RightInspector/PermissionDialog` 和 Web 孤儿 `PermissionDialog`；新增 `scripts/verify-v4-old-ui-active-paths.ps1`，阻断 active Desktop/Web source 重新 import 旧 `ChatView`、`PromptInput`、`RunDetail`、`ThreadPanel`、`IMBlockRenderer`、`useChatMessages`、`useIMChat` 或旧 `viewRegistry`。验证：Desktop typecheck/build 通过；Web focused tests 6 个文件 / 32 个测试通过；Web typecheck/build 通过；Desktop App v4 focused tests 1 个文件 / 4 个测试通过；Web Hub-only boundary 12/12 通过；v4 old UI active path boundary 16/16 通过；Desktop/Web 1440x920 Playwright smoke 通过。
 
 ## 6. 验收命令
 
 ```powershell
 git diff --check
-rg -n "ChatView|PromptInput|IMBlockRenderer|RunDetail|ThreadPanel|useChatMessages|useIMChat|viewRegistry" app docs README.md AGENTS.md
+.\scripts\verify-v4-old-ui-active-paths.ps1
 cd app/shared; corepack.cmd pnpm lint; corepack.cmd pnpm test
 cd ..\desktop; corepack.cmd pnpm typecheck; corepack.cmd pnpm test
 cd ..\web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vite build

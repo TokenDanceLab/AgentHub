@@ -35,8 +35,11 @@ import { TeamTaskBoard } from '@/components/IM/TeamTaskBoard';
 import type { TeamTaskDisplay } from '@/components/IM/TeamTaskBoard';
 import { TeamApprovalPanel } from '@/components/IM/TeamApprovalPanel';
 import { TeamEventTimeline } from '@/components/IM/TeamEventTimeline';
-import type { ViewProps } from '@/config/viewRegistry';
 import styles from './TeamRunConsole.module.css';
+
+interface TeamRunConsoleProps {
+  [key: string]: unknown;
+}
 
 // ── helpers ──
 
@@ -102,7 +105,7 @@ type ConsoleTab = 'members' | 'tasks' | 'approvals' | 'events';
 
 // ── Component ──
 
-export default function TeamRunConsole(_props: ViewProps) {
+export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const { t } = useTranslation();
   const hubAuthenticated = useHubStore((s) => s.authenticated);
 
