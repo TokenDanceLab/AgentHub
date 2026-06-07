@@ -1,8 +1,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const WORKBENCH_ROOT = join(process.cwd(), 'src', 'workbench');
+const WORKBENCH_ROOT = dirname(fileURLToPath(import.meta.url));
 const ICON_REGISTRY = join(WORKBENCH_ROOT, 'designIcons.tsx');
 const TEST_FILES = new Set([
   'designIcons.test.tsx',
