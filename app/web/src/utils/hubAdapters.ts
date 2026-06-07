@@ -23,7 +23,7 @@ export interface HubThreadInfo extends ThreadInfo {
   sessionType: string;
 }
 
-export interface RunDetailToolCall {
+export interface RunEvidenceToolCall {
   callId: string;
   toolName: string;
   status: string;
@@ -31,9 +31,9 @@ export interface RunDetailToolCall {
   output?: string;
 }
 
-export interface RunDetailProjection {
+export interface RunEvidenceProjection {
   outputText: string;
-  toolCalls: RunDetailToolCall[];
+  toolCalls: RunEvidenceToolCall[];
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
 }
 
@@ -430,10 +430,10 @@ function toolResultOutput(children: Extract<MessageBlock, { kind: 'tool_use' }>[
   return output || undefined;
 }
 
-export function projectRunDetail(messages: ChatMessage[]): RunDetailProjection {
+export function projectRunEvidence(messages: ChatMessage[]): RunEvidenceProjection {
   const outputParts: string[] = [];
-  const toolCallsById = new Map<string, RunDetailToolCall>();
-  const changedFiles: RunDetailProjection['changedFiles'] = [];
+  const toolCallsById = new Map<string, RunEvidenceToolCall>();
+  const changedFiles: RunEvidenceProjection['changedFiles'] = [];
 
   for (const message of messages) {
     if (message.role !== 'agent') continue;
@@ -449,7 +449,7 @@ export function projectRunDetail(messages: ChatMessage[]): RunDetailProjection {
           const existing = toolCallsById.get(block.callId);
           const output = toolResultOutput(block.children);
           const mergedOutput = output ?? existing?.output;
-          const projected: RunDetailToolCall = {
+          const projected: RunEvidenceToolCall = {
             callId: block.callId,
             toolName: existing?.toolName && existing.toolName !== 'Tool result'
               ? existing.toolName
@@ -483,8 +483,8 @@ export function projectRunDetail(messages: ChatMessage[]): RunDetailProjection {
   };
 }
 
-export function projectRunEvents(events: AgentRunEventLike[]): RunDetailProjection {
-  return projectRunDetail(events.map((event) => agentRunEventToChatMessage(event)));
+export function projectRunEventEvidence(events: AgentRunEventLike[]): RunEvidenceProjection {
+  return projectRunEvidence(events.map((event) => agentRunEventToChatMessage(event)));
 }
 
 export function hubMessageToChatMessage(msg: HubMessageLike): ChatMessage {
