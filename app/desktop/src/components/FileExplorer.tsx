@@ -134,7 +134,7 @@ function getFileIcon(filename: string): { Icon: React.ComponentType<{ size?: num
   const ext = getExtension(filename);
   const Icon = FILE_ICON_MAP[ext] || File;
   const color = FILE_COLOR_MAP[ext];
-  return { Icon, color };
+  return color ? { Icon, color } : { Icon };
 }
 
 // ── Component ──

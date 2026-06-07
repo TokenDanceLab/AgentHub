@@ -45,6 +45,10 @@ export interface ArtifactItem {
   status?: string;
 }
 
+function compactRecord<T>(value: Record<string, unknown>): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 interface Props {
   /** Structured team artifacts from Hub (highest fidelity). */
   teamArtifacts?: TeamArtifactState[];
@@ -185,7 +189,7 @@ function extractArtifactsFromMessages(messages: ChatMessage[] | undefined): Arti
       const artBlock = block as Extract<MessageBlock, { kind: 'artifact' }>;
       const category = mapArtifactBlockType(artBlock.artifactType);
 
-      artifacts.push({
+      artifacts.push(compactRecord<ArtifactItem>({
         id: artBlock.artifactId,
         title: artBlock.title,
         path: artBlock.title,
@@ -195,7 +199,7 @@ function extractArtifactsFromMessages(messages: ChatMessage[] | undefined): Arti
         previewUrl: artBlock.previewUrl,
         canApplyDiff: artBlock.canApplyDiff,
         diffApplied: artBlock.diffApplied,
-      });
+      }));
     }
   }
 
@@ -215,7 +219,7 @@ function mapArtifactBlockType(type: string): ArtifactCategory {
 function extractArtifactsFromTeamState(teamArtifacts: TeamArtifactState[]): ArtifactItem[] {
   return teamArtifacts
     .filter((a) => a.path)
-    .map((a, i) => ({
+    .map((a, i) => compactRecord<ArtifactItem>({
       id: `ta-${a.event_seq ?? i}-${a.path}`,
       title: titleFromPath(a.path),
       path: a.path,
@@ -611,7 +615,7 @@ export default function ArtifactBrowser({
         <PreviewPanel
           artifact={selectedArtifact}
           onClose={() => setSelectedArtifact(null)}
-          onApplyDiff={onApplyDiff}
+          {...(onApplyDiff ? { onApplyDiff } : {})}
         />
       )}
     </section>

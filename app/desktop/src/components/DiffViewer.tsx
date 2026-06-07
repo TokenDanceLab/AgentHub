@@ -294,12 +294,8 @@ export default function DiffViewer({
                 file={file}
                 expanded={expandedFiles.has(file.filePath)}
                 onToggle={() => toggleFile(file.filePath)}
-                onAcceptFile={
-                  activeTab === 'agent' ? onAcceptFile : undefined
-                }
-                onRejectFile={
-                  activeTab === 'agent' ? onRejectFile : undefined
-                }
+                {...(activeTab === 'agent' && onAcceptFile ? { onAcceptFile } : {})}
+                {...(activeTab === 'agent' && onRejectFile ? { onRejectFile } : {})}
               />
             ))}
           </div>

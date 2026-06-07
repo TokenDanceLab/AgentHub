@@ -127,7 +127,7 @@ export default function TasksSection({
               <TaskRunRow
                 key={run.runId}
                 run={run}
-                onCancel={isActiveRun(run) ? (runId) => { void cancelRunMutation.mutateAsync(runId); } : undefined}
+                {...(isActiveRun(run) ? { onCancel: (runId: string) => { void cancelRunMutation.mutateAsync(runId); } } : {})}
                 cancelling={cancelRunMutation.isPending && cancelRunMutation.variables === run.runId}
               />
             ))}
