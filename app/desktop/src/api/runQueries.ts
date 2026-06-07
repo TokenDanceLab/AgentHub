@@ -1,6 +1,6 @@
 // TanStack Query hooks for run lifecycle.
 // Service-layer data (runs, run lists) managed by TanStack Query.
-// Streaming data (outputText, toolCalls, messages) stays in useChatMessages reducer.
+// Streaming data is normalized through the v4 shared transcript/event model.
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { startRun, cancelRun, fetchRuns } from './edgeClient';
