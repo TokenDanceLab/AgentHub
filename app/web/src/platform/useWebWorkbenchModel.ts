@@ -8,12 +8,15 @@ import {
   webHubEmptyTranscript,
   webTranscript,
 } from './webPlatform';
+import { useWebHubRealtime } from './webHubRealtime';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
 export function useWebWorkbenchModel() {
   const authenticated = useHubStore((state) => state.authenticated);
   const hubReady = authenticated && Boolean(getAccessToken());
+
+  useWebHubRealtime({ enabled: hubReady });
 
   const sessions = useQuery({
     queryKey: ['web-v4', 'hub-sessions', hubReady],
