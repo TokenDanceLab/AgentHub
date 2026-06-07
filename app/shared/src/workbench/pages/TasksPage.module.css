@@ -43,9 +43,17 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .navMore:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.navMoreActive {
   background: var(--surface-high);
   color: var(--text-1);
 }
@@ -58,6 +66,36 @@
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.navMenu {
+  margin: -8px 4px 10px;
+  padding: 6px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--e-1);
+}
+
+.navMenu button {
+  width: 100%;
+  min-height: 30px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  text-align: left;
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+}
+
+.navMenu button:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
 }
 
 /* ── Nav rows ── */
@@ -178,11 +216,16 @@
 .headActions {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 8px;
+  min-width: 0;
 }
 
 /* ── Buttons ── */
 .createBtn {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 128px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -190,16 +233,25 @@
   padding: 0 18px;
   border-radius: var(--r-md);
   font: 500 0.875rem var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border: none;
   cursor: pointer;
   background: var(--primary);
   color: var(--text-inv);
-  transition: background var(--dur-normal) var(--ease);
+  transition:
+    background var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
 }
 
 .createBtn:hover {
   background: var(--primary-hover);
   box-shadow: var(--e-1);
+}
+
+.createBtn:active {
+  transform: translateY(0);
 }
 
 .iconBtn {
@@ -214,10 +266,16 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .iconBtn:hover {
   background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .iconBtn svg {
@@ -244,6 +302,16 @@
   border: 1px solid var(--bdr);
   border-radius: var(--r-md);
   background: var(--surface);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.stat:hover {
+  background: var(--surface-low);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
 }
 
 .statLabel {
@@ -263,19 +331,30 @@
   height: 38px;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 22px;
   border-bottom: 1px solid var(--bdr);
   margin-bottom: 10px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .viewTab {
+  flex: 0 1 auto;
+  min-width: 0;
   height: 38px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--text-2);
   font: 500 0.875rem var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
+  transition:
+    color var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
 }
 
 .viewTab:hover {
@@ -292,12 +371,20 @@
   min-height: 42px;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   margin-bottom: 8px;
+  overflow: auto hidden;
+  scrollbar-width: none;
+}
+
+.toolbar::-webkit-scrollbar {
+  display: none;
 }
 
 .toolbarBtn {
+  flex: 0 0 auto;
+  max-width: 168px;
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--bdr);
@@ -308,7 +395,14 @@
   align-items: center;
   gap: 6px;
   font: 500 0.75rem var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .toolbarBtn:hover {
@@ -324,6 +418,7 @@
 }
 
 .toolbarBtn svg {
+  flex: 0 0 auto;
   width: 15px;
   height: 15px;
   fill: none;
@@ -331,6 +426,130 @@
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.toolbarStatus {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font: 500 0.75rem var(--font-sans);
+}
+
+@media (max-width: 760px) {
+  .toolbarBtn:has(svg) {
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    font-size: 0;
+  }
+}
+
+/* ── Selection strip ── */
+.selectionStrip {
+  min-height: 30px;
+  margin: -2px 0 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 500 0.75rem var(--font-sans);
+}
+
+.selectionStrip > strong {
+  margin-left: auto;
+  color: var(--text-1);
+  font: 600 0.75rem var(--font-sans);
+}
+
+.selectionMeta {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-1);
+}
+
+.selectionMeta strong {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 0.8125rem var(--font-sans);
+}
+
+.selectionMeta em {
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  background: var(--surface-high);
+  border: 1px solid var(--bdr);
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-sans);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.selectionKicker {
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+}
+
+.selectionMuted {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+
+.selectionActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.selectionFeedback {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-1);
+  font: 600 0.75rem var(--font-sans);
+}
+
+.selectionActions button {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+}
+
+.selectionActions button:hover {
+  background: var(--surface-high);
+  border-color: var(--bdr-strong);
+  color: var(--text-1);
+}
+
+.selectionActions .dangerAction {
+  color: var(--danger);
+}
+
+.selectionActions .dangerAction:hover {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* ── Task table ── */
@@ -360,6 +579,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tableFiveColumns .tableHead,
+.tableFiveColumns .row {
+  grid-template-columns:
+    minmax(260px, 1.65fr)
+    minmax(140px, 0.95fr)
+    minmax(90px, 0.62fr)
+    minmax(92px, 0.62fr)
+    minmax(92px, 0.62fr);
 }
 
 /* ── Group title ── */
@@ -412,13 +641,124 @@
   text-align: left;
   font: 400 0.8125rem var(--font-sans);
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .row:hover {
   background: var(--surface-high);
 }
 
+.rowSelected,
+.rowSelected:hover {
+  background: var(--primary-light);
+  color: var(--text-1);
+}
+
 .row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editRow {
+  cursor: default;
+  padding: 0;
+}
+
+.editField {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.editField span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.editField input {
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  padding: 0 8px;
+  font: 500 0.75rem var(--font-sans);
+  outline: none;
+}
+
+.editField input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.editActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.editActions button {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+}
+
+.editActions button:hover {
+  background: var(--surface-high);
+  border-color: var(--bdr-strong);
+  color: var(--text-1);
+}
+
+.tableFiveColumns .editActions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  padding-bottom: 8px;
+}
+
+.profileCell {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+}
+
+.profileAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-full);
+  background: var(--profile-avatar-color, var(--surface-highest));
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 650 0.5625rem/1 var(--font-sans);
+  letter-spacing: 0;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 24%, transparent);
+}
+
+.profileCell[data-profile-kind='user'] .profileAvatar {
+  color: var(--text-3);
+}
+
+.profileName {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -485,6 +825,9 @@
   padding: 0;
   font: 500 0.8125rem var(--font-sans);
   cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
 }
 
 .addRow:hover {

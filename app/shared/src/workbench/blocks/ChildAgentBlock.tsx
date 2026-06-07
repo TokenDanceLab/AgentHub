@@ -31,14 +31,14 @@ export const ChildAgentBlock: React.FC<ChildAgentBlockProps> = ({
     <div className={styles.row}>
       <div className={`${styles.block} ${stateClass}`} data-card-surface>
         <div className={styles.head}>
-          <span className={styles.kind}>Child Agent</span>
+          <span className={styles.kind}>子Agent</span>
           <strong className={styles.agent}>{heading}</strong>
           <em className={styles.status}>{statusLabel}</em>
         </div>
         {body && <p className={styles.task}>{body}</p>}
         <div className={styles.meta}>
           {runId && <code className={styles.metaCode}>{runId}</code>}
-          <span className={styles.metaText}>{agent}</span>
+          <span className={styles.metaText}>subagent: {agent}</span>
           {parentRunId && (
             <span className={styles.metaText}>parent: {parentRunId}</span>
           )}

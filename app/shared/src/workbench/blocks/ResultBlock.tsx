@@ -14,8 +14,6 @@ interface ResultBlockProps {
 
 export const ResultBlock: React.FC<ResultBlockProps> = ({
   success,
-  duration,
-  turns,
   summary,
 }) => {
   return (
@@ -29,17 +27,6 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({
             {success ? '完成' : '失败'}
           </em>
         </div>
-
-        {(duration || turns != null) && (
-          <div className={styles.meta}>
-            {duration && <span className={styles.metaItem}>{duration}</span>}
-            {turns != null && (
-              <span className={styles.metaItem}>
-                {turns} {turns === 1 ? 'turn' : 'turns'}
-              </span>
-            )}
-          </div>
-        )}
 
         {summary && (
           <p className={styles.summary}>{summary}</p>

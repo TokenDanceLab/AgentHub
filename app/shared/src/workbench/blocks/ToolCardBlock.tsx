@@ -54,7 +54,7 @@ export const ToolCardBlock: React.FC<ToolCardBlockProps> = ({
   const statusClass = statusClassMap[status] ?? '';
 
   return (
-    <div className={styles.card} data-card-surface>
+    <div className={`${styles.card} tool-card agent-tool-card`} data-card-surface>
       <div className={styles.icon}>{glyph}</div>
 
       <div className={styles.main}>

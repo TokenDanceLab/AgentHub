@@ -41,6 +41,7 @@ export type {
   TaskItem,
   TaskGroup,
   TaskStatus,
+  TaskEditDraft,
   TasksPane,
   ViewMode,
 } from './TasksPage';

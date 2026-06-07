@@ -7,6 +7,16 @@
   border-radius: var(--r-sm);
   background: var(--surface);
   border: 1px solid var(--bdr);
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.card:hover {
+  background: var(--surface);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
 }
 
 .icon {
@@ -21,6 +31,7 @@
   border: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
   color: var(--primary);
   font: 700 0.6875rem var(--font-mono);
+  transition: background var(--dur-normal) var(--ease);
 }
 
 .main {

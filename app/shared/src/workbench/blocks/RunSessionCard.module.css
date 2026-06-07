@@ -26,6 +26,14 @@
   border-radius: var(--r-md);
   background: var(--surface);
   box-shadow: var(--e-1);
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.card:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-2);
 }
 
 /* flex child fills remaining space */
@@ -60,14 +68,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 700 0.625rem var(--font-mono);
+  font: 400 0.75rem var(--font-sans);
   flex: 0 0 auto;
 }
 
 /* default / running state */
 .markDefault {
   background: var(--primary-light);
-  color: var(--primary);
+  color: var(--text-2);
   border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
 }
 
