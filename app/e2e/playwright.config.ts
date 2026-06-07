@@ -7,7 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['html'], ['json', { outputFile: 'results.json' }]] : 'html',
   use: {
-    baseURL: 'http://127.0.0.1:5175',
+    baseURL: 'http://127.0.0.1:5174',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -23,7 +23,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'corepack pnpm --filter agenthub-web dev --host 127.0.0.1',
-    port: 5175,
+    port: 5174,
     reuseExistingServer: !process.env.CI,
   },
 });

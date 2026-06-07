@@ -16,7 +16,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = 'agenthub-theme';
+const STORAGE_KEY = 'agenthub-v4-theme';
 
 function getStoredMode(): ThemeMode {
   try {
@@ -25,11 +25,11 @@ function getStoredMode(): ThemeMode {
   } catch {
     /* localStorage unavailable */
   }
-  return 'dark';
+  return 'light';
 }
 
 function getSystemTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 

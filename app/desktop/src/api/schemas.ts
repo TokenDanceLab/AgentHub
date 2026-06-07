@@ -119,6 +119,16 @@ export const ThreadItemInfoSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const ThreadPinInfoSchema = z.object({
+  threadId: z.string(),
+  itemId: z.string(),
+  pinnedBy: z.string().optional(),
+  pinnedAt: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  item: ThreadItemInfoSchema.optional(),
+});
+
 // ── Run ─────────────────────────────────────────
 
 export const RunInfoSchema = z.object({

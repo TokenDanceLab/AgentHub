@@ -330,6 +330,20 @@ export type {
 } from './inspector';
 
 export {
+  WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+  createWorkbenchDemoStore,
+  demoWorkbenchAgents,
+  demoWorkbenchPins,
+  demoWorkbenchTranscripts,
+  resolveDemoWorkbenchTranscript,
+} from './demo';
+export type {
+  WorkbenchDemoMessagePin,
+  WorkbenchDemoStore,
+  WorkbenchDemoSurface,
+} from './demo';
+
+export {
   createMockPlatform,
 } from './platform';
 export type {
@@ -356,6 +370,7 @@ export type {
   EvidenceRef,
   EvidenceRefKind,
   EvidenceRefStatus,
+  RunSessionTranscriptBlock,
   TextTranscriptBlock,
   ToolCallTranscriptBlock,
   TranscriptAuthor,
