@@ -5,7 +5,12 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
+	slashpath "path"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -17,15 +22,44 @@ import (
 // Phase 2: codex app-server --listen stdio:// -- JSON-RPC full streaming.
 type CodexAdapter struct {
 	binaryPath string
+	argPrefix  []string
 	model      string
-	available  bool                    // #177: true if the CLI binary exists and is executable
+	available  bool                     // #177: true if the CLI binary exists and is executable
 	budget     *runnerctx.ContextBudget // extracted from ctx in ParseStream; nil = no tracking
 }
 
 // NewCodexAdapter creates a Codex adapter.
 func NewCodexAdapter(binaryPath, model string) *CodexAdapter {
-	_, err := exec.LookPath(binaryPath)
-	return &CodexAdapter{binaryPath: binaryPath, model: model, available: err == nil}
+	cmdPath, argPrefix, available := resolveCodexCommand(binaryPath, exec.LookPath, os.Stat, runtime.GOOS)
+	return &CodexAdapter{binaryPath: cmdPath, argPrefix: argPrefix, model: model, available: available}
+}
+
+type fileStatFunc func(string) (os.FileInfo, error)
+type lookPathFunc func(string) (string, error)
+
+func resolveCodexCommand(binaryPath string, lookPath lookPathFunc, stat fileStatFunc, goos string) (string, []string, bool) {
+	resolved, err := lookPath(binaryPath)
+	if err != nil {
+		return binaryPath, nil, false
+	}
+
+	if goos != "windows" || !strings.EqualFold(filepath.Ext(resolved), ".cmd") {
+		return resolved, nil, true
+	}
+
+	// The npm codex.cmd shim forwards args through %*, which corrupts multiline
+	// prompts when Edge launches it via os/exec. Call the Node entrypoint
+	// directly so prompts are passed as real argv values.
+	script := filepath.Join(filepath.Dir(resolved), "node_modules", "@openai", "codex", "bin", "codex.js")
+	info, err := stat(script)
+	if err != nil || info.IsDir() {
+		return resolved, nil, true
+	}
+	nodePath, err := lookPath("node")
+	if err != nil {
+		return resolved, nil, true
+	}
+	return nodePath, []string{script}, true
 }
 
 func (a *CodexAdapter) Metadata() AdapterMetadata {
@@ -59,7 +93,8 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		model = a.model
 	}
 
-	args := []string{"exec"}
+	args := append([]string(nil), a.argPrefix...)
+	args = append(args, "exec")
 	if model != "" {
 		args = append(args, "-c", "model="+model)
 	}
@@ -93,10 +128,14 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		args = append(args, "--image", image)
 	}
 
-	// Add working directory for tool access (mirrors Claude Code --add-dir)
+	// Set Codex's main working directory. Extra writable roots should be passed
+	// through a separate config field; do not mirror Claude Code --add-dir here.
 	if ctx.WorkDir != "" {
-		args = append(args, "--add-dir", ctx.WorkDir)
+		args = append(args, "--cd", ctx.WorkDir)
 	}
+
+	// Edge runs often use temporary workspaces that are not Git repositories.
+	args = append(args, "--skip-git-repo-check")
 
 	// Structured JSON output
 	args = append(args, "--json")
@@ -112,7 +151,7 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		prompt = contextPreface + "\n---\n\n" + prompt
 	}
 
-	args = append(args, prompt)
+	args = append(args, "--", prompt)
 
 	workDir := ctx.WorkDir
 	if workDir == "" {
@@ -152,6 +191,7 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 		a.budget = budget
 	}
 
+	workDir, _ := ctx.Value(CtxWorkDir).(string)
 	jsonlMode := false
 	offset := 0
 
@@ -182,7 +222,7 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 				offset += len(line)
 				return nil
 			}
-			a.dispatchCodexEvent(scope, emitter, &evt)
+			a.dispatchCodexEvent(scope, emitter, &evt, workDir)
 		} else {
 			text := string(line)
 			emitter.Emit(BusEventTextDelta, scope, map[string]any{
@@ -244,7 +284,7 @@ type codexItemError struct {
 
 // --- Event dispatch ---
 
-func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmitter, evt *codexExecEvent) {
+func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmitter, evt *codexExecEvent, workDir string) {
 	switch evt.Type {
 	case "thread.started":
 		emitter.Emit(BusEventSessionInit, scope, map[string]any{
@@ -292,13 +332,13 @@ func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmi
 		})
 
 	case "item.started":
-		a.dispatchItemStarted(scope, emitter, evt.Item)
+		a.dispatchItemStarted(scope, emitter, evt.Item, workDir)
 
 	case "item.completed":
-		a.dispatchItemCompleted(scope, emitter, evt.Item)
+		a.dispatchItemCompleted(scope, emitter, evt.Item, workDir)
 
 	case "item.updated":
-		a.dispatchItemUpdated(scope, emitter, evt.Item)
+		a.dispatchItemUpdated(scope, emitter, evt.Item, workDir)
 
 	case "error":
 		emitter.Emit(BusEventResult, scope, map[string]any{
@@ -310,7 +350,7 @@ func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmi
 
 // --- Item dispatch (two-phase: probe type then decode) ---
 
-func (a *CodexAdapter) dispatchItemStarted(scope map[string]any, emitter EventEmitter, raw json.RawMessage) {
+func (a *CodexAdapter) dispatchItemStarted(scope map[string]any, emitter EventEmitter, raw json.RawMessage, workDir string) {
 	if raw == nil {
 		return
 	}
@@ -331,13 +371,13 @@ func (a *CodexAdapter) dispatchItemStarted(scope map[string]any, emitter EventEm
 	case "file_change":
 		// Note: Codex currently emits file_change only as item.completed.
 		// We handle item.started defensively in case the protocol evolves.
-		a.emitFileChange(raw, scope, emitter)
+		a.emitFileChange(raw, scope, emitter, workDir)
 	case "todo_list":
 		a.emitTodoList(raw, scope, emitter)
 	}
 }
 
-func (a *CodexAdapter) dispatchItemCompleted(scope map[string]any, emitter EventEmitter, raw json.RawMessage) {
+func (a *CodexAdapter) dispatchItemCompleted(scope map[string]any, emitter EventEmitter, raw json.RawMessage, workDir string) {
 	if raw == nil {
 		return
 	}
@@ -360,7 +400,7 @@ func (a *CodexAdapter) dispatchItemCompleted(scope map[string]any, emitter Event
 	case "collab_tool_call":
 		a.emitTaskNotification(raw, scope, emitter)
 	case "file_change":
-		a.emitFileChange(raw, scope, emitter)
+		a.emitFileChange(raw, scope, emitter, workDir)
 	case "error":
 		a.emitErrorItem(raw, scope, emitter)
 	case "todo_list":
@@ -372,7 +412,7 @@ func (a *CodexAdapter) dispatchItemCompleted(scope map[string]any, emitter Event
 // exec protocol, file_change items are only emitted as item.completed — the
 // file_change case here is defensive. collab_tool_call on item.updated is
 // valid (sub-agent state transitions).
-func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEmitter, raw json.RawMessage) {
+func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEmitter, raw json.RawMessage, workDir string) {
 	if raw == nil {
 		return
 	}
@@ -394,7 +434,7 @@ func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEm
 		a.emitTodoList(raw, scope, emitter)
 	case "file_change":
 		// Defensive: Codex currently only emits file_change as item.completed.
-		a.emitFileChange(raw, scope, emitter)
+		a.emitFileChange(raw, scope, emitter, workDir)
 	}
 }
 
@@ -545,7 +585,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 // (codex-rs/exec/src/exec_events.rs), this item is only emitted as
 // item.completed once the patch succeeds or fails. The handler is also
 // wired to item.started/updated defensively.
-func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {
+func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any, emitter EventEmitter, workDir string) {
 	var item struct {
 		ID      string `json:"id"`
 		Status  string `json:"status"`
@@ -558,20 +598,111 @@ func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any,
 		slog.Debug("codex: emitFileChange unmarshal failed", "err", err)
 		return
 	}
-	payload := map[string]any{
-		"callId":   item.ID,
-		"toolName": "apply_patch",
-		"status":   item.Status,
-	}
 	files := make([]map[string]any, 0, len(item.Changes))
 	for _, ch := range item.Changes {
+		path, outsideWorkspace := safeCodexFileChangePath(ch.Path, workDir)
+		kind, action := codexFileChangeKindAction(ch.Kind)
 		files = append(files, map[string]any{
-			"path": ch.Path,
-			"kind": ch.Kind,
+			"path":    path,
+			"kind":    kind,
+			"action":  action,
+			"rawKind": ch.Kind,
 		})
+		if outsideWorkspace {
+			files[len(files)-1]["outsideWorkspace"] = true
+		}
 	}
-	payload["files"] = files
-	emitter.Emit(BusEventFileChange, scope, payload)
+	for _, file := range files {
+		payload := map[string]any{
+			"callId":   item.ID,
+			"toolName": "apply_patch",
+			"status":   item.Status,
+			"path":     file["path"],
+			"kind":     file["kind"],
+			"action":   file["action"],
+			"rawKind":  file["rawKind"],
+		}
+		if file["outsideWorkspace"] == true {
+			payload["outsideWorkspace"] = true
+		}
+		emitter.Emit(BusEventFileChange, scope, payload)
+	}
+}
+
+func codexFileChangeKindAction(rawKind string) (string, string) {
+	switch rawKind {
+	case "add":
+		return "created", "created"
+	case "delete":
+		return "deleted", "deleted"
+	default:
+		return "modified", "modified"
+	}
+}
+
+func safeCodexFileChangePath(rawPath string, workDir string) (string, bool) {
+	path := strings.ReplaceAll(rawPath, "\\", "/")
+	path = slashpath.Clean(path)
+	if path == "." || path == "" {
+		return slashpath.Base(strings.ReplaceAll(rawPath, "\\", "/")), true
+	}
+
+	if workDir != "" {
+		if rel, ok := codexRelPathInWorkspace(path, workDir); ok {
+			return filepath.ToSlash(rel), false
+		}
+	}
+
+	if codexPathIsAbs(path) {
+		return "<outside-workspace>/" + slashpath.Base(path), true
+	}
+
+	if path == ".." || strings.HasPrefix(path, "../") {
+		return slashpath.Base(path), true
+	}
+
+	return path, false
+}
+
+func codexRelPathInWorkspace(path string, workDir string) (string, bool) {
+	normalizedPath := strings.ReplaceAll(path, "\\", "/")
+	normalizedWorkDir := slashpath.Clean(strings.ReplaceAll(workDir, "\\", "/"))
+	pathVolume := codexPathVolumeName(normalizedPath)
+	workDirVolume := codexPathVolumeName(normalizedWorkDir)
+	if pathVolume != "" || workDirVolume != "" {
+		if !strings.EqualFold(pathVolume, workDirVolume) {
+			return "", false
+		}
+		if pathVolume != "" {
+			normalizedPath = strings.TrimPrefix(normalizedPath, pathVolume)
+			normalizedWorkDir = strings.TrimPrefix(normalizedWorkDir, workDirVolume)
+		}
+	}
+	if !strings.HasSuffix(normalizedWorkDir, "/") {
+		normalizedWorkDir += "/"
+	}
+	if strings.EqualFold(normalizedPath, strings.TrimSuffix(normalizedWorkDir, "/")) {
+		return ".", true
+	}
+	if !strings.HasPrefix(strings.ToLower(normalizedPath), strings.ToLower(normalizedWorkDir)) {
+		return "", false
+	}
+	rel := strings.TrimPrefix(normalizedPath, normalizedWorkDir)
+	if rel == "" || rel == "." || strings.HasPrefix(rel, "../") || rel == ".." {
+		return "", false
+	}
+	return rel, true
+}
+
+func codexPathIsAbs(path string) bool {
+	return filepath.IsAbs(path) || strings.HasPrefix(path, "/") || codexPathVolumeName(path) != ""
+}
+
+func codexPathVolumeName(path string) string {
+	if len(path) >= 2 && path[1] == ':' && ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) {
+		return path[:2]
+	}
+	return ""
 }
 
 func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {

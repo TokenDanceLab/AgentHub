@@ -148,7 +148,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |
 | `run.agent.tool_call` | P0 | Agent 请求工具调用 |
 | `run.agent.tool_result` | P0 | 工具调用执行结果 |
-| `run.agent.file_change` | P0 | 文件变更，payload: `{ path, kind: "created"\|"modified"\|"deleted", diff? }` |
+| `run.agent.file_change` | P0 | 文件变更。每个文件一条事件；payload: `{ callId, toolName, path, kind: "created"\|"modified"\|"deleted", action, status, rawKind?, outsideWorkspace?, diff? }`。本机绝对路径必须在进入事件前转为 workspace-relative 或 `<outside-workspace>/<basename>` |
 | `run.agent.route_decision` | P1 | Runtime structured output 中解析出的 `CoordinatorRouteDecision`；Desktop bridge 会用 dispatch payload 中的 TeamRun context 自动 POST 到 Hub route decision endpoint |
 | `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
 | `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |

@@ -2,19 +2,30 @@ package adapters
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 // parseCodexLines feeds JSONL lines through the Codex adapter's ParseStream.
 func parseCodexLines(t *testing.T, input string) *mockEmitter {
+	return parseCodexLinesWithWorkDir(t, input, "")
+}
+
+func parseCodexLinesWithWorkDir(t *testing.T, input string, workDir string) *mockEmitter {
 	t.Helper()
 	adapter := NewCodexAdapter("codex", "")
 	emitter := &mockEmitter{}
 	run := store.Run{ID: "run_test", ProjectID: "proj_test", ThreadID: "thread_test", Status: "started"}
 	ctx := context.Background()
+	if workDir != "" {
+		ctx = context.WithValue(ctx, CtxWorkDir, workDir)
+	}
 	if err := adapter.ParseStream(ctx, strings.NewReader(input), nil, emitter, run); err != nil {
 		t.Fatalf("ParseStream failed: %v", err)
 	}
@@ -215,27 +226,100 @@ func TestCodexFileChangeCompleted(t *testing.T) {
 	emitter := parseCodexLines(t, input)
 
 	events := emitter.eventsOfType(BusEventFileChange)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 file_change events, got %d", len(events))
+	}
+
+	want := []struct {
+		path    string
+		rawKind string
+		kind    string
+		action  string
+	}{
+		{"src/main.rs", "update", "modified", "modified"},
+		{"src/lib.rs", "add", "created", "created"},
+		{"src/old.rs", "delete", "deleted", "deleted"},
+	}
+	for i, w := range want {
+		payload := events[i].Payload
+		if payload["callId"] != "item_7" {
+			t.Errorf("event[%d] callId = %v", i, payload["callId"])
+		}
+		if payload["toolName"] != "apply_patch" {
+			t.Errorf("event[%d] toolName = %v", i, payload["toolName"])
+		}
+		if payload["path"] != w.path || payload["rawKind"] != w.rawKind || payload["kind"] != w.kind || payload["action"] != w.action {
+			t.Errorf("event[%d] payload = %#v", i, payload)
+		}
+		if payload["status"] != "completed" {
+			t.Errorf("event[%d] status = %v", i, payload["status"])
+		}
+	}
+	for i, event := range events {
+		if _, ok := event.Payload["files"]; ok {
+			t.Fatalf("event[%d] should not include aggregate files payload: %#v", i, event.Payload)
+		}
+	}
+}
+
+func TestCodexFileChangeRelativizesWindowsAbsolutePathInWorkspace(t *testing.T) {
+	workDir := `C:\Users\dev\project`
+	input := `{"type":"item.completed","item":{"id":"item_abs","type":"file_change","changes":[{"path":"C:\\Users\\dev\\project\\src\\main.go","kind":"update"}],"status":"completed"}}`
+	emitter := parseCodexLinesWithWorkDir(t, input, workDir)
+
+	events := emitter.eventsOfType(BusEventFileChange)
 	if len(events) != 1 {
-		t.Fatalf("expected 1 file_change, got %d", len(events))
+		t.Fatalf("expected 1 file_change event, got %d", len(events))
 	}
-	if events[0].Payload["toolName"] != "apply_patch" {
-		t.Errorf("toolName = %v", events[0].Payload["toolName"])
+	if events[0].Payload["path"] != "src/main.go" {
+		t.Fatalf("path = %#v, want workspace-relative src/main.go", events[0].Payload["path"])
 	}
-	if events[0].Payload["status"] != "completed" {
-		t.Errorf("status = %v", events[0].Payload["status"])
+	if _, ok := events[0].Payload["outsideWorkspace"]; ok {
+		t.Fatalf("inside workspace path should not set outsideWorkspace: %#v", events[0].Payload)
 	}
-	files, ok := events[0].Payload["files"].([]map[string]any)
-	if !ok {
-		t.Fatal("files should be a slice")
+}
+
+func TestCodexFileChangeRedactsOutsideWorkspaceAbsolutePath(t *testing.T) {
+	workDir := `C:\Users\dev\project`
+	input := `{"type":"item.completed","item":{"id":"item_outside","type":"file_change","changes":[{"path":"C:\\Users\\dev\\secrets\\token.txt","kind":"update"}],"status":"completed"}}`
+	emitter := parseCodexLinesWithWorkDir(t, input, workDir)
+
+	events := emitter.eventsOfType(BusEventFileChange)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 file_change event, got %d", len(events))
 	}
-	if len(files) != 3 {
-		t.Fatalf("expected 3 files, got %d", len(files))
+	if events[0].Payload["path"] != "<outside-workspace>/token.txt" {
+		t.Fatalf("path = %#v, want redacted basename", events[0].Payload["path"])
 	}
-	if files[0]["path"] != "src/main.rs" || files[0]["kind"] != "update" {
-		t.Errorf("file[0] = %v", files[0])
+	if events[0].Payload["outsideWorkspace"] != true {
+		t.Fatalf("outsideWorkspace = %#v, want true", events[0].Payload["outsideWorkspace"])
 	}
-	if files[1]["path"] != "src/lib.rs" || files[1]["kind"] != "add" {
-		t.Errorf("file[1] = %v", files[1])
+	if _, ok := events[0].Payload["files"]; ok {
+		t.Fatalf("file_change event should not include aggregate files payload: %#v", events[0].Payload)
+	}
+	for _, value := range events[0].Payload {
+		if s, ok := value.(string); ok && strings.Contains(s, `C:\Users\dev`) {
+			t.Fatalf("payload leaked absolute user path: %#v", events[0].Payload)
+		}
+	}
+}
+
+func TestCodexFileChangeCleansEscapingRelativePath(t *testing.T) {
+	input := `{"type":"item.completed","item":{"id":"item_rel","type":"file_change","changes":[{"path":"..\\outside\\secret.go","kind":"rename"}],"status":"completed"}}`
+	emitter := parseCodexLines(t, input)
+
+	events := emitter.eventsOfType(BusEventFileChange)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 file_change event, got %d", len(events))
+	}
+	if events[0].Payload["path"] != "secret.go" {
+		t.Fatalf("path = %#v, want safe basename", events[0].Payload["path"])
+	}
+	if events[0].Payload["outsideWorkspace"] != true {
+		t.Fatalf("outsideWorkspace = %#v, want true", events[0].Payload["outsideWorkspace"])
+	}
+	if events[0].Payload["rawKind"] != "rename" || events[0].Payload["kind"] != "modified" || events[0].Payload["action"] != "modified" {
+		t.Fatalf("unknown kind mapping mismatch: %#v", events[0].Payload)
 	}
 }
 
@@ -248,6 +332,9 @@ func TestCodexFileChangeStarted(t *testing.T) {
 	events := emitter.eventsOfType(BusEventFileChange)
 	if len(events) != 1 {
 		t.Fatalf("expected 1 file_change (started), got %d", len(events))
+	}
+	if events[0].Payload["path"] != "new_file.go" || events[0].Payload["action"] != "created" {
+		t.Fatalf("file_change payload mismatch: %#v", events[0].Payload)
 	}
 }
 
@@ -530,6 +617,40 @@ func TestCodexFullTurnSequence(t *testing.T) {
 	}
 }
 
+func TestCodexExecMinimalJSONLFixture(t *testing.T) {
+	input := strings.Join([]string{
+		`{"type":"thread.started","thread_id":"thread_fixture"}`,
+		`{"type":"turn.started"}`,
+		`{"type":"item.completed","item":{"id":"item_msg","type":"agent_message","text":"OK"}}`,
+		`{"type":"turn.completed","usage":{"input_tokens":11,"cached_input_tokens":3,"output_tokens":5}}`,
+	}, "\n")
+
+	emitter := parseCodexLines(t, input)
+
+	if events := emitter.eventsOfType(BusEventSessionInit); len(events) != 1 || events[0].Payload["threadId"] != "thread_fixture" {
+		t.Fatalf("thread.started event mismatch: %#v", events)
+	}
+	if events := emitter.eventsOfType(BusEventSessionStateChanged); len(events) != 2 {
+		t.Fatalf("expected turn.started busy and turn.completed idle events, got %d", len(events))
+	} else if events[0].Payload["state"] != "busy" || events[1].Payload["state"] != "idle" {
+		t.Fatalf("session state sequence mismatch: %#v", events)
+	}
+	if events := emitter.eventsOfType(BusEventTextBlock); len(events) != 1 || events[0].Payload["content"] != "OK" {
+		t.Fatalf("agent message event mismatch: %#v", events)
+	}
+	events := emitter.eventsOfType(BusEventResult)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 result event, got %d", len(events))
+	}
+	usage, ok := events[0].Payload["usage"].(map[string]any)
+	if !ok {
+		t.Fatal("usage should be a map")
+	}
+	if usage["inputTokens"] != int64(11) || usage["cachedInputTokens"] != int64(3) || usage["outputTokens"] != int64(5) {
+		t.Fatalf("usage mismatch: %#v", usage)
+	}
+}
+
 // --- Edge cases ---
 
 func TestCodexEmptyLine(t *testing.T) {
@@ -620,15 +741,47 @@ func TestCodexBuildCommandAddDirFlag(t *testing.T) {
 		WorkDir: "/home/user/project",
 	})
 
+	for _, a := range args {
+		if a == "--add-dir" {
+			t.Fatalf("--add-dir should not mirror WorkDir for Codex; args=%#v", args)
+		}
+	}
+}
+
+func TestCodexBuildCommandCdFlag(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt:  "list files",
+		WorkDir: "/home/user/project",
+	})
+
 	found := false
 	for i, a := range args {
-		if a == "--add-dir" && i+1 < len(args) && args[i+1] == "/home/user/project" {
+		if a == "--cd" && i+1 < len(args) && args[i+1] == "/home/user/project" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("--add-dir flag not found in args")
+		t.Fatal("--cd flag not found in args")
+	}
+}
+
+func TestCodexBuildCommandSkipsGitRepoCheckForEdgeWorkspace(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt: "hello",
+	})
+
+	found := false
+	for _, a := range args {
+		if a == "--skip-git-repo-check" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("--skip-git-repo-check not found in args")
 	}
 }
 
@@ -668,5 +821,123 @@ func TestCodexBuildCommandNoExtraFlagsWhenEmpty(t *testing.T) {
 		if a == "--add-dir" {
 			t.Error("--add-dir should not be present when no WorkDir is set")
 		}
+	}
+}
+
+func TestCodexBuildCommandTerminatesFlagsBeforeLeadingDashPrompt(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt: "- review this diff",
+	})
+
+	terminator := -1
+	for i, arg := range args {
+		if arg == "--" {
+			terminator = i
+			break
+		}
+	}
+	if terminator == -1 {
+		t.Fatalf("args missing -- terminator: %#v", args)
+	}
+	if terminator+1 >= len(args) {
+		t.Fatalf("-- terminator should be followed by prompt: %#v", args)
+	}
+	if args[terminator+1] != "- review this diff" {
+		t.Fatalf("prompt after -- = %q, want %q; args=%#v", args[terminator+1], "- review this diff", args)
+	}
+}
+
+func TestCodexBuildCommandKeepsNormalPromptAfterFlags(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt: "hello",
+	})
+
+	if len(args) < 2 {
+		t.Fatalf("args too short: %#v", args)
+	}
+	if args[len(args)-2] != "--" || args[len(args)-1] != "hello" {
+		t.Fatalf("normal prompt should remain the final argument after --: %#v", args)
+	}
+	foundJSON := false
+	for _, arg := range args[:len(args)-2] {
+		if arg == "--json" {
+			foundJSON = true
+			break
+		}
+	}
+	if !foundJSON {
+		t.Fatalf("--json should stay before the prompt terminator: %#v", args)
+	}
+}
+
+type fakeFileInfo struct {
+	name  string
+	isDir bool
+}
+
+func (f fakeFileInfo) Name() string       { return f.name }
+func (f fakeFileInfo) Size() int64        { return 1 }
+func (f fakeFileInfo) Mode() os.FileMode  { return 0o644 }
+func (f fakeFileInfo) ModTime() time.Time { return time.Time{} }
+func (f fakeFileInfo) IsDir() bool        { return f.isDir }
+func (f fakeFileInfo) Sys() any           { return nil }
+
+func TestResolveCodexCommandUsesNodeEntrypointForWindowsNpmShim(t *testing.T) {
+	cmdPath := filepath.Join("C:", "Users", "dev", "AppData", "Roaming", "npm", "codex.cmd")
+	jsPath := filepath.Join(filepath.Dir(cmdPath), "node_modules", "@openai", "codex", "bin", "codex.js")
+	nodePath := filepath.Join("C:", "Program Files", "nodejs", "node.exe")
+
+	lookPath := func(name string) (string, error) {
+		switch name {
+		case "codex":
+			return cmdPath, nil
+		case "node":
+			return nodePath, nil
+		default:
+			return "", errors.New("not found")
+		}
+	}
+	stat := func(name string) (os.FileInfo, error) {
+		if name == jsPath {
+			return fakeFileInfo{name: "codex.js"}, nil
+		}
+		return nil, errors.New("not found")
+	}
+
+	cmd, prefix, ok := resolveCodexCommand("codex", lookPath, stat, "windows")
+	if !ok {
+		t.Fatal("resolveCodexCommand reported unavailable")
+	}
+	if cmd != nodePath {
+		t.Fatalf("cmd = %q, want node path %q", cmd, nodePath)
+	}
+	if len(prefix) != 1 || prefix[0] != jsPath {
+		t.Fatalf("prefix = %#v, want codex js path", prefix)
+	}
+}
+
+func TestResolveCodexCommandKeepsNonNpmWindowsCmd(t *testing.T) {
+	cmdPath := filepath.Join("C:", "tools", "codex-wrapper.cmd")
+	lookPath := func(name string) (string, error) {
+		if name == "codex" {
+			return cmdPath, nil
+		}
+		return "", errors.New("not found")
+	}
+	stat := func(name string) (os.FileInfo, error) {
+		return nil, errors.New("not found")
+	}
+
+	cmd, prefix, ok := resolveCodexCommand("codex", lookPath, stat, "windows")
+	if !ok {
+		t.Fatal("resolveCodexCommand reported unavailable")
+	}
+	if cmd != cmdPath {
+		t.Fatalf("cmd = %q, want original cmd path %q", cmd, cmdPath)
+	}
+	if len(prefix) != 0 {
+		t.Fatalf("prefix = %#v, want empty", prefix)
 	}
 }
