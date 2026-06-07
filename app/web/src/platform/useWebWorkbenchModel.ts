@@ -12,6 +12,7 @@ import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import {
   resolveWebWorkbenchConversations,
+  webConversationWithPinnedMessages,
   webHubEmptyTranscript,
   webTranscript,
 } from './webPlatform';
@@ -19,7 +20,7 @@ import { useWebHubRealtime } from './webHubRealtime';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
-export function useWebWorkbenchModel() {
+export function useWebWorkbenchModel(selectedConversationId?: string) {
   const authenticated = useHubStore((state) => state.authenticated);
   const hubReady = authenticated && Boolean(getAccessToken());
   const [liveRuntimeEvents, setLiveRuntimeEvents] = useState<HubRuntimeEventTranscriptInput[]>([]);
@@ -33,7 +34,11 @@ export function useWebWorkbenchModel() {
   });
 
   const conversations = resolveWebWorkbenchConversations(sessions.data, hubReady);
-  const activeConversationId = conversations[0]?.id ?? 'agent-collab';
+  const activeConversationId = (
+    conversations.some((conversation) => conversation.id === selectedConversationId)
+      ? selectedConversationId
+      : conversations[0]?.id
+  ) ?? 'agent-collab';
   const activeHubSessionId = hubReady && sessions.data?.length ? activeConversationId : null;
 
   useEffect(() => {
@@ -58,6 +63,22 @@ export function useWebWorkbenchModel() {
     placeholderData: (previous) => previous,
   });
 
+  const pinnedMessages = useQuery({
+    queryKey: ['web-v4', 'hub-pins', activeHubSessionId],
+    queryFn: () => hubClient.listPinnedMessages(activeHubSessionId!),
+    enabled: Boolean(activeHubSessionId),
+    staleTime: 5_000,
+    placeholderData: (previous) => previous,
+  });
+
+  const resolvedConversations = hubReady && activeHubSessionId
+    ? conversations.map((conversation) =>
+      conversation.id === activeHubSessionId
+        ? webConversationWithPinnedMessages(conversation, pinnedMessages.data)
+        : conversation,
+    )
+    : conversations;
+
   const transcript = resolveWebWorkbenchTranscript(
     hubReady,
     activeHubSessionId,
@@ -67,7 +88,7 @@ export function useWebWorkbenchModel() {
 
   return {
     activeConversationId,
-    conversations,
+    conversations: resolvedConversations,
     transcript,
   };
 }

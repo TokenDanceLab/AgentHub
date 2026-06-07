@@ -18,8 +18,9 @@ export default defineConfig({
   clearScreen: false,
   envPrefix: ['VITE_'],
   server: {
-    port: 5175,
+    port: 5174,
     strictPort: true,
+    host: '127.0.0.1',
   },
   build: {
     target: ['es2021', 'chrome100', 'safari15'],

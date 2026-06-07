@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { createEventStream } from '@/api/eventClient';
 import { useCreateRun } from '@/api/runQueries';
-import { useThreadMessages, useThreads } from '@/api/threadQueries';
+import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
 
 vi.mock('@/api/eventClient', () => ({
@@ -12,6 +12,7 @@ vi.mock('@/api/eventClient', () => ({
 }));
 
 vi.mock('@/api/threadQueries', () => ({
+  useThreadPins: vi.fn(),
   useThreadMessages: vi.fn(),
   useThreads: vi.fn(),
 }));
@@ -24,12 +25,17 @@ const eventHandlers: EventHandler[] = [];
 const createRunMutateAsync = vi.fn();
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
+const mockedUseThreadPins = vi.mocked(useThreadPins);
 const mockedCreateEventStream = vi.mocked(createEventStream);
 const mockedUseCreateRun = vi.mocked(useCreateRun);
 
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      value: {},
+      configurable: true,
+    });
     eventHandlers.length = 0;
     mockedCreateEventStream.mockReturnValue(createMockEventStream());
     createRunMutateAsync.mockResolvedValue({
@@ -48,22 +54,35 @@ describe('Desktop App v4 root', () => {
     mockedUseThreadMessages.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreadMessages>);
+    mockedUseThreadPins.mockReturnValue({
+      data: undefined,
+    } as ReturnType<typeof useThreadPins>);
   });
 
   it('renders the shared v4 workbench as the active desktop route', () => {
     render(<App />);
 
+    expect(screen.getByText('AgentHub')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Window controls' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '最小化' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '最大化' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '关闭' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Conversation sidebar' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: 'Inspector tabs' })).toBeInTheDocument();
-    expect(screen.getByRole('toolbar', { name: 'Composer modes' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '添加本机附件' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '浏览器预览' })).not.toBeDisabled();
-    expect(screen.getByText('Desktop 已切入 shared v4 workbench。旧 Desktop 主 UI 不再控制 active route。')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '本地 Agent 协作群' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: '右侧工作区' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Composer input')).toBeInTheDocument();
+    expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '添加本机附件' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
+    expect(screen.getByText('运行时间线')).toBeInTheDocument();
+    expect(screen.getByText('进入代码定位阶段')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Builder' })).toBeInTheDocument();
   });
 
   it('uses Edge thread data when Desktop queries return conversations and items', () => {
@@ -189,7 +208,7 @@ describe('Desktop App v4 root', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'Live Edge 会话' })).toBeInTheDocument();
-    expect(screen.getAllByText('rg')).toHaveLength(2);
+    expect(screen.getAllByText('rg')).toHaveLength(3);
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
     expect(screen.getByText('Run run-live')).toBeInTheDocument();
 
@@ -246,20 +265,6 @@ describe('Desktop App v4 root', () => {
     fireEvent.change(screen.getByLabelText('Composer input'), {
       target: { value: '跑一下 v4 smoke' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '@Agent' }));
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /@Builder/ }));
-    expect(screen.getByRole('button', { name: '移除提及 Builder' })).toBeInTheDocument();
-    const file = new File(['attachment-token: desktop'], 'notes.txt', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId('composer-attachment-input'), {
-      target: { files: [file] },
-    });
-    expect(await screen.findByText('notes.txt')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Approval mode'), {
-      target: { value: 'workspace-write' },
-    });
-    fireEvent.change(screen.getByLabelText('Work directory'), {
-      target: { value: 'D:\\Code\\TokenDance\\AgentHub' },
-    });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
 
     await waitFor(() => {
@@ -268,17 +273,10 @@ describe('Desktop App v4 root', () => {
 
     const submittedRun = createRunMutateAsync.mock.calls[0]?.[0];
     expect(submittedRun).toEqual({
-      permissionMode: 'acceptEdits',
       projectId: 'project-1',
-      prompt: expect.any(String),
+      prompt: '跑一下 v4 smoke',
       threadId: 'thread-real',
-      workDir: 'D:\\Code\\TokenDance\\AgentHub',
     });
-    expect(submittedRun.prompt).toContain('Mentioned agents:');
-    expect(submittedRun.prompt).toContain('Builder (id: builder)');
-    expect(submittedRun.prompt).toContain('Model: glm-5.1');
-    expect(submittedRun.prompt).toContain('Attached files:');
-    expect(submittedRun.prompt).toContain('attachment-token: desktop');
     expect(screen.getByLabelText('Composer input')).toHaveValue('');
   });
 });

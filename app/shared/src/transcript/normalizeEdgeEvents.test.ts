@@ -180,6 +180,98 @@ describe('normalizeEdgeEventsToTranscript', () => {
       },
     ]);
   });
+
+  it('projects v4 detail events into design transcript blocks', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-thinking', 1, 'run.agent.thinking', {
+        runId: 'run-v4',
+        content: '正在分析 Desktop/Web shared UI。',
+      }),
+      edgeEvent('evt-subagent', 2, 'run.agent.subagent_task', {
+        runId: 'run-v4',
+        taskId: 'review-v4-blocks',
+        title: '复核 blocks 对齐',
+        worker: 'Reviewer',
+        status: 'running',
+        summary: '检查新增块是否进入 shared transcript。',
+      }),
+      edgeEvent('evt-child', 3, 'run.agent.child_agent', {
+        runId: 'run-v4',
+        childId: 'browser-qa-v4',
+        title: 'Browser QA 截图验证',
+        agentName: 'Browser QA',
+        status: 'completed',
+        summary: '确认消息列能显示新增块。',
+      }),
+      edgeEvent('evt-route', 4, 'run.agent.route_decision', {
+        runId: 'run-v4',
+        action: 'fanout',
+        nextWorker: 'Reviewer',
+        summary: '拆成可验证切片。',
+      }),
+      edgeEvent('evt-context', 5, 'run.agent.context_usage', {
+        runId: 'run-v4',
+        input: 38400,
+        output: 6200,
+        limit: 200000,
+        totalCost: 0.44,
+        model: 'GLM-5.1',
+      }),
+      edgeEvent('evt-result', 6, 'run.agent.result', {
+        runId: 'run-v4',
+        success: true,
+        durationMs: 492000,
+        turns: 7,
+        summary: '协作进度 78%。',
+      }),
+    ]);
+
+    expect(blocks).toEqual([
+      expect.objectContaining({
+        kind: 'thinking',
+        content: '正在分析 Desktop/Web shared UI。',
+        isThinking: true,
+      }),
+      expect.objectContaining({
+        kind: 'subagent',
+        title: '复核 blocks 对齐',
+        worker: 'Reviewer',
+        status: 'running',
+        summary: '检查新增块是否进入 shared transcript。',
+        runId: 'review-v4-blocks',
+      }),
+      expect.objectContaining({
+        kind: 'child_agent',
+        title: 'Browser QA 截图验证',
+        agent: 'Browser QA',
+        status: 'completed',
+        summary: '确认消息列能显示新增块。',
+        runId: 'browser-qa-v4',
+        parentRunId: 'run-v4',
+      }),
+      expect.objectContaining({
+        kind: 'route_decision',
+        action: 'fanout',
+        summary: '拆成可验证切片。',
+        targetAgent: 'Reviewer',
+      }),
+      expect.objectContaining({
+        kind: 'context_usage',
+        inputTokens: 38400,
+        outputTokens: 6200,
+        contextLimit: 200000,
+        cost: '$0.44',
+        modelLabel: 'GLM-5.1',
+      }),
+      expect.objectContaining({
+        kind: 'result',
+        success: true,
+        duration: '8m12s',
+        turns: 7,
+        summary: '协作进度 78%。',
+      }),
+    ]);
+  });
 });
 
 function edgeEvent(

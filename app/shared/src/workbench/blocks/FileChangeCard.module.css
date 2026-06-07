@@ -1,0 +1,68 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: var(--sp-sm) 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.fileIcon {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.action {
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-sans);
+  text-transform: capitalize;
+}
+
+.path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-1);
+  font: 500 0.75rem var(--font-mono);
+}
+
+.add {
+  font: 600 0.6875rem var(--font-mono);
+  font-style: normal;
+  color: var(--success);
+}
+
+.del {
+  font: 600 0.6875rem var(--font-mono);
+  font-style: normal;
+  color: var(--danger);
+}
+
+.statZero {
+  font: 600 0.6875rem var(--font-mono);
+  font-style: normal;
+  color: var(--text-3);
+}
+
+.reviewBtn {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--primary);
+  font: 600 0.6875rem var(--font-sans);
+  cursor: pointer;
+  flex-shrink: 0;
+}

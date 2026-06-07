@@ -12,6 +12,7 @@ import type {
   RunDiff,
   ThreadInfo,
   ThreadItemInfo,
+  ThreadPinInfo,
   StartRunRequest,
   Artifact,
   Preview,
@@ -32,6 +33,7 @@ import {
   safeParse,
   listResponseSchema,
   ThreadItemInfoSchema,
+  ThreadPinInfoSchema,
 } from './schemas';
 
 export type {
@@ -43,6 +45,7 @@ export type {
   RunDiff,
   ThreadInfo,
   ThreadItemInfo,
+  ThreadPinInfo,
   StartRunRequest,
   Artifact,
   Preview,
@@ -187,6 +190,32 @@ export async function fetchThreadItems(threadId: string): Promise<ListResponse<T
   });
   if (!res.ok) throw await parseError(res);
   return safeParse(listResponseSchema(ThreadItemInfoSchema), unwrapEdgeResponse(await res.json()), 'threadItems');
+}
+
+export async function fetchThreadPins(threadId: string): Promise<ListResponse<ThreadPinInfo>> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
+    headers: edgeAuthHeaders(),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(listResponseSchema(ThreadPinInfoSchema), unwrapEdgeResponse(await res.json()), 'threadPins');
+}
+
+export async function pinThreadItem(threadId: string, itemId: string, pinnedBy?: string): Promise<ThreadPinInfo> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
+    method: 'POST',
+    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ itemId, pinnedBy }),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(ThreadPinInfoSchema, unwrapEdgeResponse(await res.json()), 'pinThreadItem');
+}
+
+export async function deleteThreadPin(threadId: string, itemId: string): Promise<void> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins?itemId=${encodeURIComponent(itemId)}`, {
+    method: 'DELETE',
+    headers: edgeAuthHeaders(),
+  });
+  if (!res.ok) throw await parseError(res);
 }
 
 export async function fetchRuns(projectId?: string, threadId?: string): Promise<ListResponse<RunInfo>> {

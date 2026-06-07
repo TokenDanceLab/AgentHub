@@ -1,0 +1,130 @@
+/* ═══════════════════════════════════════════════════════
+   AgentTimeline — v4 CSS Modules
+   Mirrors .agent-timeline / .agent-timeline-head /
+           .timeline-marker / li.running / li.completed
+   ═══════════════════════════════════════════════════════ */
+
+.section {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-low);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.headTitle {
+  font: 600 0.75rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.headCount {
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-sm);
+  min-height: 30px;
+}
+
+/* ── Timeline marker dot ── */
+.marker {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  position: relative;
+}
+
+.marker::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--text-3);
+}
+
+/* ── State variants ── */
+
+/* completed */
+.completed .marker {
+  background: var(--success-bg);
+  border-color: transparent;
+}
+.completed .marker::after {
+  background: var(--success);
+}
+
+/* running */
+.running .marker {
+  background: var(--primary-light);
+  border-color: transparent;
+}
+.running .marker::after {
+  background: var(--primary);
+}
+
+/* failed */
+.failed .marker {
+  background: var(--danger-bg);
+  border-color: transparent;
+}
+.failed .marker::after {
+  background: var(--danger);
+}
+
+/* ── Item text ── */
+.itemLabel {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 0.75rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.itemDetail {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+}
+
+/* right-aligned status text */
+.itemStatus {
+  font: 500 0.6875rem var(--font-sans);
+  color: var(--text-3);
+  font-style: normal;
+}
+
+/* ── Text wrapper so label + detail stack vertically ── */
+.itemBody {
+  min-width: 0;
+}
