@@ -187,7 +187,7 @@ export function useThreadPins(threadId: string | null) {
       if (!threadId) throw new Error('threadId is required');
       return fetchThreadPins(threadId);
     },
-    enabled: !!threadId,
+    enabled: !!threadId && threadId !== 'thread_local',
     staleTime: 5_000,
     refetchInterval: 10_000,
   });

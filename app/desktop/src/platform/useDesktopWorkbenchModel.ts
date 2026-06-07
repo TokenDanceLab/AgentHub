@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
-  createWorkbenchDemoStore,
-  normalizeWorkbenchDataMode,
-  resolveDemoWorkbenchTranscript,
+  getWorkbenchDataModeOverrideSnapshot,
+  resolveWorkbenchDataMode,
+  subscribeWorkbenchDataModeOverride,
+  workbenchDemoRuntimeStore,
+  type WorkbenchDataMode,
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
 import type { WorkbenchConversation } from '@shared/platform';
@@ -19,21 +21,21 @@ export interface DesktopWorkbenchModel {
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
 }
 
-const demoStore = createWorkbenchDemoStore();
 const EMPTY_TRANSCRIPT: ReturnType<typeof normalizeThreadItemsToTranscript> = [];
 
 export function useDesktopWorkbenchModel(selectedConversationId?: string): DesktopWorkbenchModel {
-  const dataMode = getWorkbenchDataMode();
+  const dataModeOverride = useSyncExternalStore(
+    subscribeWorkbenchDataModeOverride,
+    getWorkbenchDataModeOverrideSnapshot,
+    getWorkbenchDataModeOverrideSnapshot,
+  );
+  const dataMode = getWorkbenchDataMode(dataModeOverride);
   const useDemo = dataMode === 'demo' || (dataMode === 'auto' && isBrowserPreview());
-
-  if (useDemo) {
-    return useMemo(() => ({
-      activeConversationId: selectedConversationId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
-      conversations: demoStore.conversations,
-      transcript: resolveDemoWorkbenchTranscript(selectedConversationId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID),
-    }), [selectedConversationId]);
-  }
-
+  const demoSnapshot = useSyncExternalStore(
+    workbenchDemoRuntimeStore.subscribe,
+    workbenchDemoRuntimeStore.getSnapshot,
+    workbenchDemoRuntimeStore.getSnapshot,
+  );
   const threadsQuery = useThreads();
   const threads = threadsQuery.data?.items ?? [];
   const activeThread = threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0];
@@ -45,8 +47,14 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const persistedUntilMs = useMemo(() => latestThreadItemTimestampMs(threadItems), [threadItems]);
   const liveTranscript = useDesktopEdgeEvents(activeThread?.threadId, persistedUntilMs);
 
+  const demoModel = useMemo(() => ({
+    activeConversationId: selectedConversationId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+    conversations: demoSnapshot.conversations,
+    transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedConversationId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID),
+  }), [demoSnapshot, selectedConversationId]);
+
   const conversations = useMemo(() => {
-    if (threads.length === 0) return dataMode === 'auto' ? demoStore.conversations : [];
+    if (threads.length === 0) return dataMode === 'auto' ? workbenchDemoRuntimeStore.getSnapshot().conversations : [];
     return threads.map((thread) =>
       threadToConversation(
         thread,
@@ -63,19 +71,21 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     }
     if (threads.length === 0) {
       return dataMode === 'auto'
-        ? resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID)
+        ? workbenchDemoRuntimeStore.resolveTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID)
         : EMPTY_TRANSCRIPT;
     }
     return [];
   }, [dataMode, liveTranscript, threadItems, threads.length]);
 
-  return {
+  const liveModel = {
     activeConversationId,
     activeProjectId: activeThread?.projectId,
     activeThreadId: activeThread?.threadId,
     conversations,
     transcript,
   };
+
+  return useDemo ? demoModel : liveModel;
 }
 
 /** Browser preview (no Tauri shell) uses mock data for demo fidelity. */
@@ -83,8 +93,8 @@ function isBrowserPreview(): boolean {
   return typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window);
 }
 
-function getWorkbenchDataMode() {
-  return normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
+function getWorkbenchDataMode(override: WorkbenchDataMode | undefined): WorkbenchDataMode {
+  return resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, override);
 }
 
 function threadToConversation(thread: ThreadInfo, pins?: ThreadPinInfo[]): WorkbenchConversation {

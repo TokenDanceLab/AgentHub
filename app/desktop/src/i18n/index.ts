@@ -1,5 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE, sharedWorkbenchResources } from '@shared/i18n';
 import zh from './locales/zh.json';
 import en from './locales/en.json';
 
@@ -20,7 +21,16 @@ function detectLanguage(): string {
 
 try {
   i18n.use(initReactI18next).init({
-    resources: { zh: { translation: zh }, en: { translation: en } },
+    resources: {
+      zh: {
+        translation: zh,
+        [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.zh,
+      },
+      en: {
+        translation: en,
+        [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.en,
+      },
+    },
     lng: detectLanguage(),
     fallbackLng: 'en',
     interpolation: { escapeValue: false },
