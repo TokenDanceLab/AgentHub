@@ -133,6 +133,14 @@ export interface AgentsPageProps {
 
   /** Installed agents */
   agents: AgentConfig[];
+  /** Real data loading state */
+  agentsLoading?: boolean | undefined;
+  /** Real data load error */
+  agentsError?: string | undefined;
+  /** Last mutation error */
+  agentActionError?: string | undefined;
+  /** Retry loading agents */
+  onAgentsRetry?: (() => void) | undefined;
   /** Currently selected agent id in the installed view */
   selectedAgentId?: string | undefined;
   /** Called when an agent config row is clicked */
@@ -156,6 +164,10 @@ export interface AgentsPageProps {
   onAgentDelete?: (() => void) | undefined;
   /** Add agent callback */
   onAgentAdd?: (() => void) | undefined;
+  /** Save in-flight agent id */
+  savingAgentId?: string | undefined;
+  /** Delete in-flight agent id */
+  deletingAgentId?: string | undefined;
   /** Toggle agent skill */
   onAgentSkillToggle?: ((skill: string) => void) | undefined;
   /** Set tool permission */
@@ -326,6 +338,10 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     confirmCount,
     defaultModelLabel,
     agents,
+    agentsLoading = false,
+    agentsError,
+    agentActionError,
+    onAgentsRetry,
     selectedAgentId,
     onAgentSelect,
     onAgentProfileOpen,
@@ -337,6 +353,8 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     onAgentDuplicate,
     onAgentDelete,
     onAgentAdd,
+    savingAgentId,
+    deletingAgentId,
     onAgentSkillToggle,
     onToolPermissionSet,
     onAgentFieldChange,
@@ -344,6 +362,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
   } = props;
 
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
+  const selectedAgentBusy = Boolean(selectedAgent && (savingAgentId === selectedAgent.id || deletingAgentId === selectedAgent.id));
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
@@ -377,14 +396,28 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         <section className={styles['agent-section']}>
           <div className={styles['section-title-row']}>
             <h2>已安装 Agent</h2>
-            <span>{agents.length} active</span>
+            <span>{agentsLoading ? '同步中' : `${agents.length} active`}</span>
           </div>
+          {agentsError && (
+            <div className={styles['agent-inline-state']} role="alert">
+              <span>{agentsError}</span>
+              <button type="button" onClick={onAgentsRetry}>重试</button>
+            </div>
+          )}
           <div className={styles['agent-config-list']}>
+            {agents.length === 0 && !agentsLoading && (
+              <div className={styles['agent-empty-state']} role="status">
+                <strong>暂无 Agent Profile</strong>
+                <span>当前 Hub 账号还没有已安装 Agent。</span>
+                <button type="button" onClick={onAgentAdd}>添加 Agent</button>
+              </div>
+            )}
             {agents.map((agent) => (
               <button
                 key={agent.id}
                 className={`${styles['agent-config-row']} agent-config-row ${agent.id === selectedAgentId ? styles.selected : ''}`}
                 type="button"
+                disabled={deletingAgentId === agent.id}
                 onClick={() => onAgentSelect?.(agent.id)}
               >
                 <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
@@ -407,8 +440,12 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         {selectedAgent && (
           <AgentEditPanel
             agent={selectedAgent}
+            actionError={agentActionError}
             saveStateLabel={saveStateLabel}
             isDirty={isDirty}
+            isDeleting={deletingAgentId === selectedAgent.id}
+            isSaving={savingAgentId === selectedAgent.id}
+            isBusy={selectedAgentBusy}
             allSkills={allSkills}
             allTools={allTools}
             onAgentSave={onAgentSave}
@@ -419,7 +456,6 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             onToolPermissionSet={onToolPermissionSet}
             onFieldChange={onAgentFieldChange}
             recentEvents={recentEvents}
-            agentsCount={agents.length}
           />
         )}
       </div>
@@ -445,8 +481,12 @@ const AgentStat: React.FC<{ label: string; value: string | number; meta: string 
 
 interface AgentEditPanelProps {
   agent: AgentConfig;
+  actionError?: string | undefined;
   saveStateLabel: string;
   isDirty: boolean;
+  isSaving: boolean;
+  isDeleting: boolean;
+  isBusy: boolean;
   allSkills: string[];
   allTools: string[];
   onAgentSave?: (() => void) | undefined;
@@ -457,13 +497,16 @@ interface AgentEditPanelProps {
   onToolPermissionSet?: ((tool: string, value: ToolPermission) => void) | undefined;
   onFieldChange?: ((field: string, value: string) => void) | undefined;
   recentEvents: AgentRecentEvent[];
-  agentsCount: number;
 }
 
 const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   agent,
+  actionError,
   saveStateLabel,
   isDirty,
+  isSaving,
+  isDeleting,
+  isBusy,
   allSkills,
   allTools,
   onAgentSave,
@@ -474,14 +517,13 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   onToolPermissionSet,
   onFieldChange,
   recentEvents,
-  agentsCount,
 }) => (
   <aside className={styles['agent-detail']}>
     <div className={`${styles['detail-head']} ${styles.editable}`}>
       <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
       <div>
         <h2>{agent.name}</h2>
-        <span>{agent.role} Agent</span>
+        <span>{agent.role.trim() || 'Hub AgentProfile'} Agent</span>
       </div>
       <span
         className={`${styles['agent-save-state']} ${isDirty ? styles.dirty : ''}`}
@@ -627,22 +669,37 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
         </div>
       ))}
     </section>
+    {actionError && (
+      <div className={`${styles['agent-inline-state']} ${styles.danger}`} role="alert">
+        <span>{actionError}</span>
+      </div>
+    )}
 
     {/* Edit actions */}
-    <div className={styles['agent-edit-actions']}>
-      <button className={`${styles.btn} ${styles['btn-p']}`} type="button" onClick={onAgentSave}>
-        保存配置
+    <div className={styles['agent-edit-actions']} aria-busy={isBusy ? 'true' : undefined}>
+      <button
+        className={`${styles.btn} ${styles['btn-p']}`}
+        type="button"
+        disabled={isBusy}
+        onClick={onAgentSave}
+      >
+        {isSaving ? '保存中' : '保存配置'}
       </button>
-      <button className={`${styles.btn} ${styles['btn-s']}`} type="button" onClick={onAgentDuplicate}>
+      <button
+        className={`${styles.btn} ${styles['btn-s']}`}
+        type="button"
+        disabled={isBusy}
+        onClick={onAgentDuplicate}
+      >
         复制 Agent
       </button>
       <button
         className={`${styles.btn} ${styles['btn-d']}`}
         type="button"
-        disabled={agentsCount <= 1}
+        disabled={isBusy}
         onClick={onAgentDelete}
       >
-        删除
+        {isDeleting ? '删除中' : '删除'}
       </button>
     </div>
   </aside>

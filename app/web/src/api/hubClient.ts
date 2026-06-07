@@ -297,6 +297,23 @@ export interface AgentProfileListResponse {
   };
 }
 
+export interface CreateAgentProfileRequest {
+  name: string;
+  description?: string;
+  runtime_id: string;
+  model?: string;
+  provider?: string;
+  reasoning_effort?: string;
+  permission_mode?: string;
+  skills?: string;
+  tool_allowlist?: string;
+  approval_policy?: string;
+  target_preferences?: string;
+  context_budget_max_tokens?: number;
+}
+
+export type UpdateAgentProfileRequest = Partial<CreateAgentProfileRequest>;
+
 // 鈹€鈹€ Execution targets 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export type ExecutionTargetType = 'local_edge' | 'hub_relay' | 'remote_ssh' | 'tailscale' | 'cloud_edge';
@@ -1052,6 +1069,21 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageSize?: number;
     }) =>
       request<AgentProfileListResponse>(`/web/agent-profiles${qs(params ?? {})}`),
+
+    createAgentProfile: (data: CreateAgentProfileRequest) =>
+      request<AgentProfile>('/web/agent-profiles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateAgentProfile: (id: string, data: UpdateAgentProfileRequest) =>
+      request<AgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentProfile: (id: string) =>
+      request<undefined>(`/web/agent-profiles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
     // 鈹€鈹€ Execution targets 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
