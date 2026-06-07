@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '@/App';
@@ -54,9 +54,16 @@ describe('Web app root', () => {
 
     expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'web');
+    expect(screen.queryByRole('group', { name: 'Window controls' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '最小化' })).not.toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: 'Inspector tabs' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: '右侧工作区' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('发消息给 Agent 协作群')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
     expect(text).not.toMatch(/shell\.(?:brand|toolbar|status|sidebar|statusPanel|workspace|page|source)/);
     expect(text).not.toMatch(/synced|marketplace connected|session active/i);
     expect(useAgentListMock).toHaveBeenCalledWith(true);
@@ -85,7 +92,7 @@ describe('Web app root', () => {
     expect(screen.getByText('来自 Hub session 的真实消息')).toBeInTheDocument();
   });
 
-  it('uses Hub Agent Profiles for the shared @Agent menu when available', () => {
+  it('keeps Hub Agent Profiles inside the adapter model instead of adding first-screen composer controls', () => {
     useAgentListMock.mockReturnValue({
       data: {
         items: [
@@ -115,9 +122,9 @@ describe('Web app root', () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: '@Agent' }));
-
-    expect(screen.getByRole('menuitemcheckbox', { name: /@Hub Builder/ })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitemcheckbox', { name: /@Builder/ })).not.toBeInTheDocument();
+    expect(useAgentListMock).toHaveBeenCalledWith(true);
+    expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
+    expect(screen.queryByText('@Hub Builder')).not.toBeInTheDocument();
   });
 });

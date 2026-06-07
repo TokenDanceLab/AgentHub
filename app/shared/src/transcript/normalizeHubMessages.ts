@@ -45,6 +45,7 @@ function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBloc
   return {
     id: `hub-message-${id}`,
     author: normalizeAuthor(message),
+    ...(message.created_at ? { createdAt: message.created_at } : {}),
     kind: 'text',
     text,
   };

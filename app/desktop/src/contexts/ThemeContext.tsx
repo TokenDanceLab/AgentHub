@@ -39,8 +39,8 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = 'agenthub-theme';
-const PRESET_STORAGE_KEY = 'agenthub-theme-preset';
+const STORAGE_KEY = 'agenthub-v4-theme';
+const PRESET_STORAGE_KEY = 'agenthub-v4-theme-preset';
 
 function getStoredMode(): ThemeMode {
   try {
@@ -49,7 +49,7 @@ function getStoredMode(): ThemeMode {
   } catch {
     /* localStorage unavailable */
   }
-  return 'dark';
+  return 'light';
 }
 
 function getStoredPreset(): ThemePreset | undefined {
@@ -63,7 +63,7 @@ function getStoredPreset(): ThemePreset | undefined {
 }
 
 function getSystemTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 

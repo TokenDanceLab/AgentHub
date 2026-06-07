@@ -42,9 +42,11 @@ function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock |
 
   const itemType = normalizeItemType(item.type ?? item.kind);
   const evidenceRefs = runEvidence(item.runId, item.status);
+  const createdAt = item.createdAt ?? item.timestamp ?? item.updatedAt;
   const base = {
     id: `thread-item-${id}`,
     author,
+    ...(createdAt ? { createdAt } : {}),
     ...(evidenceRefs.length > 0 ? { evidenceRefs } : {}),
   };
 

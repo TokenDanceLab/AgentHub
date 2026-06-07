@@ -1,4 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query';
+import {
+  createWorkbenchDemoStore,
+  demoWorkbenchAgents,
+  resolveDemoWorkbenchTranscript,
+} from '@shared/demo';
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
@@ -32,60 +37,11 @@ export interface WebPlatformOptions {
 }
 
 const defaultHubClient = createHubClient({ getToken: getAccessToken });
+const demoStore = createWorkbenchDemoStore();
 
-export const webConversations: WorkbenchConversation[] = [
-  {
-    id: 'agent-collab',
-    title: 'Agent 协作群',
-    kind: 'group',
-    subtitle: '共享 v4 Web 工作台',
-    unreadCount: 2,
-  },
-  {
-    id: 'builder',
-    title: 'Builder',
-    kind: 'direct',
-    subtitle: 'Claude Code',
-  },
-];
-
-export const webAgents: WorkbenchAgent[] = [
-  {
-    id: 'builder',
-    name: 'Builder',
-    description: 'Web v4 代码实现',
-    status: 'available',
-    model: 'glm-5.1',
-    runtimeId: 'claude-code',
-  },
-  {
-    id: 'reviewer',
-    name: 'Reviewer',
-    description: '架构和文档复核',
-    status: 'available',
-    model: 'deepseek-v4-pro',
-    runtimeId: 'claude-code',
-  },
-];
-
-export const webTranscript: TranscriptBlock[] = [
-  {
-    id: 'web-msg-1',
-    kind: 'text',
-    author: { id: 'system', name: 'AgentHub', role: 'system' },
-    text: 'Web 已接入 shared v4 workbench。',
-  },
-  {
-    id: 'web-tool-1',
-    kind: 'tool_call',
-    author: { id: 'builder', name: 'Builder', role: 'agent' },
-    toolName: 'AgentHubWorkbench',
-    status: 'completed',
-    evidenceRefs: [
-      { id: 'web-shared-workbench', kind: 'artifact', label: 'shared v4 workbench', status: 'completed' },
-    ],
-  },
-];
+export const webConversations: WorkbenchConversation[] = demoStore.conversations;
+export const webAgents: WorkbenchAgent[] = demoWorkbenchAgents;
+export const webTranscript: TranscriptBlock[] = resolveDemoWorkbenchTranscript('builder');
 
 export const webHubEmptyConversation: WorkbenchConversation = {
   id: 'hub-empty-workspace',
@@ -136,6 +92,29 @@ export function hubSessionToWorkbenchConversation(session: Session): WorkbenchCo
   };
 }
 
+export function webConversationWithPinnedMessages(
+  conversation: WorkbenchConversation,
+  pins: MessageResponse[] | undefined,
+): WorkbenchConversation {
+  const firstPin = pins?.[0];
+  if (!firstPin) {
+    const { pinnedAnnouncement: _removed, ...withoutPin } = conversation;
+    return withoutPin;
+  }
+
+  const pinnedTime = formatHubPinTime(firstPin.created_at);
+  return {
+    ...conversation,
+    pinnedAnnouncement: {
+      title: conversation.title,
+      content: firstPin.content,
+      author: firstPin.sender_id || 'Hub',
+      ...(pinnedTime ? { time: pinnedTime } : {}),
+      sourceId: firstPin.id,
+    },
+  };
+}
+
 export function resolveWebWorkbenchConversations(
   sessions: Session[] | undefined,
   hubAuthenticated: boolean,
@@ -146,6 +125,16 @@ export function resolveWebWorkbenchConversations(
     ?.map(hubSessionToWorkbenchConversation)
     .filter((conversation): conversation is WorkbenchConversation => Boolean(conversation)) ?? [];
   return mapped.length > 0 ? mapped : [webHubEmptyConversation];
+}
+
+function formatHubPinTime(timestamp: string | undefined): string | undefined {
+  if (!timestamp) return undefined;
+  const parsed = Date.parse(timestamp);
+  if (!Number.isFinite(parsed)) return undefined;
+  return new Date(parsed).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPlatform {
@@ -159,7 +148,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     capabilities: {
       localEdge: false,
       localFiles: false,
-      browserPreview: false,
+      browserPreview: true,
     },
     conversations: {
       async list(): Promise<WorkbenchConversation[]> {

@@ -3,6 +3,7 @@ import {
   appendHubRuntimeEvent,
   resolveWebWorkbenchTranscript,
 } from './useWebWorkbenchModel';
+import { webTranscript } from './webPlatform';
 
 describe('useWebWorkbenchModel helpers', () => {
   it('combines Hub messages with live runtime transcript blocks', () => {
@@ -52,10 +53,7 @@ describe('useWebWorkbenchModel helpers', () => {
   });
 
   it('uses preview and Hub empty transcripts for unauthenticated and empty Hub states', () => {
-    expect(resolveWebWorkbenchTranscript(false, null, undefined, [])[0]).toEqual(expect.objectContaining({
-      id: 'web-msg-1',
-      text: 'Web 已接入 shared v4 workbench。',
-    }));
+    expect(resolveWebWorkbenchTranscript(false, null, undefined, [])).toBe(webTranscript);
     expect(resolveWebWorkbenchTranscript(true, null, undefined, [])[0]).toEqual(expect.objectContaining({
       id: 'web-hub-empty',
       text: 'Hub session 已连接，暂无可显示会话。',

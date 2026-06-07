@@ -1,140 +1,150 @@
-/* ── ApprovalCard ────────────────────────────── */
-/* Uses design tokens from tokens.css — no hardcoded colors. */
+/* ── ApprovalCard — v4 aligned with design demo ── */
+/* Mirrors .approval-card from the AgentHub Desktop demo. */
 
 .card {
-  margin: var(--space-sm) 0;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  background: var(--surface-raised);
-  overflow: hidden;
-  transition: border-color var(--duration-fast) var(--ease-standard);
+  padding: 14px 16px;
+  border-radius: var(--r-lg, 12px);
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  transition: border-color var(--dur-normal, 140ms) var(--ease, cubic-bezier(0.2, 0, 0, 1));
 }
 
-/* Status border tints */
+/* Status border tints — subtle left accent */
 .statusPending {
-  border-color: var(--warning);
-  border-left: 3px solid var(--warning);
+  border-color: var(--warning, #c0883a);
+  border-left: 3px solid var(--warning, #c0883a);
 }
 
 .statusApproved {
-  border-color: var(--success);
-  border-left: 3px solid var(--success);
+  border-color: var(--success, #409467);
+  border-left: 3px solid var(--success, #409467);
   opacity: 0.88;
 }
 
 .statusDenied {
-  border-color: var(--destructive);
-  border-left: 3px solid var(--destructive);
+  border-color: var(--danger, #d15252);
+  border-left: 3px solid var(--danger, #d15252);
   opacity: 0.78;
 }
 
 .statusTimeout {
-  border-color: var(--muted-foreground);
-  border-left: 3px solid var(--muted-foreground);
+  border-color: var(--text-3, #9595ac);
+  border-left: 3px solid var(--text-3, #9595ac);
   opacity: 0.65;
 }
 
-/* Header */
+/* Header row — title + risk badge + status badge */
 .header {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border);
-  background: var(--hover-overlay);
+  gap: 8px;
+  margin-bottom: 6px;
+  font: 500 0.875rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', system-ui, sans-serif);
 }
 
 .icon {
-  color: var(--brand);
+  color: var(--primary, #5063e8);
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .title {
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
-  color: var(--foreground);
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--text-1, #1a1a2e);
 }
 
 .riskBadge {
   display: inline-flex;
   align-items: center;
-  padding: 1px 7px;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  line-height: 1.4;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-full, 9999px);
+  font: 500 0.75rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
+  white-space: nowrap;
   margin-left: auto;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+}
+
+.riskBadge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .riskLow {
-  background: var(--glass-tint-moss);
-  color: var(--success);
+  background: var(--success-bg, rgba(64,148,103,0.08));
+  color: var(--success, #409467);
 }
 
 .riskMedium {
-  background: var(--glass-tint-amber);
-  color: var(--warning);
+  background: var(--warning-bg, rgba(192,136,58,0.08));
+  color: var(--warning, #c0883a);
 }
 
 .riskHigh {
-  background: var(--glass-tint-danger);
-  color: var(--destructive);
+  background: var(--danger-bg, rgba(209,82,82,0.06));
+  color: var(--danger, #d15252);
 }
 
 .riskCritical {
-  background: var(--glass-tint-danger);
-  color: var(--destructive);
-  border: 1px solid var(--glass-tint-danger);
+  background: var(--danger-bg, rgba(209,82,82,0.06));
+  color: var(--danger, #d15252);
+  border: 1px solid var(--danger, #d15252);
 }
 
 .statusBadge {
   display: inline-flex;
   align-items: center;
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-full, 9999px);
+  font: 500 0.75rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
+  white-space: nowrap;
+}
+
+.statusBadge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .statusBadge.statusPending {
-  border: none;
-  background: var(--glass-tint-amber);
-  color: var(--warning);
+  background: var(--warning-bg, rgba(192,136,58,0.08));
+  color: var(--warning, #c0883a);
 }
 
 .statusBadge.statusApproved {
-  border: none;
-  background: var(--glass-tint-moss);
-  color: var(--success);
+  background: var(--success-bg, rgba(64,148,103,0.08));
+  color: var(--success, #409467);
 }
 
 .statusBadge.statusDenied {
-  border: none;
-  background: var(--glass-tint-danger);
-  color: var(--destructive);
+  background: var(--danger-bg, rgba(209,82,82,0.06));
+  color: var(--danger, #d15252);
 }
 
 .statusBadge.statusTimeout {
-  border: none;
-  background: var(--glass-bg-heavy);
-  color: var(--muted-foreground);
+  background: var(--surface-high, #efedf5);
+  color: var(--text-3, #9595ac);
 }
 
-/* Info rows */
+/* Info rows — agent name + tool name */
 .info {
-  padding: var(--space-md) var(--space-lg);
+  color: var(--text-2, #585870);
+  font: 400 0.8125rem/1.5 var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
+  margin-bottom: 12px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 6px;
 }
 
 .infoRow {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 6px;
 }
 
 .infoLabel {
@@ -142,31 +152,33 @@
   align-items: center;
   gap: 4px;
   min-width: 72px;
-  font-size: var(--font-size-xs);
-  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  color: var(--text-3, #9595ac);
 }
 
 .infoValue {
-  font-size: var(--font-size-sm);
-  color: var(--foreground);
+  font-size: 0.8125rem;
+  color: var(--text-1, #1a1a2e);
+  font-weight: 500;
 }
 
-/* Reason */
+/* Reason block */
 .reason {
-  margin-top: var(--space-xs);
+  margin-top: 4px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .reasonText {
   margin: 0;
-  padding: var(--space-sm);
-  background: var(--muted);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  color: var(--muted-foreground);
-  line-height: var(--line-height-relaxed);
+  padding: 8px 10px;
+  background: var(--surface-low, #faf9fc);
+  border-radius: var(--r-sm, 8px);
+  border: 1px solid var(--bdr, rgba(0,0,0,0.055));
+  font-size: 0.75rem;
+  color: var(--text-2, #585870);
+  line-height: 1.55;
   max-height: 120px;
   overflow-y: auto;
 }
@@ -176,89 +188,98 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-sm) var(--space-lg);
-  background: var(--hover-overlay);
-  font-size: var(--font-size-xs);
+  padding: 6px 0;
+  font-size: 0.75rem;
+  color: var(--text-3, #9595ac);
 }
 
 .decisionLabel {
-  color: var(--muted-foreground);
+  color: var(--text-2, #585870);
 }
 
 .decisionTime {
-  color: var(--muted-foreground);
+  color: var(--text-3, #9595ac);
 }
 
-/* Action buttons */
+/* Action buttons — matching .btn.btn-p and .btn.btn-d from demo */
 .actions {
   display: flex;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
-  border-top: 1px solid var(--border);
+  gap: 8px;
 }
 
 .approveBtn,
 .denyBtn {
-  flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-lg);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  gap: 6px;
+  height: 36px;
+  padding: 0 18px;
+  border-radius: var(--r-md, 12px);
+  font: 500 0.875rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
+  border: none;
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard),
-              opacity var(--duration-fast) var(--ease-standard);
+  transition: background var(--dur-normal, 140ms), color var(--dur-normal, 140ms), transform var(--dur-normal, 140ms), box-shadow var(--dur-normal, 140ms);
+  white-space: nowrap;
 }
 
 .approveBtn {
-  background: var(--glass-tint-moss);
-  color: var(--success);
+  background: var(--primary, #5063e8);
+  color: var(--text-inv, #ffffff);
 }
 
 .approveBtn:hover {
-  background: var(--glass-tint-moss);
+  background: var(--primary-hover, #3f4fcc);
+  box-shadow: var(--e-1, 0 1px 2px rgba(0,0,0,0.05));
+}
+
+.approveBtn:active {
+  transform: translateY(1px);
 }
 
 .approveBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .denyBtn {
-  background: var(--glass-tint-danger);
-  color: var(--destructive);
+  background: var(--danger, #d15252);
+  color: #ffffff;
 }
 
 .denyBtn:hover {
-  background: var(--glass-tint-danger);
+  filter: brightness(0.92);
+}
+
+.denyBtn:active {
+  transform: translateY(1px);
 }
 
 .denyBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  transform: none;
 }
 
-/* Footer */
+/* Footer timestamp */
 .footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-sm) var(--space-lg);
-  border-top: 1px solid var(--border);
-  font-size: var(--font-size-xs);
+  margin-top: 10px;
+  font-size: 0.6875rem;
+  color: var(--text-3, #9595ac);
 }
 
 .footerTime {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--muted-foreground);
+  color: var(--text-3, #9595ac);
 }
 
 .pendingIcon {
-  color: var(--warning);
+  color: var(--warning, #c0883a);
 }

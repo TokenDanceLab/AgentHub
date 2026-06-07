@@ -18,6 +18,14 @@ export function composerReducer(
   action: ComposerAction,
 ): ComposerState {
   switch (action.type) {
+    case 'setConversationId':
+      return state.conversationId === action.conversationId
+        ? state
+        : {
+            ...state,
+            conversationId: action.conversationId,
+            submitState: 'idle',
+          };
     case 'setText':
       return {
         ...state,
