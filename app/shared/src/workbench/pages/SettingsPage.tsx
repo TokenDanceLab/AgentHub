@@ -1,5 +1,10 @@
 import React from 'react';
-import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
+import {
+  DesignNavIcon,
+  DESIGN_NAV_GLYPH_SIZE,
+  DESIGN_NAV_GLYPH_STROKE_WIDTH,
+  type DesignNavIconName,
+} from '../designIcons';
 import styles from './SettingsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -52,6 +57,10 @@ export interface SettingsPageProps {
   permissions: Record<string, string>;
   /** Local Vite preview URL. */
   vitePreviewUrl: string;
+  /** Frontend data mode for Desktop/Web preview. */
+  dataMode: string;
+  /** Composer keyboard submit behavior. */
+  composerSubmitBehavior: string;
   /** Local workspace path. */
   workspacePath: string;
   /** Target project path. */
@@ -125,7 +134,11 @@ const PANE_META: Record<SettingsPaneId, PaneMeta> = {
 function NavGlyph({ name }: { name: DesignNavIconName }): React.ReactElement {
   return (
     <span className={styles.navGlyph} aria-hidden="true">
-      <DesignNavIcon name={name} size={17} />
+      <DesignNavIcon
+        name={name}
+        size={DESIGN_NAV_GLYPH_SIZE}
+        strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
+      />
     </span>
   );
 }
@@ -151,7 +164,7 @@ interface SettingsScopeRowProps {
 
 function SettingsScopeRow({ title, meta }: SettingsScopeRowProps): React.ReactElement {
   return (
-    <div className={styles.scopeRow} aria-label={title}>
+    <div className={`${styles.scopeRow} settings-scope-row`} aria-label={title}>
       <strong>{title}</strong>
       <span>{meta}</span>
     </div>
@@ -168,7 +181,7 @@ interface SettingsSectionProps {
 function SettingsSection({ title, children }: SettingsSectionProps): React.ReactElement {
   const count = React.Children.count(children);
   return (
-    <section className={styles.section}>
+    <section className={`${styles.section} settings-section`}>
       <div className={styles.sectionTitleRow}>
         <h2>{title}</h2>
         <span>{count} items</span>
@@ -192,9 +205,9 @@ interface SettingsRowProps {
 
 function SettingsRow({ label, description, children, wide = false }: SettingsRowProps): React.ReactElement {
   return (
-    <div className={styles.row}>
+    <div className={`${styles.row} settings-row`} data-card-surface>
       <div>
-        <span className={styles.rowLabel}>{label}</span>
+        <strong className={styles.rowLabel}>{label}</strong>
         <span className={styles.rowDesc}>{description}</span>
       </div>
       <div className={`${styles.control}${wide ? ` ${styles.controlWide}` : ''}`}>
@@ -218,6 +231,7 @@ function SettingSegment({ options, active, onChange }: SettingSegmentProps): Rea
       {options.map((option) => (
         <button
           key={option}
+          aria-pressed={option === active}
           className={`${styles.segmentBtn}${option === active ? ` ${styles.segmentBtnActive}` : ''}`}
           type="button"
           onClick={() => onChange(option)}
@@ -226,6 +240,20 @@ function SettingSegment({ options, active, onChange }: SettingSegmentProps): Rea
         </button>
       ))}
     </div>
+  );
+}
+
+/* ── Data mode segmented control ── */
+
+interface DataModeControlProps {
+  active: string;
+  onChange: (value: string) => void;
+}
+
+function DataModeControl({ active, onChange }: DataModeControlProps): React.ReactElement {
+  const normalized = normalizeSettingsDataMode(active);
+  return (
+    <SettingSegment options={['自动', 'Mock', '正常']} active={normalized} onChange={onChange} />
   );
 }
 
@@ -288,6 +316,68 @@ function SettingPath({ value, onCopy }: SettingPathProps): React.ReactElement {
   );
 }
 
+/* ── Data mode status ── */
+
+function normalizeSettingsDataMode(value: string): '自动' | 'Mock' | '正常' {
+  const key = value.trim().toLowerCase();
+  if (key === 'mock' || key === 'demo') return 'Mock';
+  if (key === '正常' || key === 'normal' || key === 'real') return '正常';
+  return '自动';
+}
+
+function DataModeStatus({
+  mode,
+}: {
+  mode: string;
+}): React.ReactElement {
+  const normalized = normalizeSettingsDataMode(mode);
+  const detail = normalized === 'Mock'
+    ? {
+      label: 'Mock fixture',
+      title: '固定使用 agenthub-design 的演示数据',
+      copy: '用于 1:1 视觉对齐、截图验收和离线前端开发，不请求 Hub 或本地 Edge 数据。',
+      desktop: '5173: demo transcript',
+      web: '5174: demo transcript',
+    }
+    : normalized === '正常'
+      ? {
+        label: 'Normal data',
+        title: '只使用真实 Hub / Edge 数据',
+        copy: '没有认证、线程或消息时显示真实空状态，不再回退到设计 fixture。',
+        desktop: '5173: Edge thread data',
+        web: '5174: Hub session data',
+      }
+      : {
+        label: 'Auto fallback',
+        title: '优先真实数据，开发预览自动回退 Mock',
+        copy: 'Desktop 浏览器预览和 Web 未登录状态使用 fixture；Tauri/已登录 Web 优先真实数据。',
+        desktop: '5173: Tauri real / browser mock',
+        web: '5174: authenticated real / anonymous mock',
+      };
+
+  return (
+    <section className={styles.modeStatus} aria-label="数据模式状态">
+      <div className={styles.modeStatusHead}>
+        <span>{detail.label}</span>
+        <span className={styles.modeStatusSpacer} aria-hidden="true" />
+        <em>{normalized}</em>
+      </div>
+      <strong>{detail.title}</strong>
+      <p>{detail.copy}</p>
+      <dl className={styles.modeFacts}>
+        <div>
+          <dt>Desktop</dt>
+          <dd>{detail.desktop}</dd>
+        </div>
+        <div>
+          <dt>Web</dt>
+          <dd>{detail.web}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
 /* ── State panel ── */
 
 export type StatePanelKind = 'empty' | 'invalid' | 'missing';
@@ -314,9 +404,13 @@ function StatePanel({ kind, label, title, copy, actionLabel, onAction }: StatePa
   );
 
   return (
-    <article className={`${styles.statePanel} ${kindClass}`} aria-label={label}>
-      <div className={styles.stateMark} aria-hidden="true">
-        <DesignNavIcon name={stateIcon} size={17} />
+    <article className={`${styles.statePanel} ${kindClass} state-panel ${kind}`} aria-label={label}>
+      <div className={`${styles.stateMark} state-mark`} aria-hidden="true">
+        <DesignNavIcon
+          name={stateIcon}
+          size={DESIGN_NAV_GLYPH_SIZE}
+          strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
+        />
       </div>
       <h3>{title}</h3>
       <p>{copy}</p>
@@ -441,7 +535,15 @@ function LocalDevPane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow label="热更新覆盖层" description="保留 Vite 错误 overlay，开发时能直接看到语法问题。">
           <SettingSwitch active={props.hrmOverlayEnabled} onChange={(v) => props.onChangeSetting('hrmOverlayEnabled', v)} />
         </SettingsRow>
+        <SettingsRow label="数据模式" description="自动优先真实数据；Mock 固定设计 fixture；正常只走真实数据。">
+          <DataModeControl active={props.dataMode} onChange={(v) => props.onChangeSetting('dataMode', v)} />
+        </SettingsRow>
+        <SettingsRow label="发送快捷键" description="默认 Enter 发送；需要换行时使用 Ctrl / Cmd + Enter。">
+          <SettingSegment options={['Enter 发送', 'Ctrl+Enter 发送']} active={props.composerSubmitBehavior} onChange={(v) => props.onChangeSetting('composerSubmitBehavior', v)} />
+        </SettingsRow>
       </SettingsSection>
+
+      <DataModeStatus mode={props.dataMode} />
 
       <SettingsSection title="调试">
         <SettingsRow label="视觉 QA" description="需要时用浏览器截图检查桌面和窄宽布局。">
@@ -473,12 +575,12 @@ function StatesPane(props: SettingsPageProps): React.ReactElement {
         </SettingsRow>
       </SettingsSection>
 
-      <section className={styles.stateSystem}>
-        <div className={styles.sectionTitleRow}>
+      <section className={`${styles.stateSystem} state-system settings-state-system`}>
+        <div className={`${styles.sectionTitleRow} section-title-row`}>
           <h2>状态组件预览</h2>
           <span>Design System</span>
         </div>
-        <div className={styles.stateGrid}>
+        <div className={`${styles.stateGrid} state-grid`}>
           <StatePanel
             kind="empty"
             label="空列表"
@@ -527,12 +629,12 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
   const PaneContent = PANE_RENDERERS[activePane] ?? PANE_RENDERERS.appearance;
 
   return (
-    <section className={styles.page}>
+    <section className={`${styles.page} workbench settings-page`}>
       {/* ── Left nav ── */}
-      <aside className={styles.nav}>
-        <div className={styles.navTitle}>设置</div>
+      <aside className={`${styles.nav} workbench-nav`}>
+        <div className={`${styles.navTitle} workbench-title`}>设置</div>
         <input
-          className={styles.navSearch}
+          className={`${styles.navSearch} workbench-search`}
           type="search"
           placeholder="搜索设置项"
         />
@@ -554,13 +656,13 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
       </aside>
 
       {/* ── Right main ── */}
-      <main className={styles.main}>
-        <div className={styles.head}>
+      <main className={`${styles.main} workbench-main`}>
+        <div className={`${styles.head} workbench-head`}>
           <div>
             <h1 className={styles.headTitle}>{meta.title}</h1>
             <p className={styles.headSubcopy}>{meta.description}</p>
           </div>
-          <button className={styles.iconAction} type="button" aria-label="设置更多">
+          <button className={`${styles.iconAction} icon-action`} type="button" aria-label="设置更多">
             <DesignNavIcon name="settings" size={16} />
           </button>
         </div>

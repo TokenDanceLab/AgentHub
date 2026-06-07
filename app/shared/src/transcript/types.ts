@@ -29,6 +29,10 @@ interface TranscriptBlockBase {
 export interface TextTranscriptBlock extends TranscriptBlockBase {
   kind: 'text';
   text: string;
+  displayTitle?: string;
+  displayDetail?: string;
+  badgeLabel?: string;
+  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary';
 }
 
 export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
@@ -42,6 +46,9 @@ export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
 export interface ArtifactTranscriptBlock extends TranscriptBlockBase {
   kind: 'artifact';
   title: string;
+  action?: 'created' | 'modified' | 'deleted';
+  additions?: number;
+  deletions?: number;
 }
 
 export interface DiffTranscriptLine {

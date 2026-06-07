@@ -6,5 +6,5 @@ interface DateDividerProps {
 }
 
 export const DateDivider: React.FC<DateDividerProps> = ({ date }) => {
-  return <div className={styles.divider}>{date}</div>;
+  return <div className={styles.divider} data-date-divider>{date}</div>;
 };

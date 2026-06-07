@@ -7,7 +7,7 @@
 }
 
 .header {
-  padding: var(--sp-sm) 12px;
+  padding: 8px 12px;
   font: 500 0.75rem var(--font-sans);
   color: var(--text-2);
   background: var(--surface-low);

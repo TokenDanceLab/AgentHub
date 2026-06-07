@@ -64,6 +64,31 @@ export type { ErrorStats, ToastConfig, ToastSeverity } from './errorReporting';
 export { buildTree, flattenTree } from './tree';
 export type { TreeNode } from './tree';
 
+export {
+  SHARED_WORKBENCH_I18N_NAMESPACE,
+  flattenSharedWorkbenchResource,
+  sharedWorkbenchResources,
+} from './i18n';
+export type {
+  SharedWorkbenchLanguage,
+  SharedWorkbenchResourceTree,
+} from './i18n';
+
+export {
+  AGENTHUB_THEME_STORAGE_KEY,
+  applyAgentHubTheme,
+  getAppliedAgentHubTheme,
+  getStoredAgentHubThemeMode,
+  getSystemAgentHubTheme,
+  persistAgentHubThemeMode,
+  resolveAgentHubTheme,
+  toggleAppliedAgentHubTheme,
+} from './theme';
+export type {
+  AgentHubTheme,
+  AgentHubThemeMode,
+} from './theme';
+
 export { normalizeDiffs, parseUnifiedDiff } from './diff';
 export type { DiffFile, DiffHunk, DiffLine } from './diff';
 
@@ -331,15 +356,18 @@ export type {
 
 export {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+  createWorkbenchDemoRuntimeStore,
   createWorkbenchDemoStore,
   demoWorkbenchAgents,
   demoWorkbenchPins,
   demoWorkbenchTranscripts,
   normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
+  workbenchDemoRuntimeStore,
 } from './demo';
 export type {
   WorkbenchDemoMessagePin,
+  WorkbenchDemoRuntimeStore,
   WorkbenchDemoStore,
   WorkbenchDemoSurface,
 } from './demo';

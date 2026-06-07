@@ -21,7 +21,6 @@ export const PinnedAnnouncement: React.FC<PinnedAnnouncementProps> = ({
   title,
   content,
   author = '系统',
-  time,
   onCopy,
   onDismiss,
 }) => {
@@ -37,15 +36,7 @@ export const PinnedAnnouncement: React.FC<PinnedAnnouncementProps> = ({
           <span>{content}</span>
         </div>
         <div className={styles.meta}>
-          {time ? (
-            <>
-              由 <a>{author}</a> 置顶 · {time}
-            </>
-          ) : (
-            <>
-              由 <a>{author}</a> 置顶
-            </>
-          )}
+          由 <a>{author}</a> 置顶
         </div>
       </div>
 

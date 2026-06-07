@@ -1,5 +1,7 @@
 import React from 'react';
 import type { TranscriptBlock, TranscriptAuthor } from '../transcript';
+import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
+import type { FileItem } from './inspector';
 import {
   AgentMessage,
   UserMessage,
@@ -14,12 +16,31 @@ import {
   ContextUsageBlock,
   DateDivider,
   PinnedAnnouncement,
-  RunSessionCard,
   AgentTimeline,
   RunStepGroup,
   ApprovalCardBlock,
 } from './blocks';
 import styles from './AgentHubWorkbench.module.css';
+
+const USER_AVATAR_GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+export interface TranscriptContextMenuEvent {
+  preventDefault: () => void;
+  clientX: number;
+  clientY: number;
+}
+
+export interface TranscriptPointerEvent {
+  preventDefault: () => void;
+  clientX: number;
+  clientY: number;
+  button: number;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  target: EventTarget | null;
+  currentTarget: HTMLElement;
+}
 
 export interface TranscriptViewProps {
   transcript: TranscriptBlock[];
@@ -28,8 +49,13 @@ export interface TranscriptViewProps {
   selectedBlockIds?: string[] | undefined;
   selectionMode?: boolean | undefined;
   softHiddenBlockIds?: string[] | undefined;
-  onBlockContextMenu?: ((block: TranscriptBlock, event: React.MouseEvent<HTMLElement>) => void) | undefined;
-  onBlockSelect?: ((blockId: string) => void) | undefined;
+  onBlockContextMenu?: ((block: TranscriptBlock, event: TranscriptContextMenuEvent) => void) | undefined;
+  onBlockPointerDown?: ((block: TranscriptBlock, event: TranscriptPointerEvent) => void) | undefined;
+  onBlockPointerMove?: ((block: TranscriptBlock, event: TranscriptPointerEvent) => void) | undefined;
+  onBlockPointerUp?: ((block: TranscriptBlock, event: TranscriptPointerEvent) => void) | undefined;
+  onBlockSelect?: ((blockId: string, event?: { shiftKey?: boolean }) => void) | undefined;
+  onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined;
+  onReviewFile?: ((file: FileItem) => void) | undefined;
   /** Optional pinned announcement to show at the top of the transcript. */
   pinnedAnnouncement?: {
     title: string;
@@ -45,19 +71,44 @@ export function TranscriptView({
   actionedBlockIds = [],
   contextBlockId,
   onBlockContextMenu,
+  onBlockPointerDown,
+  onBlockPointerMove,
+  onBlockPointerUp,
   onBlockSelect,
+  onAgentProfileOpen,
+  onReviewFile,
   selectedBlockIds = [],
   selectionMode = false,
   softHiddenBlockIds = [],
   transcript,
   pinnedAnnouncement,
 }: TranscriptViewProps): React.ReactElement {
+  const [expandedDiffIds, setExpandedDiffIds] = React.useState<Set<string>>(() => new Set());
   const actionedIds = new Set(actionedBlockIds);
   const selectedIds = new Set(selectedBlockIds);
   const softHiddenIds = new Set(softHiddenBlockIds);
+  const visibleTranscript = transcript.filter((block) => block.kind !== 'run_session');
+  const diffControls = React.useMemo<InlineDiffControls>(() => ({
+    expandedDiffIds,
+    onToggleDiff: (diffId: string) => {
+      setExpandedDiffIds((current) => {
+        const next = new Set(current);
+        if (next.has(diffId)) {
+          next.delete(diffId);
+        } else {
+          next.add(diffId);
+        }
+        return next;
+      });
+    },
+  }), [expandedDiffIds]);
 
   return (
-    <section aria-label="Transcript" className={styles.transcriptRegion}>
+    <section
+      aria-label="Transcript"
+      className={styles.transcriptRegion}
+      data-pinned={pinnedAnnouncement ? 'true' : 'false'}
+    >
       {pinnedAnnouncement && (
         <div className={styles.pinnedAnnouncementWrap}>
           <PinnedAnnouncement
@@ -71,12 +122,13 @@ export function TranscriptView({
         </div>
       )}
 
-      <ol className={styles.transcript}>
-        {transcript.map((block, index) => {
+      <ol className={styles.transcript} data-transcript-list>
+        {visibleTranscript.map((block, index) => {
           const showDateDivider =
             Boolean(block.createdAt) && (
-              index === 0 || shouldShowDateDivider(transcript[index - 1]!, block)
+              index === 0 || shouldShowDateDivider(visibleTranscript[index - 1]!, block)
             );
+          const hideGroupedUserAvatar = !showDateDivider && shouldHideGroupedUserAvatar(block, visibleTranscript[index - 1]);
 
           return (
             <React.Fragment key={block.id}>
@@ -97,10 +149,31 @@ export function TranscriptView({
                   actionedIds.has(block.id) ? 'actioned' : '',
                   softHiddenIds.has(block.id) ? 'soft-hidden' : '',
                 ].filter(Boolean).join(' ')}
-                onClick={selectionMode ? () => onBlockSelect?.(block.id) : undefined}
+                onKeyDown={(event) => {
+                  if ((event.key === 'Enter' || event.key === ' ') && selectionMode) {
+                    event.preventDefault();
+                    onBlockSelect?.(block.id, { shiftKey: event.shiftKey });
+                    return;
+                  }
+                  if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                    event.preventDefault();
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    onBlockContextMenu?.(block, {
+                      preventDefault: () => undefined,
+                      clientX: rect.left + 28,
+                      clientY: rect.top + 16,
+                    });
+                  }
+                }}
                 onContextMenu={(event) => onBlockContextMenu?.(block, event)}
+                onPointerCancel={(event) => onBlockPointerUp?.(block, event)}
+                onPointerDown={(event) => onBlockPointerDown?.(block, event)}
+                onPointerLeave={(event) => onBlockPointerUp?.(block, event)}
+                onPointerMove={(event) => onBlockPointerMove?.(block, event)}
+                onPointerUp={(event) => onBlockPointerUp?.(block, event)}
+                tabIndex={0}
               >
-                {renderTranscriptBlock(block)}
+                {renderTranscriptBlock(block, onAgentProfileOpen, onReviewFile, hideGroupedUserAvatar, diffControls)}
               </li>
             </React.Fragment>
           );
@@ -112,24 +185,28 @@ export function TranscriptView({
 
 /* ═══ Block renderer ═══ */
 
-function renderTranscriptBlock(block: TranscriptBlock): React.ReactElement {
+function renderTranscriptBlock(
+  block: TranscriptBlock,
+  onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined,
+  onReviewFile?: ((file: FileItem) => void) | undefined,
+  hideUserAvatar = false,
+  diffControls?: InlineDiffControls | undefined,
+): React.ReactElement {
   switch (block.kind) {
     case 'text':
-      return renderTextBlock(block);
+      return renderTextBlock(block, onAgentProfileOpen, hideUserAvatar);
     case 'tool_call':
       return renderToolCallBlock(block);
     case 'artifact':
-      return renderArtifactBlock(block);
+      return renderArtifactBlock(block, onReviewFile, diffControls);
     case 'diff':
       return renderDiffBlock(block);
     case 'approval':
       return renderApprovalBlock(block);
-    case 'run_session':
-      return renderRunSessionBlock(block);
     case 'agent_timeline':
       return renderAgentTimelineBlock(block);
     case 'run_step_group':
-      return renderRunStepGroupBlock(block);
+      return renderRunStepGroupBlock(block, onReviewFile, diffControls);
     case 'thinking':
       return renderThinkingBlock(block);
     case 'subagent':
@@ -147,10 +224,19 @@ function renderTranscriptBlock(block: TranscriptBlock): React.ReactElement {
   }
 }
 
+interface InlineDiffControls {
+  expandedDiffIds: Set<string>;
+  onToggleDiff(diffId: string): void;
+}
+
 /* ── Text block ── */
 
-function renderTextBlock(block: Extract<TranscriptBlock, { kind: 'text' }>): React.ReactElement {
-  if (isAgentAuthor(block.author)) {
+function renderTextBlock(
+  block: Extract<TranscriptBlock, { kind: 'text' }>,
+  onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined,
+  hideUserAvatar = false,
+): React.ReactElement {
+  if (!isCurrentUserAuthor(block.author)) {
     const time = formatBlockTime(block.createdAt);
 
     return (
@@ -160,21 +246,22 @@ function renderTextBlock(block: Extract<TranscriptBlock, { kind: 'text' }>): Rea
         {...agentMessageBadge(block)}
         {...(time ? { time } : {})}
         name={block.author.name}
+        onAvatarClick={onAgentProfileOpen}
       >
-        {renderAgentText(block.text)}
+        {renderAgentText(block)}
       </AgentMessage>
     );
   }
 
   return (
-    <UserMessage>
+    <UserMessage hideAvatar={hideUserAvatar} avatarInitials={agentAvatar(block.author.name)}>
       <p className={styles.blockText}>{block.text}</p>
     </UserMessage>
   );
 }
 
-function renderAgentText(text: string): React.ReactElement {
-  const [title, rest] = splitAgentText(text);
+function renderAgentText(block: Extract<TranscriptBlock, { kind: 'text' }>): React.ReactElement {
+  const [title, rest] = agentTextParts(block);
   if (!rest) {
     return <p className={styles.blockText}>{title}</p>;
   }
@@ -185,6 +272,13 @@ function renderAgentText(text: string): React.ReactElement {
       <div className={styles.inlineMutedLoose}>{rest}</div>
     </>
   );
+}
+
+function agentTextParts(block: Extract<TranscriptBlock, { kind: 'text' }>): [string, string] {
+  const title = block.displayTitle?.trim();
+  const detail = block.displayDetail?.trim();
+  if (title) return [title, detail ?? ''];
+  return splitAgentText(block.text);
 }
 
 function splitAgentText(text: string): [string, string] {
@@ -235,19 +329,36 @@ function renderToolCallBlock(
 
 function renderArtifactBlock(
   block: Extract<TranscriptBlock, { kind: 'artifact' }>,
+  onReviewFile?: ((file: FileItem) => void) | undefined,
+  diffControls?: InlineDiffControls | undefined,
+  pairedDiff?: Extract<TranscriptBlock, { kind: 'diff' }> | undefined,
 ): React.ReactElement {
   const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
+  const path = fileRef?.path ?? fileRef?.label;
 
-  if (fileRef?.path) {
+  if (path) {
     return (
       <div className={styles.agentBlockRow}>
         <div className={styles.agentRunShell}>
           <FileChangeCard
-            path={fileRef.path}
+            path={path}
             action={block.action ?? 'modified'}
             {...(block.additions != null ? { additions: block.additions } : {})}
             {...(block.deletions != null ? { deletions: block.deletions } : {})}
+            {...(pairedDiff && diffControls ? {
+              diffExpanded: diffControls.expandedDiffIds.has(pairedDiff.id),
+              onToggleDiff: () => diffControls.onToggleDiff(pairedDiff.id),
+            } : {})}
+            onReview={onReviewFile ? () => onReviewFile(fileItemFromPath(path)) : undefined}
           />
+          {pairedDiff && diffControls?.expandedDiffIds.has(pairedDiff.id) && (
+            <DiffCard
+              additions={pairedDiff.additions ?? block.additions ?? 0}
+              deletions={pairedDiff.deletions ?? block.deletions ?? 0}
+              filename={pairedDiff.files[0] ?? path}
+              lines={pairedDiff.lines ?? []}
+            />
+          )}
         </div>
       </div>
     );
@@ -301,23 +412,6 @@ function renderApprovalBlock(
   );
 }
 
-function renderRunSessionBlock(
-  block: Extract<TranscriptBlock, { kind: 'run_session' }>,
-): React.ReactElement {
-  return (
-    <div className={styles.agentBlockRow}>
-      <div className={styles.agentRunShell}>
-        <RunSessionCard
-          meta={block.meta}
-          runId={block.runId}
-          status={block.status}
-          title={block.title}
-        />
-      </div>
-    </div>
-  );
-}
-
 function renderAgentTimelineBlock(
   block: Extract<TranscriptBlock, { kind: 'agent_timeline' }>,
 ): React.ReactElement {
@@ -332,7 +426,29 @@ function renderAgentTimelineBlock(
 
 function renderRunStepGroupBlock(
   block: Extract<TranscriptBlock, { kind: 'run_step_group' }>,
+  onReviewFile?: ((file: FileItem) => void) | undefined,
+  diffControls?: InlineDiffControls | undefined,
 ): React.ReactElement {
+  const renderedChildren: React.ReactNode[] = [];
+  const consumedDiffIds = new Set<string>();
+  for (let index = 0; index < block.children.length; index += 1) {
+    const child = block.children[index]!;
+    if (child.kind === 'diff' && consumedDiffIds.has(child.id)) continue;
+    if (child.kind === 'artifact') {
+      const pairedDiff = findPairedDiffBlock(child, block.children, consumedDiffIds);
+      if (pairedDiff) consumedDiffIds.add(pairedDiff.id);
+      renderedChildren.push(
+        <React.Fragment key={child.id}>
+          {renderRunStepChild(child, onReviewFile, diffControls, pairedDiff)}
+        </React.Fragment>,
+      );
+      continue;
+    }
+    renderedChildren.push(
+      <React.Fragment key={child.id}>{renderRunStepChild(child, onReviewFile, diffControls)}</React.Fragment>,
+    );
+  }
+
   return (
     <div className={styles.agentBlockRow}>
       <RunStepGroup
@@ -342,15 +458,37 @@ function renderRunStepGroupBlock(
         status={block.status}
         title={block.title}
       >
-        {block.children.map((child) => (
-          <React.Fragment key={child.id}>{renderRunStepChild(child)}</React.Fragment>
-        ))}
+        {renderedChildren}
       </RunStepGroup>
     </div>
   );
 }
 
-function renderRunStepChild(block: TranscriptBlock): React.ReactElement {
+function findPairedDiffBlock(
+  artifact: Extract<TranscriptBlock, { kind: 'artifact' }>,
+  siblings: TranscriptBlock[],
+  consumedDiffIds: Set<string>,
+): Extract<TranscriptBlock, { kind: 'diff' }> | undefined {
+  const artifactPath = artifactFilePath(artifact);
+  if (!artifactPath) return undefined;
+  return siblings.find((candidate): candidate is Extract<TranscriptBlock, { kind: 'diff' }> => (
+    candidate.kind === 'diff'
+    && !consumedDiffIds.has(candidate.id)
+    && candidate.files.some((file) => file === artifactPath)
+  ));
+}
+
+function artifactFilePath(block: Extract<TranscriptBlock, { kind: 'artifact' }>): string | undefined {
+  const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
+  return fileRef?.path ?? fileRef?.label ?? block.title;
+}
+
+function renderRunStepChild(
+  block: TranscriptBlock,
+  onReviewFile?: ((file: FileItem) => void) | undefined,
+  diffControls?: InlineDiffControls | undefined,
+  pairedDiff?: Extract<TranscriptBlock, { kind: 'diff' }> | undefined,
+): React.ReactElement {
   switch (block.kind) {
     case 'tool_call': {
       const evidence = block.evidenceRefs?.find((ref) => ref.path) ?? block.evidenceRefs?.find((ref) => ref.kind === 'tool');
@@ -366,14 +504,29 @@ function renderRunStepChild(block: TranscriptBlock): React.ReactElement {
     }
     case 'artifact': {
       const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
+      const path = fileRef?.path ?? fileRef?.label ?? block.title;
       return (
-        <FileChangeCard
-          action={block.action ?? 'modified'}
-          {...(block.additions != null ? { additions: block.additions } : {})}
-          {...(block.deletions != null ? { deletions: block.deletions } : {})}
-          onReview={() => undefined}
-          path={fileRef?.path ?? block.title}
-        />
+        <>
+          <FileChangeCard
+            action={block.action ?? 'modified'}
+            {...(block.additions != null ? { additions: block.additions } : {})}
+            {...(block.deletions != null ? { deletions: block.deletions } : {})}
+            {...(pairedDiff && diffControls ? {
+              diffExpanded: diffControls.expandedDiffIds.has(pairedDiff.id),
+              onToggleDiff: () => diffControls.onToggleDiff(pairedDiff.id),
+            } : {})}
+            onReview={onReviewFile ? () => onReviewFile(fileItemFromPath(path)) : undefined}
+            path={path}
+          />
+          {pairedDiff && diffControls?.expandedDiffIds.has(pairedDiff.id) && (
+            <DiffCard
+              additions={pairedDiff.additions ?? block.additions ?? 0}
+              deletions={pairedDiff.deletions ?? block.deletions ?? 0}
+              filename={pairedDiff.files[0] ?? path}
+              lines={pairedDiff.lines ?? []}
+            />
+          )}
+        </>
       );
     }
     case 'diff':
@@ -388,7 +541,7 @@ function renderRunStepChild(block: TranscriptBlock): React.ReactElement {
     case 'thinking':
       return renderNestedThinkingDetail(block);
     default:
-      return renderTranscriptBlock(block);
+      return renderTranscriptBlock(block, undefined, onReviewFile, false, diffControls);
   }
 }
 
@@ -498,27 +651,30 @@ function renderResultBlock(
 
 /* ═══ Helpers ═══ */
 
-function isAgentAuthor(author: TranscriptAuthor): boolean {
-  return author.role === 'agent';
+function isCurrentUserAuthor(author: TranscriptAuthor): boolean {
+  const id = author.id.trim().toLowerCase();
+  const name = author.name.trim().toLowerCase();
+  return id === 'delicious233' || id === 'delicious' || name === 'delicious233';
 }
 
 function agentAvatar(name: string): string {
-  return name.trim().slice(0, 1).toUpperCase() || 'A';
+  return workbenchProfileInitials(name);
 }
 
 function agentAvatarColor(name: string): string {
-  const key = name.trim().toLowerCase();
-  if (key.includes('builder')) return 'var(--role-builder)';
-  if (key.includes('reviewer')) return 'var(--role-reviewer)';
-  if (key.includes('deployer')) return 'var(--role-deployer)';
-  if (key.includes('orchestrator')) return 'var(--role-orchestrator)';
-  if (key.includes('researcher')) return 'var(--role-researcher)';
-  return 'var(--surface-highest)';
+  return workbenchAgentColor({ name });
 }
 
 function agentMessageBadge(
   block: Extract<TranscriptBlock, { kind: 'text' }>,
 ): { badgeLabel?: string; badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary' } {
+  if (block.badgeLabel) {
+    return {
+      badgeLabel: block.badgeLabel,
+      badgeVariant: block.badgeVariant ?? 'primary',
+    };
+  }
+
   const statuses = block.evidenceRefs?.map((ref) => ref.status).filter(Boolean) ?? [];
   if (statuses.includes('running')) return { badgeLabel: '运行中', badgeVariant: 'thinking' };
   if (statuses.includes('pending')) return { badgeLabel: '待执行', badgeVariant: 'primary' };
@@ -555,6 +711,23 @@ function shouldShowDateDivider(prev: TranscriptBlock, next: TranscriptBlock): bo
   return Boolean(prevDate && nextDate && prevDate !== nextDate);
 }
 
+function shouldHideGroupedUserAvatar(
+  current: TranscriptBlock,
+  previous: TranscriptBlock | undefined,
+): boolean {
+  if (!previous) return false;
+  if (current.kind !== 'text' || previous.kind !== 'text') return false;
+  if (!isCurrentUserAuthor(current.author) || !isCurrentUserAuthor(previous.author)) return false;
+  if (current.author.id !== previous.author.id) return false;
+
+  if (!current.createdAt || !previous.createdAt) return true;
+  const currentTime = new Date(current.createdAt).getTime();
+  const previousTime = new Date(previous.createdAt).getTime();
+  if (Number.isNaN(currentTime) || Number.isNaN(previousTime)) return true;
+
+  return currentTime >= previousTime && currentTime - previousTime <= USER_AVATAR_GROUP_WINDOW_MS;
+}
+
 /** Returns a human-readable date string for a block. */
 function formatBlockDate(block: TranscriptBlock): string {
   if (!block.createdAt) return '';
@@ -581,4 +754,18 @@ function dayKey(value: string): string | null {
     month: '2-digit',
     year: 'numeric',
   });
+}
+
+function fileItemFromPath(path: string): FileItem {
+  return {
+    name: path,
+    type: fileTypeFromPath(path),
+  };
+}
+
+function fileTypeFromPath(path: string): FileItem['type'] {
+  if (path.endsWith('.md')) return 'md';
+  if (path.endsWith('.ts') || path.endsWith('.tsx')) return 'ts';
+  if (path.endsWith('.sql') || path.endsWith('.db')) return 'db';
+  return 'txt';
 }
