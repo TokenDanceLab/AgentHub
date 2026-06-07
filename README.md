@@ -144,6 +144,7 @@ AgentHub/
 │   ├── architecture.md   # 产品定位 + 系统架构 + 实现状态
 │   ├── roadmap.md        # 当前主线与任务优先级
 │   ├── desktop-web-v4-clean-rebuild-plan.md
+│   ├── v4-frontend-progress-2026-06-07.md
 │   ├── adr/              # 架构决策记录
 │   ├── designs/          # 组件设计文档
 │   ├── governance/       # 安全台账、分支治理、文档标准
@@ -162,6 +163,7 @@ AgentHub/
 | [架构文档](docs/architecture.md) | 产品定位、系统架构、实现状态（首选入口） |
 | [路线图](docs/roadmap.md) | 当前主线、阶段任务和验收口径 |
 | [v4 重构计划](docs/desktop-web-v4-clean-rebuild-plan.md) | Desktop/Web shared workbench clean rebuild |
+| [v4 前端进度](docs/v4-frontend-progress-2026-06-07.md) | 5173/5174 shared UI、动效、主题、侧栏和验证证据 |
 | [API 契约](api/) | REST + WebSocket 接口定义 |
 | [安全风险台账](docs/governance/security-risk-register.md) | 安全风险登记与追踪 |
 
