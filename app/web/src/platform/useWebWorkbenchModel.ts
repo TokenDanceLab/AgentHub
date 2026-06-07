@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
-  normalizeWorkbenchDataMode,
+  getWorkbenchDataModeOverrideSnapshot,
+  resolveWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
+  subscribeWorkbenchDataModeOverride,
+  workbenchDemoRuntimeStore,
 } from '@shared/demo';
 import {
   normalizeHubMessagesToTranscript,
@@ -25,9 +28,19 @@ import { useWebHubRealtime } from './webHubRealtime';
 const hubClient = createHubClient({ getToken: getAccessToken });
 
 export function useWebWorkbenchModel(selectedConversationId?: string) {
-  const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
+  const dataModeOverride = useSyncExternalStore(
+    subscribeWorkbenchDataModeOverride,
+    getWorkbenchDataModeOverrideSnapshot,
+    getWorkbenchDataModeOverrideSnapshot,
+  );
+  const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
   const authenticated = useHubStore((state) => state.authenticated);
   const hubReady = dataMode !== 'demo' && authenticated && Boolean(getAccessToken());
+  const demoSnapshot = useSyncExternalStore(
+    workbenchDemoRuntimeStore.subscribe,
+    workbenchDemoRuntimeStore.getSnapshot,
+    workbenchDemoRuntimeStore.getSnapshot,
+  );
   const [liveRuntimeEvents, setLiveRuntimeEvents] = useState<HubRuntimeEventTranscriptInput[]>([]);
 
   const sessions = useQuery({
@@ -38,7 +51,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     placeholderData: (previous) => previous,
   });
 
-  const conversations = resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
+  const conversations = !hubReady && dataMode !== 'real'
+    ? demoSnapshot.conversations
+    : resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
   const activeConversationId = (
     conversations.some((conversation) => conversation.id === selectedConversationId)
       ? selectedConversationId
@@ -84,12 +99,15 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     )
     : conversations;
 
-  const transcript = resolveWebWorkbenchTranscript(
-    hubReady,
-    activeHubSessionId,
-    messages.data,
-    liveRuntimeEvents,
-  );
+  const transcript = !hubReady && dataMode !== 'real'
+    ? workbenchDemoRuntimeStore.resolveTranscript(activeConversationId)
+    : resolveWebWorkbenchTranscript(
+      hubReady,
+      activeHubSessionId,
+      messages.data,
+      liveRuntimeEvents,
+      dataMode,
+    );
 
   return {
     activeConversationId,
@@ -103,7 +121,7 @@ export function resolveWebWorkbenchTranscript(
   activeHubSessionId: string | null,
   messages: HubMessageTranscriptInput[] | undefined,
   liveRuntimeEvents: HubRuntimeEventTranscriptInput[],
-  dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
+  dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
 ): TranscriptBlock[] {
   if (!hubReady) {
     return dataMode === 'real'

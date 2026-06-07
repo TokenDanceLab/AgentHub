@@ -4,7 +4,9 @@ import {
   demoWorkbenchAgents,
   normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
+  workbenchDemoRuntimeStore,
   type WorkbenchDataMode,
+  type WorkbenchDemoRuntimeStore,
 } from '@shared/demo';
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
@@ -35,6 +37,7 @@ export interface WebPlatformOptions {
   hubClient?: WebRunHubClient;
   queryClient?: QueryClient;
   createClientMessageId?: () => string;
+  demoRuntimeStore?: WorkbenchDemoRuntimeStore;
   now?: () => string;
 }
 
@@ -142,8 +145,10 @@ function formatHubPinTime(timestamp: string | undefined): string | undefined {
 
 export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPlatform {
   const hubClient = options.hubClient ?? defaultHubClient;
+  const hasInjectedHubClient = Boolean(options.hubClient);
   const queryClient = options.queryClient ?? defaultQueryClient;
   const createClientMessageId = options.createClientMessageId ?? newClientMessageId;
+  const demoRuntimeStore = options.demoRuntimeStore ?? workbenchDemoRuntimeStore;
   const now = options.now ?? (() => new Date().toISOString());
 
   return {
@@ -164,6 +169,10 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
+        const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
+        if (dataMode === 'demo' || (dataMode === 'auto' && !hasInjectedHubClient && !getAccessToken())) {
+          return demoRuntimeStore.submitComposerIntent(intent);
+        }
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
       },
     },
