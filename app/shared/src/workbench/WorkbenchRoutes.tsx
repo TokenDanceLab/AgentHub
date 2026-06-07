@@ -76,9 +76,22 @@ const TASK_STATUS_SEQUENCE: TaskStatus[] = ['未开始', '进行中', '待评审
 export interface WorkbenchRoutesProps {
   activePage: WorkbenchPage;
   agents?: WorkbenchAgent[] | undefined;
+  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
   focusedAgentId?: string | undefined;
+  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
+  onAgentsRetry?: (() => void) | undefined;
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
+}
+
+export interface WorkbenchAgentProfilesStatus {
+  loading?: boolean | undefined;
+  error?: string | undefined;
+  actionError?: string | undefined;
+  savingAgentId?: string | undefined;
+  deletingAgentId?: string | undefined;
 }
 
 export interface WorkbenchContactsData {
@@ -382,8 +395,13 @@ function workbenchAgentToAgentConfig(agent: WorkbenchAgent): AgentConfig {
 export function WorkbenchRoutes({
   activePage,
   agents,
+  agentProfilesStatus,
   contacts,
   focusedAgentId,
+  onAgentCreate,
+  onAgentUpdate,
+  onAgentDelete,
+  onAgentsRetry,
   onAgentProfileOpen,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
@@ -411,11 +429,21 @@ export function WorkbenchRoutes({
   const [settingsPane, setSettingsPane] = useState<SettingsPaneId>('appearance');
   const [settings, setSettings] = useState(createSettingsDefaults);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(focusedAgentId);
+  const [agentDrafts, setAgentDrafts] = useState<Record<string, AgentConfig>>({});
+  const [draftAgentIds, setDraftAgentIds] = useState<string[]>([]);
+  const [dirtyAgentIds, setDirtyAgentIds] = useState<string[]>([]);
+  const [agentDraftCounter, setAgentDraftCounter] = useState(1);
 
-  const agentConfigs = useMemo(
+  const sourceAgentConfigs = useMemo(
     () => (agents === undefined ? WORKBENCH_MOCK_AGENT_CONFIGS : agents.map(workbenchAgentToAgentConfig)),
     [agents],
   );
+  const agentConfigs = useMemo(() => [
+    ...draftAgentIds
+      .map((id) => agentDrafts[id])
+      .filter((agent): agent is AgentConfig => Boolean(agent)),
+    ...sourceAgentConfigs.map((agent) => agentDrafts[agent.id] ?? agent),
+  ], [agentDrafts, draftAgentIds, sourceAgentConfigs]);
   const contactsData = contacts ?? {
     members: WORKBENCH_MOCK_CONTACT_MEMBERS,
     externalContacts: WORKBENCH_MOCK_EXTERNAL_CONTACTS,
@@ -432,10 +460,160 @@ export function WorkbenchRoutes({
     ...contactsData.members.map((member) => ({ ...member, kind: 'user' as const })),
   ], [agentConfigs, contactsData.members]);
   const effectiveSelectedAgentId = selectedAgentId ?? agentConfigs[0]?.id ?? '';
+  const selectedAgentIsDraft = effectiveSelectedAgentId ? draftAgentIds.includes(effectiveSelectedAgentId) : false;
+  const selectedAgentIsDirty = effectiveSelectedAgentId ? dirtyAgentIds.includes(effectiveSelectedAgentId) : false;
+  const selectedAgentSaving = effectiveSelectedAgentId && agentProfilesStatus?.savingAgentId === effectiveSelectedAgentId;
+  const selectedAgentDeleting = effectiveSelectedAgentId && agentProfilesStatus?.deletingAgentId === effectiveSelectedAgentId;
 
   React.useEffect(() => {
     if (focusedAgentId) setSelectedAgentId(focusedAgentId);
   }, [focusedAgentId]);
+
+  React.useEffect(() => {
+    const sourceIds = new Set(sourceAgentConfigs.map((agent) => agent.id));
+    setAgentDrafts((current) => Object.fromEntries(
+      Object.entries(current).filter(([id]) => draftAgentIds.includes(id) || sourceIds.has(id)),
+    ));
+    setDirtyAgentIds((current) => current.filter((id) => draftAgentIds.includes(id) || sourceIds.has(id)));
+  }, [draftAgentIds, sourceAgentConfigs]);
+
+  React.useEffect(() => {
+    if (!effectiveSelectedAgentId && agentConfigs[0]?.id) {
+      setSelectedAgentId(agentConfigs[0].id);
+      return;
+    }
+    if (effectiveSelectedAgentId && !agentConfigs.some((agent) => agent.id === effectiveSelectedAgentId)) {
+      setSelectedAgentId(agentConfigs[0]?.id);
+    }
+  }, [agentConfigs, effectiveSelectedAgentId]);
+
+  function setAgentDirty(agentId: string): void {
+    setDirtyAgentIds((current) => current.includes(agentId) ? current : [...current, agentId]);
+  }
+
+  function clearAgentDirty(agentId: string): void {
+    setDirtyAgentIds((current) => current.filter((id) => id !== agentId));
+  }
+
+  function patchSelectedAgent(patch: Partial<AgentConfig>): void {
+    if (!effectiveSelectedAgentId) return;
+    const current = agentConfigs.find((agent) => agent.id === effectiveSelectedAgentId);
+    if (!current) return;
+    setAgentDrafts((drafts) => ({
+      ...drafts,
+      [effectiveSelectedAgentId]: { ...current, ...drafts[effectiveSelectedAgentId], ...patch },
+    }));
+    setAgentDirty(effectiveSelectedAgentId);
+  }
+
+  function createAgentDraft(index: number): AgentConfig {
+    return {
+      id: `draft-agent-${index}`,
+      name: `新 Agent ${index}`,
+      role: '',
+      engine: 'codex',
+      model: 'codex / gpt-5-codex',
+      mode: 'Reasoning medium',
+      approval: 'Hub 默认策略',
+      scope: 'default',
+      state: 'waiting',
+      skills: [],
+      tools: {},
+    };
+  }
+
+  function selectAdjacentAgent(deletedId: string): void {
+    const remaining = agentConfigs.filter((agent) => agent.id !== deletedId);
+    setSelectedAgentId(remaining[0]?.id);
+  }
+
+  function handleAgentAdd(): void {
+    const nextIndex = agentDraftCounter;
+    const draft = createAgentDraft(nextIndex);
+    setAgentDraftCounter((current) => current + 1);
+    setDraftAgentIds((current) => [draft.id, ...current]);
+    setAgentDrafts((current) => ({ ...current, [draft.id]: draft }));
+    setAgentDirty(draft.id);
+    setSelectedAgentId(draft.id);
+  }
+
+  async function handleAgentSave(): Promise<void> {
+    if (!effectiveSelectedAgentId) return;
+    const agent = agentConfigs.find((item) => item.id === effectiveSelectedAgentId);
+    if (!agent) return;
+    if (selectedAgentIsDraft) {
+      try {
+        await onAgentCreate?.(agent);
+      } catch {
+        return;
+      }
+      setDraftAgentIds((current) => current.filter((id) => id !== agent.id));
+      setAgentDrafts((current) => {
+        const { [agent.id]: _removed, ...rest } = current;
+        return rest;
+      });
+      clearAgentDirty(agent.id);
+      return;
+    }
+    try {
+      await onAgentUpdate?.(agent);
+    } catch {
+      return;
+    }
+    clearAgentDirty(agent.id);
+  }
+
+  async function handleAgentDelete(): Promise<void> {
+    if (!effectiveSelectedAgentId) return;
+    const agentId = effectiveSelectedAgentId;
+    if (draftAgentIds.includes(agentId)) {
+      setDraftAgentIds((current) => current.filter((id) => id !== agentId));
+      setAgentDrafts((current) => {
+        const { [agentId]: _removed, ...rest } = current;
+        return rest;
+      });
+      clearAgentDirty(agentId);
+      selectAdjacentAgent(agentId);
+      return;
+    }
+    try {
+      await onAgentDelete?.(agentId);
+    } catch {
+      return;
+    }
+    selectAdjacentAgent(agentId);
+  }
+
+  function handleAgentSkillToggle(skill: string): void {
+    const current = agentConfigs.find((agent) => agent.id === effectiveSelectedAgentId);
+    if (!current) return;
+    const skills = current.skills.includes(skill)
+      ? current.skills.filter((item) => item !== skill)
+      : [...current.skills, skill];
+    patchSelectedAgent({ skills });
+  }
+
+  function handleToolPermissionSet(tool: string, value: ToolPermission): void {
+    const current = agentConfigs.find((agent) => agent.id === effectiveSelectedAgentId);
+    patchSelectedAgent({ tools: { ...(current?.tools ?? {}), [tool]: value } });
+  }
+
+  function handleAgentFieldChange(field: string, value: string): void {
+    if (field === 'state') {
+      patchSelectedAgent({ state: value as AgentConfig['state'] });
+      return;
+    }
+    patchSelectedAgent({ [field]: value } as Partial<AgentConfig>);
+  }
+
+  function agentSaveStateLabel(): string {
+    if (selectedAgentDeleting) return '删除中';
+    if (selectedAgentSaving) return selectedAgentIsDraft ? '创建中' : '保存中';
+    if (agentProfilesStatus?.actionError) return '保存失败';
+    if (selectedAgentIsDraft) return '草稿';
+    if (selectedAgentIsDirty) return '未保存';
+    return '已同步';
+  }
 
   function handleSettingChange(key: string, value: string | boolean): void {
     if (key === 'dataMode' && typeof value === 'string') {
@@ -687,6 +865,9 @@ export function WorkbenchRoutes({
         <AgentsPage
           activePane={agentsPane}
           agents={agentConfigs}
+          agentActionError={agentProfilesStatus?.actionError}
+          agentsError={agentProfilesStatus?.error}
+          agentsLoading={agentProfilesStatus?.loading}
           allSkills={WORKBENCH_MOCK_AGENT_SKILL_OPTIONS}
           allTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
           auditEntries={WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
@@ -707,11 +888,22 @@ export function WorkbenchRoutes({
           }))}
           models={WORKBENCH_MOCK_AGENT_MODELS}
           onPaneChange={setAgentsPane}
+          onAgentAdd={handleAgentAdd}
+          onAgentDelete={handleAgentDelete}
+          onAgentFieldChange={handleAgentFieldChange}
           onAgentProfileOpen={onAgentProfileOpen}
+          onAgentSave={handleAgentSave}
           onAgentSelect={setSelectedAgentId}
+          onAgentSkillToggle={handleAgentSkillToggle}
+          onAgentsRetry={onAgentsRetry}
+          onToolPermissionSet={handleToolPermissionSet}
           policyRules={WORKBENCH_MOCK_AGENT_POLICY_RULES}
           recentShortcuts={agents === undefined ? ['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由'] : agentConfigs.slice(0, 3).map((agent) => `${agent.name} 已同步`)}
           runnableCount={agentConfigs.filter((agent) => agent.state === 'running' || agent.state === 'ready').length}
+          saveStateLabel={agentSaveStateLabel()}
+          isDirty={selectedAgentIsDirty}
+          savingAgentId={agentProfilesStatus?.savingAgentId}
+          deletingAgentId={agentProfilesStatus?.deletingAgentId}
           toolMatrixAgents={agentConfigs.map((agent) => ({
             id: agent.id,
             name: agent.name,
