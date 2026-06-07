@@ -628,7 +628,7 @@
 
   --border: #E2E8F0;
   --input: #F1F5F9;
-  --ring: rgba(99, 102, 241, 0.25);
+  --ring: rgba(0, 113, 188, 0.25);
 
   --success: #22C55E;
   --success-foreground: #FFFFFF;
@@ -675,8 +675,8 @@
   --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
 
   --agent-card-bg: transparent;
-  --agent-card-hover: rgba(99, 102, 241, 0.04);
-  --agent-card-active: rgba(99, 102, 241, 0.06);
+  --agent-card-hover: rgba(0, 113, 188, 0.04);
+  --agent-card-active: rgba(0, 113, 188, 0.06);
 
   --hover-overlay: rgba(0, 0, 0, 0.035);
 

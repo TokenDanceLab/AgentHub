@@ -16,6 +16,14 @@ Desktop/Web v4 主工作台已经以 `app/shared/src/workbench` 为唯一 UI 壳
 
 ## 已保存进度
 
+### 最新保存点：主色 token 对齐 AgentHub logo 蓝
+
+- Desktop/Web v4 共享主题主色已从旧紫蓝 `#5063e8` / `#6985e8` 对齐到 AgentHub logo 蓝：Light `#0071BC`，Dark `#29ABE2`。
+- `--primary`、`--primary-hover`、`--primary-light`、`--primary-soft`、`--bdr-focus`、`--ring`、`--surface-selected` 等 active primary/focus/selected token 已同步更新；`--brand`、`--authority-hub`、`--run-starting`、`--color-primary` 继续通过 `var(--primary)` 继承。
+- 旧名兼容 alias `--glass-tint-plum` 仍保留变量名，但值改为 logo blue tint，避免旧壳和空状态强调层继续呈现旧紫色。
+- 组件内仅清理 `ApprovalCard` 和 shared `DeployCard` 的旧 primary fallback，避免缺少主题变量时回落到旧紫色。
+- 本次不改变 backend/mobile，也不把角色色、历史审计、archive/reference 中的旧色说明改写成新事实。
+
 ### 最新保存点：右侧 FilePreview 打开方式图标改为库资产
 
 - 右侧 `FilePreview` 顶部继续保持紧凑结构：toolbar 40px、meta 22px、打开方式菜单 212px 宽、10 项每项 30px。
