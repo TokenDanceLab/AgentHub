@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
+import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@/api/hubWS';
 import { getAccessToken } from '@/hooks/useAuth';
 
@@ -32,16 +33,27 @@ const AGENT_EVENTS = new Set<string>([
 
 export interface WebHubRealtimeOptions {
   enabled: boolean;
+  runtimeSessionId?: string | null;
+  onRuntimeEvent?: (event: HubRuntimeEventTranscriptInput) => void;
   createSocket?: CreateHubWS;
   getToken?: () => string | null;
 }
 
 export function useWebHubRealtime({
   enabled,
+  runtimeSessionId,
+  onRuntimeEvent,
   createSocket = createHubWS,
   getToken = getAccessToken,
 }: WebHubRealtimeOptions): void {
   const queryClient = useQueryClient();
+  const runtimeSessionIdRef = useRef(runtimeSessionId);
+  const onRuntimeEventRef = useRef(onRuntimeEvent);
+
+  useEffect(() => {
+    runtimeSessionIdRef.current = runtimeSessionId;
+    onRuntimeEventRef.current = onRuntimeEvent;
+  }, [onRuntimeEvent, runtimeSessionId]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -49,6 +61,7 @@ export function useWebHubRealtime({
     const socket = createSocket({ getToken });
     const unsubscribe = socket.onAny((type, payload) => {
       invalidateWebWorkbenchHubQueries(queryClient, type, payload);
+      dispatchHubRuntimeEvent(type, payload, runtimeSessionIdRef.current, onRuntimeEventRef.current);
     });
 
     socket.connect();
@@ -57,6 +70,19 @@ export function useWebHubRealtime({
       socket.close();
     };
   }, [createSocket, enabled, getToken, queryClient]);
+}
+
+export function dispatchHubRuntimeEvent(
+  eventType: string,
+  payload: unknown,
+  runtimeSessionId: string | null | undefined,
+  onRuntimeEvent: ((event: HubRuntimeEventTranscriptInput) => void) | undefined,
+): void {
+  if (eventType !== HUB_EVENTS.AGENT_STREAM || !onRuntimeEvent || !runtimeSessionId) return;
+
+  const event = hubRuntimeEventFromPayload(payload);
+  if (!event || event.session_id !== runtimeSessionId) return;
+  onRuntimeEvent(event);
 }
 
 export function invalidateWebWorkbenchHubQueries(
