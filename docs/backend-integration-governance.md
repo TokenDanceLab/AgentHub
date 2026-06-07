@@ -77,7 +77,7 @@ next: <1-3 steps>
 
 当前 dirty diff 的首轮推荐顺序：
 
-1. **B. Hub callback 错误脱敏**：范围最小，先合 `edge-server/internal/hub/callback.go` 和测试。验证 `go test ./internal/hub -count=1`。
+1. **B. Hub callback 错误脱敏**：已合入 `dev/delicious233`，提交 `9d43b18d fix(edge): redact hub callback response bodies`。范围只有 `edge-server/internal/hub/callback.go` 和 `edge-server/internal/hub/callback_test.go`；验证 `go test ./internal/hub -count=1` 和 `edge-server go test ./... -short -count=1` 通过。
 2. **A. Codex adapter 运行时修复**：再合 `edge-server/internal/adapters/*`、必要的 lifecycle 参数摘要、cmd tests 和 `api/events.md`。验证 focused Go tests；真实 Codex smoke 只跑一次作为收口证据。
 3. **C. Edge runtime smoke / OIDC 脚本硬化**：独立合 `scripts/edge-runtime-smoke.ps1`、`scripts/verify-oidc-flow.ps1` 和 `tests/scripts/*`。验证脚本测试，不和 adapter 改动混在一起。
 4. **D. Real CLI opt-in E2E**：合 `scripts/edge-runtime-e2e.ps1`、`tests/scripts/edge-runtime-e2e.ps1`、`real-cli-e2e.yml` 和 README。必须写清这是 opt-in/self-hosted/nightly，不是普通 PR 硬门禁。
