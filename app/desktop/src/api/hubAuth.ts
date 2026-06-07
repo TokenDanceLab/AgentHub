@@ -34,7 +34,7 @@ export class OidcError extends Error {
     super(fallbackMessage);
     this.name = 'OidcError';
     this.code = code;
-    this.detail = detail;
+    if (detail) this.detail = detail;
   }
 }
 

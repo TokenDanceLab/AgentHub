@@ -57,6 +57,7 @@ export interface CommunityAgentItem {
 function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketItem {
   const id = readUnknownString(raw.id) ?? readUnknownString(raw.agent_id) ?? readUnknownString(raw.custom_agent_id) ?? 'custom-agent';
   const capabilityTags = readUnknownArray(raw.capability_tags);
+  const updatedAt = readUnknownString(raw.updated_at) ?? readUnknownString(raw.created_at);
   return {
     id,
     name: readUnknownString(raw.name) ?? id,
@@ -64,7 +65,7 @@ function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketIt
     systemPrompt: readUnknownString(raw.system_prompt) ?? readUnknownString(raw.description) ?? '',
     capabilities: capabilityTags.length > 0 ? capabilityTags : readUnknownArray(raw.capabilities),
     source: '/web/custom-agents',
-    updatedAt: readUnknownString(raw.updated_at) ?? readUnknownString(raw.created_at),
+    ...(updatedAt ? { updatedAt } : {}),
   };
 }
 

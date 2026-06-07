@@ -102,13 +102,16 @@ export const TeamTaskBoard: FC<TeamTaskBoardProps> = ({
           <h4 className={styles.sectionTitle}>
             {t('teamRun.activeTasksHeader', 'Active ({{count}})', { count: activeTasks.length })}
           </h4>
-          {activeTasks.map((task) => (
-            <TaskCard
-              key={task.taskId}
-              task={task}
-              memberName={task.assigneeMemberId ? memberNames?.[task.assigneeMemberId] : undefined}
-            />
-          ))}
+          {activeTasks.map((task) => {
+            const memberName = task.assigneeMemberId ? memberNames?.[task.assigneeMemberId] : undefined;
+            return (
+              <TaskCard
+                key={task.taskId}
+                task={task}
+                {...(memberName ? { memberName } : {})}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -117,13 +120,16 @@ export const TeamTaskBoard: FC<TeamTaskBoardProps> = ({
           <h4 className={styles.sectionTitle}>
             {t('teamRun.completedTasksHeader', 'Completed ({{count}})', { count: completedTasks.length })}
           </h4>
-          {completedTasks.map((task) => (
-            <TaskCard
-              key={task.taskId}
-              task={task}
-              memberName={task.assigneeMemberId ? memberNames?.[task.assigneeMemberId] : undefined}
-            />
-          ))}
+          {completedTasks.map((task) => {
+            const memberName = task.assigneeMemberId ? memberNames?.[task.assigneeMemberId] : undefined;
+            return (
+              <TaskCard
+                key={task.taskId}
+                task={task}
+                {...(memberName ? { memberName } : {})}
+              />
+            );
+          })}
         </div>
       )}
     </div>
