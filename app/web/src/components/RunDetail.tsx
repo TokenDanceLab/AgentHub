@@ -4,7 +4,7 @@ import { FileText, TerminalSquare, Wrench, Hash, Clock, Cpu, CheckCircle, Packag
 import { ActivityCard, DisclosureRow, MetricGrid } from '@shared/ui';
 import type { MetricGridItem } from '@shared/ui';
 import type { RunInfo } from '@shared/types';
-import type { FileDiff, ChatMessage } from './ChatView.types';
+import type { FileDiff, ChatMessage } from '@shared/types/chat';
 import type { SessionMetrics } from '@shared/context/breakdown';
 import { formatTokens } from '@shared/context/breakdown';
 import { createHubClient, type AgentRunEventSummary } from '@/api/hubClient';

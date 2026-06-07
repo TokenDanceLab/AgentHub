@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { MessageBlock, ToolResultBlock } from './ChatView.types';
+import type { MessageBlock, ToolResultBlock } from '@shared/types/chat';
 import { FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench } from 'lucide-react';
 import styles from './ToolGroup.module.css';
 

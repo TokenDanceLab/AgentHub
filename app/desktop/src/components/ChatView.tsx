@@ -5,7 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge, AlertTriangle, X, Settings } from 'lucide-react';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import { formatTokens, formatCost } from '@shared/context/breakdown';
-import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
+import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from '@shared/types/chat';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
 import { EmptyState, ToolTimeline, ArtifactCard, ArtifactPreview, DeployCard, MessageSearchPanel, LinkCard } from '@shared/ui';
@@ -957,7 +957,7 @@ function blockKey(block: MessageBlock, index: number): string {
     case 'tool_group':
       return `toolgroup-${block.blocks[0]?.callId ?? index}`;
     case 'error':
-      return `error-${block.category ?? ''}-${block.message.slice(0, 32)}`;
+      return `error-${block.category ?? ''}-${(block.message ?? block.error ?? '').slice(0, 32)}`;
     case 'citation':
       return `cite-${block.url ?? block.text ?? index}`;
     case 'compact':
