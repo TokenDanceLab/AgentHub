@@ -1278,6 +1278,32 @@ paths:
                   data:
                     $ref: "#/components/schemas/AgentRunEventSummary"
 
+  /web/agent-tasks/{id}/summary:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetTaskRunEventSummaryAlias
+      summary: Summarize typed runtime event history for an agent task.
+      description: Compatibility alias for `/web/agent-tasks/{id}/events/summary`; returns the same owner-scoped runtime history summary.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Runtime event summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  data:
+                    $ref: "#/components/schemas/AgentRunEventSummary"
+
   /edge/agent-tasks/{id}/ack:
     parameters:
       - name: id

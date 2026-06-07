@@ -163,6 +163,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/edge/agent-tasks/{id}/fail":                                         {"post"},
 		"/web/agent-tasks":                                                    {"post"},
 		"/web/agent-tasks/{id}/cancel":                                        {"post"},
+		"/web/agent-tasks/{id}/summary":                                       {"get"},
 		"/web/agent-tasks/{id}/events/summary":                                {"get"},
 		"/web/agent-tasks/{id}/events":                                        {"get"},
 		"/web/custom-agents":                                                  {"get", "post"},
