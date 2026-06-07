@@ -17,20 +17,59 @@ export interface RightInspectorProps {
   evidence: EvidenceRef[];
   browserPreviewEnabled: boolean;
   canOpenPreview?: ((evidence: EvidenceRef) => boolean) | undefined;
+  collapsed: boolean;
+  maxWidth: number;
+  minWidth: number;
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
+  onResizeBy: (delta: number) => void;
+  onResizeStart: (clientX: number) => void;
+  width: number;
 }
 
 export function RightInspector({
   evidence,
   browserPreviewEnabled,
   canOpenPreview,
+  collapsed,
+  maxWidth,
+  minWidth,
   onOpenPreview,
+  onResizeBy,
+  onResizeStart,
+  width,
 }: RightInspectorProps): React.ReactElement {
   const [activeMode, setActiveMode] = useState<InspectorMode>('overview');
   const model = buildInspectorEvidenceModel(evidence);
 
   return (
-    <aside aria-label="Right inspector" className={styles.inspector}>
+    <aside
+      aria-hidden={collapsed}
+      aria-label="Right inspector"
+      className={styles.inspector}
+      data-collapsed={collapsed ? 'true' : 'false'}
+    >
+      <div
+        aria-label="调整右侧栏宽度"
+        aria-orientation="vertical"
+        aria-valuemax={maxWidth}
+        aria-valuemin={minWidth}
+        aria-valuenow={width}
+        className={styles.inspectorResizer}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+          event.preventDefault();
+          const step = event.shiftKey ? 40 : 16;
+          onResizeBy(event.key === 'ArrowLeft' ? step : -step);
+        }}
+        onPointerDown={(event) => {
+          if (collapsed) return;
+          event.preventDefault();
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+          onResizeStart(event.clientX);
+        }}
+        role="separator"
+        tabIndex={collapsed ? -1 : 0}
+      />
       <div aria-label="Inspector tabs" className={styles.inspectorTabs} role="tablist">
         {inspectorTabs.map((tab) => {
           const disabled = tab.mode === 'browser' && !browserPreviewEnabled;
