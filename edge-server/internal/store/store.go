@@ -52,6 +52,15 @@ type Item struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+type ThreadPin struct {
+	ThreadID  string `json:"threadId"`
+	ItemID    string `json:"itemId"`
+	PinnedBy  string `json:"pinnedBy,omitempty"`
+	PinnedAt  string `json:"pinnedAt"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
 type RunCleanupOptions struct {
 	Now                      time.Time
 	TerminalTTL              time.Duration
@@ -72,6 +81,7 @@ type Reader interface {
 	ListRuns(threadID string) []Run
 	GetItem(id string) (Item, bool)
 	ListThreadItems(threadID string) []Item
+	ListThreadPins(threadID string) []ThreadPin
 }
 
 type Writer interface {
@@ -84,6 +94,8 @@ type Writer interface {
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
 	CreateItem(item Item) (Item, error)
 	CreateThreadMessage(itemID, threadID, role, content string) (Item, error)
+	PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, error)
+	DeleteThreadPin(threadID, itemID string) bool
 }
 
 type Repository interface {
@@ -108,11 +120,13 @@ type Store struct {
 	threads  map[string]Thread
 	runs     map[string]Run
 	items    map[string]Item
+	pins     map[string]ThreadPin
 
 	projectOrder []string
 	threadOrder  []string
 	runOrder     []string
 	itemOrder    []string
+	pinOrder     []string
 }
 
 func New() *Store {
@@ -121,6 +135,7 @@ func New() *Store {
 		threads:  make(map[string]Thread),
 		runs:     make(map[string]Run),
 		items:    make(map[string]Item),
+		pins:     make(map[string]ThreadPin),
 	}
 }
 
@@ -133,10 +148,12 @@ func (s *Store) snapshot() fileSnapshot {
 		Threads:      copyMap(s.threads),
 		Runs:         copyMap(s.runs),
 		Items:        copyMap(s.items),
+		Pins:         copyMap(s.pins),
 		ProjectOrder: append([]string(nil), s.projectOrder...),
 		ThreadOrder:  append([]string(nil), s.threadOrder...),
 		RunOrder:     append([]string(nil), s.runOrder...),
 		ItemOrder:    append([]string(nil), s.itemOrder...),
+		PinOrder:     append([]string(nil), s.pinOrder...),
 	}
 }
 
@@ -148,10 +165,12 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.threads = copyMap(snapshot.Threads)
 	s.runs = copyMap(snapshot.Runs)
 	s.items = copyMap(snapshot.Items)
+	s.pins = copyMap(snapshot.Pins)
 	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
 	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
 	s.runOrder = normalizeOrder(snapshot.RunOrder, s.runs)
 	s.itemOrder = normalizeOrder(snapshot.ItemOrder, s.items)
+	s.pinOrder = normalizeOrder(snapshot.PinOrder, s.pins)
 }
 
 func copyMap[K comparable, V any](source map[K]V) map[K]V {
@@ -305,6 +324,9 @@ func (s *Store) DeleteThread(id string) bool {
 			s.itemOrder = removeString(s.itemOrder, itemID)
 		}
 	}
+	s.removePins(func(pin ThreadPin) bool {
+		return pin.ThreadID == id
+	})
 	return true
 }
 
@@ -448,9 +470,11 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	})
 
 	removedItems := 0
+	removedItemIDs := make(map[string]struct{})
 	for id, item := range s.items {
 		if _, remove := removeRuns[item.RunID]; remove {
 			delete(s.items, id)
+			removedItemIDs[id] = struct{}{}
 			removedItems++
 		}
 	}
@@ -458,6 +482,10 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 		s.itemOrder = filterIDs(s.itemOrder, func(id string) bool {
 			_, ok := s.items[id]
 			return ok
+		})
+		s.removePins(func(pin ThreadPin) bool {
+			_, removed := removedItemIDs[pin.ItemID]
+			return removed
 		})
 	}
 
@@ -626,6 +654,90 @@ func (s *Store) ListThreadItems(threadID string) []Item {
 		return items[i].CreatedAt < items[j].CreatedAt
 	})
 	return items
+}
+
+func (s *Store) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.threads[threadID]; !ok {
+		return ThreadPin{}, ErrNotFound
+	}
+	item, ok := s.items[itemID]
+	if !ok || item.ThreadID != threadID {
+		return ThreadPin{}, ErrNotFound
+	}
+
+	now := nowString()
+	key := threadPinKey(threadID, itemID)
+	if existing, ok := s.pins[key]; ok {
+		existing.PinnedBy = strings.TrimSpace(pinnedBy)
+		existing.PinnedAt = now
+		existing.UpdatedAt = now
+		s.pins[key] = existing
+		return existing, nil
+	}
+
+	pin := ThreadPin{
+		ThreadID:  threadID,
+		ItemID:    itemID,
+		PinnedBy:  strings.TrimSpace(pinnedBy),
+		PinnedAt:  now,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	s.pins[key] = pin
+	s.pinOrder = append(s.pinOrder, key)
+	return pin, nil
+}
+
+func (s *Store) DeleteThreadPin(threadID, itemID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := threadPinKey(threadID, itemID)
+	if _, ok := s.pins[key]; !ok {
+		return false
+	}
+	delete(s.pins, key)
+	s.pinOrder = removeString(s.pinOrder, key)
+	return true
+}
+
+func (s *Store) ListThreadPins(threadID string) []ThreadPin {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	pins := make([]ThreadPin, 0, len(s.pinOrder))
+	for _, id := range s.pinOrder {
+		pin := s.pins[id]
+		if pin.ThreadID == threadID {
+			pins = append(pins, pin)
+		}
+	}
+	sort.SliceStable(pins, func(i, j int) bool {
+		return pins[i].PinnedAt > pins[j].PinnedAt
+	})
+	return pins
+}
+
+func (s *Store) removePins(match func(ThreadPin) bool) {
+	if len(s.pins) == 0 {
+		return
+	}
+	for id, pin := range s.pins {
+		if match(pin) {
+			delete(s.pins, id)
+		}
+	}
+	s.pinOrder = filterIDs(s.pinOrder, func(id string) bool {
+		_, ok := s.pins[id]
+		return ok
+	})
+}
+
+func threadPinKey(threadID, itemID string) string {
+	return threadID + "\x00" + itemID
 }
 
 func nowString() string {

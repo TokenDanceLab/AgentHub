@@ -117,6 +117,8 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `thread.updated` | P0 | Thread 状态或标题更新 |
 | `thread.deleted` | P0 | Thread 删除 |
 | `thread.forked` | P1 | Thread 分支创建 (planned) |
+| `thread.pin.created` | P0 | Edge 本地 Thread item 置顶，payload 为 `ThreadPin`，scope: `{ threadId, itemId }` |
+| `thread.pin.deleted` | P0 | Edge 本地 Thread item 取消置顶，payload: `{ threadId, itemId }`，scope: `{ threadId, itemId }` |
 | `message.created` | P0 | 消息创建 |
 | `message.delta` | P0 | Agent 消息流式增量 |
 | `item.created` | P0 | Thread Item 创建 |

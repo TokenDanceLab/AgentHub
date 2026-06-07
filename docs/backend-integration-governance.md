@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 04:07 +08:00
+> 最后更新：2026-06-08 04:29 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -72,6 +72,7 @@ next: <1-3 steps>
 | D2. Release preflight | `.github/workflows/release.yml` | 发布流程变更单独审批，不和普通脚本硬化混合 | release dry policy review |
 | D3. Real CLI/model E2E | `.github/workflows/real-cli-e2e.yml`、real CLI 脚本 | 只在专用 runner、预算和 artifact 脱敏确认后手动/夜间运行 | opt-in real CLI evidence |
 | E. Docs/governance | `docs/`、`AGENTS.md`、项目 skill | 不创建第二事实源；不写本机隐私或私有日志 | `git diff --check -- AGENTS.md docs` |
+| F. Edge local thread pins | `edge-server/internal/store/`、`edge-server/internal/api/`、`api/openapi.yaml`、`api/events.md` | 只实现 Edge 本地 Thread item pin，不引入 Hub DB、UI 或 mobile 依赖；pin 随 thread/delete 和 run cleanup 级联清理 | store/api focused tests + contract diff check |
 | G. DB persistence | Edge SQL store、Hub migrations、repository tests | migration 可回滚或有兼容路径；mock 数据替换为 DB 合同 | Hub PG/Redis gate + Edge store tests |
 
 每个切片进入主线前必须回答三件事：它解决什么用户可见问题、它触碰哪个权威边界、失败时怎么回滚或降级。
@@ -85,14 +86,23 @@ next: <1-3 steps>
 3. **C1. Edge runtime smoke 脚本硬化**：已在 `codex/integrate-backend-c-scripts` 提交 `32cd688a test(scripts): harden edge runtime smoke gate`。范围只有 `scripts/edge-runtime-smoke.ps1`、`scripts/integration-e2e.ps1`、`tests/scripts/edge-runtime-smoke.ps1`；默认行为改为 CI-safe fake process fixture，真实 CLI/model 只能显式传 `-RealCli` opt-in，`-SkipCli` 仅保留兼容语义。验证 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\edge-runtime-smoke.ps1` 和 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\edge-runtime-smoke.ps1 -Port 34990 -TimeoutSec 20` 通过。
 4. **C2. OIDC 诊断脱敏**：已在 `codex/integrate-backend-c-scripts` 提交 `09aef187 test(oidc): redact diagnostics output`。范围只有 `scripts/verify-oidc-flow.ps1`、`tests/scripts/verify-oidc-flow.ps1`；OIDC env 和 authorization URL 诊断只输出脱敏摘要，`RepoRoot` 默认初始化已移出 `param()` 并覆盖“不传 `-RepoRoot`”回归。验证 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-oidc-flow.ps1 -RepoRoot .`、`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-oidc-flow.ps1 -SkipHub -SkipTD`、`pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-oidc-flow.ps1 -SkipHub -SkipTD` 通过；Windows PowerShell 5.1 中文显示仍可能 mojibake，但退出码和断言通过。
 5. **E. Docs / handoff / skills / ignore 规则**：已合入 `dev/delicious233`，提交 `3c36c314 docs(skills): add codex team coordination skill` 和 `1afcde3d docs(skills): align skill ignore whitelist`。范围只有 `.agents/skills/dev-team/SKILL.md`、`.agents/skills/dev-team-codex/SKILL.md`、`.gitignore`、`AGENTS.md`；generic `dev-team` 不再硬编码模型、供应商或本地 alias，`dev-team-codex` 单独记录 Leader `gpt-5.5 xhigh` / Workers `gpt-5.5 high` 编队，`.gitignore` 和 `AGENTS.md` whitelist 同步包含 `dev-team-codex` 与 `env-sandbox`。
-6. **D1a. Backend TeamRun fixture CI gate**：已拆为独立 ready-for-review 切片，范围只有 `.github/workflows/checks.yml`、`scripts/verify-ci-gates.ps1` 和本文档/roadmap；workflow 只显式运行 `hub-server` 内的 `go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1`，不触发真实 CLI、Edge runtime smoke、docker compose 或根级泛化 E2E。
+6. **D1a. Backend TeamRun fixture CI gate**：已合入 `dev/delicious233`，范围只有 `.github/workflows/checks.yml`、`scripts/verify-ci-gates.ps1` 和本文档/roadmap；workflow 只显式运行 `hub-server` 内的 `go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1`，不触发真实 CLI、Edge runtime smoke、docker compose 或根级泛化 E2E。
 7. **D1b/D2/D3. 剩余 CI / release / real CLI gates**：延后。D1b 只在新增依赖测试已进入主线且不会让 CI 变红时再拆；`release.yml` 是发布流程变更；`real-cli-e2e.yml` 只能在专用 runner、环境审批、预算和 artifact 脱敏确认后 opt-in/nightly。
+8. **F. Edge local Thread pins**：已在 `codex/edge-thread-pins` clean worktree rebase 到 `901e5153`。范围只有 `edge-server/internal/store/`、`edge-server/internal/api/`、`api/openapi.yaml`、`api/events.md` 和本文件/roadmap；实现 `/v1/threads/{threadId}/pins` GET/POST/DELETE、`ThreadPin` snapshot 持久化、thread delete/run cleanup 级联清理、事件 `thread.pin.created/deleted` 和 OpenAPI 合同。验证 `go test ./internal/store -run "ThreadPin|Pins|CleanupRuns|FileStore" -count=1`、`go test ./internal/api -run "ThreadPin|ThreadPins|PostThreadMessage" -count=1`、`go test ./internal/api ./internal/store -short -count=1`、`edge-server go test ./... -short -count=1`、`git diff --check -- ...` 通过；未运行真实 CLI/model。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
+### 并行评审结论（2026-06-08 03:57 +08:00）
+
+- **D1a fixture-only CI gate**：已合入 `dev/delicious233`。后续 D1b 只能在新增依赖测试已进入主线且不会让 CI 变红时再拆，并继续断言不含 `-RealCli`、Docker、root `go test ./tests -count=1` 或真实 CLI/auth secret。
+- **D3 real CLI/model gate**：继续 blocked。候选 workflow 缺 GitHub `environment` approval、预算/请求上限控制，且 redaction validation 失败后仍可能上传 artifact；修复前不得合入。
+- **G1 DB-backed state**：优先建议做 Hub AgentProfile -> shared Agents 页 read-through。Web 已取 `/web/agent-profiles`，shared Agents 页仍消费 mock；该 slice 避免改 Edge store，能和本次 Edge pins 解耦。
+- **API/Event contract sync**：另有独立问题：Web client 调 `/web/agent-tasks/{id}/summary`，OpenAPI/Hub 合同是 `/web/agent-tasks/{id}/events/summary`。应作为合同同步小 slice 处理，不混入 Edge pins。
+- **Runtime adapter roadmap**：Codex `exec --json` adapter 仍是 Phase 1 batch 模式；完整 multi-turn、turn steer/interrupt、approval、subagent 和 diff patch delta 需要后续 Codex app-server 通道，不应在当前能力声明中写成已完成。
+
 ## 端到端联调顺序
 
-0. **Shared data contract**：先扩 `AgentHubPlatform` / shared data ports。当前 ports 只覆盖 conversations、run submit、attachments、preview，缺 contacts、docs、projects、tasks、agents、targets、message actions。real mode 禁止静默 demo fallback。
+0. **Shared data contract**：先扩 `AgentHubPlatform` / shared data ports。当前 ports 已覆盖 conversations、run submit、attachments、preview 和 Contacts 只读 Hub `listContacts()`；仍缺 docs、projects、tasks、agents、targets、message actions，以及 Contacts mutation/error/empty/schema。real mode 禁止静默 demo fallback。
 1. **Chat 主链路**：Desktop 走 Edge threads/items/runs/events；Web 走 Hub sessions/messages/ws/agent-tasks。
 2. **Agent/Profile/Runtime/Target**：Desktop 接 Edge `/v1/agents` 和 `/v1/model-catalog`；Web 接 Hub `/web/agent-profiles`、`/client/sessions/{id}/agents` 和 ExecutionTarget inventory。
 3. **Hub + Exact Edge routing**：Hub 只能路由到 owner-scoped exact device；目标 Edge 离线、无权限或 workspace 越界时 fail closed。
@@ -108,7 +118,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 | 面 | 当前问题 | 下一步 |
 |---|---|---|
-| Contacts | shared rail page 使用 `WORKBENCH_MOCK_*` | 接 Hub contacts/friend request/remark/block/search 合同 |
+| Contacts | 只读 Hub `listContacts()` port 已接入 Web shared page；mutation、error/empty、schema owner 和 friend request/remark/block/search 仍未生产化 | 补 Hub contacts mutation/error/empty/schema 合同 |
 | Docs | 无统一 document/artifact store | 定义 `ProjectArtifact` / `DocumentPreview` owner、blob、version、provider、permission |
 | Agents | Desktop composer agents 仍可能来自 demo；Edge `AgentInfo`、Hub `AgentProfile`、shared `WorkbenchAgent` 未统一 | 建 shared Agent/Profile/Runtime/Target mapper |
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
@@ -164,7 +174,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 主工作树 `D:\Code\TokenDance\AgentHub` 本地 `dev/delicious233` 因并行 `AGENTS.md` 等未提交改动暂时落后 `origin/dev/delicious233` 两个 E 提交；不要在未保存这些改动前直接 pull/merge。
-2. D1a fixture-only TeamRun CI gate 已独立拆片；D1b/D2/D3 单独排期，真实 CLI/model gate 必须先修 artifact 脱敏和预算/runner 策略。
-3. 开始建立 Edge SQL store 和 Hub DB-backed product surfaces 的 schema/mutation/test 队列。
+1. D1b/D2/D3 单独排期；D3 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
+2. G1 优先做 Hub AgentProfile read-through 到 shared Agents 页；Edge SQL store 延后，避免和 Edge pins store 合同重叠。
+3. API/Event contract sync 单独处理 Web `/web/agent-tasks/{id}/summary` 与 Hub/OpenAPI 路由不一致问题。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge。
