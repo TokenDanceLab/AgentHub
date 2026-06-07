@@ -1,4 +1,5 @@
 import React from 'react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { WorkbenchConversation } from '../platform';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -7,12 +8,18 @@ const workspaceTabs = ['消息', '云文档'] as const;
 export interface WorkspaceHeaderProps {
   activeConversation: WorkbenchConversation | undefined;
   browserPreviewEnabled: boolean;
+  inspectorCollapsed: boolean;
+  onToggleInspector: () => void;
 }
 
 export function WorkspaceHeader({
   activeConversation,
   browserPreviewEnabled,
+  inspectorCollapsed,
+  onToggleInspector,
 }: WorkspaceHeaderProps): React.ReactElement {
+  const InspectorIcon = inspectorCollapsed ? PanelRightOpen : PanelRightClose;
+
   return (
     <header className={styles.workspaceHeader}>
       <div className={styles.workspaceAvatar} aria-hidden="true">
@@ -46,6 +53,15 @@ export function WorkspaceHeader({
         </div>
       </div>
       <div className={styles.workspaceActions}>
+        <button
+          aria-label={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}
+          className={styles.iconButton}
+          onClick={onToggleInspector}
+          title={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}
+          type="button"
+        >
+          <InspectorIcon aria-hidden="true" />
+        </button>
         <button
           className={styles.previewButton}
           disabled={!browserPreviewEnabled}

@@ -9,14 +9,24 @@
   --ahv4-line-strong: rgba(20, 22, 26, 0.14);
   --ahv4-primary: #0071e3;
   --ahv4-primary-soft: rgba(0, 113, 227, 0.1);
+  --ahv4-inspector-width: 400px;
 
   display: grid;
-  grid-template-columns: 64px minmax(192px, 260px) minmax(0, 1fr) minmax(220px, 300px);
+  grid-template-columns: 64px minmax(192px, 260px) minmax(0, 1fr) minmax(0, var(--ahv4-inspector-width));
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
   background: var(--ahv4-canvas);
   color: var(--ahv4-text);
+}
+
+.shell[data-inspector-collapsed='true'] {
+  grid-template-columns: 64px minmax(192px, 260px) minmax(0, 1fr) 0;
+}
+
+.shell[data-inspector-resizing='true'] {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .rail,
@@ -434,16 +444,34 @@
 .workspaceActions {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
+.iconButton,
 .previewButton,
 .sendButton {
   min-height: 36px;
-  padding: 0 14px;
   border: 1px solid var(--ahv4-line-strong);
   border-radius: 8px;
   background: var(--ahv4-panel-solid);
   color: inherit;
+}
+
+.iconButton {
+  display: inline-grid;
+  width: 36px;
+  place-items: center;
+  padding: 0;
+}
+
+.iconButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.previewButton,
+.sendButton {
+  padding: 0 14px;
 }
 
 .previewButton:disabled,
@@ -516,9 +544,59 @@
 .inspector {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  position: relative;
   overflow: hidden;
   border-right: 0;
   border-left: 1px solid var(--ahv4-line);
+  transition:
+    opacity 160ms ease,
+    padding 160ms ease,
+    border-color 160ms ease;
+}
+
+.shell[data-inspector-collapsed='true'] .inspector {
+  border-left-color: transparent;
+  opacity: 0;
+  padding-right: 0;
+  padding-left: 0;
+  pointer-events: none;
+}
+
+.shell[data-inspector-resizing='true'] .inspector {
+  transition: none;
+}
+
+.inspectorResizer {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+}
+
+.inspectorResizer::after {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  content: '';
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.inspectorResizer:hover::after,
+.inspectorResizer:focus-visible::after,
+.shell[data-inspector-resizing='true'] .inspectorResizer::after {
+  background: var(--ahv4-primary);
+  box-shadow: 0 0 0 3px var(--ahv4-primary-soft);
 }
 
 .inspectorTabs {
@@ -719,6 +797,10 @@
 
 @media (max-width: 860px) {
   .shell {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .shell[data-inspector-collapsed='true'] {
     grid-template-columns: 52px minmax(0, 1fr);
   }
 

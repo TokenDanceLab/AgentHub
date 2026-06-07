@@ -231,7 +231,7 @@ app/desktop/src-tauri/src/
 
 - [ ] 聚合 `EvidenceRef` 为 progress、tool timeline、changed files、artifacts；首片已新增 `buildInspectorEvidenceModel`，把 evidence 分组为 run/tool/file/artifact 并统计 status。
 - [x] 支持 overview/browser/files 三种 v4 inspector tab。
-- [ ] 支持 collapse/resize 状态由 workbench 控制。
+- [x] 支持 collapse/resize 状态由 workbench 控制。
 - [x] 文件/浏览器预览通过 platform capability 决定可用性；已显示 changed files list/empty state 和 browser preview capability 状态，并通过 `preview.openEvidence()` 把 file/artifact evidence 打开动作交给 platform adapter。
 - [ ] 覆盖空状态、失败状态、长文件名、窄屏。
 
@@ -239,6 +239,7 @@ app/desktop/src-tauri/src/
 - 2026-06-07：新增 `app/shared/src/inspector/inspectorEvidence.ts`、`app/shared/src/inspector/index.ts` 和 focused tests；`RightInspector` 已从占位文本升级为 overview summary、run/tool/artifact evidence sections、changed files tab 和 browser capability card。
 - 2026-06-07：`collectTranscriptEvidence` 保持首次出现顺序，同时用后续同 ID evidence 更新最新 status，避免 live Edge run 状态被早期 pending/running evidence 卡住；shared focused tests 更新为 7 个文件 / 19 个测试通过。
 - 2026-06-07：`EvidenceRef` 新增 `path/uri/mimeType` preview 元数据，`RightInspector` files/browser tabs 已渲染可点击 file/artifact 行并调用 platform `preview.openEvidence()`；shared focused tests 更新为 9 个文件 / 31 个测试通过。
+- 2026-06-07：`AgentHubWorkbench` 按 design prototype 接入 inspector CSS 变量宽度、header icon collapse toggle 和可访问 resize separator；`RightInspector` 支持 ArrowLeft/ArrowRight 键盘 resize，折叠状态由 workbench 控制。验证：shared workbench focused tests 1 文件 / 9 测试通过；Desktop/Web typecheck 通过；Desktop/Web App focused tests 通过；Desktop 1440x920 Playwright DOM/screenshot smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop-inspector.png` 大小 59767 bytes。
 
 ### Task 7: Desktop platform adapter
 

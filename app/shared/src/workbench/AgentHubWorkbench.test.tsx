@@ -88,6 +88,8 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('tab', { name: '概览' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: '浏览器' })).toBeDisabled();
     expect(screen.getByRole('tab', { name: '文件' })).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: '调整右侧栏宽度' })).toHaveAttribute('aria-valuenow', '400');
+    expect(screen.getByRole('button', { name: '收起右侧概览' })).toBeInTheDocument();
     expect(screen.getByRole('toolbar', { name: 'Composer modes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '@Agent' })).toBeInTheDocument();
     expect(screen.getByLabelText('Approval mode')).toHaveValue('suggest');
@@ -97,6 +99,50 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
     expect(screen.getByText('Read desktop/index.html')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '浏览器预览' })).toBeDisabled();
+  });
+
+  it('supports v4 inspector collapse and keyboard resize controls', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    const { container } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    const shell = screen.getByTestId('agenthub-workbench');
+    const inspector = screen.getByRole('complementary', { name: 'Right inspector' });
+    const resizer = screen.getByRole('separator', { name: '调整右侧栏宽度' });
+
+    expect(shell).toHaveStyle({ '--ahv4-inspector-width': '400px' });
+    expect(inspector).toHaveAttribute('data-collapsed', 'false');
+    expect(resizer).toHaveAttribute('aria-valuemin', '300');
+    expect(resizer).toHaveAttribute('aria-valuemax', '760');
+    expect(resizer).toHaveAttribute('aria-valuenow', '400');
+
+    fireEvent.keyDown(resizer, { key: 'ArrowLeft' });
+    expect(shell).toHaveStyle({ '--ahv4-inspector-width': '416px' });
+    expect(resizer).toHaveAttribute('aria-valuenow', '416');
+
+    fireEvent.keyDown(resizer, { key: 'ArrowRight', shiftKey: true });
+    expect(shell).toHaveStyle({ '--ahv4-inspector-width': '376px' });
+    expect(resizer).toHaveAttribute('aria-valuenow', '376');
+
+    fireEvent.click(screen.getByRole('button', { name: '收起右侧概览' }));
+    expect(shell).toHaveAttribute('data-inspector-collapsed', 'true');
+    expect(container.querySelector('[data-collapsed="true"]')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '展开右侧概览' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '展开右侧概览' }));
+    expect(shell).toHaveAttribute('data-inspector-collapsed', 'false');
+    expect(screen.getByRole('button', { name: '收起右侧概览' })).toBeInTheDocument();
   });
 
   it('renders v4 inspector overview, changed files, and browser capability state', () => {
