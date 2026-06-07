@@ -1,6 +1,6 @@
 # AgentHub 文档
 
-> 新 Agent / 新开发者？按顺序读：**roadmap → architecture → v4 plan → frontend progress → v4 audit → integration plan → legacy inventory**
+> 新 Agent / 新开发者？按顺序读：**roadmap → architecture → v4 plan → integration governance → frontend progress → v4 audit → integration plan → legacy inventory**
 
 ## 必读 (3 分钟)
 
@@ -9,13 +9,14 @@
 | 1 | [roadmap.md](roadmap.md) | **该做什么**。当前 Sprint 目标 + 可打钩任务 + 已知缺口 |
 | 2 | [architecture.md](architecture.md) | **怎么运作**。产品定位 + 三层架构 + 数据流 + 实现状态 |
 | 3 | [desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md) | **怎么重构**。Desktop/Web v4 shared workbench 的实施边界、任务和验收 |
-| 4 | [v4-frontend-progress-2026-06-07.md](v4-frontend-progress-2026-06-07.md) | **前端现在到哪了**。5173/5174 shared UI、profile/avatar、Docs/Projects 预览、主题、侧栏、动效、证据和下一步 |
-| 5 | [v4-design-parity-audit-2026-06-07.md](v4-design-parity-audit-2026-06-07.md) | **怎么验收 UI 对齐**。5173/5174/5176 的截图、computed-style、交互 smoke 和剩余风险 |
-| 6 | [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) | **下一步怎么接生产链路**。Desktop/Tauri/Local Edge 与 Web/Hub 的平台边界、旧客户端清理和分阶段验收 |
-| 7 | [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md) | **旧客户端怎么清**。仍留在源码树里的旧 Desktop/Web 文件定性、迁移顺序和删除边界 |
-| 8 | [v4-merge-pr-readiness-2026-06-07.md](v4-merge-pr-readiness-2026-06-07.md) | **怎么准备合并和 PR**。当前分支事实、未提交变更分类、验证门禁和 PR 描述骨架 |
-| 9 | [v4-pr-draft.md](v4-pr-draft.md) | **PR 草稿**。创建 draft PR 前的标题、正文、验证 checklist 和 gh 命令 |
-| 10 | [v4-clean-rebuild-decision-questions.md](v4-clean-rebuild-decision-questions.md) | **还要拍板什么**。实现前需要确认的问题和推荐答案 |
+| 4 | [backend-integration-governance.md](backend-integration-governance.md) | **怎么合后端和联调**。AH-SYNC、后端切片、Desktop/Edge、Web/Hub、DB 和真实 CLI gate 的统一规则 |
+| 5 | [v4-frontend-progress-2026-06-07.md](v4-frontend-progress-2026-06-07.md) | **前端现在到哪了**。5173/5174 shared UI、profile/avatar、Docs/Projects 预览、主题、侧栏、动效、证据和下一步 |
+| 6 | [v4-design-parity-audit-2026-06-07.md](v4-design-parity-audit-2026-06-07.md) | **怎么验收 UI 对齐**。5173/5174/5176 的截图、computed-style、交互 smoke 和剩余风险 |
+| 7 | [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) | **下一步怎么接生产链路**。Desktop/Tauri/Local Edge 与 Web/Hub 的平台边界、旧客户端清理和分阶段验收 |
+| 8 | [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md) | **旧客户端怎么清**。仍留在源码树里的旧 Desktop/Web 文件定性、迁移顺序和删除边界 |
+| 9 | [v4-merge-pr-readiness-2026-06-07.md](v4-merge-pr-readiness-2026-06-07.md) | **怎么准备合并和 PR**。当前分支事实、未提交变更分类、验证门禁和 PR 描述骨架 |
+| 10 | [v4-pr-draft.md](v4-pr-draft.md) | **PR 草稿**。创建 draft PR 前的标题、正文、验证 checklist 和 gh 命令 |
+| 11 | [v4-clean-rebuild-decision-questions.md](v4-clean-rebuild-decision-questions.md) | **还要拍板什么**。实现前需要确认的问题和推荐答案 |
 
 读完 roadmap、architecture 和当前任务计划即可开始工作。
 
@@ -40,6 +41,7 @@ docs/
 ├── roadmap.md           ← Sprint 目标 + 待办清单
 ├── architecture.md      ← 三合一主文档
 ├── desktop-web-v4-clean-rebuild-plan.md
+├── backend-integration-governance.md
 ├── v4-frontend-progress-2026-06-07.md
 ├── v4-design-parity-audit-2026-06-07.md
 ├── desktop-edge-web-integration-plan.md
