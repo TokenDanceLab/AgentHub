@@ -58,6 +58,10 @@ describe('useWebWorkbenchModel helpers', () => {
       id: 'web-hub-empty',
       text: 'Hub session 已连接，暂无可显示会话。',
     }));
+    expect(resolveWebWorkbenchTranscript(false, null, undefined, [], 'real')[0]).toEqual(expect.objectContaining({
+      id: 'web-hub-empty',
+      text: 'Hub session 已连接，暂无可显示会话。',
+    }));
   });
 
   it('deduplicates live Hub runtime events by id and limits retained events', () => {

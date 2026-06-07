@@ -3,13 +3,13 @@ import styles from './AgentMessage.module.css';
 
 interface AgentMessageProps {
   name: string;
-  avatar?: string;
-  avatarColor?: string;
-  time?: string;
+  avatar?: string | undefined;
+  avatarColor?: string | undefined;
+  time?: string | undefined;
   /** Optional badge label shown in the header row (e.g. "运行中", "完成") */
-  badgeLabel?: string;
+  badgeLabel?: string | undefined;
   /** Badge variant determining color — matches demo badge-* classes */
-  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary';
+  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary' | undefined;
   children: React.ReactNode;
 }
 

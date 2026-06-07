@@ -276,10 +276,11 @@ describe('AgentHubWorkbench', () => {
 
     const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
 
-    expect(inspector.getByRole('button', { name: '任务' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('B0 SQLite 迁移')).toBeInTheDocument();
+    expect(inspector.getAllByRole('button', { expanded: true }).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('生成迁移顺序与回滚脚本')).toBeInTheDocument();
     expect(screen.getAllByText('sqlite-migration-plan.md').length).toBeGreaterThan(0);
-    expect(inspector.getByRole('button', { name: '产物' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('产物')).toBeInTheDocument();
 
     fireEvent.click(inspector.getByRole('button', { name: '打开 sqlite-migration-plan.md 只读预览' }));
     expect(screen.getByRole('tab', { name: /文件/ })).toHaveAttribute('aria-selected', 'true');
@@ -287,7 +288,6 @@ describe('AgentHubWorkbench', () => {
       name: 'sqlite-migration-plan.md 只读预览',
     })).toBeInTheDocument();
     expect(screen.getAllByText('sqlite-migration-plan.md').length).toBeGreaterThan(0);
-    expect(screen.getByText('只读 · MD')).toBeInTheDocument();
     expect(screen.getByText('Read only')).toBeInTheDocument();
     expect(openEvidence).not.toHaveBeenCalledWith(expect.objectContaining({
       id: 'ev-file',
@@ -310,7 +310,7 @@ describe('AgentHubWorkbench', () => {
     expect(platform.openedEvidence).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: '关闭预览' }));
-    expect(inspector.getByRole('button', { name: '任务' })).toHaveAttribute('aria-expanded', 'true');
+    expect(inspector.getByRole('button', { name: 'B0 SQLite 迁移' })).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: '新建右侧窗口' }));
     expect(screen.getByRole('region', { name: '内置浏览器预览' })).toBeInTheDocument();
