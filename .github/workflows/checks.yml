@@ -157,6 +157,25 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+  # ── Backend E2E: Fixture-only ────────────────
+  backend-e2e-fixture:
+    name: Backend E2E (fixture-only)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: hub-server/go.sum
+
+      - name: TeamRun fixture E2E
+        run: go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1
+
   # ── Cross-Platform Build ─────────────────────
   cross-build:
     name: Cross-platform build

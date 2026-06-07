@@ -32,6 +32,12 @@ function Assert-Contains([string]$Text, [string]$Pattern, [string]$Message) {
     }
 }
 
+function Assert-NotContains([string]$Text, [string]$Pattern, [string]$Message) {
+    if ($Text -match $Pattern) {
+        Fail $Message
+    }
+}
+
 function Assert-StepContinueOnError([string]$JobBlock, [string]$StepName, [bool]$Expected) {
     $step = Get-StepBlock $JobBlock $StepName
     $hasContinue = $step -match "(?m)^\s+continue-on-error:\s+true\s*$"
@@ -48,6 +54,7 @@ if (-not (Test-Path -LiteralPath $WorkflowPath)) {
 $workflow = Get-Content -LiteralPath $WorkflowPath -Raw
 $edge = Get-JobBlock $workflow "go-edge"
 $hub = Get-JobBlock $workflow "go-hub"
+$backendFixture = Get-JobBlock $workflow "backend-e2e-fixture"
 $desktop = Get-JobBlock $workflow "frontend-desktop"
 $web = Get-JobBlock $workflow "frontend-web"
 $mobile = Get-JobBlock $workflow "frontend-mobile"
@@ -63,6 +70,35 @@ Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
 Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $false
 Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $false
+
+Assert-Contains $backendFixture "working-directory:\s+hub-server" "backend-e2e-fixture must run from hub-server"
+Assert-Contains $backendFixture "TeamRun fixture E2E" "backend-e2e-fixture must name the TeamRun fixture step"
+Assert-Contains $backendFixture ([regex]::Escape("go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1")) "backend-e2e-fixture must run only the TeamRun fixture smoke test"
+Assert-StepContinueOnError $backendFixture "TeamRun fixture E2E" $false
+foreach ($forbidden in @(
+    "-RealCli",
+    "real[-_]?cli",
+    "self-hosted",
+    "services:",
+    "integration-smoke.ps1",
+    "edge-runtime-smoke.ps1",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "CODEX_",
+    "CLAUDE_",
+    "\bcodex\b",
+    "\bclaude\b",
+    "\bopencode\b",
+    "postgres",
+    "redis",
+    "dev-up",
+    "docker",
+    "http://",
+    "https://",
+    "go test ./tests -count=1"
+)) {
+    Assert-NotContains $backendFixture $forbidden "backend-e2e-fixture must not invoke '$forbidden'"
+}
 
 foreach ($job in @(
     @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/pnpm-lock.yaml" },
