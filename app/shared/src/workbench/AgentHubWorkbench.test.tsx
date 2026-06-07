@@ -735,6 +735,91 @@ describe('AgentHubWorkbench', () => {
     expect(within(page).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
   });
 
+  it('keeps real Hub empty agents interactive without falling back to mock agents', async () => {
+    const onAgentCreate = vi.fn().mockResolvedValue(undefined);
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={[]}
+        agentProfilesStatus={{ loading: false }}
+        onAgentCreate={onAgentCreate}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    const emptyState = within(page).getByRole('status');
+    expect(within(emptyState).getByText('暂无 Agent Profile')).toBeInTheDocument();
+    expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
+
+    fireEvent.click(within(emptyState).getByRole('button', { name: '添加 Agent' }));
+    expect(within(page).getByDisplayValue('新 Agent 1')).toBeInTheDocument();
+
+    fireEvent.click(within(page).getByRole('button', { name: '保存配置' }));
+    await waitFor(() => expect(onAgentCreate).toHaveBeenCalledTimes(1));
+    expect(onAgentCreate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'draft-agent-1',
+      name: '新 Agent 1',
+      engine: 'codex',
+      scope: 'default',
+    });
+  });
+
+  it('saves and deletes supplied Hub AgentProfiles through shared callbacks', async () => {
+    const onAgentUpdate = vi.fn().mockResolvedValue(undefined);
+    const onAgentDelete = vi.fn().mockResolvedValue(undefined);
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={[{
+          id: 'hub-agent-architect',
+          name: 'Hub Architect',
+          description: 'Architecture owner',
+          status: 'available',
+          runtimeId: 'codex',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          permissionMode: 'default',
+        }]}
+        onAgentUpdate={onAgentUpdate}
+        onAgentDelete={onAgentDelete}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+
+    fireEvent.change(within(page).getByLabelText('名称'), {
+      target: { value: 'Hub Architect Prime' },
+    });
+    fireEvent.click(within(page).getByRole('button', { name: '保存配置' }));
+    await waitFor(() => expect(onAgentUpdate).toHaveBeenCalledTimes(1));
+    expect(onAgentUpdate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'hub-agent-architect',
+      name: 'Hub Architect Prime',
+    });
+
+    fireEvent.click(within(page).getByRole('button', { name: '删除' }));
+    await waitFor(() => expect(onAgentDelete).toHaveBeenCalledWith('hub-agent-architect'));
+  });
+
   it('renders supplied Hub contacts on the Contacts rail page', () => {
     const platform = createMockPlatform({
       surface: 'web',
