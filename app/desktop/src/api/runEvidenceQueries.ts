@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { parseUnifiedDiff } from '@shared/diff';
 import type { Artifact, Preview, RunDiff } from '@shared/types';
-import type { FileDiff } from '@/components/ChatView.types';
+import type { FileDiff } from '@shared/types/chat';
 import { fetchArtifacts, fetchPreviews, fetchRunDiff } from './edgeClient';
 
 export interface RunEvidenceState {

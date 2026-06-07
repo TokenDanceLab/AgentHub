@@ -26,11 +26,11 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 | Rank | 任务 | 状态 | 下一步 | 验收证据 |
 |---:|---|---|---|---|
 | P0-1 | v4 clean rebuild 文档架构 | 进行中 | 更新 README、docs 导航和治理文档，移除旧状态入口和旧分支事实 | `git diff --check`；活跃文档无旧主线冲突 |
-| P0-2 | shared UI 工作台边界 | 进行中 | 补 shared Chat/Diff 兼容类型、Hub normalize、block renderer 和 design token bridge | shared focused tests 30 passed；新增模块 targeted tsc 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
+| P0-2 | shared UI 工作台边界 | 进行中 | 补 Hub normalize、block renderer 和 design token bridge | shared Chat/Diff 兼容类型已落地；shared focused tests 13 passed；Desktop/Web typecheck 通过；full lint 仍被既有 Storybook/旧组件测试问题阻断 |
 | P0-3 | Desktop v4 shell 接入 | 进行中 | 继续替换剩余静态 smoke 数据，并补 inspector resize/collapse | Desktop App v4 focused tests 4 passed；Desktop typecheck/build 通过；1440x920 Playwright smoke 通过，且读取真实 Edge thread 列表、persisted items、live Edge event evidence，可从 v4 composer 提交 Edge run，并在 shared inspector 展示 run/tool/file/artifact evidence；v4 composer approval/workDir/@Agent/浏览器文件附件/Desktop 原生文件附件上下文已传入 Edge `startRun`；files/browser inspector 已通过 platform preview port 打开 evidence target |
 | P0-4 | Web v4 shell 接入 | 进行中 | 继续补 Web v4 TeamRun/IM 子页在 shared workbench 内的正式入口 | Web App focused test 通过；Web typecheck/build 通过；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles`；Web v4 conversations/transcript 已接 Hub sessions/messages；Hub WS 已接 v4 query invalidation；Hub `agent.stream` runtime events 已直接投影到 shared transcript；composer submit 已改为真实 Hub message + optional `/web/agent-tasks`；Hub message 已有 optimistic cache 插入/确认/失败回滚；@Agent submit 已先创建并缓存 Hub session `AgentInstance`，再用 exact `agent_instance_id` 触发 `/web/agent-tasks` |
 | P0-5 | Tauri Host API 重构 | 未开始 | 把 `commands.rs` 巨石拆为 host 能力模块和 typed invoke facade | Rust tests；Tauri command coverage；路径/权限负测 |
-| P0-6 | 旧 UI 清理门禁 | 进行中 | 下一批先做 shared `ChatMessage/FileDiff` 类型合同迁移，再删除旧 Chat/Prompt/Thread/IM hook 本体 | 已删除 Desktop/Web 旧 `viewRegistry`、旧 `MainView`、旧 `IMView`、旧 Desktop `RunDetail/RightInspector/PermissionDialog` 和 Web 孤儿 `PermissionDialog`；新增 `scripts/verify-v4-old-ui-active-paths.ps1`，16/16 通过；无双主工作台 active import |
+| P0-6 | 旧 UI 清理门禁 | 进行中 | 删除旧 `ChatView.types.ts`、旧 Chat/Prompt/Thread/IM hook 本体和旧测试 | 已迁移旧 `ChatView.types` 类型 import 到 shared `types/chat.ts`；已删除 Desktop/Web 旧 `viewRegistry`、旧 `MainView`、旧 `IMView`、旧 Desktop `RunDetail/RightInspector/PermissionDialog` 和 Web 孤儿 `PermissionDialog`；`scripts/verify-v4-old-ui-active-paths.ps1` 17/17 通过；无双主工作台 active import |
 
 ## P0: 文档与架构冻结
 
@@ -48,7 +48,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 
 - [ ] `app/shared/src/ui/`：清理 exports，明确基础组件的 public API。
 - [ ] `app/shared/src/workbench/`：已新增 `AgentHubWorkbench` shared shell，并拆出 `GlobalRail`、`ConversationSidebar`、`WorkspaceHeader`、`TranscriptView`、`UnifiedComposer`、`RightInspector`；下一步补 `WorkbenchRoutes` 和 design token bridge。
-- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock、Hub message -> TranscriptBlock、Hub runtime event -> TranscriptBlock normalize；下一步补 shared Chat/Diff 兼容类型、更完整 block renderer 和 TeamRun runtime events。
+- [ ] `app/shared/src/transcript/`：首片已定义 `TranscriptBlock` 和 evidence refs，并新增 ThreadItem -> TranscriptBlock、live Edge event -> TranscriptBlock、Hub message -> TranscriptBlock、Hub runtime event -> TranscriptBlock normalize；shared `types/chat.ts` 已成为旧 `ChatView.types` 迁移兼容合同；下一步补更完整 block renderer 和 TeamRun runtime events。
 - [ ] `app/shared/src/composer/`：已定义共享 composer 状态、intent、reducer、v4 modes、approval mode、workDir、结构化 @Agent mention、浏览器文件附件和 Desktop 原生文件附件上下文；下一步补 per-conversation draft persistence。
 - [ ] `app/shared/src/inspector/`：首片已建立 evidence 聚合模型，shared workbench 的 overview/browser/files tabs 已显示 run/tool/file/artifact summary、changed files 空/列表状态和 browser capability 状态，并已接入 files/browser evidence preview 打开动作；下一步补 resize/collapse 和更完整 tool timeline。
 - [ ] `app/shared/src/platform/`：首片已定义 Desktop/Web 平台 adapter interface、mock platform、附件 picker port 和 preview port；Desktop/Web 已接实际 adapter；Web 已接 Hub REST session/message/profile、Hub WS query invalidation、Hub runtime live transcript、Hub message/task submit、optimistic message cache 和 Agent Profile -> exact AgentInstance dispatch；下一步进入旧 UI active path 清理。
@@ -69,6 +69,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 - 2026-06-07：shared `UnifiedComposer` 增加 @Agent 菜单、mention chip、删除动作和结构化 mention intent；新增 `composer/mentions.ts`，Desktop submit 会把 mention 名称、id、模型、runtime 拼进 Edge `startRun.prompt`；focused shared tests 更新为 9 个文件 / 26 个测试通过。
 - 2026-06-07：shared platform 新增 `attachments.pickFiles()` port；Desktop 通过 Tauri dialog 和既有 `read_file` command 选择本机文件并生成 desktop attachment preview，Web 继续回退浏览器 file input；focused shared tests 更新为 9 个文件 / 30 个测试通过。
 - 2026-06-07：shared platform 新增 `preview.openEvidence()` port，`RightInspector` 的 files/browser tabs 可点击 file/artifact evidence 并交给 platform adapter 打开；`EvidenceRef` 保留 `path/uri/mimeType` preview 元数据；focused shared tests 更新为 9 个文件 / 31 个测试通过。
+- 2026-06-07：shared `types/chat.ts` 升级为旧 `ChatView.types` 迁移兼容合同，新增 `ReplyTarget`、显式 `undefined` 兼容字段和 focused tests；Desktop/Web/shared 的旧 `ChatView.types` 类型 import 已迁到 shared。验证：shared 2 文件 / 13 测试通过；Desktop typecheck 通过；Web typecheck 通过；Web Diff/MessageTime focused tests 2 文件 / 4 测试通过；Desktop Diff/Search focused tests 2 文件 / 25 测试通过；v4 old UI active path boundary 17/17 通过。
 
 ## P2: Desktop v4 接入
 
@@ -140,6 +141,7 @@ AgentHub 要从现有 Desktop/Web 分叉 UI 迁移到一套以 v4 新界面为�
 验证记录：
 - 2026-06-07：删除 Desktop/Web 旧 registry 和旧 `MainView/IMView` active route；删除 Desktop 旧 `RunDetail`、`RightInspector`、`PermissionDialog` 与对应旧 tests；删除 Web 孤儿 `PermissionDialog`；新增 `scripts/verify-v4-old-ui-active-paths.ps1`，验证 active Desktop/Web source 不再 import 旧 `ChatView`、`PromptInput`、`RunDetail`、`ThreadPanel`、`IMBlockRenderer`、`useChatMessages`、`useIMChat` 或旧 `viewRegistry`。验证：Desktop typecheck/build 通过；Web focused tests 6 个文件 / 32 个测试通过；Web typecheck/build 通过；Desktop App v4 focused tests 1 个文件 / 4 个测试通过；`.\scripts\verify-web-hub-boundary.ps1` 12/12 通过；`.\scripts\verify-v4-old-ui-active-paths.ps1` 16/16 通过；Desktop 1440x920 Playwright smoke 通过，截图 `app/desktop/.tmp/visual-smoke-desktop.png`；Web 1440x920 Playwright smoke 通过，截图 `app/web/.tmp/visual-smoke-web.png`。
 - 2026-06-07：只读 `opus` 子代理盘点剩余旧 UI 债务，结论是下一批先做 shared `ChatMessage/FileDiff` 类型合同迁移和旧 `ChatView.types` import 迁移，再删除旧 Chat/Prompt/Thread/IM hook 本体；该输出用于架构拆分，不作为测试证据。
+- 2026-06-07：旧 `ChatView.types` 类型 import 已迁到 shared `types/chat.ts`，旧 UI active path 边界脚本新增旧类型 import 检查并通过 17/17；下一步进入旧组件/旧测试删除。
 
 ## 暂不做
 

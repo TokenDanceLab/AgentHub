@@ -7,7 +7,7 @@ import { useReducer, useEffect, useRef, useCallback, useState } from 'react';
 import { createEventStream } from '@/api/eventClient';
 import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
-import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
+import type { ChatMessage, MessageBlock, ToolResultBlock } from '@shared/types/chat';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useRunStore } from '@/stores/runStore';

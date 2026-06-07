@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { createThread } from '@/api/edgeClient';
 import type { ThreadInfo } from '@shared/types';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 import type { AddToastInput } from '@/stores/toastStore';
 import { useSearchStore } from '@/stores/searchStore';
 import { buildForkDraft } from '@/utils/messageActions';

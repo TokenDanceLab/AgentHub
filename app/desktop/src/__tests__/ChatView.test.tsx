@@ -106,7 +106,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ChatView from '@/components/ChatView';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '@shared/types/chat';
 
 function makeUserMessage(content: string): ChatMessage {
   return {

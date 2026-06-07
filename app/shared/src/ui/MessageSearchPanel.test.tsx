@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import MessageSearchPanel from './MessageSearchPanel';
-import type { ChatMessage } from '@/components/ChatView.types';
+import type { ChatMessage } from '../types/chat';
 
 const baseMessages: ChatMessage[] = [
   {
