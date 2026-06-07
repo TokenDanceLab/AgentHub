@@ -116,6 +116,7 @@ func main() {
 		RemoteMode:         cfg.RemoteMode,
 		Dev:                cfg.Dev,
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
+		SkillsDirs:         append([]string(nil), cfg.SkillsDirs...),
 		EventLogPath:       cfg.EventLogPath,
 	}
 	if cfg.RunnerCommand != "" {
