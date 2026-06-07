@@ -36,7 +36,7 @@ import {
   SettingsPage,
   TasksPage,
 } from './pages';
-import type { AgentConfig, AgentsPaneId } from './pages/AgentsPage';
+import type { AgentConfig, AgentsPaneId, ToolPermission } from './pages/AgentsPage';
 import type { TaskEditDraft } from './pages/TasksPage';
 import type { GlobalRailPage } from './GlobalRail';
 import {
@@ -75,7 +75,7 @@ const TASK_STATUS_SEQUENCE: TaskStatus[] = ['未开始', '进行中', '待评审
 
 export interface WorkbenchRoutesProps {
   activePage: WorkbenchPage;
-  agents: WorkbenchAgent[];
+  agents?: WorkbenchAgent[] | undefined;
   contacts?: WorkbenchContactsData | undefined;
   focusedAgentId?: string | undefined;
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
@@ -337,6 +337,48 @@ function createLocalTask(index: number): TaskItem {
   };
 }
 
+function workbenchAgentStateToAgentState(status: WorkbenchAgent['status']): AgentConfig['state'] {
+  switch (status) {
+    case 'available':
+      return 'ready';
+    case 'configuring':
+      return 'waiting';
+    case 'unavailable':
+    default:
+      return 'idle';
+  }
+}
+
+function toolPermissionFromAgent(agent: WorkbenchAgent): Record<string, ToolPermission> {
+  const allowedTools = new Set(agent.toolAllowlist ?? []);
+  if (allowedTools.size === 0) return {};
+  return Object.fromEntries(
+    WORKBENCH_MOCK_AGENT_TOOL_OPTIONS.map((tool) => [
+      tool,
+      allowedTools.has(tool) ? '允许' : '需确认',
+    ]),
+  ) as Record<string, ToolPermission>;
+}
+
+function workbenchAgentToAgentConfig(agent: WorkbenchAgent): AgentConfig {
+  const runtimeLabel = agent.runtimeId?.trim() || 'Hub AgentProfile';
+  const providerLabel = agent.provider?.trim();
+  const modelLabel = [providerLabel, agent.model?.trim()].filter(Boolean).join(' / ') || '未配置模型';
+  return {
+    id: agent.id,
+    name: agent.name,
+    role: agent.description?.trim() || 'Hub AgentProfile',
+    engine: runtimeLabel,
+    model: modelLabel,
+    mode: agent.reasoningEffort ? `Reasoning ${agent.reasoningEffort}` : 'Hub read-through',
+    approval: agent.approvalPolicy?.trim() || agent.permissionMode?.trim() || 'Hub 默认策略',
+    scope: agent.permissionMode?.trim() || 'Hub owner scope',
+    state: workbenchAgentStateToAgentState(agent.status),
+    skills: agent.skills ?? [],
+    tools: toolPermissionFromAgent(agent),
+  };
+}
+
 export function WorkbenchRoutes({
   activePage,
   agents,
@@ -370,8 +412,10 @@ export function WorkbenchRoutes({
   const [settings, setSettings] = useState(createSettingsDefaults);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(focusedAgentId);
 
-  void agents;
-  const agentConfigs = WORKBENCH_MOCK_AGENT_CONFIGS;
+  const agentConfigs = useMemo(
+    () => (agents === undefined ? WORKBENCH_MOCK_AGENT_CONFIGS : agents.map(workbenchAgentToAgentConfig)),
+    [agents],
+  );
   const contactsData = contacts ?? {
     members: WORKBENCH_MOCK_CONTACT_MEMBERS,
     externalContacts: WORKBENCH_MOCK_EXTERNAL_CONTACTS,
@@ -647,7 +691,7 @@ export function WorkbenchRoutes({
           allTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
           auditEntries={WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
           confirmCount={agentConfigs.reduce((total, agent) => total + WORKBENCH_MOCK_AGENT_TOOL_OPTIONS.filter((tool) => agent.tools[tool] === '需确认').length, 0)}
-          defaultModelLabel="DeepSeek-V4-Pro"
+          defaultModelLabel={agentConfigs[0]?.model ?? '未配置模型'}
           installedCount={agentConfigs.length}
           marketFeatured={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(0, 3)}
           marketTemplates={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(3)}
@@ -666,7 +710,7 @@ export function WorkbenchRoutes({
           onAgentProfileOpen={onAgentProfileOpen}
           onAgentSelect={setSelectedAgentId}
           policyRules={WORKBENCH_MOCK_AGENT_POLICY_RULES}
-          recentShortcuts={['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由']}
+          recentShortcuts={agents === undefined ? ['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由'] : agentConfigs.slice(0, 3).map((agent) => `${agent.name} 已同步`)}
           runnableCount={agentConfigs.filter((agent) => agent.state === 'running' || agent.state === 'ready').length}
           toolMatrixAgents={agentConfigs.map((agent) => ({
             id: agent.id,

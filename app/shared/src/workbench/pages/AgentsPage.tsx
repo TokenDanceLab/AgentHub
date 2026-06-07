@@ -351,7 +351,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>Agent管理</h1>
           <p className={styles['head-subcopy']}>
-            编辑 Agent 基础配置、skills 和工具权限。当前为前端 demo 内存状态。
+            查看 Agent 基础配置、skills 和工具权限；写入能力按 Hub / Edge 合同逐步接入。
           </p>
         </div>
         <button

@@ -1,6 +1,11 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
+import {
+  getWorkbenchDataModeOverrideSnapshot,
+  resolveWorkbenchDataMode,
+  subscribeWorkbenchDataModeOverride,
+} from '@shared/demo';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { queryClient } from '@/api/queryClient';
 import { useAgentList } from '@/api/agentQueries';
@@ -24,9 +29,15 @@ export default function App() {
 
 function WebWorkbenchRoot() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
+  const dataModeOverride = useSyncExternalStore(
+    subscribeWorkbenchDataModeOverride,
+    getWorkbenchDataModeOverrideSnapshot,
+    getWorkbenchDataModeOverrideSnapshot,
+  );
+  const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
   const agentList = useAgentList(true);
   const workbench = useWebWorkbenchModel(selectedConversationId);
-  const agents = resolveWebWorkbenchAgents(agentList.data?.items);
+  const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
 
   return (
     <AgentHubWorkbench

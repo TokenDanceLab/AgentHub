@@ -42,6 +42,12 @@ export interface WorkbenchAgent {
   status?: 'available' | 'unavailable' | 'configuring' | undefined;
   model?: string | undefined;
   runtimeId?: string | undefined;
+  provider?: string | undefined;
+  approvalPolicy?: string | undefined;
+  permissionMode?: string | undefined;
+  reasoningEffort?: string | undefined;
+  skills?: string[] | undefined;
+  toolAllowlist?: string[] | undefined;
 }
 
 export interface ConversationPort {
