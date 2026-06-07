@@ -92,9 +92,9 @@ next: <1-3 steps>
 9. **API/Event route summary alias**：已合入 `dev/delicious233`，提交 `51ac4b8c fix(api): add agent task summary alias`。该片只补 Hub `GET /web/agent-tasks/:id/summary` 到既有 `TaskEventSummary`，并在 OpenAPI 增加 `/web/agent-tasks/{id}/summary` 兼容 alias；不改前端、Edge、runtime schema 或真实 CLI gate。
 10. **G1. Hub AgentProfile read-through**：已合入 `dev/delicious233`，提交 `c30cbeec feat(web): 接入 Hub AgentProfile 到 Agents 页`。该前端切片只把 Hub `/web/agent-profiles` 投影到 shared Agents 页已安装列表和 `WorkbenchAgent` 字段，阻断 Web real mode demo agent fallback；不做 AgentProfile CRUD、自建 Agent、市场闭环、TeamRun Orchestrator、Edge SQL 或真实 CLI/model gate。
 11. **G0. Edge repository contract harness**：已合入 `dev/delicious233`，提交 `4a5ccaf3 test(edge): add store repository contract harness`。该片只新增 `edge-server/internal/store/store_contract_test.go` 并更新本文档/roadmap，让 in-memory `Store` 与 JSON `FileStore` 共跑生命周期、pins、thread delete cascade、run cleanup cascade、FileStore 删除持久化和 snapshot restore 合同；不引入 SQL、migration、Hub DB 或 API schema 变化。
-12. **Edge runtime event docs contract**：`codex/event-contract-docs` 只补齐已在 Edge runtime 代码中发出的 `run.agent.sub_agent_status` 与 `run.agent.task_dispatch_failed` 文档，并新增测试确保 adapter event constants / known hardcoded runtime events 出现在 `api/events.md`；不重命名事件、不改 payload、不运行真实 CLI/model。
-13. **G2a. Web AgentProfile mutations**：`codex/agentprofile-mutations` 已在 isolated worktree 准备 ready-for-review。范围仅 `app/web` Hub client/mutation hooks、`app/shared` Agents 页 empty/error/saving/create/update/delete 交互和 focused tests；不做 publish/install/market、TeamRun Orchestrator、ExecutionTarget inventory、后端 schema/OpenAPI 硬化、Edge SQL 或真实 CLI/model gate。前端 mapper 继续按当前 Hub 实现发送 JSON string 字段，并过滤 `Hub AgentProfile`、`Hub owner scope`、runtime/model hint 等 UI fallback 文案，避免写回 Hub description/runtime/permission。验证 `app/shared` `AgentHubWorkbench.test.tsx` 29/29、`app/web` focused tests 22/22、Web typecheck、`verify-web-hub-boundary.ps1` 15/15 通过。
-14. **G2b. Backend AgentProfile contract hardening**：等待 G2a 合入或主负责人显式释放后另起 backend-only worktree。倾向 option A：Hub create/update 接受 OpenAPI object/array 请求，marshal 到现有 JSON string model fields，并给 updateable fields 加 type guards 返回 400 而不是 panic；不改 Web/shared mutation 行为，不扩展 publish/install/market。
+12. **Edge runtime event docs contract**：已合入 `dev/delicious233`，提交 `0e6f5f7a test(edge): document runtime event contract`。该片只补齐已在 Edge runtime 代码中发出的 `run.agent.sub_agent_status` 与 `run.agent.task_dispatch_failed` 文档，并新增测试确保 adapter event constants / known hardcoded runtime events 出现在 `api/events.md`；不重命名事件、不改 payload、不运行真实 CLI/model。
+13. **G2a. Web AgentProfile mutations**：已合入 `dev/delicious233`，提交 `35060823 feat(web): wire agent profile mutations`。范围仅 `app/web` Hub client/mutation hooks、`app/shared` Agents 页 empty/error/saving/create/update/delete 交互和 focused tests；不做 publish/install/market、TeamRun Orchestrator、ExecutionTarget inventory、后端 schema/OpenAPI 硬化、Edge SQL 或真实 CLI/model gate。前端 mapper 继续按当前 Hub 实现发送 JSON string 字段，并过滤 `Hub AgentProfile`、`Hub owner scope`、runtime/model hint 等 UI fallback 文案，避免写回 Hub description/runtime/permission。验证 `app/shared` `AgentHubWorkbench.test.tsx` 29/29、`app/web` focused tests 22/22、Web typecheck、`verify-web-hub-boundary.ps1` 15/15 通过。
+14. **G2b. Backend AgentProfile contract hardening**：当前在 `codex/g2b-agentprofile-contract` / `.worktrees/g2b-agentprofile-contract` 收口。Hub create/update 接受当前 JSON string payload 和 OpenAPI object/array payload，marshal 到现有 JSON string model fields；service updateable fields 增加 type guards，malformed payload 返回 400 而不是 panic；OpenAPI 只记录当前 create/delete 200 OK envelope，不改 handler status 行为。不改 Web/shared mutation 行为，不扩展 publish/install/market，不做 DB migration、Edge SQL、release workflow 或真实 CLI/model gate。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -102,7 +102,7 @@ next: <1-3 steps>
 
 - **D1a fixture-only CI gate**：已合入 `dev/delicious233`。后续 D1b 只能在新增依赖测试已进入主线且不会让 CI 变红时再拆，并继续断言不含 `-RealCli`、Docker、root `go test ./tests -count=1` 或真实 CLI/auth secret。
 - **D3 real CLI/model gate**：继续 blocked。候选 workflow 缺 GitHub `environment` approval、预算/请求上限控制，且 redaction validation 失败后仍可能上传 artifact；修复前不得合入。
-- **G1/G2a DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已 ready-for-review。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回，不改 Hub schema、Edge store、publish/install 或 market lifecycle。
+- **G1/G2a/G2b DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已合入；G2b 当前只做后端 AgentProfile request contract hardening 和 OpenAPI 当前行为同步。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回；G2b 不改 Hub schema、Edge store、publish/install 或 market lifecycle。
 - **API/Event contract sync**：`codex/api-event-summary-alias` 已把 Web client 已用的 `/web/agent-tasks/{id}/summary` 声明为 Hub/OpenAPI 兼容 alias，复用既有 `/web/agent-tasks/{id}/events/summary` response contract；`codex/event-contract-docs` 继续做 Edge runtime event 文档/测试漂移收口，不混入 Web UI、Edge pins 或真实 CLI gate。
 - **Runtime adapter roadmap**：Codex `exec --json` adapter 仍是 Phase 1 batch 模式；完整 multi-turn、turn steer/interrupt、approval、subagent 和 diff patch delta 需要后续 Codex app-server 通道，不应在当前能力声明中写成已完成。
 
@@ -126,7 +126,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 |---|---|---|
 | Contacts | 只读 Hub `listContacts()` port 已接入 Web shared page；mutation、error/empty、schema owner 和 friend request/remark/block/search 仍未生产化 | 补 Hub contacts mutation/error/empty/schema 合同 |
 | Docs | 无统一 document/artifact store | 定义 `ProjectArtifact` / `DocumentPreview` owner、blob、version、provider、permission |
-| Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已准备 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；Desktop/Edge runtime inventory、G2b backend contract hardening、market/install 和 target preference mutation 仍未生产化 | review/merge G2a；随后启动 G2b 后端-only AgentProfile contract hardening，再拆 ExecutionTarget inventory 和 Desktop Edge runtime mapper |
+| Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已合入 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；G2b 正在收口 Hub AgentProfile JSON-like request contract hardening；Desktop/Edge runtime inventory、market/install 和 target preference mutation 仍未生产化 | review/merge G2b；随后拆 ExecutionTarget inventory、Desktop Edge runtime mapper、market/install |
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
 | Projects | Project rail 数据和 artifact/workspace 关系未生产化 | 定义 Hub/Edge ownership 和 mutation |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
@@ -180,7 +180,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 主负责人 review/merge `codex/agentprofile-mutations` G2a；合入前不启动 G2b 写入，除非主负责人显式释放并指定 backend-only worktree。
-2. G2a 合入后启动 G2b backend-only AgentProfile contract hardening：接受 OpenAPI object/array 请求、marshal 到现有 JSON string storage、移除 unchecked update casts，并对 malformed payload 返回 400；不扩展 publish/install/market。
+1. 主负责人 review/merge `codex/g2b-agentprofile-contract` G2b；该片只包含 Hub AgentProfile JSON-like request normalization、safe update casts、OpenAPI 当前 200 envelope 文档和 focused tests。
+2. G2b 合入后再选择 ExecutionTarget inventory、Hub Projects backed by `workspaces`、Edge SQL proposal 或 D1b/D2/D3 gate policy；不要把这些扩进 G2b。
 3. D1b/D2/D3 单独排期；D3 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge。
