@@ -90,6 +90,8 @@ Desktop/Web v4 shared workbench 已通过 PR #291 合入 `dev/delicious233`，�
 
 2026-06-08 02:00 +08:00 前端对接审计补充：v4 shell 已统一，但生产数据接线只覆盖聊天主链路。Contacts、Docs、Agents、Tasks/Runs、Projects、Settings 和 RightInspector evidence 仍有大量 demo/mock 数据。下一步先补 shared data contract 和 real mode 错误语义，再逐页接 Hub/Edge DB/API；不要继续只做 UI 表皮。
 
+2026-06-08 02:22 +08:00 后端切片合并进展：B `Hub callback 错误脱敏` 已从 `feat/backend-edge-hub` path-level 抽取并合入 `dev/delicious233`，提交 `9d43b18d fix(edge): redact hub callback response bodies`。验证：`go test ./internal/hub -count=1`、`edge-server go test ./... -short -count=1`、`git diff --check`。下一片按顺序审 A `Codex adapter 运行时修复`，不整包 cherry-pick `74431e85`。
+
 ## P0: 文档与架构冻结
 
 - [x] 清理本地过时分支，只保留 `dev/delicious233` 作为本地主线。
