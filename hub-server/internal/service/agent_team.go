@@ -20,7 +20,7 @@ import (
 
 // agentTeamAgentSvc is the subset of AgentService used by AgentTeamService.
 type agentTeamAgentSvc interface {
-	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
+	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
 }
 
