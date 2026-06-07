@@ -439,6 +439,36 @@ func TestTaskEventSummaryReturnsRuntimeSummary(t *testing.T) {
 	}
 }
 
+func TestTaskEventSummaryAliasReturnsRuntimeSummary(t *testing.T) {
+	agentSvc := &mockAgentService{
+		taskRunEventSummaryFn: func(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
+			return &model.AgentRunEventSummary{
+				TaskID:      taskID,
+				Status:      model.TaskStatusRunning,
+				TotalEvents: 3,
+			}, nil
+		},
+	}
+	h := handler.NewAgentHandler(agentSvc)
+
+	c, w := newGinCtx("GET", "/web/agent-tasks/task-1/summary", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "task-1"}}
+	h.TaskEventSummary(c)
+
+	assertStatus(t, w, 200)
+	resp := parseResp(t, w)
+	if resp.Code != "OK" {
+		t.Fatalf("expected OK, got %s", resp.Code)
+	}
+	payload, ok := resp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected object data, got %T", resp.Data)
+	}
+	if payload["task_id"] != "task-1" || payload["status"] != model.TaskStatusRunning {
+		t.Fatalf("unexpected alias summary payload: %v", payload)
+	}
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────
 
 // mockAgentService satisfies handler.AgentService.
