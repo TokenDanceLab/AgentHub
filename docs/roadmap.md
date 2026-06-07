@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 03:56 +08:00 | 当前主线：v4 shared UI 已入 `dev/delicious233`，进入后端切片合并、Desktop/Edge、Web/Hub、DB-backed product surfaces 和端到端联调 | 历史长版见 [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md) 和 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> 最后更新：2026-06-08 04:07 +08:00 | 当前主线：v4 shared UI 已入 `dev/delicious233`，进入后端切片合并、Desktop/Edge、Web/Hub、DB-backed product surfaces 和端到端联调 | 历史长版见 [archive/roadmap-pre-5day-cleanup-20260605.md](archive/roadmap-pre-5day-cleanup-20260605.md) 和 [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
 ## 当前目标
 
@@ -32,7 +32,7 @@ Desktop/Web v4 shared workbench 已通过 PR #291 合入 `dev/delicious233`，�
 | 项 | 当前事实 |
 |---|---|
 | 主工作树 | 当前为 `dev/delicious233` |
-| 当前提交 | `1afcde3d`（`origin/dev/delicious233` 后端 C1/C2 脚本与 E docs/skill 合入点；主工作树本地因并行脏改暂时停在 `a4b27d63`） |
+| 当前提交 | `origin/dev/delicious233` 最新提交（本轮从 `74d47c00` 继续合入 D1a fixture-only CI gate；主工作树本地因并行脏改仍不可直接 pull/merge） |
 | 并行 worktree | 摘要：`.worktrees/backend` = `feat/backend-edge-hub`；多条 `.worktrees/backend-*-0607` 为后端历史切片；`.worktrees/johnny-dev` = detached HEAD。完整实时列表以 `git worktree list` 为准 |
 | UI 基准 | 当前分支 `app/shared/src/workbench` + mock/demo 运行态；`D:\Code\TokenDance\agenthub-design\desktop` 为只读历史参考 |
 | Desktop/Web 端口 | Desktop `5173`，Web `5174` |
@@ -50,7 +50,7 @@ Desktop/Web v4 shared workbench 已通过 PR #291 合入 `dev/delicious233`，�
 | P0-4 | Web v4 shell 接入 | 进行中 | 继续补 Web v4 TeamRun/IM 子页在 shared workbench 内的正式入口 | Web App focused test 通过；Web typecheck/build 通过；5174 使用同一套 shared workbench，但明确不显示 Desktop fake window chrome，根布局为 `y=0,height=920`；Web Vite/Vitest 已对齐 shared lucide 依赖解析；v4 workbench @Agent 列表已在 Hub session 下读取 `/web/agent-profiles`；Web v4 首片登录态 happy path 已接 Hub sessions/messages；Hub WS 已接 v4 query invalidation；Hub `agent.stream` runtime events 已直接投影到 shared transcript；composer submit 已改为真实 Hub message + optional `/web/agent-tasks`；Hub message 已有 optimistic cache 插入/确认/失败回滚；@Agent submit 已先创建并缓存 Hub session `AgentInstance`，再用 exact `agent_instance_id` 触发 `/web/agent-tasks`；demo/mock preview 下 5174 发送同样追加用户消息和 mock reply；这不代表 TeamRun/IM、全量 mutation、正式鉴权错误态或回滚矩阵已经冻结完成 |
 | P0-5 | Desktop Edge / Web Hub 生产对接 | 已部分落地，facade/host 拆分待实现 | 按 [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) 和 [backend-integration-governance.md](backend-integration-governance.md) 推进 Desktop+Local Edge、Web+Hub、Hub+exact Edge routing | 当前 `App.tsx` 已是薄入口；Desktop 已有 EdgeManager/Edge REST/WS 基础；Web 已走 Hub adapter；`desktopHost.ts` / `localEdgeRuntime.ts` 和 Tauri `host/*` 尚未落地；下一步验证以 Desktop/Web platform focused tests、Rust host tests、`verify-web-hub-boundary.ps1`、Edge focused tests 和 Hub fake callback DB/WS gate 为门禁 |
 | P0-6 | 旧 UI 清理门禁 | 旧主路径已完成，迁移债务继续 | 清理剩余 Search/Diff/Artifact 迁移素材并把可复用逻辑转入 shared | 已删除旧 Desktop `ChatView/PromptInput/ThreadPanel/useChatMessages/useIMChat/IMBlockRenderer/IMMessageView` 及对应旧测试/CSS；已删除旧 Web `ChatView/PromptInput/ThreadPanel/RunDetail/ReplyPreviewBar/IMMessageView` 及对应旧测试/CSS；Web runtime projection 已从 `RunDetail*` 改为 run evidence 命名；`scripts/verify-v4-old-ui-active-paths.ps1` 44/44 通过；无双主工作台 active import |
-| P0-7 | 后端切片合并进 dev | 进行中 | B/A0+A/C1/C2/E 已入 `origin/dev/delicious233`；下一步只审 D CI/release/real CLI gate、G DB persistence 或生产对接切片 | 已有 scope、验证、风险、回滚说明；真实 CLI/model 仍是 opt-in readiness gate；禁止整包直合 |
+| P0-7 | 后端切片合并进 dev | 进行中 | B/A0+A/C1/C2/E 已入 `origin/dev/delicious233`；D1a TeamRun fixture-only CI gate 已拆为 ready-for-review；下一步只审 D1b/D2/D3、G DB persistence 或生产对接切片 | 已有 scope、验证、风险、回滚说明；真实 CLI/model 仍是 opt-in readiness gate；禁止整包直合 |
 | P0-8 | Shared data contract + DB-backed state | 首片进行中 | Web Contacts 已从 shared mock-only 改为可接 Hub `listContacts()` 的只读数据 port；下一步继续按 Contacts -> Agents -> Tasks/TeamRun -> Projects/Docs artifact -> Settings owner/schema 的顺序逐页定义 owner/schema/mutation/loading/error/empty，禁止 real mode 静默 demo fallback | Contacts focused tests、`verify-web-hub-boundary.ps1`、Web typecheck 已通过；后续补 Hub PG/Redis gate、Edge SQL store tests、前端 mutation/error/empty focused tests |
 | P0-9 | 字节比赛 demo 与交付闭环 | 新增 | 补 3 分钟 demo loop、真实 runtime 证据包、TeamRun UI、artifact/diff evidence、AI 协作记录和答辩材料；P1 再做 AgentProfile CRUD、消息操作、上下文连续、审批/失败态、preview card；P2 做 deploy card、mobile viewer、version history | 可运行 demo、至少两个真实 runtime 证据、录屏脚本、产品/技术文档、AI 协作开发记录 |
 | P2-1 | Mobile v4 IM / Remote Client 支线 | 新增低优先级 | 在 `codex/mobile-v4-im-redesign` 独立 worktree 研究和规划；Mobile 以飞书移动 IM 为主参考、Codex 手机 chat 为辅参考，定位为 Hub-mediated IM/remote-control client | 规划文档、mobile IA/remote-control 边界、5175 visual QA；禁止 Web/Desktop/Backend 源码混入 mobile 支线 |
@@ -101,6 +101,8 @@ Desktop/Web v4 shared workbench 已通过 PR #291 合入 `dev/delicious233`，�
 2026-06-08 03:35 +08:00 后端切片合并进展：E docs/skill 已从 clean worktree 直接合入 `origin/dev/delicious233`，提交 `3c36c314 docs(skills): add codex team coordination skill` 和 `1afcde3d docs(skills): align skill ignore whitelist`。本片只改 `.agents/skills/dev-team/SKILL.md`、`.agents/skills/dev-team-codex/SKILL.md`、`.gitignore`、`AGENTS.md`；generic `dev-team` 去掉模型/供应商/alias 硬编码，`dev-team-codex` 单独记录 Leader `gpt-5.5 xhigh` / Workers `gpt-5.5 high`，并同步 `dev-team-codex` / `env-sandbox` whitelist。主工作树本地仍有并行 `AGENTS.md`、frontend/mobile/backend dirty 改动，暂时不要直接 pull；等这些改动保存后再快进到远端 dev。
 
 2026-06-08 03:56 +08:00 Web/Hub 数据接入首片：在 isolated worktree `.worktrees/integration-20260608` 的 `codex/integration-20260608` 上推进 P0-8 Contacts 只读切片。`AgentHubWorkbench` / `WorkbenchRoutes` 新增可选 `WorkbenchContactsData`，无 contacts prop 时继续保留 demo 数据；Web `useWebWorkbenchModel()` 在 Hub ready 时读取 `hubClient.listContacts()` 并映射到 shared Contacts 页，real mode 无 Hub 数据时显示空联系人，不再伪装旧 demo 联系人，也不会在 Hub readiness 丢失时渲染 previous query contacts。Hub supplied contacts 下服务台和待处理联系人默认不再回退到 design mock。验证：shared `AgentHubWorkbench.test.tsx` 1 文件 / 26 测试通过；Web `useWebWorkbenchModel.test.ts + webPlatform.test.ts + App.test.tsx` 3 文件 / 21 测试通过；Web typecheck 通过；`verify-web-hub-boundary.ps1` 15/15 通过；`git diff --check` 无 whitespace error（仅 CRLF warning）。补跑 `app/shared` 全量 `pnpm lint` 仍失败，失败集中在既有 Storybook 类型、旧 components 测试引用、`Array.at` lib-target、旧 UI/当前 workbench 测试 strict 类型和 SVG module declaration 缺失，不作为本切片完成证据。
+
+2026-06-08 04:07 +08:00 后端 D1a fixture CI gate：新增独立 `backend-e2e-fixture` workflow job，只在 `hub-server` 运行 `go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1`，并在 `scripts/verify-ci-gates.ps1` 中固定检查该 job 的工作目录、精确命令和 forbidden real/runtime patterns。该片不运行真实 CLI/model，不改 release workflow，不引入 docker compose 或根级泛化 E2E；D1b/D2/D3 继续延后。
 
 2026-06-08 02:52 +08:00 Mobile 支线编排：已从 `dev/delicious233` 创建 `.worktrees/mobile-v4-im-redesign` / `codex/mobile-v4-im-redesign`。Mobile 方向降级为 P2 支线，以飞书移动 IM 为主参考、Codex 手机 chat 为辅参考，采用 IM-first shell、消息列表首页、聊天 drill-in、平板双栏；远程控制只做 Hub-mediated 发任务、看运行流、审批、停止，禁止 Mobile 直连 Local Edge。相关研究/规划由 subagent 团队在 mobile worktree 推进，不混入当前后端切片。
 
