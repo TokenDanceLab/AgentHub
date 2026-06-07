@@ -335,6 +335,7 @@ export {
   demoWorkbenchAgents,
   demoWorkbenchPins,
   demoWorkbenchTranscripts,
+  normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
 } from './demo';
 export type {
@@ -365,13 +366,22 @@ export {
 } from './transcript';
 export type {
   ApprovalTranscriptBlock,
+  AgentTimelineItem,
+  AgentTimelineTranscriptBlock,
   ArtifactTranscriptBlock,
+  ChildAgentTranscriptBlock,
+  ContextUsageTranscriptBlock,
   DiffTranscriptBlock,
+  ResultTranscriptBlock,
+  RouteDecisionTranscriptBlock,
+  RunStepGroupTranscriptBlock,
   EvidenceRef,
   EvidenceRefKind,
   EvidenceRefStatus,
   RunSessionTranscriptBlock,
+  SubagentTranscriptBlock,
   TextTranscriptBlock,
+  ThinkingTranscriptBlock,
   ToolCallTranscriptBlock,
   TranscriptAuthor,
   TranscriptAuthorRole,

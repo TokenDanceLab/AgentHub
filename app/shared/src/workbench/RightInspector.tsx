@@ -45,8 +45,8 @@ const prototypeTasks: TaskItem[] = [
 ];
 
 const prototypeFiles: FileItem[] = [
-  { name: 'sqlite-migration-plan.md', type: 'md', isPrimary: true },
-  { name: 'migrations/0007_chat_threads.sql', type: 'sql' },
+  { name: 'sqlite-migration-plan.md', type: 'sql', isPrimary: true },
+  { name: 'migrations/0007_chat_threads.sql', type: 'db' },
   { name: 'hooks/useThreadNavigation.ts', type: 'ts' },
   { name: 'B0-SQLITE-RISKS.md', type: 'md' },
 ];
@@ -224,6 +224,7 @@ export function RightInspector({
           <OverviewPanel
             tasks={overviewTasks}
             files={overviewFiles}
+            taskSectionTitle="B0 SQLite 迁移"
             kicker="Builder 工作目录"
             primaryFileLabel="最终文件"
             onFileClick={handleFileClick}

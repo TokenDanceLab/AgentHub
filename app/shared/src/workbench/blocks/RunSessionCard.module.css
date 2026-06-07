@@ -14,9 +14,9 @@
   --_agent-inset: var(--agent-inset, 34px);
   --_bubble-col: var(--bubble-col, 100%);
 
-  width: min(calc(100% - var(--_agent-inset)), var(--_bubble-col));
-  max-width: calc(100% - var(--_agent-inset));
-  margin-left: var(--_agent-inset);
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
   min-height: 48px;
   display: flex;
   align-items: center;

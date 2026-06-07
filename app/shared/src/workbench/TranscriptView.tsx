@@ -151,13 +151,17 @@ function renderTranscriptBlock(block: TranscriptBlock): React.ReactElement {
 
 function renderTextBlock(block: Extract<TranscriptBlock, { kind: 'text' }>): React.ReactElement {
   if (isAgentAuthor(block.author)) {
+    const time = formatBlockTime(block.createdAt);
+
     return (
       <AgentMessage
         avatar={agentAvatar(block.author.name)}
         avatarColor={agentAvatarColor(block.author.name)}
+        {...agentMessageBadge(block)}
+        {...(time ? { time } : {})}
         name={block.author.name}
       >
-        <p className={styles.blockText}>{block.text}</p>
+        {renderAgentText(block.text)}
       </AgentMessage>
     );
   }
@@ -167,6 +171,40 @@ function renderTextBlock(block: Extract<TranscriptBlock, { kind: 'text' }>): Rea
       <p className={styles.blockText}>{block.text}</p>
     </UserMessage>
   );
+}
+
+function renderAgentText(text: string): React.ReactElement {
+  const [title, rest] = splitAgentText(text);
+  if (!rest) {
+    return <p className={styles.blockText}>{title}</p>;
+  }
+
+  return (
+    <>
+      <div className={styles.inlineTitle}>{title}</div>
+      <div className={styles.inlineMutedLoose}>{rest}</div>
+    </>
+  );
+}
+
+function splitAgentText(text: string): [string, string] {
+  const newlineIndex = text.indexOf('\n');
+  if (newlineIndex > 0 && newlineIndex < text.length - 1) {
+    return [
+      text.slice(0, newlineIndex).trim(),
+      text.slice(newlineIndex + 1).trim(),
+    ];
+  }
+
+  const sentenceEnd = text.indexOf('。');
+  if (sentenceEnd <= 0 || sentenceEnd >= text.length - 1) {
+    return [text, ''];
+  }
+
+  return [
+    text.slice(0, sentenceEnd),
+    text.slice(sentenceEnd + 1),
+  ];
 }
 
 /* ── Tool call block ── */
@@ -204,7 +242,12 @@ function renderArtifactBlock(
     return (
       <div className={styles.agentBlockRow}>
         <div className={styles.agentRunShell}>
-          <FileChangeCard path={fileRef.path} action="modified" />
+          <FileChangeCard
+            path={fileRef.path}
+            action={block.action ?? 'modified'}
+            {...(block.additions != null ? { additions: block.additions } : {})}
+            {...(block.deletions != null ? { deletions: block.deletions } : {})}
+          />
         </div>
       </div>
     );
@@ -262,12 +305,16 @@ function renderRunSessionBlock(
   block: Extract<TranscriptBlock, { kind: 'run_session' }>,
 ): React.ReactElement {
   return (
-    <RunSessionCard
-      meta={block.meta}
-      runId={block.runId}
-      status={block.status}
-      title={block.title}
-    />
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <RunSessionCard
+          meta={block.meta}
+          runId={block.runId}
+          status={block.status}
+          title={block.title}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -319,7 +366,15 @@ function renderRunStepChild(block: TranscriptBlock): React.ReactElement {
     }
     case 'artifact': {
       const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
-      return <FileChangeCard action="modified" path={fileRef?.path ?? block.title} />;
+      return (
+        <FileChangeCard
+          action={block.action ?? 'modified'}
+          {...(block.additions != null ? { additions: block.additions } : {})}
+          {...(block.deletions != null ? { deletions: block.deletions } : {})}
+          onReview={() => undefined}
+          path={fileRef?.path ?? block.title}
+        />
+      );
     }
     case 'diff':
       return (
@@ -331,12 +386,7 @@ function renderRunStepChild(block: TranscriptBlock): React.ReactElement {
         />
       );
     case 'thinking':
-      return (
-        <ThinkingBlock
-          content={block.content}
-          isThinking={block.isThinking ?? isEvidenceRunning(block)}
-        />
-      );
+      return renderNestedThinkingDetail(block);
     default:
       return renderTranscriptBlock(block);
   }
@@ -352,6 +402,21 @@ function renderThinkingBlock(
       content={block.content}
       isThinking={block.isThinking ?? isEvidenceRunning(block)}
     />
+  );
+}
+
+function renderNestedThinkingDetail(
+  block: Extract<TranscriptBlock, { kind: 'thinking' }>,
+): React.ReactElement {
+  const running = block.isThinking ?? isEvidenceRunning(block);
+  return (
+    <div className={styles.runStepThinkingDetail} data-card-surface>
+      <div className={styles.runStepThinkingHead}>
+        <strong>{running ? '当前推理' : '推理摘要'}</strong>
+        <em>{running ? '运行中' : '完成'}</em>
+      </div>
+      {block.content ? <p>{block.content}</p> : null}
+    </div>
   );
 }
 
@@ -449,6 +514,30 @@ function agentAvatarColor(name: string): string {
   if (key.includes('orchestrator')) return 'var(--role-orchestrator)';
   if (key.includes('researcher')) return 'var(--role-researcher)';
   return 'var(--surface-highest)';
+}
+
+function agentMessageBadge(
+  block: Extract<TranscriptBlock, { kind: 'text' }>,
+): { badgeLabel?: string; badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary' } {
+  const statuses = block.evidenceRefs?.map((ref) => ref.status).filter(Boolean) ?? [];
+  if (statuses.includes('running')) return { badgeLabel: '运行中', badgeVariant: 'thinking' };
+  if (statuses.includes('pending')) return { badgeLabel: '待执行', badgeVariant: 'primary' };
+  if (statuses.includes('failed')) return { badgeLabel: '失败', badgeVariant: 'danger' };
+  if (statuses.length > 0 && statuses.every((status) => status === 'completed')) {
+    return { badgeLabel: '完成', badgeVariant: 'success' };
+  }
+  return {};
+}
+
+function formatBlockTime(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+  });
 }
 
 function isEvidenceRunning(block: TranscriptBlock): boolean {

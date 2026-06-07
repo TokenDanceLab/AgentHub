@@ -8,6 +8,8 @@ export type { HubRuntimeEventTranscriptInput } from './normalizeHubRuntimeEvents
 export type { ThreadTranscriptItemInput } from './normalizeThreadItems';
 export type {
   ApprovalTranscriptBlock,
+  AgentTimelineItem,
+  AgentTimelineTranscriptBlock,
   ArtifactTranscriptBlock,
   ChildAgentTranscriptBlock,
   ContextUsageTranscriptBlock,
@@ -17,6 +19,7 @@ export type {
   EvidenceRefStatus,
   ResultTranscriptBlock,
   RouteDecisionTranscriptBlock,
+  RunStepGroupTranscriptBlock,
   RunSessionTranscriptBlock,
   SubagentTranscriptBlock,
   TextTranscriptBlock,
