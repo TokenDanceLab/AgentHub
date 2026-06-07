@@ -49,6 +49,7 @@ export interface ComposerSubmitResult {
 }
 
 export type ComposerAction =
+  | { type: 'setConversationId'; conversationId: string }
   | { type: 'setText'; text: string }
   | { type: 'setMode'; mode: ComposerMode }
   | { type: 'addMention'; mention: ComposerMention }

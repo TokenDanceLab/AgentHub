@@ -1,0 +1,207 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   FilePreview — v4 Read-only Code Editor Panel
+   Converts .readonly-editor / .editor-toolbar / .editor-meta / .editor-code
+   from demo to CSS Modules using ONLY v4 custom properties.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Root panel ── */
+.pane {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--e-1);
+  animation: editorIn var(--dur-medium) var(--ease-spring);
+}
+
+/* ── Top toolbar ── */
+.toolbar {
+  min-height: 54px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--surface-low) 8%);
+}
+
+/* ── File title block (icon + name + type) ── */
+.fileTitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fileIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.fileIcon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.fileTitleText {
+  min-width: 0;
+}
+
+.fileTitleName {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 0.875rem/1.2 var(--font-sans);
+  color: var(--text-1);
+}
+
+.fileTitleLang {
+  display: block;
+  margin-top: 2px;
+  font: 500 0.6875rem var(--font-sans);
+  color: var(--text-3);
+}
+
+/* ── Close button ── */
+.closeBtn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.closeBtn:hover {
+  background: var(--surface-low);
+  color: var(--text-1);
+  box-shadow: var(--e-1);
+}
+
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.closeBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── Meta bar (workspace, encoding, lines) ── */
+.meta {
+  min-height: 30px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--bdr);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-3);
+  background: var(--surface-low);
+  font: 500 0.6875rem var(--font-sans);
+  overflow: hidden;
+}
+
+.metaItem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Adjacent sibling dot separator */
+.metaItem + .metaItem::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  margin-right: 10px;
+  border-radius: var(--r-full);
+  background: var(--bdr-strong);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ── Code area ── */
+.code {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  background: color-mix(in srgb, var(--surface-low) 72%, var(--surface) 28%);
+  color: var(--text-1);
+  font: 400 0.75rem/1.65 var(--font-mono);
+  tab-size: 2;
+}
+
+.code:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+.codeInner {
+  display: block;
+  min-width: max-content;
+  padding: 12px 0;
+}
+
+/* ── Single code line (grid: line-number | content) ── */
+.line {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 20px;
+}
+
+.line:hover {
+  background: var(--primary-light);
+}
+
+/* ── Line number ── */
+.lineNum {
+  padding-right: 10px;
+  color: var(--text-3);
+  text-align: right;
+  font-style: normal;
+  user-select: none;
+  border-right: 1px solid var(--bdr);
+}
+
+/* ── Line content ── */
+.lineContent {
+  padding: 0 14px;
+  font-weight: 400;
+  white-space: pre;
+}
+
+/* ── Entry animation ── */
+@keyframes editorIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

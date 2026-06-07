@@ -33,7 +33,7 @@ async function assertExistingServerIsDesktop() {
       [
         `[agenthub-desktop] ${DEV_URL} is already serving a non-Desktop app.`,
         'Stop the process on port 5173 before launching AgentHub Desktop.',
-        'Desktop must load app/desktop/src/main.tsx; Mobile uses port 5174.',
+        'Desktop must load app/desktop/src/main.tsx; Web uses port 5174.',
       ].join('\n'),
     );
     process.exit(1);

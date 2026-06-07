@@ -1,0 +1,710 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   ContactsPage — v4 Design Tokens
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Root layout: workbench-page pattern ── */
+.page {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  color: var(--text-1);
+  overflow: hidden;
+}
+
+/* ── Left nav (310px) ── */
+.nav {
+  width: 310px;
+  flex: 0 0 310px;
+  padding: 26px 12px 14px;
+  border-right: 1px solid var(--bdr);
+  background: var(--surface-low);
+  overflow-y: auto;
+}
+
+.navTitle {
+  padding: 0 12px 18px;
+  font: 600 1.375rem/1.2 var(--font-sans);
+  letter-spacing: 0;
+}
+
+.search {
+  width: 100%;
+  height: 40px;
+  margin: 0 0 10px;
+  padding: 0 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-1);
+  outline: none;
+  font: 400 0.875rem var(--font-sans);
+}
+
+.search::placeholder {
+  color: var(--text-3);
+}
+
+.search:focus {
+  border-color: var(--bdr-focus);
+  box-shadow: var(--focus-ring);
+}
+
+/* ── Org row ── */
+.orgRow {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  margin-bottom: 8px;
+}
+
+.orgLogo {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-full);
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 0.625rem var(--font-mono);
+  border: 1px solid var(--bdr);
+}
+
+.orgName {
+  flex: 1;
+  font: 500 0.875rem var(--font-sans);
+}
+
+.orgAction {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+}
+
+/* ── Nav rows ── */
+.navRow {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  margin: 2px 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font: 500 0.9375rem var(--font-sans);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.navRow:hover {
+  background: var(--surface-high);
+}
+
+.navRowActive {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.navBadge {
+  margin-left: auto;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-sans);
+}
+
+.navRowActive .navBadge {
+  color: var(--primary);
+}
+
+.navGlyph {
+  width: 20px;
+  height: 20px;
+  color: currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+}
+
+.navGlyph svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.navCaption {
+  margin: 18px 12px 8px;
+  color: var(--text-3);
+  font: 500 0.75rem var(--font-sans);
+}
+
+.navShortcut {
+  padding: 8px 12px 8px 38px;
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  font: 400 0.8125rem/1.35 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.navShortcut:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+/* ── Right main ── */
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 42px;
+  overflow: auto;
+  background: var(--surface);
+}
+
+/* ── Head ── */
+.head {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.headTitle {
+  font: 600 1.375rem/1.2 var(--font-sans);
+}
+
+.headSubcopy {
+  margin-top: 5px;
+  color: var(--text-2);
+  font: 400 0.8125rem/1.45 var(--font-sans);
+}
+
+/* ── Add button ── */
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--primary);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--primary);
+  font: 500 0.875rem var(--font-sans);
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: var(--primary-light);
+}
+
+/* ── Quick action grid ── */
+.quickGrid {
+  max-width: 760px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 22px;
+}
+
+.quickBtn {
+  min-height: 74px;
+  padding: 14px 16px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--dur-medium) var(--ease),
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
+}
+
+.quickBtn:hover {
+  background: var(--surface);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+.quickBtnLabel {
+  display: block;
+  margin-bottom: 5px;
+  font: 600 0.875rem var(--font-sans);
+}
+
+.quickBtnDesc {
+  display: block;
+  color: var(--text-2);
+  font: 400 0.75rem/1.45 var(--font-sans);
+}
+
+/* ── Section title ── */
+.sectionTitle {
+  margin: 4px 0 10px;
+  color: var(--text-3);
+  font: 500 0.8125rem var(--font-sans);
+}
+
+/* ── Member list ── */
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(100%, 980px);
+  border-top: 1px solid var(--bdr);
+}
+
+.memberRow {
+  width: 100%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--bdr);
+  background: transparent;
+  text-align: left;
+  border-radius: 0;
+  padding: 7px 8px;
+  cursor: pointer;
+  color: var(--text-1);
+  font-family: inherit;
+}
+
+.memberRow:hover {
+  background: var(--surface-high);
+}
+
+.memberAv {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--primary), var(--success));
+  color: var(--text-inv);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 0.75rem var(--font-sans);
+  flex-shrink: 0;
+}
+
+.memberName {
+  font: 500 0.9375rem var(--font-sans);
+  flex-shrink: 0;
+}
+
+.memberTag {
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+  background: var(--surface-high);
+  color: var(--text-2);
+  font: 500 0.6875rem var(--font-sans);
+  flex-shrink: 0;
+}
+
+.memberOrg {
+  flex: 1;
+  min-width: 160px;
+  color: var(--text-2);
+  font: 400 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberStatus {
+  margin-left: auto;
+  color: var(--text-3);
+  font: 400 0.75rem var(--font-sans);
+  flex-shrink: 0;
+}
+
+.groupMemberOrg {
+  max-width: 420px;
+}
+
+/* ── Service grid ── */
+.serviceGrid {
+  max-width: 780px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.serviceCard {
+  min-height: 86px;
+  padding: 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
+  color: var(--text-1);
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--dur-medium) var(--ease),
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease);
+}
+
+.serviceCard:hover {
+  background: var(--surface);
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+.serviceCardName {
+  display: block;
+  margin-bottom: 4px;
+  font: 600 0.875rem var(--font-sans);
+}
+
+.serviceCardDesc {
+  color: var(--text-2);
+  font: 400 0.75rem/1.45 var(--font-sans);
+}
+
+.serviceCardAction {
+  color: var(--primary);
+  font: 600 0.75rem var(--font-sans);
+  font-style: normal;
+}
+
+/* ── Modal backdrop ── */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(18, 18, 28, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+/* ── Contact modal ── */
+.modal {
+  position: relative;
+  width: min(860px, calc(100vw - 96px));
+  max-height: min(760px, calc(100vh - 80px));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bdr-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--e-4);
+}
+
+.modalClose {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalClose:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.modalClose svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modalHead {
+  padding: 32px 36px 16px;
+}
+
+.modalTitle {
+  font: 600 1.25rem/1.2 var(--font-sans);
+  margin-bottom: 10px;
+}
+
+.modalDesc {
+  max-width: 640px;
+  color: var(--text-2);
+  font: 400 0.875rem/1.55 var(--font-sans);
+}
+
+/* ── Modal tabs ── */
+.modalTabs {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin: 0 36px;
+  border-bottom: 1px solid var(--bdr);
+}
+
+.modalTab {
+  height: 42px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-1);
+  font: 500 0.875rem var(--font-sans);
+  cursor: pointer;
+}
+
+.modalTab:hover {
+  color: var(--primary);
+}
+
+.modalTabActive {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.modalBody {
+  overflow-y: auto;
+  padding: 22px 36px 36px;
+}
+
+/* ── QR panel ── */
+.qrPanel {
+  min-height: 430px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, var(--surface-low), var(--surface));
+}
+
+.qrCard {
+  padding: 18px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  box-shadow: var(--e-1);
+}
+
+.qrGrid {
+  position: relative;
+  width: 188px;
+  height: 188px;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 3px;
+  padding: 10px;
+  background: white;
+  border-radius: var(--r-sm);
+}
+
+.qrCell {
+  background: var(--qr-cell);
+  border-radius: 2px;
+}
+
+.qrCellOn {
+  background: var(--qr-cell-on);
+}
+
+.qrCenter {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: var(--text-inv);
+  font: 700 0.8125rem var(--font-mono);
+  border: 4px solid white;
+}
+
+.qrTitle {
+  font: 600 0.9375rem var(--font-sans);
+}
+
+.qrCopy {
+  color: var(--text-2);
+  font: 400 0.8125rem/1.5 var(--font-sans);
+}
+
+.qrExpire {
+  color: var(--text-2);
+  font: 400 0.8125rem/1.5 var(--font-sans);
+}
+
+/* ── Link panel ── */
+.linkPanel {
+  min-height: 310px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-low);
+}
+
+.linkLabel {
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+}
+
+.linkCopyRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.linkInput {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 400 0.8125rem var(--font-sans);
+  outline: none;
+}
+
+.linkCopyBtn {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--primary);
+  border-radius: var(--r-sm);
+  background: var(--primary);
+  color: var(--text-inv);
+  font: 600 0.8125rem var(--font-sans);
+  cursor: pointer;
+}
+
+.linkHint {
+  color: var(--text-2);
+  font: 400 0.8125rem/1.5 var(--font-sans);
+}
+
+/* ── Code panel ── */
+.codePanel {
+  min-height: 310px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-low);
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.codeValue {
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  color: var(--text-1);
+  font: 700 1.25rem var(--font-mono);
+  letter-spacing: 0;
+}
+
+.codeBtn {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--primary);
+  border-radius: var(--r-sm);
+  background: var(--primary);
+  color: var(--text-inv);
+  font: 600 0.8125rem var(--font-sans);
+  cursor: pointer;
+}
+
+/* ── Phone panel ── */
+.phonePanel {
+  min-height: 310px;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface-low);
+}
+
+.phoneLabel {
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+}
+
+.phoneRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.phoneSelect {
+  width: 88px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font: 400 0.8125rem var(--font-sans);
+  outline: none;
+}
+
+.phoneInput {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font: 400 0.8125rem var(--font-sans);
+  outline: none;
+}
+
+.phoneSendBtn {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--primary);
+  border-radius: var(--r-sm);
+  background: var(--primary);
+  color: var(--text-inv);
+  font: 600 0.8125rem var(--font-sans);
+  cursor: pointer;
+}

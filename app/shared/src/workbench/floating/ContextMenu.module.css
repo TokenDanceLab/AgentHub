@@ -1,0 +1,121 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-context-backdrop);
+}
+
+.menu {
+  position: fixed;
+  z-index: var(--z-context-menu);
+  width: 244px;
+  padding: 6px;
+  border: 1px solid var(--bdr-strong);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
+  box-shadow: var(--e-3);
+  opacity: 0;
+  transform: translateY(4px) scale(0.985);
+  transform-origin: top left;
+  transition: opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+  pointer-events: none;
+}
+
+.menu.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.title {
+  padding: 7px 8px 8px;
+  border-bottom: 1px solid var(--bdr);
+  margin-bottom: 4px;
+}
+
+.title span {
+  display: block;
+  color: var(--text-1);
+  font: 600 0.75rem / 1.35 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font: 500 0.625rem var(--font-sans);
+}
+
+.group {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--bdr);
+}
+
+.group:last-child {
+  border-bottom: 0;
+}
+
+.item {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-1);
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  font: 500 0.8125rem var(--font-sans);
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--surface-high);
+}
+
+.item.danger {
+  color: var(--danger);
+}
+
+.item.danger:hover {
+  background: var(--danger-bg);
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.item:hover .icon {
+  color: currentColor;
+}
+
+.shortcut {
+  color: var(--text-3);
+  font: 500 0.625rem var(--font-mono);
+}
+
+.chevron {
+  color: var(--text-3);
+  font: 600 0.875rem / 1 var(--font-sans);
+}
