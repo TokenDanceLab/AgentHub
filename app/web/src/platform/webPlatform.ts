@@ -2,8 +2,19 @@ import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@s
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { AgentInfo } from '@shared/types';
+import { createHubClient, type HubClient, type PendingAgentTask, type SendMessageResponse } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
 import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
+
+type WebRunHubClient = Pick<HubClient, 'sendMessage' | 'triggerAgentTask'>;
+
+export interface WebPlatformOptions {
+  hubClient?: WebRunHubClient;
+  createClientMessageId?: () => string;
+}
+
+const defaultHubClient = createHubClient({ getToken: getAccessToken });
 
 export const webConversations: WorkbenchConversation[] = [
   {
@@ -120,8 +131,9 @@ export function resolveWebWorkbenchConversations(
   return mapped.length > 0 ? mapped : [webHubEmptyConversation];
 }
 
-export function createWebPlatform(): AgentHubPlatform {
-  const submittedIntents: ComposerIntent[] = [];
+export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPlatform {
+  const hubClient = options.hubClient ?? defaultHubClient;
+  const createClientMessageId = options.createClientMessageId ?? newClientMessageId;
 
   return {
     surface: 'web',
@@ -141,11 +153,97 @@ export function createWebPlatform(): AgentHubPlatform {
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
-        submittedIntents.push(intent);
-        return {
-          intentId: `web-intent-${submittedIntents.length}`,
-        };
+        return submitWebComposerIntent(hubClient, createClientMessageId, intent);
       },
     },
   };
+}
+
+export async function submitWebComposerIntent(
+  hubClient: WebRunHubClient,
+  createClientMessageId: () => string,
+  intent: ComposerIntent,
+): Promise<ComposerSubmitResult> {
+  const mention = intent.mentions[0];
+  if (mention && !mention.runtimeId) {
+    throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
+  }
+
+  const message = await sendComposerMessage(hubClient, createClientMessageId, intent);
+  if (!mention) {
+    return { intentId: message.message_id };
+  }
+
+  const task = await triggerMentionedAgent(hubClient, message.message_id, intent);
+  return { intentId: task.id || message.message_id };
+}
+
+async function sendComposerMessage(
+  hubClient: WebRunHubClient,
+  createClientMessageId: () => string,
+  intent: ComposerIntent,
+): Promise<SendMessageResponse> {
+  return hubClient.sendMessage(intent.conversationId, {
+    client_msg_id: createClientMessageId(),
+    content_type: 'text',
+    content: buildHubComposerPrompt(intent),
+  });
+}
+
+async function triggerMentionedAgent(
+  hubClient: WebRunHubClient,
+  triggerMessageId: string,
+  intent: ComposerIntent,
+): Promise<PendingAgentTask> {
+  const mention = intent.mentions[0];
+  return hubClient.triggerAgentTask(triggerMessageId, {
+    ...(mention?.runtimeId ? { agent_type: mention.runtimeId } : {}),
+    model_params: JSON.stringify(buildHubAgentTaskModelParams(intent)),
+  });
+}
+
+function buildHubComposerPrompt(intent: ComposerIntent): string {
+  const lines = [intent.text.trim()];
+  const attachmentContext = intent.attachments
+    .filter((attachment) => attachment.contentPreview?.trim())
+    .map((attachment) => {
+      const source = attachment.source ? ` (${attachment.source})` : '';
+      return `### ${attachment.name}${source}\n${attachment.contentPreview}`;
+    });
+
+  if (attachmentContext.length > 0) {
+    lines.push('[AgentHub attachments]', attachmentContext.join('\n\n'));
+  }
+
+  return lines.filter(Boolean).join('\n\n');
+}
+
+function buildHubAgentTaskModelParams(intent: ComposerIntent): Record<string, unknown> {
+  return {
+    source: 'web-v4-workbench',
+    mode: intent.mode,
+    approval_mode: intent.approvalMode,
+    ...(intent.workDir ? { work_dir: intent.workDir } : {}),
+    mentions: intent.mentions.map((mention) => ({
+      id: mention.id,
+      label: mention.label,
+      ...(mention.runtimeId ? { runtime_id: mention.runtimeId } : {}),
+      ...(mention.model ? { model: mention.model } : {}),
+    })),
+    attachments: intent.attachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      ...(attachment.source ? { source: attachment.source } : {}),
+      ...(attachment.kind ? { kind: attachment.kind } : {}),
+      ...(attachment.mime ? { mime: attachment.mime } : {}),
+      ...(attachment.truncated != null ? { truncated: attachment.truncated } : {}),
+    })),
+  };
+}
+
+function newClientMessageId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `web-v4-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
