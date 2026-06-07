@@ -23,7 +23,7 @@ export interface IMMessage {
   authority: AuthorityType;
   content: string;
   /** Optional structured blocks for rich rendering (Sprint #2).
-   *  When present, IMBlockRenderer renders blocks instead of parsing content. */
+   *  When present, v4 transcript renderers can consume blocks instead of parsing content. */
   blocks?: MessageBlock[];
   timestamp: string;
   replyToId?: string;
