@@ -27,7 +27,7 @@ export function DesktopChrome({ children }: DesktopChromeProps) {
 
   return (
     <div className={styles.host}>
-      <div className={`${styles.chrome} window-chrome`}>
+      <div className={`${styles.chrome} window-chrome`} data-desktop-window-chrome>
         <div className={styles.drag}>
           <span className={styles.brandMark}>
             <img alt="AgentHub" src={logoUrl} />
