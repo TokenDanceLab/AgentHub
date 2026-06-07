@@ -179,25 +179,14 @@ git diff --check                  # 无冲突标记、无行尾空格
 git status --short --branch       # 确认只改了允许的路径
 ```
 
-### 模型分配策略
+### 并行团队调度策略
 
-> AgentHub 项目专用。这里的 `opus` / `sonnet` / `haiku` 是本地 Claude CLI 路由别名，不等于公开 Claude 模型名；Codex 自带 agent 工具单独建模。dev-loop skill 同步更新。
-> 本轮 Desktop/Web v4 clean rebuild 的代码实现主力是 **GLM-5.1 对应的本地 Claude CLI 路由**。如果用户或网关把某个 alias 重新指向 GLM-5.1，派任务前用 `claude -p ... --output-format json` 或 `claude-subagent` skill 的探针确认实际路由，再写入任务卡；不要按公开模型名猜测。
+> 具体执行口径以仓库级 skill 为准，不在本文件硬编码模型、供应商或本地 alias 映射。
 
-| 入口 | 别名/模型 | 上下文 | 强项 | 优先使用场景 |
-|---|---|---:|---|---|
-| Codex 自带 agent 工具 | GPT-5.5 low/mid | 256k | 前端、看图、UI/视觉判断、常规实现和审查 | 前端 UI、截图对比、局部体验判断、常规 code review |
-| Codex 自带 agent 工具 | GPT-5.5 xhigh | 256k | 最强架构推理和复杂工程设计 | 复杂架构、关键方案、跨模块取舍、主 Agent 复核前的高强度 sidecar |
-| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文 | 大范围阅读、文档整理、roadmap/architecture 归纳、竞品/仓库查找、复杂方案审查 |
-| Claude CLI | **sonnet** = GLM-5.1 | 200k | 强代码和 agentic 能力 | 窄范围代码实现、测试修复、Go/TS 小切片、明确文件集的重构 |
-| Claude CLI | **haiku** = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈 | 快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
-
-- **主 Agent（本 session）**：负责架构设计、规划、分支治理、文档、开发进度管理、整体工程化设计和任务拆解。
-- **Codex GPT-5.5 low/mid**：用于看图、前端 UI、截图对比和常规前端判断。
-- **Codex GPT-5.5 xhigh**：用于复杂架构推理、关键方案和高风险设计复核。
-- **Claude opus**：DeepSeek-V4-Pro，1M 上下文，速度快、强推理，用于长文本、找东西、简单文档、架构整理、大范围归纳和复杂方案审查。
-- **Claude sonnet**：GLM-5.1，200k 上下文，强代码模型，用于明确路径内的代码实现和 focused tests；每次只给必要文件。
-- **Claude haiku**：DeepSeek-V4-Flash，200k 上下文，用于快速检查、轻量 review、日志/文档/小范围 UI 可读性审查，不派它做代码主力。
+- 通用多团队、多 subagent 并行开发、审查、测试和文档同步，读 `.agents/skills/dev-team/SKILL.md`。
+- Codex 专用 Leader/Worker 编队，读 `.agents/skills/dev-team-codex/SKILL.md`。
+- `dev-loop` 仍负责长程单线推进、交叉审查和循环验证；需要并行攻坚时由 `dev-team` 或 `dev-team-codex` 接管分队调度。
+- 每个 subagent 必须有明确写入范围、禁改范围、验证命令和回报格式；主 Agent 负责集成审查和最终验证。
 
 ### Agent 间进度同步
 
@@ -205,7 +194,7 @@ git status --short --branch       # 确认只改了允许的路径
 
 ### 仓库级 Skill
 
-- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`。
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`、`.agents/skills/dev-team-codex/`。
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）默认先读 `.agents/skills/dev-loop/SKILL.md`；本轮 Desktop/Web v4 clean rebuild 是用户明确排除 dev-loop 的例外，按 roadmap/plan 直接推进。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
