@@ -50,7 +50,8 @@ paths:
   # IMPLEMENTED: /v1/health, /v1/events, /v1/projects (GET/POST),
   #   /v1/projects/{projectId} (GET only), /v1/threads (GET/POST),
   #   /v1/threads/{threadId} (GET/PATCH/DELETE), /v1/threads/{threadId}/items,
-  #   /v1/threads/{threadId}/messages, /v1/items/{itemId},
+  #   /v1/threads/{threadId}/messages, /v1/threads/{threadId}/pins,
+  #   /v1/items/{itemId},
   #   /v1/runners (GET only), /v1/agents, /v1/runs (GET/POST),
   #   /v1/runs/{runId} (GET), /v1/runs/{runId}:cancel,
   #   /v1/metrics, /v1/agent-instances (GET only),
@@ -408,6 +409,74 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+
+  /v1/threads/{threadId}/pins:
+    get:
+      tags: [IMProject]
+      operationId: listThreadPins
+      summary: List pinned thread items.
+      description: Returns Edge-local thread pin metadata with each pinned item hydrated when the item still exists.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/ThreadId"
+      responses:
+        "200":
+          description: Pinned items list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadPinListResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [IMProject]
+      operationId: pinThreadItem
+      summary: Pin an item in a thread.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/ThreadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinThreadItemRequest"
+      responses:
+        "201":
+          description: Thread item pin created or updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadPinResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [IMProject]
+      operationId: deleteThreadPin
+      summary: Remove a pinned item from a thread.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/ThreadId"
+        - name: itemId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Thread item pin removed.
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/threads/{threadId}/messages:
     post:
@@ -4892,6 +4961,70 @@ components:
           type: string
           default: user
           description: Message role. Defaults to user when omitted.
+    PinThreadItemRequest:
+      type: object
+      required: [itemId]
+      properties:
+        itemId:
+          type: string
+          minLength: 1
+          description: Thread item id to pin. The item must belong to the target thread.
+        pinnedBy:
+          type: string
+          description: Optional local actor label for audit display.
+    ThreadPin:
+      type: object
+      required: [threadId, itemId, pinnedAt, createdAt, updatedAt]
+      properties:
+        threadId:
+          type: string
+        itemId:
+          type: string
+        pinnedBy:
+          type: string
+        pinnedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ThreadPinResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: string
+          enum: [OK]
+        data:
+          $ref: "#/components/schemas/ThreadPin"
+    ThreadPinListResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: string
+          enum: [OK]
+        data:
+          type: object
+          required: [items, page]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ThreadPinWithItem"
+            page:
+              $ref: "#/components/schemas/PageInfo"
+    ThreadPinWithItem:
+      allOf:
+        - $ref: "#/components/schemas/ThreadPin"
+        - type: object
+          required: [item]
+          properties:
+            item:
+              $ref: "#/components/schemas/Item"
     Item:
       type: object
       required: [itemId, projectId, threadId, type, status, createdAt, updatedAt]

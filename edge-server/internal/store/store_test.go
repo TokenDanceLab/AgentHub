@@ -101,6 +101,56 @@ func TestStoreCreatesThreadMessageItem(t *testing.T) {
 	}
 }
 
+func TestStorePinsThreadItems(t *testing.T) {
+	s := New()
+	_, _ = s.CreateProject("proj_test", "Test Project")
+	thread, _ := s.CreateThread("thread_test", "proj_test", "Test Thread")
+	otherThread, _ := s.CreateThread("thread_other", "proj_test", "Other Thread")
+	item, err := s.CreateThreadMessage("item_msg", thread.ID, "", "hello")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+	if _, err := s.CreateThreadMessage("item_other", otherThread.ID, "", "other"); err != nil {
+		t.Fatalf("CreateThreadMessage other returned error: %v", err)
+	}
+
+	pin, err := s.PinThreadItem(thread.ID, item.ID, "  Delicious233  ")
+	if err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
+	if pin.ThreadID != thread.ID || pin.ItemID != item.ID || pin.PinnedBy != "Delicious233" {
+		t.Fatalf("pin = %#v, want trimmed pinned item metadata", pin)
+	}
+
+	updated, err := s.PinThreadItem(thread.ID, item.ID, "AgentHub")
+	if err != nil {
+		t.Fatalf("PinThreadItem duplicate returned error: %v", err)
+	}
+	if updated.CreatedAt != pin.CreatedAt || updated.PinnedBy != "AgentHub" || updated.UpdatedAt == "" {
+		t.Fatalf("updated pin = %#v, want same CreatedAt and updated metadata", updated)
+	}
+	if pins := s.ListThreadPins(thread.ID); len(pins) != 1 || pins[0].PinnedBy != "AgentHub" {
+		t.Fatalf("ListThreadPins = %#v, want one updated pin", pins)
+	}
+
+	if _, err := s.PinThreadItem("thread_missing", item.ID, "user"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("PinThreadItem missing thread error = %v, want ErrNotFound", err)
+	}
+	if _, err := s.PinThreadItem(thread.ID, "item_other", "user"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("PinThreadItem cross-thread item error = %v, want ErrNotFound", err)
+	}
+
+	if !s.DeleteThreadPin(thread.ID, item.ID) {
+		t.Fatal("DeleteThreadPin returned false")
+	}
+	if pins := s.ListThreadPins(thread.ID); len(pins) != 0 {
+		t.Fatalf("ListThreadPins after delete = %#v, want empty", pins)
+	}
+	if s.DeleteThreadPin(thread.ID, item.ID) {
+		t.Fatal("DeleteThreadPin missing pin returned true")
+	}
+}
+
 func TestStoreRejectsThreadMessageForMissingThread(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_test", "Test Project")
@@ -180,6 +230,9 @@ func TestStoreUpdatesAndDeletesThreads(t *testing.T) {
 	if _, err := s.CreateThreadMessage("item_test", thread.ID, "user", "hello"); err != nil {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
 	}
+	if _, err := s.PinThreadItem(thread.ID, "item_test", "Delicious233"); err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
 
 	title := "Renamed Thread"
 	status := "archived"
@@ -202,6 +255,9 @@ func TestStoreUpdatesAndDeletesThreads(t *testing.T) {
 	}
 	if items := s.ListThreadItems(thread.ID); len(items) != 0 {
 		t.Fatalf("thread items = %#v, want none after delete", items)
+	}
+	if pins := s.ListThreadPins(thread.ID); len(pins) != 0 {
+		t.Fatalf("thread pins = %#v, want none after delete", pins)
 	}
 }
 
@@ -284,6 +340,12 @@ func TestStoreCleanupRunsRemovesExpiredTerminalRunsAndItems(t *testing.T) {
 	addCleanupItem(s, "item_old", "run_old")
 	addCleanupItem(s, "item_recent", "run_recent")
 	addCleanupItem(s, "item_active", "run_active")
+	if _, err := s.PinThreadItem("thread_test", "item_old", "Delicious233"); err != nil {
+		t.Fatalf("PinThreadItem old returned error: %v", err)
+	}
+	if _, err := s.PinThreadItem("thread_test", "item_recent", "Delicious233"); err != nil {
+		t.Fatalf("PinThreadItem recent returned error: %v", err)
+	}
 
 	result := s.CleanupRuns(RunCleanupOptions{
 		Now:         now,
@@ -310,6 +372,10 @@ func TestStoreCleanupRunsRemovesExpiredTerminalRunsAndItems(t *testing.T) {
 	}
 	if _, ok := s.GetItem("item_active"); !ok {
 		t.Fatal("item for active run was removed")
+	}
+	pins := s.ListThreadPins("thread_test")
+	if len(pins) != 1 || pins[0].ItemID != "item_recent" {
+		t.Fatalf("pins after cleanup = %#v, want only recent item pin", pins)
 	}
 }
 
