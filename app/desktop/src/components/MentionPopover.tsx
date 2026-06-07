@@ -21,7 +21,7 @@ function agentToMentionItem(agent: AgentInfo): MentionItem {
     id: `agent:${agent.id}`,
     kind: 'agent',
     label: agent.name,
-    description: agent.description,
+    ...(agent.description ? { description: agent.description } : {}),
     status: agent.status,
     agent,
   };

@@ -58,7 +58,9 @@ const IMContactList = memo(function IMContactList({
   const statusHintLabel = useCallback(
     (contact: IMContact) => {
       if (!contact.statusHint) return contact.lastSeen;
-      const translated = t(contact.statusHint, contact.statusHintParams);
+      const translated = contact.statusHintParams
+        ? t(contact.statusHint, contact.statusHintParams)
+        : t(contact.statusHint);
       if (translated !== contact.statusHint) return translated;
       if (contact.statusHintParams?.seq) return `${contact.statusHint} ${contact.statusHintParams.seq}`;
       return contact.statusHint;
@@ -211,7 +213,7 @@ const IMContactList = memo(function IMContactList({
             <>
               {composeMode === 'private' && hubContacts.length > 0 && (
                 <Select
-                  className={styles.addInput}
+                  {...(styles.addInput ? { className: styles.addInput } : {})}
                   value={targetUserId}
                   onChange={(value) => setTargetUserId(value)}
                   options={[
