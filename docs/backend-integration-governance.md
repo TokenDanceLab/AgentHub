@@ -96,6 +96,7 @@ next: <1-3 steps>
 13. **G2a. Web AgentProfile mutations**：已合入 `dev/delicious233`，提交 `35060823 feat(web): wire agent profile mutations`。范围仅 `app/web` Hub client/mutation hooks、`app/shared` Agents 页 empty/error/saving/create/update/delete 交互和 focused tests；不做 publish/install/market、TeamRun Orchestrator、ExecutionTarget inventory、后端 schema/OpenAPI 硬化、Edge SQL 或真实 CLI/model gate。前端 mapper 继续按当前 Hub 实现发送 JSON string 字段，并过滤 `Hub AgentProfile`、`Hub owner scope`、runtime/model hint 等 UI fallback 文案，避免写回 Hub description/runtime/permission。验证 `app/shared` `AgentHubWorkbench.test.tsx` 29/29、`app/web` focused tests 22/22、Web typecheck、`verify-web-hub-boundary.ps1` 15/15 通过。
 14. **G2b. Backend AgentProfile contract hardening**：已合入 `dev/delicious233`，提交 `5e730169 fix(api): harden agent profile payload contract`。Hub create/update 接受当前 JSON string payload 和 OpenAPI object/array payload，marshal 到现有 JSON string model fields；service updateable fields 增加 type guards，malformed payload 返回 400 而不是 panic；OpenAPI 只记录当前 create/delete 200 OK envelope，不改 handler status 行为。不改 Web/shared mutation 行为，不扩展 publish/install/market，不做 DB migration、Edge SQL、release workflow 或真实 CLI/model gate。验证 handler/service focused、hub-server short、OpenAPI YAML parse、diff check 和冲突标记扫描通过；未运行真实 CLI/model。
 15. **ExecutionTarget contract hardening**：已合入 `dev/delicious233`，提交 `f9fbaf0e fix(api): harden execution target payload contract`。范围仅 Hub `/web/execution-targets` create/update request normalization、handler/service focused tests、OpenAPI request schema 和本文档/roadmap；`workspace_allowlist` 接受 JSON string array 或 OpenAPI array，`capabilities`/`metadata` 接受 JSON string object 或 OpenAPI object，并继续以现有 JSON string model/response 存储返回。空数组/空对象用于清空本地 allowlist/capabilities/metadata；invalid scalar/schema 返回 400。该片不做 DB migration、ExecutionTarget routing 行为迁移、Desktop Edge mapper、Hub Projects、Edge SQL、release workflow、D1b/D2/D3 或真实 CLI/model gate。
+16. **Hub Projects/workspaces P1**：已在 `codex/hub-projects-workspaces` 准备 ready-for-review。范围仅新增 Web-owned Hub `/web/projects` 与 `/web/projects/{id}` list/create/get/update，背后复用现有 owner-scoped `workspaces` 表和 `Workspace` projection `{id,name,description,owner_id,created_at,updated_at}`；list 支持 `pageSize`、`pageCursor` 和 `q` 搜索；create/update 保持当前 Hub 200 OK envelope。该片不实现 delete，不 hard-delete workspace，不加 `deleted_at` 或 migration，不改 Edge-owned `/v1/projects`、Web/shared UI、Desktop Edge mapper、Edge SQL、TeamRun routing、release workflow、D1b/D2/D3 或真实 CLI/model gate。delete/soft-delete 需要先明确 workspace 与 agent_instances/artifacts 的关系和 orphan policy 后另起 proposal。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -103,7 +104,7 @@ next: <1-3 steps>
 
 - **D1a fixture-only CI gate**：已合入 `dev/delicious233`。后续 D1b 只能在新增依赖测试已进入主线且不会让 CI 变红时再拆，并继续断言不含 `-RealCli`、Docker、root `go test ./tests -count=1` 或真实 CLI/auth secret。
 - **D3 real CLI/model gate**：继续 blocked。候选 workflow 缺 GitHub `environment` approval、预算/请求上限控制，且 redaction validation 失败后仍可能上传 artifact；修复前不得合入。
-- **G1/G2a/G2b/ExecutionTarget DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已合入；G2b 后端 AgentProfile request contract hardening 和 OpenAPI 当前行为同步已合入；ExecutionTarget request contract hardening 已合入。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回；G2b 与 ExecutionTarget 不改 Hub schema、Edge store、publish/install、routing 或 market lifecycle。
+- **G1/G2a/G2b/ExecutionTarget/Projects DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已合入；G2b 后端 AgentProfile request contract hardening 和 OpenAPI 当前行为同步已合入；ExecutionTarget request contract hardening 已合入；Hub Projects/workspaces P1 已准备 backend-only ready-for-review。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回；G2b 与 ExecutionTarget 不改 Hub schema、Edge store、publish/install、routing 或 market lifecycle；Projects P1 只做现有 workspaces list/create/get/update，不做 delete/migration。
 - **API/Event contract sync**：`codex/api-event-summary-alias` 已把 Web client 已用的 `/web/agent-tasks/{id}/summary` 声明为 Hub/OpenAPI 兼容 alias，复用既有 `/web/agent-tasks/{id}/events/summary` response contract；`codex/event-contract-docs` 继续做 Edge runtime event 文档/测试漂移收口，不混入 Web UI、Edge pins 或真实 CLI gate。
 - **Runtime adapter roadmap**：Codex `exec --json` adapter 仍是 Phase 1 batch 模式；完整 multi-turn、turn steer/interrupt、approval、subagent 和 diff patch delta 需要后续 Codex app-server 通道，不应在当前能力声明中写成已完成。
 
@@ -129,7 +130,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 | Docs | 无统一 document/artifact store | 定义 `ProjectArtifact` / `DocumentPreview` owner、blob、version、provider、permission |
 | Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已合入 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；G2b 已合入 Hub AgentProfile JSON-like request contract hardening；ExecutionTarget contract hardening 已合入 Hub request normalization；Desktop/Edge runtime inventory、market/install 和 target preference mutation 仍未生产化 | 下一步拆 Hub Projects/workspaces persistence proposal；Desktop Edge runtime mapper、market/install 继续后置 |
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
-| Projects | Project rail 数据和 artifact/workspace 关系未生产化 | 定义 Hub/Edge ownership 和 mutation |
+| Projects | Hub Projects/workspaces P1 已准备 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Project rail 仍未接生产数据，artifact/workspace 关系和 delete/soft-delete policy 未定义 | 主线程 review/merge 后再拆 Web/shared projects data port；delete 需另起 soft-delete/orphan policy proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
 | RightInspector | 默认任务/文件内容来自 demo evidence；client 已调用 artifacts/previews，但 Edge OpenAPI 仍有 planned 项 | 先补 Edge routes 或移除假调用，再接 evidence snapshot |
 
@@ -182,6 +183,6 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 ## 当前下一步
 
 1. G2b 和 ExecutionTarget contract hardening 已合入；对应本地 worktree/branch 已由主负责人清理，后续不得继续扩写。
-2. 当前 backend 候选为 Hub Projects backed by `workspaces` persistence proposal；Edge SQL proposal 或 D1b/D2/D3 gate policy 继续保持独立 proposal，不得混入该片。
+2. 当前 backend ready-for-review 候选为 Hub Projects backed by `workspaces` P1，限定 list/create/get/update；Edge SQL proposal、Projects delete/soft-delete policy 或 D1b/D2/D3 gate policy 继续保持独立 proposal，不得混入该片。
 3. D1b/D2/D3 单独排期；D3 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge。
