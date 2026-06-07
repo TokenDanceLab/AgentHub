@@ -32,9 +32,9 @@
   },
   "peerDependencies": {
     "lucide-react": ">=0.400.0 <2.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-i18next": "^15.0.0"
+    "react": ">=19.2.7",
+    "react-dom": ">=19.2.7",
+    "react-i18next": ">=15.0.0"
   },
   "dependencies": {
     "@pierre/diffs": "^1.1.0-beta.18",
@@ -50,8 +50,8 @@
     "@types/react-dom": "^19.1.0",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.16.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "~5.8.0",
     "vitest": "^4.1.7"
   }
