@@ -1,11 +1,73 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendHubRuntimeEvent,
+  resolveWebWorkbenchContacts,
   resolveWebWorkbenchTranscript,
 } from './useWebWorkbenchModel';
 import { webTranscript } from './webPlatform';
 
 describe('useWebWorkbenchModel helpers', () => {
+  it('maps Hub contacts into shared workbench contacts', () => {
+    expect(resolveWebWorkbenchContacts([
+      {
+        user_id: 'user-1',
+        username: 'alice',
+        nickname: 'Alice Zhang',
+        remark: '产品负责人',
+        online: true,
+        type: 'internal',
+      },
+      {
+        user_id: 'user-2',
+        username: 'bob',
+        nickname: 'Bob',
+        online: false,
+        type: 'external',
+      },
+    ], true)).toMatchObject({
+      members: [
+        {
+          id: 'user-1',
+          name: '产品负责人',
+          initials: '产品',
+          org: 'TokenDance',
+          status: '在线',
+          tag: 'Hub',
+        },
+        {
+          id: 'user-2',
+          name: 'Bob',
+          initials: 'B',
+          org: '外部联系人',
+          status: '离线',
+          tag: 'External',
+        },
+      ],
+      recentShortcuts: ['产品负责人', 'Bob'],
+    });
+  });
+
+  it('keeps demo contacts unless Hub or real mode is active', () => {
+    expect(resolveWebWorkbenchContacts(undefined, false)).toBeUndefined();
+    expect(resolveWebWorkbenchContacts(undefined, false, 'real')).toMatchObject({
+      members: [],
+      recentShortcuts: [],
+    });
+  });
+
+  it('does not render stale Hub contacts when real mode loses Hub readiness', () => {
+    expect(resolveWebWorkbenchContacts([{
+      user_id: 'old-user',
+      username: 'old',
+      nickname: 'Old Contact',
+      online: true,
+      type: 'internal',
+    }], false, 'real')).toMatchObject({
+      members: [],
+      recentShortcuts: [],
+    });
+  });
+
   it('combines Hub messages with live runtime transcript blocks', () => {
     const transcript = resolveWebWorkbenchTranscript(
       true,
