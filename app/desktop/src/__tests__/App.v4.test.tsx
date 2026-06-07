@@ -80,8 +80,8 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
-    expect(screen.getByText('B0 SQLite 迁移任务')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Builder' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Composer input')).toHaveAttribute('placeholder', '发消息给 Builder');
   });
 
   it('uses Edge thread data when Desktop queries return conversations and items', () => {
