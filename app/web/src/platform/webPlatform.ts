@@ -6,6 +6,7 @@ import type { AgentInfo } from '@shared/types';
 import { queryClient as defaultQueryClient } from '@/api/queryClient';
 import {
   createHubClient,
+  type AgentInstance,
   type HubClient,
   type MessageResponse,
   type PendingAgentTask,
@@ -15,7 +16,13 @@ import { getAccessToken } from '@/hooks/useAuth';
 import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
 
-type WebRunHubClient = Pick<HubClient, 'sendMessage' | 'triggerAgentTask'>;
+type WebRunHubClient = Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'>;
+
+interface SessionAgentInstanceBinding {
+  profileId: string;
+  runtimeId: string;
+  agentInstance: AgentInstance;
+}
 
 export interface WebPlatformOptions {
   hubClient?: WebRunHubClient;
@@ -186,6 +193,9 @@ export async function submitWebComposerIntent(
   if (mention && !mention.runtimeId) {
     throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
   }
+  const agentInstance = mention
+    ? await ensureMentionedAgentInstance(hubClient, intent.conversationId, mention, options.queryClient)
+    : undefined;
 
   const clientMessageId = createClientMessageId();
   const optimisticMessage = optimisticHubMessageFromIntent(intent, clientMessageId, options.now?.() ?? new Date().toISOString());
@@ -204,7 +214,7 @@ export async function submitWebComposerIntent(
     return { intentId: message.message_id };
   }
 
-  const task = await triggerMentionedAgent(hubClient, message.message_id, intent);
+  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, intent);
   return { intentId: task.id || message.message_id };
 }
 
@@ -287,14 +297,69 @@ function hubMessagesQueryKey(sessionId: string): [string, string, string] {
   return ['web-v4', 'hub-messages', sessionId];
 }
 
+function sessionAgentBindingsQueryKey(sessionId: string): [string, string, string] {
+  return ['web-v4', 'session-agent-instances', sessionId];
+}
+
+async function ensureMentionedAgentInstance(
+  hubClient: WebRunHubClient,
+  sessionId: string,
+  mention: ComposerIntent['mentions'][number],
+  queryClient: QueryClient | undefined,
+): Promise<AgentInstance> {
+  const runtimeId = mention.runtimeId?.trim();
+  if (!runtimeId) {
+    throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
+  }
+
+  const cached = queryClient
+    ?.getQueryData<SessionAgentInstanceBinding[]>(sessionAgentBindingsQueryKey(sessionId))
+    ?.find((binding) => binding.profileId === mention.id && binding.runtimeId === runtimeId);
+  if (cached?.agentInstance.id) {
+    return cached.agentInstance;
+  }
+
+  const agentInstance = await hubClient.addAgentToSession(sessionId, {
+    agent_type: runtimeId,
+    display_name: mention.label,
+  });
+  if (!agentInstance?.id) {
+    throw new Error(`Hub did not return an agent instance id for "${mention.label}".`);
+  }
+
+  upsertSessionAgentBinding(queryClient, sessionId, {
+    profileId: mention.id,
+    runtimeId,
+    agentInstance,
+  });
+  return agentInstance;
+}
+
+function upsertSessionAgentBinding(
+  queryClient: QueryClient | undefined,
+  sessionId: string,
+  binding: SessionAgentInstanceBinding,
+): void {
+  queryClient?.setQueryData<SessionAgentInstanceBinding[]>(
+    sessionAgentBindingsQueryKey(sessionId),
+    (current = []) => [
+      ...current.filter((item) => item.profileId !== binding.profileId || item.runtimeId !== binding.runtimeId),
+      binding,
+    ],
+  );
+}
+
 async function triggerMentionedAgent(
   hubClient: WebRunHubClient,
   triggerMessageId: string,
+  agentInstanceId: string | undefined,
   intent: ComposerIntent,
 ): Promise<PendingAgentTask> {
-  const mention = intent.mentions[0];
+  if (!agentInstanceId) {
+    throw new Error('Hub did not return an exact agent instance id for dispatch.');
+  }
   return hubClient.triggerAgentTask(triggerMessageId, {
-    ...(mention?.runtimeId ? { agent_type: mention.runtimeId } : {}),
+    agent_instance_id: agentInstanceId,
     model_params: JSON.stringify(buildHubAgentTaskModelParams(intent)),
   });
 }

@@ -181,6 +181,17 @@ export interface AddAgentToSessionRequest {
   display_name: string;
 }
 
+export interface AgentInstance {
+  id: string;
+  agent_type: string;
+  custom_agent_id?: string;
+  session_id: string;
+  inviter_user_id: string;
+  workspace_id?: string;
+  display_name: string;
+  created_at?: string;
+}
+
 export interface PendingAgentTask {
   id: string;
   agent_instance_id: string;
@@ -992,7 +1003,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     /** Add an agent to a session (becomes triggerable by @mentions). */
     addAgentToSession: (sessionId: string, data: AddAgentToSessionRequest) =>
-      request<undefined>(`/client/sessions/${sessionId}/agents`, {
+      request<AgentInstance>(`/client/sessions/${encodeURIComponent(sessionId)}/agents`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
