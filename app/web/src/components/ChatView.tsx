@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, AlertTriangle, ExternalLink, RefreshCcw, Reply } from 'lucide-react';
-import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff, ReplyTarget } from './ChatView.types';
+import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff, ReplyTarget } from '@shared/types/chat';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
 import { CodePreviewCard, DisclosureRow, EmptyState, DeployCard, ArtifactPreview, LinkCard } from '@shared/ui';
@@ -425,11 +425,11 @@ function ApprovalBlock({ block }: { block: Extract<MessageBlock, { kind: 'approv
   return (
     <ApprovalCard
       approvalId={block.approvalId}
-      agentName={block.agentName}
-      toolName={block.toolName}
-      riskLevel={block.riskLevel}
-      status={block.status}
-      timestamp={block.timestamp}
+      agentName={block.agentName ?? ''}
+      toolName={block.toolName ?? ''}
+      riskLevel={block.riskLevel ?? 'low'}
+      status={block.status as 'pending' | 'approved' | 'denied' | 'timeout'}
+      timestamp={block.timestamp ?? ''}
       reason={block.reason}
       decidedBy={block.decidedBy}
       decidedAt={block.decidedAt}

@@ -2,7 +2,7 @@
 // Extended with Trump's IM enhancements (PR #220): recall, read receipts, friend/notification types.
 // Extended with rich message rendering: optional blocks for Tool/Diff/Thinking/Approval (Sprint #2).
 
-import type { MessageBlock } from '../ChatView.types';
+import type { MessageBlock } from '@shared/types/chat';
 
 export type AuthorityType = 'hub' | 'edge' | 'hybrid';
 

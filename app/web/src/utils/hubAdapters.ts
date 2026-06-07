@@ -1,5 +1,5 @@
 import type { Session } from '@/api/hubClient';
-import type { ChatMessage, MessageBlock } from '@/components/ChatView.types';
+import type { ChatMessage, MessageBlock } from '@shared/types/chat';
 import type { ThreadInfo } from '@shared/types';
 
 export interface HubMessageLike {
