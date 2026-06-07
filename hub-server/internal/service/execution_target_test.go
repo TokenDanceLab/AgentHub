@@ -200,3 +200,44 @@ func TestExecutionTargetRejectsInvalidWorkspaceAllowlist(t *testing.T) {
 	})
 	require.Error(t, err)
 }
+
+func TestExecutionTargetUpdateClearsJSONLikeFields(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedExecutionTarget(t, db, "target-1", "owner-1")
+	svc := NewExecutionTargetService(db)
+
+	target, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
+		WorkspaceAllowlist: `[]`,
+		Capabilities:       `{}`,
+		Metadata:           `{}`,
+	})
+	require.NoError(t, err)
+	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
+	require.JSONEq(t, `{}`, target.Capabilities)
+	require.JSONEq(t, `{}`, target.Metadata)
+}
+
+func TestExecutionTargetUpdateRejectsInvalidJSONLikeFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		updates model.ExecutionTarget
+	}{
+		{name: "workspace allowlist object", updates: model.ExecutionTarget{WorkspaceAllowlist: `{"path":"/repo"}`}},
+		{name: "capabilities array", updates: model.ExecutionTarget{Capabilities: `["not-object"]`}},
+		{name: "metadata malformed", updates: model.ExecutionTarget{Metadata: `{not-json}`}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newExecutionTargetTestDB(t)
+			seedExecutionTarget(t, db, "target-1", "owner-1")
+			svc := NewExecutionTargetService(db)
+
+			var err error
+			require.NotPanics(t, func() {
+				_, err = svc.Update(context.Background(), "target-1", "owner-1", &tt.updates)
+			})
+			require.ErrorIs(t, err, errcode.ErrBadRequest)
+		})
+	}
+}
