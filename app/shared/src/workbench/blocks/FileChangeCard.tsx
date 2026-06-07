@@ -2,13 +2,13 @@ import React from 'react';
 import { DesignFileIcon } from '../designIcons';
 import styles from './FileChangeCard.module.css';
 
-interface FileChangeCardProps {
+export interface FileChangeCardProps {
   path: string;
   action: 'created' | 'modified' | 'deleted';
-  additions?: number;
-  deletions?: number;
+  additions?: number | undefined;
+  deletions?: number | undefined;
   /** Optional callback for the "Review" button. When provided the button is rendered. */
-  onReview?: () => void;
+  onReview?: (() => void) | undefined;
 }
 
 export const FileChangeCard: React.FC<FileChangeCardProps> = ({

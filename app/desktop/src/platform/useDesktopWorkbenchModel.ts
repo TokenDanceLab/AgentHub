@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   createWorkbenchDemoStore,
+  normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
@@ -19,10 +20,13 @@ export interface DesktopWorkbenchModel {
 }
 
 const demoStore = createWorkbenchDemoStore();
+const EMPTY_TRANSCRIPT: ReturnType<typeof normalizeThreadItemsToTranscript> = [];
 
 export function useDesktopWorkbenchModel(selectedConversationId?: string): DesktopWorkbenchModel {
-  /* Browser preview (no Tauri) → always use mock data, never fetch API */
-  if (isBrowserPreview()) {
+  const dataMode = getWorkbenchDataMode();
+  const useDemo = dataMode === 'demo' || (dataMode === 'auto' && isBrowserPreview());
+
+  if (useDemo) {
     return useMemo(() => ({
       activeConversationId: selectedConversationId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
       conversations: demoStore.conversations,
@@ -42,7 +46,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const liveTranscript = useDesktopEdgeEvents(activeThread?.threadId, persistedUntilMs);
 
   const conversations = useMemo(() => {
-    if (threads.length === 0) return demoStore.conversations;
+    if (threads.length === 0) return dataMode === 'auto' ? demoStore.conversations : [];
     return threads.map((thread) =>
       threadToConversation(
         thread,
@@ -57,8 +61,13 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     if (persistedTranscript.length > 0 || liveTranscript.length > 0) {
       return [...persistedTranscript, ...liveTranscript];
     }
-    return threads.length === 0 ? resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID) : [];
-  }, [liveTranscript, threadItems, threads.length]);
+    if (threads.length === 0) {
+      return dataMode === 'auto'
+        ? resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID)
+        : EMPTY_TRANSCRIPT;
+    }
+    return [];
+  }, [dataMode, liveTranscript, threadItems, threads.length]);
 
   return {
     activeConversationId,
@@ -72,6 +81,10 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
 /** Browser preview (no Tauri shell) uses mock data for demo fidelity. */
 function isBrowserPreview(): boolean {
   return typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window);
+}
+
+function getWorkbenchDataMode() {
+  return normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
 }
 
 function threadToConversation(thread: ThreadInfo, pins?: ThreadPinInfo[]): WorkbenchConversation {

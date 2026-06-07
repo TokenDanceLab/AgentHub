@@ -15,6 +15,10 @@
   font: 400 0.875rem/1.5 var(--font-sans);
 }
 
+.bubble p {
+  line-height: inherit;
+}
+
 /* Mirrors .user-avatar from design demo */
 .avatar {
   width: 28px;
