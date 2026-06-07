@@ -33,42 +33,70 @@ func NewExecutionTargetHandler(service ExecutionTargetService) *ExecutionTargetH
 }
 
 type createTargetReq struct {
-	Name               string   `json:"name" binding:"required"`
-	TargetType         string   `json:"target_type"`
-	Host               string   `json:"host"`
-	Port               int      `json:"port"`
-	WorkspaceRoot      string   `json:"workspace_root"`
-	WorkspaceAllowlist []string `json:"workspace_allowlist"`
-	TrustLevel         string   `json:"trust_level"`
-	HealthState        string   `json:"health_state"`
-	AuthMethod         string   `json:"auth_method"`
-	DeviceID           string   `json:"device_id"`
-	Capabilities       string   `json:"capabilities"`
-	Metadata           string   `json:"metadata"`
+	Name               string `json:"name" binding:"required"`
+	TargetType         string `json:"target_type"`
+	Host               string `json:"host"`
+	Port               int    `json:"port"`
+	WorkspaceRoot      string `json:"workspace_root"`
+	WorkspaceAllowlist any    `json:"workspace_allowlist"`
+	TrustLevel         string `json:"trust_level"`
+	HealthState        string `json:"health_state"`
+	AuthMethod         string `json:"auth_method"`
+	DeviceID           string `json:"device_id"`
+	Capabilities       any    `json:"capabilities"`
+	Metadata           any    `json:"metadata"`
 }
 
 type updateTargetReq struct {
-	Name               string   `json:"name"`
-	TargetType         string   `json:"target_type"`
-	Host               string   `json:"host"`
-	Port               int      `json:"port"`
-	WorkspaceRoot      string   `json:"workspace_root"`
-	WorkspaceAllowlist []string `json:"workspace_allowlist"`
-	TrustLevel         string   `json:"trust_level"`
-	HealthState        string   `json:"health_state"`
-	AuthMethod         string   `json:"auth_method"`
-	DeviceID           string   `json:"device_id"`
-	Capabilities       string   `json:"capabilities"`
-	Metadata           string   `json:"metadata"`
+	Name               string `json:"name"`
+	TargetType         string `json:"target_type"`
+	Host               string `json:"host"`
+	Port               int    `json:"port"`
+	WorkspaceRoot      string `json:"workspace_root"`
+	WorkspaceAllowlist any    `json:"workspace_allowlist"`
+	TrustLevel         string `json:"trust_level"`
+	HealthState        string `json:"health_state"`
+	AuthMethod         string `json:"auth_method"`
+	DeviceID           string `json:"device_id"`
+	Capabilities       any    `json:"capabilities"`
+	Metadata           any    `json:"metadata"`
 }
 
-func marshalStringArray(values []string) (string, error) {
-	if values == nil {
+func normalizeTargetJSONField(field string, value any, wantObject bool) (string, *errcode.Error) {
+	if value == nil {
 		return "", nil
 	}
-	b, err := json.Marshal(values)
+	if s, ok := value.(string); ok {
+		if s == "" {
+			return "", nil
+		}
+		if wantObject {
+			var obj map[string]any
+			if err := json.Unmarshal([]byte(s), &obj); err != nil {
+				return "", errcode.ErrBadRequest.WithMessage(field + " must be a JSON object")
+			}
+			return s, nil
+		}
+		var arr []any
+		if err := json.Unmarshal([]byte(s), &arr); err != nil {
+			return "", errcode.ErrBadRequest.WithMessage(field + " must be a JSON array")
+		}
+		return s, nil
+	}
+	if wantObject {
+		if _, ok := value.(map[string]any); !ok {
+			return "", errcode.ErrBadRequest.WithMessage(field + " must be a JSON object")
+		}
+	} else {
+		switch value.(type) {
+		case []any, []string:
+		default:
+			return "", errcode.ErrBadRequest.WithMessage(field + " must be a JSON array")
+		}
+	}
+	b, err := json.Marshal(value)
 	if err != nil {
-		return "", err
+		return "", errcode.ErrBadRequest.WithMessage(field + " is not valid JSON")
 	}
 	return string(b), nil
 }
@@ -86,9 +114,19 @@ func (h *ExecutionTargetHandler) CreateTarget(c *gin.Context) {
 		return
 	}
 
-	workspaceAllowlist, err := marshalStringArray(req.WorkspaceAllowlist)
-	if err != nil {
-		Fail(c, errcode.ErrBadRequest)
+	workspaceAllowlist, normErr := normalizeTargetJSONField("workspace_allowlist", req.WorkspaceAllowlist, false)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
+	}
+	capabilities, normErr := normalizeTargetJSONField("capabilities", req.Capabilities, true)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
+	}
+	metadata, normErr := normalizeTargetJSONField("metadata", req.Metadata, true)
+	if normErr != nil {
+		Fail(c, normErr)
 		return
 	}
 
@@ -101,8 +139,8 @@ func (h *ExecutionTargetHandler) CreateTarget(c *gin.Context) {
 		WorkspaceAllowlist: workspaceAllowlist,
 		TrustLevel:         req.TrustLevel,
 		AuthMethod:         req.AuthMethod,
-		Capabilities:       req.Capabilities,
-		Metadata:           req.Metadata,
+		Capabilities:       capabilities,
+		Metadata:           metadata,
 	}
 	if req.DeviceID != "" {
 		target.DeviceID = &req.DeviceID
@@ -168,9 +206,19 @@ func (h *ExecutionTargetHandler) UpdateTarget(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
-	workspaceAllowlist, err := marshalStringArray(req.WorkspaceAllowlist)
-	if err != nil {
-		Fail(c, errcode.ErrBadRequest)
+	workspaceAllowlist, normErr := normalizeTargetJSONField("workspace_allowlist", req.WorkspaceAllowlist, false)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
+	}
+	capabilities, normErr := normalizeTargetJSONField("capabilities", req.Capabilities, true)
+	if normErr != nil {
+		Fail(c, normErr)
+		return
+	}
+	metadata, normErr := normalizeTargetJSONField("metadata", req.Metadata, true)
+	if normErr != nil {
+		Fail(c, normErr)
 		return
 	}
 	updates := model.ExecutionTarget{
@@ -183,8 +231,8 @@ func (h *ExecutionTargetHandler) UpdateTarget(c *gin.Context) {
 		TrustLevel:         req.TrustLevel,
 		HealthState:        req.HealthState,
 		AuthMethod:         req.AuthMethod,
-		Capabilities:       req.Capabilities,
-		Metadata:           req.Metadata,
+		Capabilities:       capabilities,
+		Metadata:           metadata,
 	}
 	if req.DeviceID != "" {
 		updates.DeviceID = &req.DeviceID

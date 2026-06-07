@@ -4859,9 +4859,12 @@ components:
         workspace_root:
           type: string
         workspace_allowlist:
-          type: array
-          items:
-            type: string
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: string
+              description: Hub-compatible JSON string array.
           description: Workspace roots this target may execute inside. Empty keeps the target registered but does not grant remote/cloud workspace routing.
         trust_level:
           type: string
@@ -4873,11 +4876,19 @@ components:
           type: string
           format: uuid
         capabilities:
-          type: string
-          description: JSON object encoded by the current Hub model.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
+              description: Hub-compatible JSON string object.
+          description: Runtime capability metadata. Hub responses keep this field encoded as a JSON string.
         metadata:
-          type: string
-          description: JSON object encoded by the current Hub model.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
+              description: Hub-compatible JSON string object.
+          description: Target metadata. Hub responses keep this field encoded as a JSON string.
     UpdateExecutionTargetRequest:
       type: object
       properties:
@@ -4893,9 +4904,12 @@ components:
         workspace_root:
           type: string
         workspace_allowlist:
-          type: array
-          items:
-            type: string
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: string
+              description: Hub-compatible JSON string array.
           description: Workspace roots this target may execute inside. Empty clears the target-local allowlist.
         trust_level:
           type: string
@@ -4906,11 +4920,19 @@ components:
           type: string
           format: uuid
         capabilities:
-          type: string
-          description: JSON object encoded by the current Hub model.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
+              description: Hub-compatible JSON string object.
+          description: Runtime capability metadata. Empty object clears the target-local capabilities. Hub responses keep this field encoded as a JSON string.
         metadata:
-          type: string
-          description: JSON object encoded by the current Hub model.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: string
+              description: Hub-compatible JSON string object.
+          description: Target metadata. Empty object clears the target-local metadata. Hub responses keep this field encoded as a JSON string.
     AgentProfile:
       type: object
       required: [id, name, runtime_id]
