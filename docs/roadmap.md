@@ -1,148 +1,139 @@
 # AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 08:52 +08:00
+> Last updated: 2026-06-09 07:35 +08:00
 > Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
-> Review branch: `origin/codex/p1-remote-control-integration` at `fd94c54d`
-> Evidence integration branch: `codex/p1-remote-control-evidence-integration`
-> Next-wave integration branch: `codex/p1-next-wave-integration`
-> Active controller integration branch: `codex/p1-critical-evidence-integration`
-> Next candidate tag after accepted merge: `v0.3.0-rc.6`
+> Active integration candidate: `origin/codex/p1-critical-evidence-integration` at `cc13a48e`
+> Current delta: integration is `ahead 73 / behind 0` from stable baseline
+> Next tag candidate after accepted merge only: `v0.3.0-rc.6`
 
-Archived history stays in `docs/archive/roadmap-pre-refresh-20260608-1008.md` and `docs/archive/roadmap-full-history-20260605.md`. This file is the current sprint control board only.
+This file is the sprint control board. Long history is archived in
+`docs/archive/roadmap-pre-refresh-20260608-1008.md` and
+`docs/archive/roadmap-full-history-20260605.md`. Detailed proof remains in
+`docs/audit/`.
 
-## Goal
+## Mission
 
 Ship a usable remote-control loop:
 
 ```text
-Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI/SDK adapter
+Web -> Hub -> registered Desktop target -> Desktop Local Edge sidecar
+    -> CLI/SDK adapter -> Hub events/replay -> Web rendering
 ```
 
-In the current P1 Desktop path, the registered Desktop/Edge target is the Desktop app's Local Edge sidecar boundary, and completed adapter events replay back through Hub.
+Mobile is owned by thread `019ea616-0dbf-7263-a785-87fdb2e9d8a4`; coordinate
+only protocol drift. Web must stay Hub-only. Desktop must execute through the
+Local Edge sidecar. Real TokenDanceID login, real CLI/model spend, public
+deploy, signing, notarization, updater metadata, and release upload remain
+explicit approval gates.
 
-Mobile is owned by the mobile thread. Coordinate only protocol drift. Real TokenDanceID login, real CLI/model spend, public deploy, signing/notarization, updater metadata publication, and release upload remain explicit approval gates.
+## Baseline And Branch Control
 
-## Current State
-
-| Lane | State | Notes |
+| Item | Current truth | Action |
 |---|---|---|
-| Stable baseline | done | `v0.3.0-rc.5` points at `19079563` and must not move. |
-| P1 rc.6 review branch | ready-for-review | `fd94c54d` contains the reviewed rc.6 remote-control slice set. |
-| P1 evidence integration | ready-for-review | Adds reviewed localhost product-loop fixture, Edge SDK JSON replay readiness, Desktop workspace picker UI, duplicate target preflight, Web visual smoke report, unsigned Tauri build report, and Agent SDK integration report. |
-| P1 next-wave integration | testing | Adds Edge CLI approval gate, Edge SQLite readiness report, localhost readiness-only real-services gate, Web real-mode UX closure, LobeHub runtime/tool icons, and Tauri package readiness hardening. |
-| P1 critical evidence integration | active | Adds approved control gates plus live-chain topology guard, local stack readiness runner, Web TeamRun event replay rendering, and Hub-compatible Desktop task bridge proof fields. |
-| Main worktree | quarantined | `D:\Code\TokenDance\AgentHub` is stale/dirty; do not implement there. |
-| Release tag | blocked | Do not push `v0.3.0-rc.6` until release approval; tag push can trigger release workflow. |
+| Stable dev | `origin/dev/delicious233 = 19079563`, tagged `v0.3.0-rc.5` | Keep stable. Do not move tag. |
+| Main worktree | `D:\Code\TokenDance\AgentHub` is stale, behind remote, and dirty | Quarantine. Do not develop or merge there. |
+| Integration candidate | `origin/codex/p1-critical-evidence-integration = cc13a48e` | Review, gate, then merge to dev if accepted. |
+| Next release marker | `v0.3.0-rc.6` | Create only after explicit release approval. |
+| Git maintenance | Auto-gc reports bad tree `fff550960821b6454a476d755465c71d9deaa258` | No destructive repair without approval. |
 
-## Integrated P1 Capabilities
+## What Is Already In The Candidate
 
-| Area | Status | Boundary |
+The integration candidate bundles the reviewed P1 remote-control evidence line:
+
+| Area | Evidence now present | Still not claimed |
 |---|---|---|
-| Edge SQLite preview | integrated | Diff projection and ID collision fix only; full DB migration remains separate. |
-| Localhost smoke harness | integrated | Plan/FixtureOnly/LocalOnly evidence; no real services unless explicitly started. |
-| Localhost product loop | evidence branch | Fixture service chain proves target routing and callback validation with `RealTested=false`. |
-| Desktop Local Edge launch diagnostics | integrated | Token, health URL, stdout/stderr paths, and dry-gate coverage. |
-| Desktop workspace picker | evidence branch | Visible trusted-folder picker delegates authority to Tauri backend. |
-| Desktop target registration | integrated | Owner-scoped `local_edge` target upsert and race hardening. |
-| Web explicit target gate | integrated | Real-mode dispatch requires explicit Hub execution target. |
-| Edge SDK JSON readiness | evidence branch | Fixture JSON replay maps SDK-like events; no real CLI/model execution. |
-| Edge CLI real-run approval gate | next-wave branch | Static approval/readiness verifier only; no real CLI/model execution. |
-| Edge CLI dispatch evidence gate | critical evidence branch | Adds fixture invocation-plan/event replay verifier plus fail-closed observed mode; `real_tested=true` needs approval and correlation evidence. |
-| Edge SQLite readiness | next-wave branch | Planning/readiness report only; production row-first durable store remains separate. |
-| Edge SQLite migration guard | critical evidence branch | Unknown applied migration versions now fail before pending migrations run; production row-first durable store remains separate. |
-| Tauri packaging evidence | evidence branch | Unsigned Windows local build smoke only; no signing/notary/updater/release. |
-| Tauri package readiness polish | next-wave branch | Generated schema cleanliness/deletion gates and post-build readiness evidence; still no signing/notary/release upload. |
-| Tauri package build evidence | critical evidence branch | Local unsigned Windows NSIS setup and portable zip were produced and documented; artifacts remain ignored/uncommitted. |
-| Agent SDK research | evidence branch | Treat OpenAI/Claude SDKs as Edge adapter inputs, not product model. |
-| Agent SDK product path | critical evidence branch | Recommends SDKs as Edge adapter/runtime inputs, provider-neutral custom Agent profiles first, and no SDK rewrite in the 48h sprint. |
-| Localhost real-services readiness | next-wave branch | Explicit opt-in health/topology consistency gate; always `real_tested=false` until observed Hub/Desktop dispatch evidence exists. |
-| Observed localhost dispatch verifier | critical evidence branch | Requires observed Hub/Desktop/Edge chain proof and keeps `real_tested=false` unless observed validation succeeds and approval gate is explicit. |
-| Web real-mode UX | next-wave branch | Target-required dispatch, Hub error/replay states, and non-nested team/run controls. |
-| Web Projects real-mode state | critical evidence branch | Real/signed-out mode now surfaces Hub sign-in requirement instead of silently falling back to mock projects. |
-| Desktop Local Edge readiness UI | critical evidence branch | Settings now distinguishes signed-out/loading/error/offline/missing/degraded/ready target states using exact `deviceId` match and Hub target health. |
-| Login E2E approval harness | critical evidence branch | Offline verifier and Playwright harness fail closed without approval/env, reject token-bearing evidence and direct Local Edge proof, and preserve real-login skip boundary. |
-| Live chain topology verifier | critical evidence branch | Static guard maps Hub/Web/Desktop/Local Edge/adapter surfaces and names remaining live-proof gaps. |
-| Local stack E2E readiness runner | critical evidence branch | Composes fixture/readiness/approved-real gates with safe artifact/evidence roots; no real login/CLI by default. |
-| Web TeamRun event replay rendering | critical evidence branch | Merges Hub event rows with run events and renders CLI/SDK runtime summaries, target IDs, Edge run IDs, tool results, file changes, and failures. |
-| Desktop Hub task bridge proof | critical evidence branch | Desktop fails closed unless Hub dispatch/control carries matching `target_id` and `edge_device_id`; Hub now includes those fields for target-bound dispatch. |
-| Edge SDK JSON contract | critical evidence branch | Provider-neutral fixture contract maps Claude/OpenAI/OpenCode/custom Agent event shapes with recursive redaction and documented no-real-SDK boundary. |
-| Runtime/tool icons | next-wave branch | Shared LobeHub icon component, fallback rendering, and Storybook coverage. |
+| Hub dispatch proof | `agent.dispatch` carries `target_id` and `edge_device_id`; Desktop rejects mismatched proof before handoff | Real deployed multi-device dispatch |
+| Desktop Local Edge readiness | UI distinguishes signed-out/loading/error/offline/missing/degraded/ready using exact `deviceId` and target health | Signed installer or macOS package |
+| Edge CLI/SDK contract | Provider-neutral JSON fixture mapping for Claude/OpenAI/OpenCode/custom Agent shapes, recursive redaction, safe trace refs | Real SDK/model invocation |
+| Web event rendering | TeamRun console renders runtime summaries, target IDs, Edge run IDs, tool results, file changes, and failures | Live selected-run WebSocket proof |
+| Local stack gates | Fixture/readiness/approved-real runner plus live-chain topology verifier | Real login or real CLI by default |
+| Login harness | Approval-gated real login E2E harness with secret redaction and safe artifact roots | Disposable TokenDanceID account proof |
+| Tauri packaging | Unsigned Windows NSIS setup and portable zip evidence report | Signing/notary/updater/release upload |
+| Web Projects state | Real/signed-out mode requires Hub sign-in instead of silently falling back to mock data | Full Projects CRUD UX polish |
 
-## Operating Rules
+## 48h Priority Order
 
-1. Controller owns `docs/roadmap.md`, integration branches, tags, final gates, and worker cleanup.
-2. Workers use isolated `.worktrees/*` branches from the current approved integration base, currently `codex/p1-critical-evidence-integration`.
-3. Workers must not push, merge, tag, edit this roadmap, or touch the dirty main worktree.
-4. Every worker result must include commit SHA, clean status, changed paths, verification, and explicit non-goals.
-5. No SHA plus clean status means not ready. No read-only review means not integrated.
-6. Web remains Hub-only. Web must not call Local Edge, Tauri, or localhost runtime directly.
-7. Desktop must use the Local Edge sidecar for CLI execution. Renderer UI cannot grant host paths by itself.
-8. Real login, real CLI/model, deploy, signing, notarization, and release upload require explicit approval and separate evidence.
-9. Mobile worktrees are owned by the mobile thread; controller only intervenes for protocol drift.
-10. Cleanup reports are advisory until reviewed. Do not delete worktrees while active workers have dirty edits or unique commits.
-
-## Priority Topology
-
-| Priority | Workstream | Parallelism | Gate |
+| Priority | Workstream | Owner mode | Definition of done |
 |---|---|---|---|
-| P0 | Review/merge evidence integration | controller | Do not move `v0.3.0-rc.5`; do not push `v0.3.0-rc.6` tag without release approval. |
-| P1 | Finish next-wave integration | controller | Focused gates for Edge CLI approval, localhost readiness, Web real-mode UX, shared icons, Edge SQLite readiness, and Tauri package readiness. |
-| P1 | Desktop package/install polish | controller | Integrated into next-wave; keep signing/notary/release upload as separate approval slices. |
-| P1 | Web Projects read-through | integrated in critical evidence | Real mode no longer silently falls back to mock projects when Hub is not ready; full Projects CRUD UX remains separate. |
-| P1 | Desktop Local Edge launch flow | integrated in critical evidence | Strict `deviceId`, Local Edge online, Hub target online/healthy, and pagination-aware inventory before readiness. |
-| P1 | Tauri build/package evidence | integrated in critical evidence | Unsigned Windows package evidence recorded; signing/notary/updater metadata/release upload remain blocked. |
-| P1 | Observed real localhost dispatch | integrated in critical evidence | Requires deriving target/dispatch evidence from live Hub/Desktop path, not caller-supplied URLs; failed observed validation keeps `real_tested=false`. |
-| P1 | Login E2E approval harness | integrated in critical evidence | Approval-gated harness only; real TokenDanceID login/live Hub dispatch still needs disposable-account/env approval and evidence. |
-| P1 | Edge real CLI evidence gate | integrated in critical evidence | Default no-spend/fail-closed; observed mode requires approval plus correlation evidence and still runs no real CLI/model by default. |
-| P1 | Live chain topology audit | integrated in critical evidence | Code-grounded map and static verifier for Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK -> Hub replay -> Web render. |
-| P1 | Local stack E2E runner | integrated in critical evidence | Composes readiness gates toward one reproducible local product loop; no real login/CLI by default. |
-| P1 | Web event render sync | integrated in critical evidence | Renders Hub/Edge/CLI events clearly in Web without direct Local Edge calls. |
-| P1 | Desktop Hub task bridge | integrated in critical evidence | Hub dispatch payload now carries target/device proof consumed by Desktop before Local Edge handoff. |
-| P1 | Edge SDK JSON contract | integrated in critical evidence | Provider-neutral JSON event/invocation contract for Claude/OpenAI/OpenCode/custom Agent fixtures; no real SDK/model calls. |
-| P2 | Edge durable store implementation | worker + reviewer | SQLite migration guard is approved; full row-first durable store still separate from CLI execution. |
-| P2 | Agent SDK product integration | integrated in critical evidence | SDK-as-adapter/product-runtime report approved; no code/model calls. |
-| P2 | Public deploy and macOS packaging | worker + reviewer | Separate approval for env, signing/notary, updater metadata, and release upload. |
+| P0 | Merge-gate `p1-critical-evidence-integration` | Controller + reviewer | Read-only review returns no blocker; focused gates pass; branch merges to `dev/delicious233`; no rc.6 tag without approval. |
+| P0 | Local product-loop evidence | Worker + controller | One reproducible local run proves Hub/Web/Desktop/Local Edge/adapter fixture flow and produces sanitized evidence. |
+| P0 | Desktop usable package | Worker | Windows unsigned installer/portable package can launch Desktop, show Hub sign-in state, start/diagnose Local Edge, and preserve logs. |
+| P0 | Web real-mode remote UX | Worker | Web can select a Hub target, dispatch a task, and render replay/error states without mock fallback or direct Local Edge calls. |
+| P1 | Edge durable store alpha | Worker + reviewer | SQLite row-first store covers store contract key paths without regressing FileStore or migration guard. |
+| P1 | SDK/custom Agent product path | Researcher + worker | OpenAI/Claude/OpenCode/custom Agent registration fields and adapter contract are documented and mapped to concrete implementation slices. |
+| P1 | Runtime/tool icons | Worker | LobeHub icons cover major model/runtime/tool brands with fallback and tests. |
+| P1 | Release/deploy gates | Worker + controller | Web build/deploy, Tauri signing/notary/updater, and real CLI spend gates are documented as approval-controlled operations. |
 
-## Active Worktrees
+## Parallel Topology
 
-| Branch | Worktree | Owner | State | Integration rule |
-|---|---|---|---|---|
-| `codex/p1-critical-evidence-integration` | `.worktrees/p1-critical-evidence-integration` | controller | active, clean, pushed at `3d303c0d` | Append only reviewed slices; run integration gates before push. |
-| `codex/p1-web-projects-readthrough` | `.worktrees/p1-web-projects-readthrough` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commit is in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-desktop-edge-launch-flow` | `.worktrees/p1-desktop-edge-launch-flow` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-tauri-build-package-evidence` | `.worktrees/p1-tauri-build-package-evidence` | worker | integrated | Source branch can be cleaned only after final cleanup approval; report is in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-edge-real-cli-evidence` | `.worktrees/p1-edge-real-cli-evidence` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-sdk-integration-product-report` | `.worktrees/p1-sdk-integration-product-report` | worker | integrated | Source branch can be cleaned only after final cleanup approval; report is in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-observed-localhost-dispatch` | `.worktrees/p1-observed-localhost-dispatch` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-login-e2e-approval-harness` | `.worktrees/p1-login-e2e-approval-harness` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-live-chain-topology-audit` | `.worktrees/p1-live-chain-topology-audit` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-local-stack-e2e-runner` | `.worktrees/p1-local-stack-e2e-runner` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-web-event-render-sync` | `.worktrees/p1-web-event-render-sync` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-desktop-hub-task-bridge` | `.worktrees/p1-desktop-hub-task-bridge` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-edge-sdk-json-contract` | `.worktrees/p1-edge-sdk-json-contract` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/worktree-cleanup-audit` | `.worktrees/worktree-cleanup-audit` | worker | blocked | Report inventory must be refreshed before any cleanup decision. |
+Current active delegation wave:
 
-## Verification Queue
+| Agent | Lane | Write scope |
+|---|---|---|
+| P1 integration reviewer | Merge readiness | Read-only. |
+| Edge durable store worker | Edge SQLite alpha | `edge-server/internal/store/**`, edge store audit docs only. |
+| Tauri package worker | Desktop package/runtime evidence | `app/desktop/**`, Tauri scripts/tests/audit docs only. |
+| SDK/custom Agent researcher | Product architecture | Read-only report. |
+| Runtime icon worker | LobeHub icon polish | Shared runtime/icon UI and tests only. |
 
-Run on the active integration branch before push/merge:
+Controller owns this roadmap, integration branches, tags, final gates, cleanup,
+and conflict resolution. Workers must not push, merge, tag, edit this roadmap,
+or touch the dirty main worktree.
+
+## Verification Gates
+
+Run from `D:\Code\TokenDance\AgentHub\.worktrees\p1-critical-evidence-integration`.
+
+Minimum merge-gate:
 
 ```powershell
-git diff --check origin/codex/p1-remote-control-integration...HEAD
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-localhost-product-loop.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-localhost-real-services.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-p0-local-smoke.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\check-local-edge-target-duplicates.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-edge-cli-real-readiness.ps1 -RepoRoot .
-cd hub-server; go test ./internal/handler ./internal/service ./internal/repository -short -count=1
-cd edge-server; go test ./internal/store -short -count=1
-cd edge-server; go test ./internal/adapters ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
-cd app\shared; corepack.cmd pnpm exec vitest run src\workbench\UnifiedComposer.test.tsx src\workbench\AgentHubWorkbench.test.tsx --reporter=dot
-cd app\shared; corepack.cmd pnpm exec vitest run src\ui\RuntimeIcon.test.tsx src\workbench\RuntimeBrandIcon.test.tsx src\ui\ToolTimeline.test.tsx src\workbench\blocks\ToolCardBlock.test.tsx --reporter=dot
-cd app\web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vitest run src\platform\webPlatform.test.ts src\views\TeamRunConsole.test.tsx src\platform\useWebWorkbenchModel.test.ts src\App.test.tsx --reporter=dot
-cd app\desktop; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vitest run src\utils\workspaceStore.test.ts src\components\settings\sections\WorktreeSection.test.tsx src\i18n\locales.test.ts --reporter=dot
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-tauri-package-dry.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
+git diff --check origin/dev/delicious233...HEAD
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-live-chain-topology.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-local-stack-e2e-readiness.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-edge-cli-dispatch-evidence.ps1 -RepoRoot .
+corepack.cmd pnpm --dir app\web typecheck
+corepack.cmd pnpm --dir app\web exec vitest run src\views\TeamRunConsole.test.tsx --reporter=dot
+cd app\desktop
+corepack.cmd pnpm typecheck
+corepack.cmd pnpm exec vitest run src\__tests__\useHubIntegration.test.ts --reporter=dot
 ```
 
-Use precise package-local `pnpm exec vitest run <files>` commands. Workspace-level test commands still expand into unrelated stale tests.
+Expanded gates before `v0.3.0-rc.6` approval:
+
+```powershell
+cd hub-server
+go test ./internal/handler ./internal/service ./internal/repository -short -count=1
+cd ..\edge-server
+go test ./internal/store -short -count=1
+go test ./internal/adapters ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
+cd ..\app\shared
+corepack.cmd pnpm exec vitest run src\ui\RuntimeIcon.test.tsx src\workbench\RuntimeBrandIcon.test.tsx --reporter=dot
+cd ..\desktop
+corepack.cmd pnpm exec vitest run src\utils\workspaceStore.test.ts src\components\settings\sections\WorktreeSection.test.tsx --reporter=dot
+cd ..\..
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-login-e2e-readiness.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
+```
+
+Approved-real gates are separate. They require disposable login credentials,
+explicit real CLI/model approval, sanitized artifact roots, and post-run evidence
+review before any `real_tested=true` claim.
+
+## Open Decisions
+
+| Decision | Default until approved |
+|---|---|
+| Merge `cc13a48e` into `dev/delicious233` | Wait for reviewer and gate evidence. |
+| Push `v0.3.0-rc.6` | Blocked. Needs explicit release approval. |
+| Real TokenDanceID login test | Blocked. Needs disposable account/env approval. |
+| Real OpenAI/Claude/OpenCode invocation | Blocked. Needs spend/API approval and redacted evidence path. |
+| Tauri signing/notary/updater/release upload | Blocked. Needs signing identity and release approval. |
+| Worktree cleanup | Blocked until cleanup audit is refreshed; do not delete unique dirty work. |
+
+## Next Controller Actions
+
+1. Finish read-only review and minimum merge-gate for `cc13a48e`.
+2. Integrate or reject worker outputs by disjoint lane; do not widen scope.
+3. If merge-gate passes, prepare merge instruction for `dev/delicious233`.
+4. After dev merge, decide whether to request `v0.3.0-rc.6` approval.
+5. Start approved local product-loop evidence run before any real spend.
