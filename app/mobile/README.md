@@ -5,11 +5,15 @@ AgentHub Mobile is the secondary client surface for the AgentHub product line. D
 ## Current Scope
 
 - Tauri project: `app/mobile/src-tauri/`
-- Vite dev port: `5174`
+- Vite dev port: `5175` allocation for Mobile v4 planning and QA. Current source config migration from older local values is a separate implementation slice.
 - Android package: `com.agenthub.mobile`
 - Frontend stack: React 19, TypeScript, TanStack Query, `@agenthub/shared`
 - Runtime model: Mobile talks to Hub APIs. It does not start Local Edge or own Desktop runtime orchestration.
 - Hub API host: `https://hub.vectorcontrol.tech` for REST and `wss://hub.vectorcontrol.tech/ws` for WebSocket. The shared client appends `/v1`; `visual:qa` mocks both the current host and the older `api.hub.vectorcontrol.tech` host to keep local browser QA off production CORS.
+
+## Mobile v4 Planning
+
+The Mobile v4 planning source is [docs/mobile-v4-plan.md](docs/mobile-v4-plan.md). It keeps Mobile as a lower-priority planning track: Feishu/Lark IM mobile is the primary interaction reference, Codex mobile chat is the secondary thread/composer reference, remote control is Hub-mediated, `5175` is the Mobile QA boundary, phone and tablet viewports are both required, and shared UI reuse must stay inside the stable cross-platform design-system contract.
 
 ## UI Status
 
