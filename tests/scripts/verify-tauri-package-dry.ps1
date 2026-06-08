@@ -36,6 +36,26 @@ Assert-True ($scriptText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe" -and
 Assert-True ($scriptText -match "agenthub-edge" -and $scriptText -match "<app-data>" -and $scriptText -match "--store-backend") "dry gate checks SQLite app-data sidecar policy"
 Assert-True ($scriptText -match "AgentHub_\$\{desktopVersion\}_x64-setup\.exe" -and $scriptText -match "AgentHub_\$\{desktopVersion\}_x64-portable\.zip") "dry gate names NSIS and portable proof artifacts"
 Assert-True ($scriptText -match "artifact-manifest\.json" -and $scriptText -match "package-dry-report\.json" -and $scriptText -match "Get-FileHash") "dry gate records report and artifact hashes"
+Assert-True ($scriptText -match "repoChildPrefix" -and $scriptText -match "DirectorySeparatorChar") "dry gate uses a path-separator-bounded repo containment check"
+
+$repoParent = Split-Path $RepoRoot -Parent
+$repoLeaf = Split-Path $RepoRoot -Leaf
+$siblingRoot = Join-Path $repoParent "$repoLeaf-sibling-$([Guid]::NewGuid().ToString('N'))"
+$siblingArtifactRoot = Join-Path $siblingRoot "delete-me"
+$siblingSentinel = Join-Path $siblingArtifactRoot "sentinel.txt"
+New-Item -ItemType Directory $siblingArtifactRoot -Force | Out-Null
+"must-not-delete" | Out-File $siblingSentinel -Encoding UTF8
+try {
+    $siblingOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -RepoRoot $RepoRoot -ArtifactsRoot $siblingArtifactRoot -SkipInstall -SkipExecutableCompile 2>&1 | Out-String
+    Assert-True ($LASTEXITCODE -ne 0) "dry gate rejects sibling absolute artifact root" $siblingOutput
+    Assert-True (Test-Path -LiteralPath $siblingSentinel) "dry gate does not delete sibling artifact root contents"
+    Assert-True ($siblingOutput -match "stays inside repo worktree") "sibling rejection names repo containment boundary" $siblingOutput
+}
+finally {
+    if (Test-Path -LiteralPath $siblingRoot) {
+        Remove-Item -LiteralPath $siblingRoot -Recurse -Force
+    }
+}
 
 $artifactRoot = Join-Path $RepoRoot ".tmp\test-tauri-package-dry"
 if (Test-Path -LiteralPath $artifactRoot) {
