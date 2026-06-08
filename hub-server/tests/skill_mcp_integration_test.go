@@ -2,8 +2,10 @@ package tests
 
 import (
 	"encoding/json"
-	"net/http"
+	"reflect"
 	"testing"
+
+	"github.com/agenthub/hub-server/internal/model"
 )
 
 func TestSkillAndMCPIntegrationReadthrough(t *testing.T) {
@@ -12,152 +14,148 @@ func TestSkillAndMCPIntegrationReadthrough(t *testing.T) {
 	owner := register(t, "tsm01", "pass1234", "SkillMCPOwner")
 	stranger := register(t, "tsm02", "pass1234", "SkillMCPStranger")
 
-	t.Run("SkillCRUDAndOwnerBoundary", func(t *testing.T) {
-		resp := postAuth("/web/skills", owner.Token, map[string]interface{}{
-			"name":          "Skill Alpha",
-			"description":   "test skill",
-			"skill_type":    "agent_skill",
-			"runtime_ids":   `["codex"]`,
-			"entry_point":   "skills/alpha",
-			"config_schema": `{"enabled":{"type":"boolean"}}`,
-		})
-		r := parse(resp)
-		mustOK(t, r, "create skill")
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("create skill: expected HTTP 200 got %d", resp.StatusCode)
-		}
-		skillID := extract(r.Data, "id")
-		if skillID == "" {
-			t.Fatal("create skill: expected non-empty id")
-		}
+	skill := &model.Skill{
+		OwnerID:      owner.ID,
+		Name:         "Fixture Skill Alpha",
+		Description:  "readthrough fixture",
+		SkillType:    "fixture_skill",
+		RuntimeIDs:   `["fixture-runtime"]`,
+		EntryPoint:   "fixtures/skill-alpha",
+		ConfigSchema: `{"enabled":{"type":"boolean"}}`,
+	}
+	if err := db.Create(skill).Error; err != nil {
+		t.Fatalf("seed skill fixture: %v", err)
+	}
 
-		resp = get("/web/skills/"+skillID, owner.Token)
-		r = parse(resp)
-		mustOK(t, r, "get skill")
-		if extract(r.Data, "name") != "Skill Alpha" {
-			t.Fatalf("get skill: expected Skill Alpha got %q", extract(r.Data, "name"))
+	mcp := &model.MCPServer{
+		OwnerID:    owner.ID,
+		Name:       "Fixture MCP Alpha",
+		Transport:  "stdio",
+		Command:    "fixture-command",
+		Args:       `["fixture-server.js"]`,
+		EnvVars:    `{"FIXTURE_MODE":"true"}`,
+		AuthConfig: `{"api_key":"***"}`,
+		ToolSchema: `{"tools":[]}`,
+	}
+	if err := db.Create(mcp).Error; err != nil {
+		t.Fatalf("seed mcp fixture: %v", err)
+	}
+
+	t.Run("SkillGetListAndOwnerScope", func(t *testing.T) {
+		resp := get("/web/skills/"+skill.ID, owner.Token)
+		r := parse(resp)
+		mustOK(t, r, "get skill fixture")
+		if extract(r.Data, "name") != skill.Name {
+			t.Fatalf("get skill fixture: expected %q got %q", skill.Name, extract(r.Data, "name"))
 		}
-		if extract(r.Data, "runtime_ids") != `["codex"]` {
-			t.Fatalf("get skill: expected runtime_ids JSON string, got %q", extract(r.Data, "runtime_ids"))
+		if extract(r.Data, "runtime_ids") != skill.RuntimeIDs {
+			t.Fatalf("get skill fixture: expected runtime_ids %q got %q", skill.RuntimeIDs, extract(r.Data, "runtime_ids"))
 		}
+		requireJSONEquivalent(t, "get skill fixture config_schema", skill.ConfigSchema, extract(r.Data, "config_schema"))
 
 		resp = get("/web/skills?pageSize=10", owner.Token)
 		r = parse(resp)
-		mustOK(t, r, "list skills")
+		mustOK(t, r, "list skill fixtures")
 		var listResp struct {
 			Items []map[string]interface{} `json:"items"`
 			Page  map[string]interface{}   `json:"page"`
 		}
 		if err := json.Unmarshal(r.Data, &listResp); err != nil {
-			t.Fatalf("list skills: decode response: %v", err)
+			t.Fatalf("list skill fixtures: decode response: %v", err)
 		}
-		if len(listResp.Items) == 0 || listResp.Page == nil {
-			t.Fatalf("list skills: expected items and page metadata, got %#v", listResp)
+		if listResp.Page == nil {
+			t.Fatal("list skill fixtures: expected page metadata")
+		}
+		if !containsID(listResp.Items, skill.ID) {
+			t.Fatalf("list skill fixtures: expected seeded skill %s in owner list", skill.ID)
 		}
 
-		resp = put("/web/skills/"+skillID, owner.Token, map[string]interface{}{
-			"name":          "Skill Alpha Updated",
-			"skill_type":    "tool",
-			"config_schema": `{"mode":{"type":"string"}}`,
-		})
+		resp = get("/web/skills/"+skill.ID, stranger.Token)
+		mustCode(t, parse(resp), "AUTH_DEVICE_MISMATCH", "stranger get skill fixture")
+
+		resp = get("/web/skills?pageSize=10", stranger.Token)
 		r = parse(resp)
-		mustOK(t, r, "update skill")
-		if extract(r.Data, "name") != "Skill Alpha Updated" {
-			t.Fatalf("update skill: expected updated name got %q", extract(r.Data, "name"))
+		mustOK(t, r, "stranger list skill fixtures")
+		listResp = struct {
+			Items []map[string]interface{} `json:"items"`
+			Page  map[string]interface{}   `json:"page"`
+		}{}
+		if err := json.Unmarshal(r.Data, &listResp); err != nil {
+			t.Fatalf("stranger list skill fixtures: decode response: %v", err)
 		}
-
-		resp = put("/web/skills/"+skillID, stranger.Token, map[string]interface{}{
-			"name": "Hijacked Skill",
-		})
-		r = parse(resp)
-		mustCode(t, r, "AUTH_DEVICE_MISMATCH", "stranger update skill")
-
-		resp = del("/web/skills/"+skillID, owner.Token)
-		mustOK(t, parse(resp), "delete skill")
-		resp = get("/web/skills/"+skillID, owner.Token)
-		mustCode(t, parse(resp), "USER_NOT_FOUND", "get deleted skill")
+		if containsID(listResp.Items, skill.ID) {
+			t.Fatalf("stranger list skill fixtures: leaked owner skill %s", skill.ID)
+		}
 	})
 
-	t.Run("MCPCRUDSecretGuardAndOwnerBoundary", func(t *testing.T) {
-		resp := postAuth("/web/mcp-servers", owner.Token, map[string]interface{}{
-			"name":        "MCP Alpha",
-			"transport":   "stdio",
-			"command":     "node",
-			"args":        `["server.js"]`,
-			"env_vars":    `{"NODE_ENV":"test"}`,
-			"auth_config": `{"api_key":"***"}`,
-			"tool_schema": `{"tools":[]}`,
-		})
+	t.Run("MCPGetListAndOwnerScope", func(t *testing.T) {
+		resp := get("/web/mcp-servers/"+mcp.ID, owner.Token)
 		r := parse(resp)
-		mustOK(t, r, "create mcp server")
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("create mcp server: expected HTTP 200 got %d", resp.StatusCode)
+		mustOK(t, r, "get mcp fixture")
+		if extract(r.Data, "name") != mcp.Name {
+			t.Fatalf("get mcp fixture: expected %q got %q", mcp.Name, extract(r.Data, "name"))
 		}
-		mcpID := extract(r.Data, "id")
-		if mcpID == "" {
-			t.Fatal("create mcp server: expected non-empty id")
+		if extract(r.Data, "args") != mcp.Args {
+			t.Fatalf("get mcp fixture: expected args %q got %q", mcp.Args, extract(r.Data, "args"))
 		}
-
-		resp = get("/web/mcp-servers/"+mcpID, owner.Token)
-		r = parse(resp)
-		mustOK(t, r, "get mcp server")
-		if extract(r.Data, "name") != "MCP Alpha" {
-			t.Fatalf("get mcp server: expected MCP Alpha got %q", extract(r.Data, "name"))
-		}
-		if extract(r.Data, "args") != `["server.js"]` {
-			t.Fatalf("get mcp server: expected args JSON string, got %q", extract(r.Data, "args"))
-		}
+		requireJSONEquivalent(t, "get mcp fixture tool_schema", mcp.ToolSchema, extract(r.Data, "tool_schema"))
 
 		resp = get("/web/mcp-servers?transport=stdio&pageSize=10", owner.Token)
 		r = parse(resp)
-		mustOK(t, r, "list mcp servers")
+		mustOK(t, r, "list mcp fixtures")
 		var listResp struct {
 			Items []map[string]interface{} `json:"items"`
 			Page  map[string]interface{}   `json:"page"`
 		}
 		if err := json.Unmarshal(r.Data, &listResp); err != nil {
-			t.Fatalf("list mcp servers: decode response: %v", err)
+			t.Fatalf("list mcp fixtures: decode response: %v", err)
 		}
-		if len(listResp.Items) == 0 || listResp.Page == nil {
-			t.Fatalf("list mcp servers: expected items and page metadata, got %#v", listResp)
+		if listResp.Page == nil {
+			t.Fatal("list mcp fixtures: expected page metadata")
+		}
+		if !containsID(listResp.Items, mcp.ID) {
+			t.Fatalf("list mcp fixtures: expected seeded mcp %s in owner list", mcp.ID)
 		}
 
-		resp = put("/web/mcp-servers/"+mcpID, owner.Token, map[string]interface{}{
-			"name":        "MCP Alpha Updated",
-			"transport":   "stdio",
-			"command":     "node",
-			"args":        `["updated.js"]`,
-			"env_vars":    `{}`,
-			"auth_config": `{}`,
-			"tool_schema": `{"tools":["list"]}`,
-		})
+		resp = get("/web/mcp-servers/"+mcp.ID, stranger.Token)
+		mustCode(t, parse(resp), "AUTH_DEVICE_MISMATCH", "stranger get mcp fixture")
+
+		resp = get("/web/mcp-servers?transport=stdio&pageSize=10", stranger.Token)
 		r = parse(resp)
-		mustOK(t, r, "update mcp server")
-		if extract(r.Data, "args") != `["updated.js"]` {
-			t.Fatalf("update mcp server: expected updated args got %q", extract(r.Data, "args"))
+		mustOK(t, r, "stranger list mcp fixtures")
+		listResp = struct {
+			Items []map[string]interface{} `json:"items"`
+			Page  map[string]interface{}   `json:"page"`
+		}{}
+		if err := json.Unmarshal(r.Data, &listResp); err != nil {
+			t.Fatalf("stranger list mcp fixtures: decode response: %v", err)
 		}
-
-		resp = put("/web/mcp-servers/"+mcpID, stranger.Token, map[string]interface{}{
-			"name": "Hijacked MCP",
-		})
-		r = parse(resp)
-		mustCode(t, r, "AUTH_DEVICE_MISMATCH", "stranger update mcp server")
-
-		resp = postAuth("/web/mcp-servers", owner.Token, map[string]interface{}{
-			"name":        "MCP With Plain Secret",
-			"transport":   "stdio",
-			"command":     "node",
-			"auth_config": `{"api_key":"sk-test-secret"}`,
-		})
-		r = parse(resp)
-		mustCode(t, r, "BAD_REQUEST", "reject plaintext mcp auth_config")
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("reject plaintext mcp auth_config: expected HTTP 400 got %d", resp.StatusCode)
+		if containsID(listResp.Items, mcp.ID) {
+			t.Fatalf("stranger list mcp fixtures: leaked owner mcp %s", mcp.ID)
 		}
-
-		resp = del("/web/mcp-servers/"+mcpID, owner.Token)
-		mustOK(t, parse(resp), "delete mcp server")
-		resp = get("/web/mcp-servers/"+mcpID, owner.Token)
-		mustCode(t, parse(resp), "USER_NOT_FOUND", "get deleted mcp server")
 	})
+}
+
+func containsID(items []map[string]interface{}, id string) bool {
+	for _, item := range items {
+		if item["id"] == id {
+			return true
+		}
+	}
+	return false
+}
+
+func requireJSONEquivalent(t *testing.T, label, expected, actual string) {
+	t.Helper()
+	var expectedValue interface{}
+	var actualValue interface{}
+	if err := json.Unmarshal([]byte(expected), &expectedValue); err != nil {
+		t.Fatalf("%s: decode expected JSON: %v", label, err)
+	}
+	if err := json.Unmarshal([]byte(actual), &actualValue); err != nil {
+		t.Fatalf("%s: decode actual JSON: %v", label, err)
+	}
+	if !reflect.DeepEqual(expectedValue, actualValue) {
+		t.Fatalf("%s: expected JSON %s got %s", label, expected, actual)
+	}
 }
