@@ -92,6 +92,44 @@ func TestAdminMuxRequiresBasicAuthForMetricsAndPprof(t *testing.T) {
 	}
 }
 
+func TestHubConfigDumperMasksSecrets(t *testing.T) {
+	cfg := &config.Config{
+		Server: config.ServerConfig{Port: 8080, AdminPort: 6060},
+		DB: config.DBConfig{
+			Host:     "db.internal",
+			Port:     5432,
+			Name:     "agenthub",
+			User:     "agenthub_user",
+			Password: "raw-db-password",
+		},
+		Redis: config.RedisConfig{
+			Host:     "redis.internal",
+			Port:     6379,
+			Password: "raw-redis-password",
+		},
+		JWT: config.JWTConfig{
+			Secret: "raw-jwt-secret",
+		},
+	}
+	app := &App{Config: cfg}
+
+	dump := app.hubConfigDumper()()
+
+	require.Equal(t, 8080, dump["server_port"])
+	require.Equal(t, 6060, dump["admin_port"])
+	require.Equal(t, "db.internal", dump["db_host"])
+	require.Equal(t, 5432, dump["db_port"])
+	require.Equal(t, "agenthub", dump["db_name"])
+	require.Equal(t, "agenthub_user", dump["db_user"])
+
+	for _, key := range []string{"db_password", "redis_password", "jwt_secret"} {
+		require.Equal(t, "[REDACTED]", dump[key])
+	}
+	require.NotContains(t, dump, "raw-db-password")
+	require.NotContains(t, dump, "raw-redis-password")
+	require.NotContains(t, dump, "raw-jwt-secret")
+}
+
 // TestOIDCSmoke verifies that when TokenDance ID is configured (ClientID is set),
 // both the OIDC service and handler are non-nil. When ClientID is empty, both
 // should remain nil (OIDC disabled).
