@@ -19,6 +19,7 @@ var _ RunLifecycleStore = (*SQLiteStore)(nil)
 var _ RunCleaner = (*SQLiteStore)(nil)
 
 const sqliteSnapshotKey = "default"
+const sqliteProjectionOwnerID = "agenthub_store_snapshot"
 
 type SQLiteStore struct {
 	db        *sql.DB
@@ -109,12 +110,19 @@ func (s *SQLiteStore) syncPersist() error {
 	s.persistMu.Lock()
 	defer s.persistMu.Unlock()
 
-	payload, err := json.Marshal(s.store.snapshot())
+	snapshot := s.store.snapshot()
+	payload, err := json.Marshal(snapshot)
 	if err != nil {
 		s.lastErr = fmt.Errorf("encode sqlite store snapshot: %w", err)
 		return s.lastErr
 	}
-	_, err = s.db.Exec(
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		s.lastErr = fmt.Errorf("begin sqlite store persist: %w", err)
+		return s.lastErr
+	}
+	_, err = tx.Exec(
 		`INSERT INTO agenthub_store_snapshots (key, payload, updated_at)
 VALUES (?, ?, ?)
 ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
@@ -123,11 +131,163 @@ ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded
 		nowString(),
 	)
 	if err != nil {
+		_ = tx.Rollback()
 		s.lastErr = fmt.Errorf("write sqlite store snapshot: %w", err)
+		return s.lastErr
+	}
+	if err := replaceSQLiteRelationalProjection(tx, snapshot); err != nil {
+		_ = tx.Rollback()
+		s.lastErr = fmt.Errorf("write sqlite relational projection: %w", err)
+		return s.lastErr
+	}
+	if err := tx.Commit(); err != nil {
+		s.lastErr = fmt.Errorf("commit sqlite store persist: %w", err)
 		return s.lastErr
 	}
 	s.lastErr = nil
 	return nil
+}
+
+func replaceSQLiteRelationalProjection(tx *sql.Tx, snapshot fileSnapshot) error {
+	if _, err := tx.Exec(`DELETE FROM edge_owners WHERE owner_id = ?`, sqliteProjectionOwnerID); err != nil {
+		return fmt.Errorf("clear prior projection: %w", err)
+	}
+	now := nowString()
+	if _, err := tx.Exec(
+		`INSERT INTO edge_owners (owner_id, source, display_name, created_at, updated_at)
+VALUES (?, 'snapshot', 'AgentHub snapshot projection', ?, ?)`,
+		sqliteProjectionOwnerID,
+		now,
+		now,
+	); err != nil {
+		return fmt.Errorf("project owner: %w", err)
+	}
+
+	for _, project := range snapshot.Projects {
+		if project.ID == "" {
+			continue
+		}
+		createdAt := firstNonEmpty(project.CreatedAt, now)
+		updatedAt := firstNonEmpty(project.UpdatedAt, createdAt)
+		name := firstNonEmpty(project.Name, project.ID)
+		status := firstNonEmpty(project.Status, "active")
+		if _, err := tx.Exec(
+			`INSERT INTO edge_workspaces (workspace_id, owner_id, local_path, name, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			project.ID,
+			sqliteProjectionOwnerID,
+			project.ID,
+			name,
+			status,
+			createdAt,
+			updatedAt,
+		); err != nil {
+			return fmt.Errorf("project workspace %s: %w", project.ID, err)
+		}
+	}
+
+	for _, run := range snapshot.Runs {
+		if run.ID == "" || run.ProjectID == "" {
+			continue
+		}
+		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
+			continue
+		}
+		createdAt := firstNonEmpty(run.CreatedAt, now)
+		if _, err := tx.Exec(
+			`INSERT INTO edge_runs (run_id, owner_id, workspace_id, thread_id, status, created_at, started_at, finished_at, metadata_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')`,
+			run.ID,
+			sqliteProjectionOwnerID,
+			run.ProjectID,
+			nullString(run.ThreadID),
+			firstNonEmpty(run.Status, "queued"),
+			createdAt,
+			nullString(run.StartedAt),
+			nullString(run.FinishedAt),
+		); err != nil {
+			return fmt.Errorf("run %s: %w", run.ID, err)
+		}
+	}
+
+	for _, artifact := range snapshot.Artifacts {
+		if artifact.ID == "" || artifact.RunID == "" {
+			continue
+		}
+		run, ok := snapshot.Runs[artifact.RunID]
+		if !ok || run.ProjectID == "" {
+			continue
+		}
+		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
+			continue
+		}
+		contentSourceKind, contentSourcePath, contentSourceReadable := sqliteArtifactContentSourceColumns(artifact.ContentSource)
+		metadataJSON, err := sqliteArtifactMetadataJSON(artifact)
+		if err != nil {
+			return fmt.Errorf("artifact metadata %s: %w", artifact.ID, err)
+		}
+		createdAt := firstNonEmpty(artifact.CreatedAt, now)
+		updatedAt := firstNonEmpty(artifact.UpdatedAt, createdAt)
+		if _, err := tx.Exec(
+			`INSERT INTO edge_artifacts (artifact_id, owner_id, workspace_id, run_id, kind, path, status, created_at, updated_at, metadata_json, content_source_kind, content_source_path, content_source_readable)
+VALUES (?, ?, ?, ?, ?, ?, 'created', ?, ?, ?, ?, ?, ?)`,
+			artifact.ID,
+			sqliteProjectionOwnerID,
+			run.ProjectID,
+			artifact.RunID,
+			firstNonEmpty(artifact.Kind, "file"),
+			artifact.Path,
+			createdAt,
+			updatedAt,
+			metadataJSON,
+			contentSourceKind,
+			contentSourcePath,
+			contentSourceReadable,
+		); err != nil {
+			return fmt.Errorf("artifact %s: %w", artifact.ID, err)
+		}
+	}
+
+	return nil
+}
+
+func sqliteArtifactContentSourceColumns(source *ArtifactContentSource) (string, string, int) {
+	if source == nil {
+		return "", "", 0
+	}
+	readable := 0
+	if source.Readable {
+		readable = 1
+	}
+	return source.Kind, source.Path, readable
+}
+
+func sqliteArtifactMetadataJSON(artifact Artifact) (string, error) {
+	payload, err := json.Marshal(struct {
+		SizeBytes int64 `json:"sizeBytes"`
+	}{
+		SizeBytes: artifact.SizeBytes,
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+func nullString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func persistAfterSQLiteWrite[T any](s *SQLiteStore, value T, err error) (T, error) {
