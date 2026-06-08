@@ -92,4 +92,52 @@ describe('createDesktopPlatform', () => {
     expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('command');
     expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('cliPath');
   });
+
+  it('exposes Tauri host readiness without granting UI process spawn inputs', async () => {
+    const platform = createDesktopPlatform({
+      getEdgeHostReadiness: vi.fn().mockResolvedValue({
+        running: false,
+        pid: null,
+        port: 3210,
+        sidecar_name: 'agenthub-edge',
+        target_id: 'local-edge',
+        route: 'local-edge-api',
+        bind_addr: '127.0.0.1:3210',
+        sidecar_args: [
+          '--store-file',
+          '<app-data>/agenthub-edge-store.json',
+          '--addr',
+          '127.0.0.1:3210',
+          '--runner-profile',
+          'claude-code',
+        ],
+        direct_cli_spawn: false,
+      }),
+    });
+
+    const readiness = await platform.host.edgeHostReadiness();
+
+    expect(readiness).toEqual(expect.objectContaining({
+      sidecar_name: 'agenthub-edge',
+      target_id: 'local-edge',
+      route: 'local-edge-api',
+      direct_cli_spawn: false,
+    }));
+    expect(readiness.sidecar_args).toEqual(expect.arrayContaining([
+      '--store-file',
+      '<app-data>/agenthub-edge-store.json',
+      '--addr',
+      '127.0.0.1:3210',
+    ]));
+    expect(readiness.sidecar_args).not.toEqual(expect.arrayContaining([
+      'codex',
+      'codex.exe',
+      'claude',
+      'claude.exe',
+      'opencode',
+      'opencode.exe',
+    ]));
+    expect(readiness).not.toHaveProperty('command');
+    expect(readiness).not.toHaveProperty('cliPath');
+  });
 });
