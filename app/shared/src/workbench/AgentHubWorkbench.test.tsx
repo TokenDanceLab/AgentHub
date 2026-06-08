@@ -882,6 +882,177 @@ describe('AgentHubWorkbench', () => {
     expect(projectScope.getByLabelText('项目名称')).toHaveValue('失败项目');
   });
 
+  it('shows a clear Hub Projects empty-state create gate', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleProjectCreate = vi.fn().mockResolvedValue({
+      id: 'hub-project-new',
+      name: '新 Hub 项目',
+      description: 'Hub workspace',
+      status: 'Hub',
+      meta: '0 runs',
+      members: [],
+      announcement: 'Hub workspace',
+      runs: [],
+      artifacts: [],
+      feed: [],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[]}
+        onProjectCreate={handleProjectCreate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectMain = screen.getByRole('heading', { name: '暂无项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    fireEvent.click(projectScope.getByRole('button', { name: '创建第一个项目' }));
+    fireEvent.change(projectScope.getByLabelText('项目名称'), { target: { value: '新 Hub 项目' } });
+    fireEvent.change(projectScope.getByLabelText('项目描述'), { target: { value: 'Hub workspace' } });
+    fireEvent.click(projectScope.getByRole('button', { name: '创建项目' }));
+
+    await waitFor(() => {
+      expect(handleProjectCreate).toHaveBeenCalledWith({
+        name: '新 Hub 项目',
+        description: 'Hub workspace',
+      });
+    });
+  });
+
+  it('hides Hub Projects create affordances when project creation is unavailable', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+
+    expect(screen.getByRole('heading', { name: '暂无项目' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '新建项目' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '创建第一个项目' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '创建项目' })).not.toBeInTheDocument();
+  });
+
+  it('hides Hub Projects update affordances when project updates are unavailable', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[{
+          id: 'hub-project-1',
+          name: 'Hub 项目',
+          description: 'Hub workspace',
+          status: 'Hub',
+          meta: '0 runs',
+          members: [],
+          announcement: 'Hub workspace',
+          runs: [],
+          artifacts: [],
+          feed: [],
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+
+    const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    expect(projectScope.queryByRole('button', { name: '编辑项目' })).not.toBeInTheDocument();
+    expect(projectScope.queryByRole('button', { name: '保存项目' })).not.toBeInTheDocument();
+  });
+
+  it('submits Hub project updates without exposing delete actions', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleProjectUpdate = vi.fn().mockResolvedValue({
+      id: 'hub-project-1',
+      name: 'Hub 项目更新',
+      description: 'Updated workspace',
+      status: 'Hub',
+      meta: '0 runs',
+      members: [],
+      announcement: 'Updated workspace',
+      runs: [],
+      artifacts: [],
+      feed: [],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[{
+          id: 'hub-project-1',
+          name: 'Hub 项目',
+          description: 'Hub workspace',
+          status: 'Hub',
+          meta: '0 runs',
+          members: [],
+          announcement: 'Hub workspace',
+          runs: [],
+          artifacts: [],
+          feed: [],
+        }]}
+        onProjectUpdate={handleProjectUpdate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    fireEvent.click(projectScope.getByRole('button', { name: '编辑项目' }));
+    fireEvent.change(projectScope.getByLabelText('项目名称'), { target: { value: 'Hub 项目更新' } });
+    fireEvent.change(projectScope.getByLabelText('项目描述'), { target: { value: 'Updated workspace' } });
+    fireEvent.click(projectScope.getByRole('button', { name: '保存项目' }));
+
+    await waitFor(() => {
+      expect(handleProjectUpdate).toHaveBeenCalledWith('hub-project-1', {
+        name: 'Hub 项目更新',
+        description: 'Updated workspace',
+      });
+    });
+    expect(projectScope.queryByRole('button', { name: /删除|delete/i })).not.toBeInTheDocument();
+  });
+
   it('renders supplied Hub AgentProfiles on the Agents rail page instead of mock agents', () => {
     const platform = createMockPlatform({
       surface: 'web',
