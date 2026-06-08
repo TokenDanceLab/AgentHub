@@ -89,17 +89,6 @@ function Test-NonEmpty([string]$Value) {
     return -not [string]::IsNullOrWhiteSpace($Value)
 }
 
-function Test-RepoFilePath([string]$Value) {
-    if (-not (Test-NonEmpty $Value)) {
-        return $false
-    }
-    $path = $Value
-    if (-not [System.IO.Path]::IsPathRooted($path)) {
-        $path = Join-Path $RepoRoot $path
-    }
-    return Test-Path -LiteralPath $path -PathType Leaf
-}
-
 function Add-PrerequisiteResult {
     param(
         [bool]$Condition,
@@ -175,7 +164,12 @@ Add-PrerequisiteResult (Test-NonEmpty $EvidenceMode) "evidence mode is named" "e
 Add-PrerequisiteResult (Test-NonEmpty $OperatorApprovalId) "operator approval id is named" "operator approval missing; provide approval id before RealTested or Submission"
 
 if ($Mode -ne "ProposalOnly") {
-    Add-PrerequisiteResult (Test-RepoFilePath $RealExecutionEvidenceManifest) "real execution evidence manifest file exists" "real execution evidence manifest missing; this static gate cannot prove RealTested or Submission completion"
+    if (Test-NonEmpty $RealExecutionEvidenceManifest) {
+        Warn "real execution evidence manifest parameter was provided but is not validated by this static proposal gate"
+    } else {
+        Warn "real execution evidence manifest missing"
+    }
+    Block "RealTested/Submission require an independent real-run verifier; this static gate cannot prove real CLI/model execution"
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
@@ -192,10 +186,10 @@ if ($Mode -eq "ProposalOnly") {
 
 if ($Failed -gt 0 -or $Blocks -gt 0) {
     Write-Host "Status: BLOCKED_FOR_REAL_EXECUTION" -ForegroundColor Red
-    Write-Host "RealTested/Submission modes require complete approval metadata plus a real execution evidence manifest." -ForegroundColor Red
+    Write-Host "RealTested/Submission modes require a separate approved real-run verifier with redacted evidence." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Status: READY_FOR_APPROVED_RUN" -ForegroundColor Green
-Write-Host "This static gate did not execute any real CLI/model command and does not claim RealTested or Submission completion." -ForegroundColor Green
-exit 0
+Write-Host "Status: BLOCKED_FOR_REAL_EXECUTION" -ForegroundColor Red
+Write-Host "Non-proposal modes are not successful in this static verifier." -ForegroundColor Red
+exit 1
