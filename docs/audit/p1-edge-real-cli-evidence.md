@@ -25,10 +25,16 @@ Observed evidence is only accepted by `scripts/verify-edge-cli-dispatch-evidence
 - an existing approval marker file via `-ApprovalMarker`
 - a redacted JSON manifest via `-ObservedManifest`
 
-The manifest must show:
+The manifest is fail-closed: required scalar fields must be present with the expected JSON type. Missing values and wrong-type values do not coerce to success.
+
+The manifest must show typed execution identity and correlation:
 
 - supported adapter id: `codex`, `claude-code`, or `opencode`
 - approval id
+- `observedEvidenceRef` with a concrete reference prefix such as `edge-event-log:`, `event-log:`, `artifact:`, or `sha256:`
+- `correlationId`
+- `invocationPlanEventId`
+- `terminalEventId`
 - `requestMapped=true`
 - `invocationPlanObserved=true`
 - `eventReplayObserved=true`
@@ -38,7 +44,9 @@ The manifest must show:
 - `terminalStatus=finished`
 - `exitCode=0`
 
-Any missing approval marker, missing manifest field, failed terminal status, nonzero exit code, unsupported adapter, or secret-like manifest content keeps `real_tested=false`. In `RealTested` mode, a failed observed chain exits nonzero and still reports `real_tested=false`.
+Any missing approval marker, missing manifest field, wrong-type required field, missing observed evidence reference, missing correlation field, failed terminal status, nonzero exit code, unsupported adapter, or secret-like manifest content keeps `real_tested=false`. In `RealTested` mode, a failed observed chain exits nonzero and still reports `real_tested=false`.
+
+Boolean-only synthetic manifests are fixture proof only. Even with an approval marker, they remain `real_tested=false` unless they include the concrete observed evidence reference and event correlation fields above.
 
 ## Commands
 
