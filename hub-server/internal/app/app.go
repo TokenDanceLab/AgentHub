@@ -238,6 +238,7 @@ func (a *App) Run(ctx context.Context) error {
 		MaxTeamRunBudgetUsagePct: a.Config.AgentTeam.MaxTeamRunBudgetUsagePct,
 	})
 	a.AgentTeamService.SetControlService(a.AgentControlService)
+	a.AgentTeamService.SetBus(a.bus)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 
 	// Relay service
@@ -582,6 +583,37 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		sessionID := payload["session_id"]
 		a.mgr.PushToSession(sessionID, frame)
 	})
+
+	for _, teamEvent := range []struct {
+		eventType        string
+		frameType        string
+		pushUserIfNoSess bool
+	}{
+		{eventType: "team.run.started", frameType: ws.TypeTeamRunStarted, pushUserIfNoSess: true},
+		{eventType: "team.event", frameType: ws.TypeTeamEvent},
+		{eventType: "team.assignment.completed", frameType: ws.TypeTeamAssignmentDone},
+		{eventType: "team.assignment.failed", frameType: ws.TypeTeamAssignmentFailed},
+	} {
+		teamEvent := teamEvent
+		a.bus.Subscribe(teamEvent.eventType, func(ctx context.Context, event service.Event) {
+			payload, ok := event.Payload.(map[string]interface{})
+			if !ok {
+				return
+			}
+			frame := ws.NewFrame(teamEvent.frameType, payload)
+			sessionID, _ := payload["session_id"].(string)
+			if sessionID != "" {
+				a.mgr.PushToSession(sessionID, frame)
+				return
+			}
+			if teamEvent.pushUserIfNoSess {
+				userID, _ := payload["user_id"].(string)
+				if userID != "" {
+					a.mgr.PushToUser(userID, frame)
+				}
+			}
+		})
+	}
 
 	a.bus.Subscribe("friend.request", func(ctx context.Context, event service.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
