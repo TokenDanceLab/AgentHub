@@ -13,7 +13,7 @@ vi.mock('@lobehub/icons', () => ({
   OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
 }));
 
-vi.mock('@lobehub/icons/es/features/ProviderIcon', () => ({
+vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({
   default: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
 }));
 
@@ -60,7 +60,7 @@ describe('RuntimeBrandIcon', () => {
     });
   });
 
-  it('renders source metadata for tests and visual QA probes', () => {
+  it('renders source metadata for tests', () => {
     render(
       <div>
         <RuntimeBrandIcon kind="runtime" name="Codex" />
