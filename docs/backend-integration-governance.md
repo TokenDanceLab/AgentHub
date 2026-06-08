@@ -1,11 +1,11 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 20:56 +08:00
+> 最后更新：2026-06-08 21:30 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
 
-当前开发事实源是 `dev/delicious233`。`master` 只接收从 `dev/delicious233` 发起的 PR。后端长期线程已关闭并归档，后端旧整合线合并由 backend merge Agent 负责；主负责人只记录合并状态、规划后续依赖和按需派发新的短生命周期 subagent/worktree。关键后端/API/Edge 窄切片已经多批合入，但 `feat/backend-edge-hub` 仍有未吸收提交，因此不能把后端旧整合线视为全部并入主线。
+当前开发事实源是 `dev/delicious233`。`master` 只接收从 `dev/delicious233` 发起的 PR。后端长期线程已关闭并归档，后端旧整合线合并由 backend merge Agent 负责；主负责人只记录合并状态、规划后续依赖和按需派发新的短生命周期 subagent/worktree。关键后端/API/Edge 窄切片已经多批合入，当前有效迁移进入收尾，只剩 WS delivery reliability、remote Edge CORS 这类小片和 real CLI/release/refactor/helper 等延期项；但 `feat/backend-edge-hub` 仍有未吸收提交，因此不能把后端旧整合线视为全部并入主线。
 
 已确认的产品边界：
 
@@ -20,7 +20,7 @@
 
 ## 旧后端分支收口账本
 
-`feat/backend-edge-hub` 仍会被 `git log --cherry-pick --right-only origin/dev/delicious233...feat/backend-edge-hub` 列出大量提交；这不是未完成证明，因为主线采用了语义小片吸收，而不是整提交 cherry-pick。后续 review 以本节和当前代码/测试为准，不恢复旧 `docs/roadmaps/BACKEND-ROADMAP.md`、根级 `HANDOFF-BACKEND-AGENT.md` 或第二套 backend roadmap。
+`feat/backend-edge-hub` 仍会被 `git log --cherry-pick --right-only origin/dev/delicious233...feat/backend-edge-hub` 列出大量提交；这不是未完成证明，因为主线采用了语义小片吸收，而不是整提交 cherry-pick。后续 review 以本节和当前代码/测试为准，不恢复旧 `docs/roadmaps/BACKEND-ROADMAP.md`、根级 `HANDOFF-BACKEND-AGENT.md` 或第二套 backend roadmap。当前收尾只核验 WS delivery reliability、remote Edge CORS 等小片；real CLI、release、refactor/helper 类改动继续延期或另起 proposal。
 
 | 类别 | 处理结论 | 当前证据 |
 |---|---|---|
@@ -154,13 +154,13 @@ next: Main owner reviews the isolated icon diff and decides merge order.
 
 - **D1a fixture-only CI gate**：已合入 `dev/delicious233`。后续 D1b 只能在新增依赖测试已进入主线且不会让 CI 变红时再拆，并继续断言不含 `-RealCli`、Docker、root `go test ./tests -count=1` 或真实 CLI/auth secret。
 - **D3 real CLI/model gate**：继续 blocked。候选 workflow 缺 GitHub `environment` approval、预算/请求上限控制，且 redaction validation 失败后仍可能上传 artifact；修复前不得合入。
-- **G1/G2a/G2b/ExecutionTarget/Projects DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已合入；G2b 后端 AgentProfile request contract hardening 和 OpenAPI 当前行为同步已合入；ExecutionTarget request contract hardening 已合入；Hub Projects/workspaces P1 已合入；Web Projects read-through 已作为 `0c79f277 feat(web): read Hub projects into workbench` 合入并打 `v0.3.0-rc.1` 稳定候选 tag。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回；G2b 与 ExecutionTarget 不改 Hub schema、Edge store、publish/install、routing 或 market lifecycle；Projects P1/read-through 只做现有 workspaces list/create/get/update 与 shared Projects list 数据口，不做 delete/migration。
+- **G1/G2a/G2b/ExecutionTarget/Projects DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已合入；G2b 后端 AgentProfile request contract hardening 和 OpenAPI 当前行为同步已合入；ExecutionTarget request contract hardening 已合入；Hub Projects/workspaces P1 已合入；Web Projects read-through 已作为 `0c79f277 feat(web): read Hub projects into workbench` 合入并打 `v0.3.0-rc.1` 稳定候选 tag；Projects create/update UI gate 已作为 `fd7be0f9 feat(web): 收口 Hub Projects 创建更新 UI gate` 合入。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回；G2b 与 ExecutionTarget 不改 Hub schema、Edge store、publish/install、routing 或 market lifecycle；Projects P1/read-through/create/update UI 只做现有 workspaces list/create/get/update 与 shared Projects 基础交互，不做 delete/migration。
 - **API/Event contract sync**：`codex/api-event-summary-alias` 已把 Web client 已用的 `/web/agent-tasks/{id}/summary` 声明为 Hub/OpenAPI 兼容 alias，复用既有 `/web/agent-tasks/{id}/events/summary` response contract；`codex/event-contract-docs` 继续做 Edge runtime event 文档/测试漂移收口，不混入 Web UI、Edge pins 或真实 CLI gate。
 - **Runtime adapter roadmap**：Codex `exec --json` adapter 仍是 Phase 1 batch 模式；完整 multi-turn、turn steer/interrupt、approval、subagent 和 diff patch delta 需要后续 Codex app-server 通道，不应在当前能力声明中写成已完成。
 
 ## 端到端联调顺序
 
-0. **Shared data contract**：先扩 `AgentHubPlatform` / shared data ports。当前 ports 已覆盖 conversations、run submit、attachments、preview、Contacts 只读 Hub `listContacts()` 和 Web Projects read-through；仍缺 docs、tasks、targets、message actions，以及 Contacts/Projects mutation/error/empty/schema。real mode 禁止静默 demo fallback。
+0. **Shared data contract**：先扩 `AgentHubPlatform` / shared data ports。当前 ports 已覆盖 conversations、run submit、attachments、preview、Contacts 只读 Hub `listContacts()`、Web Projects read-through 和 Projects create/update UI gate；仍缺 docs、tasks、targets、message actions、Contacts mutation/error/empty/schema，以及 Projects delete/soft-delete policy 和 artifact/workspace relationship。real mode 禁止静默 demo fallback。
 1. **Chat 主链路**：Desktop 走 Edge threads/items/runs/events；Web 走 Hub sessions/messages/ws/agent-tasks。
 2. **Agent/Profile/Runtime/Target**：Desktop 接 Edge `/v1/agents` 和 `/v1/model-catalog`；Web 接 Hub `/web/agent-profiles`、`/client/sessions/{id}/agents` 和 ExecutionTarget inventory。
 3. **Hub + Exact Edge routing**：Hub 只能路由到 owner-scoped exact device；目标 Edge 离线、无权限或 workspace 越界时 fail closed。
@@ -180,7 +180,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 | Docs | 无统一 document/artifact store | 定义 `ProjectArtifact` / `DocumentPreview` owner、blob、version、provider、permission |
 | Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已合入 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；G2b 已合入 Hub AgentProfile JSON-like request contract hardening；ExecutionTarget contract hardening 已合入 Hub request normalization；Desktop Edge 首切片已从 Local Edge `/v1/agents`、`/v1/model-catalog` 和 health runners 投影 Workbench agents/Local Edge target，并在 review 修正 StartRunRequest adapter id、provider 字段和 live 空线程 demo fallback；`codex/desktop-target-tauri-host` 正在补 Desktop-owned Local Edge preference 与 Tauri host readiness；market/install 仍未生产化 | 继续验证 Desktop target preference/Tauri host readiness；market/install 后置 |
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
-| Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | Projects create/update UI 排在 Edge SQL、Desktop mapper、登录和安装包基线之后；artifact 关系和 delete/soft-delete 需另起 proposal |
+| Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据；Projects create/update UI gate 已在 `fd7be0f9` 合入；Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | artifact 关系、delete/soft-delete/orphan policy 需另起 proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
 | RightInspector | 默认任务/文件内容仍主要来自 demo/event evidence；Edge 已补 artifact/diff/preview read-only REST 空态/数据合同，runtime evidence 写入已收口，`codex/runtime-evidence-inspector` 已在 shared inspector 增加 read-only snapshot 消费并由 Desktop 复用既有 Edge evidence hook；review blocker 修复覆盖 raw run id、Desktop App v4 harness、artifact metadata 非交互行和 preview 切 tab，已通过 focused gate 复验；`codex/artifact-lifecycle-next` 补单条 artifact/preview metadata lookup；`codex/preview-lifecycle-readiness` 补 stopped metadata transition；preview start/runner、artifact content/apply/discard 和真实 CLI evidence 仍未完成 | Review/merge runtime evidence inspector、metadata lookup 和 stopped transition；下一片 preview runner 只允许 fake runner + Edge API/store/OpenAPI focused tests，artifact apply/discard/content 另拆 |
 
@@ -232,7 +232,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 后端长期线程已关闭；后端旧整合线由 backend merge Agent 继续处理，主负责人不接管该合并，只把结果作为后续 Edge/Desktop/Web/packaging 规划输入。旧 `feat/backend-edge-hub` 和历史 backend worktree 仍需由该合并线确认抽片或清理。
+1. 后端长期线程已关闭；后端旧整合线由 backend merge Agent 继续处理，主负责人不接管该合并，只把结果作为后续 Edge/Desktop/Web/packaging 规划输入。当前有效迁移进入收尾，只剩 WS delivery reliability、remote Edge CORS 这类小片和 real CLI/release/refactor/helper 等延期项；旧 `feat/backend-edge-hub` 整分支不得写成已合并。
 2. `v0.3.0-rc.1` 已打在 `0c79f277`，作为 shared v4 workbench + Hub/Edge 合并基线；Web Projects read-through 已完成并保持 shared `/v1/projects` 与 Desktop/Edge 语义不变。
-3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend、Edge relational migration、Tauri Windows installer/updater metadata readiness、TeamRun dry fixture evidence、Artifact/Diff/Preview read-only endpoints、runtime evidence metadata 写入和 artifact/preview metadata lookup 已合入；`codex/tauri-package-readiness` follow-up 已补 generated artifact ignore gate，待 review；`codex/tauri-installer-smoke` 补 Windows installer smoke preflight，作为完整 dry package build 前的轻量本地/CI 先决条件检查；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge preference 与 Tauri host readiness；`codex/runtime-evidence-inspector` 已补 shared inspector read-only snapshot 消费并完成 review blocker 修复和 focused gate 复验，待 review/merge；`codex/preview-lifecycle-readiness` 只补 preview stopped metadata transition。下一批继续推进 Projects create/update UI、packaged login E2E；Projects delete/soft-delete policy、preview start/runner、artifact content/apply/discard、macOS signing/notarization 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
+3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend、Edge relational migration、Tauri Windows installer/updater metadata readiness、TeamRun dry fixture evidence、Artifact/Diff/Preview read-only endpoints、runtime evidence metadata 写入、artifact/preview metadata lookup 和 Projects create/update UI gate 已合入；`codex/tauri-package-readiness` follow-up 已补 generated artifact ignore gate，待 review；`codex/tauri-installer-smoke` 补 Windows installer smoke preflight，作为完整 dry package build 前的轻量本地/CI 先决条件检查；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge preference 与 Tauri host readiness；`codex/runtime-evidence-inspector` 已补 shared inspector read-only snapshot 消费并完成 review blocker 修复和 focused gate 复验，待 review/merge；`codex/preview-lifecycle-readiness` 只补 preview stopped metadata transition。下一批继续推进 packaged login E2E；Projects delete/soft-delete policy、artifact/workspace relationship、preview start/runner、artifact content/apply/discard、macOS signing/notarization 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge；D3 真实 CLI/model gate 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
