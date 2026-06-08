@@ -20,13 +20,138 @@
     "The exporter must not start services, run agent CLIs, call model APIs, upload artifacts, or claim the final recording.",
     "Runtime identifiers in this fixture are labels for evidence shape coverage, not proof that those runtimes executed."
   ],
+  "remote_control_manifest": {
+    "hubTaskId": "task-supervisor-fixture",
+    "targetId": "target-local-edge-fixture-001",
+    "edgeDeviceId": "desktop-edge-device-fixture-001",
+    "edgeRunId": "edge-run-fixture-001",
+    "adapterId": "codex-fixture-adapter",
+    "mode": "FixtureRehearsal",
+    "startedAt": "2026-06-09T01:30:00+08:00",
+    "eventRefs": [
+      "web:teamrun.start:evt-remote-001",
+      "hub:agent.dispatch:evt-remote-002",
+      "desktop-edge:dispatch.accepted:evt-remote-003",
+      "local-edge:run.started:evt-remote-004",
+      "adapter:run.completed:evt-remote-005",
+      "hub:task.done:evt-remote-006"
+    ],
+    "chain": [
+      {
+        "stage": "web_start",
+        "label": "Web starts TeamRun with target_id",
+        "eventRef": "web:teamrun.start:evt-remote-001"
+      },
+      {
+        "stage": "hub_exact_route",
+        "label": "Hub exact-routes to Desktop/Edge target",
+        "eventRef": "hub:agent.dispatch:evt-remote-002"
+      },
+      {
+        "stage": "desktop_bridge_start",
+        "label": "Desktop bridge starts Local Edge run fixture",
+        "eventRef": "desktop-edge:dispatch.accepted:evt-remote-003"
+      },
+      {
+        "stage": "edge_events_callback",
+        "label": "Edge emits/callbacks fixture events",
+        "eventRef": "local-edge:run.started:evt-remote-004"
+      },
+      {
+        "stage": "adapter_callback_result",
+        "label": "Adapter result/callback is emitted",
+        "eventRef": "adapter:run.completed:evt-remote-005"
+      },
+      {
+        "stage": "hub_replay",
+        "label": "Hub replay records completed fixture chain",
+        "eventRef": "hub:task.done:evt-remote-006"
+      },
+      {
+        "stage": "manifest_validated",
+        "label": "FixtureRehearsal manifest validates",
+        "eventRef": "hub:task.done:evt-remote-006"
+      }
+    ],
+    "redaction": {
+      "status": "not_required",
+      "checkedAt": "2026-06-09T01:35:00+08:00"
+    }
+  },
   "required_evidence_fields": [
     "state",
     "tasks",
     "assignments",
     "events",
     "runtime_profiles",
-    "screenshot_or_video_rehearsal"
+    "screenshot_or_video_rehearsal",
+    "remote_control_manifest",
+    "evidence_matrix"
+  ],
+  "evidence_matrix": [
+    {
+      "requirement_id": "im_or_teamrun_start",
+      "requirement": "IM @Agent or TeamRun start initiates the work.",
+      "fixture_evidence": "evt-remote-001 web.teamrun.start plus TeamRun state teamrun-fixture-001.",
+      "real_tested_requirement": "Capture Web or IM action screenshot and Hub API export for the real start.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "target_id",
+      "requirement": "Start request carries target_id.",
+      "fixture_evidence": "remote_control_manifest.targetId and state.target_id both equal target-local-edge-fixture-001.",
+      "real_tested_requirement": "Real Hub request/export must preserve the selected owner-scoped target_id.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "exact_desktop_edge_device",
+      "requirement": "Hub exact-routes to the recorded Desktop/Edge device.",
+      "fixture_evidence": "remote_control_manifest.edgeDeviceId, state.edge_device_id, task.edge_device_id, and evt-remote-002/003 match desktop-edge-device-fixture-001.",
+      "real_tested_requirement": "Real Hub dispatch and replay logs must prove no fallback to another Desktop device.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "edge_run_id",
+      "requirement": "Desktop bridge starts a Local Edge run and records edge_run_id.",
+      "fixture_evidence": "remote_control_manifest.edgeRunId, task.edge_run_id, evt-remote-004, and evt-remote-006 match edge-run-fixture-001.",
+      "real_tested_requirement": "Real Desktop/Edge logs and Hub state export must show the same edge_run_id.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "adapter_id",
+      "requirement": "Local Edge run names the runtime adapter id.",
+      "fixture_evidence": "remote_control_manifest.adapterId, task.adapter_id, evt-remote-004, and evt-remote-005 match codex-fixture-adapter.",
+      "real_tested_requirement": "Real run must show a supported adapter id such as codex, claude-code, or opencode without fallback.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "route_task_event_replay",
+      "requirement": "Route, task, and event replay expose the same run chain.",
+      "fixture_evidence": "events include run.agent.route_decision, team.route.decided, agent.dispatch, edge.run.started, run.agent.result, and hub.task.done.",
+      "real_tested_requirement": "Real /state, /events, /tasks, and /assignments exports must replay the chain.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "transcript_render_evidence",
+      "requirement": "Transcript/render evidence is represented.",
+      "fixture_evidence": "ui_evidence_capture lists app/desktop/src/__e2e__/teamrun-ui-evidence.spec.ts and transcript/inspector screenshots.",
+      "real_tested_requirement": "Real screenshot/video must show transcript and evidence inspector surfaces.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "artifact_diff_preview",
+      "requirement": "Artifact, diff, or preview evidence is captured when available.",
+      "fixture_evidence": "Fixture declares artifact/diff/preview as not_available in the offline package, so absence is explicit instead of silent.",
+      "real_tested_requirement": "Real package should include artifact, diff, preview, or an explicit not-applicable note with run context.",
+      "mode_label": "FixtureRehearsal"
+    },
+    {
+      "requirement_id": "mode_labels",
+      "requirement": "FixtureRehearsal and RealTested labels remain clear.",
+      "fixture_evidence": "source.fixture_only=true, manifest.mode=FixtureRehearsal, claims keep real_runtime_executed/live_hub_runtime_verified/final_recording_complete/submission_ready false.",
+      "real_tested_requirement": "RealTested requires real_proof refs, real runtime claims, and no fixture_only/mock_only label.",
+      "mode_label": "FixtureRehearsal"
+    }
   ],
   "runtime_profiles": [
     {
@@ -86,6 +211,8 @@
   "state": {
     "team_id": "team-fixture-bytedance",
     "team_run_id": "teamrun-fixture-001",
+    "target_id": "target-local-edge-fixture-001",
+    "edge_device_id": "desktop-edge-device-fixture-001",
     "status": "completed",
     "goal": "Show the minimum TeamRun route from supervisor to worker using fixture-only evidence."
   },
@@ -110,6 +237,10 @@
       "assignment_id": "assign-supervisor-fixture",
       "role": "supervisor",
       "status": "completed",
+      "target_id": "target-local-edge-fixture-001",
+      "edge_device_id": "desktop-edge-device-fixture-001",
+      "edge_run_id": "edge-run-fixture-001",
+      "adapter_id": "codex-fixture-adapter",
       "summary": "Plan and delegate the fixture demo task."
     },
     {
@@ -121,6 +252,52 @@
     }
   ],
   "events": [
+    {
+      "id": "evt-remote-001",
+      "type": "web.teamrun.start",
+      "actor": "web",
+      "team_run_id": "teamrun-fixture-001",
+      "target_id": "target-local-edge-fixture-001"
+    },
+    {
+      "id": "evt-remote-002",
+      "type": "agent.dispatch",
+      "actor": "hub",
+      "task_id": "task-supervisor-fixture",
+      "target_id": "target-local-edge-fixture-001",
+      "edge_device_id": "desktop-edge-device-fixture-001"
+    },
+    {
+      "id": "evt-remote-003",
+      "type": "desktop.edge.dispatch.accepted",
+      "actor": "desktop-edge",
+      "task_id": "task-supervisor-fixture",
+      "target_id": "target-local-edge-fixture-001",
+      "edge_device_id": "desktop-edge-device-fixture-001"
+    },
+    {
+      "id": "evt-remote-004",
+      "type": "edge.run.started",
+      "actor": "local-edge",
+      "task_id": "task-supervisor-fixture",
+      "edge_run_id": "edge-run-fixture-001",
+      "adapter_id": "codex-fixture-adapter"
+    },
+    {
+      "id": "evt-remote-005",
+      "type": "run.agent.result",
+      "actor": "codex-fixture-adapter",
+      "task_id": "task-supervisor-fixture",
+      "edge_run_id": "edge-run-fixture-001",
+      "adapter_id": "codex-fixture-adapter"
+    },
+    {
+      "id": "evt-remote-006",
+      "type": "hub.task.done",
+      "actor": "hub",
+      "task_id": "task-supervisor-fixture",
+      "edge_run_id": "edge-run-fixture-001"
+    },
     {
       "id": "evt-001",
       "type": "agent.dispatch",
@@ -174,6 +351,11 @@
     ],
     "current_assets": [],
     "honesty_note": "No screenshot or video in this fixture proves real runtime execution."
+  },
+  "artifact_diff_preview": {
+    "status": "not_available",
+    "mode": "fixture_rehearsal",
+    "note": "This offline fixture has no generated artifact, diff, or preview. RealTested evidence must include one of those refs or an explicit not-applicable note tied to the run."
   },
   "api_exports_required_for_real_demo": [
     "GET /web/agent-teams/:teamId/runs/:runId/state",
