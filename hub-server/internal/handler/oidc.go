@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -56,12 +57,8 @@ func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
 	result, err := h.service.GenerateAuthorizationURL(c.Request.Context(),
 		req.CodeChallenge, req.CodeChallengeMethod, deviceType, deviceID, strings.TrimSpace(req.RedirectURI))
 	if err != nil {
-		slog.Error("oidc authorize service error", "request_id", middleware.GetRequestID(c), "error", err)
-		if e, ok := err.(*errcode.Error); ok {
-			Fail(c, e)
-			return
-		}
-		Fail(c, errcode.ErrInternal)
+		logOIDCServiceError(c, "oidc authorize service error", err)
+		handleOIDCServiceError(c, err)
 		return
 	}
 	OK(c, result)
@@ -133,15 +130,46 @@ func (h *OIDCHandler) handleCallback(c *gin.Context, code, state, codeVerifier, 
 	result, err := h.service.HandleCallback(c.Request.Context(),
 		code, state, codeVerifier, dt, did, strings.TrimSpace(redirectURI))
 	if err != nil {
-		slog.Error("oidc callback service error", "request_id", middleware.GetRequestID(c), "error", err)
-		if e, ok := err.(*errcode.Error); ok {
-			Fail(c, e)
-			return
-		}
-		Fail(c, errcode.ErrInternal)
+		logOIDCServiceError(c, "oidc callback service error", err)
+		handleOIDCServiceError(c, err)
 		return
 	}
 	OK(c, result)
+}
+
+func logOIDCServiceError(c *gin.Context, message string, err error) {
+	if safeErr := safeOIDCServiceError(err); safeErr != nil {
+		slog.Error(message, "request_id", middleware.GetRequestID(c), "error_code", safeErr.Code)
+		return
+	}
+	slog.Error(message, "request_id", middleware.GetRequestID(c), "error_category", "service_error")
+}
+
+func handleOIDCServiceError(c *gin.Context, err error) {
+	if safeErr := safeOIDCServiceError(err); safeErr != nil {
+		Fail(c, safeErr)
+		return
+	}
+	Fail(c, errcode.ErrInternal)
+}
+
+func safeOIDCServiceError(err error) *errcode.Error {
+	var e *errcode.Error
+	if !errors.As(err, &e) {
+		return nil
+	}
+	switch e.Code {
+	case errcode.OIDCInvalidState.Code:
+		return errcode.OIDCInvalidState
+	case errcode.OIDCCodeExchangeFailed.Code:
+		return errcode.OIDCCodeExchangeFailed
+	case errcode.OIDCIDTokenInvalid.Code:
+		return errcode.OIDCIDTokenInvalid
+	case errcode.OIDCSubNotFound.Code:
+		return errcode.OIDCSubNotFound
+	default:
+		return nil
+	}
 }
 
 func normalizeOIDCDeviceType(value string) (string, bool) {
