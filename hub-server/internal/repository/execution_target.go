@@ -5,12 +5,21 @@ import (
 
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const defaultTargetPageSize = 50
 
 func CreateExecutionTarget(db *gorm.DB, t *model.ExecutionTarget) error {
 	return db.Create(t).Error
+}
+
+func CreateExecutionTargetIfNotExists(db *gorm.DB, t *model.ExecutionTarget) (bool, error) {
+	result := db.Clauses(clause.OnConflict{DoNothing: true}).Create(t)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 func GetExecutionTargetByID(db *gorm.DB, id string) (*model.ExecutionTarget, error) {
