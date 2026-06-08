@@ -802,4 +802,39 @@ func TestOnRouteSetReplaysPendingAgentControlsToExactDevice(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("device B did not replay its control queue")
 	}
+
+	require.Eventually(t, func() bool {
+		remaining, err := cacheClient.ListPendingAgentControlsForDevice(context.Background(), "user-1", "dev-b")
+		require.NoError(t, err)
+		return len(remaining) == 0
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestOnRouteSetKeepsPendingAgentControlsWhenDeliveryBufferFull(t *testing.T) {
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	for i := 0; i < cap(connB.Send); i++ {
+		connB.Send <- []byte("already queued")
+	}
+
+	a := &App{
+		CacheClient: cacheClient,
+		mgr:         mgr,
+		coreCtx:     context.Background(),
+	}
+	const payload = `{"kind":"permission.decide","approval_id":"approval-b"}`
+	require.NoError(t, cacheClient.PushPendingAgentControl(context.Background(), "user-1", "dev-b", payload))
+
+	a.pushPendingAgentControls(context.Background(), "user-1", "dev-b", connB.ID)
+
+	remaining, err := cacheClient.PopPendingAgentControlsForDevice(context.Background(), "user-1", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []string{payload}, remaining)
 }
