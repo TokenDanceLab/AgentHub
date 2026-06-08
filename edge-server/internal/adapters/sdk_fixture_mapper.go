@@ -289,6 +289,7 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 			"success":        success,
 			"summary":        event.Summary,
 			"terminalReason": terminalReasonForSDKEvent(event, success),
+			"reason":         event.Reason,
 			"usage":          sdkUsagePayload(event),
 		})
 		return oneSDKMappedEvent(BusEventResult, scope, payload)
@@ -308,13 +309,13 @@ func commonSDKPayload(event SDKFixtureEvent, provider string, fields map[string]
 		payload["sessionId"] = event.SessionID
 	}
 	if event.TraceID != "" {
-		payload["traceId"] = event.TraceID
+		payload["traceId"] = sanitizeSDKText(event.TraceID)
 	}
 	if len(event.TraceRefs) > 0 {
-		payload["traceRefs"] = append([]string(nil), event.TraceRefs...)
+		payload["traceRefs"] = sanitizeSDKValue(event.TraceRefs)
 	}
 	if len(event.EvidenceRefs) > 0 {
-		payload["evidenceRefs"] = append([]string(nil), event.EvidenceRefs...)
+		payload["evidenceRefs"] = sanitizeSDKValue(event.EvidenceRefs)
 	}
 	if len(event.Metadata) > 0 {
 		payload["metadata"] = sanitizeSDKValue(event.Metadata)
@@ -530,7 +531,7 @@ var (
 	sdkPromptBodyPattern       = regexp.MustCompile(`(?i)\b((?:system[_ -]?prompt|prompt|trace[_ -]?body|tracebody)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^,;\n]+)`)
 	sdkWindowsPathPattern      = regexp.MustCompile(`(?i)[a-z]:[\\/](?:[^\\/\s"]+[\\/])*([^\\/\s"]+)`)
 	sdkPOSIXPathPattern        = regexp.MustCompile(`(^|[\s"'=])/(?:[^/\s"]+/)+([^/\s"]+)`)
-	sdkTokenPattern            = regexp.MustCompile(`(?i)\b(?:sk|ghp|gho|ghu|ghs|glpat|xox[baprs])-[-_a-z0-9]{6,}\b`)
+	sdkTokenPattern            = regexp.MustCompile(`(?i)(^|[^a-z0-9])(?:sk|ghp|gho|ghu|ghs|glpat|xox[baprs])-[-_a-z0-9]{6,}\b`)
 )
 
 func sanitizeSDKText(value string) string {
@@ -541,7 +542,7 @@ func sanitizeSDKText(value string) string {
 	sanitized = sdkBearerPattern.ReplaceAllString(sanitized, "Bearer [redacted-token]")
 	sanitized = sdkSecretAssignmentPattern.ReplaceAllString(sanitized, "${1}[redacted-secret]")
 	sanitized = sdkPromptBodyPattern.ReplaceAllString(sanitized, "${1}[redacted]")
-	sanitized = sdkTokenPattern.ReplaceAllString(sanitized, "[redacted-token]")
+	sanitized = sdkTokenPattern.ReplaceAllString(sanitized, "${1}[redacted-token]")
 	sanitized = sdkWindowsPathPattern.ReplaceAllString(sanitized, "$1")
 	sanitized = sdkPOSIXPathPattern.ReplaceAllString(sanitized, "${1}${2}")
 	return sanitized
