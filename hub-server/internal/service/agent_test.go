@@ -1365,6 +1365,9 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
 	for _, ddl := range []string{
 		`CREATE TABLE sessions (
 			id TEXT PRIMARY KEY,
@@ -1386,6 +1389,13 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 			edited BOOLEAN NOT NULL DEFAULT FALSE,
 			edited_at DATETIME,
 			created_at DATETIME
+		)`,
+		`CREATE TABLE message_pins (
+			session_id TEXT NOT NULL,
+			message_id TEXT NOT NULL,
+			pinned_by_user_id TEXT NOT NULL,
+			pinned_at DATETIME,
+			PRIMARY KEY (session_id, message_id)
 		)`,
 		`CREATE TABLE session_members (
 			id TEXT PRIMARY KEY,

@@ -176,6 +176,27 @@ jobs:
       - name: TeamRun fixture E2E
         run: go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1
 
+  # -- Backend: focused subset, no real CLI/model/services
+  backend-focused-subset:
+    name: Backend focused subset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            hub-server/go.sum
+            edge-server/go.sum
+
+      - name: Hub focused backend packages
+        run: cd hub-server && go test ./internal/repository ./internal/service ./internal/app ./internal/handler ./internal/router -short -count=1
+
+      - name: Edge focused backend packages
+        run: cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
+
   # ── Cross-Platform Build ─────────────────────
   cross-build:
     name: Cross-platform build
