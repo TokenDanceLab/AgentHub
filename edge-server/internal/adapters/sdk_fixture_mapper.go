@@ -302,7 +302,10 @@ func isSDKPathKey(key string) bool {
 		normalized == "filepath" ||
 		normalized == "filename" ||
 		normalized == "workspacepath" ||
-		normalized == "artifactpath"
+		normalized == "artifactpath" ||
+		normalized == "cwd" ||
+		normalized == "workdir" ||
+		strings.HasSuffix(normalized, "path")
 }
 
 func normalizeSDKWorkspacePath(value string) string {

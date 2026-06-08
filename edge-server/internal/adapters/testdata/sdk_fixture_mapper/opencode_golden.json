@@ -1,0 +1,218 @@
+[
+  {
+    "type": "run.agent.session_init",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "metadata": {
+        "sidecar_transport": "http-sse",
+        "workspace_path": "fixture-workspace"
+      },
+      "model": "opencode/gpt-5.1-fixture",
+      "permissionMode": "approval-required",
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_session_1",
+      "tools": [
+        "read",
+        "edit",
+        "bash"
+      ],
+      "traceRefs": [
+        "trace:opencode:session"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.tool_call",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "part_edit_report",
+      "input": {
+        "path": "docs/audit/sdk-adapter-fixture.md"
+      },
+      "metadata": {
+        "title": "Edit fixture report"
+      },
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_tool_running_1",
+      "status": "running",
+      "toolName": "edit"
+    }
+  },
+  {
+    "type": "run.agent.tool_call",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "part_edit_report",
+      "input": {
+        "path": "docs/audit/sdk-adapter-fixture.md"
+      },
+      "metadata": {
+        "api_token": "[redacted]",
+        "durationMs": 42
+      },
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_tool_completed_1",
+      "status": "completed",
+      "toolName": "edit",
+      "traceRefs": [
+        "trace:opencode:tool-edit"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.tool_result",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "attachments": [
+        {
+          "mime": "application/json",
+          "path": "trace.json",
+          "secret": "[redacted]"
+        }
+      ],
+      "callId": "part_edit_report",
+      "content": "updated fixture report",
+      "isError": false,
+      "metadata": {
+        "api_token": "[redacted]",
+        "durationMs": 42
+      },
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_tool_completed_1",
+      "toolName": "edit",
+      "traceRefs": [
+        "trace:opencode:tool-edit"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.permission_requested",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "input": {
+        "command": "go test ./internal/adapters -run SDKFixture -short -count=1"
+      },
+      "provider": "opencode-agent-sdk-fixture",
+      "reason": "OpenCode sidecar requested shell approval",
+      "requestId": "perm_opencode_shell",
+      "riskLevel": "high",
+      "sourceEventId": "opencode_permission_1",
+      "toolName": "bash",
+      "toolUseId": "part_bash"
+    }
+  },
+  {
+    "type": "run.agent.tool_call",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "part_failed_bash",
+      "input": {
+        "command": "exit 1",
+        "cwd": "outside-workspace"
+      },
+      "metadata": {
+        "session_token": "[redacted]",
+        "stderr_path": "stderr.log"
+      },
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_tool_error_1",
+      "status": "error",
+      "toolName": "bash",
+      "traceRefs": [
+        "trace:opencode:tool-error"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.tool_result",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "part_failed_bash",
+      "content": "fixture command failed",
+      "isError": true,
+      "metadata": {
+        "session_token": "[redacted]",
+        "stderr_path": "stderr.log"
+      },
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_tool_error_1",
+      "toolName": "bash",
+      "traceRefs": [
+        "trace:opencode:tool-error"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.status_change",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "metadata": {
+        "mode": "build",
+        "provider": "fixture"
+      },
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_status_1",
+      "status": "idle"
+    }
+  },
+  {
+    "type": "run.agent.result",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "evidenceRefs": [
+        "event:opencode_tool_completed_1"
+      ],
+      "provider": "opencode-agent-sdk-fixture",
+      "sessionId": "opencode_session_1",
+      "sourceEventId": "opencode_result_1",
+      "success": true,
+      "summary": "OpenCode sidecar fixture completed.",
+      "traceRefs": [
+        "trace:opencode:root"
+      ]
+    }
+  }
+]
