@@ -106,14 +106,20 @@ function Assert-SidecarSqlitePolicy {
     Step "Packaged Local Edge SQLite app-data policy"
     $edgeManager = Read-Text "app\desktop\src-tauri\src\edge_manager.rs"
     $commands = Read-Text "app\desktop\src-tauri\src\commands.rs"
+    $lib = Read-Text "app\desktop\src-tauri\src\lib.rs"
+    $useHealth = Read-Text "app\desktop\src\hooks\useHealth.ts"
     $desktopPlatformTest = Read-Text "app\desktop\src\platform\desktopPlatform.test.ts"
 
     Assert-True ($edgeManager -match 'EDGE_STORE_DB_FILE_NAME:\s*&str\s*=\s*"agenthub-edge\.sqlite"') "Edge manager pins the SQLite db filename"
     Assert-True ($edgeManager -match '<app-data>/agenthub-edge\.sqlite') "Readiness exposes only the app-data SQLite placeholder"
     Assert-True ($edgeManager -match '--store-backend' -and $edgeManager -match '"sqlite"' -and $edgeManager -match '--store-db') "Sidecar launch args use explicit sqlite store backend and db path"
     Assert-True ($edgeManager -match 'app_data_dir\(\)' -and $edgeManager -match 'edge_store_db_path') "Packaged sidecar resolves store db under Tauri app data"
-    Assert-True ($commands -match 'get_edge_host_readiness' -and $commands -match 'edge_host_readiness_snapshot') "Tauri command exposes readiness without process-spawn inputs"
-    Assert-True ($desktopPlatformTest -match 'direct_cli_spawn:\s*false' -and $desktopPlatformTest -match '<app-data>/agenthub-edge\.sqlite') "Desktop platform test preserves no direct CLI spawn and app-data SQLite policy"
+    Assert-True ($edgeManager -match 'new_unavailable' -and $lib -match 'Local Edge startup is blocked') "Token generation failure keeps Local Edge fail-closed"
+    Assert-True ($edgeManager -match 'local-edge\.stdout\.log' -and $edgeManager -match 'local-edge\.stderr\.log') "Local Edge stdout/stderr log paths are exposed for diagnostics"
+    Assert-True ($edgeManager -match 'edge_health_url' -and $edgeManager -match '/v1/health') "Local Edge health URL is included in readiness/status"
+    Assert-True ($commands -match 'get_edge_host_readiness' -and $commands -match 'host_readiness_for_app' -and $commands -match 'local_auth_token\(\)\.map') "Tauri commands expose readiness and fail closed on missing Edge auth token"
+    Assert-True ($useHealth -match 'lastError' -and $useHealth -match 'Local Edge health check failed') "Desktop health hook preserves the last Local Edge health error"
+    Assert-True ($desktopPlatformTest -match 'direct_cli_spawn:\s*false' -and $desktopPlatformTest -match '<app-data>/agenthub-edge\.sqlite' -and $desktopPlatformTest -match 'local-edge\.stderr\.log') "Desktop platform test preserves no direct CLI spawn, app-data SQLite policy, and log diagnostics"
 }
 
 $artifactRoot = Reset-ArtifactRoot

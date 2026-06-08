@@ -103,6 +103,13 @@ describe('createDesktopPlatform', () => {
         target_id: 'local-edge',
         route: 'local-edge-api',
         bind_addr: '127.0.0.1:3210',
+        health_url: 'http://127.0.0.1:3210/v1/health',
+        store_db_policy: '<app-data>/agenthub-edge.sqlite',
+        log_paths: {
+          directory: '<app-data>/edge-logs',
+          stdout: '<app-data>/edge-logs/local-edge.stdout.log',
+          stderr: '<app-data>/edge-logs/local-edge.stderr.log',
+        },
         sidecar_args: [
           '--store-backend',
           'sqlite',
@@ -113,6 +120,13 @@ describe('createDesktopPlatform', () => {
           '--runner-profile',
           'claude-code',
         ],
+        preflight: {
+          sidecar_available: false,
+          fallback_executable_available: false,
+          auth_token_ready: true,
+          status: 'blocked',
+          blocker: 'Local Edge sidecar is not bundled and fallback executable is missing',
+        },
         direct_cli_spawn: false,
       }),
     });
@@ -123,7 +137,19 @@ describe('createDesktopPlatform', () => {
       sidecar_name: 'agenthub-edge',
       target_id: 'local-edge',
       route: 'local-edge-api',
+      health_url: 'http://127.0.0.1:3210/v1/health',
+      store_db_policy: '<app-data>/agenthub-edge.sqlite',
       direct_cli_spawn: false,
+    }));
+    expect(readiness.log_paths).toEqual(expect.objectContaining({
+      stdout: '<app-data>/edge-logs/local-edge.stdout.log',
+      stderr: '<app-data>/edge-logs/local-edge.stderr.log',
+    }));
+    expect(readiness.preflight).toEqual(expect.objectContaining({
+      sidecar_available: false,
+      fallback_executable_available: false,
+      auth_token_ready: true,
+      status: 'blocked',
     }));
     expect(readiness.sidecar_args).toEqual(expect.arrayContaining([
       '--store-backend',
