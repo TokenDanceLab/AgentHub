@@ -2,13 +2,19 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestLocalStorage_PutAndGet(t *testing.T) {
@@ -163,6 +169,68 @@ func TestSaveAttachment_StorageInjection(t *testing.T) {
 	}
 }
 
+func TestSaveAttachmentWithMetadata_NormalizesJSONObject(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+
+	hash := strings.Repeat("a", 64)
+	attachment, err := svc.SaveAttachmentWithMetadata(context.Background(), "user-1", hash, "text/plain", "notes.txt", 12, `{
+		"source": "chat",
+		"labels": ["draft", "review"]
+	}`)
+	if err != nil {
+		t.Fatalf("SaveAttachmentWithMetadata() error = %v", err)
+	}
+
+	if attachment.Metadata != `{"labels":["draft","review"],"source":"chat"}` {
+		t.Fatalf("Metadata = %q, want normalized object JSON", attachment.Metadata)
+	}
+
+	var fetched model.Attachment
+	if err := db.First(&fetched, "id = ?", attachment.ID).Error; err != nil {
+		t.Fatalf("fetch attachment: %v", err)
+	}
+	if fetched.Metadata != attachment.Metadata {
+		t.Fatalf("persisted Metadata = %q, want %q", fetched.Metadata, attachment.Metadata)
+	}
+}
+
+func TestSaveAttachmentWithMetadata_RejectsInvalidMetadata(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+
+	hash := strings.Repeat("b", 64)
+	_, err := svc.SaveAttachmentWithMetadata(context.Background(), "user-1", hash, "text/plain", "notes.txt", 12, `["not", "object"]`)
+	if err == nil {
+		t.Fatal("SaveAttachmentWithMetadata() error = nil, want bad request")
+	}
+	var coded *errcode.Error
+	if !errors.As(err, &coded) || coded.Code != errcode.ErrBadRequest.Code {
+		t.Fatalf("SaveAttachmentWithMetadata() error = %v, want %s", err, errcode.ErrBadRequest.Code)
+	}
+
+	var count int64
+	if err := db.Model(&model.Attachment{}).Count(&count).Error; err != nil {
+		t.Fatalf("count attachments: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("attachments count = %d, want 0", count)
+	}
+}
+
+func TestSaveAttachment_DefaultsMetadataToEmptyObject(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+
+	attachment, err := svc.SaveAttachment(context.Background(), "user-1", strings.Repeat("c", 64), "text/plain", "notes.txt", 12)
+	if err != nil {
+		t.Fatalf("SaveAttachment() error = %v", err)
+	}
+	if attachment.Metadata != "{}" {
+		t.Fatalf("Metadata = %q, want {}", attachment.Metadata)
+	}
+}
+
 func TestS3Storage_PutReturnsTrue(t *testing.T) {
 	s3 := service.NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
@@ -205,4 +273,25 @@ func TestS3Storage_PutReturnsFalseWhenBlobAlreadyExists(t *testing.T) {
 	if created {
 		t.Error("S3Storage.Put should return false when the object already exists")
 	}
+}
+
+func newAttachmentServiceTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.Exec(`CREATE TABLE attachments (
+		id TEXT PRIMARY KEY,
+		hash TEXT NOT NULL UNIQUE,
+		size INTEGER NOT NULL,
+		mime_type TEXT NOT NULL,
+		original_name TEXT DEFAULT '',
+		uploader_user_id TEXT NOT NULL,
+		metadata TEXT NOT NULL DEFAULT '{}',
+		created_at DATETIME
+	)`).Error; err != nil {
+		t.Fatalf("create attachments table: %v", err)
+	}
+	return db
 }
