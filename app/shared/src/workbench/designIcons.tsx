@@ -1,9 +1,17 @@
 import React from 'react';
+import {
+  ClaudeCode,
+  Codex,
+  ModelIcon,
+  OpenCode,
+} from '@lobehub/icons';
+import ProviderIcon from '@lobehub/icons/es/features/ProviderIcon';
 import AntigravityIcon from '@lobehub/icons/es/Antigravity/components/Color.js';
 import { siCursor, siGitforwindows, siLinux } from 'simple-icons';
 import androidStudioIcon from 'devicon/icons/androidstudio/androidstudio-original.svg';
 import visualStudioIcon from 'devicon/icons/visualstudio/visualstudio-original.svg';
 import vscodeIcon from 'devicon/icons/vscode/vscode-original.svg';
+import runtimeBrandStyles from './RuntimeBrandIcon.module.css';
 
 export const DESIGN_FILE_ICON_SIZE = 17;
 export const DESIGN_FILE_ICON_RADIUS = 3;
@@ -11,6 +19,68 @@ export const DESIGN_NAV_ICON_SIZE = 16;
 export const DESIGN_NAV_ICON_STROKE_WIDTH = 1.9;
 export const DESIGN_NAV_GLYPH_SIZE = 17;
 export const DESIGN_NAV_GLYPH_STROKE_WIDTH = 1.85;
+
+export type RuntimeBrandIconKind = 'model' | 'provider' | 'runtime' | 'tool';
+
+export type RuntimeBrandIconSize = 'compact' | 'normal' | 'large';
+
+export type RuntimeBrandIconSource = 'lobehub' | 'fallback';
+
+export interface RuntimeBrandIconResolution {
+  kind: RuntimeBrandIconKind;
+  label: string;
+  source: RuntimeBrandIconSource;
+  value: string;
+  fallback: RuntimeFallbackIconName;
+  lobeType?: 'model' | 'provider' | 'runtime';
+}
+
+export interface RuntimeBrandIconProps {
+  kind: RuntimeBrandIconKind;
+  name?: string | undefined;
+  provider?: string | undefined;
+  className?: string | undefined;
+  size?: RuntimeBrandIconSize | undefined;
+  framed?: boolean | undefined;
+  title?: string | undefined;
+}
+
+type RuntimeFallbackIconName =
+  | 'agenthub'
+  | 'browser'
+  | 'diff'
+  | 'model'
+  | 'provider'
+  | 'read'
+  | 'runtime'
+  | 'search'
+  | 'shell'
+  | 'task'
+  | 'tool'
+  | 'write';
+
+const LOBE_RUNTIME_KEYS = new Set(['claude-code', 'codex', 'opencode']);
+const LOBE_PROVIDER_KEYS = new Set([
+  'anthropic',
+  'deepseek',
+  'google',
+  'moonshot',
+  'openai',
+  'qwen',
+  'zhipu',
+]);
+
+const MODEL_PATTERNS = [
+  /^claude[-\s]/,
+  /^deepseek[-\s]/,
+  /^doubao[-\s]/,
+  /^gemini[-\s]/,
+  /^glm[-\s]/,
+  /^gpt[-\s]/,
+  /^kimi[-\s]/,
+  /^o[134][-\s]/,
+  /^qwen[-\s]/,
+];
 
 export type DesignOpenWithIconName =
   | 'androidStudio'
@@ -29,6 +99,296 @@ type IconProps = {
   name?: string | undefined;
   type?: string | undefined;
 };
+
+export function resolveRuntimeBrandIcon({
+  kind,
+  name,
+  provider,
+}: Pick<RuntimeBrandIconProps, 'kind' | 'name' | 'provider'>): RuntimeBrandIconResolution {
+  const label = cleanRuntimeBrandLabel(name || provider || kind);
+  const normalizedName = normalizeRuntimeBrandIconKey(name);
+  const normalizedProvider = normalizeRuntimeBrandProviderKey(provider || name);
+  const runtimeKey = normalizeRuntimeBrandRuntimeKey(name);
+
+  if (kind === 'runtime' && LOBE_RUNTIME_KEYS.has(runtimeKey)) {
+    return {
+      kind,
+      label,
+      source: 'lobehub',
+      value: runtimeKey,
+      fallback: 'runtime',
+      lobeType: 'runtime',
+    };
+  }
+
+  if (kind === 'provider' && normalizedProvider && LOBE_PROVIDER_KEYS.has(normalizedProvider)) {
+    return {
+      kind,
+      label,
+      source: 'lobehub',
+      value: normalizedProvider,
+      fallback: 'provider',
+      lobeType: 'provider',
+    };
+  }
+
+  if (kind === 'model' && normalizedName && isLikelyLobeModel(normalizedName)) {
+    return {
+      kind,
+      label,
+      source: 'lobehub',
+      value: normalizedName,
+      fallback: 'model',
+      lobeType: 'model',
+    };
+  }
+
+  if (kind === 'model' && normalizedProvider && LOBE_PROVIDER_KEYS.has(normalizedProvider)) {
+    return {
+      kind,
+      label,
+      source: 'lobehub',
+      value: normalizedProvider,
+      fallback: 'model',
+      lobeType: 'provider',
+    };
+  }
+
+  return {
+    kind,
+    label,
+    source: 'fallback',
+    value: runtimeBrandFallbackValue(kind, label),
+    fallback: runtimeBrandFallbackIconFor(kind, label),
+  };
+}
+
+export function RuntimeBrandIcon({
+  kind,
+  name,
+  provider,
+  className,
+  size = 'normal',
+  framed = true,
+  title,
+}: RuntimeBrandIconProps): React.ReactElement {
+  const resolution = resolveRuntimeBrandIcon({ kind, name, provider });
+  const label = title || resolution.label;
+  const classNames = [
+    runtimeBrandStyles.root,
+    framed ? runtimeBrandStyles.framed : '',
+    size === 'compact' ? runtimeBrandStyles.compact : '',
+    size === 'large' ? runtimeBrandStyles.large : '',
+    resolution.source === 'lobehub' ? runtimeBrandStyles.lobe : '',
+    className ?? '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <span
+      aria-label={label}
+      className={classNames}
+      data-runtime-brand-fallback={resolution.fallback}
+      data-runtime-brand-kind={resolution.kind}
+      data-runtime-brand-source={resolution.source}
+      data-runtime-brand-value={resolution.value}
+      role="img"
+      title={label}
+    >
+      {renderRuntimeBrandIcon(resolution)}
+    </span>
+  );
+}
+
+function renderRuntimeBrandIcon(resolution: RuntimeBrandIconResolution): React.ReactNode {
+  if (resolution.source === 'lobehub') {
+    if (resolution.lobeType === 'runtime') return renderLobeRuntimeIcon(resolution.value);
+    if (resolution.lobeType === 'provider') return <ProviderIcon provider={resolution.value} size={18} type="color" />;
+    return <ModelIcon model={resolution.value} size={18} />;
+  }
+
+  const fallback = runtimeBrandFallbackSvg(resolution.fallback);
+  return fallback || <span className={runtimeBrandStyles.fallbackText}>{resolution.value}</span>;
+}
+
+function renderLobeRuntimeIcon(value: string): React.ReactNode {
+  if (value === 'claude-code') return <ClaudeCode size={18} />;
+  if (value === 'codex') return <Codex size={18} />;
+  if (value === 'opencode') return <OpenCode size={18} />;
+  return runtimeBrandFallbackSvg('runtime');
+}
+
+function normalizeRuntimeBrandIconKey(value: string | undefined): string {
+  return cleanRuntimeBrandLabel(value)
+    .toLowerCase()
+    .replace(/→/g, '-')
+    .replace(/[._/]+/g, '-')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function normalizeRuntimeBrandRuntimeKey(value: string | undefined): string {
+  const key = normalizeRuntimeBrandIconKey(value);
+  if (key === 'claude' || key === 'claudecode') return 'claude-code';
+  if (key === 'open-code') return 'opencode';
+  return key;
+}
+
+function normalizeRuntimeBrandProviderKey(value: string | undefined): string {
+  const key = normalizeRuntimeBrandIconKey(value);
+  if (!key) return '';
+  if (key.includes('anthropic') || key.includes('claude')) return 'anthropic';
+  if (key.includes('deepseek')) return 'deepseek';
+  if (key.includes('gemini') || key.includes('google')) return 'google';
+  if (key.includes('glm') || key.includes('zhipu')) return 'zhipu';
+  if (key.includes('kimi') || key.includes('moonshot')) return 'moonshot';
+  if (key.includes('openai') || key.includes('gpt') || key.includes('codex')) return 'openai';
+  if (key.includes('qwen') || key.includes('alibaba')) return 'qwen';
+  return key;
+}
+
+function isLikelyLobeModel(value: string): boolean {
+  if (!value || value === 'auto') return false;
+  return MODEL_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function runtimeBrandFallbackIconFor(kind: RuntimeBrandIconKind, label: string): RuntimeFallbackIconName {
+  const key = normalizeRuntimeBrandIconKey(label);
+  if (kind === 'tool') {
+    if (key.includes('read')) return 'read';
+    if (key.includes('write') || key.includes('edit') || key.includes('patch')) return 'write';
+    if (key.includes('shell') || key.includes('bash') || key.includes('terminal')) return 'shell';
+    if (key.includes('grep') || key.includes('glob') || key.includes('search') || key.includes('rg')) return 'search';
+    if (key.includes('browser') || key.includes('web') || key.includes('screenshot')) return 'browser';
+    if (key.includes('diff') || key.includes('git')) return 'diff';
+    if (key.includes('task') || key.includes('subagent')) return 'task';
+    return 'tool';
+  }
+  if (kind === 'provider') return 'provider';
+  if (kind === 'model') return 'model';
+  if (key.includes('tokendance') || key.includes('agenthub') || key.includes('cc-switch')) return 'agenthub';
+  if (key.includes('browser')) return 'browser';
+  return 'runtime';
+}
+
+function runtimeBrandFallbackValue(kind: RuntimeBrandIconKind, label: string): string {
+  const ascii = label.match(/[A-Za-z0-9]+/g);
+  if (ascii?.length) {
+    return ascii
+      .slice(0, kind === 'tool' ? 1 : 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase();
+  }
+  const chars = Array.from(label);
+  return chars.slice(0, 2).join('').toUpperCase() || kind.slice(0, 1).toUpperCase();
+}
+
+function cleanRuntimeBrandLabel(value: string | undefined): string {
+  return (value ?? '').trim() || 'Unknown';
+}
+
+function runtimeBrandFallbackSvg(name: RuntimeFallbackIconName): React.ReactNode {
+  const common = {
+    'aria-hidden': true,
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    strokeWidth: 1.8,
+    viewBox: '0 0 24 24',
+  } as const;
+
+  switch (name) {
+    case 'agenthub':
+      return (
+        <svg {...common}>
+          <path d="M5 7h14v10H5z" />
+          <path d="M8 10h8M8 14h5" />
+          <path d="M12 3v4M12 17v4" />
+        </svg>
+      );
+    case 'browser':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M4 12h16M12 4c2 2.2 3 4.9 3 8s-1 5.8-3 8M12 4c-2 2.2-3 4.9-3 8s1 5.8 3 8" />
+        </svg>
+      );
+    case 'diff':
+      return (
+        <svg {...common}>
+          <path d="M6 5h12M6 12h12M6 19h12" />
+          <path d="M9 9V3M15 21v-6" />
+        </svg>
+      );
+    case 'model':
+      return (
+        <svg {...common}>
+          <rect x="5" y="5" width="14" height="14" rx="2" />
+          <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" />
+        </svg>
+      );
+    case 'provider':
+      return (
+        <svg {...common}>
+          <path d="M12 3 4 7v10l8 4 8-4V7z" />
+          <path d="M4 7l8 4 8-4M12 11v10" />
+        </svg>
+      );
+    case 'read':
+      return (
+        <svg {...common}>
+          <path d="M5 4h10l4 4v12H5z" />
+          <path d="M14 4v5h5M8 13h8M8 17h5" />
+        </svg>
+      );
+    case 'runtime':
+      return (
+        <svg {...common}>
+          <rect x="4" y="8" width="16" height="11" rx="2" />
+          <path d="M12 4v4M8 13h.01M16 13h.01M9 17h6" />
+        </svg>
+      );
+    case 'search':
+      return (
+        <svg {...common}>
+          <circle cx="10.5" cy="10.5" r="6" />
+          <path d="M15 15l5 5" />
+        </svg>
+      );
+    case 'shell':
+      return (
+        <svg {...common}>
+          <path d="M4 5h16v14H4z" />
+          <path d="m7 9 3 3-3 3M12 15h5" />
+        </svg>
+      );
+    case 'task':
+      return (
+        <svg {...common}>
+          <path d="M5 7h10M5 12h8M5 17h6" />
+          <path d="m16 17 2 2 4-5" />
+        </svg>
+      );
+    case 'write':
+      return (
+        <svg {...common}>
+          <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z" />
+          <path d="m13.5 8.5 2 2" />
+        </svg>
+      );
+    case 'tool':
+    default:
+      return (
+        <svg {...common}>
+          <path d="m14.5 6.5 3 3" />
+          <path d="M4 20l7.5-7.5" />
+          <path d="M13 5a4 4 0 0 0 5 5l-8 8H6v-4z" />
+        </svg>
+      );
+  }
+}
 
 export type DesignFileIconType =
   | 'css'

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Plug } from 'lucide-react';
+import { RuntimeBrandIcon } from '@shared/workbench';
 import type { AgentInfo } from '@shared/types';
 import styles from '../primitives/primitives.module.css';
 
@@ -10,7 +10,7 @@ export default function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
     <div className={styles.profileCard}>
       <div className={styles.profileHeader}>
         <div className={styles.profileIcon}>
-          <Plug size={17} />
+          <RuntimeBrandIcon kind="runtime" name={agent.id || agent.name} size="compact" framed={false} />
         </div>
         <div>
           <strong>{agent.name}</strong>

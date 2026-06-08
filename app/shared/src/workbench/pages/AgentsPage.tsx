@@ -7,6 +7,7 @@ import {
   type DesignNavIconName,
 } from '../designIcons';
 import { resolveWorkbenchProfile } from '../profileRegistry';
+import { RuntimeBrandIcon } from '../RuntimeBrandIcon';
 import { Select } from '../../ui';
 import styles from './AgentsPage.module.css';
 
@@ -535,6 +536,7 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
     {/* Runtime line */}
     <div className={styles['agent-runtime-line']}>
       <span className={`${styles.state} ${stateClass(agent.state)}`} />
+      <RuntimeBrandIcon kind="runtime" name={agent.engine} size="compact" framed={false} />
       <strong>{agent.engine}</strong>
       <em>{agent.model}</em>
     </div>
@@ -977,7 +979,10 @@ const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
           <div className={styles['tool-matrix-head']}>
             <span>Agent</span>
             {toolMatrixTools.map((tool) => (
-              <span key={tool}>{tool}</span>
+              <span key={tool} className={styles['tool-head-cell']}>
+                <RuntimeBrandIcon kind="tool" name={tool} size="compact" framed={false} />
+                {tool}
+              </span>
             ))}
           </div>
           {/* Rows */}
@@ -1059,9 +1064,7 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
       <div className={styles['model-grid']}>
         {models.map((model) => (
           <article key={model.name} className={`${styles['model-card']} agent-card`} data-card-surface>
-            <div className={styles['market-icon']}>
-              {marketInitials(model.name)}
-            </div>
+            <RuntimeBrandIcon kind="model" name={model.name} size="large" />
             <div>
               <h2>{model.name}</h2>
               <p>{model.description}</p>
@@ -1097,6 +1100,7 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
                 {route.role} · {route.mode}
               </small>
             </div>
+            <RuntimeBrandIcon kind="model" name={route.model} size="compact" framed={false} />
             <em>{route.model}</em>
           </button>
         ))}
@@ -1110,6 +1114,7 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
         </div>
         {modelHealthRows.map((row) => (
           <div key={row.name} className={styles['model-health-row']}>
+            <RuntimeBrandIcon kind="model" name={row.name} size="compact" framed={false} />
             <strong>{row.name}</strong>
             <span>{row.status}</span>
             <em>{row.meta}</em>

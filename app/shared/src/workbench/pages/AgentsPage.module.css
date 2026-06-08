@@ -594,7 +594,7 @@
   border-radius: var(--r-sm);
   background: var(--surface-low);
   display: grid;
-  grid-template-columns: 9px minmax(0, 1fr) minmax(120px, auto);
+  grid-template-columns: 9px 18px minmax(0, 1fr) minmax(120px, auto);
   align-items: center;
   gap: 9px;
 }
@@ -1307,6 +1307,13 @@
   font: 600 0.6875rem var(--font-sans);
 }
 
+.tool-head-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .tool-matrix-row {
   width: 100%;
   border-left: 0;
@@ -1473,7 +1480,7 @@
   background: transparent;
   color: var(--text-1);
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 150px;
+  grid-template-columns: 34px minmax(0, 1fr) 18px 150px;
   align-items: center;
   gap: 10px;
   text-align: left;
@@ -1518,7 +1525,7 @@
 .model-health-row {
   min-height: 40px;
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 72px minmax(120px, 0.7fr);
+  grid-template-columns: 18px minmax(180px, 1fr) 72px minmax(120px, 0.7fr);
   align-items: center;
   gap: 12px;
   border-top: 1px solid var(--bdr);

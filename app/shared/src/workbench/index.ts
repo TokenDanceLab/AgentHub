@@ -20,6 +20,10 @@ export {
   getDesignFileIconType,
   profileActionIconName,
 } from './designIcons';
+export {
+  RuntimeBrandIcon,
+  resolveRuntimeBrandIcon,
+} from './RuntimeBrandIcon';
 
 /* ── Types ── */
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
@@ -38,6 +42,13 @@ export type {
   DesignFileIconType,
   DesignNavIconName,
 } from './designIcons';
+export type {
+  RuntimeBrandIconKind,
+  RuntimeBrandIconProps,
+  RuntimeBrandIconResolution,
+  RuntimeBrandIconSize,
+  RuntimeBrandIconSource,
+} from './RuntimeBrandIcon';
 
 /* ═══ Pages ═══ */
 export {
