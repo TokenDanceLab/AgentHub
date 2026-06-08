@@ -1,0 +1,74 @@
+{
+  "provider": "openai-agents-sdk-fixture",
+  "events": [
+    {
+      "id": "openai_tool_1",
+      "type": "function_call",
+      "sessionId": "openai_session_1",
+      "traceId": "trace_openai_1",
+      "callId": "call_apply_patch",
+      "toolName": "apply_patch",
+      "input": {
+        "path": "edge-server/internal/adapters/sdk_fixture_mapper.go",
+        "patch": "*** fixture patch ***"
+      },
+      "traceRefs": ["trace:openai:function-call"],
+      "evidenceRefs": ["event:openai_tool_1"]
+    },
+    {
+      "id": "openai_guardrail_1",
+      "type": "guardrail_triggered",
+      "requestId": "guard_openai_1",
+      "callId": "call_shell",
+      "toolName": "shell",
+      "riskLevel": "medium",
+      "guardrail": "workspace_write_policy",
+      "decision": "review_required",
+      "reason": "write action needs AgentHub approval evidence",
+      "input": {
+        "command": "git diff --check origin/dev/delicious233...HEAD"
+      },
+      "traceRefs": ["trace:openai:guardrail"]
+    },
+    {
+      "id": "openai_route_1",
+      "type": "handoff",
+      "action": "delegate",
+      "targetAgent": "docs-worker",
+      "instructions": "Sync SDK fixture status in docs.",
+      "summary": "Route suggestion from OpenAI Agents SDK-like handoff.",
+      "evidenceRefs": ["event:openai_guardrail_1"]
+    },
+    {
+      "id": "openai_file_1",
+      "type": "artifact_file",
+      "callId": "call_apply_patch",
+      "toolName": "apply_patch",
+      "path": "docs/reference/sdk-agent-strategy.md",
+      "kind": "modified",
+      "diff": "@@ docs fixture diff @@"
+    },
+    {
+      "id": "openai_artifact_1",
+      "type": "artifact_created",
+      "artifactId": "artifact_openai_trace",
+      "path": "artifacts/openai-trace-summary.json",
+      "kind": "json",
+      "sizeBytes": 256,
+      "summary": "Trace summary fixture",
+      "metadata": {
+        "trace_url": "fixture://trace/openai",
+        "api_key": "sk-not-real"
+      },
+      "traceRefs": ["trace:openai:root"]
+    },
+    {
+      "id": "openai_result_1",
+      "type": "run_result",
+      "success": true,
+      "summary": "OpenAI Agents SDK-like fixture completed.",
+      "traceRefs": ["trace:openai:root"],
+      "evidenceRefs": ["artifact:artifact_openai_trace"]
+    }
+  ]
+}

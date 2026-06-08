@@ -1,0 +1,130 @@
+[
+  {
+    "type": "run.agent.tool_call",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "toolu_read",
+      "evidenceRefs": [
+        "event:claude_tool_1"
+      ],
+      "input": {
+        "file_path": "edge-server/internal/adapters/adapter.go"
+      },
+      "provider": "claude-sdk-fixture",
+      "sessionId": "claude_session_1",
+      "sourceEventId": "claude_tool_1",
+      "status": "pending",
+      "toolName": "Read",
+      "traceId": "trace_claude_1",
+      "traceRefs": [
+        "trace:claude:span-tool-read"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.permission_requested",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "input": {
+        "command": "go test ./internal/adapters -short -count=1"
+      },
+      "provider": "claude-sdk-fixture",
+      "reason": "shell command requires approval",
+      "requestId": "perm_claude_1",
+      "riskLevel": "high",
+      "sourceEventId": "claude_perm_1",
+      "toolName": "Bash",
+      "toolUseId": "toolu_bash",
+      "traceRefs": [
+        "trace:claude:permission"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.route_decision",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "action": "delegate",
+      "evidenceRefs": [
+        "event:claude_perm_1",
+        "trace:claude:permission"
+      ],
+      "instructions": "Review mapped event evidence.",
+      "next_worker": "reviewer",
+      "provider": "claude-sdk-fixture",
+      "reasoning": "Provider suggested a review handoff.",
+      "sourceEventId": "claude_route_1",
+      "targetAgent": "reviewer"
+    }
+  },
+  {
+    "type": "run.agent.file_change",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "toolu_write",
+      "diff": "@@ fixture diff @@",
+      "kind": "modified",
+      "path": "edge-server/internal/adapters/sdk_fixture_mapper.go",
+      "provider": "claude-sdk-fixture",
+      "sourceEventId": "claude_file_1",
+      "toolName": "Write"
+    }
+  },
+  {
+    "type": "artifact.created",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "artifactId": "artifact_claude_report",
+      "id": "artifact_claude_report",
+      "kind": "markdown",
+      "path": "artifacts/claude-fixture-report.md",
+      "provider": "claude-sdk-fixture",
+      "sizeBytes": 128,
+      "sourceEventId": "claude_artifact_1",
+      "summary": "Fixture report",
+      "traceRefs": [
+        "trace:claude:artifact"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.result",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "evidenceRefs": [
+        "artifact:artifact_claude_report"
+      ],
+      "provider": "claude-sdk-fixture",
+      "sourceEventId": "claude_result_1",
+      "success": true,
+      "summary": "Claude SDK-like fixture completed.",
+      "traceRefs": [
+        "trace:claude:root"
+      ]
+    }
+  }
+]

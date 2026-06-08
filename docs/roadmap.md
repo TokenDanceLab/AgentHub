@@ -1,6 +1,6 @@
 # AgentHub Roadmap
 
-> Last updated: 2026-06-08 22:15 +08:00
+> Last updated: 2026-06-09 00:02 +08:00
 > Fact source: `origin/dev/delicious233`
 > Current dev baseline: use live `git log -1 origin/dev/delicious233`
 > Stable RC tag: `v0.3.0-rc.2 @ 35f83537`
@@ -26,6 +26,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
 | Edge store | SQLite opt-in snapshot backend and relational migration tests are merged | Repair/reconcile stale `codex/edge-sql-store` worktree before cleanup |
 | Backend CI | TeamRun fixture gate is merged; backend focused subset gate covers Hub/Edge short focused packages without real CLI/model/services | Keep release workflow and real CLI/model gates separate and opt-in |
 | Runtime evidence | Edge read-only diff/artifact/preview indexes, runtime evidence writer, metadata lookup, content planned/404 contract, preview stop metadata, and shared inspector consumption are merged | Implement preview start/fake runner; artifact content source fields before content route |
+| SDK fixtures | `AgentHubAgentSpec` docs/schema fixture contract is active; SDK fixture mapper golden tests now cover Claude/OpenAI provider-like events without SDK packages | Keep TeamRun fixture E2E separate; do not install SDK packages or run real CLI/model before approval |
 | Login | Fake/local and packaged readiness gates are merged | Real TokenDanceID packaged E2E requires approved test OAuth client, account, browser window, and no-secret evidence |
 | Tauri packaging | Version/readiness checks, installer smoke, release dry topology, and macOS unsigned dry policy are merged | Full build, signing, notarization, staple, and release upload remain approval-gated |
 | Mobile | Separate low-priority owner track | Do not mix with Desktop/Web/Hub/Edge critical path |
@@ -52,7 +53,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
    - Keep D3 real CLI/model blocked until runner, budget, environment approval, and artifact redaction are approved.
    - Backend focused subset CI is allowed only for existing Hub/Edge short focused packages; it must not include Docker, service containers, self-hosted runners, external URLs, real CLI, model keys, or TokenDanceID live auth.
    - SDK agent strategy lives in [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md): AgentHub owns `AgentHubAgentSpec` / DSL; Claude/OpenAI SDKs remain Edge runtime/provider adapter experiments.
-   - Next SDK slices stay fixture-only until approved: Claude read-only adapter fixture -> OpenAI sandbox fixture -> SDK event mapper golden tests -> TeamRun fixture E2E.
+   - SDK event mapper golden tests are fixture-only in `edge-server/internal/adapters`; next SDK slice is TeamRun fixture E2E.
 
 5. **Login real E2E**
    - Use existing fake/local and packaged readiness gates as preconditions.
@@ -75,6 +76,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
 | Next artifact | new worktree TBD | worker/explorer | content source schema proposal | ready to dispatch after docs push |
 | Next demo | new worktree TBD | worker/explorer | TeamRun real evidence topology | ready to dispatch after docs push |
 | SDK contract | `.worktrees/agent-spec-schema` / `codex/agent-spec-schema` | worker | `AgentHubAgentSpec` docs/schema/fixture contract draft only | active; no runtime code or SDK packages |
+| SDK mapper | `.worktrees/sdk-fixture-mapper` / `codex/sdk-fixture-mapper` | worker | Edge fixture-only mapper/golden tests for Claude/OpenAI SDK-like events | ready for review; no adapter replacement, SDK packages, CLI/model, or UI changes |
 
 ## Blocked Gates
 
@@ -128,6 +130,6 @@ After this Roadmap slice is pushed:
 1. Spawn Edge preview fake-runner worker.
 2. Spawn artifact content-source proposal worker.
 3. Spawn TeamRun real evidence topology explorer.
-4. Spawn SDK PoC fixture workers in order: Claude read-only fixture, OpenAI sandbox fixture, mapper golden tests, TeamRun fixture E2E.
+4. Spawn next SDK PoC fixture worker for TeamRun fixture E2E after reviewing the Edge mapper golden tests.
 5. Spawn cleanup worker for clean merged worktrees only.
 6. Keep mobile and backend merge owners isolated.
