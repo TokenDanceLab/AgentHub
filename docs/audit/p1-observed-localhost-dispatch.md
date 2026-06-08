@@ -33,9 +33,11 @@ missing dispatch events, direct Hub-to-LocalEdge targets, and forged replay refs
 ## RealTested Boundary
 
 Default output keeps `real_tested=false` even when the observed manifest is
-otherwise valid. An input `real_tested=true` claim is downgraded unless a future
-operator explicitly runs with `-AllowRealTestedApproval` and the manifest carries
-`approval_gate=observed-localhost-dispatch-approved`.
+otherwise valid. An input `real_tested=true` claim is downgraded unless
+validation succeeds, a future operator explicitly runs with
+`-AllowRealTestedApproval`, and the manifest carries
+`approval_gate=observed-localhost-dispatch-approved`. Failed validation always
+writes `real_tested=false`, regardless of approval flags or manifest fields.
 
 This verifier does not start services and does not perform TokenDanceID login,
 real CLI/model invocation, public deploy, signing, release upload, or installer
