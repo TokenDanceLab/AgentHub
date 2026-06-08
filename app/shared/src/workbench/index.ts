@@ -25,7 +25,7 @@ export {
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
 export type { ConversationSidebarProps } from './ConversationSidebar';
 export type { GlobalRailProps, GlobalRailPage } from './GlobalRail';
-export type { RightInspectorProps } from './RightInspector';
+export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './RightInspector';
 export type { TranscriptViewProps } from './TranscriptView';
 export type { UnifiedComposerProps } from './UnifiedComposer';
 export type {

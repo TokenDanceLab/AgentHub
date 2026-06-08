@@ -5,6 +5,7 @@ import App from '@/App';
 import { createEventStream } from '@/api/eventClient';
 import { useAgentList } from '@/api/agentQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
+import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
@@ -27,6 +28,10 @@ vi.mock('@/api/modelCatalogQueries', () => ({
   useModelCatalog: vi.fn(),
 }));
 
+vi.mock('@/api/runEvidenceQueries', () => ({
+  useRunEvidence: vi.fn(),
+}));
+
 vi.mock('@/api/runQueries', () => ({
   useCreateRun: vi.fn(),
 }));
@@ -38,6 +43,7 @@ const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
 const mockedUseAgentList = vi.mocked(useAgentList);
 const mockedUseModelCatalog = vi.mocked(useModelCatalog);
+const mockedUseRunEvidence = vi.mocked(useRunEvidence);
 const mockedCreateEventStream = vi.mocked(createEventStream);
 const mockedUseCreateRun = vi.mocked(useCreateRun);
 
@@ -66,6 +72,20 @@ describe('Desktop App v4 root', () => {
     mockedUseModelCatalog.mockReturnValue({
       data: { items: [], sources: [] },
     } as ReturnType<typeof useModelCatalog>);
+    mockedUseRunEvidence.mockReturnValue({
+      diffs: [],
+      artifacts: [],
+      previews: [],
+      diffLoading: false,
+      artifactLoading: false,
+      previewLoading: false,
+      diffError: false,
+      artifactError: false,
+      previewError: false,
+      diffSource: 'none',
+      artifactSource: 'none',
+      previewSource: 'none',
+    });
     mockedUseThreads.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreads>);
@@ -226,6 +246,7 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('heading', { name: 'Live Edge 会话' })).toBeInTheDocument();
     expect(screen.getAllByText('rg')).toHaveLength(2);
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
+    expect(mockedUseRunEvidence).toHaveBeenLastCalledWith('run-live');
 
     mockedUseThreadMessages.mockReturnValue({
       data: {
