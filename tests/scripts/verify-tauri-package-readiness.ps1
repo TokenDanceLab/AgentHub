@@ -133,7 +133,43 @@ function New-RogueMacOSCommandFixture {
 
     $workflowPath = Join-Path $tempRoot ".github\workflows\release-readiness.yml"
     $workflowText = Get-Content $workflowPath -Raw -Encoding UTF8
-    $injected = $workflowText -replace '(?m)^          echo "Signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice\."\s*$', "`$0`r`n          $Command"
+    $injected = $workflowText -replace '(?m)^          Write-Host "Apple Developer ID signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice\."\s*$', "`$0`r`n          $Command"
+    Set-Content $workflowPath $injected -Encoding UTF8
+
+    & git -C $tempRoot init -q
+    return $tempRoot
+}
+
+function New-RogueMacOSReleaseActionFixture {
+    param(
+        [string]$Action
+    )
+
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    $workflowPath = Join-Path $tempRoot ".github\workflows\release-readiness.yml"
+    $workflowText = Get-Content $workflowPath -Raw -Encoding UTF8
+
+    if ($Action -match "uses:") {
+        $injected = $workflowText -replace '(?m)^      - name: Upload macOS unsigned dry policy artifact\s*$', "      - name: Rogue GitHub Release upload`r`n        $Action`r`n`$0"
+    } else {
+        $injected = $workflowText -replace '(?m)^          Write-Host "Apple Developer ID signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice\."\s*$', "`$0`r`n          $Action"
+    }
+
     Set-Content $workflowPath $injected -Encoding UTF8
 
     & git -C $tempRoot init -q
@@ -234,8 +270,10 @@ foreach ($artifactPattern in @(
     Assert-True ($scriptText -match [regex]::Escape($artifactPattern)) "checker covers ignored generated artifact path $artifactPattern"
 }
 Assert-True ($scriptText -match "run_macos_unsigned_dry_policy" -and $scriptText -match "macos-unsigned-dry-policy") "checker enforces explicit macOS unsigned dry workflow gate"
-Assert-True ($scriptText -match "agenthub-edge-aarch64-apple-darwin" -and $scriptText -match "AgentHub\\.app" -and $scriptText -match "AgentHub\\.dmg") "checker records future macOS arm64 sidecar and bundle boundaries"
+Assert-True ($scriptText -match "agenthub-edge-aarch64-apple-darwin" -and $scriptText -match "AgentHub\\.app" -and $scriptText -match "AgentHub_\\\$\\{version\\}_aarch64\\.dmg") "checker records future macOS arm64 sidecar and versioned bundle boundaries"
 Assert-True ($scriptText -match "later approval slice|approval slice|审批") "checker keeps macOS signing and notarization behind later approval"
+Assert-True ($scriptText -match "macos-unsigned-dry-policy\\.json" -and $scriptText -match "actions/upload-artifact@v4" -and $scriptText -match "workflow artifact") "checker enforces macOS workflow artifact-only policy manifest"
+Assert-True ($scriptText -match "Assert-NoMacOSUnsignedDryReleaseActions" -and $scriptText -match "softprops/action-gh-release" -and $scriptText -match "latest\\.json") "checker forbids macOS release upload and updater metadata publication actions"
 Assert-True ($smokeScriptText -match "StrictToolchain" -and $smokeScriptText -match "GOOS=windows" -and $smokeScriptText -match "GOARCH=amd64") "installer smoke records Windows sidecar toolchain preflight"
 Assert-True ($smokeScriptText -match "installer-header\.bmp" -and $smokeScriptText -match "installer-sidebar\.bmp") "installer smoke verifies NSIS installer image assets"
 Assert-True ($smokeScriptText -match "AgentHub-portable/AgentHub\.exe" -and $smokeScriptText -match "AgentHub-portable/agenthub-edge\.exe") "installer smoke verifies portable staging outputs stay ignored"
@@ -254,7 +292,8 @@ Assert-True ($readinessWorkflowText -match "artifact-manifest\.json" -and $readi
 Assert-True ($readinessWorkflowText -match "missing latest\.json" -and $readinessWorkflowText -match "missing updater signature") "release readiness workflow fails collection when updater metadata or signature is missing"
 Assert-True ($readinessWorkflowText -match "run_macos_unsigned_dry_policy") "release readiness workflow declares macOS unsigned dry policy input"
 Assert-True ($readinessWorkflowText -match "macos-unsigned-dry-policy" -and $readinessWorkflowText -match "agenthub-edge-aarch64-apple-darwin") "release readiness workflow records future macOS arm64 unsigned dry sidecar boundary"
-Assert-True ($readinessWorkflowText -match "AgentHub\.app" -and $readinessWorkflowText -match "AgentHub\.dmg" -and $readinessWorkflowText -match "workflow artifacts only") "release readiness workflow records future macOS bundle artifact-only boundary"
+Assert-True ($readinessWorkflowText -match "AgentHub\.app" -and $readinessWorkflowText -match "AgentHub_\$\{version\}_aarch64\.dmg" -and $readinessWorkflowText -match "workflow artifacts only") "release readiness workflow records future macOS versioned bundle artifact-only boundary"
+Assert-True ($readinessWorkflowText -match "macos-unsigned-dry-policy\.json" -and $readinessWorkflowText -match "actions/upload-artifact@v4") "release readiness workflow uploads a macOS policy manifest as a workflow artifact"
 Assert-True ($readinessWorkflowText -match "later approval slice") "release readiness workflow keeps macOS signing/notarization as a later approval slice"
 Assert-True ($readinessWorkflowText -notmatch "softprops/action-gh-release") "release readiness workflow does not create a GitHub Release"
 Assert-True ($readinessWorkflowText -notmatch "TAURI_SIGNING_PRIVATE_KEY") "release readiness workflow does not require production signing secrets"
@@ -333,6 +372,22 @@ foreach ($hostShell in $scriptHosts) {
             $rogue = Invoke-Script $hostShell @("-RepoRoot", $rogueRoot) $rogueRoot
             Assert-True ($rogue.ExitCode -ne 0) "readiness checker fails rogue macOS command '$rogueMacOSCommand' under $($rogue.Host)" $rogue.Output
             Assert-True ($rogue.Output -match "macos-unsigned-dry-policy" -and $rogue.Output -match [regex]::Escape($rogueMacOSCommand)) "rogue macOS command failure names the offending job and command under $($rogue.Host)" $rogue.Output
+        }
+        finally {
+            Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue
+        }
+    }
+
+    foreach ($rogueMacOSReleaseAction in @(
+        "gh release upload v0.2.0 dist/macos-unsigned-dry-policy.json",
+        "uses: softprops/action-gh-release@v2",
+        "aws s3 cp dist/latest.json s3://example-updater/latest.json"
+    )) {
+        $rogueRoot = New-RogueMacOSReleaseActionFixture $rogueMacOSReleaseAction
+        try {
+            $rogue = Invoke-Script $hostShell @("-RepoRoot", $rogueRoot) $rogueRoot
+            Assert-True ($rogue.ExitCode -ne 0) "readiness checker fails rogue macOS release/updater action '$rogueMacOSReleaseAction' under $($rogue.Host)" $rogue.Output
+            Assert-True ($rogue.Output -match "macos-unsigned-dry-policy|GitHub Release|release assets|release/updater publication|latest\.json") "rogue macOS release/updater action failure names a release or updater publication boundary under $($rogue.Host)" $rogue.Output
         }
         finally {
             Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue

@@ -179,10 +179,52 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_unsigned_dry_policy == true }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Record unsigned macOS dry policy boundary
+        shell: pwsh
         run: |
-          echo "Policy/readiness only: this macOS unsigned dry slice validates future arm64 sidecar and bundle boundaries."
-          echo "Future sidecar basename: app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin."
-          echo "Future unsigned bundle outputs: AgentHub.app and AgentHub.dmg, scoped to workflow artifacts only."
-          echo "No full Tauri package build, Developer ID signing, macOS signing command, notarization command, stapling command, GitHub Release upload, or updater production metadata publication is performed here."
-          echo "Signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice."
+          $version = (Get-Content "app/desktop/package.json" -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory dist -Force | Out-Null
+
+          $policy = [ordered]@{
+            mode = "policy-only"
+            platform = "macos-arm64"
+            sidecarBinary = "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin"
+            appBundle = "AgentHub.app"
+            dmgArtifact = "AgentHub_${version}_aarch64.dmg"
+            workflowArtifact = "macos-unsigned-package-dry"
+            distribution = "workflow-artifact-only"
+            forbidden = @(
+              "full Tauri package build",
+              "Developer ID signing",
+              "macOS signing command",
+              "notarytool notarization",
+              "stapler staple",
+              "GitHub Release upload",
+              "production updater metadata publication"
+            )
+            approvalGate = @(
+              "Apple Developer ID signing",
+              "notarytool notarization",
+              "stapler staple",
+              "GitHub Release upload",
+              "production updater metadata publication"
+            )
+          }
+
+          $policy |
+            ConvertTo-Json -Depth 6 |
+            Out-File "dist/macos-unsigned-dry-policy.json" -Encoding UTF8
+
+          Write-Host "Policy/readiness only: this macOS unsigned dry slice validates future arm64 sidecar and bundle boundaries."
+          Write-Host "Future sidecar basename: app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin."
+          Write-Host "Future unsigned bundle outputs: AgentHub.app and AgentHub_${version}_aarch64.dmg, scoped to workflow artifacts only."
+          Write-Host "No full Tauri package build, Developer ID signing, macOS signing command, notarization command, stapling command, GitHub Release upload, or updater production metadata publication is performed here."
+          Write-Host "Apple Developer ID signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice."
+
+      - name: Upload macOS unsigned dry policy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-unsigned-package-dry
+          path: dist/macos-unsigned-dry-policy.json
