@@ -204,10 +204,11 @@ function New-FixedStableReleaseFixture {
 
 function New-TaggedReleaseFixture {
     param(
-        [string]$TagName
+        [string]$TagName,
+        [string]$MetadataVersion = "0.3.0-rc.5"
     )
 
-    $metadataVersion = "0.2.0"
+    $metadataVersion = $MetadataVersion
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
     New-Item -ItemType Directory $tempRoot -Force | Out-Null
 
@@ -332,6 +333,7 @@ $workflowText = Read-Text ".github\workflows\release.yml"
 $readinessWorkflowText = Read-Text ".github\workflows\release-readiness.yml"
 $desktopPackage = Get-Content (Join-Path $RepoRoot "app\desktop\package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $desktopVersion = [string]$desktopPackage.version
+Assert-True ($desktopVersion -eq "0.3.0-rc.6") "desktop metadata targets next P1 RC version 0.3.0-rc.6"
 
 Assert-True ($scriptText -match "package\.json" -and $scriptText -match "Cargo\.toml" -and $scriptText -match "Cargo\.lock" -and $scriptText -match "tauri\.conf\.json") "checker compares desktop package, Cargo, Cargo.lock, and Tauri versions"
 Assert-True ($scriptText -match "Release tag version alignment" -and $scriptText -match "prerelease|pre-release") "checker reports RC/pre-release tag version alignment"
@@ -448,11 +450,21 @@ foreach ($hostShell in $scriptHosts) {
         Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue
     }
 
-    $rcMismatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.5"
+    $rcMatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.6" "0.3.0-rc.6"
+    try {
+        $rcMatch = Invoke-Script $hostShell @("-RepoRoot", $rcMatchRoot) $rcMatchRoot
+        Assert-True ($rcMatch.ExitCode -eq 0) "readiness checker accepts RC tag v0.3.0-rc.6 when desktop metadata matches under $($rcMatch.Host)" $rcMatch.Output
+        Assert-True ($rcMatch.Output -match "v0\.3\.0-rc\.6" -and $rcMatch.Output -match "0\.3\.0-rc\.6") "RC tag match output names v0.3.0-rc.6 and metadata 0.3.0-rc.6 under $($rcMatch.Host)" $rcMatch.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $rcMatchRoot -ErrorAction SilentlyContinue
+    }
+
+    $rcMismatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.6" "0.3.0-rc.5"
     try {
         $rcMismatch = Invoke-Script $hostShell @("-RepoRoot", $rcMismatchRoot) $rcMismatchRoot
         Assert-True ($rcMismatch.ExitCode -ne 0) "readiness checker rejects RC tag when desktop metadata has a different version under $($rcMismatch.Host)" $rcMismatch.Output
-        Assert-True ($rcMismatch.Output -match "v0\.3\.0-rc\.5" -and $rcMismatch.Output -match "0\.3\.0-rc\.5" -and $rcMismatch.Output -match "0\.2\.0") "RC tag mismatch failure names tag, expected version, and actual desktop version under $($rcMismatch.Host)" $rcMismatch.Output
+        Assert-True ($rcMismatch.Output -match "v0\.3\.0-rc\.6" -and $rcMismatch.Output -match "0\.3\.0-rc\.6" -and $rcMismatch.Output -match "0\.3\.0-rc\.5") "RC tag mismatch failure names tag, expected version, and actual desktop version under $($rcMismatch.Host)" $rcMismatch.Output
     }
     finally {
         Remove-Item -Recurse -Force $rcMismatchRoot -ErrorAction SilentlyContinue
