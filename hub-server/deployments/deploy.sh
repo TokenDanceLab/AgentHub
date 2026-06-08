@@ -101,7 +101,6 @@ cleanup() {
 rollback() {
     log "Rolling back to $HUB_IMAGE..."
     cd "$PROJECT_DIR"
-    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down
     AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --force-recreate --remove-orphans hub-server
     health_check
     verify_public_api
@@ -119,6 +118,7 @@ case "${1:-deploy}" in
         log "Deployment complete! api.hub.vectorcontrol.tech is live."
         ;;
     rollback)
+        check_prereqs
         rollback
         log "Rollback complete"
         ;;
