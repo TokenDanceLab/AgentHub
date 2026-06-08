@@ -495,6 +495,74 @@ func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
 	}
 }
 
+func TestAppSessionServiceLifecycleEventsReachWebSocket(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.Session{}, &model.SessionMember{}, &model.Friendship{}))
+	require.NoError(t, db.Create(&model.Friendship{
+		UserID:   "owner-1",
+		FriendID: "member-1",
+		Status:   model.StatusAccepted,
+	}).Error)
+
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "owner-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{
+		DB:             db,
+		SessionService: service.NewSessionService(db, nil, bus),
+		mgr:            mgr,
+		bus:            bus,
+	}
+	mgr.ResolveMembers = func(sessionID string) []string {
+		members, err := a.SessionService.ListActiveMembers(sessionID)
+		if err != nil {
+			return nil
+		}
+		ids := make([]string, 0, len(members))
+		for _, member := range members {
+			ids = append(ids, member.MemberID)
+		}
+		return ids
+	}
+	a.startEventSubscriptions(context.Background())
+
+	resp, err := a.SessionService.CreateGroupSession(context.Background(), "owner-1", "Workspace", []string{})
+	require.NoError(t, err)
+	frame := readAppTestFrame(t, conn)
+	require.Equal(t, ws.TypeSessionCreated, frame.Type)
+	require.Equal(t, resp.SessionID, frame.Payload["session_id"])
+	require.Equal(t, "group", frame.Payload["type"])
+
+	require.NoError(t, a.SessionService.AddGroupMembers(context.Background(), "owner-1", resp.SessionID, []string{"member-1"}))
+	frame = readAppTestFrame(t, conn)
+	require.Equal(t, ws.TypeSessionMemberJoined, frame.Type)
+	require.Equal(t, resp.SessionID, frame.Payload["session_id"])
+	require.Equal(t, "member-1", frame.Payload["member_id"])
+
+	name := "Renamed workspace"
+	require.NoError(t, a.SessionService.UpdateGroupInfo(context.Background(), "owner-1", resp.SessionID, &name, nil, nil))
+	frame = readAppTestFrame(t, conn)
+	require.Equal(t, ws.TypeSessionInfoUpdated, frame.Type)
+	require.Equal(t, resp.SessionID, frame.Payload["session_id"])
+	require.Equal(t, name, frame.Payload["changes"].(map[string]interface{})["name"])
+
+	require.NoError(t, a.SessionService.DissolveGroup(context.Background(), "owner-1", resp.SessionID))
+	frame = readAppTestFrame(t, conn)
+	require.Equal(t, ws.TypeSessionDissolved, frame.Type)
+	require.Equal(t, resp.SessionID, frame.Payload["session_id"])
+}
+
 func readAppTestFrame(t *testing.T, conn *ws.Conn) struct {
 	Type    string                 `json:"type"`
 	Payload map[string]interface{} `json:"payload"`
