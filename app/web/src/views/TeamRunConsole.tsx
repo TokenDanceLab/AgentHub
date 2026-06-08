@@ -44,6 +44,10 @@ function formatStatus(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || 'Unknown error');
+}
+
 const RUN_STATUS_DOT: Record<string, string> = {
   queued: '#9ca3af',
   running: '#f59e0b',
@@ -51,6 +55,8 @@ const RUN_STATUS_DOT: Record<string, string> = {
   failed: '#ef4444',
   cancelled: '#6b7280',
 };
+const EMPTY_TASKS: AgentTeamTask[] = [];
+const EMPTY_EVENTS: AgentTeamEvent[] = [];
 
 function mapMemberDisplays(
   members: { member_id: string; agent_profile_id?: string; role: string; active_tasks?: number; completed_tasks?: number }[],
@@ -119,6 +125,8 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const [insetTeam, setInsetTeam] = useState<AgentTeamDetail | null>(null);
   const [insetRun, setInsetRun] = useState<AgentTeamRun | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState('');
+  const [startRunError, setStartRunError] = useState('');
+  const [runReplayError, setRunReplayError] = useState('');
 
   // Queries
   const agentTeamsQuery = useHubAgentTeams({
@@ -141,8 +149,8 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const runs = selectedBundle?.runs ?? [];
 
   const state = localState ?? agentTeamsQuery.data?.state;
-  const tasks = localTasks.length > 0 ? localTasks : (agentTeamsQuery.data?.tasks ?? []);
-  const events = localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? []);
+  const tasks = localTasks.length > 0 ? localTasks : (agentTeamsQuery.data?.tasks ?? EMPTY_TASKS);
+  const events = localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? EMPTY_EVENTS);
   const onlineLocalEdgeTargets = useMemo(
     () => (executionTargetsQuery.data?.items ?? []).filter((target) =>
       target.target_type === 'local_edge' &&
@@ -221,6 +229,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
       setLocalEvents([]);
       setInsetTeam(null);
       setInsetRun(null);
+      setRunReplayError('');
     },
     [],
   );
@@ -233,6 +242,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
       setLocalTasks([]);
       setLocalEvents([]);
       setStateLoading(true);
+      setRunReplayError('');
       try {
         const token = tokenGetter();
         if (!token) return;
@@ -249,8 +259,8 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
         setInsetTeam(teamDetailData);
         const runData = await client.getTeamRun(teamId, runId);
         setInsetRun(runData);
-      } catch {
-        // keep stale data
+      } catch (error) {
+        setRunReplayError(formatErrorMessage(error));
       } finally {
         setStateLoading(false);
       }
@@ -273,6 +283,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
 
   const handleStartRun = useCallback(async () => {
     if (!selectedTeamId || !triggerMessage.trim() || !selectedRunTarget) return;
+    setStartRunError('');
     try {
       const run = await startRunMut.mutateAsync({
         teamId: selectedTeamId,
@@ -281,8 +292,8 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
       setTriggerMessage('');
       setShowStartRun(false);
       setTimeout(() => handleSelectRun(selectedTeamId, run.id), 1500);
-    } catch {
-      // mutation handles error
+    } catch (error) {
+      setStartRunError(formatErrorMessage(error));
     }
   }, [handleSelectRun, selectedRunTarget, selectedTeamId, startRunMut, triggerMessage]);
 
@@ -438,12 +449,19 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
               const runCount = bundle?.runs.length ?? 0;
               const active = selectedTeamId === team.id;
               return (
-                <button
-                  key={team.id}
-                  type="button"
-                  className={`${styles.teamItem} ${active ? styles.teamItemActive : ''}`}
-                  onClick={() => handleSelectTeam(team.id)}
-                >
+                  <div
+                    key={team.id}
+                    role="button"
+                    tabIndex={0}
+                    className={`${styles.teamItem} ${active ? styles.teamItemActive : ''}`}
+                    onClick={() => handleSelectTeam(team.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        void handleSelectTeam(team.id);
+                      }
+                    }}
+                  >
                   <div className={styles.teamItemHeader}>
                     <span className={styles.teamName}>{team.name}</span>
                     <span className={styles.teamRunCount}>{runCount}</span>
@@ -482,7 +500,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                       })}
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -544,7 +562,10 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                           className={styles.select}
                           aria-label={t('teamRun.targetPickerLabel', 'Desktop/Edge target')}
                           value={selectedTargetId}
-                          onChange={(event) => setSelectedTargetId(event.target.value)}
+                          onChange={(event) => {
+                            setSelectedTargetId(event.target.value);
+                            setStartRunError('');
+                          }}
                           disabled={runTargetLoading || Boolean(runTargetError) || onlineLocalEdgeTargets.length === 0}
                         >
                           <option value="">
@@ -579,6 +600,11 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                             : t('teamRun.go', 'Go')}
                         </button>
                       </div>
+                      {startRunError && (
+                        <div className={styles.inlineError} role="status">
+                          {t('teamRun.startRunError', 'Hub dispatch failed: {{message}}', { message: startRunError })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -622,6 +648,10 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
               ) : !selectedRun ? (
                 <div className={styles.listHint}>
                   {t('teamRun.selectRun', 'Select a run from the sidebar to view details.')}
+                </div>
+              ) : runReplayError ? (
+                <div className={styles.listError} role="status">
+                  {t('teamRun.runReplayError', 'Unable to load Hub run replay: {{message}}', { message: runReplayError })}
                 </div>
               ) : (
                 <>
