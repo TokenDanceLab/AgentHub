@@ -1,6 +1,7 @@
 import type { ComposerIntent, ComposerSubmitResult } from '../composer';
 import type { WorkbenchAgent, WorkbenchConversation } from '../platform';
 import type { TranscriptBlock } from '../transcript';
+import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoTranscript } from './teamrunDemo';
 
 export type WorkbenchDemoSurface = 'desktop' | 'web';
 
@@ -57,6 +58,17 @@ const demoConversationsBase: WorkbenchConversation[] = [
     unreadCount: 4,
     model: 'DeepSeek-V4-Pro',
     avatarColor: `linear-gradient(135deg, ${ROLE_ORCHESTRATOR}, ${ROLE_BUILDER})`,
+  },
+  {
+    id: TEAMRUN_DEMO_CONVERSATION_ID,
+    title: 'ByteDance TeamRun',
+    kind: 'group',
+    subtitle: 'fixture-only UI evidence capture',
+    updatedLabel: '10:11',
+    unreadCount: 3,
+    model: 'fixture-only',
+    avatarLabel: 'T',
+    avatarColor: `linear-gradient(135deg, ${ROLE_ORCHESTRATOR}, ${ROLE_REVIEWER})`,
   },
   {
     id: 'deployer',
@@ -482,6 +494,7 @@ export const demoWorkbenchPins: WorkbenchDemoMessagePin[] = [
 
 export const demoWorkbenchTranscripts: Record<string, TranscriptBlock[]> = {
   builder: builderTranscript,
+  [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
 };
 
 export function createWorkbenchDemoStore(): WorkbenchDemoStore {

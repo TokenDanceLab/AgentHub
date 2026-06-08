@@ -50,6 +50,25 @@
       "submission_ready": false
     }
   ],
+  "ui_evidence_capture": {
+    "harness": "app/desktop/src/__e2e__/teamrun-ui-evidence.spec.ts",
+    "fixture_conversation_id": "bytedance-teamrun",
+    "screenshots": [
+      "teamrun-transcript.png",
+      "teamrun-inspector-files.png"
+    ],
+    "covered_surfaces": [
+      "Desktop shared transcript",
+      "Right inspector file/evidence list",
+      "TeamRun route, task, and event fixture list"
+    ],
+    "blocked_runtime_touches": [
+      "TokenDance ID login",
+      "Hub or Edge service mutation",
+      "real CLI or model execution",
+      "secret reads"
+    ]
+  },
   "agent_profiles": [
     {
       "id": "profile-supervisor-fixture",
