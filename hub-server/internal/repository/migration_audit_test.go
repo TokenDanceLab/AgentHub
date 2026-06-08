@@ -37,6 +37,21 @@ func TestMigration0042MessageSearchTsvectorCreatesPartialGINExpressionIndex(t *t
 	requireSQL(t, normalizedDown, "drop index if exists idx_messages_content_text_tsvector")
 }
 
+func TestMigration0044MessagesEditAddsEditedColumnsAndPartialIndex(t *testing.T) {
+	up := readMigration(t, "0044_messages_edit.up.sql")
+	down := readMigration(t, "0044_messages_edit.down.sql")
+
+	normalizedUp := normalizeSQL(up)
+	requireSQL(t, normalizedUp, "alter table messages add column if not exists edited boolean not null default false")
+	requireSQL(t, normalizedUp, "alter table messages add column if not exists edited_at timestamptz")
+	requireSQL(t, normalizedUp, "create index if not exists idx_messages_edited on messages (session_id, edited_at) where edited = true")
+
+	normalizedDown := normalizeSQL(down)
+	requireSQL(t, normalizedDown, "drop index if exists idx_messages_edited")
+	requireSQL(t, normalizedDown, "alter table messages drop column if exists edited_at")
+	requireSQL(t, normalizedDown, "alter table messages drop column if exists edited")
+}
+
 func readMigration(t *testing.T, filename string) string {
 	t.Helper()
 

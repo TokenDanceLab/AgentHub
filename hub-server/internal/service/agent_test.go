@@ -1342,7 +1342,12 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 			content_type TEXT NOT NULL,
 			content TEXT NOT NULL,
 			seq_id INTEGER NOT NULL,
-			client_msg_id TEXT NOT NULL
+			client_msg_id TEXT NOT NULL,
+			reply_to_message_id TEXT,
+			recalled BOOLEAN NOT NULL DEFAULT FALSE,
+			edited BOOLEAN NOT NULL DEFAULT FALSE,
+			edited_at DATETIME,
+			created_at DATETIME
 		)`,
 		`CREATE TABLE session_members (
 			id TEXT PRIMARY KEY,

@@ -2760,6 +2760,34 @@ paths:
 
   # ── Messages (individual operations — code paths) ──
 
+  /client/messages/{id}:
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubEditMessageDirect
+      summary: Edit a message.
+      description: Sender-only edit for user messages within the Hub edit window.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content_type, content]
+              properties:
+                content_type: { type: string }
+                content: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   /client/messages/{id}/recall:
     post:
       tags: [HubSyncRelay]

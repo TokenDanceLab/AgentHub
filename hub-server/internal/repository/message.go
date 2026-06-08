@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -71,6 +72,25 @@ func AllocateSeqID(tx *gorm.DB, sessionID string) (int64, error) {
 
 func UpdateMessageRecalled(db *gorm.DB, id string) error {
 	return db.Model(&model.Message{}).Where("id = ?", id).Update("recalled", true).Error
+}
+
+func UpdateMessageContent(db *gorm.DB, id, contentType, content string) error {
+	now := time.Now()
+	result := db.Model(&model.Message{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"content_type": contentType,
+			"content":      content,
+			"edited":       true,
+			"edited_at":    &now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func InsertPin(db *gorm.DB, pin *model.MessagePin) error {
