@@ -567,6 +567,40 @@ func TestOpenAPIHubWebSocketDocumentsUpgradeAuth(t *testing.T) {
 	}
 }
 
+func TestOpenAPIHubWebSocketFrameSchemas(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	components := yamlMapField(t, spec, "components", "components")
+	schemas := yamlMapField(t, components, "schemas", "components.schemas")
+
+	frame := yamlMapField(t, schemas, "HubWebSocketFrame", "components.schemas.HubWebSocketFrame")
+	required := yamlStringSlice(t, yamlField(t, frame, "required", "HubWebSocketFrame.required"), "HubWebSocketFrame.required")
+	for _, field := range []string{"type", "payload"} {
+		if !containsString(required, field) {
+			t.Fatalf("HubWebSocketFrame.required = %v, want %q", required, field)
+		}
+	}
+	frameProps := yamlMapField(t, frame, "properties", "HubWebSocketFrame.properties")
+	frameType := yamlMapField(t, frameProps, "type", "HubWebSocketFrame.properties.type")
+	enum := yamlStringSlice(t, yamlField(t, frameType, "enum", "HubWebSocketFrame.properties.type.enum"), "HubWebSocketFrame.properties.type.enum")
+	for _, eventType := range []string{
+		"message.edited",
+		"message.reaction_added",
+		"message.reaction_removed",
+		"device.online",
+		"device.offline",
+		"team.run.started",
+		"team.assignment.done",
+		"team.assignment.failed",
+	} {
+		if !containsString(enum, eventType) {
+			t.Fatalf("HubWebSocketFrame type enum missing %q: %v", eventType, enum)
+		}
+	}
+
+	assertSchemaHasOnlyProperties(t, schemas, "HubDevicePresencePayload", []string{"user_id"})
+	assertSchemaRequiredFields(t, schemas, "HubDevicePresencePayload", []string{"user_id"})
+}
+
 func assertSchemaRequiresUUIDDeviceID(t *testing.T, schemas *yaml.Node, schemaName string) {
 	t.Helper()
 	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
