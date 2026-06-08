@@ -48,10 +48,17 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	if healthHandler != nil {
 		r.GET("/health", healthHandler.Check)
+		r.GET("/health/live", healthHandler.Live)
+		r.GET("/health/ready", healthHandler.Ready)
 	} else {
-		r.GET("/health", func(c *gin.Context) {
-			handler.OK(c, gin.H{"status": "ok"})
+		healthOK := func(c *gin.Context) {
+			handler.OK(c, gin.H{"status": "ok", "live": true, "ready": true})
+		}
+		r.GET("/health", healthOK)
+		r.GET("/health/live", func(c *gin.Context) {
+			handler.OK(c, gin.H{"status": "ok", "live": true})
 		})
+		r.GET("/health/ready", healthOK)
 	}
 
 	// Public API — no auth required (official website hub.vectorcontrol.tech)
