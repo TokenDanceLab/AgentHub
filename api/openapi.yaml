@@ -1267,6 +1267,7 @@ paths:
           $ref: "#/components/responses/Error"
 
   /web/agent-tasks:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubTriggerTask
@@ -1305,6 +1306,7 @@ paths:
           description: Task dispatched.
 
   /web/agent-tasks/{id}/events:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListTaskRunEvents
@@ -1347,6 +1349,7 @@ paths:
                       $ref: "#/components/schemas/AgentRunEvent"
 
   /web/agent-tasks/{id}/events/summary:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubGetTaskRunEventSummary
@@ -1373,6 +1376,7 @@ paths:
                     $ref: "#/components/schemas/AgentRunEventSummary"
 
   /web/agent-tasks/{id}/summary:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubGetTaskRunEventSummaryAlias
@@ -1399,6 +1403,7 @@ paths:
                     $ref: "#/components/schemas/AgentRunEventSummary"
 
   /edge/agent-tasks/{id}/ack:
+    x-agenthub-device-type: desktop
     parameters:
       - name: id
         in: path
@@ -1423,6 +1428,7 @@ paths:
           description: Task marked running.
 
   /edge/agent-tasks/{id}/stream:
+    x-agenthub-device-type: desktop
     post:
       tags: [HubSyncRelay]
       operationId: hubTaskStream
@@ -1447,6 +1453,7 @@ paths:
           description: Chunk recorded.
 
   /edge/agent-tasks/{id}/done:
+    x-agenthub-device-type: desktop
     post:
       tags: [HubSyncRelay]
       operationId: hubTaskDone
@@ -1471,6 +1478,7 @@ paths:
           description: Task marked done.
 
   /edge/agent-tasks/{id}/fail:
+    x-agenthub-device-type: desktop
     post:
       tags: [HubSyncRelay]
       operationId: hubTaskFail
@@ -2166,6 +2174,7 @@ paths:
   # ── Custom Agents ──
 
   /web/agent-profiles:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListAgentProfiles
@@ -2232,6 +2241,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/custom-agents:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListCustomAgents
@@ -2275,6 +2285,7 @@ paths:
           $ref: "#/components/responses/Created"
 
   /web/custom-agents/{id}:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubGetCustomAgent
@@ -2346,6 +2357,7 @@ paths:
   # ── Edge / Web ──
 
   /edge/devices/register:
+    x-agenthub-device-type: desktop
     post:
       tags: [HubSyncRelay]
       operationId: hubRegisterDevice
@@ -2453,6 +2465,7 @@ paths:
           $ref: "#/components/responses/Error"
 
   /web/agent-tasks/{id}/cancel:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubCancelTask
@@ -2866,6 +2879,7 @@ paths:
   # ── Execution Targets ──
 
   /web/execution-targets:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListExecutionTargets
@@ -2894,6 +2908,7 @@ paths:
           $ref: "#/components/responses/Created"
 
   /web/execution-targets/{id}:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubGetExecutionTarget
@@ -2947,6 +2962,7 @@ paths:
           description: Deleted.
 
   /web/execution-targets/{id}/ping:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubPingExecutionTarget
@@ -2969,6 +2985,7 @@ paths:
   # ── Projects backed by Hub workspaces ──
 
   /web/projects:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListProjects
@@ -3008,6 +3025,7 @@ paths:
           $ref: "#/components/responses/Error"
 
   /web/projects/{id}:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubGetProject
@@ -3054,12 +3072,14 @@ paths:
   # ── Audit Events ──
 
   /web/audit-events:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListAuditEvents
       summary: List audit events.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/PageSize"
@@ -3071,12 +3091,14 @@ paths:
   # ── Relay Commands (web) ──
 
   /web/relay/commands:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateWebRelayCommand
       summary: Create a relay command.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -3104,12 +3126,14 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/relay/commands/{id}:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubGetWebRelayCommand
       summary: Get a relay command status.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -3121,12 +3145,14 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/relay/commands/{id}/ack:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubAckWebRelayCommand
       summary: Acknowledge a relay command.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -3140,6 +3166,7 @@ paths:
   # ── Devices (web) ──
 
   /web/devices:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListDevices
@@ -3154,6 +3181,7 @@ paths:
   # ── Agent Teams (web) ──
 
   /web/agent-teams:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateAgentTeam
@@ -3189,6 +3217,7 @@ paths:
           $ref: "#/components/responses/List"
 
   /web/agent-teams/{id}:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3238,6 +3267,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/members:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3270,6 +3300,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/members/{member_id}:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3291,6 +3322,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3328,6 +3360,7 @@ paths:
           $ref: "#/components/responses/List"
 
   /web/agent-teams/{id}/runs/{run_id}:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3349,6 +3382,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs/{run_id}/state:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3370,6 +3404,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs/{run_id}/events:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3391,6 +3426,7 @@ paths:
           $ref: "#/components/responses/List"
 
   /web/agent-teams/{id}/runs/{run_id}/tasks:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3412,6 +3448,7 @@ paths:
           $ref: "#/components/responses/List"
 
   /web/agent-teams/{id}/runs/{run_id}/route-decisions:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3440,6 +3477,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3472,6 +3510,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3504,6 +3543,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs/{run_id}/assignments:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3557,6 +3597,7 @@ paths:
           $ref: "#/components/responses/List"
 
   /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/dispatch:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3582,6 +3623,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/complete:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -3617,6 +3659,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/fail:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -4028,6 +4071,7 @@ paths:
   # ── Agent Profiles (CRUD beyond GET list) ──
 
   /web/agent-profiles/{id}:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -4073,12 +4117,14 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-profiles/{id}/publish:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubPublishAgentProfile
       summary: Publish an Agent Profile to the marketplace (admin only).
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -4090,6 +4136,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/agent-profiles/{id}/install:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubInstallAgentProfile
@@ -4109,6 +4156,7 @@ paths:
   # ── Skills ──
 
   /web/skills:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListSkills
@@ -4140,6 +4188,7 @@ paths:
           $ref: "#/components/responses/Created"
 
   /web/skills/{id}:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -4185,12 +4234,14 @@ paths:
           description: Deleted.
 
   /web/skills/{id}/publish:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubPublishSkill
       summary: Publish a skill to the marketplace (admin only).
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -4202,12 +4253,14 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/skills/{id}/unpublish:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubUnpublishSkill
       summary: Unpublish a skill from the marketplace (admin only).
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -4221,6 +4274,7 @@ paths:
   # ── MCP Servers ──
 
   /web/mcp-servers:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListMCPServers
@@ -4252,6 +4306,7 @@ paths:
           $ref: "#/components/responses/Created"
 
   /web/mcp-servers/{id}:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -4297,12 +4352,14 @@ paths:
           description: Deleted.
 
   /web/mcp-servers/{id}/publish:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubPublishMCPServer
       summary: Publish an MCP server to the marketplace (admin only).
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -4314,12 +4371,14 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/mcp-servers/{id}/unpublish:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubUnpublishMCPServer
       summary: Unpublish an MCP server from the marketplace (admin only).
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      x-agenthub-role: admin
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -4333,6 +4392,7 @@ paths:
   # ── Provider Bindings ──
 
   /web/provider-bindings:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubListProviderBindings
@@ -4364,6 +4424,7 @@ paths:
           $ref: "#/components/responses/Created"
 
   /web/provider-bindings/{id}:
+    x-agenthub-device-type: web
     parameters:
       - name: id
         in: path
@@ -4399,6 +4460,7 @@ paths:
   # ── Market ──
 
   /web/market/profiles:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubSearchMarketProfiles
@@ -4419,6 +4481,7 @@ paths:
           $ref: "#/components/responses/List"
 
   /web/market/profiles/{id}:
+    x-agenthub-device-type: web
     get:
       tags: [HubSyncRelay]
       operationId: hubGetMarketProfile
@@ -4438,6 +4501,7 @@ paths:
           $ref: "#/components/responses/Error"
 
   /web/market/profiles/{id}/install:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubInstallMarketProfile
@@ -4455,6 +4519,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /web/market/profiles/{id}/rate:
+    x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
       operationId: hubRateMarketProfile
