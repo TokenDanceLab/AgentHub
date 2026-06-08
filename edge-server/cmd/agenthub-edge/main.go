@@ -27,7 +27,8 @@ type config struct {
 	LocalAuthToken     string
 	HubJWTSecret       string // shared secret for validating Hub-issued HS256 JWTs
 	RemoteMode         bool   // allow non-loopback bind + remote origins (requires auth)
-	Dev                bool   // disable auto-generated local auth token for development
+	AllowedOrigins     repeatedString
+	Dev                bool // disable auto-generated local auth token for development
 
 	// Hub callback configuration (Edge→Hub direct bridge)
 	HubURL   string // Hub server base URL for Edge callback reporting
@@ -114,6 +115,7 @@ func main() {
 		HubURL:             cfg.HubURL,
 		HubToken:           cfg.HubToken,
 		RemoteMode:         cfg.RemoteMode,
+		AllowedOrigins:     append([]string(nil), cfg.AllowedOrigins...),
 		Dev:                cfg.Dev,
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 		SkillsDirs:         append([]string(nil), cfg.SkillsDirs...),
@@ -153,6 +155,29 @@ func splitPathList(value string) []string {
 	return out
 }
 
+func splitCommaList(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func trimRepeatedStrings(values repeatedString) repeatedString {
+	out := repeatedString{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
 func buildConfig(args []string) (config, error) {
 	fs := flag.NewFlagSet("agenthub-edge", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -170,6 +195,8 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")
 	fs.StringVar(&cfg.HubToken, "hub-token", getEnv("AGENTHUB_HUB_TOKEN", ""), "JWT bearer token for authenticating callback requests to Hub")
 	fs.BoolVar(&cfg.RemoteMode, "remote-mode", getEnv("AGENTHUB_REMOTE_MODE", "0") == "1", "allow non-loopback bind and remote origins (requires --local-auth-token or --hub-jwt-secret)")
+	cfg.AllowedOrigins = append(cfg.AllowedOrigins, splitCommaList(getEnv("AGENTHUB_ALLOWED_ORIGINS", ""))...)
+	fs.Var(&cfg.AllowedOrigins, "allowed-origin", "browser origin allowed by remote-mode CORS; may be repeated; env AGENTHUB_ALLOWED_ORIGINS uses comma separators")
 	fs.BoolVar(&cfg.Dev, "dev", getEnv("AGENTHUB_DEV", "0") == "1", "disable auto-generated local auth token for development; all endpoints are open")
 	fs.BoolVar(&cfg.Tailscale, "tailscale", getEnv("AGENTHUB_TAILSCALE", "0") == "1", "enable tailscale mode (implies --remote-mode, registers with Hub via tailscale identity)")
 	fs.StringVar(&cfg.TailscaleIP, "tailscale-ip", getEnv("AGENTHUB_TAILSCALE_IP", ""), "tailscale IP address for Hub registration identity")
@@ -218,6 +245,7 @@ func buildConfig(args []string) (config, error) {
 	cfg.RunnerCommand = strings.TrimSpace(cfg.RunnerCommand)
 	cfg.AgentDefault = strings.TrimSpace(cfg.AgentDefault)
 	cfg.LocalAuthToken = strings.TrimSpace(cfg.LocalAuthToken)
+	cfg.AllowedOrigins = trimRepeatedStrings(cfg.AllowedOrigins)
 	if cfg.RunnerCommand == "" && len(cfg.RunnerArgs) > 0 {
 		return config{}, fmt.Errorf("--runner-arg requires --runner-command")
 	}

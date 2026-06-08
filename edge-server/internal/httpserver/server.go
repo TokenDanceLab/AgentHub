@@ -61,6 +61,7 @@ type Config struct {
 	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
 	HubToken           string             // JWT bearer token for Hub callback authentication
 	RemoteMode         bool               // allow non-loopback bind + remote origins (requires auth)
+	AllowedOrigins     []string           // explicit remote-mode browser origins allowed by CORS
 	Dev                bool               // dev mode disables auto-generated local auth token
 	WorkspaceAllowlist []string           // optional roots allowed for request workDir
 	SkillsDirs         []string           // optional SKILL.md search dirs; empty = use defaults
@@ -146,7 +147,7 @@ func Run(cfg Config) error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode)),
+		Handler: reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode, cfg.AllowedOrigins)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
@@ -409,11 +410,11 @@ func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecu
 	orchAdapter.WithMessageQueue(msgQueue)
 }
 
-func corsMiddleware(next http.Handler, remoteMode bool) http.Handler {
+func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
-			if !security.IsTrustedOrigin(origin, remoteMode) {
+			if !security.IsAllowedOrigin(origin, remoteMode, allowedOrigins) {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
@@ -478,20 +479,11 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 }
 
 // isLocalAuthExempt reports whether a request is exempt from local auth checks.
-// Read-only methods (GET, HEAD, OPTIONS) are generally exempt — they expose
-// project/thread/run metadata but cannot mutate state or execute commands.
-// Only POST/PATCH/DELETE endpoints require authentication because they can
-// create runs, send messages, approve tool calls, or delete threads.
-//
-// WebSocket upgrade requests (GET to /v1/events) are NOT exempt even though
-// they use the GET method, because the live event stream exposes real-time
-// agent output, tool-call permission prompts, and file-change notifications —
-// the same class of sensitive data that mutation endpoints protect.
+// Only CORS preflight requests and the health endpoint are open when local
+// auth is configured. Ordinary GET/HEAD routes can expose project metadata,
+// run output, approvals, and local workspace state, so they must authenticate.
 func isLocalAuthExempt(r *http.Request) bool {
-	if isWebSocketUpgrade(r) {
-		return false
-	}
-	return r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions
+	return r.Method == http.MethodOptions || r.URL.Path == "/v1/health"
 }
 
 // authTokenCandidates extracts all possible auth tokens from a request.
@@ -566,6 +558,7 @@ func edgeConfigDumper(cfg Config) debugpkg.ConfigDumper {
 		return map[string]any{
 			"addr":                cfg.Addr,
 			"remote_mode":         cfg.RemoteMode,
+			"allowed_origins":     cfg.AllowedOrigins,
 			"dev":                 cfg.Dev,
 			"workspace_allowlist": cfg.WorkspaceAllowlist,
 			"hub_url":             cfg.HubURL,
