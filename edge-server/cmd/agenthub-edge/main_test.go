@@ -643,6 +643,42 @@ func TestBuildConfigParsesLocalAuthTokenFromFlag(t *testing.T) {
 	}
 }
 
+func TestBuildConfigParsesAllowedOriginsFromFlag(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--allowed-origin", " https://app.example.com ",
+		"--allowed-origin", "http://edge.example.com:3210",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	want := []string{"https://app.example.com", "http://edge.example.com:3210"}
+	if len(cfg.AllowedOrigins) != len(want) {
+		t.Fatalf("AllowedOrigins = %v, want %v", []string(cfg.AllowedOrigins), want)
+	}
+	for i := range want {
+		if cfg.AllowedOrigins[i] != want[i] {
+			t.Fatalf("AllowedOrigins[%d] = %q, want %q", i, cfg.AllowedOrigins[i], want[i])
+		}
+	}
+}
+
+func TestBuildConfigEnvVarAllowedOrigins(t *testing.T) {
+	t.Setenv("AGENTHUB_ALLOWED_ORIGINS", "https://app.example.com,http://edge.example.com:3210")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	want := []string{"https://app.example.com", "http://edge.example.com:3210"}
+	if len(cfg.AllowedOrigins) != len(want) {
+		t.Fatalf("AllowedOrigins = %v, want %v", []string(cfg.AllowedOrigins), want)
+	}
+	for i := range want {
+		if cfg.AllowedOrigins[i] != want[i] {
+			t.Fatalf("AllowedOrigins[%d] = %q, want %q", i, cfg.AllowedOrigins[i], want[i])
+		}
+	}
+}
+
 func TestBuildConfigEnvVarLocalAuthToken(t *testing.T) {
 	t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "env-edge-secret")
 	cfg, err := buildConfig(nil)
