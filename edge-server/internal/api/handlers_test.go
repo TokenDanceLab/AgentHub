@@ -472,6 +472,55 @@ func TestArtifactPreviewMetadataLookupRoutes(t *testing.T) {
 	}
 }
 
+func TestPostPreviewsStartsFakePreviewMetadata(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	h.ensureDefaults()
+	if _, err := h.Store.CreateRun("run_preview_start", "proj_local", "thread_local"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/previews", strings.NewReader(`{
+		"previewId": "preview_fake_start",
+		"runId": "run_preview_start"
+	}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST /v1/previews status = %d, want 202 body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode preview body: %v", err)
+	}
+	body = unwrapSuccess(body)
+	if body["id"] != "preview_fake_start" || body["runId"] != "run_preview_start" || body["threadId"] != "thread_local" || body["status"] != "starting" {
+		t.Fatalf("preview start body = %#v, want starting metadata", body)
+	}
+	if _, hasURL := body["url"]; hasURL {
+		t.Fatalf("starting preview url = %#v, want omitted url", body["url"])
+	}
+	stored, ok := h.Store.GetPreview("preview_fake_start")
+	if !ok || stored.Status != "starting" || stored.URL != "" || stored.RunID != "run_preview_start" || stored.ThreadID != "thread_local" {
+		t.Fatalf("stored preview = %#v ok=%v, want starting metadata", stored, ok)
+	}
+}
+
+func TestPostPreviewsRejectsMissingRun(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/previews", strings.NewReader(`{"previewId":"preview_missing","runId":"run_missing"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST /v1/previews missing run status = %d, want 404 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestProjectThreadRoutes(t *testing.T) {
 	h := newTestHandler()
 	mux := http.NewServeMux()
