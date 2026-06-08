@@ -6,8 +6,8 @@ Default mode is a dry-run/plan harness: it runs repeatable FixtureOnly and
 LocalOnly checks, records localhost service probes as blocked, and writes an
 evidence matrix. Pass output never means RealTested. Use -RunLocalhost only
 after local Hub/Web/Desktop/Edge fixture services are already running. The
-current localhost probes are TCP-only reachability checks; they do not prove
-service identity or fixture readiness.
+localhost probes require /health JSON identity markers for each fixture
+service; plain TCP reachability is not accepted as proof.
 
 This script does not start real TokenDanceID, run real CLI/model adapters,
 deploy public surfaces, sign packages, upload releases, or touch Mobile.
@@ -269,31 +269,73 @@ function Invoke-RequiredNativeGate {
     Fail $Label $run.Output.Trim() $Claim
 }
 
-function Test-TcpPort {
+$ExpectedHealthMarkers = @{
+    hub = @{
+        service = "hub"
+        identity = "agenthub-hub-localhost-fixture"
+        upstream = "registered-desktop-target-router"
+    }
+    web = @{
+        service = "web"
+        identity = "agenthub-web-localhost-fixture"
+        upstream = "hub-only"
+    }
+    desktop = @{
+        service = "desktop"
+        identity = "agenthub-desktop-bridge-localhost-fixture"
+        bridge = "tauri-sidecar-fixture"
+    }
+    "local-edge" = @{
+        service = "local-edge"
+        identity = "agenthub-local-edge-localhost-fixture"
+        adapter = "fixture-sdk"
+        runner = "fixture-local-edge-runner"
+    }
+}
+
+function Invoke-HealthProbe {
     param(
-        [string]$HostName,
-        [int]$Port,
+        [string]$Url,
         [int]$Timeout
     )
 
-    $client = [System.Net.Sockets.TcpClient]::new()
     try {
-        $task = $client.ConnectAsync($HostName, $Port)
-        if (-not $task.Wait($Timeout)) {
-            return $false
+        Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
+        $client = [System.Net.Http.HttpClient]::new()
+        $client.Timeout = [TimeSpan]::FromMilliseconds($Timeout)
+        try {
+            $response = $client.GetAsync($Url).GetAwaiter().GetResult()
+            $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            if (-not $response.IsSuccessStatusCode) {
+                return [pscustomobject]@{
+                    Ok = $false
+                    Detail = "GET $Url returned HTTP $([int]$response.StatusCode): $body"
+                    Health = $null
+                }
+            }
+            $health = $body | ConvertFrom-Json
+            return [pscustomobject]@{
+                Ok = $true
+                Detail = $body
+                Health = $health
+            }
+        } finally {
+            $client.Dispose()
         }
-        return $client.Connected
     } catch {
-        return $false
-    } finally {
-        $client.Dispose()
+        return [pscustomobject]@{
+            Ok = $false
+            Detail = "GET $Url failed: $($_.Exception.Message)"
+            Health = $null
+        }
     }
 }
 
 function Test-LocalhostService {
     param(
         [string]$Label,
-        [int]$Port
+        [int]$Port,
+        [string]$Service
     )
 
     if (-not $RunLocalhost) {
@@ -301,14 +343,30 @@ function Test-LocalhostService {
         return
     }
 
-    if (Test-TcpPort "127.0.0.1" $Port $TimeoutMs) {
-        $detail = "TCP-only reachability: 127.0.0.1:$Port accepted a TCP connection; does not prove service identity or fixture readiness. TODO: replace TCP-only probes with health/fixture marker checks. RealTested=false"
-        Pass "$Label TCP-only reachability" "LocalhostSmoke" $detail
-        Write-Host "        $detail" -ForegroundColor DarkGray
+    $expected = $ExpectedHealthMarkers[$Service]
+    if (-not $expected) {
+        Fail $Label "missing expected health marker definition for service $Service"
         return
     }
 
-    Block $Label "127.0.0.1:$Port is not reachable. Start the local fixture service or keep this as a blocked smoke check."
+    $url = "http://127.0.0.1:$Port/health"
+    $probe = Invoke-HealthProbe $url $TimeoutMs
+    if (-not $probe.Ok) {
+        Block $Label "$($probe.Detail). Start the local fixture service or keep this as a blocked smoke check."
+        return
+    }
+
+    foreach ($key in $expected.Keys) {
+        $actual = [string]$probe.Health.$key
+        if ($actual -ne [string]$expected[$key]) {
+            Block $Label "missing identity marker for $Service.$key. Expected '$($expected[$key])', got '$actual'. Raw health: $($probe.Detail)"
+            return
+        }
+    }
+
+    $detail = "GET $url returned expected $Service identity marker. RealTested=false"
+    Pass "$Label health identity marker" "LocalhostSmoke" $detail
+    Write-Host "        $detail" -ForegroundColor DarkGray
 }
 
 function Write-EvidenceMatrix {
@@ -416,10 +474,10 @@ Invoke-RequiredNativeGate "go test ./internal/security ./internal/httpserver -ru
 Write-Host "        Edge remote origin boundary" -ForegroundColor DarkGray
 
 Step "Localhost service probes"
-Test-LocalhostService "localhost Hub service probe" $HubPort
-Test-LocalhostService "localhost Web service probe" $WebPort
-Test-LocalhostService "localhost Desktop service probe" $DesktopPort
-Test-LocalhostService "localhost Local Edge service probe" $EdgePort
+Test-LocalhostService "localhost Hub service probe" $HubPort "hub"
+Test-LocalhostService "localhost Web service probe" $WebPort "web"
+Test-LocalhostService "localhost Desktop service probe" $DesktopPort "desktop"
+Test-LocalhostService "localhost Local Edge service probe" $EdgePort "local-edge"
 Block "localhost fake/local session chain proof" "Requires pre-started Hub/Web/Desktop/Local Edge fixture services plus a fake/local session path and fixture adapter run evidence; this script only records the blocked check until those services are available."
 
 Step "RealApprovalRequired gates"
