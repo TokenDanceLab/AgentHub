@@ -1,12 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -27,6 +29,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/pkg/reqlog"
 	"github.com/glebarez/sqlite"
 )
 
@@ -317,6 +320,71 @@ func TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession(t *testing.
 
 	_, err = repository.FindRefreshTokenByHash(db, jwtutil.HashRefreshToken(result.RefreshToken))
 	require.NoError(t, err)
+}
+
+func TestHandleCallback_TokenEndpointErrorDoesNotLogProviderRawBody(t *testing.T) {
+	db := setupOIDCDB(t)
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	const rawProviderBody = `{"error":"invalid_grant","error_description":"authorization code auth-code-secret returned access_token provider-access-secret","access_token":"provider-access-secret","refresh_token":"provider-refresh-secret","id_token":"provider-id-secret"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oidc/token" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(rawProviderBody))
+	}))
+	t.Cleanup(server.Close)
+
+	var logBuf bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+	jwtutil.SetJWKSURI("")
+	jwtutil.ResetJWKSCache()
+	svc := NewOIDCService(db, config.TokenDanceIDConfig{
+		IssuerURL:    server.URL,
+		ClientID:     "agenthub-client",
+		ClientSecret: "agenthub-secret",
+		RedirectURI:  "http://127.0.0.1:8181/client/auth/oidc/callback",
+	}, config.JWTConfig{
+		Secret:     "hub-local-secret-minimum-32-chars",
+		AccessTTL:  15 * time.Minute,
+		RefreshTTL: time.Hour,
+	}, cacheClient)
+
+	deviceID := "11111111-1111-4111-8111-111111111111"
+	authz, err := svc.GenerateAuthorizationURL(context.Background(), "challenge-1", "S256", "desktop", deviceID, "")
+	require.NoError(t, err)
+
+	ctx := reqlog.WithRequestID(context.Background(), "req-oidc-token-redact")
+	_, err = svc.HandleCallback(ctx, "auth-code-secret", authz.State, "verifier-1", "desktop", deviceID, "")
+	require.ErrorIs(t, err, errcode.OIDCCodeExchangeFailed)
+
+	logText := logBuf.String()
+	assert.Contains(t, logText, "req-oidc-token-redact")
+	assert.Contains(t, logText, "invalid_grant")
+	assert.Contains(t, logText, "400")
+	for _, forbidden := range []string{
+		rawProviderBody,
+		"auth-code-secret",
+		"provider-access-secret",
+		"provider-refresh-secret",
+		"provider-id-secret",
+		"access_token",
+		"refresh_token",
+		"id_token",
+		"response_body",
+	} {
+		assert.NotContains(t, logText, forbidden)
+		assert.NotContains(t, err.Error(), forbidden)
+	}
 }
 
 func oidcTestKey(t *testing.T) (*rsa.PrivateKey, string, string) {
