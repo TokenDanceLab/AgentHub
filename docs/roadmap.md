@@ -89,6 +89,11 @@ The final demo narrative must show: AgentHub defines the collaboration model; Ed
 | `.worktrees/audit-login-chat-sync` / `codex/audit-login-chat-sync` | report ready | Use report findings for next worker dispatch; bridge mount finding is superseded by unified baseline. |
 | `.worktrees/audit-scheduling-cli` / `codex/audit-scheduling-cli` | report ready | Use report findings for final e2e/evidence planning; several base blockers are superseded by unified baseline. |
 | `.worktrees/audit-build-deploy` / `codex/audit-build-deploy` | report ready | Build/deploy findings feed Desktop packaging and Web deploy workers. |
+| `.worktrees/p0-desktop-packaging-dry` / `codex/p0-desktop-packaging-dry` | running | Desktop packaging dry proof: sidecar, SQLite app-data policy, installer readiness; no signing/notarization/upload. |
+| `.worktrees/p0-web-auth-deploy` / `codex/p0-web-auth-deploy` | running | Web auth root, callback defaults, production build/deploy manifest; no live TokenDanceID or public deploy. |
+| `.worktrees/p0-desktop-device-registration` / `codex/p0-desktop-device-registration` | running | Active Desktop device registration and execution-target refresh for Web/TeamRun routing. |
+| `.worktrees/p0-remote-fixture-e2e` / `codex/p0-remote-fixture-e2e` | running | Fixture E2E evidence gate for Web -> Hub -> Desktop/Edge -> Local Edge -> adapter chain. |
+| `.worktrees/p0-sdk-adapter-fixture` / `codex/p0-sdk-adapter-fixture` | running | Claude/OpenAI/OpenCode SDK fixture mapping below Edge adapter boundary; no SDK installs or model/API calls. |
 | `.worktrees/edge-sql-store` / `codex/edge-sql-store` | broken object | Do not use for P0 unless recreated. |
 | `.worktrees/tauri-package-next` / `codex/tauri-package-next` | dirty, behind dev | P1 packaging reference only. |
 | `mobile-*` | external | Do not edit. |
