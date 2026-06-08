@@ -105,7 +105,7 @@ Assert-Contains "edge-server\internal\adapters\sdk_fixture_mapper_test.go" "Test
 Step "Topology docs"
 Assert-Contains "docs\roadmap.md" "P0 fixture topology now proves Web authenticated Hub session can address a registered Desktop/Edge target" "roadmap records P0 remote-control auth/topology prerequisite"
 Assert-Contains "docs\backend-integration-governance.md" "Login fixture topology gate" "governance records login fixture topology gate"
-Assert-Contains "docs\backend-integration-governance.md" "Desktop receives Hub dispatch -> Local Edge starts CLI adapter.*后续真实/fixture dispatch slice" "governance keeps dispatch/CLI start outside this login slice"
+Assert-Contains "docs\backend-integration-governance.md" "Desktop receives Hub dispatch -> Local Edge starts CLI adapter" "governance keeps dispatch/CLI start outside this login slice"
 Assert-Contains "docs\backend-integration-governance.md" "future real TokenDanceID/OIDC login remains approval-gated" "governance keeps real TokenDanceID/OIDC approval gate"
 
 Step "Focused verification commands"
