@@ -259,21 +259,23 @@ Write-Host "No real CLI/model command was executed by this verifier." -Foregroun
 Invoke-GoFixtureTest "./internal/adapters" "TestCLIInvocationPlanRedactsPromptEnvAndPaths"
 Invoke-GoFixtureTest "./internal/lifecycle" "TestProcessExecutorPublishesCLIInvocationPlanAndReplaysFixtureStatus"
 
-$realTested = $false
+$observedManifestAccepted = $false
 if ($Mode -ne "Fixture") {
     $approved = Test-ApprovalMarker
     $manifest = Test-ObservedManifest
     $observedOK = Test-ObservedChain $manifest
-    $realTested = $approved -and $observedOK
+    $observedManifestAccepted = $approved -and $observedOK
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  Passed: $Passed  |  Failed: $Failed  |  Blocks: $Blocks" -ForegroundColor $(if ($Failed -eq 0 -and ($Mode -eq "Fixture" -or $realTested)) { "Green" } else { "Red" })
+Write-Host "  Passed: $Passed  |  Failed: $Failed  |  Blocks: $Blocks" -ForegroundColor $(if ($Failed -eq 0 -and ($Mode -eq "Fixture" -or $observedManifestAccepted)) { "Green" } else { "Red" })
 Write-Host "========================================" -ForegroundColor Cyan
 
-if ($realTested) {
-    Write-Host "real_tested=true" -ForegroundColor Green
-    Write-Host "Status: OBSERVED_DISPATCH_VERIFIED" -ForegroundColor Green
+if ($observedManifestAccepted) {
+    Write-Host "real_tested=false" -ForegroundColor Yellow
+    Write-Host "observed_manifest_accepted=true" -ForegroundColor Green
+    Write-Host "Status: OBSERVED_MANIFEST_ACCEPTED" -ForegroundColor Green
+    Write-Host "RealTested promotion requires a separate verifier that dereferences the observed evidence artifact/log/hash." -ForegroundColor Yellow
     exit $(if ($Failed -eq 0) { 0 } else { 1 })
 }
 
