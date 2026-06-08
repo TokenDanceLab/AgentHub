@@ -85,7 +85,7 @@ func TestOpenAPIEdgeRouteStatuses(t *testing.T) {
 		{"/v1/previews", "get", "implemented"},
 		{"/v1/previews", "post", "planned"},
 		{"/v1/previews/{previewId}", "get", "implemented"},
-		{"/v1/previews/{previewId}:stop", "post", "planned"},
+		{"/v1/previews/{previewId}:stop", "post", "implemented"},
 		{"/v1/workspaces/{workspaceId}/files:read", "post", "planned"},
 	}
 

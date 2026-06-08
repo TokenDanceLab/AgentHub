@@ -140,8 +140,8 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `approval.decided` | P0 | 用户已审批 (planned) |
 | `artifact.created` | P0 | 产物创建；Edge lifecycle 将该事件的 artifact metadata 写入本地 evidence store，当前只读 REST 合同通过 `GET /v1/artifacts` 暴露 metadata snapshot；不包含 content/apply/discard |
 | `artifact.updated` | P1 | 产物元数据更新 (planned) |
-| `preview.ready` | P0 | 预览可用；Edge lifecycle 将该事件的 preview metadata 写入本地 evidence store，当前只读 REST 合同通过 `GET /v1/previews` 暴露 metadata snapshot；start/stop 生命周期后续补齐 |
-| `preview.stopped` | P1 | 预览停止 (planned) |
+| `preview.ready` | P0 | 预览可用；Edge lifecycle 将该事件的 preview metadata 写入本地 evidence store，当前只读 REST 合同通过 `GET /v1/previews` / `GET /v1/previews/{previewId}` 暴露 metadata snapshot；start 生命周期后续补齐 |
+| `preview.stopped` | P1 | 预览停止；Edge lifecycle 将该事件写回同一条 preview metadata，状态转为 `stopped` 并清空 ready URL；真实进程停止仍由后续 preview runner slice 实现 |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
 | `run.cancelled` | P0 | AgentRun 已取消（已实现） |
