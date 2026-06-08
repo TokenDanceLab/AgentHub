@@ -90,6 +90,23 @@ function Invoke-RepoScript {
     }
 }
 
+function Assert-FaultModeFails {
+    param(
+        [string]$FaultMode,
+        [string]$ExpectedText
+    )
+
+    $faultEvidencePath = Join-Path $tmpRoot "localhost-product-loop-$FaultMode-evidence.json"
+    $faultRun = Invoke-RepoScript @(
+        $gatePath,
+        "-RepoRoot", $RepoRoot,
+        "-EvidencePath", $faultEvidencePath,
+        "-FaultMode", $FaultMode
+    )
+    Assert-True ($faultRun.ExitCode -ne 0) "FaultMode $FaultMode is rejected by localhost product-loop harness" $faultRun.Output
+    Assert-True ($faultRun.Output -match [regex]::Escape($ExpectedText)) "FaultMode $FaultMode failure names $ExpectedText" $faultRun.Output
+}
+
 function Get-EventIndex {
     param($Events, [string]$Type)
 
@@ -124,6 +141,8 @@ if (Test-Path -LiteralPath $gatePath) {
         "Desktop bridge dispatches only to Local Edge",
         "Local Edge runs fixture/SDK adapter without CLI/model spend",
         "Hub replay records completed localhost fixture chain",
+        "localhost fixture services started with identity markers",
+        "Hub rejects forged and out-of-order callbacks before replay",
         "RealTested=false"
     )) {
         Assert-True ($run.Output -match [regex]::Escape($text)) "harness output includes: $text" $run.Output
@@ -148,8 +167,20 @@ if (Test-Path -LiteralPath $gatePath) {
             if ($row) {
                 Assert-True ($row.url -match "^http://127\.0\.0\.1:\d+$") "service $service uses localhost URL" ($row | ConvertTo-Json -Depth 5)
                 Assert-True ($row.status -eq "started") "service $service is started" ($row | ConvertTo-Json -Depth 5)
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$row.health.identity)) "service $service exposes an identity marker" ($row | ConvertTo-Json -Depth 5)
             }
         }
+        $web = @($services | Where-Object { $_.service -eq "web" } | Select-Object -First 1)[0]
+        $hub = @($services | Where-Object { $_.service -eq "hub" } | Select-Object -First 1)[0]
+        $desktop = @($services | Where-Object { $_.service -eq "desktop" } | Select-Object -First 1)[0]
+        $edge = @($services | Where-Object { $_.service -eq "local-edge" } | Select-Object -First 1)[0]
+        Assert-True ($web.health.identity -eq "agenthub-web-localhost-fixture") "Web health marker identifies the web fixture" ($web | ConvertTo-Json -Depth 5)
+        Assert-True ($hub.health.identity -eq "agenthub-hub-localhost-fixture") "Hub health marker identifies the hub fixture" ($hub | ConvertTo-Json -Depth 5)
+        Assert-True ($hub.health.upstream -eq "registered-desktop-target-router") "Hub health marker identifies registered-target router upstream" ($hub | ConvertTo-Json -Depth 5)
+        Assert-True ($desktop.health.identity -eq "agenthub-desktop-bridge-localhost-fixture") "Desktop health marker identifies the bridge fixture" ($desktop | ConvertTo-Json -Depth 5)
+        Assert-True ($desktop.health.bridge -eq "tauri-sidecar-fixture") "Desktop health marker identifies the bridge mode" ($desktop | ConvertTo-Json -Depth 5)
+        Assert-True ($edge.health.identity -eq "agenthub-local-edge-localhost-fixture") "Local Edge health marker identifies the edge fixture" ($edge | ConvertTo-Json -Depth 5)
+        Assert-True ($edge.health.runner -eq "fixture-local-edge-runner") "Local Edge health marker identifies the fixture runner" ($edge | ConvertTo-Json -Depth 5)
 
         Assert-True (@($evidence.topology.web.allowed_upstreams) -contains "hub") "Web boundary allows Hub upstream"
         Assert-True (@($evidence.topology.web.allowed_upstreams).Count -eq 1) "Web boundary is Hub-only"
@@ -188,6 +219,19 @@ if (Test-Path -LiteralPath $gatePath) {
             Assert-True ($task.adapter_id -eq $manifest.adapterId) "Hub task carries adapter_id"
         }
 
+        $dispatch = @($evidence.events | Where-Object { $_.type -eq "hub.agent.dispatch" } | Select-Object -First 1)[0]
+        Assert-True ($dispatch.desktop_url -eq $desktop.url) "Hub dispatch records the exact registered desktopUrl" ($dispatch | ConvertTo-Json -Depth 5)
+        Assert-True (@($evidence.negative_checks).Count -ge 5) "evidence records forged and duplicate callback rejection checks" ($evidence.negative_checks | ConvertTo-Json -Depth 8)
+        foreach ($label in @(
+            "forged hubTaskId callback",
+            "forged callback type",
+            "forged edgeRunId callback",
+            "forged adapterId callback",
+            "duplicate callback order"
+        )) {
+            Assert-True (@($evidence.negative_checks | Where-Object { $_.label -eq $label }).Count -eq 1) "negative checks include $label" ($evidence.negative_checks | ConvertTo-Json -Depth 8)
+        }
+
         foreach ($blocker in @(
             "real TokenDanceID login remains blocked",
             "real CLI/model adapter invocation remains blocked",
@@ -196,6 +240,13 @@ if (Test-Path -LiteralPath $gatePath) {
             Assert-True (@($evidence.blockers) -contains $blocker) "evidence records blocker: $blocker"
         }
     }
+
+    Assert-FaultModeFails "WrongDesktopUrl" "not found"
+    Assert-FaultModeFails "MissingDesktopUrl" "desktopUrl must be a localhost http URL"
+    Assert-FaultModeFails "NonLocalhostDesktopUrl" "desktopUrl must be a localhost http URL"
+    Assert-FaultModeFails "ForgedCallback" "callback type does not match expected in-flight run"
+    Assert-FaultModeFails "MissingIdentityMarker" "web health identity marker mismatch for identity"
+    Assert-FaultModeFails "RealTestedOverclaim" "evidence must keep RealTested=false"
 }
 
 if ($Failed -gt 0) {
