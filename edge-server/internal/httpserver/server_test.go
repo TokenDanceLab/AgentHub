@@ -82,6 +82,27 @@ func TestCORSMiddlewareRemoteModeRejectsOriginOutsideAllowlist(t *testing.T) {
 	}
 }
 
+func TestCORSMiddlewareRemoteModeRejectsLocalhostOutsideAllowlist(t *testing.T) {
+	called := false
+	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), true, []string{"https://app.example"})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+	if called {
+		t.Fatal("handler should not be called for localhost outside the remote allowlist")
+	}
+}
+
 func TestCORSMiddlewareRemoteModeAllowsOriginInAllowlist(t *testing.T) {
 	called := false
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
