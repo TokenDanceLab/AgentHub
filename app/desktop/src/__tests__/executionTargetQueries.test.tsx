@@ -2,7 +2,11 @@ import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useHubExecutionTargets, usePingHubExecutionTarget } from '@/api/executionTargetQueries';
+import {
+  findRegisteredLocalEdgeTarget,
+  useHubExecutionTargets,
+  usePingHubExecutionTarget,
+} from '@/api/executionTargetQueries';
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -86,5 +90,46 @@ describe('execution target queries', () => {
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://test.local/web/execution-targets/target-relay-1/ping');
     expect(init.method).toBe('POST');
+  });
+
+  it('selects the registered local edge target for the current desktop device', () => {
+    const target = findRegisteredLocalEdgeTarget(
+      [
+        {
+          id: 'remote-1',
+          name: 'Remote',
+          target_type: 'remote_ssh',
+          workspace_allowlist: [],
+          trust_level: 'remote',
+          health_state: 'healthy',
+          is_online: true,
+        },
+        {
+          id: 'local-other',
+          device_id: 'desktop-other',
+          name: 'Other desktop',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          trust_level: 'local',
+          health_state: 'healthy',
+          is_online: true,
+        },
+        {
+          id: 'local-this-device',
+          device_id: 'desktop-current',
+          name: 'Doris Windows Local Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: ['D:/Code/TokenDance/AgentHub'],
+          trust_level: 'local',
+          health_state: 'healthy',
+          is_online: true,
+          last_seen_at: '2026-06-09T01:00:00Z',
+        },
+      ],
+      'desktop-current',
+    );
+
+    expect(target?.id).toBe('local-this-device');
+    expect(target?.workspace_allowlist).toEqual(['D:/Code/TokenDance/AgentHub']);
   });
 });

@@ -144,6 +144,18 @@ export function summarizeExecutionTargets(targets: ExecutionTargetInventoryItem[
   };
 }
 
+export function findRegisteredLocalEdgeTarget(
+  targets: ExecutionTargetInventoryItem[],
+  deviceId: string | null | undefined,
+): ExecutionTargetInventoryItem | null {
+  const localEdgeTargets = targets.filter((target) => target.target_type === 'local_edge');
+  if (deviceId) {
+    const deviceMatch = localEdgeTargets.find((target) => target.device_id === deviceId);
+    if (deviceMatch) return deviceMatch;
+  }
+  return localEdgeTargets.length === 1 ? localEdgeTargets[0] ?? null : null;
+}
+
 export function useHubExecutionTargets(enabledOrOptions: boolean | UseHubExecutionTargetsOptions) {
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const options = typeof enabledOrOptions === 'boolean'
