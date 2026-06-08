@@ -84,6 +84,12 @@ func TestControlProtocolCapabilitySubtypesReturnExplicitUnsupported(t *testing.T
 			if payload.RequestedSubtype != tt.subtype {
 				t.Fatalf("RequestedSubtype = %q, want %q", payload.RequestedSubtype, tt.subtype)
 			}
+			if payload.RequestID != "req-"+tt.subtype {
+				t.Fatalf("RequestID = %q, want %q", payload.RequestID, "req-"+tt.subtype)
+			}
+			if payload.Subtype != tt.subtype {
+				t.Fatalf("Subtype = %q, want %q", payload.Subtype, tt.subtype)
+			}
 			if payload.Capability != tt.capability {
 				t.Fatalf("Capability = %q, want %q", payload.Capability, tt.capability)
 			}

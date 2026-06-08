@@ -39,6 +39,8 @@ type hookCallbackControlRequest struct {
 // ControlCapabilityResponse reports that a known control-protocol subtype was
 // routed but cannot be fulfilled by this adapter yet.
 type ControlCapabilityResponse struct {
+	RequestID        string `json:"request_id"`
+	Subtype          string `json:"subtype"`
 	RequestedSubtype string `json:"requestedSubtype"`
 	Capability       string `json:"capability"`
 	Supported        bool   `json:"supported"`
@@ -105,6 +107,8 @@ func decodeControlInput(input any, out any) {
 func writeUnsupportedControlResponse(stdin io.Writer, requestID, requestedSubtype, capability string, details map[string]any) error {
 	message := fmt.Sprintf("control subtype %q is recognized but %q is not wired in the Edge adapter", requestedSubtype, capability)
 	payload := map[string]any{
+		"request_id":       requestID,
+		"subtype":          requestedSubtype,
 		"requestedSubtype": requestedSubtype,
 		"capability":       capability,
 		"supported":        false,
