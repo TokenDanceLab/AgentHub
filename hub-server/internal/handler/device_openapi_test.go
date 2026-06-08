@@ -149,108 +149,160 @@ func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	requireMaxLength(t, yamlMapField(t, doneProps, "final_content", "HubTaskDoneRequest.properties.final_content"), "1048576", "done final_content")
 }
 
+func TestOpenAPIClientMessageReactionsMatchesHubContract(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	path := yamlMapField(t, paths, "/client/messages/{id}/reactions", "paths./client/messages/{id}/reactions")
+	for _, method := range []string{"post", "delete"} {
+		op := yamlMapField(t, path, method, "paths./client/messages/{id}/reactions."+method)
+		schema := requestBodySchema(t, op, "message reaction "+method)
+		if got := yamlScalarField(t, schema, "$ref", "message reaction "+method+" requestBody schema.$ref"); got != "#/components/schemas/MessageReactionRequest" {
+			t.Fatalf("%s reaction request body ref = %v, want MessageReactionRequest", method, got)
+		}
+		data := responseEnvelopeData(t, op, "message reaction "+method)
+		if got := yamlScalarField(t, data, "$ref", "message reaction "+method+" response data.$ref"); got != "#/components/schemas/MessageReactionResponse" {
+			t.Fatalf("%s reaction response data ref = %v, want MessageReactionResponse", method, got)
+		}
+	}
+
+	request := yamlMapField(t, schemas, "MessageReactionRequest", "components.schemas.MessageReactionRequest")
+	required := yamlStringSlice(t, yamlField(t, request, "required", "MessageReactionRequest.required"), "MessageReactionRequest.required")
+	if !containsString(required, "session_id") || !containsString(required, "reaction") {
+		t.Fatalf("MessageReactionRequest.required = %v, want session_id and reaction", required)
+	}
+	requestProps := yamlMapField(t, request, "properties", "MessageReactionRequest.properties")
+	requireMaxLength(t, yamlMapField(t, requestProps, "reaction", "MessageReactionRequest.properties.reaction"), "64", "message reaction")
+
+	response := yamlMapField(t, schemas, "MessageReactionResponse", "components.schemas.MessageReactionResponse")
+	responseRequired := yamlStringSlice(t, yamlField(t, response, "required", "MessageReactionResponse.required"), "MessageReactionResponse.required")
+	for _, field := range []string{"message_id", "session_id", "reaction", "count", "reacted_by_me"} {
+		if !containsString(responseRequired, field) {
+			t.Fatalf("MessageReactionResponse.required = %v, want %s", responseRequired, field)
+		}
+	}
+	responseProps := yamlMapField(t, response, "properties", "MessageReactionResponse.properties")
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "message_id", "MessageReactionResponse.properties.message_id"), "type", "message_id type"); got != "string" {
+		t.Fatalf("message_id type = %v, want string", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "session_id", "MessageReactionResponse.properties.session_id"), "type", "session_id type"); got != "string" {
+		t.Fatalf("session_id type = %v, want string", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "reaction", "MessageReactionResponse.properties.reaction"), "type", "reaction type"); got != "string" {
+		t.Fatalf("reaction type = %v, want string", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "count", "MessageReactionResponse.properties.count"), "type", "count type"); got != "integer" {
+		t.Fatalf("count type = %v, want integer", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "reacted_by_me", "MessageReactionResponse.properties.reacted_by_me"), "type", "reacted_by_me type"); got != "boolean" {
+		t.Fatalf("reacted_by_me type = %v, want boolean", got)
+	}
+}
+
 func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
 
 	expected := map[string][]string{
-		"/client/ws":                                          {"get"},
-		"/client/auth/refresh":                                {"post"},
-		"/client/auth/oidc/authorize":                         {"post"},
-		"/client/auth/oidc/callback":                          {"get", "post"},
-		"/client/auth/me":                                     {"get"},
-		"/client/auth/logout":                                 {"post"},
-		"/client/auth/profile":                                {"put"},
-		"/client/contacts/search":                             {"get"},
-		"/client/contacts/friend-requests":                    {"get", "post"},
-		"/client/contacts/friend-requests/{id}/accept":        {"post"},
-		"/client/contacts/friend-requests/{id}/reject":        {"post"},
-		"/client/contacts":                                    {"get"},
-		"/client/contacts/{userId}":                           {"delete"},
-		"/client/contacts/{userId}/block":                     {"post"},
-		"/client/contacts/{userId}/unblock":                   {"post"},
-		"/client/contacts/{userId}/remark":                    {"put"},
-		"/client/sessions":                                    {"get"},
-		"/client/sessions/private":                            {"post"},
-		"/client/sessions/group":                              {"post"},
-		"/client/sessions/{id}/members":                       {"post"},
-		"/client/sessions/{id}/members/{user_id}":             {"delete"},
-		"/client/sessions/{id}/leave":                         {"post"},
-		"/client/sessions/{id}/transfer-owner":                {"post"},
-		"/client/sessions/{id}/dissolve":                      {"post"},
-		"/client/sessions/{id}/info":                          {"put"},
-		"/client/sessions/{id}/settings":                      {"put"},
-		"/client/sessions/{id}":                               {"delete"},
-		"/client/sessions/{id}/messages":                      {"get", "post"},
-		"/client/sessions/{id}/messages/sync":                 {"get"},
-		"/client/sessions/{id}/pins":                          {"get"},
-		"/client/sessions/{id}/read":                          {"post"},
-		"/client/sessions/{id}/agents":                        {"post"},
-		"/client/sessions/{id}/messages/search":               {"get"},
-		"/client/sessions/search":                             {"get"},
-		"/client/messages/{id}":                               {"put"},
-		"/client/messages/{id}/recall":                        {"post"},
-		"/client/messages/{id}/pin":                           {"post", "delete"},
-		"/client/messages/{id}/forward":                       {"post"},
-		"/client/messages/search":                             {"get"},
-		"/client/attachments/probe":                           {"post"},
-		"/client/attachments":                                 {"post"},
-		"/client/attachments/{id}":                            {"get"},
-		"/client/notifications":                               {"get"},
-		"/client/notifications/{id}/read":                     {"post"},
-		"/client/notifications/read-all":                      {"post"},
-		"/edge/devices/register":                              {"post"},
-		"/edge/agent-tasks/{id}/ack":                          {"post"},
-		"/edge/agent-tasks/{id}/stream":                       {"post"},
-		"/edge/agent-tasks/{id}/done":                         {"post"},
-		"/edge/agent-tasks/{id}/fail":                         {"post"},
-		"/cloud/edge/register":                                {"post"},
-		"/web/agent-tasks":                                    {"post"},
-		"/web/agent-tasks/{id}/cancel":                        {"post"},
-		"/web/agent-tasks/{id}/summary":                       {"get"},
-		"/web/agent-tasks/{id}/events/summary":                {"get"},
-		"/web/agent-tasks/{id}/events":                        {"get"},
-		"/web/custom-agents":                                  {"get", "post"},
-		"/web/custom-agents/{id}":                             {"put", "delete"},
-		"/web/agent-profiles":                                 {"get", "post"},
-		"/web/agent-profiles/{id}":                            {"get", "patch", "delete"},
-		"/web/agent-profiles/{id}/publish":                    {"post"},
-		"/web/agent-profiles/{id}/install":                    {"post"},
-		"/web/skills":                                         {"get", "post"},
-		"/web/skills/{id}":                                    {"get", "put", "delete"},
-		"/web/skills/{id}/publish":                            {"post"},
-		"/web/skills/{id}/unpublish":                          {"post"},
-		"/web/mcp-servers":                                    {"get", "post"},
-		"/web/mcp-servers/{id}":                               {"get", "put", "delete"},
-		"/web/mcp-servers/{id}/publish":                       {"post"},
-		"/web/mcp-servers/{id}/unpublish":                     {"post"},
-		"/web/market/profiles":                                {"get"},
-		"/web/market/profiles/{id}":                           {"get"},
-		"/web/market/profiles/{id}/install":                   {"post"},
-		"/web/market/profiles/{id}/rate":                      {"post"},
-		"/web/provider-bindings":                              {"get", "post"},
-		"/web/provider-bindings/{id}":                         {"put", "delete"},
-		"/web/execution-targets":                              {"get", "post"},
-		"/web/execution-targets/{id}":                         {"get", "patch", "delete"},
-		"/web/execution-targets/{id}/ping":                    {"post"},
-		"/web/projects":                                       {"get", "post"},
-		"/web/projects/{id}":                                  {"get", "patch"},
-		"/web/audit-events":                                   {"get"},
-		"/web/relay/commands":                                 {"post"},
-		"/web/relay/commands/{id}":                            {"get"},
-		"/web/relay/commands/{id}/ack":                        {"post"},
-		"/web/devices":                                        {"get"},
-		"/web/agent-teams":                                    {"get", "post"},
-		"/web/agent-teams/{id}":                               {"get", "put", "delete"},
-		"/web/agent-teams/{id}/members":                       {"post"},
-		"/web/agent-teams/{id}/members/{member_id}":           {"delete"},
-		"/web/agent-teams/{id}/runs":                          {"get", "post"},
-		"/web/agent-teams/{id}/runs/{run_id}":                 {"get"},
-		"/web/agent-teams/{id}/runs/{run_id}/state":           {"get"},
-		"/web/agent-teams/{id}/runs/{run_id}/tasks":           {"get"},
-		"/web/agent-teams/{id}/runs/{run_id}/events":          {"get"},
-		"/web/agent-teams/{id}/runs/{run_id}/route-decisions": {"post"},
-		"/web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide":       {"post"},
+		"/client/ws":                                                         {"get"},
+		"/client/auth/refresh":                                               {"post"},
+		"/client/auth/oidc/authorize":                                        {"post"},
+		"/client/auth/oidc/callback":                                         {"get", "post"},
+		"/client/auth/me":                                                    {"get"},
+		"/client/auth/logout":                                                {"post"},
+		"/client/auth/profile":                                               {"put"},
+		"/client/contacts/search":                                            {"get"},
+		"/client/contacts/friend-requests":                                   {"get", "post"},
+		"/client/contacts/friend-requests/{id}/accept":                       {"post"},
+		"/client/contacts/friend-requests/{id}/reject":                       {"post"},
+		"/client/contacts":                                                   {"get"},
+		"/client/contacts/{userId}":                                          {"delete"},
+		"/client/contacts/{userId}/block":                                    {"post"},
+		"/client/contacts/{userId}/unblock":                                  {"post"},
+		"/client/contacts/{userId}/remark":                                   {"put"},
+		"/client/sessions":                                                   {"get"},
+		"/client/sessions/private":                                           {"post"},
+		"/client/sessions/group":                                             {"post"},
+		"/client/sessions/{id}/members":                                      {"post"},
+		"/client/sessions/{id}/members/{user_id}":                            {"delete"},
+		"/client/sessions/{id}/leave":                                        {"post"},
+		"/client/sessions/{id}/transfer-owner":                               {"post"},
+		"/client/sessions/{id}/dissolve":                                     {"post"},
+		"/client/sessions/{id}/info":                                         {"put"},
+		"/client/sessions/{id}/settings":                                     {"put"},
+		"/client/sessions/{id}":                                              {"delete"},
+		"/client/sessions/{id}/messages":                                     {"get", "post"},
+		"/client/sessions/{id}/messages/sync":                                {"get"},
+		"/client/sessions/{id}/pins":                                         {"get"},
+		"/client/sessions/{id}/read":                                         {"post"},
+		"/client/sessions/{id}/agents":                                       {"post"},
+		"/client/sessions/{id}/messages/search":                              {"get"},
+		"/client/sessions/search":                                            {"get"},
+		"/client/messages/{id}":                                              {"put"},
+		"/client/messages/{id}/recall":                                       {"post"},
+		"/client/messages/{id}/pin":                                          {"post", "delete"},
+		"/client/messages/{id}/reactions":                                    {"post", "delete"},
+		"/client/messages/{id}/forward":                                      {"post"},
+		"/client/messages/search":                                            {"get"},
+		"/client/attachments/probe":                                          {"post"},
+		"/client/attachments":                                                {"post"},
+		"/client/attachments/{id}":                                           {"get"},
+		"/client/notifications":                                              {"get"},
+		"/client/notifications/{id}/read":                                    {"post"},
+		"/client/notifications/read-all":                                     {"post"},
+		"/edge/devices/register":                                             {"post"},
+		"/edge/agent-tasks/{id}/ack":                                         {"post"},
+		"/edge/agent-tasks/{id}/stream":                                      {"post"},
+		"/edge/agent-tasks/{id}/done":                                        {"post"},
+		"/edge/agent-tasks/{id}/fail":                                        {"post"},
+		"/cloud/edge/register":                                               {"post"},
+		"/web/agent-tasks":                                                   {"post"},
+		"/web/agent-tasks/{id}/cancel":                                       {"post"},
+		"/web/agent-tasks/{id}/summary":                                      {"get"},
+		"/web/agent-tasks/{id}/events/summary":                               {"get"},
+		"/web/agent-tasks/{id}/events":                                       {"get"},
+		"/web/custom-agents":                                                 {"get", "post"},
+		"/web/custom-agents/{id}":                                            {"put", "delete"},
+		"/web/agent-profiles":                                                {"get", "post"},
+		"/web/agent-profiles/{id}":                                           {"get", "patch", "delete"},
+		"/web/agent-profiles/{id}/publish":                                   {"post"},
+		"/web/agent-profiles/{id}/install":                                   {"post"},
+		"/web/skills":                                                        {"get", "post"},
+		"/web/skills/{id}":                                                   {"get", "put", "delete"},
+		"/web/skills/{id}/publish":                                           {"post"},
+		"/web/skills/{id}/unpublish":                                         {"post"},
+		"/web/mcp-servers":                                                   {"get", "post"},
+		"/web/mcp-servers/{id}":                                              {"get", "put", "delete"},
+		"/web/mcp-servers/{id}/publish":                                      {"post"},
+		"/web/mcp-servers/{id}/unpublish":                                    {"post"},
+		"/web/market/profiles":                                               {"get"},
+		"/web/market/profiles/{id}":                                          {"get"},
+		"/web/market/profiles/{id}/install":                                  {"post"},
+		"/web/market/profiles/{id}/rate":                                     {"post"},
+		"/web/provider-bindings":                                             {"get", "post"},
+		"/web/provider-bindings/{id}":                                        {"put", "delete"},
+		"/web/execution-targets":                                             {"get", "post"},
+		"/web/execution-targets/{id}":                                        {"get", "patch", "delete"},
+		"/web/execution-targets/{id}/ping":                                   {"post"},
+		"/web/projects":                                                      {"get", "post"},
+		"/web/projects/{id}":                                                 {"get", "patch"},
+		"/web/audit-events":                                                  {"get"},
+		"/web/relay/commands":                                                {"post"},
+		"/web/relay/commands/{id}":                                           {"get"},
+		"/web/relay/commands/{id}/ack":                                       {"post"},
+		"/web/devices":                                                       {"get"},
+		"/web/agent-teams":                                                   {"get", "post"},
+		"/web/agent-teams/{id}":                                              {"get", "put", "delete"},
+		"/web/agent-teams/{id}/members":                                      {"post"},
+		"/web/agent-teams/{id}/members/{member_id}":                          {"delete"},
+		"/web/agent-teams/{id}/runs":                                         {"get", "post"},
+		"/web/agent-teams/{id}/runs/{run_id}":                                {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/state":                          {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/tasks":                          {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/events":                         {"get"},
+		"/web/agent-teams/{id}/runs/{run_id}/route-decisions":                {"post"},
+		"/web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide": {"post"},
 		"/web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve":      {"post"},
 		"/web/agent-teams/{id}/runs/{run_id}/assignments":                          {"get", "post"},
 		"/web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/dispatch": {"post"},
@@ -446,6 +498,17 @@ func requestBodySchema(t *testing.T, post *yaml.Node, name string) *yaml.Node {
 	content := yamlMapField(t, body, "content", name+" requestBody.content")
 	jsonBody := yamlMapField(t, content, "application/json", name+" requestBody.application/json")
 	return yamlMapField(t, jsonBody, "schema", name+" requestBody.schema")
+}
+
+func responseEnvelopeData(t *testing.T, op *yaml.Node, name string) *yaml.Node {
+	t.Helper()
+	responses := yamlMapField(t, op, "responses", name+" responses")
+	okResp := yamlMapField(t, responses, "200", name+" responses.200")
+	okContent := yamlMapField(t, okResp, "content", name+" responses.200.content")
+	okJSON := yamlMapField(t, okContent, "application/json", name+" responses.200.application/json")
+	responseSchema := yamlMapField(t, okJSON, "schema", name+" responses.200.schema")
+	responseProperties := yamlMapField(t, responseSchema, "properties", name+" responses.200.schema.properties")
+	return yamlMapField(t, responseProperties, "data", name+" responses.200.schema.properties.data")
 }
 
 func loadOpenAPISpec(t *testing.T) *yaml.Node {

@@ -2850,6 +2850,72 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /client/messages/{id}/reactions:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubAddMessageReactionDirect
+      summary: Add a reaction to a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageReactionRequest"
+      responses:
+        "200":
+          description: Message reaction summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code:
+                    type: string
+                    enum: [OK]
+                  data:
+                    $ref: "#/components/schemas/MessageReactionResponse"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubRemoveMessageReactionDirect
+      summary: Remove a reaction from a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageReactionRequest"
+      responses:
+        "200":
+          description: Message reaction summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code:
+                    type: string
+                    enum: [OK]
+                  data:
+                    $ref: "#/components/schemas/MessageReactionResponse"
+
   /client/messages/{id}/forward:
     post:
       tags: [HubSyncRelay]
@@ -5547,6 +5613,32 @@ components:
           type: string
           default: user
           description: Message role. Defaults to user when omitted.
+    MessageReactionRequest:
+      type: object
+      required: [session_id, reaction]
+      properties:
+        session_id:
+          type: string
+        reaction:
+          type: string
+          minLength: 1
+          maxLength: 64
+    MessageReactionResponse:
+      type: object
+      required: [message_id, session_id, reaction, count, reacted_by_me]
+      properties:
+        message_id:
+          type: string
+        session_id:
+          type: string
+        reaction:
+          type: string
+          maxLength: 64
+        count:
+          type: integer
+          minimum: 0
+        reacted_by_me:
+          type: boolean
     PinThreadItemRequest:
       type: object
       required: [itemId]
