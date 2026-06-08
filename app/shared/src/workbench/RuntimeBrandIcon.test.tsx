@@ -105,6 +105,11 @@ describe('RuntimeBrandIcon', () => {
       source: 'fallback',
       fallback: 'browser',
     });
+    expect(resolveRuntimeBrandIcon({ kind: 'runtime', name: 'Custom Agent' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'custom',
+      value: 'CA',
+    });
     expect(resolveRuntimeBrandIcon({ kind: 'runtime', name: 'Open Code' })).toMatchObject({
       source: 'lobehub',
       value: 'opencode',

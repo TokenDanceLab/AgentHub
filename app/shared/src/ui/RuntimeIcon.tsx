@@ -17,6 +17,7 @@ export type RuntimeIconSource = 'lobehub' | 'fallback';
 export type RuntimeIconFallback =
   | 'agenthub'
   | 'browser'
+  | 'custom'
   | 'diff'
   | 'model'
   | 'provider'
@@ -291,6 +292,7 @@ function isLikelyLobeModel(value: string): boolean {
 function runtimeIconFallbackFor(kind: RuntimeIconKind, label: string): RuntimeIconFallback {
   const key = normalizeRuntimeIconKey(label);
   if (key.includes('tokendance') || key.includes('agenthub') || key.includes('cc-switch')) return 'agenthub';
+  if (key.includes('custom')) return 'custom';
   if (kind === 'tool') {
     if (key.includes('read')) return 'read';
     if (key.includes('write') || key.includes('edit') || key.includes('patch')) return 'write';
@@ -351,6 +353,14 @@ function runtimeIconFallbackSvg(name: RuntimeIconFallback, iconSize: number): Re
         <svg {...common}>
           <circle cx="12" cy="12" r="8" />
           <path d="M4 12h16M12 4c2 2.2 3 4.9 3 8s-1 5.8-3 8M12 4c-2 2.2-3 4.9-3 8s1 5.8 3 8" />
+        </svg>
+      );
+    case 'custom':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="3" />
+          <path d="M6 20v-1a6 6 0 0 1 12 0v1" />
+          <path d="M18 5l2 2M20 5l-2 2" />
         </svg>
       );
     case 'diff':
