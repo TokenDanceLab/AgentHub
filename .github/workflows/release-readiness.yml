@@ -1,0 +1,140 @@
+name: Release Readiness
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/workflows/release-readiness.yml"
+      - "app/desktop/package.json"
+      - "app/desktop/src-tauri/Cargo.toml"
+      - "app/desktop/src-tauri/Cargo.lock"
+      - "app/desktop/src-tauri/tauri.conf.json"
+      - "scripts/**release**"
+      - "scripts/**tauri**"
+      - "tests/scripts/**"
+  workflow_dispatch:
+    inputs:
+      run_windows_package_dry:
+        description: "Run the Windows Tauri package dry build. This uploads artifacts only to the workflow run."
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+
+jobs:
+  readiness-policy:
+    name: Static package readiness policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Tauri package readiness policy
+        shell: pwsh
+        run: ./scripts/verify-tauri-package-readiness.ps1 -RepoRoot .
+
+  windows-package-dry:
+    name: Windows NSIS and portable dry package
+    needs: readiness-policy
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows_package_dry == true }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Create dist directory
+        shell: pwsh
+        run: New-Item -ItemType Directory dist -Force | Out-Null
+
+      - name: Build Edge Server sidecar for Windows
+        working-directory: edge-server
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-windows-amd64.exe ./cmd/agenthub-edge/
+
+      - name: Prepare Windows sidecar
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory "app\desktop\src-tauri\binaries" -Force | Out-Null
+          Copy-Item "dist\agenthub-edge-windows-amd64.exe" "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
+
+      - name: Build Tauri Windows package dry run
+        working-directory: app/desktop
+        run: pnpm tauri build
+
+      - name: Collect Windows package artifacts
+        shell: pwsh
+        run: |
+          $ver = (Get-Content "app\desktop\package.json" -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory dist -Force | Out-Null
+
+          $nsis = Get-ChildItem "app\desktop\src-tauri\target\release\bundle\nsis" -Filter "*setup.exe" -File | Select-Object -First 1
+          if (-not $nsis) { throw "missing setup.exe" }
+          Copy-Item $nsis.FullName "dist\AgentHub_${ver}_x64-setup.exe"
+
+          $exe = Get-ChildItem "app\desktop\src-tauri\target\release" -Filter "agenthub-desktop.exe" -File | Select-Object -First 1
+          if (-not $exe) { throw "missing agenthub-desktop.exe" }
+          $portableDir = "dist\AgentHub-portable"
+          New-Item -ItemType Directory $portableDir -Force | Out-Null
+          Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
+          Copy-Item "dist\agenthub-edge-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
+          @"
+          AgentHub v$ver portable package.
+
+          Internal dry-run artifact only. This is not a signed public release.
+          "@ | Out-File "$portableDir\README.txt" -Encoding UTF8
+          Compress-Archive -Path "$portableDir\*" -DestinationPath "dist\AgentHub_${ver}_x64-portable.zip" -Force
+
+          $latestJson = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "latest.json" -Recurse -File | Select-Object -First 1
+          if ($latestJson) { Copy-Item $latestJson.FullName "dist\latest.json" }
+
+          $signature = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "*.sig" -Recurse -File | Select-Object -First 1
+          if ($signature) { Copy-Item $signature.FullName "dist\AgentHub_${ver}_x64-setup.exe.sig" }
+
+      - name: Gate collected package artifacts
+        shell: pwsh
+        run: ./scripts/verify-tauri-package-readiness.ps1 -RepoRoot . -BuiltArtifactsRoot dist -RequireBuiltArtifacts
+
+      - name: Upload dry package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package-dry
+          path: dist/
+
+  macos-unsigned-policy-note:
+    name: macOS unsigned package policy note
+    needs: readiness-policy
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record unsigned macOS package boundary
+        run: |
+          echo "Policy note only: this workflow does not validate macOS package construction."
+          echo "The tag release workflow still builds the macOS DMG on macos-latest."
+          echo "A future macOS dry validation proposal must run on macos-latest and check the aarch64-apple-darwin sidecar/package path."
+          echo "No Developer ID signing, notarization, or stapling is performed in this readiness workflow."
