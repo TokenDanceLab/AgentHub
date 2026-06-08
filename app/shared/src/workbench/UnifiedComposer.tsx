@@ -65,7 +65,7 @@ export function UnifiedComposer({
     if (!shouldSubmit) return;
 
     event.preventDefault();
-    if (canSubmitComposer(composer) && !isSubmitting) {
+    if (!submitDisabled) {
       event.currentTarget.form?.requestSubmit();
     }
   }
