@@ -163,6 +163,9 @@ func runSQLiteMigrations(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if err := validateSQLiteAppliedMigrations(applied); err != nil {
+		return err
+	}
 	for _, migration := range sqliteMigrations {
 		if _, ok := applied[migration.version]; ok {
 			continue
@@ -267,6 +270,19 @@ func readSQLiteAppliedMigrationMap(db *sql.DB) (map[int]SQLiteMigrationInfo, err
 		applied[info.Version] = info
 	}
 	return applied, nil
+}
+
+func validateSQLiteAppliedMigrations(applied map[int]SQLiteMigrationInfo) error {
+	for version, info := range applied {
+		migration, ok := sqliteMigrationByVersion(version)
+		if !ok {
+			return fmt.Errorf("unknown sqlite migration version %d (%s)", version, info.Name)
+		}
+		if info.Name != migration.name {
+			return fmt.Errorf("sqlite migration version %d name mismatch: got %s, want %s", version, info.Name, migration.name)
+		}
+	}
+	return nil
 }
 
 func readSQLiteAppliedMigrations(db *sql.DB) ([]SQLiteMigrationInfo, error) {
