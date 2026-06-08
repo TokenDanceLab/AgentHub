@@ -81,6 +81,13 @@ export interface RunSessionTranscriptBlock extends TranscriptBlockBase {
   status?: 'running' | 'completed' | 'failed';
   meta?: string;
   runId?: string;
+  taskId?: string;
+  edgeRunId?: string;
+  adapterId?: string;
+  deviceId?: string;
+  sourceLabel?: string;
+  modeLabel?: string;
+  targetLabel?: string;
 }
 
 export interface AgentTimelineItem {

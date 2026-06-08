@@ -11,6 +11,8 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
         id: 'evt-hub-text',
         task_id: 'task-hub',
         edge_run_id: 'run-hub',
+        edge_device_id: 'desktop-device-1',
+        adapter_id: 'codex',
         session_id: 'hub-session-1',
         agent_instance_id: 'agent-instance-1',
         event_seq: 1,
@@ -46,6 +48,20 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
     ]);
 
     expect(blocks).toEqual([
+      expect.objectContaining({
+        id: 'hub-runtime-session-task-hub-run-hub',
+        kind: 'run_session',
+        title: 'Hub task replay',
+        status: 'running',
+        runId: 'run-hub',
+        taskId: 'task-hub',
+        edgeRunId: 'run-hub',
+        deviceId: 'desktop-device-1',
+        adapterId: 'codex',
+        sourceLabel: 'Hub replay',
+        modeLabel: 'Real',
+        targetLabel: 'Edge run',
+      }),
       expect.objectContaining({
         id: 'edge-event-hub-runtime-evt-hub-text',
         kind: 'text',
@@ -107,7 +123,7 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
       payload: '{"content":"from json payload"}',
       created_at: '2026-06-07T04:00:04Z',
     });
-    expect(normalizeHubRuntimeEventsToTranscript([event!])[0]).toEqual(expect.objectContaining({
+    expect(normalizeHubRuntimeEventsToTranscript([event!])[1]).toEqual(expect.objectContaining({
       kind: 'text',
       text: 'from json payload',
     }));

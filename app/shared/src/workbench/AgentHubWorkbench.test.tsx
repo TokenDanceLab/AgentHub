@@ -62,6 +62,22 @@ describe('AgentHubWorkbench', () => {
       ],
     },
     {
+      id: 'run-session-1',
+      kind: 'run_session',
+      author: { id: 'hub', name: 'Hub replay', role: 'system' },
+      title: 'Hub replay for desktop run',
+      status: 'running',
+      meta: 'same Hub task projected from Edge run',
+      runId: 'run-v4',
+      taskId: 'task-v4',
+      edgeRunId: 'edge-run-v4',
+      adapterId: 'codex',
+      deviceId: 'desktop-device-1',
+      sourceLabel: 'Hub replay',
+      modeLabel: 'Real',
+      targetLabel: 'Desktop local_edge',
+    },
+    {
       id: 'thinking-1',
       kind: 'thinking',
       author: { id: 'builder', name: 'Builder', role: 'agent' },
@@ -192,6 +208,14 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByTestId('composer-attachment-input')).not.toBeInTheDocument();
     expect(screen.getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
     expect(screen.getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
+    expect(screen.getByText('Hub replay for desktop run')).toBeInTheDocument();
+    expect(screen.getByText('Source: Hub replay')).toBeInTheDocument();
+    expect(screen.getByText('Mode: Real')).toBeInTheDocument();
+    expect(screen.getByText('Target: Desktop local_edge')).toBeInTheDocument();
+    expect(screen.getByText('Hub task: task-v4')).toBeInTheDocument();
+    expect(screen.getByText('Edge run: edge-run-v4')).toBeInTheDocument();
+    expect(screen.getByText('Adapter: codex')).toBeInTheDocument();
+    expect(screen.getByText('Device: desktop-device-1')).toBeInTheDocument();
   });
 
   it('renders read-only runtime evidence snapshots in the right inspector', () => {
@@ -1604,7 +1628,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(within(menu).getByRole('menuitem', { name: /多选/ }));
 
     const toolbar = screen.getByRole('toolbar', { name: '多选操作' });
-    expect(toolbar).toHaveTextContent('1 已选择 / 11');
+    expect(toolbar).toHaveTextContent('1 已选择 / 12');
     expect(within(toolbar).getByRole('button', { name: '全选' })).toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: '清空' })).toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: '复制' })).toBeInTheDocument();
@@ -1615,7 +1639,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
 
     fireEvent.click(within(toolbar).getByRole('button', { name: '清空' }));
-    expect(toolbar).toHaveTextContent('0 框选模式 / 11');
+    expect(toolbar).toHaveTextContent('0 框选模式 / 12');
 
     fireEvent.click(within(toolbar).getByRole('button', { name: '退出' }));
     expect(screen.queryByRole('toolbar', { name: '多选操作' })).not.toBeInTheDocument();
@@ -1648,7 +1672,7 @@ describe('AgentHubWorkbench', () => {
       fireEvent.pointerUp(firstCard, { button: 0, clientX: 120, clientY: 180 });
 
       const toolbar = screen.getByRole('toolbar', { name: '多选操作' });
-      expect(toolbar).toHaveTextContent('1 已选择 / 11');
+      expect(toolbar).toHaveTextContent('1 已选择 / 12');
       expect(firstCard).toHaveAttribute('aria-selected', 'true');
       expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
 
@@ -1699,7 +1723,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.keyDown(secondCard, { key: ' ' });
 
     const toolbar = screen.getByRole('toolbar', { name: '多选操作' });
-    expect(toolbar).toHaveTextContent('2 已选择 / 11');
+    expect(toolbar).toHaveTextContent('2 已选择 / 12');
     expect(secondCard).toHaveAttribute('aria-selected', 'true');
   });
 

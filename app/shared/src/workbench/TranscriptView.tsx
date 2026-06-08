@@ -17,6 +17,7 @@ import {
   DateDivider,
   PinnedAnnouncement,
   AgentTimeline,
+  RunSessionCard,
   RunStepGroup,
   ApprovalCardBlock,
 } from './blocks';
@@ -87,7 +88,7 @@ export function TranscriptView({
   const actionedIds = new Set(actionedBlockIds);
   const selectedIds = new Set(selectedBlockIds);
   const softHiddenIds = new Set(softHiddenBlockIds);
-  const visibleTranscript = transcript.filter((block) => block.kind !== 'run_session');
+  const visibleTranscript = transcript;
   const diffControls = React.useMemo<InlineDiffControls>(() => ({
     expandedDiffIds,
     onToggleDiff: (diffId: string) => {
@@ -205,6 +206,8 @@ function renderTranscriptBlock(
       return renderApprovalBlock(block);
     case 'agent_timeline':
       return renderAgentTimelineBlock(block);
+    case 'run_session':
+      return renderRunSessionBlock(block);
     case 'run_step_group':
       return renderRunStepGroupBlock(block, onReviewFile, diffControls);
     case 'thinking':
@@ -419,6 +422,30 @@ function renderAgentTimelineBlock(
     <div className={styles.agentBlockRow}>
       <div className={styles.agentRunShell}>
         <AgentTimeline items={block.items} title={block.title ?? '运行时间线'} />
+      </div>
+    </div>
+  );
+}
+
+function renderRunSessionBlock(
+  block: Extract<TranscriptBlock, { kind: 'run_session' }>,
+): React.ReactElement {
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <RunSessionCard
+          adapterId={block.adapterId}
+          deviceId={block.deviceId}
+          edgeRunId={block.edgeRunId}
+          meta={block.meta}
+          modeLabel={block.modeLabel}
+          runId={block.runId}
+          sourceLabel={block.sourceLabel}
+          status={block.status}
+          targetLabel={block.targetLabel}
+          taskId={block.taskId}
+          title={block.title}
+        />
       </div>
     </div>
   );
