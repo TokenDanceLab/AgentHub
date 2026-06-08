@@ -38,6 +38,7 @@ type Handler struct {
 	Registry           *runners.Registry
 	Store              store.Repository
 	Executor           lifecycle.RunExecutor
+	PreviewRunner      lifecycle.PreviewRunner
 	AdapterRegistry    *adapters.Registry // nil if no agent adapters configured
 	AgentRegistry      *agents.Registry   // runtime agent instance registry
 	MessageQueue       *agents.Queue      // inter-agent message queue
@@ -175,6 +176,13 @@ func ensureBus(h *Handler) *events.Bus {
 		h.Bus = events.NewBus(10000)
 	}
 	return h.Bus
+}
+
+func ensurePreviewRunner(h *Handler, repository store.Repository) lifecycle.PreviewRunner {
+	if h.PreviewRunner == nil {
+		h.PreviewRunner = lifecycle.NewFakePreviewRunner(repository)
+	}
+	return h.PreviewRunner
 }
 
 func (h *Handler) ensurePermissionRegistry() *PermissionRegistry {
@@ -642,6 +650,38 @@ func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListPreviews(runID)))
 }
 
+func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PreviewID string `json:"previewId"`
+		RunID     string `json:"runId"`
+		ThreadID  string `json:"threadId"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	if req.RunID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("runId is required")))
+		return
+	}
+	if strings.TrimSpace(req.PreviewID) == "" {
+		req.PreviewID = genID("preview_")
+	}
+
+	repository := ensureStore(h)
+	preview, err := ensurePreviewRunner(h, repository).StartPreview(lifecycle.PreviewStartRequest{
+		PreviewID: req.PreviewID,
+		RunID:     req.RunID,
+		ThreadID:  req.ThreadID,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+	writeSuccess(w, http.StatusAccepted, preview)
+}
+
 func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID string) {
 	previewID = strings.TrimSpace(previewID)
 	if previewID == "" || strings.Contains(previewID, "/") {
@@ -667,9 +707,7 @@ func (h *Handler) PostPreviewStop(w http.ResponseWriter, r *http.Request, previe
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
 		return
 	}
-	preview.Status = "stopped"
-	preview.URL = ""
-	stopped, err := repository.UpsertPreview(preview)
+	stopped, err := ensurePreviewRunner(h, repository).StopPreview(preview.ID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
 		return
@@ -1516,11 +1554,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
 	mux.HandleFunc("/v1/previews", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			h.GetPreviews(w, r)
-			return
+		case http.MethodPost:
+			h.PostPreview(w, r)
+		default:
+			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
 	mux.HandleFunc("/v1/previews/", func(w http.ResponseWriter, r *http.Request) {
 		previewPath := strings.TrimPrefix(r.URL.Path, "/v1/previews/")
