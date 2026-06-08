@@ -15,6 +15,7 @@ type Claims struct {
 	UserID     string `json:"user_id"`
 	DeviceType string `json:"device_type"`
 	DeviceID   string `json:"device_id"`
+	Purpose    string `json:"purpose,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -27,6 +28,25 @@ func GenerateAccessToken(userID, deviceType, deviceID, secret string, ttl time.D
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "agenthub-hub",
 			Audience:  jwt.ClaimStrings{"agenthub-api"},
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
+}
+
+func GenerateEdgeToken(userID, deviceID, secret string, ttl time.Duration) (string, error) {
+	now := time.Now()
+	claims := Claims{
+		UserID:     userID,
+		DeviceType: "edge",
+		DeviceID:   deviceID,
+		Purpose:    "edge-api",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-edge"},
 			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(now),
