@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -141,6 +142,7 @@ func TestS3Storage_LocalPathReturnsEmpty(t *testing.T) {
 		func(ctx context.Context, bucket, key string) error {
 			return nil
 		},
+		nil,
 		"test-bucket",
 	)
 	if p := s3.LocalPath("uploads/ab/cd/hash"); p != "" {
@@ -267,6 +269,7 @@ func TestS3Storage_PutReturnsTrue(t *testing.T) {
 		func(ctx context.Context, bucket, key string) error {
 			return nil
 		},
+		nil,
 		"test-bucket",
 	)
 	created, err := s3.Put(context.Background(), "key", strings.NewReader("data"), "text/plain")
@@ -289,6 +292,7 @@ func TestS3Storage_PutReturnsFalseWhenBlobAlreadyExists(t *testing.T) {
 		func(ctx context.Context, bucket, key string) error {
 			return nil
 		},
+		nil,
 		"test-bucket",
 	)
 	created, err := s3.Put(context.Background(), "key", strings.NewReader("data"), "text/plain")
@@ -298,6 +302,121 @@ func TestS3Storage_PutReturnsFalseWhenBlobAlreadyExists(t *testing.T) {
 	if created {
 		t.Error("S3Storage.Put should return false when the object already exists")
 	}
+}
+
+func TestAttachmentServicePresignBlobURLUsesStorageKeyAndSafeResponseHeaders(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	hash := strings.Repeat("d", 64)
+	store := &recordingPresignStorage{url: "https://s3.example.test/presigned"}
+	svc := service.NewAttachmentService(db, config.UploadConfig{}, store)
+
+	url, err := svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="safe.txt"`)
+	if err != nil {
+		t.Fatalf("PresignBlobURL() error = %v", err)
+	}
+	if url != store.url {
+		t.Fatalf("PresignBlobURL() = %q, want %q", url, store.url)
+	}
+	if store.key != service.PathFromHash(hash) {
+		t.Fatalf("presign key = %q, want %q", store.key, service.PathFromHash(hash))
+	}
+	if store.contentType != "text/plain" {
+		t.Fatalf("presign content type = %q, want text/plain", store.contentType)
+	}
+	if store.contentDisposition != `attachment; filename="safe.txt"` {
+		t.Fatalf("presign content disposition = %q, want safe disposition", store.contentDisposition)
+	}
+	if store.expiresIn != 15*time.Minute {
+		t.Fatalf("presign expiry = %s, want 15m", store.expiresIn)
+	}
+}
+
+func TestAttachmentServicePresignBlobURLRejectsInvalidHashBeforeStorage(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	store := &recordingPresignStorage{url: "https://s3.example.test/presigned"}
+	svc := service.NewAttachmentService(db, config.UploadConfig{}, store)
+
+	url, err := svc.PresignBlobURL(context.Background(), "bad", "text/plain", `attachment; filename="safe.txt"`)
+	if err != nil {
+		t.Fatalf("PresignBlobURL() error = %v", err)
+	}
+	if url != "" {
+		t.Fatalf("PresignBlobURL() = %q, want empty URL for invalid hash", url)
+	}
+	if store.called {
+		t.Fatal("storage PresignURL should not be called for invalid hash")
+	}
+}
+
+func TestS3Storage_PresignURLDelegatesToConfiguredSigner(t *testing.T) {
+	var gotBucket, gotKey, gotType, gotDisposition string
+	var gotExpiry time.Duration
+	s3 := service.NewS3Storage(
+		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
+			return true, nil
+		},
+		func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("")), nil
+		},
+		func(ctx context.Context, bucket, key string) error {
+			return nil
+		},
+		func(ctx context.Context, bucket, key, contentType, contentDisposition string, expiresIn time.Duration) (string, error) {
+			gotBucket = bucket
+			gotKey = key
+			gotType = contentType
+			gotDisposition = contentDisposition
+			gotExpiry = expiresIn
+			return "https://s3.example.test/presigned", nil
+		},
+		"test-bucket",
+	)
+
+	url, err := s3.PresignURL(context.Background(), "uploads/aa/bb/hash", "text/plain", `attachment; filename="safe.txt"`, time.Minute)
+	if err != nil {
+		t.Fatalf("PresignURL() error = %v", err)
+	}
+	if url != "https://s3.example.test/presigned" {
+		t.Fatalf("PresignURL() = %q, want configured URL", url)
+	}
+	if gotBucket != "test-bucket" || gotKey != "uploads/aa/bb/hash" || gotType != "text/plain" ||
+		gotDisposition != `attachment; filename="safe.txt"` || gotExpiry != time.Minute {
+		t.Fatalf("presign args = bucket %q key %q type %q disposition %q expiry %s", gotBucket, gotKey, gotType, gotDisposition, gotExpiry)
+	}
+}
+
+type recordingPresignStorage struct {
+	url                string
+	called             bool
+	key                string
+	contentType        string
+	contentDisposition string
+	expiresIn          time.Duration
+}
+
+func (s *recordingPresignStorage) Put(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
+	return true, nil
+}
+
+func (s *recordingPresignStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader("")), nil
+}
+
+func (s *recordingPresignStorage) Delete(ctx context.Context, key string) error {
+	return nil
+}
+
+func (s *recordingPresignStorage) LocalPath(key string) string {
+	return ""
+}
+
+func (s *recordingPresignStorage) PresignURL(ctx context.Context, key string, contentType string, contentDisposition string, expiresIn time.Duration) (string, error) {
+	s.called = true
+	s.key = key
+	s.contentType = contentType
+	s.contentDisposition = contentDisposition
+	s.expiresIn = expiresIn
+	return s.url, nil
 }
 
 func newAttachmentServiceTestDB(t *testing.T) *gorm.DB {

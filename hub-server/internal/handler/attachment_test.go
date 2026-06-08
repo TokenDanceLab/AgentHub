@@ -31,14 +31,20 @@ import (
 )
 
 type mockAttachmentService struct {
-	probeCalled      bool
-	saveCalled       bool
-	storeCalled      bool
-	saveMimeType     string
-	saveOriginalName string
-	saveMetadata     string
-	getAttachment    *model.Attachment
-	allowedMimeTypes map[string]bool
+	probeCalled        bool
+	saveCalled         bool
+	storeCalled        bool
+	getBlobCalled      bool
+	saveMimeType       string
+	saveOriginalName   string
+	saveMetadata       string
+	getAttachment      *model.Attachment
+	allowedMimeTypes   map[string]bool
+	remoteStorage      bool
+	presignURL         string
+	presignHash        string
+	presignType        string
+	presignDisposition string
 }
 
 func (m *mockAttachmentService) ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error) {
@@ -78,6 +84,7 @@ func (m *mockAttachmentService) StoreBlob(ctx context.Context, hash string, r io
 }
 
 func (m *mockAttachmentService) GetBlob(ctx context.Context, hash string) (io.ReadCloser, error) {
+	m.getBlobCalled = true
 	return io.NopCloser(strings.NewReader("")), nil
 }
 
@@ -86,11 +93,21 @@ func (m *mockAttachmentService) DeleteBlob(ctx context.Context, hash string) err
 }
 
 func (m *mockAttachmentService) BlobLocalPath(hash string) string {
+	if m.remoteStorage {
+		return ""
+	}
 	relPath := service.PathFromHash(hash)
 	if relPath == "" {
 		return ""
 	}
 	return filepath.Join(".", relPath, hash)
+}
+
+func (m *mockAttachmentService) PresignBlobURL(ctx context.Context, hash string, contentType string, contentDisposition string) (string, error) {
+	m.presignHash = hash
+	m.presignType = contentType
+	m.presignDisposition = contentDisposition
+	return m.presignURL, nil
 }
 
 func (m *mockAttachmentService) IsAttachmentMimeTypeAllowed(mimeType string) bool {
@@ -530,5 +547,63 @@ func TestAttachmentDownloadFormatsUnsafeFilenameSafely(t *testing.T) {
 	}
 	if params["filename"] == "" {
 		t.Fatalf("Content-Disposition missing sanitized filename: %q", disposition)
+	}
+}
+
+func TestAttachmentDownloadRedirectsToPresignedRemoteURLWithSafeDisposition(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	content := []byte("remote body")
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+
+	svc := &mockAttachmentService{
+		remoteStorage: true,
+		presignURL:    "https://s3.example.test/bucket/object?signature=abc",
+		getAttachment: &model.Attachment{
+			ID:           "att-remote",
+			Hash:         hash,
+			Size:         int64(len(content)),
+			MimeType:     "text/plain; charset=utf-8",
+			OriginalName: "..\\evil\"\r\nX-Injected: yes.txt",
+		},
+	}
+	h := handler.NewAttachmentHandler(svc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "user-1")
+	c.Params = []gin.Param{{Key: "id", Value: "att-remote"}}
+	c.Request = httptest.NewRequest(http.MethodGet, "/client/attachments/att-remote", nil)
+
+	h.Download(c)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("expected status 302, got %d: %s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Location"); got != svc.presignURL {
+		t.Fatalf("Location = %q, want presigned URL", got)
+	}
+	if svc.getBlobCalled {
+		t.Fatal("GetBlob should not be called when presigned redirect is available")
+	}
+	if svc.presignHash != hash {
+		t.Fatalf("presign hash = %q, want %q", svc.presignHash, hash)
+	}
+	if svc.presignType != "text/plain; charset=utf-8" {
+		t.Fatalf("presign content type = %q, want sanitized attachment content type", svc.presignType)
+	}
+	if strings.ContainsAny(svc.presignDisposition, "\r\n") {
+		t.Fatalf("presign disposition contains raw newline bytes: %q", svc.presignDisposition)
+	}
+	mediaType, params, err := mime.ParseMediaType(svc.presignDisposition)
+	if err != nil {
+		t.Fatalf("presign disposition is not parseable: %q: %v", svc.presignDisposition, err)
+	}
+	if mediaType != "attachment" {
+		t.Fatalf("presign disposition media type = %q, want attachment", mediaType)
+	}
+	if params["filename"] != "evil\"X-Injected: yes.txt" {
+		t.Fatalf("presign filename = %q, want sanitized base filename", params["filename"])
 	}
 }
