@@ -28,6 +28,7 @@ type config struct {
 	WorkspaceAllowlist repeatedString
 	LocalAuthToken     string
 	HubJWTSecret       string // shared secret for validating Hub-issued HS256 JWTs
+	EdgeDeviceID       string // local Edge device ID expected in Edge-scoped Hub JWTs
 	RemoteMode         bool   // allow non-loopback bind + remote origins (requires auth)
 	AllowedOrigins     repeatedString
 	Dev                bool // disable auto-generated local auth token for development
@@ -114,6 +115,7 @@ func main() {
 		AgentDefault:       cfg.AgentDefault,
 		LocalAuthToken:     cfg.LocalAuthToken,
 		HubJWTSecret:       cfg.HubJWTSecret,
+		EdgeDeviceID:       cfg.EdgeDeviceID,
 		HubURL:             cfg.HubURL,
 		HubToken:           cfg.HubToken,
 		RemoteMode:         cfg.RemoteMode,
@@ -196,6 +198,7 @@ func buildConfig(args []string) (config, error) {
 	fs.Var(&cfg.WorkspaceAllowlist, "workspace-allowlist", "workspace root allowed for request workDir; may be repeated; env AGENTHUB_WORKSPACE_ALLOWLIST uses OS path-list separators")
 	fs.StringVar(&cfg.LocalAuthToken, "local-auth-token", getEnv("AGENTHUB_EDGE_AUTH_TOKEN", ""), "optional local bearer token required for Edge APIs other than /v1/health")
 	fs.StringVar(&cfg.HubJWTSecret, "hub-jwt-secret", getEnv("AGENTHUB_HUB_JWT_SECRET", ""), "shared secret for validating Hub-issued HS256 JWTs (enables TokenDance trust chain)")
+	fs.StringVar(&cfg.EdgeDeviceID, "edge-device-id", getEnv("AGENTHUB_EDGE_DEVICE_ID", ""), "local Edge device ID expected in Edge-scoped Hub JWTs; required with --hub-jwt-secret")
 	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")
 	fs.StringVar(&cfg.HubToken, "hub-token", getEnv("AGENTHUB_HUB_TOKEN", ""), "JWT bearer token for authenticating callback requests to Hub")
 	fs.BoolVar(&cfg.RemoteMode, "remote-mode", getEnv("AGENTHUB_REMOTE_MODE", "0") == "1", "allow non-loopback bind and remote origins (requires --local-auth-token or --hub-jwt-secret)")
@@ -225,6 +228,9 @@ func buildConfig(args []string) (config, error) {
 	cfg.StoreFile = strings.TrimSpace(cfg.StoreFile)
 	cfg.StoreBackend = strings.ToLower(strings.TrimSpace(cfg.StoreBackend))
 	cfg.StoreDB = strings.TrimSpace(cfg.StoreDB)
+	cfg.LocalAuthToken = strings.TrimSpace(cfg.LocalAuthToken)
+	cfg.HubJWTSecret = strings.TrimSpace(cfg.HubJWTSecret)
+	cfg.EdgeDeviceID = strings.TrimSpace(cfg.EdgeDeviceID)
 	switch cfg.StoreBackend {
 	case "":
 		if cfg.StoreDB != "" {
@@ -275,12 +281,14 @@ func buildConfig(args []string) (config, error) {
 			return config{}, err
 		}
 	}
+	if cfg.HubJWTSecret != "" && cfg.EdgeDeviceID == "" {
+		return config{}, fmt.Errorf("--hub-jwt-secret requires --edge-device-id")
+	}
 	if err := applyRunnerProfile(&cfg); err != nil {
 		return config{}, err
 	}
 	cfg.RunnerCommand = strings.TrimSpace(cfg.RunnerCommand)
 	cfg.AgentDefault = strings.TrimSpace(cfg.AgentDefault)
-	cfg.LocalAuthToken = strings.TrimSpace(cfg.LocalAuthToken)
 	cfg.AllowedOrigins = trimRepeatedStrings(cfg.AllowedOrigins)
 	if cfg.RunnerCommand == "" && len(cfg.RunnerArgs) > 0 {
 		return config{}, fmt.Errorf("--runner-arg requires --runner-command")

@@ -863,6 +863,47 @@ func TestBuildConfigParsesLocalAuthTokenFromFlag(t *testing.T) {
 	}
 }
 
+func TestBuildConfigParsesEdgeDeviceID(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		args []string
+		want string
+	}{
+		{
+			name: "flag",
+			env:  " env-edge-device ",
+			args: []string{"--edge-device-id", " flag-edge-device "},
+			want: "flag-edge-device",
+		},
+		{
+			name: "env",
+			env:  " env-edge-device ",
+			want: "env-edge-device",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("AGENTHUB_EDGE_DEVICE_ID", tt.env)
+			cfg, err := buildConfig(tt.args)
+			if err != nil {
+				t.Fatalf("buildConfig returned error: %v", err)
+			}
+			if got := cfg.EdgeDeviceID; got != tt.want {
+				t.Fatalf("EdgeDeviceID = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildConfigRejectsHubJWTSecretWithoutEdgeDeviceID(t *testing.T) {
+	_, err := buildConfig([]string{"--hub-jwt-secret", " hub-secret "})
+	if err == nil || !strings.Contains(err.Error(), "--hub-jwt-secret requires --edge-device-id") {
+		t.Fatalf("buildConfig error = %v, want hub jwt edge device requirement", err)
+	}
+}
+
 func TestBuildConfigParsesAllowedOriginsFromFlag(t *testing.T) {
 	cfg, err := buildConfig([]string{
 		"--allowed-origin", " https://app.example.com ",
