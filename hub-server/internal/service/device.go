@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -15,12 +16,21 @@ import (
 // DeviceService encapsulates device business logic, keeping DB access
 // out of the HTTP handler layer.
 type DeviceService struct {
-	db *gorm.DB
+	db                     *gorm.DB
+	desktopTargetRegistrar desktopTargetRegistrar
+}
+
+type desktopTargetRegistrar interface {
+	UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *model.Device) (*model.ExecutionTarget, error)
 }
 
 // NewDeviceService creates a new DeviceService backed by the given database.
 func NewDeviceService(db *gorm.DB) *DeviceService {
 	return &DeviceService{db: db}
+}
+
+func (s *DeviceService) SetDesktopTargetRegistrar(registrar desktopTargetRegistrar) {
+	s.desktopTargetRegistrar = registrar
 }
 
 // Register creates or updates a device record for the given user and returns it.
@@ -43,6 +53,12 @@ func (s *DeviceService) Register(deviceID, userID, deviceType, appVersion string
 			return nil, errcode.ErrBadRequest
 		}
 		return nil, err
+	}
+
+	if device.DeviceType == "desktop" && s.desktopTargetRegistrar != nil {
+		if _, err := s.desktopTargetRegistrar.UpsertLocalEdgeForDesktopDevice(context.Background(), device); err != nil {
+			return nil, err
+		}
 	}
 
 	return device, nil

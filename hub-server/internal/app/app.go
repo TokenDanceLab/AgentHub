@@ -214,6 +214,7 @@ func (a *App) Run(ctx context.Context) error {
 	// Execution Target service
 	targetSvc := service.NewExecutionTargetService(a.DB)
 	targetSvc.SetCache(a.CacheClient)
+	a.DeviceService.SetDesktopTargetRegistrar(targetSvc)
 	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
 
 	// Workspace service
