@@ -461,6 +461,74 @@ finished:
 	}
 }
 
+func TestProcessExecutorPublishesCLIInvocationPlanAndReplaysFixtureStatus(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	adapter := &fixtureSDKStreamAdapter{id: "opencode"}
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-fixture-sdk-json",
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{
+		AgentID:        "opencode",
+		Prompt:         "SECRET_PROMPT_SHOULD_NOT_APPEAR",
+		PermissionMode: "plan",
+		WorkDir:        "D:\\private\\fixture-workspace",
+	}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var live []events.EventEnvelope
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		live = append(live, evt)
+		switch evt.Type {
+		case "run.finished":
+			goto finished
+		case "run.failed":
+			t.Fatalf("run failed: %#v", evt.Payload)
+		}
+	}
+
+finished:
+	planEvent := findEventType(live, adapters.BusEventCLIInvocationPlan)
+	if planEvent == nil {
+		t.Fatalf("live events missing invocation plan: %v", eventTypeList(live))
+	}
+	planPayload, ok := planEvent.Payload.(map[string]any)
+	if !ok {
+		t.Fatalf("invocation plan payload = %T, want map", planEvent.Payload)
+	}
+	if planPayload["adapterId"] != "opencode" || planPayload["observed"] != false || planPayload["realTested"] != false {
+		t.Fatalf("invocation plan payload = %#v, want opencode fixture plan without observed/realTested claim", planPayload)
+	}
+	planJSON, err := json.Marshal(planPayload)
+	if err != nil {
+		t.Fatalf("marshal invocation plan: %v", err)
+	}
+	if bytes.Contains(planJSON, []byte("SECRET_PROMPT_SHOULD_NOT_APPEAR")) || bytes.Contains(planJSON, []byte("D:\\private")) {
+		t.Fatalf("invocation plan leaked prompt or absolute workdir: %s", planJSON)
+	}
+
+	_, _, replay := bus.Subscribe(0)
+	for _, want := range []string{
+		adapters.BusEventCLIInvocationPlan,
+		adapters.BusEventPermissionRequested,
+		adapters.BusEventResult,
+		"run.finished",
+	} {
+		if !hasEventType(replay, want) {
+			t.Fatalf("replay events missing %s: %v", want, eventTypeList(replay))
+		}
+	}
+}
+
 func TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
@@ -1448,6 +1516,15 @@ func hasEventType(events []events.EventEnvelope, eventType string) bool {
 		}
 	}
 	return false
+}
+
+func findEventType(events []events.EventEnvelope, eventType string) *events.EventEnvelope {
+	for i := range events {
+		if events[i].Type == eventType {
+			return &events[i]
+		}
+	}
+	return nil
 }
 
 func eventTypeList(events []events.EventEnvelope) []string {
