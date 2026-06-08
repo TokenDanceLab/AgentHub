@@ -35,7 +35,7 @@ function Join-NativeArguments {
             '""'
             continue
         }
-        if ($arg -notmatch '[\s"]' -and $arg.Length -gt 0) {
+        if ($arg -notmatch '[\s"\[\]]' -and $arg.Length -gt 0) {
             $arg
             continue
         }
@@ -74,12 +74,14 @@ function Invoke-RepoScript {
     param([string[]]$Arguments)
 
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = "powershell"
+    $psi.FileName = "pwsh"
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.WorkingDirectory = $RepoRoot
-    $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File " + (Join-NativeArguments $Arguments)
+    foreach ($arg in @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File") + $Arguments) {
+        [void]$psi.ArgumentList.Add($arg)
+    }
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdout = $proc.StandardOutput.ReadToEnd()
@@ -202,6 +204,75 @@ try {
         Assert-True ($directLocalEdge.ExitCode -ne 0) "direct Web-to-LocalEdge URL fails closed" $directLocalEdge.Output
         Assert-True ($directLocalEdge.Output -match "Web URL must not point directly at Local Edge") "direct LocalEdge failure is explicit" $directLocalEdge.Output
 
+        $localhostLocalEdge = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-Mode", "RealApproved",
+            "-OAuthClientId", "agenthub-test-client",
+            "-CallbackUrl", "http://localhost:5174/auth/tokendance/callback",
+            "-HubBaseUrl", "http://127.0.0.1:8080",
+            "-WebUrl", "http://localhost:3210/v1/runs",
+            "-TestAccountIndicator", "disposable-test-account",
+            "-ArtifactRoot", ".tmp\login-e2e\approved",
+            "-BrowserEvidenceBoundary", "metadata-only",
+            "-OperatorApprovalId", "approval-123",
+            "-ApproveRealLogin",
+            "-ApproveRemoteDispatch",
+            "-HubSessionProof", "proof:hub-session",
+            "-TargetInventoryProof", "proof:target-inventory",
+            "-SelectedDesktopTargetProof", "proof:selected-target",
+            "-DispatchRequestProof", "proof:dispatch",
+            "-EventReplayProof", "proof:event-replay"
+        )
+        Assert-True ($localhostLocalEdge.ExitCode -ne 0) "localhost Local Edge alias fails closed" $localhostLocalEdge.Output
+        Assert-True ($localhostLocalEdge.Output -match "Web URL must not point directly at Local Edge") "localhost Local Edge alias failure is explicit" $localhostLocalEdge.Output
+
+        $ipv6LocalEdge = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-Mode", "RealApproved",
+            "-OAuthClientId", "agenthub-test-client",
+            "-CallbackUrl", "http://localhost:5174/auth/tokendance/callback",
+            "-HubBaseUrl", "http://127.0.0.1:8080",
+            "-WebUrl", "http://[::1]:3210/v1/runs",
+            "-TestAccountIndicator", "disposable-test-account",
+            "-ArtifactRoot", ".tmp\login-e2e\approved",
+            "-BrowserEvidenceBoundary", "metadata-only",
+            "-OperatorApprovalId", "approval-123",
+            "-ApproveRealLogin",
+            "-ApproveRemoteDispatch",
+            "-HubSessionProof", "proof:hub-session",
+            "-TargetInventoryProof", "proof:target-inventory",
+            "-SelectedDesktopTargetProof", "proof:selected-target",
+            "-DispatchRequestProof", "proof:dispatch",
+            "-EventReplayProof", "proof:event-replay"
+        )
+        Assert-True ($ipv6LocalEdge.ExitCode -ne 0) "IPv6 loopback Local Edge alias fails closed" $ipv6LocalEdge.Output
+        Assert-True ($ipv6LocalEdge.Output -match "Web URL must not point directly at Local Edge") "IPv6 Local Edge alias failure is explicit" $ipv6LocalEdge.Output
+
+        $traversalArtifactRoot = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-Mode", "RealApproved",
+            "-OAuthClientId", "agenthub-test-client",
+            "-CallbackUrl", "http://localhost:5174/auth/tokendance/callback",
+            "-HubBaseUrl", "http://127.0.0.1:8080",
+            "-WebUrl", "http://127.0.0.1:5174",
+            "-TestAccountIndicator", "disposable-test-account",
+            "-ArtifactRoot", ".tmp\..\docs\audit",
+            "-BrowserEvidenceBoundary", "metadata-only",
+            "-OperatorApprovalId", "approval-123",
+            "-ApproveRealLogin",
+            "-ApproveRemoteDispatch",
+            "-HubSessionProof", "proof:hub-session",
+            "-TargetInventoryProof", "proof:target-inventory",
+            "-SelectedDesktopTargetProof", "proof:selected-target",
+            "-DispatchRequestProof", "proof:dispatch",
+            "-EventReplayProof", "proof:event-replay"
+        )
+        Assert-True ($traversalArtifactRoot.ExitCode -ne 0) "path traversal artifact root fails closed" $traversalArtifactRoot.Output
+        Assert-True ($traversalArtifactRoot.Output -match "artifact root") "path traversal artifact root failure is explicit" $traversalArtifactRoot.Output
+
         $missingTargetProof = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
@@ -282,6 +353,70 @@ try {
         )
         Assert-True ($reviewMissingInventory.ExitCode -ne 0) "evidence review rejects missing target inventory proof" $reviewMissingInventory.Output
         Assert-True ($reviewMissingInventory.Output -match "target_inventory") "evidence review names missing target inventory" $reviewMissingInventory.Output
+
+        $manifestOpaqueToken = Join-Path $tmpRoot "opaque-token-manifest.json"
+        @{
+            real_login_approved = $true
+            remote_dispatch_approved = $true
+            redaction_status = "redacted"
+            web_to_local_edge_direct = $false
+            hub_session = @{ access_token = "opaque-session-token-value" }
+            target_inventory = @{ ref = "proof:target-inventory" }
+            selected_desktop_target = @{ ref = "proof:selected-target" }
+            dispatch_request = @{ ref = "proof:dispatch" }
+            event_replay = @{ ref = "proof:event-replay" }
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestOpaqueToken -Encoding UTF8
+
+        $reviewOpaqueToken = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-Mode", "EvidenceReview",
+            "-OAuthClientId", "agenthub-test-client",
+            "-CallbackUrl", "http://localhost:5174/auth/tokendance/callback",
+            "-HubBaseUrl", "http://127.0.0.1:8080",
+            "-WebUrl", "http://127.0.0.1:5174",
+            "-TestAccountIndicator", "disposable-test-account",
+            "-ArtifactRoot", ".tmp\login-e2e\approved",
+            "-BrowserEvidenceBoundary", "metadata-only",
+            "-OperatorApprovalId", "approval-123",
+            "-ApproveRealLogin",
+            "-ApproveRemoteDispatch",
+            "-EvidenceManifest", $manifestOpaqueToken
+        )
+        Assert-True ($reviewOpaqueToken.ExitCode -ne 0) "evidence review rejects opaque sensitive token fields" $reviewOpaqueToken.Output
+        Assert-True ($reviewOpaqueToken.Output -match "sensitive field") "opaque sensitive token field failure is explicit" $reviewOpaqueToken.Output
+
+        $manifestDirectEdgeUrl = Join-Path $tmpRoot "direct-edge-url-manifest.json"
+        @{
+            real_login_approved = $true
+            remote_dispatch_approved = $true
+            redaction_status = "redacted"
+            web_to_local_edge_direct = $false
+            hub_session = @{ ref = "proof:hub-session" }
+            target_inventory = @{ ref = "http://localhost:3210/v1/health" }
+            selected_desktop_target = @{ ref = "proof:selected-target" }
+            dispatch_request = @{ ref = "proof:dispatch" }
+            event_replay = @{ ref = "proof:event-replay" }
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestDirectEdgeUrl -Encoding UTF8
+
+        $reviewDirectEdgeUrl = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-Mode", "EvidenceReview",
+            "-OAuthClientId", "agenthub-test-client",
+            "-CallbackUrl", "http://localhost:5174/auth/tokendance/callback",
+            "-HubBaseUrl", "http://127.0.0.1:8080",
+            "-WebUrl", "http://127.0.0.1:5174",
+            "-TestAccountIndicator", "disposable-test-account",
+            "-ArtifactRoot", ".tmp\login-e2e\approved",
+            "-BrowserEvidenceBoundary", "metadata-only",
+            "-OperatorApprovalId", "approval-123",
+            "-ApproveRealLogin",
+            "-ApproveRemoteDispatch",
+            "-EvidenceManifest", $manifestDirectEdgeUrl
+        )
+        Assert-True ($reviewDirectEdgeUrl.ExitCode -ne 0) "evidence review rejects direct Local Edge URLs in proof fields" $reviewDirectEdgeUrl.Output
+        Assert-True ($reviewDirectEdgeUrl.Output -match "direct Local Edge URL") "direct Local Edge evidence URL failure is explicit" $reviewDirectEdgeUrl.Output
 
         $manifestGood = Join-Path $tmpRoot "good-manifest.json"
         @{
