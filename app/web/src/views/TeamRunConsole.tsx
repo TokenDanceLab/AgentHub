@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Users,
@@ -19,7 +19,7 @@ import type {
   AgentTeamTask,
   TeamRunState,
 } from '@/api/hubClient';
-import { selectOnlineLocalEdgeExecutionTarget, useHubExecutionTargets } from '@/api/executionTargetQueries';
+import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useHubStore } from '@/stores/hubStore';
 import { getAccessToken } from '@/hooks/useAuth';
 import { TeamMemberList } from '@/components/IM/TeamMemberList';
@@ -118,6 +118,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const [decidingIds, setDecidingIds] = useState<Set<string>>(new Set());
   const [insetTeam, setInsetTeam] = useState<AgentTeamDetail | null>(null);
   const [insetRun, setInsetRun] = useState<AgentTeamRun | null>(null);
+  const [selectedTargetId, setSelectedTargetId] = useState('');
 
   // Queries
   const agentTeamsQuery = useHubAgentTeams({
@@ -142,10 +143,15 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const state = localState ?? agentTeamsQuery.data?.state;
   const tasks = localTasks.length > 0 ? localTasks : (agentTeamsQuery.data?.tasks ?? []);
   const events = localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? []);
-  const selectedRunTarget = useMemo(
-    () => selectOnlineLocalEdgeExecutionTarget(executionTargetsQuery.data?.items ?? []),
+  const onlineLocalEdgeTargets = useMemo(
+    () => (executionTargetsQuery.data?.items ?? []).filter((target) =>
+      target.target_type === 'local_edge' &&
+      target.is_online === true &&
+      target.health_state !== 'offline'
+    ),
     [executionTargetsQuery.data?.items],
   );
+  const selectedRunTarget = onlineLocalEdgeTargets.find((target) => target.id === selectedTargetId);
   const runTargetLoading =
     executionTargetsQuery.isLoading ||
     (executionTargetsQuery.isFetching && !executionTargetsQuery.data);
@@ -159,8 +165,17 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
     : runTargetError
       ? t('teamRun.targetError', 'Hub execution targets unavailable: {{message}}', { message: runTargetError })
       : selectedRunTarget
-        ? t('teamRun.targetSelected', 'Target: {{name}}', { name: selectedRunTarget.id })
-        : t('teamRun.targetMissing', 'No online local_edge execution target is available.');
+        ? t('teamRun.targetSelected', 'Target: {{name}}', { name: selectedRunTarget.name || selectedRunTarget.id })
+        : onlineLocalEdgeTargets.length > 0
+          ? t('teamRun.targetRequired', 'Select a Desktop/Edge target before starting.')
+          : t('teamRun.targetMissing', 'No online local_edge execution target is available.');
+
+  useEffect(() => {
+    if (!selectedTargetId) return;
+    if (!onlineLocalEdgeTargets.some((target) => target.id === selectedTargetId)) {
+      setSelectedTargetId('');
+    }
+  }, [onlineLocalEdgeTargets, selectedTargetId]);
 
   // Mutations
   const createTeamMut = useCreateAgentTeam({ getToken: tokenGetter });
@@ -523,6 +538,27 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                         onChange={(e) => setTriggerMessage(e.target.value)}
                         rows={2}
                       />
+                      <label className={styles.targetPicker}>
+                        <span>{t('teamRun.targetPickerLabel', 'Desktop/Edge target')}</span>
+                        <select
+                          className={styles.select}
+                          aria-label={t('teamRun.targetPickerLabel', 'Desktop/Edge target')}
+                          value={selectedTargetId}
+                          onChange={(event) => setSelectedTargetId(event.target.value)}
+                          disabled={runTargetLoading || Boolean(runTargetError) || onlineLocalEdgeTargets.length === 0}
+                        >
+                          <option value="">
+                            {onlineLocalEdgeTargets.length > 0
+                              ? t('teamRun.targetPickerPlaceholder', 'Select a Hub-registered Desktop/Edge target')
+                              : t('teamRun.targetPickerEmpty', 'No online Desktop/Edge targets')}
+                          </option>
+                          {onlineLocalEdgeTargets.map((target) => (
+                            <option key={target.id} value={target.id}>
+                              {target.name || target.id}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       <div className={styles.startRunActions}>
                         <span className={styles.targetHint}>{runTargetStatus}</span>
                         <button

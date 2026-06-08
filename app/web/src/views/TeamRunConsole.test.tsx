@@ -8,6 +8,7 @@ const startTeamRunMock = vi.hoisted(() => vi.fn());
 const refetchTeamsMock = vi.hoisted(() => vi.fn());
 const executionTargetItems = vi.hoisted(() => [] as Array<{
   id: string;
+  name?: string;
   target_type: string;
   is_online: boolean;
   health_state: string;
@@ -91,6 +92,9 @@ describe('TeamRunConsole target routing', () => {
 
     fireEvent.click(screen.getByText('P0 Team'));
     fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-1' },
+    });
     fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
       target: { value: 'Run the remote control fixture' },
     });
@@ -119,5 +123,77 @@ describe('TeamRunConsole target routing', () => {
     expect(screen.getByText('No online local_edge execution target is available.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Go' })).toBeDisabled();
     expect(startTeamRunMock).not.toHaveBeenCalled();
+  });
+
+  it('does not silently choose the first online local_edge target before user selection', () => {
+    executionTargetItems.push(
+      {
+        id: 'target-local-edge-alpha',
+        name: 'Alpha Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+      {
+        id: 'target-local-edge-beta',
+        name: 'Beta Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+    );
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
+      target: { value: 'Run without explicit target' },
+    });
+
+    expect(screen.getByText('Select a Desktop/Edge target before starting.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go' })).toBeDisabled();
+    expect(startTeamRunMock).not.toHaveBeenCalled();
+  });
+
+  it('lets the user choose which online local_edge target receives the TeamRun', async () => {
+    executionTargetItems.push(
+      {
+        id: 'target-local-edge-alpha',
+        name: 'Alpha Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+      {
+        id: 'target-local-edge-beta',
+        name: 'Beta Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+    );
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-beta' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
+      target: { value: 'Run on beta desktop' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+
+    await waitFor(() => {
+      expect(startTeamRunMock).toHaveBeenCalledWith({
+        teamId: 'team-1',
+        run: {
+          trigger_message: 'Run on beta desktop',
+          target_id: 'target-local-edge-beta',
+        },
+      });
+    });
   });
 });

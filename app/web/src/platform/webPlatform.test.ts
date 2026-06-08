@@ -29,6 +29,10 @@ function hubMessages(queryClient: QueryClient, sessionId = 'hub-session-1'): Mes
   return queryClient.getQueryData<MessageResponse[]>(['web-v4', 'hub-messages', sessionId]) ?? [];
 }
 
+function withExecutionTarget<T extends object>(intent: T, executionTargetId: string): T & { executionTargetId: string } {
+  return { ...intent, executionTargetId };
+}
+
 describe('webPlatform workbench agent mapping', () => {
   it('maps Hub AgentInfo into shared workbench agents', () => {
     const agent: AgentInfo = {
@@ -248,7 +252,7 @@ describe('webPlatform workbench agent mapping', () => {
       now: () => '2026-06-07T00:00:00Z',
     });
 
-    await expect(platform.runs.submitComposerIntent({
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
       conversationId: 'hub-session-1',
       text: '继续 v4 clean rebuild',
       mode: 'code',
@@ -266,7 +270,7 @@ describe('webPlatform workbench agent mapping', () => {
       }],
       approvalMode: 'workspace-write',
       workDir: 'D:\\Code\\TokenDance\\AgentHub',
-    })).resolves.toEqual({ intentId: 'task-1' });
+    }, 'target-local-edge-1'))).resolves.toEqual({ intentId: 'task-1' });
 
     expect(hubClient.sendMessage).toHaveBeenCalledWith('hub-session-1', {
       client_msg_id: 'client-message-1',
@@ -305,6 +309,52 @@ describe('webPlatform workbench agent mapping', () => {
         content: expect.stringContaining('继续 v4 clean rebuild'),
       }),
     ]);
+  });
+
+  it('does not silently choose the first online local_edge target for Web composer dispatch', async () => {
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-no-explicit-target',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn().mockResolvedValue({
+        message_id: 'hub-message-no-explicit-target',
+        seq_id: 51,
+        created_at: '2026-06-07T00:00:08Z',
+      }),
+      triggerAgentTask: vi.fn(),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-local-edge-first',
+            name: 'First Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      createClientMessageId: () => 'client-message-no-explicit-target',
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'hub-session-1',
+      text: '不要自动选择第一个 Desktop Edge',
+      mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Select a Desktop/Edge target before Web can dispatch real Hub work.');
+
+    expect(hubClient.listExecutionTargets).not.toHaveBeenCalled();
+    expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
   });
 
   it('reuses the cached exact Hub agent instance for repeated profile mentions', async () => {
@@ -361,6 +411,7 @@ describe('webPlatform workbench agent mapping', () => {
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest' as const,
+      executionTargetId: 'target-local-edge-cached',
     };
 
     await platform.runs.submitComposerIntent({ ...baseIntent, text: '第一次触发' });
@@ -527,14 +578,14 @@ describe('webPlatform workbench agent mapping', () => {
       now: () => '2026-06-07T00:00:03Z',
     });
 
-    await expect(platform.runs.submitComposerIntent({
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
       conversationId: 'hub-session-1',
       text: '消息已发送但任务失败',
       mode: 'code',
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest',
-    })).rejects.toThrow('task dispatch failed');
+    }, 'target-local-edge-dispatch-failed'))).rejects.toThrow('task dispatch failed');
 
     expect(hubMessages(queryClient)).toEqual([
       expect.objectContaining({
@@ -584,16 +635,20 @@ describe('webPlatform workbench agent mapping', () => {
       createClientMessageId: () => 'client-message-no-target',
     });
 
-    await expect(platform.runs.submitComposerIntent({
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
       conversationId: 'hub-session-1',
       text: '需要本机 Edge 目标',
       mode: 'code',
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest',
-    })).rejects.toThrow('No online local_edge execution target is available for Web Hub dispatch.');
+    }, 'target-relay-1'))).rejects.toThrow('Selected Desktop/Edge target is not available for Web Hub dispatch.');
 
     expect(hubClient.sendMessage).toHaveBeenCalled();
+    expect(hubClient.listExecutionTargets).toHaveBeenCalledWith({
+      target_type: 'local_edge',
+      pageSize: 50,
+    });
     expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
   });
 
