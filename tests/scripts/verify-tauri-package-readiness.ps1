@@ -110,6 +110,36 @@ function New-RogueTauriBuildFixture {
     return $tempRoot
 }
 
+function New-RogueMacOSCommandFixture {
+    param(
+        [string]$Command
+    )
+
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    $workflowPath = Join-Path $tempRoot ".github\workflows\release-readiness.yml"
+    $workflowText = Get-Content $workflowPath -Raw -Encoding UTF8
+    $injected = $workflowText -replace '(?m)^          echo "Signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice\."\s*$', "`$0`r`n          $Command"
+    Set-Content $workflowPath $injected -Encoding UTF8
+
+    & git -C $tempRoot init -q
+    return $tempRoot
+}
+
 $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
 $smokeScriptPath = Join-Path $RepoRoot "scripts\verify-tauri-installer-smoke.ps1"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\release.yml"
@@ -142,7 +172,9 @@ foreach ($artifactPattern in @(
 )) {
     Assert-True ($scriptText -match [regex]::Escape($artifactPattern)) "checker covers ignored generated artifact path $artifactPattern"
 }
-Assert-True ($scriptText -match "unsigned" -and $scriptText -match "aarch64-apple-darwin" -and $scriptText -match "policy note") "checker records macOS arm64 unsigned policy note without formal signing claims"
+Assert-True ($scriptText -match "run_macos_unsigned_dry_policy" -and $scriptText -match "macos-unsigned-dry-policy") "checker enforces explicit macOS unsigned dry workflow gate"
+Assert-True ($scriptText -match "agenthub-edge-aarch64-apple-darwin" -and $scriptText -match "AgentHub\\.app" -and $scriptText -match "AgentHub\\.dmg") "checker records future macOS arm64 sidecar and bundle boundaries"
+Assert-True ($scriptText -match "later approval slice|approval slice|审批") "checker keeps macOS signing and notarization behind later approval"
 Assert-True ($smokeScriptText -match "StrictToolchain" -and $smokeScriptText -match "GOOS=windows" -and $smokeScriptText -match "GOARCH=amd64") "installer smoke records Windows sidecar toolchain preflight"
 Assert-True ($smokeScriptText -match "installer-header\.bmp" -and $smokeScriptText -match "installer-sidebar\.bmp") "installer smoke verifies NSIS installer image assets"
 Assert-True ($smokeScriptText -match "AgentHub-portable/AgentHub\.exe" -and $smokeScriptText -match "AgentHub-portable/agenthub-edge\.exe") "installer smoke verifies portable staging outputs stay ignored"
@@ -157,6 +189,10 @@ Assert-True ($readinessWorkflowText -match "app/desktop/src-tauri/Cargo\.lock") 
 Assert-True ($readinessWorkflowText -match "verify-tauri-package-readiness\.ps1") "release readiness workflow runs readiness checker"
 Assert-True ($readinessWorkflowText -match "verify-tauri-installer-smoke\.ps1") "release readiness workflow runs installer smoke preflight"
 Assert-True ($readinessWorkflowText -match "windows-installer-smoke-preflight") "release readiness workflow has a Windows installer smoke preflight job"
+Assert-True ($readinessWorkflowText -match "run_macos_unsigned_dry_policy") "release readiness workflow declares macOS unsigned dry policy input"
+Assert-True ($readinessWorkflowText -match "macos-unsigned-dry-policy" -and $readinessWorkflowText -match "agenthub-edge-aarch64-apple-darwin") "release readiness workflow records future macOS arm64 unsigned dry sidecar boundary"
+Assert-True ($readinessWorkflowText -match "AgentHub\.app" -and $readinessWorkflowText -match "AgentHub\.dmg" -and $readinessWorkflowText -match "workflow artifacts only") "release readiness workflow records future macOS bundle artifact-only boundary"
+Assert-True ($readinessWorkflowText -match "later approval slice") "release readiness workflow keeps macOS signing/notarization as a later approval slice"
 Assert-True ($readinessWorkflowText -notmatch "softprops/action-gh-release") "release readiness workflow does not create a GitHub Release"
 Assert-True ($readinessWorkflowText -notmatch "TAURI_SIGNING_PRIVATE_KEY") "release readiness workflow does not require production signing secrets"
 
@@ -182,5 +218,21 @@ foreach ($hostShell in $scriptHosts) {
     }
     finally {
         Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue
+    }
+
+    foreach ($rogueMacOSCommand in @(
+        "codesign -s `"Developer ID Application: Example`" AgentHub.app",
+        "notarytool submit AgentHub.dmg --keychain-profile example",
+        "xcrun stapler staple AgentHub.dmg"
+    )) {
+        $rogueRoot = New-RogueMacOSCommandFixture $rogueMacOSCommand
+        try {
+            $rogue = Invoke-Script $hostShell @("-RepoRoot", $rogueRoot) $rogueRoot
+            Assert-True ($rogue.ExitCode -ne 0) "readiness checker fails rogue macOS command '$rogueMacOSCommand' under $($rogue.Host)" $rogue.Output
+            Assert-True ($rogue.Output -match "macos-unsigned-dry-policy" -and $rogue.Output -match [regex]::Escape($rogueMacOSCommand)) "rogue macOS command failure names the offending job and command under $($rogue.Host)" $rogue.Output
+        }
+        finally {
+            Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue
+        }
     }
 }
