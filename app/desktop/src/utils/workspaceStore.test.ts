@@ -53,4 +53,34 @@ describe('chooseWorkspaceRootFromBackend', () => {
     expect(localStorage.getItem('agenthub.prompt.workDir')).toBeNull();
     expect(localStorage.getItem('agenthub.workspaces.recent')).toBeNull();
   });
+
+  it('returns null without writing local storage when the Tauri picker is cancelled', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {},
+    });
+    mockedInvoke.mockResolvedValueOnce(null);
+
+    const workspace = await chooseWorkspaceRootFromBackend();
+
+    expect(mockedInvoke).toHaveBeenCalledWith('choose_workspace_root');
+    expect(workspace).toBeNull();
+    expect(localStorage.getItem('agenthub.prompt.workDir')).toBeNull();
+    expect(localStorage.getItem('agenthub.workspaces.recent')).toBeNull();
+  });
+
+  it('catches Tauri picker errors without writing local storage', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {},
+    });
+    mockedInvoke.mockRejectedValueOnce(new Error('dialog failed'));
+
+    const workspace = await chooseWorkspaceRootFromBackend();
+
+    expect(mockedInvoke).toHaveBeenCalledWith('choose_workspace_root');
+    expect(workspace).toBeNull();
+    expect(localStorage.getItem('agenthub.prompt.workDir')).toBeNull();
+    expect(localStorage.getItem('agenthub.workspaces.recent')).toBeNull();
+  });
 });
