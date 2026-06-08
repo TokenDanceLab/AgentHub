@@ -75,6 +75,162 @@ func TestSDKFixtureMapperKeepsOutputWorkspaceRelativeAndRedacted(t *testing.T) {
 	}
 }
 
+func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
+	stream := SDKFixtureStream{
+		Provider: "agenthub-neutral-fixture",
+		Events: []SDKFixtureEvent{
+			{
+				ID:                 "contract_plan_1",
+				Type:               "invocation_plan",
+				AdapterID:          "custom-agent",
+				CommandName:        "C:\\Tools\\AgentHub\\custom-agent.exe",
+				ArgFlags:           []string{"--json", "--model"},
+				ConfigKeys:         []string{"approval.mode"},
+				PositionalArgCount: 1,
+				EnvNames:           []string{"AGENTHUB_TOKEN=secret-value", "OPENAI_API_KEY=sk-not-real"},
+				WorkDir:            "C:\\Users\\Ding\\private\\workspace",
+				PromptRedacted:     true,
+				ExecutionMode:      "fixture",
+			},
+			{
+				ID:        "contract_status_1",
+				Type:      "status",
+				SessionID: "session_contract",
+				Status:    "running",
+				Summary:   "runtime accepted fixture plan",
+			},
+			{
+				ID:          "contract_progress_1",
+				Type:        "progress",
+				TaskID:      "task_contract",
+				Description: "Replaying provider-neutral fixture",
+				Status:      "in_progress",
+				Percent:     42.5,
+			},
+			{
+				ID:        "contract_tool_call_1",
+				Type:      "tool_call",
+				CallID:    "call_contract",
+				ToolName:  "write_file",
+				SessionID: "session_contract",
+				Input: map[string]any{
+					"path":          "D:\\Code\\TokenDance\\AgentHub\\.env",
+					"access_token":  "secret-token",
+					"safe_argument": "kept",
+				},
+			},
+			{
+				ID:        "contract_tool_result_1",
+				Type:      "tool_result",
+				CallID:    "call_contract",
+				ToolName:  "write_file",
+				Output:    "wrote fixture file",
+				SessionID: "session_contract",
+			},
+			{
+				ID:        "contract_usage_1",
+				Type:      "usage",
+				SessionID: "session_contract",
+				Usage: &SDKFixtureUsage{
+					InputTokens:  120,
+					OutputTokens: 45,
+					TotalTokens:  165,
+					TotalCostUSD: 0.0123,
+				},
+				Model: "fixture-model",
+			},
+			{
+				ID:        "contract_terminal_1",
+				Type:      "terminal_result",
+				SessionID: "session_contract",
+				Success:   boolPtr(true),
+				Summary:   "provider-neutral terminal result",
+				Usage: &SDKFixtureUsage{
+					InputTokens:  120,
+					OutputTokens: 45,
+					TotalTokens:  165,
+				},
+			},
+			{
+				ID:        "contract_error_1",
+				Type:      "error",
+				SessionID: "session_contract",
+				Error:     "fixture runtime failed after redacted path C:\\Users\\Ding\\secret.txt",
+				Reason:    "adapter_error",
+			},
+			{
+				ID:        "contract_cancel_1",
+				Type:      "cancelled",
+				SessionID: "session_contract",
+				Reason:    "user_cancelled",
+				Summary:   "operator cancelled fixture run",
+			},
+		},
+	}
+
+	mapped := MapSDKFixtureStream(stream, testSDKFixtureScope())
+	gotTypes := make([]string, 0, len(mapped))
+	for _, evt := range mapped {
+		gotTypes = append(gotTypes, evt.Type)
+		if evt.Scope["runId"] != "run_fixture" {
+			t.Fatalf("mapped event %s lost replay scope: %#v", evt.Type, evt.Scope)
+		}
+	}
+	wantTypes := []string{
+		BusEventCLIInvocationPlan,
+		BusEventStatusChange,
+		BusEventTaskProgress,
+		BusEventToolCall,
+		BusEventToolResult,
+		BusEventContextUsage,
+		BusEventResult,
+		BusEventResult,
+		BusEventResult,
+	}
+	if strings.Join(gotTypes, ",") != strings.Join(wantTypes, ",") {
+		t.Fatalf("mapped types = %v, want %v", gotTypes, wantTypes)
+	}
+
+	plan := mapped[0].Payload
+	if plan["commandName"] != "custom-agent.exe" || plan["workDir"] != "workspace" {
+		t.Fatalf("invocation plan was not basename redacted: %#v", plan)
+	}
+	envNames, ok := plan["envNames"].([]string)
+	if !ok || strings.Join(envNames, ",") != "AGENTHUB_TOKEN,OPENAI_API_KEY" {
+		t.Fatalf("env names not redacted to keys only: %#v", plan["envNames"])
+	}
+	if plan["approvalRequired"] != true || plan["noSpendDefault"] != true || plan["redactionApplied"] != true {
+		t.Fatalf("invocation plan missing safety defaults: %#v", plan)
+	}
+
+	input := mapped[3].Payload["input"].(map[string]any)
+	if input["path"] != ".env" || input["access_token"] != "[redacted]" || input["safe_argument"] != "kept" {
+		t.Fatalf("tool input not sanitized: %#v", input)
+	}
+
+	usage := mapped[5].Payload
+	if usage["inputTokens"] != int64(120) || usage["outputTokens"] != int64(45) || usage["totalTokens"] != int64(165) {
+		t.Fatalf("usage payload = %#v", usage)
+	}
+
+	if mapped[6].Payload["terminalReason"] != "completed" || mapped[6].Payload["success"] != true {
+		t.Fatalf("terminal result payload = %#v", mapped[6].Payload)
+	}
+	if mapped[7].Payload["terminalReason"] != "error" || mapped[7].Payload["success"] != false {
+		t.Fatalf("error result payload = %#v", mapped[7].Payload)
+	}
+	if mapped[8].Payload["terminalReason"] != "cancelled" || mapped[8].Payload["cancelled"] != true {
+		t.Fatalf("cancel result payload = %#v", mapped[8].Payload)
+	}
+
+	hubReplay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
+	for _, leaked := range []string{"secret-token", "secret-value", "sk-not-real", "C:\\Users\\Ding", "D:\\Code\\TokenDance"} {
+		if strings.Contains(hubReplay, leaked) {
+			t.Fatalf("Hub replay contract leaked %q:\n%s", leaked, hubReplay)
+		}
+	}
+}
+
 func TestCLIInvocationPlanRedactsPromptEnvAndPaths(t *testing.T) {
 	adapter := NewClaudeCodeAdapter("C:\\Tools\\Claude\\claude.exe", "claude-sonnet-fixture", "default")
 	plan := BuildCLIInvocationPlan(adapter, RunProcessContext{
@@ -141,9 +297,14 @@ func readSDKFixtureTestdata(t *testing.T, filename string) []byte {
 
 func marshalSDKFixtureGolden(t *testing.T, mapped []SDKMappedEvent) string {
 	t.Helper()
-	data, err := json.MarshalIndent(mapped, "", "  ")
+	return marshalSDKFixtureJSON(t, mapped)
+}
+
+func marshalSDKFixtureJSON(t *testing.T, value any) string {
+	t.Helper()
+	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
-		t.Fatalf("marshal mapped events: %v", err)
+		t.Fatalf("marshal SDK fixture JSON: %v", err)
 	}
 	return string(data) + "\n"
 }
@@ -158,4 +319,29 @@ func testSDKFixtureScope() map[string]any {
 		"threadId":  "thread_fixture",
 		"runId":     "run_fixture",
 	}
+}
+
+func mapSDKEventsForHubReplay(mapped []SDKMappedEvent) []map[string]any {
+	replay := make([]map[string]any, len(mapped))
+	for i, evt := range mapped {
+		replay[i] = map[string]any{
+			"type": "agent.stream",
+			"payload": map[string]any{
+				"id":                evt.Payload["sourceEventId"],
+				"task_id":           "task_fixture",
+				"edge_run_id":       evt.Scope["runId"],
+				"session_id":        evt.Payload["sessionId"],
+				"agent_instance_id": "agent_fixture",
+				"event_seq":         i + 1,
+				"event_type":        evt.Type,
+				"payload":           evt.Payload,
+				"created_at":        "2026-06-09T00:00:00Z",
+			},
+		}
+	}
+	return replay
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }

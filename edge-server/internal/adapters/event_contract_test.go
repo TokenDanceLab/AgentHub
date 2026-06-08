@@ -44,6 +44,7 @@ func TestEventDocsCoverRuntimeAdapterEvents(t *testing.T) {
 		BusEventToolUseSummary,
 		BusEventAuthStatus,
 		BusEventRateLimit,
+		BusEventCLIInvocationPlan,
 		BusEventPermissionRequested,
 		BusEventPermissionDecided,
 		BusEventSessionMetrics,
