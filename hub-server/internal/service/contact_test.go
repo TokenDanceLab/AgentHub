@@ -268,6 +268,37 @@ func TestSendFriendRequest_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestSendFriendRequest_PublishesDocumentedEventPayload(t *testing.T) {
+	db, mock, sqlDB := newMockDBContact(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlcUserByID).
+		WithArgs("target-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
+			AddRow("target-1", "target", "hash", "Target", ""))
+
+	mock.ExpectQuery(sqlcFriendshipBetween).
+		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
+		WillReturnError(gorm.ErrRecordNotFound)
+
+	mock.ExpectExec(sqlcInsertFriend).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "friend.request")
+	svc := NewContactService(db, bus, nil)
+	err := svc.SendFriendRequest(context.Background(), "user-1", "target-1", "please add me")
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.NotEmpty(t, payload["request_id"])
+	assert.Equal(t, "user-1", payload["from_user_id"])
+	assert.Equal(t, "please add me", payload["message"])
+	assert.NotContains(t, payload, "sender_id")
+	assert.NotContains(t, payload, "receiver_id")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestSendFriendRequest_PendingAlready(t *testing.T) {
 	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
@@ -355,6 +386,35 @@ func TestAcceptFriendRequest_Success(t *testing.T) {
 	svc := NewContactService(db, nil, testCacheClient(t))
 	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
 	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAcceptFriendRequest_PublishesAcceptedEventAfterMutation(t *testing.T) {
+	db, mock, sqlDB := newMockDBContact(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlcFriendshipByID).
+		WithArgs("req-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("req-1", "sender", "user-1", model.StatusPending))
+
+	mock.ExpectBegin()
+	mock.ExpectExec(sqlcUpdateFriend).
+		WithArgs(model.StatusAccepted, sqlmock.AnyArg(), "req-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(sqlcInsertFriend).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "friend.accepted")
+	svc := NewContactService(db, bus, testCacheClient(t))
+	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.Equal(t, "req-1", payload["friendship_id"])
+	assert.Equal(t, "user-1", payload["user_id"])
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -728,4 +788,25 @@ func TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender(t *testing.
 	assert.Equal(t, "req-1", requests[0].RequestID)
 	assert.Equal(t, "req-2", requests[1].RequestID)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func captureServiceEvents(bus *Bus, eventType string) <-chan Event {
+	events := make(chan Event, 1)
+	bus.Subscribe(eventType, func(ctx context.Context, event Event) {
+		events <- event
+	})
+	return events
+}
+
+func waitForServiceEventPayload(t *testing.T, events <-chan Event) map[string]interface{} {
+	t.Helper()
+	select {
+	case event := <-events:
+		payload, ok := event.Payload.(map[string]interface{})
+		require.True(t, ok, "event payload should be a map")
+		return payload
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for service event")
+		return nil
+	}
 }
