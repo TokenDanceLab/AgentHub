@@ -2,10 +2,11 @@ import React from 'react';
 import {
   ClaudeCode,
   Codex,
+  GeminiCLI,
   ModelIcon,
   OpenCode,
+  ProviderIcon,
 } from '@lobehub/icons';
-import ProviderIcon from '@lobehub/icons/es/features/ProviderIcon/index.js';
 import AntigravityIcon from '@lobehub/icons/es/Antigravity/components/Color.js';
 import { siCursor, siGitforwindows, siLinux } from 'simple-icons';
 import androidStudioIcon from 'devicon/icons/androidstudio/androidstudio-original.svg';
@@ -59,24 +60,29 @@ type RuntimeFallbackIconName =
   | 'tool'
   | 'write';
 
-const LOBE_RUNTIME_KEYS = new Set(['claude-code', 'codex', 'opencode']);
+const LOBE_RUNTIME_KEYS = new Set(['claude-code', 'codex', 'gemini-cli', 'opencode']);
 const LOBE_PROVIDER_KEYS = new Set([
   'alibaba',
   'alibabacloud',
   'anthropic',
   'azure',
+  'aws',
   'bedrock',
   'bytedance',
+  'claude',
   'cohere',
   'deepseek',
   'doubao',
+  'gemini',
   'google',
   'meta',
   'mistral',
   'moonshot',
   'openai',
+  'opencode',
   'perplexity',
   'qwen',
+  'volcengine',
   'zhipu',
 ]);
 
@@ -204,27 +210,34 @@ export function RuntimeBrandIcon({
       role="img"
       title={label}
     >
-      {renderRuntimeBrandIcon(resolution)}
+      {renderRuntimeBrandIcon(resolution, runtimeBrandLobePixelSize(size))}
     </span>
   );
 }
 
-function renderRuntimeBrandIcon(resolution: RuntimeBrandIconResolution): React.ReactNode {
+function renderRuntimeBrandIcon(resolution: RuntimeBrandIconResolution, iconSize: number): React.ReactNode {
   if (resolution.source === 'lobehub') {
-    if (resolution.lobeType === 'runtime') return renderLobeRuntimeIcon(resolution.value);
-    if (resolution.lobeType === 'provider') return <ProviderIcon provider={resolution.value} size={18} type="color" />;
-    return <ModelIcon model={resolution.value} size={18} />;
+    if (resolution.lobeType === 'runtime') return renderLobeRuntimeIcon(resolution.value, iconSize);
+    if (resolution.lobeType === 'provider') return <ProviderIcon provider={resolution.value} size={iconSize} type="color" />;
+    return <ModelIcon model={resolution.value} size={iconSize} />;
   }
 
   const fallback = runtimeBrandFallbackSvg(resolution.fallback);
   return fallback || <span className={runtimeBrandStyles.fallbackText}>{resolution.value}</span>;
 }
 
-function renderLobeRuntimeIcon(value: string): React.ReactNode {
-  if (value === 'claude-code') return <ClaudeCode size={18} />;
-  if (value === 'codex') return <Codex size={18} />;
-  if (value === 'opencode') return <OpenCode size={18} />;
+function renderLobeRuntimeIcon(value: string, iconSize: number): React.ReactNode {
+  if (value === 'claude-code') return <ClaudeCode size={iconSize} />;
+  if (value === 'codex') return <Codex size={iconSize} />;
+  if (value === 'gemini-cli') return <GeminiCLI size={iconSize} />;
+  if (value === 'opencode') return <OpenCode size={iconSize} />;
   return runtimeBrandFallbackSvg('runtime');
+}
+
+function runtimeBrandLobePixelSize(size: RuntimeBrandIconSize): number {
+  if (size === 'compact') return 16;
+  if (size === 'large') return 24;
+  return 18;
 }
 
 function normalizeRuntimeBrandIconKey(value: string | undefined): string {
@@ -250,6 +263,7 @@ function normalizeRuntimeBrandModelKey(value: string | undefined): string {
 function normalizeRuntimeBrandRuntimeKey(value: string | undefined): string {
   const key = normalizeRuntimeBrandIconKey(value);
   if (key === 'claude' || key === 'claudecode') return 'claude-code';
+  if (key === 'gemini' || key === 'geminicli' || key === 'google-gemini-cli') return 'gemini-cli';
   if (key === 'open-code') return 'opencode';
   return key;
 }
@@ -259,13 +273,18 @@ function normalizeRuntimeBrandProviderKey(value: string | undefined): string {
   if (!key) return '';
   if (key.includes('alibaba-cloud')) return 'alibabacloud';
   if (key.includes('alibaba') || key.includes('qwen')) return 'qwen';
-  if (key.includes('anthropic') || key.includes('claude')) return 'anthropic';
+  if (key.includes('anthropic')) return 'anthropic';
+  if (key.includes('claude')) return 'claude';
   if (key.includes('azure') || key.includes('microsoft')) return 'azure';
-  if (key.includes('bedrock') || key.includes('aws')) return 'bedrock';
-  if (key.includes('bytedance') || key.includes('doubao')) return 'doubao';
+  if (key.includes('bedrock')) return 'bedrock';
+  if (key.includes('aws')) return 'aws';
+  if (key.includes('bytedance') || key.includes('byte-dance') || key.includes('zijie')) return 'bytedance';
+  if (key.includes('doubao')) return 'doubao';
+  if (key.includes('volcengine')) return 'volcengine';
   if (key.includes('cohere')) return 'cohere';
   if (key.includes('deepseek')) return 'deepseek';
-  if (key.includes('gemini') || key.includes('google')) return 'google';
+  if (key.includes('gemini')) return 'gemini';
+  if (key.includes('google')) return 'google';
   if (key.includes('llama') || key.includes('meta')) return 'meta';
   if (key.includes('glm') || key.includes('zhipu')) return 'zhipu';
   if (key.includes('kimi') || key.includes('moonshot')) return 'moonshot';
