@@ -41,5 +41,7 @@
   overflow: hidden;
   color: currentColor;
   font: 750 0.625rem/1 var(--font-mono);
+  text-overflow: clip;
   text-transform: uppercase;
+  white-space: nowrap;
 }
