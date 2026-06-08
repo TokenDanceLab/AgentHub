@@ -2,7 +2,7 @@
 
 > Last updated: 2026-06-08 22:10 +08:00
 > Fact source: `origin/dev/delicious233`
-> Current dev baseline: `35f83537`
+> Current dev baseline: `460a8bc8`
 > Stable RC tag: `v0.3.0-rc.2 @ 35f83537`
 
 Historical merge logs are archived in [archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md) and [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md). This file tracks only current status, next slices, blockers, and cleanup.
@@ -17,7 +17,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
 
 | Area | Status | Next decision |
 |---|---|---|
-| Baseline | `origin/dev/delicious233 @ 35f83537`; main worktree is dirty/stale and must stay read-only | Continue from isolated `.worktrees/*` only |
+| Baseline | `origin/dev/delicious233 @ 460a8bc8`; main worktree is dirty/stale and must stay read-only | Continue from isolated `.worktrees/*` only |
 | Backend merge | Long backend thread is closed; backend merge Agent still absorbs old backend line by small slices | Do not whole-merge `feat/backend-edge-hub`; preserve semantic slice rule |
 | Web boundary | Web remains Hub-only; no Local Edge/Tauri/filesystem direct access | Keep `verify-web-hub-boundary.ps1` in every Web/shared slice |
 | Desktop boundary | Desktop may use Local Edge and Tauri host; it must not spawn CLI directly | Finish target preference and Tauri host readiness |
