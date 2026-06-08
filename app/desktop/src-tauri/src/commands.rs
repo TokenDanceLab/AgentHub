@@ -57,16 +57,17 @@ pub async fn get_edge_status(state: State<'_, SharedEdgeManager>) -> Result<Edge
 
 #[tauri::command]
 pub async fn get_edge_host_readiness(
+    app: tauri::AppHandle,
     state: State<'_, SharedEdgeManager>,
 ) -> Result<EdgeHostReadiness, String> {
     let mgr = state.lock().await;
-    Ok(edge_host_readiness_snapshot(&mgr))
+    Ok(mgr.host_readiness_for_app(&app))
 }
 
 #[tauri::command]
 pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
     let mgr = state.lock().await;
-    Ok(mgr.local_auth_token().to_string())
+    mgr.local_auth_token().map(str::to_string)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -109,6 +110,7 @@ pub async fn stop_edge(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus
     Ok(mgr.status())
 }
 
+#[cfg(test)]
 fn edge_host_readiness_snapshot(mgr: &crate::edge_manager::EdgeManager) -> EdgeHostReadiness {
     mgr.host_readiness()
 }
@@ -809,10 +811,11 @@ mod tests {
 
     #[test]
     fn edge_host_readiness_command_snapshot_is_sidecar_only() {
-        let manager = EdgeManager::new_fallback(
+        let manager = EdgeManager::new(
             PathBuf::from("edge-server/agenthub-edge"),
             PathBuf::from("agenthub-edge.sqlite"),
-        );
+        )
+        .expect("test token generation should succeed");
 
         let readiness = edge_host_readiness_snapshot(&manager);
 
@@ -820,6 +823,9 @@ mod tests {
         assert_eq!(readiness.target_id, "local-edge");
         assert_eq!(readiness.route, "local-edge-api");
         assert_eq!(readiness.bind_addr, "127.0.0.1:3210");
+        assert_eq!(readiness.health_url, "http://127.0.0.1:3210/v1/health");
+        assert_eq!(readiness.log_paths.stdout, "<app-data>/edge-logs/local-edge.stdout.log");
+        assert!(readiness.preflight.auth_token_ready);
         assert_eq!(
             readiness.sidecar_args,
             vec![

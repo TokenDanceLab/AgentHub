@@ -132,6 +132,7 @@ describe('Desktop App v4 root', () => {
         status: 'ok',
         version: 'test',
       },
+      lastError: null,
       refetch: refetchHealth,
     } as ReturnType<typeof useHealth>);
     mockedUseAuth.mockReturnValue({
