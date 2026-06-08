@@ -1,6 +1,6 @@
 # AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 06:30 +08:00
+> Last updated: 2026-06-09 06:52 +08:00
 > Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
 > Review branch: `origin/codex/p1-remote-control-integration` at `fd94c54d`
 > Evidence integration branch: `codex/p1-remote-control-evidence-integration`
@@ -30,7 +30,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | P1 rc.6 review branch | ready-for-review | `fd94c54d` contains the reviewed rc.6 remote-control slice set. |
 | P1 evidence integration | ready-for-review | Adds reviewed localhost product-loop fixture, Edge SDK JSON replay readiness, Desktop workspace picker UI, duplicate target preflight, Web visual smoke report, unsigned Tauri build report, and Agent SDK integration report. |
 | P1 next-wave integration | testing | Adds Edge CLI approval gate, Edge SQLite readiness report, localhost readiness-only real-services gate, Web real-mode UX closure, LobeHub runtime/tool icons, and Tauri package readiness hardening. |
-| P1 critical evidence integration | active | Starts from next-wave and currently adds approved SQLite unknown-migration guard at `219cadb0`; this is the controller-owned branch for the next accepted slices. |
+| P1 critical evidence integration | active | Pushed at `cbe9b5d5`; includes approved SQLite unknown-migration guard plus observed localhost dispatch verifier and RealTested overclaim fix. |
 | Main worktree | quarantined | `D:\Code\TokenDance\AgentHub` is stale/dirty; do not implement there. |
 | Release tag | blocked | Do not push `v0.3.0-rc.6` until release approval; tag push can trigger release workflow. |
 
@@ -53,6 +53,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | Tauri package readiness polish | next-wave branch | Generated schema cleanliness/deletion gates and post-build readiness evidence; still no signing/notary/release upload. |
 | Agent SDK research | evidence branch | Treat OpenAI/Claude SDKs as Edge adapter inputs, not product model. |
 | Localhost real-services readiness | next-wave branch | Explicit opt-in health/topology consistency gate; always `real_tested=false` until observed Hub/Desktop dispatch evidence exists. |
+| Observed localhost dispatch verifier | critical evidence branch | Requires observed Hub/Desktop/Edge chain proof and keeps `real_tested=false` unless observed validation succeeds and approval gate is explicit. |
 | Web real-mode UX | next-wave branch | Target-required dispatch, Hub error/replay states, and non-nested team/run controls. |
 | Runtime/tool icons | next-wave branch | Shared LobeHub icon component, fallback rendering, and Storybook coverage. |
 
@@ -79,7 +80,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | P1 | Web Projects read-through | worker active | Connect Web real mode to Hub `/web/projects`; preserve demo/mock fallback; no direct Local Edge calls. |
 | P1 | Desktop Local Edge launch flow | worker active | Improve Desktop target/sidecar readiness path; no CLI bypass, no signing/release. |
 | P1 | Tauri build/package evidence | worker active | Produce local Windows package evidence and macOS readiness notes; no signing/notary/upload. |
-| P1 | Observed real localhost dispatch | worker fixing blocker | Requires deriving target/dispatch evidence from live Hub/Desktop path, not caller-supplied URLs; failed observed validation must keep `real_tested=false`. |
+| P1 | Observed real localhost dispatch | integrated in critical evidence | Requires deriving target/dispatch evidence from live Hub/Desktop path, not caller-supplied URLs; failed observed validation keeps `real_tested=false`. |
 | P1 | Login E2E approval harness | worker done, review active | TokenDanceID test client/account/env, callback URL, browser evidence, no token disclosure; approval-gated path is not real evidence until run. |
 | P1 | Edge real CLI evidence gate | worker active | Default no-spend/fail-closed; real CLI/model evidence only under explicit approval. |
 | P2 | Edge durable store implementation | worker + reviewer | SQLite migration guard is approved; full row-first durable store still separate from CLI execution. |
@@ -90,13 +91,13 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 
 | Branch | Worktree | Owner | State | Integration rule |
 |---|---|---|---|---|
-| `codex/p1-critical-evidence-integration` | `.worktrees/p1-critical-evidence-integration` | controller | active, clean, ahead 1 | Append only reviewed slices; run integration gates before push. |
+| `codex/p1-critical-evidence-integration` | `.worktrees/p1-critical-evidence-integration` | controller | active, clean, pushed at `cbe9b5d5` | Append only reviewed slices; run integration gates before push. |
 | `codex/p1-web-projects-readthrough` | `.worktrees/p1-web-projects-readthrough` | worker | active | Review then cherry-pick; reject direct Local Edge calls. |
 | `codex/p1-desktop-edge-launch-flow` | `.worktrees/p1-desktop-edge-launch-flow` | worker | active | Review then cherry-pick; reject renderer-only host authority. |
 | `codex/p1-tauri-build-package-evidence` | `.worktrees/p1-tauri-build-package-evidence` | worker | active | Evidence/report only unless package config fix is minimal and tested. |
 | `codex/p1-edge-real-cli-evidence` | `.worktrees/p1-edge-real-cli-evidence` | worker | active | Review no-spend semantics before integration. |
 | `codex/p1-sdk-integration-product-report` | `.worktrees/p1-sdk-integration-product-report` | worker | active | Docs/report only; cite official sources. |
-| `codex/p1-observed-localhost-dispatch` | `.worktrees/p1-observed-localhost-dispatch` | worker | blocker fix active | Do not integrate until `real_tested` failure regression passes and reviewer approves. |
+| `codex/p1-observed-localhost-dispatch` | `.worktrees/p1-observed-localhost-dispatch` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
 | `codex/p1-login-e2e-approval-harness` | `.worktrees/p1-login-e2e-approval-harness` | worker | ready, review active | Approval-gated harness only; no real login claim. |
 | `codex/worktree-cleanup-audit` | `.worktrees/worktree-cleanup-audit` | worker | blocked | Report inventory must be refreshed before any cleanup decision. |
 
