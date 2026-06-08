@@ -66,6 +66,7 @@ import AboutSection from './settings/sections/AboutSection';
 import { useHubStore } from '@/stores/hubStore';
 import { getEdgeBaseUrl } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
+import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
@@ -77,6 +78,7 @@ import {
   buildDefaultAgentOptions,
   resolveAvailableDefaultAgentId,
 } from '@/utils/defaultAgent';
+import { mapLocalEdgeExecutionTarget } from '@/platform/edgeCapabilityMapper';
 import styles from './SettingsPage.module.css';
 import {
   useStoredBooleanState,
@@ -153,6 +155,7 @@ export default function SettingsPage({
   const hubAuth = useAuth();
   const { online: edgeOnline, health, refetch: refetchHealth } = useHealth();
   const { data: agentData, refetch: refetchAgents } = useAgentList(edgeOnline);
+  const { data: modelCatalog } = useModelCatalog(edgeOnline);
   const {
     data: runData,
     isError: runsError,
@@ -280,6 +283,16 @@ export default function SettingsPage({
     : t('settings.edgeOffline');
   const edgeAddress = getEdgeBaseUrl();
   const healthStatus = edgeOnline ? (health?.status ?? 'unknown') : 'offline';
+  const localEdgeTarget = useMemo(
+    () => mapLocalEdgeExecutionTarget({
+      edgeOnline,
+      healthStatus,
+      runners: runnerItems,
+      agents,
+      modelCatalog,
+    }),
+    [agents, edgeOnline, healthStatus, modelCatalog, runnerItems],
+  );
   const handleRefreshConnections = useCallback(() => {
     refetchHealth();
     refetchAgents();
@@ -523,6 +536,7 @@ export default function SettingsPage({
               runnerSummary={runnerSummary}
               runnerItems={runnerItems}
               availableRunners={availableRunners}
+              localEdgeTarget={localEdgeTarget}
               desktopDeviceStatus={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
               deviceId={deviceId}
             />
