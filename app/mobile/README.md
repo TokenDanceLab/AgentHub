@@ -36,6 +36,7 @@ Do not expand the Tauri implementation unless a short-lived compatibility fix is
 The recommended Mobile mainline is Expo + React Native:
 
 - React Native UI for phone/tablet interaction quality.
+- AgentHub Desktop/Web v4 and `agenthub-design/desktop` define the Mobile visual system and component semantics; Feishu/Lark mobile IM is an interaction reference for queue density, bottom navigation, badges, search/new entry, unread, recovery, and native ergonomics.
 - Expo SecureStore for Hub session persistence.
 - Expo AuthSession/Linking for TokenDance ID OIDC + PKCE deep links.
 - Expo Notifications for approval/run notifications.
