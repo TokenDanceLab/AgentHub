@@ -155,6 +155,21 @@ describe('useWebWorkbenchModel helpers', () => {
     });
   });
 
+  it('surfaces real-mode signed-out Projects state instead of a silent empty list', () => {
+    expect(resolveWebProjectsStatus(
+      { isFetching: false, error: undefined },
+      undefined,
+      undefined,
+      false,
+      'real',
+    )).toEqual({
+      loading: false,
+      error: 'Sign in to Hub to load workspace projects.',
+      actionError: undefined,
+      saving: false,
+    });
+  });
+
   it('normalizes project form drafts before sending Hub mutations', () => {
     expect(projectDraftToHubRequest({
       name: '  AgentHub Web  ',
