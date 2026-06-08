@@ -33,6 +33,7 @@ export const HUB_EVENTS = {
   AGENT_DONE: 'agent.done',
   AGENT_FAILED: 'agent.failed',
   AGENT_CANCEL: 'agent.cancel',
+  AGENT_CONTROL: 'agent.control',
 
   // ── Notification & social ─────────────────────
   NOTIFICATION_NEW: 'notification.new',
