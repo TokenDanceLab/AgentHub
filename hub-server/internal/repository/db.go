@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -46,4 +47,14 @@ func InitDB(cfg *config.DBConfig) (*gorm.DB, error) {
 
 	slog.Info("database connected", "host", cfg.Host, "port", cfg.Port, "name", cfg.Name)
 	return db, nil
+}
+
+func WrapNotFound(err error, mappedErr error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return mappedErr
+	}
+	return err
 }
