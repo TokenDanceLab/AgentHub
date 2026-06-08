@@ -9,12 +9,14 @@ import styles from './AgentList.module.css';
 const RUNTIME_ORDER = ['codex', 'claude', 'opencode'];
 
 function agentIcon(agent: AgentInfo): ReactNode {
-  const iconName = agent.runtimeId || agent.id || agent.name;
+  const iconKind = agent.provider || agent.model ? 'model' : 'runtime';
+  const iconName = agent.model || agent.runtimeId || agent.id || agent.name;
   if (!iconName.trim()) return null;
   return (
     <RuntimeBrandIcon
-      kind="runtime"
+      kind={iconKind}
       name={iconName}
+      provider={agent.provider}
       size="normal"
       framed={false}
       title={agent.name}

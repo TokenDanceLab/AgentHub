@@ -96,7 +96,9 @@ declare module 'react-syntax-highlighter/dist/esm/languages/prism/sql' {
 
 declare module '@lobehub/icons' {
   export const ModelIcon: React.ComponentType<{ model: string; size?: number }>;
+  export const ProviderIcon: React.ComponentType<{ provider: string; size?: number; type?: 'mono' | 'color' }>;
   export const ClaudeCode: React.ComponentType<{ size?: number }>;
   export const Codex: React.ComponentType<{ size?: number }>;
+  export const GeminiCLI: React.ComponentType<{ size?: number }>;
   export const OpenCode: React.ComponentType<{ size?: number }>;
 }
