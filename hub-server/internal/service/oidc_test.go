@@ -24,6 +24,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/glebarez/sqlite"
@@ -209,6 +210,28 @@ func TestHandleCallback_StateExpired(t *testing.T) {
 
 	_, err := svc.HandleCallback(ctx, "test-code", "expired-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	assert.Error(t, err)
+}
+
+func TestHandleCallback_RejectsStaleStateEntryBeforeTokenExchange(t *testing.T) {
+	svc, _, mr := setupOIDCTest(t)
+	ctx := context.Background()
+
+	entry := stateEntry{
+		CodeChallenge:       "challenge",
+		CodeChallengeMethod: "S256",
+		DeviceType:          "desktop",
+		DeviceID:            "11111111-1111-4111-8111-111111111111",
+		RedirectURI:         "http://localhost:8080/client/auth/oidc/callback",
+		CreatedAt:           time.Now().Add(-11 * time.Minute).Unix(),
+	}
+	entryJSON, err := json.Marshal(entry)
+	require.NoError(t, err)
+	require.NoError(t, mr.Set("oidc:state:stale-state", string(entryJSON)))
+
+	_, err = svc.HandleCallback(ctx, "test-code", "stale-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
+	require.Error(t, err)
+	require.IsType(t, &errcode.Error{}, err)
+	assert.Equal(t, errcode.OIDCInvalidState.Code, err.(*errcode.Error).Code)
 }
 
 func TestGenerateAuthorizationURL_InvalidDeviceType(t *testing.T) {
