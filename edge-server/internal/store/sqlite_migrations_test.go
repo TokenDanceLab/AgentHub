@@ -2,10 +2,13 @@ package store
 
 import (
 	"database/sql"
+	"errors"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -90,6 +93,146 @@ func TestRollbackSQLiteMigrationsReturnsToSnapshotOnlySchema(t *testing.T) {
 	}
 }
 
+func TestSQLiteMigrationsAreIdempotentAcrossReopen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+	first, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("first NewSQLite returned error: %v", err)
+	}
+	first.Close()
+	applied, err := SQLiteAppliedMigrations(path)
+	if err != nil {
+		t.Fatalf("SQLiteAppliedMigrations after first open returned error: %v", err)
+	}
+	if got, want := migrationVersions(applied), "1,2"; got != want {
+		t.Fatalf("applied migration versions after first open = %s, want %s", got, want)
+	}
+
+	second, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("second NewSQLite returned error: %v", err)
+	}
+	second.Close()
+	reapplied, err := SQLiteAppliedMigrations(path)
+	if err != nil {
+		t.Fatalf("SQLiteAppliedMigrations after second open returned error: %v", err)
+	}
+	if got, want := migrationVersions(reapplied), "1,2"; got != want {
+		t.Fatalf("applied migration versions after second open = %s, want %s", got, want)
+	}
+	if len(reapplied) != len(applied) {
+		t.Fatalf("applied migration count after second open = %d, want %d", len(reapplied), len(applied))
+	}
+	for i := range applied {
+		if reapplied[i] != applied[i] {
+			t.Fatalf("migration %d after second open = %#v, want %#v", i, reapplied[i], applied[i])
+		}
+	}
+}
+
+func TestRollbackSQLiteMigrationsIsIdempotentAtTargetVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	s.Close()
+
+	if err := RollbackSQLiteMigrations(path, 1); err != nil {
+		t.Fatalf("first RollbackSQLiteMigrations returned error: %v", err)
+	}
+	if err := RollbackSQLiteMigrations(path, 1); err != nil {
+		t.Fatalf("second RollbackSQLiteMigrations returned error: %v", err)
+	}
+	applied, err := SQLiteAppliedMigrations(path)
+	if err != nil {
+		t.Fatalf("SQLiteAppliedMigrations returned error: %v", err)
+	}
+	if got, want := migrationVersions(applied), "1"; got != want {
+		t.Fatalf("applied migration versions after repeated rollback = %s, want %s", got, want)
+	}
+}
+
+func TestSQLiteForeignKeysAreEnabledForStoreConnections(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	s.Close()
+
+	db, err := openSQLiteDatabase(path)
+	if err != nil {
+		t.Fatalf("openSQLiteDatabase returned error: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO edge_workspaces (workspace_id, owner_id, local_path, name, created_at, updated_at)
+VALUES ('workspace_orphan', 'missing_owner', 'C:\agenthub\workspace', 'Orphan', 'now', 'now')`); err == nil {
+		t.Fatal("insert orphan workspace succeeded, want foreign key constraint failure")
+	}
+}
+
+func TestSQLiteStoreCreatesNestedWindowsStylePath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "AgentHub Edge DB", "Nested Folder With Spaces", "edge-store.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error for nested path: %v", err)
+	}
+	s.Close()
+	if !sqliteFileExists(t, path) {
+		t.Fatalf("sqlite db file was not created at %s", path)
+	}
+}
+
+func TestSQLiteStoreWaitsForTransientDatabaseLock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	s.Close()
+
+	lockedDB, err := openSQLiteDatabase(path)
+	if err != nil {
+		t.Fatalf("openSQLiteDatabase for lock holder returned error: %v", err)
+	}
+	defer lockedDB.Close()
+	if _, err := lockedDB.Exec(`BEGIN IMMEDIATE`); err != nil {
+		t.Fatalf("BEGIN IMMEDIATE returned error: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		reopened, err := NewSQLite(path)
+		if err == nil {
+			reopened.Close()
+		}
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("NewSQLite completed while write lock was still held")
+		}
+		t.Fatalf("NewSQLite returned before transient lock was released: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if _, err := lockedDB.Exec(`COMMIT`); err != nil {
+		t.Fatalf("COMMIT returned error: %v", err)
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("NewSQLite after transient lock release returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("NewSQLite did not complete after transient lock was released")
+	}
+}
+
 func migrationVersions(applied []SQLiteMigrationInfo) string {
 	versions := make([]string, 0, len(applied))
 	for _, migration := range applied {
@@ -129,4 +272,16 @@ func sqliteTableExists(t *testing.T, db *sql.DB, table string) bool {
 		t.Fatalf("query table existence for %s returned error: %v", table, err)
 	}
 	return count == 1
+}
+
+func sqliteFileExists(t *testing.T, path string) bool {
+	t.Helper()
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	if err != nil {
+		t.Fatalf("stat sqlite db file returned error: %v", err)
+	}
+	return !info.IsDir()
 }
