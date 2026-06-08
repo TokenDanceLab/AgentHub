@@ -25,36 +25,42 @@ type SDKFixtureStream struct {
 // fixture mapper. Unknown fields stay below the adapter boundary and are not
 // forwarded in mapped events.
 type SDKFixtureEvent struct {
-	ID           string         `json:"id,omitempty"`
-	Type         string         `json:"type"`
-	Provider     string         `json:"provider,omitempty"`
-	SessionID    string         `json:"sessionId,omitempty"`
-	TraceID      string         `json:"traceId,omitempty"`
-	TraceRefs    []string       `json:"traceRefs,omitempty"`
-	EvidenceRefs []string       `json:"evidenceRefs,omitempty"`
-	ToolName     string         `json:"toolName,omitempty"`
-	ToolUseID    string         `json:"toolUseId,omitempty"`
-	CallID       string         `json:"callId,omitempty"`
-	Input        map[string]any `json:"input,omitempty"`
-	Output       string         `json:"output,omitempty"`
-	IsError      bool           `json:"isError,omitempty"`
-	RequestID    string         `json:"requestId,omitempty"`
-	RiskLevel    string         `json:"riskLevel,omitempty"`
-	Reason       string         `json:"reason,omitempty"`
-	Decision     string         `json:"decision,omitempty"`
-	Guardrail    string         `json:"guardrail,omitempty"`
-	Action       string         `json:"action,omitempty"`
-	TargetAgent  string         `json:"targetAgent,omitempty"`
-	NextWorker   string         `json:"nextWorker,omitempty"`
-	Instructions string         `json:"instructions,omitempty"`
-	Path         string         `json:"path,omitempty"`
-	Kind         string         `json:"kind,omitempty"`
-	Diff         string         `json:"diff,omitempty"`
-	ArtifactID   string         `json:"artifactId,omitempty"`
-	SizeBytes    int64          `json:"sizeBytes,omitempty"`
-	Summary      string         `json:"summary,omitempty"`
-	Success      *bool          `json:"success,omitempty"`
-	Metadata     map[string]any `json:"metadata,omitempty"`
+	ID             string           `json:"id,omitempty"`
+	Type           string           `json:"type"`
+	Provider       string           `json:"provider,omitempty"`
+	SessionID      string           `json:"sessionId,omitempty"`
+	TraceID        string           `json:"traceId,omitempty"`
+	TraceRefs      []string         `json:"traceRefs,omitempty"`
+	EvidenceRefs   []string         `json:"evidenceRefs,omitempty"`
+	Model          string           `json:"model,omitempty"`
+	PermissionMode string           `json:"permissionMode,omitempty"`
+	Tools          []string         `json:"tools,omitempty"`
+	Status         string           `json:"status,omitempty"`
+	ToolName       string           `json:"toolName,omitempty"`
+	ToolUseID      string           `json:"toolUseId,omitempty"`
+	CallID         string           `json:"callId,omitempty"`
+	Input          map[string]any   `json:"input,omitempty"`
+	Output         string           `json:"output,omitempty"`
+	Error          string           `json:"error,omitempty"`
+	IsError        bool             `json:"isError,omitempty"`
+	RequestID      string           `json:"requestId,omitempty"`
+	RiskLevel      string           `json:"riskLevel,omitempty"`
+	Reason         string           `json:"reason,omitempty"`
+	Decision       string           `json:"decision,omitempty"`
+	Guardrail      string           `json:"guardrail,omitempty"`
+	Action         string           `json:"action,omitempty"`
+	TargetAgent    string           `json:"targetAgent,omitempty"`
+	NextWorker     string           `json:"nextWorker,omitempty"`
+	Instructions   string           `json:"instructions,omitempty"`
+	Path           string           `json:"path,omitempty"`
+	Kind           string           `json:"kind,omitempty"`
+	Diff           string           `json:"diff,omitempty"`
+	ArtifactID     string           `json:"artifactId,omitempty"`
+	SizeBytes      int64            `json:"sizeBytes,omitempty"`
+	Summary        string           `json:"summary,omitempty"`
+	Success        *bool            `json:"success,omitempty"`
+	Attachments    []map[string]any `json:"attachments,omitempty"`
+	Metadata       map[string]any   `json:"metadata,omitempty"`
 }
 
 // SDKMappedEvent is the AgentHub-owned event projection emitted by the mapper.
@@ -96,6 +102,43 @@ func DecodeSDKFixtureStream(data []byte) (SDKFixtureStream, error) {
 
 func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
 	switch normalizeSDKFixtureType(event.Type) {
+	case "sidecar_session_ready", "session_ready":
+		return oneSDKMappedEvent(BusEventSessionInit, scope, commonSDKPayload(event, provider, map[string]any{
+			"sessionId":      event.SessionID,
+			"model":          event.Model,
+			"permissionMode": event.PermissionMode,
+			"tools":          event.Tools,
+		}))
+	case "session_updated":
+		return oneSDKMappedEvent(BusEventStatusChange, scope, commonSDKPayload(event, provider, map[string]any{
+			"sessionId": event.SessionID,
+			"status":    event.Status,
+		}))
+	case "tool_state":
+		events := []SDKMappedEvent{{
+			Type:  BusEventToolCall,
+			Scope: cloneSDKScope(scope),
+			Payload: commonSDKPayload(event, provider, map[string]any{
+				"callId":   firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
+				"toolName": event.ToolName,
+				"input":    sanitizeSDKValue(event.Input),
+				"status":   firstNonEmpty(event.Status, "pending"),
+			}),
+		}}
+		if event.Status == "completed" || event.Status == "error" || event.Output != "" || event.Error != "" {
+			events = append(events, SDKMappedEvent{
+				Type:  BusEventToolResult,
+				Scope: cloneSDKScope(scope),
+				Payload: commonSDKPayload(event, provider, map[string]any{
+					"callId":      firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
+					"toolName":    event.ToolName,
+					"content":     firstNonEmpty(event.Output, event.Error),
+					"isError":     event.IsError || event.Status == "error",
+					"attachments": sanitizeSDKValue(event.Attachments),
+				}),
+			})
+		}
+		return events
 	case "tool_call":
 		return oneSDKMappedEvent(BusEventToolCall, scope, commonSDKPayload(event, provider, map[string]any{
 			"callId":   firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
@@ -201,6 +244,14 @@ func commonSDKPayload(event SDKFixtureEvent, provider string, fields map[string]
 			if len(v) == 0 {
 				continue
 			}
+		case []string:
+			if len(v) == 0 {
+				continue
+			}
+		case []map[string]any:
+			if len(v) == 0 {
+				continue
+			}
 		case nil:
 			continue
 		}
@@ -239,6 +290,8 @@ func normalizeSDKFixtureType(value string) string {
 		return "tool_result"
 	case "approval_request", "permission", "can_use_tool":
 		return "permission_request"
+	case "permission_asked":
+		return "permission_request"
 	case "guardrail", "guardrail_triggered", "approval_signal":
 		return "guardrail_signal"
 	case "route", "handoff_suggestion":
@@ -276,6 +329,13 @@ func sanitizeSDKValue(value any) any {
 		sanitized := make([]any, len(v))
 		for i, child := range v {
 			sanitized[i] = sanitizeSDKValue(child)
+		}
+		return sanitized
+	case []map[string]any:
+		sanitized := make([]map[string]any, len(v))
+		for i, child := range v {
+			mapped, _ := sanitizeSDKValue(child).(map[string]any)
+			sanitized[i] = mapped
 		}
 		return sanitized
 	case []string:

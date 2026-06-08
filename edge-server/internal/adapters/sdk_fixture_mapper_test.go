@@ -16,6 +16,10 @@ func TestSDKFixtureMapperOpenAIGolden(t *testing.T) {
 	assertSDKFixtureGolden(t, "openai")
 }
 
+func TestSDKFixtureMapperOpenCodeGolden(t *testing.T) {
+	assertSDKFixtureGolden(t, "opencode")
+}
+
 func TestSDKFixtureMapperKeepsOutputWorkspaceRelativeAndRedacted(t *testing.T) {
 	stream := SDKFixtureStream{
 		Provider: SDKFixtureProviderClaude,
