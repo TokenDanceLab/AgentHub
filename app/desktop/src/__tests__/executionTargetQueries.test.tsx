@@ -132,4 +132,103 @@ describe('execution target queries', () => {
     expect(target?.id).toBe('local-this-device');
     expect(target?.workspace_allowlist).toEqual(['D:/Code/TokenDance/AgentHub']);
   });
+
+  it('does not select a sole local edge target when the desktop device id is missing', () => {
+    const target = findRegisteredLocalEdgeTarget(
+      [
+        {
+          id: 'local-only',
+          device_id: 'desktop-other',
+          name: 'Other desktop',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          trust_level: 'local',
+          health_state: 'healthy',
+          is_online: true,
+        },
+      ],
+      null,
+    );
+
+    expect(target).toBeNull();
+  });
+
+  it('does not select a sole local edge target when the desktop device id mismatches', () => {
+    const target = findRegisteredLocalEdgeTarget(
+      [
+        {
+          id: 'local-only',
+          device_id: 'desktop-other',
+          name: 'Other desktop',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          trust_level: 'local',
+          health_state: 'healthy',
+          is_online: true,
+        },
+      ],
+      'desktop-current',
+    );
+
+    expect(target).toBeNull();
+  });
+
+  it('loads subsequent Hub execution target pages before reporting inventory', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [
+              {
+                id: 'relay-first-page',
+                name: 'Relay',
+                target_type: 'hub_relay',
+                health_state: 'healthy',
+                is_online: true,
+              },
+            ],
+            page: { hasMore: true, nextCursor: 'cursor-2' },
+          },
+        }), {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [
+              {
+                id: 'local-second-page',
+                device_id: 'desktop-current',
+                name: 'Current desktop',
+                target_type: 'local_edge',
+                health_state: 'healthy',
+                is_online: true,
+              },
+            ],
+            page: { hasMore: false },
+          },
+        }), {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+    const { result } = renderHook(
+      () => useHubExecutionTargets({ enabled: true, getToken: () => 'tok', baseUrl: 'http://test.local' }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.items.map((target) => target.id)).toEqual([
+      'relay-first-page',
+      'local-second-page',
+    ]);
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe('http://test.local/web/execution-targets?pageSize=50&pageCursor=cursor-2');
+  });
 });

@@ -12,8 +12,9 @@ Last updated: 2026-06-09
 ## Change
 
 - Settings > Execution Targets now shows a Local Edge target readiness callout.
-- The callout checks Hub `/web/execution-targets` for a `local_edge` target matching the current Desktop device ID.
-- The UI distinguishes signed-out, loading, read failure, missing device ID, Local Edge offline, missing Hub target, and registered-target states.
+- The callout checks Hub `/web/execution-targets` pages for a `local_edge` target whose `device_id` matches the current Desktop device ID.
+- The UI does not infer readiness from a sole `local_edge` target; readiness requires a current Desktop device ID, Local Edge online, a matching Hub target, `is_online=true`, and non-degraded Hub target health.
+- The UI distinguishes signed-out, loading, read failure, missing device ID, Local Edge offline, pagination-limited inventory, missing Hub target, stale/offline Hub target, degraded/unknown Hub target, and registered-ready states.
 
 ## Verification
 
