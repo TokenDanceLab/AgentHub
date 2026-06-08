@@ -5,6 +5,22 @@ import (
 	"sync"
 )
 
+var cliAdapterIDs = map[string]struct{}{
+	"claude-code": {},
+	"codex":       {},
+	"opencode":    {},
+}
+
+// ValidateCLIAdapterID checks the runtime IDs that Edge may expose as real CLI
+// adapter targets. The mock runner and orchestrator are separate execution
+// modes, not direct CLI adapter IDs for real CLI smoke readiness.
+func ValidateCLIAdapterID(id string) error {
+	if _, ok := cliAdapterIDs[id]; ok {
+		return nil
+	}
+	return fmt.Errorf("unsupported CLI adapter %q; supported values: claude-code, codex, opencode", id)
+}
+
 // Registry manages available agent adapters.
 type Registry struct {
 	mu       sync.RWMutex

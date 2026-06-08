@@ -358,6 +358,53 @@ func TestProcessExecutorPassesRuntimeContextToAdapter(t *testing.T) {
 	}
 }
 
+func TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	defaultAdapter := &recordingContextAdapter{contexts: make(chan adapters.RunProcessContext, 1)}
+	reg := adapters.NewRegistry()
+	if err := reg.Register(defaultAdapter); err != nil {
+		t.Fatalf("Register default adapter: %v", err)
+	}
+	reg.SetDefault("default", defaultAdapter.Metadata().ID)
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-adapter-sentinel",
+	}, defaultAdapter, reg)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{AgentID: "unknown-runtime"}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.failed":
+			payload, ok := evt.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("failed payload = %T, want map", evt.Payload)
+			}
+			if !strings.Contains(fmt.Sprint(payload["error"]), `agent adapter "unknown-runtime" not found`) {
+				t.Fatalf("failed payload = %#v, want unknown adapter error", payload)
+			}
+			select {
+			case got := <-defaultAdapter.contexts:
+				t.Fatalf("default adapter was invoked for unknown runtime: %#v", got)
+			default:
+			}
+			return
+		case "run.finished":
+			t.Fatal("unknown runtime fell back to default adapter and finished")
+		}
+	}
+}
+
 func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()

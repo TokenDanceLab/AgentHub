@@ -363,10 +363,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	// Resolve adapter for this run: explicit agentID first, then default
 	adapter := e.adapter
-	if e.adapterReg != nil {
-		if resolved, err := e.adapterReg.Resolve(runCtx.AgentID); err == nil {
-			adapter = resolved
+	if e.adapterReg != nil && (runCtx.AgentID != "" || adapter != nil) {
+		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
+		if err != nil {
+			e.publishFailed(run, err)
+			return
 		}
+		adapter = resolved
 	}
 
 	// Resolve adapter label for Prometheus metrics

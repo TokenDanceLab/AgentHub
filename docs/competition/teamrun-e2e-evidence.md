@@ -141,6 +141,20 @@ not evidence that Codex/OpenCode/Claude or any other real runtime executed.
 The readiness gate blocks fixture evidence in `Submission` mode, and the package
 script blocks `-PackageMode Submission` for fixture evidence.
 
+## Edge CLI Readiness Evidence Taxonomy
+
+Edge runtime smoke evidence has two explicit modes:
+
+| Mode | Command shape | Evidence claim |
+|---|---|---|
+| Mock-only fixture | `pwsh -File scripts/edge-runtime-smoke.ps1` | Verifies Edge REST/WebSocket run plumbing, event capture, output redaction, and smoke harness behavior without resolving or running any real CLI/model. |
+| Real CLI opt-in | `pwsh -File scripts/edge-runtime-smoke.ps1 -RealCli -Runtime <claude-code|codex|opencode>` | Verifies the selected runtime adapter against a real local CLI only after budget/environment approval. Missing CLI must fail with install/path guidance unless `-AllowMissingCli` is passed for an explicit skip. |
+
+Only `claude-code`, `codex`, and `opencode` are direct real CLI adapter IDs.
+Unknown runtime IDs must fail instead of falling back to the default adapter.
+Structured runtime events are expected to carry stable event types, run scope,
+bounded payloads, and redacted local paths/secrets before Hub/Web display.
+
 ## Demo Script
 
 1. Prepare two Agent Profiles in Hub:
