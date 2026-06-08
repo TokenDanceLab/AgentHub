@@ -1042,7 +1042,11 @@ paths:
       x-agenthub-owner: Edge
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Model catalog.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelCatalogResponse"
 
   /v1/agent-instances:
     get:
@@ -4838,6 +4842,73 @@ components:
           enum: [OK]
         data:
           $ref: "#/components/schemas/RunDiff"
+    ModelCatalogResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: string
+          enum: [OK]
+        data:
+          $ref: "#/components/schemas/ModelCatalog"
+    ModelCatalog:
+      type: object
+      required: [items, sources]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelCatalogItem"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelCatalogSource"
+    ModelCatalogItem:
+      type: object
+      required: [id, value, label, sourceId, sourceLabel, status]
+      properties:
+        id:
+          type: string
+        value:
+          type: string
+        label:
+          type: string
+        provider:
+          type: string
+        runtimeId:
+          type: string
+        resolvedModel:
+          type: string
+        sourceId:
+          type: string
+        sourceLabel:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        reasoningEfforts:
+          type: array
+          items:
+            type: string
+        default:
+          type: boolean
+    ModelCatalogSource:
+      type: object
+      required: [id, label, status]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+        detail:
+          type: string
     Artifact:
       type: object
       required: [id, runId, threadId, kind, path, sizeBytes, createdAt]
@@ -6392,14 +6463,26 @@ components:
 
     ProviderBinding:
       type: object
+      required: [id, provider, is_available, quota_used, quota_limit, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
-        owner_id: { type: string, format: uuid }
         provider: { type: string }
-        api_base: { type: string }
-        api_key: { type: string }
-        models: { type: string }
-        is_default: { type: boolean }
+        binding_name: { type: string }
+        base_url: { type: string }
+        is_available: { type: boolean }
+        quota_used:
+          type: integer
+          format: int64
+        quota_limit:
+          type: integer
+          format: int64
+        last_checked:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: string
+          description: JSON object metadata encoded by the current Hub provider binding handler.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -6409,32 +6492,43 @@ components:
       properties:
         provider:
           type: string
-        api_base:
+        binding_name:
           type: string
-        api_key:
+        base_url:
           type: string
-        models:
-          type: array
-          items:
-            type: string
-        is_default:
+        is_available:
           type: boolean
+        quota_limit:
+          type: integer
+          format: int64
+        metadata:
+          type: string
+          description: JSON object metadata encoded by the current Hub provider binding handler.
 
     UpdateProviderBindingRequest:
       type: object
       properties:
         provider:
           type: string
-        api_base:
+        binding_name:
           type: string
-        api_key:
+        base_url:
           type: string
-        models:
-          type: array
-          items:
-            type: string
-        is_default:
+        is_available:
           type: boolean
+        quota_used:
+          type: integer
+          format: int64
+        quota_limit:
+          type: integer
+          format: int64
+        last_checked:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: string
+          description: JSON object metadata encoded by the current Hub provider binding handler.
 
     Device:
       type: object
