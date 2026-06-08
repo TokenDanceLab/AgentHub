@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useState, useSyncExternalStore } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
-import type { AgentConfig } from '@shared/workbench';
+import type { AgentConfig, ProjectDraft, ProjectInfo } from '@shared/workbench';
 import {
   getWorkbenchDataModeOverrideSnapshot,
   resolveWorkbenchDataMode,
@@ -93,6 +93,14 @@ function WebWorkbenchRoot() {
     }
   }
 
+  async function handleProjectCreate(draft: ProjectDraft): Promise<ProjectInfo | void> {
+    return workbench.projectsActions?.create(draft);
+  }
+
+  async function handleProjectUpdate(projectId: string, draft: ProjectDraft): Promise<ProjectInfo | void> {
+    return workbench.projectsActions?.update(projectId, draft);
+  }
+
   return (
     <AgentHubWorkbench
       activeConversationId={workbench.activeConversationId}
@@ -116,6 +124,8 @@ function WebWorkbenchRoot() {
         setAgentActionError(undefined);
         void agentList.refetch();
       }}
+      onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
+      onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
       platform={webPlatform}
       transcript={workbench.transcript}
     />
