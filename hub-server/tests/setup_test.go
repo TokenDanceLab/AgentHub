@@ -52,6 +52,10 @@ func (s testMessageServiceWithReactions) RemoveMessageReaction(ctx context.Conte
 	return s.reactions.RemoveMessageReaction(ctx, userID, sessionID, msgID, reaction)
 }
 
+func (s testMessageServiceWithReactions) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+	return s.reactions.ListMessageReactions(ctx, userID, sessionID, msgID)
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
