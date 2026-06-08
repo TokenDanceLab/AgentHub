@@ -33,10 +33,16 @@ func TestOpenAPIEdgeRouteStatuses(t *testing.T) {
 		status string
 	}{
 		{"/v1/health", "get", "implemented"},
+		{"/v1/model-catalog", "get", "implemented"},
 		{"/v1/runners", "get", "implemented"},
+		{"/v1/threads/{threadId}", "delete", "implemented"},
+		{"/v1/threads/{threadId}:archive", "post", "implemented"},
 		{"/v1/runs", "post", "implemented"},
 		{"/v1/runs/{runId}", "get", "implemented"},
 		{"/v1/runs/{runId}:cancel", "post", "implemented"},
+		{"/v1/agent-instances", "get", "implemented"},
+		{"/v1/agent-instances", "post", "planned"},
+		{"/v1/agent-instances/{id}", "get", "implemented"},
 		{"/v1/permissions/decide", "post", "implemented"},
 		{"/v1/projects/{projectId}", "patch", "planned"},
 		{"/v1/projects/{projectId}", "delete", "planned"},
