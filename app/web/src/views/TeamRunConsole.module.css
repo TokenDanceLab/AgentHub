@@ -164,19 +164,39 @@
   flex-direction: column;
   gap: 2px;
   padding: 10px 16px;
-  border: none;
   background: transparent;
   color: var(--color-text, #e5e7eb);
-  cursor: pointer;
   text-align: left;
   border-bottom: 1px solid transparent;
   transition: background 0.15s;
 }
 
-.teamItem:hover { background: var(--color-surface-variant, rgba(255, 255, 255, 0.03)); }
 .teamItemActive {
   background: var(--color-surface-variant, rgba(255, 255, 255, 0.04));
   border-bottom-color: var(--color-primary, #0071BC);
+}
+
+.teamSelectButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.teamSelectButton:hover .teamName,
+.teamSelectButton:focus-visible .teamName {
+  color: var(--color-primary, #0071BC);
+}
+
+.teamSelectButton:focus-visible {
+  outline: 2px solid var(--color-primary, #0071BC);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 .teamItemHeader {

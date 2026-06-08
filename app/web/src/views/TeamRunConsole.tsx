@@ -449,23 +449,21 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
               const runCount = bundle?.runs.length ?? 0;
               const active = selectedTeamId === team.id;
               return (
-                  <div
-                    key={team.id}
-                    role="button"
-                    tabIndex={0}
-                    className={`${styles.teamItem} ${active ? styles.teamItemActive : ''}`}
+                <div
+                  key={team.id}
+                  className={`${styles.teamItem} ${active ? styles.teamItemActive : ''}`}
+                >
+                  <button
+                    type="button"
+                    className={styles.teamSelectButton}
+                    aria-label={t('teamRun.selectTeamNamed', 'Select team {{name}}', { name: team.name })}
                     onClick={() => handleSelectTeam(team.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        void handleSelectTeam(team.id);
-                      }
-                    }}
                   >
-                  <div className={styles.teamItemHeader}>
-                    <span className={styles.teamName}>{team.name}</span>
-                    <span className={styles.teamRunCount}>{runCount}</span>
-                  </div>
+                    <span className={styles.teamItemHeader}>
+                      <span className={styles.teamName}>{team.name}</span>
+                      <span className={styles.teamRunCount}>{runCount}</span>
+                    </span>
+                  </button>
                   {team.description && (
                     <div className={styles.teamDesc}>{team.description}</div>
                   )}

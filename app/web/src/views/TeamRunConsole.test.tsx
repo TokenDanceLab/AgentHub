@@ -358,6 +358,60 @@ describe('TeamRunConsole target routing', () => {
     });
   });
 
+  it('uses an explicit team select button instead of making the row interactive', () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+
+    render(<TeamRunConsole />);
+
+    const teamSelect = screen.getByRole('button', { name: 'Select team P0 Team' });
+    fireEvent.click(teamSelect);
+
+    expect(teamSelect).toBeInTheDocument();
+    expect(teamSelect.parentElement).not.toHaveAttribute('role');
+    expect(teamSelect.parentElement).not.toHaveAttribute('tabindex');
+    expect(screen.getByRole('button', { name: /Running/i })).toBeInTheDocument();
+  });
+
+  it('activates a run with Enter without invoking parent team selection', async () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([{
+      id: 'event-1',
+      team_run_id: 'run-1',
+      seq: 1,
+      type: 'team.run.started',
+      payload: JSON.stringify({ reason: 'Keyboard selected run replay' }),
+      created_at: '2026-06-09T09:00:01Z',
+    }]);
+
+    render(<TeamRunConsole />);
+
+    const teamSelect = screen.getByRole('button', { name: 'Select team P0 Team' });
+    fireEvent.keyDown(teamSelect, {
+      key: 'Enter',
+      code: 'Enter',
+    });
+    fireEvent.click(teamSelect);
+    const runButton = screen.getByRole('button', { name: /Running/i });
+    fireEvent.keyDown(runButton, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(runButton);
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Keyboard selected run replay')).toBeInTheDocument();
+    });
+    expect(hubClientMock.getTeamRunState).toHaveBeenCalledWith('team-1', 'run-1');
+  });
+
   it('loads and renders replayed Hub events for a selected run in sequence order', async () => {
     teamRunsState.runs = [{
       id: 'run-1',
