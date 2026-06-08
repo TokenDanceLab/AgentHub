@@ -85,6 +85,8 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL DEFAULT '',
 			reply_to_message_id TEXT,
 			recalled INTEGER NOT NULL DEFAULT 0,
+			edited BOOLEAN NOT NULL DEFAULT FALSE,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 		`CREATE TABLE message_pins (
@@ -309,6 +311,36 @@ func setupSQLite(t *testing.T) *gorm.DB {
 		require.NoError(t, db.Exec(ddl).Error, "DDL: %s", ddl[:60])
 	}
 	return db
+}
+
+func TestUpdateMessageContentMarksEditedAndStoresTimestamp(t *testing.T) {
+	db := setupSQLite(t)
+	require.NoError(t, db.Exec(`INSERT INTO messages (
+		id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-edit", "sess-edit", 1, "client-edit", "user", "user-1", "text", `{"text":"before"}`, false, time.Now(),
+	).Error)
+
+	require.NoError(t, UpdateMessageContent(db, "msg-edit", "text", `{"text":"after"}`))
+
+	var stored struct {
+		ContentType string
+		Content     string
+		Edited      bool
+		EditedAt    *time.Time
+	}
+	require.NoError(t, db.Table("messages").Where("id = ?", "msg-edit").First(&stored).Error)
+	assert.Equal(t, "text", stored.ContentType)
+	assert.JSONEq(t, `{"text":"after"}`, stored.Content)
+	assert.True(t, stored.Edited)
+	if stored.EditedAt == nil {
+		t.Fatal("edited_at was not set")
+	}
+}
+
+func TestUpdateMessageContentReturnsNotFoundWhenNoRowsChange(t *testing.T) {
+	db := setupSQLite(t)
+	require.ErrorIs(t, UpdateMessageContent(db, "missing", "text", `{"text":"after"}`), gorm.ErrRecordNotFound)
 }
 
 // =============================================================================

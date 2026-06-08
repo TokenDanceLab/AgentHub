@@ -137,6 +137,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		messages.Use(middleware.RequireHubSession())
 		{
 			messages.POST("/:id/recall", messageHandler.RecallMessage)
+			messages.PUT("/:id", messageHandler.EditMessage)
 			messages.POST("/:id/pin", messageHandler.PinMessage)
 			messages.DELETE("/:id/pin", messageHandler.UnpinMessage)
 			messages.POST("/:id/forward", messageHandler.ForwardMessage)

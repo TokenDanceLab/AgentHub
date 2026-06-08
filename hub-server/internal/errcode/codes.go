@@ -36,6 +36,8 @@ var (
 
 	MsgNotFound          = New("MSG_NOT_FOUND", "message not found", http.StatusNotFound)
 	MsgRecallTimeout     = New("MSG_RECALL_TIMEOUT", "recall window has expired", http.StatusBadRequest)
+	MsgEditTimeout       = New("MSG_EDIT_TIMEOUT", "edit window has expired", http.StatusBadRequest)
+	MsgNotEditable       = New("MSG_NOT_EDITABLE", "message cannot be edited", http.StatusBadRequest)
 	MsgPinLimitExceeded  = New("MSG_PIN_LIMIT_EXCEEDED", "pin limit exceeded for this session", http.StatusBadRequest)
 	MsgBlockedByReceiver = New("MSG_BLOCKED_BY_RECEIVER", "you have been blocked by the receiver", http.StatusForbidden)
 

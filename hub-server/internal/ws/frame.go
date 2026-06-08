@@ -16,6 +16,7 @@ const (
 	TypeAuthFail = "auth.fail"
 
 	TypeMessageNew          = "message.new"
+	TypeMessageEdited       = "message.edited"
 	TypeMessageRecall       = "message.recall"
 	TypeMessagePin          = "message.pin"
 	TypeMessageUnpin        = "message.unpin"
