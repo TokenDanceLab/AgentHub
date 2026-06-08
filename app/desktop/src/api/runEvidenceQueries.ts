@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { parseUnifiedDiff } from '@shared/diff';
+import type { RuntimeEvidenceSource } from '@shared/inspector';
 import type { Artifact, Preview, RunDiff } from '@shared/types';
 import type { FileDiff } from '@shared/types/chat';
 import { fetchArtifacts, fetchPreviews, fetchRunDiff } from './edgeClient';
@@ -15,9 +16,9 @@ export interface RunEvidenceState {
   diffError: boolean;
   artifactError: boolean;
   previewError: boolean;
-  diffSource: 'edge' | 'event' | 'none';
-  artifactSource: 'edge' | 'event' | 'none';
-  previewSource: 'edge' | 'event' | 'none';
+  diffSource: RuntimeEvidenceSource;
+  artifactSource: RuntimeEvidenceSource;
+  previewSource: RuntimeEvidenceSource;
 }
 
 function fallbackDiff(file: RunDiff['files'][number]): FileDiff {
@@ -84,10 +85,10 @@ export function useRunEvidence(runId: string | undefined, eventDiffs: FileDiff[]
     staleTime: 5_000,
   });
 
-  const diffs = useMemo(() => {
-    const edgeDiffs = toReviewDiffs(diffQuery.data);
-    return edgeDiffs.length > 0 ? edgeDiffs : eventDiffs;
-  }, [diffQuery.data, eventDiffs]);
+  const edgeDiffs = useMemo(() => toReviewDiffs(diffQuery.data), [diffQuery.data]);
+  const diffs = useMemo(() => (
+    edgeDiffs.length > 0 ? edgeDiffs : eventDiffs
+  ), [edgeDiffs, eventDiffs]);
 
   const artifacts = useMemo(
     () => (artifactQuery.data?.items ?? []).filter((artifact) => artifact.runId === runId),
@@ -108,7 +109,7 @@ export function useRunEvidence(runId: string | undefined, eventDiffs: FileDiff[]
     diffError: diffQuery.isError,
     artifactError: artifactQuery.isError,
     previewError: previewQuery.isError,
-    diffSource: toReviewDiffs(diffQuery.data).length > 0 ? 'edge' : eventDiffs.length > 0 ? 'event' : 'none',
+    diffSource: edgeDiffs.length > 0 ? 'edge' : eventDiffs.length > 0 ? 'event' : 'none',
     artifactSource: artifacts.length > 0 ? 'edge' : 'none',
     previewSource: previews.length > 0 ? 'edge' : 'none',
   };

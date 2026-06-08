@@ -247,6 +247,7 @@ describe('AgentHubWorkbench', () => {
 
     expect(screen.getByText('运行证据')).toBeInTheDocument();
     expect(screen.getByText('Run run-edge-1')).toBeInTheDocument();
+    expect(screen.getAllByText('Edge / 1')).toHaveLength(3);
     expect(screen.getByRole('button', { name: '打开 diff src/runtime.ts' })).toBeInTheDocument();
     expect(screen.getByLabelText('产物 metadata reports/runtime.patch')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '查看产物 reports/runtime.patch' })).not.toBeInTheDocument();
@@ -317,7 +318,8 @@ describe('AgentHubWorkbench', () => {
     );
 
     expect(screen.getByText('暂无运行证据')).toBeInTheDocument();
-    expect(screen.getByText('Edge 已返回空 diff、artifact 和 preview snapshot。')).toBeInTheDocument();
+    expect(screen.getByText(/Edge 已返回空 diff、artifact 和 preview snapshot。/)).toBeInTheDocument();
+    expect(screen.getByText(/Diff snapshot: None/)).toBeInTheDocument();
   });
 
   it('hides repeated avatars for rapid consecutive user messages', () => {
