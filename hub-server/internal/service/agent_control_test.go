@@ -99,6 +99,39 @@ func TestAgentControlServiceQueuesWhenExactDeviceRouteMissing(t *testing.T) {
 	require.JSONEq(t, `{"kind":"permission.decide","edge_device_id":"dev-b","approval_id":"approval-b","edge_control":{"runId":"edge-run-b","requestId":"approval-b","decision":"allow"}}`, queued[0])
 }
 
+func TestAgentControlServiceQueuesWhenExactDeviceDeliveryBufferFull(t *testing.T) {
+	ctx := context.Background()
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-b")
+	require.NoError(t, cacheClient.SetRoute(ctx, "user-1", "desktop:dev-b", conn.ID))
+	for i := 0; i < cap(conn.Send); i++ {
+		conn.Send <- []byte("already queued")
+	}
+
+	svc := NewAgentControlService(cacheClient, mgr)
+	require.NoError(t, svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", model.AgentControlPayload{
+		Kind:       model.AgentControlKindPermissionDecide,
+		ApprovalID: "approval-b",
+		EdgeControl: &model.TeamApprovalEdgeControl{
+			RunID:     "edge-run-b",
+			RequestID: "approval-b",
+			Decision:  "allow",
+		},
+	}))
+
+	queued, err := cacheClient.PopPendingAgentControlsForDevice(ctx, "user-1", "dev-b")
+	require.NoError(t, err)
+	require.Len(t, queued, 1)
+	require.JSONEq(t, `{"kind":"permission.decide","edge_device_id":"dev-b","approval_id":"approval-b","edge_control":{"runId":"edge-run-b","requestId":"approval-b","decision":"allow"}}`, queued[0])
+}
+
 func TestAgentControlServiceQueuesDuplicateOfflineControlOnce(t *testing.T) {
 	ctx := context.Background()
 	mr, err := miniredis.Run()
