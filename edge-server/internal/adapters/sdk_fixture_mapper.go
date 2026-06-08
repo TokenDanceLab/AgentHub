@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -61,6 +62,40 @@ type SDKFixtureEvent struct {
 	Success        *bool            `json:"success,omitempty"`
 	Attachments    []map[string]any `json:"attachments,omitempty"`
 	Metadata       map[string]any   `json:"metadata,omitempty"`
+
+	// Provider-neutral Edge contract fields. These are fixture-only projections
+	// of SDK/CLI signals and must stay redacted before they cross the adapter
+	// boundary.
+	AdapterID           string           `json:"adapterId,omitempty"`
+	CommandName         string           `json:"commandName,omitempty"`
+	ArgFlags            []string         `json:"argFlags,omitempty"`
+	ConfigKeys          []string         `json:"configKeys,omitempty"`
+	PositionalArgCount  int              `json:"positionalArgCount,omitempty"`
+	EnvNames            []string         `json:"envNames,omitempty"`
+	WorkDir             string           `json:"workDir,omitempty"`
+	PromptRedacted      bool             `json:"promptRedacted,omitempty"`
+	Observed            bool             `json:"observed,omitempty"`
+	RealTested          bool             `json:"realTested,omitempty"`
+	RealTestedReason    string           `json:"realTestedReason,omitempty"`
+	ExecutionMode       string           `json:"executionMode,omitempty"`
+	NoSpendDefault      bool             `json:"noSpendDefault,omitempty"`
+	RedactionApplied    bool             `json:"redactionApplied,omitempty"`
+	ApprovalRequired    bool             `json:"approvalRequired,omitempty"`
+	ApprovalEvidenceRef string           `json:"approvalEvidenceRef,omitempty"`
+	TaskID              string           `json:"taskId,omitempty"`
+	Description         string           `json:"description,omitempty"`
+	LastToolName        string           `json:"lastToolName,omitempty"`
+	Percent             float64          `json:"percent,omitempty"`
+	Usage               *SDKFixtureUsage `json:"usage,omitempty"`
+}
+
+// SDKFixtureUsage is a provider-neutral usage/cost projection accepted only by
+// fixture contract tests.
+type SDKFixtureUsage struct {
+	InputTokens  int64   `json:"inputTokens,omitempty"`
+	OutputTokens int64   `json:"outputTokens,omitempty"`
+	TotalTokens  int64   `json:"totalTokens,omitempty"`
+	TotalCostUSD float64 `json:"totalCostUsd,omitempty"`
 }
 
 // SDKMappedEvent is the AgentHub-owned event projection emitted by the mapper.
@@ -102,6 +137,25 @@ func DecodeSDKFixtureStream(data []byte) (SDKFixtureStream, error) {
 
 func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
 	switch normalizeSDKFixtureType(event.Type) {
+	case "invocation_plan", "cli_invocation_plan":
+		return oneSDKMappedEvent(BusEventCLIInvocationPlan, scope, commonSDKPayload(event, provider, map[string]any{
+			"adapterId":           event.AdapterID,
+			"commandName":         commandNameOnly(event.CommandName),
+			"argFlags":            event.ArgFlags,
+			"configKeys":          event.ConfigKeys,
+			"positionalArgCount":  event.PositionalArgCount,
+			"envNames":            envNamesOnly(event.EnvNames),
+			"workDir":             invocationPathNameOnly(event.WorkDir),
+			"promptRedacted":      event.PromptRedacted,
+			"observed":            false,
+			"realTested":          false,
+			"realTestedReason":    firstNonEmpty(event.RealTestedReason, "fixture plan only; no approved observed CLI chain"),
+			"executionMode":       firstNonEmpty(event.ExecutionMode, "fixture"),
+			"noSpendDefault":      true,
+			"redactionApplied":    true,
+			"approvalRequired":    true,
+			"approvalEvidenceRef": event.ApprovalEvidenceRef,
+		}))
 	case "sidecar_session_ready", "session_ready":
 		return oneSDKMappedEvent(BusEventSessionInit, scope, commonSDKPayload(event, provider, map[string]any{
 			"sessionId":      event.SessionID,
@@ -109,11 +163,43 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 			"permissionMode": event.PermissionMode,
 			"tools":          event.Tools,
 		}))
-	case "session_updated":
+	case "session_updated", "status", "status_change":
 		return oneSDKMappedEvent(BusEventStatusChange, scope, commonSDKPayload(event, provider, map[string]any{
 			"sessionId": event.SessionID,
 			"status":    event.Status,
+			"summary":   event.Summary,
+			"reason":    event.Reason,
 		}))
+	case "progress", "task_progress":
+		return oneSDKMappedEvent(BusEventTaskProgress, scope, commonSDKPayload(event, provider, map[string]any{
+			"taskId":       firstNonEmpty(event.TaskID, event.ID),
+			"description":  event.Description,
+			"status":       event.Status,
+			"percent":      event.Percent,
+			"lastToolName": event.LastToolName,
+			"summary":      event.Summary,
+		}))
+	case "usage", "context_usage":
+		return oneSDKMappedEvent(BusEventContextUsage, scope, commonSDKPayload(event, provider, sdkUsagePayload(event)))
+	case "error", "runtime_error":
+		payload := commonSDKPayload(event, provider, map[string]any{
+			"success":        false,
+			"terminalReason": "error",
+			"reason":         firstNonEmpty(event.Reason, "error"),
+			"error":          sanitizeSDKText(event.Error),
+			"sessionId":      event.SessionID,
+		})
+		return oneSDKMappedEvent(BusEventResult, scope, payload)
+	case "cancelled", "canceled", "cancellation":
+		payload := commonSDKPayload(event, provider, map[string]any{
+			"success":        false,
+			"cancelled":      true,
+			"terminalReason": "cancelled",
+			"reason":         firstNonEmpty(event.Reason, "cancelled"),
+			"summary":        event.Summary,
+			"sessionId":      event.SessionID,
+		})
+		return oneSDKMappedEvent(BusEventResult, scope, payload)
 	case "tool_state":
 		events := []SDKMappedEvent{{
 			Type:  BusEventToolCall,
@@ -193,14 +279,16 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 			"summary":    event.Summary,
 		})
 		return oneSDKMappedEvent(sdkFixtureEventArtifactCreated, scope, payload)
-	case "trace_ref", "result", "run_result":
+	case "trace_ref", "result", "run_result", "terminal_result":
 		success := true
 		if event.Success != nil {
 			success = *event.Success
 		}
 		payload := commonSDKPayload(event, provider, map[string]any{
-			"success": success,
-			"summary": event.Summary,
+			"success":        success,
+			"summary":        event.Summary,
+			"terminalReason": terminalReasonForSDKEvent(event, success),
+			"usage":          sdkUsagePayload(event),
 		})
 		return oneSDKMappedEvent(BusEventResult, scope, payload)
 	default:
@@ -250,6 +338,10 @@ func commonSDKPayload(event SDKFixtureEvent, provider string, fields map[string]
 			}
 		case []map[string]any:
 			if len(v) == 0 {
+				continue
+			}
+		case float64:
+			if v == 0 {
 				continue
 			}
 		case nil:
@@ -345,6 +437,50 @@ func sanitizeSDKValue(value any) any {
 	}
 }
 
+func sdkUsagePayload(event SDKFixtureEvent) map[string]any {
+	if event.Usage == nil {
+		return nil
+	}
+	payload := map[string]any{}
+	if event.Usage.InputTokens > 0 {
+		payload["inputTokens"] = event.Usage.InputTokens
+	}
+	if event.Usage.OutputTokens > 0 {
+		payload["outputTokens"] = event.Usage.OutputTokens
+	}
+	if event.Usage.TotalTokens > 0 {
+		payload["totalTokens"] = event.Usage.TotalTokens
+	}
+	if event.Usage.TotalCostUSD > 0 {
+		payload["totalCostUsd"] = event.Usage.TotalCostUSD
+	}
+	if event.Model != "" {
+		payload["model"] = event.Model
+	}
+	if event.SessionID != "" {
+		payload["sessionId"] = event.SessionID
+	}
+	return payload
+}
+
+func terminalReasonForSDKEvent(event SDKFixtureEvent, success bool) string {
+	if event.Reason != "" {
+		return event.Reason
+	}
+	switch normalizeSDKFixtureType(event.Type) {
+	case "terminal_result", "run_result", "result":
+		if success {
+			return "completed"
+		}
+		return "error"
+	default:
+		if success {
+			return "completed"
+		}
+		return "error"
+	}
+}
+
 func isSDKSecretKey(key string) bool {
 	normalized := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(key, "_", ""), "-", ""))
 	return strings.Contains(normalized, "secret") ||
@@ -381,6 +517,22 @@ func normalizeSDKWorkspacePath(value string) string {
 		return path.Base(cleaned)
 	}
 	return strings.TrimPrefix(cleaned, "./")
+}
+
+var (
+	sdkWindowsPathPattern = regexp.MustCompile(`(?i)[a-z]:[\\/](?:[^\\/\s"]+[\\/])*([^\\/\s"]+)`)
+	sdkPOSIXPathPattern   = regexp.MustCompile(`/(?:[^/\s"]+/)+([^/\s"]+)`)
+	sdkTokenPattern       = regexp.MustCompile(`(?i)\b(?:sk|ghp|gho|ghu|ghs|glpat|xox[baprs])-[-_a-z0-9]{6,}\b`)
+)
+
+func sanitizeSDKText(value string) string {
+	if value == "" {
+		return ""
+	}
+	sanitized := sdkWindowsPathPattern.ReplaceAllString(value, "$1")
+	sanitized = sdkPOSIXPathPattern.ReplaceAllString(sanitized, "$1")
+	sanitized = sdkTokenPattern.ReplaceAllString(sanitized, "[redacted]")
+	return sanitized
 }
 
 func firstNonEmpty(values ...string) string {
