@@ -478,6 +478,48 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	require.Empty(t, cache.snapshot().pushedTarget)
 }
 
+func TestDispatchTaskQueuesTargetBoundTaskWhenDeliveryBufferFull(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-target-full", "agent-1", "user-1", "msg-1", "target-dev-b", model.TaskStatusQueued, "dev-b", "2030-01-01T00:00:00Z").Error)
+
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	for i := 0; i < cap(connB.Send); i++ {
+		connB.Send <- []byte("already queued")
+	}
+
+	cache := &mockAgentCache{
+		deviceRoutes: map[string]string{
+			"user-1|desktop|dev-b": connB.ID,
+		},
+	}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-target-full",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-dev-b",
+		EdgeDeviceID:      "dev-b",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
+
+	snapshot := cache.snapshot()
+	require.Len(t, snapshot.pushedTarget, 1)
+	require.Equal(t, "target-dev-b", snapshot.pushedTargetID)
+	require.Equal(t, "dev-b", snapshot.pushedDeviceID)
+}
+
 func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	mgr := ws.NewManager()
