@@ -72,7 +72,7 @@ func TestOpenAPIHubAuthDeviceIDsUseUUIDContract(t *testing.T) {
 	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCCallbackRequest")
 }
 
-func TestOpenAPICloudEdgeRegisterDocumentsEdgeScopedJWT(t *testing.T) {
+func TestOpenAPICloudEdgeRegisterDocumentsEdgeScopedJWTAndNoCallerDeviceMatch(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
 	path := yamlMapField(t, paths, "/cloud/edge/register", "paths./cloud/edge/register")
@@ -88,6 +88,17 @@ func TestOpenAPICloudEdgeRegisterDocumentsEdgeScopedJWT(t *testing.T) {
 		if strings.Contains(description, stale) {
 			t.Fatalf("cloud edge register description contains stale wording %q: %s", stale, description)
 		}
+	}
+	if strings.Contains(description, "must match") || strings.Contains(description, "JWT device_id claim") {
+		t.Fatalf("cloud edge register description must not require caller JWT device match: %s", description)
+	}
+
+	requestSchema := requestBodySchema(t, post, "cloud edge register")
+	properties := yamlMapField(t, requestSchema, "properties", "cloud edge register request properties")
+	deviceID := yamlMapField(t, properties, "device_id", "cloud edge register device_id")
+	deviceDescription := yamlScalarField(t, deviceID, "description", "cloud edge register device_id description")
+	if strings.Contains(deviceDescription, "must match") || strings.Contains(deviceDescription, "JWT device_id") {
+		t.Fatalf("cloud edge device_id description must not require caller JWT device match: %s", deviceDescription)
 	}
 
 	responses := yamlMapField(t, post, "responses", "cloud edge register responses")
