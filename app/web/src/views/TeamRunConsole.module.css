@@ -365,6 +365,18 @@
   font-size: 11px;
 }
 
+.inlineError,
+.listError {
+  color: var(--color-danger, #ef4444);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.listError {
+  padding: 24px;
+  text-align: center;
+}
+
 /* ── Tabs ── */
 
 .tabs {
