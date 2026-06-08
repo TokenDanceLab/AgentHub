@@ -84,7 +84,9 @@ go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code --
 | 参数 / 环境变量 | 说明 |
 |---|---|
 | `--addr` / `AGENTHUB_ADDR` | 监听地址，默认 `127.0.0.1:3210` |
-| `--store-file` / `AGENTHUB_STORE_FILE` | JSON file store 快照路径；为空使用内存 store |
+| `--store-backend` / `AGENTHUB_STORE_BACKEND` | Store backend 模式：`memory`、`file`、`sqlite`；留空保持兼容自动选择，显式 `memory` 禁止同时设置 store file/db |
+| `--store-db` / `AGENTHUB_STORE_DB` | SQLite database 路径；使用 `--store-backend sqlite` 时必填，不能和 `--store-file` 同时设置 |
+| `--store-file` / `AGENTHUB_STORE_FILE` | 兼容旧配置的 JSON file store 快照路径；未设置 `--store-backend` 时启用 file store，显式 `--store-backend file` 时必填 |
 | `--agent-default` / `AGENTHUB_AGENT_DEFAULT` | 默认 Runtime adapter ID：`claude-code`、`codex`、`opencode` |
 | `--runner-profile` / `AGENTHUB_RUNNER_PROFILE` | 兼容旧名称的 Runtime preset：`agenthub-runner-mock`、`claude-code`、`codex`、`opencode` |
 | `--workspace-allowlist` / `AGENTHUB_WORKSPACE_ALLOWLIST` | 限制 `/v1/runs` 请求里的 `workDir` 必须位于允许的 workspace root 内；flag 可重复，环境变量使用系统 path-list 分隔符 |
@@ -93,6 +95,8 @@ go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code --
 | `--codex-path` / `AGENTHUB_CODEX_PATH` | Codex CLI 路径，默认 `codex` |
 | `--opencode-path` / `AGENTHUB_OPENCODE_PATH` | OpenCode CLI 路径，默认 `opencode` |
 | `--agent-model` / `AGENTHUB_AGENT_MODEL` | 默认 Runtime 的模型覆盖 |
+
+Store backend 的 operator 模式是 memory、file、sqlite：留空 backend 时保持旧兼容规则，不配置持久化参数默认 memory，已有 `--store-file` / `AGENTHUB_STORE_FILE` 部署继续使用 JSON file store；显式 `--store-backend memory` 会拒绝同时设置 `--store-file` 或 `--store-db`；显式 `--store-backend file` 必须设置 `--store-file`；新 SQLite 持久化使用 `--store-backend sqlite --store-db <path>`。
 
 本地 Edge token 启用后，REST 请求使用 `Authorization: Bearer <token>` 或 `X-AgentHub-Edge-Token: <token>`。浏览器 WebSocket 无法设置自定义 header，所以 `/v1/events` 使用 `?access_token=<token>`。这只覆盖本地回环 Edge 的进程调用边界；Remote/Cloud/Hub relay Target 仍需要 Hub session、device proof、Target 权限和审计。
 
