@@ -416,6 +416,8 @@ export interface HubAgentDispatchPayload {
   agent_instance_id: string;
   agent_type: string;
   custom_agent_id?: string;
+  target_id?: string;
+  edge_device_id?: string;
   session_id: string;
   trigger_message_id: string;
   trigger_user_id: string;
