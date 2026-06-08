@@ -51,6 +51,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
    - Upgrade from dry fixture evidence to real UI/runtime evidence where allowed.
    - Keep D3 real CLI/model blocked until runner, budget, environment approval, and artifact redaction are approved.
    - Backend focused subset CI is allowed only for existing Hub/Edge short focused packages; it must not include Docker, service containers, self-hosted runners, external URLs, real CLI, model keys, or TokenDanceID live auth.
+   - SDK agent strategy lives in [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md): AgentHub owns `AgentHubAgentSpec` / DSL; Claude/OpenAI SDKs remain Edge runtime/provider adapter experiments.
 
 5. **Login real E2E**
    - Use existing fake/local and packaged readiness gates as preconditions.
