@@ -8,6 +8,7 @@ export interface ComposerMention {
   description?: string;
   status?: 'available' | 'unavailable' | 'configuring';
   model?: string;
+  provider?: string;
   runtimeId?: string;
 }
 

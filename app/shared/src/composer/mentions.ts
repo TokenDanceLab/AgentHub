@@ -8,6 +8,7 @@ export function formatComposerMentionContext(mentions: ComposerMention[]): strin
   mentions.forEach((mention, index) => {
     lines.push(`${index + 1}. ${mention.label} (id: ${mention.id})`);
     if (mention.description) lines.push(`   Description: ${mention.description}`);
+    if (mention.provider) lines.push(`   Provider: ${mention.provider}`);
     if (mention.runtimeId) lines.push(`   Runtime: ${mention.runtimeId}`);
     if (mention.model) lines.push(`   Model: ${mention.model}`);
     if (mention.status) lines.push(`   Status: ${mention.status}`);

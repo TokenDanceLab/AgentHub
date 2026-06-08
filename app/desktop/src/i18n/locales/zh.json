@@ -810,6 +810,7 @@
   "settings.edgeOnline": "Edge 在线",
   "settings.edgeOffline": "Edge 离线",
   "settings.runnerSummary": "{{available}}/{{total}} 可用",
+  "settings.localEdgeInventorySummary": "{{runners}}/{{totalRunners}} runner · {{agents}} agent · {{models}} model",
   "settings.agentProfilesDesc": "为不同 Agent 设置默认模型、可用工具和上下文偏好。",
   "settings.profileAvailable": "可用 Agent 引擎",
   "settings.profileAvailableDesc": "当前设备上可运行 Profile 的本机 Agent 引擎。",
