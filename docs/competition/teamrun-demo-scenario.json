@@ -1,5 +1,11 @@
 {
   "contract": "teamrun-demo-evidence-v1",
+  "manifest_schema": {
+    "version": "teamrun-demo-manifest-v2",
+    "purpose": "ByteDance TeamRun rehearsal manifest for fixture-only evidence shape validation",
+    "readiness_mode": "fixture_rehearsal",
+    "submission_gate": "blocked_until_real_runtime_and_final_recording"
+  },
   "scenario_id": "bytedance-teamrun-fixture-minimum",
   "title": "ByteDance TeamRun fixture-only demo contract",
   "fixture_only": true,
@@ -19,7 +25,30 @@
     "tasks",
     "assignments",
     "events",
-    "runtime_profiles"
+    "runtime_profiles",
+    "screenshot_or_video_rehearsal"
+  ],
+  "runtime_profiles": [
+    {
+      "id": "profile-supervisor-fixture",
+      "display_name": "Demo Supervisor",
+      "role": "supervisor",
+      "runtime_type": "codex-fixture",
+      "runtime_label_source": "fixture_manifest",
+      "runtime_execution_evidence": "not_executed",
+      "real_runtime_executed": false,
+      "submission_ready": false
+    },
+    {
+      "id": "profile-worker-fixture",
+      "display_name": "Demo Worker",
+      "role": "worker",
+      "runtime_type": "opencode-fixture",
+      "runtime_label_source": "fixture_manifest",
+      "runtime_execution_evidence": "not_executed",
+      "real_runtime_executed": false,
+      "submission_ready": false
+    }
   ],
   "agent_profiles": [
     {
@@ -112,6 +141,21 @@
       "team_run_id": "teamrun-fixture-001"
     }
   ],
+  "screenshot_or_video_rehearsal": {
+    "mode": "fixture_rehearsal",
+    "required_for_submission": true,
+    "final_recording_complete": false,
+    "submission_ready": false,
+    "real_runtime_executed": false,
+    "target_duration_seconds": 180,
+    "expected_capture_surfaces": [
+      "Desktop transcript showing supervisor and worker turns",
+      "TeamRun evidence inspector with state/events/tasks/assignments",
+      "Final package manifest with real runtime and recording claims"
+    ],
+    "current_assets": [],
+    "honesty_note": "No screenshot or video in this fixture proves real runtime execution."
+  },
   "api_exports_required_for_real_demo": [
     "GET /web/agent-teams/:teamId/runs/:runId/state",
     "GET /web/agent-teams/:teamId/runs/:runId/events",
