@@ -239,6 +239,7 @@ func (a *App) Run(ctx context.Context) error {
 	})
 	a.AgentTeamService.SetControlService(a.AgentControlService)
 	a.AgentTeamService.SetBus(a.bus)
+	a.AgentService.SetTeamRouteHandler(a.AgentTeamService)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 
 	// Relay service
