@@ -13,6 +13,7 @@ import (
 const (
 	eventArtifactCreated = "artifact.created"
 	eventPreviewReady    = "preview.ready"
+	eventPreviewStopped  = "preview.stopped"
 )
 
 type runtimeEvidenceEmitter struct {
@@ -43,6 +44,8 @@ func (e *runtimeEvidenceEmitter) Emit(eventType string, scope map[string]any, pa
 		e.persistArtifact(payloadMap)
 	case eventPreviewReady:
 		e.persistPreview(payloadMap)
+	case eventPreviewStopped:
+		e.persistPreviewStopped(payloadMap)
 	}
 }
 
@@ -95,6 +98,22 @@ func (e *runtimeEvidenceEmitter) persistPreview(payload map[string]any) {
 	}
 	if _, err := e.writer.UpsertPreview(preview); err != nil {
 		slog.Warn("process: failed to persist runtime preview evidence", "runId", e.run.ID, "previewId", id, "err", err)
+	}
+}
+
+func (e *runtimeEvidenceEmitter) persistPreviewStopped(payload map[string]any) {
+	id := firstPayloadString(payload, "id", "previewId")
+	if id == "" {
+		return
+	}
+	preview := store.Preview{
+		ID:       id,
+		RunID:    e.run.ID,
+		ThreadID: e.run.ThreadID,
+		Status:   "stopped",
+	}
+	if _, err := e.writer.UpsertPreview(preview); err != nil {
+		slog.Warn("process: failed to persist runtime preview stopped evidence", "runId", e.run.ID, "previewId", id, "err", err)
 	}
 }
 

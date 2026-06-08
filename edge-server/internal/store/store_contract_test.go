@@ -596,6 +596,18 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	if got, ok := evidence.GetPreview(preview.ID); !ok || got.ID != preview.ID || got.RunID != run.ID {
 		t.Fatalf("GetPreview = %#v, %v; want stored preview", got, ok)
 	}
+	stoppedPreview, err := evidence.UpsertPreview(Preview{
+		ID:       preview.ID,
+		RunID:    run.ID,
+		ThreadID: thread.ID,
+		Status:   "stopped",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview stopped returned error: %v", err)
+	}
+	if stoppedPreview.Status != "stopped" || stoppedPreview.URL != "" || stoppedPreview.CreatedAt != preview.CreatedAt || stoppedPreview.UpdatedAt == "" {
+		t.Fatalf("stopped preview = %#v, want stopped transition with preserved createdAt", stoppedPreview)
+	}
 
 	if handle.path == "" || handle.reopen == nil {
 		return
@@ -617,10 +629,10 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	if got, ok := restoredEvidence.GetArtifact(artifact.ID); !ok || got.ID != artifact.ID {
 		t.Fatalf("restored artifact lookup = %#v, %v; want persisted artifact", got, ok)
 	}
-	if got := restoredEvidence.ListPreviews(run.ID); len(got) != 1 || got[0].ID != preview.ID {
+	if got := restoredEvidence.ListPreviews(run.ID); len(got) != 1 || got[0].ID != preview.ID || got[0].Status != "stopped" {
 		t.Fatalf("restored previews = %#v, want persisted preview", got)
 	}
-	if got, ok := restoredEvidence.GetPreview(preview.ID); !ok || got.ID != preview.ID {
+	if got, ok := restoredEvidence.GetPreview(preview.ID); !ok || got.ID != preview.ID || got.Status != "stopped" {
 		t.Fatalf("restored preview lookup = %#v, %v; want persisted preview", got, ok)
 	}
 }
