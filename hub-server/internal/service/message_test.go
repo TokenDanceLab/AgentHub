@@ -374,6 +374,61 @@ func TestSendMessage_FileContentRecordsAttachmentReference(t *testing.T) {
 	}
 }
 
+func TestSendMessage_ImageContentWithAttachmentIDRecordsAndReadsAttachment(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 10}}
+	ctx := context.Background()
+
+	seedMessageSessionMember(t, db, "sess-image", "user-1")
+	require.NoError(t, db.Exec(`INSERT INTO attachments (id, hash, size, mime_type, original_name, uploader_user_id) VALUES (?, ?, ?, ?, ?, ?)`,
+		"77777777-7777-4777-8777-777777777778", "8888888888888888888888888888888888888888888888888888888888888888", 34, "image/png", "chart.png", "user-1").Error)
+
+	resp, err := svc.SendMessage(ctx, "sess-image", "user-1", SendMessageRequest{
+		ClientMsgID: "55555555-5555-4555-8555-555555555556",
+		ContentType: "image",
+		Content:     `{"attachment_id":"77777777-7777-4777-8777-777777777778","alt":"chart"}`,
+	})
+	require.NoError(t, err)
+
+	var count int64
+	require.NoError(t, db.Table("message_attachments").
+		Where("session_id = ? AND message_id = ? AND attachment_id = ?", "sess-image", resp.MessageID, "77777777-7777-4777-8777-777777777778").
+		Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+
+	msgs, err := svc.GetMessages(ctx, "sess-image", "user-1", 0, 50)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	require.Len(t, msgs[0].Attachments, 1)
+	assert.Equal(t, "77777777-7777-4777-8777-777777777778", msgs[0].Attachments[0].ID)
+	assert.Equal(t, "8888888888888888888888888888888888888888888888888888888888888888", msgs[0].Attachments[0].Hash)
+	assert.Equal(t, int64(34), msgs[0].Attachments[0].Size)
+	assert.Equal(t, "image/png", msgs[0].Attachments[0].MimeType)
+	assert.Equal(t, "chart.png", msgs[0].Attachments[0].OriginalName)
+}
+
+func TestSendMessage_ImageContentWithURLDoesNotRequireAttachment(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 11}}
+	ctx := context.Background()
+
+	seedMessageSessionMember(t, db, "sess-image-url", "user-1")
+
+	resp, err := svc.SendMessage(ctx, "sess-image-url", "user-1", SendMessageRequest{
+		ClientMsgID: "55555555-5555-4555-8555-555555555557",
+		ContentType: "image",
+		Content:     `{"url":"https://example.test/chart.png","alt":"chart"}`,
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.MessageID)
+
+	msgs, err := svc.GetMessages(ctx, "sess-image-url", "user-1", 0, 50)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	assert.Empty(t, msgs[0].Attachments)
+	assert.JSONEq(t, `{"url":"https://example.test/chart.png","alt":"chart"}`, msgs[0].Content)
+}
+
 func TestSendMessage_FileContentRejectsInvalidAttachmentID(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
 	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 8}}
