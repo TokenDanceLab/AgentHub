@@ -707,8 +707,8 @@ func (s *MessageService) forwardOne(ctx context.Context, userID string, msg *mod
 	forwarded := &model.Message{
 		SessionID:   sessionID,
 		ClientMsgID: uuidv7.Must(),
-		SenderType:  model.SenderTypeUser,
-		SenderID:    userID,
+		SenderType:  msg.SenderType,
+		SenderID:    msg.SenderID,
 		ContentType: msg.ContentType,
 		Content:     msg.Content,
 		SeqID:       seq,
