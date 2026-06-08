@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"gorm.io/gorm"
@@ -64,10 +63,7 @@ func (s *ContactService) SearchUser(ctx context.Context, currentUserID, targetID
 
 	target, err := repository.GetUserByID(s.db, targetID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.UserNotFound
-		}
-		return nil, err
+		return nil, repository.WrapNotFound(err, errcode.UserNotFound)
 	}
 
 	rel := "stranger"
@@ -109,10 +105,7 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 
 	_, err := repository.GetUserByID(s.db, friendID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errcode.UserNotFound
-		}
-		return err
+		return repository.WrapNotFound(err, errcode.UserNotFound)
 	}
 
 	existing, err := repository.FindFriendshipBetween(s.db, userID, friendID)
@@ -334,10 +327,7 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 
 func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error {
 	if err := repository.UpdateFriendshipRemark(s.db, currentUserID, friendUserID, remark); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errcode.FriendRemarkNoRow
-		}
-		return err
+		return repository.WrapNotFound(err, errcode.FriendRemarkNoRow)
 	}
 	return nil
 }
