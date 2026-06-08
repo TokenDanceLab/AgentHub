@@ -128,6 +128,39 @@ function Assert-FieldPresent([object]$Obj, [string]$Field, [string]$Label) {
     }
 }
 
+function Assert-FileContains([string]$Path, [string]$Pattern, [string]$Label) {
+    if (-not (Test-Path $Path)) {
+        Fail "$Label — missing file: $Path"
+        return
+    }
+
+    $content = Get-Content -LiteralPath $Path -Raw
+    if ($content -match $Pattern) {
+        Pass $Label
+    } else {
+        Fail "$Label — expected pattern not found"
+    }
+}
+
+function Test-PackagedDesktopReadiness {
+    param([string]$Root)
+
+    Step "Packaged Desktop loopback/keyring readiness"
+
+    $oidcServerPath = Join-Path $Root "app\desktop\src-tauri\src\oidc_server.rs"
+    $secureStorePath = Join-Path $Root "app\desktop\src-tauri\src\secure_store.rs"
+    $commandsPath = Join-Path $Root "app\desktop\src-tauri\src\commands.rs"
+    $libPath = Join-Path $Root "app\desktop\src-tauri\src\lib.rs"
+
+    Assert-FileContains $oidcServerPath "pub fn check_loopback_callback_readiness\(\)" "  Desktop loopback readiness source is wired"
+    Assert-FileContains $oidcServerPath 'TcpListener::bind\("127\.0\.0\.1:0"\)' "  Desktop loopback readiness uses random localhost bind"
+    Assert-FileContains $secureStorePath "pub fn check_credential_store_readiness\(\)" "  Desktop keyring readiness source is wired"
+    Assert-FileContains $secureStorePath "Entry::new\(SERVICE, HUB_REFRESH_TOKEN_USER\)" "  Desktop keyring readiness checks Hub refresh-token credential entry"
+    Assert-FileContains $commandsPath "pub async fn get_packaged_login_readiness\(\)" "  Desktop packaged login readiness command exists"
+    Assert-FileContains $commandsPath 'status: "proposal_only"\.to_string\(\)' "  Real packaged login E2E remains proposal-only"
+    Assert-FileContains $libPath "commands::get_packaged_login_readiness" "  Desktop readiness command is registered in Tauri invoke handler"
+}
+
 function Get-Sha256Prefix([string]$Text) {
     $sha256 = [Security.Cryptography.SHA256]::Create()
     try {
@@ -186,6 +219,7 @@ if ($LocalOnly) {
     $SkipTD = $true
     Step "Local-only fake/static gate"
     Pass "Live Hub and TokenDance ID phases are skipped"
+    Test-PackagedDesktopReadiness $RepoRoot
 }
 
 # ═══════════════════════════════════════════════════

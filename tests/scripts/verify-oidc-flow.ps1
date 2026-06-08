@@ -104,6 +104,8 @@ Assert-True ($scriptText -notmatch 'Write-Host\s+"[^"]*\$\(\$global:VerifyAuthUr
 Assert-True ($scriptText -notmatch 'Assert-Field\s+\$authData\s+"authorization_url"') "authorization_url field is not printed through raw Assert-Field"
 Assert-True ($scriptText -match '\[string\]\$RepoRoot\s*=\s*""') "RepoRoot param default is side-effect free"
 Assert-True ($scriptText -match '\[switch\]\$LocalOnly') "verify-oidc-flow exposes a local-only fake/static gate"
+Assert-True ($scriptText -match 'function\s+Test-PackagedDesktopReadiness') "verify-oidc-flow has packaged Desktop readiness gate"
+Assert-True ($scriptText -match 'get_packaged_login_readiness') "packaged Desktop readiness command is part of the local gate"
 
 $defaultRoot = Invoke-OidcScript @(
     "-NoProfile",
@@ -123,6 +125,9 @@ $localOnly = Invoke-OidcScript @(
 )
 Assert-True ($localOnly.ExitCode -eq 0) "verify-oidc-flow local-only mode does not require live Hub or TokenDance ID" $localOnly.Output
 Assert-True ($localOnly.Output -match "Local-only fake/static gate") "verify-oidc-flow labels local-only mode" $localOnly.Output
+Assert-True ($localOnly.Output -match "Packaged Desktop loopback/keyring readiness") "local-only mode includes packaged Desktop readiness" $localOnly.Output
+Assert-True ($localOnly.Output -match "Desktop loopback readiness source is wired") "local-only mode checks Desktop loopback readiness wiring" $localOnly.Output
+Assert-True ($localOnly.Output -match "Desktop keyring readiness source is wired") "local-only mode checks Desktop keyring readiness wiring" $localOnly.Output
 Assert-True ($localOnly.Output -notmatch "Phase 1") "local-only mode skips live TokenDance ID phase" $localOnly.Output
 Assert-True ($localOnly.Output -notmatch "Phase 2") "local-only mode skips live Hub phase" $localOnly.Output
 
