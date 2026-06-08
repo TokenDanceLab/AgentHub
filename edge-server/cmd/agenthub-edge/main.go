@@ -18,6 +18,8 @@ import (
 type config struct {
 	Addr               string
 	StoreFile          string
+	StoreBackend       string
+	StoreDB            string
 	RunnerProfile      string
 	RunnerCommand      string
 	RunnerArgs         repeatedString
@@ -185,6 +187,8 @@ func buildConfig(args []string) (config, error) {
 	cfg := config{}
 	fs.StringVar(&cfg.Addr, "addr", getEnv("AGENTHUB_ADDR", "127.0.0.1:3210"), "listen address")
 	fs.StringVar(&cfg.StoreFile, "store-file", getEnv("AGENTHUB_STORE_FILE", ""), "JSON store snapshot file path")
+	fs.StringVar(&cfg.StoreBackend, "store-backend", getEnv("AGENTHUB_STORE_BACKEND", ""), "store backend; empty = legacy auto, supported: memory, file, sqlite")
+	fs.StringVar(&cfg.StoreDB, "store-db", getEnv("AGENTHUB_STORE_DB", ""), "SQLite store database path; requires --store-backend sqlite")
 	fs.StringVar(&cfg.RunnerProfile, "runner-profile", getEnv("AGENTHUB_RUNNER_PROFILE", ""), "runner profile preset; supported: agenthub-runner-mock, claude-code, codex, opencode")
 	fs.StringVar(&cfg.RunnerCommand, "runner-command", getEnv("AGENTHUB_RUNNER_COMMAND", ""), "local process executable to run for each run; empty uses the built-in mock executor")
 	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", getEnv("AGENTHUB_RUNNER_WORKDIR", ""), "working directory for --runner-command; empty inherits the edge process working directory")
@@ -218,6 +222,38 @@ func buildConfig(args []string) (config, error) {
 		return config{}, err
 	}
 	cfg.Addr = strings.TrimSpace(cfg.Addr)
+	cfg.StoreFile = strings.TrimSpace(cfg.StoreFile)
+	cfg.StoreBackend = strings.ToLower(strings.TrimSpace(cfg.StoreBackend))
+	cfg.StoreDB = strings.TrimSpace(cfg.StoreDB)
+	switch cfg.StoreBackend {
+	case "":
+		if cfg.StoreDB != "" {
+			return config{}, fmt.Errorf("--store-db requires --store-backend sqlite")
+		}
+	case "memory":
+		if cfg.StoreFile != "" {
+			return config{}, fmt.Errorf("--store-file cannot be combined with --store-backend memory")
+		}
+		if cfg.StoreDB != "" {
+			return config{}, fmt.Errorf("--store-db cannot be combined with --store-backend memory")
+		}
+	case "file":
+		if cfg.StoreFile == "" {
+			return config{}, fmt.Errorf("--store-backend file requires --store-file")
+		}
+		if cfg.StoreDB != "" {
+			return config{}, fmt.Errorf("--store-db cannot be combined with --store-backend file")
+		}
+	case "sqlite":
+		if cfg.StoreDB == "" {
+			return config{}, fmt.Errorf("--store-backend sqlite requires --store-db")
+		}
+		if cfg.StoreFile != "" {
+			return config{}, fmt.Errorf("--store-file cannot be combined with --store-backend sqlite")
+		}
+	default:
+		return config{}, fmt.Errorf("unknown --store-backend %q; supported values: memory, file, sqlite", cfg.StoreBackend)
+	}
 	// --tailscale implies --remote-mode and tailscale-aware registration with Hub
 	if cfg.Tailscale {
 		cfg.RemoteMode = true
@@ -363,12 +399,34 @@ func registeredChildAgentIDs(reg *adapters.Registry) []string {
 }
 
 func newStoreFromConfig(cfg config) (store.Repository, error) {
-	if cfg.StoreFile == "" {
+	switch cfg.StoreBackend {
+	case "sqlite":
+		repository, err := store.NewSQLite(cfg.StoreDB)
+		if err != nil {
+			return nil, fmt.Errorf("open sqlite store %q: %w", cfg.StoreDB, err)
+		}
+		return repository, nil
+	case "memory":
 		return store.New(), nil
+	case "file":
+		if cfg.StoreFile == "" {
+			return nil, fmt.Errorf("--store-backend file requires --store-file")
+		}
+		repository, err := store.NewFile(cfg.StoreFile)
+		if err != nil {
+			return nil, fmt.Errorf("open store file %q: %w", cfg.StoreFile, err)
+		}
+		return repository, nil
+	case "":
+		if cfg.StoreFile == "" {
+			return store.New(), nil
+		}
+		repository, err := store.NewFile(cfg.StoreFile)
+		if err != nil {
+			return nil, fmt.Errorf("open store file %q: %w", cfg.StoreFile, err)
+		}
+		return repository, nil
+	default:
+		return nil, fmt.Errorf("unknown store backend %q", cfg.StoreBackend)
 	}
-	repository, err := store.NewFile(cfg.StoreFile)
-	if err != nil {
-		return nil, fmt.Errorf("open store file %q: %w", cfg.StoreFile, err)
-	}
-	return repository, nil
 }
