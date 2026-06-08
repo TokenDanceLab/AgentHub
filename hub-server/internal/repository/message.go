@@ -140,11 +140,37 @@ func escapeILIKE(s string) string {
 	return s
 }
 
+func messageSearchCondition(db *gorm.DB, tableAlias, q string) (string, []interface{}) {
+	if db.Dialector.Name() == "postgres" {
+		textExpr := postgresMessageTextExpression(tableAlias)
+		return "(to_tsvector('simple', COALESCE(" + textExpr + ", '')) @@ plainto_tsquery('simple', ?) OR " + textExpr + " ILIKE ? ESCAPE '\\')",
+			[]interface{}{q, "%" + escapeILIKE(q) + "%"}
+	}
+
+	textExpr := sqliteMessageTextExpression(tableAlias)
+	return "COALESCE(" + textExpr + ", '') LIKE ? ESCAPE '\\'", []interface{}{"%" + escapeILIKE(q) + "%"}
+}
+
+func postgresMessageTextExpression(tableAlias string) string {
+	if tableAlias == "" {
+		return "content->>'text'"
+	}
+	return tableAlias + ".content->>'text'"
+}
+
+func sqliteMessageTextExpression(tableAlias string) string {
+	if tableAlias == "" {
+		return "json_extract(content, '$.text')"
+	}
+	return "json_extract(" + tableAlias + ".content, '$.text')"
+}
+
 func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]model.Message, error) {
 	var msgs []model.Message
+	searchCondition, searchArgs := messageSearchCondition(db, "", q)
 	query := db.Where("session_id = ?", sessionID).
 		Where("recalled = false").
-		Where("content->>'text' ILIKE ?", "%"+escapeILIKE(q)+"%")
+		Where(searchCondition, searchArgs...)
 	if contentType != "" {
 		query = query.Where("content_type = ?", contentType)
 	}
@@ -160,12 +186,14 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 
 func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]model.Message, error) {
 	var msgs []model.Message
+	searchCondition, searchArgs := messageSearchCondition(db, "m", q)
 	sql := `SELECT m.* FROM messages m
 		INNER JOIN session_members sm ON m.session_id = sm.session_id
 		WHERE sm.member_type = ? AND sm.member_id = ? AND sm.left_at IS NULL
 			AND m.recalled = false
-			AND m.content->>'text' ILIKE ?`
-	args := []interface{}{"user", userID, "%" + escapeILIKE(q) + "%"}
+			AND ` + searchCondition
+	args := []interface{}{"user", userID}
+	args = append(args, searchArgs...)
 
 	if contentType != "" {
 		sql += " AND m.content_type = ?"
