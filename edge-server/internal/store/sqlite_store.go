@@ -23,6 +23,17 @@ var _ RunCleaner = (*SQLiteStore)(nil)
 const sqliteSnapshotKey = "default"
 const sqliteProjectionOwnerID = "agenthub_store_snapshot"
 
+const (
+	sqliteRowKindProject  = "project"
+	sqliteRowKindThread   = "thread"
+	sqliteRowKindRun      = "run"
+	sqliteRowKindItem     = "item"
+	sqliteRowKindPin      = "pin"
+	sqliteRowKindDiff     = "diff"
+	sqliteRowKindArtifact = "artifact"
+	sqliteRowKindPreview  = "preview"
+)
+
 type SQLiteStore struct {
 	db        *sql.DB
 	store     *Store
@@ -81,8 +92,17 @@ func (s *SQLiteStore) migrate() error {
 }
 
 func (s *SQLiteStore) load() error {
+	rowSnapshot, ok, err := loadSQLiteRows(s.db)
+	if err != nil {
+		return err
+	}
+	if ok {
+		s.store.applySnapshot(rowSnapshot)
+		return nil
+	}
+
 	var payload string
-	err := s.db.QueryRow(
+	err = s.db.QueryRow(
 		`SELECT payload FROM agenthub_store_snapshots WHERE key = ?`,
 		sqliteSnapshotKey,
 	).Scan(&payload)
@@ -137,6 +157,11 @@ ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded
 		s.lastErr = fmt.Errorf("write sqlite store snapshot: %w", err)
 		return s.lastErr
 	}
+	if err := replaceSQLiteRows(tx, snapshot); err != nil {
+		_ = tx.Rollback()
+		s.lastErr = fmt.Errorf("write sqlite store rows: %w", err)
+		return s.lastErr
+	}
 	if err := replaceSQLiteRelationalProjection(tx, snapshot); err != nil {
 		_ = tx.Rollback()
 		s.lastErr = fmt.Errorf("write sqlite relational projection: %w", err)
@@ -147,6 +172,183 @@ ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded
 		return s.lastErr
 	}
 	s.lastErr = nil
+	return nil
+}
+
+func loadSQLiteRows(db *sql.DB) (fileSnapshot, bool, error) {
+	rows, err := db.Query(`SELECT row_kind, row_id, payload FROM agenthub_store_rows ORDER BY row_kind, order_index, row_id`)
+	if err != nil {
+		return fileSnapshot{}, false, fmt.Errorf("read sqlite store rows: %w", err)
+	}
+	defer rows.Close()
+
+	var snapshot fileSnapshot
+	loaded := false
+	for rows.Next() {
+		var kind, id, payload string
+		if err := rows.Scan(&kind, &id, &payload); err != nil {
+			return fileSnapshot{}, false, fmt.Errorf("scan sqlite store row: %w", err)
+		}
+		loaded = true
+		if err := applySQLiteRow(&snapshot, kind, id, payload); err != nil {
+			return fileSnapshot{}, false, err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fileSnapshot{}, false, fmt.Errorf("iterate sqlite store rows: %w", err)
+	}
+	return snapshot, loaded, nil
+}
+
+func applySQLiteRow(snapshot *fileSnapshot, kind, id, payload string) error {
+	switch kind {
+	case sqliteRowKindProject:
+		var value Project
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite project row %s: %w", id, err)
+		}
+		if snapshot.Projects == nil {
+			snapshot.Projects = map[string]Project{}
+		}
+		snapshot.Projects[id] = value
+		snapshot.ProjectOrder = append(snapshot.ProjectOrder, id)
+	case sqliteRowKindThread:
+		var value Thread
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite thread row %s: %w", id, err)
+		}
+		if snapshot.Threads == nil {
+			snapshot.Threads = map[string]Thread{}
+		}
+		snapshot.Threads[id] = value
+		snapshot.ThreadOrder = append(snapshot.ThreadOrder, id)
+	case sqliteRowKindRun:
+		var value Run
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite run row %s: %w", id, err)
+		}
+		if snapshot.Runs == nil {
+			snapshot.Runs = map[string]Run{}
+		}
+		snapshot.Runs[id] = value
+		snapshot.RunOrder = append(snapshot.RunOrder, id)
+	case sqliteRowKindItem:
+		var value Item
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite item row %s: %w", id, err)
+		}
+		if snapshot.Items == nil {
+			snapshot.Items = map[string]Item{}
+		}
+		snapshot.Items[id] = value
+		snapshot.ItemOrder = append(snapshot.ItemOrder, id)
+	case sqliteRowKindPin:
+		var value ThreadPin
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite pin row %s: %w", id, err)
+		}
+		if snapshot.Pins == nil {
+			snapshot.Pins = map[string]ThreadPin{}
+		}
+		snapshot.Pins[id] = value
+		snapshot.PinOrder = append(snapshot.PinOrder, id)
+	case sqliteRowKindDiff:
+		var value RunDiffFile
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite diff row %s: %w", id, err)
+		}
+		if snapshot.Diffs == nil {
+			snapshot.Diffs = map[string]RunDiffFile{}
+		}
+		snapshot.Diffs[id] = value
+		snapshot.DiffOrder = append(snapshot.DiffOrder, id)
+	case sqliteRowKindArtifact:
+		var value Artifact
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite artifact row %s: %w", id, err)
+		}
+		if snapshot.Artifacts == nil {
+			snapshot.Artifacts = map[string]Artifact{}
+		}
+		snapshot.Artifacts[id] = value
+		snapshot.ArtifactOrder = append(snapshot.ArtifactOrder, id)
+	case sqliteRowKindPreview:
+		var value Preview
+		if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+			return fmt.Errorf("decode sqlite preview row %s: %w", id, err)
+		}
+		if snapshot.Previews == nil {
+			snapshot.Previews = map[string]Preview{}
+		}
+		snapshot.Previews[id] = value
+		snapshot.PreviewOrder = append(snapshot.PreviewOrder, id)
+	default:
+		return fmt.Errorf("unknown sqlite store row kind %s", kind)
+	}
+	return nil
+}
+
+func decodeSQLiteRowPayload(payload string, value any) error {
+	decoder := json.NewDecoder(strings.NewReader(payload))
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("trailing data")
+	}
+	return nil
+}
+
+func replaceSQLiteRows(tx *sql.Tx, snapshot fileSnapshot) error {
+	if _, err := tx.Exec(`DELETE FROM agenthub_store_rows`); err != nil {
+		return fmt.Errorf("clear prior rows: %w", err)
+	}
+	now := nowString()
+	if err := insertSQLiteRows(tx, sqliteRowKindProject, snapshot.ProjectOrder, snapshot.Projects, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindThread, snapshot.ThreadOrder, snapshot.Threads, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindRun, snapshot.RunOrder, snapshot.Runs, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindItem, snapshot.ItemOrder, snapshot.Items, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindPin, snapshot.PinOrder, snapshot.Pins, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindDiff, snapshot.DiffOrder, snapshot.Diffs, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindArtifact, snapshot.ArtifactOrder, snapshot.Artifacts, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindPreview, snapshot.PreviewOrder, snapshot.Previews, now); err != nil {
+		return err
+	}
+	return nil
+}
+
+func insertSQLiteRows[V any](tx *sql.Tx, kind string, order []string, values map[string]V, updatedAt string) error {
+	for index, id := range normalizeOrder(order, values) {
+		payload, err := json.Marshal(values[id])
+		if err != nil {
+			return fmt.Errorf("encode %s row %s: %w", kind, id, err)
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO agenthub_store_rows (row_kind, row_id, payload, order_index, updated_at)
+VALUES (?, ?, ?, ?, ?)`,
+			kind,
+			id,
+			string(payload),
+			index,
+			updatedAt,
+		); err != nil {
+			return fmt.Errorf("write %s row %s: %w", kind, id, err)
+		}
+	}
 	return nil
 }
 
