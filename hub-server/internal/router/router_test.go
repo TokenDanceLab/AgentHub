@@ -5,10 +5,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
@@ -46,6 +50,86 @@ func TestNoRouteReturnsNotFound(t *testing.T) {
 				t.Fatalf("status = %d, want %d; body=%q", w.Code, http.StatusNotFound, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestHealthRoutesExposeCompatibleLiveAndReadyEndpoints(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		if err := rdb.Close(); err != nil {
+			t.Fatalf("redis close: %v", err)
+		}
+	})
+	cacheClient := cache.NewClient(rdb)
+
+	sqlDB, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+	})
+	mock.ExpectPing()
+	mock.ExpectPing()
+
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		SkipDefaultTransaction: true,
+		PrepareStmt:            false,
+		DisableAutomaticPing:   true,
+	})
+	if err != nil {
+		t.Fatalf("gorm open: %v", err)
+	}
+
+	healthHandler := handler.NewHealthHandler(gormDB, cacheClient, &config.DBConfig{
+		Host: "127.0.0.1",
+		Port: 9999,
+		User: "test",
+		Name: "testdb",
+	}, time.Now(), "router-test")
+
+	r := gin.New()
+	SetupRoutes(
+		r,
+		&config.Config{},
+		"",
+		cacheClient,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		healthHandler,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	)
+
+	tests := []struct {
+		path string
+		want int
+	}{
+		{path: "/health", want: http.StatusOK},
+		{path: "/health/live", want: http.StatusOK},
+		{path: "/health/ready", want: http.StatusServiceUnavailable},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			w := httptest.NewRecorder()
+
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.want {
+				t.Fatalf("status = %d, want %d; body=%q", w.Code, tt.want, w.Body.String())
+			}
+		})
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations: %v", err)
 	}
 }
 
