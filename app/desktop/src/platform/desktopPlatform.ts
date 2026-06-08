@@ -12,6 +12,7 @@ import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
 import { pickDesktopComposerAttachments } from './desktopAttachments';
 import { canOpenDesktopEvidencePreview, openDesktopEvidencePreview } from './desktopPreview';
+import { resolveDesktopTargetPreference, type DesktopTargetPreference } from './targetPreference';
 
 export const DESKTOP_FALLBACK_CONVERSATION_ID = WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID;
 export const desktopConversations: WorkbenchConversation[] = workbenchDemoRuntimeStore.getSnapshot().conversations;
@@ -30,13 +31,24 @@ export interface DesktopPlatformOptions {
   submitRun?: (request: StartRunRequest) => Promise<RunInfo>;
 }
 
-export function createDesktopPlatform(options: DesktopPlatformOptions = {}): AgentHubPlatform {
+export interface DesktopHostPort {
+  executionTargetPreference(): DesktopTargetPreference;
+}
+
+export interface DesktopPlatform extends AgentHubPlatform {
+  host: DesktopHostPort;
+}
+
+export function createDesktopPlatform(options: DesktopPlatformOptions = {}): DesktopPlatform {
   return {
     surface: 'desktop',
     capabilities: {
       localEdge: true,
       localFiles: true,
       browserPreview: true,
+    },
+    host: {
+      executionTargetPreference: resolveDesktopTargetPreference,
     },
     conversations: {
       async list(): Promise<WorkbenchConversation[]> {

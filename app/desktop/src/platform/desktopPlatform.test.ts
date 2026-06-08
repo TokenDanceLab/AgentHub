@@ -57,4 +57,39 @@ describe('createDesktopPlatform', () => {
     }));
     expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('provider');
   });
+
+  it('keeps Desktop run submission owned by the Local Edge target preference', async () => {
+    const submitRun = vi.fn().mockResolvedValue({
+      runId: 'run-edge-1',
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+      status: 'queued',
+    });
+    const platform = createDesktopPlatform({
+      activeProjectId: 'project-edge',
+      activeThreadId: 'thread-edge',
+      submitRun,
+    });
+
+    await platform.runs.submitComposerIntent({
+      conversationId: 'thread-edge',
+      text: 'use the desktop target owner',
+      mode: 'code',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    });
+
+    expect(submitRun).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+    }));
+    expect(platform.host?.executionTargetPreference?.()).toEqual(expect.objectContaining({
+      owner: 'desktop',
+      targetId: 'local-edge',
+      route: 'local-edge-api',
+    }));
+    expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('command');
+    expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('cliPath');
+  });
 });

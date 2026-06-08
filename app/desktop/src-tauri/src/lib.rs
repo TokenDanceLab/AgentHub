@@ -54,6 +54,7 @@ pub fn run() {
         .manage(QuittingState(quitting.clone()))
         .invoke_handler(tauri::generate_handler![
             commands::get_edge_status,
+            commands::get_edge_host_readiness,
             commands::get_edge_auth_token,
             commands::start_edge,
             commands::stop_edge,
