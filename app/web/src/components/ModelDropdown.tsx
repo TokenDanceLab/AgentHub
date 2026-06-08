@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
-import { ModelIcon, ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { RuntimeBrandIcon } from '@shared/workbench';
 import styles from './ModelDropdown.module.css';
 
 interface Option {
@@ -34,12 +34,17 @@ function cleanModelName(name: string): string {
   return map[name] || name;
 }
 
-function AgentDot({ name }: { name: string }) {
-  const n = name.toLowerCase();
-  if (n.includes('claude')) return <ClaudeCode size={18} />;
-  if (n.includes('codex')) return <Codex size={18} />;
-  if (n.includes('opencode')) return <OpenCode size={18} />;
-  return <ModelIcon model={name} size={18} />;
+function OptionBrandIcon({ option }: { option: Option }) {
+  return (
+    <RuntimeBrandIcon
+      kind={option.isAgent ? 'runtime' : 'model'}
+      name={option.value || option.label}
+      provider={option.group}
+      size="normal"
+      framed={false}
+      title={option.label}
+    />
+  );
 }
 
 export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight, variant = 'default' }: Props) {
@@ -148,7 +153,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
               className={`${styles.item} ${compact ? styles.itemCompact : ''} ${opt.value === value ? styles.itemActive : ''}`}
               onClick={() => handleSelect(opt.value)}>
               <span className={styles.itemIcon}>
-                {opt.isAgent ? <AgentDot name={opt.label} /> : <ModelIcon model={opt.value} size={16} />}
+                <OptionBrandIcon option={opt} />
               </span>
               <span className={styles.itemBody}>
                 <span className={styles.itemName}>{cleanModelName(opt.label)}</span>

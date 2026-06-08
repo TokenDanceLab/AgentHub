@@ -1,33 +1,25 @@
 import { useTranslation } from 'react-i18next';
-import { Network, Search, Settings2, Sparkles } from 'lucide-react';
-import { useState, useMemo, memo, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { Search, Settings2, Sparkles } from 'lucide-react';
+import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
-import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { RuntimeBrandIcon } from '@shared/workbench';
 import { EmptyState } from '@shared/ui';
 import styles from './AgentList.module.css';
 
 const RUNTIME_ORDER = ['orchestrator', 'codex', 'claude', 'opencode'];
 
-function DecorativeRuntimeIcon({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    ref.current?.querySelectorAll('title').forEach((node) => node.remove());
-  });
-
+function agentIcon(agent: AgentInfo): ReactNode {
+  const iconName = agent.runtimeId || agent.id || agent.name;
+  if (!iconName.trim()) return null;
   return (
-    <span ref={ref} className={styles.decorativeIcon} aria-hidden="true">
-      {children}
-    </span>
+    <RuntimeBrandIcon
+      kind="runtime"
+      name={iconName}
+      size="normal"
+      framed={false}
+      title={agent.name}
+    />
   );
-}
-
-function agentIcon(name: string): ReactNode {
-  const n = name.toLowerCase();
-  if (n.includes('orchestrator')) return <Network size={18} />;
-  if (n.includes('claude')) return <DecorativeRuntimeIcon><ClaudeCode size={20} /></DecorativeRuntimeIcon>;
-  if (n.includes('codex')) return <DecorativeRuntimeIcon><Codex size={20} /></DecorativeRuntimeIcon>;
-  if (n.includes('opencode')) return <DecorativeRuntimeIcon><OpenCode size={20} /></DecorativeRuntimeIcon>;
-  return null;
 }
 
 function runtimeRank(agent: AgentInfo): number {
@@ -133,7 +125,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                 disabled={a.status !== 'available'}
               >
                 <span className={styles.avatar}>
-                  {agentIcon(a.name) || <Settings2 size={17} />}
+                  {agentIcon(a) || <Settings2 size={17} />}
                   <span className={`${styles.statusDot} ${styles[`status_${a.status}`]}`} />
                 </span>
                 <div className={styles.info}>

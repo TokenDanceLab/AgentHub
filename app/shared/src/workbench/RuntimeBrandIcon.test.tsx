@@ -47,6 +47,34 @@ describe('RuntimeBrandIcon', () => {
       value: 'deepseek',
       lobeType: 'provider',
     });
+    expect(resolveRuntimeBrandIcon({ kind: 'provider', name: 'ByteDance Doubao' })).toMatchObject({
+      source: 'lobehub',
+      value: 'doubao',
+      lobeType: 'provider',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'model', name: 'glm-5.1' })).toMatchObject({
+      source: 'lobehub',
+      value: 'glm-5.1',
+      lobeType: 'model',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'model', name: 'claude-sonnet-4-20250514' })).toMatchObject({
+      source: 'lobehub',
+      value: 'claude-sonnet-4-20250514',
+      lobeType: 'model',
+    });
+  });
+
+  it('keeps internal TokenDance and AgentHub providers on branded fallbacks', () => {
+    expect(resolveRuntimeBrandIcon({ kind: 'provider', name: 'TokenDance Gateway' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'agenthub',
+      value: 'TG',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'provider', name: 'cc-switch' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'agenthub',
+      value: 'CS',
+    });
   });
 
   it('falls back to local compact icons for internal runtimes and tools', () => {
@@ -54,9 +82,18 @@ describe('RuntimeBrandIcon', () => {
       source: 'fallback',
       fallback: 'browser',
     });
+    expect(resolveRuntimeBrandIcon({ kind: 'runtime', name: 'Open Code' })).toMatchObject({
+      source: 'lobehub',
+      value: 'opencode',
+      lobeType: 'runtime',
+    });
     expect(resolveRuntimeBrandIcon({ kind: 'tool', name: 'Git Diff' })).toMatchObject({
       source: 'fallback',
       fallback: 'diff',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'tool', name: 'apply_patch' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'write',
     });
   });
 
