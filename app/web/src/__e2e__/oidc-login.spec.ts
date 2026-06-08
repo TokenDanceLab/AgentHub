@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * AgentHub Web — OIDC Login E2E Tests
@@ -104,6 +106,183 @@ function buildWebRedirectUri(): string {
   return 'http://localhost:5174/auth/tokendance/callback';
 }
 
+interface LoginE2EConfig {
+  oauthClientId: string;
+  callbackUrl: string;
+  hubBaseUrl: string;
+  webUrl: string;
+  testAccountIndicator: string;
+  artifactRoot: string;
+  browserEvidenceBoundary: 'metadata-only' | 'redacted-screenshots';
+  operatorApprovalId: string;
+  targetId?: string;
+  teamId?: string;
+}
+
+interface LoginE2EEvidenceManifest {
+  real_login_approved?: boolean;
+  remote_dispatch_approved?: boolean;
+  redaction_status?: string;
+  web_to_local_edge_direct?: boolean;
+  hub_session?: unknown;
+  target_inventory?: unknown;
+  selected_desktop_target?: unknown;
+  dispatch_request?: unknown;
+  event_replay?: unknown;
+}
+
+const LOCAL_EDGE_ORIGIN = 'http://127.0.0.1:3210';
+
+function envValue(env: NodeJS.ProcessEnv, key: string): string {
+  return env[key]?.trim() ?? '';
+}
+
+function isApproved(value: string): boolean {
+  return value === 'true';
+}
+
+function looksSecretLike(value: string): boolean {
+  return /(sk-[a-z0-9_-]{8,}|eyJ[a-z0-9_-]{12,}|bearer\s+[a-z0-9._-]{12,}|refresh[_-]?token\s*=|access[_-]?token\s*=|id[_-]?token\s*=|password\s*=|client_secret\s*=)/i.test(value);
+}
+
+function originOf(rawUrl: string): string {
+  const url = new URL(rawUrl);
+  const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+  return `${url.protocol}//${url.hostname.toLowerCase()}:${port}`;
+}
+
+function validateHttpUrl(label: string, rawUrl: string): void {
+  if (!rawUrl) {
+    throw new Error(`${label} is required`);
+  }
+  const url = new URL(rawUrl);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`${label} must be an http(s) URL`);
+  }
+}
+
+function assertNoDirectLocalEdge(label: string, rawUrl: string): void {
+  if (originOf(rawUrl) === originOf(LOCAL_EDGE_ORIGIN)) {
+    throw new Error(`${label} must not point directly at Local Edge`);
+  }
+}
+
+function assertSafeArtifactRoot(rawPath: string): void {
+  if (!rawPath) {
+    throw new Error('artifact root is required');
+  }
+  const normalized = rawPath.replace(/\\/g, '/');
+  if (!normalized.startsWith('.tmp/') && normalized !== '.tmp' && !normalized.startsWith('tmp/') && normalized !== 'tmp') {
+    throw new Error('artifact root must stay under .tmp or tmp');
+  }
+}
+
+function readRealLoginConfig(env: NodeJS.ProcessEnv = process.env): LoginE2EConfig {
+  const config: LoginE2EConfig = {
+    oauthClientId: envValue(env, 'AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID'),
+    callbackUrl: envValue(env, 'AGENTHUB_LOGIN_E2E_CALLBACK_URL'),
+    hubBaseUrl: envValue(env, 'AGENTHUB_LOGIN_E2E_HUB_BASE_URL'),
+    webUrl: envValue(env, 'AGENTHUB_LOGIN_E2E_WEB_URL'),
+    testAccountIndicator: envValue(env, 'AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR'),
+    artifactRoot: envValue(env, 'AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT'),
+    browserEvidenceBoundary: envValue(env, 'AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY') as LoginE2EConfig['browserEvidenceBoundary'],
+    operatorApprovalId: envValue(env, 'AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID'),
+  };
+  const targetId = envValue(env, 'AGENTHUB_LOGIN_E2E_TARGET_ID');
+  if (targetId) config.targetId = targetId;
+  const teamId = envValue(env, 'AGENTHUB_LOGIN_E2E_TEAM_ID');
+  if (teamId) config.teamId = teamId;
+
+  for (const [key, value] of Object.entries(config)) {
+    if (typeof value === 'string' && looksSecretLike(value)) {
+      throw new Error(`${key} contains secret-like material`);
+    }
+  }
+
+  if (!config.oauthClientId) throw new Error('OAuth client id is required');
+  validateHttpUrl('callback URL', config.callbackUrl);
+  validateHttpUrl('Hub base URL', config.hubBaseUrl);
+  validateHttpUrl('Web URL', config.webUrl);
+  assertNoDirectLocalEdge('Web URL', config.webUrl);
+  assertNoDirectLocalEdge('Hub base URL', config.hubBaseUrl);
+  if (!/(disposable|test|throwaway|sandbox)/i.test(config.testAccountIndicator)) {
+    throw new Error('test account indicator must name a disposable/test/sandbox account');
+  }
+  assertSafeArtifactRoot(config.artifactRoot);
+  if (config.browserEvidenceBoundary !== 'metadata-only' && config.browserEvidenceBoundary !== 'redacted-screenshots') {
+    throw new Error('browser evidence boundary must be metadata-only or redacted-screenshots');
+  }
+  if (!config.operatorApprovalId) throw new Error('operator approval id is required');
+  if (!isApproved(envValue(env, 'AGENTHUB_LOGIN_E2E_APPROVE_REAL_LOGIN'))) {
+    throw new Error('real login approval env is required');
+  }
+  if (!isApproved(envValue(env, 'AGENTHUB_LOGIN_E2E_APPROVE_REMOTE_DISPATCH'))) {
+    throw new Error('remote dispatch approval env is required');
+  }
+
+  return config;
+}
+
+function hasApprovedRealLoginEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  try {
+    readRealLoginConfig(env);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function redactForEvidence(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return looksSecretLike(value) ? '<redacted>' : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactForEvidence(entry));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        /(token|authorization|password|secret|cookie)/i.test(key) ? '<redacted>' : redactForEvidence(entry),
+      ]),
+    );
+  }
+  return value;
+}
+
+function validateEvidenceManifest(manifest: LoginE2EEvidenceManifest): void {
+  if (JSON.stringify(manifest).match(/(sk-[a-z0-9_-]{8,}|eyJ[a-z0-9_-]{12,}|bearer\s+[a-z0-9._-]{12,})/i)) {
+    throw new Error('evidence manifest contains secret-like material');
+  }
+  for (const field of ['hub_session', 'target_inventory', 'selected_desktop_target', 'dispatch_request', 'event_replay'] as const) {
+    if (!manifest[field]) {
+      throw new Error(`evidence manifest missing ${field}`);
+    }
+  }
+  if (manifest.real_login_approved !== true) throw new Error('evidence manifest must record real_login_approved=true');
+  if (manifest.remote_dispatch_approved !== true) throw new Error('evidence manifest must record remote_dispatch_approved=true');
+  if (manifest.redaction_status !== 'redacted') throw new Error('evidence manifest redaction_status must be redacted');
+  if (manifest.web_to_local_edge_direct === true) throw new Error('evidence manifest must not prove direct Web-to-LocalEdge access');
+}
+
+async function waitForHubAccessToken(page: import('@playwright/test').Page): Promise<string> {
+  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem('agenthub_hub_access_token')), {
+    timeout: 180_000,
+    message: 'waiting for Hub-issued session after approved TokenDanceID login',
+  }).not.toBeNull();
+  const token = await page.evaluate(() => sessionStorage.getItem('agenthub_hub_access_token'));
+  return String(token);
+}
+
+async function writeEvidenceManifest(config: LoginE2EConfig, manifest: LoginE2EEvidenceManifest): Promise<string> {
+  validateEvidenceManifest(manifest);
+  const fullRoot = path.resolve(process.cwd(), config.artifactRoot);
+  await fs.promises.mkdir(fullRoot, { recursive: true });
+  const manifestPath = path.join(fullRoot, 'login-e2e-evidence.redacted.json');
+  await fs.promises.writeFile(manifestPath, JSON.stringify(redactForEvidence(manifest), null, 2), 'utf8');
+  return manifestPath;
+}
+
 // ── Tests ────────────────────────────────────────
 
 test.describe('Web OIDC Login — Happy Path', () => {
@@ -177,15 +356,15 @@ test.describe('Web OIDC Login — Error Handling', () => {
     mockOIDCFlow(page);
 
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate((redirectUri) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'honest-state',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri: buildWebRedirectUri(),
+        redirectUri,
         createdAt: Date.now(),
       }));
-    });
+    }, buildWebRedirectUri());
 
     // Attacker-modified callback URL
     await page.goto('/auth/tokendance/callback?code=evil-code&state=attacker-state');
@@ -199,15 +378,15 @@ test.describe('Web OIDC Login — Error Handling', () => {
     mockOIDCFlow(page);
 
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate((redirectUri) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'web-expired-test',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri: buildWebRedirectUri(),
+        redirectUri,
         createdAt: Date.now() - 11 * 60 * 1000,
       }));
-    });
+    }, buildWebRedirectUri());
 
     await page.goto('/auth/tokendance/callback?code=some-code&state=web-expired-test');
     await page.waitForTimeout(2000);
@@ -244,15 +423,15 @@ test.describe('Web OIDC Login — Error Handling', () => {
     mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
 
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate((redirectUri) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'web-test-state-mock-12345',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri: buildWebRedirectUri(),
+        redirectUri,
         createdAt: Date.now(),
       }));
-    });
+    }, buildWebRedirectUri());
 
     await page.goto('/auth/tokendance/callback?code=bad-code&state=web-test-state-mock-12345');
     await page.waitForTimeout(3000);
@@ -277,5 +456,136 @@ test.describe('Web OIDC Login — Logout', () => {
 
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
+  });
+});
+
+test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
+  test('fails closed when approval env is missing', () => {
+    expect(() => readRealLoginConfig({})).toThrow(/OAuth client id is required/);
+  });
+
+  test('rejects unapproved real mode even when endpoints are present', () => {
+    expect(() => readRealLoginConfig({
+      AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
+      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+      AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
+      AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
+      AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
+      AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: '.tmp/login-e2e/approved',
+      AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
+      AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID: 'approval-123',
+    })).toThrow(/real login approval env is required/);
+  });
+
+  test('rejects unsafe token-like input without printing the token value', () => {
+    expect(() => readRealLoginConfig({
+      AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'sk-test-secret-value-123456',
+      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+      AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
+      AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
+      AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
+      AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: '.tmp/login-e2e/approved',
+      AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
+      AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID: 'approval-123',
+      AGENTHUB_LOGIN_E2E_APPROVE_REAL_LOGIN: 'true',
+      AGENTHUB_LOGIN_E2E_APPROVE_REMOTE_DISPATCH: 'true',
+    })).toThrow(/contains secret-like material/);
+  });
+
+  test('rejects direct Web-to-LocalEdge topology', () => {
+    expect(() => readRealLoginConfig({
+      AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
+      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+      AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
+      AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:3210',
+      AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
+      AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: '.tmp/login-e2e/approved',
+      AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
+      AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID: 'approval-123',
+      AGENTHUB_LOGIN_E2E_APPROVE_REAL_LOGIN: 'true',
+      AGENTHUB_LOGIN_E2E_APPROVE_REMOTE_DISPATCH: 'true',
+    })).toThrow(/Web URL must not point directly at Local Edge/);
+  });
+
+  test('rejects evidence without target inventory proof', () => {
+    expect(() => validateEvidenceManifest({
+      real_login_approved: true,
+      remote_dispatch_approved: true,
+      redaction_status: 'redacted',
+      web_to_local_edge_direct: false,
+      hub_session: { ref: 'proof:hub-session' },
+      selected_desktop_target: { ref: 'proof:selected-target' },
+      dispatch_request: { ref: 'proof:dispatch' },
+      event_replay: { ref: 'proof:event-replay' },
+    })).toThrow(/target_inventory/);
+  });
+});
+
+test.describe('Web OIDC Login — Approved Real Login And Remote Dispatch', () => {
+  test.skip(!hasApprovedRealLoginEnv(), 'real TokenDanceID login E2E requires explicit env approval and a disposable/test account');
+
+  test('proves Hub session, target inventory, selected Desktop target, dispatch, and replay evidence', async ({ page, request }) => {
+    const config = readRealLoginConfig();
+
+    await page.goto(config.webUrl, { waitUntil: 'networkidle' });
+    const loginBtn = page.getByRole('button', { name: /TokenDance|ID.*登录|登录.*TokenDance|Continue with/i });
+    if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await loginBtn.click();
+    }
+
+    const token = await waitForHubAccessToken(page);
+    expect(looksSecretLike(token)).toBe(false);
+
+    const authHeaders = { Authorization: `Bearer ${token}` };
+    const me = await request.get(`${config.hubBaseUrl}/client/auth/me`, { headers: authHeaders });
+    expect(me.ok()).toBeTruthy();
+
+    const targetInventory = await request.get(`${config.hubBaseUrl}/web/execution-targets?target_type=local_edge&pageSize=50`, {
+      headers: authHeaders,
+    });
+    expect(targetInventory.ok()).toBeTruthy();
+    const inventoryBody = await targetInventory.json();
+    const targets = Array.isArray(inventoryBody.items) ? inventoryBody.items : [];
+    expect(targets.length, 'target inventory proof is required').toBeGreaterThan(0);
+
+    const selectedTarget = targets.find((target: { id?: string; target_type?: string; is_online?: boolean; health_state?: string }) =>
+      target.id === config.targetId,
+    ) ?? targets.find((target: { target_type?: string; is_online?: boolean; health_state?: string }) =>
+      target.target_type === 'local_edge' && target.is_online === true && target.health_state !== 'offline',
+    );
+    expect(selectedTarget, 'selected Desktop target proof is required').toBeTruthy();
+
+    const teamId = config.teamId;
+    expect(teamId, 'AGENTHUB_LOGIN_E2E_TEAM_ID is required for approved remote-control dispatch evidence').toBeTruthy();
+
+    const dispatch = await request.post(`${config.hubBaseUrl}/web/agent-teams/${encodeURIComponent(String(teamId))}/runs`, {
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      data: {
+        trigger_message: 'Approved login E2E remote-control dispatch proof.',
+        target_id: selectedTarget.id,
+      },
+    });
+    expect(dispatch.ok()).toBeTruthy();
+    const dispatchBody = await dispatch.json();
+    expect(dispatchBody.target_id ?? selectedTarget.id).toBe(selectedTarget.id);
+
+    const runId = dispatchBody.id;
+    expect(runId, 'dispatch must return a run id for event replay proof').toBeTruthy();
+    const events = await request.get(`${config.hubBaseUrl}/web/agent-teams/${encodeURIComponent(String(teamId))}/runs/${encodeURIComponent(String(runId))}/events`, {
+      headers: authHeaders,
+    });
+    expect(events.ok()).toBeTruthy();
+
+    await writeEvidenceManifest(config, {
+      real_login_approved: true,
+      remote_dispatch_approved: true,
+      redaction_status: 'redacted',
+      web_to_local_edge_direct: false,
+      hub_session: { ref: 'api:/client/auth/me', status: me.status() },
+      target_inventory: { ref: 'api:/web/execution-targets?target_type=local_edge&pageSize=50', count: targets.length },
+      selected_desktop_target: { id: selectedTarget.id, target_type: selectedTarget.target_type, is_online: selectedTarget.is_online },
+      dispatch_request: { ref: `api:/web/agent-teams/${teamId}/runs`, target_id: selectedTarget.id, run_id: runId },
+      event_replay: { ref: `api:/web/agent-teams/${teamId}/runs/${runId}/events`, status: events.status() },
+    });
   });
 });
