@@ -190,6 +190,13 @@ func pendingAgentControlKey(userID, deviceID string) string {
 	return "pending_controls:" + userID + ":device:" + deviceID
 }
 
+// PendingTargetTask is a target/device-bound pending dispatch payload listed
+// from Redis before the caller explicitly acknowledges it.
+type PendingTargetTask struct {
+	TargetID string
+	Payload  string
+}
+
 // PushPendingTask pushes a task JSON to the user's offline pending queue.
 func (c *Client) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
 	key := pendingTaskKey(userID)
@@ -236,6 +243,53 @@ func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, de
 	pipe.LPush(ctx, taskKey, taskJSON)
 	pipe.Expire(ctx, taskKey, config.PendingTaskTTL)
 	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// ListPendingTargetTasksForDevice lists target-bound pending tasks for one
+// device without deleting them. Call AckPendingTargetTask only after durable
+// dispatch state has been persisted.
+func (c *Client) ListPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]PendingTargetTask, error) {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	targetIDs, err := c.rdb.SMembers(ctx, indexKey).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]PendingTargetTask, 0)
+	for _, targetID := range targetIDs {
+		key := pendingTargetTaskKey(userID, targetID, deviceID)
+		tasks, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range tasks {
+			var raw json.RawMessage
+			if json.Unmarshal([]byte(t), &raw) == nil {
+				result = append(result, PendingTargetTask{TargetID: targetID, Payload: t})
+			}
+		}
+	}
+	return result, nil
+}
+
+// AckPendingTargetTask removes one target/device-bound payload after it has
+// been durably marked dispatched.
+func (c *Client) AckPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
+	if err := c.rdb.LRem(ctx, taskKey, 1, taskJSON).Err(); err != nil {
+		return err
+	}
+	count, err := c.rdb.LLen(ctx, taskKey).Result()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		pipe := c.rdb.TxPipeline()
+		pipe.Del(ctx, taskKey)
+		pipe.SRem(ctx, indexKey, targetID)
+		_, err = pipe.Exec(ctx)
+	}
 	return err
 }
 
