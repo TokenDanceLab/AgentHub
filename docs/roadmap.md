@@ -1,8 +1,8 @@
 # AgentHub 48h P0 Roadmap
 
-> Last updated: 2026-06-09 02:12 +08:00
+> Last updated: 2026-06-09 03:11 +08:00
 > SSOT branch: `codex/p0-remote-control-integration`
-> Code baseline before this roadmap sync: `9786cb1c fix(replay): 接受 verified live 模式证据`
+> Integration baseline: `f6196b6f docs(roadmap): restore real login approval gate wording`
 
 Archived merge history remains in `docs/archive/roadmap-pre-refresh-20260608-1008.md` and `docs/archive/roadmap-full-history-20260605.md`. This file is only the active sprint board.
 
@@ -29,7 +29,7 @@ Mobile stays outside this implementation thread, but the Hub protocol must remai
 
 | Area | State | Evidence / next action |
 |---|---|---|
-| Unified P0 baseline | integrated | Branch `codex/p0-remote-control-integration`, code baseline `9786cb1c`, ahead of `origin/dev/delicious233`. |
+| Unified P0 baseline | integrated | Branch `codex/p0-remote-control-integration`, integration baseline `f6196b6f`, ahead of `origin/dev/delicious233`. |
 | Fixture remote-control E2E | integrated | `scripts/verify-remote-control-fixture-e2e.ps1` passes 107/0; negative tests cover missing refs and missing adapter callback. |
 | SDK adapter fixture | integrated | OpenCode running/completed/error fixture coverage absorbed; `go test ./internal/adapters -run SDKFixture -short -count=1` passes. |
 | Web auth/deploy readiness | integrated | Web auth root mounted; no silent demo fallback in real mode; Web build plus deploy readiness 16/16 passes after production build. |
