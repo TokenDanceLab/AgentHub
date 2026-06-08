@@ -113,7 +113,9 @@ type Reader interface {
 	ListThreadItems(threadID string) []Item
 	ListThreadPins(threadID string) []ThreadPin
 	ListRunDiffFiles(runID string) []RunDiffFile
+	GetArtifact(id string) (Artifact, bool)
 	ListArtifacts(runID string) []Artifact
+	GetPreview(id string) (Preview, bool)
 	ListPreviews(runID string) []Preview
 }
 
@@ -540,6 +542,14 @@ func (s *Store) ListArtifacts(runID string) []Artifact {
 	return artifacts
 }
 
+func (s *Store) GetArtifact(id string) (Artifact, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	artifact, ok := s.artifacts[id]
+	return artifact, ok
+}
+
 func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -587,6 +597,14 @@ func (s *Store) ListPreviews(runID string) []Preview {
 		}
 	}
 	return previews
+}
+
+func (s *Store) GetPreview(id string) (Preview, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	preview, ok := s.previews[id]
+	return preview, ok
 }
 
 func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
