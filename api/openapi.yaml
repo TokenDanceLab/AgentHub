@@ -5075,6 +5075,8 @@ components:
           description: System-managed health proof state. Clients cannot set this through create/update requests.
         auth_method:
           type: string
+          enum: [none, ssh_tunnel, tailscale_mtls, hub_jwt]
+          description: Public authentication strategy only; not a credential or bearer token.
         is_online:
           type: boolean
         last_seen_at:
@@ -5159,6 +5161,8 @@ components:
           default: local
         auth_method:
           type: string
+          enum: [none, ssh_tunnel, tailscale_mtls, hub_jwt]
+          description: Public authentication strategy only; not a credential or bearer token.
         device_id:
           type: string
           format: uuid
@@ -5203,6 +5207,8 @@ components:
           enum: [local, remote, cloud, relay]
         auth_method:
           type: string
+          enum: [none, ssh_tunnel, tailscale_mtls, hub_jwt]
+          description: Public authentication strategy only; not a credential or bearer token.
         device_id:
           type: string
           format: uuid
