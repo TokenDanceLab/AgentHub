@@ -103,7 +103,7 @@ Assert-Contains "edge-server\internal\adapters\sdk_fixture_mapper_test.go" "Test
 Assert-Contains "edge-server\internal\adapters\sdk_fixture_mapper_test.go" "TestSDKFixtureMapperOpenAIGolden" "SDK fixture mapper OpenAI golden evidence remains fixture-only"
 
 Step "Topology docs"
-Assert-Contains "docs\roadmap.md" "P0 fixture topology now proves Web authenticated Hub session can address a registered Desktop/Edge target" "roadmap records P0 remote-control auth/topology prerequisite"
+Assert-Contains "docs\roadmap.md" "login fixture topology|Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI/SDK adapter" "roadmap records P0 remote-control auth/topology prerequisite"
 Assert-Contains "docs\backend-integration-governance.md" "Login fixture topology gate" "governance records login fixture topology gate"
 Assert-Contains "docs\backend-integration-governance.md" "Desktop receives Hub dispatch -> Local Edge starts CLI adapter" "governance keeps dispatch/CLI start outside this login slice"
 Assert-Contains "docs\backend-integration-governance.md" "future real TokenDanceID/OIDC login remains approval-gated" "governance keeps real TokenDanceID/OIDC approval gate"
