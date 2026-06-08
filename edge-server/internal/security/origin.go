@@ -45,9 +45,9 @@ func IsTrustedLocalOrigin(origin string) bool {
 }
 
 // IsTrustedOrigin reports whether a browser Origin can control Edge.
-// When remoteMode is true, only localhost origins are trusted by default.
-// Remote browser origins must be passed through IsAllowedOrigin with an
-// explicit allowlist.
+// When remoteMode is true, no browser origins are trusted by default.
+// Remote browser origins must be allowed by IsAllowedOrigin with an explicit
+// allowlist.
 func IsTrustedOrigin(origin string, remoteMode bool) bool {
 	return IsAllowedOrigin(origin, remoteMode, nil)
 }
@@ -71,6 +71,9 @@ func IsAllowedOrigin(origin string, remoteMode bool, allowedOrigins []string) bo
 	host := strings.ToLower(u.Hostname())
 
 	if scheme == "tauri" {
+		if remoteMode {
+			return false
+		}
 		return host == "" || host == "localhost" || host == "tauri.localhost"
 	}
 
@@ -78,12 +81,11 @@ func IsAllowedOrigin(origin string, remoteMode bool, allowedOrigins []string) bo
 		return false
 	}
 
-	switch host {
-	case "localhost", "127.0.0.1", "::1", "tauri.localhost":
-		return true
-	}
-
 	if !remoteMode {
+		switch host {
+		case "localhost", "127.0.0.1", "::1", "tauri.localhost":
+			return true
+		}
 		return false
 	}
 
