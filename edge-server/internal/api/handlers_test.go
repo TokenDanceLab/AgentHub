@@ -434,6 +434,13 @@ func TestArtifactPreviewMetadataLookupRoutes(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("GET missing artifact status = %d, want 404 body=%s", rec.Code, rec.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/artifacts/artifact_readonly/content", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET artifact content status = %d, want 404 while content route remains planned body=%s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestProjectThreadRoutes(t *testing.T) {
