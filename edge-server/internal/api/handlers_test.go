@@ -428,6 +428,35 @@ func TestArtifactPreviewMetadataLookupRoutes(t *testing.T) {
 		t.Fatalf("preview body = %#v, want stored metadata", previewBody)
 	}
 
+	req = httptest.NewRequest(http.MethodPost, "/v1/previews/preview_readonly:stop", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST preview stop status = %d, want 202 body=%s", rec.Code, rec.Body.String())
+	}
+	var stoppedBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&stoppedBody); err != nil {
+		t.Fatalf("failed to decode stopped preview body: %v", err)
+	}
+	stoppedBody = unwrapSuccess(stoppedBody)
+	if stoppedBody["id"] != preview.ID || stoppedBody["status"] != "stopped" {
+		t.Fatalf("stopped preview body = %#v, want stopped metadata", stoppedBody)
+	}
+	if _, hasURL := stoppedBody["url"]; hasURL {
+		t.Fatalf("stopped preview url = %#v, want omitted url", stoppedBody["url"])
+	}
+	storedPreview, ok := h.Store.GetPreview(preview.ID)
+	if !ok || storedPreview.Status != "stopped" || storedPreview.URL != "" || storedPreview.CreatedAt != preview.CreatedAt || storedPreview.UpdatedAt == "" {
+		t.Fatalf("stored stopped preview = %#v, want stopped transition with preserved createdAt", storedPreview)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/previews/missing:stop", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST missing preview stop status = %d, want 404 body=%s", rec.Code, rec.Body.String())
+	}
+
 	req = httptest.NewRequest(http.MethodGet, "/v1/artifacts/missing", nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)

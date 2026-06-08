@@ -182,13 +182,17 @@ describe('workbenchReducer', () => {
         runId: 'run-1',
         url: 'http://127.0.0.1:4173',
       }),
-      event(8, 'run.finished', {
+      event(8, 'preview.stopped', {
+        previewId: 'preview-1',
+        runId: 'run-1',
+      }),
+      event(9, 'run.finished', {
         runId: 'run-1',
         finishedAt: '2026-05-24T10:02:00.000Z',
       }),
     ]);
 
-    expect(state.lastSeq).toBe(8);
+    expect(state.lastSeq).toBe(9);
     expect(state.runs[0]).toMatchObject({
       runId: 'run-1',
       status: 'finished',
@@ -205,9 +209,9 @@ describe('workbenchReducer', () => {
     );
     expect(state.previews[0]).toMatchObject({
       id: 'preview-1',
-      status: 'ready',
-      url: 'http://127.0.0.1:4173',
+      status: 'stopped',
     });
+    expect(state.previews[0]?.url).toBeUndefined();
   });
 
   it('handles cancelled runs and truncated batched stderr output', () => {
