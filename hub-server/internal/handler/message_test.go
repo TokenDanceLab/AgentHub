@@ -13,17 +13,19 @@ import (
 )
 
 type mockMessageService struct {
-	sendMsgFn     func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
-	getMsgsFn     func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
-	getMsgsIncrFn func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
-	recallFn      func(ctx context.Context, msgID, userID string) error
-	pinFn         func(ctx context.Context, userID, sessionID, msgID string) error
-	unpinFn       func(ctx context.Context, userID, sessionID, msgID string) error
-	listPinsFn    func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
-	forwardFn     func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
-	markReadFn    func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
-	searchFn      func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
-	editFn        func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
+	sendMsgFn        func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
+	getMsgsFn        func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
+	getMsgsIncrFn    func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
+	recallFn         func(ctx context.Context, msgID, userID string) error
+	pinFn            func(ctx context.Context, userID, sessionID, msgID string) error
+	unpinFn          func(ctx context.Context, userID, sessionID, msgID string) error
+	listPinsFn       func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
+	forwardFn        func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
+	markReadFn       func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
+	searchFn         func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
+	editFn           func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
+	addReactionFn    func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	removeReactionFn func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
 }
 
 func (m *mockMessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
@@ -58,6 +60,12 @@ func (m *mockMessageService) SearchMessages(ctx context.Context, userID, q, sess
 }
 func (m *mockMessageService) EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
 	return m.editFn(ctx, msgID, userID, req)
+}
+func (m *mockMessageService) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return m.addReactionFn(ctx, userID, sessionID, msgID, reaction)
+}
+func (m *mockMessageService) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return m.removeReactionFn(ctx, userID, sessionID, msgID, reaction)
 }
 
 // ── SendMessage ─────────────────────────────────────────────────────
