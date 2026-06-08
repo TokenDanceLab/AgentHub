@@ -663,6 +663,7 @@ export interface AddAgentTeamMemberRequest {
 
 export interface StartAgentTeamRunRequest {
   trigger_message: string;
+  target_id?: string;
 }
 
 interface HubEnvelope<T> {
