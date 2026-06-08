@@ -1,6 +1,6 @@
 # AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 07:00 +08:00
+> Last updated: 2026-06-09 07:10 +08:00
 > Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
 > Review branch: `origin/codex/p1-remote-control-integration` at `fd94c54d`
 > Evidence integration branch: `codex/p1-remote-control-evidence-integration`
@@ -30,7 +30,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | P1 rc.6 review branch | ready-for-review | `fd94c54d` contains the reviewed rc.6 remote-control slice set. |
 | P1 evidence integration | ready-for-review | Adds reviewed localhost product-loop fixture, Edge SDK JSON replay readiness, Desktop workspace picker UI, duplicate target preflight, Web visual smoke report, unsigned Tauri build report, and Agent SDK integration report. |
 | P1 next-wave integration | testing | Adds Edge CLI approval gate, Edge SQLite readiness report, localhost readiness-only real-services gate, Web real-mode UX closure, LobeHub runtime/tool icons, and Tauri package readiness hardening. |
-| P1 critical evidence integration | active | Includes approved SQLite unknown-migration guard, observed localhost dispatch verifier/RealTested fix, and Agent SDK product integration report. |
+| P1 critical evidence integration | active | Includes approved SQLite guard, observed dispatch verifier/fix, Agent SDK product report, and Web Projects real-mode signed-out state. |
 | Main worktree | quarantined | `D:\Code\TokenDance\AgentHub` is stale/dirty; do not implement there. |
 | Release tag | blocked | Do not push `v0.3.0-rc.6` until release approval; tag push can trigger release workflow. |
 
@@ -56,6 +56,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | Localhost real-services readiness | next-wave branch | Explicit opt-in health/topology consistency gate; always `real_tested=false` until observed Hub/Desktop dispatch evidence exists. |
 | Observed localhost dispatch verifier | critical evidence branch | Requires observed Hub/Desktop/Edge chain proof and keeps `real_tested=false` unless observed validation succeeds and approval gate is explicit. |
 | Web real-mode UX | next-wave branch | Target-required dispatch, Hub error/replay states, and non-nested team/run controls. |
+| Web Projects real-mode state | critical evidence branch | Real/signed-out mode now surfaces Hub sign-in requirement instead of silently falling back to mock projects. |
 | Runtime/tool icons | next-wave branch | Shared LobeHub icon component, fallback rendering, and Storybook coverage. |
 
 ## Operating Rules
@@ -78,8 +79,8 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | P0 | Review/merge evidence integration | controller | Do not move `v0.3.0-rc.5`; do not push `v0.3.0-rc.6` tag without release approval. |
 | P1 | Finish next-wave integration | controller | Focused gates for Edge CLI approval, localhost readiness, Web real-mode UX, shared icons, Edge SQLite readiness, and Tauri package readiness. |
 | P1 | Desktop package/install polish | controller | Integrated into next-wave; keep signing/notary/release upload as separate approval slices. |
-| P1 | Web Projects read-through | worker active | Connect Web real mode to Hub `/web/projects`; preserve demo/mock fallback; no direct Local Edge calls. |
-| P1 | Desktop Local Edge launch flow | worker active | Improve Desktop target/sidecar readiness path; no CLI bypass, no signing/release. |
+| P1 | Web Projects read-through | integrated in critical evidence | Real mode no longer silently falls back to mock projects when Hub is not ready; full Projects CRUD UX remains separate. |
+| P1 | Desktop Local Edge launch flow | worker fixing blocker | Must strictly match current Desktop `deviceId` and Hub target health before showing readiness. |
 | P1 | Tauri build/package evidence | worker active | Produce local Windows package evidence and macOS readiness notes; no signing/notary/upload. |
 | P1 | Observed real localhost dispatch | integrated in critical evidence | Requires deriving target/dispatch evidence from live Hub/Desktop path, not caller-supplied URLs; failed observed validation keeps `real_tested=false`. |
 | P1 | Login E2E approval harness | worker done, review active | TokenDanceID test client/account/env, callback URL, browser evidence, no token disclosure; approval-gated path is not real evidence until run. |
@@ -93,8 +94,8 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | Branch | Worktree | Owner | State | Integration rule |
 |---|---|---|---|---|
 | `codex/p1-critical-evidence-integration` | `.worktrees/p1-critical-evidence-integration` | controller | active, clean, pushed at `cbe9b5d5` | Append only reviewed slices; run integration gates before push. |
-| `codex/p1-web-projects-readthrough` | `.worktrees/p1-web-projects-readthrough` | worker | active | Review then cherry-pick; reject direct Local Edge calls. |
-| `codex/p1-desktop-edge-launch-flow` | `.worktrees/p1-desktop-edge-launch-flow` | worker | active | Review then cherry-pick; reject renderer-only host authority. |
+| `codex/p1-web-projects-readthrough` | `.worktrees/p1-web-projects-readthrough` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commit is in `codex/p1-critical-evidence-integration`. |
+| `codex/p1-desktop-edge-launch-flow` | `.worktrees/p1-desktop-edge-launch-flow` | worker | blocker fix active | Do not integrate until device matching, target health, and pagination risks are fixed and reviewed. |
 | `codex/p1-tauri-build-package-evidence` | `.worktrees/p1-tauri-build-package-evidence` | worker | active | Evidence/report only unless package config fix is minimal and tested. |
 | `codex/p1-edge-real-cli-evidence` | `.worktrees/p1-edge-real-cli-evidence` | worker | active | Review no-spend semantics before integration. |
 | `codex/p1-sdk-integration-product-report` | `.worktrees/p1-sdk-integration-product-report` | worker | integrated | Source branch can be cleaned only after final cleanup approval; report is in `codex/p1-critical-evidence-integration`. |
