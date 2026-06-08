@@ -215,7 +215,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 			port = 3210
 		}
 		addr := net.JoinHostPort(t.Host, fmt.Sprintf("%d", port))
-		return pingEdgeServer(ctx, addr, t.AuthMethod, t.ID, id, s.db)
+		return pingEdgeServer(ctx, addr, t.AuthCredential, t.ID, id, s.db)
 	case "hub_relay":
 		// hub_relay health depends on whether the owner has an active
 		// WebSocket connection that can relay tasks.
@@ -236,7 +236,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 
 // pingEdgeServer performs an actual HTTP GET /v1/health against the Edge Server
 // and updates the target's online status and last_seen_at accordingly.
-func pingEdgeServer(ctx context.Context, addr string, authMethod, targetID, targetOwnerID string, db *gorm.DB) error {
+func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID, targetOwnerID string, db *gorm.DB) error {
 	scheme := "http"
 	url := scheme + "://" + addr + "/v1/health"
 
@@ -247,12 +247,10 @@ func pingEdgeServer(ctx context.Context, addr string, authMethod, targetID, targ
 		return errcode.TargetNotRoutable.WithMessage("failed to build ping request: " + err.Error())
 	}
 
-	// If the target has an auth method configured, attach the token.
-	// In practice, remote SSH Edge uses SSH tunnel auth (no HTTP auth needed),
-	// Tailscale uses mTLS/networking auth (no HTTP auth needed),
-	// Cloud Edge uses Hub JWT (attached by the caller).
-	if authMethod != "" && authMethod != "none" {
-		req.Header.Set("Authorization", "Bearer "+authMethod)
+	// auth_method is a public strategy enum; only a trusted internal credential
+	// value may become an Authorization header.
+	if authCredential != "" {
+		req.Header.Set("Authorization", "Bearer "+authCredential)
 	}
 
 	resp, err := client.Do(req)
