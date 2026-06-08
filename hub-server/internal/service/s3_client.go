@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -44,6 +45,7 @@ func NewS3StorageFromConfig(ctx context.Context, cfg config.S3Config) (*S3Storag
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
+	presigner := s3.NewPresignClient(client)
 
 	return NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
@@ -75,6 +77,20 @@ func NewS3StorageFromConfig(ctx context.Context, cfg config.S3Config) (*S3Storag
 				Key:    aws.String(key),
 			})
 			return err
+		},
+		func(ctx context.Context, bucket, key, contentType, contentDisposition string, expiresIn time.Duration) (string, error) {
+			req, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+				Bucket:                     aws.String(bucket),
+				Key:                        aws.String(key),
+				ResponseContentType:        aws.String(contentType),
+				ResponseContentDisposition: aws.String(contentDisposition),
+			}, func(opts *s3.PresignOptions) {
+				opts.Expires = expiresIn
+			})
+			if err != nil {
+				return "", err
+			}
+			return req.URL, nil
 		},
 		cfg.Bucket,
 	), nil
