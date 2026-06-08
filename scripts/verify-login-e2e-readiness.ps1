@@ -176,13 +176,17 @@ function Test-AllowedArtifactRoot([string]$Path) {
     if ([string]::IsNullOrWhiteSpace($Path)) {
         return $false
     }
-    $full = [System.IO.Path]::GetFullPath((Resolve-RepoPath $Path))
+    $full = [System.IO.Path]::GetFullPath((Resolve-RepoPath $Path)).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
     $allowed = @(
-        [System.IO.Path]::GetFullPath((Join-Path $RepoRoot ".tmp")),
-        [System.IO.Path]::GetFullPath((Join-Path $RepoRoot "tmp"))
+        [System.IO.Path]::GetFullPath((Join-Path $RepoRoot ".tmp")).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar),
+        [System.IO.Path]::GetFullPath((Join-Path $RepoRoot "tmp")).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
     )
     foreach ($root in $allowed) {
-        if ($full.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+        if ($full.Equals($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+        $rootWithSeparator = $root + [System.IO.Path]::DirectorySeparatorChar
+        if ($full.StartsWith($rootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)) {
             return $true
         }
     }
@@ -245,8 +249,12 @@ function Test-RedactedPlaceholder([object]$Value) {
     return $false
 }
 
-function Test-SensitiveFieldName([string]$Name) {
-    return $Name -match '(?i)^(access_token|refresh_token|id_token|token|secret|authorization|cookie|password|client_secret|client-secret)$'
+function Test-SensitiveFieldName([string]$Name, [string]$ParentPath) {
+    if ($ParentPath -eq "$" -and $Name.ToLowerInvariant() -eq "hub_session") {
+        return $false
+    }
+    $normalized = ([regex]::Replace($Name.ToLowerInvariant(), '[^a-z0-9]', ''))
+    return $normalized -match '(token|secret|password|cookie|authorization|session)'
 }
 
 function Assert-ManifestSafety {
@@ -278,7 +286,7 @@ function Assert-ManifestSafety {
     if ($Node -is [System.Collections.IDictionary]) {
         foreach ($key in $Node.Keys) {
             $value = $Node[$key]
-            if ((Test-SensitiveFieldName ([string]$key)) -and -not (Test-RedactedPlaceholder $value)) {
+            if ((Test-SensitiveFieldName ([string]$key) $Path) -and -not (Test-RedactedPlaceholder $value)) {
                 Add-Failure "evidence manifest contains unredacted sensitive field at $Path.$key"
             }
             Assert-ManifestSafety -Node $value -Path "$Path.$key"
@@ -288,7 +296,7 @@ function Assert-ManifestSafety {
 
     if ($Node -is [pscustomobject]) {
         foreach ($prop in $Node.PSObject.Properties) {
-            if ((Test-SensitiveFieldName $prop.Name) -and -not (Test-RedactedPlaceholder $prop.Value)) {
+            if ((Test-SensitiveFieldName $prop.Name $Path) -and -not (Test-RedactedPlaceholder $prop.Value)) {
                 Add-Failure "evidence manifest contains unredacted sensitive field at $Path.$($prop.Name)"
             }
             Assert-ManifestSafety -Node $prop.Value -Path "$Path.$($prop.Name)"

@@ -204,8 +204,10 @@ function isRedactedPlaceholder(value: unknown): boolean {
   return false;
 }
 
-function isSensitiveEvidenceKey(key: string): boolean {
-  return /^(access_token|refresh_token|id_token|token|secret|authorization|cookie|password|client_secret|client-secret)$/i.test(key);
+function isSensitiveEvidenceKey(key: string, parentPath = ''): boolean {
+  if (parentPath === '$' && key.toLowerCase() === 'hub_session') return false;
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ['token', 'secret', 'password', 'cookie', 'authorization', 'session'].some((term) => normalized.includes(term));
 }
 
 function validateEvidenceSafety(value: unknown, pathLabel = '$'): void {
@@ -223,7 +225,7 @@ function validateEvidenceSafety(value: unknown, pathLabel = '$'): void {
   }
   if (value && typeof value === 'object') {
     for (const [key, entry] of Object.entries(value)) {
-      if (isSensitiveEvidenceKey(key) && !isRedactedPlaceholder(entry)) {
+      if (isSensitiveEvidenceKey(key, pathLabel) && !isRedactedPlaceholder(entry)) {
         throw new Error(`evidence manifest contains unredacted sensitive field at ${pathLabel}.${key}`);
       }
       validateEvidenceSafety(entry, `${pathLabel}.${key}`);
@@ -306,10 +308,10 @@ function redactForEvidence(value: unknown): unknown {
 }
 
 function validateEvidenceManifest(manifest: LoginE2EEvidenceManifest): void {
+  validateEvidenceSafety(manifest);
   if (JSON.stringify(manifest).match(/(sk-[a-z0-9_-]{8,}|eyJ[a-z0-9_-]{12,}|bearer\s+[a-z0-9._-]{12,})/i)) {
     throw new Error('evidence manifest contains secret-like material');
   }
-  validateEvidenceSafety(manifest);
   for (const field of ['hub_session', 'target_inventory', 'selected_desktop_target', 'dispatch_request', 'event_replay'] as const) {
     if (!manifest[field]) {
       throw new Error(`evidence manifest missing ${field}`);
@@ -581,18 +583,20 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   });
 
   test('rejects path traversal artifact roots', () => {
-    expect(() => readRealLoginConfig({
-      AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
-      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
-      AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
-      AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
-      AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
-      AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: '.tmp/../docs/audit',
-      AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
-      AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID: 'approval-123',
-      AGENTHUB_LOGIN_E2E_APPROVE_REAL_LOGIN: 'true',
-      AGENTHUB_LOGIN_E2E_APPROVE_REMOTE_DISPATCH: 'true',
-    })).toThrow(/artifact root must stay under/);
+    for (const artifactRoot of ['.tmp/../docs/audit', '.tmpx/login-e2e', 'tmp-old/login-e2e', path.resolve(process.cwd(), '.tmp-sibling/login-e2e')]) {
+      expect(() => readRealLoginConfig({
+        AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
+        AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+        AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
+        AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
+        AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
+        AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: artifactRoot,
+        AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
+        AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID: 'approval-123',
+        AGENTHUB_LOGIN_E2E_APPROVE_REAL_LOGIN: 'true',
+        AGENTHUB_LOGIN_E2E_APPROVE_REMOTE_DISPATCH: 'true',
+      })).toThrow(/artifact root must stay under/);
+    }
   });
 
   test('rejects evidence without target inventory proof', () => {
@@ -609,17 +613,29 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   });
 
   test('rejects opaque sensitive token fields in evidence', () => {
-    expect(() => validateEvidenceManifest({
-      real_login_approved: true,
-      remote_dispatch_approved: true,
-      redaction_status: 'redacted',
-      web_to_local_edge_direct: false,
-      hub_session: { access_token: 'opaque-session-token-value' },
-      target_inventory: { ref: 'proof:target-inventory' },
-      selected_desktop_target: { ref: 'proof:selected-target' },
-      dispatch_request: { ref: 'proof:dispatch' },
-      event_replay: { ref: 'proof:event-replay' },
-    })).toThrow(/sensitive field/);
+    const sensitiveEvidenceCases: Array<[string, string]> = [
+      ['access_token', 'opaque-session-token-value'],
+      ['accessToken', 'opaque-session-token-value'],
+      ['refreshToken', 'opaque-session-token-value'],
+      ['idToken', 'opaque-session-token-value'],
+      ['clientSecret', 'opaque-client-secret'],
+      ['authorizationHeader', 'Bearer opaque-header-value'],
+      ['session_token', 'opaque-session-token-value'],
+      ['auth-cookie', 'opaque-cookie-value'],
+    ];
+    for (const [key, value] of sensitiveEvidenceCases) {
+      expect(() => validateEvidenceManifest({
+        real_login_approved: true,
+        remote_dispatch_approved: true,
+        redaction_status: 'redacted',
+        web_to_local_edge_direct: false,
+        hub_session: { [key]: value },
+        target_inventory: { ref: 'proof:target-inventory' },
+        selected_desktop_target: { ref: 'proof:selected-target' },
+        dispatch_request: { ref: 'proof:dispatch' },
+        event_replay: { ref: 'proof:event-replay' },
+      })).toThrow(/sensitive field/);
+    }
   });
 
   test('rejects direct Local Edge URLs in evidence proof fields', () => {

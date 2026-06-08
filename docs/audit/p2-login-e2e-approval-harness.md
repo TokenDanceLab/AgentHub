@@ -52,9 +52,9 @@ The test script covers:
 - unsafe token-like input output;
 - unapproved real mode;
 - direct Web-to-LocalEdge URL, including `localhost`, `[::1]`, and `127.0.0.0/8` aliases on the configured Local Edge port;
-- path traversal artifact roots such as `.tmp/../docs/audit`;
+- path traversal and sibling-prefix artifact roots such as `.tmp/../docs/audit`, `.tmpx`, `tmp-old`, and absolute sibling paths;
 - missing target inventory proof.
-- opaque sensitive evidence fields such as `access_token`, `refresh_token`, `id_token`, `token`, `secret`, and `authorization` unless the value is an explicit redaction placeholder;
+- opaque sensitive evidence fields such as `access_token`, `accessToken`, `refreshToken`, `idToken`, `session_token`, `clientSecret`, `authorizationHeader`, `token`, `secret`, `password`, `cookie`, and `authorization` variants unless the value is an explicit redaction placeholder;
 - direct Local Edge URLs embedded in evidence proof fields, even when `web_to_local_edge_direct=false`.
 
 Verification:
