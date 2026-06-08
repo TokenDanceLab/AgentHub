@@ -22,6 +22,17 @@ func newExecutionTargetTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(`
+		CREATE TABLE devices (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			device_type TEXT NOT NULL,
+			app_version TEXT DEFAULT '',
+			capabilities TEXT DEFAULT '[]',
+			last_active_at DATETIME NOT NULL,
+			created_at DATETIME
+		)
+	`).Error)
+	require.NoError(t, db.Exec(`
 		CREATE TABLE execution_targets (
 			id TEXT PRIMARY KEY,
 			owner_id TEXT NOT NULL,
@@ -45,6 +56,18 @@ func newExecutionTargetTestDB(t *testing.T) *gorm.DB {
 		)
 	`).Error)
 	return db
+}
+
+func seedDevice(t *testing.T, db *gorm.DB, id, ownerID, deviceType string) {
+	t.Helper()
+	require.NoError(t, db.Create(&model.Device{
+		ID:           id,
+		UserID:       ownerID,
+		DeviceType:   deviceType,
+		AppVersion:   "0.2.0",
+		Capabilities: `["local_edge"]`,
+		LastActiveAt: time.Now(),
+	}).Error)
 }
 
 func seedExecutionTarget(t *testing.T, db *gorm.DB, id, ownerID string) {
@@ -198,6 +221,24 @@ func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
 	require.Equal(t, "unknown", target.HealthState)
 }
 
+func TestExecutionTargetCreateRejectsForeignDeviceBinding(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedDevice(t, db, "44444444-4444-4444-8444-444444444444", "owner-2", "desktop")
+	svc := NewExecutionTargetService(db)
+	deviceID := "44444444-4444-4444-8444-444444444444"
+
+	_, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{
+		Name:               "Forged binding",
+		DeviceID:           &deviceID,
+		WorkspaceAllowlist: `[]`,
+	})
+	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Count(&count).Error)
+	require.Zero(t, count)
+}
+
 func TestExecutionTargetCreateRejectsClientManagedHealthState(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	svc := NewExecutionTargetService(db)
@@ -228,6 +269,23 @@ func TestExecutionTargetUpdateRejectsClientManagedHealthState(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
 	require.Equal(t, "Owner target", target.Name)
 	require.Equal(t, "unknown", target.HealthState)
+}
+
+func TestExecutionTargetUpdateRejectsForeignDeviceBinding(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedExecutionTarget(t, db, "target-1", "owner-1")
+	seedDevice(t, db, "55555555-5555-4555-8555-555555555555", "owner-2", "desktop")
+	svc := NewExecutionTargetService(db)
+	deviceID := "55555555-5555-4555-8555-555555555555"
+
+	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
+		DeviceID: &deviceID,
+	})
+	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
+	require.Nil(t, target.DeviceID)
 }
 
 func TestExecutionTargetRejectsInvalidWorkspaceAllowlist(t *testing.T) {
@@ -285,6 +343,7 @@ func TestExecutionTargetUpdateRejectsInvalidJSONLikeFields(t *testing.T) {
 func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineTarget(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	svc := NewExecutionTargetService(db)
+	seedDevice(t, db, "11111111-1111-4111-8111-111111111111", "owner-1", "desktop")
 	device := &model.Device{
 		ID:           "11111111-1111-4111-8111-111111111111",
 		UserID:       "owner-1",
@@ -305,16 +364,128 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineT
 	require.NotNil(t, target.LastSeenAt)
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
 	require.JSONEq(t, `{"device_capabilities":["local_edge","agent.dispatch","agent.control"]}`, target.Capabilities)
-	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.0"}`, target.Metadata)
+	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.0","health_basis":"desktop_check_in_freshness_not_ws_route"}`, target.Metadata)
 
 	var count int64
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Count(&count).Error)
 	require.Equal(t, int64(1), count)
 }
 
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRejectsAmbiguousDuplicateTargets(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	deviceID := "13131313-1313-4131-8131-131313131313"
+	seedDevice(t, db, deviceID, "owner-1", "desktop")
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-by-device",
+		OwnerID:            "owner-1",
+		DeviceID:           &deviceID,
+		Name:               "Manual desktop target",
+		TargetType:         "local_edge",
+		WorkspaceAllowlist: `[]`,
+		TrustLevel:         "local",
+		HealthState:        "healthy",
+		Capabilities:       `{}`,
+		Metadata:           `{}`,
+	}).Error)
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-by-name",
+		OwnerID:            "owner-1",
+		Name:               "Desktop Local Edge 13131313",
+		TargetType:         "local_edge",
+		WorkspaceAllowlist: `[]`,
+		TrustLevel:         "local",
+		HealthState:        "offline",
+		Capabilities:       `{}`,
+		Metadata:           `{}`,
+	}).Error)
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
+		ID:         deviceID,
+		UserID:     "owner-1",
+		DeviceType: "desktop",
+	})
+	require.ErrorIs(t, err, errcode.UserInvalidParam)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("owner_id = ? AND target_type = ?", "owner-1", "local_edge").Count(&count).Error)
+	require.Equal(t, int64(2), count)
+}
+
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesGeneratedNameTarget(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	deviceID := "12121212-1212-4121-8121-121212121212"
+	seedDevice(t, db, deviceID, "owner-1", "desktop")
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-generated-name",
+		OwnerID:            "owner-1",
+		Name:               "Desktop Local Edge 12121212",
+		TargetType:         "local_edge",
+		WorkspaceAllowlist: `["/old"]`,
+		TrustLevel:         "local",
+		HealthState:        "offline",
+		IsOnline:           false,
+		Capabilities:       `{}`,
+		Metadata:           `{}`,
+	}).Error)
+	svc := NewExecutionTargetService(db)
+
+	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
+		ID:           deviceID,
+		UserID:       "owner-1",
+		DeviceType:   "desktop",
+		AppVersion:   "0.2.1",
+		Capabilities: `["local_edge"]`,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "target-generated-name", target.ID)
+	require.NotNil(t, target.DeviceID)
+	require.Equal(t, deviceID, *target.DeviceID)
+	require.True(t, target.IsOnline)
+	require.Equal(t, "healthy", target.HealthState)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("owner_id = ? AND target_type = ?", "owner-1", "local_edge").Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRejectsGeneratedNameBoundToAnotherDevice(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	deviceID := "14141414-1414-4141-8141-141414141414"
+	otherDeviceID := "14141414-9999-4999-8999-999999999999"
+	seedDevice(t, db, deviceID, "owner-1", "desktop")
+	seedDevice(t, db, otherDeviceID, "owner-1", "desktop")
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-name-collision",
+		OwnerID:            "owner-1",
+		DeviceID:           &otherDeviceID,
+		Name:               "Desktop Local Edge 14141414",
+		TargetType:         "local_edge",
+		WorkspaceAllowlist: `[]`,
+		TrustLevel:         "local",
+		HealthState:        "healthy",
+		Capabilities:       `{}`,
+		Metadata:           `{}`,
+	}).Error)
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
+		ID:         deviceID,
+		UserID:     "owner-1",
+		DeviceType: "desktop",
+	})
+	require.ErrorIs(t, err, errcode.UserInvalidParam)
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-name-collision").First(&target).Error)
+	require.NotNil(t, target.DeviceID)
+	require.Equal(t, otherDeviceID, *target.DeviceID)
+}
+
 func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesDuplicateOfflineTarget(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	deviceID := "22222222-2222-4222-8222-222222222222"
+	seedDevice(t, db, deviceID, "owner-1", "desktop")
 	oldSeenAt := time.Now().Add(-time.Hour)
 	require.NoError(t, db.Create(&model.ExecutionTarget{
 		ID:                 "target-existing",
@@ -347,16 +518,17 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesDuplicateOffline
 	require.True(t, target.LastSeenAt.After(oldSeenAt))
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
 	require.JSONEq(t, `{"device_capabilities":["local_edge"]}`, target.Capabilities)
-	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.1"}`, target.Metadata)
+	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.1","health_basis":"desktop_check_in_freshness_not_ws_route"}`, target.Metadata)
 
 	var count int64
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("owner_id = ? AND device_id = ?", "owner-1", deviceID).Count(&count).Error)
 	require.Equal(t, int64(1), count)
 }
 
-func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRejectsCrossOwnerDeviceBinding(t *testing.T) {
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceIgnoresForgedForeignBindingForRightfulOwner(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	deviceID := "33333333-3333-4333-8333-333333333333"
+	seedDevice(t, db, deviceID, "owner-2", "desktop")
 	require.NoError(t, db.Create(&model.ExecutionTarget{
 		ID:                 "target-owner-1",
 		OwnerID:            "owner-1",
@@ -372,14 +544,18 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRejectsCrossOwnerDeviceBi
 	}).Error)
 	svc := NewExecutionTargetService(db)
 
-	_, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
+	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
 		ID:         deviceID,
 		UserID:     "owner-2",
 		DeviceType: "desktop",
 	})
-	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+	require.NoError(t, err)
+	require.Equal(t, "owner-2", target.OwnerID)
+	require.NotEqual(t, "target-owner-1", target.ID)
+	require.NotNil(t, target.DeviceID)
+	require.Equal(t, deviceID, *target.DeviceID)
 
 	var count int64
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("device_id = ?", deviceID).Count(&count).Error)
-	require.Equal(t, int64(1), count)
+	require.Equal(t, int64(2), count)
 }
