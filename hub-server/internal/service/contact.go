@@ -217,7 +217,8 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "friend.accepted", Payload: map[string]interface{}{
 			"friendship_id": r.ID,
-			"user_id":       userID,
+			"user_id":       r.UserID,
+			"accepter_id":   userID,
 		}})
 	}
 	return nil
