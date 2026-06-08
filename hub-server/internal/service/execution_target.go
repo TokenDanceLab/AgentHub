@@ -94,33 +94,44 @@ func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Con
 			return err
 		}
 
-		var matches []model.ExecutionTarget
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("owner_id = ? AND target_type = ? AND deleted_at IS NULL AND (device_id = ? OR name = ?)", device.UserID, "local_edge", device.ID, name).
-			Order("id ASC").
-			Find(&matches).Error; err != nil {
+		matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
+		if err != nil {
 			return err
 		}
 
-		if len(matches) > 1 {
-			return errcode.UserInvalidParam.WithMessage("multiple local_edge targets match desktop device registration")
+		target, found, err := desktopLocalEdgeTargetFromMatches(matches, device.ID)
+		if err != nil {
+			return err
 		}
-
-		target := model.ExecutionTarget{
-			OwnerID:    device.UserID,
-			TargetType: "local_edge",
-		}
-		if len(matches) == 1 {
-			target = matches[0]
-			if target.DeviceID != nil && *target.DeviceID != device.ID {
-				return errcode.UserInvalidParam.WithMessage("generated local_edge target name is bound to another desktop device")
+		if !found {
+			target = model.ExecutionTarget{
+				OwnerID:    device.UserID,
+				TargetType: "local_edge",
 			}
 		}
 
 		refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata, now)
 		if target.ID == "" {
-			if err := repository.CreateExecutionTarget(tx, &target); err != nil {
+			created, err := repository.CreateExecutionTargetIfNotExists(tx, &target)
+			if err != nil {
 				return err
+			}
+			if !created {
+				matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
+				if err != nil {
+					return err
+				}
+				target, found, err = desktopLocalEdgeTargetFromMatches(matches, device.ID)
+				if err != nil {
+					return err
+				}
+				if !found {
+					return errcode.UserInvalidParam.WithMessage("local_edge target conflict could not be resolved")
+				}
+				refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata, now)
+				if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
+					return err
+				}
 			}
 		} else if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
 			return err
@@ -133,6 +144,32 @@ func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Con
 		return nil, err
 	}
 	return result, nil
+}
+
+func findDesktopLocalEdgeTargetMatches(tx *gorm.DB, ownerID, deviceID, name string) ([]model.ExecutionTarget, error) {
+	var matches []model.ExecutionTarget
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("owner_id = ? AND target_type = ? AND deleted_at IS NULL AND (device_id = ? OR name = ?)", ownerID, "local_edge", deviceID, name).
+		Order("id ASC").
+		Find(&matches).Error; err != nil {
+		return nil, err
+	}
+	return matches, nil
+}
+
+func desktopLocalEdgeTargetFromMatches(matches []model.ExecutionTarget, deviceID string) (model.ExecutionTarget, bool, error) {
+	if len(matches) > 1 {
+		return model.ExecutionTarget{}, false, errcode.UserInvalidParam.WithMessage("multiple local_edge targets match desktop device registration")
+	}
+	if len(matches) == 0 {
+		return model.ExecutionTarget{}, false, nil
+	}
+
+	target := matches[0]
+	if target.DeviceID != nil && *target.DeviceID != deviceID {
+		return model.ExecutionTarget{}, false, errcode.UserInvalidParam.WithMessage("generated local_edge target name is bound to another desktop device")
+	}
+	return target, true, nil
 }
 
 func refreshDesktopLocalEdgeTarget(target *model.ExecutionTarget, device *model.Device, name, capabilities, metadata string, now time.Time) {

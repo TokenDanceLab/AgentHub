@@ -151,6 +151,19 @@ func TestMigration0045MessageReactionsCreatesUniqueUserReactionTable(t *testing.
 	requireSQL(t, normalizedDown, "drop table if exists message_reactions")
 }
 
+func TestMigration0047ExecutionTargetsCreatesActiveLocalEdgeDeviceUniqueness(t *testing.T) {
+	up := readMigration(t, "0047_execution_target_local_edge_uniqueness.up.sql")
+	down := readMigration(t, "0047_execution_target_local_edge_uniqueness.down.sql")
+
+	normalizedUp := normalizeSQL(up)
+	requireSQL(t, normalizedUp, "create unique index if not exists idx_execution_targets_active_local_edge_device_unique")
+	requireSQL(t, normalizedUp, "on execution_targets (owner_id, target_type, device_id)")
+	requireSQL(t, normalizedUp, "where deleted_at is null and target_type = 'local_edge' and device_id is not null")
+
+	normalizedDown := normalizeSQL(down)
+	requireSQL(t, normalizedDown, "drop index if exists idx_execution_targets_active_local_edge_device_unique")
+}
+
 func readMigration(t *testing.T, filename string) string {
 	t.Helper()
 
