@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 19:33 +08:00
+> 最后更新：2026-06-08 20:12 +08:00
 > 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
@@ -20,9 +20,9 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 主工作树 | `D:\Code\TokenDance\AgentHub @ a4b27d63`，behind 23 且 dirty；只读，不直接 pull/merge/stage |
 | 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
 | 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、ExecutionTarget contract、Edge pins/store/event contracts、Edge SQLite opt-in + relational migration、TeamRun fixture/dry evidence gate、Artifact/Diff/Preview read-only Edge 前置、runtime evidence 写入 |
-| 当前短切片 | `codex/artifact-lifecycle-next`：只补 Edge read-only metadata dereference：`GET /v1/artifacts/{artifactId}`、`GET /v1/previews/{previewId}`；不做 content/apply/discard、preview start/stop、Hub artifact store、Web 直连 Edge 或真实 CLI/model gate |
+| 当前短切片 | `codex/artifact-content-contract`：artifact content readiness proposal/test-only；确认当前 Edge store 只有 sanitized metadata path，没有可安全解析的 content source，因此 `GET /v1/artifacts/{artifactId}/content` 继续 planned/404；不做 content/apply/discard、preview start/stop、Hub artifact store、Web 直连 Edge 或真实 CLI/model gate |
 | 仍未完成 | Desktop target preference/Tauri host 集成、登录端到端、Tauri 正式签名发布与 macOS 打包、TeamRun 真实演示、Artifact/Diff/Preview preview lifecycle 与 artifact content/apply/discard 生产化、Projects mutation UI、D1b/D2/D3 gate |
-| 当前候选切片 | `codex/desktop-target-tauri-host`：Desktop-owned Local Edge target preference 与 Tauri host readiness，待 rebase/verify/merge；`codex/runtime-evidence-inspector`：shared RightInspector read-only 消费 Edge runtime evidence snapshot，已 rebase 到 `9bf674f0` 后补 review blocker 修复，并通过 focused gate 复验，待 review/merge；`codex/artifact-lifecycle-next`：Edge artifact/preview metadata lookup，待 focused gate/merge |
+| 当前候选切片 | `codex/desktop-target-tauri-host`：Desktop-owned Local Edge target preference 与 Tauri host readiness，待 rebase/verify/merge；`codex/runtime-evidence-inspector`：shared RightInspector read-only 消费 Edge runtime evidence snapshot，已 rebase 到 `9bf674f0` 后补 review blocker 修复，并通过 focused gate 复验，待 review/merge；`codex/artifact-lifecycle-next`：Edge artifact/preview metadata lookup，待 focused gate/merge；`codex/artifact-content-contract`：proposal/test-only content readiness |
 | 外部依赖 | 后端旧整合线合并由 backend merge Agent 负责；本路线图只记录其状态和对后续切片的影响，不接管合并 |
 
 ## P0 执行顺序
@@ -35,7 +35,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；已补 Hub state expiry/replay、OIDC `-LocalOnly` gate 和 packaged Desktop loopback/keyring readiness；真实 packaged 登录仍只做 proposal/gate | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
 | 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；`codex/tauri-package-readiness` 已补版本对齐、独立 release readiness workflow、updater metadata gate 和 generated artifact ignore gate；`codex/tauri-installer-smoke` 补 Windows installer smoke preflight，仅检查本地工具链、sidecar/NSIS/portable 输入和 ignored 输出位置，不跑完整签名发布；正式签名发布仍后置 | `scripts/verify-tauri-package-readiness.ps1`、`scripts/verify-tauri-installer-smoke.ps1`、installer artifact 检查、release dry policy |
 | 6 | ByteDance / TeamRun demo | dry fixture evidence pack 已合入；真实 IM 群聊、多 Agent 调度、证据 inspector、录屏脚本仍待 runtime/UI 证据 | readiness script、manifest、截图/视频/接口导出 |
-| 7 | Artifact/Diff/Preview 生产化 | read-only Edge API 首片已补 `GET /v1/runs/{runId}/diff`、`GET /v1/artifacts`、`GET /v1/previews`，runtime evidence 写入已合入；当前短切片补 artifact/preview metadata lookup，不做 preview start/stop 或 artifact content/apply/discard | Edge API、shared inspector、Desktop smoke；Web 仍不直连 Edge |
+| 7 | Artifact/Diff/Preview 生产化 | read-only Edge API 首片已补 `GET /v1/runs/{runId}/diff`、`GET /v1/artifacts`、`GET /v1/previews`，runtime evidence 写入与 metadata lookup 已合入候选；artifact content readiness 已确认缺 content source 字段与 run/workspace root 绑定，先保持 planned/404，不做 preview start/stop 或 artifact content/apply/discard | Edge API、shared inspector、Desktop smoke；Web 仍不直连 Edge |
 | 8 | Projects create/update UI | Web/Hub only；不做 delete；排在存储/安装/登录之后 | Web focused、shared focused、Web typecheck、Web boundary |
 | 9 | Release signing / macOS | Windows Authenticode；macOS arm64 dry validation 另起 proposal 后再做 Developer ID signing、entitlements、notarization、staple | `Get-AuthenticodeSignature`、`codesign`、`spctl`、`stapler` |
 | 10 | D1b/D2/D3 gates | 先 policy；D3 继续 opt-in | CI policy、release review、artifact redaction |
@@ -84,6 +84,6 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
    - `codex/login-real-readiness-gate` 补 `scripts/verify-packaged-login-real-readiness.ps1` dry gate 和脚本测试，明确 fake/local、packaged readiness、future real E2E 三层；真实 packaged login 仍 blocked，除非另行批准浏览器登录窗口、测试 OAuth client、测试账号和 Hub 测试环境。
 3. Desktop Edge mapper 首切片已合入：已接入 Edge agents/model catalog/Local Edge target mapper，并在 review 修正 StartRunRequest adapter id 映射、移除 provider 提交字段、阻断 Desktop live 空线程/demo transcript fallback；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge target preference、Tauri host readiness command 和 sidecar launch args 测试，安装包联调后置。
 4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness；当前 installer smoke 只记录 macOS arm64 unsigned compatibility note，不跑 `codesign`、`notarytool` 或 `stapler`。
-5. `codex/runtime-evidence-inspector` 已补 shared RightInspector read-only snapshot 消费和 Desktop 既有 Edge evidence hook 接线，并修复 raw run id 选择、Desktop App v4 测试 harness、artifact metadata 非交互行与 preview 切 tab 行为；`codex/artifact-lifecycle-next` 只补 Edge artifact/preview metadata lookup；两者都不碰 preview start/stop、artifact apply/discard/content、Web 直连 Edge、Hub route 或真实 CLI/model。
+5. `codex/runtime-evidence-inspector` 已补 shared RightInspector read-only snapshot 消费和 Desktop 既有 Edge evidence hook 接线，并修复 raw run id 选择、Desktop App v4 测试 harness、artifact metadata 非交互行与 preview 切 tab 行为；`codex/artifact-lifecycle-next` 只补 Edge artifact/preview metadata lookup；`codex/artifact-content-contract` 只记录 content readiness blocker 并用测试保持 planned/404。三者都不碰 preview start/stop、artifact apply/discard、Web 直连 Edge、Hub route 或真实 CLI/model。
 6. TeamRun 下一步从 dry fixture evidence 升级到真实 runtime/UI 证据，但仍不跑未批准的 D3 real CLI/model gate。
 7. Worker F LobeHub icon slice is ready for review on `codex/lobe-icons-runtime-branding` after rebase to current `origin/dev/delicious233`: focused registry/render tests, icon-governance test, Desktop typecheck, Web typecheck, and diff check are the completed gates; full shared `lint` remains blocked by pre-existing shared test/story/module issues unrelated to this icon slice.
