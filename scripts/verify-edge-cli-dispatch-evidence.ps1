@@ -107,16 +107,77 @@ function Test-ObservedManifest {
     return $manifest
 }
 
-function Get-ManifestBool {
+function Get-RequiredManifestProperty {
     param(
         [object]$Manifest,
         [string]$Name
     )
+
     $prop = $Manifest.PSObject.Properties[$Name]
     if ($null -eq $prop) {
+        Block "observed manifest $Name is missing"
+        return $null
+    }
+    return $prop.Value
+}
+
+function Test-RequiredManifestBoolTrue {
+    param(
+        [object]$Manifest,
+        [string]$Name
+    )
+
+    $value = Get-RequiredManifestProperty $Manifest $Name
+    if ($null -eq $value) {
         return $false
     }
-    return [bool]$prop.Value
+    if ($value -isnot [bool]) {
+        Block "observed manifest $Name must be boolean true"
+        return $false
+    }
+    if ($value -ne $true) {
+        Block "observed manifest $Name is not true"
+        return $false
+    }
+    Pass "observed manifest $Name=true"
+    return $true
+}
+
+function Test-RequiredManifestString {
+    param(
+        [object]$Manifest,
+        [string]$Name
+    )
+
+    $value = Get-RequiredManifestProperty $Manifest $Name
+    if ($null -eq $value) {
+        return $null
+    }
+    if ($value -isnot [string] -or [string]::IsNullOrWhiteSpace($value)) {
+        Block "observed manifest $Name must be a non-empty string"
+        return $null
+    }
+    Pass "observed manifest $Name is present"
+    return $value
+}
+
+function Test-RequiredManifestExitCodeZero {
+    param([object]$Manifest)
+
+    $value = Get-RequiredManifestProperty $Manifest "exitCode"
+    if ($null -eq $value) {
+        return $false
+    }
+    if (-not ($value -is [int] -or $value -is [long])) {
+        Block "observed manifest exitCode must be integer 0"
+        return $false
+    }
+    if ([long]$value -ne 0) {
+        Block "observed manifest exitCode is not 0"
+        return $false
+    }
+    Pass "observed manifest exitCode=0"
+    return $true
 }
 
 function Test-ObservedChain {
@@ -128,39 +189,63 @@ function Test-ObservedChain {
 
     $ok = $true
     foreach ($field in @("requestMapped", "invocationPlanObserved", "eventReplayObserved", "realCliObserved", "redacted", "noSecrets")) {
-        if (Get-ManifestBool $Manifest $field) {
-            Pass "observed manifest $field=true"
-        } else {
-            Block "observed manifest $field is not true"
+        if (-not (Test-RequiredManifestBoolTrue $Manifest $field)) {
             $ok = $false
         }
     }
 
-    if ($Manifest.adapterId -in @("codex", "claude-code", "opencode")) {
+    $adapterId = Test-RequiredManifestString $Manifest "adapterId"
+    if ($adapterId -in @("codex", "claude-code", "opencode")) {
         Pass "observed manifest adapterId is supported"
     } else {
         Block "observed manifest adapterId is unsupported"
         $ok = $false
     }
 
-    if (-not [string]::IsNullOrWhiteSpace([string]$Manifest.approvalId)) {
-        Pass "observed manifest approvalId is present"
-    } else {
-        Block "observed manifest approvalId is missing"
+    if ($null -eq (Test-RequiredManifestString $Manifest "approvalId")) {
         $ok = $false
     }
 
-    if ([string]$Manifest.terminalStatus -eq "finished") {
+    $observedEvidenceRef = Test-RequiredManifestString $Manifest "observedEvidenceRef"
+    if ($null -eq $observedEvidenceRef) {
+        $ok = $false
+    } elseif ($observedEvidenceRef -notmatch '^(edge-event-log|event-log|artifact|sha256):.+') {
+        Block "observed manifest observedEvidenceRef must name an edge-event-log, event-log, artifact, or sha256 reference"
+        $ok = $false
+    } else {
+        Pass "observed manifest observedEvidenceRef has concrete reference prefix"
+    }
+
+    $correlationId = Test-RequiredManifestString $Manifest "correlationId"
+    if ($null -eq $correlationId) {
+        $ok = $false
+    }
+    $invocationPlanEventId = Test-RequiredManifestString $Manifest "invocationPlanEventId"
+    if ($null -eq $invocationPlanEventId) {
+        $ok = $false
+    }
+    $terminalEventId = Test-RequiredManifestString $Manifest "terminalEventId"
+    if ($null -eq $terminalEventId) {
+        $ok = $false
+    }
+    if ($null -ne $invocationPlanEventId -and $null -ne $terminalEventId) {
+        if ($invocationPlanEventId -eq $terminalEventId) {
+            Block "observed manifest invocationPlanEventId and terminalEventId must be distinct"
+            $ok = $false
+        } else {
+            Pass "observed manifest event ids are distinct"
+        }
+    }
+
+    $terminalStatus = Test-RequiredManifestString $Manifest "terminalStatus"
+    if ($terminalStatus -eq "finished") {
         Pass "observed manifest terminalStatus=finished"
     } else {
         Block "observed manifest terminalStatus is not finished"
         $ok = $false
     }
 
-    if ([int]$Manifest.exitCode -eq 0) {
-        Pass "observed manifest exitCode=0"
-    } else {
-        Block "observed manifest exitCode is not 0"
+    if (-not (Test-RequiredManifestExitCodeZero $Manifest)) {
         $ok = $false
     }
 
