@@ -45,16 +45,69 @@ function Get-ScriptHosts {
 function Invoke-Script {
     param(
         [pscustomobject]$HostShell,
-        [string[]]$Arguments
+        [string[]]$Arguments,
+        [string]$WorkingDirectory = $RepoRoot
     )
 
     $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
-    $output = & $HostShell.Path -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
+    Push-Location $WorkingDirectory
+    try {
+        $output = & $HostShell.Path -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+    }
+
     return [pscustomobject]@{
-        ExitCode = $LASTEXITCODE
+        ExitCode = $exitCode
         Output = $output
         Host = $HostShell.Name
     }
+}
+
+function Copy-FixtureFile([string]$RelativePath, [string]$TempRoot) {
+    $source = Join-Path $RepoRoot $RelativePath
+    $target = Join-Path $TempRoot $RelativePath
+    New-Item -ItemType Directory (Split-Path $target -Parent) -Force | Out-Null
+    Copy-Item $source $target
+}
+
+function New-RogueTauriBuildFixture {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    $workflowPath = Join-Path $tempRoot ".github\workflows\release-readiness.yml"
+    $workflowText = Get-Content $workflowPath -Raw -Encoding UTF8
+    $rogueJob = @'
+
+  rogue-tauri-build:
+    name: Rogue Tauri build
+    needs: readiness-policy
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rogue full build
+        working-directory: app/desktop
+        run: pnpm tauri build
+'@
+    Set-Content $workflowPath ($workflowText + $rogueJob) -Encoding UTF8
+
+    & git -C $tempRoot init -q
+    return $tempRoot
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
@@ -120,4 +173,14 @@ foreach ($hostShell in $scriptHosts) {
     $missingUpdater = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", (Join-Path $RepoRoot "does-not-exist"), "-RequireBuiltArtifacts")
     Assert-True ($missingUpdater.ExitCode -ne 0) "built artifact gate fails when updater metadata is missing under $($missingUpdater.Host)" $missingUpdater.Output
     Assert-True ($missingUpdater.Output -match "latest\.json") "missing updater metadata failure names latest.json under $($missingUpdater.Host)" $missingUpdater.Output
+
+    $rogueRoot = New-RogueTauriBuildFixture
+    try {
+        $rogue = Invoke-Script $hostShell @("-RepoRoot", $rogueRoot) $rogueRoot
+        Assert-True ($rogue.ExitCode -ne 0) "readiness checker fails rogue non-opt-in Tauri build job under $($rogue.Host)" $rogue.Output
+        Assert-True ($rogue.Output -match "rogue-tauri-build|manual opt-in|pnpm tauri build") "rogue Tauri build failure names the offending job under $($rogue.Host)" $rogue.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue
+    }
 }
