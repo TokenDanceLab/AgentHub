@@ -97,23 +97,17 @@ func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, std
 		// CLI requesting session init — acknowledge
 		return nil
 	case "get_context_usage":
-		slog.Debug("control: get_context_usage not implemented (stub)")
-		return nil
+		return h.handleGetContextUsage(ctx, stdin, msg.RequestID, &inner)
 	case "mcp_status":
-		slog.Debug("control: mcp_status not implemented (stub)")
-		return nil
+		return h.handleMCPStatus(ctx, stdin, msg.RequestID, &inner)
 	case "mcp_set_servers":
-		slog.Debug("control: mcp_set_servers not implemented (stub)")
-		return nil
+		return h.handleMCPSetServers(ctx, stdin, msg.RequestID, &inner)
 	case "get_settings":
-		slog.Debug("control: get_settings not implemented (stub)")
-		return nil
+		return h.handleGetSettings(ctx, stdin, msg.RequestID, &inner)
 	case "apply_flag_settings":
-		slog.Debug("control: apply_flag_settings not implemented (stub)")
-		return nil
+		return h.handleApplyFlagSettings(ctx, stdin, msg.RequestID, &inner)
 	case "hook_callback":
-		slog.Debug("control: hook_callback not implemented (stub)")
-		return nil
+		return h.handleHookCallback(ctx, stdin, msg.RequestID, &inner)
 	default:
 		slog.Debug("control: unhandled request subtype", "subtype", inner.Subtype)
 		return nil
