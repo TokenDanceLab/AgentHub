@@ -46,7 +46,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 - Settings DB-backed preferences。
 - Projects create/update UI 与 delete/soft-delete/orphan policy。
 - `release.yml` 保留 tag release 语义；`release-readiness.yml` 只做内测 dry package policy。Windows Authenticode 与 macOS Developer ID/notarization 自动化另起 proposal。
-- Mobile v4 IM / remote client 支线。
+- Mobile v4 plan 已收敛到 `app/mobile/docs/mobile-v4-plan.md`；低优先级支线，主参考飞书 IM mobile、辅参考 Codex mobile chat，后续不混入 Desktop/Web v4 主门禁。
 
 ## 分支和 Worktree
 
