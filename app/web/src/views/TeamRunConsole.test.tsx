@@ -579,4 +579,181 @@ describe('TeamRunConsole target routing', () => {
     expect(screen.getByText(/Dispatch failed for child-task-1: target queue rejected replay/)).toBeInTheDocument();
     expect(screen.getAllByText(/Hub task task-sdk-1/).length).toBeGreaterThan(0);
   });
+
+  it('orders merged Hub events and state runtime events by timestamp before source sequence', async () => {
+    teamRunsState.runs = [{
+      id: 'run-order',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRunState.mockResolvedValueOnce({
+      members: [],
+      approvals: [],
+      conflicts: [],
+      run_events: [
+        {
+          agent_task_id: 'task-order',
+          edge_run_id: 'run-edge-order',
+          event_seq: 1,
+          event_type: 'run.agent.result',
+          payload: JSON.stringify({ success: true, summary: 'State event should render second' }),
+          created_at: '2026-06-09T09:00:03Z',
+        },
+      ],
+    });
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'event-late-low-seq',
+        team_run_id: 'run-order',
+        seq: 1,
+        type: 'agent.message',
+        payload: JSON.stringify({ summary: 'Endpoint event should render third' }),
+        created_at: '2026-06-09T09:00:04Z',
+      },
+      {
+        id: 'event-early-high-seq',
+        team_run_id: 'run-order',
+        seq: 99,
+        type: 'agent.message',
+        payload: JSON.stringify({ summary: 'Endpoint event should render first' }),
+        created_at: '2026-06-09T09:00:01Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Endpoint event should render first')).toBeInTheDocument();
+      expect(screen.getByText(/Result succeeded: State event should render second/)).toBeInTheDocument();
+      expect(screen.getByText('Endpoint event should render third')).toBeInTheDocument();
+    });
+    const renderedText = document.body.textContent ?? '';
+    expect(renderedText.indexOf('Endpoint event should render first')).toBeLessThan(renderedText.indexOf('State event should render second'));
+    expect(renderedText.indexOf('State event should render second')).toBeLessThan(renderedText.indexOf('Endpoint event should render third'));
+  });
+
+  it('preserves runtime result summary, tool error flags, and file change kind labels', async () => {
+    teamRunsState.runs = [{
+      id: 'run-detail',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'evt-result-summary',
+        team_run_id: 'run-detail',
+        seq: 1,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 1,
+          event_type: 'run.agent.result',
+          payload: { success: true, summary: 'Reviewer-ready terminal summary' },
+        },
+        created_at: '2026-06-09T09:00:01Z',
+      },
+      {
+        id: 'evt-tool-is-error',
+        team_run_id: 'run-detail',
+        seq: 2,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 2,
+          event_type: 'run.agent.tool_result',
+          payload: { toolName: 'bash', isError: true, output: 'command denied' },
+        },
+        created_at: '2026-06-09T09:00:02Z',
+      },
+      {
+        id: 'evt-tool-is-error-snake',
+        team_run_id: 'run-detail',
+        seq: 3,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 3,
+          event_type: 'run.agent.tool_result',
+          payload: { tool_name: 'read_file', is_error: true },
+        },
+        created_at: '2026-06-09T09:00:03Z',
+      },
+      {
+        id: 'evt-file-kind',
+        team_run_id: 'run-detail',
+        seq: 4,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 4,
+          event_type: 'run.agent.file_change',
+          payload: { kind: 'deleted', path: 'tmp/output.log' },
+        },
+        created_at: '2026-06-09T09:00:04Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Result succeeded: Reviewer-ready terminal summary/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Tool bash result failed: command denied/)).toBeInTheDocument();
+    expect(screen.getByText(/Tool read_file result failed/)).toBeInTheDocument();
+    expect(screen.getByText(/File change deleted: tmp\/output\.log/)).toBeInTheDocument();
+  });
+
+  it('keeps malformed and unknown agent.stream payloads understandable', async () => {
+    teamRunsState.runs = [{
+      id: 'run-malformed',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'evt-malformed-stream',
+        team_run_id: 'run-malformed',
+        seq: 1,
+        type: 'agent.stream',
+        payload: '{"event_type":',
+        created_at: '2026-06-09T09:00:01Z',
+      },
+      {
+        id: 'evt-unknown-stream',
+        team_run_id: 'run-malformed',
+        seq: 2,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-unknown',
+          event_seq: 7,
+          event_type: 'run.agent.custom_signal',
+          payload: { message: 'custom provider emitted signal' },
+        },
+        created_at: '2026-06-09T09:00:02Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/\{"event_type":/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/custom provider emitted signal/)).toBeInTheDocument();
+    expect(screen.getByText(/Hub task task-unknown/)).toBeInTheDocument();
+  });
 });
