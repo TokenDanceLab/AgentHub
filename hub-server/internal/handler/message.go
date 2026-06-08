@@ -16,6 +16,7 @@ type MessageService interface {
 	SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
 	GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
 	GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
+	EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
 	RecallMessage(ctx context.Context, msgID, userID string) error
 	PinMessage(ctx context.Context, userID, sessionID, msgID string) error
 	UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error
@@ -143,6 +144,28 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 	}
 
 	result, err := h.service.GetMessagesIncremental(c.Request.Context(), sessionID, userID, afterSeq, limit)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
+}
+
+func (h *MessageHandler) EditMessage(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+
+	var req service.EditMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.EditMessage(c.Request.Context(), msgID, userID, req)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
