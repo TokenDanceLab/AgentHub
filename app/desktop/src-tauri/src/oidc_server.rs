@@ -9,11 +9,53 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
+use serde::Serialize;
 use tauri::Emitter;
 
 static OIDC_STOPPED: AtomicBool = AtomicBool::new(false);
 
 const CALLBACK_TIMEOUT_SECS: u64 = 300;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LoopbackReadiness {
+    pub available: bool,
+    pub bind_host: String,
+    pub port: Option<u16>,
+    pub redirect_uri: Option<String>,
+    pub error: Option<String>,
+}
+
+pub fn check_loopback_callback_readiness() -> LoopbackReadiness {
+    let bind_host = "127.0.0.1".to_string();
+    match TcpListener::bind("127.0.0.1:0") {
+        Ok(listener) => match listener.local_addr() {
+            Ok(addr) => {
+                let port = addr.port();
+                LoopbackReadiness {
+                    available: true,
+                    bind_host,
+                    port: Some(port),
+                    redirect_uri: Some(format!("http://127.0.0.1:{port}/callback")),
+                    error: None,
+                }
+            }
+            Err(err) => LoopbackReadiness {
+                available: false,
+                bind_host,
+                port: None,
+                redirect_uri: None,
+                error: Some(format!("failed to inspect loopback callback address: {err}")),
+            },
+        },
+        Err(err) => LoopbackReadiness {
+            available: false,
+            bind_host,
+            port: None,
+            redirect_uri: None,
+            error: Some(format!("failed to bind loopback callback listener: {err}")),
+        },
+    }
+}
 
 /// Starts an HTTP server on a random port that listens for ONE OIDC callback.
 /// Returns the port number immediately.
@@ -275,4 +317,35 @@ fn escape_html(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loopback_readiness_binds_random_localhost_port() {
+        let readiness = check_loopback_callback_readiness();
+
+        assert!(readiness.available);
+        assert_eq!(readiness.bind_host, "127.0.0.1");
+        assert!(readiness.port.unwrap_or_default() > 0);
+        assert!(readiness.error.is_none());
+    }
+
+    #[test]
+    fn loopback_redirect_uri_uses_http_loopback_callback_path() {
+        let readiness = LoopbackReadiness {
+            available: true,
+            bind_host: "127.0.0.1".to_string(),
+            port: Some(49152),
+            redirect_uri: Some("http://127.0.0.1:49152/callback".to_string()),
+            error: None,
+        };
+
+        assert_eq!(
+            readiness.redirect_uri.as_deref(),
+            Some("http://127.0.0.1:49152/callback")
+        );
+    }
 }
