@@ -164,13 +164,6 @@ func (h *DeviceHandler) CloudEdgeRegister(c *gin.Context) {
 	}
 
 	userID := c.GetString("user_id")
-	jwtDeviceID := c.GetString("device_id")
-
-	// Cross-validate JWT device_id against registration request.
-	if jwtDeviceID != "" && jwtDeviceID != deviceID {
-		FailWithMessage(c, errcode.ErrBadRequest, "device_id does not match JWT claims")
-		return
-	}
 
 	device, err := h.deviceService.Register(deviceID, userID, "cloud_edge", req.AppVersion, req.Capabilities)
 	if err != nil {
