@@ -186,6 +186,10 @@ func pendingTargetTaskIndexKey(userID, deviceID string) string {
 	return "pending_tasks:" + userID + ":device:" + deviceID + ":targets"
 }
 
+func pendingTargetTaskOrderKey(userID, deviceID string) string {
+	return "pending_tasks:" + userID + ":device:" + deviceID + ":target_order"
+}
+
 func pendingAgentControlKey(userID, deviceID string) string {
 	return "pending_controls:" + userID + ":device:" + deviceID
 }
@@ -195,6 +199,31 @@ func pendingAgentControlKey(userID, deviceID string) string {
 type PendingTargetTask struct {
 	TargetID string
 	Payload  string
+}
+
+type pendingTargetTaskOrderEntry struct {
+	TargetID string `json:"target_id"`
+	Payload  string `json:"payload"`
+}
+
+func encodePendingTargetTaskOrderEntry(targetID, payload string) (string, error) {
+	data, err := json.Marshal(pendingTargetTaskOrderEntry{TargetID: targetID, Payload: payload})
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func decodePendingTargetTaskOrderEntry(data string) (PendingTargetTask, bool) {
+	var entry pendingTargetTaskOrderEntry
+	if err := json.Unmarshal([]byte(data), &entry); err != nil || entry.TargetID == "" {
+		return PendingTargetTask{}, false
+	}
+	var raw json.RawMessage
+	if json.Unmarshal([]byte(entry.Payload), &raw) != nil {
+		return PendingTargetTask{}, false
+	}
+	return PendingTargetTask{TargetID: entry.TargetID, Payload: entry.Payload}, true
 }
 
 // PushPendingTask pushes a task JSON to the user's offline pending queue.
@@ -236,13 +265,20 @@ func (c *Client) PendingTaskCount(ctx context.Context, userID string) (int64, er
 // queue so target-bound dispatch cannot be replayed to a different desktop.
 func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
 	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	orderKey := pendingTargetTaskOrderKey(userID, deviceID)
 	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
+	orderEntry, err := encodePendingTargetTaskOrderEntry(targetID, taskJSON)
+	if err != nil {
+		return err
+	}
 	pipe := c.rdb.TxPipeline()
 	pipe.SAdd(ctx, indexKey, targetID)
 	pipe.Expire(ctx, indexKey, config.PendingTaskTTL)
-	pipe.LPush(ctx, taskKey, taskJSON)
+	pipe.RPush(ctx, taskKey, taskJSON)
 	pipe.Expire(ctx, taskKey, config.PendingTaskTTL)
-	_, err := pipe.Exec(ctx)
+	pipe.RPush(ctx, orderKey, orderEntry)
+	pipe.Expire(ctx, orderKey, config.PendingTaskTTL)
+	_, err = pipe.Exec(ctx)
 	return err
 }
 
@@ -250,6 +286,31 @@ func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, de
 // device without deleting them. Call AckPendingTargetTask only after durable
 // dispatch state has been persisted.
 func (c *Client) ListPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]PendingTargetTask, error) {
+	if tasks, ok, err := c.listPendingTargetTasksFromOrder(ctx, userID, deviceID); err != nil || ok {
+		return tasks, err
+	}
+	return c.listPendingTargetTasksFromIndex(ctx, userID, deviceID)
+}
+
+func (c *Client) listPendingTargetTasksFromOrder(ctx context.Context, userID, deviceID string) ([]PendingTargetTask, bool, error) {
+	orderKey := pendingTargetTaskOrderKey(userID, deviceID)
+	entries, err := c.rdb.LRange(ctx, orderKey, 0, -1).Result()
+	if err != nil {
+		return nil, false, err
+	}
+	if len(entries) == 0 {
+		return nil, false, nil
+	}
+	result := make([]PendingTargetTask, 0, len(entries))
+	for _, entry := range entries {
+		if task, ok := decodePendingTargetTaskOrderEntry(entry); ok {
+			result = append(result, task)
+		}
+	}
+	return result, true, nil
+}
+
+func (c *Client) listPendingTargetTasksFromIndex(ctx context.Context, userID, deviceID string) ([]PendingTargetTask, error) {
 	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
 	targetIDs, err := c.rdb.SMembers(ctx, indexKey).Result()
 	if err != nil {
@@ -276,8 +337,16 @@ func (c *Client) ListPendingTargetTasksForDevice(ctx context.Context, userID, de
 // been durably marked dispatched.
 func (c *Client) AckPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
 	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	orderKey := pendingTargetTaskOrderKey(userID, deviceID)
 	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
-	if err := c.rdb.LRem(ctx, taskKey, 1, taskJSON).Err(); err != nil {
+	orderEntry, err := encodePendingTargetTaskOrderEntry(targetID, taskJSON)
+	if err != nil {
+		return err
+	}
+	pipe := c.rdb.TxPipeline()
+	pipe.LRem(ctx, taskKey, 1, taskJSON)
+	pipe.LRem(ctx, orderKey, 1, orderEntry)
+	if _, err := pipe.Exec(ctx); err != nil {
 		return err
 	}
 	count, err := c.rdb.LLen(ctx, taskKey).Result()
@@ -290,12 +359,36 @@ func (c *Client) AckPendingTargetTask(ctx context.Context, userID, targetID, dev
 		pipe.SRem(ctx, indexKey, targetID)
 		_, err = pipe.Exec(ctx)
 	}
+	if err != nil {
+		return err
+	}
+	orderCount, err := c.rdb.LLen(ctx, orderKey).Result()
+	if err != nil {
+		return err
+	}
+	if orderCount == 0 {
+		return c.rdb.Del(ctx, orderKey).Err()
+	}
 	return err
 }
 
 // PopPendingTargetTasksForDevice pops all target-bound pending tasks for one
 // device and clears only that device's target queues.
 func (c *Client) PopPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	if tasks, ok, err := c.listPendingTargetTasksFromOrder(ctx, userID, deviceID); err != nil || ok {
+		if err != nil {
+			return nil, err
+		}
+		if err := c.clearPendingTargetTaskQueuesForDevice(ctx, userID, deviceID); err != nil {
+			return nil, err
+		}
+		result := make([]string, 0, len(tasks))
+		for _, task := range tasks {
+			result = append(result, task.Payload)
+		}
+		return result, nil
+	}
+
 	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
 	targetIDs, err := c.rdb.SMembers(ctx, indexKey).Result()
 	if err != nil {
@@ -325,14 +418,31 @@ func (c *Client) PopPendingTargetTasksForDevice(ctx context.Context, userID, dev
 	return result, nil
 }
 
+func (c *Client) clearPendingTargetTaskQueuesForDevice(ctx context.Context, userID, deviceID string) error {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	orderKey := pendingTargetTaskOrderKey(userID, deviceID)
+	targetIDs, err := c.rdb.SMembers(ctx, indexKey).Result()
+	if err != nil {
+		return err
+	}
+	pipe := c.rdb.TxPipeline()
+	for _, targetID := range targetIDs {
+		pipe.Del(ctx, pendingTargetTaskKey(userID, targetID, deviceID))
+	}
+	pipe.Del(ctx, orderKey)
+	pipe.Del(ctx, indexKey)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
 // PushPendingAgentControl pushes a control JSON to a device-specific offline
 // queue so approval decisions are never replayed to a different desktop.
 func (c *Client) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
 	key := pendingAgentControlKey(userID, deviceID)
 	pipe := c.rdb.TxPipeline()
 	pipe.LRem(ctx, key, 0, controlJSON)
-	pipe.LPush(ctx, key, controlJSON)
-	pipe.LTrim(ctx, key, 0, int64(config.PendingAgentControlQueueMaxLen-1))
+	pipe.RPush(ctx, key, controlJSON)
+	pipe.LTrim(ctx, key, int64(-config.PendingAgentControlQueueMaxLen), -1)
 	pipe.Expire(ctx, key, config.PendingAgentControlQueueTTL)
 	_, err := pipe.Exec(ctx)
 	return err
