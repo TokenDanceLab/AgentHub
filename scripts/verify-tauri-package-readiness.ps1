@@ -170,6 +170,42 @@ function Assert-WorkflowCommandExplicitOptIn {
     Pass "$Label command is isolated to manual opt-in job"
 }
 
+function Get-ForbiddenMacOSUnsignedDryCommands {
+    param(
+        [string]$JobBlock
+    )
+
+    $commandPattern = "(?i)(^|[\s;&|(``])(?:xcrun\s+)?(?:codesign|notarytool|stapler)(?:\s|$)"
+    $offending = @()
+
+    foreach ($line in ($JobBlock -split "\r?\n")) {
+        $candidate = $line.Trim()
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        if ($candidate -match $commandPattern) {
+            $offending += $candidate
+        }
+    }
+
+    return $offending
+}
+
+function Assert-NoMacOSUnsignedDryCommands {
+    param(
+        [string]$JobBlock,
+        [string]$JobName
+    )
+
+    $offending = @(Get-ForbiddenMacOSUnsignedDryCommands $JobBlock)
+    if ($offending.Count -gt 0) {
+        Fail "macOS unsigned dry policy job '$JobName' contains forbidden command: $($offending[0])"
+    }
+
+    Pass "macOS unsigned dry policy job '$JobName' has no codesign, notarytool, or stapler commands"
+}
+
 Step "Desktop version metadata"
 $package = Read-Json "app\desktop\package.json"
 $tauri = Read-Json "app\desktop\src-tauri\tauri.conf.json"
@@ -234,11 +270,17 @@ Assert-GitIgnored "app/desktop/src-tauri/target/release/bundle/nsis/AgentHub_${d
 Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-pc-windows-msvc.exe" "Windows sidecar binary"
 Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin" "macOS arm64 sidecar binary"
 
-Step "macOS policy note boundary"
-Assert-True ($readinessWorkflowText -match "macOS unsigned package policy note") "release readiness workflow names macOS step as a policy note"
-Assert-True ($readinessWorkflowText -match "aarch64-apple-darwin") "release readiness workflow documents the future macOS arm64 validation path"
-Assert-True ($readinessWorkflowText -match "unsigned") "release readiness workflow labels macOS policy as unsigned"
-Assert-True ($readinessWorkflowText -notmatch "xcrun\s+notarytool|codesign\s+--sign|stapler\s+staple") "release readiness workflow does not run macOS signing, notarization, or stapling commands"
+Step "macOS unsigned dry policy boundary"
+Assert-True ($readinessWorkflowText -match "run_macos_unsigned_dry_policy") "release readiness workflow declares explicit macOS unsigned dry policy input"
+$macosUnsignedDryBlock = Get-WorkflowJobBlock $readinessWorkflowText "macos-unsigned-dry-policy"
+Assert-True (Test-WorkflowJobHasManualOptIn $macosUnsignedDryBlock "run_macos_unsigned_dry_policy") "macOS unsigned dry policy job is gated by explicit workflow_dispatch input"
+Assert-True ($macosUnsignedDryBlock -match "macOS unsigned dry") "release readiness workflow names macOS step as unsigned dry policy"
+Assert-True ($macosUnsignedDryBlock -match "agenthub-edge-aarch64-apple-darwin") "release readiness workflow documents the future macOS arm64 sidecar boundary"
+Assert-True ($macosUnsignedDryBlock -match "AgentHub\.app" -and $macosUnsignedDryBlock -match "AgentHub\.dmg") "release readiness workflow documents future macOS app and DMG bundle boundaries"
+Assert-True ($macosUnsignedDryBlock -match "workflow artifacts only") "release readiness workflow scopes future macOS unsigned outputs to workflow artifacts only"
+Assert-True ($macosUnsignedDryBlock -match "later approval slice") "release readiness workflow keeps signing and notarization as later approval slice"
+Assert-True ($macosUnsignedDryBlock -notmatch "pnpm\s+tauri\s+build|softprops/action-gh-release|gh release upload|TAURI_SIGNING_PRIVATE_KEY") "macOS unsigned dry policy job does not run build, release upload, or production signing secret commands"
+Assert-NoMacOSUnsignedDryCommands $macosUnsignedDryBlock "macos-unsigned-dry-policy"
 
 Step "Release dry topology documentation"
 Assert-True ($governanceText -match "D2b\. Release dry build topology") "governance doc records release dry build topology"
@@ -250,7 +292,9 @@ Assert-True ($governanceText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe")
 Assert-True ($governanceText -match "latest\.json.*\.sig|\.sig.*latest\.json") "governance doc records updater metadata artifacts"
 Assert-True ($governanceText -match "agenthub-edge-aarch64-apple-darwin") "governance doc records macOS arm64 sidecar name"
 Assert-True ($governanceText -match "macOS.*unsigned|arm64 unsigned") "governance doc keeps macOS validation unsigned"
+Assert-True ($governanceText -match "AgentHub\.app" -and $governanceText -match "AgentHub\.dmg") "governance doc records future macOS app and DMG bundle boundaries"
 Assert-True ($governanceText -match "notarytool|notarization") "governance doc names notarization as out of scope"
+Assert-True ($governanceText -match "approval slice|审批") "governance doc keeps signing and notarization behind later approval"
 Assert-True ($governanceText -match "workflow artifact") "governance doc keeps dry artifacts scoped to workflow artifact upload"
 Assert-True ($governanceText -match "GitHub Release|release asset|updater 生产 metadata") "governance doc keeps release creation/upload out of dry topology"
 
