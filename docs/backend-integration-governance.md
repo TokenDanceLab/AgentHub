@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 10:03 +08:00
+> 最后更新：2026-06-08 10:31 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -104,7 +104,7 @@ next: <1-3 steps>
 
 - **D1a fixture-only CI gate**：已合入 `dev/delicious233`。后续 D1b 只能在新增依赖测试已进入主线且不会让 CI 变红时再拆，并继续断言不含 `-RealCli`、Docker、root `go test ./tests -count=1` 或真实 CLI/auth secret。
 - **D3 real CLI/model gate**：继续 blocked。候选 workflow 缺 GitHub `environment` approval、预算/请求上限控制，且 redaction validation 失败后仍可能上传 artifact；修复前不得合入。
-- **G1/G2a/G2b/ExecutionTarget/Projects DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已合入；G2b 后端 AgentProfile request contract hardening 和 OpenAPI 当前行为同步已合入；ExecutionTarget request contract hardening 已合入；Hub Projects/workspaces P1 已合入。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回；G2b 与 ExecutionTarget 不改 Hub schema、Edge store、publish/install、routing 或 market lifecycle；Projects P1 只做现有 workspaces list/create/get/update，不做 delete/migration。当前主线程正在 `codex/web-projects-readthrough` 把 shared Projects 页接 Hub `/web/projects` read-through，不触碰 Edge-owned `/v1/projects`。
+- **G1/G2a/G2b/ExecutionTarget/Projects DB-backed state**：Hub AgentProfile -> shared Agents 页 read-through 已合入；G2a Web mutation/empty/error/saving 切片已合入；G2b 后端 AgentProfile request contract hardening 和 OpenAPI 当前行为同步已合入；ExecutionTarget request contract hardening 已合入；Hub Projects/workspaces P1 已合入；Web Projects read-through 已作为 `0c79f277 feat(web): read Hub projects into workbench` 合入并打 `v0.3.0-rc.1` 稳定候选 tag。G2a 只消费既有 Hub CRUD 合同并过滤 UI fallback 写回；G2b 与 ExecutionTarget 不改 Hub schema、Edge store、publish/install、routing 或 market lifecycle；Projects P1/read-through 只做现有 workspaces list/create/get/update 与 shared Projects list 数据口，不做 delete/migration。
 - **API/Event contract sync**：`codex/api-event-summary-alias` 已把 Web client 已用的 `/web/agent-tasks/{id}/summary` 声明为 Hub/OpenAPI 兼容 alias，复用既有 `/web/agent-tasks/{id}/events/summary` response contract；`codex/event-contract-docs` 继续做 Edge runtime event 文档/测试漂移收口，不混入 Web UI、Edge pins 或真实 CLI gate。
 - **Runtime adapter roadmap**：Codex `exec --json` adapter 仍是 Phase 1 batch 模式；完整 multi-turn、turn steer/interrupt、approval、subagent 和 diff patch delta 需要后续 Codex app-server 通道，不应在当前能力声明中写成已完成。
 
@@ -130,7 +130,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 | Docs | 无统一 document/artifact store | 定义 `ProjectArtifact` / `DocumentPreview` owner、blob、version、provider、permission |
 | Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已合入 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；G2b 已合入 Hub AgentProfile JSON-like request contract hardening；ExecutionTarget contract hardening 已合入 Hub request normalization；Desktop/Edge runtime inventory、market/install 和 target preference mutation 仍未生产化 | Desktop Edge runtime mapper、market/install 继续后置 |
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
-| Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 正在把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | 本片先完成 read-through；Projects create/update UI、artifact 关系和 delete/soft-delete 需另起 proposal |
+| Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | 下一片接 Projects create/update UI；artifact 关系和 delete/soft-delete 需另起 proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
 | RightInspector | 默认任务/文件内容来自 demo evidence；client 已调用 artifacts/previews，但 Edge OpenAPI 仍有 planned 项 | 先补 Edge routes 或移除假调用，再接 evidence snapshot |
 
@@ -183,6 +183,6 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 ## 当前下一步
 
 1. 后端长期线程已关闭；后续 backend/API/Edge 由主负责人按需开短生命周期 subagent/worktree，不能再让旧 backend 线程自行扩写或合并。
-2. 当前实现片是 `codex/web-projects-readthrough`：Web real mode Projects 从 Hub `/web/projects` 读取，shared `/v1/projects` 和 Desktop/Edge 语义不变。
-3. Projects create/update UI、Projects delete/soft-delete policy、Edge SQL proposal、Desktop Edge mapper、D1b/D2/D3 gate policy 继续保持独立 proposal，不得混入 Web Projects read-through。
+2. `v0.3.0-rc.1` 已打在 `0c79f277`，作为 shared v4 workbench + Hub/Edge 合并基线；Web Projects read-through 已完成并保持 shared `/v1/projects` 与 Desktop/Edge 语义不变。
+3. 下一批实现按 roadmap 排序：先 Edge SQL/store migration、Tauri Windows installer/macOS packaging、登录链路联调，再 Desktop Edge mapper、ByteDance/TeamRun demo evidence 和 Projects create/update UI；Projects delete/soft-delete policy 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge；D3 真实 CLI/model gate 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
