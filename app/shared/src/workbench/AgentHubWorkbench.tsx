@@ -180,6 +180,7 @@ export function AgentHubWorkbench({
     ...(agent.description ? { description: agent.description } : {}),
     ...(agent.status ? { status: agent.status } : {}),
     ...(agent.model ? { model: agent.model } : {}),
+    ...(agent.provider ? { provider: agent.provider } : {}),
     ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
   }));
 

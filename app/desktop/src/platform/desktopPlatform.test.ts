@@ -2,20 +2,59 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
-  it('falls back to the shared demo runtime when no active Edge thread is selected', async () => {
+  it('fails closed instead of using the demo runtime when no active Edge thread is selected', async () => {
     const submitRun = vi.fn();
     const platform = createDesktopPlatform({ submitRun });
 
-    const result = await platform.runs.submitComposerIntent({
+    await expect(platform.runs.submitComposerIntent({
       conversationId: 'builder',
       text: 'demo send smoke',
       mode: 'ask',
       mentions: [],
       attachments: [],
       approvalMode: 'suggest',
+    })).rejects.toThrow('Local Edge thread is required');
+
+    expect(submitRun).not.toHaveBeenCalled();
+  });
+
+  it('routes selected runtime adapter id through the Local Edge run request', async () => {
+    const submitRun = vi.fn().mockResolvedValue({
+      runId: 'run-edge-1',
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+      status: 'queued',
+    });
+    const platform = createDesktopPlatform({
+      activeProjectId: 'project-edge',
+      activeThreadId: 'thread-edge',
+      submitRun,
     });
 
-    expect(result.intentId).toMatch(/^demo-agent-/);
-    expect(submitRun).not.toHaveBeenCalled();
+    await platform.runs.submitComposerIntent({
+      conversationId: 'thread-edge',
+      text: 'review the mapper',
+      mode: 'code',
+      mentions: [{
+        id: 'codex-local',
+        label: 'Codex Local',
+        model: 'gpt-5.1-codex',
+        provider: 'tokendance-gateway',
+        runtimeId: 'codex',
+      }],
+      attachments: [],
+      approvalMode: 'workspace-write',
+      workDir: 'D:/Code/TokenDance/AgentHub',
+    });
+
+    expect(submitRun).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: 'codex',
+      model: 'gpt-5.1-codex',
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+      permissionMode: 'acceptEdits',
+      workDir: 'D:/Code/TokenDance/AgentHub',
+    }));
+    expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('provider');
   });
 });

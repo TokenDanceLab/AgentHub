@@ -39,7 +39,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const threadsQuery = useThreads();
   const threads = threadsQuery.data?.items ?? [];
   const activeThread = threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0];
-  const activeConversationId = activeThread?.threadId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID;
+  const activeConversationId = activeThread?.threadId ?? selectedConversationId ?? '';
   const threadItemsQuery = useThreadMessages(activeThread?.threadId ?? null);
   const threadPinsQuery = useThreadPins(activeThread?.threadId ?? null);
   const threadItems = threadItemsQuery.data?.items;
@@ -54,7 +54,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   }), [demoSnapshot, selectedConversationId]);
 
   const conversations = useMemo(() => {
-    if (threads.length === 0) return dataMode === 'auto' ? workbenchDemoRuntimeStore.getSnapshot().conversations : [];
+    if (threads.length === 0) return [];
     return threads.map((thread) =>
       threadToConversation(
         thread,
@@ -69,13 +69,9 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     if (persistedTranscript.length > 0 || liveTranscript.length > 0) {
       return [...persistedTranscript, ...liveTranscript];
     }
-    if (threads.length === 0) {
-      return dataMode === 'auto'
-        ? workbenchDemoRuntimeStore.resolveTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID)
-        : EMPTY_TRANSCRIPT;
-    }
+    if (threads.length === 0) return EMPTY_TRANSCRIPT;
     return [];
-  }, [dataMode, liveTranscript, threadItems, threads.length]);
+  }, [liveTranscript, threadItems, threads.length]);
 
   const liveModel = {
     activeConversationId,

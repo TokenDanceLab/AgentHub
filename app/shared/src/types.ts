@@ -154,7 +154,6 @@ export interface StartRunRequest {
   prompt?: string;
   agentId?: string;
   model?: string;
-  provider?: string;
   modelAlias?: string;
   reasoningEffort?: string;
   modelMappingEnabled?: boolean;
@@ -242,7 +241,6 @@ export interface StartRunRequest {
   prompt?: string;
   agentId?: string;
   model?: string;
-  provider?: string;
   modelAlias?: string;
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;

@@ -7,6 +7,7 @@ import Callout from '../primitives/Callout';
 import RunnerRow from '../cards/RunnerRow';
 import { shortId } from '../utils';
 import styles from '../primitives/primitives.module.css';
+import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
 
 interface ExecutionTargetsSectionProps {
   edgeOnline: boolean;
@@ -15,15 +16,25 @@ interface ExecutionTargetsSectionProps {
   runnerSummary: string;
   runnerItems: RunnerHealthItem[];
   availableRunners: number;
+  localEdgeTarget: DesktopExecutionTarget;
   desktopDeviceStatus: string;
   deviceId: string | null;
 }
 
 export default function ExecutionTargetsSection({
   edgeOnline, health, hubSessionActive, runnerSummary, runnerItems,
-  availableRunners, desktopDeviceStatus, deviceId,
+  availableRunners, localEdgeTarget, desktopDeviceStatus, deviceId,
 }: ExecutionTargetsSectionProps) {
   const { t } = useTranslation();
+  const localEdgeMetric = edgeOnline
+    ? t('settings.localEdgeInventorySummary', {
+        runners: localEdgeTarget.onlineRunnerCount,
+        totalRunners: localEdgeTarget.runnerCount,
+        agents: localEdgeTarget.agentCount,
+        models: localEdgeTarget.modelCount,
+      })
+    : runnerSummary;
+
   return (
     <Panel title={t('settings.executionTargets')} description={t('settings.executionTargetsDesc')}>
       <div className={styles.targetGrid}>
@@ -31,8 +42,8 @@ export default function ExecutionTargetsSection({
           icon={<Monitor size={18} />}
           title={t('settings.targetLocalEdge')}
           description={t('settings.targetLocalEdgeDesc')}
-          status={edgeOnline ? health?.status ?? 'ok' : t('settings.offline')}
-          metric={runnerSummary}
+          status={edgeOnline ? health?.status ?? localEdgeTarget.status : t('settings.offline')}
+          metric={localEdgeMetric}
           connected={edgeOnline && availableRunners > 0}
         />
         <ExecutionTargetCard
