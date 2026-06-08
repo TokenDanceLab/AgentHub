@@ -132,6 +132,8 @@ func teamTestDB(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL DEFAULT '',
 			reply_to_message_id TEXT,
 			recalled INTEGER NOT NULL DEFAULT 0,
+			edited INTEGER NOT NULL DEFAULT 0,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 
