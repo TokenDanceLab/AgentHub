@@ -210,6 +210,7 @@
       "sourceEventId": "opencode_result_1",
       "success": true,
       "summary": "OpenCode sidecar fixture completed.",
+      "terminalReason": "completed",
       "traceRefs": [
         "trace:opencode:root"
       ]

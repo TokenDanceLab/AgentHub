@@ -177,6 +177,36 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.rate_limit` | P1 | 速率限制通知 |
 | `run.agent.permission_requested` | P1 | Agent 请求权限审批 |
 | `run.agent.permission_decided` | P1 | 权限审批结果 |
+| `run.agent.cli_invocation_plan` | P1 | CLI/SDK/custom Agent 的无执行调用计划；payload 只包含脱敏 command shape、flags、config keys、env names、workspace basename 和 fixture/no-spend/approval flags |
+
+### Edge Adapter JSON Contract
+
+Edge adapters emit provider-neutral JSON events. CLI, SDK, OpenCode sidecar,
+and custom Agent fixtures must map native provider signals into the existing
+`run.agent.*` vocabulary before Hub/Web replay. The replay shape remains:
+
+```json
+{"type":"agent.stream","payload":{"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"edge_run_id":"run_01","event_seq":1}}
+```
+
+Provider-specific fields stay below the Edge adapter boundary. Event payloads
+must redact raw prompts, API tokens, authorization headers, secret-like keys,
+absolute workspace paths, and provider trace bodies. Paths are workspace
+relative when safe; otherwise only the basename is retained.
+
+Contract fixture mappings:
+
+| Fixture signal | AgentHub event | Required payload notes |
+|---|---|---|
+| `invocation_plan` / `cli_invocation_plan` | `run.agent.cli_invocation_plan` | `adapterId`, basename `commandName`, `argFlags`, `configKeys`, env variable names only, basename `workDir`, `promptRedacted`, `executionMode: fixture`, `noSpendDefault: true`, `approvalRequired: true`, `redactionApplied: true`, `observed: false`, `realTested: false` |
+| `status` / `session.updated` | `run.agent.status_change` | `sessionId`, `status`, optional `summary`, `reason`, redacted `metadata` |
+| `progress` / `task_progress` | `run.agent.task_progress` | `taskId`, `description`, `status`, optional `percent`, `lastToolName`, `summary` |
+| `tool_call` / provider tool use | `run.agent.tool_call` | `callId`, `toolName`, redacted `input`, provider/session/trace refs |
+| `tool_result` / provider tool output | `run.agent.tool_result` | `callId`, `toolName`, `content`, `isError`, redacted attachments/metadata |
+| `usage` / `context_usage` | `run.agent.context_usage` | `inputTokens`, `outputTokens`, `totalTokens`, optional `totalCostUsd`, `model`, `sessionId` |
+| `terminal_result` / `run_result` | `run.agent.result` | `success`, `summary`, `terminalReason: completed\|error`, optional nested `usage` |
+| `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted `error`, `reason` |
+| `cancelled` / `cancellation` | `run.agent.result` | Adapter-level cancellation signal only: `success: false`, `cancelled: true`, `terminalReason: cancelled`; lifecycle-owned `run.cancelled` is still emitted by `ProcessExecutor` |
 
 ### AgentTeam / TeamRun
 
