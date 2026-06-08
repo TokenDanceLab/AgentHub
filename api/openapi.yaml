@@ -2868,6 +2868,38 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /client/messages/{id}/reactions:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListMessageReactionsDirect
+      summary: List reaction summaries for a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: session_id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Grouped message reaction summaries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code:
+                    type: string
+                    enum: [OK]
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageReactionResponse"
     post:
       tags: [HubSyncRelay]
       operationId: hubAddMessageReactionDirect
