@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -37,6 +38,11 @@ type ObjectStorage interface {
 	// storage is backed by a local directory. Returns an empty string
 	// when the storage is remote (e.g. S3).
 	LocalPath(key string) string
+
+	// PresignURL returns a direct-download URL for the key when supported
+	// by the backing store. The caller provides already-safe response
+	// headers for the object-store GET response.
+	PresignURL(ctx context.Context, key string, contentType string, contentDisposition string, expiresIn time.Duration) (string, error)
 }
 
 // ── LocalStorage ────────────────────────────────────────────────────────────
@@ -104,6 +110,10 @@ func (s *LocalStorage) LocalPath(key string) string {
 	return s.pathForKey(key)
 }
 
+func (s *LocalStorage) PresignURL(ctx context.Context, key string, contentType string, contentDisposition string, expiresIn time.Duration) (string, error) {
+	return "", nil
+}
+
 func (s *LocalStorage) pathForKey(key string) string {
 	return filepath.Join(s.baseDir, s.localKey(key))
 }
@@ -123,6 +133,7 @@ type S3Storage struct {
 	putObject    func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error)
 	getObject    func(ctx context.Context, bucket, key string) (io.ReadCloser, error)
 	deleteObject func(ctx context.Context, bucket, key string) error
+	presignURL   func(ctx context.Context, bucket, key, contentType, contentDisposition string, expiresIn time.Duration) (string, error)
 	bucket       string
 }
 
@@ -133,12 +144,14 @@ func NewS3Storage(
 	putObject func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error),
 	getObject func(ctx context.Context, bucket, key string) (io.ReadCloser, error),
 	deleteObject func(ctx context.Context, bucket, key string) error,
+	presignURL func(ctx context.Context, bucket, key, contentType, contentDisposition string, expiresIn time.Duration) (string, error),
 	bucket string,
 ) *S3Storage {
 	return &S3Storage{
 		putObject:    putObject,
 		getObject:    getObject,
 		deleteObject: deleteObject,
+		presignURL:   presignURL,
 		bucket:       bucket,
 	}
 }
@@ -157,6 +170,13 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 
 func (s *S3Storage) LocalPath(key string) string {
 	return "" // remote storage, no local path
+}
+
+func (s *S3Storage) PresignURL(ctx context.Context, key string, contentType string, contentDisposition string, expiresIn time.Duration) (string, error) {
+	if s.presignURL == nil {
+		return "", nil
+	}
+	return s.presignURL(ctx, s.bucket, key, contentType, contentDisposition, expiresIn)
 }
 
 // ── AttachmentService ───────────────────────────────────────────────────────
@@ -277,6 +297,16 @@ func (s *AttachmentService) BlobLocalPath(hash string) string {
 		return ""
 	}
 	return s.storage.LocalPath(key)
+}
+
+// PresignBlobURL returns a direct-download URL for remote storage when the
+// configured object store supports presigned GET requests.
+func (s *AttachmentService) PresignBlobURL(ctx context.Context, hash string, contentType string, contentDisposition string) (string, error) {
+	key := PathFromHash(hash)
+	if key == "" {
+		return "", nil
+	}
+	return s.storage.PresignURL(ctx, key, contentType, contentDisposition, 15*time.Minute)
 }
 
 func (s *AttachmentService) GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error) {

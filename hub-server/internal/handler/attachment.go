@@ -30,6 +30,7 @@ type AttachmentService interface {
 	GetBlob(ctx context.Context, hash string) (io.ReadCloser, error)
 	DeleteBlob(ctx context.Context, hash string) error
 	BlobLocalPath(hash string) string
+	PresignBlobURL(ctx context.Context, hash string, contentType string, contentDisposition string) (string, error)
 }
 
 type AttachmentHandler struct {
@@ -193,7 +194,14 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 		return
 	}
 
-	// Remote storage: stream from S3.
+	// Remote storage: redirect to a presigned URL when available, then
+	// fall back to Hub streaming for stores that cannot presign.
+	presignedURL, err := h.service.PresignBlobURL(c.Request.Context(), a.Hash, safeAttachmentContentType(a.MimeType), formatAttachmentDisposition(a.OriginalName))
+	if err == nil && presignedURL != "" {
+		c.Redirect(http.StatusFound, presignedURL)
+		return
+	}
+
 	reader, err := h.service.GetBlob(c.Request.Context(), a.Hash)
 	if err != nil {
 		Fail(c, errcode.AttachNotFound)
