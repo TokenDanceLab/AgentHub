@@ -1396,6 +1396,7 @@
   "settings.environmentNodeDesc": "用于前端开发、测试和构建。",
   "settings.environmentTauriDesc": "桌面壳和本地能力桥接。",
   "settings.defaultWorkspace": "默认工作区",
+  "settings.chooseWorkspace": "选择工作区",
   "settings.noWorkspaceSelected": "未选择工作区",
   "settings.worktreePolicy": "工作树策略",
   "settings.worktreeDesc": "管理隔离开发目录和默认工作区位置。",
