@@ -56,9 +56,7 @@ func (s *DeviceService) Get(deviceID string) (*model.Device, error) {
 // List returns all devices belonging to the given user, ordered by most
 // recently active first.
 func (s *DeviceService) List(userID string) ([]model.Device, error) {
-	var devices []model.Device
-	err := s.db.Where("user_id = ?", userID).Order("last_active_at DESC").Find(&devices).Error
-	return devices, err
+	return repository.ListDevicesByUser(s.db, userID)
 }
 
 // ListDevices is an alias for List to match the handler interface.
