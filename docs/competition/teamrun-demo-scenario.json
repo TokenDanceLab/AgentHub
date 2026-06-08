@@ -1,0 +1,127 @@
+{
+  "contract": "teamrun-demo-evidence-v1",
+  "scenario_id": "bytedance-teamrun-fixture-minimum",
+  "title": "ByteDance TeamRun fixture-only demo contract",
+  "fixture_only": true,
+  "claims": {
+    "real_runtime_executed": false,
+    "final_recording_complete": false,
+    "live_hub_runtime_verified": false,
+    "submission_ready": false
+  },
+  "boundaries": [
+    "This manifest freezes the minimum evidence shape only.",
+    "The exporter must not start services, run agent CLIs, call model APIs, upload artifacts, or claim the final recording.",
+    "Runtime identifiers in this fixture are labels for evidence shape coverage, not proof that those runtimes executed."
+  ],
+  "required_evidence_fields": [
+    "state",
+    "tasks",
+    "assignments",
+    "events",
+    "runtime_profiles"
+  ],
+  "agent_profiles": [
+    {
+      "id": "profile-supervisor-fixture",
+      "display_name": "Demo Supervisor",
+      "role": "supervisor",
+      "runtime_type": "codex-fixture"
+    },
+    {
+      "id": "profile-worker-fixture",
+      "display_name": "Demo Worker",
+      "role": "worker",
+      "runtime_type": "opencode-fixture"
+    }
+  ],
+  "state": {
+    "team_id": "team-fixture-bytedance",
+    "team_run_id": "teamrun-fixture-001",
+    "status": "completed",
+    "goal": "Show the minimum TeamRun route from supervisor to worker using fixture-only evidence."
+  },
+  "assignments": [
+    {
+      "id": "assign-supervisor-fixture",
+      "profile_id": "profile-supervisor-fixture",
+      "role": "supervisor",
+      "status": "completed"
+    },
+    {
+      "id": "assign-worker-fixture",
+      "profile_id": "profile-worker-fixture",
+      "role": "worker",
+      "status": "completed",
+      "parent_assignment_id": "assign-supervisor-fixture"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-supervisor-fixture",
+      "assignment_id": "assign-supervisor-fixture",
+      "role": "supervisor",
+      "status": "completed",
+      "summary": "Plan and delegate the fixture demo task."
+    },
+    {
+      "id": "task-worker-fixture",
+      "assignment_id": "assign-worker-fixture",
+      "role": "worker",
+      "status": "completed",
+      "summary": "Return a fixture implementation result."
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-001",
+      "type": "agent.dispatch",
+      "actor": "hub",
+      "assignment_id": "assign-supervisor-fixture"
+    },
+    {
+      "id": "evt-002",
+      "type": "run.agent.route_decision",
+      "actor": "profile-supervisor-fixture",
+      "assignment_id": "assign-supervisor-fixture",
+      "next_worker": "profile-worker-fixture"
+    },
+    {
+      "id": "evt-003",
+      "type": "team.route.decided",
+      "actor": "hub",
+      "assignment_id": "assign-supervisor-fixture",
+      "child_assignment_id": "assign-worker-fixture"
+    },
+    {
+      "id": "evt-004",
+      "type": "agent.dispatch",
+      "actor": "hub",
+      "assignment_id": "assign-worker-fixture"
+    },
+    {
+      "id": "evt-005",
+      "type": "run.agent.result",
+      "actor": "profile-worker-fixture",
+      "assignment_id": "assign-worker-fixture"
+    },
+    {
+      "id": "evt-006",
+      "type": "team.run.completed",
+      "actor": "hub",
+      "team_run_id": "teamrun-fixture-001"
+    }
+  ],
+  "api_exports_required_for_real_demo": [
+    "GET /web/agent-teams/:teamId/runs/:runId/state",
+    "GET /web/agent-teams/:teamId/runs/:runId/events",
+    "GET /web/agent-teams/:teamId/runs/:runId/tasks",
+    "GET /web/agent-teams/:teamId/runs/:runId/assignments"
+  ],
+  "next_real_evidence": [
+    "Replace fixture runtime profiles with real configured Agent Profiles.",
+    "Capture Desktop transcript and inspector screenshots.",
+    "Export the four Hub TeamRun API responses from the real run.",
+    "Run readiness again with the exported evidence and final video path only after recording exists."
+  ]
+}

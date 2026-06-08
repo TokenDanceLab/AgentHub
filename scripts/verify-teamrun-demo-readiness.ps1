@@ -129,6 +129,25 @@ if ($evidence) {
     } else {
         Fail "evidence proves at least two runtime types (actual: $runtimeTypes)"
     }
+
+    Step "Fixture boundary"
+    if ($evidence.contract -eq "teamrun-demo-evidence-v1" -and $null -ne $evidence.source -and $evidence.source.fixture_only -eq $true) {
+        Pass "fixture-only evidence contract"
+    } else {
+        Fail "fixture-only evidence contract"
+    }
+
+    if ($null -ne $evidence.claims -and $evidence.claims.real_runtime_executed -eq $false) {
+        Pass "evidence does not claim real runtime execution"
+    } else {
+        Fail "evidence does not claim real runtime execution"
+    }
+
+    if ($null -ne $evidence.claims -and $evidence.claims.final_recording_complete -eq $false) {
+        Pass "evidence does not claim final demo recording"
+    } else {
+        Fail "evidence does not claim final demo recording"
+    }
 }
 
 Step "Manifest"
