@@ -88,6 +88,7 @@ func TestAllFrameTypes(t *testing.T) {
 		TypeAuth, TypeTyping,
 		TypeAuthOK, TypeAuthFail,
 		TypeMessageNew, TypeMessageRecall, TypeMessagePin, TypeMessageUnpin,
+		TypeMessageReactionAdded, TypeMessageReactionRemoved,
 		TypeMessageRead, TypeSessionCreated, TypeSessionDissolved,
 		TypeSessionMemberJoined, TypeSessionMemberLeft, TypeSessionInfoUpdated,
 		TypeDeviceOnline, TypeDeviceOffline, TypeDeviceKicked,
