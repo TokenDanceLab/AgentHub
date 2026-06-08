@@ -156,7 +156,7 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 		}
 	}
 }
-
+
 // messageLoop reads messages from an already-authenticated WebSocket connection.
 // It is used when the upgrade request was already authenticated by middleware,
 // so no in-protocol auth frame exchange is needed.
@@ -199,7 +199,6 @@ func (h *WebSocketHandler) messageLoop(conn *ws.Conn) {
 		}
 	}
 }
-
 
 func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 	data, err := frame.Marshal()

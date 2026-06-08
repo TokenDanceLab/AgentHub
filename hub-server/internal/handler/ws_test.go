@@ -128,11 +128,91 @@ func TestWebSocketRouteAcceptsHubLocalQueryTokenBeforeUpgrade(t *testing.T) {
 	}
 }
 
+func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
+	token, err := jwtutil.GenerateAccessToken("user-ws-typing", "desktop", "device-ws-typing", testWSSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("generate access token: %v", err)
+	}
+
+	manager := hubws.NewManager()
+	manager.ResolveMembers = func(sessionID string) []string {
+		if sessionID == "sess-typing" {
+			return []string{"user-ws-typing", "peer-ws-typing"}
+		}
+		return nil
+	}
+	called := make(chan map[string]string, 1)
+	wsURL := newWebSocketTestServerWithHandler(t, manager, func(h *handler.WebSocketHandler) {
+		h.SetOnTyping(func(userID, sessionID string) {
+			called <- map[string]string{"user_id": userID, "session_id": sessionID}
+		})
+	})
+	conn := dialWebSocket(t, wsURL)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeAuthFrame(t, conn, token)
+	if frame := readFrame(t, conn); frame.Type != hubws.TypeAuthOK {
+		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
+	}
+	writeTypingFrame(t, conn, "sess-typing")
+
+	select {
+	case got := <-called:
+		if got["user_id"] != "user-ws-typing" || got["session_id"] != "sess-typing" {
+			t.Fatalf("typing callback = %#v", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected typing callback for active session member")
+	}
+}
+
+func TestWebSocketTypingRejectsNonMemberBeforeCallback(t *testing.T) {
+	token, err := jwtutil.GenerateAccessToken("user-ws-outsider", "desktop", "device-ws-outsider", testWSSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("generate access token: %v", err)
+	}
+
+	manager := hubws.NewManager()
+	manager.ResolveMembers = func(sessionID string) []string {
+		if sessionID == "sess-typing" {
+			return []string{"peer-ws-typing"}
+		}
+		return nil
+	}
+	called := make(chan struct{}, 1)
+	wsURL := newWebSocketTestServerWithHandler(t, manager, func(h *handler.WebSocketHandler) {
+		h.SetOnTyping(func(userID, sessionID string) {
+			called <- struct{}{}
+		})
+	})
+	conn := dialWebSocket(t, wsURL)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	writeAuthFrame(t, conn, token)
+	if frame := readFrame(t, conn); frame.Type != hubws.TypeAuthOK {
+		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
+	}
+	writeTypingFrame(t, conn, "sess-typing")
+
+	select {
+	case <-called:
+		t.Fatal("typing callback must not run for non-member session")
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
 func newWebSocketTestServer(t *testing.T, manager *hubws.Manager) string {
+	return newWebSocketTestServerWithHandler(t, manager, nil)
+}
+
+func newWebSocketTestServerWithHandler(t *testing.T, manager *hubws.Manager, configure func(*handler.WebSocketHandler)) string {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	h := handler.NewWebSocketHandler(manager, testWSSecret)
+	if configure != nil {
+		configure(h)
+	}
 	r.GET("/client/ws", h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
@@ -172,6 +252,20 @@ func writeAuthFrame(t *testing.T, conn *websocket.Conn, token string) {
 	defer cancel()
 	if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
 		t.Fatalf("write auth frame: %v", err)
+	}
+}
+
+func writeTypingFrame(t *testing.T, conn *websocket.Conn, sessionID string) {
+	t.Helper()
+	frame := hubws.NewFrame(hubws.TypeTyping, map[string]string{"session_id": sessionID})
+	data, err := frame.Marshal()
+	if err != nil {
+		t.Fatalf("marshal typing frame: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
+		t.Fatalf("write typing frame: %v", err)
 	}
 }
 
