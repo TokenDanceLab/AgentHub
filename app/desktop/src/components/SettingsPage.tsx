@@ -66,6 +66,7 @@ import AboutSection from './settings/sections/AboutSection';
 import { useHubStore } from '@/stores/hubStore';
 import { getEdgeBaseUrl } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
+import { findRegisteredLocalEdgeTarget, useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
@@ -310,6 +311,11 @@ export default function SettingsPage({
         ? t('settings.hubLocalLogin')
         : t('settings.notConfigured');
   const deviceId = readBrowserStorage('local', DEVICE_ID_KEY);
+  const hubExecutionTargets = useHubExecutionTargets({ enabled: hubSessionActive });
+  const registeredLocalEdgeTarget = useMemo(
+    () => findRegisteredLocalEdgeTarget(hubExecutionTargets.data?.items ?? [], deviceId),
+    [deviceId, hubExecutionTargets.data?.items],
+  );
   const handleSignOut = () => {
     void hubAuth.logout();
   };
@@ -539,6 +545,9 @@ export default function SettingsPage({
               localEdgeTarget={localEdgeTarget}
               desktopDeviceStatus={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
               deviceId={deviceId}
+              registeredLocalEdgeTarget={registeredLocalEdgeTarget}
+              hubTargetsLoading={hubExecutionTargets.isLoading}
+              hubTargetsError={hubExecutionTargets.isError}
             />
           )}
 
