@@ -7,7 +7,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::RwLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 
 #[derive(Debug, Default)]
 pub struct WorkspaceFileAccessState {
@@ -32,6 +34,17 @@ impl WorkspaceFileAccessState {
             .write()
             .map_err(|_| "Workspace file access state is unavailable".to_string())?;
         *guard = roots;
+        Ok(())
+    }
+
+    fn add_root(&self, root: PathBuf) -> Result<(), String> {
+        let mut guard = self
+            .allowed_roots
+            .write()
+            .map_err(|_| "Workspace file access state is unavailable".to_string())?;
+        if !guard.iter().any(|existing| existing == &root) {
+            guard.push(root);
+        }
         Ok(())
     }
 }
@@ -70,11 +83,17 @@ fn resolve_for_boundary(path: &Path) -> std::io::Result<PathBuf> {
     let mut ancestor = path;
     while !ancestor.exists() {
         let name = ancestor.file_name().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::NotFound, "path has no existing ancestor")
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "path has no existing ancestor",
+            )
         })?;
         missing.push(name.to_os_string());
         ancestor = ancestor.parent().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::NotFound, "path has no existing ancestor")
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "path has no existing ancestor",
+            )
         })?;
     }
 
@@ -108,7 +127,99 @@ fn replace_workspace_roots_from_store(
     access: &WorkspaceFileAccessState,
     data: &WorkspaceStoreData,
 ) -> Result<(), String> {
+    let roots = authorized_workspace_roots_from_store_data(access, data)?;
+    access.replace_roots(roots)
+}
+
+fn replace_workspace_roots_from_trusted_store(
+    access: &WorkspaceFileAccessState,
+    data: &WorkspaceStoreData,
+) -> Result<(), String> {
     access.replace_roots(workspace_roots_from_store_data(data))
+}
+
+fn authorized_workspace_roots_from_store_data(
+    access: &WorkspaceFileAccessState,
+    data: &WorkspaceStoreData,
+) -> Result<Vec<PathBuf>, String> {
+    let roots = workspace_roots_from_store_data(data);
+    if roots.is_empty() {
+        return Ok(Vec::new());
+    }
+    let allowed = access.allowed_roots().map_err(|_| {
+        "Workspace store sync contains workspace roots that are not authorized by the host; use the native workspace picker before syncing"
+            .to_string()
+    })?;
+    let mut authorized = Vec::new();
+    for root in roots {
+        let canonical = validate_path(&root, &allowed).map_err(|_| {
+            format!(
+                "Workspace root '{}' is not authorized by the host; use the native workspace picker before syncing",
+                root.display()
+            )
+        })?;
+        if !authorized.iter().any(|existing| existing == &canonical) {
+            authorized.push(canonical);
+        }
+    }
+    Ok(authorized)
+}
+
+fn authorize_workspace_root_from_host_path(
+    path: impl AsRef<Path>,
+    access: &WorkspaceFileAccessState,
+) -> Result<PathBuf, String> {
+    let path = path.as_ref();
+    if !path.is_absolute() {
+        return Err(format!(
+            "Workspace root '{}' must be an absolute path",
+            path.display()
+        ));
+    }
+    let canonical = path
+        .canonicalize()
+        .map_err(|e| format!("Cannot resolve workspace root '{}': {}", path.display(), e))?;
+    if !canonical.is_dir() {
+        return Err(format!(
+            "Workspace root '{}' is not a directory",
+            canonical.display()
+        ));
+    }
+    access.add_root(canonical.clone())?;
+    Ok(canonical)
+}
+
+fn workspace_store_entry_for_authorized_root(path: PathBuf) -> WorkspaceStoreEntry {
+    WorkspaceStoreEntry {
+        name: path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| path.display().to_string()),
+        path: path.to_string_lossy().to_string(),
+        last_opened_at: current_unix_millis(),
+        branch: None,
+        settings: None,
+    }
+}
+
+fn upsert_workspace_store_entry(
+    mut data: WorkspaceStoreData,
+    entry: WorkspaceStoreEntry,
+) -> WorkspaceStoreData {
+    let entry_path = entry.path.to_lowercase();
+    data.workspaces
+        .retain(|existing| existing.path.to_lowercase() != entry_path);
+    data.workspaces.insert(0, entry);
+    data.workspaces.truncate(10);
+    data
+}
+
+fn current_unix_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().try_into().unwrap_or(u64::MAX))
+        .unwrap_or(0)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1056,6 +1167,116 @@ mod tests {
     }
 
     #[test]
+    fn workspace_store_sync_cannot_grant_unknown_existing_directory() {
+        let dir = TestDir::new("store-sync-unknown");
+        let access = WorkspaceFileAccessState::default();
+        let data = WorkspaceStoreData {
+            workspaces: vec![WorkspaceStoreEntry {
+                name: "unknown".to_string(),
+                path: dir.path.to_string_lossy().to_string(),
+                last_opened_at: 1,
+                branch: None,
+                settings: None,
+            }],
+        };
+
+        let err = replace_workspace_roots_from_store(&access, &data)
+            .expect_err("renderer workspace-store sync must not grant unknown roots");
+
+        assert!(err.contains("not authorized"));
+        assert!(validate_state_path(&dir.path, &access).is_err());
+    }
+
+    #[test]
+    fn workspace_store_sync_round_trips_already_authorized_workspace() {
+        let dir = TestDir::new("store-sync-authorized");
+        let access = WorkspaceFileAccessState::default();
+        let canonical = dir.path.canonicalize().unwrap();
+        access
+            .replace_roots(vec![canonical.clone()])
+            .expect("test root should be seeded");
+        let data = WorkspaceStoreData {
+            workspaces: vec![WorkspaceStoreEntry {
+                name: "authorized".to_string(),
+                path: dir.path.to_string_lossy().to_string(),
+                last_opened_at: 1,
+                branch: Some("main".to_string()),
+                settings: None,
+            }],
+        };
+
+        replace_workspace_roots_from_store(&access, &data)
+            .expect("already-authorized workspace should persist and remain allowed");
+
+        let resolved = validate_state_path(&dir.path, &access)
+            .expect("authorized workspace should still be allowed");
+        assert_eq!(resolved, canonical);
+    }
+
+    #[test]
+    fn host_authorized_workspace_root_can_seed_file_access() {
+        let dir = TestDir::new("host-authorized-root");
+        let access = WorkspaceFileAccessState::default();
+
+        let canonical = authorize_workspace_root_from_host_path(&dir.path, &access)
+            .expect("host-selected directory should be authorized");
+
+        assert_eq!(canonical, dir.path.canonicalize().unwrap());
+        let file = dir.path.join("notes.txt");
+        fs::write(&file, "inside").expect("workspace file should be written");
+        let resolved =
+            validate_state_path(&file, &access).expect("file under host-selected root should pass");
+        assert_eq!(resolved, file.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn host_authorized_workspace_root_rejects_relative_paths() {
+        let access = WorkspaceFileAccessState::default();
+
+        let err = authorize_workspace_root_from_host_path("relative/workspace", &access)
+            .expect_err("relative host path should not be authorized");
+
+        assert!(err.contains("must be an absolute path"));
+        assert!(access.allowed_roots().is_err());
+    }
+
+    #[test]
+    fn workspace_store_upsert_keeps_latest_authorized_root_first() {
+        let data = WorkspaceStoreData {
+            workspaces: vec![
+                WorkspaceStoreEntry {
+                    name: "old".to_string(),
+                    path: "C:/repo".to_string(),
+                    last_opened_at: 1,
+                    branch: Some("old-branch".to_string()),
+                    settings: None,
+                },
+                WorkspaceStoreEntry {
+                    name: "other".to_string(),
+                    path: "C:/other".to_string(),
+                    last_opened_at: 2,
+                    branch: None,
+                    settings: None,
+                },
+            ],
+        };
+        let entry = WorkspaceStoreEntry {
+            name: "repo".to_string(),
+            path: "c:/repo".to_string(),
+            last_opened_at: 3,
+            branch: None,
+            settings: None,
+        };
+
+        let updated = upsert_workspace_store_entry(data, entry);
+
+        assert_eq!(updated.workspaces.len(), 2);
+        assert_eq!(updated.workspaces[0].name, "repo");
+        assert_eq!(updated.workspaces[0].path, "c:/repo");
+        assert_eq!(updated.workspaces[1].name, "other");
+    }
+
+    #[test]
     fn workspace_store_roots_keep_only_existing_absolute_directories() {
         let dir = TestDir::new("store-roots");
         let data = WorkspaceStoreData {
@@ -1180,7 +1401,7 @@ pub fn seed_workspace_file_access_from_store(
         fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
     let data: WorkspaceStoreData = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse workspace store: {}", e))?;
-    replace_workspace_roots_from_store(access, &data)
+    replace_workspace_roots_from_trusted_store(access, &data)
 }
 
 #[tauri::command]
@@ -1197,7 +1418,7 @@ pub async fn read_workspace_store(
         fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
     let data: WorkspaceStoreData = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse workspace store: {}", e))?;
-    replace_workspace_roots_from_store(&access, &data)?;
+    replace_workspace_roots_from_trusted_store(&access, &data)?;
     Ok(data)
 }
 
@@ -1207,6 +1428,7 @@ pub async fn write_workspace_store(
     data: WorkspaceStoreData,
     access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
+    let roots = authorized_workspace_roots_from_store_data(&access, &data)?;
     let path = workspace_store_path(&app);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create app data dir: {}", e))?;
@@ -1214,7 +1436,45 @@ pub async fn write_workspace_store(
     let content = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
     fs::write(&path, &content).map_err(|e| format!("Failed to write workspace store: {}", e))?;
-    replace_workspace_roots_from_store(&access, &data)
+    access.replace_roots(roots)
+}
+
+#[tauri::command]
+pub async fn choose_workspace_root(
+    app: tauri::AppHandle,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<Option<WorkspaceStoreEntry>, String> {
+    let selected = app
+        .dialog()
+        .file()
+        .set_title("Choose workspace folder")
+        .blocking_pick_folder();
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|e| format!("Failed to resolve selected workspace folder: {}", e))?;
+    let canonical = authorize_workspace_root_from_host_path(path, &access)?;
+    let entry = workspace_store_entry_for_authorized_root(canonical);
+    let store_path = workspace_store_path(&app);
+    let existing = if store_path.exists() {
+        let content = fs::read_to_string(&store_path)
+            .map_err(|e| format!("Failed to read workspace store: {}", e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse workspace store: {}", e))?
+    } else {
+        WorkspaceStoreData::default()
+    };
+    let next = upsert_workspace_store_entry(existing, entry.clone());
+    if let Some(parent) = store_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create app data dir: {}", e))?;
+    }
+    let content = serde_json::to_string_pretty(&next)
+        .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
+    fs::write(&store_path, &content)
+        .map_err(|e| format!("Failed to write workspace store: {}", e))?;
+    Ok(Some(entry))
 }
 
 // ── Workspace Content Search ──

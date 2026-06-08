@@ -288,6 +288,30 @@ export async function syncWorkspacesToBackend(): Promise<void> {
 }
 
 /**
+ * Open the native host workspace picker and persist the selected root in both
+ * Rust workspace-store.json and the legacy localStorage recent list.
+ */
+export async function chooseWorkspaceRootFromBackend(): Promise<WorkspaceEntry | null> {
+  if (!isTauriRuntime()) return null;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const entry: RustWorkspaceStoreEntry | null = await invoke('choose_workspace_root');
+    if (!entry?.path) return null;
+    const workspace = compactRecord<WorkspaceEntry>({
+      name: entry.name || pathBasename(entry.path),
+      path: normalizePath(entry.path),
+      lastOpenedAt: entry.last_opened_at || Date.now(),
+      branch: entry.branch,
+    });
+    addRecentWorkspace(workspace);
+    setSavedWorkDir(workspace.path);
+    return workspace;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Restore workspace data from the Rust backend JSON file.
  * Merges backend entries that are not already in localStorage.
  */
