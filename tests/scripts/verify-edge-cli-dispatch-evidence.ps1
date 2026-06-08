@@ -162,11 +162,112 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($failedObserved.Output -match "real_tested=false") "failed observed chain reports real_tested=false" $failedObserved.Output
     Assert-True ($failedObserved.Output -match "terminalStatus") "failed observed chain names terminal status blocker" $failedObserved.Output
 
-    $passingManifest = Join-Path $tempDir "passing-observed.json"
+    $missingExitCodeManifest = Join-Path $tempDir "missing-exit-code-observed.json"
     @'
 {
   "adapterId": "codex",
   "approvalId": "approval-123",
+  "observedEvidenceRef": "edge-event-log:evt-plan..evt-finished",
+  "correlationId": "run-observed-123",
+  "invocationPlanEventId": "evt-plan",
+  "terminalEventId": "evt-finished",
+  "requestMapped": true,
+  "invocationPlanObserved": true,
+  "eventReplayObserved": true,
+  "realCliObserved": true,
+  "redacted": true,
+  "noSecrets": true,
+  "terminalStatus": "finished"
+}
+'@ | Set-Content -LiteralPath $missingExitCodeManifest -Encoding UTF8
+
+    $missingExitCodeObserved = Invoke-DispatchScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "RealTested",
+        "-ObservedManifest", $missingExitCodeManifest,
+        "-ApprovalMarker", $approvalMarker,
+        "-ApproveObservedCLI"
+    )
+    Assert-True ($missingExitCodeObserved.ExitCode -ne 0) "missing exitCode fails closed" $missingExitCodeObserved.Output
+    Assert-True ($missingExitCodeObserved.Output -match "exitCode") "missing exitCode failure names required field" $missingExitCodeObserved.Output
+    Assert-True ($missingExitCodeObserved.Output -match "real_tested=false") "missing exitCode reports real_tested=false" $missingExitCodeObserved.Output
+
+    $wrongTypesManifest = Join-Path $tempDir "wrong-types-observed.json"
+    @'
+{
+  "adapterId": 7,
+  "approvalId": true,
+  "observedEvidenceRef": ["edge-event-log:evt-plan"],
+  "correlationId": 123,
+  "invocationPlanEventId": false,
+  "terminalEventId": 9,
+  "requestMapped": "true",
+  "invocationPlanObserved": "true",
+  "eventReplayObserved": "true",
+  "realCliObserved": "true",
+  "redacted": "true",
+  "noSecrets": "true",
+  "terminalStatus": true,
+  "exitCode": "0"
+}
+'@ | Set-Content -LiteralPath $wrongTypesManifest -Encoding UTF8
+
+    $wrongTypesObserved = Invoke-DispatchScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "RealTested",
+        "-ObservedManifest", $wrongTypesManifest,
+        "-ApprovalMarker", $approvalMarker,
+        "-ApproveObservedCLI"
+    )
+    Assert-True ($wrongTypesObserved.ExitCode -ne 0) "wrong-type required manifest fields fail closed" $wrongTypesObserved.Output
+    Assert-True ($wrongTypesObserved.Output -match "must be") "wrong-type failure names type requirements" $wrongTypesObserved.Output
+    Assert-True ($wrongTypesObserved.Output -match "real_tested=false") "wrong-type required fields report real_tested=false" $wrongTypesObserved.Output
+
+    $syntheticBooleanOnlyManifest = Join-Path $tempDir "synthetic-boolean-only-observed.json"
+    @'
+{
+  "adapterId": "codex",
+  "approvalId": "approval-123",
+  "requestMapped": true,
+  "invocationPlanObserved": true,
+  "eventReplayObserved": true,
+  "realCliObserved": true,
+  "redacted": true,
+  "noSecrets": true,
+  "terminalStatus": "finished",
+  "exitCode": 0
+}
+'@ | Set-Content -LiteralPath $syntheticBooleanOnlyManifest -Encoding UTF8
+
+    $syntheticBooleanOnlyObserved = Invoke-DispatchScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "RealTested",
+        "-ObservedManifest", $syntheticBooleanOnlyManifest,
+        "-ApprovalMarker", $approvalMarker,
+        "-ApproveObservedCLI"
+    )
+    Assert-True ($syntheticBooleanOnlyObserved.ExitCode -ne 0) "approved boolean-only synthetic manifest stays blocked" $syntheticBooleanOnlyObserved.Output
+    Assert-True ($syntheticBooleanOnlyObserved.Output -match "observedEvidenceRef|correlationId|invocationPlanEventId|terminalEventId") "boolean-only synthetic manifest names missing provenance/correlation" $syntheticBooleanOnlyObserved.Output
+    Assert-True ($syntheticBooleanOnlyObserved.Output -match "real_tested=false") "boolean-only synthetic manifest reports real_tested=false" $syntheticBooleanOnlyObserved.Output
+
+    $passingManifest = Join-Path $tempDir "passing-correlated-observed.json"
+    @'
+{
+  "adapterId": "codex",
+  "approvalId": "approval-123",
+  "observedEvidenceRef": "edge-event-log:evt-plan..evt-finished",
+  "correlationId": "run-observed-123",
+  "invocationPlanEventId": "evt-plan",
+  "terminalEventId": "evt-finished",
   "requestMapped": true,
   "invocationPlanObserved": true,
   "eventReplayObserved": true,
@@ -198,6 +299,8 @@ if (Test-Path -LiteralPath $docPath) {
     Assert-True ($docText -match "request -> CLI invocation plan -> event replay/status") "audit doc records dispatch evidence chain"
     Assert-True ($docText -match "real_tested=false") "audit doc records false-by-default real-tested semantics"
     Assert-True ($docText -match "approval marker") "audit doc records observed approval marker gate"
+    Assert-True ($docText -match "observedEvidenceRef") "audit doc records observed evidence reference requirement"
+    Assert-True ($docText -match "correlationId") "audit doc records correlation requirement"
 }
 
 if ($Failed -gt 0) {
