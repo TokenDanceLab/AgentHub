@@ -144,10 +144,24 @@ jobs:
           Compress-Archive -Path "$portableDir\*" -DestinationPath "dist\AgentHub_${ver}_x64-portable.zip" -Force
 
           $latestJson = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "latest.json" -Recurse -File | Select-Object -First 1
-          if ($latestJson) { Copy-Item $latestJson.FullName "dist\latest.json" }
+          if (-not $latestJson) { throw "missing latest.json updater metadata" }
+          Copy-Item $latestJson.FullName "dist\latest.json"
 
           $signature = Get-ChildItem "app\desktop\src-tauri\target\release\bundle" -Filter "*.sig" -Recurse -File | Select-Object -First 1
-          if ($signature) { Copy-Item $signature.FullName "dist\AgentHub_${ver}_x64-setup.exe.sig" }
+          if (-not $signature) { throw "missing updater signature .sig" }
+          Copy-Item $signature.FullName "dist\AgentHub_${ver}_x64-setup.exe.sig"
+
+          Get-ChildItem dist -File |
+            Sort-Object Name |
+            ForEach-Object {
+              [pscustomobject]@{
+                name = $_.Name
+                bytes = $_.Length
+                sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+              }
+            } |
+            ConvertTo-Json -Depth 4 |
+            Out-File "dist\artifact-manifest.json" -Encoding UTF8
 
       - name: Gate collected package artifacts
         shell: pwsh
