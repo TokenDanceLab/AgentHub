@@ -1,11 +1,11 @@
 export {
   RuntimeBrandIcon,
   resolveRuntimeBrandIcon,
-} from './designIcons';
+} from '../ui/RuntimeIcon';
 export type {
   RuntimeBrandIconKind,
   RuntimeBrandIconProps,
   RuntimeBrandIconResolution,
   RuntimeBrandIconSize,
   RuntimeBrandIconSource,
-} from './designIcons';
+} from '../ui/RuntimeIcon';
