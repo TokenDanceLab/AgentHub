@@ -16,6 +16,8 @@ Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI adapter
 
 The sprint succeeds when Web can start or control work through Hub, Hub targets one owner-scoped registered Desktop/Edge, Desktop receives the dispatch, Local Edge starts the run through an adapter, and Web/Desktop can replay the run state plus evidence. Mobile is out of implementation scope for this thread, but the same Hub-mediated protocol must remain reusable by Mobile.
 
+P0 fixture topology now proves Web authenticated Hub session can address a registered Desktop/Edge target. Real TokenDanceID/OIDC login and real CLI/model execution remain explicit approval gates.
+
 ## Current Baseline
 
 - Backend is mainlined for this sprint: Hub/Edge contracts, target-bound dispatch, fake/local login gates, Desktop packaged Local Edge SQLite, Edge SQL readmodel, TeamRun fixture evidence, Web Projects/Icons, Tauri/macOS dry policy, and SDK fixture mapper are already on dev.
