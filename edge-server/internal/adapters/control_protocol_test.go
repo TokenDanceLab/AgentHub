@@ -672,7 +672,7 @@ func TestChannelPermissionDecider(t *testing.T) {
 }
 
 // TestControlProtocolMissingSubtypes ensures stub handlers for subtypes
-// that are not yet fully implemented do not panic or error.
+// that are not yet fully implemented return an explicit unsupported response.
 func TestControlProtocolMissingSubtypes(t *testing.T) {
 	subtypes := []string{
 		"get_context_usage",
@@ -693,9 +693,18 @@ func TestControlProtocolMissingSubtypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("HandleControlRequest for %q returned error: %v", subtype, err)
 			}
-			// Stubs should not write a response (silent no-op)
-			if buf.Len() > 0 {
-				t.Logf("stub %q wrote %d bytes (expected silent no-op)", subtype, buf.Len())
+			payload := decodeControlCapabilityResponse(t, buf.Bytes(), "r-stub")
+			if payload.Status != "unsupported" {
+				t.Fatalf("Status = %q, want unsupported", payload.Status)
+			}
+			if payload.RequestID != "r-stub" {
+				t.Fatalf("RequestID = %q, want r-stub", payload.RequestID)
+			}
+			if payload.RequestedSubtype != subtype {
+				t.Fatalf("RequestedSubtype = %q, want %q", payload.RequestedSubtype, subtype)
+			}
+			if payload.Subtype != subtype {
+				t.Fatalf("Subtype = %q, want %q", payload.Subtype, subtype)
 			}
 		})
 	}
