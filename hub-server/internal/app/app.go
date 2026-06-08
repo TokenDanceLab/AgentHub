@@ -47,15 +47,16 @@ type App struct {
 	Version string
 
 	// Service layer
-	AuthService         *service.AuthService
-	ContactService      *service.ContactService
-	SessionService      *service.SessionService
-	MessageService      *service.MessageService
-	AgentService        *service.AgentService
-	AgentControlService *service.AgentControlService
-	AttachmentService   *service.AttachmentService
-	NotificationService *service.NotificationService
-	DeviceService       *service.DeviceService
+	AuthService            *service.AuthService
+	ContactService         *service.ContactService
+	SessionService         *service.SessionService
+	MessageService         *service.MessageService
+	MessageReactionService *service.MessageReactionService
+	AgentService           *service.AgentService
+	AgentControlService    *service.AgentControlService
+	AttachmentService      *service.AttachmentService
+	NotificationService    *service.NotificationService
+	DeviceService          *service.DeviceService
 
 	// OIDC (optional — only when TokenDance ID is configured)
 	OIDCService *service.OIDCService
@@ -110,6 +111,19 @@ func New(cfg *config.Config, db *gorm.DB, cacheClient *cache.Client) *App {
 		coreCtx:     coreCtx,
 		coreCancel:  coreCancel,
 	}
+}
+
+type messageServiceWithReactions struct {
+	*service.MessageService
+	reactions *service.MessageReactionService
+}
+
+func (s messageServiceWithReactions) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return s.reactions.AddMessageReaction(ctx, userID, sessionID, msgID, reaction)
+}
+
+func (s messageServiceWithReactions) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return s.reactions.RemoveMessageReaction(ctx, userID, sessionID, msgID, reaction)
 }
 
 // Run starts the Hub Server and blocks until a shutdown signal is received.
@@ -171,6 +185,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
+	a.MessageReactionService = service.NewMessageReactionService(a.DB, a.bus)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
 	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 	a.DeviceService = service.NewDeviceService(a.DB)
@@ -242,7 +257,10 @@ func (a *App) Run(ctx context.Context) error {
 	a.DeviceHandler.SetJWTConfig(a.Config.JWT.Secret, a.Config.JWT.AccessTTL)
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
-	a.MessageHandler = handler.NewMessageHandler(a.MessageService)
+	a.MessageHandler = handler.NewMessageHandler(messageServiceWithReactions{
+		MessageService: a.MessageService,
+		reactions:      a.MessageReactionService,
+	})
 	a.AgentHandler = handler.NewAgentHandler(a.AgentService)
 	a.CustomAgentHandler = handler.NewCustomAgentHandler(a.AgentService)
 	a.AttachmentHandler = handler.NewAttachmentHandler(a.AttachmentService)
@@ -475,6 +493,24 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		frame := ws.NewFrame(ws.TypeMessageUnpin, payload)
 		a.mgr.PushToSession(payload["session_id"], frame)
 	})
+
+	for _, reactionEvent := range []struct {
+		eventType string
+		frameType string
+	}{
+		{eventType: ws.TypeMessageReactionAdded, frameType: ws.TypeMessageReactionAdded},
+		{eventType: ws.TypeMessageReactionRemoved, frameType: ws.TypeMessageReactionRemoved},
+	} {
+		reactionEvent := reactionEvent
+		a.bus.Subscribe(reactionEvent.eventType, func(ctx context.Context, event service.Event) {
+			payload, ok := event.Payload.(service.MessageReactionEventPayload)
+			if !ok {
+				return
+			}
+			frame := ws.NewFrame(reactionEvent.frameType, payload)
+			a.mgr.PushToSession(payload.SessionID, frame)
+		})
+	}
 
 	a.bus.Subscribe("message.read", func(ctx context.Context, event service.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
