@@ -66,6 +66,8 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL,
 			reply_to_message_id TEXT,
 			recalled BOOLEAN NOT NULL DEFAULT FALSE,
+			edited BOOLEAN NOT NULL DEFAULT FALSE,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,

@@ -129,6 +129,10 @@ const RateLimitExpiryBuffer = 10 * time.Second
 // MessageRecallWindow is the non-owner recall window for messages.
 const MessageRecallWindow = 5 * time.Minute
 
+// MessageEditWindow is the time window during which a sender may edit their
+// own message. Set to 0 to allow editing without a time limit.
+const MessageEditWindow = 15 * time.Minute
+
 // MaxPinsPerSession caps how many messages can be pinned in one session.
 const MaxPinsPerSession int64 = 50
 

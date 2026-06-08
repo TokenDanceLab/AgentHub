@@ -85,6 +85,8 @@ type MessageResponse struct {
 	ReplyTo      *ReplyToInfo       `json:"reply_to,omitempty"`
 	Attachments  []model.Attachment `json:"attachments,omitempty"`
 	Recalled     bool               `json:"recalled"`
+	Edited       bool               `json:"edited"`
+	EditedAt     string             `json:"edited_at,omitempty"`
 	CreatedAt    string             `json:"created_at"`
 }
 
@@ -92,6 +94,16 @@ type SendMessageResponse struct {
 	MessageID string `json:"message_id"`
 	SeqID     int64  `json:"seq_id"`
 	CreatedAt string `json:"created_at"`
+}
+
+type EditMessageRequest struct {
+	ContentType string `json:"content_type"`
+	Content     string `json:"content"`
+}
+
+type EditMessageResponse struct {
+	MessageID string `json:"message_id"`
+	EditedAt  string `json:"edited_at"`
 }
 
 var validContentTypes = map[string]bool{
@@ -452,7 +464,11 @@ func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageRespo
 			Content:      m.Content,
 			ReplyToMsgID: m.ReplyToMsgID,
 			Recalled:     m.Recalled,
+			Edited:       m.Edited,
 			CreatedAt:    m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		if m.EditedAt != nil {
+			resp.EditedAt = m.EditedAt.Format("2006-01-02T15:04:05Z07:00")
 		}
 
 		if len(attachmentsByMessage[m.ID]) > 0 {
@@ -537,6 +553,66 @@ func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string
 	s.bus.Publish(ctx, Event{Type: "message.recall", Payload: msg})
 
 	return nil
+}
+
+func (s *MessageService) EditMessage(ctx context.Context, msgID, userID string, req EditMessageRequest) (*EditMessageResponse, error) {
+	msg, err := repository.GetMessageByID(s.db, msgID)
+	if err != nil {
+		return nil, errcode.MsgNotFound
+	}
+
+	if _, err := repository.GetActiveMember(s.db, msg.SessionID, model.MemberTypeUser, userID); err != nil {
+		return nil, errcode.SessionNotMember
+	}
+	if msg.Recalled {
+		return nil, errcode.MsgNotEditable
+	}
+	if msg.SenderType != model.SenderTypeUser {
+		return nil, errcode.MsgNotEditable
+	}
+	if msg.SenderID != userID {
+		return nil, errcode.SessionNotMember
+	}
+	if config.MessageEditWindow > 0 && time.Since(msg.CreatedAt) > config.MessageEditWindow {
+		return nil, errcode.MsgEditTimeout
+	}
+	if !validContentTypes[req.ContentType] {
+		return nil, errcode.ErrBadRequest
+	}
+
+	content, err := normalizeMessageContent(req.ContentType, req.Content)
+	if err != nil {
+		slog.Warn("invalid message edit content", "content_type", req.ContentType, "error", err)
+		return nil, errcode.ErrBadRequest
+	}
+	attachmentIDs, ok := attachmentIDsFromContent(req.ContentType, content)
+	if !ok {
+		return nil, errcode.ErrBadRequest
+	}
+	for _, attachmentID := range attachmentIDs {
+		if err := s.ensureAttachmentReferenceAllowed(userID, attachmentID); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := repository.UpdateMessageContent(s.db, msgID, req.ContentType, content); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.MsgNotFound
+		}
+		return nil, err
+	}
+
+	updated, err := repository.GetMessageByID(s.db, msgID)
+	if err != nil {
+		return nil, err
+	}
+	s.bus.Publish(ctx, Event{Type: "message.edited", Payload: updated})
+
+	editedAt := ""
+	if updated.EditedAt != nil {
+		editedAt = updated.EditedAt.Format("2006-01-02T15:04:05Z07:00")
+	}
+	return &EditMessageResponse{MessageID: msgID, EditedAt: editedAt}, nil
 }
 
 func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgID string) error {

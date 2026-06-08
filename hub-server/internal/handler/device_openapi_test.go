@@ -188,6 +188,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/client/sessions/{id}/agents":                                       {"post"},
 		"/client/sessions/{id}/messages/search":                              {"get"},
 		"/client/sessions/search":                                            {"get"},
+		"/client/messages/{id}":                                              {"put"},
 		"/client/messages/{id}/recall":                                       {"post"},
 		"/client/messages/{id}/pin":                                          {"post", "delete"},
 		"/client/messages/{id}/forward":                                      {"post"},
