@@ -80,7 +80,8 @@ cd hub-server; go test ./internal/handler ./internal/service ./internal/router -
 
 ## Approval Gates
 
-- Real TokenDanceID login: needs approved OAuth client, disposable/test account, Hub environment, browser evidence boundary, and no token disclosure.
+- Real TokenDanceID/OIDC login, real CLI/model spend, public deploy, signing/notarization, updater metadata, and release upload remain explicit approval gates.
+- Real TokenDanceID login: requires approved OAuth client, disposable/test account, Hub environment, browser evidence boundary, and no token disclosure.
 - Real CLI/model run: needs runtime choice, budget approval, redaction policy, and artifact upload policy.
 - Public Web deploy: needs target environment, env var ownership, callback URL confirmation, and no-secret deploy log boundary.
 - Desktop release: signing, notarization, stapling, updater metadata, and release upload are separate approval slices.
