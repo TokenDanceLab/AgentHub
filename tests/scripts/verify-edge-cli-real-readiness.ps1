@@ -108,6 +108,14 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($scriptText -notmatch '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode)\b') "script has no direct Codex/Claude/OpenCode command pattern"
     Assert-True ($scriptText -match 'ValidateCLIAdapterID') "script checks supported CLI adapter id evidence"
     Assert-True ($scriptText -match 'TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback') "script checks explicit unknown runtime no-fallback evidence"
+    Assert-True ($scriptText -match '\$CommandPlan') "script requires an explicit future command plan input"
+    Assert-True ($scriptText -match '\$TimeoutPlan') "script requires an explicit timeout/kill policy input"
+    Assert-True ($scriptText -match '\$ArtifactRetention') "script requires explicit artifact retention input"
+    Assert-True ($scriptText -match '\$EnvVarOwnership') "script requires explicit env var ownership input"
+    Assert-True ($scriptText -match '\$RequireApprovalInputs') "script can fail closed when approval inputs are required"
+    Assert-True ($scriptText -match '\$ApproveRedactionPolicy') "script has an explicit redaction approval flag"
+    Assert-True ($scriptText -match '\$ApproveArtifactRetention') "script has an explicit artifact retention approval flag"
+    Assert-True ($scriptText -match '\$ApproveEnvVarOwnership') "script has an explicit env ownership approval flag"
 
     $defaultRun = Invoke-ReadinessScript @(
         "-NoProfile",
@@ -139,6 +147,60 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($realTestedRun.ExitCode -ne 0) "RealTested mode fails without operator approval" $realTestedRun.Output
     Assert-True ($realTestedRun.Output -match "operator approval") "RealTested failure names missing operator approval" $realTestedRun.Output
 
+    $unknownRuntimeRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-RuntimeId", "unknown-runtime"
+    )
+    Assert-True ($unknownRuntimeRun.ExitCode -ne 0) "unknown runtime id fails closed even in proposal mode" $unknownRuntimeRun.Output
+    Assert-True ($unknownRuntimeRun.Output -match "unsupported adapter") "unknown runtime failure names unsupported adapter" $unknownRuntimeRun.Output
+
+    $outsideArtifactRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-ArtifactRoot", "docs\audit"
+    )
+    Assert-True ($outsideArtifactRun.ExitCode -ne 0) "artifact root outside allowed temp dirs fails closed" $outsideArtifactRun.Output
+    Assert-True ($outsideArtifactRun.Output -match "allowed temp") "artifact root failure names allowed temp boundary" $outsideArtifactRun.Output
+
+    $secretValue = "sk-test-secret-value"
+    $secretInputRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-RuntimeEnvManifest", "OPENAI_API_KEY=$secretValue"
+    )
+    Assert-True ($secretInputRun.ExitCode -ne 0) "secret-like approval input fails closed" $secretInputRun.Output
+    Assert-True ($secretInputRun.Output -match "secret-like") "secret-like failure is reported generically" $secretInputRun.Output
+    Assert-True ($secretInputRun.Output -notmatch [regex]::Escape($secretValue)) "secret-like input value is not printed" $secretInputRun.Output
+
+    $approvalRequiredRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-RequireApprovalInputs",
+        "-RuntimeId", "codex",
+        "-RuntimePath", "operator-owned-codex-path",
+        "-RuntimeEnvManifest", "OPENAI_API_KEY owned by operator secret store",
+        "-BudgetPlan", "max 1 request, max 1000 output tokens, max 2 USD",
+        "-CommandPlan", "codex exec --json --approval-mode manual",
+        "-TimeoutPlan", "hard timeout 120 seconds, kill process tree",
+        "-RedactionPlan", "redact env, stdout, stderr, prompts, and artifacts",
+        "-ArtifactRoot", ".tmp\edge-cli-real-readiness\codex",
+        "-ArtifactRetention", "retain redacted logs for 7 days, delete raw capture immediately",
+        "-EnvVarOwnership", "OPENAI_API_KEY owned by operator secret store",
+        "-EvidenceMode", "redacted-log",
+        "-OperatorApprovalId", "approval-123"
+    )
+    Assert-True ($approvalRequiredRun.ExitCode -ne 0) "approval-required run fails when explicit approval flags are missing" $approvalRequiredRun.Output
+    Assert-True ($approvalRequiredRun.Output -match "approval flag") "missing approval flags are reported" $approvalRequiredRun.Output
+
     $fakeRealTestedRun = Invoke-ReadinessScript @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -149,10 +211,18 @@ if (Test-Path -LiteralPath $scriptPath) {
         "-RuntimePath", "approved-runtime-owner",
         "-RuntimeEnvManifest", "approved-env-manifest",
         "-BudgetPlan", "approved-budget",
+        "-CommandPlan", "codex exec --json --approval-mode manual",
+        "-TimeoutPlan", "hard timeout 120 seconds",
         "-RedactionPlan", "approved-redaction",
-        "-ArtifactRoot", "approved-artifacts",
+        "-ArtifactRoot", ".tmp\edge-cli-real-readiness\codex",
+        "-ArtifactRetention", "approved retention",
+        "-EnvVarOwnership", "approved env owners",
         "-EvidenceMode", "approved-evidence-mode",
-        "-OperatorApprovalId", "approval-123"
+        "-OperatorApprovalId", "approval-123",
+        "-ApproveNoRealExecution",
+        "-ApproveRedactionPolicy",
+        "-ApproveArtifactRetention",
+        "-ApproveEnvVarOwnership"
     )
     Assert-True ($fakeRealTestedRun.ExitCode -ne 0) "RealTested forged metadata remains blocked without real execution evidence manifest" $fakeRealTestedRun.Output
     Assert-True ($fakeRealTestedRun.Output -match "real execution evidence manifest") "RealTested forged metadata names missing real execution evidence manifest" $fakeRealTestedRun.Output
@@ -169,11 +239,19 @@ if (Test-Path -LiteralPath $scriptPath) {
         "-RuntimePath", "approved-runtime-owner",
         "-RuntimeEnvManifest", "approved-env-manifest",
         "-BudgetPlan", "approved-budget",
+        "-CommandPlan", "codex exec --json --approval-mode manual",
+        "-TimeoutPlan", "hard timeout 120 seconds",
         "-RedactionPlan", "approved-redaction",
-        "-ArtifactRoot", "approved-artifacts",
+        "-ArtifactRoot", ".tmp\edge-cli-real-readiness\codex",
+        "-ArtifactRetention", "approved retention",
+        "-EnvVarOwnership", "approved env owners",
         "-EvidenceMode", "approved-evidence-mode",
         "-OperatorApprovalId", "approval-123",
-        "-RealExecutionEvidenceManifest", "docs\audit\p0-edge-cli-real-readiness.md"
+        "-RealExecutionEvidenceManifest", "docs\audit\p0-edge-cli-real-readiness.md",
+        "-ApproveNoRealExecution",
+        "-ApproveRedactionPolicy",
+        "-ApproveArtifactRetention",
+        "-ApproveEnvVarOwnership"
     )
     Assert-True ($fakeRealTestedMarkdownRun.ExitCode -ne 0) "RealTested forged existing markdown evidence remains blocked" $fakeRealTestedMarkdownRun.Output
     Assert-True ($fakeRealTestedMarkdownRun.Output -match "independent real-run verifier") "RealTested forged existing markdown points to independent real-run verifier" $fakeRealTestedMarkdownRun.Output
@@ -199,10 +277,18 @@ if (Test-Path -LiteralPath $scriptPath) {
         "-RuntimePath", "approved-runtime-owner",
         "-RuntimeEnvManifest", "approved-env-manifest",
         "-BudgetPlan", "approved-budget",
+        "-CommandPlan", "codex exec --json --approval-mode manual",
+        "-TimeoutPlan", "hard timeout 120 seconds",
         "-RedactionPlan", "approved-redaction",
-        "-ArtifactRoot", "approved-artifacts",
+        "-ArtifactRoot", ".tmp\edge-cli-real-readiness\codex",
+        "-ArtifactRetention", "approved retention",
+        "-EnvVarOwnership", "approved env owners",
         "-EvidenceMode", "approved-evidence-mode",
-        "-OperatorApprovalId", "approval-123"
+        "-OperatorApprovalId", "approval-123",
+        "-ApproveNoRealExecution",
+        "-ApproveRedactionPolicy",
+        "-ApproveArtifactRetention",
+        "-ApproveEnvVarOwnership"
     )
     Assert-True ($fakeSubmissionRun.ExitCode -ne 0) "Submission forged metadata remains blocked without real execution evidence manifest" $fakeSubmissionRun.Output
     Assert-True ($fakeSubmissionRun.Output -match "real execution evidence manifest") "Submission forged metadata names missing real execution evidence manifest" $fakeSubmissionRun.Output
@@ -219,11 +305,19 @@ if (Test-Path -LiteralPath $scriptPath) {
         "-RuntimePath", "approved-runtime-owner",
         "-RuntimeEnvManifest", "approved-env-manifest",
         "-BudgetPlan", "approved-budget",
+        "-CommandPlan", "codex exec --json --approval-mode manual",
+        "-TimeoutPlan", "hard timeout 120 seconds",
         "-RedactionPlan", "approved-redaction",
-        "-ArtifactRoot", "approved-artifacts",
+        "-ArtifactRoot", ".tmp\edge-cli-real-readiness\codex",
+        "-ArtifactRetention", "approved retention",
+        "-EnvVarOwnership", "approved env owners",
         "-EvidenceMode", "approved-evidence-mode",
         "-OperatorApprovalId", "approval-123",
-        "-RealExecutionEvidenceManifest", "docs\audit\p0-edge-cli-real-readiness.md"
+        "-RealExecutionEvidenceManifest", "docs\audit\p0-edge-cli-real-readiness.md",
+        "-ApproveNoRealExecution",
+        "-ApproveRedactionPolicy",
+        "-ApproveArtifactRetention",
+        "-ApproveEnvVarOwnership"
     )
     Assert-True ($fakeSubmissionMarkdownRun.ExitCode -ne 0) "Submission forged existing markdown evidence remains blocked" $fakeSubmissionMarkdownRun.Output
     Assert-True ($fakeSubmissionMarkdownRun.Output -match "independent real-run verifier") "Submission forged existing markdown points to independent real-run verifier" $fakeSubmissionMarkdownRun.Output
@@ -235,6 +329,12 @@ if (Test-Path -LiteralPath $docPath) {
     Assert-True ($docText -match "codex.*claude-code.*opencode") "audit doc records supported runtime ids"
     Assert-True ($docText -match "unknown-runtime") "audit doc records unknown runtime no-fallback evidence"
     Assert-True ($docText -match "operator approval") "audit doc records approval prerequisite"
+    Assert-True ($docText -match "command") "audit doc records command approval prerequisite"
+    Assert-True ($docText -match "timeout") "audit doc records timeout approval prerequisite"
+    Assert-True ($docText -match "artifact retention") "audit doc records artifact retention prerequisite"
+    Assert-True ($docText -match "env var ownership") "audit doc records env var ownership prerequisite"
+    Assert-True ($docText -match "allowed temp") "audit doc records allowed artifact temp roots"
+    Assert-True ($docText -match "secret-like") "audit doc records secret-like input rejection"
     Assert-True ($docText -match "No real CLI/model run") "audit doc records no real CLI/model execution"
 }
 
