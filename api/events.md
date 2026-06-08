@@ -249,8 +249,10 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | 字段 | 类型 | 必填 | 描述 |
 |-------|------|:---:|------|
 | `type` | string | 是 | 事件类型，使用 dot.notation 格式（如 `message.new`） |
-| `seq_id` | number | 否 | 当前连接内单调递增序号 |
+| `seq_id` | number | 否 | 服务端保留字段，用于需要排序/游标的 Hub-emitted frames；未排序事件、认证帧和客户端事件应省略 |
 | `payload` | object | 视事件而定 | 事件载荷，结构由 `type` 决定 |
+
+`seq_id` 不是客户端可写字段。当前实现中 `Frame.seq_id` 使用 `omitempty`，所以 `auth.ok`、`auth.fail`、`typing`、device presence 和 agent control/dispatch 默认不带 `seq_id`；消息分页游标仍以 message payload 内的 `seq_id` 为准。
 
 对比 Edge EventEnvelope：
 
@@ -317,8 +319,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `device.online` | 设备上线，payload: `{ user_id, device_id, device_type }` |
-| `device.offline` | 设备下线，payload: `{ user_id, device_id, device_type }` |
+| `device.online` | 用户在线 presence，payload: `{ user_id }`；这是 user-level presence 广播，不暴露具体 device |
+| `device.offline` | 用户离线 presence，payload: `{ user_id }`；这是 user-level presence 广播，不暴露具体 device |
 | `device.kicked` | 设备被踢下线，payload: `{ device_id, reason }` |
 
 #### Agent Task 事件（Hub↔Edge）
@@ -359,7 +361,7 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 {"type":"message.new","seq_id":42,"payload":{"message_id":"msg_01HX...","session_id":"sess_01HX...","sender_id":"user_01HX...","sender_type":"user","content":{"text":"Hello"},"content_type":"text","created_at":"2026-05-25T12:00:00Z"}}
 
 // 服务端推送设备上线
-{"type":"device.online","payload":{"user_id":"user_01HX...","device_id":"device_01HX...","device_type":"desktop"}}
+{"type":"device.online","payload":{"user_id":"user_01HX..."}}
 
 // Edge 上报 agent 任务完成
 {"type":"agent.done","payload":{"task_id":"task_01HX...","result_summary":"Tests passed. 3/3 OK.","usage":{"input_tokens":1234,"output_tokens":567}}}
