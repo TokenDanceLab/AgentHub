@@ -12,15 +12,26 @@ param(
     [string]$RepoRoot = ".",
     [ValidateSet("ProposalOnly", "RealTested", "Submission")]
     [string]$Mode = "ProposalOnly",
+    [string]$AdapterId = "",
     [string]$RuntimeId = "",
     [string]$RuntimePath = "",
     [string]$RuntimeEnvManifest = "",
     [string]$BudgetPlan = "",
+    [string]$CommandPlan = "",
+    [string]$TimeoutPlan = "",
     [string]$RedactionPlan = "",
+    [string]$RedactionPolicy = "",
     [string]$ArtifactRoot = "",
+    [string]$ArtifactRetention = "",
+    [string]$EnvVarOwnership = "",
     [string]$EvidenceMode = "",
     [string]$OperatorApprovalId = "",
-    [string]$RealExecutionEvidenceManifest = ""
+    [string]$RealExecutionEvidenceManifest = "",
+    [switch]$RequireApprovalInputs,
+    [switch]$ApproveNoRealExecution,
+    [switch]$ApproveRedactionPolicy,
+    [switch]$ApproveArtifactRetention,
+    [switch]$ApproveEnvVarOwnership
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +43,14 @@ $Warnings = 0
 $Blocks = 0
 
 $SupportedRuntimeIds = @("codex", "claude-code", "opencode")
+$EffectiveAdapterId = if (-not [string]::IsNullOrWhiteSpace($AdapterId)) { $AdapterId } else { $RuntimeId }
+$EffectiveRedactionPolicy = if (-not [string]::IsNullOrWhiteSpace($RedactionPolicy)) { $RedactionPolicy } else { $RedactionPlan }
+$TempBase = if (-not [string]::IsNullOrWhiteSpace($env:TEMP)) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+$AllowedArtifactRoots = @(
+    [System.IO.Path]::GetFullPath((Join-Path $RepoRoot ".tmp\edge-cli-real-readiness")),
+    [System.IO.Path]::GetFullPath((Join-Path $TempBase "AgentHub\edge-cli-real-readiness"))
+)
+$SecretLikePattern = '(?i)(sk-[a-z0-9_-]{8,}|gh[pousr]_[a-z0-9_]{8,}|xox[baprs]-[a-z0-9-]+|AKIA[0-9A-Z]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|(?:token|secret|api[_-]?key|password|authorization)\s*[:=]\s*\S+)'
 
 function Step([string]$Text) {
     Write-Host "`n=== $Text ===" -ForegroundColor Cyan
@@ -89,15 +108,63 @@ function Test-NonEmpty([string]$Value) {
     return -not [string]::IsNullOrWhiteSpace($Value)
 }
 
+function Get-NormalizedProposedPath([string]$Path) {
+    if (-not (Test-NonEmpty $Path)) {
+        return ""
+    }
+
+    $candidate = if ([System.IO.Path]::IsPathRooted($Path)) { $Path } else { Join-Path $RepoRoot $Path }
+    return [System.IO.Path]::GetFullPath($candidate)
+}
+
+function Test-PathUnderAllowedRoot([string]$Path) {
+    if (-not (Test-NonEmpty $Path)) {
+        return $false
+    }
+
+    $normalized = Get-NormalizedProposedPath $Path
+    foreach ($root in $AllowedArtifactRoots) {
+        $normalizedRoot = [System.IO.Path]::GetFullPath($root)
+        if ([string]::Equals($normalized, $normalizedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+
+        $rootPrefix = $normalizedRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+        if ($normalized.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Assert-NoSecretLikeInput([string]$Name, [string]$Value) {
+    if (-not (Test-NonEmpty $Value)) {
+        return
+    }
+
+    if ($Value -match $SecretLikePattern) {
+        Fail "$Name contains secret-like content; provide names, owners, hashes, or redacted placeholders only"
+    } else {
+        Pass "$Name contains no secret-like content"
+    }
+}
+
 function Add-PrerequisiteResult {
     param(
         [bool]$Condition,
         [string]$PassText,
-        [string]$BlockText
+        [string]$BlockText,
+        [switch]$FailWhenMissing
     )
 
     if ($Condition) {
         Pass $PassText
+        return
+    }
+
+    if ($FailWhenMissing) {
+        Fail "missing required approval input: $BlockText"
         return
     }
 
@@ -153,15 +220,51 @@ Assert-NotContains "scripts\verify-edge-cli-real-readiness.ps1" $forbiddenPrimit
 Assert-NotContains "scripts\verify-edge-cli-real-readiness.ps1" '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode)\b' "this readiness script has no direct real CLI command pattern"
 
 Step "real run approval prerequisites"
-$runtimeIdKnown = (Test-NonEmpty $RuntimeId) -and ($SupportedRuntimeIds -contains $RuntimeId)
-Add-PrerequisiteResult $runtimeIdKnown "runtime id is one of: codex, claude-code, opencode" "runtime id missing or unsupported; pass -RuntimeId codex|claude-code|opencode"
-Add-PrerequisiteResult (Test-NonEmpty $RuntimePath) "runtime path is named for approval evidence" "runtime path missing; provide a redacted path/owner, not CLI auth contents"
-Add-PrerequisiteResult (Test-NonEmpty $RuntimeEnvManifest) "runtime env manifest is named for approval evidence" "runtime path/env missing; provide required env names and owners without values"
-Add-PrerequisiteResult (Test-NonEmpty $BudgetPlan) "budget/request limit plan is named" "budget missing; provide max calls/tokens/cost/time and stop policy"
-Add-PrerequisiteResult (Test-NonEmpty $RedactionPlan) "redaction plan is named" "redaction missing; provide stdout/stderr/env/artifact redaction policy"
-Add-PrerequisiteResult (Test-NonEmpty $ArtifactRoot) "artifact root is named" "artifact root missing; provide isolated output directory for real-run evidence"
-Add-PrerequisiteResult (Test-NonEmpty $EvidenceMode) "evidence mode is named" "evidence mode missing; provide redacted-log/hash-only/operator-reviewed mode"
-Add-PrerequisiteResult (Test-NonEmpty $OperatorApprovalId) "operator approval id is named" "operator approval missing; provide approval id before RealTested or Submission"
+$failMissingApprovalInputs = [bool]$RequireApprovalInputs
+$runtimeIdKnown = (Test-NonEmpty $EffectiveAdapterId) -and ($SupportedRuntimeIds -contains $EffectiveAdapterId)
+
+if ((Test-NonEmpty $EffectiveAdapterId) -and (-not $runtimeIdKnown)) {
+    Fail "unsupported adapter/runtime id; allowed adapters are codex, claude-code, opencode"
+}
+
+Assert-NoSecretLikeInput "adapter/runtime id" $EffectiveAdapterId
+Assert-NoSecretLikeInput "runtime path" $RuntimePath
+Assert-NoSecretLikeInput "runtime env manifest" $RuntimeEnvManifest
+Assert-NoSecretLikeInput "budget plan" $BudgetPlan
+Assert-NoSecretLikeInput "command plan" $CommandPlan
+Assert-NoSecretLikeInput "timeout plan" $TimeoutPlan
+Assert-NoSecretLikeInput "redaction policy" $EffectiveRedactionPolicy
+Assert-NoSecretLikeInput "artifact root" $ArtifactRoot
+Assert-NoSecretLikeInput "artifact retention" $ArtifactRetention
+Assert-NoSecretLikeInput "env var ownership" $EnvVarOwnership
+Assert-NoSecretLikeInput "evidence mode" $EvidenceMode
+Assert-NoSecretLikeInput "operator approval id" $OperatorApprovalId
+Assert-NoSecretLikeInput "real execution evidence manifest" $RealExecutionEvidenceManifest
+
+if (Test-NonEmpty $ArtifactRoot) {
+    if (Test-PathUnderAllowedRoot $ArtifactRoot) {
+        Pass "artifact root is inside allowed temp dirs"
+    } else {
+        Fail "artifact root is outside allowed temp dirs; use .tmp\edge-cli-real-readiness or `$env:TEMP\AgentHub\edge-cli-real-readiness"
+    }
+}
+
+Add-PrerequisiteResult $runtimeIdKnown "adapter/runtime id is one of: codex, claude-code, opencode" "adapter/runtime id missing or unsupported; pass -AdapterId codex|claude-code|opencode" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $RuntimePath) "runtime path is named for approval evidence" "runtime path missing; provide a redacted path/owner, not CLI auth contents" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $RuntimeEnvManifest) "runtime env manifest is named for approval evidence" "runtime path/env missing; provide required env names and owners without values" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $EnvVarOwnership) "env var ownership is named" "env var ownership missing; name each required env var owner without values" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $BudgetPlan) "budget/request limit plan is named" "budget missing; provide max calls/tokens/cost/time and stop policy" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $CommandPlan) "future command plan is named" "command missing; provide exact future CLI command shape without executing it" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $TimeoutPlan) "timeout/kill policy is named" "timeout missing; provide hard timeout and process-tree kill policy" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $EffectiveRedactionPolicy) "redaction policy is named" "redaction missing; provide stdout/stderr/env/artifact redaction policy" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult ((Test-NonEmpty $ArtifactRoot) -and (Test-PathUnderAllowedRoot $ArtifactRoot)) "artifact root is named and inside allowed temp dirs" "artifact root missing or outside allowed temp dirs; provide isolated output directory for real-run evidence" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $ArtifactRetention) "artifact retention policy is named" "artifact retention missing; provide retention owner, duration, and raw-artifact deletion policy" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $EvidenceMode) "evidence mode is named" "evidence mode missing; provide redacted-log/hash-only/operator-reviewed mode" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult (Test-NonEmpty $OperatorApprovalId) "operator approval id is named" "operator approval missing; provide approval id before RealTested or Submission" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult ([bool]$ApproveNoRealExecution) "approval flag confirms this verifier is static and ran no real CLI/model call" "approval flag missing: -ApproveNoRealExecution" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult ([bool]$ApproveRedactionPolicy) "approval flag confirms redaction policy review" "approval flag missing: -ApproveRedactionPolicy" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult ([bool]$ApproveArtifactRetention) "approval flag confirms artifact retention review" "approval flag missing: -ApproveArtifactRetention" -FailWhenMissing:$failMissingApprovalInputs
+Add-PrerequisiteResult ([bool]$ApproveEnvVarOwnership) "approval flag confirms env var ownership review" "approval flag missing: -ApproveEnvVarOwnership" -FailWhenMissing:$failMissingApprovalInputs
 
 if ($Mode -ne "ProposalOnly") {
     if (Test-NonEmpty $RealExecutionEvidenceManifest) {
