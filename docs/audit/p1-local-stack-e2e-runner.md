@@ -15,6 +15,7 @@ This slice adds `scripts/verify-local-stack-e2e-readiness.ps1` as the next pract
 The default mode is `ReadinessOnly`, and it fails closed unless the caller supplies:
 
 - safe `-ArtifactRoot` under `.tmp/local-stack-e2e-readiness`, `tmp/local-stack-e2e-readiness`, or `$env:TEMP/AgentHub/local-stack-e2e-readiness`;
+- caller-supplied `-EvidencePath` under a canonical readiness temp root or under the validated `-ArtifactRoot`; omitted `-EvidencePath` keeps the existing process-temp default;
 - required environment variable names: `AGENTHUB_WEB_URL`, `AGENTHUB_HUB_URL`, `AGENTHUB_DESKTOP_BRIDGE_URL`, `AGENTHUB_LOCAL_EDGE_URL`, and `AGENTHUB_LOCAL_STACK_ARTIFACT_ROOT`;
 - localhost topology that keeps Web upstream on Hub and Desktop bridge upstream on Local Edge;
 - `-ProbeServices` for already-running services, or explicit `-StartServices -StartServicePlanPath` to delegate bounded startup to the existing real-services verifier.
