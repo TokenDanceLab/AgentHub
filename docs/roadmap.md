@@ -1,6 +1,6 @@
 # AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 08:34 +08:00
+> Last updated: 2026-06-09 08:52 +08:00
 > Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
 > Review branch: `origin/codex/p1-remote-control-integration` at `fd94c54d`
 > Evidence integration branch: `codex/p1-remote-control-evidence-integration`
@@ -65,6 +65,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | Local stack E2E readiness runner | critical evidence branch | Composes fixture/readiness/approved-real gates with safe artifact/evidence roots; no real login/CLI by default. |
 | Web TeamRun event replay rendering | critical evidence branch | Merges Hub event rows with run events and renders CLI/SDK runtime summaries, target IDs, Edge run IDs, tool results, file changes, and failures. |
 | Desktop Hub task bridge proof | critical evidence branch | Desktop fails closed unless Hub dispatch/control carries matching `target_id` and `edge_device_id`; Hub now includes those fields for target-bound dispatch. |
+| Edge SDK JSON contract | critical evidence branch | Provider-neutral fixture contract maps Claude/OpenAI/OpenCode/custom Agent event shapes with recursive redaction and documented no-real-SDK boundary. |
 | Runtime/tool icons | next-wave branch | Shared LobeHub icon component, fallback rendering, and Storybook coverage. |
 
 ## Operating Rules
@@ -97,7 +98,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | P1 | Local stack E2E runner | integrated in critical evidence | Composes readiness gates toward one reproducible local product loop; no real login/CLI by default. |
 | P1 | Web event render sync | integrated in critical evidence | Renders Hub/Edge/CLI events clearly in Web without direct Local Edge calls. |
 | P1 | Desktop Hub task bridge | integrated in critical evidence | Hub dispatch payload now carries target/device proof consumed by Desktop before Local Edge handoff. |
-| P1 | Edge SDK JSON contract | review active | Provider-neutral JSON event/invocation contract for Claude/OpenAI/OpenCode/custom Agent fixtures; redaction fix is under review. |
+| P1 | Edge SDK JSON contract | integrated in critical evidence | Provider-neutral JSON event/invocation contract for Claude/OpenAI/OpenCode/custom Agent fixtures; no real SDK/model calls. |
 | P2 | Edge durable store implementation | worker + reviewer | SQLite migration guard is approved; full row-first durable store still separate from CLI execution. |
 | P2 | Agent SDK product integration | integrated in critical evidence | SDK-as-adapter/product-runtime report approved; no code/model calls. |
 | P2 | Public deploy and macOS packaging | worker + reviewer | Separate approval for env, signing/notary, updater metadata, and release upload. |
@@ -118,7 +119,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | `codex/p1-local-stack-e2e-runner` | `.worktrees/p1-local-stack-e2e-runner` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
 | `codex/p1-web-event-render-sync` | `.worktrees/p1-web-event-render-sync` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
 | `codex/p1-desktop-hub-task-bridge` | `.worktrees/p1-desktop-hub-task-bridge` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
-| `codex/p1-edge-sdk-json-contract` | `.worktrees/p1-edge-sdk-json-contract` | worker | review active | Do not integrate until redaction fix review approves. |
+| `codex/p1-edge-sdk-json-contract` | `.worktrees/p1-edge-sdk-json-contract` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
 | `codex/worktree-cleanup-audit` | `.worktrees/worktree-cleanup-audit` | worker | blocked | Report inventory must be refreshed before any cleanup decision. |
 
 ## Verification Queue
