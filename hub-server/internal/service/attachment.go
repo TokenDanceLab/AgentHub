@@ -55,7 +55,7 @@ func NewLocalStorage(baseDir string) *LocalStorage {
 }
 
 func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
-	absPath := filepath.Join(s.baseDir, key)
+	absPath := s.pathForKey(key)
 	dir := filepath.Dir(absPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return false, err
@@ -86,12 +86,12 @@ func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, cont
 }
 
 func (s *LocalStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	absPath := filepath.Join(s.baseDir, key)
+	absPath := s.pathForKey(key)
 	return os.Open(absPath)
 }
 
 func (s *LocalStorage) Delete(ctx context.Context, key string) error {
-	absPath := filepath.Join(s.baseDir, key)
+	absPath := s.pathForKey(key)
 	if err := os.Remove(absPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -99,7 +99,19 @@ func (s *LocalStorage) Delete(ctx context.Context, key string) error {
 }
 
 func (s *LocalStorage) LocalPath(key string) string {
-	return filepath.Join(s.baseDir, key)
+	return s.pathForKey(key)
+}
+
+func (s *LocalStorage) pathForKey(key string) string {
+	return filepath.Join(s.baseDir, s.localKey(key))
+}
+
+func (s *LocalStorage) localKey(key string) string {
+	if !strings.EqualFold(filepath.Base(filepath.Clean(s.baseDir)), "uploads") {
+		return key
+	}
+	key = filepath.ToSlash(filepath.Clean(key))
+	return strings.TrimPrefix(key, "uploads/")
 }
 
 // ── S3Storage ───────────────────────────────────────────────────────────────
