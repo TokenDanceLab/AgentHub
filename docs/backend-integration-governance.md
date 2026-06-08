@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 19:33 +08:00
+> 最后更新：2026-06-08 20:56 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -17,6 +17,23 @@
 | Hub | 账号 + IM + 同步 + 中继 | Hub 是云端会话、设备、权限、审计、TeamRun 和远程路由权威。 |
 
 禁止回退到旧架构：Web 不能直连 Local Edge；Desktop 不能绕过 Edge 直接启动 CLI；shared UI 不能持有 Tauri、Edge URL、Hub URL 或 token 存储细节。
+
+## 旧后端分支收口账本
+
+`feat/backend-edge-hub` 仍会被 `git log --cherry-pick --right-only origin/dev/delicious233...feat/backend-edge-hub` 列出大量提交；这不是未完成证明，因为主线采用了语义小片吸收，而不是整提交 cherry-pick。后续 review 以本节和当前代码/测试为准，不恢复旧 `docs/roadmaps/BACKEND-ROADMAP.md`、根级 `HANDOFF-BACKEND-AGENT.md` 或第二套 backend roadmap。
+
+| 类别 | 处理结论 | 当前证据 |
+|---|---|---|
+| IM/TeamRun realtime 修复 | 已迁入主线 | `6743a41e` session lifecycle bus wiring、`57ed2ea1` friend accepted recipient、`f3b63b51` AgentTeam WS events、`63696863` coordinator route auto-parse。 |
+| WS dispatch 防丢 | 已迁入主线 | `b78dd5cf` 在普通非 target dispatch 的 WebSocket enqueue 失败时保留 pending payload；target/control queue 的 list/ack 语义已由早期小片吸收。 |
+| OpenAPI / event contract | 已迁入主线 | `216cbf58` 补 backend OpenAPI gaps；`3306ddbe` 补 Hub WebSocket frame 和 user-level presence schema；`api/events.md` 已记录 message edit/reaction 和 device presence payload。 |
+| Security / auth / Edge hardening | 已吸收或登记 | OIDC token exchange redaction、Edge JWT device binding、Cloud Edge registration、Edge env/log/CORS hardening、ExecutionTarget credential output 均已由当前代码/测试吸收；`0d12b155` 恢复 AH-SR-045..049 并按当前 dev 重算状态。 |
+| Audit migration / attachments / message edit/reaction/search | 已吸收，skip | audit pgcrypto + TRUNCATE guard、attachment metadata/MIME/S3/image refs、message edit/reaction/search 已由当前主线的小片和 focused tests 覆盖。 |
+| CORS/dev config | 部分吸收，剩余 defer | CORS error/testability 已吸收；生产 CORS 保持单一正式 origin。旧分支里的 Mobile/Desktop dev redirect 全量端口扩展不直接迁入，需等对应 app 端口/回调事实确认。 |
+| Deploy/readiness | 已迁入主线 | `46313daf` 让 deploy health gate 默认检查 `/health/ready` 且要求 `status=ok`、`ready=true`；`7f3df20b` rollback 不再先 `docker compose down` 停依赖，并在 rollback 前检查预加载镜像。 |
+| Real CLI / model / release gates | defer / proposal only | D3 real CLI/model、self-hosted runner、release publish、签名、notarization、artifact upload 需要 runner、预算、secret 和脱敏证据审批，不能作为 backend branch migration 直接合入。 |
+| 大重构 | defer，禁止整包合并 | `e1720e8a`、`8bd642cc` 属结构重构；`repository.WrapNotFound` helper 已在主线，剩余服务层样板清理只能后续按小文件切片推进。 |
+| 旧 docs/handoff | skip | 当前事实源为本文、`docs/roadmap.md` 和 `docs/governance/security-risk-register.md`；旧 handoff/roadmap 仅作历史参考，不恢复为 active docs。 |
 
 ## AH-SYNC v1
 
