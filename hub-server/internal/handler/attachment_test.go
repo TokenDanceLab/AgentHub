@@ -6,6 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -33,6 +36,7 @@ type mockAttachmentService struct {
 	storeCalled      bool
 	saveMimeType     string
 	saveOriginalName string
+	saveMetadata     string
 	getAttachment    *model.Attachment
 	allowedMimeTypes map[string]bool
 }
@@ -47,6 +51,14 @@ func (m *mockAttachmentService) SaveAttachment(ctx context.Context, uploaderID, 
 	m.saveMimeType = mimeType
 	m.saveOriginalName = originalName
 	return &model.Attachment{Hash: hash, Size: size, MimeType: mimeType, OriginalName: originalName}, nil
+}
+
+func (m *mockAttachmentService) SaveAttachmentWithMetadata(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64, metadata string) (*model.Attachment, error) {
+	m.saveCalled = true
+	m.saveMimeType = mimeType
+	m.saveOriginalName = originalName
+	m.saveMetadata = metadata
+	return &model.Attachment{Hash: hash, Size: size, MimeType: mimeType, OriginalName: originalName, Metadata: metadata}, nil
 }
 
 func (m *mockAttachmentService) GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error) {
@@ -340,6 +352,55 @@ func TestAttachmentUploadRejectsDisallowedSniffedMimeBeforeStorage(t *testing.T)
 	}
 }
 
+func TestAttachmentUploadExtractsPNGDimensionsIntoMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Chdir(t.TempDir())
+
+	content := makePNGAttachmentBytes(t, 2, 3)
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+
+	svc := &mockAttachmentService{}
+	h := handler.NewAttachmentHandler(svc)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("hash", hash); err != nil {
+		t.Fatalf("WriteField hash returned error: %v", err)
+	}
+	if err := writer.WriteField("original_name", "preview.png"); err != nil {
+		t.Fatalf("WriteField original_name returned error: %v", err)
+	}
+	part, err := writer.CreateFormFile("file", "preview.png")
+	if err != nil {
+		t.Fatalf("CreateFormFile returned error: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("part.Write returned error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close returned error: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "user-1")
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/attachments", &body)
+	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	h.Upload(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if svc.saveMimeType != "image/png" {
+		t.Fatalf("saved MIME type = %q, want image/png", svc.saveMimeType)
+	}
+	if svc.saveMetadata != `{"height":3,"width":2}` {
+		t.Fatalf("saved metadata = %q, want PNG dimensions", svc.saveMetadata)
+	}
+}
+
 func TestAttachmentUploadUsesConfiguredLocalStorageDir(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	workDir := t.TempDir()
@@ -406,6 +467,18 @@ func TestAttachmentUploadUsesConfiguredLocalStorageDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(workDir, "uploads")); !os.IsNotExist(err) {
 		t.Fatalf("upload handler created cwd uploads directory despite configured upload dir: %v", err)
 	}
+}
+
+func makePNGAttachmentBytes(t *testing.T, width, height int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	img.Set(width-1, height-1, color.RGBA{G: 255, A: 255})
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("png.Encode returned error: %v", err)
+	}
+	return buf.Bytes()
 }
 
 func TestAttachmentDownloadFormatsUnsafeFilenameSafely(t *testing.T) {

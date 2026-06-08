@@ -22,6 +22,7 @@ import (
 type AttachmentService interface {
 	ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error)
 	SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error)
+	SaveAttachmentWithMetadata(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64, metadata string) (*model.Attachment, error)
 	GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error)
 	MaxUploadSize() int64
 	IsAttachmentMimeTypeAllowed(mimeType string) bool
@@ -131,6 +132,11 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 		Fail(c, errcode.AttachTypeNotAllowed)
 		return
 	}
+	metadata, err := service.ExtractImageMetadataJSON(tmpPath, mimeType)
+	if err != nil {
+		Fail(c, errcode.ErrInternal)
+		return
+	}
 
 	// Commit the blob to object storage (local or S3).
 	// Re-open the temp file for reading.
@@ -147,7 +153,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	a, err := h.service.SaveAttachment(c.Request.Context(), userID, hash, mimeType, originalName, written)
+	a, err := h.service.SaveAttachmentWithMetadata(c.Request.Context(), userID, hash, mimeType, originalName, written, metadata)
 	if err != nil {
 		if createdBlob {
 			_ = h.service.DeleteBlob(c.Request.Context(), hash)
