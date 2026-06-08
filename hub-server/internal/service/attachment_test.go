@@ -79,6 +79,51 @@ func TestLocalStorage_PutAndGet(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_AvoidsDoubleUploadsPrefixWhenBaseDirIsUploads(t *testing.T) {
+	root := t.TempDir()
+	uploadDir := filepath.Join(root, "uploads")
+	store := service.NewLocalStorage(uploadDir)
+
+	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	key := service.PathFromHash(hash)
+	if key == "" {
+		t.Fatal("PathFromHash should return a non-empty key for a valid hash")
+	}
+
+	created, err := store.Put(context.Background(), key, strings.NewReader("attachment"), "text/plain")
+	if err != nil {
+		t.Fatalf("Put() error = %v", err)
+	}
+	if !created {
+		t.Fatal("first Put should create a new blob")
+	}
+
+	wantPath := filepath.Join(uploadDir, hash[:2], hash[2:4], hash)
+	if got := store.LocalPath(key); got != wantPath {
+		t.Fatalf("LocalPath() = %q, want %q", got, wantPath)
+	}
+
+	if _, err := os.Stat(wantPath); err != nil {
+		t.Fatalf("stored file should exist at normalized upload path: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(uploadDir, key)); !os.IsNotExist(err) {
+		t.Fatalf("stored file should not use double uploads prefix, stat error = %v", err)
+	}
+
+	rc, err := store.Get(context.Background(), key)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	defer rc.Close()
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("ReadAll error = %v", err)
+	}
+	if string(got) != "attachment" {
+		t.Fatalf("Get() = %q, want %q", string(got), "attachment")
+	}
+}
+
 func TestS3Storage_LocalPathReturnsEmpty(t *testing.T) {
 	s3 := service.NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
