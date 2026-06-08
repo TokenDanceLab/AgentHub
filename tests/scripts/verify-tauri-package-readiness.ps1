@@ -176,9 +176,64 @@ function New-RogueMacOSReleaseActionFixture {
     return $tempRoot
 }
 
+function New-TaggedReleaseFixture {
+    param(
+        [string]$TagName
+    )
+
+    $metadataVersion = "0.2.0"
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    $packageJsonPath = Join-Path $tempRoot "app\desktop\package.json"
+    $packageJson = Get-Content $packageJsonPath -Raw -Encoding UTF8
+    $packageJson = [regex]::Replace($packageJson, '(?m)^  "version": "[^"]+",', "  `"version`": `"$metadataVersion`",", 1)
+    Set-Content $packageJsonPath $packageJson -Encoding UTF8
+
+    $tauriConfPath = Join-Path $tempRoot "app\desktop\src-tauri\tauri.conf.json"
+    $tauriConf = Get-Content $tauriConfPath -Raw -Encoding UTF8
+    $tauriConf = [regex]::Replace($tauriConf, '(?m)^  "version": "[^"]+",', "  `"version`": `"$metadataVersion`",", 1)
+    Set-Content $tauriConfPath $tauriConf -Encoding UTF8
+
+    $cargoTomlPath = Join-Path $tempRoot "app\desktop\src-tauri\Cargo.toml"
+    $cargoToml = Get-Content $cargoTomlPath -Raw -Encoding UTF8
+    $cargoToml = [regex]::Replace($cargoToml, '(?m)^version = "[^"]+"', "version = `"$metadataVersion`"", 1)
+    Set-Content $cargoTomlPath $cargoToml -Encoding UTF8
+
+    $cargoLockPath = Join-Path $tempRoot "app\desktop\src-tauri\Cargo.lock"
+    $cargoLock = Get-Content $cargoLockPath -Raw -Encoding UTF8
+    $cargoLock = [regex]::Replace(
+        $cargoLock,
+        '(?ms)(\[\[package\]\]\s*\r?\nname\s*=\s*"agenthub-desktop"\s*\r?\nversion\s*=\s*")[^"]+(")',
+        { param($match) $match.Groups[1].Value + $metadataVersion + $match.Groups[2].Value },
+        1
+    )
+    Set-Content $cargoLockPath $cargoLock -Encoding UTF8
+
+    & git -C $tempRoot init -q
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" add .
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" commit -q -m "fixture"
+    & git -C $tempRoot tag $TagName
+    return $tempRoot
+}
+
 function New-TestArtifactRoot {
     param(
         [string]$Name,
+        [string]$Version,
         [switch]$OmitLatestVersion,
         [switch]$OmitPortableSidecar,
         [switch]$BadManifestHash
@@ -187,9 +242,9 @@ function New-TestArtifactRoot {
     $root = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-artifacts-$Name-$(New-Guid)"
     New-Item -ItemType Directory $root -Force | Out-Null
 
-    $setupPath = Join-Path $root "AgentHub_0.2.0_x64-setup.exe"
+    $setupPath = Join-Path $root "AgentHub_${Version}_x64-setup.exe"
     [System.IO.File]::WriteAllBytes($setupPath, [byte[]](1..32))
-    "signature-for-test" | Out-File (Join-Path $root "AgentHub_0.2.0_x64-setup.exe.sig") -Encoding UTF8
+    "signature-for-test" | Out-File (Join-Path $root "AgentHub_${Version}_x64-setup.exe.sig") -Encoding UTF8
 
     $portableDir = Join-Path $root "portable-src"
     New-Item -ItemType Directory $portableDir -Force | Out-Null
@@ -198,7 +253,7 @@ function New-TestArtifactRoot {
         "edge" | Out-File (Join-Path $portableDir "agenthub-edge.exe") -Encoding UTF8
     }
     "readme" | Out-File (Join-Path $portableDir "README.txt") -Encoding UTF8
-    Compress-Archive -Path (Join-Path $portableDir "*") -DestinationPath (Join-Path $root "AgentHub_0.2.0_x64-portable.zip") -Force
+    Compress-Archive -Path (Join-Path $portableDir "*") -DestinationPath (Join-Path $root "AgentHub_${Version}_x64-portable.zip") -Force
     Remove-Item $portableDir -Recurse -Force
 
     $latest = [ordered]@{
@@ -207,12 +262,12 @@ function New-TestArtifactRoot {
         platforms = [ordered]@{
             "windows-x86_64" = [ordered]@{
                 signature = "signature-for-test"
-                url = "https://github.com/TokenDanceLab/AgentHub/releases/download/v0.2.0/AgentHub_0.2.0_x64-setup.exe"
+                url = "https://github.com/TokenDanceLab/AgentHub/releases/download/v$Version/AgentHub_${Version}_x64-setup.exe"
             }
         }
     }
     if (-not $OmitLatestVersion) {
-        $latest.version = "0.2.0"
+        $latest.version = $Version
     }
     $latest | ConvertTo-Json -Depth 8 | Out-File (Join-Path $root "latest.json") -Encoding UTF8
 
@@ -249,8 +304,11 @@ $scriptText = Read-Text "scripts\verify-tauri-package-readiness.ps1"
 $smokeScriptText = Read-Text "scripts\verify-tauri-installer-smoke.ps1"
 $workflowText = Read-Text ".github\workflows\release.yml"
 $readinessWorkflowText = Read-Text ".github\workflows\release-readiness.yml"
+$desktopPackage = Get-Content (Join-Path $RepoRoot "app\desktop\package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+$desktopVersion = [string]$desktopPackage.version
 
 Assert-True ($scriptText -match "package\.json" -and $scriptText -match "Cargo\.toml" -and $scriptText -match "Cargo\.lock" -and $scriptText -match "tauri\.conf\.json") "checker compares desktop package, Cargo, Cargo.lock, and Tauri versions"
+Assert-True ($scriptText -match "Release tag version alignment" -and $scriptText -match "prerelease|pre-release") "checker reports RC/pre-release tag version alignment"
 Assert-True ($scriptText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe") "checker enforces Windows sidecar binary name"
 Assert-True ($scriptText -match "latest\.json" -and $scriptText -match "\.sig") "checker requires updater metadata and signature"
 Assert-True ($scriptText -match "portable\.zip" -and $scriptText -match "setup\.exe") "checker requires installer and portable artifacts"
@@ -312,7 +370,7 @@ foreach ($hostShell in $scriptHosts) {
     Assert-True ($missingUpdater.ExitCode -ne 0) "built artifact gate fails when updater metadata is missing under $($missingUpdater.Host)" $missingUpdater.Output
     Assert-True ($missingUpdater.Output -match "latest\.json") "missing updater metadata failure names latest.json under $($missingUpdater.Host)" $missingUpdater.Output
 
-    $completeArtifacts = New-TestArtifactRoot "complete"
+    $completeArtifacts = New-TestArtifactRoot "complete" $desktopVersion
     try {
         $completeGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $completeArtifacts, "-RequireBuiltArtifacts")
         Assert-True ($completeGate.ExitCode -eq 0) "built artifact gate accepts inspected manifest, installer, portable package, updater metadata, and signature under $($completeGate.Host)" $completeGate.Output
@@ -322,7 +380,7 @@ foreach ($hostShell in $scriptHosts) {
         Remove-Item -Recurse -Force $completeArtifacts -ErrorAction SilentlyContinue
     }
 
-    $badLatest = New-TestArtifactRoot "bad-latest" -OmitLatestVersion
+    $badLatest = New-TestArtifactRoot "bad-latest" $desktopVersion -OmitLatestVersion
     try {
         $badLatestGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $badLatest, "-RequireBuiltArtifacts")
         Assert-True ($badLatestGate.ExitCode -ne 0) "built artifact gate rejects latest.json without version metadata under $($badLatestGate.Host)" $badLatestGate.Output
@@ -332,7 +390,7 @@ foreach ($hostShell in $scriptHosts) {
         Remove-Item -Recurse -Force $badLatest -ErrorAction SilentlyContinue
     }
 
-    $badPortable = New-TestArtifactRoot "bad-portable" -OmitPortableSidecar
+    $badPortable = New-TestArtifactRoot "bad-portable" $desktopVersion -OmitPortableSidecar
     try {
         $badPortableGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $badPortable, "-RequireBuiltArtifacts")
         Assert-True ($badPortableGate.ExitCode -ne 0) "built artifact gate rejects portable package without Edge sidecar under $($badPortableGate.Host)" $badPortableGate.Output
@@ -342,7 +400,7 @@ foreach ($hostShell in $scriptHosts) {
         Remove-Item -Recurse -Force $badPortable -ErrorAction SilentlyContinue
     }
 
-    $badManifest = New-TestArtifactRoot "bad-manifest" -BadManifestHash
+    $badManifest = New-TestArtifactRoot "bad-manifest" $desktopVersion -BadManifestHash
     try {
         $badManifestGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $badManifest, "-RequireBuiltArtifacts")
         Assert-True ($badManifestGate.ExitCode -ne 0) "built artifact gate rejects artifact-manifest hash mismatch under $($badManifestGate.Host)" $badManifestGate.Output
@@ -360,6 +418,16 @@ foreach ($hostShell in $scriptHosts) {
     }
     finally {
         Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue
+    }
+
+    $rcMismatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.5"
+    try {
+        $rcMismatch = Invoke-Script $hostShell @("-RepoRoot", $rcMismatchRoot) $rcMismatchRoot
+        Assert-True ($rcMismatch.ExitCode -ne 0) "readiness checker rejects RC tag when desktop metadata has a different version under $($rcMismatch.Host)" $rcMismatch.Output
+        Assert-True ($rcMismatch.Output -match "v0\.3\.0-rc\.5" -and $rcMismatch.Output -match "0\.3\.0-rc\.5" -and $rcMismatch.Output -match "0\.2\.0") "RC tag mismatch failure names tag, expected version, and actual desktop version under $($rcMismatch.Host)" $rcMismatch.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $rcMismatchRoot -ErrorAction SilentlyContinue
     }
 
     foreach ($rogueMacOSCommand in @(
