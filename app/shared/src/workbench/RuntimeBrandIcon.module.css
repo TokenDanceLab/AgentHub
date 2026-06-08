@@ -1,0 +1,45 @@
+.root {
+  --runtime-brand-size: 18px;
+
+  width: var(--runtime-brand-size);
+  height: var(--runtime-brand-size);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--runtime-brand-size);
+  line-height: 1;
+}
+
+.framed {
+  border: 1px solid var(--bdr);
+  background: var(--surface-low);
+}
+
+.compact {
+  --runtime-brand-size: 16px;
+}
+
+.large {
+  --runtime-brand-size: 32px;
+}
+
+.root svg {
+  width: calc(var(--runtime-brand-size) * 0.72);
+  height: calc(var(--runtime-brand-size) * 0.72);
+  flex: none;
+}
+
+.lobe svg {
+  width: calc(var(--runtime-brand-size) * 0.76);
+  height: calc(var(--runtime-brand-size) * 0.76);
+}
+
+.fallbackText {
+  max-width: calc(var(--runtime-brand-size) - 4px);
+  overflow: hidden;
+  color: currentColor;
+  font: 750 0.625rem/1 var(--font-mono);
+  text-transform: uppercase;
+}
