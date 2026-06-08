@@ -718,6 +718,48 @@
   box-shadow: none;
 }
 
+.composerTargetPicker {
+  order: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  color: var(--text-3);
+  font: var(--caption);
+  white-space: nowrap;
+}
+
+.composerTargetSelect {
+  width: 160px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-1);
+  font: var(--caption);
+}
+
+.composerTargetSelect:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.composerTargetSelect:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.composerStatus {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 820px);
+  margin: -2px auto 0;
+  color: var(--text-3);
+  font: var(--caption);
+  pointer-events: auto;
+}
+
 .sendButton {
   order: 2;
   width: 36px;
