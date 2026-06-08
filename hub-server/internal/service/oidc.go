@@ -37,6 +37,8 @@ type OIDCService struct {
 
 var validDeviceTypes = []string{"desktop", "web", "cli"}
 
+const oidcStateTTL = 10 * time.Minute
+
 // NewOIDCService creates a new OIDCService.
 func NewOIDCService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTConfig, cache *cache.Client) *OIDCService {
 	if cfg.JWKSURI != "" {
@@ -101,7 +103,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	}
 	state := base64.RawURLEncoding.EncodeToString(stateBytes)
 
-	// Store PKCE data in Redis with 10-minute TTL
+	// Store PKCE data in Redis with a short TTL.
 	entry := stateEntry{
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
@@ -115,10 +117,10 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 		return nil, fmt.Errorf("marshal state entry: %w", err)
 	}
 	stateKey := "oidc:state:" + state
-	if err := s.cache.GetRDB().Set(ctx, stateKey, string(entryJSON), 10*time.Minute).Err(); err != nil {
+	if err := s.cache.GetRDB().Set(ctx, stateKey, string(entryJSON), oidcStateTTL).Err(); err != nil {
 		return nil, fmt.Errorf("store state in redis: %w", err)
 	}
-	slog.Debug("oidc.state.stored", "state", state[:8]+"...", "ttl", "10m")
+	slog.Debug("oidc.state.stored", "state", state[:8]+"...", "ttl", oidcStateTTL.String())
 
 	// Build the TokenDance ID authorization URL
 	authURL, err := url.Parse(strings.TrimRight(s.cfg.IssuerURL, "/") + "/oidc/authorize")
@@ -163,6 +165,9 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 
 	var entry stateEntry
 	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return nil, errcode.OIDCInvalidState
+	}
+	if entry.CreatedAt <= 0 || time.Since(time.Unix(entry.CreatedAt, 0)) > oidcStateTTL {
 		return nil, errcode.OIDCInvalidState
 	}
 

@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 11:16 +08:00
+> 最后更新：2026-06-08 11:51 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -68,6 +68,7 @@ next: <1-3 steps>
 | B. Hub callback redaction | `edge-server/internal/hub/` | callback 失败不包含原始 response body；4xx/5xx 行为不变 | Hub focused tests + edge-server short gate |
 | C1. Runtime smoke scripts | `scripts/edge-runtime-smoke.ps1`、`scripts/integration-e2e.ps1`、`tests/scripts/edge-runtime-smoke.ps1` | 默认不跑真实 CLI；脚本测试证明兼容性 | script tests |
 | C2. OIDC diagnostics | `scripts/verify-oidc-flow.ps1`、`tests/scripts/verify-oidc-flow.ps1` | 诊断输出脱敏；本体访问本地服务，测试只做 fake/static | OIDC script tests |
+| C3. OIDC fake/local gate | `hub-server/internal/service/oidc*`、`scripts/verify-oidc-flow.ps1`、`tests/scripts/verify-oidc-flow.ps1` | Hub callback 拒绝 stale state entry；脚本提供 `-LocalOnly` fake/static gate，不连接 live Hub 或 TokenDance ID | Hub OIDC focused tests + OIDC script tests |
 | D1. Backend E2E CI gate | `.github/workflows/checks.yml`、`scripts/verify-ci-gates.ps1` 和依赖 tests | 依赖测试先进入主线；不能单合 workflow 让 CI 变红 | Hub tests + CI policy gate |
 | D2. Release preflight | `.github/workflows/release.yml` | 发布流程变更单独审批，不和普通脚本硬化混合 | release dry policy review |
 | D3. Real CLI/model E2E | `.github/workflows/real-cli-e2e.yml`、real CLI 脚本 | 只在专用 runner、预算和 artifact 脱敏确认后手动/夜间运行 | opt-in real CLI evidence |
@@ -97,6 +98,7 @@ next: <1-3 steps>
 14. **G2b. Backend AgentProfile contract hardening**：已合入 `dev/delicious233`，提交 `5e730169 fix(api): harden agent profile payload contract`。Hub create/update 接受当前 JSON string payload 和 OpenAPI object/array payload，marshal 到现有 JSON string model fields；service updateable fields 增加 type guards，malformed payload 返回 400 而不是 panic；OpenAPI 只记录当前 create/delete 200 OK envelope，不改 handler status 行为。不改 Web/shared mutation 行为，不扩展 publish/install/market，不做 DB migration、Edge SQL、release workflow 或真实 CLI/model gate。验证 handler/service focused、hub-server short、OpenAPI YAML parse、diff check 和冲突标记扫描通过；未运行真实 CLI/model。
 15. **ExecutionTarget contract hardening**：已合入 `dev/delicious233`，提交 `f9fbaf0e fix(api): harden execution target payload contract`。范围仅 Hub `/web/execution-targets` create/update request normalization、handler/service focused tests、OpenAPI request schema 和本文档/roadmap；`workspace_allowlist` 接受 JSON string array 或 OpenAPI array，`capabilities`/`metadata` 接受 JSON string object 或 OpenAPI object，并继续以现有 JSON string model/response 存储返回。空数组/空对象用于清空本地 allowlist/capabilities/metadata；invalid scalar/schema 返回 400。该片不做 DB migration、ExecutionTarget routing 行为迁移、Desktop Edge mapper、Hub Projects、Edge SQL、release workflow、D1b/D2/D3 或真实 CLI/model gate。
 16. **Hub Projects/workspaces P1**：已合入 `dev/delicious233`，提交 `1cd052fc feat(api): add hub project workspace endpoints`。范围仅新增 Web-owned Hub `/web/projects` 与 `/web/projects/{id}` list/create/get/update，背后复用现有 owner-scoped `workspaces` 表和 `Workspace` projection `{id,name,description,owner_id,created_at,updated_at}`；list 支持 `pageSize`、`pageCursor` 和 `q` 搜索；create/update 保持当前 Hub 200 OK envelope；PATCH 已由主负责人补成部分更新语义：省略字段不变、显式空 description 可清空、空白 name 返回 `BAD_REQUEST`。该片不实现 delete，不 hard-delete workspace，不加 `deleted_at` 或 migration，不改 Edge-owned `/v1/projects`、Web/shared UI、Desktop Edge mapper、Edge SQL、TeamRun routing、release workflow、D1b/D2/D3 或真实 CLI/model gate。delete/soft-delete 需要先明确 workspace 与 agent_instances/artifacts 的关系和 orphan policy 后另起 proposal。
+17. **C3. OIDC fake/local gate**：本轮在 `codex/login-local-gates` 收口 Hub state expiry/replay 和脚本 gate 语义。Hub OIDC callback 在消费 Redis state 后还会校验 `created_at` 不超过 10 分钟，防止手工/fake state entry 绕过 TTL 后继续打 token endpoint；`verify-oidc-flow.ps1 -LocalOnly` 强制跳过 live Hub 与 TokenDance ID phases，只做 fake/static diagnostics。该片不做真实 TokenDanceID/生产登录，不改 Web UI、Desktop packaging、Edge SQL 或真实 CLI/model gate。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 

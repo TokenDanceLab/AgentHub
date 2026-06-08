@@ -103,6 +103,7 @@ Assert-True ($scriptText -notmatch 'Pass\s+"[^"]*\$\(\$var\.Name\)\s+is configur
 Assert-True ($scriptText -notmatch 'Write-Host\s+"[^"]*\$\(\$global:VerifyAuthUrl\)"') "authorization URL is not printed raw"
 Assert-True ($scriptText -notmatch 'Assert-Field\s+\$authData\s+"authorization_url"') "authorization_url field is not printed through raw Assert-Field"
 Assert-True ($scriptText -match '\[string\]\$RepoRoot\s*=\s*""') "RepoRoot param default is side-effect free"
+Assert-True ($scriptText -match '\[switch\]\$LocalOnly') "verify-oidc-flow exposes a local-only fake/static gate"
 
 $defaultRoot = Invoke-OidcScript @(
     "-NoProfile",
@@ -112,6 +113,18 @@ $defaultRoot = Invoke-OidcScript @(
 )
 Assert-True ($defaultRoot.ExitCode -eq 0) "verify-oidc-flow initializes default RepoRoot" $defaultRoot.Output
 Assert-True ($defaultRoot.Output -notmatch "Join-Path") "default RepoRoot init does not fail before assertions" $defaultRoot.Output
+
+$localOnly = Invoke-OidcScript @(
+    "-NoProfile",
+    "-File", $scriptPath,
+    "-LocalOnly",
+    "-HubUrl", "http://127.0.0.1:1",
+    "-TdUrl", "http://127.0.0.1:2"
+)
+Assert-True ($localOnly.ExitCode -eq 0) "verify-oidc-flow local-only mode does not require live Hub or TokenDance ID" $localOnly.Output
+Assert-True ($localOnly.Output -match "Local-only fake/static gate") "verify-oidc-flow labels local-only mode" $localOnly.Output
+Assert-True ($localOnly.Output -notmatch "Phase 1") "local-only mode skips live TokenDance ID phase" $localOnly.Output
+Assert-True ($localOnly.Output -notmatch "Phase 2") "local-only mode skips live Hub phase" $localOnly.Output
 
 $tmpRepo = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-oidc-flow-redaction-$PID"
 Remove-Item -LiteralPath $tmpRepo -Recurse -Force -ErrorAction SilentlyContinue
