@@ -130,6 +130,39 @@ func TestSQLiteMigrationsAreIdempotentAcrossReopen(t *testing.T) {
 	}
 }
 
+func TestSQLiteStoreRejectsUnknownAppliedMigrationVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	s.Close()
+
+	db, err := openSQLiteDatabase(path)
+	if err != nil {
+		t.Fatalf("openSQLiteDatabase returned error: %v", err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO agenthub_sqlite_migrations (version, name, applied_at) VALUES (?, ?, ?)`,
+		99,
+		"future_row_store",
+		nowString(),
+	); err != nil {
+		db.Close()
+		t.Fatalf("insert future migration returned error: %v", err)
+	}
+	db.Close()
+
+	reopened, err := NewSQLite(path)
+	if err == nil {
+		reopened.Close()
+		t.Fatal("NewSQLite returned nil error for database with unknown future migration")
+	}
+	if !strings.Contains(err.Error(), "unknown sqlite migration version 99") {
+		t.Fatalf("NewSQLite error = %v, want unknown sqlite migration version 99", err)
+	}
+}
+
 func TestRollbackSQLiteMigrationsIsIdempotentAtTargetVersion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "edge-store.db")
 	s, err := NewSQLite(path)
