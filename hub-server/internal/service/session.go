@@ -24,10 +24,15 @@ type sessionCache interface {
 type SessionService struct {
 	db          *gorm.DB
 	cacheClient sessionCache
+	bus         *Bus
 }
 
-func NewSessionService(db *gorm.DB, cacheClient *cache.Client) *SessionService {
-	return &SessionService{db: db, cacheClient: resolveSessionCache(cacheClient)}
+func NewSessionService(db *gorm.DB, cacheClient *cache.Client, bus ...*Bus) *SessionService {
+	var eventBus *Bus
+	if len(bus) > 0 {
+		eventBus = bus[0]
+	}
+	return &SessionService{db: db, cacheClient: resolveSessionCache(cacheClient), bus: eventBus}
 }
 
 type CreateSessionResponse struct {
@@ -100,6 +105,12 @@ func (s *SessionService) CreatePrivateSession(ctx context.Context, currentUserID
 	if err := resolveSessionCache(s.cacheClient).InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
+	s.publishEvent(ctx, "session.created", map[string]interface{}{
+		"session_id": session.ID,
+		"type":       model.SessionTypePrivate,
+		"owner_id":   "",
+		"members":    []string{currentUserID, targetUserID},
+	})
 
 	return &CreateSessionResponse{SessionID: session.ID, Type: model.SessionTypePrivate, Created: true}, nil
 }
@@ -147,6 +158,14 @@ func (s *SessionService) CreateGroupSession(ctx context.Context, ownerUserID, na
 	if err := resolveSessionCache(s.cacheClient).InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
+	members := append([]string{ownerUserID}, memberIDs...)
+	s.publishEvent(ctx, "session.created", map[string]interface{}{
+		"session_id": session.ID,
+		"type":       model.SessionTypeGroup,
+		"name":       name,
+		"owner_id":   ownerUserID,
+		"members":    members,
+	})
 
 	return &CreateSessionResponse{SessionID: session.ID, Type: model.SessionTypeGroup, Created: true}, nil
 }
@@ -266,6 +285,7 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 	}
 
 	members := make([]*model.SessionMember, 0, len(memberIDs))
+	joinedMembers := make([]*model.SessionMember, 0, len(memberIDs))
 	for _, mid := range memberIDs {
 		// Reactivate soft-deleted members instead of creating duplicates.
 		softDeleted, err := repository.IsMemberSoftDeleted(s.db, sessionID, model.MemberTypeUser, mid)
@@ -276,11 +296,16 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 			if err := repository.ReactivateMember(s.db, sessionID, model.MemberTypeUser, mid, model.MemberRoleMember); err != nil {
 				return err
 			}
+			joinedMembers = append(joinedMembers, &model.SessionMember{
+				SessionID: sessionID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
+			})
 			continue
 		}
-		members = append(members, &model.SessionMember{
+		member := &model.SessionMember{
 			SessionID: sessionID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
-		})
+		}
+		members = append(members, member)
+		joinedMembers = append(joinedMembers, member)
 	}
 	if len(members) > 0 {
 		if err := repository.BatchCreateMembers(s.db, members); err != nil {
@@ -288,6 +313,13 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 		}
 	}
 	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	for _, member := range joinedMembers {
+		s.publishEvent(ctx, "session.member_joined", map[string]interface{}{
+			"session_id":  sessionID,
+			"member_id":   member.MemberID,
+			"member_type": member.MemberType,
+		})
+	}
 	return nil
 }
 
@@ -336,6 +368,10 @@ func (s *SessionService) RemoveGroupMember(ctx context.Context, currentUserID, s
 		return err
 	}
 	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
+		"session_id": sessionID,
+		"member_id":  targetUserID,
+	})
 	return nil
 }
 
@@ -385,6 +421,10 @@ func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionI
 		return err
 	}
 	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
+		"session_id": sessionID,
+		"member_id":  currentUserID,
+	})
 	return nil
 }
 
@@ -442,6 +482,9 @@ func (s *SessionService) DissolveGroup(ctx context.Context, currentUserID, sessi
 		return err
 	}
 	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	s.publishEvent(ctx, "session.dissolved", map[string]interface{}{
+		"session_id": sessionID,
+	})
 	return nil
 }
 
@@ -463,19 +506,27 @@ func (s *SessionService) UpdateGroupInfo(ctx context.Context, currentUserID, ses
 		return errcode.GroupNotOwner
 	}
 
+	changes := make(map[string]interface{})
 	if name != nil {
 		session.Name = *name
+		changes["name"] = *name
 	}
 	if avatarURL != nil {
 		session.AvatarURL = *avatarURL
+		changes["avatar_url"] = *avatarURL
 	}
 	if announcement != nil {
 		session.Announcement = *announcement
+		changes["announcement"] = *announcement
 	}
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
 	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:meta:"+sessionID)
+	s.publishEvent(ctx, "session.info_updated", map[string]interface{}{
+		"session_id": sessionID,
+		"changes":    changes,
+	})
 	return nil
 }
 
@@ -536,6 +587,10 @@ func (s *SessionService) DeleteForMe(ctx context.Context, currentUserID, session
 		return err
 	}
 	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	s.publishEvent(ctx, "session.member_left", map[string]interface{}{
+		"session_id": sessionID,
+		"member_id":  currentUserID,
+	})
 	return nil
 }
 
@@ -576,4 +631,11 @@ func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) (
 // ListActiveMembers returns all active (non-left) members of a session. Thin wrapper over repository.ListActiveMembers.
 func (s *SessionService) ListActiveMembers(sessionID string) ([]*model.SessionMember, error) {
 	return repository.ListActiveMembers(s.db, sessionID)
+}
+
+func (s *SessionService) publishEvent(ctx context.Context, eventType string, payload map[string]interface{}) {
+	if s.bus == nil {
+		return
+	}
+	s.bus.Publish(ctx, Event{Type: eventType, Payload: payload})
 }

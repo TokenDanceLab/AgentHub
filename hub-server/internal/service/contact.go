@@ -143,11 +143,12 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 		return err
 	}
 
+	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
-			"sender_id":   userID,
-			"receiver_id": friendID,
-			"message":     message,
+			"request_id":   f.ID,
+			"from_user_id": userID,
+			"message":      message,
 		}})
 	}
 
@@ -220,6 +221,12 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 	}
 
 	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	if s.bus != nil {
+		s.bus.Publish(ctx, Event{Type: "friend.accepted", Payload: map[string]interface{}{
+			"friendship_id": r.ID,
+			"user_id":       userID,
+		}})
+	}
 	return nil
 }
 
