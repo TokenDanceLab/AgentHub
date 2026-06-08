@@ -52,6 +52,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
    - Keep D3 real CLI/model blocked until runner, budget, environment approval, and artifact redaction are approved.
    - Backend focused subset CI is allowed only for existing Hub/Edge short focused packages; it must not include Docker, service containers, self-hosted runners, external URLs, real CLI, model keys, or TokenDanceID live auth.
    - SDK agent strategy lives in [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md): AgentHub owns `AgentHubAgentSpec` / DSL; Claude/OpenAI SDKs remain Edge runtime/provider adapter experiments.
+   - Next SDK slices stay fixture-only until approved: Claude read-only adapter fixture -> OpenAI sandbox fixture -> SDK event mapper golden tests -> TeamRun fixture E2E.
 
 5. **Login real E2E**
    - Use existing fake/local and packaged readiness gates as preconditions.
@@ -73,6 +74,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
 | Next Edge | new worktree TBD | worker | preview fake runner and start contract | ready to dispatch after docs push |
 | Next artifact | new worktree TBD | worker/explorer | content source schema proposal | ready to dispatch after docs push |
 | Next demo | new worktree TBD | worker/explorer | TeamRun real evidence topology | ready to dispatch after docs push |
+| SDK contract | `.worktrees/agent-spec-schema` / `codex/agent-spec-schema` | worker | `AgentHubAgentSpec` docs/schema/fixture contract draft only | active; no runtime code or SDK packages |
 
 ## Blocked Gates
 
@@ -126,5 +128,6 @@ After this Roadmap slice is pushed:
 1. Spawn Edge preview fake-runner worker.
 2. Spawn artifact content-source proposal worker.
 3. Spawn TeamRun real evidence topology explorer.
-4. Spawn cleanup worker for clean merged worktrees only.
-5. Keep mobile and backend merge owners isolated.
+4. Spawn SDK PoC fixture workers in order: Claude read-only fixture, OpenAI sandbox fixture, mapper golden tests, TeamRun fixture E2E.
+5. Spawn cleanup worker for clean merged worktrees only.
+6. Keep mobile and backend merge owners isolated.
