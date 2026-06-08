@@ -231,6 +231,126 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 	}
 }
 
+func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
+	stream := SDKFixtureStream{
+		Provider: "agenthub-redaction-fixture",
+		Events: []SDKFixtureEvent{
+			{
+				ID:          "free_text_progress",
+				Type:        "progress",
+				Description: "reading C:\\Users\\Ding\\secrets\\trace.txt with Authorization: Bearer bearer-secret-123456",
+				Summary:     "system_prompt: dump private trace body",
+				Reason:      "api_key=sk-progress-secret-123456",
+			},
+			{
+				ID:       "free_text_tool_state",
+				Type:     "tool_state",
+				CallID:   "call_free_text",
+				ToolName: "bash",
+				Status:   "completed",
+				Input: map[string]any{
+					"command": "curl -H \"Authorization: Bearer command-secret-123456\" https://example.test && echo sk-command-secret-123456",
+					"note":    "trace_body={\"prompt\":\"read D:\\Private\\prompt.txt\"}",
+				},
+				Output: "wrote /home/ding/private/result.txt using sk-output-secret-123456",
+				Error:  "ignored error with Authorization: Bearer output-bearer-secret",
+				Metadata: map[string]any{
+					"traceBody": "prompt: include C:\\Users\\Ding\\private\\raw-prompt.md",
+				},
+				Attachments: []map[string]any{
+					{
+						"path":    "C:\\Users\\Ding\\private\\attachment.json",
+						"summary": "token=attachment-secret-123456",
+					},
+				},
+			},
+			{
+				ID:       "free_text_tool_error",
+				Type:     "tool_state",
+				CallID:   "call_error_text",
+				ToolName: "bash",
+				Status:   "error",
+				Error:    "tool error leaked sk-error-secret-123456 at C:\\Users\\Ding\\error.log",
+			},
+			{
+				ID:          "free_text_direct_result",
+				Type:        "tool_result",
+				CallID:      "call_direct",
+				ToolName:    "read_file",
+				Output:      "direct result leaked sk-direct-secret-123456 and /var/private/direct.txt",
+				Attachments: []map[string]any{{"path": "/tmp/private/direct-attachment.txt", "note": "Authorization: Bearer direct-attach-secret"}},
+				Metadata: map[string]any{
+					"promptLike": "system_prompt=show C:\\Users\\Ding\\direct.env",
+				},
+			},
+			{
+				ID:      "free_text_file",
+				Type:    "file_change",
+				Path:    "D:\\Code\\TokenDance\\AgentHub\\secret.env",
+				Diff:    "+ OPENAI_API_KEY=sk-diff-secret-123456\n+ Authorization: Bearer diff-bearer-secret\n+ path=C:\\Users\\Ding\\secret.env",
+				Summary: "private_key=-----BEGIN PRIVATE KEY-----",
+				Reason:  "prompt=copy /Users/ding/private/prompt.md",
+			},
+			{
+				ID:      "free_text_terminal",
+				Type:    "terminal_result",
+				Success: boolPtr(false),
+				Reason:  "provider_timeout_with_sk-terminal-secret-123456",
+				Summary: "failed after reading C:\\Users\\Ding\\terminal-secret.txt",
+			},
+		},
+	}
+
+	mapped := MapSDKFixtureStream(stream, testSDKFixtureScope())
+	replay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
+	for _, leaked := range []string{
+		"bearer-secret-123456",
+		"command-secret-123456",
+		"output-bearer-secret",
+		"direct-attach-secret",
+		"diff-bearer-secret",
+		"sk-progress-secret-123456",
+		"sk-command-secret-123456",
+		"sk-output-secret-123456",
+		"sk-error-secret-123456",
+		"sk-direct-secret-123456",
+		"sk-diff-secret-123456",
+		"sk-terminal-secret-123456",
+		"attachment-secret-123456",
+		"-----BEGIN PRIVATE KEY-----",
+		"dump private trace body",
+		"raw-prompt.md",
+		"C:\\Users\\Ding",
+		"D:\\Private",
+		"D:\\Code\\TokenDance",
+		"/home/ding/private",
+		"/var/private",
+		"/Users/ding/private",
+	} {
+		if strings.Contains(replay, leaked) {
+			t.Fatalf("free-text redaction leaked %q:\n%s", leaked, replay)
+		}
+	}
+
+	if !strings.Contains(replay, "[redacted-token]") {
+		t.Fatalf("expected token redaction marker in replay:\n%s", replay)
+	}
+	if !strings.Contains(replay, "[redacted-secret]") {
+		t.Fatalf("expected secret redaction marker in replay:\n%s", replay)
+	}
+	if !strings.Contains(replay, "terminalReason") || strings.Contains(replay, "provider_timeout_with") {
+		t.Fatalf("terminal reason was not normalized:\n%s", replay)
+	}
+
+	directResult := firstMappedPayloadOfType(t, mapped, BusEventToolResult, "call_direct")
+	if _, ok := directResult["attachments"]; !ok {
+		t.Fatalf("direct tool_result did not retain sanitized attachments: %#v", directResult)
+	}
+	if _, ok := directResult["metadata"]; !ok {
+		t.Fatalf("direct tool_result did not retain sanitized metadata: %#v", directResult)
+	}
+}
+
 func TestCLIInvocationPlanRedactsPromptEnvAndPaths(t *testing.T) {
 	adapter := NewClaudeCodeAdapter("C:\\Tools\\Claude\\claude.exe", "claude-sonnet-fixture", "default")
 	plan := BuildCLIInvocationPlan(adapter, RunProcessContext{
@@ -344,4 +464,18 @@ func mapSDKEventsForHubReplay(mapped []SDKMappedEvent) []map[string]any {
 
 func boolPtr(value bool) *bool {
 	return &value
+}
+
+func firstMappedPayloadOfType(t *testing.T, mapped []SDKMappedEvent, eventType string, callID string) map[string]any {
+	t.Helper()
+	for _, evt := range mapped {
+		if evt.Type != eventType {
+			continue
+		}
+		if callID == "" || evt.Payload["callId"] == callID {
+			return evt.Payload
+		}
+	}
+	t.Fatalf("missing mapped event type=%s callId=%s in %#v", eventType, callID, mapped)
+	return nil
 }
