@@ -293,6 +293,10 @@ func (s *SQLiteStore) ListArtifacts(runID string) []Artifact {
 	return s.store.ListArtifacts(runID)
 }
 
+func (s *SQLiteStore) GetArtifact(id string) (Artifact, bool) {
+	return s.store.GetArtifact(id)
+}
+
 func (s *SQLiteStore) UpsertPreview(preview Preview) (Preview, error) {
 	created, err := s.store.UpsertPreview(preview)
 	return persistAfterSQLiteWrite(s, created, err)
@@ -300,6 +304,10 @@ func (s *SQLiteStore) UpsertPreview(preview Preview) (Preview, error) {
 
 func (s *SQLiteStore) ListPreviews(runID string) []Preview {
 	return s.store.ListPreviews(runID)
+}
+
+func (s *SQLiteStore) GetPreview(id string) (Preview, bool) {
+	return s.store.GetPreview(id)
 }
 
 func ensureSQLiteDirectory(path string) error {

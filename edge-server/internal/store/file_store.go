@@ -310,6 +310,10 @@ func (f *FileStore) ListArtifacts(runID string) []Artifact {
 	return f.store.ListArtifacts(runID)
 }
 
+func (f *FileStore) GetArtifact(id string) (Artifact, bool) {
+	return f.store.GetArtifact(id)
+}
+
 func (f *FileStore) UpsertPreview(preview Preview) (Preview, error) {
 	created, err := f.store.UpsertPreview(preview)
 	if err != nil {
@@ -321,6 +325,10 @@ func (f *FileStore) UpsertPreview(preview Preview) (Preview, error) {
 
 func (f *FileStore) ListPreviews(runID string) []Preview {
 	return f.store.ListPreviews(runID)
+}
+
+func (f *FileStore) GetPreview(id string) (Preview, bool) {
+	return f.store.GetPreview(id)
 }
 
 func ensureFileSnapshotDirectory(path string) error {

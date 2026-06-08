@@ -16,8 +16,10 @@ type repositoryEvidenceStore interface {
 	UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error)
 	ListRunDiffFiles(runID string) []RunDiffFile
 	UpsertArtifact(artifact Artifact) (Artifact, error)
+	GetArtifact(id string) (Artifact, bool)
 	ListArtifacts(runID string) []Artifact
 	UpsertPreview(preview Preview) (Preview, error)
+	GetPreview(id string) (Preview, bool)
 	ListPreviews(runID string) []Preview
 }
 
@@ -568,6 +570,9 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	if got := evidence.ListArtifacts(run.ID); len(got) != 1 || got[0].ID != artifact.ID || got[0].ThreadID != thread.ID {
 		t.Fatalf("ListArtifacts(run) = %#v, want scoped artifact", got)
 	}
+	if got, ok := evidence.GetArtifact(artifact.ID); !ok || got.ID != artifact.ID || got.RunID != run.ID {
+		t.Fatalf("GetArtifact = %#v, %v; want stored artifact", got, ok)
+	}
 
 	preview, err := evidence.UpsertPreview(Preview{
 		ID:       "preview_contract",
@@ -584,6 +589,9 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	}
 	if got := evidence.ListPreviews(run.ID); len(got) != 1 || got[0].ID != preview.ID || got[0].Status != "ready" {
 		t.Fatalf("ListPreviews(run) = %#v, want scoped preview", got)
+	}
+	if got, ok := evidence.GetPreview(preview.ID); !ok || got.ID != preview.ID || got.RunID != run.ID {
+		t.Fatalf("GetPreview = %#v, %v; want stored preview", got, ok)
 	}
 
 	if handle.path == "" || handle.reopen == nil {
@@ -603,8 +611,14 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	if got := restoredEvidence.ListArtifacts(run.ID); len(got) != 1 || got[0].ID != artifact.ID {
 		t.Fatalf("restored artifacts = %#v, want persisted artifact", got)
 	}
+	if got, ok := restoredEvidence.GetArtifact(artifact.ID); !ok || got.ID != artifact.ID {
+		t.Fatalf("restored artifact lookup = %#v, %v; want persisted artifact", got, ok)
+	}
 	if got := restoredEvidence.ListPreviews(run.ID); len(got) != 1 || got[0].ID != preview.ID {
 		t.Fatalf("restored previews = %#v, want persisted preview", got)
+	}
+	if got, ok := restoredEvidence.GetPreview(preview.ID); !ok || got.ID != preview.ID {
+		t.Fatalf("restored preview lookup = %#v, %v; want persisted preview", got, ok)
 	}
 }
 
