@@ -19,10 +19,12 @@ const lobeExamples: RuntimeIconExample[] = [
   { kind: 'runtime', name: 'OpenCode' },
   { kind: 'model', name: 'gpt-5-codex' },
   { kind: 'provider', name: 'OpenAI' },
+  { kind: 'provider', name: 'Claude' },
   { kind: 'model', name: 'internal-fast', provider: 'Anthropic' },
 ];
 
 const fallbackExamples: RuntimeIconExample[] = [
+  { kind: 'runtime', name: 'Custom Agent' },
   { kind: 'runtime', name: 'Browser Worker' },
   { kind: 'tool', name: 'apply_patch' },
   { kind: 'tool', name: 'Git Diff' },
