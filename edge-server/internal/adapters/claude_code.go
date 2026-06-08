@@ -16,11 +16,12 @@ import (
 // Invocation: claude -p "prompt" --output-format stream-json --verbose
 // Protocol: NDJSON over stdout (each line a JSON message), stderr for diagnostics.
 type ClaudeCodeAdapter struct {
-	binaryPath     string
-	model          string // default model (fallback when runCtx.Model is empty)
-	permissionMode string // default permission mode (fallback when runCtx.PermissionMode is empty)
-	maxTurns       int
-	available      bool // #177: true if the CLI binary exists and is executable
+	binaryPath       string
+	model            string // default model (fallback when runCtx.Model is empty)
+	permissionMode   string // default permission mode (fallback when runCtx.PermissionMode is empty)
+	maxTurns         int
+	available        bool // #177: true if the CLI binary exists and is executable
+	permissionBroker *PermissionDecisionBroker
 }
 
 // NewClaudeCodeAdapter creates a Claude Code adapter.
@@ -56,6 +57,10 @@ func (a *ClaudeCodeAdapter) Capabilities() AgentCapabilities {
 		MCPIntegration:  true,
 		SubAgentSpawn:   true, // AgentTool (forkSubagent) for task delegation
 	}
+}
+
+func (a *ClaudeCodeAdapter) SetPermissionBroker(broker *PermissionDecisionBroker) {
+	a.permissionBroker = broker
 }
 
 func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
@@ -193,7 +198,15 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
 	parser := NewNDJSONStreamParser(emitter, run)
 	if stdin != nil {
-		parser.WithControlHandler(NewEventEmittingPermissionHandler(emitter), stdin)
+		if a.permissionBroker != nil {
+			parser.WithControlHandler(NewBrokeredPermissionHandler(emitter, a.permissionBroker, PermissionScope{
+				ProjectID: run.ProjectID,
+				ThreadID:  run.ThreadID,
+				RunID:     run.ID,
+			}), stdin)
+		} else {
+			parser.WithControlHandler(NewEventEmittingPermissionHandler(emitter), stdin)
+		}
 	}
 	// Security hooks are now installed at the ProcessExecutor level via
 	// SecureEmitter, covering all adapters uniformly (Claude Code, Codex, OpenCode).
