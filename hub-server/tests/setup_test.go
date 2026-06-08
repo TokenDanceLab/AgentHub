@@ -19,8 +19,10 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
@@ -34,6 +36,7 @@ var (
 	bus             *service.Bus
 	db              *gorm.DB // hold reference for cleanDB
 	testCacheClient *cache.Client
+	testJWT         config.JWTConfig
 )
 
 func TestMain(m *testing.M) {
@@ -49,6 +52,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
+	if cfg.JWT.Secret == "" {
+		cfg.JWT.Secret = "test-jwt-secret-for-integration-tests"
+	}
+	testJWT = cfg.JWT
 	log.Init(&cfg.Server)
 
 	database, err := repository.InitDB(&cfg.DB)
@@ -271,38 +278,41 @@ type testUser struct {
 func register(t *testing.T, username, password, nickname string) testUser {
 	t.Helper()
 
-	w := post("/client/auth/register", map[string]string{
-		"username": username, "password": password, "nickname": nickname,
-	})
-	r := parse(w)
-	if r.GetCode() == "USER_USERNAME_TAKEN" {
-		return loginAndGetUser(t, username, password)
+	user := model.User{
+		Username: username,
+		Nickname: nickname,
 	}
-	if r.GetCode() != "OK" {
-		t.Fatalf("register %s failed: %s", username, r.GetCode())
+	if err := db.Create(&user).Error; err != nil {
+		existing, findErr := repository.GetUserByUsername(db, username)
+		if findErr != nil {
+			t.Fatalf("create test user %s failed: %v", username, err)
+		}
+		user = *existing
 	}
-	return loginAndGetUser(t, username, password)
+
+	deviceID := testDeviceID(username, "web")
+	token, err := jwtutil.GenerateAccessToken(user.ID, "web", deviceID, testJWT.Secret, testJWT.AccessTTL)
+	if err != nil {
+		t.Fatalf("generate token for %s: %v", username, err)
+	}
+
+	return testUser{Username: username, Password: password, Token: token, ID: user.ID}
 }
 
-func loginAndGetUser(t *testing.T, username, password string) testUser {
-	t.Helper()
-	w := post("/client/auth/login", map[string]interface{}{
-		"username": username, "password": password,
-		"device_type": "web", "device_id": testDeviceID(username, "web"),
-	})
+func TestSetupRegisterCreatesHubSession(t *testing.T) {
+	CleanDB(t, db)
+
+	u := register(t, "tsetup_user", "pass1234", "SetupUser")
+
+	w := get("/client/auth/me", u.Token)
 	r := parse(w)
 	if r.GetCode() != "OK" {
-		t.Fatalf("login %s failed: %s", username, r.GetCode())
-	}
-	tok := extract(r.Data, "access_token")
-
-	w = get("/client/auth/me", tok)
-	r = parse(w)
-	if r.GetCode() != "OK" {
-		t.Fatalf("me %s failed: %s", username, r.GetCode())
+		t.Fatalf("me %s failed: %s", u.Username, r.GetCode())
 	}
 	id := extract(r.Data, "id")
-	return testUser{Username: username, Password: password, Token: tok, ID: id}
+	if id != u.ID {
+		t.Fatalf("me returned id %s, want %s", id, u.ID)
+	}
 }
 
 func testDeviceID(username, deviceType string) string {
