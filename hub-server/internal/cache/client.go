@@ -338,6 +338,41 @@ func (c *Client) PushPendingAgentControl(ctx context.Context, userID, deviceID, 
 	return err
 }
 
+// ListPendingAgentControlsForDevice lists queued controls for one device
+// without removing them. Call AckPendingAgentControl after WebSocket enqueue
+// succeeds.
+func (c *Client) ListPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	key := pendingAgentControlKey(userID, deviceID)
+	controls, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, 0, len(controls))
+	for _, control := range controls {
+		var raw json.RawMessage
+		if json.Unmarshal([]byte(control), &raw) == nil {
+			result = append(result, control)
+		}
+	}
+	return result, nil
+}
+
+// AckPendingAgentControl removes one exact queued control after it has been
+// accepted by the WebSocket send queue.
+func (c *Client) AckPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	key := pendingAgentControlKey(userID, deviceID)
+	pipe := c.rdb.TxPipeline()
+	pipe.LRem(ctx, key, 1, controlJSON)
+	remaining := pipe.LLen(ctx, key)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+	if remaining.Val() == 0 {
+		return c.rdb.Del(ctx, key).Err()
+	}
+	return nil
+}
+
 // PopPendingAgentControlsForDevice pops all queued controls for one device and
 // clears only that device's control queue.
 func (c *Client) PopPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
@@ -447,6 +482,12 @@ func (NoOpCache) PopPendingTargetTasksForDevice(ctx context.Context, userID, dev
 	return nil, ErrCacheUnavailable
 }
 func (NoOpCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	return ErrCacheUnavailable
+}
+func (NoOpCache) ListPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	return nil, ErrCacheUnavailable
+}
+func (NoOpCache) AckPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
 	return ErrCacheUnavailable
 }
 func (NoOpCache) PopPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
