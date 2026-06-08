@@ -289,15 +289,18 @@ if (Test-Path -LiteralPath $scriptPath) {
         "-ApprovalMarker", $approvalMarker,
         "-ApproveObservedCLI"
     )
-    Assert-True ($passingObserved.ExitCode -eq 0) "approved passing observed chain can report real tested" $passingObserved.Output
-    Assert-True ($passingObserved.Output -match "real_tested=true") "approved passing observed chain reports real_tested=true" $passingObserved.Output
-    Assert-True ($passingObserved.Output -match "Status: OBSERVED_DISPATCH_VERIFIED") "approved passing observed chain reports observed status" $passingObserved.Output
+    Assert-True ($passingObserved.ExitCode -eq 0) "approved passing observed chain can accept correlated manifest" $passingObserved.Output
+    Assert-True ($passingObserved.Output -match "real_tested=false") "approved passing observed chain does not promote real_tested from manifest text" $passingObserved.Output
+    Assert-True ($passingObserved.Output -match "observed_manifest_accepted=true") "approved passing observed chain reports accepted manifest status" $passingObserved.Output
+    Assert-True ($passingObserved.Output -match "Status: OBSERVED_MANIFEST_ACCEPTED") "approved passing observed chain reports manifest accepted status" $passingObserved.Output
+    Assert-True ($passingObserved.Output -match "separate verifier") "approved passing observed chain names separate verifier requirement" $passingObserved.Output
 }
 
 if (Test-Path -LiteralPath $docPath) {
     $docText = Get-Content -LiteralPath $docPath -Raw
     Assert-True ($docText -match "request -> CLI invocation plan -> event replay/status") "audit doc records dispatch evidence chain"
     Assert-True ($docText -match "real_tested=false") "audit doc records false-by-default real-tested semantics"
+    Assert-True ($docText -match "observed_manifest_accepted") "audit doc records accepted manifest status"
     Assert-True ($docText -match "approval marker") "audit doc records observed approval marker gate"
     Assert-True ($docText -match "observedEvidenceRef") "audit doc records observed evidence reference requirement"
     Assert-True ($docText -match "correlationId") "audit doc records correlation requirement"

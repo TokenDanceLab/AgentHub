@@ -46,7 +46,13 @@ The manifest must show typed execution identity and correlation:
 
 Any missing approval marker, missing manifest field, wrong-type required field, missing observed evidence reference, missing correlation field, failed terminal status, nonzero exit code, unsupported adapter, or secret-like manifest content keeps `real_tested=false`. In `RealTested` mode, a failed observed chain exits nonzero and still reports `real_tested=false`.
 
-Boolean-only synthetic manifests are fixture proof only. Even with an approval marker, they remain `real_tested=false` unless they include the concrete observed evidence reference and event correlation fields above.
+Passing observed manifests are still manifest-level evidence only. They report
+`observed_manifest_accepted=true` and keep `real_tested=false` because this
+verifier does not dereference the referenced artifact, event log, or hash. A
+future RealTested promotion needs a separate verifier that reads the referenced
+material and checks event ids/correlation ids against it.
+
+Boolean-only synthetic manifests are fixture proof only. Even with an approval marker, they remain `real_tested=false`; concrete observed evidence reference and event correlation fields are required only to accept the manifest for follow-up verification.
 
 ## Commands
 
