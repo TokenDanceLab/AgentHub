@@ -45,9 +45,16 @@ func IsTrustedLocalOrigin(origin string) bool {
 }
 
 // IsTrustedOrigin reports whether a browser Origin can control Edge.
-// When remoteMode is true, any valid http/https origin is trusted (auth
-// still required). When false, only localhost origins are trusted.
+// When remoteMode is true, only localhost origins are trusted by default.
+// Remote browser origins must be passed through IsAllowedOrigin with an
+// explicit allowlist.
 func IsTrustedOrigin(origin string, remoteMode bool) bool {
+	return IsAllowedOrigin(origin, remoteMode, nil)
+}
+
+// IsAllowedOrigin reports whether a browser Origin can control Edge under the
+// supplied runtime mode and remote-origin allowlist.
+func IsAllowedOrigin(origin string, remoteMode bool, allowedOrigins []string) bool {
 	// Reject empty Origin: non-browser clients (curl, scripts) send no
 	// Origin header, and the browser CORS spec always sends Origin for
 	// cross-origin requests. Accepting empty Origin would bypass CORS.
@@ -71,17 +78,45 @@ func IsTrustedOrigin(origin string, remoteMode bool) bool {
 		return false
 	}
 
-	// Remote mode: any http/https origin is allowed (auth gate still applies).
-	if remoteMode {
-		return true
-	}
-
 	switch host {
 	case "localhost", "127.0.0.1", "::1", "tauri.localhost":
 		return true
-	default:
+	}
+
+	if !remoteMode {
 		return false
 	}
+
+	normalizedOrigin := normalizeHTTPOrigin(u)
+	for _, allowed := range allowedOrigins {
+		if normalizedAllowed, ok := normalizeAllowedHTTPOrigin(allowed); ok && normalizedAllowed == normalizedOrigin {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeAllowedHTTPOrigin(origin string) (string, bool) {
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return "", false
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return "", false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", false
+	}
+	if u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+		return "", false
+	}
+	return normalizeHTTPOrigin(u), true
+}
+
+func normalizeHTTPOrigin(u *url.URL) string {
+	return strings.ToLower(u.Scheme) + "://" + strings.ToLower(u.Host)
 }
 
 // ValidateLocalListenAddr rejects wildcard or non-loopback listen addresses.
