@@ -5,7 +5,9 @@ AgentHub P0 localhost smoke harness.
 Default mode is a dry-run/plan harness: it runs repeatable FixtureOnly and
 LocalOnly checks, records localhost service probes as blocked, and writes an
 evidence matrix. Pass output never means RealTested. Use -RunLocalhost only
-after local Hub/Web/Desktop/Edge fixture services are already running.
+after local Hub/Web/Desktop/Edge fixture services are already running. The
+current localhost probes are TCP-only reachability checks; they do not prove
+service identity or fixture readiness.
 
 This script does not start real TokenDanceID, run real CLI/model adapters,
 deploy public surfaces, sign packages, upload releases, or touch Mobile.
@@ -300,7 +302,9 @@ function Test-LocalhostService {
     }
 
     if (Test-TcpPort "127.0.0.1" $Port $TimeoutMs) {
-        Pass $Label "LocalhostSmoke" "127.0.0.1:$Port is reachable; RealTested=false"
+        $detail = "TCP-only reachability: 127.0.0.1:$Port accepted a TCP connection; does not prove service identity or fixture readiness. TODO: replace TCP-only probes with health/fixture marker checks. RealTested=false"
+        Pass "$Label TCP-only reachability" "LocalhostSmoke" $detail
+        Write-Host "        $detail" -ForegroundColor DarkGray
         return
     }
 
