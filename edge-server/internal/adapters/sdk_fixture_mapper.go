@@ -234,10 +234,11 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 		}))
 	case "tool_result":
 		return oneSDKMappedEvent(BusEventToolResult, scope, commonSDKPayload(event, provider, map[string]any{
-			"callId":   firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
-			"toolName": event.ToolName,
-			"content":  event.Output,
-			"isError":  event.IsError,
+			"callId":      firstNonEmpty(event.CallID, event.ToolUseID, event.ID),
+			"toolName":    event.ToolName,
+			"content":     event.Output,
+			"isError":     event.IsError,
+			"attachments": sanitizeSDKValue(event.Attachments),
 		}))
 	case "permission_request", "guardrail_signal":
 		return oneSDKMappedEvent(BusEventPermissionRequested, scope, commonSDKPayload(event, provider, map[string]any{
@@ -431,7 +432,13 @@ func sanitizeSDKValue(value any) any {
 		}
 		return sanitized
 	case []string:
-		return append([]string(nil), v...)
+		sanitized := make([]string, len(v))
+		for i, child := range v {
+			sanitized[i] = sanitizeSDKText(child)
+		}
+		return sanitized
+	case string:
+		return sanitizeSDKText(v)
 	default:
 		return value
 	}
@@ -464,21 +471,18 @@ func sdkUsagePayload(event SDKFixtureEvent) map[string]any {
 }
 
 func terminalReasonForSDKEvent(event SDKFixtureEvent, success bool) string {
-	if event.Reason != "" {
-		return event.Reason
+	normalizedType := normalizeSDKFixtureType(event.Type)
+	if normalizedType == "cancelled" || normalizedType == "canceled" || normalizedType == "cancellation" {
+		return "cancelled"
 	}
-	switch normalizeSDKFixtureType(event.Type) {
-	case "terminal_result", "run_result", "result":
-		if success {
-			return "completed"
-		}
-		return "error"
-	default:
-		if success {
-			return "completed"
-		}
+	normalizedReason := strings.ToLower(event.Reason)
+	if strings.Contains(normalizedReason, "cancel") {
+		return "cancelled"
+	}
+	if !success {
 		return "error"
 	}
+	return "completed"
 }
 
 func isSDKSecretKey(key string) bool {
@@ -520,18 +524,26 @@ func normalizeSDKWorkspacePath(value string) string {
 }
 
 var (
-	sdkWindowsPathPattern = regexp.MustCompile(`(?i)[a-z]:[\\/](?:[^\\/\s"]+[\\/])*([^\\/\s"]+)`)
-	sdkPOSIXPathPattern   = regexp.MustCompile(`/(?:[^/\s"]+/)+([^/\s"]+)`)
-	sdkTokenPattern       = regexp.MustCompile(`(?i)\b(?:sk|ghp|gho|ghu|ghs|glpat|xox[baprs])-[-_a-z0-9]{6,}\b`)
+	sdkAuthHeaderPattern       = regexp.MustCompile(`(?i)(authorization\s*:\s*bearer\s+)[^"'\s,;\\]+`)
+	sdkBearerPattern           = regexp.MustCompile(`(?i)\bbearer\s+[-._~+/=a-z0-9]{8,}`)
+	sdkSecretAssignmentPattern = regexp.MustCompile(`(?i)\b([a-z0-9_ -]*(?:api[_ -]?key|token|secret|password|private[_ -]?key|authorization)[a-z0-9_ -]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|-----BEGIN [^-]+ PRIVATE KEY-----|[^"'\s,;]+)`)
+	sdkPromptBodyPattern       = regexp.MustCompile(`(?i)\b((?:system[_ -]?prompt|prompt|trace[_ -]?body|tracebody)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^,;\n]+)`)
+	sdkWindowsPathPattern      = regexp.MustCompile(`(?i)[a-z]:[\\/](?:[^\\/\s"]+[\\/])*([^\\/\s"]+)`)
+	sdkPOSIXPathPattern        = regexp.MustCompile(`(^|[\s"'=])/(?:[^/\s"]+/)+([^/\s"]+)`)
+	sdkTokenPattern            = regexp.MustCompile(`(?i)\b(?:sk|ghp|gho|ghu|ghs|glpat|xox[baprs])-[-_a-z0-9]{6,}\b`)
 )
 
 func sanitizeSDKText(value string) string {
 	if value == "" {
 		return ""
 	}
-	sanitized := sdkWindowsPathPattern.ReplaceAllString(value, "$1")
-	sanitized = sdkPOSIXPathPattern.ReplaceAllString(sanitized, "$1")
-	sanitized = sdkTokenPattern.ReplaceAllString(sanitized, "[redacted]")
+	sanitized := sdkAuthHeaderPattern.ReplaceAllString(value, "${1}[redacted-token]")
+	sanitized = sdkBearerPattern.ReplaceAllString(sanitized, "Bearer [redacted-token]")
+	sanitized = sdkSecretAssignmentPattern.ReplaceAllString(sanitized, "${1}[redacted-secret]")
+	sanitized = sdkPromptBodyPattern.ReplaceAllString(sanitized, "${1}[redacted]")
+	sanitized = sdkTokenPattern.ReplaceAllString(sanitized, "[redacted-token]")
+	sanitized = sdkWindowsPathPattern.ReplaceAllString(sanitized, "$1")
+	sanitized = sdkPOSIXPathPattern.ReplaceAllString(sanitized, "${1}${2}")
 	return sanitized
 }
 
