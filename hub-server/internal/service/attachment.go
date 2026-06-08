@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -330,4 +331,30 @@ func (s *AttachmentService) MaxUploadSize() int64 {
 		return config.DefaultMaxUploadSize
 	}
 	return s.uploadCfg.MaxSize
+}
+
+func (s *AttachmentService) IsAttachmentMimeTypeAllowed(mimeType string) bool {
+	mediaType, _, err := mime.ParseMediaType(mimeType)
+	if err != nil {
+		mediaType = strings.TrimSpace(mimeType)
+	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	if mediaType == "" {
+		return false
+	}
+
+	allowedMimeTypes := s.uploadCfg.AllowedMimeTypes
+	if len(allowedMimeTypes) == 0 {
+		allowedMimeTypes = config.DefaultAllowedUploadMimeTypes
+	}
+	for _, allowed := range allowedMimeTypes {
+		allowedMediaType, _, err := mime.ParseMediaType(allowed)
+		if err != nil {
+			allowedMediaType = strings.TrimSpace(allowed)
+		}
+		if mediaType == strings.ToLower(strings.TrimSpace(allowedMediaType)) {
+			return true
+		}
+	}
+	return false
 }

@@ -231,6 +231,31 @@ func TestSaveAttachment_DefaultsMetadataToEmptyObject(t *testing.T) {
 	}
 }
 
+func TestAttachmentServiceMimeAllowlistUsesDefaultWithoutOctetStream(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	svc := service.NewAttachmentService(db, config.UploadConfig{}, service.NewLocalStorage(t.TempDir()))
+
+	if !svc.IsAttachmentMimeTypeAllowed("text/plain; charset=utf-8") {
+		t.Fatal("text/plain with parameters should be allowed by default")
+	}
+	if svc.IsAttachmentMimeTypeAllowed("application/octet-stream") {
+		t.Fatal("application/octet-stream must not be allowed by default")
+	}
+}
+
+func TestAttachmentServiceMimeAllowlistAllowsConfiguredOctetStream(t *testing.T) {
+	db := newAttachmentServiceTestDB(t)
+	svc := service.NewAttachmentService(
+		db,
+		config.UploadConfig{AllowedMimeTypes: []string{"text/plain", "application/octet-stream"}},
+		service.NewLocalStorage(t.TempDir()),
+	)
+
+	if !svc.IsAttachmentMimeTypeAllowed("application/octet-stream") {
+		t.Fatal("application/octet-stream should be allowed when explicitly configured")
+	}
+}
+
 func TestS3Storage_PutReturnsTrue(t *testing.T) {
 	s3 := service.NewS3Storage(
 		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
