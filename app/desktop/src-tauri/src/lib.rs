@@ -36,8 +36,8 @@ pub fn run() {
     let edge = Arc::new(Mutex::new(
         EdgeManager::new(edge_path.clone(), store_path.clone())
             .unwrap_or_else(|e| {
-                log::error!("Failed to initialize local Edge auth token: {e}. Edge connections will not authenticate.");
-                EdgeManager::new_fallback(edge_path, store_path)
+                log::error!("Failed to initialize local Edge auth token: {e}. Local Edge startup is blocked.");
+                EdgeManager::new_unavailable(edge_path, store_path, e)
             }),
     ));
 

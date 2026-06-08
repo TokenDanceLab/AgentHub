@@ -83,5 +83,6 @@ describe('useHealth', () => {
 
     expect(result.current.online).toBe(false);
     expect(result.current.health).toBeNull();
+    expect(result.current.lastError).toBe('connection refused');
   });
 });
