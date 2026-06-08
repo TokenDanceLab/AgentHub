@@ -93,8 +93,8 @@ func TestIsTrustedOriginRemoteMode(t *testing.T) {
 		origin string
 		want   bool
 	}{
-		{"https remote", "https://edge.example.com", true},
-		{"http remote", "http://edge.example.com:3210", true},
+		{"https remote not trusted by default", "https://edge.example.com", false},
+		{"http remote not trusted by default", "http://edge.example.com:3210", false},
 		{"localhost still allowed", "http://localhost:5173", true},
 		{"empty origin rejected", "", false},
 		{"invalid url rejected", "://bad", false},
@@ -108,6 +108,31 @@ func TestIsTrustedOriginRemoteMode(t *testing.T) {
 			got := IsTrustedOrigin(tt.origin, true)
 			if got != tt.want {
 				t.Fatalf("IsTrustedOrigin(%q, true) = %v, want %v", tt.origin, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsAllowedOriginRemoteModeUsesExplicitAllowlist(t *testing.T) {
+	allowed := []string{"https://app.example.com", "http://edge.example.com:3210"}
+	tests := []struct {
+		name   string
+		origin string
+		want   bool
+	}{
+		{"listed https origin", "https://app.example.com", true},
+		{"listed http origin", "http://edge.example.com:3210", true},
+		{"unlisted https origin", "https://evil.example", false},
+		{"same host different scheme", "http://app.example.com", false},
+		{"same host different port", "http://edge.example.com:3211", false},
+		{"localhost still allowed", "http://localhost:5173", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsAllowedOrigin(tt.origin, true, allowed)
+			if got != tt.want {
+				t.Fatalf("IsAllowedOrigin(%q, true, allowed) = %v, want %v", tt.origin, got, tt.want)
 			}
 		})
 	}
