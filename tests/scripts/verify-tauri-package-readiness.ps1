@@ -58,14 +58,17 @@ function Invoke-Script {
 }
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
+$smokeScriptPath = Join-Path $RepoRoot "scripts\verify-tauri-installer-smoke.ps1"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\release.yml"
 $readinessWorkflowPath = Join-Path $RepoRoot ".github\workflows\release-readiness.yml"
 
 Assert-True (Test-Path $scriptPath) "Tauri package readiness checker exists"
+Assert-True (Test-Path $smokeScriptPath) "Tauri installer smoke preflight exists"
 Assert-True (Test-Path $workflowPath) "release workflow exists"
 Assert-True (Test-Path $readinessWorkflowPath) "release readiness workflow exists"
 
 $scriptText = Read-Text "scripts\verify-tauri-package-readiness.ps1"
+$smokeScriptText = Read-Text "scripts\verify-tauri-installer-smoke.ps1"
 $workflowText = Read-Text ".github\workflows\release.yml"
 $readinessWorkflowText = Read-Text ".github\workflows\release-readiness.yml"
 
@@ -87,6 +90,11 @@ foreach ($artifactPattern in @(
     Assert-True ($scriptText -match [regex]::Escape($artifactPattern)) "checker covers ignored generated artifact path $artifactPattern"
 }
 Assert-True ($scriptText -match "unsigned" -and $scriptText -match "aarch64-apple-darwin" -and $scriptText -match "policy note") "checker records macOS arm64 unsigned policy note without formal signing claims"
+Assert-True ($smokeScriptText -match "StrictToolchain" -and $smokeScriptText -match "GOOS=windows" -and $smokeScriptText -match "GOARCH=amd64") "installer smoke records Windows sidecar toolchain preflight"
+Assert-True ($smokeScriptText -match "installer-header\.bmp" -and $smokeScriptText -match "installer-sidebar\.bmp") "installer smoke verifies NSIS installer image assets"
+Assert-True ($smokeScriptText -match "AgentHub-portable/AgentHub\.exe" -and $smokeScriptText -match "AgentHub-portable/agenthub-edge\.exe") "installer smoke verifies portable staging outputs stay ignored"
+Assert-True ($smokeScriptText -match "notarization" -and $smokeScriptText -match "stapling" -and $smokeScriptText -match "policy note only") "installer smoke keeps macOS compatibility as policy note only"
+Assert-True ($smokeScriptText -notmatch "pnpm\s+tauri\s+build|softprops/action-gh-release|gh release upload|codesign\s+--sign|xcrun\s+notarytool|stapler\s+staple") "installer smoke does not run release, signing, notarization, or full Tauri build commands"
 
 Assert-True ($workflowText -match "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*tags:" -and $workflowText -match "softprops/action-gh-release") "release workflow keeps tag release semantics"
 Assert-True ($workflowText -match "TAURI_SIGNING_PRIVATE_KEY") "release workflow keeps production signing secret boundary"
@@ -94,6 +102,8 @@ Assert-True ($readinessWorkflowText -match "workflow_dispatch") "release readine
 Assert-True ($readinessWorkflowText -match "\.github/workflows/release\.yml") "release readiness workflow watches release.yml"
 Assert-True ($readinessWorkflowText -match "app/desktop/src-tauri/Cargo\.lock") "release readiness workflow watches Cargo.lock"
 Assert-True ($readinessWorkflowText -match "verify-tauri-package-readiness\.ps1") "release readiness workflow runs readiness checker"
+Assert-True ($readinessWorkflowText -match "verify-tauri-installer-smoke\.ps1") "release readiness workflow runs installer smoke preflight"
+Assert-True ($readinessWorkflowText -match "windows-installer-smoke-preflight") "release readiness workflow has a Windows installer smoke preflight job"
 Assert-True ($readinessWorkflowText -notmatch "softprops/action-gh-release") "release readiness workflow does not create a GitHub Release"
 Assert-True ($readinessWorkflowText -notmatch "TAURI_SIGNING_PRIVATE_KEY") "release readiness workflow does not require production signing secrets"
 
@@ -103,6 +113,9 @@ Assert-True ($scriptHosts.Count -gt 0) "at least one PowerShell host is availabl
 foreach ($hostShell in $scriptHosts) {
     $ok = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot)
     Assert-True ($ok.ExitCode -eq 0) "readiness checker passes current repository policy under $($ok.Host)" $ok.Output
+
+    $smokeOutput = & $hostShell.Path -NoProfile -ExecutionPolicy Bypass -File $smokeScriptPath -RepoRoot $RepoRoot 2>&1 | Out-String
+    Assert-True ($LASTEXITCODE -eq 0) "installer smoke preflight passes without full build under $($hostShell.Name)" $smokeOutput
 
     $missingUpdater = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", (Join-Path $RepoRoot "does-not-exist"), "-RequireBuiltArtifacts")
     Assert-True ($missingUpdater.ExitCode -ne 0) "built artifact gate fails when updater metadata is missing under $($missingUpdater.Host)" $missingUpdater.Output
