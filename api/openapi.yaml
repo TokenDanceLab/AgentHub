@@ -862,7 +862,7 @@ paths:
       tags: [ExecutionRunner]
       operationId: getArtifactContent
       summary: Get artifact content or redirect.
-      description: Planned. Current Edge artifact metadata stores only a sanitized logical path and does not yet include a safe content source, blob key, workspace binding, MIME type, checksum, or size/read policy.
+      description: Planned. Current Edge artifact metadata may include safe contentSource metadata, but this route still lacks an approved workspace resolver, blob key, MIME type, checksum, size cap, and read policy.
       x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
@@ -4969,16 +4969,32 @@ components:
           description: Artifact category such as patch, file, image, document, or web.
         path:
           type: string
-          description: Workspace-relative artifact path or logical artifact name.
+          description: Workspace-relative artifact path or logical artifact name. Absolute private paths are never exposed.
         sizeBytes:
           type: integer
           format: int64
+        contentSource:
+          $ref: "#/components/schemas/ArtifactContentSource"
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    ArtifactContentSource:
+      type: object
+      description: Safe metadata for future artifact content reads. The path is either workspace-relative or basename-only; absolute private paths are never stored or returned.
+      required: [kind, path, readable]
+      properties:
+        kind:
+          type: string
+          enum: [workspace_relative, basename]
+        path:
+          type: string
+          description: Workspace-relative source path when readable, otherwise basename-only fallback.
+        readable:
+          type: boolean
+          description: Whether a future content route may resolve the source from an approved workspace root.
     ArtifactList:
       type: object
       required: [items, page]

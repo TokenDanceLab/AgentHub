@@ -26,11 +26,11 @@ func TestSQLiteStoreAppliesRelationalMigrationPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SQLiteAppliedMigrations returned error: %v", err)
 	}
-	if got, want := migrationVersions(applied), "1,2"; got != want {
+	if got, want := migrationVersions(applied), "1,2,3"; got != want {
 		t.Fatalf("applied migration versions = %s, want %s", got, want)
 	}
-	if applied[0].Name != "snapshot_store" || applied[1].Name != "relational_edge_lifecycle" {
-		t.Fatalf("applied migrations = %#v, want snapshot and relational lifecycle migrations", applied)
+	if applied[0].Name != "snapshot_store" || applied[1].Name != "relational_edge_lifecycle" || applied[2].Name != "artifact_content_source_readiness" {
+		t.Fatalf("applied migrations = %#v, want snapshot, relational lifecycle, and content source migrations", applied)
 	}
 
 	db, err := sql.Open("sqlite", path)
@@ -42,7 +42,7 @@ func TestSQLiteStoreAppliesRelationalMigrationPlan(t *testing.T) {
 	assertSQLiteColumns(t, db, "edge_owners", []string{"owner_id", "source", "display_name", "created_at", "updated_at"})
 	assertSQLiteColumns(t, db, "edge_workspaces", []string{"workspace_id", "owner_id", "local_path", "name", "status", "created_at", "updated_at"})
 	assertSQLiteColumns(t, db, "edge_runs", []string{"run_id", "owner_id", "workspace_id", "thread_id", "status", "created_at", "started_at", "finished_at", "metadata_json"})
-	assertSQLiteColumns(t, db, "edge_artifacts", []string{"artifact_id", "owner_id", "workspace_id", "run_id", "kind", "path", "mime_type", "digest", "status", "created_at", "updated_at", "metadata_json"})
+	assertSQLiteColumns(t, db, "edge_artifacts", []string{"artifact_id", "owner_id", "workspace_id", "run_id", "kind", "path", "mime_type", "digest", "status", "created_at", "updated_at", "metadata_json", "content_source_kind", "content_source_path", "content_source_readable"})
 	assertSQLiteColumns(t, db, "edge_diffs", []string{"diff_id", "owner_id", "workspace_id", "run_id", "artifact_id", "base_ref", "head_ref", "summary_json", "patch_path", "status", "created_at", "updated_at"})
 	assertSQLiteColumns(t, db, "edge_previews", []string{"preview_id", "owner_id", "workspace_id", "run_id", "artifact_id", "url", "local_path", "status", "created_at", "updated_at", "metadata_json"})
 }
@@ -88,7 +88,7 @@ func TestRollbackSQLiteMigrationsReturnsToSnapshotOnlySchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SQLiteAppliedMigrations after reapply returned error: %v", err)
 	}
-	if got, want := migrationVersions(applied), "1,2"; got != want {
+	if got, want := migrationVersions(applied), "1,2,3"; got != want {
 		t.Fatalf("applied migration versions after reapply = %s, want %s", got, want)
 	}
 }
@@ -104,7 +104,7 @@ func TestSQLiteMigrationsAreIdempotentAcrossReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SQLiteAppliedMigrations after first open returned error: %v", err)
 	}
-	if got, want := migrationVersions(applied), "1,2"; got != want {
+	if got, want := migrationVersions(applied), "1,2,3"; got != want {
 		t.Fatalf("applied migration versions after first open = %s, want %s", got, want)
 	}
 
@@ -117,7 +117,7 @@ func TestSQLiteMigrationsAreIdempotentAcrossReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SQLiteAppliedMigrations after second open returned error: %v", err)
 	}
-	if got, want := migrationVersions(reapplied), "1,2"; got != want {
+	if got, want := migrationVersions(reapplied), "1,2,3"; got != want {
 		t.Fatalf("applied migration versions after second open = %s, want %s", got, want)
 	}
 	if len(reapplied) != len(applied) {

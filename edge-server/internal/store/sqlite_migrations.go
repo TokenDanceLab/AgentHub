@@ -139,6 +139,20 @@ var sqliteMigrations = []sqliteMigration{
 			`DROP TABLE IF EXISTS edge_owners`,
 		},
 	},
+	{
+		version: 3,
+		name:    "artifact_content_source_readiness",
+		up: []string{
+			`ALTER TABLE edge_artifacts ADD COLUMN content_source_kind TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE edge_artifacts ADD COLUMN content_source_path TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE edge_artifacts ADD COLUMN content_source_readable INTEGER NOT NULL DEFAULT 0`,
+		},
+		down: []string{
+			`ALTER TABLE edge_artifacts DROP COLUMN content_source_readable`,
+			`ALTER TABLE edge_artifacts DROP COLUMN content_source_path`,
+			`ALTER TABLE edge_artifacts DROP COLUMN content_source_kind`,
+		},
+	},
 }
 
 func runSQLiteMigrations(db *sql.DB) error {
