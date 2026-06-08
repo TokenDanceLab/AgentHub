@@ -1,7 +1,7 @@
 # AgentHub 路线图
 
 > 最后更新：2026-06-08 10:39 +08:00
-> 当前主线：`origin/dev/delicious233 @ 866050d2 docs(roadmap): refresh execution priorities`
+> 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
@@ -15,7 +15,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 
 | 项 | 状态 |
 |---|---|
-| dev | `origin/dev/delicious233 @ 866050d2` |
+| dev | `origin/dev/delicious233`；具体 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
 | 稳定候选 | `v0.3.0-rc.1 @ 0c79f277` |
 | 主工作树 | `D:\Code\TokenDance\AgentHub @ a4b27d63`，behind 20 且 dirty；只读，不直接 pull/merge/stage |
 | 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
@@ -27,7 +27,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 顺序 | 切片 | 边界 | 最低门禁 |
 |---:|---|---|---|
 | 1 | Roadmap/tag/worktree 收口 | `v0.3.0-rc.1` 已打；roadmap 压缩；分支清理先审计不批量删 | docs diff-check、root governance、worktree audit |
-| 2 | Edge SQL/store migration | 优先于继续 UI 产品面；基于 G0 contract，带 migration/rollback | Edge store contract、migration tests、edge short gate |
+| 2 | Edge SQL/store migration | 优先于继续 UI 产品面；先锁 G0 repository contract，SQLite 作为 opt-in backend，默认 memory/file 不变 | Edge store contract、migration tests、edge short gate |
 | 3 | Tauri 打包与安装程序 | Windows installer 先闭环；macOS 单独确认签名、entitlements、notarization | Tauri build/package dry run、installer artifact 检查、release policy |
 | 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口 | Web/Desktop auth tests、Hub OIDC tests、OIDC script gate |
 | 5 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动 | Desktop platform、Edge focused、Rust host tests |
