@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 11:16 +08:00
+> 最后更新：2026-06-08 11:51 +08:00
 > 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
@@ -30,7 +30,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 1 | Roadmap/tag/worktree 收口 | `v0.3.0-rc.1` 已打；roadmap 压缩；分支清理先审计不批量删 | docs diff-check、root governance、worktree audit |
 | 2 | Edge SQL/store migration | 优先于继续 UI 产品面；先锁 G0 repository contract，SQLite 作为 opt-in backend，默认 memory/file 不变 | Edge store contract、migration tests、edge short gate |
 | 3 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动；给安装包提供可运行侧车基线 | Desktop platform、Edge focused、Rust host tests |
-| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；覆盖 Web session 和 Desktop loopback/keyring | Web/Desktop auth tests、Hub OIDC tests、OIDC script gate |
+| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；覆盖 Web session、Desktop loopback/keyring、Hub state expiry/replay | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
 | 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；版本对齐；updater metadata 从“可选复制”改为 gate | Tauri build/package dry run、installer artifact 检查、release policy |
 | 6 | ByteDance / TeamRun demo | IM 群聊、多 Agent 调度、证据 inspector、录屏脚本 | readiness script、manifest、截图/视频/接口导出 |
 | 7 | Artifact/Diff/Preview 生产化 | 去掉 demo evidence，补真实 artifact/diff/preview API | Edge API、shared inspector、Desktop/Web smoke |
@@ -77,5 +77,6 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 1. 提交并推送本轮 roadmap/governance 刷新。
 2. 开 Edge SQL/store migration proposal/worker，先锁 G0 contract，再做 SQLite opt-in backend。
 3. 并行开 Desktop Edge mapper worker 和登录 fake/local gate worker，为安装包提供可运行前置条件。
+   - 登录 fake/local gate 已补 Hub stale state `created_at` 拒绝和 `verify-oidc-flow.ps1 -LocalOnly` fake/static gate；该 gate 不连接 live Hub 或 TokenDance ID。
 4. 开 Tauri Windows installer/updater metadata worker；macOS 正式签名另起 proposal。
 5. 开 ByteDance/TeamRun demo evidence worker。
