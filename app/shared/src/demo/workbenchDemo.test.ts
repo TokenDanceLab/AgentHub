@@ -6,6 +6,7 @@ import {
   demoWorkbenchPins,
   resolveDemoWorkbenchTranscript,
 } from './workbenchDemo';
+import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoScenario } from './teamrunDemo';
 
 describe('workbench v4 demo data source', () => {
   it('derives the Builder pinned announcement from the design demo summary', () => {
@@ -36,6 +37,32 @@ describe('workbench v4 demo data source', () => {
       id: 'reviewer-user-1',
       kind: 'text',
     }));
+  });
+
+  it('exposes the ByteDance TeamRun fixture without live-runtime claims', () => {
+    const store = createWorkbenchDemoStore();
+    const teamRun = store.conversations.find((conversation) => conversation.id === TEAMRUN_DEMO_CONVERSATION_ID);
+    const transcript = resolveDemoWorkbenchTranscript(TEAMRUN_DEMO_CONVERSATION_ID);
+
+    expect(teamRun).toEqual(expect.objectContaining({
+      title: 'ByteDance TeamRun',
+      model: 'fixture-only',
+    }));
+    expect(teamRunDemoScenario.fixtureOnly).toBe(true);
+    expect(teamRunDemoScenario.claims.realRuntimeExecuted).toBe(false);
+    expect(teamRunDemoScenario.claims.liveHubRuntimeVerified).toBe(false);
+    expect(teamRunDemoScenario.runtimeProfiles).toHaveLength(2);
+    expect(teamRunDemoScenario.events.map((event) => event.type)).toEqual(expect.arrayContaining([
+      'agent.dispatch',
+      'run.agent.route_decision',
+      'team.route.decided',
+      'run.agent.result',
+    ]));
+    expect(transcript).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'teamrun-route-list', kind: 'agent_timeline' }),
+      expect.objectContaining({ id: 'teamrun-task-step', kind: 'run_step_group' }),
+      expect.objectContaining({ id: 'teamrun-delegate', kind: 'route_decision' }),
+    ]));
   });
 
   it('mutates demo transcripts through the runtime store submit path', async () => {

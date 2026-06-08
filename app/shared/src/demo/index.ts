@@ -1,4 +1,16 @@
 export {
+  TEAMRUN_DEMO_CONVERSATION_ID,
+  teamRunDemoScenario,
+  teamRunDemoTranscript,
+} from './teamrunDemo';
+export type {
+  TeamRunDemoEvent,
+  TeamRunDemoRuntimeProfile,
+  TeamRunDemoScenario,
+  TeamRunDemoTask,
+} from './teamrunDemo';
+
+export {
   WORKBENCH_DATA_MODE_STORAGE_KEY,
   getWorkbenchDataModeOverrideSnapshot,
   normalizeWorkbenchDataMode,
