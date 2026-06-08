@@ -52,9 +52,10 @@ paths:
   #   /v1/threads/{threadId} (GET/PATCH/DELETE), /v1/threads/{threadId}/items,
   #   /v1/threads/{threadId}/messages, /v1/threads/{threadId}/pins,
   #   /v1/items/{itemId},
+  #   /v1/model-catalog,
   #   /v1/runners (GET only), /v1/agents, /v1/runs (GET/POST),
   #   /v1/runs/{runId} (GET), /v1/runs/{runId}:cancel,
-  #   /v1/metrics, /v1/agent-instances (GET only),
+  #   /v1/metrics, /v1/agent-instances (GET only), /v1/agent-instances/{id},
   #   /v1/permissions/decide
   #
   # PLANNED (documented but not yet implemented):
@@ -65,7 +66,6 @@ paths:
   #   POST /v1/conversations/{conversationId}:archive,
   #   GET/POST /v1/conversations/{conversationId}/members,
   #   DELETE /v1/conversations/{conversationId}/members/{memberId},
-  #   POST /v1/threads/{threadId}:archive,
   #   POST /v1/threads/{threadId}:fork,
   #   GET /v1/runners/{runnerId},
   #   POST /v1/runners/{runnerId}:ping,
@@ -365,6 +365,18 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+    delete:
+      tags: [IMProject]
+      operationId: deleteThread
+      summary: Delete thread and associated local run/item records.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/ThreadId"
+      responses:
+        "204":
+          description: Deleted.
 
   /v1/threads/{threadId}:archive:
     post:
@@ -372,7 +384,7 @@ paths:
       operationId: archiveThread
       summary: Archive thread.
       x-agenthub-phase: P0
-      x-agenthub-status: planned
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
@@ -987,6 +999,19 @@ paths:
         "200":
           description: Prometheus text format.
 
+  /v1/model-catalog:
+    get:
+      tags: [ExecutionRunner]
+      operationId: getModelCatalog
+      summary: List runtime model catalog entries discovered from local provider configuration.
+      description: Returns model/catalog metadata only; provider API keys and secret material are redacted by the Edge implementation.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
   /v1/agent-instances:
     get:
       tags: [ExecutionRunner]
@@ -1008,11 +1033,30 @@ paths:
       tags: [ExecutionRunner]
       operationId: createAgentInstance
       summary: Register a sub-agent instance.
-      x-agenthub-status: implemented
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       responses:
         "201":
           $ref: "#/components/responses/Created"
+
+  /v1/agent-instances/{id}:
+    get:
+      tags: [ExecutionRunner]
+      operationId: getAgentInstance
+      summary: Get one orchestrator sub-agent instance.
+      x-agenthub-phase: P1
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/permissions/decide:
     post:
@@ -1165,12 +1209,30 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubWebSocket
       summary: Hub WebSocket — real-time IM + agent dispatch.
-      description: First frame must be auth handshake. See api/events.md for Hub event types.
+      description: >
+        Main Hub WebSocket route. The production route validates a Hub-issued
+        HS256 access token during HTTP upgrade, using either `access_token` query
+        auth for browser clients or `Authorization: Bearer <token>` for native
+        clients. TokenDance ID RS256 bearer tokens and TokenDance API keys are
+        not Hub WebSocket credentials. The legacy first-frame `auth` event is
+        only for tests and compatibility entries that do not install
+        WSAuthMiddleware. See api/events.md for Hub event types.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
+      security:
+        - hubWebSocketQueryToken: []
+        - bearerAuth: []
+      parameters:
+        - name: access_token
+          in: query
+          required: false
+          schema: { type: string }
+          description: Hub-issued HS256 access token for browser WebSocket upgrade authentication.
       responses:
         "101":
           description: Switching Protocols.
+        "401":
+          $ref: "#/components/responses/Error"
 
   /web/agent-tasks:
     post:
@@ -1436,6 +1498,39 @@ paths:
           $ref: "#/components/responses/Error"
 
   /client/auth/oidc/callback:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubOidcCallbackPage
+      summary: Render the browser OIDC callback result page.
+      description: >
+        Browser redirect endpoint for TokenDance ID Authorization Code callbacks.
+        It reads `code` and `state` from the query string and renders localized
+        HTML for Desktop/Web handoff. It does not exchange the code or mint Hub
+        session tokens; clients still call POST /client/auth/oidc/callback for
+        the server-side exchange.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema: { type: string }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Localized HTML success page.
+          content:
+            text/html:
+              schema: { type: string }
+        "400":
+          description: Localized HTML missing-parameter page.
+          content:
+            text/html:
+              schema: { type: string }
     post:
       tags: [HubSyncRelay]
       operationId: hubOidcCallback
@@ -2260,6 +2355,68 @@ paths:
                     $ref: "#/components/schemas/Device"
         "400":
           $ref: "#/components/responses/BadRequest"
+
+  /cloud/edge/register:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRegisterCloudEdge
+      summary: Register a cloud Edge device and mint its Hub WebSocket JWT.
+      description: >
+        Authenticated Hub session route without the desktop device-type
+        restriction used by /edge/devices/register. The request device_id must
+        be a UUID and, when a JWT device_id claim is present, it must match the
+        request. Hub registers the device as `cloud_edge` and returns a
+        Hub-issued JWT for subsequent /client/ws authentication.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id:
+                  type: string
+                  format: uuid
+                  description: Stable cloud Edge device UUID; must match JWT device_id when that claim is present.
+                name:
+                  type: string
+                host:
+                  type: string
+                port:
+                  type: integer
+                app_version:
+                  type: string
+                capabilities:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: Cloud Edge registered and JWT issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    type: object
+                    required: [device_id, device_type, jwt]
+                    properties:
+                      device_id: { type: string, format: uuid }
+                      device_type: { type: string, enum: [cloud_edge] }
+                      jwt:
+                        type: string
+                        description: Hub-issued access token for cloud Edge WebSocket authentication.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Error"
 
   /web/agent-tasks/{id}/cancel:
     post:
@@ -4296,6 +4453,14 @@ components:
       description: >
         Browser WebSocket transport for the optional Local Edge token on
         /v1/events. Hub WebSocket uses Hub-issued access tokens separately.
+    hubWebSocketQueryToken:
+      type: apiKey
+      in: query
+      name: access_token
+      description: >
+        Hub-issued HS256 access token used by browser clients during /client/ws
+        HTTP upgrade. TokenDance ID bearer tokens and TokenDance API keys are
+        not accepted.
   parameters:
     PageSize:
       name: pageSize
