@@ -122,6 +122,7 @@
       "sourceEventId": "claude_result_1",
       "success": true,
       "summary": "Claude SDK-like fixture completed.",
+      "terminalReason": "completed",
       "traceRefs": [
         "trace:claude:root"
       ]
