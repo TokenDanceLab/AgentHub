@@ -51,8 +51,11 @@ The test script covers:
 - missing env/prerequisites;
 - unsafe token-like input output;
 - unapproved real mode;
-- direct Web-to-LocalEdge URL;
+- direct Web-to-LocalEdge URL, including `localhost`, `[::1]`, and `127.0.0.0/8` aliases on the configured Local Edge port;
+- path traversal artifact roots such as `.tmp/../docs/audit`;
 - missing target inventory proof.
+- opaque sensitive evidence fields such as `access_token`, `refresh_token`, `id_token`, `token`, `secret`, and `authorization` unless the value is an explicit redaction placeholder;
+- direct Local Edge URLs embedded in evidence proof fields, even when `web_to_local_edge_direct=false`.
 
 Verification:
 
