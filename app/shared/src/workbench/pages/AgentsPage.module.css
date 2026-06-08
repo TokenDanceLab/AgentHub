@@ -1457,7 +1457,7 @@
   font: 500 0.6875rem var(--font-sans);
 }
 
-.model-card > span {
+.model-state {
   padding: 3px 8px;
   border-radius: var(--r-full);
   background: var(--primary-light);
