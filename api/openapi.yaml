@@ -5727,6 +5727,10 @@ components:
     AgentProfile:
       type: object
       required: [id, name, runtime_id]
+      description: >
+        Current implemented Hub AgentProfile response. See AgentHubAgentSpec
+        for an experimental component-only contract draft; no current endpoint
+        accepts or returns that full draft shape.
       properties:
         id:
           type: string
@@ -5788,6 +5792,222 @@ components:
         updated_at:
           type: string
           format: date-time
+    AgentHubAgentSpec:
+      type: object
+      x-agenthub-status: contract-draft
+      x-agenthub-contract: experimental
+      description: >
+        Experimental AgentHub-owned agent contract draft for docs and fixtures.
+        This component is not wired to any implemented request or response.
+        Hub owns orchestration/API and product identity; Edge owns runtime/SDK
+        adapters; Web/Desktop consume AgentHub-owned fields only; Tauri never
+        owns SDK objects. Live SDK/model execution remains approval-gated.
+      required:
+        - identity
+        - display
+        - role
+        - runtime
+        - target
+        - tools
+        - mcpServers
+        - approval
+        - memory
+        - evidence
+        - handoff
+        - sdkOptions
+      properties:
+        identity:
+          type: object
+          required: [specId, ownerScope, visibility, source]
+          description: Hub-owned product identity, not a provider SDK Agent object.
+          properties:
+            specId:
+              type: string
+              maxLength: 128
+              description: Stable draft spec id or AgentProfile projection id.
+            ownerScope:
+              type: string
+              enum: [hub-user, hub-org, team-fixture]
+            visibility:
+              type: string
+              enum: [private, team, marketplace, fixture]
+            source:
+              type: string
+              enum: [hub-agent-profile, marketplace-draft, fixture]
+        display:
+          type: object
+          required: [name, description]
+          description: User-visible AgentHub profile display fields.
+          properties:
+            name:
+              type: string
+              maxLength: 120
+            description:
+              type: string
+              maxLength: 1000
+            avatarRef:
+              type: string
+              maxLength: 256
+              description: Optional AgentHub asset ref, never a provider secret.
+        role:
+          type: object
+          required: [teamRole, instructions]
+          description: Durable product role used by Hub TeamRun assignment.
+          properties:
+            teamRole:
+              type: string
+              enum: [supervisor, worker, reviewer, observer]
+            instructions:
+              type: string
+              maxLength: 20000
+            responsibility:
+              type: string
+              maxLength: 1000
+        runtime:
+          type: object
+          required: [preferredRuntime, adapterMode]
+          description: Runtime/provider hint consumed below the Edge adapter boundary.
+          properties:
+            preferredRuntime:
+              type: string
+              enum: [codex, claude-code, opencode, openai-agents-sdk, claude-sdk]
+            modelHint:
+              type: string
+              maxLength: 256
+              description: Policy hint only; not a public claim that a model is configured.
+            reasoning:
+              type: string
+              maxLength: 128
+            adapterMode:
+              type: string
+              enum: [cli, sdk, daemon, fixture]
+        target:
+          type: object
+          required: [preferences, workspacePolicy]
+          description: AgentHub ExecutionTarget preference, not SDK runtime identity.
+          properties:
+            preferences:
+              type: array
+              items:
+                type: string
+                enum: [local-edge, remote-edge, cloud-edge, hub-relay, fixture]
+            workspacePolicy:
+              type: string
+              enum: [explicit-allowlist, project-bound, read-only-fixture, blocked]
+        tools:
+          type: object
+          required: [allowlist]
+          description: AgentHub-owned tool policy projected to adapters.
+          properties:
+            allowlist:
+              type: array
+              items:
+                type: string
+                maxLength: 128
+            deniedByDefault:
+              type: boolean
+              default: true
+        mcpServers:
+          type: array
+          description: AgentHub-owned MCP server refs, not raw secret config.
+          items:
+            type: object
+            required: [serverId, ownerScope, exposure]
+            properties:
+              serverId:
+                type: string
+                maxLength: 128
+              ownerScope:
+                type: string
+                enum: [hub, edge, fixture]
+              exposure:
+                type: string
+                enum: [tool-provider, context-provider, blocked-in-fixture]
+        approval:
+          type: object
+          required: [mode, riskRules]
+          description: Product approval policy mapped into Edge/Hub approval events.
+          properties:
+            mode:
+              type: string
+              enum: [read-only, workspace-write, approval-required, blocked]
+            riskRules:
+              type: array
+              items:
+                type: object
+                required: [match, decision]
+                properties:
+                  match:
+                    type: string
+                    maxLength: 256
+                  decision:
+                    type: string
+                    enum: [allow, require-approval, deny]
+        memory:
+          type: object
+          required: [sources, retention]
+          description: AgentHub-owned memory/context policy, not SDK session state.
+          properties:
+            sources:
+              type: array
+              items:
+                type: string
+                enum: [agents-md, project-memory, thread-context, artifact-summary, fixture]
+            retention:
+              type: string
+              enum: [thread-only, project-policy, no-persist-fixture]
+        evidence:
+          type: object
+          required: [required, redaction]
+          description: Normalized evidence required for review/demo replay.
+          properties:
+            required:
+              type: array
+              items:
+                type: string
+                enum:
+                  - run-events
+                  - tool-calls
+                  - file-changes
+                  - artifacts
+                  - approvals
+                  - route-decisions
+                  - handoff-summary
+            redaction:
+              type: string
+              enum: [no-secrets, workspace-relative-paths, fixture-only]
+        handoff:
+          type: object
+          required: [accepts, emits]
+          description: TeamRun handoff contract; SDK handoffs are adapter signals only.
+          properties:
+            accepts:
+              type: array
+              items:
+                type: string
+                enum: [teamrun-assignment, approval-decision, fixture-event]
+            emits:
+              type: array
+              items:
+                type: string
+                enum: [route-decision, result-summary, evidence-refs]
+        sdkOptions:
+          type: object
+          required: [provider, adapterExperiment, liveModelExecution, rawSdkObjectPolicy]
+          description: Provider-specific adapter options constrained below Edge.
+          properties:
+            provider:
+              type: string
+              enum: [none, claude-sdk, openai-agents-sdk]
+            adapterExperiment:
+              type: string
+              enum: [read-only-fixture, sandbox-fixture, event-mapper, teamrun-fixture-e2e, live-approved]
+            liveModelExecution:
+              type: string
+              enum: [blocked, approval-required]
+            rawSdkObjectPolicy:
+              type: string
+              enum: [never-exposed-above-edge-adapter]
     CreateThreadMessageRequest:
       type: object
       required: [content]
