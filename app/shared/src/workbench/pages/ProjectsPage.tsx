@@ -967,6 +967,8 @@ export function ProjectsPage({
   const [editorMode, setEditorMode] = useState<'create' | 'update' | null>(null);
   const [draft, setDraft] = useState<ProjectDraft>({ name: '', description: '' });
   const [localActionError, setLocalActionError] = useState<string | undefined>();
+  const canCreateProject = Boolean(onProjectCreate);
+  const canUpdateProject = Boolean(onProjectUpdate);
 
   useEffect(() => {
     if (editorMode !== 'update' || !activeProject) return;
@@ -977,8 +979,8 @@ export function ProjectsPage({
   }, [activeProject, editorMode]);
 
   function startProjectCreate(): void {
-    onNewProject?.();
     if (!onProjectCreate) return;
+    onNewProject?.();
     setDraft({ name: '', description: '' });
     setLocalActionError(undefined);
     setEditorMode('create');
@@ -1015,14 +1017,16 @@ export function ProjectsPage({
 
     try {
       if (editorMode === 'create') {
-        const created = await onProjectCreate?.(nextDraft);
+        if (!onProjectCreate) return;
+        const created = await onProjectCreate(nextDraft);
         if (created?.id) onProjectSelect(created.id);
         setEditorMode(null);
         return;
       }
 
       if (editorMode === 'update' && activeProject) {
-        const updated = await onProjectUpdate?.(activeProject.id, nextDraft);
+        if (!onProjectUpdate) return;
+        const updated = await onProjectUpdate(activeProject.id, nextDraft);
         if (updated?.id) onProjectSelect(updated.id);
         setEditorMode(null);
       }
@@ -1039,13 +1043,15 @@ export function ProjectsPage({
       <aside className={`${styles.nav} workbench-nav project-nav`}>
         <div className={styles.navHeader}>
           <div className={`${styles.navTitle} workbench-title`}>项目</div>
-          <button
-            type="button"
-            className={`${styles.newProjectBtn} ${styles.navNewProjectBtn} outline-action`}
-            onClick={startProjectCreate}
-          >
-            新建项目
-          </button>
+          {canCreateProject ? (
+            <button
+              type="button"
+              className={`${styles.newProjectBtn} ${styles.navNewProjectBtn} outline-action`}
+              onClick={startProjectCreate}
+            >
+              新建项目
+            </button>
+          ) : null}
         </div>
         <input
           className={`${styles.search} workbench-search`}
@@ -1084,7 +1090,7 @@ export function ProjectsPage({
                 </p>
               </div>
               <div className={styles.headActions}>
-                {onProjectUpdate ? (
+                {canUpdateProject ? (
                   <button
                     type="button"
                     className={styles.newProjectBtn}
@@ -1130,6 +1136,15 @@ export function ProjectsPage({
               <p>{projectsError || '创建第一个项目以开始协作。'}</p>
             </div>
             <div className={styles.headActions}>
+              {canCreateProject ? (
+                <button
+                  type="button"
+                  className={styles.newProjectBtn}
+                  onClick={startProjectCreate}
+                >
+                  创建第一个项目
+                </button>
+              ) : null}
               <span className={styles.statusBadge}>空项目</span>
             </div>
             {editorMode ? (
