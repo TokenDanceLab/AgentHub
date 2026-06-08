@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
@@ -279,4 +280,106 @@ func TestExecutionTargetUpdateRejectsInvalidJSONLikeFields(t *testing.T) {
 			require.ErrorIs(t, err, errcode.ErrBadRequest)
 		})
 	}
+}
+
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineTarget(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	svc := NewExecutionTargetService(db)
+	device := &model.Device{
+		ID:           "11111111-1111-4111-8111-111111111111",
+		UserID:       "owner-1",
+		DeviceType:   "desktop",
+		AppVersion:   "0.2.0",
+		Capabilities: `["local_edge","agent.dispatch","agent.control"]`,
+	}
+
+	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), device)
+	require.NoError(t, err)
+	require.Equal(t, "owner-1", target.OwnerID)
+	require.NotNil(t, target.DeviceID)
+	require.Equal(t, device.ID, *target.DeviceID)
+	require.Equal(t, "local_edge", target.TargetType)
+	require.Equal(t, "local", target.TrustLevel)
+	require.Equal(t, "healthy", target.HealthState)
+	require.True(t, target.IsOnline)
+	require.NotNil(t, target.LastSeenAt)
+	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
+	require.JSONEq(t, `{"device_capabilities":["local_edge","agent.dispatch","agent.control"]}`, target.Capabilities)
+	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.0"}`, target.Metadata)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesDuplicateOfflineTarget(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	deviceID := "22222222-2222-4222-8222-222222222222"
+	oldSeenAt := time.Now().Add(-time.Hour)
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-existing",
+		OwnerID:            "owner-1",
+		DeviceID:           &deviceID,
+		Name:               "Old desktop target",
+		TargetType:         "local_edge",
+		WorkspaceAllowlist: `["/old"]`,
+		TrustLevel:         "local",
+		HealthState:        "offline",
+		IsOnline:           false,
+		LastSeenAt:         &oldSeenAt,
+		Capabilities:       `{"old":true}`,
+		Metadata:           `{"source":"old"}`,
+	}).Error)
+	svc := NewExecutionTargetService(db)
+
+	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
+		ID:           deviceID,
+		UserID:       "owner-1",
+		DeviceType:   "desktop",
+		AppVersion:   "0.2.1",
+		Capabilities: `["local_edge"]`,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "target-existing", target.ID)
+	require.Equal(t, "healthy", target.HealthState)
+	require.True(t, target.IsOnline)
+	require.NotNil(t, target.LastSeenAt)
+	require.True(t, target.LastSeenAt.After(oldSeenAt))
+	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
+	require.JSONEq(t, `{"device_capabilities":["local_edge"]}`, target.Capabilities)
+	require.JSONEq(t, `{"source":"desktop_device_registration","device_type":"desktop","app_version":"0.2.1"}`, target.Metadata)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("owner_id = ? AND device_id = ?", "owner-1", deviceID).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRejectsCrossOwnerDeviceBinding(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	deviceID := "33333333-3333-4333-8333-333333333333"
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-owner-1",
+		OwnerID:            "owner-1",
+		DeviceID:           &deviceID,
+		Name:               "Owner 1 desktop",
+		TargetType:         "local_edge",
+		WorkspaceAllowlist: `[]`,
+		TrustLevel:         "local",
+		HealthState:        "healthy",
+		IsOnline:           true,
+		Capabilities:       `{}`,
+		Metadata:           `{}`,
+	}).Error)
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
+		ID:         deviceID,
+		UserID:     "owner-2",
+		DeviceType: "desktop",
+	})
+	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("device_id = ?", deviceID).Count(&count).Error)
+	require.Equal(t, int64(1), count)
 }
