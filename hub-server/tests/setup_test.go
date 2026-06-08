@@ -175,7 +175,7 @@ func cleanDBTables(database *gorm.DB) {
 	database.Exec("DELETE FROM attachments")
 	database.Exec("DELETE FROM custom_agents")
 	database.Exec("DELETE FROM workspaces")
-	database.Exec("DELETE FROM audit_events")
+	deleteAuditEvents(database)
 	database.Exec("DELETE FROM provider_bindings")
 	database.Exec("DELETE FROM mcp_servers")
 	database.Exec("DELETE FROM skills")
@@ -184,6 +184,21 @@ func cleanDBTables(database *gorm.DB) {
 	database.Exec("DELETE FROM refresh_tokens")
 	database.Exec("DELETE FROM devices")
 	database.Exec("DELETE FROM users")
+}
+
+func deleteAuditEvents(database *gorm.DB) {
+	if database.Dialector.Name() != "postgres" {
+		database.Exec("DELETE FROM audit_events")
+		return
+	}
+
+	if err := database.Exec("ALTER TABLE audit_events DISABLE TRIGGER USER").Error; err != nil {
+		database.Exec("DELETE FROM audit_events")
+		return
+	}
+	defer database.Exec("ALTER TABLE audit_events ENABLE TRIGGER USER")
+
+	database.Exec("DELETE FROM audit_events")
 }
 
 func clearRateLimitKeys() error {
