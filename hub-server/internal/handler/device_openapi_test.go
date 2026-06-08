@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -115,7 +116,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/client/ws":                                                         {"get"},
 		"/client/auth/refresh":                                               {"post"},
 		"/client/auth/oidc/authorize":                                        {"post"},
-		"/client/auth/oidc/callback":                                         {"post"},
+		"/client/auth/oidc/callback":                                         {"get", "post"},
 		"/client/auth/me":                                                    {"get"},
 		"/client/auth/logout":                                                {"post"},
 		"/client/auth/profile":                                               {"put"},
@@ -161,6 +162,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/edge/agent-tasks/{id}/stream":                                      {"post"},
 		"/edge/agent-tasks/{id}/done":                                        {"post"},
 		"/edge/agent-tasks/{id}/fail":                                        {"post"},
+		"/cloud/edge/register":                                               {"post"},
 		"/web/agent-tasks":                                                   {"post"},
 		"/web/agent-tasks/{id}/cancel":                                       {"post"},
 		"/web/agent-tasks/{id}/summary":                                      {"get"},
@@ -267,6 +269,32 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		for _, method := range methods {
 			assertOperationIsNotImplemented(t, paths, path, method)
 		}
+	}
+}
+
+func TestOpenAPIHubWebSocketDocumentsUpgradeAuth(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	wsGet := yamlMapField(t, yamlMapField(t, paths, "/client/ws", "paths./client/ws"), "get", "paths./client/ws.get")
+
+	description := yamlScalarField(t, wsGet, "description", "paths./client/ws.get.description")
+	for _, want := range []string{"HTTP upgrade", "WSAuthMiddleware", "TokenDance ID RS256 bearer tokens"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("/client/ws description missing %q: %s", want, description)
+		}
+	}
+
+	security := yamlSequenceField(t, wsGet, "security", "paths./client/ws.get.security")
+	if !securityRequirementIncludes(security, "hubWebSocketQueryToken") {
+		t.Fatal("/client/ws security must include hubWebSocketQueryToken for browser upgrade auth")
+	}
+	if !securityRequirementIncludes(security, "bearerAuth") {
+		t.Fatal("/client/ws security must include bearerAuth for native Authorization header auth")
+	}
+
+	params := yamlSequenceField(t, wsGet, "parameters", "paths./client/ws.get.parameters")
+	if !parameterNamed(params, "access_token") {
+		t.Fatal("/client/ws parameters must document access_token query auth")
 	}
 }
 
@@ -421,6 +449,25 @@ func sequenceRequires(items []*yaml.Node, requiredField string) bool {
 			if field.Kind == yaml.ScalarNode && field.Value == requiredField {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func securityRequirementIncludes(items []*yaml.Node, scheme string) bool {
+	for _, item := range items {
+		if yamlOptionalMapField(item, scheme) != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func parameterNamed(items []*yaml.Node, name string) bool {
+	for _, item := range items {
+		nameNode := yamlOptionalMapField(item, "name")
+		if nameNode != nil && nameNode.Kind == yaml.ScalarNode && nameNode.Value == name {
+			return true
 		}
 	}
 	return false
