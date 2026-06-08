@@ -8,6 +8,11 @@ use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
 const DEFAULT_EDGE_PORT: u16 = 3210;
+const EDGE_SIDECAR_NAME: &str = "agenthub-edge";
+const LOCAL_EDGE_TARGET_ID: &str = "local-edge";
+const LOCAL_EDGE_ROUTE: &str = "local-edge-api";
+const DEFAULT_RUNNER_PROFILE: &str = "claude-code";
+const READINESS_STORE_FILE_PLACEHOLDER: &str = "<app-data>/agenthub-edge-store.json";
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EdgeStatus {
@@ -24,6 +29,9 @@ pub struct EdgeHostReadiness {
     pub sidecar_name: &'static str,
     pub target_id: &'static str,
     pub route: &'static str,
+    pub bind_addr: String,
+    pub sidecar_args: Vec<String>,
+    pub direct_cli_spawn: bool,
 }
 
 /// Wrapper for the two child-process types: Tauri sidecar (release) or
@@ -80,7 +88,7 @@ impl EdgeManager {
             return Err("Edge Server is already running".into());
         }
 
-        let addr = format!("127.0.0.1:{}", self.port);
+        let addr = edge_bind_addr(self.port);
 
         // Resolve store path: prefer app data dir over temp
         let store_path = match app_handle.path().app_data_dir() {
@@ -99,7 +107,7 @@ impl EdgeManager {
         let args = edge_launch_args(&store_path_str, &addr);
 
         // ── Try sidecar first (release / bundled builds) ─────────────────
-        if let Ok(sidecar_cmd) = app_handle.shell().sidecar("agenthub-edge") {
+        if let Ok(sidecar_cmd) = app_handle.shell().sidecar(EDGE_SIDECAR_NAME) {
             let mut cmd = sidecar_cmd.args(&args);
 
             if cfg!(debug_assertions) {
@@ -236,9 +244,15 @@ impl EdgeManager {
             running: status.running,
             pid: status.pid,
             port: status.port,
-            sidecar_name: "agenthub-edge",
-            target_id: "local-edge",
-            route: "local-edge-api",
+            sidecar_name: EDGE_SIDECAR_NAME,
+            target_id: LOCAL_EDGE_TARGET_ID,
+            route: LOCAL_EDGE_ROUTE,
+            bind_addr: edge_bind_addr(status.port),
+            sidecar_args: edge_launch_args(
+                READINESS_STORE_FILE_PLACEHOLDER,
+                &edge_bind_addr(status.port),
+            ),
+            direct_cli_spawn: false,
         }
     }
 }
@@ -303,8 +317,12 @@ fn edge_launch_args(store_path: &str, addr: &str) -> Vec<String> {
         "--addr".to_string(),
         addr.to_string(),
         "--runner-profile".to_string(),
-        "claude-code".to_string(),
+        DEFAULT_RUNNER_PROFILE.to_string(),
     ]
+}
+
+fn edge_bind_addr(port: u16) -> String {
+    format!("127.0.0.1:{}", port)
 }
 
 #[cfg(test)]
@@ -346,6 +364,23 @@ mod tests {
         assert_eq!(readiness.route, "local-edge-api");
         assert_eq!(readiness.target_id, "local-edge");
         assert_eq!(readiness.port, 3210);
+        assert_eq!(readiness.bind_addr, "127.0.0.1:3210");
+        assert_eq!(
+            readiness.sidecar_args,
+            vec![
+                "--store-file",
+                "<app-data>/agenthub-edge-store.json",
+                "--addr",
+                "127.0.0.1:3210",
+                "--runner-profile",
+                "claude-code",
+            ]
+        );
+        assert!(!readiness.direct_cli_spawn);
+        assert!(!readiness
+            .sidecar_args
+            .iter()
+            .any(|arg| arg.contains("AppData") || arg.contains("Users")));
     }
 }
 
