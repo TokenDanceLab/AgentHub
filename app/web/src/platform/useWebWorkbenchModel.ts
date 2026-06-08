@@ -19,6 +19,8 @@ import {
 } from '@shared/transcript';
 import { createHubClient } from '@/api/hubClient';
 import type { ContactInfo, WorkspaceProject } from '@/api/hubClient';
+import { selectOnlineLocalEdgeExecutionTarget, useHubExecutionTargets } from '@/api/executionTargetQueries';
+import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import {
@@ -123,6 +125,14 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
       void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-projects'] });
     },
   });
+  const executionTargets = useHubExecutionTargets({ enabled: hubReady });
+  const executionTargetStatus = resolveWebExecutionTargetStatus({
+    hubReady,
+    dataMode,
+    isFetching: executionTargets.isFetching,
+    error: executionTargets.error,
+    targets: executionTargets.data?.items,
+  });
 
   const resolvedConversations = hubReady && activeHubSessionId
     ? conversations.map((conversation) =>
@@ -141,6 +151,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
       liveRuntimeEvents,
       dataMode,
     );
+  const surfacedTranscript = executionTargetStatus.block
+    ? [executionTargetStatus.block, ...transcript]
+    : transcript;
 
   return {
     activeConversationId,
@@ -161,7 +174,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
         workspaceProjectToProjectInfo(await updateProject.mutateAsync({ projectId, draft }))
       ),
     } : undefined,
-    transcript,
+    transcript: surfacedTranscript,
   };
 }
 
@@ -253,6 +266,68 @@ export function resolveWebProjectsStatus(
     error: effectiveRealMode && projects.error ? errorMessage(projects.error, 'Hub Projects 加载失败') : undefined,
     actionError: effectiveRealMode ? errorMessage(createError ?? updateError, '') || undefined : undefined,
     saving,
+  };
+}
+
+export type WebExecutionTargetStatusState = 'hidden' | 'signed-out' | 'loading' | 'error' | 'empty' | 'ready';
+
+export interface WebExecutionTargetStatus {
+  state: WebExecutionTargetStatusState;
+  selectedTarget?: ExecutionTargetInventoryItem | undefined;
+  block?: TranscriptBlock | undefined;
+}
+
+export function resolveWebExecutionTargetStatus(input: {
+  hubReady: boolean;
+  dataMode: WorkbenchDataMode;
+  isFetching: boolean;
+  error: unknown;
+  targets: ExecutionTargetInventoryItem[] | undefined;
+}): WebExecutionTargetStatus {
+  const visibleRealMode = input.hubReady || input.dataMode === 'real';
+  if (!visibleRealMode) return { state: 'hidden' };
+  if (!input.hubReady) {
+    return targetStatus('signed-out', 'Sign in to Hub before Web can select a local_edge execution target.');
+  }
+  if (input.isFetching && !input.targets) {
+    return targetStatus('loading', 'Loading Hub execution targets before Web dispatch.');
+  }
+  if (input.error) {
+    return targetStatus('error', `Hub execution targets unavailable: ${errorMessage(input.error, 'Hub target inventory failed')}`);
+  }
+
+  const selectedTarget = selectOnlineLocalEdgeExecutionTarget(input.targets ?? []) as ExecutionTargetInventoryItem | undefined;
+  if (!selectedTarget) {
+    return targetStatus(
+      'empty',
+      'No online local_edge execution target is available. Web real Hub mode will not dispatch agent tasks to mock targets.',
+    );
+  }
+
+  return {
+    state: 'ready',
+    selectedTarget,
+    block: targetStatusBlock(
+      'ready',
+      `Selected local_edge execution target: ${selectedTarget.name || selectedTarget.id} (${selectedTarget.id}).`,
+    ),
+  };
+}
+
+function targetStatus(state: Exclude<WebExecutionTargetStatusState, 'hidden' | 'ready'>, text: string): WebExecutionTargetStatus {
+  return {
+    state,
+    selectedTarget: undefined,
+    block: targetStatusBlock(state, text),
+  };
+}
+
+function targetStatusBlock(state: WebExecutionTargetStatusState, text: string): TranscriptBlock {
+  return {
+    id: `web-hub-execution-target-${state}`,
+    kind: 'text',
+    author: { id: 'hub-targets', name: 'Hub targets', role: 'system' },
+    text,
   };
 }
 
