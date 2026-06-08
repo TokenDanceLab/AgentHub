@@ -19,7 +19,8 @@ param(
     [string]$RedactionPlan = "",
     [string]$ArtifactRoot = "",
     [string]$EvidenceMode = "",
-    [string]$OperatorApprovalId = ""
+    [string]$OperatorApprovalId = "",
+    [string]$RealExecutionEvidenceManifest = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -86,6 +87,17 @@ function Assert-NotContains([string]$RelativePath, [string]$Pattern, [string]$La
 
 function Test-NonEmpty([string]$Value) {
     return -not [string]::IsNullOrWhiteSpace($Value)
+}
+
+function Test-RepoFilePath([string]$Value) {
+    if (-not (Test-NonEmpty $Value)) {
+        return $false
+    }
+    $path = $Value
+    if (-not [System.IO.Path]::IsPathRooted($path)) {
+        $path = Join-Path $RepoRoot $path
+    }
+    return Test-Path -LiteralPath $path -PathType Leaf
 }
 
 function Add-PrerequisiteResult {
@@ -162,6 +174,10 @@ Add-PrerequisiteResult (Test-NonEmpty $ArtifactRoot) "artifact root is named" "a
 Add-PrerequisiteResult (Test-NonEmpty $EvidenceMode) "evidence mode is named" "evidence mode missing; provide redacted-log/hash-only/operator-reviewed mode"
 Add-PrerequisiteResult (Test-NonEmpty $OperatorApprovalId) "operator approval id is named" "operator approval missing; provide approval id before RealTested or Submission"
 
+if ($Mode -ne "ProposalOnly") {
+    Add-PrerequisiteResult (Test-RepoFilePath $RealExecutionEvidenceManifest) "real execution evidence manifest file exists" "real execution evidence manifest missing; this static gate cannot prove RealTested or Submission completion"
+}
+
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Passed: $Passed  |  Failed: $Failed  |  Warnings: $Warnings  |  Blocks: $Blocks" -ForegroundColor $(if ($Failed -eq 0 -and ($Mode -eq "ProposalOnly" -or $Blocks -eq 0)) { "Green" } else { "Red" })
 Write-Host "========================================" -ForegroundColor Cyan
@@ -176,10 +192,10 @@ if ($Mode -eq "ProposalOnly") {
 
 if ($Failed -gt 0 -or $Blocks -gt 0) {
     Write-Host "Status: BLOCKED_FOR_REAL_EXECUTION" -ForegroundColor Red
-    Write-Host "RealTested/Submission modes require complete approval metadata and static evidence." -ForegroundColor Red
+    Write-Host "RealTested/Submission modes require complete approval metadata plus a real execution evidence manifest." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Status: READY_FOR_OPERATOR_APPROVED_REAL_TEST" -ForegroundColor Green
-Write-Host "This script still did not execute any real CLI/model command." -ForegroundColor Green
+Write-Host "Status: READY_FOR_APPROVED_RUN" -ForegroundColor Green
+Write-Host "This static gate did not execute any real CLI/model command and does not claim RealTested or Submission completion." -ForegroundColor Green
 exit 0

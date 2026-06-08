@@ -25,7 +25,7 @@ This slice is a proposal/readiness gate for future approved Edge CLI runs. No re
 
 ## Approval Prerequisites
 
-Future `RealTested` or `Submission` mode must include all of the following before real execution can be considered:
+Future real execution approval must include all of the following before a run can be considered ready. Metadata alone is not real execution evidence, and this static script cannot certify `RealTested` or `Submission` completion.
 
 | Prerequisite | Required approval evidence | Current status |
 |---|---|---|
@@ -34,8 +34,14 @@ Future `RealTested` or `Submission` mode must include all of the following befor
 | artifact root | Isolated evidence output directory, retention owner, and generated-artifact ignore boundary. | Missing |
 | evidence mode | Redacted log, hash-only, or operator-reviewed evidence mode. | Missing |
 | operator approval | Explicit approval id for the exact runtime, path/env, budget, artifact root, and evidence mode. | Missing |
+| real execution evidence manifest | Separate no-secret manifest from an approved real run. Required before `RealTested` or `Submission` modes may exit successfully. | Missing |
 
-Default `ProposalOnly` mode may pass static checks while still reporting these items as blockers. `RealTested` and `Submission` modes must fail if any prerequisite is missing.
+Default `ProposalOnly` mode may pass static checks while still reporting these items as blockers. `RealTested` and `Submission` modes must fail if any prerequisite is missing, and must not pass only because runtime/path/env/budget/redaction/artifact/evidence/approval metadata is non-empty.
+
+Allowed status claims from this script:
+
+- `PROPOSAL_ONLY`: static evidence was checked; real execution is still blocked or not attempted.
+- `READY_FOR_APPROVED_RUN`: approval metadata and a separate evidence manifest pointer are present; the script still did not execute a real CLI/model command and does not prove a completed real test.
 
 ## Proposed Commands
 
