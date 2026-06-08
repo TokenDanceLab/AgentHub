@@ -133,6 +133,70 @@ describe('createHubClient', () => {
     );
   });
 
+  it('lists and updates Hub workspace projects through the Web-owned route', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/web/projects?')) {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: {
+              items: [
+                {
+                  id: '00000000-0000-0000-0000-00000000p101',
+                  name: 'AgentHub Demo',
+                  description: 'Competition workspace',
+                  owner_id: '00000000-0000-0000-0000-00000000u101',
+                  created_at: '2026-06-08T00:00:00Z',
+                  updated_at: '2026-06-08T00:30:00Z',
+                },
+              ],
+              page: { hasMore: false },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            id: '00000000-0000-0000-0000-00000000p101',
+            name: 'AgentHub Demo',
+            description: '',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createHubClient({
+      baseUrl: 'https://hub.example.test',
+      getToken: () => 'hub-access',
+    });
+
+    const list = await client.listWorkspaceProjects({ q: 'AgentHub', pageCursor: 'cursor-1', pageSize: 20 });
+    const updated = await client.updateWorkspaceProject('project/id', { description: '' });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://hub.example.test/web/projects?q=AgentHub&pageCursor=cursor-1&pageSize=20',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://hub.example.test/web/projects/project%2Fid',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ description: '' }),
+      }),
+    );
+    expect(list.items[0]).toMatchObject({ name: 'AgentHub Demo', description: 'Competition workspace' });
+    expect(updated).toMatchObject({ name: 'AgentHub Demo', description: '' });
+  });
+
   it('passes target_id when triggering a Hub agent task', async () => {
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({

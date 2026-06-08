@@ -350,6 +350,32 @@ export interface ExecutionTargetListResponse {
   };
 }
 
+// ── Hub workspace projects ─────────────────────
+
+export interface WorkspaceProject {
+  id: string;
+  name: string;
+  description?: string;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WorkspaceProjectListResponse {
+  items: WorkspaceProject[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface CreateWorkspaceProjectRequest {
+  name: string;
+  description?: string;
+}
+
+export type UpdateWorkspaceProjectRequest = Partial<CreateWorkspaceProjectRequest>;
+
 // 鈹€鈹€ Auth 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface OIDCAuthorizeRequest {
@@ -1096,6 +1122,30 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     pingExecutionTarget: (id: string) =>
       request<undefined>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
+
+    // ── Hub workspace projects ─────────────────
+
+    listWorkspaceProjects: (params?: {
+      q?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<WorkspaceProjectListResponse>(`/web/projects${qs(params ?? {})}`),
+
+    getWorkspaceProject: (id: string) =>
+      request<WorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`),
+
+    createWorkspaceProject: (data: CreateWorkspaceProjectRequest) =>
+      request<WorkspaceProject>('/web/projects', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateWorkspaceProject: (id: string, data: UpdateWorkspaceProjectRequest) =>
+      request<WorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
 
     // ── Agent teams / TeamRun console ────────────────
 

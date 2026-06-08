@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { ContactMember, WorkbenchContactsData } from '@shared/workbench';
+import type { ContactMember, ProjectInfo, WorkbenchContactsData } from '@shared/workbench';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   getWorkbenchDataModeOverrideSnapshot,
@@ -17,7 +17,7 @@ import {
   type TranscriptBlock,
 } from '@shared/transcript';
 import { createHubClient } from '@/api/hubClient';
-import type { ContactInfo } from '@/api/hubClient';
+import type { ContactInfo, WorkspaceProject } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import {
@@ -101,6 +101,14 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     placeholderData: (previous) => previous,
   });
 
+  const projects = useQuery({
+    queryKey: ['web-v4', 'hub-projects', hubReady],
+    queryFn: () => hubClient.listWorkspaceProjects({ pageSize: 50 }),
+    enabled: hubReady,
+    staleTime: 10_000,
+    placeholderData: (previous) => previous,
+  });
+
   const resolvedConversations = hubReady && activeHubSessionId
     ? conversations.map((conversation) =>
       conversation.id === activeHubSessionId
@@ -123,6 +131,11 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     activeConversationId,
     contacts: resolveWebWorkbenchContacts(contacts.data, hubReady, dataMode),
     conversations: resolvedConversations,
+    projects: resolveWebWorkbenchProjects(projects.data?.items, hubReady, dataMode),
+    projectsStatus: {
+      loading: dataMode === 'real' && projects.isFetching,
+      error: dataMode === 'real' && projects.error ? errorMessage(projects.error, 'Hub Projects 加载失败') : undefined,
+    },
     transcript,
   };
 }
@@ -165,6 +178,38 @@ export function resolveWebWorkbenchContacts(
     starredContacts: members.slice(0, 2),
     recentShortcuts: members.slice(0, 3).map((member) => member.name),
   };
+}
+
+export function resolveWebWorkbenchProjects(
+  projects: WorkspaceProject[] | undefined,
+  hubReady: boolean,
+  dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
+): ProjectInfo[] | undefined {
+  if (!hubReady) {
+    return dataMode === 'real' ? [] : undefined;
+  }
+  return (projects ?? []).map(workspaceProjectToProjectInfo);
+}
+
+export function workspaceProjectToProjectInfo(project: WorkspaceProject): ProjectInfo {
+  const description = project.description?.trim() || 'Hub workspace project';
+  return {
+    id: project.id,
+    name: project.name?.trim() || '未命名项目',
+    description,
+    status: 'Hub',
+    meta: '0 runs',
+    members: [],
+    announcement: description,
+    runs: [],
+    artifacts: [],
+    feed: [],
+  };
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return fallback;
 }
 
 function contactInitials(name: string): string {
