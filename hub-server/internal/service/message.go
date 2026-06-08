@@ -139,6 +139,9 @@ func validateContentPayload(contentType string, payload map[string]interface{}) 
 	case model.ContentTypeLinkCard:
 		return requireContentString(payload, "url", contentType)
 	case model.ContentTypeImage:
+		if hasContentString(payload, "attachment_id") {
+			return nil
+		}
 		return requireContentString(payload, "url", contentType)
 	case model.ContentTypeDeployCard:
 		return nil
@@ -292,7 +295,7 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 }
 
 func attachmentIDsFromContent(contentType, content string) ([]string, bool) {
-	if contentType != model.ContentTypeFile {
+	if contentType != model.ContentTypeFile && contentType != model.ContentTypeImage {
 		return nil, true
 	}
 
@@ -484,7 +487,7 @@ func (s *MessageService) attachmentsByMessageID(msgs []model.Message) map[string
 	messageIDs := make([]string, 0)
 	seen := make(map[string]struct{})
 	for _, msg := range msgs {
-		if msg.ContentType != model.ContentTypeFile || msg.ID == "" {
+		if (msg.ContentType != model.ContentTypeFile && msg.ContentType != model.ContentTypeImage) || msg.ID == "" {
 			continue
 		}
 		if _, exists := seen[msg.ID]; exists {
