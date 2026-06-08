@@ -232,7 +232,7 @@ func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, reques
 	if r.FriendID != userID || r.Status != model.StatusPending {
 		return errcode.FriendRequestNotFound
 	}
-	if err := s.db.Delete(r).Error; err != nil {
+	if err := repository.DeleteFriendship(s.db, r); err != nil {
 		return err
 	}
 	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
@@ -319,7 +319,7 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 	if err != nil || f.Status != model.StatusBlocked {
 		return errcode.FriendRequestNotFound
 	}
-	if err := s.db.Delete(f).Error; err != nil {
+	if err := repository.DeleteFriendship(s.db, f); err != nil {
 		return err
 	}
 	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)

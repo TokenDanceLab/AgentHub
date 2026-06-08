@@ -354,14 +354,8 @@ func (s *SessionService) RemoveGroupMember(ctx context.Context, currentUserID, s
 	}
 
 	// #135: clean up agents invited by the removed member
-	agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, targetUserID)
-	if err != nil {
+	if err := s.cleanupInvitedAgents(sessionID, targetUserID); err != nil {
 		return err
-	}
-	for _, agent := range agents {
-		_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
-		_ = repository.DeleteAgentInstance(s.db, agent.ID)
-		_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
 	}
 
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID); err != nil {
@@ -407,14 +401,8 @@ func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionI
 	}
 
 	// P11.3: clean up agents invited by this user
-	agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, currentUserID)
-	if err != nil {
+	if err := s.cleanupInvitedAgents(sessionID, currentUserID); err != nil {
 		return err
-	}
-	for _, agent := range agents {
-		_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
-		_ = repository.DeleteAgentInstance(s.db, agent.ID)
-		_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
 	}
 
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
@@ -572,14 +560,8 @@ func (s *SessionService) DeleteForMe(ctx context.Context, currentUserID, session
 
 	// #135: clean up agents invited by this user
 	if session.Type == model.SessionTypeGroup {
-		agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, currentUserID)
-		if err != nil {
+		if err := s.cleanupInvitedAgents(sessionID, currentUserID); err != nil {
 			return err
-		}
-		for _, agent := range agents {
-			_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
-			_ = repository.DeleteAgentInstance(s.db, agent.ID)
-			_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
 		}
 	}
 
@@ -631,6 +613,19 @@ func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) (
 // ListActiveMembers returns all active (non-left) members of a session. Thin wrapper over repository.ListActiveMembers.
 func (s *SessionService) ListActiveMembers(sessionID string) ([]*model.SessionMember, error) {
 	return repository.ListActiveMembers(s.db, sessionID)
+}
+
+func (s *SessionService) cleanupInvitedAgents(sessionID, inviterUserID string) error {
+	agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, inviterUserID)
+	if err != nil {
+		return err
+	}
+	for _, agent := range agents {
+		_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
+		_ = repository.DeleteAgentInstance(s.db, agent.ID)
+		_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
+	}
+	return nil
 }
 
 func (s *SessionService) publishEvent(ctx context.Context, eventType string, payload map[string]interface{}) {
