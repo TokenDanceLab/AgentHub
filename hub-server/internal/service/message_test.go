@@ -794,9 +794,9 @@ func TestGetMessages_ReadsAttachmentsFromMessageAttachmentRelation(t *testing.T)
 		`{"attachment_id":"att-read-1","name":"report.txt"}`, false, time.Now(),
 	).Error)
 	require.NoError(t, db.Exec(`INSERT INTO attachments (
-		id, hash, size, mime_type, original_name, uploader_user_id, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		"att-read-1", "hash-read-1", 128, "text/plain", "report.txt", "sender-1", time.Now(),
+		id, hash, size, mime_type, original_name, uploader_user_id, metadata, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"att-read-1", "hash-read-1", 128, "text/plain", "report.txt", "sender-1", `{"height":3,"width":2}`, time.Now(),
 	).Error)
 	require.NoError(t, db.Exec(`INSERT INTO message_attachments (
 		session_id, message_id, attachment_id, created_at
@@ -813,6 +813,7 @@ func TestGetMessages_ReadsAttachmentsFromMessageAttachmentRelation(t *testing.T)
 	assert.Equal(t, int64(128), msgs[0].Attachments[0].Size)
 	assert.Equal(t, "text/plain", msgs[0].Attachments[0].MimeType)
 	assert.Equal(t, "report.txt", msgs[0].Attachments[0].OriginalName)
+	assert.JSONEq(t, `{"height":3,"width":2}`, msgs[0].Attachments[0].Metadata)
 }
 
 // ==================== ForwardMessage ====================
@@ -1043,6 +1044,7 @@ func newMessageAttachmentTestDB(t *testing.T) *gorm.DB {
 			mime_type TEXT NOT NULL,
 			original_name TEXT DEFAULT '',
 			uploader_user_id TEXT NOT NULL,
+			metadata TEXT NOT NULL DEFAULT '{}',
 			created_at DATETIME
 		)`,
 		`CREATE TABLE message_attachments (
