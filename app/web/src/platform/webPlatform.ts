@@ -30,6 +30,10 @@ type WebRunHubClient =
   Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'> &
   Partial<Pick<HubClient, 'listExecutionTargets'>>;
 
+interface WebComposerIntent extends ComposerIntent {
+  executionTargetId?: string;
+}
+
 interface SessionAgentInstanceBinding {
   profileId: string;
   runtimeId: string;
@@ -219,6 +223,9 @@ export async function submitWebComposerIntent(
   if (mention && !mention.runtimeId) {
     throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
   }
+  const dispatchTarget = mention
+    ? await resolveWebDispatchTarget(hubClient, (intent as WebComposerIntent).executionTargetId)
+    : undefined;
   const agentInstance = mention
     ? await ensureMentionedAgentInstance(hubClient, intent.conversationId, mention, options.queryClient)
     : undefined;
@@ -240,7 +247,7 @@ export async function submitWebComposerIntent(
     return { intentId: message.message_id };
   }
 
-  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, intent);
+  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, dispatchTarget, intent);
   return { intentId: task.id || message.message_id };
 }
 
@@ -379,15 +386,15 @@ async function triggerMentionedAgent(
   hubClient: WebRunHubClient,
   triggerMessageId: string,
   agentInstanceId: string | undefined,
+  target: Pick<ExecutionTarget, 'id'> | undefined,
   intent: ComposerIntent,
 ): Promise<PendingAgentTask> {
   if (!agentInstanceId) {
     throw new Error('Hub did not return an exact agent instance id for dispatch.');
   }
-  const target = await resolveWebDispatchTarget(
-    hubClient,
-    (intent as ComposerIntent & { executionTargetId?: string }).executionTargetId,
-  );
+  if (!target?.id) {
+    throw new Error('Selected Desktop/Edge target is not available for Web Hub dispatch.');
+  }
   return hubClient.triggerAgentTask(triggerMessageId, {
     agent_instance_id: agentInstanceId,
     target_id: target.id,

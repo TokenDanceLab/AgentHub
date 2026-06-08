@@ -353,6 +353,8 @@ describe('webPlatform workbench agent mapping', () => {
       approvalMode: 'suggest',
     })).rejects.toThrow('Select a Desktop/Edge target before Web can dispatch real Hub work.');
 
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
     expect(hubClient.listExecutionTargets).not.toHaveBeenCalled();
     expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
   });
@@ -644,7 +646,8 @@ describe('webPlatform workbench agent mapping', () => {
       approvalMode: 'suggest',
     }, 'target-relay-1'))).rejects.toThrow('Selected Desktop/Edge target is not available for Web Hub dispatch.');
 
-    expect(hubClient.sendMessage).toHaveBeenCalled();
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
     expect(hubClient.listExecutionTargets).toHaveBeenCalledWith({
       target_type: 'local_edge',
       pageSize: 50,
