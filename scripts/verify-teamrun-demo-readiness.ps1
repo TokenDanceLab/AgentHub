@@ -12,7 +12,7 @@ param(
     [string]$EvidencePath,
     [string]$ManifestPath,
     [string]$VideoPath,
-    [ValidateSet("Submission", "FixtureRehearsal")]
+    [ValidateSet("Submission", "FixtureRehearsal", "Mock", "RealTested")]
     [string]$Mode = "Submission",
     [switch]$RequireVideo
 )
@@ -79,6 +79,69 @@ function Count-Items($Value) {
     return 1
 }
 
+function Test-RequiredString($Object, [string]$Field, [string]$Label) {
+    if ($null -ne $Object -and -not [string]::IsNullOrWhiteSpace([string]$Object.$Field)) {
+        Pass "$Label contains $Field"
+        return $true
+    }
+    Fail "$Label contains $Field"
+    return $false
+}
+
+function Test-RealProof($Evidence, [bool]$SubmissionMode) {
+    $ok = $true
+    $requiredProofFields = @(
+        "webActionRef",
+        "hubDispatchRef",
+        "desktopEdgeRef",
+        "localEdgeRunRef",
+        "cliAdapterRef",
+        "hubStateExportRef"
+    )
+
+    if ($null -eq $Evidence.real_proof) {
+        Fail "real evidence requires real_proof"
+        $ok = $false
+    } else {
+        Pass "real evidence requires real_proof"
+        foreach ($field in $requiredProofFields) {
+            if (-not (Test-RequiredString $Evidence.real_proof $field "real_proof")) {
+                $ok = $false
+            }
+        }
+    }
+
+    if ($Evidence.claims.real_runtime_executed -eq $true) {
+        Pass "real evidence has real_runtime_executed=true"
+    } else {
+        Fail "real evidence requires real_runtime_executed=true"
+        $ok = $false
+    }
+    if ($Evidence.claims.live_hub_runtime_verified -eq $true) {
+        Pass "real evidence has live_hub_runtime_verified=true"
+    } else {
+        Fail "real evidence requires live_hub_runtime_verified=true"
+        $ok = $false
+    }
+
+    if ($SubmissionMode) {
+        if ($Evidence.claims.final_recording_complete -eq $true) {
+            Pass "submission mode has final recording claim"
+        } else {
+            Fail "submission mode requires final_recording_complete=true"
+            $ok = $false
+        }
+        if ($Evidence.claims.submission_ready -eq $true) {
+            Pass "submission mode has submission-ready claim"
+        } else {
+            Fail "submission mode requires submission_ready=true"
+            $ok = $false
+        }
+    }
+
+    return $ok
+}
+
 Step "Evidence file"
 $resolvedEvidence = Resolve-RepoPath $EvidencePath
 if (-not $resolvedEvidence) {
@@ -104,6 +167,18 @@ if ($resolvedEvidence -and (Test-Path -LiteralPath $resolvedEvidence)) {
 }
 
 if ($evidence) {
+    $fixtureOnly = $false
+    if ($null -ne $evidence.source -and $evidence.source.fixture_only -eq $true) {
+        $fixtureOnly = $true
+    }
+    $mockOnly = $false
+    if ($null -ne $evidence.source -and $evidence.source.mock_only -eq $true) {
+        $mockOnly = $true
+    }
+    if ($null -ne $evidence.remote_control_manifest -and $evidence.remote_control_manifest.mode -eq "Mock") {
+        $mockOnly = $true
+    }
+
     Step "Evidence shape"
     foreach ($field in @("state", "tasks", "assignments", "events", "runtime_profiles", "screenshot_or_video_rehearsal")) {
         if ($null -ne $evidence.$field) {
@@ -132,12 +207,42 @@ if ($evidence) {
         Fail "evidence proves at least two runtime types (actual: $runtimeTypes)"
     }
 
-    Step "Fixture boundary"
-    $fixtureOnly = $false
-    if ($null -ne $evidence.source -and $evidence.source.fixture_only -eq $true) {
-        $fixtureOnly = $true
+    Step "Remote-control evidence manifest"
+    $remoteManifestRequired = ($Mode -ne "FixtureRehearsal" -or $null -ne $evidence.remote_control_manifest)
+    if (-not $remoteManifestRequired) {
+        Pass "remote-control manifest not required for legacy fixture rehearsal"
+    } elseif ($null -eq $evidence.remote_control_manifest) {
+        Fail "remote-control manifest is present"
+    } else {
+        Pass "remote-control manifest is present"
+        $manifest = $evidence.remote_control_manifest
+        foreach ($field in @("hubTaskId", "targetId", "edgeDeviceId", "edgeRunId", "adapterId", "mode", "startedAt")) {
+            [void](Test-RequiredString $manifest $field "remote-control manifest")
+        }
+        $eventRefCount = Count-Items $manifest.eventRefs
+        if ($eventRefCount -ge 4) {
+            Pass "remote-control manifest contains eventRefs for the chain"
+        } else {
+            Fail "remote-control manifest contains eventRefs for the chain (actual: $eventRefCount)"
+        }
+        if ($null -ne $manifest.redaction -and -not [string]::IsNullOrWhiteSpace([string]$manifest.redaction.status)) {
+            Pass "remote-control manifest contains redaction status"
+            if (@("redacted", "not_required") -contains [string]$manifest.redaction.status) {
+                Pass "remote-control manifest redaction status is acceptable"
+            } else {
+                Fail "remote-control manifest redaction status is acceptable"
+            }
+        } else {
+            Fail "remote-control manifest contains redaction status"
+        }
+        if ($manifest.mode -eq $Mode) {
+            Pass "remote-control manifest mode matches readiness mode"
+        } else {
+            Fail "remote-control manifest mode matches readiness mode"
+        }
     }
 
+    Step "Evidence taxonomy"
     if ($evidence.contract -eq "teamrun-demo-evidence-v1") {
         Pass "teamrun evidence contract"
     } else {
@@ -173,27 +278,39 @@ if ($evidence) {
             } else {
                 Fail "fixture rehearsal mode requires honest fixture claims"
             }
+        } elseif ($Mode -eq "Mock") {
+            if ($mockOnly -and
+                $evidence.claims.real_runtime_executed -eq $false -and
+                $evidence.claims.final_recording_complete -eq $false -and
+                $evidence.claims.submission_ready -eq $false) {
+                Pass "mock mode accepts honest mock claims"
+            } else {
+                Fail "mock mode requires mock-only evidence with real, recording, and submission claims false"
+            }
+        } elseif ($Mode -eq "RealTested") {
+            if ($fixtureOnly) {
+                Fail "real-tested mode rejects fixture-only evidence"
+            } else {
+                Pass "real-tested mode evidence is not fixture-only"
+            }
+            if ($mockOnly) {
+                Fail "real-tested mode rejects mock-only evidence"
+            } else {
+                Pass "real-tested mode evidence is not mock-only"
+            }
+            [void](Test-RealProof $evidence $false)
         } else {
             if ($fixtureOnly) {
                 Fail "submission mode rejects fixture-only evidence"
             } else {
                 Pass "submission mode evidence is not fixture-only"
             }
-            if ($evidence.claims.real_runtime_executed -eq $true) {
-                Pass "submission mode has real runtime execution claim"
+            if ($mockOnly) {
+                Fail "submission mode rejects mock-only evidence"
             } else {
-                Fail "submission mode requires real_runtime_executed=true"
+                Pass "submission mode evidence is not mock-only"
             }
-            if ($evidence.claims.final_recording_complete -eq $true) {
-                Pass "submission mode has final recording claim"
-            } else {
-                Fail "submission mode requires final_recording_complete=true"
-            }
-            if ($evidence.claims.submission_ready -eq $true) {
-                Pass "submission mode has submission-ready claim"
-            } else {
-                Fail "submission mode requires submission_ready=true"
-            }
+            [void](Test-RealProof $evidence $true)
         }
     }
 
