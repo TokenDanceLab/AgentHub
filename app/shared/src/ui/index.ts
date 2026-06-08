@@ -55,6 +55,8 @@ export { TriageCard } from './TriageCard';
 export type { TriageCardProps } from './TriageCard';
 export { ToolTimeline } from './ToolTimeline';
 export type { ToolTimelineToolUse, ToolTimelineFileChange, ToolTimelineAgentTask, ToolTimelineChildAgent, ToolTimelineRouteDecision, ToolTimelineBlock, ToolTimelineLabels, ToolTimelineProps } from './ToolTimeline';
+export { RuntimeIcon, resolveRuntimeIcon, RuntimeBrandIcon, resolveRuntimeBrandIcon } from './RuntimeIcon';
+export type { RuntimeIconKind, RuntimeIconProps, RuntimeIconResolution, RuntimeIconSize, RuntimeIconSource, RuntimeBrandIconKind, RuntimeBrandIconProps, RuntimeBrandIconResolution, RuntimeBrandIconSize, RuntimeBrandIconSource } from './RuntimeIcon';
 export { PermissionModePicker } from './PermissionModePicker';
 export type { PermissionModePickerProps, PermissionModeOption } from './PermissionModePicker';
 export { default as ArtifactCard } from './ArtifactCard';
