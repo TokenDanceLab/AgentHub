@@ -1315,6 +1315,22 @@ func TestTriggerAgentTaskRejectsTargetWithoutBoundDevice(t *testing.T) {
 	require.Equal(t, int64(0), count)
 }
 
+func TestTriggerAgentTaskRejectsNonLocalEdgeTarget(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO devices (id, user_id, device_type, app_version, capabilities, last_active_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"dev-remote", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
+	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"target-remote", "user-1", "dev-remote", "Remote SSH target", "remote_ssh", `["/workspace"]`, "remote", "healthy", "{}", "{}").Error)
+	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-remote")
+
+	require.ErrorIs(t, err, errcode.TargetNotRoutable)
+	var count int64
+	require.NoError(t, db.Table("pending_agent_tasks").Count(&count).Error)
+	require.Equal(t, int64(0), count)
+}
+
 func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	require.NoError(t, db.Exec(`INSERT INTO devices (id, user_id, device_type, app_version, capabilities, last_active_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
