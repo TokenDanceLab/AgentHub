@@ -68,18 +68,17 @@ function Assert-GitPathClean {
 function Assert-GeneratedSchemaClean {
     $schemaDirRelative = "app/desktop/src-tauri/gen/schemas"
     $schemaDir = Join-Path $RepoRoot $schemaDirRelative
+    $requiredSchemas = @("desktop-schema.json", "windows-schema.json")
 
     Step "Generated Tauri schema policy"
-    if (-not (Test-Path -LiteralPath $schemaDir)) {
-        Pass "No generated Tauri schema directory is present ($schemaDirRelative)"
-        return
-    }
+    Assert-GitPathClean $schemaDirRelative "Tauri generated schemas"
+    Assert-True (Test-Path -LiteralPath $schemaDir) "required generated schema directory exists ($schemaDirRelative)"
 
     $schemaFiles = @(Get-ChildItem -LiteralPath $schemaDir -Filter "*.json" -File -ErrorAction SilentlyContinue)
     Assert-True ($schemaFiles.Count -gt 0) "generated Tauri schema directory contains JSON schema files"
-    Assert-True (Test-Path -LiteralPath (Join-Path $schemaDir "desktop-schema.json")) "desktop generated schema exists"
-    Assert-True (Test-Path -LiteralPath (Join-Path $schemaDir "windows-schema.json")) "Windows generated schema exists"
-    Assert-GitPathClean $schemaDirRelative "Tauri generated schemas"
+    foreach ($schemaName in $requiredSchemas) {
+        Assert-True (Test-Path -LiteralPath (Join-Path $schemaDir $schemaName)) "required generated schema file exists ($schemaDirRelative/$schemaName)"
+    }
 }
 
 function Read-Json([string]$RelativePath) {
