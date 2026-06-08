@@ -52,6 +52,27 @@ func TestMigration0044MessagesEditAddsEditedColumnsAndPartialIndex(t *testing.T)
 	requireSQL(t, normalizedDown, "alter table messages drop column if exists edited")
 }
 
+func TestMigration0045MessageReactionsCreatesUniqueUserReactionTable(t *testing.T) {
+	up := readMigration(t, "0045_message_reactions.up.sql")
+	down := readMigration(t, "0045_message_reactions.down.sql")
+
+	normalizedUp := normalizeSQL(up)
+	requireSQL(t, normalizedUp, "create table if not exists message_reactions")
+	requireSQL(t, normalizedUp, "session_id uuid not null references sessions(id) on delete cascade")
+	requireSQL(t, normalizedUp, "message_id uuid not null")
+	requireSQL(t, normalizedUp, "user_id uuid not null references users(id) on delete cascade")
+	requireSQL(t, normalizedUp, "reaction varchar(64) not null")
+	requireSQL(t, normalizedUp, "constraint fk_message_reactions_message_session foreign key (session_id, message_id) references messages (session_id, id) on delete cascade")
+	requireSQL(t, normalizedUp, "constraint uq_message_reaction unique (session_id, message_id, user_id, reaction)")
+	requireSQL(t, normalizedUp, "create index if not exists idx_message_reactions_message on message_reactions (session_id, message_id)")
+	requireSQL(t, normalizedUp, "create index if not exists idx_message_reactions_user on message_reactions (user_id)")
+
+	normalizedDown := normalizeSQL(down)
+	requireSQL(t, normalizedDown, "drop index if exists idx_message_reactions_user")
+	requireSQL(t, normalizedDown, "drop index if exists idx_message_reactions_message")
+	requireSQL(t, normalizedDown, "drop table if exists message_reactions")
+}
+
 func readMigration(t *testing.T, filename string) string {
 	t.Helper()
 
