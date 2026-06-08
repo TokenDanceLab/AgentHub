@@ -134,23 +134,7 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 
 		switch frame.Type {
 		case ws.TypeTyping:
-			slog.Debug("ws typing", "user_id", conn.UserID)
-			if h.onTyping != nil {
-				sessionID := ""
-				if m, ok := frame.Payload.(map[string]interface{}); ok {
-					if sid, ok := m["session_id"].(string); ok {
-						sessionID = sid
-					}
-				}
-				if sessionID == "" {
-					if s, ok := frame.Payload.(string); ok {
-						sessionID = s
-					}
-				}
-				if sessionID != "" {
-					h.onTyping(conn.UserID, sessionID)
-				}
-			}
+			h.handleTyping(conn, frame)
 		default:
 			slog.Debug("ws unknown frame type", "type", frame.Type)
 		}
@@ -177,27 +161,54 @@ func (h *WebSocketHandler) messageLoop(conn *ws.Conn) {
 
 		switch frame.Type {
 		case ws.TypeTyping:
-			slog.Debug("ws typing", "user_id", conn.UserID)
-			if h.onTyping != nil {
-				sessionID := ""
-				if m, ok := frame.Payload.(map[string]interface{}); ok {
-					if sid, ok := m["session_id"].(string); ok {
-						sessionID = sid
-					}
-				}
-				if sessionID == "" {
-					if s, ok := frame.Payload.(string); ok {
-						sessionID = s
-					}
-				}
-				if sessionID != "" {
-					h.onTyping(conn.UserID, sessionID)
-				}
-			}
+			h.handleTyping(conn, frame)
 		default:
 			slog.Debug("ws unknown frame type", "type", frame.Type)
 		}
 	}
+}
+
+func (h *WebSocketHandler) handleTyping(conn *ws.Conn, frame *ws.Frame) {
+	sessionID := typingSessionID(frame.Payload)
+	if sessionID == "" {
+		return
+	}
+	if !h.canTypeInSession(conn.UserID, sessionID) {
+		slog.Warn("ws typing rejected: user is not a session member", "user_id", conn.UserID, "session_id", sessionID)
+		return
+	}
+	if h.onTyping != nil {
+		h.onTyping(conn.UserID, sessionID)
+	}
+}
+
+func typingSessionID(payload any) string {
+	if m, ok := payload.(map[string]interface{}); ok {
+		if sid, ok := m["session_id"].(string); ok {
+			return sid
+		}
+	}
+	if m, ok := payload.(map[string]string); ok {
+		if sid, ok := m["session_id"]; ok {
+			return sid
+		}
+	}
+	if s, ok := payload.(string); ok {
+		return s
+	}
+	return ""
+}
+
+func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) bool {
+	if userID == "" || sessionID == "" || h.manager.ResolveMembers == nil {
+		return false
+	}
+	for _, memberID := range h.manager.ResolveMembers(sessionID) {
+		if memberID == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
