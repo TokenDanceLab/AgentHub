@@ -78,6 +78,7 @@ export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
   conversations: WorkbenchConversation[];
   agents?: WorkbenchAgent[];
+  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
   projects?: ProjectInfo[] | undefined;
@@ -106,6 +107,7 @@ export function AgentHubWorkbench({
   platform,
   conversations,
   agents,
+  composerExecutionTargets,
   agentProfilesStatus,
   contacts,
   projects,
@@ -137,6 +139,7 @@ export function AgentHubWorkbench({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const [activePage, setActivePage] = useState<GlobalRailPage>('chat');
+  const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [contextMenu, setContextMenu] = useState<{
     blockId: string;
     title: string;
@@ -201,6 +204,13 @@ export function AgentHubWorkbench({
   useEffect(() => {
     dispatchComposer({ type: 'setConversationId', conversationId: currentConversationId });
   }, [currentConversationId]);
+
+  useEffect(() => {
+    if (!composerExecutionTargets || !selectedExecutionTargetId) return;
+    if (!composerExecutionTargets.some((target) => target.id === selectedExecutionTargetId)) {
+      setSelectedExecutionTargetId('');
+    }
+  }, [composerExecutionTargets, selectedExecutionTargetId]);
 
   useEffect(() => {
     if (!inspectorResizing) return;
@@ -336,7 +346,11 @@ export function AgentHubWorkbench({
 
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
     try {
-      await platform.runs.submitComposerIntent(buildComposerIntent(composer));
+      const intent = buildComposerIntent(composer);
+      await platform.runs.submitComposerIntent({
+        ...intent,
+        ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}),
+      });
       dispatchComposer({ type: 'resetAfterSubmit' });
     } catch {
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
@@ -991,8 +1005,11 @@ export function AgentHubWorkbench({
               <UnifiedComposer
                 composer={composer}
                 dispatchComposer={dispatchComposer}
+                executionTargets={composerExecutionTargets}
+                executionTargetId={selectedExecutionTargetId}
                 inputRef={composerInputRef}
                 mentionableAgents={mentionableAgents}
+                onExecutionTargetChange={setSelectedExecutionTargetId}
                 onPickLocalAttachments={platform.attachments?.pickFiles}
                 onSubmit={submitComposer}
                 submitBehavior={composerSubmitBehavior}
