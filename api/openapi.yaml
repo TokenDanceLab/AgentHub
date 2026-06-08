@@ -56,7 +56,8 @@ paths:
   #   /v1/runners (GET only), /v1/agents, /v1/runs (GET/POST),
   #   /v1/runs/{runId} (GET), /v1/runs/{runId}:cancel,
   #   /v1/runs/{runId}/diff (GET), /v1/artifacts (GET),
-  #   /v1/previews (GET),
+  #   /v1/artifacts/{artifactId} (GET), /v1/previews (GET),
+  #   /v1/previews/{previewId} (GET),
   #   /v1/metrics, /v1/agent-instances (GET only), /v1/agent-instances/{id},
   #   /v1/permissions/decide
   #
@@ -79,7 +80,7 @@ paths:
   #   GET /v1/runs/{runId}/logs,
   #   GET/POST /v1/approvals and nested,
   #   POST /v1/artifacts and nested content/apply/discard,
-  #   POST /v1/previews and nested get/stop lifecycle,
+  #   POST /v1/previews and nested stop lifecycle,
   #   GET /v1/workspaces/{workspaceId} and nested,
   #   POST /v1/agent-instances
   # ═══════════════════════════════════════════════════════════
@@ -846,8 +847,9 @@ paths:
       tags: [ExecutionRunner]
       operationId: getArtifact
       summary: Get artifact metadata.
+      description: Read-only Edge-local artifact metadata lookup. Artifact content, apply and discard remain planned.
       x-agenthub-phase: P0
-      x-agenthub-status: planned
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
@@ -938,8 +940,9 @@ paths:
       tags: [ExecutionRunner]
       operationId: getPreview
       summary: Get preview.
+      description: Read-only Edge-local preview metadata lookup. Starting and stopping previews remain planned.
       x-agenthub-phase: P0
-      x-agenthub-status: planned
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/PreviewId"

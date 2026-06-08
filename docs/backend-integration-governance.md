@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 18:29 +08:00
+> 最后更新：2026-06-08 19:33 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -126,6 +126,7 @@ next: Main owner reviews the isolated icon diff and decides merge order.
 23. **Packaged Desktop OIDC readiness**：`codex/packaged-login-e2e` 只把 packaged Desktop loopback bind、keyring entry 和 Tauri readiness command 纳入 `verify-oidc-flow.ps1 -LocalOnly` fake/static gate；不连接真实 TokenDanceID、不打开真实登录窗口、不改 Web/Hub OIDC 行为，真实 packaged E2E 仍保持 proposal-only gate。
 24. **Packaged real login dry readiness**：`codex/login-real-readiness-gate` 新增 `scripts/verify-packaged-login-real-readiness.ps1` 和 `tests/scripts/verify-packaged-login-real-readiness.ps1`，只做 repo 静态扫描，分开验证 fake/local gate、packaged readiness gate、future real E2E gate。该片不连接 Hub/TokenDance ID，不打开浏览器，不需要 secrets，不消费真实 CLI/model；未来真实 packaged login 仍需显式批准测试 OAuth client、测试账号、Hub 测试环境、浏览器窗口和无密证据边界。
 25. **Runtime evidence inspector consumption**：`codex/runtime-evidence-inspector` 只把已存在的 Edge read-only diff/artifact/preview snapshot 消费到 shared RightInspector，并由 Desktop 复用既有 Edge evidence hook 传入；review 修复已改为从 transcript raw run id / normalized evidence id 安全解析当前 run，artifact metadata 行不再伪装为可点击操作，preview URL 会切到 Browser tab；不新增 backend route，不做 mutation/apply/discard/content、Web 直连 Edge、Hub route 或真实 CLI/model gate。
+26. **Artifact/preview metadata dereference**：`codex/artifact-lifecycle-next` 只把已存在的 Edge read-only artifact/preview index 增加单条 metadata lookup：`GET /v1/artifacts/{artifactId}`、`GET /v1/previews/{previewId}`，并同步 store contract 与 OpenAPI status。该片不新增 content blob store，不做 artifact apply/discard、preview start/stop、Hub artifact store、Desktop/Web UI、Web 直连 Edge 或真实 CLI/model gate。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -161,7 +162,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
 | Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | Projects create/update UI 排在 Edge SQL、Desktop mapper、登录和安装包基线之后；artifact 关系和 delete/soft-delete 需另起 proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
-| RightInspector | 默认任务/文件内容仍主要来自 demo/event evidence；Edge 已补 artifact/diff/preview read-only REST 空态/数据合同，runtime evidence 写入已收口，`codex/runtime-evidence-inspector` 已在 shared inspector 增加 read-only snapshot 消费并由 Desktop 复用既有 Edge evidence hook；review blocker 修复覆盖 raw run id、Desktop App v4 harness、artifact metadata 非交互行和 preview 切 tab，已通过 focused gate 复验；preview lifecycle、artifact content/apply/discard 和真实 CLI evidence 仍未完成 | Review/merge `codex/runtime-evidence-inspector`；preview start/stop、artifact apply/discard/content 另拆 |
+| RightInspector | 默认任务/文件内容仍主要来自 demo/event evidence；Edge 已补 artifact/diff/preview read-only REST 空态/数据合同，runtime evidence 写入已收口，`codex/runtime-evidence-inspector` 已在 shared inspector 增加 read-only snapshot 消费并由 Desktop 复用既有 Edge evidence hook；review blocker 修复覆盖 raw run id、Desktop App v4 harness、artifact metadata 非交互行和 preview 切 tab，已通过 focused gate 复验；`codex/artifact-lifecycle-next` 补单条 artifact/preview metadata lookup；preview lifecycle、artifact content/apply/discard 和真实 CLI evidence 仍未完成 | Review/merge `codex/runtime-evidence-inspector` 与 metadata lookup；preview start/stop、artifact apply/discard/content 另拆 |
 
 ## 分支清理规则
 
@@ -213,5 +214,5 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 1. 后端长期线程已关闭；后端旧整合线由 backend merge Agent 继续处理，主负责人不接管该合并，只把结果作为后续 Edge/Desktop/Web/packaging 规划输入。旧 `feat/backend-edge-hub` 和历史 backend worktree 仍需由该合并线确认抽片或清理。
 2. `v0.3.0-rc.1` 已打在 `0c79f277`，作为 shared v4 workbench + Hub/Edge 合并基线；Web Projects read-through 已完成并保持 shared `/v1/projects` 与 Desktop/Edge 语义不变。
-3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend、Edge relational migration、Tauri Windows installer/updater metadata readiness、TeamRun dry fixture evidence 和 Artifact/Diff/Preview read-only endpoints 已合入；`codex/tauri-package-readiness` follow-up 已补 generated artifact ignore gate，待 review；`codex/tauri-installer-smoke` 补 Windows installer smoke preflight，作为完整 dry package build 前的轻量本地/CI 先决条件检查；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge preference 与 Tauri host readiness；`codex/runtime-evidence-writer` 正在收口 runtime evidence metadata 写入；`codex/runtime-evidence-inspector` 已补 shared inspector read-only snapshot 消费并完成 review blocker 修复和 focused gate 复验，待 review/merge。下一批继续推进 Projects create/update UI、packaged login E2E；Projects delete/soft-delete policy、preview lifecycle、artifact content/apply/discard、macOS signing/notarization 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
+3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend、Edge relational migration、Tauri Windows installer/updater metadata readiness、TeamRun dry fixture evidence、Artifact/Diff/Preview read-only endpoints 和 runtime evidence metadata 写入已合入；`codex/tauri-package-readiness` follow-up 已补 generated artifact ignore gate，待 review；`codex/tauri-installer-smoke` 补 Windows installer smoke preflight，作为完整 dry package build 前的轻量本地/CI 先决条件检查；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge preference 与 Tauri host readiness；`codex/runtime-evidence-inspector` 已补 shared inspector read-only snapshot 消费并完成 review blocker 修复和 focused gate 复验，待 review/merge；`codex/artifact-lifecycle-next` 只补 Edge artifact/preview metadata lookup。下一批继续推进 Projects create/update UI、packaged login E2E；Projects delete/soft-delete policy、preview lifecycle、artifact content/apply/discard、macOS signing/notarization 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge；D3 真实 CLI/model gate 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
