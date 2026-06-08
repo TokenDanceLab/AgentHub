@@ -557,6 +557,71 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 			a.NotificationService.Notify(ctx, receiverID, model.TypeFriendRequest, payload)
 		}
 	})
+
+	a.bus.Subscribe(ws.TypeFriendAccepted, func(ctx context.Context, event service.Event) {
+		payload, ok := event.Payload.(map[string]interface{})
+		if !ok {
+			return
+		}
+		userID, _ := payload["user_id"].(string)
+		if userID == "" {
+			return
+		}
+		a.mgr.PushToUser(userID, ws.NewFrame(ws.TypeFriendAccepted, payload))
+	})
+
+	a.bus.Subscribe(ws.TypeSessionCreated, func(ctx context.Context, event service.Event) {
+		payload, ok := event.Payload.(map[string]interface{})
+		if !ok {
+			return
+		}
+		frame := ws.NewFrame(ws.TypeSessionCreated, payload)
+		if members := payloadStringSlice(payload, "members"); len(members) > 0 {
+			for _, userID := range members {
+				a.mgr.PushToUser(userID, frame)
+			}
+			return
+		}
+		sessionID, _ := payload["session_id"].(string)
+		a.mgr.PushToSession(sessionID, frame)
+	})
+
+	for _, eventType := range []string{
+		ws.TypeSessionMemberJoined,
+		ws.TypeSessionMemberLeft,
+		ws.TypeSessionInfoUpdated,
+		ws.TypeSessionDissolved,
+	} {
+		eventType := eventType
+		a.bus.Subscribe(eventType, func(ctx context.Context, event service.Event) {
+			payload, ok := event.Payload.(map[string]interface{})
+			if !ok {
+				return
+			}
+			sessionID, _ := payload["session_id"].(string)
+			if sessionID == "" {
+				return
+			}
+			a.mgr.PushToSession(sessionID, ws.NewFrame(eventType, payload))
+		})
+	}
+}
+
+func payloadStringSlice(payload map[string]interface{}, key string) []string {
+	switch value := payload[key].(type) {
+	case []string:
+		return value
+	case []interface{}:
+		result := make([]string, 0, len(value))
+		for _, item := range value {
+			if s, ok := item.(string); ok && s != "" {
+				result = append(result, s)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 // startTaskScheduler periodically scans for expired agent tasks and publishes timeout events.

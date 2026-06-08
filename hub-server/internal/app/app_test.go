@@ -315,6 +315,149 @@ func TestStartEventSubscriptionsSkipsAgentMessageNewPush(t *testing.T) {
 	}
 }
 
+func TestStartEventSubscriptionsPushesFriendAcceptedToUser(t *testing.T) {
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{mgr: mgr, bus: bus}
+	a.startEventSubscriptions(context.Background())
+
+	bus.Publish(context.Background(), service.Event{
+		Type: ws.TypeFriendAccepted,
+		Payload: map[string]interface{}{
+			"friendship_id": "friendship-1",
+			"user_id":       "user-1",
+		},
+	})
+
+	frame := readAppTestFrame(t, conn)
+	require.Equal(t, ws.TypeFriendAccepted, frame.Type)
+	require.Equal(t, "friendship-1", frame.Payload["friendship_id"])
+	require.Equal(t, "user-1", frame.Payload["user_id"])
+}
+
+func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
+	mgr := ws.NewManager()
+	mgr.ResolveMembers = func(sessionID string) []string {
+		if sessionID == "sess-1" {
+			return []string{"user-1", "user-2"}
+		}
+		return nil
+	}
+
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{mgr: mgr, bus: bus}
+	a.startEventSubscriptions(context.Background())
+
+	tests := []struct {
+		name    string
+		event   string
+		payload map[string]interface{}
+	}{
+		{
+			name:  "created",
+			event: ws.TypeSessionCreated,
+			payload: map[string]interface{}{
+				"session_id": "sess-created",
+				"type":       "group",
+				"name":       "Group",
+				"owner_id":   "user-1",
+				"members":    []interface{}{"user-1", "user-2"},
+			},
+		},
+		{
+			name:  "member joined",
+			event: ws.TypeSessionMemberJoined,
+			payload: map[string]interface{}{
+				"session_id":  "sess-1",
+				"member_id":   "user-2",
+				"member_type": "user",
+			},
+		},
+		{
+			name:  "member left",
+			event: ws.TypeSessionMemberLeft,
+			payload: map[string]interface{}{
+				"session_id": "sess-1",
+				"member_id":  "user-2",
+			},
+		},
+		{
+			name:  "info updated",
+			event: ws.TypeSessionInfoUpdated,
+			payload: map[string]interface{}{
+				"session_id": "sess-1",
+				"changes": map[string]interface{}{
+					"name": "New Group",
+				},
+			},
+		},
+		{
+			name:  "dissolved",
+			event: ws.TypeSessionDissolved,
+			payload: map[string]interface{}{
+				"session_id": "sess-1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bus.Publish(context.Background(), service.Event{
+				Type:    tt.event,
+				Payload: tt.payload,
+			})
+
+			frame := readAppTestFrame(t, conn)
+			require.Equal(t, tt.event, frame.Type)
+			require.Equal(t, tt.payload["session_id"], frame.Payload["session_id"])
+			for key, value := range tt.payload {
+				require.Equal(t, value, frame.Payload[key])
+			}
+		})
+	}
+}
+
+func readAppTestFrame(t *testing.T, conn *ws.Conn) struct {
+	Type    string                 `json:"type"`
+	Payload map[string]interface{} `json:"payload"`
+} {
+	t.Helper()
+
+	select {
+	case data := <-conn.Send:
+		var frame struct {
+			Type    string                 `json:"type"`
+			Payload map[string]interface{} `json:"payload"`
+		}
+		require.NoError(t, json.Unmarshal(data, &frame))
+		return frame
+	case <-time.After(time.Second):
+		t.Fatal("websocket frame was not pushed")
+	}
+	return struct {
+		Type    string                 `json:"type"`
+		Payload map[string]interface{} `json:"payload"`
+	}{}
+}
+
 func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
