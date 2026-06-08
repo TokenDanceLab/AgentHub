@@ -1,4 +1,4 @@
-use crate::edge_manager::{EdgeStatus, SharedEdgeManager};
+use crate::edge_manager::{EdgeHostReadiness, EdgeStatus, SharedEdgeManager};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,6 +51,14 @@ pub struct FileEntry {
 pub async fn get_edge_status(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
     let mgr = state.lock().await;
     Ok(mgr.status())
+}
+
+#[tauri::command]
+pub async fn get_edge_host_readiness(
+    state: State<'_, SharedEdgeManager>,
+) -> Result<EdgeHostReadiness, String> {
+    let mgr = state.lock().await;
+    Ok(mgr.host_readiness())
 }
 
 #[tauri::command]
