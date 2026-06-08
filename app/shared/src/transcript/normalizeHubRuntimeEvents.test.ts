@@ -17,7 +17,11 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
         agent_instance_id: 'agent-instance-1',
         event_seq: 1,
         event_type: 'run.agent.text_block',
-        payload: { content: 'Hub runtime 正在执行。' },
+        payload: {
+          content: 'Hub runtime 正在执行。',
+          evidence_mode: 'real_tested',
+          target_type: 'local_edge',
+        },
         created_at: '2026-06-07T04:00:01Z',
       },
       {
@@ -60,7 +64,7 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
         adapterId: 'codex',
         sourceLabel: 'Hub replay',
         modeLabel: 'Real',
-        targetLabel: 'Edge run',
+        targetLabel: 'local_edge',
       }),
       expect.objectContaining({
         id: 'edge-event-hub-runtime-evt-hub-text',
@@ -135,5 +139,43 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
     expect(normalizeHubRuntimeEventsToTranscript([
       { id: 'missing-type', payload: { content: 'ignored' } },
     ])).toEqual([]);
+  });
+
+  it('keeps opaque replay ids unverified without over-claiming mode or target', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-fixture-shaped',
+        task_id: 'fixture-task-opaque',
+        edge_run_id: 'run-opaque',
+        edge_device_id: 'mockish-device-id',
+        adapter_id: 'codex-fixture-looking-adapter',
+        session_id: 'hub-session-opaque',
+        event_seq: 1,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'Replay payload with opaque ids only.' },
+        created_at: '2026-06-07T04:00:05Z',
+      },
+    ]);
+
+    expect(blocks[0]).toEqual(expect.objectContaining({
+      id: 'hub-runtime-session-fixture-task-opaque-run-opaque',
+      kind: 'run_session',
+      modeLabel: 'Replay',
+      targetLabel: 'Edge run evidence',
+      taskId: 'fixture-task-opaque',
+      edgeRunId: 'run-opaque',
+      deviceId: 'mockish-device-id',
+      adapterId: 'codex-fixture-looking-adapter',
+    }));
+    expect(blocks[0]).not.toEqual(expect.objectContaining({
+      modeLabel: 'Real',
+    }));
+    expect(blocks[0]).not.toEqual(expect.objectContaining({
+      targetLabel: 'local_edge',
+    }));
+    expect(blocks[1]).toEqual(expect.objectContaining({
+      kind: 'text',
+      text: 'Replay payload with opaque ids only.',
+    }));
   });
 });
