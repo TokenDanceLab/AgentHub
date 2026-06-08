@@ -104,3 +104,4 @@ CLI/SDK Runtime，并把结果回放到 Web。
 - Mock 和 fixture 模式必须显式；real mode 不能静默降级。
 - 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
 - Roadmap 只写未来路线；当前事实写在 `STATE.md`。
+- Mobile Expo/RN candidate lives in `app/mobile-rn` as a side-by-side scaffold; legacy `app/mobile` Tauri remains reference-only, and Mobile interaction references must not become Desktop/Web v4 gates.

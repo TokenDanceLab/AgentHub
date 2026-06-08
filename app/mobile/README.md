@@ -45,6 +45,13 @@ The recommended Mobile mainline is Expo + React Native:
 
 The first milestone is an `app/mobile-rn` spike with four surfaces: Threads, Chat, Runs, Account. It should prove session storage, deep linking, REST/WS, notifications, and Android/iOS development builds before replacing this package.
 
+Current Expo/RN candidate status:
+
+- `app/mobile-rn` now exists as the side-by-side Expo/RN package.
+- The first slice has AgentHub-aligned RN tokens, theme provider, primitives, layout shell, and stateful Threads/Chat/Runs/Account surfaces.
+- Verified so far: `typecheck`, unit tests, `expo-doctor`, and package-local lint.
+- Not yet replacement-ready: real TokenDance ID exchange, SecureStore device persistence, live Hub REST/WS, notifications, screenshot automation, and Android/iOS dev build installation.
+
 ## Boundaries
 
 - Mobile is Hub-only. It does not connect to Local Edge directly.

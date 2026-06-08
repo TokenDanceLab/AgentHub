@@ -128,6 +128,8 @@ If a useful shared helper currently pulls DOM/CSS/Tauri transitively, extract a 
 
 Goal: create a minimal Expo/RN package that proves the stack and locks the Mobile design system boundary without replacing the legacy app.
 
+Current status: slice 1 scaffold has started in `app/mobile-rn`. It includes Expo/RN package wiring, AgentHub Desktop-aligned RN tokens, theme provider, primitives, layout shell, stateful Threads/Chat/Runs/Account surfaces, mock Hub/session/deep-link facades, and focused tests. This is not the replacement gate.
+
 Allowed write set:
 
 - `app/mobile-rn/package.json`
@@ -185,6 +187,23 @@ When visual automation is available, add a focused RN screenshot or story harnes
 - `768x1024` queue + thread split and inspector sheet/pane behavior.
 - light and dark token rendering.
 - no horizontal overflow and no touch target below 44px.
+
+Current verified commands:
+
+```powershell
+cd app
+corepack pnpm --filter agenthub-mobile-rn typecheck
+corepack pnpm --filter agenthub-mobile-rn test
+corepack pnpm --filter agenthub-mobile-rn run doctor
+corepack pnpm --filter agenthub-mobile-rn lint
+```
+
+Current verified results:
+
+- TypeScript passed.
+- Vitest passed: 5 files, 12 tests.
+- Expo doctor passed: 21/21 checks.
+- ESLint passed for `app/mobile-rn/src`.
 
 ## Parallel Worker Plan
 

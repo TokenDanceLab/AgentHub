@@ -119,6 +119,14 @@ This is a planning sequence, not a current implementation commitment:
 | M5 | Tablet layout. | Two-column and three-column tablet screenshots with inspector evidence. |
 | M6 | Shared UI cleanup and stale Mobile UI removal. | No active duplicate message model or second design system. |
 
+Current M1 progress:
+
+- `app/mobile-rn` exists and is wired into the pnpm workspace and Vitest workspace.
+- RN design foundation exists for tokens, theme provider, primitives, icons, layout shell, motion constants, i18n strings, safe area, phone-first bottom tabs, and tablet-ready inspector semantics.
+- Stateful Threads, Chat, Runs, and Account surfaces use realistic AgentHub workflow fixture data.
+- Verified commands so far: `typecheck`, unit tests, `expo-doctor`, and package-local lint.
+- Remaining M1 gaps before moving to M2/M3 depth: visual screenshot harness, real device/emulator development build install, SecureStore/AuthSession device proof, notification routing proof, and live/mock-local Hub REST/WS contract proof.
+
 ## Verification For This Planning Slice
 
 ```powershell

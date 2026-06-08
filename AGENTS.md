@@ -47,9 +47,9 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 | 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
 | 后端 | Hub Server、TokenDance ID 接入、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` |
 | 客户端（Desktop） | Desktop Tauri、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验、tray | `app/desktop/`、`edge-server/` |
-| 客户端（Mobile） | Mobile Tauri、移动端 UI、OIDC deep-link | `app/mobile/` |
+| 客户端（Mobile） | Expo/React Native 移动端主线候选、移动端 UI、OIDC deep-link、Hub-mediated remote review；旧 Tauri 只作 legacy/reference | `app/mobile-rn/`、`app/mobile/` |
 
-Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri/`，不共享 Rust crate，不互相修改对方的配置。
+Desktop 是 Tauri 项目；Mobile 新主线候选是 `app/mobile-rn` Expo + React Native，旧 `app/mobile` Tauri 原型冻结为 legacy/reference，不再扩展为长期移动端主线。
 
 共享边界：
 
@@ -65,11 +65,11 @@ Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能�
 | 资源 | Desktop/Tauri | Web | Mobile |
 |---|---|---|---|
 | Vite 开发端口 | **5173** (strict) | **5174** (strict) | **5175** (strict，非本轮主线) |
-| 前端源码 | `app/desktop/src/` | `app/web/src/` | `app/mobile/src/` |
-| 平台入口 | `app/desktop/src/App.tsx` + Tauri host adapter | `app/web/src/App.tsx` + Hub/Web adapter | Mobile native adaptation |
-| Tauri 项目 | `app/desktop/src-tauri/` | 无 | `app/mobile/src-tauri/` |
-| Rust crate | `agenthub-desktop` | 无 | `agenthub-mobile` |
-| Tauri identifier | `com.agenthub.desktop` | 无 | `com.agenthub.mobile` |
+| 前端源码 | `app/desktop/src/` | `app/web/src/` | `app/mobile-rn/src/`；legacy reference `app/mobile/src/` |
+| 平台入口 | `app/desktop/src/App.tsx` + Tauri host adapter | `app/web/src/App.tsx` + Hub/Web adapter | `app/mobile-rn/src/App.tsx` + Expo development build |
+| Tauri 项目 | `app/desktop/src-tauri/` | 无 | legacy only: `app/mobile/src-tauri/` |
+| Rust crate | `agenthub-desktop` | 无 | legacy only: `agenthub-mobile` |
+| Native identifier | `com.agenthub.desktop` | 无 | Expo candidate `tech.vectorcontrol.agenthub.mobile`; legacy Tauri `com.agenthub.mobile` |
 | 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) | 稳定子集 |
 | Storybook | 6006 | 共用 shared/desktop story | 无 |
 
@@ -83,13 +83,15 @@ Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能�
 | OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
 | Web 工作台 | 5174 | `app/web/vite.config.ts` |
 
-Rust/Tauri 隔离规则：
+Rust/Tauri / Expo 隔离规则：
 
-- **Desktop Agent 只能修改** `app/desktop/src-tauri/`，**Mobile Agent 只能修改** `app/mobile/src-tauri/`。
+- **Desktop Agent 只能修改** `app/desktop/src-tauri/`。Mobile Expo/RN 工作默认修改 `app/mobile-rn/**`，不得扩展 legacy `app/mobile/src-tauri/**`，除非用户明确批准短期兼容修复。
 - 任何 Agent 不得修改对方的 `tauri.conf.json`、`Cargo.toml`、`lib.rs`。
 - 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate，两边各自在 `Cargo.toml` 中 `[dependencies]` 引用。
-- Desktop 特有功能（tray、Edge 进程管理、keyring）不往 Web/Mobile 移植；Web 只能通过 Hub/Web adapter 访问远端能力；Mobile 特有功能（deep link、platform secure store）不往 desktop 移植。
+- Desktop 特有功能（tray、Edge 进程管理、keyring）不往 Web/Mobile 移植；Web 只能通过 Hub/Web adapter 访问远端能力；Mobile 特有功能（deep link、SecureStore、notification、safe area、native gestures）不往 desktop 移植。
 - 共享的前端代码（类型、hooks、i18n、UI 组件）放 `app/shared/`，两个项目通过 `workspace:*` 引用。
+- `app/mobile-rn` 只能复用 RN-safe shared TypeScript contracts、normalizers、labels、fixtures 和纯 helper；不得把 React DOM 组件、CSS modules、Tauri invoke 或 browser storage 作为 RN runtime 依赖。
+- Mobile 视觉系统和组件语义继承 AgentHub Desktop/Web v4、shared workbench 和 `agenthub-design/desktop`；Feishu/Lark mobile 只作为信息架构、交互密度和原生体验参考。
 
 ### AgentHub 产品术语边界
 
@@ -204,7 +206,7 @@ git status --short --branch       # 确认只改了允许的路径
 ## 3. 技术主线
 
 - Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前执行生命周期在 `edge-server/internal/lifecycle/`，Agent Runtime 协议适配在 `edge-server/internal/adapters/`。`edge-server/internal/runners/` 仍保留为内部兼容包，通过 `/v1/runners` 提供 Runtime/Target health 摘要；但 root-level `runner/` 目录（原独立服务）已不再存在。
-- UI 使用 React + TypeScript，Desktop 使用 Tauri。
+- UI 使用 React + TypeScript；Desktop 使用 Tauri；Mobile 新主线候选使用 Expo + React Native，旧 Tauri Mobile 只保留为 legacy/reference。
 - 主协议是 REST JSON API + WebSocket typed events。
 - REST endpoint 入口是 `api/openapi.yaml`。
 - WebSocket 事件入口是 `api/events.md`。
