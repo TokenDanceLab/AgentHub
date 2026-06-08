@@ -5,9 +5,9 @@ import {
   getDemoFileContent,
   getDemoFileDiff,
 } from '../demo/workbenchDemoData';
-import { buildInspectorEvidenceModel } from '../inspector';
+import { buildInspectorEvidenceModel, buildRuntimeEvidenceInspectorModel } from '../inspector';
+import type { RuntimeEvidenceChannel, RuntimeEvidenceSnapshot } from '../inspector';
 import type { EvidenceRef } from '../transcript';
-import type { Artifact, Preview } from '../types';
 import type { FileDiff } from '../types/chat';
 import {
   OverviewPanel,
@@ -26,29 +26,7 @@ import {
 import styles from './AgentHubWorkbench.module.css';
 
 type InspectorMode = 'overview' | 'browser' | 'files';
-type RuntimeEvidenceSource = 'edge' | 'event' | 'none';
-
-export interface RuntimeEvidenceSnapshot {
-  runId?: string | undefined;
-  diffs: FileDiff[];
-  artifacts: Artifact[];
-  previews: Preview[];
-  loading?: {
-    diff?: boolean | undefined;
-    artifacts?: boolean | undefined;
-    previews?: boolean | undefined;
-  } | undefined;
-  errors?: {
-    diff?: boolean | undefined;
-    artifacts?: boolean | undefined;
-    previews?: boolean | undefined;
-  } | undefined;
-  sources?: {
-    diff?: RuntimeEvidenceSource | undefined;
-    artifacts?: RuntimeEvidenceSource | undefined;
-    previews?: RuntimeEvidenceSource | undefined;
-  } | undefined;
-}
+export type { RuntimeEvidenceSnapshot } from '../inspector';
 
 type PreviewFile = FileItem & {
   content?: string | undefined;
@@ -417,40 +395,36 @@ function RuntimeEvidencePanel({
   onOpenDiff: (file: FileDiff) => void;
   onOpenPreviewUrl: (url: string) => void;
 }): React.ReactElement {
-  const loadingMessages = runtimeEvidenceLoadingMessages(runtimeEvidence);
-  const errorMessages = runtimeEvidenceErrorMessages(runtimeEvidence);
-  const hasEvidence = runtimeEvidence.diffs.length > 0
-    || runtimeEvidence.artifacts.length > 0
-    || runtimeEvidence.previews.length > 0;
+  const evidenceModel = buildRuntimeEvidenceInspectorModel(runtimeEvidence);
+  const diffSummary = evidenceModel.channels.find((channel) => channel.channel === 'diff');
+  const artifactSummary = evidenceModel.channels.find((channel) => channel.channel === 'artifacts');
+  const previewSummary = evidenceModel.channels.find((channel) => channel.channel === 'previews');
 
   return (
     <div className={styles.runtimeEvidence}>
       <div className={styles.runtimeEvidenceHead}>
         <strong>运行证据</strong>
-        <span>{runtimeEvidence.runId ? `Run ${runtimeEvidence.runId}` : '当前 Run'}</span>
+        <span>{evidenceModel.runLabel}</span>
       </div>
 
-      {(loadingMessages.length > 0 || errorMessages.length > 0) && (
+      {evidenceModel.stateItems.length > 0 && (
         <ul className={styles.runtimeEvidenceStateList} aria-label="Runtime evidence state">
-          {loadingMessages.map((message) => (
-            <li key={message} className={styles.runtimeEvidenceState} data-state="loading">{message}</li>
-          ))}
-          {errorMessages.map((message) => (
-            <li key={message} className={styles.runtimeEvidenceState} data-state="error">{message}</li>
+          {evidenceModel.stateItems.map((item) => (
+            <li key={`${item.kind}-${item.channel}`} className={styles.runtimeEvidenceState} data-state={item.kind}>{item.label}</li>
           ))}
         </ul>
       )}
 
-      {!hasEvidence && loadingMessages.length === 0 && errorMessages.length === 0 && (
+      {!evidenceModel.hasEvidence && evidenceModel.stateItems.length === 0 && (
         <div className={styles.browserPreviewCard}>
           <DesignNavIcon className={styles.browserPreviewIcon} name="overview" size={24} />
-          <strong>暂无运行证据</strong>
-          <span>Edge 已返回空 diff、artifact 和 preview snapshot。</span>
+          <strong>{evidenceModel.emptyTitle}</strong>
+          <span>{evidenceModel.emptyDetail}</span>
         </div>
       )}
 
       {runtimeEvidence.diffs.length > 0 && (
-        <RuntimeEvidenceSection title="Diff snapshot">
+        <RuntimeEvidenceSection channel="diff" count={diffSummary?.count} sourceLabel={diffSummary?.sourceLabel} title="Diff snapshot">
           {runtimeEvidence.diffs.map((file) => (
             <li key={`diff-${file.filePath}`}>
               <button
@@ -469,7 +443,7 @@ function RuntimeEvidencePanel({
       )}
 
       {runtimeEvidence.artifacts.length > 0 && (
-        <RuntimeEvidenceSection title="Artifacts">
+        <RuntimeEvidenceSection channel="artifacts" count={artifactSummary?.count} sourceLabel={artifactSummary?.sourceLabel} title="Artifacts">
           {runtimeEvidence.artifacts.map((artifact) => (
             <li key={artifact.id}>
               <div
@@ -486,7 +460,7 @@ function RuntimeEvidencePanel({
       )}
 
       {runtimeEvidence.previews.length > 0 && (
-        <RuntimeEvidenceSection title="Previews">
+        <RuntimeEvidenceSection channel="previews" count={previewSummary?.count} sourceLabel={previewSummary?.sourceLabel} title="Previews">
           {runtimeEvidence.previews.map((preview) => {
             const canOpen = Boolean(preview.url);
             return (
@@ -514,15 +488,27 @@ function RuntimeEvidencePanel({
 }
 
 function RuntimeEvidenceSection({
+  channel,
   children,
+  count,
+  sourceLabel,
   title,
 }: {
+  channel: RuntimeEvidenceChannel;
   children: React.ReactNode;
+  count?: number | undefined;
+  sourceLabel?: string | undefined;
   title: string;
 }): React.ReactElement {
+  const meta = [sourceLabel, typeof count === 'number' ? `${count}` : undefined]
+    .filter(Boolean)
+    .join(' / ');
   return (
     <section className={styles.runtimeEvidenceSection}>
-      <div className={styles.runtimeEvidenceSectionTitle}>{title}</div>
+      <div className={styles.runtimeEvidenceSectionTitle} data-channel={channel}>
+        <span>{title}</span>
+        {meta && <em>{meta}</em>}
+      </div>
       <ul className={styles.fileList}>{children}</ul>
     </section>
   );
@@ -669,22 +655,6 @@ function canOpenEvidence(
   canOpenPreview: ((evidence: EvidenceRef) => boolean) | undefined,
 ): boolean {
   return Boolean(onOpenPreview) && (canOpenPreview?.(evidence) ?? true);
-}
-
-function runtimeEvidenceLoadingMessages(runtimeEvidence: RuntimeEvidenceSnapshot): string[] {
-  const messages: string[] = [];
-  if (runtimeEvidence.loading?.diff) messages.push('正在读取 diff snapshot');
-  if (runtimeEvidence.loading?.artifacts) messages.push('正在读取 artifact index');
-  if (runtimeEvidence.loading?.previews) messages.push('正在读取 preview index');
-  return messages;
-}
-
-function runtimeEvidenceErrorMessages(runtimeEvidence: RuntimeEvidenceSnapshot): string[] {
-  const messages: string[] = [];
-  if (runtimeEvidence.errors?.diff) messages.push('Diff snapshot 读取失败');
-  if (runtimeEvidence.errors?.artifacts) messages.push('Artifact index 读取失败');
-  if (runtimeEvidence.errors?.previews) messages.push('Preview index 读取失败');
-  return messages;
 }
 
 function runtimeDiffPreviewFile(file: FileDiff): PreviewFile {
