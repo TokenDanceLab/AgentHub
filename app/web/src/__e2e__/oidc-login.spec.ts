@@ -115,6 +115,7 @@ interface LoginE2EConfig {
   artifactRoot: string;
   browserEvidenceBoundary: 'metadata-only' | 'redacted-screenshots';
   operatorApprovalId: string;
+  localEdgeUrl: string;
   targetId?: string;
   teamId?: string;
 }
@@ -131,7 +132,7 @@ interface LoginE2EEvidenceManifest {
   event_replay?: unknown;
 }
 
-const LOCAL_EDGE_ORIGIN = 'http://127.0.0.1:3210';
+const LOCAL_EDGE_URL = 'http://127.0.0.1:3210';
 
 function envValue(env: NodeJS.ProcessEnv, key: string): string {
   return env[key]?.trim() ?? '';
@@ -145,10 +146,11 @@ function looksSecretLike(value: string): boolean {
   return /(sk-[a-z0-9_-]{8,}|eyJ[a-z0-9_-]{12,}|bearer\s+[a-z0-9._-]{12,}|refresh[_-]?token\s*=|access[_-]?token\s*=|id[_-]?token\s*=|password\s*=|client_secret\s*=)/i.test(value);
 }
 
-function originOf(rawUrl: string): string {
-  const url = new URL(rawUrl);
-  const port = url.port || (url.protocol === 'https:' ? '443' : '80');
-  return `${url.protocol}//${url.hostname.toLowerCase()}:${port}`;
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host === '::1') return true;
+  const parts = host.split('.').map((part) => Number(part));
+  return parts.length === 4 && parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255) && parts[0] === 127;
 }
 
 function validateHttpUrl(label: string, rawUrl: string): void {
@@ -161,8 +163,18 @@ function validateHttpUrl(label: string, rawUrl: string): void {
   }
 }
 
-function assertNoDirectLocalEdge(label: string, rawUrl: string): void {
-  if (originOf(rawUrl) === originOf(LOCAL_EDGE_ORIGIN)) {
+function isDirectLocalEdgeUrl(rawUrl: string, localEdgeUrl = LOCAL_EDGE_URL): boolean {
+  const url = new URL(rawUrl);
+  const edge = new URL(localEdgeUrl);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+  if (!isLoopbackHost(url.hostname)) return false;
+  if (url.port !== edge.port) return false;
+  const edgePath = edge.pathname && edge.pathname !== '/' ? edge.pathname.replace(/\/+$/, '') : '';
+  return !edgePath || url.pathname.startsWith(edgePath);
+}
+
+function assertNoDirectLocalEdge(label: string, rawUrl: string, localEdgeUrl = LOCAL_EDGE_URL): void {
+  if (isDirectLocalEdgeUrl(rawUrl, localEdgeUrl)) {
     throw new Error(`${label} must not point directly at Local Edge`);
   }
 }
@@ -171,9 +183,51 @@ function assertSafeArtifactRoot(rawPath: string): void {
   if (!rawPath) {
     throw new Error('artifact root is required');
   }
-  const normalized = rawPath.replace(/\\/g, '/');
-  if (!normalized.startsWith('.tmp/') && normalized !== '.tmp' && !normalized.startsWith('tmp/') && normalized !== 'tmp') {
+  const artifactRoot = path.resolve(process.cwd(), rawPath);
+  const allowedRoots = [path.resolve(process.cwd(), '.tmp'), path.resolve(process.cwd(), 'tmp')];
+  if (!allowedRoots.some((root) => artifactRoot === root || artifactRoot.startsWith(`${root}${path.sep}`))) {
     throw new Error('artifact root must stay under .tmp or tmp');
+  }
+}
+
+function isRedactedPlaceholder(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === 'string') {
+    return /^(<redacted>|\[redacted\]|redacted|\*{3,}|<[^>]*redacted[^>]*>)$/i.test(value);
+  }
+  if (Array.isArray(value)) {
+    return value.every((entry) => isRedactedPlaceholder(entry));
+  }
+  if (typeof value === 'object') {
+    return Object.values(value).every((entry) => isRedactedPlaceholder(entry));
+  }
+  return false;
+}
+
+function isSensitiveEvidenceKey(key: string): boolean {
+  return /^(access_token|refresh_token|id_token|token|secret|authorization|cookie|password|client_secret|client-secret)$/i.test(key);
+}
+
+function validateEvidenceSafety(value: unknown, pathLabel = '$'): void {
+  if (typeof value === 'string') {
+    for (const match of value.matchAll(/https?:\/\/[^\s"'<>]+/g)) {
+      if (isDirectLocalEdgeUrl(match[0])) {
+        throw new Error(`evidence manifest contains direct Local Edge URL at ${pathLabel}`);
+      }
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => validateEvidenceSafety(entry, `${pathLabel}[${index}]`));
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      if (isSensitiveEvidenceKey(key) && !isRedactedPlaceholder(entry)) {
+        throw new Error(`evidence manifest contains unredacted sensitive field at ${pathLabel}.${key}`);
+      }
+      validateEvidenceSafety(entry, `${pathLabel}.${key}`);
+    }
   }
 }
 
@@ -187,6 +241,7 @@ function readRealLoginConfig(env: NodeJS.ProcessEnv = process.env): LoginE2EConf
     artifactRoot: envValue(env, 'AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT'),
     browserEvidenceBoundary: envValue(env, 'AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY') as LoginE2EConfig['browserEvidenceBoundary'],
     operatorApprovalId: envValue(env, 'AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID'),
+    localEdgeUrl: envValue(env, 'AGENTHUB_LOGIN_E2E_LOCAL_EDGE_URL') || LOCAL_EDGE_URL,
   };
   const targetId = envValue(env, 'AGENTHUB_LOGIN_E2E_TARGET_ID');
   if (targetId) config.targetId = targetId;
@@ -203,8 +258,8 @@ function readRealLoginConfig(env: NodeJS.ProcessEnv = process.env): LoginE2EConf
   validateHttpUrl('callback URL', config.callbackUrl);
   validateHttpUrl('Hub base URL', config.hubBaseUrl);
   validateHttpUrl('Web URL', config.webUrl);
-  assertNoDirectLocalEdge('Web URL', config.webUrl);
-  assertNoDirectLocalEdge('Hub base URL', config.hubBaseUrl);
+  assertNoDirectLocalEdge('Web URL', config.webUrl, config.localEdgeUrl);
+  assertNoDirectLocalEdge('Hub base URL', config.hubBaseUrl, config.localEdgeUrl);
   if (!/(disposable|test|throwaway|sandbox)/i.test(config.testAccountIndicator)) {
     throw new Error('test account indicator must name a disposable/test/sandbox account');
   }
@@ -254,6 +309,7 @@ function validateEvidenceManifest(manifest: LoginE2EEvidenceManifest): void {
   if (JSON.stringify(manifest).match(/(sk-[a-z0-9_-]{8,}|eyJ[a-z0-9_-]{12,}|bearer\s+[a-z0-9._-]{12,})/i)) {
     throw new Error('evidence manifest contains secret-like material');
   }
+  validateEvidenceSafety(manifest);
   for (const field of ['hub_session', 'target_inventory', 'selected_desktop_target', 'dispatch_request', 'event_replay'] as const) {
     if (!manifest[field]) {
       throw new Error(`evidence manifest missing ${field}`);
@@ -507,6 +563,38 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
     })).toThrow(/Web URL must not point directly at Local Edge/);
   });
 
+  test('rejects Local Edge loopback aliases', () => {
+    for (const webUrl of ['http://localhost:3210/v1/runs', 'http://[::1]:3210/v1/runs', 'http://127.42.0.1:3210/v1/runs']) {
+      expect(() => readRealLoginConfig({
+        AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
+        AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+        AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
+        AGENTHUB_LOGIN_E2E_WEB_URL: webUrl,
+        AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
+        AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: '.tmp/login-e2e/approved',
+        AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
+        AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID: 'approval-123',
+        AGENTHUB_LOGIN_E2E_APPROVE_REAL_LOGIN: 'true',
+        AGENTHUB_LOGIN_E2E_APPROVE_REMOTE_DISPATCH: 'true',
+      })).toThrow(/Web URL must not point directly at Local Edge/);
+    }
+  });
+
+  test('rejects path traversal artifact roots', () => {
+    expect(() => readRealLoginConfig({
+      AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
+      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+      AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
+      AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
+      AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
+      AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: '.tmp/../docs/audit',
+      AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
+      AGENTHUB_LOGIN_E2E_OPERATOR_APPROVAL_ID: 'approval-123',
+      AGENTHUB_LOGIN_E2E_APPROVE_REAL_LOGIN: 'true',
+      AGENTHUB_LOGIN_E2E_APPROVE_REMOTE_DISPATCH: 'true',
+    })).toThrow(/artifact root must stay under/);
+  });
+
   test('rejects evidence without target inventory proof', () => {
     expect(() => validateEvidenceManifest({
       real_login_approved: true,
@@ -518,6 +606,34 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
       dispatch_request: { ref: 'proof:dispatch' },
       event_replay: { ref: 'proof:event-replay' },
     })).toThrow(/target_inventory/);
+  });
+
+  test('rejects opaque sensitive token fields in evidence', () => {
+    expect(() => validateEvidenceManifest({
+      real_login_approved: true,
+      remote_dispatch_approved: true,
+      redaction_status: 'redacted',
+      web_to_local_edge_direct: false,
+      hub_session: { access_token: 'opaque-session-token-value' },
+      target_inventory: { ref: 'proof:target-inventory' },
+      selected_desktop_target: { ref: 'proof:selected-target' },
+      dispatch_request: { ref: 'proof:dispatch' },
+      event_replay: { ref: 'proof:event-replay' },
+    })).toThrow(/sensitive field/);
+  });
+
+  test('rejects direct Local Edge URLs in evidence proof fields', () => {
+    expect(() => validateEvidenceManifest({
+      real_login_approved: true,
+      remote_dispatch_approved: true,
+      redaction_status: 'redacted',
+      web_to_local_edge_direct: false,
+      hub_session: { ref: 'proof:hub-session' },
+      target_inventory: { ref: 'http://localhost:3210/v1/health' },
+      selected_desktop_target: { ref: 'proof:selected-target' },
+      dispatch_request: { ref: 'proof:dispatch' },
+      event_replay: { ref: 'proof:event-replay' },
+    })).toThrow(/direct Local Edge URL/);
   });
 });
 
