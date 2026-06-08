@@ -61,11 +61,21 @@ type RuntimeFallbackIconName =
 
 const LOBE_RUNTIME_KEYS = new Set(['claude-code', 'codex', 'opencode']);
 const LOBE_PROVIDER_KEYS = new Set([
+  'alibaba',
+  'alibabacloud',
   'anthropic',
+  'azure',
+  'bedrock',
+  'bytedance',
+  'cohere',
   'deepseek',
+  'doubao',
   'google',
+  'meta',
+  'mistral',
   'moonshot',
   'openai',
+  'perplexity',
   'qwen',
   'zhipu',
 ]);
@@ -106,7 +116,7 @@ export function resolveRuntimeBrandIcon({
   provider,
 }: Pick<RuntimeBrandIconProps, 'kind' | 'name' | 'provider'>): RuntimeBrandIconResolution {
   const label = cleanRuntimeBrandLabel(name || provider || kind);
-  const normalizedName = normalizeRuntimeBrandIconKey(name);
+  const normalizedModel = normalizeRuntimeBrandModelKey(name);
   const normalizedProvider = normalizeRuntimeBrandProviderKey(provider || name);
   const runtimeKey = normalizeRuntimeBrandRuntimeKey(name);
 
@@ -132,12 +142,12 @@ export function resolveRuntimeBrandIcon({
     };
   }
 
-  if (kind === 'model' && normalizedName && isLikelyLobeModel(normalizedName)) {
+  if (kind === 'model' && normalizedModel && isLikelyLobeModel(normalizedModel)) {
     return {
       kind,
       label,
       source: 'lobehub',
-      value: normalizedName,
+      value: normalizedModel,
       fallback: 'model',
       lobeType: 'model',
     };
@@ -227,6 +237,16 @@ function normalizeRuntimeBrandIconKey(value: string | undefined): string {
     .replace(/^-|-$/g, '');
 }
 
+function normalizeRuntimeBrandModelKey(value: string | undefined): string {
+  return cleanRuntimeBrandLabel(value)
+    .toLowerCase()
+    .replace(/→/g, '-')
+    .replace(/[_/]+/g, '-')
+    .replace(/[^a-z0-9.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 function normalizeRuntimeBrandRuntimeKey(value: string | undefined): string {
   const key = normalizeRuntimeBrandIconKey(value);
   if (key === 'claude' || key === 'claudecode') return 'claude-code';
@@ -237,13 +257,21 @@ function normalizeRuntimeBrandRuntimeKey(value: string | undefined): string {
 function normalizeRuntimeBrandProviderKey(value: string | undefined): string {
   const key = normalizeRuntimeBrandIconKey(value);
   if (!key) return '';
+  if (key.includes('alibaba-cloud')) return 'alibabacloud';
+  if (key.includes('alibaba') || key.includes('qwen')) return 'qwen';
   if (key.includes('anthropic') || key.includes('claude')) return 'anthropic';
+  if (key.includes('azure') || key.includes('microsoft')) return 'azure';
+  if (key.includes('bedrock') || key.includes('aws')) return 'bedrock';
+  if (key.includes('bytedance') || key.includes('doubao')) return 'doubao';
+  if (key.includes('cohere')) return 'cohere';
   if (key.includes('deepseek')) return 'deepseek';
   if (key.includes('gemini') || key.includes('google')) return 'google';
+  if (key.includes('llama') || key.includes('meta')) return 'meta';
   if (key.includes('glm') || key.includes('zhipu')) return 'zhipu';
   if (key.includes('kimi') || key.includes('moonshot')) return 'moonshot';
+  if (key.includes('mistral')) return 'mistral';
   if (key.includes('openai') || key.includes('gpt') || key.includes('codex')) return 'openai';
-  if (key.includes('qwen') || key.includes('alibaba')) return 'qwen';
+  if (key.includes('perplexity') || key.includes('sonar')) return 'perplexity';
   return key;
 }
 
@@ -254,6 +282,7 @@ function isLikelyLobeModel(value: string): boolean {
 
 function runtimeBrandFallbackIconFor(kind: RuntimeBrandIconKind, label: string): RuntimeFallbackIconName {
   const key = normalizeRuntimeBrandIconKey(label);
+  if (key.includes('tokendance') || key.includes('agenthub') || key.includes('cc-switch')) return 'agenthub';
   if (kind === 'tool') {
     if (key.includes('read')) return 'read';
     if (key.includes('write') || key.includes('edit') || key.includes('patch')) return 'write';
@@ -266,7 +295,6 @@ function runtimeBrandFallbackIconFor(kind: RuntimeBrandIconKind, label: string):
   }
   if (kind === 'provider') return 'provider';
   if (kind === 'model') return 'model';
-  if (key.includes('tokendance') || key.includes('agenthub') || key.includes('cc-switch')) return 'agenthub';
   if (key.includes('browser')) return 'browser';
   return 'runtime';
 }
