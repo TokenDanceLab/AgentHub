@@ -126,6 +126,9 @@ func TestRepositoryContract(t *testing.T) {
 			t.Run("artifact_diff_preview_readonly", func(t *testing.T) {
 				runRepositoryArtifactDiffPreviewContract(t, factory.new(t))
 			})
+			t.Run("runtime_evidence_current", func(t *testing.T) {
+				runRepositoryRuntimeEvidenceCurrentContract(t, factory.new(t))
+			})
 		})
 	}
 }
@@ -619,6 +622,215 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	}
 	if got, ok := restoredEvidence.GetPreview(preview.ID); !ok || got.ID != preview.ID {
 		t.Fatalf("restored preview lookup = %#v, %v; want persisted preview", got, ok)
+	}
+}
+
+func runRepositoryRuntimeEvidenceCurrentContract(t *testing.T, handle repositoryContractHandle) {
+	defer closeContractHandle(handle)
+	repo := handle.store
+	evidence, ok := repo.(repositoryEvidenceStore)
+	if !ok {
+		t.Fatalf("%s store does not implement runtime evidence contract", handle.name)
+	}
+
+	project, _ := repo.CreateProject("proj_evidence_current", "Evidence Current")
+	threadA, _ := repo.CreateThread("thread_evidence_a", project.ID, "Evidence A")
+	threadB, _ := repo.CreateThread("thread_evidence_b", project.ID, "Evidence B")
+	runA, err := repo.CreateRun("run_evidence_a", project.ID, threadA.ID)
+	if err != nil {
+		t.Fatalf("CreateRun A returned error: %v", err)
+	}
+	runB, err := repo.CreateRun("run_evidence_b", project.ID, threadB.ID)
+	if err != nil {
+		t.Fatalf("CreateRun B returned error: %v", err)
+	}
+
+	if _, err := evidence.UpsertRunDiffFile(RunDiffFile{RunID: runA.ID, Path: "   ", Diff: "+empty"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertRunDiffFile blank path error = %v, want ErrNotFound", err)
+	}
+	diffA, err := evidence.UpsertRunDiffFile(RunDiffFile{
+		RunID:  runA.ID,
+		Path:   " src/app.ts ",
+		Diff:   "@@ -1 +1 @@\n-old\n+new",
+		Status: "created",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile A returned error: %v", err)
+	}
+	if diffA.Path != "src/app.ts" || diffA.Status != "added" {
+		t.Fatalf("diff A = %#v, want trimmed path and added status", diffA)
+	}
+	diffACreatedAt := diffA.CreatedAt
+	diffA, err = evidence.UpsertRunDiffFile(RunDiffFile{
+		RunID:  runA.ID,
+		Path:   "src/app.ts",
+		Diff:   "@@ -1 +1 @@\n-old\n+newer",
+		Status: "unknown-runtime-status",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile A update returned error: %v", err)
+	}
+	if diffA.CreatedAt != diffACreatedAt || diffA.Status != "modified" || diffA.Diff == "" {
+		t.Fatalf("updated diff A = %#v, want createdAt preserved and modified status", diffA)
+	}
+	diffB, err := evidence.UpsertRunDiffFile(RunDiffFile{
+		RunID:  runB.ID,
+		Path:   "src/app.ts",
+		Diff:   "@@ -1 +0 @@\n-old",
+		Status: "remove",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile B returned error: %v", err)
+	}
+	if diffB.Status != "deleted" {
+		t.Fatalf("diff B status = %q, want deleted", diffB.Status)
+	}
+	if got := evidence.ListRunDiffFiles(runA.ID); len(got) != 1 || got[0].RunID != runA.ID || got[0].Diff != diffA.Diff {
+		t.Fatalf("ListRunDiffFiles(runA) = %#v, want only updated run A diff", got)
+	}
+	if got := evidence.ListRunDiffFiles(""); len(got) != 2 || got[0].RunID != runA.ID || got[1].RunID != runB.ID {
+		t.Fatalf("ListRunDiffFiles(all) = %#v, want current diffs in insertion order", got)
+	}
+
+	if _, err := evidence.UpsertArtifact(Artifact{ID: "artifact_missing_run", RunID: "missing"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertArtifact missing run error = %v, want ErrNotFound", err)
+	}
+	if _, err := evidence.UpsertArtifact(Artifact{RunID: runA.ID, Path: "missing-id.txt"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertArtifact blank id error = %v, want ErrNotFound", err)
+	}
+	if _, err := evidence.UpsertArtifact(Artifact{ID: "artifact_wrong_thread", RunID: runA.ID, ThreadID: threadB.ID}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertArtifact mismatched thread error = %v, want ErrNotFound", err)
+	}
+	artifactA, err := evidence.UpsertArtifact(Artifact{
+		ID:        "artifact_current_a",
+		RunID:     runA.ID,
+		Path:      "runtime.log",
+		SizeBytes: 12,
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact A returned error: %v", err)
+	}
+	if artifactA.ThreadID != threadA.ID || artifactA.Kind != "file" {
+		t.Fatalf("artifact A = %#v, want default thread and file kind", artifactA)
+	}
+	artifactACreatedAt := artifactA.CreatedAt
+	artifactA, err = evidence.UpsertArtifact(Artifact{
+		ID:        artifactA.ID,
+		RunID:     runA.ID,
+		Kind:      "log",
+		Path:      "runtime-2.log",
+		SizeBytes: 24,
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact A update returned error: %v", err)
+	}
+	if artifactA.CreatedAt != artifactACreatedAt || artifactA.Kind != "log" || artifactA.Path != "runtime-2.log" || artifactA.ThreadID != threadA.ID {
+		t.Fatalf("updated artifact A = %#v, want preserved createdAt and current metadata", artifactA)
+	}
+	artifactB, err := evidence.UpsertArtifact(Artifact{
+		ID:       "artifact_current_b",
+		RunID:    runB.ID,
+		ThreadID: threadB.ID,
+		Kind:     "patch",
+		Path:     "changes.diff",
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact B returned error: %v", err)
+	}
+	if got := evidence.ListArtifacts(runA.ID); len(got) != 1 || got[0].ID != artifactA.ID || got[0].RunID != runA.ID {
+		t.Fatalf("ListArtifacts(runA) = %#v, want only artifact A", got)
+	}
+	if got := evidence.ListArtifacts(""); len(got) != 2 || got[0].ID != artifactA.ID || got[1].ID != artifactB.ID {
+		t.Fatalf("ListArtifacts(all) = %#v, want current artifacts in insertion order", got)
+	}
+
+	if _, err := evidence.UpsertPreview(Preview{ID: "preview_missing_run", RunID: "missing"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertPreview missing run error = %v, want ErrNotFound", err)
+	}
+	if _, err := evidence.UpsertPreview(Preview{RunID: runA.ID, URL: "http://127.0.0.1:4173"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertPreview blank id error = %v, want ErrNotFound", err)
+	}
+	if _, err := evidence.UpsertPreview(Preview{ID: "preview_wrong_thread", RunID: runA.ID, ThreadID: threadB.ID}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertPreview mismatched thread error = %v, want ErrNotFound", err)
+	}
+	previewA, err := evidence.UpsertPreview(Preview{
+		ID:    "preview_current_a",
+		RunID: runA.ID,
+		URL:   "http://127.0.0.1:4173",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview A returned error: %v", err)
+	}
+	if previewA.ThreadID != threadA.ID || previewA.Status != "ready" {
+		t.Fatalf("preview A = %#v, want default thread and ready status", previewA)
+	}
+	previewACreatedAt := previewA.CreatedAt
+	previewA, err = evidence.UpsertPreview(Preview{
+		ID:     previewA.ID,
+		RunID:  runA.ID,
+		URL:    "http://127.0.0.1:5173",
+		Status: "stopped",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview A update returned error: %v", err)
+	}
+	if previewA.CreatedAt != previewACreatedAt || previewA.URL != "http://127.0.0.1:5173" || previewA.Status != "stopped" || previewA.ThreadID != threadA.ID {
+		t.Fatalf("updated preview A = %#v, want preserved createdAt and current metadata", previewA)
+	}
+	previewB, err := evidence.UpsertPreview(Preview{
+		ID:       "preview_current_b",
+		RunID:    runB.ID,
+		ThreadID: threadB.ID,
+		URL:      "http://127.0.0.1:5174",
+		Status:   "ready",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview B returned error: %v", err)
+	}
+	if got := evidence.ListPreviews(runA.ID); len(got) != 1 || got[0].ID != previewA.ID || got[0].RunID != runA.ID {
+		t.Fatalf("ListPreviews(runA) = %#v, want only preview A", got)
+	}
+	if got := evidence.ListPreviews(""); len(got) != 2 || got[0].ID != previewA.ID || got[1].ID != previewB.ID {
+		t.Fatalf("ListPreviews(all) = %#v, want current previews in insertion order", got)
+	}
+
+	if _, ok := repo.SetRunStatus(runA.ID, "finished"); !ok {
+		t.Fatalf("SetRunStatus(%s) returned false", runA.ID)
+	}
+	result := repo.CleanupRuns(RunCleanupOptions{
+		Now:         time.Now().UTC().Add(48 * time.Hour),
+		TerminalTTL: time.Hour,
+	})
+	if result.RemovedRuns != 1 {
+		t.Fatalf("CleanupRuns result = %#v, want one run removed", result)
+	}
+	if got := evidence.ListRunDiffFiles(""); len(got) != 1 || got[0].RunID != runB.ID {
+		t.Fatalf("diffs after run cleanup = %#v, want only run B evidence", got)
+	}
+	if got := evidence.ListArtifacts(""); len(got) != 1 || got[0].ID != artifactB.ID {
+		t.Fatalf("artifacts after run cleanup = %#v, want only artifact B", got)
+	}
+	if _, ok := evidence.GetArtifact(artifactA.ID); ok {
+		t.Fatalf("GetArtifact(%s) returned true after run cleanup", artifactA.ID)
+	}
+	if got := evidence.ListPreviews(""); len(got) != 1 || got[0].ID != previewB.ID {
+		t.Fatalf("previews after run cleanup = %#v, want only preview B", got)
+	}
+	if _, ok := evidence.GetPreview(previewA.ID); ok {
+		t.Fatalf("GetPreview(%s) returned true after run cleanup", previewA.ID)
+	}
+
+	if !repo.DeleteThread(threadB.ID) {
+		t.Fatalf("DeleteThread(%s) returned false", threadB.ID)
+	}
+	if got := evidence.ListRunDiffFiles(""); len(got) != 0 {
+		t.Fatalf("diffs after thread delete = %#v, want empty", got)
+	}
+	if got := evidence.ListArtifacts(""); len(got) != 0 {
+		t.Fatalf("artifacts after thread delete = %#v, want empty", got)
+	}
+	if got := evidence.ListPreviews(""); len(got) != 0 {
+		t.Fatalf("previews after thread delete = %#v, want empty", got)
 	}
 }
 
