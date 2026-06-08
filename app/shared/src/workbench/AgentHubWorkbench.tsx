@@ -28,7 +28,7 @@ import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
-import type { AgentConfig } from './pages';
+import type { AgentConfig, ProjectDraft } from './pages';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
@@ -81,13 +81,23 @@ export interface AgentHubWorkbenchProps {
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
   projects?: ProjectInfo[] | undefined;
-  projectsStatus?: { loading?: boolean | undefined; error?: string | undefined } | undefined;
+  projectsStatus?: {
+    loading?: boolean | undefined;
+    error?: string | undefined;
+    actionError?: string | undefined;
+    saving?: boolean | undefined;
+  } | undefined;
   activeConversationId?: string;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
   onAgentsRetry?: (() => void) | undefined;
+  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onProjectUpdate?: ((
+    projectId: string,
+    draft: ProjectDraft,
+  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   transcript: TranscriptBlock[];
 }
@@ -106,6 +116,8 @@ export function AgentHubWorkbench({
   onAgentUpdate,
   onAgentDelete,
   onAgentsRetry,
+  onProjectCreate,
+  onProjectUpdate,
   runtimeEvidence,
   transcript,
 }: AgentHubWorkbenchProps): React.ReactElement {
@@ -998,6 +1010,8 @@ export function AgentHubWorkbench({
               focusedAgentId={focusedAgentId}
               projects={projects}
               projectsStatus={projectsStatus}
+              onProjectCreate={onProjectCreate}
+              onProjectUpdate={onProjectUpdate}
               onAgentCreate={onAgentCreate}
               onAgentUpdate={onAgentUpdate}
               onAgentDelete={onAgentDelete}

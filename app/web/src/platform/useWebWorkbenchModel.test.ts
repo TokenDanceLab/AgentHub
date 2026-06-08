@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendHubRuntimeEvent,
+  projectDraftToHubRequest,
   resolveWebWorkbenchContacts,
   resolveWebWorkbenchProjects,
   resolveWebWorkbenchTranscript,
+  resolveWebProjectsStatus,
   workspaceProjectToProjectInfo,
 } from './useWebWorkbenchModel';
 import { webTranscript } from './webPlatform';
@@ -92,8 +94,9 @@ describe('useWebWorkbenchModel helpers', () => {
     });
   });
 
-  it('keeps demo projects unless Hub or real mode is active', () => {
-    expect(resolveWebWorkbenchProjects(undefined, false)).toBeUndefined();
+  it('keeps demo projects only in demo mode without Hub readiness', () => {
+    expect(resolveWebWorkbenchProjects(undefined, false)).toEqual([]);
+    expect(resolveWebWorkbenchProjects(undefined, false, 'demo')).toBeUndefined();
     expect(resolveWebWorkbenchProjects(undefined, false, 'real')).toEqual([]);
     expect(resolveWebWorkbenchProjects([{
       id: 'project-1',
@@ -107,6 +110,65 @@ describe('useWebWorkbenchModel helpers', () => {
         artifacts: [],
       }),
     ]);
+  });
+
+  it('treats auto mode with a ready Hub as real Projects status', () => {
+    const loadError = new Error('Hub Projects unavailable');
+    const actionError = new Error('Hub Projects create failed');
+
+    expect(resolveWebProjectsStatus(
+      { isFetching: true, error: loadError },
+      undefined,
+      undefined,
+      true,
+      'auto',
+    )).toEqual({
+      loading: true,
+      error: 'Hub Projects unavailable',
+      actionError: undefined,
+      saving: false,
+    });
+    expect(resolveWebProjectsStatus(
+      { isFetching: false, error: undefined },
+      actionError,
+      undefined,
+      true,
+      'auto',
+    )).toEqual({
+      loading: false,
+      error: undefined,
+      actionError: 'Hub Projects create failed',
+      saving: false,
+    });
+    expect(resolveWebProjectsStatus(
+      { isFetching: true, error: loadError },
+      actionError,
+      undefined,
+      false,
+      'auto',
+    )).toEqual({
+      loading: false,
+      error: undefined,
+      actionError: undefined,
+      saving: false,
+    });
+  });
+
+  it('normalizes project form drafts before sending Hub mutations', () => {
+    expect(projectDraftToHubRequest({
+      name: '  AgentHub Web  ',
+      description: '  Hub-only workspace  ',
+    })).toEqual({
+      name: 'AgentHub Web',
+      description: 'Hub-only workspace',
+    });
+    expect(projectDraftToHubRequest({
+      name: 'Untitled',
+      description: '   ',
+    })).toEqual({
+      name: 'Untitled',
+      description: '',
+    });
   });
 
   it('combines Hub messages with live runtime transcript blocks', () => {
