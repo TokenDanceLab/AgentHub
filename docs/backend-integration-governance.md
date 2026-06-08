@@ -1,11 +1,11 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 10:31 +08:00
+> 最后更新：2026-06-08 11:16 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
 
-当前开发事实源是 `dev/delicious233`。`master` 只接收从 `dev/delicious233` 发起的 PR。后端长期线程已关闭并归档，后续 backend/API/Edge 工作由主负责人按切片创建短生命周期 subagent/worktree；旧 `.worktrees/backend` 和历史 backend worktree 只作为待审/待清理资产，不再作为自行推进的主线。
+当前开发事实源是 `dev/delicious233`。`master` 只接收从 `dev/delicious233` 发起的 PR。后端长期线程已关闭并归档，后端旧整合线合并由 backend merge Agent 负责；主负责人只记录合并状态、规划后续依赖和按需派发新的短生命周期 subagent/worktree。关键后端/API/Edge 窄切片已经多批合入，但 `feat/backend-edge-hub` 仍有未吸收提交，因此不能把后端旧整合线视为全部并入主线。
 
 已确认的产品边界：
 
@@ -130,7 +130,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 | Docs | 无统一 document/artifact store | 定义 `ProjectArtifact` / `DocumentPreview` owner、blob、version、provider、permission |
 | Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已合入 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；G2b 已合入 Hub AgentProfile JSON-like request contract hardening；ExecutionTarget contract hardening 已合入 Hub request normalization；Desktop/Edge runtime inventory、market/install 和 target preference mutation 仍未生产化 | Desktop Edge runtime mapper、market/install 继续后置 |
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
-| Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | 下一片接 Projects create/update UI；artifact 关系和 delete/soft-delete 需另起 proposal |
+| Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | Projects create/update UI 排在 Edge SQL、Desktop mapper、登录和安装包基线之后；artifact 关系和 delete/soft-delete 需另起 proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
 | RightInspector | 默认任务/文件内容来自 demo evidence；client 已调用 artifacts/previews，但 Edge OpenAPI 仍有 planned 项 | 先补 Edge routes 或移除假调用，再接 evidence snapshot |
 
@@ -182,7 +182,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 后端长期线程已关闭；后续 backend/API/Edge 由主负责人按需开短生命周期 subagent/worktree，不能再让旧 backend 线程自行扩写或合并。
+1. 后端长期线程已关闭；后端旧整合线由 backend merge Agent 继续处理，主负责人不接管该合并，只把结果作为后续 Edge/Desktop/Web/packaging 规划输入。旧 `feat/backend-edge-hub` 和历史 backend worktree 仍需由该合并线确认抽片或清理。
 2. `v0.3.0-rc.1` 已打在 `0c79f277`，作为 shared v4 workbench + Hub/Edge 合并基线；Web Projects read-through 已完成并保持 shared `/v1/projects` 与 Desktop/Edge 语义不变。
-3. 下一批实现按 roadmap 排序：先 Edge SQL/store migration、Tauri Windows installer/macOS packaging、登录链路联调，再 Desktop Edge mapper、ByteDance/TeamRun demo evidence 和 Projects create/update UI；Projects delete/soft-delete policy 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
+3. 下一批实现按 roadmap 排序：先 Edge SQL/store migration；并行推进 Desktop Edge mapper 与登录 fake/local gate；之后做 Tauri Windows installer/updater metadata 内测包，macOS signing/notarization 单独 proposal；再推进 ByteDance/TeamRun demo evidence 和 Projects create/update UI。Projects delete/soft-delete policy 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge；D3 真实 CLI/model gate 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
