@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // --- mockEventEmitter ---
@@ -668,6 +670,139 @@ func TestChannelPermissionDecider(t *testing.T) {
 	}
 	if innerResp.DecisionClass != "user_approved" {
 		t.Fatalf("DecisionClass = %q, want user_approved", innerResp.DecisionClass)
+	}
+}
+
+func TestBrokeredPermissionHandlerWaitsForDecision(t *testing.T) {
+	inner, _ := json.Marshal(ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
+		ToolUseID: "tu-broker",
+		Input:     map[string]any{"command": "go test ./..."},
+	})
+	broker := NewPermissionDecisionBroker()
+	handler := NewBrokeredPermissionHandler(nil, broker, PermissionScope{
+		RunID:     "run_broker",
+		ProjectID: "proj_broker",
+		ThreadID:  "thread_broker",
+	})
+	var buf bytes.Buffer
+	done := make(chan error, 1)
+
+	go func() {
+		done <- handler.HandleControlRequest(context.Background(), &buf, ControlMessage{
+			Type: "control_request", RequestID: "req_broker", Request: inner,
+		})
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("handler returned before decision: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	pending, ok := broker.Decide("run_broker", "req_broker", PermissionDecision{
+		Behavior:      "allow",
+		DecisionClass: "user_approved",
+	})
+	if !ok {
+		t.Fatal("broker did not find pending request")
+	}
+	if pending.ProjectID != "proj_broker" || pending.ThreadID != "thread_broker" || pending.ToolName != "Bash" {
+		t.Fatalf("pending metadata = %#v, want scoped Bash request", pending)
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("HandleControlRequest: %v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("handler did not resume after decision")
+	}
+
+	var resp ControlMessage
+	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	var innerResp ControlResponseInner
+	if err := json.Unmarshal(resp.Response, &innerResp); err != nil {
+		t.Fatalf("inner unmarshal: %v", err)
+	}
+	if innerResp.Behavior != "allow" || innerResp.DecisionClass != "user_approved" {
+		t.Fatalf("inner response = %#v, want allow/user_approved", innerResp)
+	}
+}
+
+func TestBrokeredPermissionHandlerContextCancellationDeniesAndRemovesPending(t *testing.T) {
+	inner, _ := json.Marshal(ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Write",
+		ToolUseID: "tu-timeout",
+	})
+	broker := NewPermissionDecisionBroker()
+	handler := NewBrokeredPermissionHandler(nil, broker, PermissionScope{RunID: "run_timeout"})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	var buf bytes.Buffer
+
+	if err := handler.HandleControlRequest(ctx, &buf, ControlMessage{
+		Type: "control_request", RequestID: "req_timeout", Request: inner,
+	}); err != nil {
+		t.Fatalf("HandleControlRequest: %v", err)
+	}
+	if _, ok := broker.Decide("run_timeout", "req_timeout", PermissionDecision{Behavior: "allow"}); ok {
+		t.Fatal("timed-out permission request remained pending")
+	}
+
+	var resp ControlMessage
+	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	var innerResp ControlResponseInner
+	if err := json.Unmarshal(resp.Response, &innerResp); err != nil {
+		t.Fatalf("inner unmarshal: %v", err)
+	}
+	if innerResp.Behavior != "deny" {
+		t.Fatalf("Behavior = %q, want deny timeout fallback", innerResp.Behavior)
+	}
+	if !strings.Contains(innerResp.Message, "cancelled") {
+		t.Fatalf("Message = %q, want explicit cancellation reason", innerResp.Message)
+	}
+}
+
+func TestBrokeredPermissionHandlerFailsClosedWhenRequestCannotRegister(t *testing.T) {
+	inner, _ := json.Marshal(ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
+		ToolUseID: "tu-duplicate",
+	})
+	broker := NewPermissionDecisionBroker()
+	if _, ok := broker.Begin(PermissionScope{RunID: "run_duplicate"}, PermissionRequest{RequestID: "req_duplicate"}); !ok {
+		t.Fatal("failed to seed pending permission request")
+	}
+	handler := NewBrokeredPermissionHandler(nil, broker, PermissionScope{RunID: "run_duplicate"})
+	var buf bytes.Buffer
+
+	if err := handler.HandleControlRequest(context.Background(), &buf, ControlMessage{
+		Type: "control_request", RequestID: "req_duplicate", Request: inner,
+	}); err != nil {
+		t.Fatalf("HandleControlRequest: %v", err)
+	}
+
+	var resp ControlMessage
+	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	var innerResp ControlResponseInner
+	if err := json.Unmarshal(resp.Response, &innerResp); err != nil {
+		t.Fatalf("inner unmarshal: %v", err)
+	}
+	if innerResp.Behavior != "deny" {
+		t.Fatalf("Behavior = %q, want deny duplicate fallback", innerResp.Behavior)
+	}
+	if !strings.Contains(innerResp.Message, "could not be registered") {
+		t.Fatalf("Message = %q, want registration failure reason", innerResp.Message)
 	}
 }
 
