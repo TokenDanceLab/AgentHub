@@ -5135,6 +5135,48 @@ components:
           type: string
           maxLength: 128
           description: Alias for run_id for explicit Hub persistence.
+    HubWebSocketFrame:
+      type: object
+      required: [type, payload]
+      description: Hub WebSocket frame envelope. Event-specific payload contracts are documented in api/events.md.
+      properties:
+        type:
+          type: string
+          enum:
+            - message.new
+            - message.edited
+            - message.reaction_added
+            - message.reaction_removed
+            - device.online
+            - device.offline
+            - session.created
+            - session.member_joined
+            - session.member_left
+            - session.info_updated
+            - agent.dispatch
+            - agent.stream
+            - agent.done
+            - agent.failed
+            - agent.cancel
+            - agent.control
+            - team.run.started
+            - team.event
+            - team.assignment.done
+            - team.assignment.failed
+            - notification.new
+            - friend.request
+            - friend.accepted
+        payload:
+          type: object
+          additionalProperties: true
+    HubDevicePresencePayload:
+      type: object
+      required: [user_id]
+      description: User-level Hub presence payload for device.online and device.offline WebSocket frames. Hub broadcasts presence by user and does not expose device_id or device_type in this payload.
+      properties:
+        user_id:
+          type: string
+      additionalProperties: false
     HubTaskStreamRequest:
       type: object
       anyOf:
