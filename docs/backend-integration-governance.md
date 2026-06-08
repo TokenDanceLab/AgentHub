@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 12:34 +08:00
+> 最后更新：2026-06-08 13:35 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -101,6 +101,7 @@ next: <1-3 steps>
 16. **Hub Projects/workspaces P1**：已合入 `dev/delicious233`，提交 `1cd052fc feat(api): add hub project workspace endpoints`。范围仅新增 Web-owned Hub `/web/projects` 与 `/web/projects/{id}` list/create/get/update，背后复用现有 owner-scoped `workspaces` 表和 `Workspace` projection `{id,name,description,owner_id,created_at,updated_at}`；list 支持 `pageSize`、`pageCursor` 和 `q` 搜索；create/update 保持当前 Hub 200 OK envelope；PATCH 已由主负责人补成部分更新语义：省略字段不变、显式空 description 可清空、空白 name 返回 `BAD_REQUEST`。该片不实现 delete，不 hard-delete workspace，不加 `deleted_at` 或 migration，不改 Edge-owned `/v1/projects`、Web/shared UI、Desktop Edge mapper、Edge SQL、TeamRun routing、release workflow、D1b/D2/D3 或真实 CLI/model gate。delete/soft-delete 需要先明确 workspace 与 agent_instances/artifacts 的关系和 orphan policy 后另起 proposal。
 17. **C3. OIDC fake/local gate**：本轮在 `codex/login-local-gates` 收口 Hub state expiry/replay 和脚本 gate 语义。Hub OIDC callback 在消费 Redis state 后还会校验 `created_at` 不超过 10 分钟，防止手工/fake state entry 绕过 TTL 后继续打 token endpoint；`verify-oidc-flow.ps1 -LocalOnly` 强制跳过 live Hub 与 TokenDance ID phases，只做 fake/static diagnostics。该片不做真实 TokenDanceID/生产登录，不改 Web UI、Desktop packaging、Edge SQL 或真实 CLI/model gate。
 18. **G3. Edge SQLite opt-in store**：`codex/edge-sql-store` 首片实现 Edge 本地 SQLite opt-in backend，并显式支持 `--store-backend memory|file|sqlite` / `AGENTHUB_STORE_BACKEND=memory|file|sqlite`。留空 backend 保持旧兼容：有 `--store-file` 走 JSON file store，否则 memory；显式 memory 拒绝 store file/db，显式 file 要求 `--store-file`，sqlite 要求 `--store-db`。SQLite 当前以 snapshot 表保存 repository 状态并共跑 memory/file/sqlite contract；不引入 Hub DB、Web/Projects UI、Desktop/Tauri 或真实 CLI/model gate。后续 relational schema/migration 另拆。
+19. **Desktop Edge mapper first slice**：`codex/desktop-edge-mapper` 首片把 Local Edge `/v1/agents`、`/v1/model-catalog` 和 health runners 投影到 Desktop Workbench agents / Local Edge target，保留 Edge `runtimeId` 并让 `StartRunRequest.agentId` 使用 adapter runtime id；移除提交到 Edge runs 的 `provider` 字段，阻断 Desktop live/auto 空线程回落 demo transcript。该片不改 Web、Hub、Edge API/OpenAPI、Edge lifecycle 或真实 CLI/model gate；target preference mutation、Tauri host readiness 和安装包联调继续另拆。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -132,7 +133,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 |---|---|---|
 | Contacts | 只读 Hub `listContacts()` port 已接入 Web shared page；mutation、error/empty、schema owner 和 friend request/remark/block/search 仍未生产化 | 补 Hub contacts mutation/error/empty/schema 合同 |
 | Docs | 无统一 document/artifact store | 定义 `ProjectArtifact` / `DocumentPreview` owner、blob、version、provider、permission |
-| Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已合入 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；G2b 已合入 Hub AgentProfile JSON-like request contract hardening；ExecutionTarget contract hardening 已合入 Hub request normalization；Desktop/Edge runtime inventory、market/install 和 target preference mutation 仍未生产化 | Desktop Edge runtime mapper、market/install 继续后置 |
+| Agents | G1 已建立 Hub `AgentProfile` 到 shared Agents 已安装页的只读 mapper，并阻断 Web real mode demo agent fallback；G2a 已合入 Web AgentProfile create/update/delete、empty/error/saving 和 mapper 写回保护；G2b 已合入 Hub AgentProfile JSON-like request contract hardening；ExecutionTarget contract hardening 已合入 Hub request normalization；Desktop Edge 首切片已从 Local Edge `/v1/agents`、`/v1/model-catalog` 和 health runners 投影 Workbench agents/Local Edge target，并在 review 修正 StartRunRequest adapter id、provider 字段和 live 空线程 demo fallback；market/install 和 target preference mutation 仍未生产化 | 继续补 Desktop target preference mutation、Tauri host readiness；market/install 后置 |
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
 | Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | Projects create/update UI 排在 Edge SQL、Desktop mapper、登录和安装包基线之后；artifact 关系和 delete/soft-delete 需另起 proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
@@ -188,5 +189,5 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 1. 后端长期线程已关闭；后端旧整合线由 backend merge Agent 继续处理，主负责人不接管该合并，只把结果作为后续 Edge/Desktop/Web/packaging 规划输入。旧 `feat/backend-edge-hub` 和历史 backend worktree 仍需由该合并线确认抽片或清理。
 2. `v0.3.0-rc.1` 已打在 `0c79f277`，作为 shared v4 workbench + Hub/Edge 合并基线；Web Projects read-through 已完成并保持 shared `/v1/projects` 与 Desktop/Edge 语义不变。
-3. 下一批实现按 roadmap 排序：Edge SQLite opt-in backend 与登录 fake/local gate 已合入；继续推进 Desktop Edge mapper、Tauri Windows installer/updater metadata readiness branch，macOS signing/notarization 单独 proposal；再推进 ByteDance/TeamRun demo evidence 和 Artifact/Diff/Preview read-only endpoints。Projects delete/soft-delete policy 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
+3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend 和 Tauri Windows installer/updater metadata readiness 已合入；Desktop Edge mapper 首切片正在合入，后续继续补 target preference mutation、Tauri host readiness；ByteDance/TeamRun demo evidence、Artifact/Diff/Preview read-only endpoints、Projects create/update UI 仍按独立切片推进。Edge relational migration、Projects delete/soft-delete policy、macOS signing/notarization 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge；D3 真实 CLI/model gate 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。

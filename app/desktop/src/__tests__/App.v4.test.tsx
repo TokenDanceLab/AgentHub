@@ -3,6 +3,8 @@ import type { EventEnvelope } from '@shared/events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { createEventStream } from '@/api/eventClient';
+import { useAgentList } from '@/api/agentQueries';
+import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useCreateRun } from '@/api/runQueries';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
@@ -17,6 +19,14 @@ vi.mock('@/api/threadQueries', () => ({
   useThreads: vi.fn(),
 }));
 
+vi.mock('@/api/agentQueries', () => ({
+  useAgentList: vi.fn(),
+}));
+
+vi.mock('@/api/modelCatalogQueries', () => ({
+  useModelCatalog: vi.fn(),
+}));
+
 vi.mock('@/api/runQueries', () => ({
   useCreateRun: vi.fn(),
 }));
@@ -26,6 +36,8 @@ const createRunMutateAsync = vi.fn();
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
+const mockedUseAgentList = vi.mocked(useAgentList);
+const mockedUseModelCatalog = vi.mocked(useModelCatalog);
 const mockedCreateEventStream = vi.mocked(createEventStream);
 const mockedUseCreateRun = vi.mocked(useCreateRun);
 
@@ -48,6 +60,12 @@ describe('Desktop App v4 root', () => {
     mockedUseCreateRun.mockReturnValue({
       mutateAsync: createRunMutateAsync,
     } as ReturnType<typeof useCreateRun>);
+    mockedUseAgentList.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+    } as ReturnType<typeof useAgentList>);
+    mockedUseModelCatalog.mockReturnValue({
+      data: { items: [], sources: [] },
+    } as ReturnType<typeof useModelCatalog>);
     mockedUseThreads.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreads>);
@@ -62,7 +80,7 @@ describe('Desktop App v4 root', () => {
   it('renders the shared v4 workbench as the active desktop route', () => {
     render(<App />);
 
-    expect(screen.getByText('AgentHub')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'AgentHub' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Window controls' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '最小化' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '最大化' })).toBeInTheDocument();
@@ -80,8 +98,8 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Builder' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Composer input')).toHaveAttribute('placeholder', '发消息给 Builder');
+    expect(screen.getByRole('heading', { name: 'AgentHub' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Composer input')).toHaveAttribute('placeholder', '发消息给 AgentHub');
   });
 
   it('uses Edge thread data when Desktop queries return conversations and items', () => {

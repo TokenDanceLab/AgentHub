@@ -553,6 +553,7 @@
   "settings.edgeOnline": "Edge online",
   "settings.edgeOffline": "Edge offline",
   "settings.runnerSummary": "{{available}}/{{total}} available",
+  "settings.localEdgeInventorySummary": "{{runners}}/{{totalRunners}} runners · {{agents}} agents · {{models}} models",
   "settings.agentProfilesDesc": "Set the default model, available tools, and context preferences for each Agent.",
   "settings.profileAvailable": "Available Agent engines",
   "settings.profileAvailableDesc": "Local Agent engines that can run profiles on this device.",
