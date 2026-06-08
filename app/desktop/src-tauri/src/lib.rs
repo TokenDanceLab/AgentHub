@@ -43,6 +43,7 @@ pub fn run() {
 
     let close_to_tray = Arc::new(AtomicBool::new(true));
     let quitting = Arc::new(AtomicBool::new(false));
+    let workspace_file_access = commands::WorkspaceFileAccessState::default();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -50,6 +51,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(edge.clone())
+        .manage(workspace_file_access)
         .manage(CloseToTrayState(close_to_tray.clone()))
         .manage(QuittingState(quitting.clone()))
         .invoke_handler(tauri::generate_handler![
@@ -93,6 +95,10 @@ pub fn run() {
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+            let access = app.state::<commands::WorkspaceFileAccessState>();
+            if let Err(error) = commands::seed_workspace_file_access_from_store(&handle, &access) {
+                log::warn!("Failed to seed workspace file access state: {error}");
+            }
             tray::build_tray(&handle)?;
             let edge_for_start = edge.clone();
             let start_handle = handle.clone();
