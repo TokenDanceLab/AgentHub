@@ -225,30 +225,28 @@ func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targe
 	if target.OwnerID != userID {
 		return nil, errcode.TargetNotFound
 	}
-	switch target.TargetType {
-	case "local_edge", "hub_relay", "remote_ssh", "tailscale", "cloud_edge":
-		if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
-			return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
-		}
-		deviceID := strings.TrimSpace(*target.DeviceID)
-		device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
-			}
-			return nil, err
-		}
-		if device.UserID != userID || device.DeviceType != "desktop" {
-			return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
-		}
-		return &dispatchTargetSnapshot{
-			ID:         target.ID,
-			TargetType: target.TargetType,
-			DeviceID:   deviceID,
-		}, nil
-	default:
+	if target.TargetType != "local_edge" {
 		return nil, errcode.TargetNotRoutable.WithMessage("execution target type is not dispatchable yet")
 	}
+	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
+	}
+	deviceID := strings.TrimSpace(*target.DeviceID)
+	device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+		}
+		return nil, err
+	}
+	if device.UserID != userID || device.DeviceType != "desktop" {
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+	}
+	return &dispatchTargetSnapshot{
+		ID:         target.ID,
+		TargetType: target.TargetType,
+		DeviceID:   deviceID,
+	}, nil
 }
 
 func promptFromMessage(msg *model.Message) string {
