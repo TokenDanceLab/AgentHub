@@ -6,6 +6,7 @@ import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
 import { DesktopChrome } from '@/components/DesktopChrome';
+import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
 import { useHealth } from '@/hooks/useHealth';
 import { createDesktopPlatform } from '@/platform/desktopPlatform';
 import { mapEdgeAgentsToWorkbenchAgents } from '@/platform/edgeCapabilityMapper';
@@ -35,6 +36,7 @@ export default function App() {
 
   return (
     <DesktopChrome>
+      {edgeOnline ? <DesktopHubTaskBridge /> : null}
       <AgentHubWorkbench
         activeConversationId={workbench.activeConversationId}
         agents={edgeAgents}
