@@ -127,6 +127,7 @@ const (
 	BusEventToolUseSummary      = "run.agent.tool_use_summary"
 	BusEventAuthStatus          = "run.agent.auth_status"
 	BusEventRateLimit           = "run.agent.rate_limit"
+	BusEventCLIInvocationPlan   = "run.agent.cli_invocation_plan"
 
 	// Permission gating events
 	BusEventPermissionRequested = "run.agent.permission_requested"

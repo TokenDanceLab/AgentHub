@@ -411,38 +411,11 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	var cmdPath string
 	var args, env []string
 	var workDir string
+	adapterCtx := adapters.RunProcessContext(runCtx)
 
 	if adapter != nil {
 		// Adapter mode: BuildCommand provides full command configuration
-		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
-			Run:                    runCtx.Run,
-			Prompt:                 runCtx.Prompt,
-			AgentID:                runCtx.AgentID,
-			Model:                  runCtx.Model,
-			WorkDir:                runCtx.WorkDir,
-			SessionID:              runCtx.SessionID,
-			ContinueLast:           runCtx.ContinueLast,
-			ForkSession:            runCtx.ForkSession,
-			ReasoningEffort:        runCtx.ReasoningEffort,
-			ThinkingMode:           runCtx.ThinkingMode,
-			MaxThinkingTokens:      runCtx.MaxThinkingTokens,
-			PermissionMode:         runCtx.PermissionMode,
-			IncludePartial:         runCtx.IncludePartial,
-			StructuredOutputSchema: runCtx.StructuredOutputSchema,
-			SystemPrompt:           runCtx.SystemPrompt,
-			AppendSystemPrompt:     runCtx.AppendSystemPrompt,
-			SkillsPrompt:           runCtx.SkillsPrompt,
-			AgentDefinitions:       runCtx.AgentDefinitions,
-			MCPConfig:              runCtx.MCPConfig,
-			AllowedTools:           runCtx.AllowedTools,
-			HubTaskID:              runCtx.HubTaskID,
-			ConfigOverrides:        runCtx.ConfigOverrides,
-			Ephemeral:              runCtx.Ephemeral,
-			AgentName:              runCtx.AgentName,
-			Budget:                 runCtx.Budget,
-			Messages:               runCtx.Messages,
-			PinnedMessages:         runCtx.PinnedMessages,
-		})
+		cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
 	} else {
 		// Profile mode: use configured command template
 		var err error
@@ -453,6 +426,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 		cmdPath = e.profile.Command
 		workDir = e.profile.WorkDir
+	}
+	if adapter != nil {
+		plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
+		e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
 	}
 
 	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
