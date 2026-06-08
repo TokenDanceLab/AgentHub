@@ -41,7 +41,21 @@ export interface DesktopEdgeHostReadiness {
   target_id: 'local-edge';
   route: 'local-edge-api';
   bind_addr: string;
+  health_url: string;
+  store_db_policy: '<app-data>/agenthub-edge.sqlite';
+  log_paths: {
+    directory: string;
+    stdout: string;
+    stderr: string;
+  };
   sidecar_args: string[];
+  preflight: {
+    sidecar_available: boolean;
+    fallback_executable_available: boolean;
+    auth_token_ready: boolean;
+    status: 'ready' | 'blocked';
+    blocker: string | null;
+  };
   direct_cli_spawn: false;
 }
 

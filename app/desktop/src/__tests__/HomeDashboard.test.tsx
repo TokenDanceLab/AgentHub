@@ -16,6 +16,8 @@ vi.mock('@/hooks/useHealth', () => ({
   useHealth: vi.fn(() => ({
     online: true,
     health: { version: 'v1.0.0', status: 'ok', checks: {} },
+    lastError: null,
+    refetch: vi.fn(),
   })),
 }));
 
@@ -151,6 +153,8 @@ describe('HomeDashboard', () => {
     vi.mocked(useHealthModule.useHealth).mockReturnValue({
       online: false,
       health: null,
+      lastError: 'connection refused',
+      refetch: vi.fn(),
     });
 
     render(
