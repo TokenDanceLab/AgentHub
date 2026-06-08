@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 11:51 +08:00
+> 最后更新：2026-06-08 12:34 +08:00
 > 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
@@ -30,12 +30,12 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 1 | Roadmap/tag/worktree 收口 | `v0.3.0-rc.1` 已打；roadmap 压缩；分支清理先审计不批量删 | docs diff-check、root governance、worktree audit |
 | 2 | Edge SQL/store migration | G0 contract 已覆盖 memory/file/sqlite；`codex/edge-sql-store` 新增 SQLite opt-in snapshot backend，并显式支持 memory/file/sqlite backend 值；留空 backend 继续按旧规则自动选择 memory/file；后续再拆 relational migration | Edge store contract、cmd store config tests、edge short gate |
 | 3 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动；给安装包提供可运行侧车基线 | Desktop platform、Edge focused、Rust host tests |
-| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；覆盖 Web session、Desktop loopback/keyring、Hub state expiry/replay | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
-| 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；版本对齐；updater metadata 从“可选复制”改为 gate | Tauri build/package dry run、installer artifact 检查、release policy |
+| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；已补 Hub state expiry/replay 与 OIDC `-LocalOnly` gate；后续覆盖 packaged Desktop loopback/keyring | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
+| 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；`codex/tauri-package-readiness` 已补版本对齐、独立 release readiness workflow 和 updater metadata gate；正式签名发布仍后置 | `scripts/verify-tauri-package-readiness.ps1`、installer artifact 检查、release dry policy |
 | 6 | ByteDance / TeamRun demo | IM 群聊、多 Agent 调度、证据 inspector、录屏脚本 | readiness script、manifest、截图/视频/接口导出 |
 | 7 | Artifact/Diff/Preview 生产化 | 去掉 demo evidence，补真实 artifact/diff/preview API | Edge API、shared inspector、Desktop/Web smoke |
 | 8 | Projects create/update UI | Web/Hub only；不做 delete；排在存储/安装/登录之后 | Web focused、shared focused、Web typecheck、Web boundary |
-| 9 | Release signing / macOS | Windows Authenticode；macOS arm64 DMG proof 后再做 Developer ID signing、entitlements、notarization、staple | `Get-AuthenticodeSignature`、`codesign`、`spctl`、`stapler` |
+| 9 | Release signing / macOS | Windows Authenticode；macOS arm64 dry validation 另起 proposal 后再做 Developer ID signing、entitlements、notarization、staple | `Get-AuthenticodeSignature`、`codesign`、`spctl`、`stapler` |
 | 10 | D1b/D2/D3 gates | 先 policy；D3 继续 opt-in | CI policy、release review、artifact redaction |
 
 ## P1 后续
@@ -45,7 +45,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 - Tasks/TeamRun 页面正式映射。
 - Settings DB-backed preferences。
 - Projects create/update UI 与 delete/soft-delete/orphan policy。
-- Release workflow、Windows installer、updater metadata gate、macOS signing/notarization 自动化。
+- `release.yml` 保留 tag release 语义；`release-readiness.yml` 只做内测 dry package policy。Windows Authenticode 与 macOS Developer ID/notarization 自动化另起 proposal。
 - Mobile v4 IM / remote client 支线。
 
 ## 分支和 Worktree
@@ -78,5 +78,5 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 2. Review/merge Edge SQLite opt-in backend；下一片再拆 relational schema/migration。
 3. 并行开 Desktop Edge mapper worker 和登录 fake/local gate worker，为安装包提供可运行前置条件。
    - 登录 fake/local gate 已补 Hub stale state `created_at` 拒绝和 `verify-oidc-flow.ps1 -LocalOnly` fake/static gate；该 gate 不连接 live Hub 或 TokenDance ID。
-4. 开 Tauri Windows installer/updater metadata worker；macOS 正式签名另起 proposal。
+4. Review/merge Tauri Windows installer/updater metadata readiness branch；macOS 正式签名另起 proposal。
 5. 开 ByteDance/TeamRun demo evidence worker。
