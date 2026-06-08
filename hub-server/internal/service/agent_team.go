@@ -309,7 +309,7 @@ func (s *AgentTeamService) GetTeamWithMembers(ctx context.Context, userID, teamI
 
 // StartTeamRun creates a group session, adds all team members as agent
 // instances, triggers the supervisor agent, and records the run.
-func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error) {
+func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error) {
 	team, err := repository.GetTeamByID(s.db, teamID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -384,6 +384,7 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		TeamID:         teamID,
 		TriggerUserID:  userID,
 		TriggerMessage: triggerMessage,
+		TargetID:       optionalTeamRunTargetID(targetID),
 		Status:         model.TeamRunStatusQueued,
 	}
 
@@ -513,7 +514,7 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 	}
 
 	// Trigger the task. This dispatches asynchronously.
-	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", supervisorRouteModelParams(), ""); err != nil {
+	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", supervisorRouteModelParams(), teamRunTargetID(run)); err != nil {
 		slog.Error("failed to trigger supervisor agent task for team run", "run_id", run.ID, "team_id", teamID, "error", err)
 		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
 		return run, err
@@ -1905,6 +1906,21 @@ func routeAssignmentType(action string) string {
 	}
 }
 
+func optionalTeamRunTargetID(targetID string) *string {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return nil
+	}
+	return &targetID
+}
+
+func teamRunTargetID(run *model.AgentTeamRun) string {
+	if run == nil || run.TargetID == nil {
+		return ""
+	}
+	return strings.TrimSpace(*run.TargetID)
+}
+
 // --- TeamAssignment ---
 
 // CreateAssignment creates a new team assignment (delegation) from a supervisor
@@ -2088,7 +2104,7 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 		return err
 	}
 
-	pendingTask, triggerErr := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, targetAIID, "", "", "", "")
+	pendingTask, triggerErr := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, targetAIID, "", "", "", teamRunTargetID(run))
 	if triggerErr != nil {
 		slog.Error("failed to trigger dispatch for assignment", "assignment_id", assignmentID, "error", triggerErr)
 		return triggerErr

@@ -78,6 +78,7 @@ type AgentTeamRun struct {
 	SessionID      string    `gorm:"type:uuid;not null" json:"session_id"`
 	TriggerUserID  string    `gorm:"type:uuid;not null" json:"trigger_user_id"`
 	TriggerMessage string    `gorm:"type:text" json:"trigger_message,omitempty"`
+	TargetID       *string   `gorm:"type:uuid" json:"target_id,omitempty"`
 	Status         string    `gorm:"type:varchar(20);not null;default:queued" json:"status"`
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updated_at"`

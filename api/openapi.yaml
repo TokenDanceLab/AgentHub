@@ -3460,6 +3460,10 @@ paths:
               properties:
                 trigger_message:
                   type: string
+                target_id:
+                  type: string
+                  format: uuid
+                  description: Optional owner-scoped ExecutionTarget id used for exact Desktop/Edge routing of the TeamRun supervisor and assignment tasks.
       responses:
         "200":
           $ref: "#/components/responses/Ok"
