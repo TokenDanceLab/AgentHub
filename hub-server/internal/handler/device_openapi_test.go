@@ -200,6 +200,55 @@ func TestOpenAPIClientMessageReactionsMatchesHubContract(t *testing.T) {
 	}
 }
 
+func TestOpenAPIProviderBindingSchemasMatchHubModelAndDoNotExposeCredentials(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	assertSchemaHasOnlyProperties(t, schemas, "ProviderBinding", []string{
+		"id",
+		"provider",
+		"binding_name",
+		"base_url",
+		"is_available",
+		"quota_used",
+		"quota_limit",
+		"last_checked",
+		"metadata",
+		"created_at",
+		"updated_at",
+	})
+	assertSchemaRequiredFields(t, schemas, "ProviderBinding", []string{
+		"id",
+		"provider",
+		"is_available",
+		"quota_used",
+		"quota_limit",
+		"created_at",
+		"updated_at",
+	})
+
+	assertSchemaHasOnlyProperties(t, schemas, "CreateProviderBindingRequest", []string{
+		"provider",
+		"binding_name",
+		"base_url",
+		"is_available",
+		"quota_limit",
+		"metadata",
+	})
+	assertSchemaRequiredFields(t, schemas, "CreateProviderBindingRequest", []string{"provider"})
+
+	assertSchemaHasOnlyProperties(t, schemas, "UpdateProviderBindingRequest", []string{
+		"provider",
+		"binding_name",
+		"base_url",
+		"is_available",
+		"quota_used",
+		"quota_limit",
+		"last_checked",
+		"metadata",
+	})
+}
+
 func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
@@ -668,6 +717,52 @@ func requireMaxLength(t *testing.T, node *yaml.Node, want string, field string) 
 	t.Helper()
 	if got := yamlScalarField(t, node, "maxLength", field+" maxLength"); got != want {
 		t.Fatalf("%s maxLength = %v, want %s", field, got, want)
+	}
+}
+
+func assertSchemaHasOnlyProperties(t *testing.T, schemas *yaml.Node, schemaName string, want []string) {
+	t.Helper()
+	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
+	properties := yamlMapField(t, schema, "properties", "components.schemas."+schemaName+".properties")
+	actual := map[string]struct{}{}
+	for i := 0; i+1 < len(properties.Content); i += 2 {
+		key := properties.Content[i].Value
+		actual[key] = struct{}{}
+	}
+	for _, field := range want {
+		if _, ok := actual[field]; !ok {
+			t.Fatalf("%s.properties missing %q", schemaName, field)
+		}
+		delete(actual, field)
+	}
+	for field := range actual {
+		t.Fatalf("%s.properties contains unexpected field %q", schemaName, field)
+	}
+	for _, field := range []string{"api_key", "api_base", "models", "is_default", "credential", "credentials", "token", "secret", "access_token", "refresh_token"} {
+		if yamlOptionalMapField(properties, field) != nil {
+			t.Fatalf("%s.properties must not expose credential-like field %q", schemaName, field)
+		}
+	}
+}
+
+func assertSchemaRequiredFields(t *testing.T, schemas *yaml.Node, schemaName string, want []string) {
+	t.Helper()
+	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
+	requiredNode := yamlOptionalMapField(schema, "required")
+	if len(want) == 0 {
+		if requiredNode != nil {
+			t.Fatalf("%s.required = %v, want absent", schemaName, requiredNode.Value)
+		}
+		return
+	}
+	if requiredNode == nil {
+		t.Fatalf("%s.required is missing", schemaName)
+	}
+	required := yamlStringSlice(t, requiredNode, schemaName+".required")
+	for _, field := range want {
+		if !containsString(required, field) {
+			t.Fatalf("%s.required = %v, want %q", schemaName, required, field)
+		}
 	}
 }
 
