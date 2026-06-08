@@ -120,6 +120,15 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($defaultRun.Output -match "No Codex, Claude Code, or OpenCode command was executed") "script reports no real CLI/model execution" $defaultRun.Output
     Assert-True ($defaultRun.Output -match "BLOCK real execution") "default mode blocks real execution while prerequisites are missing" $defaultRun.Output
 
+    $badModeRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "BadMode"
+    )
+    Assert-True ($badModeRun.ExitCode -ne 0) "BadMode is rejected by parameter validation" $badModeRun.Output
+
     $realTestedRun = Invoke-ReadinessScript @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -130,6 +139,25 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($realTestedRun.ExitCode -ne 0) "RealTested mode fails without operator approval" $realTestedRun.Output
     Assert-True ($realTestedRun.Output -match "operator approval") "RealTested failure names missing operator approval" $realTestedRun.Output
 
+    $fakeRealTestedRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "RealTested",
+        "-RuntimeId", "codex",
+        "-RuntimePath", "approved-runtime-owner",
+        "-RuntimeEnvManifest", "approved-env-manifest",
+        "-BudgetPlan", "approved-budget",
+        "-RedactionPlan", "approved-redaction",
+        "-ArtifactRoot", "approved-artifacts",
+        "-EvidenceMode", "approved-evidence-mode",
+        "-OperatorApprovalId", "approval-123"
+    )
+    Assert-True ($fakeRealTestedRun.ExitCode -ne 0) "RealTested forged metadata remains blocked without real execution evidence manifest" $fakeRealTestedRun.Output
+    Assert-True ($fakeRealTestedRun.Output -match "real execution evidence manifest") "RealTested forged metadata names missing real execution evidence manifest" $fakeRealTestedRun.Output
+    Assert-True ($fakeRealTestedRun.Output -notmatch "READY_FOR_OPERATOR_APPROVED_REAL_TEST") "RealTested forged metadata does not claim operator-approved real test readiness" $fakeRealTestedRun.Output
+
     $submissionRun = Invoke-ReadinessScript @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -139,6 +167,25 @@ if (Test-Path -LiteralPath $scriptPath) {
     )
     Assert-True ($submissionRun.ExitCode -ne 0) "Submission mode fails without operator approval" $submissionRun.Output
     Assert-True ($submissionRun.Output -match "operator approval") "Submission failure names missing operator approval" $submissionRun.Output
+
+    $fakeSubmissionRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "Submission",
+        "-RuntimeId", "codex",
+        "-RuntimePath", "approved-runtime-owner",
+        "-RuntimeEnvManifest", "approved-env-manifest",
+        "-BudgetPlan", "approved-budget",
+        "-RedactionPlan", "approved-redaction",
+        "-ArtifactRoot", "approved-artifacts",
+        "-EvidenceMode", "approved-evidence-mode",
+        "-OperatorApprovalId", "approval-123"
+    )
+    Assert-True ($fakeSubmissionRun.ExitCode -ne 0) "Submission forged metadata remains blocked without real execution evidence manifest" $fakeSubmissionRun.Output
+    Assert-True ($fakeSubmissionRun.Output -match "real execution evidence manifest") "Submission forged metadata names missing real execution evidence manifest" $fakeSubmissionRun.Output
+    Assert-True ($fakeSubmissionRun.Output -notmatch "READY_FOR_OPERATOR_APPROVED_REAL_TEST") "Submission forged metadata does not claim operator-approved real test readiness" $fakeSubmissionRun.Output
 }
 
 if (Test-Path -LiteralPath $docPath) {
