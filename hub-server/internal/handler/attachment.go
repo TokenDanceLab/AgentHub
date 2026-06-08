@@ -24,6 +24,7 @@ type AttachmentService interface {
 	SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error)
 	GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error)
 	MaxUploadSize() int64
+	IsAttachmentMimeTypeAllowed(mimeType string) bool
 	StoreBlob(ctx context.Context, hash string, r io.Reader, contentType string) (bool, error)
 	GetBlob(ctx context.Context, hash string) (io.ReadCloser, error)
 	DeleteBlob(ctx context.Context, hash string) error
@@ -124,6 +125,10 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 	mimeType, err := sniffAttachmentMimeType(tmpPath)
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
+		return
+	}
+	if !h.service.IsAttachmentMimeTypeAllowed(mimeType) {
+		Fail(c, errcode.AttachTypeNotAllowed)
 		return
 	}
 
