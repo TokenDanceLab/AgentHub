@@ -85,6 +85,8 @@ function New-RogueTauriBuildFixture {
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
         "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
         "docs\backend-integration-governance.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
@@ -126,6 +128,8 @@ function New-RogueMacOSCommandFixture {
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
         "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
         "docs\backend-integration-governance.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
@@ -137,6 +141,8 @@ function New-RogueMacOSCommandFixture {
     Set-Content $workflowPath $injected -Encoding UTF8
 
     & git -C $tempRoot init -q
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" add .
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" commit -q -m "fixture"
     return $tempRoot
 }
 
@@ -156,6 +162,8 @@ function New-RogueMacOSReleaseActionFixture {
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
         "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
         "docs\backend-integration-governance.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
@@ -173,6 +181,8 @@ function New-RogueMacOSReleaseActionFixture {
     Set-Content $workflowPath $injected -Encoding UTF8
 
     & git -C $tempRoot init -q
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" add .
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" commit -q -m "fixture"
     return $tempRoot
 }
 
@@ -188,6 +198,8 @@ function New-FixedStableReleaseFixture {
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
         "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
         "docs\backend-integration-governance.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
@@ -220,6 +232,8 @@ function New-TaggedReleaseFixture {
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
         "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
         "docs\backend-integration-governance.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
@@ -270,6 +284,7 @@ function New-DirtyGeneratedSchemaFixture {
         "app\desktop\src-tauri\Cargo.lock",
         "app\desktop\src-tauri\tauri.conf.json",
         "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
         "docs\backend-integration-governance.md"
     )) {
         Copy-FixtureFile $relativePath $tempRoot
@@ -280,6 +295,33 @@ function New-DirtyGeneratedSchemaFixture {
     & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" commit -q -m "fixture"
 
     Add-Content (Join-Path $tempRoot "app\desktop\src-tauri\gen\schemas\desktop-schema.json") "`n// dirty generated schema fixture"
+    return $tempRoot
+}
+
+function New-DeletedGeneratedSchemaFixture {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    & git -C $tempRoot init -q
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" add .
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" commit -q -m "fixture"
+
+    Remove-Item (Join-Path $tempRoot "app\desktop\src-tauri\gen\schemas") -Recurse -Force
     return $tempRoot
 }
 
@@ -371,6 +413,7 @@ Assert-True ($scriptText -match "ZipFile" -and $scriptText -match "AgentHub\.exe
 Assert-True ($scriptText -match "check-ignore" -and $scriptText -match "Assert-GitIgnored") "checker verifies generated package artifacts stay ignored before dry builds"
 Assert-True ($scriptText -match "Generated Tauri schema policy" -and $scriptText -match "src-tauri/gen/schemas" -and $scriptText -match "git status") "checker verifies generated Tauri schemas are clean"
 Assert-True ($scriptText -match "update-index" -and $scriptText -match "--refresh") "checker refreshes the Git index before generated schema dirtiness checks"
+Assert-True ($scriptText -match "required generated schema directory" -and $scriptText -match "required generated schema file") "checker fails missing generated schema directory or files"
 foreach ($artifactPattern in @(
     'dist/AgentHub_${desktopVersion}_x64-setup.exe',
     'dist/AgentHub_${desktopVersion}_x64-portable.zip',
@@ -482,10 +525,20 @@ foreach ($hostShell in $scriptHosts) {
     try {
         $dirtySchema = Invoke-Script $hostShell @("-RepoRoot", $dirtySchemaRoot) $dirtySchemaRoot
         Assert-True ($dirtySchema.ExitCode -ne 0) "readiness checker rejects dirty generated Tauri schema files under $($dirtySchema.Host)" $dirtySchema.Output
-        Assert-True ($dirtySchema.Output -match "generated schema|src-tauri/gen/schemas|desktop-schema\.json") "dirty generated schema failure names the schema boundary under $($dirtySchema.Host)" $dirtySchema.Output
+        Assert-True ($dirtySchema.Output -match "uncommitted generated changes" -and $dirtySchema.Output -match "desktop-schema\.json") "dirty generated schema failure comes from Git dirtiness under $($dirtySchema.Host)" $dirtySchema.Output
     }
     finally {
         Remove-Item -Recurse -Force $dirtySchemaRoot -ErrorAction SilentlyContinue
+    }
+
+    $deletedSchemaRoot = New-DeletedGeneratedSchemaFixture
+    try {
+        $deletedSchema = Invoke-Script $hostShell @("-RepoRoot", $deletedSchemaRoot) $deletedSchemaRoot
+        Assert-True ($deletedSchema.ExitCode -ne 0) "readiness checker rejects deleted tracked generated Tauri schemas under $($deletedSchema.Host)" $deletedSchema.Output
+        Assert-True ($deletedSchema.Output -match "uncommitted generated changes" -and $deletedSchema.Output -match "desktop-schema\.json|windows-schema\.json|src-tauri/gen/schemas") "deleted generated schema failure names tracked schema deletion under $($deletedSchema.Host)" $deletedSchema.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $deletedSchemaRoot -ErrorAction SilentlyContinue
     }
 
     $rcMatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.6" "0.3.0-rc.6"
