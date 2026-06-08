@@ -112,3 +112,68 @@ func TestMessageHandler_RemoveMessageReaction_NotMember(t *testing.T) {
 		t.Fatalf("expected 403, got %d", w.Code)
 	}
 }
+
+func TestMessageHandler_ListMessageReactions_Success(t *testing.T) {
+	svc := &mockMessageService{
+		listReactionsFn: func(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+			if userID != "u1" || sessionID != "s1" || msgID != "m1" {
+				t.Fatalf("unexpected list reaction args: userID=%s sessionID=%s msgID=%s", userID, sessionID, msgID)
+			}
+			return []service.MessageReactionResponse{
+				{MessageID: msgID, SessionID: sessionID, Reaction: "heart", Count: 2, ReactedByMe: true},
+				{MessageID: msgID, SessionID: sessionID, Reaction: "thumbs_up", Count: 1, ReactedByMe: false},
+			}, nil
+		},
+	}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("GET", "/client/messages/m1/reactions?session_id=s1", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "m1"}}
+	c.Request.URL.RawQuery = "session_id=s1"
+	h.ListMessageReactions(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Code string                            `json:"code"`
+		Data []service.MessageReactionResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(body.Data) != 2 || body.Data[0].Reaction != "heart" || !body.Data[0].ReactedByMe || body.Data[1].ReactedByMe {
+		t.Fatalf("unexpected response: %+v", body.Data)
+	}
+}
+
+func TestMessageHandler_ListMessageReactions_RequiresSessionID(t *testing.T) {
+	svc := &mockMessageService{}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("GET", "/client/messages/m1/reactions", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "m1"}}
+	h.ListMessageReactions(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestMessageHandler_ListMessageReactions_NotMember(t *testing.T) {
+	svc := &mockMessageService{
+		listReactionsFn: func(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+			return nil, errcode.SessionNotMember
+		},
+	}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("GET", "/client/messages/m1/reactions?session_id=s1", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "m1"}}
+	c.Request.URL.RawQuery = "session_id=s1"
+	h.ListMessageReactions(c)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
