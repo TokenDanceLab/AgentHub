@@ -279,6 +279,52 @@ function Assert-NoMacOSUnsignedDryCommands {
     Pass "macOS unsigned dry policy job '$JobName' has no codesign, notarytool, or stapler commands"
 }
 
+function Get-ForbiddenMacOSUnsignedDryReleaseActions {
+    param(
+        [string]$JobBlock
+    )
+
+    $patterns = @(
+        "(?i)\bsoftprops/action-gh-release\b",
+        "(?i)\bactions/upload-release-asset\b",
+        "(?i)(^|[\s;&|(``])gh\s+release\s+(?:create|upload)(?:\s|$)",
+        "(?i)(^|[\s;&|(``])(?:aws\s+s3\s+cp|az\s+storage\s+blob\s+upload|gsutil\s+cp|rclone\s+copy|wrangler\s+r2\s+object\s+put)(?:\s|$)",
+        "(?i)\blatest\.json\b.*\b(?:upload|publish|release|s3|blob|r2|gsutil|rclone)\b",
+        "(?i)\bupdater\b.*\bmetadata\b.*\b(?:upload|publish|release)\b"
+    )
+
+    $offending = @()
+    foreach ($line in ($JobBlock -split "\r?\n")) {
+        $candidate = $line.Trim()
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        foreach ($pattern in $patterns) {
+            if ($candidate -match $pattern) {
+                $offending += $candidate
+                break
+            }
+        }
+    }
+
+    return $offending
+}
+
+function Assert-NoMacOSUnsignedDryReleaseActions {
+    param(
+        [string]$JobBlock,
+        [string]$JobName
+    )
+
+    $offending = @(Get-ForbiddenMacOSUnsignedDryReleaseActions $JobBlock)
+    if ($offending.Count -gt 0) {
+        Fail "macOS unsigned dry policy job '$JobName' contains forbidden release/updater publication action: $($offending[0])"
+    }
+
+    Pass "macOS unsigned dry policy job '$JobName' has no GitHub Release upload or updater metadata publication actions"
+}
+
 Step "Desktop version metadata"
 $package = Read-Json "app\desktop\package.json"
 $tauri = Read-Json "app\desktop\src-tauri\tauri.conf.json"
@@ -349,11 +395,16 @@ $macosUnsignedDryBlock = Get-WorkflowJobBlock $readinessWorkflowText "macos-unsi
 Assert-True (Test-WorkflowJobHasManualOptIn $macosUnsignedDryBlock "run_macos_unsigned_dry_policy") "macOS unsigned dry policy job is gated by explicit workflow_dispatch input"
 Assert-True ($macosUnsignedDryBlock -match "macOS unsigned dry") "release readiness workflow names macOS step as unsigned dry policy"
 Assert-True ($macosUnsignedDryBlock -match "agenthub-edge-aarch64-apple-darwin") "release readiness workflow documents the future macOS arm64 sidecar boundary"
-Assert-True ($macosUnsignedDryBlock -match "AgentHub\.app" -and $macosUnsignedDryBlock -match "AgentHub\.dmg") "release readiness workflow documents future macOS app and DMG bundle boundaries"
+Assert-True ($macosUnsignedDryBlock -match "AgentHub\.app" -and $macosUnsignedDryBlock -match "AgentHub_\$\{version\}_aarch64\.dmg") "release readiness workflow documents future macOS app and versioned arm64 DMG bundle boundaries"
 Assert-True ($macosUnsignedDryBlock -match "workflow artifacts only") "release readiness workflow scopes future macOS unsigned outputs to workflow artifacts only"
-Assert-True ($macosUnsignedDryBlock -match "later approval slice") "release readiness workflow keeps signing and notarization as later approval slice"
+Assert-True ($macosUnsignedDryBlock -match "macos-unsigned-dry-policy\.json") "release readiness workflow writes a macOS unsigned dry policy manifest"
+Assert-True ($macosUnsignedDryBlock -match "actions/upload-artifact@v4" -and $macosUnsignedDryBlock -match "name:\s*macos-unsigned-package-dry" -and $macosUnsignedDryBlock -match "path:\s*dist/macos-unsigned-dry-policy\.json") "release readiness workflow uploads only the macOS policy manifest as a workflow artifact"
+Assert-True ($macosUnsignedDryBlock -match "Apple Developer ID signing" -and $macosUnsignedDryBlock -match "notarytool notarization" -and $macosUnsignedDryBlock -match "stapler staple") "release readiness workflow records Apple signing, notarization, and stapling as explicit approval gates"
+Assert-True ($macosUnsignedDryBlock -match "GitHub Release upload" -and $macosUnsignedDryBlock -match "production updater metadata publication") "release readiness workflow records release upload and updater production metadata as explicit approval gates"
+Assert-True ($macosUnsignedDryBlock -match "later approval slice") "release readiness workflow keeps signing, notarization, release upload, and updater metadata as later approval slice"
 Assert-True ($macosUnsignedDryBlock -notmatch "pnpm\s+tauri\s+build|softprops/action-gh-release|gh release upload|TAURI_SIGNING_PRIVATE_KEY") "macOS unsigned dry policy job does not run build, release upload, or production signing secret commands"
 Assert-NoMacOSUnsignedDryCommands $macosUnsignedDryBlock "macos-unsigned-dry-policy"
+Assert-NoMacOSUnsignedDryReleaseActions $macosUnsignedDryBlock "macos-unsigned-dry-policy"
 
 Step "Release dry topology documentation"
 Assert-True ($governanceText -match "D2b\. Release dry build topology") "governance doc records release dry build topology"
@@ -365,7 +416,7 @@ Assert-True ($governanceText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe")
 Assert-True ($governanceText -match "latest\.json.*\.sig|\.sig.*latest\.json") "governance doc records updater metadata artifacts"
 Assert-True ($governanceText -match "agenthub-edge-aarch64-apple-darwin") "governance doc records macOS arm64 sidecar name"
 Assert-True ($governanceText -match "macOS.*unsigned|arm64 unsigned") "governance doc keeps macOS validation unsigned"
-Assert-True ($governanceText -match "AgentHub\.app" -and $governanceText -match "AgentHub\.dmg") "governance doc records future macOS app and DMG bundle boundaries"
+Assert-True ($governanceText -match "AgentHub\.app" -and $governanceText -match "AgentHub_\$\{version\}_aarch64\.dmg") "governance doc records future macOS app and versioned arm64 DMG bundle boundaries"
 Assert-True ($governanceText -match "notarytool|notarization") "governance doc names notarization as out of scope"
 Assert-True ($governanceText -match "approval slice|审批") "governance doc keeps signing and notarization behind later approval"
 Assert-True ($governanceText -match "workflow artifact") "governance doc keeps dry artifacts scoped to workflow artifact upload"
