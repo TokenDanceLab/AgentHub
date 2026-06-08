@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildInspectorEvidenceModel, evidenceStatusLabel } from './inspectorEvidence';
+import {
+  buildInspectorEvidenceModel,
+  buildRuntimeEvidenceInspectorModel,
+  evidenceStatusLabel,
+} from './inspectorEvidence';
 import type { EvidenceRef } from '../transcript';
 
 describe('buildInspectorEvidenceModel', () => {
@@ -28,5 +32,62 @@ describe('buildInspectorEvidenceModel', () => {
     expect(evidenceStatusLabel('completed')).toBe('完成');
     expect(evidenceStatusLabel('failed')).toBe('失败');
     expect(evidenceStatusLabel(undefined)).toBe('记录');
+  });
+
+  it('summarizes runtime evidence state for the right inspector', () => {
+    const model = buildRuntimeEvidenceInspectorModel({
+      runId: 'run-edge-1',
+      diffs: [{
+        filePath: 'src/runtime.ts',
+        status: 'modified',
+        additions: 2,
+        deletions: 1,
+        hunks: [],
+      }],
+      artifacts: [{
+        id: 'artifact-1',
+        runId: 'run-edge-1',
+        threadId: 'thread-1',
+        kind: 'patch',
+        path: 'reports/runtime.patch',
+        sizeBytes: 1024,
+        createdAt: '2026-06-08T08:00:00.000Z',
+      }],
+      previews: [],
+      loading: { previews: true },
+      errors: { diff: true },
+      sources: { diff: 'event', artifacts: 'edge', previews: 'none' },
+    });
+
+    expect(model.runLabel).toBe('Run run-edge-1');
+    expect(model.hasEvidence).toBe(true);
+    expect(model.channels.map((channel) => ({
+      channel: channel.channel,
+      count: channel.count,
+      sourceLabel: channel.sourceLabel,
+      loading: channel.loading,
+      error: channel.error,
+    }))).toEqual([
+      { channel: 'diff', count: 1, sourceLabel: 'Event', loading: false, error: true },
+      { channel: 'artifacts', count: 1, sourceLabel: 'Edge', loading: false, error: false },
+      { channel: 'previews', count: 0, sourceLabel: 'None', loading: true, error: false },
+    ]);
+    expect(model.errorItems.map((item) => item.label)).toEqual(['Diff snapshot 读取失败']);
+    expect(model.loadingItems.map((item) => item.label)).toEqual(['正在读取 preview index']);
+  });
+
+  it('keeps an explicit empty runtime evidence detail', () => {
+    const model = buildRuntimeEvidenceInspectorModel({
+      diffs: [],
+      artifacts: [],
+      previews: [],
+      sources: { diff: 'none', artifacts: 'none', previews: 'none' },
+    });
+
+    expect(model.hasEvidence).toBe(false);
+    expect(model.emptyTitle).toBe('暂无运行证据');
+    expect(model.emptyDetail).toContain('Edge 已返回空 diff、artifact 和 preview snapshot。');
+    expect(model.emptyDetail).toContain('Diff snapshot: None');
+    expect(model.stateItems).toEqual([]);
   });
 });
