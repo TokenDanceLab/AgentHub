@@ -119,8 +119,19 @@ if (Test-Path -LiteralPath $scenarioPath) {
     $runtimeTypes = @($scenario.runtime_profiles | ForEach-Object { $_.runtime_type } | Where-Object { $_ } | Sort-Object -Unique).Count
     Assert-True ($runtimeTypes -ge 2) "scenario includes at least two runtime types" "runtime_types=$runtimeTypes"
 
-    foreach ($field in @("state", "tasks", "assignments", "events", "runtime_profiles", "screenshot_or_video_rehearsal")) {
+    foreach ($field in @("state", "tasks", "assignments", "events", "runtime_profiles", "screenshot_or_video_rehearsal", "remote_control_manifest", "evidence_matrix")) {
         Assert-True (@($scenario.required_evidence_fields) -contains $field) "scenario requires evidence field $field"
+    }
+    Assert-True ($null -ne $scenario.remote_control_manifest) "scenario declares remote-control manifest"
+    if ($null -ne $scenario.remote_control_manifest) {
+        foreach ($field in @("targetId", "edgeDeviceId", "edgeRunId", "adapterId")) {
+            Assert-True (-not [string]::IsNullOrWhiteSpace([string]$scenario.remote_control_manifest.$field)) "scenario remote-control manifest contains $field"
+        }
+        Assert-True ($scenario.remote_control_manifest.mode -eq "FixtureRehearsal") "scenario remote-control manifest labels FixtureRehearsal"
+    }
+    $matrixIds = @($scenario.evidence_matrix | ForEach-Object { $_.requirement_id })
+    foreach ($id in @("im_or_teamrun_start", "target_id", "exact_desktop_edge_device", "edge_run_id", "adapter_id", "route_task_event_replay", "transcript_render_evidence", "artifact_diff_preview", "mode_labels")) {
+        Assert-True ($matrixIds -contains $id) "scenario evidence matrix includes $id"
     }
 }
 
@@ -153,6 +164,9 @@ if ((Test-Path -LiteralPath $scenarioPath) -and (Test-Path -LiteralPath $exporte
         Assert-True (@($evidence.events | ForEach-Object { $_.type }) -contains "team.route.decided") "exported evidence includes route decision event"
         Assert-True (@($evidence.tasks | ForEach-Object { $_.role }) -contains "worker") "exported evidence includes worker task"
         Assert-True ($null -ne $evidence.screenshot_or_video_rehearsal) "exported evidence includes screenshot/video rehearsal metadata"
+        Assert-True ($null -ne $evidence.remote_control_manifest) "exported evidence includes remote-control manifest"
+        Assert-True ($null -ne $evidence.evidence_matrix) "exported evidence includes requirement/evidence matrix"
+        Assert-True ($evidence.artifact_diff_preview.status -eq "not_available") "exported evidence explicitly labels artifact/diff/preview availability"
     }
 
     $submissionReadiness = Invoke-RepoScript @(

@@ -46,6 +46,12 @@ function Get-RuntimeProfiles($Scenario) {
     return @($Scenario.agent_profiles)
 }
 
+function Test-RequiredString($Object, [string]$Field, [string]$Label) {
+    if ($null -eq $Object -or [string]::IsNullOrWhiteSpace([string]$Object.$Field)) {
+        throw "$Label must include $Field"
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($Stamp)) {
     $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 }
@@ -83,6 +89,22 @@ if ($runtimeTypes.Count -lt 2) {
     throw "scenario must include at least two runtime types"
 }
 
+$remoteManifest = $scenario.remote_control_manifest
+if ($null -ne $remoteManifest) {
+    foreach ($field in @("hubTaskId", "targetId", "edgeDeviceId", "edgeRunId", "adapterId", "mode", "startedAt")) {
+        Test-RequiredString $remoteManifest $field "remote_control_manifest"
+    }
+    if ($remoteManifest.mode -ne "FixtureRehearsal") {
+        throw "fixture remote_control_manifest mode must be FixtureRehearsal"
+    }
+    if (@($remoteManifest.eventRefs).Count -lt 4) {
+        throw "remote_control_manifest must include at least four eventRefs"
+    }
+}
+if ($null -eq $scenario.evidence_matrix -or @($scenario.evidence_matrix).Count -lt 1) {
+    throw "scenario must include evidence_matrix"
+}
+
 $outputRootPath = Resolve-RepoPath $OutputRoot
 $outputDir = Join-Path $outputRootPath "teamrun-demo-$Stamp"
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
@@ -113,12 +135,15 @@ $evidence = [ordered]@{
         title = $scenario.title
         boundaries = $scenario.boundaries
     }
+    remote_control_manifest = $remoteManifest
     state = $scenario.state
     tasks = @($scenario.tasks)
     assignments = @($scenario.assignments)
     events = @($scenario.events)
     runtime_profiles = @($runtimeProfiles)
     screenshot_or_video_rehearsal = $scenario.screenshot_or_video_rehearsal
+    artifact_diff_preview = $scenario.artifact_diff_preview
+    evidence_matrix = @($scenario.evidence_matrix)
     api_exports_required_for_real_demo = @($scenario.api_exports_required_for_real_demo)
     counts = [ordered]@{
         runtime_profiles = Count-Items $runtimeProfiles
