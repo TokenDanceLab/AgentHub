@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -103,8 +102,8 @@ func mintDesktopToken(t *testing.T, userID, deviceID string) string {
 		userID,
 		"desktop",
 		deviceID,
-		os.Getenv("AGENTHUB_JWT_SECRET"),
-		15*time.Minute,
+		testJWT.Secret,
+		testJWT.AccessTTL,
 	)
 	if err != nil {
 		t.Fatalf("mint desktop token: %v", err)
