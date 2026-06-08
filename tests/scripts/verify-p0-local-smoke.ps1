@@ -105,9 +105,15 @@ if (Test-Path -LiteralPath $gatePath) {
         "LocalhostSmoke",
         "RealApprovalRequired",
         "RealTested=false",
-        "TCP-only reachability",
-        "TODO: replace TCP-only probes with health/fixture marker checks",
-        "Test-TcpPort",
+        "ExpectedHealthMarkers",
+        "Invoke-HealthProbe",
+        "health identity marker",
+        "agenthub-web-localhost-fixture",
+        "agenthub-hub-localhost-fixture",
+        "registered-desktop-target-router",
+        "agenthub-desktop-bridge-localhost-fixture",
+        "agenthub-local-edge-localhost-fixture",
+        "fixture-local-edge-runner",
         "verify-p0-remote-control-fixture.ps1",
         "verify-oidc-flow.ps1",
         "go test ./tests/oidc -run TestOIDCSmoke -short -count=1",
@@ -127,6 +133,9 @@ if (Test-Path -LiteralPath $gatePath) {
         "&\s*(codex|claude|opencode|openai)\b",
         "\b(go\s+run|docker|kubectl|systemctl|ssh|scp|rsync)\b",
         "\b(Invoke-WebRequest|Invoke-RestMethod|Start-Process)\b",
+        "TCP-only reachability",
+        "TODO: replace TCP-only probes with health/fixture marker checks",
+        "Test-TcpPort",
         "id\.vectorcontrol\.tech",
         "api\.vectorcontrol\.tech",
         "docker compose",
@@ -216,15 +225,15 @@ if (Test-Path -LiteralPath $gatePath) {
     )
     Assert-True ($localhostRun.ExitCode -eq 2) "RunLocalhost mode exits incomplete when localhost services are unreachable" $localhostRun.Output
     Assert-True ($localhostRun.Output -match "Mode: RunLocalhost") "RunLocalhost output labels mode" $localhostRun.Output
-    Assert-True ($localhostRun.Output -match "127\.0\.0\.1:1 is not reachable") "RunLocalhost output names unreachable localhost services" $localhostRun.Output
+    Assert-True ($localhostRun.Output -match "GET http://127\.0\.0\.1:1/health failed") "RunLocalhost output names unavailable health probes" $localhostRun.Output
     Assert-True ($localhostRun.Output -match "RealTested=false") "RunLocalhost blocked output still avoids RealTested claim" $localhostRun.Output
 
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Parse("127.0.0.1"), 0)
     $listener.Start()
     $reachablePort = $listener.LocalEndpoint.Port
     try {
-        $tcpOnlyEvidencePath = Join-Path $tmpRoot "tcp-only-evidence.json"
-        $tcpOnlyRun = Invoke-RepoScript @(
+        $missingMarkerEvidencePath = Join-Path $tmpRoot "missing-marker-evidence.json"
+        $missingMarkerRun = Invoke-RepoScript @(
             $gatePath,
             "-RepoRoot", $RepoRoot,
             "-RunLocalhost",
@@ -232,19 +241,19 @@ if (Test-Path -LiteralPath $gatePath) {
             "-WebPort", "$reachablePort",
             "-DesktopPort", "$reachablePort",
             "-EdgePort", "$reachablePort",
-            "-EvidencePath", $tcpOnlyEvidencePath,
+            "-EvidencePath", $missingMarkerEvidencePath,
             "-TimeoutMs", "250"
         )
-        Assert-True ($tcpOnlyRun.ExitCode -eq 2) "RunLocalhost stays incomplete even when TCP probes are reachable because chain proof remains blocked" $tcpOnlyRun.Output
-        Assert-True ($tcpOnlyRun.Output -match "TCP-only reachability") "RunLocalhost reachable probe is labeled TCP-only" $tcpOnlyRun.Output
-        Assert-True ($tcpOnlyRun.Output -match "does not prove service identity") "RunLocalhost reachable probe does not claim service identity" $tcpOnlyRun.Output
-        Assert-True ($tcpOnlyRun.Output -match "TODO: replace TCP-only probes with health/fixture marker checks") "RunLocalhost output leaves health/fixture marker TODO" $tcpOnlyRun.Output
-        Assert-True (Test-Path -LiteralPath $tcpOnlyEvidencePath) "RunLocalhost TCP-only run writes evidence matrix"
-        if (Test-Path -LiteralPath $tcpOnlyEvidencePath) {
-            $tcpOnlyMatrix = Get-Content -Raw -LiteralPath $tcpOnlyEvidencePath | ConvertFrom-Json
-            $tcpPassRows = @($tcpOnlyMatrix.rows | Where-Object { $_.claim -eq "LocalhostSmoke" -and $_.status -eq "PASS" -and $_.evidence -match "TCP-only reachability" })
-            Assert-True ($tcpPassRows.Count -ge 4) "reachable localhost evidence rows are TCP-only LocalhostSmoke PASS rows" ($tcpOnlyMatrix.rows | ConvertTo-Json -Depth 8)
-            Assert-True (@($tcpOnlyMatrix.rows | Where-Object { $_.real_tested -ne $false }).Count -eq 0) "TCP-only evidence rows keep real_tested false"
+        Assert-True ($missingMarkerRun.ExitCode -eq 2) "RunLocalhost stays incomplete when a reachable port lacks health identity markers" $missingMarkerRun.Output
+        Assert-True ($missingMarkerRun.Output -notmatch "TCP-only reachability") "RunLocalhost reachable port is not labeled TCP-only" $missingMarkerRun.Output
+        Assert-True ($missingMarkerRun.Output -match "/health") "RunLocalhost reachable port probes health endpoint" $missingMarkerRun.Output
+        Assert-True ($missingMarkerRun.Output -match "BLOCKED  localhost Hub service probe") "RunLocalhost reachable port remains blocked without health marker" $missingMarkerRun.Output
+        Assert-True (Test-Path -LiteralPath $missingMarkerEvidencePath) "RunLocalhost missing-marker run writes evidence matrix"
+        if (Test-Path -LiteralPath $missingMarkerEvidencePath) {
+            $missingMarkerMatrix = Get-Content -Raw -LiteralPath $missingMarkerEvidencePath | ConvertFrom-Json
+            $tcpPassRows = @($missingMarkerMatrix.rows | Where-Object { $_.claim -eq "LocalhostSmoke" -and $_.status -eq "PASS" -and $_.evidence -match "TCP-only reachability" })
+            Assert-True ($tcpPassRows.Count -eq 0) "reachable localhost evidence rows never pass on TCP-only reachability" ($missingMarkerMatrix.rows | ConvertTo-Json -Depth 8)
+            Assert-True (@($missingMarkerMatrix.rows | Where-Object { $_.real_tested -ne $false }).Count -eq 0) "missing-marker evidence rows keep real_tested false"
         }
     } finally {
         $listener.Stop()

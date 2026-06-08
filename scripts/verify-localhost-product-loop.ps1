@@ -18,7 +18,9 @@ Boundary:
 param(
     [string]$RepoRoot = ".",
     [string]$EvidencePath = "",
-    [string]$NodePath = "node"
+    [string]$NodePath = "node",
+    [ValidateSet("", "WrongDesktopUrl", "MissingDesktopUrl", "NonLocalhostDesktopUrl", "ForgedCallback", "MissingIdentityMarker", "RealTestedOverclaim")]
+    [string]$FaultMode = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -119,6 +121,7 @@ const fs = require("node:fs");
 
 const evidencePath = process.argv[2];
 const repoRoot = process.argv[3];
+const faultMode = process.argv[4] || "";
 const startedAt = new Date().toISOString();
 
 const ids = {
@@ -134,6 +137,7 @@ const urls = {};
 const servers = [];
 const events = [];
 const tasks = [];
+const negativeChecks = [];
 const targets = new Map();
 
 function log(text) {
@@ -200,6 +204,78 @@ async function requestJson(method, url, body) {
   return parsed;
 }
 
+async function expectRejectedJson(method, url, body, label) {
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  const response = await fetch(url, {
+    method,
+    headers: payload ? { "Content-Type": "application/json" } : undefined,
+    body: payload,
+  });
+  const text = await response.text();
+  let parsed = {};
+  if (text.trim()) {
+    parsed = JSON.parse(text);
+  }
+  if (response.ok) {
+    throw new Error(`${label} was accepted unexpectedly: ${text}`);
+  }
+  negativeChecks.push({
+    label,
+    status: response.status,
+    error: parsed.error || text,
+  });
+  return parsed;
+}
+
+function isLocalhostHttpUrl(value) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return false;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function serviceHealth(service, applyFault = true) {
+  const health = {
+    web: {
+      service: "web",
+      status: "ok",
+      identity: "agenthub-web-localhost-fixture",
+      upstream: "hub-only",
+    },
+    hub: {
+      service: "hub",
+      status: "ok",
+      identity: "agenthub-hub-localhost-fixture",
+      upstream: "registered-desktop-target-router",
+    },
+    desktop: {
+      service: "desktop",
+      status: "ok",
+      identity: "agenthub-desktop-bridge-localhost-fixture",
+      bridge: "tauri-sidecar-fixture",
+    },
+    "local-edge": {
+      service: "local-edge",
+      status: "ok",
+      identity: "agenthub-local-edge-localhost-fixture",
+      adapter: "fixture-sdk",
+      runner: "fixture-local-edge-runner",
+    },
+  }[service];
+  if (!health) {
+    throw new Error(`unknown service health fixture ${service}`);
+  }
+  if (applyFault && faultMode === "MissingIdentityMarker" && service === "web") {
+    delete health.identity;
+  }
+  return health;
+}
+
 function createService(service, handler) {
   const server = http.createServer((req, res) => {
     Promise.resolve(handler(req, res)).catch((error) => {
@@ -220,7 +296,7 @@ async function startHub() {
   await createService("hub", async (req, res) => {
     const route = new URL(req.url, urls.hub);
     if (req.method === "GET" && route.pathname === "/health") {
-      writeJson(res, 200, { service: "hub", status: "ok" });
+      writeJson(res, 200, serviceHealth("hub"));
       return;
     }
 
@@ -230,10 +306,15 @@ async function startHub() {
         writeJson(res, 400, { error: "unexpected target registration" });
         return;
       }
+      if (!isLocalhostHttpUrl(body.desktopUrl)) {
+        writeJson(res, 400, { error: "desktopUrl must be a localhost http URL" });
+        return;
+      }
       targets.set(body.targetId, body);
       record("target.registered", "orchestrator", {
         target_id: body.targetId,
         edge_device_id: body.edgeDeviceId,
+        desktop_url: body.desktopUrl,
         registration_mode: "localhost-fixture-seed",
       });
       writeJson(res, 200, { status: "registered", targetId: body.targetId });
@@ -242,7 +323,8 @@ async function startHub() {
 
     if (req.method === "POST" && route.pathname === "/api/teamruns") {
       const body = await readJson(req);
-      if (!targets.has(body.targetId)) {
+      const target = targets.get(body.targetId);
+      if (!target) {
         writeJson(res, 404, { error: "target is not registered" });
         return;
       }
@@ -254,14 +336,18 @@ async function startHub() {
         edge_device_id: ids.edgeDeviceId,
         edge_run_id: "",
         adapter_id: "",
+        expected_callback_type: "adapter.run.completed",
+        expected_edge_run_id: ids.edgeRunId,
+        expected_adapter_id: ids.adapterId,
       };
       tasks.push(task);
       record("hub.agent.dispatch", "hub", {
         target_id: ids.targetId,
         edge_device_id: ids.edgeDeviceId,
         hub_task_id: ids.hubTaskId,
+        desktop_url: target.desktopUrl,
       });
-      await requestJson("POST", `${urls.desktop}/dispatch`, {
+      await requestJson("POST", `${target.desktopUrl}/dispatch`, {
         teamRunId: ids.teamRunId,
         hubTaskId: ids.hubTaskId,
         targetId: ids.targetId,
@@ -275,11 +361,29 @@ async function startHub() {
     if (req.method === "POST" && route.pathname === "/api/events") {
       const body = await readJson(req);
       const task = tasks.find((item) => item.id === body.hubTaskId);
-      if (task) {
-        task.status = "completed";
-        task.edge_run_id = body.edgeRunId;
-        task.adapter_id = body.adapterId;
+      if (!task) {
+        writeJson(res, 400, { error: "callback hubTaskId has no in-flight run" });
+        return;
       }
+      if (task.status !== "dispatching") {
+        writeJson(res, 409, { error: "callback order is invalid for task status" });
+        return;
+      }
+      if (body.type !== task.expected_callback_type) {
+        writeJson(res, 400, { error: "callback type does not match expected in-flight run" });
+        return;
+      }
+      if (body.edgeRunId !== task.expected_edge_run_id) {
+        writeJson(res, 400, { error: "callback edgeRunId does not match expected in-flight run" });
+        return;
+      }
+      if (body.adapterId !== task.expected_adapter_id) {
+        writeJson(res, 400, { error: "callback adapterId does not match expected in-flight run" });
+        return;
+      }
+      task.status = "completed";
+      task.edge_run_id = body.edgeRunId;
+      task.adapter_id = body.adapterId;
       record("hub.replay.recorded", "hub", {
         target_id: ids.targetId,
         edge_device_id: ids.edgeDeviceId,
@@ -310,7 +414,7 @@ async function startLocalEdge() {
   await createService("local-edge", async (req, res) => {
     const route = new URL(req.url, urls["local-edge"]);
     if (req.method === "GET" && route.pathname === "/health") {
-      writeJson(res, 200, { service: "local-edge", status: "ok", adapter: "fixture-sdk" });
+      writeJson(res, 200, serviceHealth("local-edge"));
       return;
     }
 
@@ -322,6 +426,41 @@ async function startLocalEdge() {
         edge_run_id: ids.edgeRunId,
         adapter_id: ids.adapterId,
       });
+
+      if (faultMode === "ForgedCallback") {
+        await requestJson("POST", body.hubCallbackUrl, {
+          type: "adapter.run.started",
+          hubTaskId: body.hubTaskId,
+          edgeRunId: "forged-edge-run",
+          adapterId: "forged-adapter",
+        });
+      }
+
+      await expectRejectedJson("POST", body.hubCallbackUrl, {
+        type: "adapter.run.completed",
+        hubTaskId: "forged-hub-task",
+        edgeRunId: ids.edgeRunId,
+        adapterId: ids.adapterId,
+      }, "forged hubTaskId callback");
+      await expectRejectedJson("POST", body.hubCallbackUrl, {
+        type: "adapter.run.started",
+        hubTaskId: body.hubTaskId,
+        edgeRunId: ids.edgeRunId,
+        adapterId: ids.adapterId,
+      }, "forged callback type");
+      await expectRejectedJson("POST", body.hubCallbackUrl, {
+        type: "adapter.run.completed",
+        hubTaskId: body.hubTaskId,
+        edgeRunId: "forged-edge-run",
+        adapterId: ids.adapterId,
+      }, "forged edgeRunId callback");
+      await expectRejectedJson("POST", body.hubCallbackUrl, {
+        type: "adapter.run.completed",
+        hubTaskId: body.hubTaskId,
+        edgeRunId: ids.edgeRunId,
+        adapterId: "forged-adapter",
+      }, "forged adapterId callback");
+
       record("adapter.run.completed", "fixture-sdk", {
         target_id: body.targetId,
         edge_device_id: body.edgeDeviceId,
@@ -351,7 +490,7 @@ async function startDesktop() {
   await createService("desktop", async (req, res) => {
     const route = new URL(req.url, urls.desktop);
     if (req.method === "GET" && route.pathname === "/health") {
-      writeJson(res, 200, { service: "desktop", status: "ok", bridge: "tauri-sidecar-fixture" });
+      writeJson(res, 200, serviceHealth("desktop"));
       return;
     }
 
@@ -381,7 +520,7 @@ async function startWeb() {
   await createService("web", async (req, res) => {
     const route = new URL(req.url, urls.web);
     if (req.method === "GET" && route.pathname === "/health") {
-      writeJson(res, 200, { service: "web", status: "ok", upstream: "hub-only" });
+      writeJson(res, 200, serviceHealth("web"));
       return;
     }
 
@@ -411,6 +550,13 @@ function assert(condition, message) {
 
 function eventIndex(type) {
   return events.findIndex((event) => event.type === type);
+}
+
+function validateServiceIdentity(service, health) {
+  const expected = serviceHealth(service, false);
+  for (const [key, value] of Object.entries(expected)) {
+    assert(health[key] === value, `${service} health identity marker mismatch for ${key}`);
+  }
 }
 
 function validateReplay(replay) {
@@ -456,27 +602,44 @@ async function main() {
 
   for (const service of services) {
     const health = await requestJson("GET", `${service.url}/health`);
+    validateServiceIdentity(service.service, health);
     service.health = health;
   }
 
-  log("PASS: localhost fixture services started");
+  log("PASS: localhost fixture services started with identity markers");
 
-  await requestJson("POST", `${urls.hub}/api/targets/register`, {
+  const registration = {
     targetId: ids.targetId,
     edgeDeviceId: ids.edgeDeviceId,
     desktopUrl: urls.desktop,
     registrationMode: "localhost-fixture-seed",
-  });
+  };
+  if (faultMode === "WrongDesktopUrl") {
+    registration.desktopUrl = urls["local-edge"];
+  } else if (faultMode === "MissingDesktopUrl") {
+    delete registration.desktopUrl;
+  } else if (faultMode === "NonLocalhostDesktopUrl") {
+    registration.desktopUrl = "https://example.com/desktop";
+  }
+
+  await requestJson("POST", `${urls.hub}/api/targets/register`, registration);
   log("PASS: Hub has registered Desktop/Edge target");
 
   await requestJson("POST", `${urls.web}/start`, {});
   const replay = await requestJson("GET", `${urls.hub}/api/replay/${ids.teamRunId}`);
   validateReplay(replay);
+  await expectRejectedJson("POST", `${urls.hub}/api/events`, {
+    type: "adapter.run.completed",
+    hubTaskId: ids.hubTaskId,
+    edgeRunId: ids.edgeRunId,
+    adapterId: ids.adapterId,
+  }, "duplicate callback order");
 
   log("PASS: Web starts TeamRun through Hub-only boundary");
   log("PASS: Hub routes to the registered Desktop/Edge target");
   log("PASS: Desktop bridge dispatches only to Local Edge");
   log("PASS: Local Edge runs fixture/SDK adapter without CLI/model spend");
+  log("PASS: Hub rejects forged and out-of-order callbacks before replay");
   log("PASS: Hub replay records completed localhost fixture chain");
 
   const manifest = {
@@ -520,6 +683,7 @@ async function main() {
       local_edge: { adapter: "fixture-sdk", real_cli_or_model_invoked: false },
     },
     remote_control_manifest: manifest,
+    negative_checks: negativeChecks,
     tasks,
     events,
     blockers: [
@@ -528,6 +692,9 @@ async function main() {
       "public deploy remains blocked",
     ],
   };
+  if (faultMode === "RealTestedOverclaim") {
+    evidence.real_tested = true;
+  }
 
   fs.mkdirSync(require("node:path").dirname(evidencePath), { recursive: true });
   fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), "utf8");
@@ -547,7 +714,7 @@ main()
 $nodeSource | Set-Content -LiteralPath $nodeScript -Encoding UTF8
 
 Step "Localhost product-loop fixture"
-$run = Invoke-CapturedProcess $node.Source @($nodeScript, $EvidencePath, $RepoRoot) $RepoRoot
+$run = Invoke-CapturedProcess $node.Source @($nodeScript, $EvidencePath, $RepoRoot, $FaultMode) $RepoRoot
 Write-Host $run.Output
 
 if ($run.ExitCode -ne 0) {
