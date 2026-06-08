@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Plug } from 'lucide-react';
+import { RuntimeBrandIcon } from '@shared/workbench';
 import type { ProviderHealth } from '@/stores/modelSettingsStore';
 import SelectControl from '../primitives/SelectControl';
 import styles from '../primitives/primitives.module.css';
@@ -34,7 +34,7 @@ export default function ProviderHealthRow({
     <div className={styles.providerRow}>
       <div className={styles.providerMain}>
         <div className={styles.connectionIcon}>
-          <Plug size={17} />
+          <RuntimeBrandIcon kind="provider" name={id || name} size="compact" framed={false} />
         </div>
         <div className={styles.settingCopy}>
           <strong>{name}</strong>

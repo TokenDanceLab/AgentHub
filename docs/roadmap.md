@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 17:14 +08:00
+> 最后更新：2026-06-08 18:29 +08:00
 > 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
@@ -61,6 +61,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | `backend-edge-split`、`backend-tests` | dirty 风险；保留，先审独有改动 |
 | `integrate-codex-adapter-precheck` | 复核是否已被 A0+A 吸收后清理 |
 | mobile worktrees | 低优先级支线，不混主线 |
+| `.worktrees/lobe-icons-runtime-branding` / `codex/lobe-icons-runtime-branding` | Worker F ready-for-review：shared `RuntimeBrandIcon` / `designIcons` registry uses `@lobehub/icons` model/runtime/provider helpers where available and local fallback icons for internal tools/runtimes; touches only shared workbench icon surfaces and small Desktop settings cards. |
 
 清理规则：每个 worktree 清理前必须记录 `git status --short --branch` 和 `git rev-list --left-right --count HEAD...origin/dev/delicious233` 或等价 cherry 证据；dirty worktree 不批量删。
 
@@ -83,3 +84,4 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness。
 5. `codex/runtime-evidence-inspector` 已补 shared RightInspector read-only snapshot 消费和 Desktop 既有 Edge evidence hook 接线，并修复 raw run id 选择、Desktop App v4 测试 harness、artifact metadata 非交互行与 preview 切 tab 行为；不碰 preview start/stop、artifact apply/discard/content、Web 直连 Edge、Hub route 或真实 CLI/model。
 6. TeamRun 下一步从 dry fixture evidence 升级到真实 runtime/UI 证据，但仍不跑未批准的 D3 real CLI/model gate。
+7. Worker F LobeHub icon slice is ready for review on `codex/lobe-icons-runtime-branding` after rebase to current `origin/dev/delicious233`: focused registry/render tests, Desktop typecheck, Web typecheck, and diff check are the expected review gates; full shared `lint` remains blocked by pre-existing shared test/story/module issues unrelated to this icon slice.
