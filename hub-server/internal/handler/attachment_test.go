@@ -30,9 +30,11 @@ import (
 type mockAttachmentService struct {
 	probeCalled      bool
 	saveCalled       bool
+	storeCalled      bool
 	saveMimeType     string
 	saveOriginalName string
 	getAttachment    *model.Attachment
+	allowedMimeTypes map[string]bool
 }
 
 func (m *mockAttachmentService) ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error) {
@@ -59,6 +61,7 @@ func (m *mockAttachmentService) MaxUploadSize() int64 {
 }
 
 func (m *mockAttachmentService) StoreBlob(ctx context.Context, hash string, r io.Reader, contentType string) (bool, error) {
+	m.storeCalled = true
 	return true, nil
 }
 
@@ -76,6 +79,13 @@ func (m *mockAttachmentService) BlobLocalPath(hash string) string {
 		return ""
 	}
 	return filepath.Join(".", relPath, hash)
+}
+
+func (m *mockAttachmentService) IsAttachmentMimeTypeAllowed(mimeType string) bool {
+	if m.allowedMimeTypes == nil {
+		return true
+	}
+	return m.allowedMimeTypes[mimeType]
 }
 
 func TestAttachmentUploadRejectsMalformedHashBeforePathDerivation(t *testing.T) {
@@ -265,6 +275,68 @@ func TestAttachmentUploadSniffsMimeTypeInsteadOfTrustingMultipartHeader(t *testi
 	}
 	if svc.saveMimeType != "application/pdf" {
 		t.Fatalf("saved MIME type = %q, want application/pdf", svc.saveMimeType)
+	}
+}
+
+func TestAttachmentUploadRejectsDisallowedSniffedMimeBeforeStorage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Chdir(t.TempDir())
+
+	content := []byte("opaque binary payload")
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+
+	svc := &mockAttachmentService{allowedMimeTypes: map[string]bool{
+		"text/plain": false,
+	}}
+	h := handler.NewAttachmentHandler(svc)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("hash", hash); err != nil {
+		t.Fatalf("WriteField hash returned error: %v", err)
+	}
+	if err := writer.WriteField("original_name", "payload.bin"); err != nil {
+		t.Fatalf("WriteField original_name returned error: %v", err)
+	}
+	part, err := writer.CreateFormFile("file", "payload.bin")
+	if err != nil {
+		t.Fatalf("CreateFormFile returned error: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("part.Write returned error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close returned error: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "user-1")
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/attachments", &body)
+	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	h.Upload(c)
+
+	if w.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("expected status 415, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Error.Code != "ATTACH_TYPE_NOT_ALLOWED" {
+		t.Fatalf("expected ATTACH_TYPE_NOT_ALLOWED, got %s", resp.Error.Code)
+	}
+	if svc.storeCalled {
+		t.Fatal("StoreBlob should not be called for a disallowed MIME type")
+	}
+	if svc.saveCalled {
+		t.Fatal("SaveAttachment should not be called for a disallowed MIME type")
 	}
 }
 

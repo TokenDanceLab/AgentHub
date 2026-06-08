@@ -338,6 +338,7 @@ func TestEnvOverrideUploadConfig(t *testing.T) {
 	t.Setenv("AGENTHUB_JWT_SECRET", "upload-override-secret")
 	t.Setenv("AGENTHUB_UPLOAD_DIR", "/custom/uploads")
 	t.Setenv("AGENTHUB_UPLOAD_MAX_SIZE", "20971520")
+	t.Setenv("AGENTHUB_UPLOAD_ALLOWED_MIME_TYPES", "text/plain, application/octet-stream")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -348,6 +349,33 @@ func TestEnvOverrideUploadConfig(t *testing.T) {
 	}
 	if cfg.Upload.MaxSize != 20971520 {
 		t.Errorf("Upload.MaxSize = %d, want 20971520", cfg.Upload.MaxSize)
+	}
+	if len(cfg.Upload.AllowedMimeTypes) != 2 {
+		t.Fatalf("Upload.AllowedMimeTypes len = %d, want 2", len(cfg.Upload.AllowedMimeTypes))
+	}
+	if cfg.Upload.AllowedMimeTypes[0] != "text/plain" {
+		t.Errorf("AllowedMimeTypes[0] = %q, want text/plain", cfg.Upload.AllowedMimeTypes[0])
+	}
+	if cfg.Upload.AllowedMimeTypes[1] != "application/octet-stream" {
+		t.Errorf("AllowedMimeTypes[1] = %q, want application/octet-stream", cfg.Upload.AllowedMimeTypes[1])
+	}
+}
+
+func TestLoadUploadAllowedMimeTypesDefaultExcludesOctetStream(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "upload-mime-default-secret")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(cfg.Upload.AllowedMimeTypes) == 0 {
+		t.Fatal("Upload.AllowedMimeTypes is empty, want default allowlist")
+	}
+	for _, mimeType := range cfg.Upload.AllowedMimeTypes {
+		if mimeType == "application/octet-stream" {
+			t.Fatal("default upload MIME allowlist must not include application/octet-stream")
+		}
 	}
 }
 
