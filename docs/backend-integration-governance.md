@@ -5,7 +5,7 @@
 
 ## 当前基线
 
-当前开发事实源是 `dev/delicious233`。`master` 只接收从 `dev/delicious233` 发起的 PR。后端长期线程已关闭并归档，后端旧整合线合并由 backend merge Agent 负责；主负责人只记录合并状态、规划后续依赖和按需派发新的短生命周期 subagent/worktree。关键后端/API/Edge 窄切片已经多批合入，当前有效迁移进入收尾，只剩 WS delivery reliability、remote Edge CORS 这类小片和 real CLI/release/refactor/helper 等延期项；但 `feat/backend-edge-hub` 仍有未吸收提交，因此不能把后端旧整合线视为全部并入主线。
+当前开发事实源是 `dev/delicious233`。`master` 只接收从 `dev/delicious233` 发起的 PR。后端长期线程已关闭并归档；对 48h 冲刺而言，Hub/Edge 后端能力已经主线化，主负责人负责 Web、Hub、Desktop、Edge、CLI adapter、证据与文档的全局规划，mobile 除外。旧后端整合线不再是当前 Roadmap 的主线阻塞；任何遗留项只能按新的远程控制闭环拆成短生命周期 proposal/worktree。
 
 已确认的产品边界：
 
@@ -66,21 +66,7 @@ next: <1-3 steps>
 
 ### 当前 ready-for-review 同步
 
-```markdown
-AH-SYNC v1
-from: frontend
-kind: ready-for-review
-branch: codex/lobe-icons-runtime-branding
-worktree: .worktrees/lobe-icons-runtime-branding
-scope: shared|desktop|docs
-writes: app/shared/src/workbench/RuntimeBrandIcon.*; app/shared/src/workbench/designIcons.tsx; app/shared/src/workbench/pages/AgentsPage.*; app/desktop/src/components/settings/cards/{RuntimeInventoryCard,RunnerRow,ProviderHealthRow,McpRuntimeCard}.tsx; docs/roadmap.md; docs/backend-integration-governance.md
-state: ready-for-review
-summary: Added a shared RuntimeBrandIcon registry behind the existing design icon registry; model/provider/runtime logos use @lobehub/icons where available; internal tools/runtimes use compact local fallbacks; model-card status styling is scoped so brand icons are not styled as status pills; Web/mobile/backend boundaries are unchanged.
-verified: rebase to latest origin/dev/delicious233; vitest RuntimeBrandIcon + icon-governance; agenthub-desktop typecheck; agenthub-web typecheck; git diff --check
-blockers: Full @agenthub/shared lint remains blocked by pre-existing shared test/story/module issues outside this slice.
-needs-from-main: Review and merge ordering only.
-next: Main owner reviews the isolated icon diff and decides merge order.
-```
+当前没有旧 `codex/lobe-icons-runtime-branding` 合并阻塞；该工作已由 `354a1a26 feat(shared): 收敛 Lobe 图标展示` 吸收进 `origin/dev/delicious233`。48h 同步只围绕 `docs/roadmap.md` 的 Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI adapter 闭环。
 
 ## 硬边界规则
 
@@ -187,7 +173,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
 | Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据；Projects create/update UI gate 已在 `fd7be0f9` 合入；Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | artifact 关系、delete/soft-delete/orphan policy 需另起 proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
-| RightInspector | 默认任务/文件内容仍主要来自 demo/event evidence；Edge 已补 artifact/diff/preview read-only REST 空态/数据合同，runtime evidence 写入已收口，`codex/runtime-evidence-inspector` 已在 shared inspector 增加 read-only snapshot 消费并由 Desktop 复用既有 Edge evidence hook；review blocker 修复覆盖 raw run id、Desktop App v4 harness、artifact metadata 非交互行和 preview 切 tab，已通过 focused gate 复验；`codex/artifact-lifecycle-next` 补单条 artifact/preview metadata lookup；`codex/preview-lifecycle-readiness` 补 stopped metadata transition；`codex/preview-runner-fake` 补 fake start metadata；artifact content/apply/discard、真实 preview process runner 和真实 CLI evidence 仍未完成 | Review/merge runtime evidence inspector、metadata lookup、stopped transition 和 fake start contract；artifact apply/discard/content 另拆 |
+| RightInspector | 默认任务/文件内容仍主要来自 demo/event evidence；Edge 已补 artifact/diff/preview read-only REST 空态/数据合同，runtime evidence 写入已收口，shared inspector 已消费 read-only snapshot，artifact/preview metadata lookup、stopped transition 和 fake start metadata 均已作为 48h 证据回放支撑进入主线；artifact content/apply/discard、真实 preview process runner 和真实 CLI evidence 仍未完成 | artifact content/apply/discard、真实 preview process runner 和真实 CLI evidence 另拆；P0 只要求远程控制链路能回放 run/task/event/evidence |
 
 ## 分支清理规则
 
@@ -237,7 +223,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 ## 当前下一步
 
-1. 后端长期线程已关闭；后端旧整合线由 backend merge Agent 继续处理，主负责人不接管该合并，只把结果作为后续 Edge/Desktop/Web/packaging 规划输入。当前有效迁移进入收尾，只剩 WS delivery reliability、remote Edge CORS 这类小片和 real CLI/release/refactor/helper 等延期项；旧 `feat/backend-edge-hub` 整分支不得写成已合并。
-2. `v0.3.0-rc.1` 已打在 `0c79f277`，作为 shared v4 workbench + Hub/Edge 合并基线；Web Projects read-through 已完成并保持 shared `/v1/projects` 与 Desktop/Edge 语义不变。
-3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend、Edge relational migration、Tauri Windows installer/updater metadata readiness、TeamRun dry fixture evidence、Artifact/Diff/Preview read-only endpoints、runtime evidence metadata 写入、artifact/preview metadata lookup 和 Projects create/update UI gate 已合入；`codex/tauri-package-readiness` follow-up 已补 generated artifact ignore gate，待 review；`codex/tauri-installer-smoke` 补 Windows installer smoke preflight，作为完整 dry package build 前的轻量本地/CI 先决条件检查；Desktop-owned Local Edge preference 与 Tauri host readiness 已收口到 packaged app-data SQLite sidecar/readiness args；`codex/runtime-evidence-inspector` 已补 shared inspector read-only snapshot 消费并完成 review blocker 修复和 focused gate 复验，待 review/merge；`codex/preview-lifecycle-readiness` 只补 preview stopped metadata transition；D1b `backend-focused-subset` 只跑现有 Hub/Edge focused short packages，继续禁止真实 CLI/model、service containers、external endpoint 和根级泛化 E2E；`codex/preview-runner-fake` 只补 fake start metadata contract；SDK PoC 下一步只做 Claude read-only fixture、OpenAI sandbox fixture、mapper golden tests 和 TeamRun fixture E2E。下一批继续推进 packaged login E2E；Projects delete/soft-delete policy、artifact/workspace relationship、真实 preview process runner、artifact content/apply/discard、真实 SDK/model execution、macOS signing/notarization 和 D2/D3 gate policy 继续保持独立 proposal。
-4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge；D3 真实 CLI/model gate 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
+1. 后端长期线程已关闭；48h P0 改为可运行的远程控制闭环：Web -> Hub -> Desktop registered Edge -> Local Edge -> CLI adapter。主负责人接管除 mobile 外的全局规划，旧 `feat/backend-edge-hub` 整分支不再作为 active Roadmap 主线。
+2. `origin/dev/delicious233 @ 4700ad0b` 是当前 48h 基线；最新 release-candidate tag 是 `v0.3.0-rc.4 @ 04527725`。`v0.3.0-rc.1 @ 0c79f277` 只作为 Web Projects read-through 历史检查点，不再作为当前冲刺基线。
+3. 已合入事实保留为远程控制闭环的支撑：登录 fake/local gate、Desktop packaged Local Edge SQLite、Tauri/macOS dry policy、Edge SQL readmodel、TeamRun dry fixture evidence、Artifact/Diff/Preview read-only endpoints、runtime evidence metadata、artifact/preview metadata lookup、Projects create/update UI gate、SDK fixture mapper golden tests。SDK、packaging、artifact content/apply/discard、真实 preview runner、真实 CLI/model execution、signing/notarization/release upload 均降为 P1/P2 或审批项。
+4. 按 Web/Hub 与 Desktop/Edge/CLI adapter 一条链路推进生产对接：Web 只能经 Hub 选择 owner-scoped ExecutionTarget；Hub 只能向 exact Desktop registered Edge 下发或排队；Desktop 只能经 Local Edge 启动 run；Edge 只能经注册 adapter 执行并回传事件。Web 不直连 Local Edge、Desktop 不绕过 Edge、D3 真实 CLI/model gate 继续 blocked。
