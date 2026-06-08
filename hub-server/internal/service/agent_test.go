@@ -222,6 +222,7 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 	var payload dispatchPayload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushedTarget[0]), &payload))
 	require.Equal(t, "target-1", payload.TargetID)
+	require.Equal(t, "dev-1", payload.EdgeDeviceID)
 }
 
 func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
@@ -501,6 +502,7 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 		require.NoError(t, json.Unmarshal(data, &frame))
 		require.Equal(t, ws.TypeAgentDispatch, frame.Type)
 		require.Equal(t, "target-dev-b", frame.Payload.TargetID)
+		require.Equal(t, "dev-b", frame.Payload.EdgeDeviceID)
 	default:
 		t.Fatal("target-bound dispatch was not sent to device B")
 	}
@@ -1357,6 +1359,7 @@ func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 	var payload dispatchPayload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushedTarget[0]), &payload))
 	require.Equal(t, "target-local", payload.TargetID)
+	require.Equal(t, "dev-target", payload.EdgeDeviceID)
 }
 
 func TestTriggerAgentTaskPrebindsOwnedTargetDevice(t *testing.T) {

@@ -351,6 +351,41 @@ describe('useHubIntegration', () => {
     );
   });
 
+  it('hands matching target-bound dispatches to Local Edge', async () => {
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        dispatchTarget: {
+          targetId: 'target-current',
+          deviceId: 'desktop-current',
+        },
+      }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        target_id: 'target-current',
+        edge_device_id: 'desktop-current',
+      }));
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:3210/v1/threads',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:3210/v1/runs',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1', 'run-1');
+    expect(fetchBodyFor('/v1/runs')).toMatchObject({
+      threadId: 'sess-1',
+      agentId: 'claude-code',
+      prompt: 'Do something',
+    });
+  });
+
   it('normalizes legacy Claude agent ids before starting Edge run', async () => {
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
