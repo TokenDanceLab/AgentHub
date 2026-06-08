@@ -811,7 +811,7 @@ mod tests {
     fn edge_host_readiness_command_snapshot_is_sidecar_only() {
         let manager = EdgeManager::new_fallback(
             PathBuf::from("edge-server/agenthub-edge"),
-            PathBuf::from("agenthub-edge-store.json"),
+            PathBuf::from("agenthub-edge.sqlite"),
         );
 
         let readiness = edge_host_readiness_snapshot(&manager);
@@ -823,8 +823,10 @@ mod tests {
         assert_eq!(
             readiness.sidecar_args,
             vec![
-                "--store-file",
-                "<app-data>/agenthub-edge-store.json",
+                "--store-backend",
+                "sqlite",
+                "--store-db",
+                "<app-data>/agenthub-edge.sqlite",
                 "--addr",
                 "127.0.0.1:3210",
                 "--runner-profile",
