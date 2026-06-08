@@ -38,6 +38,8 @@ export interface HubIntegrationOptions {
   hubClient: HubClient;
   /** Edge server base URL (default http://127.0.0.1:3210). */
   edgeBaseUrl?: string;
+  /** Exact Hub target/device this Desktop is allowed to hand off to Local Edge. */
+  dispatchTarget?: HubDispatchTarget | null;
   /** Called when a new agent task is dispatched and the Edge run has been created. */
   onDispatch?: (task: AgentTask) => void;
 }
@@ -178,6 +180,11 @@ interface EdgePermissionDecisionControl {
   reason?: string;
 }
 
+interface HubDispatchTarget {
+  targetId: string;
+  deviceId: string;
+}
+
 const HUB_AGENT_CONTROL_EVENT = 'agent.control';
 
 function isTerminalBridgeTask(task: AgentTask): boolean {
@@ -241,6 +248,21 @@ function permissionDecisionControlKey(control: EdgePermissionDecisionControl): s
     control.decision,
     control.reason ?? '',
   ].join('\u001f');
+}
+
+function validateDispatchTarget(
+  data: Record<string, unknown>,
+  dispatchTarget: HubDispatchTarget | null | undefined,
+): string | null {
+  if (!dispatchTarget) return null;
+
+  const targetId = getFirstString(data.target_id, data.targetId);
+  const edgeDeviceId = getFirstString(data.edge_device_id, data.edgeDeviceId);
+  if (targetId === dispatchTarget.targetId && edgeDeviceId === dispatchTarget.deviceId) {
+    return null;
+  }
+
+  return `Dispatch target mismatch: expected ${dispatchTarget.targetId} for device ${dispatchTarget.deviceId}`;
 }
 
 async function postEdgePermissionDecision(
@@ -326,7 +348,7 @@ function extractRunOutputBatch(payload: Record<string, unknown>): string {
 export function useHubIntegration(
   options: HubIntegrationOptions,
 ): HubIntegrationHandle {
-  const { hubWS, hubClient, edgeBaseUrl = 'http://127.0.0.1:3210', onDispatch } = options;
+  const { hubWS, hubClient, edgeBaseUrl = 'http://127.0.0.1:3210', dispatchTarget = null, onDispatch } = options;
 
   const streamRef = useRef<StreamHandle | null>(null);
   const outputByRunRef = useRef<Map<string, string>>(new Map());
@@ -526,6 +548,22 @@ export function useHubIntegration(
       }
 
       const taskId = data.task_id;
+      const targetError = validateDispatchTarget(data, dispatchTarget);
+      if (targetError) {
+        store.getState().addTask({
+          taskId,
+          agentId: normalizeRuntimeAgentId(getString(data, 'agent_type') || getString(data, 'agent_id')),
+          prompt: getString(data, 'prompt') || getString(data, 'content'),
+          threadId: getString(data, 'thread_id') || getString(data, 'session_id') || 'hub-dispatch',
+          status: 'failed',
+          dispatchPayload: data,
+          error: targetError,
+          createdAt: new Date().toISOString(),
+        });
+        hubClient.failTask(taskId, targetError).catch(() => {});
+        return;
+      }
+
       const agentId = normalizeRuntimeAgentId(getString(data, 'agent_type') || getString(data, 'agent_id'));
       const prompt = getString(data, 'prompt') || getString(data, 'content');
       const threadId =
@@ -623,6 +661,11 @@ export function useHubIntegration(
         }
         return;
       }
+      const targetError = validateDispatchTarget(parseRecord(payload), dispatchTarget);
+      if (targetError) {
+        console.warn('[useHubIntegration] Refusing agent.control for another Desktop target:', targetError);
+        return;
+      }
 
       const key = permissionDecisionControlKey(control);
       if (deliveredAgentControlsRef.current.has(key) || inFlightAgentControlsRef.current.has(key)) {
@@ -646,7 +689,7 @@ export function useHubIntegration(
       unsubCancel();
       unsubControl();
     };
-  }, [hubWS, hubClient, edgeBaseUrl, onDispatch]);
+  }, [hubWS, hubClient, edgeBaseUrl, dispatchTarget, onDispatch]);
 
   // ── Return stable handle ──────────────────────────────
 
