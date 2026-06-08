@@ -45,7 +45,17 @@ P0 fixture topology now proves Web authenticated Hub session can address a regis
 | Real tested mode | Only after explicit approval for real TokenDanceID, real CLI/model, environment, budget, and redaction. | Live remote-control chain proof for the approved runtime only. |
 | Submission evidence | Requires real recording plus state/events/tasks/assignments/runtime proof. | Final competition/demo claim. Fixture-only evidence must fail submission mode. |
 
-ByteDance/TeamRun evidence must always state whether it is fixture rehearsal or real tested evidence. `docs/competition/teamrun-e2e-evidence.md` remains the evidence entrypoint.
+ByteDance/TeamRun evidence must always state whether it is fixture rehearsal or real tested evidence. There is no active `bytedance.md` file in this repo; the current competition evidence inputs are `docs/competition/teamrun-e2e-evidence.md`, `docs/competition/teamrun-demo-scenario.json`, and the ByteDance Demo Value section in `docs/reference/sdk-agent-strategy.md`.
+
+## Competition Evidence Inputs
+
+| Source | Required proof |
+|---|---|
+| `docs/competition/teamrun-e2e-evidence.md` | Final package needs a real run, not only unit tests: screen recording, Desktop transcript, right inspector, TeamRun state, route/task/event lists, Hub API exports, remote-control manifest, runtime proof, and redaction status. |
+| `docs/competition/teamrun-demo-scenario.json` | Fixture-only manifest freezes shape for `FixtureRehearsal`; it explicitly blocks real runtime, final recording, live Hub runtime, and submission claims. |
+| `docs/reference/sdk-agent-strategy.md` | SDK work must keep AgentHub as the product model: Agent Profiles, TeamRun, approvals, evidence, and ExecutionTarget stay Hub/Edge-owned; Claude/OpenAI/OpenCode SDK objects remain below the Edge adapter boundary. |
+
+The final demo narrative must show: AgentHub defines the collaboration model; Edge adapters translate provider SDK/CLI outputs into AgentHub events; TeamRun and evidence prove the collaboration loop.
 
 ## Practical Audit Lanes
 
