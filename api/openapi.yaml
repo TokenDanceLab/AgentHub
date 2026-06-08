@@ -55,6 +55,8 @@ paths:
   #   /v1/model-catalog,
   #   /v1/runners (GET only), /v1/agents, /v1/runs (GET/POST),
   #   /v1/runs/{runId} (GET), /v1/runs/{runId}:cancel,
+  #   /v1/runs/{runId}/diff (GET), /v1/artifacts (GET),
+  #   /v1/previews (GET),
   #   /v1/metrics, /v1/agent-instances (GET only), /v1/agent-instances/{id},
   #   /v1/permissions/decide
   #
@@ -75,10 +77,9 @@ paths:
   #   POST /v1/runs/{runId}:retry,
   #   GET /v1/runs/{runId}/items,
   #   GET /v1/runs/{runId}/logs,
-  #   GET /v1/runs/{runId}/diff,
   #   GET/POST /v1/approvals and nested,
-  #   GET/POST /v1/artifacts and nested,
-  #   GET/POST /v1/previews and nested,
+  #   POST /v1/artifacts and nested content/apply/discard,
+  #   POST /v1/previews and nested get/stop lifecycle,
   #   GET /v1/workspaces/{workspaceId} and nested,
   #   POST /v1/agent-instances
   # ═══════════════════════════════════════════════════════════
@@ -760,14 +761,21 @@ paths:
       tags: [ExecutionRunner]
       operationId: getRunDiff
       summary: Get run diff snapshot.
+      description: "Read-only Edge-local diff snapshot for a persisted run. Empty runs return `{ runId, files: [] }`."
       x-agenthub-phase: P0
-      x-agenthub-status: planned
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Run diff snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDiffResponse"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/approvals:
     get:
@@ -814,12 +822,24 @@ paths:
       tags: [ExecutionRunner]
       operationId: listArtifacts
       summary: List artifacts.
+      description: Read-only Edge-local artifact index. Artifact content, apply and discard remain planned.
       x-agenthub-phase: P0
-      x-agenthub-status: planned
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      parameters:
+        - name: runId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional Edge run id filter.
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Artifact list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactListResponse"
 
   /v1/artifacts/{artifactId}:
     get:
@@ -884,12 +904,24 @@ paths:
       tags: [ExecutionRunner]
       operationId: listPreviews
       summary: List previews.
+      description: Read-only Edge-local preview index. Starting and stopping previews remain planned.
       x-agenthub-phase: P0
-      x-agenthub-status: planned
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      parameters:
+        - name: runId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional Edge run id filter.
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Preview list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreviewListResponse"
     post:
       tags: [ExecutionRunner]
       operationId: createPreview
@@ -4613,6 +4645,124 @@ components:
           type: string
         hasMore:
           type: boolean
+    RunDiffFile:
+      type: object
+      required: [path, diff, status]
+      properties:
+        path:
+          type: string
+          description: Workspace-relative path or an already-sanitized outside-workspace marker.
+        diff:
+          type: string
+          description: Unified diff text for this file. Empty when no diff body is available yet.
+        status:
+          type: string
+          enum: [added, modified, deleted]
+    RunDiff:
+      type: object
+      required: [runId, files]
+      properties:
+        runId:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunDiffFile"
+    RunDiffResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: string
+          enum: [OK]
+        data:
+          $ref: "#/components/schemas/RunDiff"
+    Artifact:
+      type: object
+      required: [id, runId, threadId, kind, path, sizeBytes, createdAt]
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        threadId:
+          type: string
+        kind:
+          type: string
+          description: Artifact category such as patch, file, image, document, or web.
+        path:
+          type: string
+          description: Workspace-relative artifact path or logical artifact name.
+        sizeBytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ArtifactList:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Artifact"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    ArtifactListResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: string
+          enum: [OK]
+        data:
+          $ref: "#/components/schemas/ArtifactList"
+    Preview:
+      type: object
+      required: [id, runId, threadId, status, createdAt]
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        threadId:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: Local preview URL when a preview is already ready.
+        status:
+          type: string
+          enum: [starting, ready, stopped]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PreviewList:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Preview"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    PreviewListResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code:
+          type: string
+          enum: [OK]
+        data:
+          $ref: "#/components/schemas/PreviewList"
     ErrorResponse:
       type: object
       required: [error]

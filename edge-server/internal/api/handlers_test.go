@@ -2055,6 +2055,57 @@ func TestMuxRunsSubPathUnknown(t *testing.T) {
 	}
 }
 
+func TestArtifactDiffPreviewReadOnlyRoutesReturnEmptySnapshots(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	h.ensureDefaults()
+	if _, err := h.Store.CreateRun("run_evidence", "proj_local", "thread_local"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/run_evidence/diff", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET run diff status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var diffBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&diffBody); err != nil {
+		t.Fatalf("decode diff body: %v", err)
+	}
+	diffBody = unwrapSuccess(diffBody)
+	if diffBody["runId"] != "run_evidence" {
+		t.Fatalf("diff runId = %#v, want run_evidence", diffBody["runId"])
+	}
+	files, ok := diffBody["files"].([]any)
+	if !ok || len(files) != 0 {
+		t.Fatalf("diff files = %#v, want empty array", diffBody["files"])
+	}
+
+	for _, path := range []string{"/v1/artifacts", "/v1/previews"} {
+		req = httptest.NewRequest(http.MethodGet, path, nil)
+		rec = httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, want 200 body=%s", path, rec.Code, rec.Body.String())
+		}
+		var listBody map[string]any
+		if err := json.NewDecoder(rec.Body).Decode(&listBody); err != nil {
+			t.Fatalf("decode %s body: %v", path, err)
+		}
+		listBody = unwrapSuccess(listBody)
+		items, ok := listBody["items"].([]any)
+		if !ok || len(items) != 0 {
+			t.Fatalf("%s items = %#v, want empty array", path, listBody["items"])
+		}
+		page, ok := listBody["page"].(map[string]any)
+		if !ok || page["hasMore"] != false {
+			t.Fatalf("%s page = %#v, want hasMore=false", path, listBody["page"])
+		}
+	}
+}
+
 // ── WebSocket upgrade test ──
 
 func TestWebSocketUpgrade(t *testing.T) {

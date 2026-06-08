@@ -138,9 +138,9 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.persistence_error` | P0 | 持久化错误，payload: `{ runId, error }` |
 | `approval.requested` | P0 | 请求用户审批 (planned) |
 | `approval.decided` | P0 | 用户已审批 (planned) |
-| `artifact.created` | P0 | 产物创建 (planned) |
+| `artifact.created` | P0 | 产物创建 (planned)；当前只读 REST 合同已提供 `GET /v1/artifacts`，事件写入链路后续补齐 |
 | `artifact.updated` | P1 | 产物元数据更新 (planned) |
-| `preview.ready` | P0 | 预览可用 (planned) |
+| `preview.ready` | P0 | 预览可用 (planned)；当前只读 REST 合同已提供 `GET /v1/previews`，start/stop 生命周期后续补齐 |
 | `preview.stopped` | P1 | 预览停止 (planned) |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
