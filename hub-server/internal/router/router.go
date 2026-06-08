@@ -147,6 +147,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			messages.PUT("/:id", messageHandler.EditMessage)
 			messages.POST("/:id/pin", messageHandler.PinMessage)
 			messages.DELETE("/:id/pin", messageHandler.UnpinMessage)
+			messages.GET("/:id/reactions", messageHandler.ListMessageReactions)
 			messages.POST("/:id/reactions", messageHandler.AddMessageReaction)
 			messages.DELETE("/:id/reactions", messageHandler.RemoveMessageReaction)
 			messages.POST("/:id/forward", messageHandler.ForwardMessage)

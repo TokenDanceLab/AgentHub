@@ -155,6 +155,20 @@ func TestOpenAPIClientMessageReactionsMatchesHubContract(t *testing.T) {
 	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
 
 	path := yamlMapField(t, paths, "/client/messages/{id}/reactions", "paths./client/messages/{id}/reactions")
+	get := yamlMapField(t, path, "get", "paths./client/messages/{id}/reactions.get")
+	parameters := yamlSequenceField(t, get, "parameters", "message reaction get parameters")
+	if !parameterNamed(parameters, "session_id") {
+		t.Fatal("GET message reactions must document session_id query parameter")
+	}
+	getData := responseEnvelopeData(t, get, "message reaction get")
+	if got := yamlScalarField(t, getData, "type", "message reaction get response data.type"); got != "array" {
+		t.Fatalf("GET reaction response data type = %v, want array", got)
+	}
+	getItems := yamlMapField(t, getData, "items", "message reaction get response data.items")
+	if got := yamlScalarField(t, getItems, "$ref", "message reaction get response data.items.$ref"); got != "#/components/schemas/MessageReactionResponse" {
+		t.Fatalf("GET reaction response item ref = %v, want MessageReactionResponse", got)
+	}
+
 	for _, method := range []string{"post", "delete"} {
 		op := yamlMapField(t, path, method, "paths./client/messages/{id}/reactions."+method)
 		schema := requestBodySchema(t, op, "message reaction "+method)
@@ -291,7 +305,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/client/messages/{id}":                                              {"put"},
 		"/client/messages/{id}/recall":                                       {"post"},
 		"/client/messages/{id}/pin":                                          {"post", "delete"},
-		"/client/messages/{id}/reactions":                                    {"post", "delete"},
+		"/client/messages/{id}/reactions":                                    {"get", "post", "delete"},
 		"/client/messages/{id}/forward":                                      {"post"},
 		"/client/messages/search":                                            {"get"},
 		"/client/attachments/probe":                                          {"post"},

@@ -26,6 +26,7 @@ type MessageService interface {
 	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
 	AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
 	RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error)
 }
 
 type MessageHandler struct {
@@ -279,6 +280,27 @@ func (h *MessageHandler) RemoveMessageReaction(c *gin.Context) {
 	}
 
 	result, err := h.service.RemoveMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
+}
+
+func (h *MessageHandler) ListMessageReactions(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+	sessionID := c.Query("session_id")
+	if sessionID == "" {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.ListMessageReactions(c.Request.Context(), userID, sessionID, msgID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
