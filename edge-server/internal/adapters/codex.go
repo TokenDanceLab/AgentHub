@@ -599,9 +599,11 @@ func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any,
 		return
 	}
 	files := make([]map[string]any, 0, len(item.Changes))
+	filePaths := make([]string, 0, len(item.Changes))
 	for _, ch := range item.Changes {
 		path, outsideWorkspace := safeCodexFileChangePath(ch.Path, workDir)
 		kind, action := codexFileChangeKindAction(ch.Kind)
+		filePaths = append(filePaths, path)
 		files = append(files, map[string]any{
 			"path":    path,
 			"kind":    kind,
@@ -621,6 +623,7 @@ func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any,
 			"kind":     file["kind"],
 			"action":   file["action"],
 			"rawKind":  file["rawKind"],
+			"files":    filePaths,
 		}
 		if file["outsideWorkspace"] == true {
 			payload["outsideWorkspace"] = true

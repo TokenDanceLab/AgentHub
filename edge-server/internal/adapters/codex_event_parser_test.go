@@ -256,8 +256,14 @@ func TestCodexFileChangeCompleted(t *testing.T) {
 		}
 	}
 	for i, event := range events {
-		if _, ok := event.Payload["files"]; ok {
-			t.Fatalf("event[%d] should not include aggregate files payload: %#v", i, event.Payload)
+		files := requireCodexFileChangeFiles(t, event.Payload, 3)
+		for j, w := range want {
+			if files[j] != w.path {
+				t.Fatalf("event[%d] files[%d] = %#v, want %#v", i, j, files[j], w.path)
+			}
+		}
+		if files[0] != events[0].Payload["path"] {
+			t.Fatalf("event[%d] aggregate files should use same sanitized paths as path field: %#v", i, event.Payload)
 		}
 	}
 }
@@ -294,12 +300,62 @@ func TestCodexFileChangeRedactsOutsideWorkspaceAbsolutePath(t *testing.T) {
 	if events[0].Payload["outsideWorkspace"] != true {
 		t.Fatalf("outsideWorkspace = %#v, want true", events[0].Payload["outsideWorkspace"])
 	}
-	if _, ok := events[0].Payload["files"]; ok {
-		t.Fatalf("file_change event should not include aggregate files payload: %#v", events[0].Payload)
+	files := requireCodexFileChangeFiles(t, events[0].Payload, 1)
+	if files[0] != "<outside-workspace>/token.txt" {
+		t.Fatalf("files[0] = %#v, want redacted basename", files[0])
 	}
 	for _, value := range events[0].Payload {
 		if s, ok := value.(string); ok && strings.Contains(s, `C:\Users\dev`) {
 			t.Fatalf("payload leaked absolute user path: %#v", events[0].Payload)
+		}
+	}
+}
+
+func TestCodexFileChangeFilesAggregateSanitizesMixedPaths(t *testing.T) {
+	workDir := `C:\Users\dev\project`
+	input := `{"type":"item.completed","item":{"id":"item_mixed","type":"file_change","changes":[{"path":"C:\\Users\\dev\\project\\src\\main.go","kind":"update"},{"path":"C:\\Users\\dev\\secrets\\token.txt","kind":"add"},{"path":"..\\outside\\secret.go","kind":"delete"}],"status":"completed"}}`
+	emitter := parseCodexLinesWithWorkDir(t, input, workDir)
+
+	events := emitter.eventsOfType(BusEventFileChange)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 file_change events, got %d", len(events))
+	}
+
+	want := []struct {
+		path             string
+		rawKind          string
+		kind             string
+		action           string
+		outsideWorkspace bool
+	}{
+		{"src/main.go", "update", "modified", "modified", false},
+		{"<outside-workspace>/token.txt", "add", "created", "created", true},
+		{"secret.go", "delete", "deleted", "deleted", true},
+	}
+	for i, event := range events {
+		files := requireCodexFileChangeFiles(t, event.Payload, len(want))
+		if event.Payload["path"] != want[i].path {
+			t.Fatalf("event[%d] path = %#v, want %#v", i, event.Payload["path"], want[i].path)
+		}
+		if event.Payload["rawKind"] != want[i].rawKind || event.Payload["kind"] != want[i].kind || event.Payload["action"] != want[i].action {
+			t.Fatalf("event[%d] single-file fields changed: %#v", i, event.Payload)
+		}
+		if want[i].outsideWorkspace {
+			if event.Payload["outsideWorkspace"] != true {
+				t.Fatalf("event[%d] outsideWorkspace = %#v, want true", i, event.Payload["outsideWorkspace"])
+			}
+		} else if _, ok := event.Payload["outsideWorkspace"]; ok {
+			t.Fatalf("event[%d] should not set outsideWorkspace: %#v", i, event.Payload)
+		}
+		for j, w := range want {
+			if files[j] != w.path {
+				t.Fatalf("event[%d] files[%d] = %#v, want %#v", i, j, files[j], w.path)
+			}
+		}
+		for _, file := range files {
+			if strings.Contains(file, `C:\Users\dev`) {
+				t.Fatalf("aggregate files leaked absolute user path: %#v", files)
+			}
 		}
 	}
 }
@@ -336,6 +392,18 @@ func TestCodexFileChangeStarted(t *testing.T) {
 	if events[0].Payload["path"] != "new_file.go" || events[0].Payload["action"] != "created" {
 		t.Fatalf("file_change payload mismatch: %#v", events[0].Payload)
 	}
+}
+
+func requireCodexFileChangeFiles(t *testing.T, payload map[string]any, wantLen int) []string {
+	t.Helper()
+	files, ok := payload["files"].([]string)
+	if !ok {
+		t.Fatalf("files = %#v, want []string", payload["files"])
+	}
+	if len(files) != wantLen {
+		t.Fatalf("files len = %d, want %d: %#v", len(files), wantLen, files)
+	}
+	return files
 }
 
 // --- MCP tool call: completed ---
