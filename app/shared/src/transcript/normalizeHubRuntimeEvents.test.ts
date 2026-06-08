@@ -141,6 +141,45 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
     ])).toEqual([]);
   });
 
+  it('treats explicit real, verified, and live mode tokens as Real', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-mode-real',
+        task_id: 'task-mode-real',
+        edge_run_id: 'run-mode-real',
+        event_seq: 1,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'real mode', evidence_mode: 'real' },
+        created_at: '2026-06-07T04:00:05Z',
+      },
+      {
+        id: 'evt-mode-verified',
+        task_id: 'task-mode-verified',
+        edge_run_id: 'run-mode-verified',
+        event_seq: 2,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'verified mode', evidence_mode: 'verified' },
+        created_at: '2026-06-07T04:00:06Z',
+      },
+      {
+        id: 'evt-mode-live',
+        task_id: 'task-mode-live',
+        edge_run_id: 'run-mode-live',
+        event_seq: 3,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'live mode', runtime_mode: 'live' },
+        created_at: '2026-06-07T04:00:07Z',
+      },
+    ]);
+
+    const sessions = blocks.filter((block) => block.kind === 'run_session');
+    expect(sessions).toEqual([
+      expect.objectContaining({ taskId: 'task-mode-real', modeLabel: 'Real' }),
+      expect.objectContaining({ taskId: 'task-mode-verified', modeLabel: 'Real' }),
+      expect.objectContaining({ taskId: 'task-mode-live', modeLabel: 'Real' }),
+    ]);
+  });
+
   it('keeps opaque replay ids unverified without over-claiming mode or target', () => {
     const blocks = normalizeHubRuntimeEventsToTranscript([
       {
