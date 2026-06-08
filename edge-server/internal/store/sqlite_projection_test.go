@@ -11,6 +11,7 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLite returned error: %v", err)
 	}
+	defer s.Close()
 
 	project, err := s.CreateProject("proj_projection", "Projection Project")
 	if err != nil {
@@ -35,6 +36,24 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("UpsertRunDiffFile returned error: %v", err)
+	}
+	diffFile, err = s.UpsertRunDiffFile(RunDiffFile{
+		RunID:  run.ID,
+		Path:   "src/app.ts",
+		Diff:   "@@ -1 +1 @@\n-old\n+newer",
+		Status: "modified",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile update returned error: %v", err)
+	}
+	secondDiffFile, err := s.UpsertRunDiffFile(RunDiffFile{
+		RunID:  run.ID,
+		Path:   "README.md",
+		Diff:   "@@ -0 +1 @@\n+hello",
+		Status: "added",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile second returned error: %v", err)
 	}
 
 	workspaceRoot := filepath.Join(t.TempDir(), "workspace")
@@ -130,7 +149,7 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 		status      string
 		summaryJSON string
 	}
-	if err := reopened.db.QueryRow(`SELECT workspace_id, run_id, patch_path, status, summary_json FROM edge_diffs WHERE run_id = ?`, run.ID).Scan(
+	if err := reopened.db.QueryRow(`SELECT workspace_id, run_id, patch_path, status, summary_json FROM edge_diffs WHERE run_id = ? AND patch_path = ?`, run.ID, diffFile.Path).Scan(
 		&projectedDiff.workspaceID,
 		&projectedDiff.runID,
 		&projectedDiff.patchPath,
@@ -142,8 +161,22 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	if projectedDiff.workspaceID != project.ID || projectedDiff.runID != run.ID || projectedDiff.patchPath != diffFile.Path || projectedDiff.status != "modified" {
 		t.Fatalf("projected diff = %#v, want scoped modified diff for src/app.ts", projectedDiff)
 	}
-	if projectedDiff.summaryJSON != `{"path":"src/app.ts","diffBytes":21}` {
+	if projectedDiff.summaryJSON != `{"path":"src/app.ts","diffBytes":23}` {
 		t.Fatalf("projected diff summary_json = %s, want path and diff byte count", projectedDiff.summaryJSON)
+	}
+	var diffRows int
+	if err := reopened.db.QueryRow(`SELECT COUNT(*) FROM edge_diffs WHERE run_id = ?`, run.ID).Scan(&diffRows); err != nil {
+		t.Fatalf("query projected diff row count returned error: %v", err)
+	}
+	if diffRows != 2 {
+		t.Fatalf("projected diff rows for run = %d, want 2 after same-path update and second diff", diffRows)
+	}
+	var projectedSecondDiffPath string
+	if err := reopened.db.QueryRow(`SELECT patch_path FROM edge_diffs WHERE run_id = ? AND patch_path = ?`, run.ID, secondDiffFile.Path).Scan(&projectedSecondDiffPath); err != nil {
+		t.Fatalf("query projected second diff returned error: %v", err)
+	}
+	if projectedSecondDiffPath != secondDiffFile.Path {
+		t.Fatalf("projected second diff path = %q, want %q", projectedSecondDiffPath, secondDiffFile.Path)
 	}
 
 	var projectedPreview struct {
@@ -167,5 +200,62 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	}
 	if projectedPreview.metadataJSON != `{}` {
 		t.Fatalf("projected preview metadata_json = %s, want empty object", projectedPreview.metadataJSON)
+	}
+}
+
+func TestSQLiteProjectionDiffIDDoesNotCollideOnColonDelimitedRunAndPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	defer s.Close()
+
+	project, err := s.CreateProject("proj_collision", "Projection Collision")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := s.CreateThread("thread_collision", project.ID, "Projection Collision")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	firstRun, err := s.CreateRun("run:a", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun first returned error: %v", err)
+	}
+	secondRun, err := s.CreateRun("run", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun second returned error: %v", err)
+	}
+	if _, err := s.UpsertRunDiffFile(RunDiffFile{
+		RunID:  firstRun.ID,
+		Path:   "b",
+		Diff:   "+first",
+		Status: "added",
+	}); err != nil {
+		t.Fatalf("UpsertRunDiffFile first returned error: %v", err)
+	}
+	if _, err := s.UpsertRunDiffFile(RunDiffFile{
+		RunID:  secondRun.ID,
+		Path:   "a:b",
+		Diff:   "+second",
+		Status: "added",
+	}); err != nil {
+		t.Fatalf("UpsertRunDiffFile second returned error: %v", err)
+	}
+	s.Close()
+
+	reopened, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("reopen NewSQLite returned error: %v", err)
+	}
+	defer reopened.Close()
+
+	var diffRows int
+	if err := reopened.db.QueryRow(`SELECT COUNT(*) FROM edge_diffs WHERE run_id IN (?, ?)`, firstRun.ID, secondRun.ID).Scan(&diffRows); err != nil {
+		t.Fatalf("query projected diff rows returned error: %v", err)
+	}
+	if diffRows != 2 {
+		t.Fatalf("projected diff rows = %d, want 2 non-colliding rows", diffRows)
 	}
 }
