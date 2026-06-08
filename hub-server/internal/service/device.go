@@ -77,12 +77,10 @@ func (s *DeviceService) Update(deviceID, appVersion string, capabilities []strin
 		capsBytes, _ := json.Marshal(capabilities)
 		updates["capabilities"] = string(capsBytes)
 	}
-	return s.db.Model(&model.Device{}).
-		Where("id = ?", deviceID).
-		Updates(updates).Error
+	return repository.UpdateDevice(s.db, deviceID, updates)
 }
 
 // Unregister removes a device record by ID.
 func (s *DeviceService) Unregister(deviceID string) error {
-	return s.db.Where("id = ?", deviceID).Delete(&model.Device{}).Error
+	return repository.DeleteDevice(s.db, deviceID)
 }
