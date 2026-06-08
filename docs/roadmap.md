@@ -1,6 +1,6 @@
 # AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 07:50 +08:00
+> Last updated: 2026-06-09 08:08 +08:00
 > Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
 > Review branch: `origin/codex/p1-remote-control-integration` at `fd94c54d`
 > Evidence integration branch: `codex/p1-remote-control-evidence-integration`
@@ -89,6 +89,11 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | P1 | Observed real localhost dispatch | integrated in critical evidence | Requires deriving target/dispatch evidence from live Hub/Desktop path, not caller-supplied URLs; failed observed validation keeps `real_tested=false`. |
 | P1 | Login E2E approval harness | integrated in critical evidence | Approval-gated harness only; real TokenDanceID login/live Hub dispatch still needs disposable-account/env approval and evidence. |
 | P1 | Edge real CLI evidence gate | integrated in critical evidence | Default no-spend/fail-closed; observed mode requires approval plus correlation evidence and still runs no real CLI/model by default. |
+| P1 | Live chain topology audit | worker active | Code-grounded map of Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK -> Hub replay -> Web render. |
+| P1 | Local stack E2E runner | worker active | Compose readiness gates toward one reproducible local product loop; no real login/CLI by default. |
+| P1 | Web event render sync | worker active | Render Hub/Edge/CLI events clearly in Web without direct Local Edge calls. |
+| P1 | Desktop Hub task bridge | worker active | Close Desktop side between registered target readiness and Local Edge dispatch handoff. |
+| P1 | Edge SDK JSON contract | worker active | Provider-neutral JSON event/invocation contract for Claude/OpenAI/OpenCode/custom Agent fixtures. |
 | P2 | Edge durable store implementation | worker + reviewer | SQLite migration guard is approved; full row-first durable store still separate from CLI execution. |
 | P2 | Agent SDK product integration | integrated in critical evidence | SDK-as-adapter/product-runtime report approved; no code/model calls. |
 | P2 | Public deploy and macOS packaging | worker + reviewer | Separate approval for env, signing/notary, updater metadata, and release upload. |
@@ -105,6 +110,11 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | `codex/p1-sdk-integration-product-report` | `.worktrees/p1-sdk-integration-product-report` | worker | integrated | Source branch can be cleaned only after final cleanup approval; report is in `codex/p1-critical-evidence-integration`. |
 | `codex/p1-observed-localhost-dispatch` | `.worktrees/p1-observed-localhost-dispatch` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
 | `codex/p1-login-e2e-approval-harness` | `.worktrees/p1-login-e2e-approval-harness` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
+| `codex/p1-live-chain-topology-audit` | `.worktrees/p1-live-chain-topology-audit` | worker | active | Audit/verifier only; integrate after review. |
+| `codex/p1-local-stack-e2e-runner` | `.worktrees/p1-local-stack-e2e-runner` | worker | active | Script/readiness gate; reject real-tested overclaim. |
+| `codex/p1-web-event-render-sync` | `.worktrees/p1-web-event-render-sync` | worker | active | Web/shared rendering only; reject direct Local Edge calls. |
+| `codex/p1-desktop-hub-task-bridge` | `.worktrees/p1-desktop-hub-task-bridge` | worker | active | Desktop bridge only; reject renderer CLI execution or host authority expansion. |
+| `codex/p1-edge-sdk-json-contract` | `.worktrees/p1-edge-sdk-json-contract` | worker | active | Edge adapter fixture contract only; no real model/API calls. |
 | `codex/worktree-cleanup-audit` | `.worktrees/worktree-cleanup-audit` | worker | blocked | Report inventory must be refreshed before any cleanup decision. |
 
 ## Verification Queue
