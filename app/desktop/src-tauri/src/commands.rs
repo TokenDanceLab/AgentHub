@@ -1,4 +1,6 @@
 use crate::edge_manager::{EdgeHostReadiness, EdgeStatus, SharedEdgeManager};
+use crate::oidc_server::{check_loopback_callback_readiness, LoopbackReadiness};
+use crate::secure_store::{check_credential_store_readiness, CredentialStoreReadiness};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -65,6 +67,32 @@ pub async fn get_edge_host_readiness(
 pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
     let mgr = state.lock().await;
     Ok(mgr.local_auth_token().to_string())
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PackagedLoginRealE2EGate {
+    pub status: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PackagedLoginReadiness {
+    pub loopback: LoopbackReadiness,
+    pub credential_store: CredentialStoreReadiness,
+    pub real_e2e: PackagedLoginRealE2EGate,
+}
+
+#[tauri::command]
+pub async fn get_packaged_login_readiness() -> Result<PackagedLoginReadiness, String> {
+    Ok(PackagedLoginReadiness {
+        loopback: check_loopback_callback_readiness(),
+        credential_store: check_credential_store_readiness(),
+        real_e2e: PackagedLoginRealE2EGate {
+            status: "proposal_only".to_string(),
+            reason: "Real packaged login E2E requires an explicit TokenDance ID/browser gate."
+                .to_string(),
+        },
+    })
 }
 
 #[tauri::command]
