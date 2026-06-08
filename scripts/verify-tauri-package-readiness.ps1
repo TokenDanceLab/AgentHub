@@ -32,6 +32,19 @@ function Assert-True {
     Pass $Message
 }
 
+function Assert-GitIgnored {
+    param(
+        [string]$RelativePath,
+        [string]$Label
+    )
+
+    & git -C $RepoRoot check-ignore -q -- $RelativePath
+    if ($LASTEXITCODE -ne 0) {
+        Fail "$Label is not ignored by Git: $RelativePath"
+    }
+    Pass "$Label is ignored by Git ($RelativePath)"
+}
+
 function Read-Json([string]$RelativePath) {
     $path = Join-Path $RepoRoot $RelativePath
     return Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -126,6 +139,16 @@ Assert-True ($readinessWorkflowText -notmatch "softprops/action-gh-release") "re
 Assert-True ($readinessWorkflowText -notmatch "gh release upload") "release readiness workflow does not upload release assets"
 Assert-True ($readinessWorkflowText -notmatch "TAURI_SIGNING_PRIVATE_KEY") "release readiness workflow does not require production signing secrets"
 Assert-True ($readinessWorkflowText -match "verify-tauri-package-readiness\.ps1") "release readiness workflow runs this checker"
+
+Step "Generated artifact ignore policy"
+$desktopVersion = [string]$package.version
+Assert-GitIgnored "dist/AgentHub_${desktopVersion}_x64-setup.exe" "Windows setup.exe dry artifact"
+Assert-GitIgnored "dist/AgentHub_${desktopVersion}_x64-portable.zip" "Windows portable.zip dry artifact"
+Assert-GitIgnored "dist/latest.json" "Updater latest.json dry artifact"
+Assert-GitIgnored "dist/AgentHub_${desktopVersion}_x64-setup.exe.sig" "Updater signature dry artifact"
+Assert-GitIgnored "app/desktop/src-tauri/target/release/bundle/nsis/AgentHub_${desktopVersion}_x64-setup.exe" "Tauri NSIS bundle output"
+Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-pc-windows-msvc.exe" "Windows sidecar binary"
+Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin" "macOS arm64 sidecar binary"
 
 Step "macOS policy note boundary"
 Assert-True ($readinessWorkflowText -match "macOS unsigned package policy note") "release readiness workflow names macOS step as a policy note"
