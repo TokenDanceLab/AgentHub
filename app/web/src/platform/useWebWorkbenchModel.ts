@@ -273,9 +273,14 @@ export function resolveWebProjectsStatus(
   saving = false,
 ): { loading: boolean; error?: string | undefined; actionError?: string | undefined; saving: boolean } {
   const effectiveRealMode = hubReady || dataMode === 'real';
+  const signedOutRealMode = dataMode === 'real' && !hubReady;
   return {
     loading: effectiveRealMode && projects.isFetching,
-    error: effectiveRealMode && projects.error ? errorMessage(projects.error, 'Hub Projects 加载失败') : undefined,
+    error: signedOutRealMode
+      ? 'Sign in to Hub to load workspace projects.'
+      : effectiveRealMode && projects.error
+        ? errorMessage(projects.error, 'Hub Projects 加载失败')
+        : undefined,
     actionError: effectiveRealMode ? errorMessage(createError ?? updateError, '') || undefined : undefined,
     saving,
   };
