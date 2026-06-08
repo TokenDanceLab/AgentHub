@@ -126,6 +126,17 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     },
   });
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
+  const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
+    target.target_type === 'local_edge' &&
+    target.is_online === true &&
+    target.health_state !== 'offline'
+  );
+  const composerExecutionTargets = hubReady || dataMode === 'real'
+    ? onlineLocalEdgeTargets.map((target) => ({
+        id: target.id,
+        label: target.name ? `${target.name} (${target.id})` : target.id,
+      }))
+    : undefined;
   const executionTargetStatus = resolveWebExecutionTargetStatus({
     hubReady,
     dataMode,
@@ -159,6 +170,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     activeConversationId,
     contacts: resolveWebWorkbenchContacts(contacts.data, hubReady, dataMode),
     conversations: resolvedConversations,
+    composerExecutionTargets,
     projects: resolveWebWorkbenchProjects(projects.data?.items, hubReady, dataMode),
     projectsStatus: resolveWebProjectsStatus(
       { isFetching: projects.isFetching, error: projects.error },

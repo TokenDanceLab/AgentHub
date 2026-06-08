@@ -112,6 +112,7 @@ function WebWorkbenchRoot() {
       <AgentHubWorkbench
         activeConversationId={workbench.activeConversationId}
         agents={agents}
+        composerExecutionTargets={workbench.composerExecutionTargets}
         agentProfilesStatus={{
           loading: dataMode === 'real' && agentList.isFetching,
           error: agentLoadError,

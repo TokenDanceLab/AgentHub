@@ -22,7 +22,6 @@ import {
   type PendingAgentTask,
   type SendMessageResponse,
 } from '@/api/hubClient';
-import { selectOnlineLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
 import { getAccessToken } from '@/hooks/useAuth';
 import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
@@ -385,7 +384,10 @@ async function triggerMentionedAgent(
   if (!agentInstanceId) {
     throw new Error('Hub did not return an exact agent instance id for dispatch.');
   }
-  const target = await resolveWebDispatchTarget(hubClient);
+  const target = await resolveWebDispatchTarget(
+    hubClient,
+    (intent as ComposerIntent & { executionTargetId?: string }).executionTargetId,
+  );
   return hubClient.triggerAgentTask(triggerMessageId, {
     agent_instance_id: agentInstanceId,
     target_id: target.id,
@@ -393,7 +395,14 @@ async function triggerMentionedAgent(
   });
 }
 
-async function resolveWebDispatchTarget(hubClient: WebRunHubClient): Promise<Pick<ExecutionTarget, 'id'>> {
+async function resolveWebDispatchTarget(
+  hubClient: WebRunHubClient,
+  executionTargetId: string | undefined,
+): Promise<Pick<ExecutionTarget, 'id'>> {
+  const requestedTargetId = executionTargetId?.trim();
+  if (!requestedTargetId) {
+    throw new Error('Select a Desktop/Edge target before Web can dispatch real Hub work.');
+  }
   if (!hubClient.listExecutionTargets) {
     throw new Error('Hub execution target inventory is required for Web Hub dispatch.');
   }
@@ -401,9 +410,14 @@ async function resolveWebDispatchTarget(hubClient: WebRunHubClient): Promise<Pic
     target_type: 'local_edge',
     pageSize: 50,
   });
-  const target = selectOnlineLocalEdgeExecutionTarget(inventory.items);
-  if (!target?.id) {
-    throw new Error('No online local_edge execution target is available for Web Hub dispatch.');
+  const onlineLocalEdgeTargets = inventory.items.filter((target) =>
+    target.target_type === 'local_edge' &&
+    target.is_online === true &&
+    target.health_state !== 'offline'
+  );
+  const target = onlineLocalEdgeTargets.find((item) => item.id === requestedTargetId);
+  if (!target) {
+    throw new Error('Selected Desktop/Edge target is not available for Web Hub dispatch.');
   }
   return target;
 }
