@@ -1,7 +1,7 @@
 # AgentHub 路线图
 
 > 最后更新：2026-06-08 10:39 +08:00
-> 当前主线：`origin/dev/delicious233 @ 0c79f277 feat(web): read Hub projects into workbench`
+> 当前主线：`origin/dev/delicious233 @ 866050d2 docs(roadmap): refresh execution priorities`
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
 
@@ -15,7 +15,8 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 
 | 项 | 状态 |
 |---|---|
-| dev | `origin/dev/delicious233 @ 0c79f277`，已打 `v0.3.0-rc.1` |
+| dev | `origin/dev/delicious233 @ 866050d2` |
+| 稳定候选 | `v0.3.0-rc.1 @ 0c79f277` |
 | 主工作树 | `D:\Code\TokenDance\AgentHub @ a4b27d63`，behind 20 且 dirty；只读，不直接 pull/merge/stage |
 | 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
 | 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、ExecutionTarget contract、Edge pins/store/event contracts、TeamRun fixture/evidence gate |
