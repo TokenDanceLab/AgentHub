@@ -206,6 +206,51 @@ func (a *recordingContextAdapter) NeedsStdin() bool { return false }
 
 func (a *recordingContextAdapter) Available() bool { return true }
 
+type fixtureSDKStreamAdapter struct {
+	id string
+}
+
+func (a *fixtureSDKStreamAdapter) Metadata() adapters.AdapterMetadata {
+	return adapters.AdapterMetadata{ID: a.id, Name: "Fixture SDK Stream"}
+}
+
+func (a *fixtureSDKStreamAdapter) Capabilities() adapters.AgentCapabilities {
+	return adapters.AgentCapabilities{
+		Streaming:       true,
+		ToolCalls:       true,
+		PermissionHooks: true,
+		MultiTurn:       true,
+	}
+}
+
+func (a *fixtureSDKStreamAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
+	return os.Args[0], []string{processExecutorHelperRunFlag, "--", "sdk-fixture-json"}, append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"), ""
+}
+
+func (a *fixtureSDKStreamAdapter) ParseStream(ctx context.Context, stdout io.Reader, _ io.Writer, emitter adapters.EventEmitter, run store.Run) error {
+	data, err := io.ReadAll(stdout)
+	if err != nil {
+		return err
+	}
+	stream, err := adapters.DecodeSDKFixtureStream(data)
+	if err != nil {
+		return err
+	}
+	scope := map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}
+	for _, mapped := range adapters.MapSDKFixtureStream(stream, scope) {
+		emitter.Emit(mapped.Type, mapped.Scope, mapped.Payload)
+	}
+	return nil
+}
+
+func (a *fixtureSDKStreamAdapter) NeedsStdin() bool { return false }
+
+func (a *fixtureSDKStreamAdapter) Available() bool { return true }
+
 func TestThreadTranscriptEmitterPersistsAssistantMessage(t *testing.T) {
 	s := store.New()
 	run := newExecutorTestRun(t, s)
@@ -355,6 +400,64 @@ func TestProcessExecutorPassesRuntimeContextToAdapter(t *testing.T) {
 	}
 	if got.HubTaskID != "task-1" || got.ConfigOverrides["reasoning_summary"] != "auto" || !got.Ephemeral {
 		t.Fatalf("runtime metadata context = %#v", got)
+	}
+}
+
+func TestProcessExecutorMapsSDKFixtureJSONEventsAndReplays(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, replay := bus.Subscribe(0)
+	if len(replay) != 0 {
+		t.Fatalf("initial replay events = %d, want 0", len(replay))
+	}
+
+	adapter := &fixtureSDKStreamAdapter{id: "opencode"}
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-fixture-sdk-json",
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{AgentID: "opencode"}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var live []events.EventEnvelope
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		live = append(live, evt)
+		switch evt.Type {
+		case "run.finished":
+			goto finished
+		case "run.failed":
+			t.Fatalf("run failed: %#v", evt.Payload)
+		}
+	}
+
+finished:
+	for _, want := range []string{
+		adapters.BusEventSessionInit,
+		adapters.BusEventToolCall,
+		adapters.BusEventPermissionRequested,
+		adapters.BusEventResult,
+		"run.finished",
+	} {
+		if !hasEventType(live, want) {
+			t.Fatalf("live events missing %s: %v", want, eventTypeList(live))
+		}
+	}
+
+	_, _, replay = bus.Subscribe(0)
+	for _, want := range []string{
+		adapters.BusEventPermissionRequested,
+		adapters.BusEventResult,
+		"run.finished",
+	} {
+		if !hasEventType(replay, want) {
+			t.Fatalf("replay events missing %s: %v", want, eventTypeList(replay))
+		}
 	}
 }
 
@@ -1265,6 +1368,53 @@ func TestProcessExecutorHelper(t *testing.T) {
 		if password := os.Getenv("AGENTHUB_DB_PASSWORD"); password != "" {
 			fmt.Fprintf(os.Stdout, "dbPassword=%s\n", password)
 		}
+	case "sdk-fixture-json":
+		success := true
+		stream := adapters.SDKFixtureStream{
+			Provider: "opencode-agent-sdk-fixture",
+			Events: []adapters.SDKFixtureEvent{
+				{
+					ID:             "fixture_session_1",
+					Type:           "sidecar_session_ready",
+					SessionID:      "fixture_session_1",
+					Model:          "opencode/gpt-5.1-fixture",
+					PermissionMode: "approval-required",
+					Tools:          []string{"read", "bash"},
+				},
+				{
+					ID:        "fixture_tool_1",
+					Type:      "tool_state",
+					SessionID: "fixture_session_1",
+					CallID:    "call_read",
+					ToolName:  "read",
+					Status:    "running",
+					Input:     map[string]any{"path": "README.md"},
+				},
+				{
+					ID:        "fixture_permission_1",
+					Type:      "permission.asked",
+					RequestID: "perm_fixture_shell",
+					CallID:    "call_shell",
+					ToolName:  "bash",
+					RiskLevel: "high",
+					Reason:    "fixture shell approval",
+					Input:     map[string]any{"command": "go test ./internal/adapters -short -count=1"},
+				},
+				{
+					ID:        "fixture_result_1",
+					Type:      "run_result",
+					SessionID: "fixture_session_1",
+					Success:   &success,
+					Summary:   "Fixture SDK stream completed.",
+				},
+			},
+		}
+		data, err := json.Marshal(stream)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "marshal fixture stream: %v\n", err)
+			os.Exit(4)
+		}
+		fmt.Fprintln(os.Stdout, string(data))
 	default:
 		fmt.Fprintf(os.Stderr, "unknown helper mode %q\n", mode)
 		os.Exit(2)
@@ -1289,6 +1439,23 @@ func hasArg(args []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func hasEventType(events []events.EventEnvelope, eventType string) bool {
+	for _, evt := range events {
+		if evt.Type == eventType {
+			return true
+		}
+	}
+	return false
+}
+
+func eventTypeList(events []events.EventEnvelope) []string {
+	types := make([]string, 0, len(events))
+	for _, evt := range events {
+		types = append(types, evt.Type)
+	}
+	return types
 }
 
 func TestSplitHubCallbackTextPreservesUTF8(t *testing.T) {
