@@ -23,12 +23,14 @@ interface ExecutionTargetsSectionProps {
   registeredLocalEdgeTarget?: ExecutionTargetInventoryItem | null;
   hubTargetsLoading?: boolean;
   hubTargetsError?: boolean;
+  hubTargetsPaginationLimited?: boolean;
 }
 
 export default function ExecutionTargetsSection({
   edgeOnline, health, hubSessionActive, runnerSummary, runnerItems,
   availableRunners, localEdgeTarget, desktopDeviceStatus, deviceId,
   registeredLocalEdgeTarget = null, hubTargetsLoading = false, hubTargetsError = false,
+  hubTargetsPaginationLimited = false,
 }: ExecutionTargetsSectionProps) {
   const { t } = useTranslation();
   const localEdgeMetric = edgeOnline
@@ -43,14 +45,24 @@ export default function ExecutionTargetsSection({
     if (!hubSessionActive) return t('settings.localEdgeTargetReadinessSignedOut');
     if (hubTargetsLoading) return t('settings.localEdgeTargetReadinessLoading');
     if (hubTargetsError) return t('settings.localEdgeTargetReadinessError');
+    if (!deviceId) return t('settings.localEdgeTargetReadinessNoDevice');
+    if (!edgeOnline) return t('settings.localEdgeTargetReadinessOffline');
     if (registeredLocalEdgeTarget) {
+      if (!registeredLocalEdgeTarget.is_online || registeredLocalEdgeTarget.health_state === 'offline') {
+        return t('settings.localEdgeTargetReadinessHubOffline');
+      }
+      if (registeredLocalEdgeTarget.health_state === 'degraded') {
+        return t('settings.localEdgeTargetReadinessHubDegraded');
+      }
+      if (registeredLocalEdgeTarget.health_state === 'unknown') {
+        return t('settings.localEdgeTargetReadinessHubUnknown');
+      }
       return t('settings.localEdgeTargetReadinessRegistered', {
         name: registeredLocalEdgeTarget.name,
         targetId: shortId(registeredLocalEdgeTarget.id),
       });
     }
-    if (!deviceId) return t('settings.localEdgeTargetReadinessNoDevice');
-    if (!edgeOnline) return t('settings.localEdgeTargetReadinessOffline');
+    if (hubTargetsPaginationLimited) return t('settings.localEdgeTargetReadinessPaginationLimited');
     return t('settings.localEdgeTargetReadinessMissing');
   })();
 

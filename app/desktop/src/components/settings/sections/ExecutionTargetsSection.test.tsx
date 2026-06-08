@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import ExecutionTargetsSection from './ExecutionTargetsSection';
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
+import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 
 vi.mock('../cards/RunnerRow', () => ({
   default: () => <div data-testid="runner-row" />,
@@ -34,8 +35,17 @@ vi.mock('react-i18next', () => ({
         'settings.runnerInventoryDesc': 'Edge is reachable, but no runtime inventory is currently exposed by health checks.',
         'settings.localEdgeInventorySummary': `${values?.runners}/${values?.totalRunners} runners`,
         'settings.localEdgeTargetReadiness': 'Local Edge target readiness',
+        'settings.localEdgeTargetReadinessSignedOut': 'Sign in to TokenDance ID so Hub can register this Desktop as a remote-control target.',
+        'settings.localEdgeTargetReadinessLoading': 'Checking Hub for the registered local_edge execution target for this Desktop device.',
+        'settings.localEdgeTargetReadinessError': 'Desktop could not read Hub execution targets. Local runs still use Local Edge, but Hub remote control cannot be confirmed.',
         'settings.localEdgeTargetReadinessRegistered': 'Hub can route to {{name}} ({{targetId}}) for this Desktop device.',
+        'settings.localEdgeTargetReadinessNoDevice': 'Desktop has not created a stable device ID yet; sign in and let device registration run first.',
+        'settings.localEdgeTargetReadinessOffline': 'Start Local Edge before testing Hub-driven remote control for this Desktop target.',
         'settings.localEdgeTargetReadinessMissing': 'Local Edge is healthy, but Hub has not registered a local_edge target for this Desktop device yet.',
+        'settings.localEdgeTargetReadinessHubOffline': 'Hub has this Desktop target, but it is currently offline or stale.',
+        'settings.localEdgeTargetReadinessHubDegraded': 'Hub has this Desktop target, but its health is degraded.',
+        'settings.localEdgeTargetReadinessHubUnknown': 'Hub has this Desktop target, but its health is not confirmed yet.',
+        'settings.localEdgeTargetReadinessPaginationLimited': 'Hub target inventory is still paginated; Desktop cannot confirm whether this device target exists yet.',
       };
       return text[key]?.replace('{{name}}', String(values?.name)).replace('{{targetId}}', String(values?.targetId)) ?? key;
     },
@@ -55,9 +65,90 @@ const localEdgeTarget: DesktopExecutionTarget = {
   capabilityIds: ['streaming'],
 };
 
+const registeredTarget: ExecutionTargetInventoryItem = {
+  id: 'local-target-current',
+  device_id: 'desktop-device-0001',
+  name: 'Current Desktop Local Edge',
+  target_type: 'local_edge',
+  workspace_allowlist: [],
+  trust_level: 'local',
+  health_state: 'healthy',
+  is_online: true,
+};
+
+function renderSection(overrides: Partial<React.ComponentProps<typeof ExecutionTargetsSection>> = {}) {
+  return render(
+    <ExecutionTargetsSection
+      edgeOnline
+      health={{ status: 'healthy' }}
+      hubSessionActive
+      runnerSummary="1/1 available"
+      runnerItems={[]}
+      availableRunners={1}
+      localEdgeTarget={localEdgeTarget}
+      desktopDeviceStatus="desktop...0001"
+      deviceId="desktop-device-0001"
+      registeredLocalEdgeTarget={null}
+      {...overrides}
+    />,
+  );
+}
+
 describe('ExecutionTargetsSection', () => {
   it('surfaces the missing Hub local_edge registration preflight while Local Edge is healthy', () => {
-    render(
+    renderSection();
+
+    expect(screen.getByText('Local Edge target readiness')).toBeInTheDocument();
+    expect(screen.getByText('Local Edge is healthy, but Hub has not registered a local_edge target for this Desktop device yet.')).toBeInTheDocument();
+  });
+
+  it('requires a current desktop device id before rendering registered readiness', () => {
+    renderSection({ deviceId: null, registeredLocalEdgeTarget: registeredTarget });
+
+    expect(screen.getByText('Desktop has not created a stable device ID yet; sign in and let device registration run first.')).toBeInTheDocument();
+    expect(screen.queryByText(/Hub can route/)).not.toBeInTheDocument();
+  });
+
+  it('requires Local Edge online before rendering registered readiness', () => {
+    renderSection({ edgeOnline: false, health: { status: 'offline' }, registeredLocalEdgeTarget: registeredTarget });
+
+    expect(screen.getByText('Start Local Edge before testing Hub-driven remote control for this Desktop target.')).toBeInTheDocument();
+    expect(screen.queryByText(/Hub can route/)).not.toBeInTheDocument();
+  });
+
+  it('distinguishes an offline or stale Hub local edge target from ready', () => {
+    renderSection({
+      registeredLocalEdgeTarget: {
+        ...registeredTarget,
+        is_online: false,
+        health_state: 'healthy',
+      },
+    });
+
+    expect(screen.getByText('Hub has this Desktop target, but it is currently offline or stale.')).toBeInTheDocument();
+    expect(screen.queryByText(/Hub can route/)).not.toBeInTheDocument();
+  });
+
+  it('distinguishes a degraded Hub local edge target from ready', () => {
+    renderSection({
+      registeredLocalEdgeTarget: {
+        ...registeredTarget,
+        health_state: 'degraded',
+      },
+    });
+
+    expect(screen.getByText('Hub has this Desktop target, but its health is degraded.')).toBeInTheDocument();
+    expect(screen.queryByText(/Hub can route/)).not.toBeInTheDocument();
+  });
+
+  it('distinguishes a signed-out readiness state', () => {
+    renderSection({ hubSessionActive: false });
+
+    expect(screen.getByText('Sign in to TokenDance ID so Hub can register this Desktop as a remote-control target.')).toBeInTheDocument();
+  });
+
+  it('distinguishes loading and error readiness states', () => {
+    const { rerender } = render(
       <ExecutionTargetsSection
         edgeOnline
         health={{ status: 'healthy' }}
@@ -68,11 +159,34 @@ describe('ExecutionTargetsSection', () => {
         localEdgeTarget={localEdgeTarget}
         desktopDeviceStatus="desktop...0001"
         deviceId="desktop-device-0001"
-        registeredLocalEdgeTarget={null}
+        hubTargetsLoading
       />,
     );
 
-    expect(screen.getByText('Local Edge target readiness')).toBeInTheDocument();
-    expect(screen.getByText('Local Edge is healthy, but Hub has not registered a local_edge target for this Desktop device yet.')).toBeInTheDocument();
+    expect(screen.getByText('Checking Hub for the registered local_edge execution target for this Desktop device.')).toBeInTheDocument();
+
+    rerender(
+      <ExecutionTargetsSection
+        edgeOnline
+        health={{ status: 'healthy' }}
+        hubSessionActive
+        runnerSummary="1/1 available"
+        runnerItems={[]}
+        availableRunners={1}
+        localEdgeTarget={localEdgeTarget}
+        desktopDeviceStatus="desktop...0001"
+        deviceId="desktop-device-0001"
+        hubTargetsError
+      />,
+    );
+
+    expect(screen.getByText('Desktop could not read Hub execution targets. Local runs still use Local Edge, but Hub remote control cannot be confirmed.')).toBeInTheDocument();
+  });
+
+  it('does not report missing while Hub target inventory is pagination-limited', () => {
+    renderSection({ hubTargetsPaginationLimited: true });
+
+    expect(screen.getByText('Hub target inventory is still paginated; Desktop cannot confirm whether this device target exists yet.')).toBeInTheDocument();
+    expect(screen.queryByText('Local Edge is healthy, but Hub has not registered a local_edge target for this Desktop device yet.')).not.toBeInTheDocument();
   });
 });
