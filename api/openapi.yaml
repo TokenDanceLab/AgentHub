@@ -2392,13 +2392,15 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubRegisterCloudEdge
-      summary: Register a cloud Edge device and mint its Hub WebSocket JWT.
+      summary: Register a cloud Edge device and mint its Edge API JWT.
       description: >
         Authenticated Hub session route without the desktop device-type
         restriction used by /edge/devices/register. The request device_id must
         be a UUID and, when a JWT device_id claim is present, it must match the
-        request. Hub registers the device as `cloud_edge` and returns a
-        Hub-issued JWT for subsequent /client/ws authentication.
+        request. Hub registers the device as `cloud_edge` and returns an
+        Edge-scoped JWT with `iss=agenthub-hub`, `aud=agenthub-edge`,
+        `purpose=edge-api`, `device_type=edge`, and the registered `device_id`
+        for Edge API authentication.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -2444,7 +2446,7 @@ paths:
                       device_type: { type: string, enum: [cloud_edge] }
                       jwt:
                         type: string
-                        description: Hub-issued access token for cloud Edge WebSocket authentication.
+                        description: Edge-scoped JWT for Edge API auth.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":

@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type mockDeviceService struct {
@@ -136,4 +138,94 @@ func TestDeviceHandler_Register_InternalError(t *testing.T) {
 	if w.Code != 500 {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
+}
+
+func TestDeviceHandler_CloudEdgeRegisterIssuesEdgeScopedJWT(t *testing.T) {
+	svc := &mockDeviceService{
+		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+			if deviceType != "cloud_edge" {
+				t.Fatalf("deviceType = %q, want cloud_edge", deviceType)
+			}
+			return &model.Device{
+				ID:           deviceID,
+				UserID:       userID,
+				DeviceType:   deviceType,
+				AppVersion:   appVersion,
+				Capabilities: `["edge"]`,
+			}, nil
+		},
+	}
+	h := handler.NewDeviceHandler(svc)
+	h.SetJWTConfig("hub-secret-at-least-32-bytes-long!!", time.Hour)
+
+	c, w := newGinCtx("POST", "/cloud/edge/register", map[string]any{
+		"device_id":    testDeviceID,
+		"app_version":  "1.0.0",
+		"capabilities": []string{"edge"},
+	}, "user_id", "u1", "device_id", testDeviceID)
+	h.CloudEdgeRegister(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp handler.Response
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	data, err := json.Marshal(resp.Data)
+	if err != nil {
+		t.Fatalf("marshal response data: %v", err)
+	}
+	var body struct {
+		DeviceID   string `json:"device_id"`
+		DeviceType string `json:"device_type"`
+		JWT        string `json:"jwt"`
+	}
+	if err := json.Unmarshal(data, &body); err != nil {
+		t.Fatalf("unmarshal response data: %v", err)
+	}
+	if body.DeviceType != "cloud_edge" {
+		t.Fatalf("response device_type = %q, want cloud_edge", body.DeviceType)
+	}
+
+	var claims struct {
+		UserID     string `json:"user_id"`
+		DeviceID   string `json:"device_id"`
+		DeviceType string `json:"device_type"`
+		Purpose    string `json:"purpose"`
+		jwt.RegisteredClaims
+	}
+	token, err := jwt.ParseWithClaims(body.JWT, &claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte("hub-secret-at-least-32-bytes-long!!"), nil
+	}, jwt.WithValidMethods([]string{"HS256"}))
+	if err != nil {
+		t.Fatalf("parse cloud edge jwt: %v", err)
+	}
+	if !token.Valid {
+		t.Fatal("cloud edge jwt is invalid")
+	}
+	if claims.Issuer != "agenthub-hub" {
+		t.Fatalf("issuer = %q, want agenthub-hub", claims.Issuer)
+	}
+	if !containsClaimString(claims.Audience, "agenthub-edge") {
+		t.Fatalf("audience = %v, want agenthub-edge", claims.Audience)
+	}
+	if claims.DeviceType != "edge" {
+		t.Fatalf("jwt device_type = %q, want edge", claims.DeviceType)
+	}
+	if claims.Purpose != "edge-api" {
+		t.Fatalf("purpose = %q, want edge-api", claims.Purpose)
+	}
+	if claims.UserID != "u1" || claims.DeviceID != testDeviceID {
+		t.Fatalf("jwt user/device = %q/%q, want u1/%s", claims.UserID, claims.DeviceID, testDeviceID)
+	}
+}
+
+func containsClaimString(values jwt.ClaimStrings, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
