@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { formatComposerPromptWithContext } from '@shared/composer';
 import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import {
@@ -25,14 +26,28 @@ export function resolveDesktopPreviewTranscript(conversationId: string): Transcr
 
 export interface DesktopPlatformOptions {
   activeProjectId?: string;
+  getEdgeHostReadiness?: () => Promise<DesktopEdgeHostReadiness>;
   activeThreadId?: string;
   openPreview?: (evidence: EvidenceRef) => Promise<void>;
   pickLocalAttachments?: NonNullable<AgentHubPlatform['attachments']>['pickFiles'];
   submitRun?: (request: StartRunRequest) => Promise<RunInfo>;
 }
 
+export interface DesktopEdgeHostReadiness {
+  running: boolean;
+  pid: number | null;
+  port: number;
+  sidecar_name: 'agenthub-edge';
+  target_id: 'local-edge';
+  route: 'local-edge-api';
+  bind_addr: string;
+  sidecar_args: string[];
+  direct_cli_spawn: false;
+}
+
 export interface DesktopHostPort {
   executionTargetPreference(): DesktopTargetPreference;
+  edgeHostReadiness(): Promise<DesktopEdgeHostReadiness>;
 }
 
 export interface DesktopPlatform extends AgentHubPlatform {
@@ -48,6 +63,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       browserPreview: true,
     },
     host: {
+      edgeHostReadiness: options.getEdgeHostReadiness ?? readEdgeHostReadiness,
       executionTargetPreference: resolveDesktopTargetPreference,
     },
     conversations: {
@@ -86,6 +102,10 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       },
     },
   };
+}
+
+function readEdgeHostReadiness(): Promise<DesktopEdgeHostReadiness> {
+  return invoke<DesktopEdgeHostReadiness>('get_edge_host_readiness');
 }
 
 function edgeSelectedAgent(intent: ComposerIntent): Pick<StartRunRequest, 'agentId' | 'model'> {
