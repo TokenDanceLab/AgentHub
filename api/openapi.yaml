@@ -2396,8 +2396,8 @@ paths:
       description: >
         Authenticated Hub session route without the desktop device-type
         restriction used by /edge/devices/register. The request device_id must
-        be a UUID and, when a JWT device_id claim is present, it must match the
-        request. Hub registers the device as `cloud_edge` and returns an
+        be a UUID for the cloud Edge being registered. Hub registers the device
+        as `cloud_edge` under the authenticated Hub user and returns an
         Edge-scoped JWT with `iss=agenthub-hub`, `aud=agenthub-edge`,
         `purpose=edge-api`, `device_type=edge`, and the registered `device_id`
         for Edge API authentication.
@@ -2415,7 +2415,7 @@ paths:
                 device_id:
                   type: string
                   format: uuid
-                  description: Stable cloud Edge device UUID; must match JWT device_id when that claim is present.
+                  description: Stable cloud Edge device UUID to register under the authenticated Hub user.
                 name:
                   type: string
                 host:
