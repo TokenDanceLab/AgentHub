@@ -878,8 +878,8 @@ func TestMessageAttachmentRepo_ListAttachmentsByMessageIDs(t *testing.T) {
 	require.NoError(t, InsertMessage(db, msgWithoutAttachment))
 
 	require.NoError(t, db.Exec(
-		`INSERT INTO attachments (id, hash, size, mime_type, original_name, uploader_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		"att-1", "hash-1", 42, "text/plain", "notes.txt", "owner-1", time.Now(),
+		`INSERT INTO attachments (id, hash, size, mime_type, original_name, uploader_user_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"att-1", "hash-1", 42, "text/plain", "notes.txt", "owner-1", `{"height":3,"width":2}`, time.Now(),
 	).Error)
 	require.NoError(t, CreateMessageAttachmentReferences(db, []model.MessageAttachment{{
 		SessionID:    s.ID,
@@ -896,6 +896,7 @@ func TestMessageAttachmentRepo_ListAttachmentsByMessageIDs(t *testing.T) {
 	assert.Equal(t, int64(42), attachmentsByMessage[msgWithAttachment.ID][0].Size)
 	assert.Equal(t, "text/plain", attachmentsByMessage[msgWithAttachment.ID][0].MimeType)
 	assert.Equal(t, "notes.txt", attachmentsByMessage[msgWithAttachment.ID][0].OriginalName)
+	assert.JSONEq(t, `{"height":3,"width":2}`, attachmentsByMessage[msgWithAttachment.ID][0].Metadata)
 	assert.Empty(t, attachmentsByMessage[msgWithoutAttachment.ID])
 
 	empty, err := ListAttachmentsByMessageIDs(db, nil)
