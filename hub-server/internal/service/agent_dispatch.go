@@ -499,7 +499,11 @@ func (s *AgentService) dispatchTargetBoundTask(ctx context.Context, cacheClient 
 		slog.Error("failed to mark target-bound agent task dispatched", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
 		return
 	}
-	s.mgr.PushToConn(connID, frame)
+	result := s.mgr.PushToConn(connID, frame)
+	if !result.Queued {
+		slog.Warn("target-bound agent task websocket dispatch not queued; preserving pending task", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+		queueTargetTask("websocket delivery not queued", result.Err)
+	}
 }
 
 // CancelTask cancels a pending task by its ID.
