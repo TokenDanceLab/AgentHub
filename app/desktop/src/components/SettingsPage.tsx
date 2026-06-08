@@ -548,6 +548,7 @@ export default function SettingsPage({
               registeredLocalEdgeTarget={registeredLocalEdgeTarget}
               hubTargetsLoading={hubExecutionTargets.isLoading}
               hubTargetsError={hubExecutionTargets.isError}
+              hubTargetsPaginationLimited={hubExecutionTargets.data?.page.hasMore === true}
             />
           )}
 

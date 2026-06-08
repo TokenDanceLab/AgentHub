@@ -55,6 +55,8 @@ const emptyExecutionTargets: ExecutionTargetInventoryResponse = {
   items: [],
   page: { hasMore: false },
 };
+const executionTargetPageSize = 50;
+const maxExecutionTargetPages = 10;
 
 function parseWorkspaceAllowlist(value: ExecutionTarget['workspace_allowlist']): string[] {
   if (Array.isArray(value)) {
@@ -105,10 +107,26 @@ export async function fetchExecutionTargets(
   const client = createHubClient(
     baseUrl ? { baseUrl, getToken: () => token } : { getToken: () => token },
   );
-  const res = await client.listExecutionTargets({ pageSize: 50 });
+  const items: ExecutionTargetInventoryItem[] = [];
+  let page: ExecutionTargetListResponse['page'] = { hasMore: false };
+  let pageCursor: string | undefined;
+
+  for (let i = 0; i < maxExecutionTargetPages; i += 1) {
+    const res = await client.listExecutionTargets({
+      pageSize: executionTargetPageSize,
+      ...(pageCursor ? { pageCursor } : {}),
+    });
+    items.push(...res.items.map(normalizeExecutionTarget));
+    page = res.page;
+    if (!page.hasMore || !page.nextCursor) {
+      return { items, page };
+    }
+    pageCursor = page.nextCursor;
+  }
+
   return {
-    items: res.items.map(normalizeExecutionTarget),
-    page: res.page,
+    items,
+    page: { ...page, hasMore: true },
   };
 }
 
@@ -148,12 +166,8 @@ export function findRegisteredLocalEdgeTarget(
   targets: ExecutionTargetInventoryItem[],
   deviceId: string | null | undefined,
 ): ExecutionTargetInventoryItem | null {
-  const localEdgeTargets = targets.filter((target) => target.target_type === 'local_edge');
-  if (deviceId) {
-    const deviceMatch = localEdgeTargets.find((target) => target.device_id === deviceId);
-    if (deviceMatch) return deviceMatch;
-  }
-  return localEdgeTargets.length === 1 ? localEdgeTargets[0] ?? null : null;
+  if (!deviceId) return null;
+  return targets.find((target) => target.target_type === 'local_edge' && target.device_id === deviceId) ?? null;
 }
 
 export function useHubExecutionTargets(enabledOrOptions: boolean | UseHubExecutionTargetsOptions) {
