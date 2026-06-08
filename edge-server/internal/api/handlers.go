@@ -624,9 +624,35 @@ func (h *Handler) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListArtifacts(runID)))
 }
 
+func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID string) {
+	artifactID = strings.TrimSpace(artifactID)
+	if artifactID == "" || strings.Contains(artifactID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+		return
+	}
+	if artifact, ok := ensureStore(h).GetArtifact(artifactID); ok {
+		writeSuccess(w, http.StatusOK, artifact)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+}
+
 func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
 	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
 	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListPreviews(runID)))
+}
+
+func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID string) {
+	previewID = strings.TrimSpace(previewID)
+	if previewID == "" || strings.Contains(previewID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	if preview, ok := ensureStore(h).GetPreview(previewID); ok {
+		writeSuccess(w, http.StatusOK, preview)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
 }
 
 func runDiffFilesResponse(files []store.RunDiffFile) []map[string]any {
@@ -1459,9 +1485,25 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
+	mux.HandleFunc("/v1/artifacts/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			artifactID := strings.TrimPrefix(r.URL.Path, "/v1/artifacts/")
+			h.GetArtifact(w, r, artifactID)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
 	mux.HandleFunc("/v1/previews", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.GetPreviews(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
+	mux.HandleFunc("/v1/previews/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			previewID := strings.TrimPrefix(r.URL.Path, "/v1/previews/")
+			h.GetPreview(w, r, previewID)
 			return
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
