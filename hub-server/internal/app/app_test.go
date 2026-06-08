@@ -1039,3 +1039,32 @@ func TestOnRouteSetKeepsPendingAgentControlsWhenDeliveryBufferFull(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, []string{payload}, remaining)
 }
+
+func TestPushPendingTasksRequeuesWhenDeliveryBufferFull(t *testing.T) {
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-b")
+	for i := 0; i < cap(conn.Send); i++ {
+		conn.Send <- []byte("already queued")
+	}
+
+	a := &App{
+		CacheClient: cacheClient,
+		mgr:         mgr,
+		coreCtx:     context.Background(),
+	}
+	const payload = `{"type":"agent.dispatch","body":"retry-me"}`
+	require.NoError(t, cacheClient.PushPendingTask(context.Background(), "user-1", payload))
+
+	a.pushPendingTasks(context.Background(), "user-1", conn.ID)
+
+	remaining, err := cacheClient.PopPendingTasks(context.Background(), "user-1")
+	require.NoError(t, err)
+	require.Equal(t, []string{payload}, remaining)
+}
