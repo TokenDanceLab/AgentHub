@@ -45,6 +45,43 @@ function Assert-GitIgnored {
     Pass "$Label is ignored by Git ($RelativePath)"
 }
 
+function Assert-GitPathClean {
+    param(
+        [string]$RelativePath,
+        [string]$Label
+    )
+
+    & git -C $RepoRoot update-index --refresh *> $null
+    $status = & git -C $RepoRoot status --porcelain -- $RelativePath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Fail "$Label git status check failed for $RelativePath"
+    }
+
+    $dirty = @($status | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    if ($dirty.Count -gt 0) {
+        Fail "$Label has uncommitted generated changes: $($dirty -join '; ')"
+    }
+
+    Pass "$Label has no uncommitted generated changes ($RelativePath)"
+}
+
+function Assert-GeneratedSchemaClean {
+    $schemaDirRelative = "app/desktop/src-tauri/gen/schemas"
+    $schemaDir = Join-Path $RepoRoot $schemaDirRelative
+
+    Step "Generated Tauri schema policy"
+    if (-not (Test-Path -LiteralPath $schemaDir)) {
+        Pass "No generated Tauri schema directory is present ($schemaDirRelative)"
+        return
+    }
+
+    $schemaFiles = @(Get-ChildItem -LiteralPath $schemaDir -Filter "*.json" -File -ErrorAction SilentlyContinue)
+    Assert-True ($schemaFiles.Count -gt 0) "generated Tauri schema directory contains JSON schema files"
+    Assert-True (Test-Path -LiteralPath (Join-Path $schemaDir "desktop-schema.json")) "desktop generated schema exists"
+    Assert-True (Test-Path -LiteralPath (Join-Path $schemaDir "windows-schema.json")) "Windows generated schema exists"
+    Assert-GitPathClean $schemaDirRelative "Tauri generated schemas"
+}
+
 function Read-Json([string]$RelativePath) {
     $path = Join-Path $RepoRoot $RelativePath
     return Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -451,6 +488,8 @@ $installerSmokeBlock = Get-WorkflowJobBlock $readinessWorkflowText "windows-inst
 Assert-True ($readinessPolicyBlock -notmatch "pnpm\s+tauri\s+build") "static readiness policy does not run full Tauri build"
 Assert-True ($installerSmokeBlock -notmatch "pnpm\s+tauri\s+build") "installer smoke preflight does not run full Tauri build"
 Assert-WorkflowCommandExplicitOptIn $readinessWorkflowText "pnpm\s+tauri\s+build" "run_windows_package_dry" "windows-package-dry" "Full Tauri build"
+
+Assert-GeneratedSchemaClean
 
 Step "Generated artifact ignore policy"
 $desktopVersion = [string]$package.version

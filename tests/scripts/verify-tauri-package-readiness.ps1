@@ -257,6 +257,32 @@ function New-TaggedReleaseFixture {
     return $tempRoot
 }
 
+function New-DirtyGeneratedSchemaFixture {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    & git -C $tempRoot init -q
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" add .
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" commit -q -m "fixture"
+
+    Add-Content (Join-Path $tempRoot "app\desktop\src-tauri\gen\schemas\desktop-schema.json") "`n// dirty generated schema fixture"
+    return $tempRoot
+}
+
 function New-TestArtifactRoot {
     param(
         [string]$Name,
@@ -343,6 +369,8 @@ Assert-True ($scriptText -match "portable\.zip" -and $scriptText -match "setup\.
 Assert-True ($scriptText -match "artifact-manifest\.json" -and $scriptText -match "Get-FileHash" -and $scriptText -match "sha256" -and $scriptText -match "bytes") "checker validates dry artifact manifest hashes and sizes"
 Assert-True ($scriptText -match "ZipFile" -and $scriptText -match "AgentHub\.exe" -and $scriptText -match "agenthub-edge\.exe" -and $scriptText -match "README\.txt") "checker inspects portable zip contents"
 Assert-True ($scriptText -match "check-ignore" -and $scriptText -match "Assert-GitIgnored") "checker verifies generated package artifacts stay ignored before dry builds"
+Assert-True ($scriptText -match "Generated Tauri schema policy" -and $scriptText -match "src-tauri/gen/schemas" -and $scriptText -match "git status") "checker verifies generated Tauri schemas are clean"
+Assert-True ($scriptText -match "update-index" -and $scriptText -match "--refresh") "checker refreshes the Git index before generated schema dirtiness checks"
 foreach ($artifactPattern in @(
     'dist/AgentHub_${desktopVersion}_x64-setup.exe',
     'dist/AgentHub_${desktopVersion}_x64-portable.zip',
@@ -448,6 +476,16 @@ foreach ($hostShell in $scriptHosts) {
     }
     finally {
         Remove-Item -Recurse -Force $rogueRoot -ErrorAction SilentlyContinue
+    }
+
+    $dirtySchemaRoot = New-DirtyGeneratedSchemaFixture
+    try {
+        $dirtySchema = Invoke-Script $hostShell @("-RepoRoot", $dirtySchemaRoot) $dirtySchemaRoot
+        Assert-True ($dirtySchema.ExitCode -ne 0) "readiness checker rejects dirty generated Tauri schema files under $($dirtySchema.Host)" $dirtySchema.Output
+        Assert-True ($dirtySchema.Output -match "generated schema|src-tauri/gen/schemas|desktop-schema\.json") "dirty generated schema failure names the schema boundary under $($dirtySchema.Host)" $dirtySchema.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $dirtySchemaRoot -ErrorAction SilentlyContinue
     }
 
     $rcMatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.6" "0.3.0-rc.6"
