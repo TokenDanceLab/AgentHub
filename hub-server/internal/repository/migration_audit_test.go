@@ -9,8 +9,8 @@ import (
 )
 
 func TestMigration0040AuditEventsRequiresPgcryptoAndTruncateTrigger(t *testing.T) {
-	up := readMigration0040(t, "up")
-	down := readMigration0040(t, "down")
+	up := readMigration(t, "0040_audit_events_immutable.up.sql")
+	down := readMigration(t, "0040_audit_events_immutable.down.sql")
 
 	if !strings.Contains(up, "CREATE EXTENSION IF NOT EXISTS pgcrypto;") {
 		t.Fatal("0040 up migration must enable pgcrypto before using digest()")
@@ -24,7 +24,20 @@ func TestMigration0040AuditEventsRequiresPgcryptoAndTruncateTrigger(t *testing.T
 	requireSQL(t, normalizedDown, "drop trigger if exists trg_audit_events_no_truncate on audit_events")
 }
 
-func readMigration0040(t *testing.T, direction string) string {
+func TestMigration0042MessageSearchTsvectorCreatesPartialGINExpressionIndex(t *testing.T) {
+	up := readMigration(t, "0042_message_search_tsvector.up.sql")
+	down := readMigration(t, "0042_message_search_tsvector.down.sql")
+
+	normalizedUp := normalizeSQL(up)
+	requireSQL(t, normalizedUp, "create index if not exists idx_messages_content_text_tsvector")
+	requireSQL(t, normalizedUp, "on messages using gin (to_tsvector('simple', coalesce(content->>'text', '')))")
+	requireSQL(t, normalizedUp, "where recalled = false")
+
+	normalizedDown := normalizeSQL(down)
+	requireSQL(t, normalizedDown, "drop index if exists idx_messages_content_text_tsvector")
+}
+
+func readMigration(t *testing.T, filename string) string {
 	t.Helper()
 
 	_, file, _, ok := runtime.Caller(0)
@@ -32,7 +45,7 @@ func readMigration0040(t *testing.T, direction string) string {
 		t.Fatal("cannot locate migration audit test file")
 	}
 
-	path := filepath.Join(filepath.Dir(file), "..", "..", "migrations", "0040_audit_events_immutable."+direction+".sql")
+	path := filepath.Join(filepath.Dir(file), "..", "..", "migrations", filename)
 	content, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read migration %s: %v", path, err)
