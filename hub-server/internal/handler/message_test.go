@@ -26,6 +26,7 @@ type mockMessageService struct {
 	editFn           func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
 	addReactionFn    func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
 	removeReactionFn func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	listReactionsFn  func(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error)
 }
 
 func (m *mockMessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
@@ -66,6 +67,9 @@ func (m *mockMessageService) AddMessageReaction(ctx context.Context, userID, ses
 }
 func (m *mockMessageService) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
 	return m.removeReactionFn(ctx, userID, sessionID, msgID, reaction)
+}
+func (m *mockMessageService) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+	return m.listReactionsFn(ctx, userID, sessionID, msgID)
 }
 
 // ── SendMessage ─────────────────────────────────────────────────────
