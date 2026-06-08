@@ -1,88 +1,83 @@
-# AgentHub 48h P0 Roadmap
+# AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 03:11 +08:00
-> SSOT branch: `codex/p0-remote-control-integration`
-> Integration baseline: `f6196b6f docs(roadmap): restore real login approval gate wording`
+> Last updated: 2026-06-09 04:36 +08:00
+> Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
+> Active integration branch: `codex/p1-remote-control-integration`
+> Next candidate tag after merge: `v0.3.0-rc.6`
 
-Archived merge history remains in `docs/archive/roadmap-pre-refresh-20260608-1008.md` and `docs/archive/roadmap-full-history-20260605.md`. This file is only the active sprint board.
+Archived history stays in `docs/archive/roadmap-pre-refresh-20260608-1008.md` and `docs/archive/roadmap-full-history-20260605.md`. This file is the current sprint board only.
 
-## P0 Target
+## Goal
 
-Ship one usable remote-control loop:
+Ship a usable remote-control loop within 48h:
 
 ```text
 Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI/SDK adapter
 ```
 
-P0 is not a unit-test milestone. The minimum usable proof is a Hub-mediated Desktop/Web flow where Web selects a registered `local_edge` target, Hub routes to that exact Desktop/Edge device, Desktop starts Local Edge, Edge emits adapter events, and Web/Desktop can replay the same task/run evidence.
+P0 fixture/readiness is merged and tagged at `v0.3.0-rc.5`. P1 now closes the gaps between fixture proof and a localhost/product-usable Desktop + Web flow. Mobile is owned by the mobile thread; only protocol drift is coordinated here.
 
-Mobile stays outside this implementation thread, but the Hub protocol must remain reusable by Mobile. Real TokenDanceID login, real CLI/model spend, public deploy, signing/notarization, updater metadata, and release upload remain approval-gated.
+Real TokenDanceID login, real CLI/model spend, public deploy, signing/notarization, updater metadata publication, and release upload remain explicit approval gates.
 
-## Current Baseline
+## Current Integration State
 
-- `origin/dev/delicious233` has the backend/API foundation merged. Do not use the dirty local main worktree for implementation.
-- `codex/p0-remote-control-integration` is the active integration branch and the only branch eligible to merge back after combined gates.
-- Absorbed into the integration branch: target-bound dispatch/control, Web target selection, TeamRun target routing, Desktop Hub bridge mount, Desktop device registration, Edge CLI validation, brokered permission decision path, shared `agent.control`, FIFO replay, login fixture topology, remote evidence taxonomy, fixture E2E gate, SDK fixture mapper, and Web auth/deploy readiness.
-- Web remains Hub-only. Desktop remains Local Edge/Tauri/host-capability only. No Web direct Local Edge access and no Desktop direct CLI spawn.
-
-## Active Board
-
-| Area | State | Evidence / next action |
+| Lane | State | Notes |
 |---|---|---|
-| Unified P0 baseline | integrated | Branch `codex/p0-remote-control-integration`, integration baseline `f6196b6f`, ahead of `origin/dev/delicious233`. |
-| Fixture remote-control E2E | integrated | `scripts/verify-remote-control-fixture-e2e.ps1` passes 107/0; negative tests cover missing refs and missing adapter callback. |
-| SDK adapter fixture | integrated | OpenCode running/completed/error fixture coverage absorbed; `go test ./internal/adapters -run SDKFixture -short -count=1` passes. |
-| Web auth/deploy readiness | integrated | Web auth root mounted; no silent demo fallback in real mode; Web build plus deploy readiness 16/16 passes after production build. |
-| Desktop device registration | integrated | Desktop registers stable device and refreshes execution targets before Hub WS integration. |
-| Desktop packaging dry | integrated | Local unsigned packaging dry gate, SQLite app-data sidecar policy, and sibling-path delete guard are absorbed; signing/notarization/updater metadata remain approval-gated. |
-| Fixture umbrella gate | integrated | `verify-p0-remote-control-fixture.ps1` runs login topology, Web boundary, fixture E2E, TeamRun contract, and SDK fixture gates in FixtureRehearsal mode. |
-| Runtime/model icons | integrated | LobeHub icon mapping for runtime/model/provider badges is absorbed; focused shared tests and Web typecheck pass. |
-| Replay UX evidence | integrated | Hub replay run-session cards now show source/mode/target/task/run/adapter/device evidence; opaque IDs stay conservative, explicit real/verified/live modes show Real. |
-| Edge CLI real-readiness | integrated | Proposal-only CLI readiness gate records supported adapters and no-fallback evidence; RealTested/Submission stay blocked for an independent real-run verifier. |
-| Real login / real CLI / public deploy | approval-gated | Fixture/readiness only. No real TokenDanceID browser login, model/API spend, or public upload has been run. |
+| Stable baseline | done | `origin/dev/delicious233` is `19079563`; `v0.3.0-rc.5` must not move. |
+| P1 integration | ready-for-review | `codex/p1-remote-control-integration` contains the reviewed rc.6 slice set and final local gates are green. |
+| Edge SQLite preview | integrated | SQLite diff projection with collision-safe IDs; Edge full short tests pass. |
+| Localhost smoke harness | integrated | Plan/FixtureOnly/LocalOnly gates pass; localhost services remain separate. |
+| Desktop Local Edge launch diagnostics | integrated | Fail-closed token startup, health URL, stdout/stderr log paths, dry gate coverage. |
+| Web explicit target gate | integrated | Real-mode composer and TeamRun require explicit Hub target; targetless dispatch fails before Hub side effects. |
+| Desktop release rc.6 gate | integrated | Desktop metadata is `0.3.0-rc.6`; hyphenated tags are GitHub prereleases; no rc.5 tag move. |
+| Desktop target registration | integrated | Desktop registration creates/refreshes owner-scoped `local_edge`; race fix adds active target uniqueness and conflict re-read. |
+| Tauri file permission boundary | integrated | File/git/search commands are Rust state-bound; renderer store sync cannot grant host dirs; trusted folder picker bridge exists. |
 
-## Worktree Rules
+## Operating Rules
 
-1. The main worktree `D:\Code\TokenDance\AgentHub` is read-only for this sprint because it is stale/dirty.
-2. New implementation worktrees fork from `codex/p0-remote-control-integration`, not from main.
-3. Worker branches use disjoint write sets and report SHA, changed files, verification, and blockers. Workers do not push or merge.
-4. Every worker result needs one read-only review before cherry-pick into the integration branch.
-5. Absorbed or obsolete agents are closed promptly. Running workers continue only while they own a current board item.
+1. Do not use `D:\Code\TokenDance\AgentHub` for implementation. It is stale and dirty.
+2. Workers use isolated `.worktrees/*` branches with disjoint write sets.
+3. Workers do not push, merge, tag, or edit this roadmap.
+4. Every implementation commit needs a read-only review before cherry-pick into `codex/p1-remote-control-integration`.
+5. The controller owns roadmap, branch ordering, final gates, and cleanup.
+6. Close completed/obsolete agents promptly; keep only active workers and reviewers running.
 
-## Parallel Topology
+## Priority Topology
 
-| Priority | Worker lane | Write scope | Blocked by |
+| Priority | Work | Owner branch | Gate |
 |---|---|---|---|
-| P0-A | Combined P0 final gate | Integration branch only | Run umbrella gate, Web build/deploy readiness, desktop packaging dry, focused Hub/Edge/Web/Desktop tests. |
-| P0-B | Approved real-run plan | New worktree after approval | Real TokenDanceID, real CLI/model, public deploy, signing, and release evidence remain separate approval-gated slices. |
-| P1 | Edge SQL/store migration | Edge store worktree only | After P0 remote-control proof stabilizes. |
-| P1 | Release packaging/signing | Tauri release workflow/docs only | Requires signing/notarization/release approval. |
+| 1 | Push/review rc.6 integration branch | integration branch | Keep `v0.3.0-rc.5` fixed; do not push a `v0.3.0-rc.6` tag until release approval. |
+| 2 | Start localhost product loop | new worktree after rc.6 integration | Start local Hub/Web/Desktop/Local Edge fixture services and prove Web selects Desktop target. |
+| 3 | Wire trusted workspace picker in Desktop UI | small Desktop worktree | `chooseWorkspaceRootFromBackend()` exists; visible UI hookup is still follow-up. |
+| 4 | Add migration preflight for target duplicates | backend/script worktree | Before deployment, detect active duplicate `local_edge` targets that would block migration `0047`. |
+| 5 | Real login approval slice | separate worktree | Requires approved OAuth client/test account/env/evidence boundary. |
+| 6 | Real CLI/model approval slice | separate worktree | Requires runtime, budget, redaction, artifact policy. |
+| 7 | Public deploy and signed release | separate worktrees | Requires target env, signing/notary/release upload approval. |
 
-## Verification Gates
+## Verification Queue
 
-Run per touched slice, then run the combined gate before merging the integration branch:
+Run on `codex/p1-remote-control-integration` before push/merge:
 
 ```powershell
 git diff --check origin/dev/delicious233...HEAD
-.\scripts\verify-login-fixture-topology.ps1
-.\scripts\verify-oidc-flow.ps1 -LocalOnly -SkipTD
-.\scripts\verify-web-hub-boundary.ps1
-.\scripts\verify-packaged-login-real-readiness.ps1 -RepoRoot .
-.\scripts\verify-remote-control-fixture-e2e.ps1 -Stamp final-local
-.\tests\scripts\verify-remote-control-fixture-e2e.ps1 -RepoRoot .
-cd app\web; corepack.cmd pnpm typecheck; corepack.cmd pnpm build
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-p0-local-smoke.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-web-hub-boundary.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-tauri-package-dry.ps1 -RepoRoot . -SkipInstall -SkipExecutableCompile
+cd edge-server; go test ./... -short -count=1
+cd hub-server; go test ./... -short -count=1
+cd app\shared; corepack.cmd pnpm exec vitest run src\workbench\UnifiedComposer.test.tsx src\workbench\AgentHubWorkbench.test.tsx --reporter=dot
+cd app\web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vitest run src\platform\webPlatform.test.ts src\views\TeamRunConsole.test.tsx src\platform\useWebWorkbenchModel.test.ts src\App.test.tsx --reporter=dot
 cd app\desktop; corepack.cmd pnpm typecheck
-cd edge-server; go test ./internal/api ./internal/adapters ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
-cd hub-server; go test ./internal/handler ./internal/service ./internal/router -short -count=1
 ```
 
-`verify-web-deploy-readiness.ps1` requires `app/web/dist`, so run the Web production build first. Windows PowerShell 5.1 may fail scripts that use newer .NET APIs; `pwsh` is the preferred shell for those gates.
+Use precise `pnpm exec vitest run <files>` commands in package directories. Workspace-level `pnpm --filter ... test -- --run ...` currently expands into unrelated stale tests.
 
 ## Approval Gates
 
-- Real TokenDanceID/OIDC login, real CLI/model spend, public deploy, signing/notarization, updater metadata, and release upload remain explicit approval gates.
-- Real TokenDanceID login: requires approved OAuth client, disposable/test account, Hub environment, browser evidence boundary, and no token disclosure.
+- Real TokenDanceID login: needs OAuth client, disposable/test account, Hub environment, callback URL confirmation, browser evidence boundary, and no token disclosure.
 - Real CLI/model run: needs runtime choice, budget approval, redaction policy, and artifact upload policy.
-- Public Web deploy: needs target environment, env var ownership, callback URL confirmation, and no-secret deploy log boundary.
-- Desktop release: signing, notarization, stapling, updater metadata, and release upload are separate approval slices.
-- Mobile implementation remains owned by the mobile thread; coordinate only on protocol drift.
+- Public Web deploy: needs target environment, env var ownership, callback URL confirmation, and no-secret deploy logs.
+- Desktop release: signing, notarization, stapling, updater metadata publication, and release upload are separate approval slices.
+- macOS packaging is not assumed automatically compatible; current rc.6 work only records unsigned policy boundaries and future sidecar/package expectations.
