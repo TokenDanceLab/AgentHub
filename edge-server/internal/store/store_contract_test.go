@@ -133,6 +133,103 @@ func TestRepositoryContract(t *testing.T) {
 	}
 }
 
+func TestArtifactContentSourcePathSafety(t *testing.T) {
+	workspaceRoot := filepath.Join(t.TempDir(), "workspace")
+	tests := []struct {
+		name       string
+		sourcePath string
+		wantSafe   bool
+		wantKind   string
+		wantPath   string
+		wantRead   bool
+	}{
+		{
+			name:       "POSIX absolute falls back to basename",
+			sourcePath: "/Users/ding/private/secret.log",
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "Windows drive slash absolute falls back to basename",
+			sourcePath: "C:/Users/Ding/private/secret.log",
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "Windows drive backslash absolute falls back to basename",
+			sourcePath: `C:\Users\Ding\private\secret.log`,
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "Windows drive relative file falls back to basename",
+			sourcePath: "C:secret.log",
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "Windows drive relative nested path falls back to basename",
+			sourcePath: `C:Users\Ding\private\secret.log`,
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "UNC backslash absolute falls back to basename",
+			sourcePath: `\\server\share\secret.log`,
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "UNC slash absolute falls back to basename",
+			sourcePath: "//server/share/secret.log",
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "parent traversal falls back to basename",
+			sourcePath: "../private/secret.log",
+			wantKind:   ArtifactContentSourceBasename,
+			wantPath:   "secret.log",
+		},
+		{
+			name:       "safe relative remains readable workspace relative",
+			sourcePath: "dist/report.md",
+			wantSafe:   true,
+			wantKind:   ArtifactContentSourceWorkspaceRelative,
+			wantPath:   "dist/report.md",
+			wantRead:   true,
+		},
+		{
+			name:       "colon in nested relative filename remains workspace relative",
+			sourcePath: "docs/C:note.md",
+			wantSafe:   true,
+			wantKind:   ArtifactContentSourceWorkspaceRelative,
+			wantPath:   "docs/C:note.md",
+			wantRead:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			relPath, safe := safeWorkspaceRelativePath(tt.sourcePath)
+			if safe != tt.wantSafe {
+				t.Fatalf("safeWorkspaceRelativePath(%q) safe = %v, want %v (path %q)", tt.sourcePath, safe, tt.wantSafe, relPath)
+			}
+			if safe && relPath != tt.wantPath {
+				t.Fatalf("safeWorkspaceRelativePath(%q) path = %q, want %q", tt.sourcePath, relPath, tt.wantPath)
+			}
+
+			source := NewArtifactContentSource(workspaceRoot, tt.sourcePath)
+			if source == nil {
+				t.Fatalf("NewArtifactContentSource(%q) = nil", tt.sourcePath)
+			}
+			if source.Kind != tt.wantKind || source.Path != tt.wantPath || source.Readable != tt.wantRead {
+				t.Fatalf("NewArtifactContentSource(%q) = %#v, want kind=%s path=%q readable=%v", tt.sourcePath, source, tt.wantKind, tt.wantPath, tt.wantRead)
+			}
+		})
+	}
+}
+
 func TestRepositoryContractFileStoreSnapshotRestore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "edge-store.json")
 	s, err := NewFile(path)
@@ -577,6 +674,46 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 		t.Fatalf("GetArtifact = %#v, %v; want stored artifact", got, ok)
 	}
 
+	workspaceRoot := filepath.Join(t.TempDir(), "workspace")
+	insideSource := filepath.Join(workspaceRoot, "dist", "report.md")
+	sourceArtifact, err := evidence.UpsertArtifact(Artifact{
+		ID:            "artifact_content_source",
+		RunID:         run.ID,
+		ThreadID:      thread.ID,
+		Kind:          "markdown",
+		Path:          insideSource,
+		SizeBytes:     128,
+		ContentSource: NewArtifactContentSource(workspaceRoot, insideSource),
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact content source returned error: %v", err)
+	}
+	if sourceArtifact.Path != "report.md" {
+		t.Fatalf("source artifact path = %q, want basename-only display path without private root", sourceArtifact.Path)
+	}
+	if sourceArtifact.ContentSource == nil || sourceArtifact.ContentSource.Kind != "workspace_relative" || sourceArtifact.ContentSource.Path != "dist/report.md" || !sourceArtifact.ContentSource.Readable {
+		t.Fatalf("source artifact content source = %#v, want safe workspace-relative readable source", sourceArtifact.ContentSource)
+	}
+
+	outsideSource := filepath.Join(t.TempDir(), "private", "secret.log")
+	basenameArtifact, err := evidence.UpsertArtifact(Artifact{
+		ID:            "artifact_basename_source",
+		RunID:         run.ID,
+		ThreadID:      thread.ID,
+		Kind:          "log",
+		Path:          outsideSource,
+		ContentSource: NewArtifactContentSource(workspaceRoot, outsideSource),
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact basename source returned error: %v", err)
+	}
+	if basenameArtifact.Path != "secret.log" {
+		t.Fatalf("basename artifact path = %q, want basename-only display path", basenameArtifact.Path)
+	}
+	if basenameArtifact.ContentSource == nil || basenameArtifact.ContentSource.Kind != "basename" || basenameArtifact.ContentSource.Path != "secret.log" || basenameArtifact.ContentSource.Readable {
+		t.Fatalf("basename artifact content source = %#v, want unreadable basename-only source", basenameArtifact.ContentSource)
+	}
+
 	preview, err := evidence.UpsertPreview(Preview{
 		ID:       "preview_contract",
 		RunID:    run.ID,
@@ -635,11 +772,17 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	if got := restoredEvidence.ListRunDiffFiles(run.ID); len(got) != 1 || got[0].Diff != diffFile.Diff {
 		t.Fatalf("restored diffs = %#v, want persisted diff", got)
 	}
-	if got := restoredEvidence.ListArtifacts(run.ID); len(got) != 1 || got[0].ID != artifact.ID {
-		t.Fatalf("restored artifacts = %#v, want persisted artifact", got)
+	if got := restoredEvidence.ListArtifacts(run.ID); len(got) != 3 {
+		t.Fatalf("restored artifacts = %#v, want all persisted artifacts", got)
 	}
 	if got, ok := restoredEvidence.GetArtifact(artifact.ID); !ok || got.ID != artifact.ID {
 		t.Fatalf("restored artifact lookup = %#v, %v; want persisted artifact", got, ok)
+	}
+	if got, ok := restoredEvidence.GetArtifact(sourceArtifact.ID); !ok || got.ContentSource == nil || got.ContentSource.Path != "dist/report.md" || got.Path != "report.md" {
+		t.Fatalf("restored source artifact = %#v, %v; want persisted safe content source", got, ok)
+	}
+	if got, ok := restoredEvidence.GetArtifact(basenameArtifact.ID); !ok || got.ContentSource == nil || got.ContentSource.Path != "secret.log" || got.ContentSource.Readable || got.Path != "secret.log" {
+		t.Fatalf("restored basename artifact = %#v, %v; want persisted basename-only source", got, ok)
 	}
 	if got := restoredEvidence.ListPreviews(run.ID); len(got) != 2 || got[0].ID != preview.ID || got[0].Status != "stopped" || got[1].ID != startingPreview.ID || got[1].Status != "starting" {
 		t.Fatalf("restored previews = %#v, want persisted stopped and starting previews", got)

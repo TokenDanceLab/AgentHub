@@ -276,6 +276,9 @@ func TestRuntimeEvidenceEmitterPersistsArtifactDiffPreviewEvidence(t *testing.T)
 	if len(artifacts) != 1 || artifacts[0].ID != "artifact_1" || artifacts[0].ThreadID != run.ThreadID || artifacts[0].SizeBytes != 128 {
 		t.Fatalf("ListArtifacts = %#v, want persisted runtime artifact evidence", artifacts)
 	}
+	if artifacts[0].ContentSource == nil || artifacts[0].ContentSource.Kind != store.ArtifactContentSourceWorkspaceRelative || artifacts[0].ContentSource.Path != "dist/report.md" || !artifacts[0].ContentSource.Readable {
+		t.Fatalf("artifact content source = %#v, want safe workspace-relative source", artifacts[0].ContentSource)
+	}
 	previews := s.ListPreviews(run.ID)
 	if len(previews) != 1 || previews[0].ID != "preview_1" || previews[0].URL != "" || previews[0].Status != "stopped" {
 		t.Fatalf("ListPreviews = %#v, want persisted runtime preview evidence", previews)
