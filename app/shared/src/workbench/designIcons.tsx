@@ -5,7 +5,7 @@ import {
   ModelIcon,
   OpenCode,
 } from '@lobehub/icons';
-import ProviderIcon from '@lobehub/icons/es/features/ProviderIcon';
+import ProviderIcon from '@lobehub/icons/es/features/ProviderIcon/index.js';
 import AntigravityIcon from '@lobehub/icons/es/Antigravity/components/Color.js';
 import { siCursor, siGitforwindows, siLinux } from 'simple-icons';
 import androidStudioIcon from 'devicon/icons/androidstudio/androidstudio-original.svg';
