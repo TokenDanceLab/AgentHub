@@ -337,6 +337,17 @@
 .startRunActions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.targetHint {
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 11px;
 }
 
 /* ── Tabs ── */

@@ -19,6 +19,7 @@ import type {
   AgentTeamTask,
   TeamRunState,
 } from '@/api/hubClient';
+import { selectOnlineLocalEdgeExecutionTarget, useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useHubStore } from '@/stores/hubStore';
 import { getAccessToken } from '@/hooks/useAuth';
 import { TeamMemberList } from '@/components/IM/TeamMemberList';
@@ -125,6 +126,10 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
     selectedTeamId: selectedTeamId ?? undefined,
     selectedRunId: selectedRunId ?? undefined,
   });
+  const executionTargetsQuery = useHubExecutionTargets({
+    enabled: hubAuthenticated,
+    getToken: tokenGetter,
+  });
 
   const teams = agentTeamsQuery.data?.teams ?? [];
   const bundles = agentTeamsQuery.data?.bundles ?? [];
@@ -137,6 +142,25 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const state = localState ?? agentTeamsQuery.data?.state;
   const tasks = localTasks.length > 0 ? localTasks : (agentTeamsQuery.data?.tasks ?? []);
   const events = localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? []);
+  const selectedRunTarget = useMemo(
+    () => selectOnlineLocalEdgeExecutionTarget(executionTargetsQuery.data?.items ?? []),
+    [executionTargetsQuery.data?.items],
+  );
+  const runTargetLoading =
+    executionTargetsQuery.isLoading ||
+    (executionTargetsQuery.isFetching && !executionTargetsQuery.data);
+  const runTargetError = executionTargetsQuery.error instanceof Error
+    ? executionTargetsQuery.error.message
+    : executionTargetsQuery.error
+      ? String(executionTargetsQuery.error)
+      : '';
+  const runTargetStatus = runTargetLoading
+    ? t('teamRun.targetLoading', 'Loading Hub execution targets...')
+    : runTargetError
+      ? t('teamRun.targetError', 'Hub execution targets unavailable: {{message}}', { message: runTargetError })
+      : selectedRunTarget
+        ? t('teamRun.targetSelected', 'Target: {{name}}', { name: selectedRunTarget.id })
+        : t('teamRun.targetMissing', 'No online local_edge execution target is available.');
 
   // Mutations
   const createTeamMut = useCreateAgentTeam({ getToken: tokenGetter });
@@ -233,11 +257,11 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   }, [createTeamMut, newTeamDesc, newTeamName]);
 
   const handleStartRun = useCallback(async () => {
-    if (!selectedTeamId || !triggerMessage.trim()) return;
+    if (!selectedTeamId || !triggerMessage.trim() || !selectedRunTarget) return;
     try {
       const run = await startRunMut.mutateAsync({
         teamId: selectedTeamId,
-        run: { trigger_message: triggerMessage.trim() },
+        run: { trigger_message: triggerMessage.trim(), target_id: selectedRunTarget.id },
       });
       setTriggerMessage('');
       setShowStartRun(false);
@@ -245,7 +269,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
     } catch {
       // mutation handles error
     }
-  }, [handleSelectRun, selectedTeamId, startRunMut, triggerMessage]);
+  }, [handleSelectRun, selectedRunTarget, selectedTeamId, startRunMut, triggerMessage]);
 
   const handleApprove = useCallback(
     async (approvalId: string) => {
@@ -500,6 +524,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                         rows={2}
                       />
                       <div className={styles.startRunActions}>
+                        <span className={styles.targetHint}>{runTargetStatus}</span>
                         <button
                           type="button"
                           className={styles.secondaryBtn}
@@ -511,7 +536,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                           type="button"
                           className={styles.primaryBtn}
                           onClick={handleStartRun}
-                          disabled={!triggerMessage.trim() || startRunMut.isPending}
+                          disabled={!triggerMessage.trim() || !selectedRunTarget || runTargetLoading || startRunMut.isPending}
                         >
                           {startRunMut.isPending
                             ? t('teamRun.starting', 'Starting...')
