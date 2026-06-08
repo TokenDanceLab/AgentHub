@@ -2,29 +2,49 @@ use crate::edge_manager::{EdgeHostReadiness, EdgeStatus, SharedEdgeManager};
 use crate::oidc_server::{check_loopback_callback_readiness, LoopbackReadiness};
 use crate::secure_store::{check_credential_store_readiness, CredentialStoreReadiness};
 use serde::{Deserialize, Serialize};
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::RwLock;
 use tauri::State;
+
+#[derive(Debug, Default)]
+pub struct WorkspaceFileAccessState {
+    allowed_roots: RwLock<Vec<PathBuf>>,
+}
+
+impl WorkspaceFileAccessState {
+    fn allowed_roots(&self) -> Result<Vec<PathBuf>, String> {
+        let roots = self
+            .allowed_roots
+            .read()
+            .map_err(|_| "Workspace file access state is unavailable".to_string())?;
+        if roots.is_empty() {
+            return Err("No allowed workspace directories configured".to_string());
+        }
+        Ok(roots.clone())
+    }
+
+    fn replace_roots(&self, roots: Vec<PathBuf>) -> Result<(), String> {
+        let mut guard = self
+            .allowed_roots
+            .write()
+            .map_err(|_| "Workspace file access state is unavailable".to_string())?;
+        *guard = roots;
+        Ok(())
+    }
+}
 
 /// Validate that a path is within an allowed directory.
 /// Returns the canonicalized path on success.
 fn validate_path(path: &Path, allowlist: &[PathBuf]) -> Result<PathBuf, String> {
-    let canonical = path
-        .canonicalize()
-        .or_else(|_| {
-            // For non-existent paths, canonicalize the parent and join
-            if let Some(parent) = path.parent() {
-                parent.canonicalize().map(|p| p.join(path.file_name().unwrap_or_default()))
-            } else {
-                Err(std::io::Error::new(std::io::ErrorKind::NotFound, "path has no parent"))
-            }
-        })
-        .map_err(|e| format!("Cannot resolve path '{}': {}", path.display(), e))?;
-
     if allowlist.is_empty() {
-        return Ok(canonical);
+        return Err("No allowed workspace directories configured".to_string());
     }
+
+    let canonical = resolve_for_boundary(path)
+        .map_err(|e| format!("Cannot resolve path '{}': {}", path.display(), e))?;
 
     let allowed = allowlist.iter().any(|dir| {
         let dir_canonical = dir.canonicalize().unwrap_or_else(|_| dir.clone());
@@ -39,6 +59,56 @@ fn validate_path(path: &Path, allowlist: &[PathBuf]) -> Result<PathBuf, String> 
             path.display()
         ))
     }
+}
+
+fn resolve_for_boundary(path: &Path) -> std::io::Result<PathBuf> {
+    if path.exists() {
+        return path.canonicalize();
+    }
+
+    let mut missing: Vec<OsString> = Vec::new();
+    let mut ancestor = path;
+    while !ancestor.exists() {
+        let name = ancestor.file_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "path has no existing ancestor")
+        })?;
+        missing.push(name.to_os_string());
+        ancestor = ancestor.parent().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "path has no existing ancestor")
+        })?;
+    }
+
+    let mut canonical = ancestor.canonicalize()?;
+    for component in missing.iter().rev() {
+        canonical.push(component);
+    }
+    Ok(canonical)
+}
+
+fn validate_state_path(path: &Path, access: &WorkspaceFileAccessState) -> Result<PathBuf, String> {
+    validate_path(path, &access.allowed_roots()?)
+}
+
+fn workspace_roots_from_store_data(data: &WorkspaceStoreData) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    for entry in &data.workspaces {
+        let path = PathBuf::from(entry.path.trim());
+        if !path.is_absolute() || !path.is_dir() {
+            continue;
+        }
+        let canonical = path.canonicalize().unwrap_or(path);
+        if !roots.iter().any(|root| root == &canonical) {
+            roots.push(canonical);
+        }
+    }
+    roots
+}
+
+fn replace_workspace_roots_from_store(
+    access: &WorkspaceFileAccessState,
+    data: &WorkspaceStoreData,
+) -> Result<(), String> {
+    access.replace_roots(workspace_roots_from_store_data(data))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -97,7 +167,10 @@ pub async fn get_packaged_login_readiness() -> Result<PackagedLoginReadiness, St
 }
 
 #[tauri::command]
-pub async fn start_edge(app: tauri::AppHandle, state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
+pub async fn start_edge(
+    app: tauri::AppHandle,
+    state: State<'_, SharedEdgeManager>,
+) -> Result<EdgeStatus, String> {
     let mut mgr = state.lock().await;
     mgr.start(&app).await?;
     Ok(mgr.status())
@@ -120,13 +193,18 @@ fn edge_host_readiness_snapshot(mgr: &crate::edge_manager::EdgeManager) -> EdgeH
 /// Walk a directory and return a tree of FileEntry nodes.
 /// Respects .gitignore patterns when a .gitignore file exists at the root.
 #[tauri::command]
-pub async fn read_dir_tree(dir: String) -> Result<Vec<FileEntry>, String> {
+pub async fn read_dir_tree(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<Vec<FileEntry>, String> {
     let root = Path::new(&dir);
+    let root = validate_state_path(root, &access)?;
     if !root.is_dir() {
         return Err(format!("Not a directory: {}", dir));
     }
-    let gitignore_patterns = load_gitignore(root);
-    walk_dir(root, root, &gitignore_patterns)
+    let roots = access.allowed_roots()?;
+    let gitignore_patterns = load_gitignore(&root);
+    walk_dir(&root, &root, &gitignore_patterns, &roots)
 }
 
 /// Create a new file at the given path. Parent directories must exist.
@@ -135,13 +213,11 @@ pub async fn read_dir_tree(dir: String) -> Result<Vec<FileEntry>, String> {
 pub async fn create_file(
     path: String,
     content: Option<String>,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if p.exists() {
         return Err(format!("File already exists: {}", path));
     }
@@ -149,24 +225,22 @@ pub async fn create_file(
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
     let data = content.unwrap_or_default();
-    fs::write(p, data).map_err(|e| format!("Failed to write file: {}", e))
+    fs::write(&p, data).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 /// Create a new directory at the given path. Creates parents as needed.
 #[tauri::command]
 pub async fn create_folder(
     path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if p.exists() {
         return Err(format!("Path already exists: {}", path));
     }
-    fs::create_dir_all(p).map_err(|e| format!("Failed to create folder: {}", e))
+    fs::create_dir_all(&p).map_err(|e| format!("Failed to create folder: {}", e))
 }
 
 /// Rename/move a file or directory from old_path to new_path.
@@ -174,15 +248,13 @@ pub async fn create_folder(
 pub async fn rename_entry(
     old_path: String,
     new_path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let src = Path::new(&old_path);
     let dst = Path::new(&new_path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(src, &dirs)?;
-        validate_path(dst, &dirs)?;
-    }
+    let src = validate_state_path(src, &access)?;
+    let dst = validate_state_path(dst, &access)?;
     if !src.exists() {
         return Err(format!("Source does not exist: {}", old_path));
     }
@@ -192,7 +264,7 @@ pub async fn rename_entry(
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
-    fs::rename(src, dst).map_err(|e| format!("Failed to rename: {}", e))
+    fs::rename(&src, &dst).map_err(|e| format!("Failed to rename: {}", e))
 }
 
 /// Copy a file. Directories are copied recursively.
@@ -200,15 +272,14 @@ pub async fn rename_entry(
 pub async fn copy_entry(
     src_path: String,
     dst_path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let src = Path::new(&src_path);
     let dst = Path::new(&dst_path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(src, &dirs)?;
-        validate_path(dst, &dirs)?;
-    }
+    let roots = access.allowed_roots()?;
+    let src = validate_path(src, &roots)?;
+    let dst = validate_path(dst, &roots)?;
     if !src.exists() {
         return Err(format!("Source does not exist: {}", src_path));
     }
@@ -219,22 +290,31 @@ pub async fn copy_entry(
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
     if src.is_dir() {
-        copy_dir_recursive(src, dst).map_err(|e| format!("Failed to copy directory: {}", e))
+        copy_dir_recursive(&src, &dst, &roots)
+            .map_err(|e| format!("Failed to copy directory: {}", e))
     } else {
-        fs::copy(src, dst).map_err(|e| format!("Failed to copy file: {}", e))?;
+        fs::copy(&src, &dst).map_err(|e| format!("Failed to copy file: {}", e))?;
         Ok(())
     }
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+fn copy_dir_recursive(src: &Path, dst: &Path, allowlist: &[PathBuf]) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
         let src_path = entry.path();
+        if file_type.is_symlink() {
+            return Err(std::io::Error::other(format!(
+                "Refusing to copy symbolic link: {}",
+                src_path.display()
+            )));
+        }
+        validate_path(&src_path, allowlist).map_err(std::io::Error::other)?;
         let dst_path = dst.join(entry.file_name());
         if file_type.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
+            validate_path(&dst_path, allowlist).map_err(std::io::Error::other)?;
+            copy_dir_recursive(&src_path, &dst_path, allowlist)?;
         } else {
             fs::copy(&src_path, &dst_path)?;
         }
@@ -246,20 +326,18 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 #[tauri::command]
 pub async fn delete_entry(
     path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if !p.exists() {
         return Err(format!("Path does not exist: {}", path));
     }
     if p.is_dir() {
-        fs::remove_dir_all(p).map_err(|e| format!("Failed to delete directory: {}", e))
+        fs::remove_dir_all(&p).map_err(|e| format!("Failed to delete directory: {}", e))
     } else {
-        fs::remove_file(p).map_err(|e| format!("Failed to delete file: {}", e))
+        fs::remove_file(&p).map_err(|e| format!("Failed to delete file: {}", e))
     }
 }
 
@@ -267,20 +345,18 @@ pub async fn delete_entry(
 #[tauri::command]
 pub async fn read_file(
     path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<String, String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if !p.exists() {
         return Err(format!("File does not exist: {}", path));
     }
     if p.is_dir() {
         return Err(format!("Path is a directory, not a file: {}", path));
     }
-    fs::read_to_string(p).map_err(|e| format!("Failed to read file: {}", e))
+    fs::read_to_string(&p).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 /// Write content to a file, creating it if it does not exist or overwriting if it does.
@@ -289,20 +365,18 @@ pub async fn read_file(
 pub async fn write_file(
     path: String,
     content: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if p.is_dir() {
         return Err(format!("Path is a directory: {}", path));
     }
     if let Some(parent) = p.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
-    fs::write(p, &content).map_err(|e| format!("Failed to write file: {}", e))
+    fs::write(&p, &content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 // ── Git Integration ──
@@ -330,13 +404,17 @@ pub struct GitFileStatus {
 /// Run `git status --porcelain -b` in the given directory and return
 /// structured data about the branch and changed files.
 #[tauri::command]
-pub async fn git_status(dir: String) -> Result<GitStatus, String> {
+pub async fn git_status(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<GitStatus, String> {
     let work_dir = Path::new(&dir);
+    let work_dir = validate_state_path(work_dir, &access)?;
 
     // Run git status --porcelain -b
     let output = Command::new("git")
         .args(["status", "--porcelain", "-b"])
-        .current_dir(work_dir)
+        .current_dir(&work_dir)
         .output()
         .map_err(|e| format!("Failed to run git: {}", e))?;
 
@@ -593,28 +671,50 @@ fn parse_porcelain_line(line: &str) -> Option<GitFileStatus> {
 /// Run `git diff` (unstaged changes) in the given directory and return
 /// the raw unified diff output.
 #[tauri::command]
-pub async fn git_diff_unstaged(dir: String) -> Result<String, String> {
-    run_git_diff(&dir, &["diff"])
+pub async fn git_diff_unstaged(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<String, String> {
+    run_git_diff(&dir, &["diff"], &access)
 }
 
 /// Run `git diff --cached` (staged changes) in the given directory and return
 /// the raw unified diff output.
 #[tauri::command]
-pub async fn git_diff_staged(dir: String) -> Result<String, String> {
-    run_git_diff(&dir, &["diff", "--cached"])
+pub async fn git_diff_staged(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<String, String> {
+    run_git_diff(&dir, &["diff", "--cached"], &access)
 }
 
 /// Run `git diff` for a specific file (unstaged) and return
 /// the raw unified diff output.
 #[tauri::command]
-pub async fn git_diff_file(dir: String, file_path: String) -> Result<String, String> {
-    run_git_diff(&dir, &["diff", "--", &file_path])
+pub async fn git_diff_file(
+    dir: String,
+    file_path: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<String, String> {
+    let work_dir = validate_state_path(Path::new(&dir), &access)?;
+    let target = work_dir.join(&file_path);
+    validate_state_path(&target, &access)?;
+    run_git_diff_path(&work_dir, &["diff", "--", &file_path])
 }
 
-fn run_git_diff(dir: &str, args: &[&str]) -> Result<String, String> {
+fn run_git_diff(
+    dir: &str,
+    args: &[&str],
+    access: &WorkspaceFileAccessState,
+) -> Result<String, String> {
+    let work_dir = validate_state_path(Path::new(dir), access)?;
+    run_git_diff_path(&work_dir, args)
+}
+
+fn run_git_diff_path(work_dir: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .args(args)
-        .current_dir(dir)
+        .current_dir(work_dir)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
@@ -749,6 +849,7 @@ fn walk_dir(
     current: &Path,
     root: &Path,
     gitignore_patterns: &[String],
+    allowlist: &[PathBuf],
 ) -> Result<Vec<FileEntry>, String> {
     let mut entries: Vec<FileEntry> = Vec::new();
 
@@ -771,14 +872,22 @@ fn walk_dir(
 
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(_) => continue,
+        };
 
         if is_ignored(&path, root, gitignore_patterns) {
             continue;
         }
 
-        let is_dir = path.is_dir();
+        if validate_path(&path, allowlist).is_err() {
+            continue;
+        }
+
+        let is_dir = file_type.is_dir();
         let children = if is_dir {
-            match walk_dir(&path, root, gitignore_patterns) {
+            match walk_dir(&path, root, gitignore_patterns, allowlist) {
                 Ok(children) => Some(children),
                 Err(_) => Some(Vec::new()),
             }
@@ -808,6 +917,30 @@ fn walk_dir(
 mod tests {
     use super::*;
     use crate::edge_manager::EdgeManager;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TestDir {
+        path: PathBuf,
+    }
+
+    impl TestDir {
+        fn new(name: &str) -> Self {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock should be after UNIX_EPOCH")
+                .as_nanos();
+            let path =
+                std::env::temp_dir().join(format!("agenthub-desktop-file-boundary-{name}-{nonce}"));
+            fs::create_dir_all(&path).expect("test directory should be created");
+            Self { path }
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
 
     #[test]
     fn edge_host_readiness_command_snapshot_is_sidecar_only() {
@@ -841,6 +974,159 @@ mod tests {
         );
         assert!(!readiness.running);
         assert!(!readiness.direct_cli_spawn);
+    }
+
+    #[test]
+    fn validate_path_rejects_empty_allowlist() {
+        let dir = TestDir::new("empty-allowlist");
+        let file = dir.path.join("notes.txt");
+
+        let err = validate_path(&file, &[]).expect_err("empty allowlist must fail closed");
+
+        assert!(err.contains("No allowed workspace directories"));
+    }
+
+    #[test]
+    fn validate_path_allows_nonexistent_child_inside_allowed_workspace() {
+        let dir = TestDir::new("inside");
+        let file = dir.path.join("nested").join("deeper").join("notes.txt");
+
+        let resolved = validate_path(&file, &[dir.path.clone()])
+            .expect("child under allowed workspace should pass");
+
+        assert!(resolved.starts_with(dir.path.canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn validate_path_rejects_path_outside_allowed_workspace() {
+        let allowed = TestDir::new("allowed");
+        let outside = TestDir::new("outside");
+        let file = outside.path.join("secret.txt");
+        fs::write(&file, "outside").expect("outside file should be created");
+
+        let err =
+            validate_path(&file, &[allowed.path.clone()]).expect_err("outside path must be denied");
+
+        assert!(err.contains("outside allowed directories"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn validate_path_rejects_symlink_that_escapes_workspace() {
+        let allowed = TestDir::new("symlink-allowed");
+        let outside = TestDir::new("symlink-outside");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        let link = allowed.path.join("linked-secret.txt");
+        std::os::unix::fs::symlink(&outside_file, &link).expect("symlink should be created");
+
+        let err = validate_path(&link, &[allowed.path.clone()])
+            .expect_err("symlink target outside workspace must be denied");
+
+        assert!(err.contains("outside allowed directories"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn validate_path_rejects_symlink_that_escapes_workspace() {
+        let allowed = TestDir::new("symlink-allowed");
+        let outside = TestDir::new("symlink-outside");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        let link = allowed.path.join("linked-secret.txt");
+        if std::os::windows::fs::symlink_file(&outside_file, &link).is_err() {
+            return;
+        }
+
+        let err = validate_path(&link, &[allowed.path.clone()])
+            .expect_err("symlink target outside workspace must be denied");
+
+        assert!(err.contains("outside allowed directories"));
+    }
+
+    #[test]
+    fn workspace_file_access_state_rejects_unseeded_paths() {
+        let dir = TestDir::new("unseeded-state");
+        let access = WorkspaceFileAccessState::default();
+
+        let err = validate_state_path(&dir.path, &access)
+            .expect_err("unseeded workspace file access state must fail closed");
+
+        assert!(err.contains("No allowed workspace directories"));
+    }
+
+    #[test]
+    fn workspace_store_roots_keep_only_existing_absolute_directories() {
+        let dir = TestDir::new("store-roots");
+        let data = WorkspaceStoreData {
+            workspaces: vec![
+                WorkspaceStoreEntry {
+                    name: "valid".to_string(),
+                    path: dir.path.to_string_lossy().to_string(),
+                    last_opened_at: 1,
+                    branch: None,
+                    settings: None,
+                },
+                WorkspaceStoreEntry {
+                    name: "relative".to_string(),
+                    path: "relative/path".to_string(),
+                    last_opened_at: 2,
+                    branch: None,
+                    settings: None,
+                },
+                WorkspaceStoreEntry {
+                    name: "missing".to_string(),
+                    path: dir.path.join("missing").to_string_lossy().to_string(),
+                    last_opened_at: 3,
+                    branch: None,
+                    settings: None,
+                },
+            ],
+        };
+
+        let roots = workspace_roots_from_store_data(&data);
+
+        assert_eq!(roots, vec![dir.path.canonicalize().unwrap()]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copy_dir_recursive_rejects_nested_symlink() {
+        let allowed = TestDir::new("copy-symlink-allowed");
+        let outside = TestDir::new("copy-symlink-outside");
+        let src = allowed.path.join("src");
+        let dst = allowed.path.join("dst");
+        fs::create_dir_all(&src).expect("source directory should be created");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        std::os::unix::fs::symlink(&outside_file, src.join("linked-secret.txt"))
+            .expect("symlink should be created");
+
+        let err = copy_dir_recursive(&src, &dst, &[allowed.path.clone()])
+            .expect_err("copy should reject nested symlink");
+
+        assert!(err.to_string().contains("Refusing to copy symbolic link"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn copy_dir_recursive_rejects_nested_symlink() {
+        let allowed = TestDir::new("copy-symlink-allowed");
+        let outside = TestDir::new("copy-symlink-outside");
+        let src = allowed.path.join("src");
+        let dst = allowed.path.join("dst");
+        fs::create_dir_all(&src).expect("source directory should be created");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        if std::os::windows::fs::symlink_file(&outside_file, src.join("linked-secret.txt")).is_err()
+        {
+            return;
+        }
+
+        let err = copy_dir_recursive(&src, &dst, &[allowed.path.clone()])
+            .expect_err("copy should reject nested symlink");
+
+        assert!(err.to_string().contains("Refusing to copy symbolic link"));
     }
 }
 
@@ -881,21 +1167,45 @@ fn workspace_store_path(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
     data_dir.join("workspace-store.json")
 }
 
+pub fn seed_workspace_file_access_from_store(
+    app: &tauri::AppHandle,
+    access: &WorkspaceFileAccessState,
+) -> Result<(), String> {
+    let path = workspace_store_path(app);
+    if !path.exists() {
+        access.replace_roots(Vec::new())?;
+        return Ok(());
+    }
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
+    let data: WorkspaceStoreData = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse workspace store: {}", e))?;
+    replace_workspace_roots_from_store(access, &data)
+}
+
 #[tauri::command]
-pub async fn read_workspace_store(app: tauri::AppHandle) -> Result<WorkspaceStoreData, String> {
+pub async fn read_workspace_store(
+    app: tauri::AppHandle,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<WorkspaceStoreData, String> {
     let path = workspace_store_path(&app);
     if !path.exists() {
+        access.replace_roots(Vec::new())?;
         return Ok(WorkspaceStoreData::default());
     }
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
-    serde_json::from_str(&content).map_err(|e| format!("Failed to parse workspace store: {}", e))
+    let data: WorkspaceStoreData = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse workspace store: {}", e))?;
+    replace_workspace_roots_from_store(&access, &data)?;
+    Ok(data)
 }
 
 #[tauri::command]
 pub async fn write_workspace_store(
     app: tauri::AppHandle,
     data: WorkspaceStoreData,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let path = workspace_store_path(&app);
     if let Some(parent) = path.parent() {
@@ -903,7 +1213,8 @@ pub async fn write_workspace_store(
     }
     let content = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
-    fs::write(&path, &content).map_err(|e| format!("Failed to write workspace store: {}", e))
+    fs::write(&path, &content).map_err(|e| format!("Failed to write workspace store: {}", e))?;
+    replace_workspace_roots_from_store(&access, &data)
 }
 
 // ── Workspace Content Search ──
@@ -929,8 +1240,10 @@ pub struct FileGrepMatch {
 pub async fn search_workspace_content(
     dir: String,
     query: String,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<Vec<FileGrepMatch>, String> {
     let work_dir = Path::new(&dir);
+    let work_dir = validate_state_path(work_dir, &access)?;
     if !work_dir.is_dir() {
         return Err(format!("Not a directory: {}", dir));
     }
@@ -947,7 +1260,7 @@ pub async fn search_workspace_content(
             &query,
             ".",
         ])
-        .current_dir(work_dir)
+        .current_dir(&work_dir)
         .output();
 
     let output = match output {
@@ -956,7 +1269,7 @@ pub async fn search_workspace_content(
             // Fallback: system grep
             Command::new("grep")
                 .args(["-rn", "-i", "--color=never", "-e", &query, "."])
-                .current_dir(work_dir)
+                .current_dir(&work_dir)
                 .output()
                 .map_err(|e| format!("Neither rg nor grep is available: {}", e))?
         }
