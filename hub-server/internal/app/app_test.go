@@ -317,11 +317,15 @@ func TestStartEventSubscriptionsSkipsAgentMessageNewPush(t *testing.T) {
 
 func TestStartEventSubscriptionsPushesFriendAcceptedToUser(t *testing.T) {
 	mgr := ws.NewManager()
-	conn := ws.NewConn(nil)
-	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	requesterConn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(requesterConn))
+	mgr.SetAuth(requesterConn.ID, "requester-1", "web", "device-requester")
+	accepterConn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(accepterConn))
+	mgr.SetAuth(accepterConn.ID, "accepter-1", "web", "device-accepter")
 	t.Cleanup(func() {
-		mgr.Unregister(conn.ID)
+		mgr.Unregister(requesterConn.ID)
+		mgr.Unregister(accepterConn.ID)
 	})
 
 	bus := service.NewBus()
@@ -334,14 +338,22 @@ func TestStartEventSubscriptionsPushesFriendAcceptedToUser(t *testing.T) {
 		Type: ws.TypeFriendAccepted,
 		Payload: map[string]interface{}{
 			"friendship_id": "friendship-1",
-			"user_id":       "user-1",
+			"user_id":       "requester-1",
+			"accepter_id":   "accepter-1",
 		},
 	})
 
-	frame := readAppTestFrame(t, conn)
+	frame := readAppTestFrame(t, requesterConn)
 	require.Equal(t, ws.TypeFriendAccepted, frame.Type)
 	require.Equal(t, "friendship-1", frame.Payload["friendship_id"])
-	require.Equal(t, "user-1", frame.Payload["user_id"])
+	require.Equal(t, "requester-1", frame.Payload["user_id"])
+	require.Equal(t, "accepter-1", frame.Payload["accepter_id"])
+
+	select {
+	case data := <-accepterConn.Send:
+		t.Fatalf("friend.accepted should be pushed to requester, not accepter; got accepter frame %s", string(data))
+	default:
+	}
 }
 
 func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.T) {
