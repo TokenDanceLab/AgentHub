@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 use tauri::{Manager, Runtime};
-use tauri_plugin_shell::process::{CommandEvent, CommandChild};
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
@@ -14,6 +14,16 @@ pub struct EdgeStatus {
     pub running: bool,
     pub pid: Option<u32>,
     pub port: u16,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgeHostReadiness {
+    pub running: bool,
+    pub pid: Option<u32>,
+    pub port: u16,
+    pub sidecar_name: &'static str,
+    pub target_id: &'static str,
+    pub route: &'static str,
 }
 
 /// Wrapper for the two child-process types: Tauri sidecar (release) or
@@ -86,14 +96,7 @@ impl EdgeManager {
             .unwrap_or("agenthub-edge-store.json")
             .to_string();
 
-        let args = vec![
-            "--store-file".to_string(),
-            store_path_str.clone(),
-            "--addr".to_string(),
-            addr.clone(),
-            "--runner-profile".to_string(),
-            "claude-code".to_string(),
-        ];
+        let args = edge_launch_args(&store_path_str, &addr);
 
         // ── Try sidecar first (release / bundled builds) ─────────────────
         if let Ok(sidecar_cmd) = app_handle.shell().sidecar("agenthub-edge") {
@@ -182,7 +185,11 @@ impl EdgeManager {
 
     pub async fn stop(&mut self) -> Result<(), String> {
         match self.child.take() {
-            Some(EdgeChild::Sidecar { child, pid, event_task }) => {
+            Some(EdgeChild::Sidecar {
+                child,
+                pid,
+                event_task,
+            }) => {
                 let _ = child.kill();
                 event_task.abort();
                 log::info!("Edge Server (sidecar, pid={}) stopped", pid);
@@ -221,6 +228,18 @@ impl EdgeManager {
 
     pub fn local_auth_token(&self) -> &str {
         &self.local_auth_token
+    }
+
+    pub fn host_readiness(&self) -> EdgeHostReadiness {
+        let status = self.status();
+        EdgeHostReadiness {
+            running: status.running,
+            pid: status.pid,
+            port: status.port,
+            sidecar_name: "agenthub-edge",
+            target_id: "local-edge",
+            route: "local-edge-api",
+        }
     }
 }
 
@@ -275,6 +294,59 @@ fn edge_binary_candidates() -> Vec<PathBuf> {
     }
 
     candidates
+}
+
+fn edge_launch_args(store_path: &str, addr: &str) -> Vec<String> {
+    vec![
+        "--store-file".to_string(),
+        store_path.to_string(),
+        "--addr".to_string(),
+        addr.to_string(),
+        "--runner-profile".to_string(),
+        "claude-code".to_string(),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn edge_launch_args_keep_runtime_behind_local_edge() {
+        let args = edge_launch_args(
+            "C:/Users/dev/AppData/Roaming/AgentHub/agenthub-edge-store.json",
+            "127.0.0.1:3210",
+        );
+
+        assert_eq!(
+            args,
+            vec![
+                "--store-file",
+                "C:/Users/dev/AppData/Roaming/AgentHub/agenthub-edge-store.json",
+                "--addr",
+                "127.0.0.1:3210",
+                "--runner-profile",
+                "claude-code",
+            ]
+        );
+        assert!(!args.iter().any(|arg| arg == "claude" || arg == "codex"));
+    }
+
+    #[test]
+    fn readiness_snapshot_advertises_local_edge_sidecar_route() {
+        let manager = EdgeManager::new_fallback(
+            PathBuf::from("edge-server/agenthub-edge"),
+            PathBuf::from("agenthub-edge-store.json"),
+        );
+
+        let readiness = manager.host_readiness();
+
+        assert!(!readiness.running);
+        assert_eq!(readiness.sidecar_name, "agenthub-edge");
+        assert_eq!(readiness.route, "local-edge-api");
+        assert_eq!(readiness.target_id, "local-edge");
+        assert_eq!(readiness.port, 3210);
+    }
 }
 
 pub fn resolve_edge_path() -> PathBuf {
