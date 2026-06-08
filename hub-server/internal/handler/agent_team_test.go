@@ -198,27 +198,27 @@ func TestAgentTeamHandler_DecideApproval(t *testing.T) {
 }
 
 type mockAgentTeamService struct {
-	createTeam            func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
-	listTeams             func(ctx context.Context, userID string) ([]model.AgentTeam, error)
-	getTeamWithMembers    func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
-	addTeamMember         func(ctx context.Context, userID, teamID, agentProfileID, role string) error
-	updateTeam            func(ctx context.Context, userID, teamID, name, description string) error
-	deleteTeam            func(ctx context.Context, userID, teamID string) error
-	removeTeamMember      func(ctx context.Context, userID, teamID, memberID string) error
-	startTeamRun          func(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
-	listTeamRuns          func(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
-	getTeamRun            func(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
-	getTeamRunState       func(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
-	createAssignment      func(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
-	dispatchAssignment    func(ctx context.Context, userID, assignmentID string) error
-	completeAssignment    func(ctx context.Context, userID, assignmentID string, result string) error
-	failAssignment        func(ctx context.Context, userID, assignmentID string, reason string) error
-	listAssignments       func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
-	handleRouteDecision   func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
-	listTeamTasks         func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
-	listTeamEvents        func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
-	resolveConflict       func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
-	decideApproval        func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
+	createTeam          func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
+	listTeams           func(ctx context.Context, userID string) ([]model.AgentTeam, error)
+	getTeamWithMembers  func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
+	addTeamMember       func(ctx context.Context, userID, teamID, agentProfileID, role string) error
+	updateTeam          func(ctx context.Context, userID, teamID, name, description string) error
+	deleteTeam          func(ctx context.Context, userID, teamID string) error
+	removeTeamMember    func(ctx context.Context, userID, teamID, memberID string) error
+	startTeamRun        func(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error)
+	listTeamRuns        func(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+	getTeamRun          func(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
+	getTeamRunState     func(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
+	createAssignment    func(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
+	dispatchAssignment  func(ctx context.Context, userID, assignmentID string) error
+	completeAssignment  func(ctx context.Context, userID, assignmentID string, result string) error
+	failAssignment      func(ctx context.Context, userID, assignmentID string, reason string) error
+	listAssignments     func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
+	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
+	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
+	resolveConflict     func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
+	decideApproval      func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
@@ -274,11 +274,11 @@ func (m *mockAgentTeamService) RemoveTeamMember(ctx context.Context, userID, tea
 	return m.removeTeamMember(ctx, userID, teamID, memberID)
 }
 
-func (m *mockAgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error) {
+func (m *mockAgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error) {
 	if m.startTeamRun == nil {
 		return nil, nil
 	}
-	return m.startTeamRun(ctx, userID, teamID, triggerMessage)
+	return m.startTeamRun(ctx, userID, teamID, triggerMessage, targetID)
 }
 
 func (m *mockAgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error) {
@@ -530,12 +530,13 @@ func TestAgentTeamHandler_StartRun(t *testing.T) {
 
 	called := false
 	svc := &mockAgentTeamService{
-		startTeamRun: func(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error) {
+		startTeamRun: func(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error) {
 			called = true
 			assert.Equal(t, "user-1", userID)
 			assert.Equal(t, "team-1", teamID)
 			assert.Equal(t, "Build the UI", triggerMessage)
-			return &model.AgentTeamRun{ID: "run-1", TeamID: teamID, TriggerMessage: triggerMessage, Status: "queued"}, nil
+			assert.Equal(t, "target-local-edge-1", targetID)
+			return &model.AgentTeamRun{ID: "run-1", TeamID: teamID, TriggerMessage: triggerMessage, TargetID: &targetID, Status: "queued"}, nil
 		},
 	}
 	h := NewAgentTeamHandler(svc)
@@ -546,7 +547,7 @@ func TestAgentTeamHandler_StartRun(t *testing.T) {
 		h.StartRun(c)
 	})
 
-	body := bytes.NewBufferString(`{"trigger_message":"Build the UI"}`)
+	body := bytes.NewBufferString(`{"trigger_message":"Build the UI","target_id":"target-local-edge-1"}`)
 	req := httptest.NewRequest(http.MethodPost, "/web/agent-teams/team-1/runs", body)
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -555,5 +556,6 @@ func TestAgentTeamHandler_StartRun(t *testing.T) {
 	require.True(t, called)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "run-1")
+	assert.Contains(t, w.Body.String(), "target-local-edge-1")
 	assert.Contains(t, w.Body.String(), "queued")
 }
