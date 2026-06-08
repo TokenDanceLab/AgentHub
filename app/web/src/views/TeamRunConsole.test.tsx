@@ -22,6 +22,7 @@ const teamRunsState = vi.hoisted(() => ({
   runs: [] as Array<{
     id: string;
     team_id: string;
+    target_id?: string;
     status: string;
     created_at?: string;
   }>,
@@ -451,5 +452,131 @@ describe('TeamRunConsole target routing', () => {
     const renderedText = document.body.textContent ?? '';
     expect(renderedText.indexOf('First replay event')).toBeLessThan(renderedText.indexOf('Second replay event'));
     expect(hubClientMock.listTeamEvents).toHaveBeenCalledWith('team-1', 'run-1');
+  });
+
+  it('renders CLI runtime events from Hub run state when the event endpoint is empty', async () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRunState.mockResolvedValueOnce({
+      members: [],
+      approvals: [],
+      conflicts: [],
+      run_events: [
+        {
+          agent_task_id: 'task-cli-1',
+          edge_run_id: 'run-edge-1',
+          event_seq: 1,
+          event_type: 'run.agent.tool_call',
+          payload: JSON.stringify({
+            callId: 'call-read',
+            toolName: 'read_file',
+            status: 'running',
+            target_id: 'target-local-edge-alpha',
+          }),
+          created_at: '2026-06-09T09:00:01Z',
+        },
+        {
+          agent_task_id: 'task-cli-1',
+          edge_run_id: 'run-edge-1',
+          event_seq: 2,
+          event_type: 'run.agent.tool_result',
+          payload: JSON.stringify({
+            callId: 'call-read',
+            toolName: 'read_file',
+            output: 'package.json loaded',
+          }),
+          created_at: '2026-06-09T09:00:02Z',
+        },
+        {
+          agent_task_id: 'task-cli-1',
+          edge_run_id: 'run-edge-1',
+          event_seq: 3,
+          event_type: 'run.agent.result',
+          payload: JSON.stringify({
+            success: true,
+            content: 'Remote fixture completed',
+          }),
+          created_at: '2026-06-09T09:00:03Z',
+        },
+      ],
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tool read_file requested/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Tool read_file result: package\.json loaded/)).toBeInTheDocument();
+    expect(screen.getByText(/Result succeeded: Remote fixture completed/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Edge run run-edge-1/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Target target-local-edge-alpha/).length).toBeGreaterThan(0);
+  });
+
+  it('unwraps Hub agent.stream payloads for SDK-like route and dispatch events', async () => {
+    teamRunsState.runs = [{
+      id: 'run-sdk',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'evt-route',
+        team_run_id: 'run-sdk',
+        seq: 10,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-sdk-1',
+          edge_run_id: 'run-sdk-edge',
+          event_seq: 10,
+          event_type: 'run.agent.route_decision',
+          payload: {
+            action: 'delegate',
+            next_worker: 'reviewer',
+            instructions: 'Review generated patch',
+          },
+        },
+        created_at: '2026-06-09T09:00:10Z',
+      },
+      {
+        id: 'evt-dispatch-failed',
+        team_run_id: 'run-sdk',
+        seq: 11,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-sdk-1',
+          edge_run_id: 'run-sdk-edge',
+          event_seq: 11,
+          event_type: 'run.agent.task_dispatch_failed',
+          payload: {
+            taskId: 'child-task-1',
+            error: 'target queue rejected replay',
+          },
+        },
+        created_at: '2026-06-09T09:00:11Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Route delegate -> reviewer: Review generated patch/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Dispatch failed for child-task-1: target queue rejected replay/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Hub task task-sdk-1/).length).toBeGreaterThan(0);
   });
 });

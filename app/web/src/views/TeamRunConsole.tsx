@@ -48,6 +48,209 @@ function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || 'Unknown error');
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parsePayloadRecord(payload: unknown): Record<string, unknown> | null {
+  if (isRecord(payload)) return payload;
+  if (typeof payload !== 'string') return null;
+  const trimmed = payload.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function truncate(value: string, max = 140): string {
+  return value.length > max ? `${value.slice(0, max)}...` : value;
+}
+
+function summarizeRuntimePayload(eventType: string, payload: unknown): string {
+  const record = parsePayloadRecord(payload);
+  const rawText = typeof payload === 'string' && !record ? truncate(payload) : undefined;
+  if (!record) return rawText ?? eventType;
+
+  const toolName = firstString(record.toolName, record.tool_name, record.name);
+  const callId = firstString(record.callId, record.call_id, record.toolUseId, record.tool_use_id);
+  const status = firstString(record.status, record.state);
+  const output = firstString(record.output, record.content, record.text, record.result);
+  const error = firstString(record.error, record.error_message, record.message);
+  const action = firstString(record.action, record.decision);
+  const nextWorker = firstString(record.next_worker, record.nextWorker, record.worker, record.agentId, record.agent_id);
+  const instructions = firstString(record.instructions, record.summary, record.reasoning, record.reason, record.feedback);
+  const taskId = firstString(record.taskId, record.task_id);
+
+  switch (eventType) {
+    case 'run.agent.tool_call':
+      return [
+        `Tool ${toolName ?? 'unknown'} requested`,
+        status,
+        callId ? `call ${callId}` : undefined,
+      ].filter(Boolean).join(' ');
+    case 'run.agent.tool_result':
+      return `Tool ${toolName ?? 'unknown'} result${error ? ` failed: ${truncate(error)}` : output ? `: ${truncate(output)}` : ''}`;
+    case 'run.agent.route_decision':
+      return [
+        `Route ${action ?? 'decision'}${nextWorker ? ` -> ${nextWorker}` : ''}`,
+        instructions ? truncate(instructions) : undefined,
+      ].filter(Boolean).join(': ');
+    case 'run.agent.permission_requested':
+      return [
+        `Approval requested${toolName ? ` for ${toolName}` : ''}`,
+        firstString(record.reason, record.prompt, record.description),
+      ].filter(Boolean).join(': ');
+    case 'run.agent.task_dispatch_failed':
+      return `Dispatch failed${taskId ? ` for ${taskId}` : ''}${error ? `: ${truncate(error)}` : ''}`;
+    case 'run.agent.sub_agent_status':
+      return [
+        `Sub-agent ${nextWorker ?? 'unknown'}`,
+        status,
+        taskId ? `task ${taskId}` : undefined,
+      ].filter(Boolean).join(' ');
+    case 'run.agent.result':
+      return `${record.success === false || error ? 'Result failed' : 'Result succeeded'}${error ? `: ${truncate(error)}` : output ? `: ${truncate(output)}` : ''}`;
+    case 'run.agent.text_delta':
+    case 'run.agent.text_block':
+    case 'run.agent.message':
+      return output ? truncate(output) : eventType;
+    case 'artifact.created': {
+      const title = firstString(record.title, record.path, record.uri, record.artifactId, record.artifact_id);
+      return `Artifact created${title ? `: ${truncate(title)}` : ''}`;
+    }
+    case 'run.agent.file_change': {
+      const path = firstString(record.path, record.file_path, record.filePath);
+      const fileAction = firstString(record.action, record.operation, record.status);
+      return `File change${fileAction ? ` ${fileAction}` : ''}${path ? `: ${path}` : ''}`;
+    }
+    default: {
+      const summary = firstString(
+        record.summary,
+        record.message,
+        record.reason,
+        record.objective,
+        record.instructions,
+        record.content,
+        record.output,
+        record.error,
+      );
+      return summary ? truncate(summary) : eventType;
+    }
+  }
+}
+
+type RuntimeEventContext = {
+  taskId?: string | undefined;
+  edgeRunId?: string | undefined;
+  targetId?: string | undefined;
+};
+
+function runtimeContextSummary(context: RuntimeEventContext): string[] {
+  return [
+    context.taskId ? `Hub task ${context.taskId}` : undefined,
+    context.edgeRunId ? `Edge run ${context.edgeRunId}` : undefined,
+    context.targetId ? `Target ${context.targetId}` : undefined,
+  ].filter((part): part is string => Boolean(part));
+}
+
+function runtimeSummaryPayload(
+  eventType: string,
+  payload: unknown,
+  context: RuntimeEventContext,
+): Record<string, unknown> {
+  return {
+    summary: [
+      summarizeRuntimePayload(eventType, payload),
+      ...runtimeContextSummary(context),
+    ].join(' | '),
+  };
+}
+
+function normalizeTeamRunEvent(
+  event: AgentTeamEvent,
+  selectedRun?: AgentTeamRun | undefined,
+): AgentTeamEvent {
+  const payloadRecord = parsePayloadRecord(event.payload);
+  const runtimeType = firstString(payloadRecord?.event_type);
+  if (event.type === 'agent.stream' || runtimeType) {
+    const eventType = runtimeType ?? event.type;
+    const runtimePayload = payloadRecord?.payload ?? event.payload;
+    const nestedPayload = parsePayloadRecord(runtimePayload);
+    const taskId = firstString(payloadRecord?.task_id, payloadRecord?.agent_task_id, nestedPayload?.task_id, nestedPayload?.taskId);
+    const edgeRunId = firstString(payloadRecord?.edge_run_id, payloadRecord?.run_id, nestedPayload?.edge_run_id, nestedPayload?.runId);
+    const targetId = firstString(payloadRecord?.target_id, nestedPayload?.target_id, nestedPayload?.targetId, selectedRun?.target_id);
+    return {
+      ...event,
+      type: eventType,
+      seq: numberField(payloadRecord?.event_seq) ?? event.seq,
+      payload: runtimeSummaryPayload(eventType, runtimePayload, { taskId, edgeRunId, targetId }),
+    };
+  }
+
+  if (event.type.startsWith('run.agent.') || event.type === 'artifact.created') {
+    const targetId = firstString(payloadRecord?.target_id, payloadRecord?.targetId, selectedRun?.target_id);
+    const edgeRunId = firstString(payloadRecord?.edge_run_id, payloadRecord?.runId);
+    const taskId = firstString(payloadRecord?.task_id, payloadRecord?.taskId, payloadRecord?.agent_task_id);
+    return {
+      ...event,
+      payload: runtimeSummaryPayload(event.type, event.payload, { taskId, edgeRunId, targetId }),
+    };
+  }
+
+  return event;
+}
+
+function stateEventToTeamEvent(
+  event: NonNullable<TeamRunState['run_events']>[number],
+  selectedRun?: AgentTeamRun | undefined,
+): AgentTeamEvent {
+  const payloadRecord = parsePayloadRecord(event.payload);
+  const taskId = firstString(event.agent_task_id, payloadRecord?.task_id, payloadRecord?.taskId);
+  const edgeRunId = firstString(event.edge_run_id, payloadRecord?.edge_run_id, payloadRecord?.runId);
+  const targetId = firstString(payloadRecord?.target_id, payloadRecord?.targetId, selectedRun?.target_id);
+  return {
+    id: `run-event-${taskId ?? 'task'}-${edgeRunId ?? 'edge'}-${event.event_seq}`,
+    team_run_id: selectedRun?.id ?? '',
+    seq: event.event_seq,
+    type: event.event_type,
+    payload: runtimeSummaryPayload(event.event_type, event.payload, { taskId, edgeRunId, targetId }),
+    ...(event.created_at ? { created_at: event.created_at } : {}),
+  };
+}
+
+function mergeRunEvents(
+  events: AgentTeamEvent[],
+  state?: TeamRunState | undefined,
+  selectedRun?: AgentTeamRun | undefined,
+): AgentTeamEvent[] {
+  const merged: AgentTeamEvent[] = [];
+  const seen = new Set<string>();
+  const add = (event: AgentTeamEvent) => {
+    const key = `${event.type}:${event.seq}:${event.id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(event);
+  };
+
+  events.map((event) => normalizeTeamRunEvent(event, selectedRun)).forEach(add);
+  (state?.run_events ?? []).map((event) => stateEventToTeamEvent(event, selectedRun)).forEach(add);
+  return merged;
+}
+
 const RUN_STATUS_DOT: Record<string, string> = {
   queued: '#9ca3af',
   running: '#f59e0b',
@@ -150,7 +353,14 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
 
   const state = localState ?? agentTeamsQuery.data?.state;
   const tasks = localTasks.length > 0 ? localTasks : (agentTeamsQuery.data?.tasks ?? EMPTY_TASKS);
-  const events = localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? EMPTY_EVENTS);
+  const events = useMemo(
+    () => mergeRunEvents(
+      localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? EMPTY_EVENTS),
+      state,
+      selectedRun,
+    ),
+    [agentTeamsQuery.data?.events, localEvents, selectedRun, state],
+  );
   const onlineLocalEdgeTargets = useMemo(
     () => (executionTargetsQuery.data?.items ?? []).filter((target) =>
       target.target_type === 'local_edge' &&
