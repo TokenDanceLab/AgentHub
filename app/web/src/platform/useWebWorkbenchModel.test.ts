@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   appendHubRuntimeEvent,
   resolveWebWorkbenchContacts,
+  resolveWebWorkbenchProjects,
   resolveWebWorkbenchTranscript,
+  workspaceProjectToProjectInfo,
 } from './useWebWorkbenchModel';
 import { webTranscript } from './webPlatform';
 
@@ -66,6 +68,45 @@ describe('useWebWorkbenchModel helpers', () => {
       members: [],
       recentShortcuts: [],
     });
+  });
+
+  it('maps Hub workspace projects into shared project cards without mock project activity', () => {
+    expect(workspaceProjectToProjectInfo({
+      id: 'project-1',
+      name: ' AgentHub Demo ',
+      description: 'Competition workspace',
+      owner_id: 'owner-1',
+      created_at: '2026-06-08T00:00:00Z',
+      updated_at: '2026-06-09T00:30:00Z',
+    })).toMatchObject({
+      id: 'project-1',
+      name: 'AgentHub Demo',
+      description: 'Competition workspace',
+      status: 'Hub',
+      meta: '0 runs',
+      members: [],
+      announcement: 'Competition workspace',
+      runs: [],
+      artifacts: [],
+      feed: [],
+    });
+  });
+
+  it('keeps demo projects unless Hub or real mode is active', () => {
+    expect(resolveWebWorkbenchProjects(undefined, false)).toBeUndefined();
+    expect(resolveWebWorkbenchProjects(undefined, false, 'real')).toEqual([]);
+    expect(resolveWebWorkbenchProjects([{
+      id: 'project-1',
+      name: 'AgentHub Demo',
+      description: 'Hub workspace',
+    }], true)).toEqual([
+      expect.objectContaining({
+        id: 'project-1',
+        name: 'AgentHub Demo',
+        runs: [],
+        artifacts: [],
+      }),
+    ]);
   });
 
   it('combines Hub messages with live runtime transcript blocks', () => {

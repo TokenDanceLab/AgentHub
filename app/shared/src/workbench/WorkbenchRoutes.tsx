@@ -19,6 +19,7 @@ import type {
   DocsPane,
   ProjectArtifact,
   ProjectFilter,
+  ProjectInfo,
   ProjectTab,
   SettingsPaneId,
   ServiceDesk,
@@ -79,6 +80,8 @@ export interface WorkbenchRoutesProps {
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
   focusedAgentId?: string | undefined;
+  projects?: ProjectInfo[] | undefined;
+  projectsStatus?: WorkbenchProjectsStatus | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
@@ -92,6 +95,11 @@ export interface WorkbenchAgentProfilesStatus {
   actionError?: string | undefined;
   savingAgentId?: string | undefined;
   deletingAgentId?: string | undefined;
+}
+
+export interface WorkbenchProjectsStatus {
+  loading?: boolean | undefined;
+  error?: string | undefined;
 }
 
 export interface WorkbenchContactsData {
@@ -398,6 +406,8 @@ export function WorkbenchRoutes({
   agentProfilesStatus,
   contacts,
   focusedAgentId,
+  projects,
+  projectsStatus,
   onAgentCreate,
   onAgentUpdate,
   onAgentDelete,
@@ -421,7 +431,8 @@ export function WorkbenchRoutes({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
-  const [projectId, setProjectId] = useState(WORKBENCH_MOCK_PROJECTS[0]?.id ?? null);
+  const sourceProjects = projects ?? WORKBENCH_MOCK_PROJECTS;
+  const [projectId, setProjectId] = useState(sourceProjects[0]?.id ?? null);
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [projectTab, setProjectTab] = useState<ProjectTab>('overview');
   const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
@@ -468,6 +479,16 @@ export function WorkbenchRoutes({
   React.useEffect(() => {
     if (focusedAgentId) setSelectedAgentId(focusedAgentId);
   }, [focusedAgentId]);
+
+  React.useEffect(() => {
+    if (sourceProjects.length === 0) {
+      setProjectId(null);
+      return;
+    }
+    if (!projectId || !sourceProjects.some((project) => project.id === projectId)) {
+      setProjectId(sourceProjects[0]?.id ?? null);
+    }
+  }, [projectId, sourceProjects]);
 
   React.useEffect(() => {
     const sourceIds = new Set(sourceAgentConfigs.map((agent) => agent.id));
@@ -1004,7 +1025,9 @@ export function WorkbenchRoutes({
           onClosePreview={() => setProjectPreview(null)}
           onProjectSelect={setProjectId}
           onTabChange={setProjectTab}
-          projects={WORKBENCH_MOCK_PROJECTS}
+          projects={sourceProjects}
+          projectsError={projectsStatus?.error}
+          projectsLoading={projectsStatus?.loading}
         />
       );
     case 'settings':
