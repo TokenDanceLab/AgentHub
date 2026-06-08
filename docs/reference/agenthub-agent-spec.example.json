@@ -1,0 +1,76 @@
+{
+  "identity": {
+    "specId": "fixture-review-worker",
+    "ownerScope": "team-fixture",
+    "visibility": "fixture",
+    "source": "fixture"
+  },
+  "display": {
+    "name": "Fixture Review Worker",
+    "description": "Reviews scoped changes from fixture events and emits AgentHub evidence refs.",
+    "avatarRef": "asset:agenthub-fixture-review-worker"
+  },
+  "role": {
+    "teamRole": "reviewer",
+    "instructions": "Review only the assigned fixture diff, request approval for risky actions, and return evidence refs.",
+    "responsibility": "Fixture-only review worker for SDK adapter mapping tests."
+  },
+  "runtime": {
+    "preferredRuntime": "claude-sdk",
+    "modelHint": "policy-selected-model",
+    "reasoning": "policy-default",
+    "adapterMode": "fixture"
+  },
+  "target": {
+    "preferences": ["local-edge", "fixture"],
+    "workspacePolicy": "read-only-fixture"
+  },
+  "tools": {
+    "allowlist": ["file.read", "diff.inspect", "evidence.emit"],
+    "deniedByDefault": true
+  },
+  "mcpServers": [
+    {
+      "serverId": "fixture-docs-context",
+      "ownerScope": "fixture",
+      "exposure": "context-provider"
+    }
+  ],
+  "approval": {
+    "mode": "read-only",
+    "riskRules": [
+      {
+        "match": "workspace-write",
+        "decision": "require-approval"
+      },
+      {
+        "match": "external-network",
+        "decision": "deny"
+      }
+    ]
+  },
+  "memory": {
+    "sources": ["agents-md", "thread-context", "fixture"],
+    "retention": "no-persist-fixture"
+  },
+  "evidence": {
+    "required": [
+      "run-events",
+      "tool-calls",
+      "approvals",
+      "route-decisions",
+      "handoff-summary"
+    ],
+    "redaction": "fixture-only"
+  },
+  "handoff": {
+    "accepts": ["teamrun-assignment", "fixture-event"],
+    "emits": ["route-decision", "result-summary", "evidence-refs"]
+  },
+  "sdkOptions": {
+    "provider": "claude-sdk",
+    "adapterExperiment": "read-only-fixture",
+    "liveModelExecution": "blocked",
+    "rawSdkObjectPolicy": "never-exposed-above-edge-adapter"
+  }
+}
