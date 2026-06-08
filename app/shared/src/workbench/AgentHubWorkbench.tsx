@@ -20,7 +20,7 @@ import {
   type MultiSelectBarAction,
 } from './floating';
 import { GlobalRail, type GlobalRailPage } from './GlobalRail';
-import { RightInspector } from './RightInspector';
+import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
 import type { FileItem } from './inspector';
 import { UnifiedComposer } from './UnifiedComposer';
@@ -88,6 +88,7 @@ export interface AgentHubWorkbenchProps {
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
   onAgentsRetry?: (() => void) | undefined;
+  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   transcript: TranscriptBlock[];
 }
 
@@ -105,6 +106,7 @@ export function AgentHubWorkbench({
   onAgentUpdate,
   onAgentDelete,
   onAgentsRetry,
+  runtimeEvidence,
   transcript,
 }: AgentHubWorkbenchProps): React.ReactElement {
   const fallbackConversationId = conversations[0]?.id ?? 'default';
@@ -1017,6 +1019,7 @@ export function AgentHubWorkbench({
           minWidth={INSPECTOR_MIN_WIDTH}
           onOpenPreview={platform.preview?.openEvidence}
           reviewFileRequest={reviewFileRequest}
+          runtimeEvidence={runtimeEvidence}
           onResizeBy={resizeInspectorBy}
           onResizeStart={beginInspectorResize}
           width={inspectorWidth}
