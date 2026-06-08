@@ -2,7 +2,7 @@
 
 > Date: 2026-06-08
 > Scope: Product and architecture strategy for using external agent SDKs without replacing AgentHub's own product model.
-> Status: docs-only strategy. This document does not change OpenAPI, schemas, code, adapters, runtime behavior, or real model execution gates.
+> Status: docs + contract-schema draft. This slice may define fixture examples and OpenAPI component-only draft schemas, but it does not change endpoint request/response behavior, code, adapters, runtime behavior, SDK installation, or real model execution gates.
 
 ## Decision
 
@@ -17,6 +17,15 @@ AgentHubAgentSpec / Agent Profile / TeamRun
 ```
 
 External SDK objects may inspire adapter mappings, event fixtures, and provider-specific capability discovery. They must not leak upward as Hub database rows, Web/Tauri UI state, TeamRun orchestration state, marketplace records, approval policy, memory ownership, or execution target identity.
+
+Ownership boundary:
+
+| Layer | Owns | Must not own |
+|---|---|---|
+| Hub | AgentHub API, Agent Profile identity, TeamRun orchestration, approvals, audit, marketplace intent, product memory policy | Claude/OpenAI SDK objects, SDK-native handoff state, provider sessions |
+| Edge | Runtime adapters, SDK/CLI process integration, event normalization, tool/MCP execution boundary, local evidence collection | Hub orchestration decisions, product Agent Profile identity, TeamRun authority |
+| Web/Desktop UI | AgentHub-owned fields from Hub/Edge contracts, approval UX, evidence display, target selection UX | SDK classes, provider credentials, raw SDK session objects |
+| Tauri host | Desktop platform bridge and Local Edge lifecycle readiness | SDK object ownership, direct SDK execution bypassing Edge |
 
 ## Official Source Anchors
 
@@ -62,23 +71,25 @@ The strategic direction is therefore to define a durable AgentHub layer first, t
 
 ## `AgentHubAgentSpec` v1 Shape
 
-This is a docs-only sketch, not a schema change. A later slice can turn it into shared types after review.
+This is an experimental contract draft. The OpenAPI component may exist as a docs-only schema, but no current endpoint accepts or returns this full shape until a later implementation slice explicitly wires it.
 
 ```yaml
-id: profile_builder
-kind: agent_profile
+identity:
+  specId: profile_builder
+  ownerScope: hub_user_or_org
+  visibility: private|team|marketplace
+  source: hub-agent-profile|marketplace-draft|fixture
 display:
   name: Builder
   description: Implements scoped code changes with evidence.
-identity:
-  owner: hub_user_or_org
-  visibility: private|team|marketplace
+  avatarRef: optional AgentHub asset ref
 role:
   teamRole: supervisor|worker|reviewer|observer
   instructions: product-level durable role prompt
+  responsibility: short role contract for TeamRun assignment
 runtime:
   preferredRuntime: codex|claude-code|opencode|openai-agents-sdk|claude-sdk
-  model: provider/model hint
+  modelHint: provider/model policy hint, not a public model claim
   reasoning: effort or budget hint
   adapterMode: cli|sdk|daemon|fixture
 target:
@@ -91,8 +102,10 @@ tools:
     - file.read
     - file.patch
     - shell.test
-  mcpServers:
-    - owned server ids, not raw secret config
+mcpServers:
+  - serverId: owned server id, not raw secret config
+    ownerScope: hub|edge
+    exposure: tool-provider|context-provider|blocked-in-fixture
 approval:
   mode: read-only|workspace-write|approval-required|blocked
   riskRules:
@@ -120,6 +133,11 @@ handoff:
     - route decision
     - result summary
     - evidence refs
+sdkOptions:
+  provider: none|claude-sdk|openai-agents-sdk
+  adapterExperiment: read-only-fixture|sandbox-fixture|event-mapper|live-approved
+  liveModelExecution: blocked|approval-required
+  rawSdkObjectPolicy: never exposed above Edge adapter
 ```
 
 This shape keeps product concepts first:
@@ -147,56 +165,62 @@ The first adapter experiments should use fixture event streams, not live model c
 
 ## PoC Backlog
 
-### 1. `AgentHubAgentSpec` v1 docs-only
+### 1. `AgentHubAgentSpec` v1 contract draft
 
-Owner scope: `docs/reference/sdk-agent-strategy.md`.
+Owner scope: `docs/reference/sdk-agent-strategy.md`, optional `api/openapi.yaml` component-only schema, and fixture JSON under `docs/reference/` or `docs/competition/`.
 
 Deliverables:
 
 - Freeze the product decision that AgentHub owns `AgentHubAgentSpec` / DSL.
-- Define draft fields for AgentProfile identity, tools, MCP, approval, runtime, target, memory, and evidence policy.
+- Define draft fields for `identity`, `display`, `role`, `runtime`, `target`, `tools`, `mcpServers`, `approval`, `memory`, `evidence`, `handoff`, and `sdkOptions`.
+- Mark any OpenAPI schema as `experimental` / `contract draft`; do not describe it as an implemented request or response.
+- Add only no-secret fixture examples with fake ids, no local paths, and no real model claims.
 - Record Avoid/Defer boundaries.
 
 Validation:
 
 - `git diff --check`
+- OpenAPI YAML parse if `api/openapi.yaml` changes
+- JSON parse for fixture examples
 - markdown/link basic check
 
 Non-goals:
 
-- No OpenAPI/schema/code changes.
+- No endpoint behavior changes.
+- No shared generated types or DB migration.
 - No SDK installation.
 - No real CLI/model execution.
 
-### 2. Shared schema proposal
+### 2. Claude SDK read-only adapter fixture
 
-Owner scope: future proposal only.
+Owner scope: future Edge adapter fixture slice.
 
 Deliverables:
 
-- Propose shared TypeScript/Go schema names and field ownership.
-- Map current Hub AgentProfile fields to the draft spec.
-- Identify migration-free adapter-only fields versus persistent Hub-owned fields.
+- Project a read-only Claude SDK-like fixture stream into AgentHub runtime events.
+- Cover tool listing, permission request, MCP metadata, result summary, and trace/evidence refs without importing SDK packages.
+- Use `AgentHubAgentSpec.sdkOptions.adapterExperiment: read-only-fixture`.
 
 Acceptance:
 
-- Review confirms no external SDK class or JSON shape becomes a public AgentHub product contract.
-- Review confirms Web/Tauri UI only consumes AgentHub-owned fields.
+- Fixture-only tests pass without SDK packages, CLI processes, model calls, secrets, or external services.
+- Web/Desktop remain consumers of AgentHub-owned fields only.
 
 Non-goals:
 
-- No database migration until field ownership is approved.
+- No live Claude SDK execution.
+- No provider credentials.
 - No TeamRun or ExecutionTarget replacement.
 
-### 3. Edge SDK event fixture mapper
+### 3. OpenAI Agents SDK sandbox fixture
 
-Owner scope: future Edge adapter test slice.
+Owner scope: future Edge adapter fixture slice.
 
 Deliverables:
 
-- Add fixture events that simulate Claude SDK and OpenAI Agents SDK tool, handoff, permission, result, and trace outputs.
-- Map fixtures into existing AgentHub runtime event types such as `run.agent.file_change`, `approval.requested`, `run.agent.route_decision`, `artifact.created`, and result events.
-- Verify redaction and workspace-relative path policy.
+- Project a sandboxed OpenAI Agents SDK-like fixture stream into AgentHub runtime events.
+- Cover tool call, guardrail/approval signal, handoff suggestion, result summary, and trace/evidence refs without importing SDK packages.
+- Use `AgentHubAgentSpec.sdkOptions.adapterExperiment: sandbox-fixture`.
 
 Acceptance:
 
@@ -205,52 +229,50 @@ Acceptance:
 
 Non-goals:
 
+- No live OpenAI Agents SDK execution.
+- No real MCP server.
+- No model/provider credentials.
+
+### 4. SDK event mapper golden tests
+
+Owner scope: future Edge adapter test slice.
+
+Deliverables:
+
+- Add golden fixture events that simulate Claude SDK and OpenAI Agents SDK tool, handoff, permission, result, and trace outputs.
+- Map fixtures into existing AgentHub runtime event types such as `run.agent.file_change`, `approval.requested`, `run.agent.route_decision`, `artifact.created`, and result events.
+- Verify redaction and workspace-relative path policy.
+
+Acceptance:
+
+- Golden tests prove stable mapper behavior before any live SDK/model path is approved.
+- Mapped output can feed existing transcript/evidence surfaces.
+
+Non-goals:
+
 - No live SDK runtime.
 - No real MCP server.
 - No model/provider credentials.
 
-### 4. Claude SDK adapter experiment
+### 5. TeamRun fixture E2E
 
-Owner scope: future Edge runtime/provider adapter worktree.
-
-Deliverables:
-
-- Build an experimental adapter behind an explicit runtime id, for example `claude-sdk-experimental`.
-- Map Claude SDK session/tool/permission/MCP surfaces into the existing Edge runtime adapter contract.
-- Keep permission decisions routed through AgentHub Edge/Hub approval events.
-- Keep output normalization compatible with TeamRun route decision fixtures.
-
-Acceptance:
-
-- Starts with fake/static or dry adapter tests.
-- Any live Claude SDK execution requires a separate approval gate, no-secret evidence policy, and explicit model budget.
-
-Non-goals:
-
-- Do not replace `claude-code` CLI adapter.
-- Do not replace Hub TeamRun, Hub AgentProfile, memory, or ExecutionTarget.
-- Do not expose Claude SDK objects in Web/Desktop UI.
-
-### 5. OpenAI Agents SDK experiment
-
-Owner scope: future Edge runtime/provider adapter worktree.
+Owner scope: future TeamRun fixture slice.
 
 Deliverables:
 
-- Build an experimental adapter behind an explicit runtime id, for example `openai-agents-sdk-experimental`.
-- Map OpenAI Agents SDK agent/tool/MCP/handoff/guardrail/trace concepts into Edge runtime events and evidence refs.
-- Evaluate whether SDK handoffs can become a provider-side signal for AgentHub TeamRun route decisions.
+- Feed mapped SDK fixture events into TeamRun route, approval, evidence, and handoff state.
+- Prove Hub owns TeamRun state while Edge owns adapter translation.
+- Keep Web/Desktop/Tauri display and actions limited to AgentHub-owned fields.
 
 Acceptance:
 
-- Starts with fixture mapper tests.
-- Live OpenAI Agents SDK execution requires a separate approval gate, no-secret evidence policy, and explicit model budget.
+- Fixture E2E completes without real CLI/model calls.
+- Route decisions, approvals, evidence refs, and handoff summaries are replayable from AgentHub state.
 
 Non-goals:
 
-- Do not replace Codex adapter work.
 - Do not replace Hub orchestrator, TeamRun, memory, approval, or ExecutionTarget.
-- Do not put OpenAI SDK agent objects in Hub/Web/Desktop product models.
+- Do not expose Claude/OpenAI SDK objects in Hub/Web/Desktop/Tauri product models.
 
 ## Avoid / Defer
 
@@ -262,13 +284,13 @@ Avoid:
 - Do not let Desktop bypass Edge to run SDK code.
 - Do not store SDK provider secrets in AgentHub public docs, Web local state, Feishu cards, or public logs.
 - Do not run real CLI/model calls in this strategy slice.
-- Do not create OpenAPI/schema/code changes in this strategy slice.
+- Do not describe an OpenAPI component-only draft as an implemented endpoint request or response.
 
 Defer:
 
 - Real SDK installation and runtime smoke.
 - Real MCP bridge with provider credentials.
-- Persistent schema additions.
+- Persistent schema additions, generated shared types, and DB migration.
 - Marketplace packaging for SDK-backed profiles.
 - Production remote/cloud Execution Target routing for SDK adapters.
 - Provider trace ingestion beyond fixture evidence.
