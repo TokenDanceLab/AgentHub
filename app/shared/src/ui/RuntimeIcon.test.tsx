@@ -32,6 +32,11 @@ describe('RuntimeIcon', () => {
       value: 'opencode',
       lobeType: 'runtime',
     });
+    expect(resolveRuntimeIcon({ kind: 'runtime', name: 'OpenAI Codex' })).toMatchObject({
+      source: 'lobehub',
+      value: 'codex',
+      lobeType: 'runtime',
+    });
   });
 
   it('normalizes model and provider names to LobeHub helpers', () => {
@@ -43,6 +48,11 @@ describe('RuntimeIcon', () => {
     expect(resolveRuntimeIcon({ kind: 'provider', name: 'OpenAI' })).toMatchObject({
       source: 'lobehub',
       value: 'openai',
+      lobeType: 'provider',
+    });
+    expect(resolveRuntimeIcon({ kind: 'provider', name: 'Claude' })).toMatchObject({
+      source: 'lobehub',
+      value: 'claude',
       lobeType: 'provider',
     });
     expect(resolveRuntimeIcon({ kind: 'model', name: 'internal-fast', provider: 'Anthropic' })).toMatchObject({
@@ -57,6 +67,11 @@ describe('RuntimeIcon', () => {
       source: 'fallback',
       fallback: 'browser',
       value: 'BW',
+    });
+    expect(resolveRuntimeIcon({ kind: 'runtime', name: 'Custom Agent' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'custom',
+      value: 'CA',
     });
     expect(resolveRuntimeIcon({ kind: 'tool', name: 'apply_patch' })).toMatchObject({
       source: 'fallback',
@@ -75,15 +90,21 @@ describe('RuntimeIcon', () => {
       <div>
         <RuntimeIcon kind="runtime" name="Codex" />
         <RuntimeIcon kind="runtime" name="Claude Code" size="large" />
+        <RuntimeIcon kind="runtime" name="OpenCode" />
         <RuntimeIcon kind="provider" name="OpenAI" size="compact" />
+        <RuntimeIcon kind="provider" name="Claude" />
       </div>,
     );
 
     expect(screen.getByLabelText('Codex')).toHaveAttribute('data-runtime-icon-source', 'lobehub');
     expect(screen.getByTestId('codex-icon')).toBeInTheDocument();
     expect(screen.getByTestId('claude-code-icon')).toHaveAttribute('data-size', '24');
-    expect(screen.getByTestId('provider-icon')).toHaveAttribute('data-provider', 'openai');
-    expect(screen.getByTestId('provider-icon')).toHaveAttribute('data-size', '16');
+    expect(screen.getByTestId('opencode-icon')).toBeInTheDocument();
+    const providerIcons = screen.getAllByTestId('provider-icon');
+    expect(providerIcons[0]).toHaveAttribute('data-provider', 'openai');
+    expect(providerIcons[0]).toHaveAttribute('data-size', '16');
+    expect(providerIcons[1]).toHaveAttribute('data-provider', 'claude');
+    expect(screen.getByLabelText('Claude')).toHaveAttribute('data-runtime-icon-value', 'claude');
   });
 
   it('supports decorative rendering while keeping title text on labeled icons', () => {
