@@ -157,6 +157,27 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($fakeRealTestedRun.ExitCode -ne 0) "RealTested forged metadata remains blocked without real execution evidence manifest" $fakeRealTestedRun.Output
     Assert-True ($fakeRealTestedRun.Output -match "real execution evidence manifest") "RealTested forged metadata names missing real execution evidence manifest" $fakeRealTestedRun.Output
     Assert-True ($fakeRealTestedRun.Output -notmatch "READY_FOR_OPERATOR_APPROVED_REAL_TEST") "RealTested forged metadata does not claim operator-approved real test readiness" $fakeRealTestedRun.Output
+    Assert-True ($fakeRealTestedRun.Output -notmatch "READY_FOR_APPROVED_RUN") "RealTested forged metadata does not claim approved-run readiness" $fakeRealTestedRun.Output
+
+    $fakeRealTestedMarkdownRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "RealTested",
+        "-RuntimeId", "codex",
+        "-RuntimePath", "approved-runtime-owner",
+        "-RuntimeEnvManifest", "approved-env-manifest",
+        "-BudgetPlan", "approved-budget",
+        "-RedactionPlan", "approved-redaction",
+        "-ArtifactRoot", "approved-artifacts",
+        "-EvidenceMode", "approved-evidence-mode",
+        "-OperatorApprovalId", "approval-123",
+        "-RealExecutionEvidenceManifest", "docs\audit\p0-edge-cli-real-readiness.md"
+    )
+    Assert-True ($fakeRealTestedMarkdownRun.ExitCode -ne 0) "RealTested forged existing markdown evidence remains blocked" $fakeRealTestedMarkdownRun.Output
+    Assert-True ($fakeRealTestedMarkdownRun.Output -match "independent real-run verifier") "RealTested forged existing markdown points to independent real-run verifier" $fakeRealTestedMarkdownRun.Output
+    Assert-True ($fakeRealTestedMarkdownRun.Output -notmatch "READY_FOR_APPROVED_RUN") "RealTested forged existing markdown does not claim approved-run readiness" $fakeRealTestedMarkdownRun.Output
 
     $submissionRun = Invoke-ReadinessScript @(
         "-NoProfile",
@@ -186,6 +207,27 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($fakeSubmissionRun.ExitCode -ne 0) "Submission forged metadata remains blocked without real execution evidence manifest" $fakeSubmissionRun.Output
     Assert-True ($fakeSubmissionRun.Output -match "real execution evidence manifest") "Submission forged metadata names missing real execution evidence manifest" $fakeSubmissionRun.Output
     Assert-True ($fakeSubmissionRun.Output -notmatch "READY_FOR_OPERATOR_APPROVED_REAL_TEST") "Submission forged metadata does not claim operator-approved real test readiness" $fakeSubmissionRun.Output
+    Assert-True ($fakeSubmissionRun.Output -notmatch "READY_FOR_APPROVED_RUN") "Submission forged metadata does not claim approved-run readiness" $fakeSubmissionRun.Output
+
+    $fakeSubmissionMarkdownRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-Mode", "Submission",
+        "-RuntimeId", "codex",
+        "-RuntimePath", "approved-runtime-owner",
+        "-RuntimeEnvManifest", "approved-env-manifest",
+        "-BudgetPlan", "approved-budget",
+        "-RedactionPlan", "approved-redaction",
+        "-ArtifactRoot", "approved-artifacts",
+        "-EvidenceMode", "approved-evidence-mode",
+        "-OperatorApprovalId", "approval-123",
+        "-RealExecutionEvidenceManifest", "docs\audit\p0-edge-cli-real-readiness.md"
+    )
+    Assert-True ($fakeSubmissionMarkdownRun.ExitCode -ne 0) "Submission forged existing markdown evidence remains blocked" $fakeSubmissionMarkdownRun.Output
+    Assert-True ($fakeSubmissionMarkdownRun.Output -match "independent real-run verifier") "Submission forged existing markdown points to independent real-run verifier" $fakeSubmissionMarkdownRun.Output
+    Assert-True ($fakeSubmissionMarkdownRun.Output -notmatch "READY_FOR_APPROVED_RUN") "Submission forged existing markdown does not claim approved-run readiness" $fakeSubmissionMarkdownRun.Output
 }
 
 if (Test-Path -LiteralPath $docPath) {

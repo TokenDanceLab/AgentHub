@@ -25,7 +25,7 @@ This slice is a proposal/readiness gate for future approved Edge CLI runs. No re
 
 ## Approval Prerequisites
 
-Future real execution approval must include all of the following before a run can be considered ready. Metadata alone is not real execution evidence, and this static script cannot certify `RealTested` or `Submission` completion.
+Future real execution approval must include all of the following before a separate real-run verifier is allowed to run. Metadata alone is not real execution evidence, and this static script cannot certify `RealTested` or `Submission` completion.
 
 | Prerequisite | Required approval evidence | Current status |
 |---|---|---|
@@ -34,14 +34,14 @@ Future real execution approval must include all of the following before a run ca
 | artifact root | Isolated evidence output directory, retention owner, and generated-artifact ignore boundary. | Missing |
 | evidence mode | Redacted log, hash-only, or operator-reviewed evidence mode. | Missing |
 | operator approval | Explicit approval id for the exact runtime, path/env, budget, artifact root, and evidence mode. | Missing |
-| real execution evidence manifest | Separate no-secret manifest from an approved real run. Required before `RealTested` or `Submission` modes may exit successfully. | Missing |
+| real execution evidence manifest | Separate no-secret manifest from an approved real run. This static gate records the requirement but does not validate arbitrary files as real evidence. | Missing |
 
-Default `ProposalOnly` mode may pass static checks while still reporting these items as blockers. `RealTested` and `Submission` modes must fail if any prerequisite is missing, and must not pass only because runtime/path/env/budget/redaction/artifact/evidence/approval metadata is non-empty.
+Default `ProposalOnly` mode may pass static checks while still reporting these items as blockers. `RealTested` and `Submission` modes must fail in this script even when runtime/path/env/budget/redaction/artifact/evidence/approval metadata is non-empty. A markdown file, proposal note, or arbitrary existing file must not unlock a successful real-tested/submission status.
 
 Allowed status claims from this script:
 
 - `PROPOSAL_ONLY`: static evidence was checked; real execution is still blocked or not attempted.
-- `READY_FOR_APPROVED_RUN`: approval metadata and a separate evidence manifest pointer are present; the script still did not execute a real CLI/model command and does not prove a completed real test.
+- `BLOCKED_FOR_REAL_EXECUTION`: requested mode is `RealTested` or `Submission`; use a separate approved real-run verifier with redacted evidence.
 
 ## Proposed Commands
 
