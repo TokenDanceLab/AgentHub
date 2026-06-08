@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 12:34 +08:00
+> 最后更新：2026-06-08 13:35 +08:00
 > 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
@@ -20,7 +20,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 主工作树 | `D:\Code\TokenDance\AgentHub @ a4b27d63`，behind 23 且 dirty；只读，不直接 pull/merge/stage |
 | 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
 | 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、ExecutionTarget contract、Edge pins/store/event contracts、TeamRun fixture/evidence gate |
-| 仍未完成 | Edge SQL 后续 migration、Desktop Edge mapper、登录端到端、Tauri 内测安装包/正式签名发布、TeamRun 真实演示、Artifact/Diff/Preview 生产化、Projects mutation UI、D1b/D2/D3 gate |
+| 仍未完成 | Edge SQL 后续 relational migration、Desktop target preference/Tauri host 集成、登录端到端、Tauri 正式签名发布与 macOS 打包、TeamRun 真实演示、Artifact/Diff/Preview 生产化、Projects mutation UI、D1b/D2/D3 gate |
 | 外部依赖 | 后端旧整合线合并由 backend merge Agent 负责；本路线图只记录其状态和对后续切片的影响，不接管合并 |
 
 ## P0 执行顺序
@@ -75,8 +75,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 ## 下一步
 
 1. 提交并推送本轮 roadmap/governance 刷新。
-2. Review/merge Edge SQLite opt-in backend；下一片再拆 relational schema/migration。
-3. 并行开 Desktop Edge mapper worker 和登录 fake/local gate worker，为安装包提供可运行前置条件。
-   - 登录 fake/local gate 已补 Hub stale state `created_at` 拒绝和 `verify-oidc-flow.ps1 -LocalOnly` fake/static gate；该 gate 不连接 live Hub 或 TokenDance ID。
-4. Review/merge Tauri Windows installer/updater metadata readiness branch；macOS 正式签名另起 proposal。
+2. Edge SQLite opt-in backend、登录 fake/local gate、Tauri Windows installer/updater metadata readiness 已合入；Edge relational schema/migration、真实登录和正式签名继续拆独立 proposal。
+3. Desktop Edge mapper 首切片正在合入：已接入 Edge agents/model catalog/Local Edge target mapper，并在 review 修正 StartRunRequest adapter id 映射、移除 provider 提交字段、阻断 Desktop live 空线程/demo transcript fallback；下一步补 target preference mutation、Tauri host readiness 和安装包联调。
+4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness。
 5. 开 ByteDance/TeamRun demo evidence worker。

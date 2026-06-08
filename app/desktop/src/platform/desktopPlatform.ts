@@ -52,11 +52,16 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Age
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
+        if (options.submitRun && (!options.activeProjectId || !options.activeThreadId)) {
+          throw new Error('Local Edge thread is required before starting a Desktop run');
+        }
+
         if (options.submitRun && options.activeProjectId && options.activeThreadId) {
           const run = await options.submitRun({
             projectId: options.activeProjectId,
             threadId: options.activeThreadId,
             prompt: formatComposerPromptWithContext(intent.text, intent.attachments, intent.mentions),
+            ...edgeSelectedAgent(intent),
             ...edgePermissionMode(intent),
             ...edgeWorkDir(intent),
           });
@@ -68,6 +73,15 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Age
         return workbenchDemoRuntimeStore.submitComposerIntent(intent);
       },
     },
+  };
+}
+
+function edgeSelectedAgent(intent: ComposerIntent): Pick<StartRunRequest, 'agentId' | 'model'> {
+  const mention = intent.mentions.find((item) => item.status !== 'unavailable') ?? intent.mentions[0];
+  if (!mention) return {};
+  return {
+    agentId: mention.runtimeId?.trim() || mention.id,
+    ...(mention.model ? { model: mention.model } : {}),
   };
 }
 
