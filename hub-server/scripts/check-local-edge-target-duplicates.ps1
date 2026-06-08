@@ -17,6 +17,66 @@ if ([string]::IsNullOrWhiteSpace($DatabaseUrl)) {
     exit 1
 }
 
+$psqlCommand = Get-Command -Name $Psql -ErrorAction SilentlyContinue
+if ($null -eq $psqlCommand) {
+    Write-Error "psql executable was not found. Install PostgreSQL client tools or pass -Psql."
+    exit 127
+}
+$psqlPath = if (-not [string]::IsNullOrWhiteSpace($psqlCommand.Path)) { $psqlCommand.Path } else { $psqlCommand.Source }
+
+function ConvertTo-LibpqEnvironment {
+    param([string]$ConnectionUrl)
+
+    try {
+        $uri = [System.Uri]::new($ConnectionUrl)
+    } catch {
+        Write-Error "Database URL is not a valid URI."
+        exit 1
+    }
+
+    if ($uri.Scheme -ne "postgres" -and $uri.Scheme -ne "postgresql") {
+        Write-Error "Database URL must use the postgres or postgresql scheme."
+        exit 1
+    }
+
+    $databaseName = $uri.AbsolutePath.TrimStart("/")
+    if ([string]::IsNullOrWhiteSpace($databaseName)) {
+        Write-Error "Database URL must include a database name."
+        exit 1
+    }
+
+    $result = @{
+        PGHOST = $uri.Host
+        PGDATABASE = [System.Uri]::UnescapeDataString($databaseName)
+    }
+
+    if (-not $uri.IsDefaultPort) {
+        $result.PGPORT = [string]$uri.Port
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($uri.UserInfo)) {
+        $parts = $uri.UserInfo.Split(":", 2)
+        if ($parts.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($parts[0])) {
+            $result.PGUSER = [System.Uri]::UnescapeDataString($parts[0])
+        }
+        if ($parts.Count -gt 1) {
+            $result.PGPASSWORD = [System.Uri]::UnescapeDataString($parts[1])
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($uri.Query)) {
+        foreach ($pair in $uri.Query.TrimStart("?").Split("&", [System.StringSplitOptions]::RemoveEmptyEntries)) {
+            $parts = $pair.Split("=", 2)
+            $key = [System.Uri]::UnescapeDataString($parts[0])
+            if ($key -eq "sslmode" -and $parts.Count -gt 1 -and -not [string]::IsNullOrWhiteSpace($parts[1])) {
+                $result.PGSSLMODE = [System.Uri]::UnescapeDataString($parts[1])
+            }
+        }
+    }
+
+    return $result
+}
+
 $sql = @'
 WITH duplicate_local_edge_targets AS (
     SELECT
@@ -41,12 +101,32 @@ $psqlArgs = @(
     "--tuples-only",
     "--field-separator", " | ",
     "--set", "ON_ERROR_STOP=1",
-    $DatabaseUrl,
     "--command", $sql
 )
 
-$output = & $Psql @psqlArgs 2>&1
-$psqlExitCode = $LASTEXITCODE
+$libpqEnv = ConvertTo-LibpqEnvironment -ConnectionUrl $DatabaseUrl
+$savedEnv = @{}
+foreach ($key in @("DATABASE_URL", "PGCONNECT_TIMEOUT", "PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGSSLMODE")) {
+    $savedEnv[$key] = [Environment]::GetEnvironmentVariable($key, "Process")
+}
+
+try {
+    $env:DATABASE_URL = $DatabaseUrl
+    if ([string]::IsNullOrWhiteSpace($env:PGCONNECT_TIMEOUT)) {
+        $env:PGCONNECT_TIMEOUT = "10"
+    }
+    foreach ($entry in $libpqEnv.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process")
+    }
+
+    $output = & $psqlPath @psqlArgs 2>&1
+    $psqlExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+} finally {
+    foreach ($entry in $savedEnv.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process")
+    }
+}
+
 if ($psqlExitCode -ne 0) {
     Write-Error "local_edge target duplicate preflight query failed."
     foreach ($line in $output) {
