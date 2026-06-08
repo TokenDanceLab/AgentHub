@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,51 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
+
+func TestWrapNotFound(t *testing.T) {
+	mappedErr := errors.New("mapped not found")
+
+	assert.NoError(t, WrapNotFound(nil, mappedErr))
+	assert.ErrorIs(t, WrapNotFound(gorm.ErrRecordNotFound, mappedErr), mappedErr)
+	assert.ErrorIs(t, WrapNotFound(errors.Join(errors.New("lookup failed"), gorm.ErrRecordNotFound), mappedErr), mappedErr)
+
+	otherErr := errors.New("other")
+	assert.ErrorIs(t, WrapNotFound(otherErr, mappedErr), otherErr)
+}
+
+func TestListDevicesByUserOrdersMostRecentFirst(t *testing.T) {
+	db := setupSQLite(t)
+	now := time.Now()
+	require.NoError(t, CreateUser(db, &model.User{ID: "user-a", Username: "user-a", Nickname: "User A"}))
+	require.NoError(t, CreateUser(db, &model.User{ID: "user-b", Username: "user-b", Nickname: "User B"}))
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-old",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now.Add(-time.Hour),
+	}).Error)
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-new",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now,
+	}).Error)
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-other",
+		UserID:       "user-b",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now.Add(time.Hour),
+	}).Error)
+
+	devices, err := ListDevicesByUser(db, "user-a")
+	require.NoError(t, err)
+	require.Len(t, devices, 2)
+	assert.Equal(t, "device-new", devices[0].ID)
+	assert.Equal(t, "device-old", devices[1].ID)
+}
 
 // setupSQLite creates an in-memory SQLite database with tables matching the
 // production PostgreSQL schema. Raw SQL is used instead of AutoMigrate because
