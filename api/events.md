@@ -296,6 +296,7 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | type | 说明 |
 |------|------|
 | `message.new` | 新消息，payload: `{ message_id, session_id, sender_id, sender_type, content, content_type, seq_id, reply_to_message_id, created_at }` |
+| `message.edited` | 消息已编辑，payload: 完整 message 对象，包含 `id`, `session_id`, `content`, `content_type`, `edited`, `edited_at` |
 | `message.recall` | 消息撤回，payload: `{ message_id, session_id, recalled_by }` |
 | `message.pin` | 消息置顶，payload: `{ message_id, session_id, pinned_by }` |
 | `message.unpin` | 取消置顶，payload: `{ message_id, session_id }` |
