@@ -36,9 +36,37 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-tauri-package-readiness.ps1 -RepoRoot .
 
+  windows-installer-smoke-preflight:
+    name: Windows installer smoke preflight
+    needs: readiness-policy
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify Windows installer smoke preflight
+        shell: pwsh
+        run: ./scripts/verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain
+
   windows-package-dry:
     name: Windows NSIS and portable dry package
-    needs: readiness-policy
+    needs: windows-installer-smoke-preflight
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows_package_dry == true }}
     runs-on: windows-latest
     steps:
