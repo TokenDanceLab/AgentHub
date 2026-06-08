@@ -3,6 +3,7 @@ import {
   appendHubRuntimeEvent,
   projectDraftToHubRequest,
   resolveWebWorkbenchContacts,
+  resolveWebExecutionTargetStatus,
   resolveWebWorkbenchProjects,
   resolveWebWorkbenchTranscript,
   resolveWebProjectsStatus,
@@ -227,6 +228,85 @@ describe('useWebWorkbenchModel helpers', () => {
       id: 'web-hub-empty',
       text: 'Hub session 已连接，暂无可显示会话。',
     }));
+  });
+
+  it('surfaces explicit real-mode execution target states without mock fallback', () => {
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: false,
+      dataMode: 'real',
+      isFetching: false,
+      error: null,
+      targets: undefined,
+    })).toMatchObject({
+      state: 'signed-out',
+      block: { text: expect.stringContaining('Sign in to Hub') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'real',
+      isFetching: true,
+      error: null,
+      targets: undefined,
+    })).toMatchObject({
+      state: 'loading',
+      block: { text: expect.stringContaining('Loading Hub execution targets') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'real',
+      isFetching: false,
+      error: new Error('Hub target inventory failed'),
+      targets: undefined,
+    })).toMatchObject({
+      state: 'error',
+      block: { text: expect.stringContaining('Hub target inventory failed') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'real',
+      isFetching: false,
+      error: null,
+      targets: [
+        {
+          id: 'relay-1',
+          name: 'Hub Relay',
+          target_type: 'hub_relay',
+          workspace_allowlist: [],
+          health_state: 'healthy',
+          trust_level: 'relay',
+          is_online: true,
+        },
+      ],
+    })).toMatchObject({
+      state: 'empty',
+      selectedTarget: undefined,
+      block: { text: expect.stringContaining('No online local_edge execution target') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'real',
+      isFetching: false,
+      error: null,
+      targets: [
+        {
+          id: 'target-local-edge-1',
+          name: 'Online Desktop Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: ['D:\\Code\\TokenDance\\AgentHub'],
+          health_state: 'healthy',
+          trust_level: 'local',
+          is_online: true,
+        },
+      ],
+    })).toMatchObject({
+      state: 'ready',
+      selectedTarget: { id: 'target-local-edge-1' },
+      block: { text: expect.stringContaining('Online Desktop Edge') },
+    });
   });
 
   it('deduplicates live Hub runtime events by id and limits retained events', () => {

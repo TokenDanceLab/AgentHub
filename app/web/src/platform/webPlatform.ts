@@ -16,16 +16,20 @@ import { queryClient as defaultQueryClient } from '@/api/queryClient';
 import {
   createHubClient,
   type AgentInstance,
+  type ExecutionTarget,
   type HubClient,
   type MessageResponse,
   type PendingAgentTask,
   type SendMessageResponse,
 } from '@/api/hubClient';
+import { selectOnlineLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
 import { getAccessToken } from '@/hooks/useAuth';
 import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
 
-type WebRunHubClient = Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'>;
+type WebRunHubClient =
+  Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'> &
+  Partial<Pick<HubClient, 'listExecutionTargets'>>;
 
 interface SessionAgentInstanceBinding {
   profileId: string;
@@ -369,10 +373,27 @@ async function triggerMentionedAgent(
   if (!agentInstanceId) {
     throw new Error('Hub did not return an exact agent instance id for dispatch.');
   }
+  const target = await resolveWebDispatchTarget(hubClient);
   return hubClient.triggerAgentTask(triggerMessageId, {
     agent_instance_id: agentInstanceId,
+    target_id: target.id,
     model_params: JSON.stringify(buildHubAgentTaskModelParams(intent)),
   });
+}
+
+async function resolveWebDispatchTarget(hubClient: WebRunHubClient): Promise<Pick<ExecutionTarget, 'id'>> {
+  if (!hubClient.listExecutionTargets) {
+    throw new Error('Hub execution target inventory is required for Web Hub dispatch.');
+  }
+  const inventory = await hubClient.listExecutionTargets({
+    target_type: 'local_edge',
+    pageSize: 50,
+  });
+  const target = selectOnlineLocalEdgeExecutionTarget(inventory.items);
+  if (!target?.id) {
+    throw new Error('No online local_edge execution target is available for Web Hub dispatch.');
+  }
+  return target;
 }
 
 function buildHubComposerPrompt(intent: ComposerIntent): string {
