@@ -1073,6 +1073,7 @@ paths:
       tags: [ExecutionRunner]
       operationId: createAgentInstance
       summary: Register a sub-agent instance.
+      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
       responses:
