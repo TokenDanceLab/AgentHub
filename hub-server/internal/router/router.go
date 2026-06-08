@@ -17,7 +17,11 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	if len(workspaceHandlers) > 0 {
 		workspaceHandler = workspaceHandlers[0]
 	}
-	r.Use(middleware.CORS())
+	corsMiddleware, err := middleware.CORS()
+	if err != nil {
+		panic("CORS middleware init failed: " + err.Error())
+	}
+	r.Use(corsMiddleware)
 	r.Use(middleware.APIVersion())
 	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
 	r.Use(middleware.GlobalRateLimit(cacheClient))
