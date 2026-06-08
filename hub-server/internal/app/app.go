@@ -439,6 +439,9 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		if !ok {
 			return
 		}
+		if msg.SenderType == model.SenderTypeAgent {
+			return
+		}
 		frame := ws.NewFrame(ws.TypeMessageNew, msg)
 		a.mgr.PushToSession(msg.SessionID, frame)
 	})
