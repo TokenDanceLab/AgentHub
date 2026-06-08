@@ -227,6 +227,11 @@ Internal dry-run artifact only. This is not a signed public release.
     $report.stages.updaterMetadata = "skipped"
 }
 
+Step "Post-build static readiness gates"
+& (Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1") -RepoRoot $RepoRoot
+if ($LASTEXITCODE -ne 0) { Fail "post-build static package readiness failed" }
+$report.stages.postBuildReadiness = "passed"
+
 $report.stages.macosUnsignedDry = "policy_only"
 $report | ConvertTo-Json -Depth 8 | Out-File (Join-Path $artifactRoot "package-dry-report.json") -Encoding UTF8
 Add-ArtifactManifest $artifactRoot
