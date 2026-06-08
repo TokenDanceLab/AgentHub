@@ -55,28 +55,36 @@ deploy() {
 # Health check
 health_check() {
     log "Running health checks..."
+    local health_url="${AGENTHUB_HEALTH_URL:-http://localhost:8090/health/ready}"
     local max_retries=30
     local retry=0
 
     while [ $retry -lt $max_retries ]; do
-        if curl -sf http://localhost:8090/health > /dev/null 2>&1; then
-            local health_json=$(curl -s http://localhost:8090/health)
-            log "Health check PASSED: $health_json"
+        local response http_code health_json
+        response=$(curl -sS -w '\n%{http_code}' "$health_url" 2>/dev/null || true)
+        http_code=$(printf '%s' "$response" | tail -n 1)
+        health_json=$(printf '%s' "$response" | sed '$d')
+
+        if [ "$http_code" = "200" ] && \
+            printf '%s' "$health_json" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' && \
+            printf '%s' "$health_json" | grep -Eq '"ready"[[:space:]]*:[[:space:]]*true'; then
+            log "Readiness check PASSED: $health_json"
             return 0
         fi
+        [ -n "$health_json" ] && warn "Readiness not ready (HTTP ${http_code:-unknown}): $health_json"
         retry=$((retry + 1))
         [ $retry -lt $max_retries ] && sleep 2
     done
 
-    err "Health check FAILED after ${max_retries} retries"
+    err "Readiness check FAILED after ${max_retries} retries: $health_url"
 }
 
 # Verify public API
 verify_public_api() {
     log "Verifying public API..."
-    curl -sf http://localhost:8090/api/public/stats > /dev/null 2>&1 && \
-        log "Public API OK" || \
-        warn "Public API not responding (may need DB migration)"
+    local public_url="${AGENTHUB_PUBLIC_SMOKE_URL:-http://localhost:8090/api/public/stats}"
+    curl -sf "$public_url" > /dev/null 2>&1 || err "Public API smoke FAILED: $public_url"
+    log "Public API OK"
 }
 
 # Cleanup old images
@@ -96,6 +104,7 @@ rollback() {
     AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down
     AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --force-recreate --remove-orphans hub-server
     health_check
+    verify_public_api
 }
 
 # Main
