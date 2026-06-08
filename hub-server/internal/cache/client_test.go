@@ -538,6 +538,35 @@ func TestPendingTargetTasksAreIsolatedByDeviceAndTarget(t *testing.T) {
 	require.Equal(t, []string{`{"task_id":"a2"}`}, devBTasks)
 }
 
+func TestPendingTargetTasksListDoesNotAckUntilExplicitRemove(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-a", `{"task_id":"a1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-b", "dev-a", `{"task_id":"b1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-b", `{"task_id":"a2"}`))
+
+	devATasks, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []PendingTargetTask{
+		{TargetID: "target-a", Payload: `{"task_id":"a1"}`},
+		{TargetID: "target-b", Payload: `{"task_id":"b1"}`},
+	}, devATasks)
+
+	devASecondList, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.ElementsMatch(t, devATasks, devASecondList)
+
+	require.NoError(t, c.AckPendingTargetTask(ctx, "user-target", "target-a", "dev-a", `{"task_id":"a1"}`))
+	devAAfterAck, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.Equal(t, []PendingTargetTask{{TargetID: "target-b", Payload: `{"task_id":"b1"}`}}, devAAfterAck)
+
+	devBTasks, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []PendingTargetTask{{TargetID: "target-a", Payload: `{"task_id":"a2"}`}}, devBTasks)
+}
+
 func TestPendingTargetTasksExpireWithIndex(t *testing.T) {
 	c, mr := testClient(t)
 	ctx := context.Background()

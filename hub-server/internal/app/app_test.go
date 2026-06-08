@@ -20,8 +20,8 @@ import (
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
-	debugpkg "github.com/agenthub/pkg/debug"
 	"github.com/agenthub/hub-server/internal/ws"
+	debugpkg "github.com/agenthub/pkg/debug"
 	"github.com/glebarez/sqlite"
 )
 
@@ -348,6 +348,10 @@ func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T
 		t.Fatal("target queue was replayed before task dispatch state was persisted")
 	case <-time.After(100 * time.Millisecond):
 	}
+
+	remaining, err := cacheClient.PopPendingTargetTasksForDevice(context.Background(), "user-1", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []string{`{"task_id":"missing-task","target_id":"target-dev-b"}`}, remaining)
 }
 
 func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {

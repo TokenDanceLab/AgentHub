@@ -763,21 +763,25 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 }
 
 func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, connID string) {
-	tasks, err := a.CacheClient.PopPendingTargetTasksForDevice(ctx, userID, deviceID)
+	tasks, err := a.CacheClient.ListPendingTargetTasksForDevice(ctx, userID, deviceID)
 	if err != nil || len(tasks) == 0 {
 		return
 	}
-	for _, taskJSON := range tasks {
+	for _, task := range tasks {
 		var payload json.RawMessage
-		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
+		if json.Unmarshal([]byte(task.Payload), &payload) == nil {
 			var meta struct {
 				TaskID string `json:"task_id"`
 			}
-			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
+			if json.Unmarshal([]byte(task.Payload), &meta) == nil && meta.TaskID != "" {
 				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID); err != nil {
 					slog.Error("failed to mark target-bound queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", deviceID, "error", err)
 					continue
 				}
+			}
+			if err := a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload); err != nil {
+				slog.Error("failed to ack target-bound queued task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "error", err)
+				continue
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
