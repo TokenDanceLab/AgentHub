@@ -186,6 +186,25 @@ describe('webPlatform workbench agent mapping', () => {
         trigger_message_id: 'hub-message-1',
         status: 'queued',
       }),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-offline',
+            name: 'Offline Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'offline',
+            is_online: false,
+          },
+          {
+            id: 'target-local-edge-1',
+            name: 'Online Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
     };
     const platform = createWebPlatform({
       hubClient,
@@ -225,8 +244,13 @@ describe('webPlatform workbench agent mapping', () => {
       agent_type: 'claude-code',
       display_name: 'Hub Builder',
     });
+    expect(hubClient.listExecutionTargets).toHaveBeenCalledWith({
+      target_type: 'local_edge',
+      pageSize: 50,
+    });
     expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-1', {
       agent_instance_id: 'agent-instance-1',
+      target_id: 'target-local-edge-1',
       model_params: expect.any(String),
     });
     const triggerOptions = hubClient.triggerAgentTask.mock.calls[0]?.[1];
@@ -276,6 +300,18 @@ describe('webPlatform workbench agent mapping', () => {
         trigger_message_id: 'hub-message-cached-1',
         status: 'queued',
       }),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-local-edge-cached',
+            name: 'Online Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
     };
     const platform = createWebPlatform({
       hubClient,
@@ -298,10 +334,12 @@ describe('webPlatform workbench agent mapping', () => {
     expect(hubClient.addAgentToSession).toHaveBeenCalledTimes(1);
     expect(hubClient.triggerAgentTask).toHaveBeenNthCalledWith(1, 'hub-message-cached-1', {
       agent_instance_id: 'agent-instance-cached',
+      target_id: 'target-local-edge-cached',
       model_params: expect.any(String),
     });
     expect(hubClient.triggerAgentTask).toHaveBeenNthCalledWith(2, 'hub-message-cached-2', {
       agent_instance_id: 'agent-instance-cached',
+      target_id: 'target-local-edge-cached',
       model_params: expect.any(String),
     });
   });
@@ -434,6 +472,18 @@ describe('webPlatform workbench agent mapping', () => {
         created_at: '2026-06-07T00:00:04Z',
       }),
       triggerAgentTask: vi.fn().mockRejectedValue(new Error('task dispatch failed')),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-local-edge-dispatch-failed',
+            name: 'Online Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
     };
     const platform = createWebPlatform({
       hubClient,
@@ -461,8 +511,55 @@ describe('webPlatform workbench agent mapping', () => {
     ]);
     expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-dispatch-failed', {
       agent_instance_id: 'agent-instance-dispatch-failed',
+      target_id: 'target-local-edge-dispatch-failed',
       model_params: expect.any(String),
     });
+  });
+
+  it('rejects real Hub agent task dispatch when no online local_edge target is available', async () => {
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-no-target',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn().mockResolvedValue({
+        message_id: 'hub-message-no-target',
+        seq_id: 50,
+        created_at: '2026-06-07T00:00:07Z',
+      }),
+      triggerAgentTask: vi.fn(),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-relay-1',
+            name: 'Hub Relay',
+            target_type: 'hub_relay',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      createClientMessageId: () => 'client-message-no-target',
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'hub-session-1',
+      text: '需要本机 Edge 目标',
+      mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('No online local_edge execution target is available for Web Hub dispatch.');
+
+    expect(hubClient.sendMessage).toHaveBeenCalled();
+    expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
   });
 
   it('rejects runtime-less agent mentions before sending a Hub message', async () => {

@@ -93,6 +93,16 @@ function normalizeExecutionTarget(target: ExecutionTarget): ExecutionTargetInven
   };
 }
 
+export function selectOnlineLocalEdgeExecutionTarget(
+  targets: Array<Pick<ExecutionTarget, 'id' | 'target_type' | 'is_online' | 'health_state'>>,
+): Pick<ExecutionTarget, 'id' | 'target_type' | 'is_online' | 'health_state'> | undefined {
+  return targets.find((target) =>
+    target.target_type === 'local_edge' &&
+    target.is_online === true &&
+    target.health_state !== 'offline'
+  );
+}
+
 export async function fetchExecutionTargets(
   preferHub: boolean,
   getToken: () => string | null = getAccessToken,

@@ -10,6 +10,33 @@ const useUpdateAgentProfileMock = vi.hoisted(() => vi.fn());
 const useDeleteAgentProfileMock = vi.hoisted(() => vi.fn());
 const useWebWorkbenchModelMock = vi.hoisted(() => vi.fn());
 
+vi.mock('@shared/workbench', () => ({
+  AgentHubWorkbench: (props: {
+    activeConversationId?: string;
+    conversations?: Array<{ id: string; title: string }>;
+    transcript?: Array<{ text?: string }>;
+  }) => {
+    const activeConversation =
+      props.conversations?.find((conversation) => conversation.id === props.activeConversationId) ??
+      props.conversations?.[0];
+
+    return (
+      <>
+        <nav aria-label="Global rail" />
+        <main aria-label="Workspace" data-surface="web">
+          <div role="tablist" aria-label="Workspace tabs" />
+          <div role="tablist" aria-label="右侧工作区" />
+          <h1>{activeConversation?.title ?? 'AgentHub'}</h1>
+          <input placeholder={`发消息给 ${activeConversation?.title ?? 'AgentHub'}`} />
+          {props.transcript?.map((block, index) => (
+            <p key={index}>{block.text}</p>
+          ))}
+        </main>
+      </>
+    );
+  },
+}));
+
 vi.mock('@/api/agentQueries', () => ({
   useAgentList: useAgentListMock,
   useCreateAgentProfile: useCreateAgentProfileMock,
