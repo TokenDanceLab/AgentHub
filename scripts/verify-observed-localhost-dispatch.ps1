@@ -7,8 +7,8 @@ artifact or local endpoint export. It does not start services, perform
 TokenDanceID login, invoke a real CLI/model adapter, deploy, sign, upload, or
 trust caller-supplied URL topology hints as dispatch proof.
 
-RealTested remains false unless a future approval-gated manifest is explicitly
-accepted with -AllowRealTestedApproval.
+RealTested remains false unless validation succeeds and a future
+approval-gated manifest is explicitly accepted with -AllowRealTestedApproval.
 #>
 
 [CmdletBinding()]
@@ -213,10 +213,13 @@ function Write-Report {
     $edgeRun = Get-Field -Object $Manifest -Name "edge_run"
     $hubReplay = Get-Field -Object $Manifest -Name "hub_replay"
 
+    $validationPassed = ($Status -eq "OBSERVED_DISPATCH_PASSED" -and $Failures.Count -eq 0)
     $realTested = $false
     if ((Get-Field -Object $Manifest -Name "real_tested") -eq $true) {
-        if ($AllowRealTestedApproval -and [string](Get-Field -Object $Manifest -Name "approval_gate") -eq "observed-localhost-dispatch-approved") {
+        if ($validationPassed -and $AllowRealTestedApproval -and [string](Get-Field -Object $Manifest -Name "approval_gate") -eq "observed-localhost-dispatch-approved") {
             $realTested = $true
+        } elseif (-not $validationPassed) {
+            Add-Warning "input RealTested claim was downgraded because observed dispatch validation failed"
         } else {
             Add-Warning "input RealTested claim was downgraded because explicit approval gate is absent"
         }
