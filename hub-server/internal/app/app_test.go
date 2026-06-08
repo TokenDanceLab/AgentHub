@@ -416,6 +416,127 @@ func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.
 	}
 }
 
+func TestStartEventSubscriptionsPushesAgentTeamEvents(t *testing.T) {
+	mgr := ws.NewManager()
+	mgr.ResolveMembers = func(sessionID string) []string {
+		if sessionID == "session-team-1" {
+			return []string{"user-1"}
+		}
+		return nil
+	}
+
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{mgr: mgr, bus: bus}
+	a.startEventSubscriptions(context.Background())
+
+	tests := []struct {
+		name      string
+		eventType string
+		frameType string
+		payload   map[string]interface{}
+	}{
+		{
+			name:      "run started",
+			eventType: "team.run.started",
+			frameType: ws.TypeTeamRunStarted,
+			payload: map[string]interface{}{
+				"team_id":    "team-1",
+				"run_id":     "run-1",
+				"session_id": "session-team-1",
+				"user_id":    "user-1",
+			},
+		},
+		{
+			name:      "team event",
+			eventType: "team.event",
+			frameType: ws.TypeTeamEvent,
+			payload: map[string]interface{}{
+				"team_run_id": "run-1",
+				"session_id":  "session-team-1",
+				"type":        "route.decided",
+			},
+		},
+		{
+			name:      "assignment completed",
+			eventType: "team.assignment.completed",
+			frameType: ws.TypeTeamAssignmentDone,
+			payload: map[string]interface{}{
+				"team_run_id":   "run-1",
+				"assignment_id": "assignment-1",
+				"session_id":    "session-team-1",
+				"result":        "done",
+			},
+		},
+		{
+			name:      "assignment failed",
+			eventType: "team.assignment.failed",
+			frameType: ws.TypeTeamAssignmentFailed,
+			payload: map[string]interface{}{
+				"team_run_id":   "run-1",
+				"assignment_id": "assignment-1",
+				"session_id":    "session-team-1",
+				"reason":        "blocked",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bus.Publish(context.Background(), service.Event{
+				Type:    tt.eventType,
+				Payload: tt.payload,
+			})
+
+			frame := readAppTestFrame(t, conn)
+			require.Equal(t, tt.frameType, frame.Type)
+			for key, value := range tt.payload {
+				require.Equal(t, value, frame.Payload[key])
+			}
+		})
+	}
+}
+
+func TestStartEventSubscriptionsPushesAgentTeamRunStartedToUserWithoutSession(t *testing.T) {
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{mgr: mgr, bus: bus}
+	a.startEventSubscriptions(context.Background())
+
+	payload := map[string]interface{}{
+		"team_id": "team-1",
+		"run_id":  "run-1",
+		"user_id": "user-1",
+	}
+	bus.Publish(context.Background(), service.Event{
+		Type:    "team.run.started",
+		Payload: payload,
+	})
+
+	frame := readAppTestFrame(t, conn)
+	require.Equal(t, ws.TypeTeamRunStarted, frame.Type)
+	for key, value := range payload {
+		require.Equal(t, value, frame.Payload[key])
+	}
+}
+
 func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
 	mgr := ws.NewManager()
 	mgr.ResolveMembers = func(sessionID string) []string {
