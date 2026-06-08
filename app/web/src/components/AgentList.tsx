@@ -3,17 +3,23 @@ import { MapPin, Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
 import { EmptyState, SelectableRow } from '@shared/ui';
-import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { RuntimeBrandIcon } from '@shared/workbench';
 import styles from './AgentList.module.css';
 
 const RUNTIME_ORDER = ['codex', 'claude', 'opencode'];
 
-function agentIcon(name: string): ReactNode {
-  const n = name.toLowerCase();
-  if (n.includes('claude')) return <ClaudeCode size={20} />;
-  if (n.includes('codex')) return <Codex size={20} />;
-  if (n.includes('opencode')) return <OpenCode size={20} />;
-  return null;
+function agentIcon(agent: AgentInfo): ReactNode {
+  const iconName = agent.runtimeId || agent.id || agent.name;
+  if (!iconName.trim()) return null;
+  return (
+    <RuntimeBrandIcon
+      kind="runtime"
+      name={iconName}
+      size="normal"
+      framed={false}
+      title={agent.name}
+    />
+  );
 }
 
 function runtimeRank(agent: AgentInfo): number {
@@ -129,7 +135,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                 onSelect={() => onSelect?.(a.id)}
                 icon={(
                   <>
-                  {agentIcon(a.name) || <Settings2 size={17} />}
+                  {agentIcon(a) || <Settings2 size={17} />}
                   <span className={`${styles.statusDot} ${styles[`status_${a.status}`]}`} />
                   </>
                 )}
