@@ -76,6 +76,10 @@ function numberField(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+function booleanField(...values: unknown[]): boolean {
+  return values.some((value) => value === true);
+}
+
 function truncate(value: string, max = 140): string {
   return value.length > max ? `${value.slice(0, max)}...` : value;
 }
@@ -88,12 +92,13 @@ function summarizeRuntimePayload(eventType: string, payload: unknown): string {
   const toolName = firstString(record.toolName, record.tool_name, record.name);
   const callId = firstString(record.callId, record.call_id, record.toolUseId, record.tool_use_id);
   const status = firstString(record.status, record.state);
-  const output = firstString(record.output, record.content, record.text, record.result);
+  const output = firstString(record.summary, record.output, record.content, record.text, record.result);
   const error = firstString(record.error, record.error_message, record.message);
   const action = firstString(record.action, record.decision);
   const nextWorker = firstString(record.next_worker, record.nextWorker, record.worker, record.agentId, record.agent_id);
   const instructions = firstString(record.instructions, record.summary, record.reasoning, record.reason, record.feedback);
   const taskId = firstString(record.taskId, record.task_id);
+  const toolErrored = booleanField(record.isError, record.is_error);
 
   switch (eventType) {
     case 'run.agent.tool_call':
@@ -103,7 +108,7 @@ function summarizeRuntimePayload(eventType: string, payload: unknown): string {
         callId ? `call ${callId}` : undefined,
       ].filter(Boolean).join(' ');
     case 'run.agent.tool_result':
-      return `Tool ${toolName ?? 'unknown'} result${error ? ` failed: ${truncate(error)}` : output ? `: ${truncate(output)}` : ''}`;
+      return `Tool ${toolName ?? 'unknown'} result${toolErrored || error ? ` failed${error ? `: ${truncate(error)}` : output ? `: ${truncate(output)}` : ''}` : output ? `: ${truncate(output)}` : ''}`;
     case 'run.agent.route_decision':
       return [
         `Route ${action ?? 'decision'}${nextWorker ? ` -> ${nextWorker}` : ''}`,
@@ -134,7 +139,7 @@ function summarizeRuntimePayload(eventType: string, payload: unknown): string {
     }
     case 'run.agent.file_change': {
       const path = firstString(record.path, record.file_path, record.filePath);
-      const fileAction = firstString(record.action, record.operation, record.status);
+      const fileAction = firstString(record.kind, record.action, record.operation, record.status);
       return `File change${fileAction ? ` ${fileAction}` : ''}${path ? `: ${path}` : ''}`;
     }
     default: {
@@ -237,18 +242,47 @@ function mergeRunEvents(
   state?: TeamRunState | undefined,
   selectedRun?: AgentTeamRun | undefined,
 ): AgentTeamEvent[] {
-  const merged: AgentTeamEvent[] = [];
+  type EventCandidate = {
+    event: AgentTeamEvent;
+    sourceOrder: number;
+    sourceSeq: number;
+    inputOrder: number;
+  };
+  const merged: EventCandidate[] = [];
   const seen = new Set<string>();
-  const add = (event: AgentTeamEvent) => {
+  const add = (event: AgentTeamEvent, sourceOrder: number, inputOrder: number) => {
     const key = `${event.type}:${event.seq}:${event.id}`;
     if (seen.has(key)) return;
     seen.add(key);
-    merged.push(event);
+    merged.push({
+      event,
+      sourceOrder,
+      sourceSeq: event.seq,
+      inputOrder,
+    });
   };
 
-  events.map((event) => normalizeTeamRunEvent(event, selectedRun)).forEach(add);
-  (state?.run_events ?? []).map((event) => stateEventToTeamEvent(event, selectedRun)).forEach(add);
-  return merged;
+  events.map((event) => normalizeTeamRunEvent(event, selectedRun)).forEach((event, index) => add(event, 0, index));
+  (state?.run_events ?? [])
+    .map((event) => stateEventToTeamEvent(event, selectedRun))
+    .forEach((event, index) => add(event, 1, events.length + index));
+
+  return merged
+    .sort((a, b) => {
+      const aTime = Date.parse(a.event.created_at ?? '');
+      const bTime = Date.parse(b.event.created_at ?? '');
+      const hasATime = Number.isFinite(aTime);
+      const hasBTime = Number.isFinite(bTime);
+      if (hasATime && hasBTime && aTime !== bTime) return aTime - bTime;
+      if (hasATime !== hasBTime) return hasATime ? -1 : 1;
+      if (a.sourceOrder !== b.sourceOrder) return a.sourceOrder - b.sourceOrder;
+      if (a.sourceSeq !== b.sourceSeq) return a.sourceSeq - b.sourceSeq;
+      return a.inputOrder - b.inputOrder;
+    })
+    .map(({ event }, index) => ({
+      ...event,
+      seq: index + 1,
+    }));
 }
 
 const RUN_STATUS_DOT: Record<string, string> = {

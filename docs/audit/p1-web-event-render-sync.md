@@ -26,6 +26,8 @@ This slice keeps Web Hub-only and improves TeamRun event replay rendering in `ap
 ## Verification
 
 - `pnpm --filter agenthub-web test -- src/views/TeamRunConsole.test.tsx`
+- `pnpm --filter agenthub-web typecheck`
+- `git diff --check`
 
 ## Non-Goals
 
