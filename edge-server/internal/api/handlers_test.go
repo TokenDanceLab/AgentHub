@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
@@ -1962,6 +1965,116 @@ func TestPostPermissionDecideConsumesPendingRequestAndPublishesEvent(t *testing.
 	}
 	if _, ok := h.PermissionRegistry.Consume("run_1", "req_1"); ok {
 		t.Fatal("pending request remained after decision")
+	}
+}
+
+func TestPostPermissionDecideUnblocksWaitingPermissionRequest(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		decision string
+		reason   string
+	}{
+		{name: "allow", decision: "allow"},
+		{name: "deny", decision: "deny", reason: "not safe"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHandler()
+			broker := h.ensurePermissionBroker()
+			wait, ok := broker.Begin(adapters.PermissionScope{
+				ProjectID: "proj_1",
+				ThreadID:  "thread_1",
+				RunID:     "run_1",
+			}, adapters.PermissionRequest{
+				RequestID: "req_1",
+				ToolName:  "Bash",
+				ToolUseID: "tool_1",
+			})
+			if !ok {
+				t.Fatal("failed to begin pending permission request")
+			}
+
+			resultCh := make(chan adapters.PermissionDecision, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			go func() {
+				resultCh <- wait(ctx)
+			}()
+
+			body := fmt.Sprintf(`{"runId":"run_1","requestId":"req_1","decision":%q,"reason":%q}`, tt.decision, tt.reason)
+			req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(body))
+			rec := httptest.NewRecorder()
+			h.PostPermissionDecide(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+			}
+			select {
+			case got := <-resultCh:
+				if got.Behavior != tt.decision {
+					t.Fatalf("Behavior = %q, want %q", got.Behavior, tt.decision)
+				}
+				if got.Message != tt.reason {
+					t.Fatalf("Message = %q, want %q", got.Message, tt.reason)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for broker decision")
+			}
+		})
+	}
+}
+
+func TestRegisterRoutesInstallsPermissionBrokerOnClaudeAdapter(t *testing.T) {
+	h := newTestHandler()
+	adapterRegistry := adapters.NewRegistry()
+	claude := adapters.NewClaudeCodeAdapter("claude", "", "")
+	if err := adapterRegistry.Register(claude); err != nil {
+		t.Fatalf("register adapter: %v", err)
+	}
+	h.AdapterRegistry = adapterRegistry
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	inner, _ := json.Marshal(adapters.ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
+		ToolUseID: "tool_1",
+	})
+	msg, _ := json.Marshal(adapters.ControlMessage{
+		Type:      "control_request",
+		RequestID: "req_1",
+		Request:   inner,
+	})
+	var stdin bytes.Buffer
+	done := make(chan error, 1)
+	run := store.Run{ID: "run_1", ProjectID: "proj_1", ThreadID: "thread_1", Status: "started"}
+
+	go func() {
+		done <- claude.ParseStream(context.Background(), strings.NewReader(string(msg)+"\n"), &stdin, adapters.NewBusEventEmitter(h.Bus), run)
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("ParseStream returned before /permissions/decide: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+	h.PostPermissionDecide(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("ParseStream: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("ParseStream did not resume after /permissions/decide")
+	}
+	if !strings.Contains(stdin.String(), `"behavior":"allow"`) {
+		t.Fatalf("stdin response = %s, want allow control response", stdin.String())
 	}
 }
 
