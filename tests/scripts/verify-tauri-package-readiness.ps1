@@ -140,6 +140,65 @@ function New-RogueMacOSCommandFixture {
     return $tempRoot
 }
 
+function New-TestArtifactRoot {
+    param(
+        [string]$Name,
+        [switch]$OmitLatestVersion,
+        [switch]$OmitPortableSidecar,
+        [switch]$BadManifestHash
+    )
+
+    $root = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-artifacts-$Name-$(New-Guid)"
+    New-Item -ItemType Directory $root -Force | Out-Null
+
+    $setupPath = Join-Path $root "AgentHub_0.2.0_x64-setup.exe"
+    [System.IO.File]::WriteAllBytes($setupPath, [byte[]](1..32))
+    "signature-for-test" | Out-File (Join-Path $root "AgentHub_0.2.0_x64-setup.exe.sig") -Encoding UTF8
+
+    $portableDir = Join-Path $root "portable-src"
+    New-Item -ItemType Directory $portableDir -Force | Out-Null
+    "desktop" | Out-File (Join-Path $portableDir "AgentHub.exe") -Encoding UTF8
+    if (-not $OmitPortableSidecar) {
+        "edge" | Out-File (Join-Path $portableDir "agenthub-edge.exe") -Encoding UTF8
+    }
+    "readme" | Out-File (Join-Path $portableDir "README.txt") -Encoding UTF8
+    Compress-Archive -Path (Join-Path $portableDir "*") -DestinationPath (Join-Path $root "AgentHub_0.2.0_x64-portable.zip") -Force
+    Remove-Item $portableDir -Recurse -Force
+
+    $latest = [ordered]@{
+        notes = "Internal dry-run package."
+        pub_date = "2026-06-08T00:00:00Z"
+        platforms = [ordered]@{
+            "windows-x86_64" = [ordered]@{
+                signature = "signature-for-test"
+                url = "https://github.com/TokenDanceLab/AgentHub/releases/download/v0.2.0/AgentHub_0.2.0_x64-setup.exe"
+            }
+        }
+    }
+    if (-not $OmitLatestVersion) {
+        $latest.version = "0.2.0"
+    }
+    $latest | ConvertTo-Json -Depth 8 | Out-File (Join-Path $root "latest.json") -Encoding UTF8
+
+    $manifest = Get-ChildItem $root -File |
+        Sort-Object Name |
+        ForEach-Object {
+            [pscustomobject]@{
+                name = $_.Name
+                bytes = $_.Length
+                sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            }
+        }
+
+    if ($BadManifestHash) {
+        $manifest[0].sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+
+    $manifest | ConvertTo-Json -Depth 4 | Out-File (Join-Path $root "artifact-manifest.json") -Encoding UTF8
+
+    return $root
+}
+
 $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
 $smokeScriptPath = Join-Path $RepoRoot "scripts\verify-tauri-installer-smoke.ps1"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\release.yml"
@@ -159,6 +218,8 @@ Assert-True ($scriptText -match "package\.json" -and $scriptText -match "Cargo\.
 Assert-True ($scriptText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe") "checker enforces Windows sidecar binary name"
 Assert-True ($scriptText -match "latest\.json" -and $scriptText -match "\.sig") "checker requires updater metadata and signature"
 Assert-True ($scriptText -match "portable\.zip" -and $scriptText -match "setup\.exe") "checker requires installer and portable artifacts"
+Assert-True ($scriptText -match "artifact-manifest\.json" -and $scriptText -match "Get-FileHash" -and $scriptText -match "sha256" -and $scriptText -match "bytes") "checker validates dry artifact manifest hashes and sizes"
+Assert-True ($scriptText -match "ZipFile" -and $scriptText -match "AgentHub\.exe" -and $scriptText -match "agenthub-edge\.exe" -and $scriptText -match "README\.txt") "checker inspects portable zip contents"
 Assert-True ($scriptText -match "check-ignore" -and $scriptText -match "Assert-GitIgnored") "checker verifies generated package artifacts stay ignored before dry builds"
 foreach ($artifactPattern in @(
     'dist/AgentHub_${desktopVersion}_x64-setup.exe',
@@ -189,6 +250,8 @@ Assert-True ($readinessWorkflowText -match "app/desktop/src-tauri/Cargo\.lock") 
 Assert-True ($readinessWorkflowText -match "verify-tauri-package-readiness\.ps1") "release readiness workflow runs readiness checker"
 Assert-True ($readinessWorkflowText -match "verify-tauri-installer-smoke\.ps1") "release readiness workflow runs installer smoke preflight"
 Assert-True ($readinessWorkflowText -match "windows-installer-smoke-preflight") "release readiness workflow has a Windows installer smoke preflight job"
+Assert-True ($readinessWorkflowText -match "artifact-manifest\.json" -and $readinessWorkflowText -match "Get-FileHash" -and $readinessWorkflowText -match "Length") "release readiness workflow writes artifact manifest with hashes and sizes"
+Assert-True ($readinessWorkflowText -match "missing latest\.json" -and $readinessWorkflowText -match "missing updater signature") "release readiness workflow fails collection when updater metadata or signature is missing"
 Assert-True ($readinessWorkflowText -match "run_macos_unsigned_dry_policy") "release readiness workflow declares macOS unsigned dry policy input"
 Assert-True ($readinessWorkflowText -match "macos-unsigned-dry-policy" -and $readinessWorkflowText -match "agenthub-edge-aarch64-apple-darwin") "release readiness workflow records future macOS arm64 unsigned dry sidecar boundary"
 Assert-True ($readinessWorkflowText -match "AgentHub\.app" -and $readinessWorkflowText -match "AgentHub\.dmg" -and $readinessWorkflowText -match "workflow artifacts only") "release readiness workflow records future macOS bundle artifact-only boundary"
@@ -209,6 +272,46 @@ foreach ($hostShell in $scriptHosts) {
     $missingUpdater = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", (Join-Path $RepoRoot "does-not-exist"), "-RequireBuiltArtifacts")
     Assert-True ($missingUpdater.ExitCode -ne 0) "built artifact gate fails when updater metadata is missing under $($missingUpdater.Host)" $missingUpdater.Output
     Assert-True ($missingUpdater.Output -match "latest\.json") "missing updater metadata failure names latest.json under $($missingUpdater.Host)" $missingUpdater.Output
+
+    $completeArtifacts = New-TestArtifactRoot "complete"
+    try {
+        $completeGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $completeArtifacts, "-RequireBuiltArtifacts")
+        Assert-True ($completeGate.ExitCode -eq 0) "built artifact gate accepts inspected manifest, installer, portable package, updater metadata, and signature under $($completeGate.Host)" $completeGate.Output
+        Assert-True ($completeGate.Output -match "artifact-manifest\.json verifies" -and $completeGate.Output -match "latest\.json version matches" -and $completeGate.Output -match "portable\.zip contains agenthub-edge\.exe") "artifact inspection reports manifest, metadata, and portable sidecar checks under $($completeGate.Host)" $completeGate.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $completeArtifacts -ErrorAction SilentlyContinue
+    }
+
+    $badLatest = New-TestArtifactRoot "bad-latest" -OmitLatestVersion
+    try {
+        $badLatestGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $badLatest, "-RequireBuiltArtifacts")
+        Assert-True ($badLatestGate.ExitCode -ne 0) "built artifact gate rejects latest.json without version metadata under $($badLatestGate.Host)" $badLatestGate.Output
+        Assert-True ($badLatestGate.Output -match "latest\.json version") "bad latest.json failure names version metadata under $($badLatestGate.Host)" $badLatestGate.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $badLatest -ErrorAction SilentlyContinue
+    }
+
+    $badPortable = New-TestArtifactRoot "bad-portable" -OmitPortableSidecar
+    try {
+        $badPortableGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $badPortable, "-RequireBuiltArtifacts")
+        Assert-True ($badPortableGate.ExitCode -ne 0) "built artifact gate rejects portable package without Edge sidecar under $($badPortableGate.Host)" $badPortableGate.Output
+        Assert-True ($badPortableGate.Output -match "agenthub-edge\.exe") "bad portable failure names missing Edge sidecar under $($badPortableGate.Host)" $badPortableGate.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $badPortable -ErrorAction SilentlyContinue
+    }
+
+    $badManifest = New-TestArtifactRoot "bad-manifest" -BadManifestHash
+    try {
+        $badManifestGate = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", $badManifest, "-RequireBuiltArtifacts")
+        Assert-True ($badManifestGate.ExitCode -ne 0) "built artifact gate rejects artifact-manifest hash mismatch under $($badManifestGate.Host)" $badManifestGate.Output
+        Assert-True ($badManifestGate.Output -match "artifact-manifest\.json.*sha256") "bad manifest failure names sha256 mismatch under $($badManifestGate.Host)" $badManifestGate.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $badManifest -ErrorAction SilentlyContinue
+    }
 
     $rogueRoot = New-RogueTauriBuildFixture
     try {
