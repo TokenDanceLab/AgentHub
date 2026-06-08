@@ -904,14 +904,22 @@ func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, conn
 }
 
 func (a *App) pushPendingAgentControls(ctx context.Context, userID, deviceID, connID string) {
-	controls, err := a.CacheClient.PopPendingAgentControlsForDevice(ctx, userID, deviceID)
+	controls, err := a.CacheClient.ListPendingAgentControlsForDevice(ctx, userID, deviceID)
 	if err != nil || len(controls) == 0 {
 		return
 	}
 	for _, controlJSON := range controls {
 		var payload json.RawMessage
 		if json.Unmarshal([]byte(controlJSON), &payload) == nil {
-			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, payload))
+			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, payload))
+			if !result.Queued {
+				slog.Warn("agent control replay not queued; keeping pending control", "user_id", userID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+				continue
+			}
+			if err := a.CacheClient.AckPendingAgentControl(ctx, userID, deviceID, controlJSON); err != nil {
+				slog.Error("failed to ack pending agent control", "user_id", userID, "device_id", deviceID, "error", err)
+				continue
+			}
 		}
 	}
 }

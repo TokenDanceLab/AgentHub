@@ -611,6 +611,36 @@ func TestPendingAgentControlsAreIsolatedByDevice(t *testing.T) {
 	require.JSONEq(t, `{"kind":"permission.decide","approval_id":"approval-b"}`, devBControls[0])
 }
 
+func TestPendingAgentControlsListDoesNotAckUntilExplicitRemove(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+	devAControl := `{"kind":"permission.decide","approval_id":"approval-a"}`
+	devBControl := `{"kind":"permission.decide","approval_id":"approval-b"}`
+
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", devAControl))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-b", devBControl))
+
+	devAControls, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, devAControls, 1)
+	require.JSONEq(t, devAControl, devAControls[0])
+
+	devASecondList, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, devASecondList, 1)
+	require.JSONEq(t, devAControl, devASecondList[0])
+
+	require.NoError(t, c.AckPendingAgentControl(ctx, "user-control", "dev-a", devAControl))
+	devAAfterAck, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Empty(t, devAAfterAck)
+
+	devBControls, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-b")
+	require.NoError(t, err)
+	require.Len(t, devBControls, 1)
+	require.JSONEq(t, devBControl, devBControls[0])
+}
+
 func TestPendingAgentControlsDeduplicateExactPayloadForDevice(t *testing.T) {
 	c, _ := testClient(t)
 	ctx := context.Background()
