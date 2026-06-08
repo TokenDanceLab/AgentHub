@@ -501,6 +501,46 @@ func TestOpenAPIRouteMiddlewareMetadataMatchesRouter(t *testing.T) {
 	assertPathHasNoDeviceType(t, paths, "/cloud/edge/register")
 }
 
+func TestOpenAPIBackendMigrationAuditCoverage(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+
+	assertOperationStatus(t, paths, "/client/auth/oidc/callback", "get", "implemented")
+	assertOperationStatus(t, paths, "/client/auth/oidc/callback", "post", "implemented")
+	oidcCallback := yamlMapField(t, paths, "/client/auth/oidc/callback", "paths./client/auth/oidc/callback")
+	oidcGet := yamlMapField(t, oidcCallback, "get", "paths./client/auth/oidc/callback.get")
+	oidcGetResponses := yamlMapField(t, oidcGet, "responses", "paths./client/auth/oidc/callback.get.responses")
+	_ = yamlMapField(t, oidcGetResponses, "200", "paths./client/auth/oidc/callback.get.responses.200")
+	_ = yamlMapField(t, oidcGetResponses, "400", "paths./client/auth/oidc/callback.get.responses.400")
+
+	assertOperationStatus(t, paths, "/cloud/edge/register", "post", "implemented")
+	assertPathHasNoDeviceType(t, paths, "/cloud/edge/register")
+
+	adminRoutes := []struct {
+		path   string
+		method string
+	}{
+		{"/web/agent-profiles/{id}/publish", "post"},
+		{"/web/skills/{id}/publish", "post"},
+		{"/web/skills/{id}/unpublish", "post"},
+		{"/web/mcp-servers/{id}/publish", "post"},
+		{"/web/mcp-servers/{id}/unpublish", "post"},
+		{"/web/audit-events", "get"},
+		{"/web/relay/commands", "post"},
+		{"/web/relay/commands/{id}", "get"},
+		{"/web/relay/commands/{id}/ack", "post"},
+	}
+	for _, route := range adminRoutes {
+		assertOperationRole(t, paths, route.path, route.method, "admin")
+	}
+
+	assertPathDeviceType(t, paths, "/edge/devices/register", "desktop")
+	assertPathDeviceType(t, paths, "/edge/agent-tasks/{id}/ack", "desktop")
+	assertPathDeviceType(t, paths, "/web/agent-tasks", "web")
+	assertPathDeviceType(t, paths, "/web/agent-profiles", "web")
+	assertPathDeviceType(t, paths, "/web/audit-events", "web")
+}
+
 func TestOpenAPIHubWebSocketDocumentsUpgradeAuth(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
@@ -801,6 +841,15 @@ func assertOperationIsNotImplemented(t *testing.T, paths *yaml.Node, path string
 	status := yamlOptionalMapField(op, "x-agenthub-status")
 	if status != nil && status.Kind == yaml.ScalarNode && status.Value == "implemented" {
 		t.Fatalf("legacy operation %s %s must not be marked implemented", method, path)
+	}
+}
+
+func assertOperationStatus(t *testing.T, paths *yaml.Node, path string, method string, want string) {
+	t.Helper()
+	pathNode := yamlMapField(t, paths, path, "paths."+path)
+	op := yamlMapField(t, pathNode, method, "paths."+path+"."+method)
+	if got := yamlScalarField(t, op, "x-agenthub-status", "paths."+path+"."+method+".x-agenthub-status"); got != want {
+		t.Fatalf("%s %s status = %q, want %q", method, path, got, want)
 	}
 }
 
