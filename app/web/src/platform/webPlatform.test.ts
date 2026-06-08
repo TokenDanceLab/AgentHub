@@ -164,6 +164,41 @@ describe('webPlatform workbench agent mapping', () => {
     ]));
   });
 
+  it('opens the auth guard instead of silently using demo fallback when the Web root mounts auth', async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const ensureAuth = vi.fn(() => false);
+    const hubClient = {
+      addAgentToSession: vi.fn(),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn(),
+    };
+    const platform = createWebPlatform({
+      demoRuntimeStore,
+      ensureAuth,
+      hubClient,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: '需要登录后才能进入真实 Hub 路径',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Hub authentication is required');
+
+    expect(ensureAuth).toHaveBeenCalledTimes(1);
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+    expect(demoRuntimeStore.resolveTranscript('builder')).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        author: expect.objectContaining({ role: 'human' }),
+        text: '需要登录后才能进入真实 Hub 路径',
+      }),
+    ]));
+  });
+
   it('submits Hub session messages and triggers the mentioned runtime agent', async () => {
     const queryClient = new QueryClient();
     const hubClient = {

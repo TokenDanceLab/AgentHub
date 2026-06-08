@@ -43,6 +43,7 @@ export interface WebPlatformOptions {
   createClientMessageId?: () => string;
   demoRuntimeStore?: WorkbenchDemoRuntimeStore;
   now?: () => string;
+  ensureAuth?: () => boolean;
 }
 
 const defaultHubClient = createHubClient({ getToken: getAccessToken });
@@ -164,6 +165,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
   const createClientMessageId = options.createClientMessageId ?? newClientMessageId;
   const demoRuntimeStore = options.demoRuntimeStore ?? workbenchDemoRuntimeStore;
   const now = options.now ?? (() => new Date().toISOString());
+  const ensureAuth = options.ensureAuth;
 
   return {
     surface: 'web',
@@ -184,8 +186,18 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
-        if (dataMode === 'demo' || (dataMode === 'auto' && !hasInjectedHubClient && !getAccessToken())) {
+        const hasHubToken = Boolean(getAccessToken());
+        const shouldUseDemoFallback = dataMode === 'demo' || (
+          dataMode === 'auto' &&
+          !hasInjectedHubClient &&
+          !hasHubToken &&
+          !ensureAuth
+        );
+        if (shouldUseDemoFallback) {
           return demoRuntimeStore.submitComposerIntent(intent);
+        }
+        if (!hasHubToken && ensureAuth && !ensureAuth()) {
+          throw new Error('Hub authentication is required before Web can submit real Hub work.');
         }
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
       },

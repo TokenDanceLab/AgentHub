@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { useState, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
 import type { AgentConfig, ProjectDraft, ProjectInfo } from '@shared/workbench';
 import {
@@ -15,13 +15,15 @@ import {
   useDeleteAgentProfile,
   useUpdateAgentProfile,
 } from '@/api/agentQueries';
+import AuthPage from '@/components/AuthPage';
 import {
   createWebPlatform,
   resolveWebWorkbenchAgents,
 } from '@/platform/webPlatform';
 import { useWebWorkbenchModel } from '@/platform/useWebWorkbenchModel';
-
-const webPlatform = createWebPlatform();
+import { useWebAuth } from '@/hooks/useWebAuth';
+import { useHubStore } from '@/stores/hubStore';
+import styles from './App.module.css';
 
 export default function App() {
   return (
@@ -38,6 +40,10 @@ function WebWorkbenchRoot() {
   const [agentActionError, setAgentActionError] = useState<string | undefined>();
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
+  const { ensureAuth } = useWebAuth();
+  const showAuthModal = useHubStore((state) => state.showAuthModal);
+  const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
+  const webPlatform = useMemo(() => createWebPlatform({ ensureAuth }), [ensureAuth]);
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
     getWorkbenchDataModeOverrideSnapshot,
@@ -102,33 +108,43 @@ function WebWorkbenchRoot() {
   }
 
   return (
-    <AgentHubWorkbench
-      activeConversationId={workbench.activeConversationId}
-      agents={agents}
-      agentProfilesStatus={{
-        loading: dataMode === 'real' && agentList.isFetching,
-        error: agentLoadError,
-        actionError: agentActionError,
-        savingAgentId,
-        deletingAgentId,
-      }}
-      contacts={workbench.contacts}
-      conversations={workbench.conversations}
-      projects={workbench.projects}
-      projectsStatus={workbench.projectsStatus}
-      onActiveConversationChange={setSelectedConversationId}
-      onAgentCreate={handleAgentCreate}
-      onAgentUpdate={handleAgentUpdate}
-      onAgentDelete={handleAgentDelete}
-      onAgentsRetry={() => {
-        setAgentActionError(undefined);
-        void agentList.refetch();
-      }}
-      onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
-      onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
-      platform={webPlatform}
-      transcript={workbench.transcript}
-    />
+    <>
+      <AgentHubWorkbench
+        activeConversationId={workbench.activeConversationId}
+        agents={agents}
+        agentProfilesStatus={{
+          loading: dataMode === 'real' && agentList.isFetching,
+          error: agentLoadError,
+          actionError: agentActionError,
+          savingAgentId,
+          deletingAgentId,
+        }}
+        contacts={workbench.contacts}
+        conversations={workbench.conversations}
+        projects={workbench.projects}
+        projectsStatus={workbench.projectsStatus}
+        onActiveConversationChange={setSelectedConversationId}
+        onAgentCreate={handleAgentCreate}
+        onAgentUpdate={handleAgentUpdate}
+        onAgentDelete={handleAgentDelete}
+        onAgentsRetry={() => {
+          setAgentActionError(undefined);
+          void agentList.refetch();
+        }}
+        onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
+        onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
+        platform={webPlatform}
+        transcript={workbench.transcript}
+      />
+      {showAuthModal && (
+        <div className={styles.authOverlay} role="presentation">
+          <AuthPage
+            onLoginSuccess={() => setShowAuthModal(false)}
+            onClose={() => setShowAuthModal(false)}
+          />
+        </div>
+      )}
+    </>
   );
 }
 

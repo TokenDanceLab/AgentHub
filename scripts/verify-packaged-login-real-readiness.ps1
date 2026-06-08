@@ -99,7 +99,8 @@ Assert-Contains "app\web\src\api\hubTokenStorage.ts" "sessionStorage" "Web store
 Assert-NotContains "app\web\src\api\hubTokenStorage.ts" "localStorage\.setItem" "Web storage helper does not write Hub tokens to localStorage"
 
 Step "future real E2E gate"
-Assert-Contains "docs\roadmap.md" "packaged Desktop loopback/keyring readiness.*proposal/gate" "roadmap keeps real packaged E2E as future proposal/gate"
+Assert-Contains "docs\roadmap.md" "Real TokenDanceID/OIDC login.*remain explicit approval gates" "roadmap keeps real OIDC login approval-gated"
+Assert-Contains "docs\roadmap.md" "Real TokenDanceID login: requires approved OAuth client" "roadmap lists real login approval prerequisites"
 Assert-Contains "docs\backend-integration-governance.md" "Packaged Desktop OIDC readiness.*proposal-only gate" "governance keeps real packaged E2E proposal-only"
 Assert-Contains "docs\backend-integration-governance.md" "Packaged real login dry readiness.*Hub/TokenDance ID.*secrets" "governance records no live TokenDance ID or browser action"
 Assert-Contains ".env.example" "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET" "example config names OIDC client secret without requiring a real value"
