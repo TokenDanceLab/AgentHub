@@ -317,6 +317,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			session_id TEXT,
 			trigger_user_id TEXT NOT NULL,
 			trigger_message TEXT DEFAULT '',
+			target_id TEXT,
 			status TEXT NOT NULL DEFAULT 'queued',
 			created_at DATETIME,
 			updated_at DATETIME

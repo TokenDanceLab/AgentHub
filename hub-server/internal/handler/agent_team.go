@@ -19,7 +19,7 @@ type AgentTeamService interface {
 	DeleteTeam(ctx context.Context, userID, teamID string) error
 	AddTeamMember(ctx context.Context, userID, teamID, agentProfileID, role string) error
 	RemoveTeamMember(ctx context.Context, userID, teamID, memberID string) error
-	StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
+	StartTeamRun(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error)
 	GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
 	GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
 	ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
@@ -64,6 +64,7 @@ type addMemberReq struct {
 
 type startRunReq struct {
 	TriggerMessage string `json:"trigger_message" binding:"required"`
+	TargetID       string `json:"target_id,omitempty"`
 }
 
 // --- Handlers ---
@@ -202,7 +203,7 @@ func (h *AgentTeamHandler) StartRun(c *gin.Context) {
 	}
 	userID := c.GetString("user_id")
 	teamID := c.Param("id")
-	run, err := h.service.StartTeamRun(c.Request.Context(), userID, teamID, req.TriggerMessage)
+	run, err := h.service.StartTeamRun(c.Request.Context(), userID, teamID, req.TriggerMessage, req.TargetID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
