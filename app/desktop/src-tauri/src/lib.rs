@@ -32,7 +32,7 @@ fn set_close_to_tray(state: tauri::State<'_, CloseToTrayState>, enabled: bool) {
 
 pub fn run() {
     let edge_path = resolve_edge_path();
-    let store_path = std::env::temp_dir().join("agenthub-edge-store.json");
+    let store_path = std::env::temp_dir().join("agenthub-edge.sqlite");
     let edge = Arc::new(Mutex::new(
         EdgeManager::new(edge_path.clone(), store_path.clone())
             .unwrap_or_else(|e| {

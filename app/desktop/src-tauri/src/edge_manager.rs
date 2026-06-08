@@ -12,7 +12,8 @@ const EDGE_SIDECAR_NAME: &str = "agenthub-edge";
 const LOCAL_EDGE_TARGET_ID: &str = "local-edge";
 const LOCAL_EDGE_ROUTE: &str = "local-edge-api";
 const DEFAULT_RUNNER_PROFILE: &str = "claude-code";
-const READINESS_STORE_FILE_PLACEHOLDER: &str = "<app-data>/agenthub-edge-store.json";
+const EDGE_STORE_DB_FILE_NAME: &str = "agenthub-edge.sqlite";
+const READINESS_STORE_DB_PLACEHOLDER: &str = "<app-data>/agenthub-edge.sqlite";
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EdgeStatus {
@@ -90,18 +91,18 @@ impl EdgeManager {
 
         let addr = edge_bind_addr(self.port);
 
-        // Resolve store path: prefer app data dir over temp
+        // Resolve packaged store path through app data; tests/dev can still inject fallback path.
         let store_path = match app_handle.path().app_data_dir() {
             Ok(dir) => {
                 std::fs::create_dir_all(&dir)
                     .map_err(|e| format!("Failed to create app data dir: {}", e))?;
-                dir.join("agenthub-edge-store.json")
+                edge_store_db_path(dir)
             }
             Err(_) => self.store_path.clone(),
         };
         let store_path_str = store_path
             .to_str()
-            .unwrap_or("agenthub-edge-store.json")
+            .unwrap_or(EDGE_STORE_DB_FILE_NAME)
             .to_string();
 
         let args = edge_launch_args(&store_path_str, &addr);
@@ -249,7 +250,7 @@ impl EdgeManager {
             route: LOCAL_EDGE_ROUTE,
             bind_addr: edge_bind_addr(status.port),
             sidecar_args: edge_launch_args(
-                READINESS_STORE_FILE_PLACEHOLDER,
+                READINESS_STORE_DB_PLACEHOLDER,
                 &edge_bind_addr(status.port),
             ),
             direct_cli_spawn: false,
@@ -312,7 +313,9 @@ fn edge_binary_candidates() -> Vec<PathBuf> {
 
 fn edge_launch_args(store_path: &str, addr: &str) -> Vec<String> {
     vec![
-        "--store-file".to_string(),
+        "--store-backend".to_string(),
+        "sqlite".to_string(),
+        "--store-db".to_string(),
         store_path.to_string(),
         "--addr".to_string(),
         addr.to_string(),
@@ -325,6 +328,10 @@ fn edge_bind_addr(port: u16) -> String {
     format!("127.0.0.1:{}", port)
 }
 
+fn edge_store_db_path(app_data_dir: PathBuf) -> PathBuf {
+    app_data_dir.join(EDGE_STORE_DB_FILE_NAME)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,15 +339,17 @@ mod tests {
     #[test]
     fn edge_launch_args_keep_runtime_behind_local_edge() {
         let args = edge_launch_args(
-            "C:/Users/dev/AppData/Roaming/AgentHub/agenthub-edge-store.json",
+            "fixtures/app-data/agenthub-edge.sqlite",
             "127.0.0.1:3210",
         );
 
         assert_eq!(
             args,
             vec![
-                "--store-file",
-                "C:/Users/dev/AppData/Roaming/AgentHub/agenthub-edge-store.json",
+                "--store-backend",
+                "sqlite",
+                "--store-db",
+                "fixtures/app-data/agenthub-edge.sqlite",
                 "--addr",
                 "127.0.0.1:3210",
                 "--runner-profile",
@@ -354,7 +363,7 @@ mod tests {
     fn readiness_snapshot_advertises_local_edge_sidecar_route() {
         let manager = EdgeManager::new_fallback(
             PathBuf::from("edge-server/agenthub-edge"),
-            PathBuf::from("agenthub-edge-store.json"),
+            PathBuf::from("agenthub-edge.sqlite"),
         );
 
         let readiness = manager.host_readiness();
@@ -368,8 +377,10 @@ mod tests {
         assert_eq!(
             readiness.sidecar_args,
             vec![
-                "--store-file",
-                "<app-data>/agenthub-edge-store.json",
+                "--store-backend",
+                "sqlite",
+                "--store-db",
+                "<app-data>/agenthub-edge.sqlite",
                 "--addr",
                 "127.0.0.1:3210",
                 "--runner-profile",
@@ -381,6 +392,13 @@ mod tests {
             .sidecar_args
             .iter()
             .any(|arg| arg.contains("AppData") || arg.contains("Users")));
+    }
+
+    #[test]
+    fn packaged_store_db_path_lives_under_app_data() {
+        let path = edge_store_db_path(PathBuf::from("fixtures/app-data"));
+
+        assert_eq!(path, PathBuf::from("fixtures/app-data/agenthub-edge.sqlite"));
     }
 }
 

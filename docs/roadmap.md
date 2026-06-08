@@ -20,7 +20,7 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
 | Baseline | `origin/dev/delicious233`; main worktree is dirty/stale and must stay read-only | Continue from isolated `.worktrees/*` only |
 | Backend merge | Long backend thread is closed; backend merge Agent still absorbs old backend line by small slices | Do not whole-merge `feat/backend-edge-hub`; preserve semantic slice rule |
 | Web boundary | Web remains Hub-only; no Local Edge/Tauri/filesystem direct access | Keep `verify-web-hub-boundary.ps1` in every Web/shared slice |
-| Desktop boundary | Desktop may use Local Edge and Tauri host; it must not spawn CLI directly | Finish target preference and Tauri host readiness |
+| Desktop boundary | Desktop may use Local Edge and Tauri host; packaged host readiness now keeps sidecar args on Local Edge and app-data SQLite, without CLI spawn inputs | Real packaged smoke still needs approved installer/build gate |
 | Projects | Hub `/web/projects` list/create/get/update and Web create/update UI are merged | Define delete/soft-delete/orphan policy and artifact/workspace relation |
 | Agent/runtime inventory | AgentProfile read/mutate and ExecutionTarget request contracts are merged; LobeHub runtime branding is merged on dev | Marketplace publish/install and routing behavior stay separate |
 | Edge store | SQLite opt-in snapshot backend and relational migration tests are merged | Repair/reconcile stale `codex/edge-sql-store` worktree before cleanup |
@@ -43,8 +43,8 @@ Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.
    - Non-goals: real process management, browser launching, Web direct Edge, Hub preview store, mobile, real CLI/model.
 
 3. **Desktop local execution closure**
-   - Finish Desktop target preference/Tauri host readiness if not fully merged.
-   - Verify Desktop uses Local Edge runtime ids and never bypasses Edge to spawn CLI.
+   - Keep Desktop target preference/Tauri host readiness on Local Edge sidecar args.
+   - Verify Desktop uses Local Edge runtime ids and app-data SQLite store path, and never bypasses Edge to spawn CLI.
    - Keep Web unchanged.
 
 4. **TeamRun/ByteDance demo evidence**
