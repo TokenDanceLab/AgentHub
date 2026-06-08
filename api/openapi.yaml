@@ -862,6 +862,7 @@ paths:
       tags: [ExecutionRunner]
       operationId: getArtifactContent
       summary: Get artifact content or redirect.
+      description: Planned. Current Edge artifact metadata stores only a sanitized logical path and does not yet include a safe content source, blob key, workspace binding, MIME type, checksum, or size/read policy.
       x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
