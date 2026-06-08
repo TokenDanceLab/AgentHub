@@ -59,6 +59,60 @@ func TestListDevicesByUserOrdersMostRecentFirst(t *testing.T) {
 	assert.Equal(t, "device-old", devices[1].ID)
 }
 
+func TestUpdateDeviceAppliesProvidedFields(t *testing.T) {
+	db := setupSQLite(t)
+	oldLastActive := time.Now().Add(-time.Hour)
+	newLastActive := time.Now()
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-update",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		AppVersion:   "1.0.0",
+		Capabilities: `["shell"]`,
+		LastActiveAt: oldLastActive,
+	}).Error)
+
+	err := UpdateDevice(db, "device-update", map[string]interface{}{
+		"app_version":    "1.1.0",
+		"capabilities":   `["shell","browser"]`,
+		"last_active_at": newLastActive,
+	})
+	require.NoError(t, err)
+
+	device, err := GetDeviceByID(db, "device-update")
+	require.NoError(t, err)
+	assert.Equal(t, "1.1.0", device.AppVersion)
+	assert.Equal(t, `["shell","browser"]`, device.Capabilities)
+	assert.WithinDuration(t, newLastActive, device.LastActiveAt, time.Second)
+}
+
+func TestDeleteDeviceRemovesOnlyTargetDevice(t *testing.T) {
+	db := setupSQLite(t)
+	now := time.Now()
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-delete",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now,
+	}).Error)
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-keep",
+		UserID:       "user-a",
+		DeviceType:   "mobile",
+		Capabilities: "[]",
+		LastActiveAt: now,
+	}).Error)
+
+	require.NoError(t, DeleteDevice(db, "device-delete"))
+
+	_, err := GetDeviceByID(db, "device-delete")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	kept, err := GetDeviceByID(db, "device-keep")
+	require.NoError(t, err)
+	assert.Equal(t, "device-keep", kept.ID)
+}
+
 // setupSQLite creates an in-memory SQLite database with tables matching the
 // production PostgreSQL schema. Raw SQL is used instead of AutoMigrate because
 // GORM's SQLite driver mishandles PostgreSQL-specific GORM tags (jsonb with
@@ -1264,6 +1318,23 @@ func TestFriendshipRepo_BlockAndDelete(t *testing.T) {
 	found, err := FindFriendshipBetween(db, "u1", "u2")
 	require.NoError(t, err)
 	assert.Nil(t, found)
+}
+
+func TestFriendshipRepo_DeleteFriendshipDeletesLoadedRow(t *testing.T) {
+	db := setupSQLite(t)
+
+	target := &model.Friendship{UserID: "delete-u1", FriendID: "delete-u2", Status: model.StatusPending}
+	other := &model.Friendship{UserID: "keep-u1", FriendID: "keep-u2", Status: model.StatusBlocked}
+	require.NoError(t, CreateFriendship(db, target))
+	require.NoError(t, CreateFriendship(db, other))
+
+	require.NoError(t, DeleteFriendship(db, target))
+
+	_, err := GetFriendshipByID(db, target.ID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	kept, err := GetFriendshipByID(db, other.ID)
+	require.NoError(t, err)
+	assert.Equal(t, other.ID, kept.ID)
 }
 
 func TestFriendshipRepo_Upsert(t *testing.T) {

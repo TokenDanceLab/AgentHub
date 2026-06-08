@@ -49,3 +49,13 @@ func ListDevicesByUser(db *gorm.DB, userID string) ([]model.Device, error) {
 	err := db.Where("user_id = ?", userID).Order("last_active_at DESC").Find(&devices).Error
 	return devices, err
 }
+
+func UpdateDevice(db *gorm.DB, deviceID string, updates map[string]interface{}) error {
+	return db.Model(&model.Device{}).
+		Where("id = ?", deviceID).
+		Updates(updates).Error
+}
+
+func DeleteDevice(db *gorm.DB, deviceID string) error {
+	return db.Where("id = ?", deviceID).Delete(&model.Device{}).Error
+}
