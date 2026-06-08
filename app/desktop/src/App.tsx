@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
+import { resolveCurrentTranscriptRunId } from '@shared/transcript';
 import { useAgentList } from '@/api/agentQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
+import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
 import { DesktopChrome } from '@/components/DesktopChrome';
 import { useHealth } from '@/hooks/useHealth';
@@ -16,6 +18,11 @@ export default function App() {
   const { data: agentData } = useAgentList(edgeOnline);
   const { data: modelCatalog } = useModelCatalog(edgeOnline);
   const createRun = useCreateRun();
+  const activeRunId = useMemo(() => {
+    if (!workbench.activeThreadId) return undefined;
+    return resolveCurrentTranscriptRunId(workbench.transcript);
+  }, [workbench.activeThreadId, workbench.transcript]);
+  const runtimeEvidence = useRunEvidence(activeRunId);
   const desktopPlatform = useMemo(() => createDesktopPlatform({
     ...(workbench.activeProjectId ? { activeProjectId: workbench.activeProjectId } : {}),
     ...(workbench.activeThreadId ? { activeThreadId: workbench.activeThreadId } : {}),
@@ -34,6 +41,27 @@ export default function App() {
         conversations={workbench.conversations}
         onActiveConversationChange={setSelectedConversationId}
         platform={desktopPlatform}
+        runtimeEvidence={activeRunId ? {
+          runId: activeRunId,
+          diffs: runtimeEvidence.diffs,
+          artifacts: runtimeEvidence.artifacts,
+          previews: runtimeEvidence.previews,
+          loading: {
+            diff: runtimeEvidence.diffLoading,
+            artifacts: runtimeEvidence.artifactLoading,
+            previews: runtimeEvidence.previewLoading,
+          },
+          errors: {
+            diff: runtimeEvidence.diffError,
+            artifacts: runtimeEvidence.artifactError,
+            previews: runtimeEvidence.previewError,
+          },
+          sources: {
+            diff: runtimeEvidence.diffSource,
+            artifacts: runtimeEvidence.artifactSource,
+            previews: runtimeEvidence.previewSource,
+          },
+        } : undefined}
         transcript={workbench.transcript}
       />
     </DesktopChrome>

@@ -184,6 +184,133 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
   });
 
+  it('renders read-only runtime evidence snapshots in the right inspector', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+        runtimeEvidence={{
+          runId: 'run-edge-1',
+          diffs: [{
+            filePath: 'src/runtime.ts',
+            status: 'modified',
+            additions: 1,
+            deletions: 1,
+            hunks: [{
+              header: '@@ -1 +1 @@',
+              lines: [
+                { type: 'deleted', content: 'old runtime' },
+                { type: 'added', content: 'new runtime' },
+              ],
+            }],
+          }],
+          artifacts: [{
+            id: 'artifact-1',
+            runId: 'run-edge-1',
+            threadId: 'thread-1',
+            kind: 'patch',
+            path: 'reports/runtime.patch',
+            sizeBytes: 2048,
+            createdAt: '2026-06-08T08:10:00.000Z',
+          }],
+          previews: [{
+            id: 'preview-1',
+            runId: 'run-edge-1',
+            threadId: 'thread-1',
+            url: 'http://127.0.0.1:4173/preview',
+            status: 'ready',
+            createdAt: '2026-06-08T08:12:00.000Z',
+          }],
+          sources: { diff: 'edge', artifacts: 'edge', previews: 'edge' },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
+
+    expect(screen.getByText('运行证据')).toBeInTheDocument();
+    expect(screen.getByText('Run run-edge-1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开 diff src/runtime.ts' })).toBeInTheDocument();
+    expect(screen.getByLabelText('产物 metadata reports/runtime.patch')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '查看产物 reports/runtime.patch' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开预览 preview-1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /discard/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '打开 diff src/runtime.ts' }));
+    const diffPreview = screen.getByLabelText('src/runtime.ts 只读预览');
+    expect(diffPreview).toBeInTheDocument();
+    fireEvent.click(within(diffPreview).getByRole('tab', { name: 'Diff' }));
+    expect(within(diffPreview).getByText((_, node) => node?.textContent === '+new runtime')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '返回概览' }));
+    fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
+    fireEvent.click(screen.getByRole('button', { name: '打开预览 preview-1' }));
+    expect(screen.getByRole('tab', { name: /浏览器/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('http://127.0.0.1:4173/preview')).toBeInTheDocument();
+  });
+
+  it('renders runtime evidence loading, error, and empty states', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: false },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    const { rerender } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        runtimeEvidence={{
+          runId: 'run-edge-2',
+          diffs: [],
+          artifacts: [],
+          previews: [],
+          loading: { diff: true, artifacts: true, previews: true },
+          errors: { diff: true, artifacts: false, previews: true },
+          sources: { diff: 'none', artifacts: 'none', previews: 'none' },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
+
+    expect(screen.getByText('正在读取 diff snapshot')).toBeInTheDocument();
+    expect(screen.getByText('正在读取 artifact index')).toBeInTheDocument();
+    expect(screen.getByText('正在读取 preview index')).toBeInTheDocument();
+    expect(screen.getByText('Diff snapshot 读取失败')).toBeInTheDocument();
+    expect(screen.getByText('Preview index 读取失败')).toBeInTheDocument();
+
+    rerender(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        runtimeEvidence={{
+          runId: 'run-edge-empty',
+          diffs: [],
+          artifacts: [],
+          previews: [],
+          sources: { diff: 'none', artifacts: 'none', previews: 'none' },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('暂无运行证据')).toBeInTheDocument();
+    expect(screen.getByText('Edge 已返回空 diff、artifact 和 preview snapshot。')).toBeInTheDocument();
+  });
+
   it('hides repeated avatars for rapid consecutive user messages', () => {
     const platform = createMockPlatform({
       surface: 'desktop',

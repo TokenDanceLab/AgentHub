@@ -1479,6 +1479,21 @@
   opacity: 0.62;
 }
 
+.readonlyEvidenceRow {
+  cursor: default;
+}
+
+.readonlyEvidenceRow:hover {
+  background: transparent;
+  color: var(--text-2);
+  transform: none;
+}
+
+.readonlyEvidenceRow .fileMeta {
+  opacity: 1;
+  transform: none;
+}
+
 .fileIcon {
   width: 17px;
   height: 17px;
@@ -1532,6 +1547,76 @@
   transform: translateX(0);
   background: var(--surface-high);
   color: var(--primary);
+}
+
+.readonlyEvidenceRow:hover .fileMeta,
+.readonlyEvidenceRow:focus-visible .fileMeta {
+  background: transparent;
+  color: var(--text-3);
+}
+
+/* ── Runtime evidence ── */
+.runtimeEvidence {
+  display: grid;
+  gap: 12px;
+}
+
+.runtimeEvidenceHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.runtimeEvidenceHead strong {
+  color: var(--text-1);
+  font: 600 0.8125rem var(--font-sans);
+}
+
+.runtimeEvidenceHead span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtimeEvidenceStateList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.runtimeEvidenceState {
+  min-height: 26px;
+  padding: 5px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+}
+
+.runtimeEvidenceState[data-state='error'] {
+  border-color: var(--diff-removed-border);
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-border);
+}
+
+.runtimeEvidenceSection {
+  display: grid;
+  gap: 7px;
+}
+
+.runtimeEvidenceSectionTitle {
+  padding: 0 2px;
+  color: var(--text-3);
+  font: 600 0.6875rem var(--font-sans);
+  text-transform: uppercase;
 }
 
 /* ── Browser preview card ── */

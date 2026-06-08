@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectTranscriptEvidence } from './transcriptEvidence';
+import { collectTranscriptEvidence, rawRunIdFromEvidenceId, resolveCurrentTranscriptRunId } from './transcriptEvidence';
 import type { TranscriptBlock } from './types';
 
 describe('collectTranscriptEvidence', () => {
@@ -91,5 +91,81 @@ describe('collectTranscriptEvidence', () => {
       { id: 'run-1', kind: 'run', label: 'Run 1', status: 'completed' },
       { id: 'tool-1', kind: 'tool', label: 'Shell', status: 'completed' },
     ]);
+  });
+});
+
+describe('resolveCurrentTranscriptRunId', () => {
+  it('uses the latest raw run id instead of the prefixed evidence ref id', () => {
+    const blocks: TranscriptBlock[] = [
+      {
+        id: 'run-older',
+        kind: 'run_session',
+        author: { id: 'edge', name: 'Edge', role: 'system' },
+        title: 'Older run',
+        status: 'completed',
+        runId: 'run-older',
+        evidenceRefs: [{ id: 'run-run-older', kind: 'run', label: 'Run run-older' }],
+      },
+      {
+        id: 'run-newer',
+        kind: 'run_session',
+        author: { id: 'edge', name: 'Edge', role: 'system' },
+        title: 'Newer run',
+        status: 'running',
+        runId: 'run-newer',
+        evidenceRefs: [{ id: 'run-run-newer', kind: 'run', label: 'Run run-newer' }],
+      },
+    ];
+
+    expect(resolveCurrentTranscriptRunId(blocks)).toBe('run-newer');
+  });
+
+  it('walks nested run-step children from newest to oldest', () => {
+    const blocks: TranscriptBlock[] = [
+      {
+        id: 'steps',
+        kind: 'run_step_group',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        icon: 'tools',
+        title: 'Runtime steps',
+        status: 'running',
+        children: [
+          {
+            id: 'child-older',
+            kind: 'child_agent',
+            author: { id: 'builder', name: 'Builder', role: 'agent' },
+            title: 'Older child',
+            agent: 'Reviewer',
+            status: 'completed',
+            runId: 'run-child-older',
+          },
+          {
+            id: 'child-newer',
+            kind: 'subagent',
+            author: { id: 'builder', name: 'Builder', role: 'agent' },
+            title: 'Newer child',
+            worker: 'Builder',
+            status: 'running',
+            runId: 'run-child-newer',
+          },
+        ],
+      },
+    ];
+
+    expect(resolveCurrentTranscriptRunId(blocks)).toBe('run-child-newer');
+  });
+
+  it('can parse normalized run evidence ids as a fallback', () => {
+    expect(rawRunIdFromEvidenceId('run-run-live')).toBe('run-live');
+    expect(rawRunIdFromEvidenceId('run_legacy')).toBeUndefined();
+    expect(resolveCurrentTranscriptRunId([
+      {
+        id: 'text',
+        kind: 'text',
+        author: { id: 'edge', name: 'Edge', role: 'system' },
+        text: 'Run event',
+        evidenceRefs: [{ id: 'run-run-live', kind: 'run', label: 'Run run-live' }],
+      },
+    ])).toBe('run-live');
   });
 });
