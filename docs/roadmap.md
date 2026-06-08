@@ -97,7 +97,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 
 | Branch | Worktree | Owner | State | Integration rule |
 |---|---|---|---|---|
-| `codex/p1-critical-evidence-integration` | `.worktrees/p1-critical-evidence-integration` | controller | active, clean, pushed at `cbe9b5d5` | Append only reviewed slices; run integration gates before push. |
+| `codex/p1-critical-evidence-integration` | `.worktrees/p1-critical-evidence-integration` | controller | active, clean, pushed at `3d303c0d` | Append only reviewed slices; run integration gates before push. |
 | `codex/p1-web-projects-readthrough` | `.worktrees/p1-web-projects-readthrough` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commit is in `codex/p1-critical-evidence-integration`. |
 | `codex/p1-desktop-edge-launch-flow` | `.worktrees/p1-desktop-edge-launch-flow` | worker | integrated | Source branch can be cleaned only after final cleanup approval; commits are in `codex/p1-critical-evidence-integration`. |
 | `codex/p1-tauri-build-package-evidence` | `.worktrees/p1-tauri-build-package-evidence` | worker | integrated | Source branch can be cleaned only after final cleanup approval; report is in `codex/p1-critical-evidence-integration`. |
