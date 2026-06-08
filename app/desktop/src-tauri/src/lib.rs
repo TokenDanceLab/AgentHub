@@ -75,6 +75,7 @@ pub fn run() {
             commands::git_diff_file,
             commands::read_workspace_store,
             commands::write_workspace_store,
+            commands::choose_workspace_root,
             commands::validate_allowlist,
             commands::search_workspace_content,
             oidc_server::start_oidc_callback_server,
