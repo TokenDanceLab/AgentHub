@@ -668,12 +668,19 @@ func (a *App) hubConfigDumper() debugpkg.ConfigDumper {
 			"db_port":        cfg.DB.Port,
 			"db_name":        cfg.DB.Name,
 			"db_user":        cfg.DB.User,
-			"db_password":    cfg.DB.Password,
+			"db_password":    redactConfigSecret(cfg.DB.Password),
 			"redis_addr":     cfg.Redis.Addr,
-			"redis_password": cfg.Redis.Password,
-			"jwt_secret":     cfg.JWT.Secret,
+			"redis_password": redactConfigSecret(cfg.Redis.Password),
+			"jwt_secret":     redactConfigSecret(cfg.JWT.Secret),
 		}
 	}
+}
+
+func redactConfigSecret(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	return "[REDACTED]"
 }
 
 func (a *App) hubStateDumper() debugpkg.StateDumper {
