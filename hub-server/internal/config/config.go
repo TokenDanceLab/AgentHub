@@ -133,8 +133,9 @@ func (j JWTConfig) LogValue() slog.Value {
 }
 
 type UploadConfig struct {
-	Dir     string `mapstructure:"dir"`
-	MaxSize int64  `mapstructure:"max_size"`
+	Dir              string   `mapstructure:"dir"`
+	MaxSize          int64    `mapstructure:"max_size"`
+	AllowedMimeTypes []string `mapstructure:"allowed_mime_types"`
 }
 
 type AgentTeamConfig struct {
@@ -289,6 +290,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 	v.SetDefault("db.sslmode", "disable")
+	v.SetDefault("upload.allowed_mime_types", DefaultAllowedUploadMimeTypes)
 	setAgentTeamDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
@@ -358,6 +360,12 @@ func Load(configPath string) (*Config, error) {
 			return nil, fmt.Errorf("invalid AGENTHUB_S3_USE_SSL: %w", err)
 		}
 		cfg.S3.UseSSL = useSSL
+	}
+	if envAllowedMimeTypes := os.Getenv("AGENTHUB_UPLOAD_ALLOWED_MIME_TYPES"); envAllowedMimeTypes != "" {
+		cfg.Upload.AllowedMimeTypes = splitEnvList(envAllowedMimeTypes)
+	}
+	if len(cfg.Upload.AllowedMimeTypes) == 0 {
+		cfg.Upload.AllowedMimeTypes = append([]string(nil), DefaultAllowedUploadMimeTypes...)
 	}
 
 	// Auto-derive JWKS URI from issuer URL when not explicitly set.

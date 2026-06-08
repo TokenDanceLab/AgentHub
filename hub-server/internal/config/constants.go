@@ -41,6 +41,21 @@ const DefaultServerIdleTimeout = 120 * time.Second
 // DefaultMaxUploadSize is the fallback max upload size when not configured.
 const DefaultMaxUploadSize int64 = 50 << 20 // 50 MB
 
+// DefaultAllowedUploadMimeTypes is the fallback upload MIME allowlist. It does
+// not include application/octet-stream; binary catch-all uploads must be
+// explicitly configured.
+var DefaultAllowedUploadMimeTypes = []string{
+	"text/plain",
+	"text/markdown",
+	"text/csv",
+	"application/json",
+	"application/pdf",
+	"image/png",
+	"image/jpeg",
+	"image/gif",
+	"image/webp",
+}
+
 // DefaultMaxHeaderBytes caps incoming HTTP request headers.
 const DefaultMaxHeaderBytes = 1 << 20
 
