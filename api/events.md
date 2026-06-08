@@ -179,20 +179,24 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.permission_decided` | P1 | 权限审批结果 |
 | `run.agent.cli_invocation_plan` | P1 | CLI/SDK/custom Agent 的无执行调用计划；payload 只包含脱敏 command shape、flags、config keys、env names、workspace basename 和 fixture/no-spend/approval flags |
 
-### Edge Adapter JSON Contract
+### Edge Adapter Fixture JSON Contract
 
-Edge adapters emit provider-neutral JSON events. CLI, SDK, OpenCode sidecar,
-and custom Agent fixtures must map native provider signals into the existing
-`run.agent.*` vocabulary before Hub/Web replay. The replay shape remains:
+This section documents the no-spend fixture/contract mapper used by Edge
+adapter tests. It does not claim production Claude Agent SDK, OpenAI Agents SDK,
+OpenCode sidecar, or custom Agent runtime execution support. Production
+adapters may emit the same `run.agent.*` event shapes only after an approved
+real runner/smoke slice proves that runtime path. Fixture signals must map
+native-looking provider inputs into the existing `run.agent.*` vocabulary before
+Hub/Web replay. The replay shape remains:
 
 ```json
 {"type":"agent.stream","payload":{"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"edge_run_id":"run_01","event_seq":1}}
 ```
 
-Provider-specific fields stay below the Edge adapter boundary. Event payloads
-must redact raw prompts, API tokens, authorization headers, secret-like keys,
-absolute workspace paths, and provider trace bodies. Paths are workspace
-relative when safe; otherwise only the basename is retained.
+Provider-specific fields stay below the Edge adapter boundary. Fixture event
+payloads must redact raw prompts, API tokens, authorization headers,
+secret-like keys, absolute workspace paths, and provider trace bodies. Paths
+are workspace relative when safe; otherwise only the basename is retained.
 
 Contract fixture mappings:
 
@@ -202,10 +206,10 @@ Contract fixture mappings:
 | `status` / `session.updated` | `run.agent.status_change` | `sessionId`, `status`, optional `summary`, `reason`, redacted `metadata` |
 | `progress` / `task_progress` | `run.agent.task_progress` | `taskId`, `description`, `status`, optional `percent`, `lastToolName`, `summary` |
 | `tool_call` / provider tool use | `run.agent.tool_call` | `callId`, `toolName`, redacted `input`, provider/session/trace refs |
-| `tool_result` / provider tool output | `run.agent.tool_result` | `callId`, `toolName`, `content`, `isError`, redacted attachments/metadata |
+| `tool_result` / provider tool output | `run.agent.tool_result` | `callId`, `toolName`, `content`, `isError`, redacted attachments/metadata; direct `tool_result` and completed `tool_state` use the same attachment/metadata redaction path |
 | `usage` / `context_usage` | `run.agent.context_usage` | `inputTokens`, `outputTokens`, `totalTokens`, optional `totalCostUsd`, `model`, `sessionId` |
-| `terminal_result` / `run_result` | `run.agent.result` | `success`, `summary`, `terminalReason: completed\|error`, optional nested `usage` |
-| `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted `error`, `reason` |
+| `terminal_result` / `run_result` | `run.agent.result` | `success`, `summary`, `terminalReason: completed\|error\|cancelled`, optional nested `usage`; arbitrary provider reason strings stay in sanitized `reason`, not `terminalReason` |
+| `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted `error`, sanitized `reason` |
 | `cancelled` / `cancellation` | `run.agent.result` | Adapter-level cancellation signal only: `success: false`, `cancelled: true`, `terminalReason: cancelled`; lifecycle-owned `run.cancelled` is still emitted by `ProcessExecutor` |
 
 ### AgentTeam / TeamRun

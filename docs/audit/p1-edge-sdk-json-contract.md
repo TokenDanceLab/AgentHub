@@ -7,8 +7,11 @@
 
 ## Contract
 
-Edge adapters normalize CLI, SDK, OpenCode sidecar, and custom Agent signals
-into AgentHub-owned `run.agent.*` events before Hub/Web replay. Provider SDK
+This report describes the no-spend fixture/contract mapper, not production SDK
+runtime support. Fixture inputs shaped like CLI, SDK, OpenCode sidecar, and
+custom Agent signals normalize into AgentHub-owned `run.agent.*` events before
+Hub/Web replay. Production adapters may emit the same shapes only after a
+separate approved runner/smoke slice proves that runtime path. Provider SDK
 objects, raw traces, raw prompts, API keys, authorization headers, local secret
 paths, and native provider event bodies stay below `edge-server/internal/adapters`.
 
@@ -37,15 +40,15 @@ The replay shape remains compatible with the current Hub runtime event contract:
 | `status` / `session.updated` | `run.agent.status_change` | Runtime session state and short status summaries. |
 | `progress` / `task_progress` | `run.agent.task_progress` | Provider-neutral progress for sidecar or SDK task phases. |
 | `tool_call` / `tool_state` | `run.agent.tool_call` | Tool name, call ID, status, redacted input, provider/session/trace refs. |
-| `tool_result` / completed `tool_state` | `run.agent.tool_result` | Result content, `isError`, redacted attachments and metadata. |
+| `tool_result` / completed `tool_state` | `run.agent.tool_result` | Result content, `isError`, redacted attachments and metadata. Direct `tool_result` and completed `tool_state` use the same attachment/metadata redaction path. |
 | `usage` / `context_usage` | `run.agent.context_usage` | Token totals, optional model and cost. |
-| `terminal_result` / `run_result` | `run.agent.result` | Adapter-level terminal summary with `terminalReason`. |
-| `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted error text. |
+| `terminal_result` / `run_result` | `run.agent.result` | Adapter-level terminal summary with `terminalReason: completed\|error\|cancelled`; arbitrary provider reasons stay in sanitized `reason`. |
+| `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted error text and sanitized reason. |
 | `cancelled` / `cancellation` | `run.agent.result` | Adapter-level cancellation signal only. Lifecycle-owned `run.cancelled` remains `ProcessExecutor` responsibility. |
 
 ## Provider Mapping
 
-OpenAI Agents SDK:
+OpenAI Agents SDK fixture mapping:
 
 - Agent/run start or runner options map to `invocation_plan` fixture evidence.
 - Function calls map to `run.agent.tool_call`; function outputs map to `run.agent.tool_result`.
@@ -54,14 +57,14 @@ OpenAI Agents SDK:
 - Usage and final result map to `run.agent.context_usage` and `run.agent.result`.
 - Traces stay as metadata refs only; raw trace payloads are not replayed.
 
-Claude Agent SDK:
+Claude Agent SDK fixture mapping:
 
 - Session init/update maps to `run.agent.session_init` and `run.agent.status_change`.
 - Tool use and permission hooks map to `run.agent.tool_call`, `run.agent.tool_result`, and `run.agent.permission_requested`.
 - Subagent/handoff suggestions map to route or task events as evidence, not authoritative TeamRun state.
 - Cost/usage maps to `run.agent.context_usage` or result usage.
 
-OpenCode:
+OpenCode fixture mapping:
 
 - Sidecar/session readiness maps to `run.agent.session_init`.
 - Tool state transitions map to tool call/result events.
@@ -69,9 +72,10 @@ OpenCode:
 - Sidecar progress maps to `run.agent.task_progress`.
 - Terminal status maps to adapter-level `run.agent.result`.
 
-Custom Agent:
+Custom Agent fixture mapping:
 
-- Custom Agent profiles should emit the same provider-neutral fixture signals.
+- Custom Agent fixture profiles should emit the same provider-neutral fixture
+  signals.
 - `runtimeMode`, provider, and SDK-specific options are profile/runtime metadata,
   not Hub/Web product state until a real approved execution slice lands.
 - Invocation plans are safe to show as evidence because they do not include raw
@@ -82,6 +86,11 @@ Custom Agent:
 - `TestSDKFixtureMapperProviderNeutralReplayContract` covers invocation plan,
   status, progress, tool call/result, usage, terminal result, error, and
   cancellation signals.
+- `TestSDKFixtureMapperRedactsFreeTextBeforeReplay` covers free-text redaction
+  for status/progress text, command strings, tool output/error, direct tool
+  result content, file diffs, terminal summaries, attachments, metadata, bearer
+  auth headers, `sk-*` tokens, secret-like assignments, prompt-like trace bodies,
+  and absolute paths.
 - The same test wraps mapped events into the Hub `agent.stream` replay shape and
   asserts secrets and absolute local paths are not present.
 - Existing Claude/OpenAI/OpenCode fixture golden tests now include
