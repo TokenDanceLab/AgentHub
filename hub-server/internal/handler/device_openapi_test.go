@@ -72,6 +72,36 @@ func TestOpenAPIHubAuthDeviceIDsUseUUIDContract(t *testing.T) {
 	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCCallbackRequest")
 }
 
+func TestOpenAPICloudEdgeRegisterDocumentsEdgeScopedJWT(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	path := yamlMapField(t, paths, "/cloud/edge/register", "paths./cloud/edge/register")
+	post := yamlMapField(t, path, "post", "paths./cloud/edge/register.post")
+
+	description := yamlScalarField(t, post, "description", "cloud edge register description")
+	for _, want := range []string{"aud=agenthub-edge", "purpose=edge-api", "device_type=edge"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("cloud edge register description missing %q: %s", want, description)
+		}
+	}
+	for _, stale := range []string{"desktop device type", "WebSocket auth"} {
+		if strings.Contains(description, stale) {
+			t.Fatalf("cloud edge register description contains stale wording %q: %s", stale, description)
+		}
+	}
+
+	responses := yamlMapField(t, post, "responses", "cloud edge register responses")
+	okResp := yamlMapField(t, responses, "200", "cloud edge register responses.200")
+	okContent := yamlMapField(t, okResp, "content", "cloud edge register responses.200.content")
+	okJSON := yamlMapField(t, okContent, "application/json", "cloud edge register responses.200.application/json")
+	responseSchema := yamlMapField(t, okJSON, "schema", "cloud edge register responses.200.schema")
+	data := yamlMapField(t, yamlMapField(t, responseSchema, "properties", "cloud edge register response properties"), "data", "cloud edge register response data")
+	jwtField := yamlMapField(t, yamlMapField(t, data, "properties", "cloud edge register data properties"), "jwt", "cloud edge register jwt")
+	if got := yamlScalarField(t, jwtField, "description", "cloud edge register jwt description"); got != "Edge-scoped JWT for Edge API auth." {
+		t.Fatalf("jwt description = %q, want Edge-scoped JWT for Edge API auth.", got)
+	}
+}
+
 func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
