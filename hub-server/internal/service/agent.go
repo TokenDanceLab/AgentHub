@@ -29,11 +29,16 @@ type relayDispatcher interface {
 }
 
 type AgentService struct {
-	db          *gorm.DB
-	bus         *Bus
-	mgr         *ws.Manager
-	cacheClient agentCache
-	relay       relayDispatcher
+	db               *gorm.DB
+	bus              *Bus
+	mgr              *ws.Manager
+	cacheClient      agentCache
+	relay            relayDispatcher
+	teamRouteHandler agentTeamRouteHandler
+}
+
+type agentTeamRouteHandler interface {
+	HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
@@ -43,6 +48,12 @@ func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.
 // SetRelayService injects an optional relay service for hub_relay target dispatch.
 func (s *AgentService) SetRelayService(relay relayDispatcher) {
 	s.relay = relay
+}
+
+// SetTeamRouteHandler injects the AgentTeam route handler used to process
+// coordinator decisions emitted by a supervisor stream.
+func (s *AgentService) SetTeamRouteHandler(handler agentTeamRouteHandler) {
+	s.teamRouteHandler = handler
 }
 
 // AddAgentToSession adds an agent instance to a session (invite agent into group).
