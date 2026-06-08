@@ -70,6 +70,7 @@ if ($TimeoutSec -le 0) {
     exit 2
 }
 
+$EvidencePathWasSupplied = -not [string]::IsNullOrWhiteSpace($EvidencePath)
 $RepoRoot = (Resolve-Path $RepoRoot).ProviderPath
 if ([string]::IsNullOrWhiteSpace($EvidencePath)) {
     $EvidencePath = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-local-stack-e2e-readiness-$PID.json"
@@ -283,6 +284,30 @@ function Test-AllowedArtifactRoot([string]$Path) {
     return $false
 }
 
+function Test-AllowedEvidencePath([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $false
+    }
+
+    if (-not $EvidencePathWasSupplied) {
+        return $true
+    }
+
+    $candidate = [System.IO.Path]::GetFullPath((Resolve-RepoPath $Path))
+    if (Test-AllowedArtifactRoot $candidate) {
+        return $true
+    }
+
+    if ((-not [string]::IsNullOrWhiteSpace($ArtifactRoot)) -and (Test-AllowedArtifactRoot $ArtifactRoot)) {
+        $artifactRootFull = [System.IO.Path]::GetFullPath((Resolve-RepoPath $ArtifactRoot))
+        if (Test-PathUnderRoot -Path $candidate -Root $artifactRootFull) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Test-SecretLike([string]$Value) {
     if ([string]::IsNullOrWhiteSpace($Value)) {
         return $false
@@ -366,6 +391,24 @@ function Assert-ArtifactRoot {
     } else {
         Add-Failure "artifact root must stay under .tmp\local-stack-e2e-readiness, tmp\local-stack-e2e-readiness, or `$env:TEMP\AgentHub\local-stack-e2e-readiness"
     }
+}
+
+function Assert-EvidencePath {
+    if (Test-SecretLike $EvidencePath) {
+        Add-Failure "EvidencePath contains secret-like material"
+        return $false
+    }
+    if (Test-AllowedEvidencePath $EvidencePath) {
+        if ($EvidencePathWasSupplied) {
+            Pass "EvidencePath is inside an allowed readiness root or validated ArtifactRoot"
+        } else {
+            Pass "default EvidencePath uses the process temp directory"
+        }
+        return $true
+    }
+
+    Add-Failure "EvidencePath must stay under an allowed readiness temp root or the validated ArtifactRoot"
+    return $false
 }
 
 function Assert-Commands {
@@ -511,6 +554,13 @@ function Write-Report {
 Write-Host "AgentHub local stack E2E readiness runner" -ForegroundColor Magenta
 Write-Host "Mode: $Mode" -ForegroundColor White
 Write-Host "RealTested=false unless ApprovedReal validates approval-gated observed evidence." -ForegroundColor White
+
+Step "Evidence output path"
+if (-not (Assert-EvidencePath)) {
+    Write-Host "Status: LOCAL_STACK_E2E_READINESS_FAILED" -ForegroundColor Red
+    Write-Host "RealTested=false" -ForegroundColor White
+    exit 1
+}
 
 Step "Static safety checks"
 Assert-ArtifactRoot

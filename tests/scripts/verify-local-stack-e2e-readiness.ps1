@@ -114,6 +114,10 @@ try {
     Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
     $TempRoots += $tmpRoot
+    $safeArtifactRoot = Join-Path $RepoRoot ".tmp\local-stack-e2e-readiness\script-test-$PID"
+    Remove-Item -LiteralPath $safeArtifactRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $safeArtifactRoot | Out-Null
+    $TempRoots += $safeArtifactRoot
 
     if (Test-Path -LiteralPath $scriptPath) {
         $scriptText = Get-Content -Raw -LiteralPath $scriptPath
@@ -125,11 +129,25 @@ try {
         Assert-True ($scriptText -match 'verify-observed-localhost-dispatch\.ps1') "script composes observed dispatch gate for ApprovedReal"
         Assert-True ($scriptText -match 'real_tested = \$false') "script defaults RealTested to false"
 
-        $defaultEvidence = Join-Path $tmpRoot "default.json"
+        $implicitDefaultRun = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot
+        )
+        Assert-True ($implicitDefaultRun.ExitCode -ne 0) "omitted EvidencePath still fails closed on missing prerequisites" $implicitDefaultRun.Output
+        Assert-True ($implicitDefaultRun.Output -match "default EvidencePath uses the process temp directory") "omitted EvidencePath uses default temp behavior" $implicitDefaultRun.Output
+        Assert-True ($implicitDefaultRun.Output -match "agenthub-local-stack-e2e-readiness-") "omitted EvidencePath keeps default filename prefix" $implicitDefaultRun.Output
+        $implicitDefaultPath = ""
+        if ($implicitDefaultRun.Output -match "EvidencePath:\s*(.+)") {
+            $implicitDefaultPath = $Matches[1].Trim()
+            Remove-Item -LiteralPath $implicitDefaultPath -Force -ErrorAction SilentlyContinue
+        }
+
+        $defaultEvidence = Join-Path $safeArtifactRoot "default.json"
         $defaultRun = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
-            "-EvidencePath", $defaultEvidence
+            "-EvidencePath", $defaultEvidence,
+            "-ArtifactRoot", $safeArtifactRoot
         )
         Assert-True ($defaultRun.ExitCode -ne 0) "default readiness run fails closed" $defaultRun.Output
         Assert-True ($defaultRun.Output -match "LOCAL_STACK_E2E_READINESS_FAILED") "default failure reports readiness failed" $defaultRun.Output
@@ -137,7 +155,7 @@ try {
         Assert-True ($defaultJson.real_tested -eq $false) "default failure keeps RealTested false" ($defaultJson | ConvertTo-Json -Depth 8)
         Assert-True ($defaultJson.mode -eq "ReadinessOnly") "default mode is ReadinessOnly" ($defaultJson | ConvertTo-Json -Depth 8)
 
-        $unsafeArtifactEvidence = Join-Path $tmpRoot "unsafe-artifact.json"
+        $unsafeArtifactEvidence = Join-Path $safeArtifactRoot "unsafe-artifact.json"
         $unsafeArtifactRun = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
@@ -149,7 +167,7 @@ try {
         $unsafeArtifactJson = Get-Content -Raw -LiteralPath $unsafeArtifactEvidence | ConvertFrom-Json
         Assert-True ($unsafeArtifactJson.real_tested -eq $false) "unsafe artifact evidence keeps RealTested false" ($unsafeArtifactJson | ConvertTo-Json -Depth 8)
 
-        $missingEnvEvidence = Join-Path $tmpRoot "missing-env.json"
+        $missingEnvEvidence = Join-Path $safeArtifactRoot "missing-env.json"
         $missingEnvRun = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
@@ -169,7 +187,43 @@ try {
             "AGENTHUB_LOCAL_EDGE_URL",
             "AGENTHUB_LOCAL_STACK_ARTIFACT_ROOT"
         )
-        $missingServiceEvidence = Join-Path $tmpRoot "missing-service.json"
+        $outsideEvidencePath = Join-Path $tmpRoot "outside-evidence.json"
+        $outsideEvidenceRun = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-EvidencePath", $outsideEvidencePath,
+            "-ArtifactRoot", $safeArtifactRoot
+        )
+        Assert-True ($outsideEvidenceRun.ExitCode -ne 0) "EvidencePath outside allowed roots fails closed" $outsideEvidenceRun.Output
+        Assert-True ($outsideEvidenceRun.Output -match "EvidencePath") "outside EvidencePath failure is explicit" $outsideEvidenceRun.Output
+        Assert-True (-not (Test-Path -LiteralPath $outsideEvidencePath)) "outside EvidencePath is not written"
+
+        $siblingEvidencePath = Join-Path $RepoRoot ".tmp\local-stack-e2e-readiness-sibling\report.json"
+        Remove-Item -LiteralPath $siblingEvidencePath -Force -ErrorAction SilentlyContinue
+        $siblingEvidenceRun = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-EvidencePath", $siblingEvidencePath,
+            "-ArtifactRoot", $safeArtifactRoot
+        )
+        Assert-True ($siblingEvidenceRun.ExitCode -ne 0) "EvidencePath sibling-prefix path fails closed" $siblingEvidenceRun.Output
+        Assert-True ($siblingEvidenceRun.Output -match "EvidencePath") "sibling EvidencePath failure is explicit" $siblingEvidenceRun.Output
+        Assert-True (-not (Test-Path -LiteralPath $siblingEvidencePath)) "sibling EvidencePath is not written"
+
+        $traversalEvidencePath = Join-Path $safeArtifactRoot "..\..\docs\audit\evidence-traversal.json"
+        $traversalResolvedPath = [System.IO.Path]::GetFullPath($traversalEvidencePath)
+        Remove-Item -LiteralPath $traversalResolvedPath -Force -ErrorAction SilentlyContinue
+        $traversalEvidenceRun = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-EvidencePath", $traversalEvidencePath,
+            "-ArtifactRoot", $safeArtifactRoot
+        )
+        Assert-True ($traversalEvidenceRun.ExitCode -ne 0) "EvidencePath traversal outside artifact root fails closed" $traversalEvidenceRun.Output
+        Assert-True ($traversalEvidenceRun.Output -match "EvidencePath") "traversal EvidencePath failure is explicit" $traversalEvidenceRun.Output
+        Assert-True (-not (Test-Path -LiteralPath $traversalResolvedPath)) "traversal EvidencePath is not written"
+
+        $missingServiceEvidence = Join-Path $safeArtifactRoot "missing-service.json"
         $envNameList = $allEnvNames -join ","
         $missingServiceArgs = @(
             $scriptPath,
@@ -196,7 +250,7 @@ try {
         $missingServiceJson = Get-Content -Raw -LiteralPath $missingServiceEvidence | ConvertFrom-Json
         Assert-True ($missingServiceJson.real_tested -eq $false) "missing service evidence keeps RealTested false" ($missingServiceJson | ConvertTo-Json -Depth 8)
 
-        $directEdgeEvidence = Join-Path $tmpRoot "direct-edge.json"
+        $directEdgeEvidence = Join-Path $safeArtifactRoot "direct-edge.json"
         $directEdgeArgs = @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
@@ -215,7 +269,7 @@ try {
         Assert-True ($directEdgeJson.topology.web_to_local_edge_direct -eq $true) "direct topology is recorded in evidence" ($directEdgeJson | ConvertTo-Json -Depth 8)
         Assert-True ($directEdgeJson.real_tested -eq $false) "direct topology evidence keeps RealTested false" ($directEdgeJson | ConvertTo-Json -Depth 8)
 
-        $fixtureEvidence = Join-Path $tmpRoot "fixture-only.json"
+        $fixtureEvidence = Join-Path $safeArtifactRoot "fixture-only.json"
         $fixtureRun = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
