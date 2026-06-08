@@ -93,6 +93,83 @@ function Assert-Artifact([string]$Root, [string]$Pattern, [string]$Label) {
     Assert-True ($null -ne $item) "$Label artifact exists ($Pattern)"
 }
 
+function Get-WorkflowJobBlock([string]$WorkflowText, [string]$JobName) {
+    $escapedJobName = [regex]::Escape($JobName)
+    $match = [regex]::Match($WorkflowText, "(?ms)^\s{2}$escapedJobName\s*:.*?(?=^\s{2}[A-Za-z0-9_-]+\s*:|\z)")
+    if (-not $match.Success) {
+        Fail "release readiness workflow is missing job: $JobName"
+    }
+    return $match.Value
+}
+
+function Get-WorkflowJobBlocks([string]$WorkflowText) {
+    $jobsMatch = [regex]::Match($WorkflowText, "(?ms)^jobs:\s*\r?\n(?<jobs>.*)\z")
+    if (-not $jobsMatch.Success) {
+        Fail "release readiness workflow is missing jobs section"
+    }
+
+    $jobsText = $jobsMatch.Groups["jobs"].Value
+    $blocks = @()
+    foreach ($match in [regex]::Matches($jobsText, "(?ms)^\s{2}(?<name>[A-Za-z0-9_-]+)\s*:.*?(?=^\s{2}[A-Za-z0-9_-]+\s*:|\z)")) {
+        $blocks += [pscustomobject]@{
+            Name = $match.Groups["name"].Value
+            Text = $match.Value
+        }
+    }
+
+    if ($blocks.Count -eq 0) {
+        Fail "release readiness workflow has no jobs"
+    }
+
+    return $blocks
+}
+
+function Test-WorkflowJobHasManualOptIn {
+    param(
+        [string]$JobBlock,
+        [string]$InputName
+    )
+
+    return [regex]::IsMatch($JobBlock, "github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*inputs\.$([regex]::Escape($InputName))\s*==\s*true")
+}
+
+function Assert-WorkflowCommandExplicitOptIn {
+    param(
+        [string]$WorkflowText,
+        [string]$CommandPattern,
+        [string]$InputName,
+        [string]$JobName,
+        [string]$Label
+    )
+
+    if (-not [regex]::IsMatch($WorkflowText, $CommandPattern)) {
+        Pass "$Label command is absent"
+        return
+    }
+
+    $jobBlock = Get-WorkflowJobBlock $WorkflowText $JobName
+    Assert-True ([regex]::IsMatch($WorkflowText, "(?ms)workflow_dispatch:\s*\r?\n\s*inputs:.*?^\s{6}$([regex]::Escape($InputName))\s*:")) "$Label opt-in input is declared"
+    Assert-True (Test-WorkflowJobHasManualOptIn $jobBlock $InputName) "$Label job is gated by explicit workflow_dispatch input"
+
+    $workflowCommandCount = [regex]::Matches($WorkflowText, $CommandPattern).Count
+    $jobCommandCount = 0
+    $jobsWithCommand = @()
+    foreach ($job in Get-WorkflowJobBlocks $WorkflowText) {
+        $matches = [regex]::Matches($job.Text, $CommandPattern)
+        if ($matches.Count -eq 0) {
+            continue
+        }
+
+        $jobCommandCount += $matches.Count
+        $jobsWithCommand += $job.Name
+        Assert-True ($job.Name -eq $JobName -and (Test-WorkflowJobHasManualOptIn $job.Text $InputName)) "$Label command in job '$($job.Name)' is isolated to manual opt-in"
+    }
+
+    Assert-True ($jobCommandCount -eq $workflowCommandCount) "$Label command occurrences are all inside workflow jobs"
+    Assert-True ($jobsWithCommand.Count -gt 0) "$Label command occurrences were enumerated"
+    Pass "$Label command is isolated to manual opt-in job"
+}
+
 Step "Desktop version metadata"
 $package = Read-Json "app\desktop\package.json"
 $tauri = Read-Json "app\desktop\src-tauri\tauri.conf.json"
@@ -114,6 +191,7 @@ Assert-True ($tauri.bundle.windows.nsis.installMode -eq "currentUser") "NSIS ins
 
 $releaseWorkflowText = Read-Text ".github\workflows\release.yml"
 $readinessWorkflowText = Read-Text ".github\workflows\release-readiness.yml"
+$governanceText = Read-Text "docs\backend-integration-governance.md"
 Assert-True ($readinessWorkflowText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe") "release readiness workflow prepares Windows sidecar agenthub-edge-x86_64-pc-windows-msvc.exe"
 Assert-True ($readinessWorkflowText -match "AgentHub_\$\{ver\}_x64-portable\.zip" -or $readinessWorkflowText -match "portable\.zip") "release readiness workflow names portable.zip artifact"
 Assert-True ($readinessWorkflowText -match "setup\.exe") "release readiness workflow collects NSIS setup.exe"
@@ -139,6 +217,11 @@ Assert-True ($readinessWorkflowText -notmatch "softprops/action-gh-release") "re
 Assert-True ($readinessWorkflowText -notmatch "gh release upload") "release readiness workflow does not upload release assets"
 Assert-True ($readinessWorkflowText -notmatch "TAURI_SIGNING_PRIVATE_KEY") "release readiness workflow does not require production signing secrets"
 Assert-True ($readinessWorkflowText -match "verify-tauri-package-readiness\.ps1") "release readiness workflow runs this checker"
+$readinessPolicyBlock = Get-WorkflowJobBlock $readinessWorkflowText "readiness-policy"
+$installerSmokeBlock = Get-WorkflowJobBlock $readinessWorkflowText "windows-installer-smoke-preflight"
+Assert-True ($readinessPolicyBlock -notmatch "pnpm\s+tauri\s+build") "static readiness policy does not run full Tauri build"
+Assert-True ($installerSmokeBlock -notmatch "pnpm\s+tauri\s+build") "installer smoke preflight does not run full Tauri build"
+Assert-WorkflowCommandExplicitOptIn $readinessWorkflowText "pnpm\s+tauri\s+build" "run_windows_package_dry" "windows-package-dry" "Full Tauri build"
 
 Step "Generated artifact ignore policy"
 $desktopVersion = [string]$package.version
@@ -156,6 +239,20 @@ Assert-True ($readinessWorkflowText -match "macOS unsigned package policy note")
 Assert-True ($readinessWorkflowText -match "aarch64-apple-darwin") "release readiness workflow documents the future macOS arm64 validation path"
 Assert-True ($readinessWorkflowText -match "unsigned") "release readiness workflow labels macOS policy as unsigned"
 Assert-True ($readinessWorkflowText -notmatch "xcrun\s+notarytool|codesign\s+--sign|stapler\s+staple") "release readiness workflow does not run macOS signing, notarization, or stapling commands"
+
+Step "Release dry topology documentation"
+Assert-True ($governanceText -match "D2b\. Release dry build topology") "governance doc records release dry build topology"
+Assert-True ($governanceText -match "topology/preflight only|拓扑/预检") "governance doc keeps release dry topology to topology/preflight scope"
+Assert-True ($governanceText -match "full Tauri build|pnpm tauri build") "governance doc names full Tauri build as separate opt-in scope"
+Assert-True ($governanceText -notmatch "产出未签名 NSIS|produces unsigned NSIS") "governance doc does not claim dry topology produces installer artifacts"
+Assert-True ($governanceText -match "Windows unsigned NSIS/portable|未签名 NSIS") "governance doc keeps Windows unsigned NSIS/portable as future opt-in artifact scope"
+Assert-True ($governanceText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe") "governance doc records Windows Tauri sidecar name"
+Assert-True ($governanceText -match "latest\.json.*\.sig|\.sig.*latest\.json") "governance doc records updater metadata artifacts"
+Assert-True ($governanceText -match "agenthub-edge-aarch64-apple-darwin") "governance doc records macOS arm64 sidecar name"
+Assert-True ($governanceText -match "macOS.*unsigned|arm64 unsigned") "governance doc keeps macOS validation unsigned"
+Assert-True ($governanceText -match "notarytool|notarization") "governance doc names notarization as out of scope"
+Assert-True ($governanceText -match "workflow artifact") "governance doc keeps dry artifacts scoped to workflow artifact upload"
+Assert-True ($governanceText -match "GitHub Release|release asset|updater 生产 metadata") "governance doc keeps release creation/upload out of dry topology"
 
 if ($RequireBuiltArtifacts) {
     Step "Built artifact gate"
