@@ -815,6 +815,38 @@ func TestGetMessages_ReadsAttachmentsFromMessageAttachmentRelation(t *testing.T)
 	assert.Equal(t, "report.txt", msgs[0].Attachments[0].OriginalName)
 }
 
+// ==================== ForwardMessage ====================
+
+func TestForwardMessage_PreservesOriginalSenderIdentity(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 7}}
+	ctx := context.Background()
+
+	seedMessageSessionMember(t, db, "sess-forward-src", "forwarder-1")
+	seedMessageSessionMember(t, db, "sess-forward-target", "forwarder-1")
+	require.NoError(t, db.Exec(`INSERT INTO messages (
+		id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-forward-original", "sess-forward-src", 1, "client-forward-original",
+		"agent", "agent-42", "text", `{"text":"agent answer"}`, false, time.Now(),
+	).Error)
+
+	require.NoError(t, svc.ForwardMessage(ctx, "forwarder-1", "msg-forward-original", []string{"sess-forward-target"}))
+
+	var forwarded struct {
+		SenderType string
+		SenderID   string
+		SeqID      int64
+	}
+	require.NoError(t, db.Table("messages").
+		Select("sender_type, sender_id, seq_id").
+		Where("session_id = ? AND content = ?", "sess-forward-target", `{"text":"agent answer"}`).
+		First(&forwarded).Error)
+	assert.Equal(t, "agent", forwarded.SenderType)
+	assert.Equal(t, "agent-42", forwarded.SenderID)
+	assert.Equal(t, int64(7), forwarded.SeqID)
+}
+
 // ==================== MarkRead ====================
 
 func TestMarkRead_NotMember(t *testing.T) {
