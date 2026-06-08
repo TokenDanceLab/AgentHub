@@ -138,9 +138,9 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.persistence_error` | P0 | 持久化错误，payload: `{ runId, error }` |
 | `approval.requested` | P0 | 请求用户审批 (planned) |
 | `approval.decided` | P0 | 用户已审批 (planned) |
-| `artifact.created` | P0 | 产物创建 (planned)；当前只读 REST 合同已提供 `GET /v1/artifacts`，事件写入链路后续补齐 |
+| `artifact.created` | P0 | 产物创建；Edge lifecycle 将该事件的 artifact metadata 写入本地 evidence store，当前只读 REST 合同通过 `GET /v1/artifacts` 暴露 metadata snapshot；不包含 content/apply/discard |
 | `artifact.updated` | P1 | 产物元数据更新 (planned) |
-| `preview.ready` | P0 | 预览可用 (planned)；当前只读 REST 合同已提供 `GET /v1/previews`，start/stop 生命周期后续补齐 |
+| `preview.ready` | P0 | 预览可用；Edge lifecycle 将该事件的 preview metadata 写入本地 evidence store，当前只读 REST 合同通过 `GET /v1/previews` 暴露 metadata snapshot；start/stop 生命周期后续补齐 |
 | `preview.stopped` | P1 | 预览停止 (planned) |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
@@ -150,7 +150,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |
 | `run.agent.tool_call` | P0 | Agent 请求工具调用 |
 | `run.agent.tool_result` | P0 | 工具调用执行结果 |
-| `run.agent.file_change` | P0 | 文件变更。每个文件一条事件；payload: `{ callId, toolName, path, kind: "created"\|"modified"\|"deleted", action, status, rawKind?, outsideWorkspace?, diff? }`。本机绝对路径必须在进入事件前转为 workspace-relative 或 `<outside-workspace>/<basename>` |
+| `run.agent.file_change` | P0 | 文件变更。每个文件一条事件；payload: `{ callId, toolName, path, kind: "created"\|"modified"\|"deleted", action, status, rawKind?, outsideWorkspace?, diff? }`。本机绝对路径必须在进入事件前转为 workspace-relative 或 `<outside-workspace>/<basename>`；Edge lifecycle 将 `path`/`kind`/`diff` 写入本地 run diff evidence snapshot |
 | `run.agent.route_decision` | P1 | Runtime structured output 中解析出的 `CoordinatorRouteDecision`；Desktop bridge 会用 dispatch payload 中的 TeamRun context 自动 POST 到 Hub route decision endpoint |
 | `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
 | `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |

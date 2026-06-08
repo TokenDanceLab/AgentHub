@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 13:35 +08:00
+> 最后更新：2026-06-08 16:44 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -104,6 +104,7 @@ next: <1-3 steps>
 19. **Desktop Edge mapper / target preference**：`codex/desktop-edge-mapper` 首片把 Local Edge `/v1/agents`、`/v1/model-catalog` 和 health runners 投影到 Desktop Workbench agents / Local Edge target，保留 Edge `runtimeId` 并让 `StartRunRequest.agentId` 使用 adapter runtime id；移除提交到 Edge runs 的 `provider` 字段，阻断 Desktop live/auto 空线程回落 demo transcript。后续 `codex/desktop-target-tauri-host` 收口 Desktop-owned Local Edge target preference、Tauri host readiness command 和 sidecar launch args 测试；不改 Web、Hub、Edge API/OpenAPI、Edge lifecycle 或真实 CLI/model gate，安装包联调继续另拆。
 20. **G3b. Edge SQLite relational migration**：`codex/edge-relational-store` 已补 SQLite migration table/runner、snapshot v1、owner/workspace/run/artifact/diff/preview relational lifecycle v2 schema，以及 rollback-to-v1/reapply tests。该片只改 Edge store migration 层，不改 Hub/Web/Desktop/API routes 或真实 CLI/model gate；后续 runtime evidence 写入和 artifact lifecycle 继续另拆。
 21. **G4. Artifact/Diff/Preview read-only Edge 前置**：`codex/artifact-diff-preview-readonly` 只补 Edge 本地只读 evidence store 和 REST 合同：`GET /v1/runs/{runId}/diff`、`GET /v1/artifacts`、`GET /v1/previews`，memory/file/sqlite 共用 snapshot contract。该片不做 preview start/stop、artifact apply/discard/content、Hub artifact store、Projects UI、Desktop mapper、Web 直连 Edge 或真实 CLI/model gate；artifact/preview lifecycle 事件仍为 planned。
+22. **G5. Runtime evidence writer**：`codex/runtime-evidence-writer` 只在 Edge lifecycle 结构化 runtime 事件流中写入本地 evidence snapshot：`run.agent.file_change` -> run diff file，`artifact.created` -> artifact metadata，`preview.ready` -> preview metadata。该片不新增 REST routes，不做 preview start/stop、artifact apply/discard/content、Hub artifact store、Desktop/Web UI 或真实 CLI/model gate。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
@@ -139,7 +140,7 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 | Tasks/Runs | Tasks 页是本地任务 mock；TeamRun router 已有但 shared UI 未消费 | 先定 Tasks = TeamRun projection 还是独立 product task |
 | Projects | Hub Projects/workspaces P1 已合入 Web-owned `/web/projects` list/create/get/update，复用现有 owner-scoped `workspaces`；Web Projects read-through 已把 shared Project rail 接生产 list 数据，Hub 目前不提供 runs/artifacts/feed，因此只投影基础 workspace 字段和空数组；artifact/workspace 关系和 delete/soft-delete policy 未定义 | Projects create/update UI 排在 Edge SQL、Desktop mapper、登录和安装包基线之后；artifact 关系和 delete/soft-delete 需另起 proposal |
 | Settings | UI 偏好可本地持久化，但账号/设备/运行偏好未 DB-backed | 区分 local preference、Hub user preference、Edge runtime config |
-| RightInspector | 默认任务/文件内容仍主要来自 demo/event evidence；Edge 已补 artifact/diff/preview read-only REST 空态/数据合同，但 preview lifecycle、artifact content/apply/discard 和真实 CLI evidence 写入仍未完成 | 下一片把 runtime file_change/artifact/preview evidence 写入 store，再接 shared inspector 的生产 snapshot |
+| RightInspector | 默认任务/文件内容仍主要来自 demo/event evidence；Edge 已补 artifact/diff/preview read-only REST 空态/数据合同，`codex/runtime-evidence-writer` 正在补 runtime file_change/artifact/preview metadata 写入；preview lifecycle、artifact content/apply/discard 和真实 CLI evidence 仍未完成 | 下一片再接 shared inspector 的生产 snapshot；preview start/stop、artifact apply/discard/content 另拆 |
 
 ## 分支清理规则
 
@@ -191,5 +192,5 @@ v4 shell 已统一，但生产数据接线只覆盖聊天主链路。仍然依�
 
 1. 后端长期线程已关闭；后端旧整合线由 backend merge Agent 继续处理，主负责人不接管该合并，只把结果作为后续 Edge/Desktop/Web/packaging 规划输入。旧 `feat/backend-edge-hub` 和历史 backend worktree 仍需由该合并线确认抽片或清理。
 2. `v0.3.0-rc.1` 已打在 `0c79f277`，作为 shared v4 workbench + Hub/Edge 合并基线；Web Projects read-through 已完成并保持 shared `/v1/projects` 与 Desktop/Edge 语义不变。
-3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend、Edge relational migration、Tauri Windows installer/updater metadata readiness、TeamRun dry fixture evidence 和 Artifact/Diff/Preview read-only endpoints 已合入；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge preference 与 Tauri host readiness。下一批继续推进 runtime evidence 写入、inspector snapshot、Projects create/update UI、packaged login E2E；Projects delete/soft-delete policy、macOS signing/notarization 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
+3. 下一批实现按 roadmap 排序：登录 fake/local gate、Edge SQLite opt-in backend、Edge relational migration、Tauri Windows installer/updater metadata readiness、TeamRun dry fixture evidence 和 Artifact/Diff/Preview read-only endpoints 已合入；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge preference 与 Tauri host readiness；`codex/runtime-evidence-writer` 正在收口 runtime evidence metadata 写入。下一批继续推进 inspector snapshot、Projects create/update UI、packaged login E2E；Projects delete/soft-delete policy、preview lifecycle、artifact content/apply/discard、macOS signing/notarization 和 D1b/D2/D3 gate policy 继续保持独立 proposal。
 4. 按 Desktop/Edge 与 Web/Hub 两条线推进生产对接，继续保持 Web 不直连 Local Edge、Desktop 不绕过 Edge；D3 真实 CLI/model gate 保持 blocked，先补 environment、budget、runner 和 artifact upload policy。
