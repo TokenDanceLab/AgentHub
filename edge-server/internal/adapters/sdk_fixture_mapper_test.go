@@ -338,8 +338,8 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 	if !strings.Contains(replay, "[redacted-secret]") {
 		t.Fatalf("expected secret redaction marker in replay:\n%s", replay)
 	}
-	if !strings.Contains(replay, "terminalReason") || strings.Contains(replay, "provider_timeout_with") {
-		t.Fatalf("terminal reason was not normalized:\n%s", replay)
+	if !strings.Contains(replay, `"terminalReason": "error"`) || !strings.Contains(replay, "provider_timeout_with_[redacted-token]") {
+		t.Fatalf("terminal reason was not normalized or sanitized reason was not preserved:\n%s", replay)
 	}
 
 	directResult := firstMappedPayloadOfType(t, mapped, BusEventToolResult, "call_direct")
@@ -348,6 +348,58 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 	}
 	if _, ok := directResult["metadata"]; !ok {
 		t.Fatalf("direct tool_result did not retain sanitized metadata: %#v", directResult)
+	}
+}
+
+func TestSDKFixtureMapperRedactsTopLevelRefsAndPreservesSanitizedTerminalReason(t *testing.T) {
+	stream := SDKFixtureStream{
+		Provider: "agenthub-ref-redaction-fixture",
+		Events: []SDKFixtureEvent{
+			{
+				ID:        "ref_terminal",
+				Type:      "terminal_result",
+				Success:   boolPtr(false),
+				TraceID:   "trace-C:\\Users\\Ding\\private\\trace.json-sk-traceid-secret-123456",
+				TraceRefs: []string{"trace:/home/ding/private/span.json", "trace:Authorization: Bearer trace-ref-secret-123456"},
+				EvidenceRefs: []string{
+					"artifact:C:\\Users\\Ding\\private\\evidence.json",
+					"event:sk-evidence-secret-123456",
+				},
+				Reason:  "provider_timeout sk-reason-secret-123456 at D:\\Private\\reason.txt",
+				Summary: "terminal summary",
+			},
+		},
+	}
+
+	mapped := MapSDKFixtureStream(stream, testSDKFixtureScope())
+	if len(mapped) != 1 {
+		t.Fatalf("mapped events = %d, want 1", len(mapped))
+	}
+	payload := mapped[0].Payload
+	if payload["terminalReason"] != "error" {
+		t.Fatalf("terminalReason = %#v, want error", payload["terminalReason"])
+	}
+	reason, ok := payload["reason"].(string)
+	if !ok || reason == "" {
+		t.Fatalf("terminal result did not preserve sanitized reason: %#v", payload)
+	}
+
+	replay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
+	for _, leaked := range []string{
+		"sk-traceid-secret-123456",
+		"trace-ref-secret-123456",
+		"sk-evidence-secret-123456",
+		"sk-reason-secret-123456",
+		"C:\\Users\\Ding",
+		"D:\\Private",
+		"/home/ding/private",
+	} {
+		if strings.Contains(replay, leaked) {
+			t.Fatalf("top-level refs or reason leaked %q:\n%s", leaked, replay)
+		}
+	}
+	if !strings.Contains(replay, "[redacted-token]") {
+		t.Fatalf("expected redacted token marker for refs/reason:\n%s", replay)
 	}
 }
 
