@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 17:14 +08:00
+> 最后更新：2026-06-08 18:29 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -46,6 +46,24 @@ next: <1-3 steps>
 4. 真实 CLI、self-hosted、消耗模型或生产资源的验证默认只在收口时运行一次；普通 PR 先用 fixture、unit、contract、fake callback 和 DB/Redis gate。
 5. 任何线程不得自行合并到 `dev/delicious233` 或 `master`。合并、rebase、branch deletion 由主负责人统一执行。
 6. OIDC/test harness、PowerShell 兼容性、脚本参数构造这类窄修复可以由后端负责人直接推进到 `ready-for-review`；仍需列出失败点、修复路径和复跑命令。
+
+### 当前 ready-for-review 同步
+
+```markdown
+AH-SYNC v1
+from: frontend
+kind: ready-for-review
+branch: codex/lobe-icons-runtime-branding
+worktree: .worktrees/lobe-icons-runtime-branding
+scope: shared|desktop|docs
+writes: app/shared/src/workbench/RuntimeBrandIcon.*; app/shared/src/workbench/designIcons.tsx; app/shared/src/workbench/pages/AgentsPage.*; app/desktop/src/components/settings/cards/{RuntimeInventoryCard,RunnerRow,ProviderHealthRow,McpRuntimeCard}.tsx; docs/roadmap.md; docs/backend-integration-governance.md
+state: ready-for-review
+summary: Added a shared RuntimeBrandIcon registry behind the existing design icon registry; model/provider/runtime logos use @lobehub/icons where available; internal tools/runtimes use compact local fallbacks; Web/mobile/backend boundaries are unchanged.
+verified: pnpm install lockfile up to date; vitest RuntimeBrandIcon + icon-governance; agenthub-desktop typecheck; agenthub-web typecheck; git diff --check
+blockers: Full @agenthub/shared lint remains blocked by pre-existing shared test/story/module issues outside this slice.
+needs-from-main: Review and merge ordering only.
+next: Main owner reviews the isolated icon diff, then decides whether to merge or request visual QA screenshots.
+```
 
 ## 硬边界规则
 
