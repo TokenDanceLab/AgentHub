@@ -2,7 +2,7 @@
 
 > Last updated: 2026-06-09 02:12 +08:00
 > SSOT branch: `codex/p0-remote-control-integration`
-> Code baseline before this roadmap sync: `4a20709a feat(web): wire auth root deploy readiness`
+> Code baseline before this roadmap sync: `41270914 fix(desktop): 收紧 Tauri dry artifact path guard`
 
 Archived merge history remains in `docs/archive/roadmap-pre-refresh-20260608-1008.md` and `docs/archive/roadmap-full-history-20260605.md`. This file is only the active sprint board.
 
@@ -29,12 +29,12 @@ Mobile stays outside this implementation thread, but the Hub protocol must remai
 
 | Area | State | Evidence / next action |
 |---|---|---|
-| Unified P0 baseline | integrated | Branch `codex/p0-remote-control-integration`, code baseline `4a20709a`, ahead of `origin/dev/delicious233`. |
+| Unified P0 baseline | integrated | Branch `codex/p0-remote-control-integration`, code baseline `41270914`, ahead of `origin/dev/delicious233`. |
 | Fixture remote-control E2E | integrated | `scripts/verify-remote-control-fixture-e2e.ps1` passes 107/0; negative tests cover missing refs and missing adapter callback. |
 | SDK adapter fixture | integrated | OpenCode running/completed/error fixture coverage absorbed; `go test ./internal/adapters -run SDKFixture -short -count=1` passes. |
 | Web auth/deploy readiness | integrated | Web auth root mounted; no silent demo fallback in real mode; Web build plus deploy readiness 16/16 passes after production build. |
 | Desktop device registration | integrated | Desktop registers stable device and refreshes execution targets before Hub WS integration. |
-| Desktop packaging dry | blocked-fixing | Worker found Windows path-prefix delete risk in `verify-tauri-package-dry.ps1`; do not absorb until fixed and re-reviewed. |
+| Desktop packaging dry | integrated | Local unsigned packaging dry gate, SQLite app-data sidecar policy, and sibling-path delete guard are absorbed; signing/notarization/updater metadata remain approval-gated. |
 | Real login / real CLI / public deploy | approval-gated | Fixture/readiness only. No real TokenDanceID browser login, model/API spend, or public upload has been run. |
 
 ## Worktree Rules
@@ -49,10 +49,10 @@ Mobile stays outside this implementation thread, but the Hub protocol must remai
 
 | Priority | Worker lane | Write scope | Blocked by |
 |---|---|---|---|
-| P0-A | Desktop packaging dry fix | `scripts/verify-tauri-package-dry.ps1`, `tests/scripts/verify-tauri-package-dry.ps1`, optional audit doc | Current path safety blocker. |
-| P0-B | End-to-end fixture runner | Fixture scripts/docs only; no production services | Needs current baseline and packaging/Web readiness evidence. |
-| P0-C | Web/Desktop replay UX audit | `app/web`, `app/desktop`, shared workbench tests only if scoped | Must preserve Web Hub-only and Desktop Local Edge-only boundaries. |
-| P0-D | Edge CLI real-readiness proposal | Edge adapter/lifecycle docs/scripts only | Real CLI/model run needs explicit approval. |
+| P0-A | End-to-end fixture runner | Fixture scripts/docs only; no production services | Current worker branch `codex/p0-fixture-runner`. |
+| P0-B | Web/Desktop replay UX audit | `app/web`, `app/desktop`, shared workbench tests only if scoped | Current worker branch `codex/p0-replay-ux-audit`; must preserve Web Hub-only and Desktop Local Edge-only boundaries. |
+| P0-C | Edge CLI real-readiness proposal | Edge adapter/lifecycle docs/scripts only | Current worker branch `codex/p0-edge-cli-readiness`; real CLI/model run needs explicit approval. |
+| P0-D | LobeHub runtime/model icons | Shared/Web icon mapping and focused tests | Current worker branch `codex/p0-lobe-icons`; no server or roadmap writes. |
 | P1 | Edge SQL/store migration | Edge store worktree only | After P0 remote-control proof stabilizes. |
 | P1 | Release packaging/signing | Tauri release workflow/docs only | Requires signing/notarization/release approval. |
 
