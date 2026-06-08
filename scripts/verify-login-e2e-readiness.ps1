@@ -19,6 +19,7 @@ param(
     [string]$CallbackUrl = "",
     [string]$HubBaseUrl = "",
     [string]$WebUrl = "",
+    [string]$LocalEdgeUrl = "http://127.0.0.1:3210",
     [string]$TestAccountIndicator = "",
     [string]$ArtifactRoot = "",
     [ValidateSet("", "metadata-only", "redacted-screenshots")]
@@ -87,11 +88,47 @@ function Get-Origin([string]$Url) {
     }
 }
 
+function Test-LoopbackHost([string]$HostName) {
+    if ([string]::IsNullOrWhiteSpace($HostName)) {
+        return $false
+    }
+    $normalized = $HostName.ToLowerInvariant().Trim("[", "]")
+    if ($normalized -eq "localhost" -or $normalized -eq "::1") {
+        return $true
+    }
+    if ($normalized -match '^127(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$') {
+        return $true
+    }
+    return $false
+}
+
 function Test-LoopbackUrl([string]$Url) {
     try {
         $uri = [System.Uri]::new($Url)
-        $host = $uri.Host.ToLowerInvariant()
-        return @("127.0.0.1", "localhost", "::1") -contains $host
+        return Test-LoopbackHost $uri.Host
+    } catch {
+        return $false
+    }
+}
+
+function Test-DirectLocalEdgeUrl([string]$Url, [string]$ConfiguredLocalEdgeUrl) {
+    try {
+        $uri = [System.Uri]::new($Url)
+        $edge = [System.Uri]::new($ConfiguredLocalEdgeUrl)
+        if ($uri.Scheme -ne "http" -and $uri.Scheme -ne "https") {
+            return $false
+        }
+        if (-not (Test-LoopbackHost $uri.Host)) {
+            return $false
+        }
+        if ($uri.Port -ne $edge.Port) {
+            return $false
+        }
+        $edgePath = $edge.AbsolutePath
+        if ([string]::IsNullOrWhiteSpace($edgePath) -or $edgePath -eq "/") {
+            return $true
+        }
+        return $uri.AbsolutePath.StartsWith($edgePath.TrimEnd("/"), [System.StringComparison]::OrdinalIgnoreCase)
     } catch {
         return $false
     }
@@ -174,6 +211,91 @@ function Test-JsonForSecretLike([object]$Node) {
     return Test-SecretLike $json
 }
 
+function Test-RedactedPlaceholder([object]$Value) {
+    if ($null -eq $Value) {
+        return $true
+    }
+    if ($Value -is [string]) {
+        return $Value -match '^(?i)(<redacted>|\[redacted\]|redacted|\*{3,}|<[^>]*redacted[^>]*>)$'
+    }
+    if ($Value -is [array]) {
+        foreach ($item in @($Value)) {
+            if (-not (Test-RedactedPlaceholder $item)) {
+                return $false
+            }
+        }
+        return $true
+    }
+    if ($Value -is [System.Collections.IDictionary]) {
+        foreach ($key in $Value.Keys) {
+            if (-not (Test-RedactedPlaceholder $Value[$key])) {
+                return $false
+            }
+        }
+        return $true
+    }
+    if ($Value -is [pscustomobject]) {
+        foreach ($prop in $Value.PSObject.Properties) {
+            if (-not (Test-RedactedPlaceholder $prop.Value)) {
+                return $false
+            }
+        }
+        return $true
+    }
+    return $false
+}
+
+function Test-SensitiveFieldName([string]$Name) {
+    return $Name -match '(?i)^(access_token|refresh_token|id_token|token|secret|authorization|cookie|password|client_secret|client-secret)$'
+}
+
+function Assert-ManifestSafety {
+    param(
+        [object]$Node,
+        [string]$Path = "$"
+    )
+
+    if ($null -eq $Node) {
+        return
+    }
+
+    if ($Node -is [string]) {
+        foreach ($match in [regex]::Matches($Node, 'https?://[^\s"''<>]+')) {
+            if (Test-DirectLocalEdgeUrl $match.Value $LocalEdgeUrl) {
+                Add-Failure "evidence manifest contains direct Local Edge URL at $Path"
+            }
+        }
+        return
+    }
+
+    if ($Node -is [array]) {
+        for ($i = 0; $i -lt @($Node).Count; $i++) {
+            Assert-ManifestSafety -Node @($Node)[$i] -Path "$Path[$i]"
+        }
+        return
+    }
+
+    if ($Node -is [System.Collections.IDictionary]) {
+        foreach ($key in $Node.Keys) {
+            $value = $Node[$key]
+            if ((Test-SensitiveFieldName ([string]$key)) -and -not (Test-RedactedPlaceholder $value)) {
+                Add-Failure "evidence manifest contains unredacted sensitive field at $Path.$key"
+            }
+            Assert-ManifestSafety -Node $value -Path "$Path.$key"
+        }
+        return
+    }
+
+    if ($Node -is [pscustomobject]) {
+        foreach ($prop in $Node.PSObject.Properties) {
+            if ((Test-SensitiveFieldName $prop.Name) -and -not (Test-RedactedPlaceholder $prop.Value)) {
+                Add-Failure "evidence manifest contains unredacted sensitive field at $Path.$($prop.Name)"
+            }
+            Assert-ManifestSafety -Node $prop.Value -Path "$Path.$($prop.Name)"
+        }
+    }
+}
+
 function Test-ManifestEvidence([object]$Manifest) {
     if ($null -eq $Manifest) {
         return
@@ -182,6 +304,7 @@ function Test-ManifestEvidence([object]$Manifest) {
     if (Test-JsonForSecretLike $Manifest) {
         Add-Failure "evidence manifest contains secret-like material"
     }
+    Assert-ManifestSafety -Node $Manifest
 
     foreach ($field in @("hub_session", "target_inventory", "selected_desktop_target", "dispatch_request", "event_replay")) {
         if ($null -eq $Manifest.$field) {
@@ -210,6 +333,7 @@ $OAuthClientId = First-Value $OAuthClientId "AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID"
 $CallbackUrl = First-Value $CallbackUrl "AGENTHUB_LOGIN_E2E_CALLBACK_URL"
 $HubBaseUrl = First-Value $HubBaseUrl "AGENTHUB_LOGIN_E2E_HUB_BASE_URL"
 $WebUrl = First-Value $WebUrl "AGENTHUB_LOGIN_E2E_WEB_URL"
+$LocalEdgeUrl = First-Value $LocalEdgeUrl "AGENTHUB_LOGIN_E2E_LOCAL_EDGE_URL"
 $TestAccountIndicator = First-Value $TestAccountIndicator "AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR"
 $ArtifactRoot = First-Value $ArtifactRoot "AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT"
 $BrowserEvidenceBoundary = First-Value $BrowserEvidenceBoundary "AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY"
@@ -234,6 +358,7 @@ foreach ($input in @(
     @{ Name = "CallbackUrl"; Value = $CallbackUrl },
     @{ Name = "HubBaseUrl"; Value = $HubBaseUrl },
     @{ Name = "WebUrl"; Value = $WebUrl },
+    @{ Name = "LocalEdgeUrl"; Value = $LocalEdgeUrl },
     @{ Name = "TestAccountIndicator"; Value = $TestAccountIndicator },
     @{ Name = "ArtifactRoot"; Value = $ArtifactRoot },
     @{ Name = "BrowserEvidenceBoundary"; Value = $BrowserEvidenceBoundary },
@@ -277,10 +402,10 @@ if ($Mode -eq "ProposalOnly") {
 
     $webOrigin = Get-Origin $WebUrl
     $hubOrigin = Get-Origin $HubBaseUrl
-    if (-not [string]::IsNullOrWhiteSpace($webOrigin) -and $webOrigin -eq (Get-Origin "http://127.0.0.1:3210")) {
+    if (Test-DirectLocalEdgeUrl $WebUrl $LocalEdgeUrl) {
         Add-Failure "Web URL must not point directly at Local Edge"
     }
-    if (-not [string]::IsNullOrWhiteSpace($hubOrigin) -and $hubOrigin -eq (Get-Origin "http://127.0.0.1:3210")) {
+    if (Test-DirectLocalEdgeUrl $HubBaseUrl $LocalEdgeUrl) {
         Add-Failure "Hub base URL must not point directly at Local Edge"
     }
     if (Test-LoopbackUrl $HubBaseUrl -and -not (Test-LoopbackUrl $WebUrl)) {
