@@ -71,9 +71,10 @@ function Invoke-Checked {
 
 function Assert-UnderRepo {
     param([string]$Path, [string]$Label)
-    $full = [System.IO.Path]::GetFullPath($Path)
-    $repoFull = [System.IO.Path]::GetFullPath($RepoRoot)
-    Assert-True ($full.StartsWith($repoFull, [System.StringComparison]::OrdinalIgnoreCase)) "$Label stays inside repo worktree"
+    $full = [System.IO.Path]::GetFullPath($Path).TrimEnd([char[]]@('\', '/'))
+    $repoFull = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd([char[]]@('\', '/'))
+    $repoChildPrefix = $repoFull + [System.IO.Path]::DirectorySeparatorChar
+    Assert-True ($full.StartsWith($repoChildPrefix, [System.StringComparison]::OrdinalIgnoreCase)) "$Label stays inside repo worktree"
     return $full
 }
 
