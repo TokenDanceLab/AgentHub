@@ -55,6 +55,20 @@ func TestSanitizedEnvExcludesSensitiveVars(t *testing.T) {
 	}
 }
 
+func TestSanitizedEnvExcludesGitConfigPathVars(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", "/tmp/gitconfig-with-credential-helper")
+	t.Setenv("GIT_CONFIG_SYSTEM", "/tmp/system-gitconfig-with-url-rewrite")
+
+	env := SanitizedEnv(nil, nil)
+	envMap := envToMap(env)
+
+	for _, key := range []string{"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"} {
+		if _, ok := envMap[key]; ok {
+			t.Errorf("Git config path var %q leaked into sanitized env", key)
+		}
+	}
+}
+
 func TestSanitizedEnvIncludesExtraEnv(t *testing.T) {
 	extra := []string{
 		"ANTHROPIC_API_KEY=sk-ant-test",
@@ -79,7 +93,7 @@ func TestSanitizedEnvIncludesExtraEnv(t *testing.T) {
 	}
 }
 
-func TestSanitizedEnvIncludesAgentHubVars(t *testing.T) {
+func TestSanitizedEnvIncludesNonSensitiveAgentHubVars(t *testing.T) {
 	t.Setenv("AGENTHUB_RUN_ID", "run_test")
 	t.Setenv("AGENTHUB_PROJECT_ID", "proj_test")
 	t.Setenv("AGENTHUB_CUSTOM_SETTING", "custom-value")
@@ -89,7 +103,38 @@ func TestSanitizedEnvIncludesAgentHubVars(t *testing.T) {
 
 	for _, key := range []string{"AGENTHUB_RUN_ID", "AGENTHUB_PROJECT_ID", "AGENTHUB_CUSTOM_SETTING"} {
 		if _, ok := envMap[key]; !ok {
-			t.Errorf("AGENTHUB_* var %q not in sanitized env (should always pass through)", key)
+			t.Errorf("non-sensitive AGENTHUB_* var %q not in sanitized env", key)
+		}
+	}
+}
+
+func TestSanitizedEnvExcludesSensitiveAgentHubVars(t *testing.T) {
+	t.Setenv("AGENTHUB_RUN_ID", "run_test")
+	t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "edge-token")
+	t.Setenv("AGENTHUB_HUB_TOKEN", "hub-token")
+	t.Setenv("AGENTHUB_TOKEN", "token")
+	t.Setenv("AGENTHUB_JWT_SECRET", "jwt-secret")
+	t.Setenv("AGENTHUB_SECRET", "secret")
+	t.Setenv("AGENTHUB_DB_PASSWORD", "db-password")
+	t.Setenv("AGENTHUB_PASSWORD", "password")
+
+	env := SanitizedEnv(nil, nil)
+	envMap := envToMap(env)
+
+	if got := envMap["AGENTHUB_RUN_ID"]; got != "run_test" {
+		t.Fatalf("AGENTHUB_RUN_ID = %q, want run_test", got)
+	}
+	for _, key := range []string{
+		"AGENTHUB_EDGE_AUTH_TOKEN",
+		"AGENTHUB_HUB_TOKEN",
+		"AGENTHUB_TOKEN",
+		"AGENTHUB_JWT_SECRET",
+		"AGENTHUB_SECRET",
+		"AGENTHUB_DB_PASSWORD",
+		"AGENTHUB_PASSWORD",
+	} {
+		if _, ok := envMap[key]; ok {
+			t.Errorf("sensitive AGENTHUB_* var %q leaked into sanitized env", key)
 		}
 	}
 }
@@ -124,15 +169,15 @@ func TestSanitizedEnvIncludesWindowsSpecificVars(t *testing.T) {
 	env := SanitizedEnv(nil, nil)
 	envMap := envToMap(env)
 
-		wantVars := map[string]bool{"systemroot": true, "temp": true, "userprofile": true}
-		for key := range envMap {
-			if wantVars[strings.ToLower(key)] {
-				delete(wantVars, strings.ToLower(key))
-			}
+	wantVars := map[string]bool{"systemroot": true, "temp": true, "userprofile": true}
+	for key := range envMap {
+		if wantVars[strings.ToLower(key)] {
+			delete(wantVars, strings.ToLower(key))
 		}
-		for key := range wantVars {
-			t.Errorf("Windows var %q not found in sanitized env (must be whitelisted)", key)
-		}
+	}
+	for key := range wantVars {
+		t.Errorf("Windows var %q not found in sanitized env (must be whitelisted)", key)
+	}
 }
 
 // --- IsSensitiveEnvKey tests ---
@@ -176,6 +221,8 @@ func TestIsSensitiveEnvKeyExactMatches(t *testing.T) {
 		"CONNECTION_STRING",
 		"GOOGLE_APPLICATION_CREDENTIALS",
 		"DATABASE_PASSWORD",
+		"GIT_CONFIG_GLOBAL",
+		"GIT_CONFIG_SYSTEM",
 	}
 	for _, key := range exactMatches {
 		if !IsSensitiveEnvKey(key) {
