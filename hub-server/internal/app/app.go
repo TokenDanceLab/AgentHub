@@ -183,7 +183,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
-	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
+	a.SessionService = service.NewSessionService(a.DB, a.CacheClient, a.bus)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
 	a.MessageReactionService = service.NewMessageReactionService(a.DB, a.bus)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
