@@ -74,6 +74,67 @@ function Get-CargoLockPackageVersion([string]$RelativePath, [string]$PackageName
     return $match.Groups["version"].Value
 }
 
+function Invoke-GitQuiet {
+    param([string[]]$Arguments)
+
+    $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git -C $RepoRoot @Arguments 2>$null
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = $output
+    }
+}
+
+function Get-HeadReleaseTags {
+    $headProbe = Invoke-GitQuiet @("rev-parse", "--verify", "HEAD")
+    if ($headProbe.ExitCode -ne 0) {
+        return @()
+    }
+
+    $tagProbe = Invoke-GitQuiet @("tag", "--points-at", "HEAD")
+    if ($tagProbe.ExitCode -ne 0) {
+        return @()
+    }
+
+    $tags = @()
+    foreach ($line in ($tagProbe.Output -split "\r?\n")) {
+        $tag = $line.Trim()
+        if ($tag -match '^v?(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$') {
+            $tags += [pscustomobject]@{
+                Name = $tag
+                Version = $Matches["version"]
+                IsPrerelease = $Matches["version"] -match '-'
+            }
+        }
+    }
+
+    return $tags
+}
+
+function Assert-ReleaseTagVersionAlignment {
+    param([string]$DesktopVersion)
+
+    Step "Release tag version alignment"
+    $releaseTags = @(Get-HeadReleaseTags)
+    if ($releaseTags.Count -eq 0) {
+        Pass "No semver release tag points at HEAD; package metadata version is $DesktopVersion"
+        return
+    }
+
+    foreach ($tag in $releaseTags) {
+        $tagKind = if ($tag.IsPrerelease) { "pre-release" } else { "stable release" }
+        Assert-True ($tag.Version -eq $DesktopVersion) "$tagKind tag $($tag.Name) expects desktop metadata version $($tag.Version); found $DesktopVersion"
+    }
+}
+
 function Has-Target($Targets, [string]$Expected) {
     if ($Targets -is [string]) {
         return $Targets -eq $Expected
@@ -336,6 +397,7 @@ Assert-True ($cargoVersion -eq $tauri.version) "Cargo.toml and tauri.conf.json v
 Assert-True ($cargoLockVersion -eq $tauri.version) "Cargo.lock and tauri.conf.json versions match ($cargoLockVersion)"
 Assert-True ($tauri.identifier -eq "com.agenthub.desktop") "Desktop Tauri identifier is stable"
 Assert-True ($tauri.productName -eq "AgentHub") "Desktop product name is stable"
+Assert-ReleaseTagVersionAlignment ([string]$tauri.version)
 
 Step "Windows package policy"
 Assert-True ($tauri.bundle.active -eq $true) "Tauri bundle is active"
