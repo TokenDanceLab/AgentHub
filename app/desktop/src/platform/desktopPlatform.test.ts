@@ -104,8 +104,10 @@ describe('createDesktopPlatform', () => {
         route: 'local-edge-api',
         bind_addr: '127.0.0.1:3210',
         sidecar_args: [
-          '--store-file',
-          '<app-data>/agenthub-edge-store.json',
+          '--store-backend',
+          'sqlite',
+          '--store-db',
+          '<app-data>/agenthub-edge.sqlite',
           '--addr',
           '127.0.0.1:3210',
           '--runner-profile',
@@ -124,11 +126,14 @@ describe('createDesktopPlatform', () => {
       direct_cli_spawn: false,
     }));
     expect(readiness.sidecar_args).toEqual(expect.arrayContaining([
-      '--store-file',
-      '<app-data>/agenthub-edge-store.json',
+      '--store-backend',
+      'sqlite',
+      '--store-db',
+      '<app-data>/agenthub-edge.sqlite',
       '--addr',
       '127.0.0.1:3210',
     ]));
+    expect(readiness.sidecar_args).not.toContain('--store-file');
     expect(readiness.sidecar_args).not.toEqual(expect.arrayContaining([
       'codex',
       'codex.exe',
