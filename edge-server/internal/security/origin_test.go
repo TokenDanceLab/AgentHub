@@ -95,11 +95,15 @@ func TestIsTrustedOriginRemoteMode(t *testing.T) {
 	}{
 		{"https remote not trusted by default", "https://edge.example.com", false},
 		{"http remote not trusted by default", "http://edge.example.com:3210", false},
-		{"localhost still allowed", "http://localhost:5173", true},
+		{"localhost not trusted by default", "http://localhost:5173", false},
+		{"loopback ip not trusted by default", "http://127.0.0.1:5173", false},
+		{"ipv6 loopback not trusted by default", "http://[::1]:5173", false},
+		{"tauri localhost host not trusted by default", "https://tauri.localhost", false},
 		{"empty origin rejected", "", false},
 		{"invalid url rejected", "://bad", false},
 		{"file scheme rejected", "file:///tmp/index.html", false},
 		{"extension scheme rejected", "chrome-extension://abc", false},
+		{"tauri local scheme rejected", "tauri://localhost", false},
 		{"tauri remote host rejected", "tauri://edge.example.com", false},
 	}
 
@@ -114,7 +118,7 @@ func TestIsTrustedOriginRemoteMode(t *testing.T) {
 }
 
 func TestIsAllowedOriginRemoteModeUsesExplicitAllowlist(t *testing.T) {
-	allowed := []string{"https://app.example.com", "http://edge.example.com:3210"}
+	allowed := []string{"https://app.example.com", "http://edge.example.com:3210", "http://localhost:5173", "https://tauri.localhost"}
 	tests := []struct {
 		name   string
 		origin string
@@ -122,10 +126,15 @@ func TestIsAllowedOriginRemoteModeUsesExplicitAllowlist(t *testing.T) {
 	}{
 		{"listed https origin", "https://app.example.com", true},
 		{"listed http origin", "http://edge.example.com:3210", true},
+		{"listed localhost origin", "http://localhost:5173", true},
+		{"listed tauri localhost http origin", "https://tauri.localhost", true},
 		{"unlisted https origin", "https://evil.example", false},
+		{"unlisted localhost port", "http://localhost:5174", false},
+		{"unlisted loopback ip", "http://127.0.0.1:5173", false},
+		{"unlisted ipv6 loopback", "http://[::1]:5173", false},
 		{"same host different scheme", "http://app.example.com", false},
 		{"same host different port", "http://edge.example.com:3211", false},
-		{"localhost still allowed", "http://localhost:5173", true},
+		{"tauri scheme cannot be allowed by remote http allowlist", "tauri://localhost", false},
 	}
 
 	for _, tt := range tests {
@@ -135,6 +144,17 @@ func TestIsAllowedOriginRemoteModeUsesExplicitAllowlist(t *testing.T) {
 				t.Fatalf("IsAllowedOrigin(%q, true, allowed) = %v, want %v", tt.origin, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestIsAllowedOriginRemoteModeIgnoresInvalidAllowlistEntries(t *testing.T) {
+	allowed := []string{"https://app.example.com/path", "chrome-extension://abc", "https://app.example.com"}
+
+	if got := IsAllowedOrigin("https://app.example.com", true, allowed); !got {
+		t.Fatal("IsAllowedOrigin rejected valid origin after invalid allowlist entries")
+	}
+	if got := IsAllowedOrigin("chrome-extension://abc", true, allowed); got {
+		t.Fatal("IsAllowedOrigin accepted invalid allowlist entry")
 	}
 }
 
