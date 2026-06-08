@@ -1,6 +1,6 @@
 # AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 05:49 +08:00
+> Last updated: 2026-06-09 05:55 +08:00
 > Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
 > Review branch: `origin/codex/p1-remote-control-integration` at `fd94c54d`
 > Evidence integration branch: `codex/p1-remote-control-evidence-integration`
@@ -28,7 +28,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | Stable baseline | done | `v0.3.0-rc.5` points at `19079563` and must not move. |
 | P1 rc.6 review branch | ready-for-review | `fd94c54d` contains the reviewed rc.6 remote-control slice set. |
 | P1 evidence integration | ready-for-review | Adds reviewed localhost product-loop fixture, Edge SDK JSON replay readiness, Desktop workspace picker UI, duplicate target preflight, Web visual smoke report, unsigned Tauri build report, and Agent SDK integration report. |
-| P1 next-wave integration | testing | Adds Edge CLI approval gate, Edge SQLite readiness report, localhost readiness-only real-services gate, Web real-mode UX closure, and LobeHub runtime/tool icons. |
+| P1 next-wave integration | testing | Adds Edge CLI approval gate, Edge SQLite readiness report, localhost readiness-only real-services gate, Web real-mode UX closure, LobeHub runtime/tool icons, and Tauri package readiness hardening. |
 | Main worktree | quarantined | `D:\Code\TokenDance\AgentHub` is stale/dirty; do not implement there. |
 | Release tag | blocked | Do not push `v0.3.0-rc.6` until release approval; tag push can trigger release workflow. |
 
@@ -47,6 +47,7 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | Edge CLI real-run approval gate | next-wave branch | Static approval/readiness verifier only; no real CLI/model execution. |
 | Edge SQLite readiness | next-wave branch | Planning/readiness report only; production row-first durable store remains separate. |
 | Tauri packaging evidence | evidence branch | Unsigned Windows local build smoke only; no signing/notary/updater/release. |
+| Tauri package readiness polish | next-wave branch | Generated schema cleanliness/deletion gates and post-build readiness evidence; still no signing/notary/release upload. |
 | Agent SDK research | evidence branch | Treat OpenAI/Claude SDKs as Edge adapter inputs, not product model. |
 | Localhost real-services readiness | next-wave branch | Explicit opt-in health/topology consistency gate; always `real_tested=false` until observed Hub/Desktop dispatch evidence exists. |
 | Web real-mode UX | next-wave branch | Target-required dispatch, Hub error/replay states, and non-nested team/run controls. |
@@ -68,8 +69,8 @@ Mobile is owned by the mobile thread. Coordinate only protocol drift. Real Token
 | Priority | Workstream | Parallelism | Gate |
 |---|---|---|---|
 | P0 | Review/merge evidence integration | controller | Do not move `v0.3.0-rc.5`; do not push `v0.3.0-rc.6` tag without release approval. |
-| P1 | Finish next-wave integration | controller | Focused gates for Edge CLI approval, localhost readiness, Web real-mode UX, shared icons, and Edge SQLite readiness. |
-| P1 | Desktop package/install polish | worker + reviewer | Currently in blocker fix; schema deletion/dirty-schema tests must pass before integration. |
+| P1 | Finish next-wave integration | controller | Focused gates for Edge CLI approval, localhost readiness, Web real-mode UX, shared icons, Edge SQLite readiness, and Tauri package readiness. |
+| P1 | Desktop package/install polish | controller | Integrated into next-wave; keep signing/notary/release upload as separate approval slices. |
 | P1 | Observed real localhost dispatch | worker + reviewer | Requires deriving target/dispatch evidence from live Hub/Desktop path, not caller-supplied URLs. |
 | P2 | Edge durable store implementation | worker + reviewer | Use readiness report as plan; do not mix with CLI execution. |
 | P2 | Login E2E approval slice | worker + reviewer | TokenDanceID test client/account/env, callback URL, browser evidence, no token disclosure. |
@@ -93,6 +94,9 @@ cd app\shared; corepack.cmd pnpm exec vitest run src\workbench\UnifiedComposer.t
 cd app\shared; corepack.cmd pnpm exec vitest run src\ui\RuntimeIcon.test.tsx src\workbench\RuntimeBrandIcon.test.tsx src\ui\ToolTimeline.test.tsx src\workbench\blocks\ToolCardBlock.test.tsx --reporter=dot
 cd app\web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vitest run src\platform\webPlatform.test.ts src\views\TeamRunConsole.test.tsx src\platform\useWebWorkbenchModel.test.ts src\App.test.tsx --reporter=dot
 cd app\desktop; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vitest run src\utils\workspaceStore.test.ts src\components\settings\sections\WorktreeSection.test.tsx src\i18n\locales.test.ts --reporter=dot
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-tauri-package-dry.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
 ```
 
 Use precise package-local `pnpm exec vitest run <files>` commands. Workspace-level test commands still expand into unrelated stale tests.
