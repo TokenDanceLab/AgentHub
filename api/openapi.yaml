@@ -2379,6 +2379,13 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubRegisterDevice
       summary: Register a device with the Hub. Device type is taken from the JWT claim.
+      description: >
+        Desktop registration may create or refresh an owner-scoped local_edge
+        ExecutionTarget bound to the registered Desktop device. After a
+        successful registration, clients should refresh `/web/execution-targets`
+        before dispatch target selection. The generated target `is_online` and
+        `health_state` reflect desktop check-in freshness from this registration,
+        not an active WebSocket route proof.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
