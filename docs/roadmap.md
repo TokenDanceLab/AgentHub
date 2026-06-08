@@ -32,7 +32,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 1 | Roadmap/tag/worktree 收口 | `v0.3.0-rc.1` 已打；roadmap 压缩；分支清理先审计不批量删 | docs diff-check、root governance、worktree audit |
 | 2 | Edge SQL/store migration | SQLite opt-in snapshot backend 和 relational migration v2 已合入；后续只做 runtime evidence 写入和真正 artifact lifecycle，不再把 schema 混进 UI 切片 | Edge store contract、cmd store config tests、edge short gate |
 | 3 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动；mapper 首片已合入，当前收口 Local Edge target preference / Tauri host readiness | Desktop platform、Edge focused、Rust host tests |
-| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；已补 Hub state expiry/replay 与 OIDC `-LocalOnly` gate；后续覆盖 packaged Desktop loopback/keyring | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
+| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；已补 Hub state expiry/replay、OIDC `-LocalOnly` gate 和 packaged Desktop loopback/keyring readiness；真实 packaged 登录仍只做 proposal/gate | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
 | 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；`codex/tauri-package-readiness` 已补版本对齐、独立 release readiness workflow 和 updater metadata gate；正式签名发布仍后置 | `scripts/verify-tauri-package-readiness.ps1`、installer artifact 检查、release dry policy |
 | 6 | ByteDance / TeamRun demo | dry fixture evidence pack 已合入；真实 IM 群聊、多 Agent 调度、证据 inspector、录屏脚本仍待 runtime/UI 证据 | readiness script、manifest、截图/视频/接口导出 |
 | 7 | Artifact/Diff/Preview 生产化 | read-only Edge API 首片已补 `GET /v1/runs/{runId}/diff`、`GET /v1/artifacts`、`GET /v1/previews`；当前短切片只补 runtime evidence 写入，不做 preview start/stop 或 artifact content/apply/discard | Edge API、shared inspector、Desktop smoke；Web 仍不直连 Edge |
@@ -77,7 +77,8 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 ## 下一步
 
 1. 提交并推送本轮 roadmap/governance 刷新。
-2. Edge SQLite opt-in backend、Edge relational schema/migration、登录 fake/local gate、Tauri Windows installer/updater metadata readiness、TeamRun dry evidence 和 Artifact/Diff/Preview read-only Edge 前置已合入；runtime evidence 写入正在 `codex/runtime-evidence-writer` 收口；真实登录和正式签名继续拆独立 proposal。
+2. Edge SQLite opt-in backend、Edge relational schema/migration、登录 fake/local gate、Tauri Windows installer/updater metadata readiness、TeamRun dry evidence、Artifact/Diff/Preview read-only Edge 前置和 runtime evidence 写入已合入；真实登录和正式签名继续拆独立 proposal。
+   - `codex/packaged-login-e2e` 已补 packaged Desktop loopback/keyring readiness 的 local/static gate，不连接真实 TokenDanceID、不打开真实登录窗口；真实 packaged E2E 仍需单独 proposal/gate。
 3. Desktop Edge mapper 首切片已合入：已接入 Edge agents/model catalog/Local Edge target mapper，并在 review 修正 StartRunRequest adapter id 映射、移除 provider 提交字段、阻断 Desktop live 空线程/demo transcript fallback；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge target preference、Tauri host readiness command 和 sidecar launch args 测试，安装包联调后置。
 4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness。
 5. 当前 Artifact/Diff/Preview 片只接 runtime evidence 写入，不碰 preview start/stop、artifact apply/discard/content、Hub/Web/Desktop 或真实 CLI/model。
