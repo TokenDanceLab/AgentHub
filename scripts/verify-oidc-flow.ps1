@@ -14,6 +14,7 @@ Prerequisites:
 
 Usage:
   .\scripts\verify-oidc-flow.ps1                        # Full check
+  .\scripts\verify-oidc-flow.ps1 -LocalOnly             # Local fake/static gate; no live Hub/TokenDance ID calls
   .\scripts\verify-oidc-flow.ps1 -SkipHub               # Check only TokenDance ID
   .\scripts\verify-oidc-flow.ps1 -SkipTD                # Check only Hub Server
   .\scripts\verify-oidc-flow.ps1 -Interactive            # Run manual browser flow guide
@@ -21,6 +22,7 @@ Usage:
 
 [CmdletBinding()]
 param(
+    [switch]$LocalOnly,
     [switch]$SkipHub,
     [switch]$SkipTD,
     [switch]$Interactive,
@@ -178,6 +180,13 @@ function Redact-UrlQuery([string]$Url) {
 }
 
 Banner "TokenDance ID OIDC Full-Link Smoke Verification"
+
+if ($LocalOnly) {
+    $SkipHub = $true
+    $SkipTD = $true
+    Step "Local-only fake/static gate"
+    Pass "Live Hub and TokenDance ID phases are skipped"
+}
 
 # ═══════════════════════════════════════════════════
 # Phase 1: TokenDance ID Provider
@@ -385,7 +394,11 @@ if ($global:VerifyAuthUrl) {
     Pass "  Authorization URL generated — redacted diagnostic form:"
     Write-Host "    $(Redact-UrlQuery $global:VerifyAuthUrl)" -ForegroundColor Cyan
 } else {
-    Warn "  Authorization URL not available (Phase 2 may have failed)"
+    if ($LocalOnly) {
+        Warn "  Authorization URL not available because live Hub authorize is skipped"
+    } else {
+        Warn "  Authorization URL not available because Hub authorize did not complete"
+    }
 }
 
 # 3.2 Check required env vars in hub-server/.env
@@ -484,8 +497,12 @@ Write-Host "  Passed: $Passed  |  Failed: $Failed  |  Total: $($Passed + $Failed
 Write-Host "$('=' * 60)" -ForegroundColor Magenta
 
 if ($Failed -eq 0) {
-    Write-Host "`n  All checks passed. The OIDC infrastructure is correctly wired.`n" -ForegroundColor Green
-    Write-Host "  Next step: run Desktop app for end-to-end browser flow.`n" -ForegroundColor Green
+    if ($LocalOnly) {
+        Write-Host "`n  Local-only fake/static OIDC checks passed. No live Hub or TokenDance ID calls were made.`n" -ForegroundColor Green
+    } else {
+        Write-Host "`n  All checks passed. The OIDC infrastructure is correctly wired.`n" -ForegroundColor Green
+        Write-Host "  Next step: run Desktop app for end-to-end browser flow.`n" -ForegroundColor Green
+    }
 } elseif ($Failed -le 2) {
     Write-Host "`n  Minor issues found. Review warnings above and re-run.`n" -ForegroundColor Yellow
 } else {
