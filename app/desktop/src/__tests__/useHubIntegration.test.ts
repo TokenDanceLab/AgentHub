@@ -308,6 +308,49 @@ describe('useHubIntegration', () => {
     expect(fetchBody.agentId).toBe('claude-code');
   });
 
+  it('refuses to hand off dispatches that are not targeted to this Desktop local edge', async () => {
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        dispatchTarget: {
+          targetId: 'target-current',
+          deviceId: 'desktop-current',
+        },
+      }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        target_id: 'target-other',
+        edge_device_id: 'desktop-current',
+      }));
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        task_id: 'task-missing-target',
+        edge_device_id: 'desktop-current',
+      }));
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        task_id: 'task-missing-device',
+        target_id: 'target-current',
+      }));
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).toHaveBeenCalledWith(
+      'task-1',
+      'Dispatch target mismatch: expected target-current for device desktop-current',
+    );
+    expect(hubClient.failTask).toHaveBeenCalledWith(
+      'task-missing-target',
+      'Dispatch target mismatch: expected target-current for device desktop-current',
+    );
+    expect(hubClient.failTask).toHaveBeenCalledWith(
+      'task-missing-device',
+      'Dispatch target mismatch: expected target-current for device desktop-current',
+    );
+  });
+
   it('normalizes legacy Claude agent ids before starting Edge run', async () => {
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
