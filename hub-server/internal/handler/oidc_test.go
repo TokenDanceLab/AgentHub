@@ -162,6 +162,42 @@ func TestOIDCHandler_PostOIDCCallback_Success(t *testing.T) {
 	}
 }
 
+func TestOIDCHandler_GetOIDCCallback_SuccessPageRedactsCodeAndState(t *testing.T) {
+	tests := []struct {
+		name           string
+		acceptLanguage string
+	}{
+		{name: "english", acceptLanguage: "en-US,en;q=0.9"},
+		{name: "chinese", acceptLanguage: "zh-CN,zh;q=0.9"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := handler.NewOIDCHandler(&mockOIDCService{})
+			c, w := newGinCtxWithQuery("GET", "/client/auth/oidc/callback", "code=auth-code-secret&state=state-secret", nil)
+			c.Request.Header.Set("Accept-Language", tt.acceptLanguage)
+
+			h.GetOIDCCallback(c)
+
+			if w.Code != 200 {
+				t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+			}
+			for _, forbidden := range []string{
+				"auth-code-secret",
+				"state-secret",
+				"Authorization code",
+				"授权码",
+				"状态码",
+				"State",
+			} {
+				if strings.Contains(w.Body.String(), forbidden) {
+					t.Fatalf("GET OIDC callback success page leaked %q: %s", forbidden, w.Body.String())
+				}
+			}
+		})
+	}
+}
+
 func TestOIDCHandler_PostOIDCCallback_InvalidDeviceIDDoesNotCallService(t *testing.T) {
 	called := false
 	svc := &mockOIDCService{

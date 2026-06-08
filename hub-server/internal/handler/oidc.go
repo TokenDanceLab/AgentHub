@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -106,10 +105,10 @@ func (h *OIDCHandler) GetOIDCCallback(c *gin.Context) {
 	}
 
 	if lang == "zh" {
-		success := fmt.Sprintf(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 登录成功</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">登录成功 ✓</h2><p>您可以关闭此页面并返回 AgentHub 桌面应用。</p><p style="color:#6B7280;font-size:13px">授权码: <code>%s</code></p><p style="color:#6B7280;font-size:13px">状态码: <code>%s</code></p></body></html>`, code, state)
+		const success = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 登录成功</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">登录成功 ✓</h2><p>登录流程已完成。</p><p>您可以关闭此页面并返回 AgentHub 桌面应用。</p></body></html>`
 		c.String(200, success)
 	} else {
-		success := fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Login Successful</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">Login Successful ✓</h2><p>You can close this page and return to the AgentHub desktop app.</p><p style="color:#6B7280;font-size:13px">Authorization code: <code>%s</code></p><p style="color:#6B7280;font-size:13px">State: <code>%s</code></p></body></html>`, code, state)
+		const success = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Login Successful</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">Login Successful ✓</h2><p>The login flow is complete.</p><p>You can close this page and return to the AgentHub desktop app.</p></body></html>`
 		c.String(200, success)
 	}
 }
