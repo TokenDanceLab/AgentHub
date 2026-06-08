@@ -39,6 +39,36 @@ type Run struct {
 	FinishedAt string `json:"finishedAt,omitempty"`
 }
 
+type RunDiffFile struct {
+	RunID     string `json:"runId"`
+	Path      string `json:"path"`
+	Diff      string `json:"diff"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type Artifact struct {
+	ID        string `json:"id"`
+	RunID     string `json:"runId"`
+	ThreadID  string `json:"threadId"`
+	Kind      string `json:"kind"`
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"sizeBytes"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type Preview struct {
+	ID        string `json:"id"`
+	RunID     string `json:"runId"`
+	ThreadID  string `json:"threadId"`
+	URL       string `json:"url,omitempty"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
 type Item struct {
 	ID        string `json:"itemId"`
 	ProjectID string `json:"projectId"`
@@ -82,6 +112,9 @@ type Reader interface {
 	GetItem(id string) (Item, bool)
 	ListThreadItems(threadID string) []Item
 	ListThreadPins(threadID string) []ThreadPin
+	ListRunDiffFiles(runID string) []RunDiffFile
+	ListArtifacts(runID string) []Artifact
+	ListPreviews(runID string) []Preview
 }
 
 type Writer interface {
@@ -96,6 +129,9 @@ type Writer interface {
 	CreateThreadMessage(itemID, threadID, role, content string) (Item, error)
 	PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, error)
 	DeleteThreadPin(threadID, itemID string) bool
+	UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error)
+	UpsertArtifact(artifact Artifact) (Artifact, error)
+	UpsertPreview(preview Preview) (Preview, error)
 }
 
 type Repository interface {
@@ -116,26 +152,35 @@ type RunCleaner interface {
 type Store struct {
 	mu sync.RWMutex
 
-	projects map[string]Project
-	threads  map[string]Thread
-	runs     map[string]Run
-	items    map[string]Item
-	pins     map[string]ThreadPin
+	projects  map[string]Project
+	threads   map[string]Thread
+	runs      map[string]Run
+	items     map[string]Item
+	pins      map[string]ThreadPin
+	diffs     map[string]RunDiffFile
+	artifacts map[string]Artifact
+	previews  map[string]Preview
 
-	projectOrder []string
-	threadOrder  []string
-	runOrder     []string
-	itemOrder    []string
-	pinOrder     []string
+	projectOrder  []string
+	threadOrder   []string
+	runOrder      []string
+	itemOrder     []string
+	pinOrder      []string
+	diffOrder     []string
+	artifactOrder []string
+	previewOrder  []string
 }
 
 func New() *Store {
 	return &Store{
-		projects: make(map[string]Project),
-		threads:  make(map[string]Thread),
-		runs:     make(map[string]Run),
-		items:    make(map[string]Item),
-		pins:     make(map[string]ThreadPin),
+		projects:  make(map[string]Project),
+		threads:   make(map[string]Thread),
+		runs:      make(map[string]Run),
+		items:     make(map[string]Item),
+		pins:      make(map[string]ThreadPin),
+		diffs:     make(map[string]RunDiffFile),
+		artifacts: make(map[string]Artifact),
+		previews:  make(map[string]Preview),
 	}
 }
 
@@ -144,16 +189,22 @@ func (s *Store) snapshot() fileSnapshot {
 	defer s.mu.RUnlock()
 
 	return fileSnapshot{
-		Projects:     copyMap(s.projects),
-		Threads:      copyMap(s.threads),
-		Runs:         copyMap(s.runs),
-		Items:        copyMap(s.items),
-		Pins:         copyMap(s.pins),
-		ProjectOrder: append([]string(nil), s.projectOrder...),
-		ThreadOrder:  append([]string(nil), s.threadOrder...),
-		RunOrder:     append([]string(nil), s.runOrder...),
-		ItemOrder:    append([]string(nil), s.itemOrder...),
-		PinOrder:     append([]string(nil), s.pinOrder...),
+		Projects:      copyMap(s.projects),
+		Threads:       copyMap(s.threads),
+		Runs:          copyMap(s.runs),
+		Items:         copyMap(s.items),
+		Pins:          copyMap(s.pins),
+		Diffs:         copyMap(s.diffs),
+		Artifacts:     copyMap(s.artifacts),
+		Previews:      copyMap(s.previews),
+		ProjectOrder:  append([]string(nil), s.projectOrder...),
+		ThreadOrder:   append([]string(nil), s.threadOrder...),
+		RunOrder:      append([]string(nil), s.runOrder...),
+		ItemOrder:     append([]string(nil), s.itemOrder...),
+		PinOrder:      append([]string(nil), s.pinOrder...),
+		DiffOrder:     append([]string(nil), s.diffOrder...),
+		ArtifactOrder: append([]string(nil), s.artifactOrder...),
+		PreviewOrder:  append([]string(nil), s.previewOrder...),
 	}
 }
 
@@ -166,11 +217,17 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.runs = copyMap(snapshot.Runs)
 	s.items = copyMap(snapshot.Items)
 	s.pins = copyMap(snapshot.Pins)
+	s.diffs = copyMap(snapshot.Diffs)
+	s.artifacts = copyMap(snapshot.Artifacts)
+	s.previews = copyMap(snapshot.Previews)
 	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
 	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
 	s.runOrder = normalizeOrder(snapshot.RunOrder, s.runs)
 	s.itemOrder = normalizeOrder(snapshot.ItemOrder, s.items)
 	s.pinOrder = normalizeOrder(snapshot.PinOrder, s.pins)
+	s.diffOrder = normalizeOrder(snapshot.DiffOrder, s.diffs)
+	s.artifactOrder = normalizeOrder(snapshot.ArtifactOrder, s.artifacts)
+	s.previewOrder = normalizeOrder(snapshot.PreviewOrder, s.previews)
 }
 
 func copyMap[K comparable, V any](source map[K]V) map[K]V {
@@ -316,6 +373,7 @@ func (s *Store) DeleteThread(id string) bool {
 		if run.ThreadID == id {
 			delete(s.runs, runID)
 			s.runOrder = removeString(s.runOrder, runID)
+			s.removeRunEvidence(runID)
 		}
 	}
 	for itemID, item := range s.items {
@@ -391,6 +449,146 @@ func (s *Store) ListRuns(threadID string) []Run {
 	return runs
 }
 
+func (s *Store) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.runs[file.RunID]; !ok {
+		return RunDiffFile{}, ErrNotFound
+	}
+	file.Path = strings.TrimSpace(file.Path)
+	if file.Path == "" {
+		return RunDiffFile{}, ErrNotFound
+	}
+	file.Status = normalizeEvidenceStatus(file.Status)
+	key := runDiffFileKey(file.RunID, file.Path)
+	now := nowString()
+	if existing, ok := s.diffs[key]; ok {
+		existing.Diff = file.Diff
+		existing.Status = file.Status
+		existing.UpdatedAt = now
+		s.diffs[key] = existing
+		return existing, nil
+	}
+	file.CreatedAt = now
+	file.UpdatedAt = now
+	s.diffs[key] = file
+	s.diffOrder = append(s.diffOrder, key)
+	return file, nil
+}
+
+func (s *Store) ListRunDiffFiles(runID string) []RunDiffFile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	files := make([]RunDiffFile, 0, len(s.diffOrder))
+	for _, id := range s.diffOrder {
+		file := s.diffs[id]
+		if runID == "" || file.RunID == runID {
+			files = append(files, file)
+		}
+	}
+	return files
+}
+
+func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[artifact.RunID]
+	if !ok {
+		return Artifact{}, ErrNotFound
+	}
+	if artifact.ThreadID == "" {
+		artifact.ThreadID = run.ThreadID
+	}
+	if artifact.ThreadID != run.ThreadID {
+		return Artifact{}, ErrNotFound
+	}
+	artifact.ID = strings.TrimSpace(artifact.ID)
+	if artifact.ID == "" {
+		return Artifact{}, ErrNotFound
+	}
+	if artifact.Kind == "" {
+		artifact.Kind = "file"
+	}
+	now := nowString()
+	if existing, ok := s.artifacts[artifact.ID]; ok {
+		artifact.CreatedAt = existing.CreatedAt
+		artifact.UpdatedAt = now
+		s.artifacts[artifact.ID] = artifact
+		return artifact, nil
+	}
+	artifact.CreatedAt = now
+	artifact.UpdatedAt = now
+	s.artifacts[artifact.ID] = artifact
+	s.artifactOrder = append(s.artifactOrder, artifact.ID)
+	return artifact, nil
+}
+
+func (s *Store) ListArtifacts(runID string) []Artifact {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	artifacts := make([]Artifact, 0, len(s.artifactOrder))
+	for _, id := range s.artifactOrder {
+		artifact := s.artifacts[id]
+		if runID == "" || artifact.RunID == runID {
+			artifacts = append(artifacts, artifact)
+		}
+	}
+	return artifacts
+}
+
+func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[preview.RunID]
+	if !ok {
+		return Preview{}, ErrNotFound
+	}
+	if preview.ThreadID == "" {
+		preview.ThreadID = run.ThreadID
+	}
+	if preview.ThreadID != run.ThreadID {
+		return Preview{}, ErrNotFound
+	}
+	preview.ID = strings.TrimSpace(preview.ID)
+	if preview.ID == "" {
+		return Preview{}, ErrNotFound
+	}
+	if preview.Status == "" {
+		preview.Status = "ready"
+	}
+	now := nowString()
+	if existing, ok := s.previews[preview.ID]; ok {
+		preview.CreatedAt = existing.CreatedAt
+		preview.UpdatedAt = now
+		s.previews[preview.ID] = preview
+		return preview, nil
+	}
+	preview.CreatedAt = now
+	preview.UpdatedAt = now
+	s.previews[preview.ID] = preview
+	s.previewOrder = append(s.previewOrder, preview.ID)
+	return preview, nil
+}
+
+func (s *Store) ListPreviews(runID string) []Preview {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	previews := make([]Preview, 0, len(s.previewOrder))
+	for _, id := range s.previewOrder {
+		preview := s.previews[id]
+		if runID == "" || preview.RunID == runID {
+			previews = append(previews, preview)
+		}
+	}
+	return previews
+}
+
 func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -463,6 +661,7 @@ func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 
 	for id := range removeRuns {
 		delete(s.runs, id)
+		s.removeRunEvidence(id)
 	}
 	s.runOrder = filterIDs(s.runOrder, func(id string) bool {
 		_, remove := removeRuns[id]
@@ -738,6 +937,51 @@ func (s *Store) removePins(match func(ThreadPin) bool) {
 
 func threadPinKey(threadID, itemID string) string {
 	return threadID + "\x00" + itemID
+}
+
+func runDiffFileKey(runID, path string) string {
+	return runID + "\x00" + path
+}
+
+func normalizeEvidenceStatus(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "added", "created", "add":
+		return "added"
+	case "deleted", "delete", "removed", "remove":
+		return "deleted"
+	default:
+		return "modified"
+	}
+}
+
+func (s *Store) removeRunEvidence(runID string) {
+	for id, file := range s.diffs {
+		if file.RunID == runID {
+			delete(s.diffs, id)
+		}
+	}
+	s.diffOrder = filterIDs(s.diffOrder, func(id string) bool {
+		_, ok := s.diffs[id]
+		return ok
+	})
+	for id, artifact := range s.artifacts {
+		if artifact.RunID == runID {
+			delete(s.artifacts, id)
+		}
+	}
+	s.artifactOrder = filterIDs(s.artifactOrder, func(id string) bool {
+		_, ok := s.artifacts[id]
+		return ok
+	})
+	for id, preview := range s.previews {
+		if preview.RunID == runID {
+			delete(s.previews, id)
+		}
+	}
+	s.previewOrder = filterIDs(s.previewOrder, func(id string) bool {
+		_, ok := s.previews[id]
+		return ok
+	})
 }
 
 func nowString() string {
