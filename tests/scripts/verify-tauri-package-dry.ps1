@@ -37,6 +37,7 @@ Assert-True ($scriptText -match "agenthub-edge" -and $scriptText -match "<app-da
 Assert-True ($scriptText -match "AgentHub_\$\{desktopVersion\}_x64-setup\.exe" -and $scriptText -match "AgentHub_\$\{desktopVersion\}_x64-portable\.zip") "dry gate names NSIS and portable proof artifacts"
 Assert-True ($scriptText -match "artifact-manifest\.json" -and $scriptText -match "package-dry-report\.json" -and $scriptText -match "Get-FileHash") "dry gate records report and artifact hashes"
 Assert-True ($scriptText -match "repoChildPrefix" -and $scriptText -match "DirectorySeparatorChar") "dry gate uses a path-separator-bounded repo containment check"
+Assert-True ($scriptText -match "postBuildReadiness" -and $scriptText -match "Post-build static readiness gates") "dry gate reruns static readiness after build steps"
 
 $repoParent = Split-Path $RepoRoot -Parent
 $repoLeaf = Split-Path $RepoRoot -Leaf
@@ -78,6 +79,7 @@ Assert-True ($report.stages.sidecar -eq "passed") "dry report records bundled si
 Assert-True ($report.stages.executableCompile -eq "skipped") "dry report can skip executable compile explicitly"
 Assert-True ($report.stages.nsisPackage -eq "skipped") "dry report can skip NSIS proof explicitly"
 Assert-True ($report.stages.updaterMetadata -eq "skipped") "dry report can skip updater metadata explicitly"
+Assert-True ($report.stages.postBuildReadiness -eq "passed") "dry report records post-build static readiness"
 Assert-True ($report.stages.macosUnsignedDry -eq "policy_only") "dry report records macOS policy-only status"
 
 $manifest = Get-Content $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
