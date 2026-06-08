@@ -39,6 +39,13 @@ function Count-Items($Value) {
     return 1
 }
 
+function Get-RuntimeProfiles($Scenario) {
+    if ($null -ne $Scenario.runtime_profiles) {
+        return @($Scenario.runtime_profiles)
+    }
+    return @($Scenario.agent_profiles)
+}
+
 if ([string]::IsNullOrWhiteSpace($Stamp)) {
     $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 }
@@ -58,8 +65,20 @@ if ($scenario.fixture_only -ne $true) {
 if ($scenario.claims.real_runtime_executed -ne $false -or $scenario.claims.final_recording_complete -ne $false) {
     throw "fixture scenario must not claim real runtime execution or final recording completion"
 }
+if ($scenario.claims.submission_ready -ne $false) {
+    throw "fixture scenario must not claim submission readiness"
+}
+if ($null -eq $scenario.screenshot_or_video_rehearsal) {
+    throw "scenario must include screenshot_or_video_rehearsal metadata"
+}
+if ($scenario.screenshot_or_video_rehearsal.real_runtime_executed -ne $false -or
+    $scenario.screenshot_or_video_rehearsal.final_recording_complete -ne $false -or
+    $scenario.screenshot_or_video_rehearsal.submission_ready -ne $false) {
+    throw "fixture rehearsal metadata must keep real_runtime_executed, final_recording_complete, and submission_ready false"
+}
 
-$runtimeTypes = @($scenario.agent_profiles | ForEach-Object { $_.runtime_type } | Where-Object { $_ } | Sort-Object -Unique)
+$runtimeProfiles = Get-RuntimeProfiles $scenario
+$runtimeTypes = @($runtimeProfiles | ForEach-Object { $_.runtime_type } | Where-Object { $_ } | Sort-Object -Unique)
 if ($runtimeTypes.Count -lt 2) {
     throw "scenario must include at least two runtime types"
 }
@@ -78,11 +97,15 @@ try {
 $generatedAt = Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz"
 $evidence = [ordered]@{
     contract = $scenario.contract
+    manifest_schema = $scenario.manifest_schema
     generated_at = $generatedAt
     source = [ordered]@{
         fixture_only = $true
         scenario_manifest = "docs/competition/teamrun-demo-scenario.json"
         commit = $commit
+        real_runtime_executed = $false
+        final_recording_complete = $false
+        submission_ready = $false
     }
     claims = $scenario.claims
     scenario = [ordered]@{
@@ -94,14 +117,16 @@ $evidence = [ordered]@{
     tasks = @($scenario.tasks)
     assignments = @($scenario.assignments)
     events = @($scenario.events)
-    runtime_profiles = @($scenario.agent_profiles)
+    runtime_profiles = @($runtimeProfiles)
+    screenshot_or_video_rehearsal = $scenario.screenshot_or_video_rehearsal
     api_exports_required_for_real_demo = @($scenario.api_exports_required_for_real_demo)
     counts = [ordered]@{
-        runtime_profiles = Count-Items $scenario.agent_profiles
+        runtime_profiles = Count-Items $runtimeProfiles
         runtime_types = $runtimeTypes.Count
         tasks = Count-Items $scenario.tasks
         assignments = Count-Items $scenario.assignments
         events = Count-Items $scenario.events
+        screenshot_or_video_assets = Count-Items $scenario.screenshot_or_video_rehearsal.current_assets
     }
 }
 
@@ -127,6 +152,7 @@ Contract: $($scenario.contract)
 - real_runtime_executed: false
 - final_recording_complete: false
 - submission_ready: false
+- screenshot_or_video_rehearsal: $($scenario.screenshot_or_video_rehearsal.mode)
 
 This package freezes the minimum evidence shape for the ByteDance/TeamRun demo.
 It is not the final 3-minute recording and is not proof of a real runtime run.
@@ -138,6 +164,7 @@ It is not the final 3-minute recording and is not proof of a real runtime run.
 - tasks: $(Count-Items $scenario.tasks)
 - assignments: $(Count-Items $scenario.assignments)
 - events: $(Count-Items $scenario.events)
+- screenshot_or_video_assets: $(Count-Items $scenario.screenshot_or_video_rehearsal.current_assets)
 "@ | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
 Write-Host "Created fixture-only TeamRun evidence:"
