@@ -967,6 +967,7 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	if conn != nil {
 		edgeDeviceID = conn.DeviceID
 	}
+	failedTasks := make([]string, 0)
 	for _, taskJSON := range tasks {
 		var payload json.RawMessage
 		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
@@ -979,7 +980,16 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 					continue
 				}
 			}
-			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+			if !result.Queued {
+				slog.Warn("queued task replay not queued; requeueing pending task", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+				failedTasks = append(failedTasks, taskJSON)
+			}
+		}
+	}
+	for i := len(failedTasks) - 1; i >= 0; i-- {
+		if err := a.CacheClient.PushPendingTask(ctx, userID, failedTasks[i]); err != nil {
+			slog.Error("failed to requeue pending task after websocket delivery failure", "user_id", userID, "conn_id", connID, "error", err)
 		}
 	}
 }
