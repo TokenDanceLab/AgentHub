@@ -58,6 +58,7 @@ type Config struct {
 	AgentDefault       string             // default agent adapter ID; empty = raw stdout capture
 	LocalAuthToken     string             // optional local bearer token for non-health Edge APIs
 	HubJWTSecret       string             // shared secret for validating Hub-issued HS256 JWTs
+	EdgeDeviceID       string             // local Edge device ID expected in Edge-scoped Hub JWTs
 	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
 	HubToken           string             // JWT bearer token for Hub callback authentication
 	RemoteMode         bool               // allow non-loopback bind + remote origins (requires auth)
@@ -147,7 +148,7 @@ func Run(cfg Config) error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout), cfg.RemoteMode, cfg.AllowedOrigins)),
+		Handler: reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret, cfg.EdgeDeviceID), defaultRESTRequestTimeout), cfg.RemoteMode, cfg.AllowedOrigins)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
@@ -435,9 +436,10 @@ func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string)
 	})
 }
 
-func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret string) http.Handler {
+func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret string, edgeDeviceID string) http.Handler {
 	localAuthToken = strings.TrimSpace(localAuthToken)
 	hubJWTSecret = strings.TrimSpace(hubJWTSecret)
+	edgeDeviceID = strings.TrimSpace(edgeDeviceID)
 
 	// Local dev mode: no auth configured.
 	if localAuthToken == "" && hubJWTSecret == "" {
@@ -458,7 +460,7 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 
 			// 1. Try Hub JWT validation (TokenDance ID → Hub → Edge trust chain).
 			if hubJWTSecret != "" {
-				if claims, err := jwtutil.ValidateHubToken(got, []byte(hubJWTSecret)); err == nil {
+				if claims, err := jwtutil.ValidateHubToken(got, []byte(hubJWTSecret), edgeDeviceID); err == nil {
 					ctx := context.WithValue(r.Context(), ctxKeyHubUserID, claims.UserID)
 					ctx = context.WithValue(ctx, ctxKeyHubDeviceID, claims.DeviceID)
 					next.ServeHTTP(w, r.WithContext(ctx))

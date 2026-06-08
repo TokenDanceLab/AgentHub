@@ -353,7 +353,7 @@ func TestLocalAuthMiddlewareDisabledAllowsRequests(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "", "")
+	}), "", "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	rec := httptest.NewRecorder()
@@ -373,7 +373,7 @@ func TestLocalAuthMiddlewareRequiresTokenForStateChangingRoutes(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "edge-secret", "")
+	}), "edge-secret", "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	rec := httptest.NewRecorder()
@@ -404,7 +404,7 @@ func TestLocalAuthMiddlewareRequiresTokenForReadRoutes(t *testing.T) {
 			handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusOK)
-			}), "edge-secret", "")
+			}), "edge-secret", "", "")
 
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
@@ -426,7 +426,7 @@ func TestLocalAuthMiddlewareAllowsBearerToken(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "edge-secret", "")
+	}), "edge-secret", "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	req.Header.Set("Authorization", "Bearer edge-secret")
@@ -447,7 +447,7 @@ func TestLocalAuthMiddlewareAllowsHealthAndOptionsWithoutToken(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		w.WriteHeader(http.StatusOK)
-	}), "edge-secret", "")
+	}), "edge-secret", "", "")
 
 	for _, req := range []*http.Request{
 		httptest.NewRequest(http.MethodGet, "/v1/health", nil),
@@ -469,7 +469,7 @@ func TestLocalAuthMiddlewareAllowsWebSocketQueryToken(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusSwitchingProtocols)
-	}), "edge-secret", "")
+	}), "edge-secret", "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/events?access_token=edge-secret", nil)
 	req.Header.Set("Connection", "Upgrade")
@@ -813,14 +813,48 @@ func hasString(values []string, want string) bool {
 const testHubJWTSecret = "hub-secret-at-least-32-bytes-long!!"
 
 func newHubJWT(secret string, userID string, expiresIn time.Duration) string {
+	return newHubJWTForDevice(secret, userID, "test-device", expiresIn)
+}
+
+func newHubJWTForDevice(secret string, userID string, deviceID string, expiresIn time.Duration) string {
 	claims := struct {
-		UserID   string `json:"user_id"`
-		DeviceID string `json:"device_id"`
+		UserID     string `json:"user_id"`
+		DeviceID   string `json:"device_id"`
+		DeviceType string `json:"device_type"`
+		Purpose    string `json:"purpose"`
 		jwt.RegisteredClaims
 	}{
-		UserID:   userID,
-		DeviceID: "test-device",
+		UserID:     userID,
+		DeviceID:   deviceID,
+		DeviceType: "edge",
+		Purpose:    "edge-api",
 		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-edge"},
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	s, _ := token.SignedString([]byte(secret))
+	return s
+}
+
+func newOrdinaryHubAPIJWT(secret string, userID string, expiresIn time.Duration) string {
+	claims := struct {
+		UserID     string `json:"user_id"`
+		DeviceID   string `json:"device_id"`
+		DeviceType string `json:"device_type"`
+		jwt.RegisteredClaims
+	}{
+		UserID:     userID,
+		DeviceID:   "test-device",
+		DeviceType: "desktop",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-api"},
+			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -835,7 +869,7 @@ func TestLocalAuthMiddleware_HubJWTSuccess(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "", testHubJWTSecret)
+	}), "", testHubJWTSecret, "test-device")
 
 	token := newHubJWT(testHubJWTSecret, "user-1", 1*time.Hour)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
@@ -852,12 +886,56 @@ func TestLocalAuthMiddleware_HubJWTSuccess(t *testing.T) {
 	}
 }
 
+func TestLocalAuthMiddleware_RejectsOrdinaryHubAPIToken(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusAccepted)
+	}), "", testHubJWTSecret, "test-device")
+
+	token := newOrdinaryHubAPIJWT(testHubJWTSecret, "user-1", 1*time.Hour)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+	if called {
+		t.Fatal("handler should not be called with ordinary Hub API JWT")
+	}
+}
+
+func TestLocalAuthMiddleware_RejectsHubJWTForDifferentEdgeDevice(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusAccepted)
+	}), "", testHubJWTSecret, "test-device")
+
+	token := newHubJWTForDevice(testHubJWTSecret, "user-1", "other-edge-device", 1*time.Hour)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+	if called {
+		t.Fatal("handler should not be called with a Hub JWT for a different Edge device")
+	}
+}
+
 func TestLocalAuthMiddleware_HubJWTInvalid(t *testing.T) {
 	called := false
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "", testHubJWTSecret)
+	}), "", testHubJWTSecret, "test-device")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	req.Header.Set("Authorization", "Bearer invalid-token")
@@ -878,7 +956,7 @@ func TestLocalAuthMiddleware_HubJWTWrongSecret(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "", testHubJWTSecret)
+	}), "", testHubJWTSecret, "test-device")
 
 	token := newHubJWT("different-secret-key-for-testing!!", "user-1", 1*time.Hour)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
@@ -900,7 +978,7 @@ func TestLocalAuthMiddleware_HubJWTExpired(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "", testHubJWTSecret)
+	}), "", testHubJWTSecret, "test-device")
 
 	token := newHubJWT(testHubJWTSecret, "user-1", -1*time.Hour)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
@@ -922,7 +1000,7 @@ func TestLocalAuthMiddleware_SkipsTokenDancePrefix(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "edge-secret", testHubJWTSecret)
+	}), "edge-secret", testHubJWTSecret, "test-device")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	req.Header.Set("Authorization", "Bearer td_some_tokendance_token")
@@ -943,7 +1021,7 @@ func TestLocalAuthMiddleware_LocalAuthTokenFallback(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "edge-secret", testHubJWTSecret)
+	}), "edge-secret", testHubJWTSecret, "test-device")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	req.Header.Set("Authorization", "Bearer edge-secret")
@@ -964,7 +1042,7 @@ func TestLocalAuthMiddleware_BothNilAllowsAll(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "", "")
+	}), "", "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	rec := httptest.NewRecorder()
@@ -984,7 +1062,7 @@ func TestLocalAuthMiddleware_HubJWTXEdgeTokenHeader(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusAccepted)
-	}), "", testHubJWTSecret)
+	}), "", testHubJWTSecret, "test-device")
 
 	token := newHubJWT(testHubJWTSecret, "user-2", 1*time.Hour)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
@@ -1006,7 +1084,7 @@ func TestLocalAuthMiddleware_HealthEndpointExempt(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), "edge-secret", testHubJWTSecret)
+	}), "edge-secret", testHubJWTSecret, "test-device")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	rec := httptest.NewRecorder()
@@ -1026,7 +1104,7 @@ func TestLocalAuthMiddleware_WebSocketRequiresAuth(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), "edge-secret", testHubJWTSecret)
+	}), "edge-secret", testHubJWTSecret, "test-device")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
 	req.Header.Set("Upgrade", "websocket")
@@ -1048,7 +1126,7 @@ func TestLocalAuthMiddleware_WebSocketAuthTokenViaQueryParam(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), "edge-secret", testHubJWTSecret)
+	}), "edge-secret", testHubJWTSecret, "test-device")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/events?access_token=edge-secret", nil)
 	req.Header.Set("Upgrade", "websocket")
@@ -1070,7 +1148,7 @@ func TestLocalAuthMiddleware_WebSocketAuthTokenViaHeader(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), "edge-secret", testHubJWTSecret)
+	}), "edge-secret", testHubJWTSecret, "test-device")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
 	req.Header.Set("Upgrade", "websocket")
@@ -1093,7 +1171,7 @@ func TestLocalAuthMiddleware_WebSocketAllowedWhenAuthDisabled(t *testing.T) {
 	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), "", "")
+	}), "", "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
 	req.Header.Set("Upgrade", "websocket")
