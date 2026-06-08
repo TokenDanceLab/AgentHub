@@ -8,6 +8,7 @@ import RunnerRow from '../cards/RunnerRow';
 import { shortId } from '../utils';
 import styles from '../primitives/primitives.module.css';
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
+import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 
 interface ExecutionTargetsSectionProps {
   edgeOnline: boolean;
@@ -19,11 +20,15 @@ interface ExecutionTargetsSectionProps {
   localEdgeTarget: DesktopExecutionTarget;
   desktopDeviceStatus: string;
   deviceId: string | null;
+  registeredLocalEdgeTarget?: ExecutionTargetInventoryItem | null;
+  hubTargetsLoading?: boolean;
+  hubTargetsError?: boolean;
 }
 
 export default function ExecutionTargetsSection({
   edgeOnline, health, hubSessionActive, runnerSummary, runnerItems,
   availableRunners, localEdgeTarget, desktopDeviceStatus, deviceId,
+  registeredLocalEdgeTarget = null, hubTargetsLoading = false, hubTargetsError = false,
 }: ExecutionTargetsSectionProps) {
   const { t } = useTranslation();
   const localEdgeMetric = edgeOnline
@@ -34,6 +39,20 @@ export default function ExecutionTargetsSection({
         models: localEdgeTarget.modelCount,
       })
     : runnerSummary;
+  const readinessBody = (() => {
+    if (!hubSessionActive) return t('settings.localEdgeTargetReadinessSignedOut');
+    if (hubTargetsLoading) return t('settings.localEdgeTargetReadinessLoading');
+    if (hubTargetsError) return t('settings.localEdgeTargetReadinessError');
+    if (registeredLocalEdgeTarget) {
+      return t('settings.localEdgeTargetReadinessRegistered', {
+        name: registeredLocalEdgeTarget.name,
+        targetId: shortId(registeredLocalEdgeTarget.id),
+      });
+    }
+    if (!deviceId) return t('settings.localEdgeTargetReadinessNoDevice');
+    if (!edgeOnline) return t('settings.localEdgeTargetReadinessOffline');
+    return t('settings.localEdgeTargetReadinessMissing');
+  })();
 
   return (
     <Panel title={t('settings.executionTargets')} description={t('settings.executionTargetsDesc')}>
@@ -77,6 +96,7 @@ export default function ExecutionTargetsSection({
           metric="Cloud Edge"
         />
       </div>
+      <Callout title={t('settings.localEdgeTargetReadiness')} body={readinessBody} />
       {runnerItems.length > 0 ? (
         <div className={styles.runnerList}>
           {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}
