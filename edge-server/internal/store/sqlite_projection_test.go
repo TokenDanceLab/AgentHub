@@ -27,6 +27,15 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	if _, ok := s.SetRunStatus(run.ID, "started"); !ok {
 		t.Fatalf("SetRunStatus(%s) returned false", run.ID)
 	}
+	diffFile, err := s.UpsertRunDiffFile(RunDiffFile{
+		RunID:  run.ID,
+		Path:   "src/app.ts",
+		Diff:   "@@ -1 +1 @@\n-old\n+new",
+		Status: "modified",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile returned error: %v", err)
+	}
 
 	workspaceRoot := filepath.Join(t.TempDir(), "workspace")
 	source := filepath.Join(workspaceRoot, "dist", "report.md")
@@ -41,6 +50,16 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("UpsertArtifact returned error: %v", err)
+	}
+	preview, err := s.UpsertPreview(Preview{
+		ID:       "preview_projection",
+		RunID:    run.ID,
+		ThreadID: thread.ID,
+		URL:      "http://127.0.0.1:4173",
+		Status:   "ready",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview returned error: %v", err)
 	}
 	s.Close()
 
@@ -102,5 +121,51 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	}
 	if projectedArtifact.metadataJSON != `{"sizeBytes":128}` {
 		t.Fatalf("projected artifact metadata_json = %s, want sizeBytes metadata", projectedArtifact.metadataJSON)
+	}
+
+	var projectedDiff struct {
+		workspaceID string
+		runID       string
+		patchPath   string
+		status      string
+		summaryJSON string
+	}
+	if err := reopened.db.QueryRow(`SELECT workspace_id, run_id, patch_path, status, summary_json FROM edge_diffs WHERE run_id = ?`, run.ID).Scan(
+		&projectedDiff.workspaceID,
+		&projectedDiff.runID,
+		&projectedDiff.patchPath,
+		&projectedDiff.status,
+		&projectedDiff.summaryJSON,
+	); err != nil {
+		t.Fatalf("query projected diff returned error: %v", err)
+	}
+	if projectedDiff.workspaceID != project.ID || projectedDiff.runID != run.ID || projectedDiff.patchPath != diffFile.Path || projectedDiff.status != "modified" {
+		t.Fatalf("projected diff = %#v, want scoped modified diff for src/app.ts", projectedDiff)
+	}
+	if projectedDiff.summaryJSON != `{"path":"src/app.ts","diffBytes":21}` {
+		t.Fatalf("projected diff summary_json = %s, want path and diff byte count", projectedDiff.summaryJSON)
+	}
+
+	var projectedPreview struct {
+		workspaceID  string
+		runID        string
+		url          string
+		status       string
+		metadataJSON string
+	}
+	if err := reopened.db.QueryRow(`SELECT workspace_id, run_id, url, status, metadata_json FROM edge_previews WHERE preview_id = ?`, preview.ID).Scan(
+		&projectedPreview.workspaceID,
+		&projectedPreview.runID,
+		&projectedPreview.url,
+		&projectedPreview.status,
+		&projectedPreview.metadataJSON,
+	); err != nil {
+		t.Fatalf("query projected preview returned error: %v", err)
+	}
+	if projectedPreview.workspaceID != project.ID || projectedPreview.runID != run.ID || projectedPreview.url != preview.URL || projectedPreview.status != "ready" {
+		t.Fatalf("projected preview = %#v, want scoped ready preview", projectedPreview)
+	}
+	if projectedPreview.metadataJSON != `{}` {
+		t.Fatalf("projected preview metadata_json = %s, want empty object", projectedPreview.metadataJSON)
 	}
 }
