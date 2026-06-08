@@ -275,6 +275,43 @@ describe('createHubClient', () => {
     );
   });
 
+  it('passes target_id when starting a Hub TeamRun', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({
+        code: 'ok',
+        data: {
+          id: 'run-1',
+          team_id: 'team-1',
+          status: 'queued',
+          target_id: 'target-local-edge-1',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createHubClient({
+      baseUrl: 'https://hub.example.test',
+      getToken: () => 'hub-access',
+    });
+    const res = await client.startTeamRun('team/1', {
+      trigger_message: 'Run remote control fixture',
+      target_id: 'target-local-edge-1',
+    });
+
+    expect(res.target_id).toBe('target-local-edge-1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hub.example.test/web/agent-teams/team%2F1/runs',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          trigger_message: 'Run remote control fixture',
+          target_id: 'target-local-edge-1',
+        }),
+      }),
+    );
+  });
+
   it('returns the created Hub agent instance when adding an agent to a session', async () => {
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({
