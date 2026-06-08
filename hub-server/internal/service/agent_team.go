@@ -39,6 +39,7 @@ type AgentTeamService struct {
 	agentSvc    agentTeamAgentSvc
 	cacheClient agentTeamCache
 	controlSvc  agentTeamControlSvc
+	bus         *Bus
 	guardrails  AgentTeamGuardrails
 }
 
@@ -105,6 +106,10 @@ func NewAgentTeamServiceWithGuardrails(db *gorm.DB, agentSvc agentTeamAgentSvc, 
 
 func (s *AgentTeamService) SetControlService(controlSvc agentTeamControlSvc) {
 	s.controlSvc = controlSvc
+}
+
+func (s *AgentTeamService) SetBus(bus *Bus) {
+	s.bus = bus
 }
 
 func resolveAgentTeamCache(c *cache.Client) agentTeamCache {
@@ -513,6 +518,12 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
 		return run, err
 	}
+	s.publishTeamEvent(ctx, "team.run.started", map[string]interface{}{
+		"team_id":    teamID,
+		"run_id":     run.ID,
+		"session_id": session.ID,
+		"user_id":    userID,
+	})
 
 	return run, nil
 }
@@ -2192,7 +2203,16 @@ func (s *AgentTeamService) CompleteAssignment(ctx context.Context, userID, assig
 		return errcode.ErrBadRequest
 	}
 
-	return repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusDone, result)
+	if err := repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusDone, result); err != nil {
+		return err
+	}
+	s.publishTeamEvent(ctx, "team.assignment.completed", map[string]interface{}{
+		"team_run_id":   a.TeamRunID,
+		"assignment_id": assignmentID,
+		"session_id":    run.SessionID,
+		"result":        result,
+	})
+	return nil
 }
 
 // FailAssignment marks an assignment as failed with the given reason.
@@ -2213,7 +2233,26 @@ func (s *AgentTeamService) FailAssignment(ctx context.Context, userID, assignmen
 		return errcode.AgentTaskNotFound
 	}
 
-	return repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusFailed, reason)
+	if err := repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusFailed, reason); err != nil {
+		return err
+	}
+	s.publishTeamEvent(ctx, "team.assignment.failed", map[string]interface{}{
+		"team_run_id":   a.TeamRunID,
+		"assignment_id": assignmentID,
+		"session_id":    run.SessionID,
+		"reason":        reason,
+	})
+	return nil
+}
+
+func (s *AgentTeamService) publishTeamEvent(ctx context.Context, eventType string, payload map[string]interface{}) {
+	if s.bus == nil {
+		return
+	}
+	s.bus.Publish(ctx, Event{
+		Type:    eventType,
+		Payload: payload,
+	})
 }
 
 // ListAssignments returns all assignments for a team run, verifying owner access.
