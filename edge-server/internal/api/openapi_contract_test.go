@@ -9,7 +9,28 @@ import (
 )
 
 type openAPISpec struct {
-	Paths map[string]openAPIPathItem `yaml:"paths"`
+	Paths      map[string]openAPIPathItem `yaml:"paths"`
+	Components openAPIComponents          `yaml:"components"`
+}
+
+type openAPIComponents struct {
+	Schemas map[string]openAPISchema `yaml:"schemas"`
+}
+
+type openAPISchema struct {
+	Ref        string                   `yaml:"$ref"`
+	Type       string                   `yaml:"type"`
+	Properties map[string]openAPISchema `yaml:"properties"`
+	Items      *openAPISchema           `yaml:"items"`
+	Required   []string                 `yaml:"required"`
+}
+
+type openAPIResponse struct {
+	Content map[string]openAPIMediaType `yaml:"content"`
+}
+
+type openAPIMediaType struct {
+	Schema openAPISchema `yaml:"schema"`
 }
 
 type openAPIPathItem struct {
@@ -20,8 +41,9 @@ type openAPIPathItem struct {
 }
 
 type openAPIOperation struct {
-	OperationID string `yaml:"operationId"`
-	Status      string `yaml:"x-agenthub-status"`
+	OperationID string                     `yaml:"operationId"`
+	Status      string                     `yaml:"x-agenthub-status"`
+	Responses   map[string]openAPIResponse `yaml:"responses"`
 }
 
 func TestOpenAPIEdgeRouteStatuses(t *testing.T) {
@@ -71,6 +93,59 @@ func TestOpenAPIEdgeRouteStatuses(t *testing.T) {
 	}
 }
 
+func TestOpenAPIModelCatalogDocumentsItemsAndSourcesContract(t *testing.T) {
+	spec := loadEdgeOpenAPISpec(t)
+	operation := openAPIOperationFor(t, spec, "/v1/model-catalog", "get")
+	if operation.Status != "implemented" {
+		t.Fatalf("get /v1/model-catalog status = %q, want implemented", operation.Status)
+	}
+
+	okResponse, ok := operation.Responses["200"]
+	if !ok {
+		t.Fatal("get /v1/model-catalog missing 200 response")
+	}
+	jsonBody, ok := okResponse.Content["application/json"]
+	if !ok {
+		t.Fatal("get /v1/model-catalog 200 response missing application/json content")
+	}
+	if jsonBody.Schema.Ref != "#/components/schemas/ModelCatalogResponse" {
+		t.Fatalf("get /v1/model-catalog 200 schema ref = %q, want ModelCatalogResponse", jsonBody.Schema.Ref)
+	}
+
+	response := schemaNamed(t, spec, "ModelCatalogResponse")
+	data := requireProperty(t, response, "ModelCatalogResponse", "data")
+	if data.Ref != "#/components/schemas/ModelCatalog" {
+		t.Fatalf("ModelCatalogResponse.data ref = %q, want ModelCatalog", data.Ref)
+	}
+	catalog := schemaNamed(t, spec, "ModelCatalog")
+	requireArrayRef(t, catalog, "items", "#/components/schemas/ModelCatalogItem")
+	requireArrayRef(t, catalog, "sources", "#/components/schemas/ModelCatalogSource")
+
+	item := schemaNamed(t, spec, "ModelCatalogItem")
+	for _, field := range []string{
+		"id",
+		"value",
+		"label",
+		"provider",
+		"runtimeId",
+		"resolvedModel",
+		"sourceId",
+		"sourceLabel",
+		"status",
+		"description",
+		"tags",
+		"reasoningEfforts",
+		"default",
+	} {
+		requireProperty(t, item, "ModelCatalogItem", field)
+	}
+
+	source := schemaNamed(t, spec, "ModelCatalogSource")
+	for _, field := range []string{"id", "label", "status", "detail"} {
+		requireProperty(t, source, "ModelCatalogSource", field)
+	}
+}
+
 func loadEdgeOpenAPISpec(t *testing.T) openAPISpec {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.FromSlash("../../../api/openapi.yaml"))
@@ -107,4 +182,36 @@ func openAPIOperationFor(t *testing.T, spec openAPISpec, path string, method str
 		t.Fatalf("OpenAPI operation %s %s not found", method, path)
 	}
 	return operation
+}
+
+func schemaNamed(t *testing.T, spec openAPISpec, name string) openAPISchema {
+	t.Helper()
+	schema, ok := spec.Components.Schemas[name]
+	if !ok {
+		t.Fatalf("OpenAPI schema %s not found", name)
+	}
+	return schema
+}
+
+func requireArrayRef(t *testing.T, schema openAPISchema, field string, wantRef string) {
+	t.Helper()
+	property := requireProperty(t, schema, "ModelCatalog", field)
+	if property.Type != "array" {
+		t.Fatalf("ModelCatalog.%s type = %q, want array", field, property.Type)
+	}
+	if property.Items == nil {
+		t.Fatalf("ModelCatalog.%s missing items", field)
+	}
+	if property.Items.Ref != wantRef {
+		t.Fatalf("ModelCatalog.%s items ref = %q, want %q", field, property.Items.Ref, wantRef)
+	}
+}
+
+func requireProperty(t *testing.T, schema openAPISchema, schemaName string, field string) openAPISchema {
+	t.Helper()
+	property, ok := schema.Properties[field]
+	if !ok {
+		t.Fatalf("%s missing property %s", schemaName, field)
+	}
+	return property
 }
