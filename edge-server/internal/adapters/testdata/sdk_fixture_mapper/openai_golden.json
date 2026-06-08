@@ -1,0 +1,136 @@
+[
+  {
+    "type": "run.agent.tool_call",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "call_apply_patch",
+      "evidenceRefs": [
+        "event:openai_tool_1"
+      ],
+      "input": {
+        "patch": "*** fixture patch ***",
+        "path": "edge-server/internal/adapters/sdk_fixture_mapper.go"
+      },
+      "provider": "openai-agents-sdk-fixture",
+      "sessionId": "openai_session_1",
+      "sourceEventId": "openai_tool_1",
+      "status": "pending",
+      "toolName": "apply_patch",
+      "traceId": "trace_openai_1",
+      "traceRefs": [
+        "trace:openai:function-call"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.permission_requested",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "decision": "review_required",
+      "guardrail": "workspace_write_policy",
+      "input": {
+        "command": "git diff --check origin/dev/delicious233...HEAD"
+      },
+      "provider": "openai-agents-sdk-fixture",
+      "reason": "write action needs AgentHub approval evidence",
+      "requestId": "guard_openai_1",
+      "riskLevel": "medium",
+      "sourceEventId": "openai_guardrail_1",
+      "toolName": "shell",
+      "toolUseId": "call_shell",
+      "traceRefs": [
+        "trace:openai:guardrail"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.route_decision",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "action": "delegate",
+      "evidenceRefs": [
+        "event:openai_guardrail_1"
+      ],
+      "instructions": "Sync SDK fixture status in docs.",
+      "next_worker": "docs-worker",
+      "provider": "openai-agents-sdk-fixture",
+      "sourceEventId": "openai_route_1",
+      "summary": "Route suggestion from OpenAI Agents SDK-like handoff.",
+      "targetAgent": "docs-worker"
+    }
+  },
+  {
+    "type": "run.agent.file_change",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "call_apply_patch",
+      "diff": "@@ docs fixture diff @@",
+      "kind": "modified",
+      "path": "docs/reference/sdk-agent-strategy.md",
+      "provider": "openai-agents-sdk-fixture",
+      "sourceEventId": "openai_file_1",
+      "toolName": "apply_patch"
+    }
+  },
+  {
+    "type": "artifact.created",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "artifactId": "artifact_openai_trace",
+      "id": "artifact_openai_trace",
+      "kind": "json",
+      "metadata": {
+        "api_key": "[redacted]",
+        "trace_url": "fixture://trace/openai"
+      },
+      "path": "artifacts/openai-trace-summary.json",
+      "provider": "openai-agents-sdk-fixture",
+      "sizeBytes": 256,
+      "sourceEventId": "openai_artifact_1",
+      "summary": "Trace summary fixture",
+      "traceRefs": [
+        "trace:openai:root"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.result",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "evidenceRefs": [
+        "artifact:artifact_openai_trace"
+      ],
+      "provider": "openai-agents-sdk-fixture",
+      "sourceEventId": "openai_result_1",
+      "success": true,
+      "summary": "OpenAI Agents SDK-like fixture completed.",
+      "traceRefs": [
+        "trace:openai:root"
+      ]
+    }
+  }
+]
