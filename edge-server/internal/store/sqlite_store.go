@@ -248,6 +248,69 @@ VALUES (?, ?, ?, ?, ?, ?, 'created', ?, ?, ?, ?, ?, ?)`,
 		}
 	}
 
+	for _, diffFile := range snapshot.Diffs {
+		if diffFile.RunID == "" || diffFile.Path == "" {
+			continue
+		}
+		run, ok := snapshot.Runs[diffFile.RunID]
+		if !ok || run.ProjectID == "" {
+			continue
+		}
+		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
+			continue
+		}
+		summaryJSON, err := sqliteDiffSummaryJSON(diffFile)
+		if err != nil {
+			return fmt.Errorf("diff summary %s: %w", diffFile.Path, err)
+		}
+		createdAt := firstNonEmpty(diffFile.CreatedAt, now)
+		updatedAt := firstNonEmpty(diffFile.UpdatedAt, createdAt)
+		if _, err := tx.Exec(
+			`INSERT INTO edge_diffs (diff_id, owner_id, workspace_id, run_id, summary_json, patch_path, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			sqliteDiffProjectionID(diffFile),
+			sqliteProjectionOwnerID,
+			run.ProjectID,
+			diffFile.RunID,
+			summaryJSON,
+			diffFile.Path,
+			firstNonEmpty(diffFile.Status, "modified"),
+			createdAt,
+			updatedAt,
+		); err != nil {
+			return fmt.Errorf("diff %s: %w", diffFile.Path, err)
+		}
+	}
+
+	for _, preview := range snapshot.Previews {
+		if preview.ID == "" || preview.RunID == "" {
+			continue
+		}
+		run, ok := snapshot.Runs[preview.RunID]
+		if !ok || run.ProjectID == "" {
+			continue
+		}
+		if _, ok := snapshot.Projects[run.ProjectID]; !ok {
+			continue
+		}
+		createdAt := firstNonEmpty(preview.CreatedAt, now)
+		updatedAt := firstNonEmpty(preview.UpdatedAt, createdAt)
+		if _, err := tx.Exec(
+			`INSERT INTO edge_previews (preview_id, owner_id, workspace_id, run_id, url, status, created_at, updated_at, metadata_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')`,
+			preview.ID,
+			sqliteProjectionOwnerID,
+			run.ProjectID,
+			preview.RunID,
+			preview.URL,
+			firstNonEmpty(preview.Status, "created"),
+			createdAt,
+			updatedAt,
+		); err != nil {
+			return fmt.Errorf("preview %s: %w", preview.ID, err)
+		}
+	}
+
 	return nil
 }
 
@@ -267,6 +330,24 @@ func sqliteArtifactMetadataJSON(artifact Artifact) (string, error) {
 		SizeBytes int64 `json:"sizeBytes"`
 	}{
 		SizeBytes: artifact.SizeBytes,
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+func sqliteDiffProjectionID(file RunDiffFile) string {
+	return file.RunID + ":" + file.Path
+}
+
+func sqliteDiffSummaryJSON(file RunDiffFile) (string, error) {
+	payload, err := json.Marshal(struct {
+		Path      string `json:"path"`
+		DiffBytes int    `json:"diffBytes"`
+	}{
+		Path:      file.Path,
+		DiffBytes: len([]byte(file.Diff)),
 	})
 	if err != nil {
 		return "", err
