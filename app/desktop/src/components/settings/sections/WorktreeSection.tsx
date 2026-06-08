@@ -104,6 +104,8 @@ export default function WorktreeSection({ worktreeIsolation, setWorktreeIsolatio
         loadWorkspaceSettings(selected);
         window.dispatchEvent(new CustomEvent('agenthub:workdir-selected'));
       }
+    } catch {
+      // Keep the previous workspace state when the native picker fails.
     } finally {
       setChoosingWorkspace(false);
     }

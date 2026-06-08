@@ -69,4 +69,36 @@ describe('WorktreeSection workspace picker', () => {
     });
     expect(mockedReadWorkspaceSettings).toHaveBeenCalledWith('D:/Code/TokenDance/AgentHub');
   });
+
+  it('keeps no workspace selected when the backend picker is cancelled', async () => {
+    mockedChooseWorkspaceRootFromBackend.mockResolvedValueOnce(null);
+
+    render(<WorktreeSection worktreeIsolation={true} setWorktreeIsolation={vi.fn()} />);
+
+    const chooseButton = screen.getByRole('button', { name: 'settings.chooseWorkspace' });
+    fireEvent.click(chooseButton);
+
+    await waitFor(() => {
+      expect(mockedChooseWorkspaceRootFromBackend).toHaveBeenCalledTimes(1);
+      expect(chooseButton).toBeEnabled();
+    });
+    expect(screen.getByText('settings.noWorkspaceSelected')).toBeInTheDocument();
+    expect(mockedReadWorkspaceSettings).not.toHaveBeenCalled();
+  });
+
+  it('reenables the choose button and leaves workspace state unchanged when the backend picker rejects', async () => {
+    mockedChooseWorkspaceRootFromBackend.mockRejectedValueOnce(new Error('dialog failed'));
+
+    render(<WorktreeSection worktreeIsolation={true} setWorktreeIsolation={vi.fn()} />);
+
+    const chooseButton = screen.getByRole('button', { name: 'settings.chooseWorkspace' });
+    fireEvent.click(chooseButton);
+
+    await waitFor(() => {
+      expect(mockedChooseWorkspaceRootFromBackend).toHaveBeenCalledTimes(1);
+      expect(chooseButton).toBeEnabled();
+    });
+    expect(screen.getByText('settings.noWorkspaceSelected')).toBeInTheDocument();
+    expect(mockedReadWorkspaceSettings).not.toHaveBeenCalled();
+  });
 });
