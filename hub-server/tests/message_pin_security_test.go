@@ -2,7 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -91,11 +90,7 @@ func seedPinSecurityUser(t *testing.T, username, nickname string) testUser {
 		t.Fatalf("seed user %s: %v", username, err)
 	}
 
-	secret := os.Getenv("AGENTHUB_JWT_SECRET")
-	if secret == "" {
-		t.Fatal("AGENTHUB_JWT_SECRET must be set for integration auth")
-	}
-	token, err := jwtutil.GenerateAccessToken(user.ID, "web", testDeviceID(username, "web"), secret, time.Hour)
+	token, err := jwtutil.GenerateAccessToken(user.ID, "web", testDeviceID(username, "web"), testJWT.Secret, testJWT.AccessTTL)
 	if err != nil {
 		t.Fatalf("generate token: %v", err)
 	}
