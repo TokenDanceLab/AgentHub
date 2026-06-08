@@ -91,6 +91,79 @@ function Has-Target($Targets, [string]$Expected) {
 function Assert-Artifact([string]$Root, [string]$Pattern, [string]$Label) {
     $item = Get-ChildItem $Root -Filter $Pattern -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
     Assert-True ($null -ne $item) "$Label artifact exists ($Pattern)"
+    return $item
+}
+
+function Assert-ArtifactMinBytes([System.IO.FileInfo]$Item, [int64]$MinBytes, [string]$Label) {
+    Assert-True ($Item.Length -ge $MinBytes) "$Label artifact is non-empty ($($Item.Length) bytes)"
+}
+
+function Assert-ArtifactManifest {
+    param(
+        [System.IO.FileInfo]$ManifestArtifact,
+        [System.IO.FileInfo[]]$ExpectedArtifacts
+    )
+
+    $manifestJson = Get-Content $ManifestArtifact.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+    $manifest = @()
+    foreach ($entry in $manifestJson) {
+        $manifest += $entry
+    }
+    Assert-True ($manifest.Count -gt 0) "artifact-manifest.json has entries"
+
+    foreach ($artifact in $ExpectedArtifacts) {
+        $entry = $manifest | Where-Object { [string]$_.name -eq $artifact.Name } | Select-Object -First 1
+        Assert-True ($null -ne $entry) "artifact-manifest.json includes $($artifact.Name)"
+
+        $manifestBytes = [int64]$entry.bytes
+        Assert-True ($manifestBytes -eq $artifact.Length) "artifact-manifest.json bytes match $($artifact.Name) ($manifestBytes)"
+
+        $expectedHash = (Get-FileHash $artifact.FullName -Algorithm SHA256).Hash
+        Assert-True ([string]$entry.sha256 -eq $expectedHash) "artifact-manifest.json sha256 matches $($artifact.Name)"
+    }
+
+    Pass "artifact-manifest.json verifies dry artifact hashes and sizes"
+}
+
+function Assert-ZipContains([System.IO.FileInfo]$ZipItem, [string]$EntryName, [string]$Label) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipItem.FullName)
+    try {
+        $entry = $zip.Entries | Where-Object { $_.FullName.Replace("\", "/").EndsWith($EntryName, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+        Assert-True ($null -ne $entry) "$Label portable.zip contains $EntryName"
+    }
+    finally {
+        $zip.Dispose()
+    }
+}
+
+function Assert-UpdaterLatestMetadata {
+    param(
+        [System.IO.FileInfo]$LatestJson,
+        [System.IO.FileInfo]$SetupArtifact,
+        [System.IO.FileInfo]$SignatureArtifact,
+        [string]$ExpectedVersion
+    )
+
+    $latest = Get-Content $LatestJson.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True ($latest.version -eq $ExpectedVersion) "latest.json version matches desktop package version ($ExpectedVersion)"
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$latest.pub_date)) "latest.json includes pub_date"
+    Assert-True ($null -ne $latest.platforms) "latest.json includes platforms metadata"
+
+    $platforms = $latest.platforms.PSObject.Properties
+    $windowsPlatform = $platforms | Where-Object { $_.Name -match "windows" -and $_.Name -match "x86_64" } | Select-Object -First 1
+    Assert-True ($null -ne $windowsPlatform) "latest.json includes windows-x86_64 updater platform metadata"
+
+    $platform = $windowsPlatform.Value
+    $signature = [string]$platform.signature
+    $url = [string]$platform.url
+    Assert-True (-not [string]::IsNullOrWhiteSpace($signature)) "latest.json windows-x86_64 signature is present"
+    Assert-True (-not [string]::IsNullOrWhiteSpace($url)) "latest.json windows-x86_64 URL is present"
+    Assert-True ($url.EndsWith($SetupArtifact.Name, [System.StringComparison]::OrdinalIgnoreCase)) "latest.json windows-x86_64 URL points at setup.exe artifact"
+
+    $signatureText = (Get-Content $SignatureArtifact.FullName -Raw -Encoding UTF8).Trim()
+    Assert-True (-not [string]::IsNullOrWhiteSpace($signatureText)) "updater .sig artifact is non-empty"
+    Assert-True ($signatureText -eq $signature) "updater .sig artifact matches latest.json signature"
 }
 
 function Get-WorkflowJobBlock([string]$WorkflowText, [string]$JobName) {
@@ -308,10 +381,19 @@ if ($RequireBuiltArtifacts) {
     }
 
     $artifactRoot = (Resolve-Path $BuiltArtifactsRoot).Path
-    Assert-Artifact $artifactRoot "*setup.exe" "NSIS setup.exe"
-    Assert-Artifact $artifactRoot "*portable.zip" "Windows portable.zip"
-    Assert-Artifact $artifactRoot "latest.json" "Updater latest.json"
-    Assert-Artifact $artifactRoot "*.sig" "Updater signature .sig"
+    $setupArtifact = Assert-Artifact $artifactRoot "*setup.exe" "NSIS setup.exe"
+    $portableArtifact = Assert-Artifact $artifactRoot "*portable.zip" "Windows portable.zip"
+    $latestJson = Assert-Artifact $artifactRoot "latest.json" "Updater latest.json"
+    $signatureArtifact = Assert-Artifact $artifactRoot "*.sig" "Updater signature .sig"
+    $manifestArtifact = Assert-Artifact $artifactRoot "artifact-manifest.json" "Dry artifact manifest"
+
+    Assert-ArtifactMinBytes $setupArtifact 1 "NSIS setup.exe"
+    Assert-ArtifactMinBytes $portableArtifact 1 "Windows portable.zip"
+    Assert-ArtifactManifest $manifestArtifact @($setupArtifact, $portableArtifact, $latestJson, $signatureArtifact)
+    Assert-ZipContains $portableArtifact "AgentHub.exe" "Windows"
+    Assert-ZipContains $portableArtifact "agenthub-edge.exe" "Windows"
+    Assert-ZipContains $portableArtifact "README.txt" "Windows"
+    Assert-UpdaterLatestMetadata $latestJson $setupArtifact $signatureArtifact $package.version
 }
 
 Write-Host "`nTauri package readiness policy OK" -ForegroundColor Green
