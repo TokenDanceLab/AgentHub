@@ -7,6 +7,8 @@ import {
 } from '../demo/workbenchDemoData';
 import { buildInspectorEvidenceModel } from '../inspector';
 import type { EvidenceRef } from '../transcript';
+import type { Artifact, Preview } from '../types';
+import type { FileDiff } from '../types/chat';
 import {
   OverviewPanel,
   type TaskItem,
@@ -24,6 +26,35 @@ import {
 import styles from './AgentHubWorkbench.module.css';
 
 type InspectorMode = 'overview' | 'browser' | 'files';
+type RuntimeEvidenceSource = 'edge' | 'event' | 'none';
+
+export interface RuntimeEvidenceSnapshot {
+  runId?: string | undefined;
+  diffs: FileDiff[];
+  artifacts: Artifact[];
+  previews: Preview[];
+  loading?: {
+    diff?: boolean | undefined;
+    artifacts?: boolean | undefined;
+    previews?: boolean | undefined;
+  } | undefined;
+  errors?: {
+    diff?: boolean | undefined;
+    artifacts?: boolean | undefined;
+    previews?: boolean | undefined;
+  } | undefined;
+  sources?: {
+    diff?: RuntimeEvidenceSource | undefined;
+    artifacts?: RuntimeEvidenceSource | undefined;
+    previews?: RuntimeEvidenceSource | undefined;
+  } | undefined;
+}
+
+type PreviewFile = FileItem & {
+  content?: string | undefined;
+  diffContent?: string | undefined;
+  owner?: string | undefined;
+};
 
 function TabMark({
   char,
@@ -92,6 +123,7 @@ export interface RightInspectorProps {
   minWidth: number;
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
   reviewFileRequest?: FileItem | null | undefined;
+  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   onResizeBy: (delta: number) => void;
   onResizeStart: (clientX: number) => void;
   width: number;
@@ -107,6 +139,7 @@ export function RightInspector({
   minWidth,
   onOpenPreview,
   reviewFileRequest,
+  runtimeEvidence,
   onResizeBy,
   onResizeStart,
   width,
@@ -114,7 +147,7 @@ export function RightInspector({
   const [activeMode, setActiveMode] = useState<InspectorMode>('overview');
   const [visibleTabs, setVisibleTabs] = useState<Set<InspectorMode>>(() => new Set(defaultVisibleTabs));
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
-  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
 
   const model = buildInspectorEvidenceModel(evidence);
@@ -152,7 +185,10 @@ export function RightInspector({
     setActiveMode('overview');
   }, []);
 
-  const browserPreviewUrl = browserUrl ?? defaultBrowserUrl;
+  const runtimePreviewUrl = runtimeEvidence?.previews.find((preview) => (
+    preview.status === 'ready' && Boolean(preview.url)
+  ))?.url;
+  const browserPreviewUrl = browserUrl ?? runtimePreviewUrl ?? defaultBrowserUrl;
 
   const visibleInspectorTabs = useMemo(() => (
     inspectorTabs.filter((tab) => visibleTabs.has(tab.mode))
@@ -332,23 +368,163 @@ export function RightInspector({
           previewFile ? (
             <FilePreview
               filename={previewFile.name}
+              owner={previewFile.owner}
               language={previewFile.type}
-              content={getDemoFileContent(previewFile)}
-              diffContent={getDemoFileDiff(previewFile)}
+              content={previewFile.content ?? getDemoFileContent(previewFile)}
+              diffContent={previewFile.diffContent ?? getDemoFileDiff(previewFile)}
               onClose={closePreview}
             />
           ) : (
-            <FilesPanel
-              canOpenPreview={canOpenPreview}
-              fallbackFiles={overviewFiles}
-              files={model.files}
-              onFallbackFileClick={handleFileClick}
-              onOpenPreview={onOpenPreview}
-            />
+            runtimeEvidence ? (
+              <RuntimeEvidencePanel
+                runtimeEvidence={runtimeEvidence}
+                onOpenDiff={(file) => {
+                  setPreviewFile(runtimeDiffPreviewFile(file));
+                  setActiveMode('files');
+                }}
+                onOpenPreviewUrl={(url) => {
+                  setVisibleTabs((current) => {
+                    const next = new Set(current);
+                    next.add('browser');
+                    return next;
+                  });
+                  setBrowserUrl(url);
+                  setActiveMode('browser');
+                }}
+              />
+            ) : (
+              <FilesPanel
+                canOpenPreview={canOpenPreview}
+                fallbackFiles={overviewFiles}
+                files={model.files}
+                onFallbackFileClick={handleFileClick}
+                onOpenPreview={onOpenPreview}
+              />
+            )
           )
         )}
       </div>
     </aside>
+  );
+}
+
+function RuntimeEvidencePanel({
+  runtimeEvidence,
+  onOpenDiff,
+  onOpenPreviewUrl,
+}: {
+  runtimeEvidence: RuntimeEvidenceSnapshot;
+  onOpenDiff: (file: FileDiff) => void;
+  onOpenPreviewUrl: (url: string) => void;
+}): React.ReactElement {
+  const loadingMessages = runtimeEvidenceLoadingMessages(runtimeEvidence);
+  const errorMessages = runtimeEvidenceErrorMessages(runtimeEvidence);
+  const hasEvidence = runtimeEvidence.diffs.length > 0
+    || runtimeEvidence.artifacts.length > 0
+    || runtimeEvidence.previews.length > 0;
+
+  return (
+    <div className={styles.runtimeEvidence}>
+      <div className={styles.runtimeEvidenceHead}>
+        <strong>运行证据</strong>
+        <span>{runtimeEvidence.runId ? `Run ${runtimeEvidence.runId}` : '当前 Run'}</span>
+      </div>
+
+      {(loadingMessages.length > 0 || errorMessages.length > 0) && (
+        <ul className={styles.runtimeEvidenceStateList} aria-label="Runtime evidence state">
+          {loadingMessages.map((message) => (
+            <li key={message} className={styles.runtimeEvidenceState} data-state="loading">{message}</li>
+          ))}
+          {errorMessages.map((message) => (
+            <li key={message} className={styles.runtimeEvidenceState} data-state="error">{message}</li>
+          ))}
+        </ul>
+      )}
+
+      {!hasEvidence && loadingMessages.length === 0 && errorMessages.length === 0 && (
+        <div className={styles.browserPreviewCard}>
+          <DesignNavIcon className={styles.browserPreviewIcon} name="overview" size={24} />
+          <strong>暂无运行证据</strong>
+          <span>Edge 已返回空 diff、artifact 和 preview snapshot。</span>
+        </div>
+      )}
+
+      {runtimeEvidence.diffs.length > 0 && (
+        <RuntimeEvidenceSection title="Diff snapshot">
+          {runtimeEvidence.diffs.map((file) => (
+            <li key={`diff-${file.filePath}`}>
+              <button
+                aria-label={`打开 diff ${file.filePath}`}
+                className={styles.fileRow}
+                onClick={() => onOpenDiff(file)}
+                type="button"
+              >
+                <DesignFileIcon className={styles.fileIcon} name={file.filePath} />
+                <span className={styles.fileName}>{file.filePath}</span>
+                <span className={styles.fileMeta}>{diffMeta(file)}</span>
+              </button>
+            </li>
+          ))}
+        </RuntimeEvidenceSection>
+      )}
+
+      {runtimeEvidence.artifacts.length > 0 && (
+        <RuntimeEvidenceSection title="Artifacts">
+          {runtimeEvidence.artifacts.map((artifact) => (
+            <li key={artifact.id}>
+              <div
+                aria-label={`产物 metadata ${artifact.path}`}
+                className={`${styles.fileRow} ${styles.readonlyEvidenceRow}`}
+              >
+                <DesignFileIcon className={styles.fileIcon} name={artifact.path} />
+                <span className={styles.fileName}>{artifact.path}</span>
+                <span className={styles.fileMeta}>{artifact.kind}</span>
+              </div>
+            </li>
+          ))}
+        </RuntimeEvidenceSection>
+      )}
+
+      {runtimeEvidence.previews.length > 0 && (
+        <RuntimeEvidenceSection title="Previews">
+          {runtimeEvidence.previews.map((preview) => {
+            const canOpen = Boolean(preview.url);
+            return (
+              <li key={preview.id}>
+                <button
+                  aria-label={`打开预览 ${preview.id}`}
+                  className={styles.fileRow}
+                  disabled={!canOpen}
+                  onClick={() => {
+                    if (preview.url) onOpenPreviewUrl(preview.url);
+                  }}
+                  type="button"
+                >
+                  <DesignFileIcon className={styles.fileIcon} name={preview.url ?? preview.id} type="link" />
+                  <span className={styles.fileName}>{preview.url ?? preview.id}</span>
+                  <span className={styles.fileMeta}>{preview.status}</span>
+                </button>
+              </li>
+            );
+          })}
+        </RuntimeEvidenceSection>
+      )}
+    </div>
+  );
+}
+
+function RuntimeEvidenceSection({
+  children,
+  title,
+}: {
+  children: React.ReactNode;
+  title: string;
+}): React.ReactElement {
+  return (
+    <section className={styles.runtimeEvidenceSection}>
+      <div className={styles.runtimeEvidenceSectionTitle}>{title}</div>
+      <ul className={styles.fileList}>{children}</ul>
+    </section>
   );
 }
 
@@ -493,6 +669,56 @@ function canOpenEvidence(
   canOpenPreview: ((evidence: EvidenceRef) => boolean) | undefined,
 ): boolean {
   return Boolean(onOpenPreview) && (canOpenPreview?.(evidence) ?? true);
+}
+
+function runtimeEvidenceLoadingMessages(runtimeEvidence: RuntimeEvidenceSnapshot): string[] {
+  const messages: string[] = [];
+  if (runtimeEvidence.loading?.diff) messages.push('正在读取 diff snapshot');
+  if (runtimeEvidence.loading?.artifacts) messages.push('正在读取 artifact index');
+  if (runtimeEvidence.loading?.previews) messages.push('正在读取 preview index');
+  return messages;
+}
+
+function runtimeEvidenceErrorMessages(runtimeEvidence: RuntimeEvidenceSnapshot): string[] {
+  const messages: string[] = [];
+  if (runtimeEvidence.errors?.diff) messages.push('Diff snapshot 读取失败');
+  if (runtimeEvidence.errors?.artifacts) messages.push('Artifact index 读取失败');
+  if (runtimeEvidence.errors?.previews) messages.push('Preview index 读取失败');
+  return messages;
+}
+
+function runtimeDiffPreviewFile(file: FileDiff): PreviewFile {
+  return {
+    name: file.filePath,
+    type: file.status,
+    owner: 'Edge evidence',
+    content: [
+      `Read-only runtime diff evidence for ${file.filePath}.`,
+      'Artifact content/apply/discard are not available in this inspector slice.',
+    ].join('\n'),
+    diffContent: fileDiffToText(file),
+  };
+}
+
+function fileDiffToText(file: FileDiff): string {
+  const chunks = [`diff --git a/${file.filePath} b/${file.filePath}`];
+  for (const hunk of file.hunks) {
+    chunks.push(hunk.header);
+    for (const line of hunk.lines) {
+      chunks.push(`${diffLinePrefix(line.type)}${line.content}`);
+    }
+  }
+  return chunks.join('\n');
+}
+
+function diffLinePrefix(type: FileDiff['hunks'][number]['lines'][number]['type']): string {
+  if (type === 'added') return '+';
+  if (type === 'deleted') return '-';
+  return ' ';
+}
+
+function diffMeta(file: FileDiff): string {
+  return `+${file.additions} -${file.deletions}`;
 }
 
 function inspectorTabLabel(mode: InspectorMode): string {

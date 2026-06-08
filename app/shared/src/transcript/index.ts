@@ -1,4 +1,4 @@
-export { collectTranscriptEvidence } from './transcriptEvidence';
+export { collectTranscriptEvidence, rawRunIdFromEvidenceId, resolveCurrentTranscriptRunId } from './transcriptEvidence';
 export { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents';
 export { normalizeHubMessagesToTranscript } from './normalizeHubMessages';
 export { hubRuntimeEventFromPayload, normalizeHubRuntimeEventsToTranscript } from './normalizeHubRuntimeEvents';

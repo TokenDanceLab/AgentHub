@@ -22,7 +22,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、ExecutionTarget contract、Edge pins/store/event contracts、Edge SQLite opt-in + relational migration、TeamRun fixture/dry evidence gate、Artifact/Diff/Preview read-only Edge 前置 |
 | 当前短切片 | `codex/runtime-evidence-writer`：runtime/lifecycle 最小写入 `run.agent.file_change` diff、`artifact.created` artifact metadata、`preview.ready` preview metadata evidence |
 | 仍未完成 | Desktop target preference/Tauri host 集成、登录端到端、Tauri 正式签名发布与 macOS 打包、TeamRun 真实演示、Artifact/Diff/Preview preview lifecycle 与 artifact content/apply/discard 生产化、Projects mutation UI、D1b/D2/D3 gate |
-| 当前候选切片 | `codex/desktop-target-tauri-host`：Desktop-owned Local Edge target preference 与 Tauri host readiness，待 rebase/verify/merge |
+| 当前候选切片 | `codex/desktop-target-tauri-host`：Desktop-owned Local Edge target preference 与 Tauri host readiness，待 rebase/verify/merge；`codex/runtime-evidence-inspector`：shared RightInspector read-only 消费 Edge runtime evidence snapshot，已 rebase 到 `9bf674f0` 后补 review blocker 修复，并通过 focused gate 复验，待 review/merge |
 | 外部依赖 | 后端旧整合线合并由 backend merge Agent 负责；本路线图只记录其状态和对后续切片的影响，不接管合并 |
 
 ## P0 执行顺序
@@ -81,5 +81,5 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
    - `codex/packaged-login-e2e` 已补 packaged Desktop loopback/keyring readiness 的 local/static gate，不连接真实 TokenDanceID、不打开真实登录窗口；真实 packaged E2E 仍需单独 proposal/gate。
 3. Desktop Edge mapper 首切片已合入：已接入 Edge agents/model catalog/Local Edge target mapper，并在 review 修正 StartRunRequest adapter id 映射、移除 provider 提交字段、阻断 Desktop live 空线程/demo transcript fallback；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge target preference、Tauri host readiness command 和 sidecar launch args 测试，安装包联调后置。
 4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness。
-5. 当前 Artifact/Diff/Preview 片只接 runtime evidence 写入，不碰 preview start/stop、artifact apply/discard/content、Hub/Web/Desktop 或真实 CLI/model。
+5. `codex/runtime-evidence-inspector` 已补 shared RightInspector read-only snapshot 消费和 Desktop 既有 Edge evidence hook 接线，并修复 raw run id 选择、Desktop App v4 测试 harness、artifact metadata 非交互行与 preview 切 tab 行为；不碰 preview start/stop、artifact apply/discard/content、Web 直连 Edge、Hub route 或真实 CLI/model。
 6. TeamRun 下一步从 dry fixture evidence 升级到真实 runtime/UI 证据，但仍不跑未批准的 D3 real CLI/model gate。
