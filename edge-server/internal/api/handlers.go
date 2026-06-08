@@ -655,6 +655,28 @@ func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID s
 	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
 }
 
+func (h *Handler) PostPreviewStop(w http.ResponseWriter, r *http.Request, previewID string) {
+	previewID = strings.TrimSpace(previewID)
+	if previewID == "" || strings.Contains(previewID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	repository := ensureStore(h)
+	preview, ok := repository.GetPreview(previewID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	preview.Status = "stopped"
+	preview.URL = ""
+	stopped, err := repository.UpsertPreview(preview)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	writeSuccess(w, http.StatusAccepted, stopped)
+}
+
 func runDiffFilesResponse(files []store.RunDiffFile) []map[string]any {
 	out := make([]map[string]any, 0, len(files))
 	for _, file := range files {
@@ -1501,9 +1523,17 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
 	mux.HandleFunc("/v1/previews/", func(w http.ResponseWriter, r *http.Request) {
+		previewPath := strings.TrimPrefix(r.URL.Path, "/v1/previews/")
+		if strings.HasSuffix(previewPath, ":stop") {
+			if r.Method == http.MethodPost {
+				h.PostPreviewStop(w, r, strings.TrimSuffix(previewPath, ":stop"))
+				return
+			}
+			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			return
+		}
 		if r.Method == http.MethodGet {
-			previewID := strings.TrimPrefix(r.URL.Path, "/v1/previews/")
-			h.GetPreview(w, r, previewID)
+			h.GetPreview(w, r, previewPath)
 			return
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))

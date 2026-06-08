@@ -57,7 +57,7 @@ paths:
   #   /v1/runs/{runId} (GET), /v1/runs/{runId}:cancel,
   #   /v1/runs/{runId}/diff (GET), /v1/artifacts (GET),
   #   /v1/artifacts/{artifactId} (GET), /v1/previews (GET),
-  #   /v1/previews/{previewId} (GET),
+  #   /v1/previews/{previewId} (GET), /v1/previews/{previewId}:stop,
   #   /v1/metrics, /v1/agent-instances (GET only), /v1/agent-instances/{id},
   #   /v1/permissions/decide
   #
@@ -80,7 +80,7 @@ paths:
   #   GET /v1/runs/{runId}/logs,
   #   GET/POST /v1/approvals and nested,
   #   POST /v1/artifacts and nested content/apply/discard,
-  #   POST /v1/previews and nested stop lifecycle,
+  #   POST /v1/previews and preview runner/process management,
   #   GET /v1/workspaces/{workspaceId} and nested,
   #   POST /v1/agent-instances
   # ═══════════════════════════════════════════════════════════
@@ -907,7 +907,7 @@ paths:
       tags: [ExecutionRunner]
       operationId: listPreviews
       summary: List previews.
-      description: Read-only Edge-local preview index. Starting and stopping previews remain planned.
+      description: Read-only Edge-local preview index. Starting previews remains planned; stopped previews are retained as terminal metadata.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
@@ -941,7 +941,7 @@ paths:
       tags: [ExecutionRunner]
       operationId: getPreview
       summary: Get preview.
-      description: Read-only Edge-local preview metadata lookup. Starting and stopping previews remain planned.
+      description: Read-only Edge-local preview metadata lookup. Starting previews remains planned; stopped previews are retained as terminal metadata.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
@@ -957,8 +957,9 @@ paths:
       operationId: stopPreview
       summary: Stop preview.
       x-agenthub-phase: P1
-      x-agenthub-status: planned
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      description: Contract-only local metadata transition. This marks an existing Edge preview as stopped and clears the ready URL; it does not stop an OS process or browser.
       parameters:
         - $ref: "#/components/parameters/PreviewId"
       responses:

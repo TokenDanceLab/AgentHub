@@ -264,6 +264,9 @@ func TestRuntimeEvidenceEmitterPersistsArtifactDiffPreviewEvidence(t *testing.T)
 		"url":    "http://127.0.0.1:4173",
 		"status": "ready",
 	})
+	emitter.Emit("preview.stopped", nil, map[string]any{
+		"id": "preview_1",
+	})
 
 	diffFiles := s.ListRunDiffFiles(run.ID)
 	if len(diffFiles) != 1 || diffFiles[0].Path != "src/app.ts" || diffFiles[0].Diff == "" || diffFiles[0].Status != "modified" {
@@ -274,10 +277,10 @@ func TestRuntimeEvidenceEmitterPersistsArtifactDiffPreviewEvidence(t *testing.T)
 		t.Fatalf("ListArtifacts = %#v, want persisted runtime artifact evidence", artifacts)
 	}
 	previews := s.ListPreviews(run.ID)
-	if len(previews) != 1 || previews[0].ID != "preview_1" || previews[0].URL != "http://127.0.0.1:4173" || previews[0].Status != "ready" {
+	if len(previews) != 1 || previews[0].ID != "preview_1" || previews[0].URL != "" || previews[0].Status != "stopped" {
 		t.Fatalf("ListPreviews = %#v, want persisted runtime preview evidence", previews)
 	}
-	if len(inner.events) != 3 {
+	if len(inner.events) != 4 {
 		t.Fatalf("inner events = %#v, want all runtime evidence events passed through", inner.events)
 	}
 }
