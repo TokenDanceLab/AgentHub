@@ -8,6 +8,7 @@ ENV_FILE="$SCRIPT_DIR/.env.production"
 BACKUP_DIR="$SCRIPT_DIR/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 HUB_IMAGE="${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub:latest}"
+COMPOSE_CMD=()
 
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -16,11 +17,33 @@ log()  { echo -e "${GREEN}[$(date +%H:%M:%S)]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 err()  { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
+select_compose_cmd() {
+    command -v docker >/dev/null 2>&1 || err "Docker not installed"
+    if docker compose version >/dev/null 2>&1; then
+        COMPOSE_CMD=(docker compose)
+        return
+    fi
+    if command -v docker-compose >/dev/null 2>&1; then
+        COMPOSE_CMD=(docker-compose)
+        return
+    fi
+    err "Docker Compose not installed. Install the Docker Compose plugin ('docker compose') or standalone 'docker-compose'."
+}
+
+compose() {
+    if [ ${#COMPOSE_CMD[@]} -eq 0 ]; then
+        select_compose_cmd
+    fi
+    if [ -n "${AGENTHUB_HUB_IMAGE+x}" ]; then
+        export AGENTHUB_HUB_IMAGE
+    fi
+    "${COMPOSE_CMD[@]}" "$@"
+}
+
 # Pre-flight checks
 check_prereqs() {
     log "Running pre-flight checks..."
-    command -v docker >/dev/null 2>&1 || err "Docker not installed"
-    command -v docker compose >/dev/null 2>&1 || err "Docker Compose not installed"
+    select_compose_cmd
     [ -f "$ENV_FILE" ] || err ".env.production not found at $ENV_FILE. Run: bash $PROJECT_DIR/scripts/generate-secrets.sh"
     set -a
     # shellcheck disable=SC1090
@@ -33,10 +56,10 @@ check_prereqs() {
 
 # Backup current state
 backup_current() {
-    if docker compose -f "$COMPOSE_FILE" ps --format '{{.Name}}' 2>/dev/null | grep -q agenthub; then
+    if compose -f "$COMPOSE_FILE" ps --format '{{.Name}}' 2>/dev/null | grep -q agenthub; then
         log "Backing up current state..."
         mkdir -p "$BACKUP_DIR"
-        docker compose -f "$COMPOSE_FILE" ps > "$BACKUP_DIR/ps_$TIMESTAMP.txt" 2>/dev/null || true
+        compose -f "$COMPOSE_FILE" ps > "$BACKUP_DIR/ps_$TIMESTAMP.txt" 2>/dev/null || true
         log "Backup saved to $BACKUP_DIR/ps_$TIMESTAMP.txt"
     fi
 }
@@ -47,7 +70,7 @@ deploy() {
     cd "$PROJECT_DIR"
 
     # Start/update services
-    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --force-recreate --remove-orphans hub-server
+    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --force-recreate --remove-orphans hub-server
 
     log "Deploy completed"
 }
@@ -101,7 +124,7 @@ cleanup() {
 rollback() {
     log "Rolling back to $HUB_IMAGE..."
     cd "$PROJECT_DIR"
-    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --force-recreate --remove-orphans hub-server
+    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --force-recreate --remove-orphans hub-server
     health_check
     verify_public_api
 }
@@ -126,7 +149,7 @@ case "${1:-deploy}" in
         health_check
         ;;
     logs)
-        docker compose -f "$COMPOSE_FILE" logs -f --tail=100
+        compose -f "$COMPOSE_FILE" logs -f --tail=100
         ;;
     *)
         echo "Usage: $0 {deploy|rollback|health|logs}"
