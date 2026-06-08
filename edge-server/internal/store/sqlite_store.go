@@ -1,7 +1,9 @@
 package store
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -338,7 +340,9 @@ func sqliteArtifactMetadataJSON(artifact Artifact) (string, error) {
 }
 
 func sqliteDiffProjectionID(file RunDiffFile) string {
-	return file.RunID + ":" + file.Path
+	payload, _ := json.Marshal([2]string{file.RunID, file.Path})
+	sum := sha256.Sum256(payload)
+	return "run_diff:" + hex.EncodeToString(sum[:])
 }
 
 func sqliteDiffSummaryJSON(file RunDiffFile) (string, error) {
