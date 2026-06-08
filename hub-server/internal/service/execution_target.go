@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -70,6 +71,97 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 		return nil, err
 	}
 	return req, nil
+}
+
+func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *model.Device) (*model.ExecutionTarget, error) {
+	if device == nil || strings.TrimSpace(device.ID) == "" || strings.TrimSpace(device.UserID) == "" || device.DeviceType != "desktop" {
+		return nil, errcode.ErrBadRequest
+	}
+
+	var conflicting model.ExecutionTarget
+	err := s.db.WithContext(ctx).
+		Where("device_id = ? AND target_type = ? AND owner_id <> ? AND deleted_at IS NULL", device.ID, "local_edge", device.UserID).
+		First(&conflicting).Error
+	if err == nil {
+		return nil, errcode.AuthDeviceMismatch
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	now := time.Now()
+	capabilities, metadata := desktopDeviceTargetFields(device)
+	name := desktopDeviceTargetName(device.ID)
+
+	var target model.ExecutionTarget
+	err = s.db.WithContext(ctx).
+		Where("owner_id = ? AND device_id = ? AND target_type = ? AND deleted_at IS NULL", device.UserID, device.ID, "local_edge").
+		Order("id ASC").
+		First(&target).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		target = model.ExecutionTarget{
+			OwnerID:            device.UserID,
+			DeviceID:           &device.ID,
+			Name:               name,
+			TargetType:         "local_edge",
+			WorkspaceAllowlist: "[]",
+			TrustLevel:         "local",
+			HealthState:        "healthy",
+			IsOnline:           true,
+			LastSeenAt:         &now,
+			Capabilities:       capabilities,
+			Metadata:           metadata,
+		}
+		if err := repository.CreateExecutionTarget(s.db.WithContext(ctx), &target); err != nil {
+			return nil, err
+		}
+		return &target, nil
+	}
+
+	target.Name = name
+	target.DeviceID = &device.ID
+	target.TargetType = "local_edge"
+	target.WorkspaceAllowlist = "[]"
+	target.TrustLevel = "local"
+	target.HealthState = "healthy"
+	target.IsOnline = true
+	target.LastSeenAt = &now
+	target.Capabilities = capabilities
+	target.Metadata = metadata
+	if err := repository.UpdateExecutionTarget(s.db.WithContext(ctx), &target); err != nil {
+		return nil, err
+	}
+	return &target, nil
+}
+
+func desktopDeviceTargetName(deviceID string) string {
+	shortID := strings.TrimSpace(deviceID)
+	if len(shortID) > 8 {
+		shortID = shortID[:8]
+	}
+	if shortID == "" {
+		return "Desktop Local Edge"
+	}
+	return "Desktop Local Edge " + shortID
+}
+
+func desktopDeviceTargetFields(device *model.Device) (string, string) {
+	var deviceCapabilities []string
+	if strings.TrimSpace(device.Capabilities) != "" {
+		_ = json.Unmarshal([]byte(device.Capabilities), &deviceCapabilities)
+	}
+	capabilities, _ := json.Marshal(map[string][]string{
+		"device_capabilities": deviceCapabilities,
+	})
+	metadata, _ := json.Marshal(map[string]string{
+		"source":      "desktop_device_registration",
+		"device_type": device.DeviceType,
+		"app_version": device.AppVersion,
+	})
+	return string(capabilities), string(metadata)
 }
 
 func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error) {
