@@ -309,11 +309,11 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `session.created` | 会话创建 (defined, not yet emitted)，payload: `{ session_id, type, name, owner_id, members[] }` |
-| `session.dissolved` | 群解散 (defined, not yet emitted)，payload: `{ session_id }` |
-| `session.member_joined` | 成员加入 (defined, not yet emitted)，payload: `{ session_id, member_id, member_type }` |
-| `session.member_left` | 成员离开 (defined, not yet emitted)，payload: `{ session_id, member_id }` |
-| `session.info_updated` | 会话信息变更 (defined, not yet emitted)，payload: `{ session_id, changes{} }` |
+| `session.created` | 会话创建 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, type, name, owner_id, members[] }` |
+| `session.dissolved` | 群解散 (service-emitted; WS subscription wiring pending)，payload: `{ session_id }` |
+| `session.member_joined` | 成员加入 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, member_id, member_type }` |
+| `session.member_left` | 成员离开 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, member_id }` |
+| `session.info_updated` | 会话信息变更 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, changes{} }` |
 
 #### Device 事件（Hub→Client）
 
@@ -345,8 +345,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `friend.request` | 收到好友请求，payload: `{ request_id, from_user_id, message }` |
-| `friend.accepted` | 好友请求被接受，payload: `{ friendship_id, user_id }` |
+| `friend.request` | 收到好友请求 (service-emitted; WS subscription wiring pending)，payload: `{ request_id, from_user_id, message }` |
+| `friend.accepted` | 好友请求被接受 (service-emitted; WS subscription wiring pending)，payload: `{ friendship_id, user_id }` |
 
 ### 7.4 代码示例
 
