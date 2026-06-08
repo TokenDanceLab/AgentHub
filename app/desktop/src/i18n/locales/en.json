@@ -1053,6 +1053,7 @@
   "settings.environmentNodeDesc": "Used for frontend development, tests, and builds.",
   "settings.environmentTauriDesc": "Desktop shell and local capability bridge.",
   "settings.defaultWorkspace": "Default workspace",
+  "settings.chooseWorkspace": "Choose workspace",
   "settings.worktreePolicy": "Worktree policy",
   "settings.worktreeDesc": "Manage isolated development directories and the default workspace location.",
   "settings.worktreeIsolation": "Isolate worktrees by default",
