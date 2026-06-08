@@ -29,6 +29,7 @@ import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData } from './Work
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
 import type { AgentConfig } from './pages';
+import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
@@ -79,6 +80,8 @@ export interface AgentHubWorkbenchProps {
   agents?: WorkbenchAgent[];
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
+  projects?: ProjectInfo[] | undefined;
+  projectsStatus?: { loading?: boolean | undefined; error?: string | undefined } | undefined;
   activeConversationId?: string;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
@@ -94,6 +97,8 @@ export function AgentHubWorkbench({
   agents,
   agentProfilesStatus,
   contacts,
+  projects,
+  projectsStatus,
   activeConversationId,
   onActiveConversationChange,
   onAgentCreate,
@@ -988,6 +993,8 @@ export function AgentHubWorkbench({
               agentProfilesStatus={agentProfilesStatus}
               contacts={contacts}
               focusedAgentId={focusedAgentId}
+              projects={projects}
+              projectsStatus={projectsStatus}
               onAgentCreate={onAgentCreate}
               onAgentUpdate={onAgentUpdate}
               onAgentDelete={onAgentDelete}

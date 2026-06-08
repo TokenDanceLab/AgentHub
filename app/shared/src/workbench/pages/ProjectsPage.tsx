@@ -69,6 +69,10 @@ export type ProjectTab = 'overview' | 'runs' | 'artifacts' | 'archive' | 'settin
 export interface ProjectsPageProps {
   /** Full list of projects (shown in left nav) */
   projects: ProjectInfo[];
+  /** True while the owning app is loading project data. */
+  projectsLoading?: boolean | undefined;
+  /** Error message from the owning app when project data fails to load. */
+  projectsError?: string | undefined;
   /** Currently selected project id */
   activeProjectId: string | null;
   /** Called when user clicks a project in the nav */
@@ -858,6 +862,8 @@ function ProjectDetail({
 
 export function ProjectsPage({
   projects,
+  projectsLoading,
+  projectsError,
   activeProjectId,
   onProjectSelect,
   searchQuery = '',
@@ -897,6 +903,12 @@ export function ProjectsPage({
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
         <div className={styles.navCaption}>项目空间</div>
+        {projectsLoading ? (
+          <div className={styles.navCaption} role="status">项目加载中</div>
+        ) : null}
+        {projectsError ? (
+          <div className={styles.navCaption} role="alert">{projectsError}</div>
+        ) : null}
         {projects.map((project) => (
           <ProjectNavRow
             key={project.id}
@@ -942,7 +954,7 @@ export function ProjectsPage({
           <div className={`${styles.detailHead} workbench-head`}>
             <div>
               <h1>暂无项目</h1>
-              <p>创建第一个项目以开始协作。</p>
+              <p>{projectsError || '创建第一个项目以开始协作。'}</p>
             </div>
             <div className={styles.headActions}>
               <span className={styles.statusBadge}>空项目</span>

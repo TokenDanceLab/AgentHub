@@ -106,6 +106,8 @@ function WebWorkbenchRoot() {
       }}
       contacts={workbench.contacts}
       conversations={workbench.conversations}
+      projects={workbench.projects}
+      projectsStatus={workbench.projectsStatus}
       onActiveConversationChange={setSelectedConversationId}
       onAgentCreate={handleAgentCreate}
       onAgentUpdate={handleAgentUpdate}
