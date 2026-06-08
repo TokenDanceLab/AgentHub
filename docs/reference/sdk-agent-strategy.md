@@ -1,8 +1,8 @@
 # AgentHub SDK Agent Strategy
 
-> Date: 2026-06-08
+> Date: 2026-06-09
 > Scope: Product and architecture strategy for using external agent SDKs without replacing AgentHub's own product model.
-> Status: docs + contract-schema draft. This slice may define fixture examples and OpenAPI component-only draft schemas, but it does not change endpoint request/response behavior, code, adapters, runtime behavior, SDK installation, or real model execution gates.
+> Status: strategy + fixture-mapper evidence. Current SDK work may define fixture examples, OpenAPI component-only draft schemas, and Edge adapter fixture/golden tests, but it does not change endpoint request/response behavior, adapter registration, runtime execution behavior, SDK installation, or real model execution gates.
 
 ## Decision
 
@@ -237,10 +237,17 @@ Non-goals:
 
 Owner scope: future Edge adapter test slice.
 
+Current slice:
+
+- `edge-server/internal/adapters/sdk_fixture_mapper.go` defines a fixture-only mapper and does not implement or register an `AgentAdapter`.
+- Claude SDK-like and OpenAI Agents SDK-like JSON fixtures live under `edge-server/internal/adapters/testdata/sdk_fixture_mapper/`.
+- Golden tests project provider-like fixture events into existing AgentHub event types: `run.agent.tool_call`, `run.agent.permission_requested`, `run.agent.route_decision`, `run.agent.file_change`, `artifact.created`, and `run.agent.result`.
+- Mapper output strips common secret/token fields and normalizes file/artifact paths to workspace-relative or basename-only values before emitting payloads.
+
 Deliverables:
 
 - Add golden fixture events that simulate Claude SDK and OpenAI Agents SDK tool, handoff, permission, result, and trace outputs.
-- Map fixtures into existing AgentHub runtime event types such as `run.agent.file_change`, `approval.requested`, `run.agent.route_decision`, `artifact.created`, and result events.
+- Map fixtures into existing AgentHub runtime event types such as `run.agent.file_change`, `run.agent.permission_requested`, `run.agent.route_decision`, `artifact.created`, and result events.
 - Verify redaction and workspace-relative path policy.
 
 Acceptance:
