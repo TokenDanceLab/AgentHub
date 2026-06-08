@@ -232,6 +232,51 @@ func TestStartEventSubscriptionsPushesAgentStreamToSession(t *testing.T) {
 	}
 }
 
+func TestStartEventSubscriptionsSkipsAgentMessageNewPush(t *testing.T) {
+	mgr := ws.NewManager()
+	mgr.ResolveMembers = func(sessionID string) []string {
+		if sessionID == "sess-1" {
+			return []string{"user-1"}
+		}
+		return nil
+	}
+
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{mgr: mgr, bus: bus}
+	a.startEventSubscriptions(context.Background())
+
+	bus.Publish(context.Background(), service.Event{
+		Type: "message.new",
+		Payload: &model.Message{
+			ID:          "msg-agent-1",
+			SessionID:   "sess-1",
+			SeqID:       1,
+			SenderType:  model.SenderTypeAgent,
+			SenderID:    "agent-1",
+			ContentType: model.ContentTypeText,
+			Content:     `{"text":"done"}`,
+		},
+	})
+	require.Eventually(t, func() bool {
+		return bus.Pending() == 0
+	}, time.Second, 10*time.Millisecond)
+
+	select {
+	case data := <-conn.Send:
+		t.Fatalf("agent message.new frame should not be pushed to session, got %s", string(data))
+	default:
+	}
+}
+
 func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
