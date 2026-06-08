@@ -296,6 +296,13 @@
   box-shadow: none;
 }
 
+.newProjectBtn:disabled,
+.editorCancelBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  box-shadow: none;
+}
+
 .navNewProjectBtn {
   height: 30px;
   padding: 0 10px;
@@ -303,6 +310,77 @@
   border-radius: var(--r-sm);
   background: var(--surface);
   font-size: 0.75rem;
+}
+
+.projectEditor {
+  max-width: 1180px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
+  display: grid;
+  gap: 10px;
+}
+
+.editorGrid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.68fr) minmax(220px, 1fr);
+  gap: 10px;
+}
+
+.editorField {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--text-2);
+  font: 600 0.75rem var(--font-sans);
+}
+
+.editorField input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font: 400 0.875rem var(--font-sans);
+  outline: none;
+}
+
+.editorField input:focus {
+  border-color: var(--bdr-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.editorError {
+  min-height: 30px;
+  padding: 7px 9px;
+  border: 1px solid var(--state-error, var(--danger));
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 88%, var(--state-error, var(--danger)) 12%);
+  color: var(--state-error, var(--danger));
+  font: 600 0.75rem var(--font-sans);
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.editorCancelBtn {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 500 0.875rem var(--font-sans);
+  cursor: pointer;
+  font-family: inherit;
 }
 
 /* ── Tabs ── */
