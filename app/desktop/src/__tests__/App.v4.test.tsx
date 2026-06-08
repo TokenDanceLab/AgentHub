@@ -3,12 +3,27 @@ import type { EventEnvelope } from '@shared/events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { createEventStream } from '@/api/eventClient';
+import { createHubClient } from '@/api/hubClient';
 import { useAgentList } from '@/api/agentQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
+import { getAccessToken, useAuth } from '@/hooks/useAuth';
+import { useHealth } from '@/hooks/useHealth';
+import { useHubEventStream } from '@/hooks/useHubEventStream';
+import { useHubIntegration } from '@/hooks/useHubIntegration';
+
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: () => null,
+  Codex: () => null,
+  ModelIcon: () => null,
+  OpenCode: () => null,
+}));
+
+vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 vi.mock('@/api/eventClient', () => ({
   createEventStream: vi.fn(),
@@ -36,8 +51,44 @@ vi.mock('@/api/runQueries', () => ({
   useCreateRun: vi.fn(),
 }));
 
+vi.mock('@/api/hubClient', () => ({
+  createHubClient: vi.fn(),
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  getAccessToken: vi.fn(() => 'hub-token'),
+  useAuth: vi.fn(),
+}));
+
+vi.mock('@/hooks/useHealth', () => ({
+  useHealth: vi.fn(),
+}));
+
+vi.mock('@/hooks/useHubEventStream', () => ({
+  useHubEventStream: vi.fn(),
+}));
+
+vi.mock('@/hooks/useHubIntegration', () => ({
+  useHubIntegration: vi.fn(),
+}));
+
 const eventHandlers: EventHandler[] = [];
 const createRunMutateAsync = vi.fn();
+const tryAutoLogin = vi.fn();
+const refetchHealth = vi.fn();
+const mockHubClient = { ackTask: vi.fn() };
+const mockHubWS = {
+  on: vi.fn(() => vi.fn()),
+  onAny: vi.fn(() => vi.fn()),
+  onStatus: vi.fn(() => vi.fn()),
+  send: vi.fn(),
+  sendTyping: vi.fn(),
+  close: vi.fn(),
+  reconnect: vi.fn(),
+  connect: vi.fn(),
+  getStatus: vi.fn(() => 'connected'),
+  isAuthenticated: vi.fn(() => true),
+};
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
@@ -46,6 +97,11 @@ const mockedUseModelCatalog = vi.mocked(useModelCatalog);
 const mockedUseRunEvidence = vi.mocked(useRunEvidence);
 const mockedCreateEventStream = vi.mocked(createEventStream);
 const mockedUseCreateRun = vi.mocked(useCreateRun);
+const mockedCreateHubClient = vi.mocked(createHubClient);
+const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseHealth = vi.mocked(useHealth);
+const mockedUseHubEventStream = vi.mocked(useHubEventStream);
+const mockedUseHubIntegration = vi.mocked(useHubIntegration);
 
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
@@ -56,6 +112,44 @@ describe('Desktop App v4 root', () => {
     });
     eventHandlers.length = 0;
     mockedCreateEventStream.mockReturnValue(createMockEventStream());
+    mockedUseHealth.mockReturnValue({
+      online: true,
+      health: {
+        status: 'ok',
+        version: 'test',
+      },
+      refetch: refetchHealth,
+    } as ReturnType<typeof useHealth>);
+    mockedUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      token: 'hub-token',
+      user: null,
+      loading: false,
+      error: null,
+      loginWithTokenDance: vi.fn(),
+      logout: vi.fn(),
+      tryAutoLogin,
+    } as ReturnType<typeof useAuth>);
+    mockedUseHubEventStream.mockReturnValue({
+      hubWS: mockHubWS,
+      status: 'connected',
+      lastFrame: null,
+      lastMessage: null,
+      lastNotification: null,
+      lastAgentTask: null,
+      onlineUsers: [],
+      sendTyping: vi.fn(),
+      onFrame: vi.fn(() => vi.fn()),
+      on: vi.fn(() => vi.fn()),
+      reconnect: vi.fn(),
+    } as ReturnType<typeof useHubEventStream>);
+    mockedCreateHubClient.mockReturnValue(mockHubClient as ReturnType<typeof createHubClient>);
+    mockedUseHubIntegration.mockReturnValue({
+      tasks: [],
+      activeTaskCount: 0,
+      getTaskByRunId: vi.fn(),
+      getRunByTaskId: vi.fn(),
+    });
     createRunMutateAsync.mockResolvedValue({
       runId: 'run-created',
       projectId: 'project-1',
@@ -120,6 +214,20 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'AgentHub' })).toBeInTheDocument();
     expect(screen.getByLabelText('Composer input')).toHaveAttribute('placeholder', '发消息给 AgentHub');
+  });
+
+  it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockedUseHubIntegration).toHaveBeenCalledWith({
+        hubWS: mockHubWS,
+        hubClient: mockHubClient,
+      });
+    });
+    expect(mockedUseHubEventStream).toHaveBeenCalledWith(getAccessToken);
+    expect(mockedCreateHubClient).toHaveBeenCalledWith({ getToken: getAccessToken });
+    expect(tryAutoLogin).not.toHaveBeenCalled();
   });
 
   it('uses Edge thread data when Desktop queries return conversations and items', () => {
