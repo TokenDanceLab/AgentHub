@@ -273,6 +273,31 @@ try {
         Assert-True ($traversalArtifactRoot.ExitCode -ne 0) "path traversal artifact root fails closed" $traversalArtifactRoot.Output
         Assert-True ($traversalArtifactRoot.Output -match "artifact root") "path traversal artifact root failure is explicit" $traversalArtifactRoot.Output
 
+        foreach ($unsafeArtifactRoot in @(".tmpx\login-e2e", "tmp-old\login-e2e", (Join-Path $RepoRoot ".tmp-sibling\login-e2e"))) {
+            $siblingArtifactRoot = Invoke-RepoScript @(
+                $scriptPath,
+                "-RepoRoot", $RepoRoot,
+                "-Mode", "RealApproved",
+                "-OAuthClientId", "agenthub-test-client",
+                "-CallbackUrl", "http://localhost:5174/auth/tokendance/callback",
+                "-HubBaseUrl", "http://127.0.0.1:8080",
+                "-WebUrl", "http://127.0.0.1:5174",
+                "-TestAccountIndicator", "disposable-test-account",
+                "-ArtifactRoot", $unsafeArtifactRoot,
+                "-BrowserEvidenceBoundary", "metadata-only",
+                "-OperatorApprovalId", "approval-123",
+                "-ApproveRealLogin",
+                "-ApproveRemoteDispatch",
+                "-HubSessionProof", "proof:hub-session",
+                "-TargetInventoryProof", "proof:target-inventory",
+                "-SelectedDesktopTargetProof", "proof:selected-target",
+                "-DispatchRequestProof", "proof:dispatch",
+                "-EventReplayProof", "proof:event-replay"
+            )
+            Assert-True ($siblingArtifactRoot.ExitCode -ne 0) "artifact root sibling prefix fails closed: $unsafeArtifactRoot" $siblingArtifactRoot.Output
+            Assert-True ($siblingArtifactRoot.Output -match "artifact root") "artifact root sibling prefix failure is explicit: $unsafeArtifactRoot" $siblingArtifactRoot.Output
+        }
+
         $missingTargetProof = Invoke-RepoScript @(
             $scriptPath,
             "-RepoRoot", $RepoRoot,
@@ -385,6 +410,50 @@ try {
         )
         Assert-True ($reviewOpaqueToken.ExitCode -ne 0) "evidence review rejects opaque sensitive token fields" $reviewOpaqueToken.Output
         Assert-True ($reviewOpaqueToken.Output -match "sensitive field") "opaque sensitive token field failure is explicit" $reviewOpaqueToken.Output
+
+        foreach ($variant in @(
+            @{ Name = "accessToken"; Value = "opaque-session-token-value" },
+            @{ Name = "refreshToken"; Value = "opaque-session-token-value" },
+            @{ Name = "idToken"; Value = "opaque-session-token-value" },
+            @{ Name = "clientSecret"; Value = "opaque-client-secret" },
+            @{ Name = "authorizationHeader"; Value = "Bearer opaque-header-value" },
+            @{ Name = "session_token"; Value = "opaque-session-token-value" },
+            @{ Name = "auth-cookie"; Value = "opaque-cookie-value" }
+        )) {
+            $manifestSensitiveVariant = Join-Path $tmpRoot "sensitive-$($variant.Name)-manifest.json"
+            $hubSession = @{}
+            $hubSession[$variant.Name] = $variant.Value
+            @{
+                real_login_approved = $true
+                remote_dispatch_approved = $true
+                redaction_status = "redacted"
+                web_to_local_edge_direct = $false
+                hub_session = $hubSession
+                target_inventory = @{ ref = "proof:target-inventory" }
+                selected_desktop_target = @{ ref = "proof:selected-target" }
+                dispatch_request = @{ ref = "proof:dispatch" }
+                event_replay = @{ ref = "proof:event-replay" }
+            } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestSensitiveVariant -Encoding UTF8
+
+            $reviewSensitiveVariant = Invoke-RepoScript @(
+                $scriptPath,
+                "-RepoRoot", $RepoRoot,
+                "-Mode", "EvidenceReview",
+                "-OAuthClientId", "agenthub-test-client",
+                "-CallbackUrl", "http://localhost:5174/auth/tokendance/callback",
+                "-HubBaseUrl", "http://127.0.0.1:8080",
+                "-WebUrl", "http://127.0.0.1:5174",
+                "-TestAccountIndicator", "disposable-test-account",
+                "-ArtifactRoot", ".tmp\login-e2e\approved",
+                "-BrowserEvidenceBoundary", "metadata-only",
+                "-OperatorApprovalId", "approval-123",
+                "-ApproveRealLogin",
+                "-ApproveRemoteDispatch",
+                "-EvidenceManifest", $manifestSensitiveVariant
+            )
+            Assert-True ($reviewSensitiveVariant.ExitCode -ne 0) "evidence review rejects opaque sensitive key variant: $($variant.Name)" $reviewSensitiveVariant.Output
+            Assert-True ($reviewSensitiveVariant.Output -match "sensitive field") "opaque sensitive key variant failure is explicit: $($variant.Name)" $reviewSensitiveVariant.Output
+        }
 
         $manifestDirectEdgeUrl = Join-Path $tmpRoot "direct-edge-url-manifest.json"
         @{
