@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
+	"sync"
 )
 
 // ControlHandler receives control messages from the CLI's stdout and can respond on stdin.
@@ -61,6 +63,25 @@ type PermissionRequest struct {
 	Input     any
 }
 
+// PermissionScope binds a CLI permission request to the Edge run that owns it.
+type PermissionScope struct {
+	ProjectID string
+	ThreadID  string
+	RunID     string
+}
+
+// PendingPermissionRequest records a permission request waiting for a Desktop
+// or Hub control decision.
+type PendingPermissionRequest struct {
+	ProjectID string
+	ThreadID  string
+	RunID     string
+	RequestID string
+	ToolName  string
+	ToolUseID string
+	Input     any
+}
+
 // PermissionDecision is the response to a permission request.
 type PermissionDecision struct {
 	Behavior      string // "allow" or "deny"
@@ -80,8 +101,10 @@ type PermissionDecider func(ctx context.Context, req PermissionRequest) Permissi
 // For production use, supply a PermissionDecider via NewBridgedPermissionHandler
 // to bridge to Desktop's approval UI.
 type DefaultPermissionHandler struct {
-	emitter EventEmitter      // nil = silent auto-approve; non-nil = emit permission events
-	decider PermissionDecider // nil = auto-approve all; non-nil = block until decision
+	emitter EventEmitter              // nil = silent auto-approve; non-nil = emit permission events
+	decider PermissionDecider         // nil = auto-approve all; non-nil = block until decision
+	broker  *PermissionDecisionBroker // nil = no Hub/Desktop decision bridge
+	scope   PermissionScope           // run scope for brokered requests
 }
 
 func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, stdin io.Writer, msg ControlMessage) error {
@@ -118,6 +141,22 @@ func (h *DefaultPermissionHandler) handleCanUseTool(ctx context.Context, stdin i
 	// Compute base risk level for the event payload (no blocked-pattern scan here —
 	// the SecurityHook pierces on PreToolUse before we reach this handler).
 	riskLevel := ClassifyToolRisk(inner.ToolName)
+	req := PermissionRequest{
+		RequestID: requestID,
+		ToolName:  inner.ToolName,
+		ToolUseID: inner.ToolUseID,
+		Input:     inner.Input,
+	}
+
+	var waitForBrokerDecision func(context.Context) PermissionDecision
+	brokerRegisterFailed := false
+	if h.broker != nil {
+		if wait, ok := h.broker.Begin(h.scope, req); ok {
+			waitForBrokerDecision = wait
+		} else {
+			brokerRegisterFailed = true
+		}
+	}
 
 	// Emit permission_requested so Desktop can display approval UI
 	if h.emitter != nil {
@@ -133,16 +172,19 @@ func (h *DefaultPermissionHandler) handleCanUseTool(ctx context.Context, stdin i
 	// Wait for decision: if a decider is configured, block until Desktop responds.
 	// Otherwise fall back to auto-approve.
 	var decision PermissionDecision
-	if h.decider != nil {
-		decision = h.decider(ctx, PermissionRequest{
-			RequestID: requestID,
-			ToolName:  inner.ToolName,
-			ToolUseID: inner.ToolUseID,
-			Input:     inner.Input,
-		})
+	if waitForBrokerDecision != nil {
+		decision = waitForBrokerDecision(ctx)
+	} else if brokerRegisterFailed {
+		decision = PermissionDecision{
+			Behavior: "deny",
+			Message:  "permission request could not be registered for approval",
+		}
+	} else if h.decider != nil {
+		decision = h.decider(ctx, req)
 	} else {
 		decision = PermissionDecision{Behavior: "allow"}
 	}
+	decision = normalizePermissionDecision(decision)
 
 	resp := ControlMessage{
 		Type:      "control_response",
@@ -199,6 +241,125 @@ func NewEventEmittingPermissionHandler(emitter EventEmitter) *DefaultPermissionH
 // permission_requested/permission_decided events for observability.
 func NewBridgedPermissionHandler(emitter EventEmitter, decider PermissionDecider) *DefaultPermissionHandler {
 	return &DefaultPermissionHandler{emitter: emitter, decider: decider}
+}
+
+// NewBrokeredPermissionHandler creates a handler that registers permission
+// requests before emitting permission_requested and then blocks until the
+// shared broker receives a matching decision.
+func NewBrokeredPermissionHandler(emitter EventEmitter, broker *PermissionDecisionBroker, scope PermissionScope) *DefaultPermissionHandler {
+	return &DefaultPermissionHandler{emitter: emitter, broker: broker, scope: scope}
+}
+
+type permissionDecisionKey struct {
+	runID     string
+	requestID string
+}
+
+type brokeredPermission struct {
+	pending  PendingPermissionRequest
+	decision chan PermissionDecision
+}
+
+// PermissionDecisionBroker connects a live CLI control request to a later
+// /v1/permissions/decide call. Requests are keyed by runId + requestId.
+type PermissionDecisionBroker struct {
+	mu      sync.Mutex
+	pending map[permissionDecisionKey]brokeredPermission
+}
+
+func NewPermissionDecisionBroker() *PermissionDecisionBroker {
+	return &PermissionDecisionBroker{
+		pending: make(map[permissionDecisionKey]brokeredPermission),
+	}
+}
+
+// Begin registers a pending permission request and returns a waiter. The waiter
+// returns a safe deny decision if the run context is cancelled before a user
+// decision arrives.
+func (b *PermissionDecisionBroker) Begin(scope PermissionScope, req PermissionRequest) (func(context.Context) PermissionDecision, bool) {
+	if b == nil {
+		return nil, false
+	}
+	scope.RunID = strings.TrimSpace(scope.RunID)
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	if scope.RunID == "" || req.RequestID == "" {
+		return nil, false
+	}
+	key := permissionDecisionKey{runID: scope.RunID, requestID: req.RequestID}
+	waiter := brokeredPermission{
+		pending: PendingPermissionRequest{
+			ProjectID: strings.TrimSpace(scope.ProjectID),
+			ThreadID:  strings.TrimSpace(scope.ThreadID),
+			RunID:     scope.RunID,
+			RequestID: req.RequestID,
+			ToolName:  strings.TrimSpace(req.ToolName),
+			ToolUseID: strings.TrimSpace(req.ToolUseID),
+			Input:     req.Input,
+		},
+		decision: make(chan PermissionDecision, 1),
+	}
+
+	b.mu.Lock()
+	if _, exists := b.pending[key]; exists {
+		b.mu.Unlock()
+		return nil, false
+	}
+	b.pending[key] = waiter
+	b.mu.Unlock()
+
+	return func(ctx context.Context) PermissionDecision {
+		select {
+		case decision := <-waiter.decision:
+			return normalizePermissionDecision(decision)
+		case <-ctx.Done():
+			b.mu.Lock()
+			delete(b.pending, key)
+			b.mu.Unlock()
+			return PermissionDecision{
+				Behavior: "deny",
+				Message:  "permission decision cancelled before approval was received",
+			}
+		}
+	}, true
+}
+
+// Decide resolves and removes a pending permission request.
+func (b *PermissionDecisionBroker) Decide(runID, requestID string, decision PermissionDecision) (PendingPermissionRequest, bool) {
+	if b == nil {
+		return PendingPermissionRequest{}, false
+	}
+	key := permissionDecisionKey{
+		runID:     strings.TrimSpace(runID),
+		requestID: strings.TrimSpace(requestID),
+	}
+	if key.runID == "" || key.requestID == "" {
+		return PendingPermissionRequest{}, false
+	}
+	b.mu.Lock()
+	waiter, ok := b.pending[key]
+	if ok {
+		delete(b.pending, key)
+	}
+	b.mu.Unlock()
+	if !ok {
+		return PendingPermissionRequest{}, false
+	}
+	waiter.decision <- normalizePermissionDecision(decision)
+	return waiter.pending, true
+}
+
+func normalizePermissionDecision(decision PermissionDecision) PermissionDecision {
+	decision.Behavior = strings.TrimSpace(decision.Behavior)
+	switch decision.Behavior {
+	case "allow", "deny":
+		return decision
+	default:
+		if strings.TrimSpace(decision.Message) == "" {
+			decision.Message = "invalid or missing permission decision"
+		}
+		decision.Behavior = "deny"
+		return decision
+	}
 }
 
 // ChannelPermissionDecider bridges the permission decider to a channel-based

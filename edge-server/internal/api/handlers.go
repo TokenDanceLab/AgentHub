@@ -56,10 +56,12 @@ type Handler struct {
 	HubJWTSecret string
 
 	PermissionRegistry *PermissionRegistry
+	PermissionBroker   *adapters.PermissionDecisionBroker
 
-	runCreateMu              sync.Mutex
-	permissionRegistryMu     sync.Mutex
-	permissionObserverCancel func()
+	runCreateMu               sync.Mutex
+	permissionRegistryMu      sync.Mutex
+	permissionObserverCancel  func()
+	permissionBrokerInstalled bool
 }
 
 var upgrader = websocket.Upgrader{
@@ -191,10 +193,44 @@ func (h *Handler) ensurePermissionRegistry() *PermissionRegistry {
 	if h.PermissionRegistry == nil {
 		h.PermissionRegistry = NewPermissionRegistry(0)
 	}
+	if h.PermissionBroker == nil {
+		h.PermissionBroker = adapters.NewPermissionDecisionBroker()
+	}
+	h.installPermissionBrokerLocked()
 	if h.permissionObserverCancel == nil {
 		h.permissionObserverCancel = ensureBus(h).AddObserver(h.PermissionRegistry.ObserveEvent)
 	}
 	return h.PermissionRegistry
+}
+
+type permissionBrokerConfigurer interface {
+	SetPermissionBroker(*adapters.PermissionDecisionBroker)
+}
+
+func (h *Handler) ensurePermissionBroker() *adapters.PermissionDecisionBroker {
+	h.permissionRegistryMu.Lock()
+	defer h.permissionRegistryMu.Unlock()
+	if h.PermissionBroker == nil {
+		h.PermissionBroker = adapters.NewPermissionDecisionBroker()
+	}
+	h.installPermissionBrokerLocked()
+	return h.PermissionBroker
+}
+
+func (h *Handler) installPermissionBrokerLocked() {
+	if h.permissionBrokerInstalled || h.PermissionBroker == nil || h.AdapterRegistry == nil {
+		return
+	}
+	for _, metadata := range h.AdapterRegistry.List() {
+		adapter, ok := h.AdapterRegistry.Get(metadata.ID)
+		if !ok {
+			continue
+		}
+		if configurable, ok := adapter.(permissionBrokerConfigurer); ok {
+			configurable.SetPermissionBroker(h.PermissionBroker)
+		}
+	}
+	h.permissionBrokerInstalled = true
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -1344,10 +1380,16 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	permission, ok := h.ensurePermissionRegistry().Consume(req.RunID, req.RequestID)
-	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPermissionRequestNotFound))
-		return
+	registry := h.ensurePermissionRegistry()
+	permission, ok := pendingPermissionFromBroker(h.ensurePermissionBroker(), req.RunID, req.RequestID, req.Decision, req.Reason)
+	if ok {
+		_, _ = registry.Consume(req.RunID, req.RequestID)
+	} else {
+		permission, ok = registry.Consume(req.RunID, req.RequestID)
+		if !ok {
+			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPermissionRequestNotFound))
+			return
+		}
 	}
 
 	scope := map[string]any{"runId": permission.RunID}
@@ -1368,6 +1410,24 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("permission decided by Desktop", "requestId", req.RequestID, "decision", req.Decision)
 	writeSuccess(w, http.StatusOK, map[string]any{"status": "ok"})
+}
+
+func pendingPermissionFromBroker(broker *adapters.PermissionDecisionBroker, runID, requestID, decision, reason string) (PendingPermission, bool) {
+	pending, ok := broker.Decide(runID, requestID, adapters.PermissionDecision{
+		Behavior: decision,
+		Message:  reason,
+	})
+	if !ok {
+		return PendingPermission{}, false
+	}
+	return PendingPermission{
+		ProjectID: pending.ProjectID,
+		ThreadID:  pending.ThreadID,
+		RunID:     pending.RunID,
+		RequestID: pending.RequestID,
+		ToolName:  pending.ToolName,
+		ToolUseID: pending.ToolUseID,
+	}, true
 }
 
 // ---------------------------------------------------------------------------
