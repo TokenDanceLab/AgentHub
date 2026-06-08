@@ -789,11 +789,15 @@ func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, conn
 					continue
 				}
 			}
+			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+			if !result.Queued {
+				slog.Warn("target-bound queued task replay not queued; keeping pending task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+				continue
+			}
 			if err := a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload); err != nil {
 				slog.Error("failed to ack target-bound queued task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "error", err)
 				continue
 			}
-			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
 	}
 }

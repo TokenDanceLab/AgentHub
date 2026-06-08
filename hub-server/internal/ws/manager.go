@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,31 @@ type Conn struct {
 	// closed is set atomically before the Send channel is closed.  PushToConn
 	// and closeSend use sendMu so channel send and close never race.
 	closed atomic.Bool
+}
+
+// DeliveryStatus describes the observable result of a non-blocking WebSocket
+// enqueue attempt.
+type DeliveryStatus string
+
+const (
+	DeliveryStatusQueued       DeliveryStatus = "queued"
+	DeliveryStatusConnNotFound DeliveryStatus = "conn_not_found"
+	DeliveryStatusConnClosed   DeliveryStatus = "conn_closed"
+	DeliveryStatusMarshalError DeliveryStatus = "marshal_error"
+	DeliveryStatusBufferFull   DeliveryStatus = "buffer_full"
+)
+
+var (
+	ErrDeliveryConnNotFound = errors.New("websocket connection not found")
+	ErrDeliveryConnClosed   = errors.New("websocket connection closed")
+	ErrDeliveryMarshalError = errors.New("websocket frame marshal failed")
+	ErrDeliveryBufferFull   = errors.New("websocket send buffer full")
+)
+
+type DeliveryResult struct {
+	Queued bool
+	Status DeliveryStatus
+	Err    error
 }
 
 func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
@@ -184,31 +210,34 @@ func (m *Manager) Unregister(connID string) {
 }
 
 // PushToConn sends a frame to a single connection.
-func (m *Manager) PushToConn(connID string, frame Frame) {
+func (m *Manager) PushToConn(connID string, frame Frame) DeliveryResult {
 	m.mu.RLock()
 	c, ok := m.conns[connID]
 	m.mu.RUnlock()
 	if !ok {
-		return
+		return DeliveryResult{Status: DeliveryStatusConnNotFound, Err: ErrDeliveryConnNotFound}
 	}
 	if c.closed.Load() {
-		return
+		return DeliveryResult{Status: DeliveryStatusConnClosed, Err: ErrDeliveryConnClosed}
 	}
 	data, err := frame.Marshal()
 	if err != nil {
-		return
+		return DeliveryResult{Status: DeliveryStatusMarshalError, Err: errors.Join(ErrDeliveryMarshalError, err)}
 	}
 
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
 	if c.closed.Load() {
-		return
+		return DeliveryResult{Status: DeliveryStatusConnClosed, Err: ErrDeliveryConnClosed}
 	}
 
 	select {
 	case c.Send <- data:
+		return DeliveryResult{Queued: true, Status: DeliveryStatusQueued}
 	default:
-		metrics.WSDroppedFrames.Inc()
+		if metrics.WSDroppedFrames != nil {
+			metrics.WSDroppedFrames.Inc()
+		}
 		sessionID := extractSessionID(frame.Payload)
 		slog.Warn("ws frame dropped: send buffer full",
 			"conn_id", connID,
@@ -217,6 +246,7 @@ func (m *Manager) PushToConn(connID string, frame Frame) {
 			"frame_type", frame.Type,
 			"session_id", sessionID,
 		)
+		return DeliveryResult{Status: DeliveryStatusBufferFull, Err: ErrDeliveryBufferFull}
 	}
 }
 

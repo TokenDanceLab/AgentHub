@@ -385,6 +385,59 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	require.Equal(t, "dev-b", stored.EdgeDeviceID)
 }
 
+func TestOnRouteSetKeepsPendingTargetQueueWhenDeliveryBufferFull(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		id TEXT PRIMARY KEY,
+		agent_instance_id TEXT NOT NULL,
+		triggered_by_user_id TEXT NOT NULL,
+		trigger_message_id TEXT NOT NULL,
+		target_id TEXT,
+		status TEXT NOT NULL,
+		edge_run_id TEXT DEFAULT '',
+		edge_device_id TEXT DEFAULT '',
+		error_message TEXT DEFAULT '',
+		created_at DATETIME,
+		dispatched_at DATETIME,
+		finished_at DATETIME,
+		expire_at DATETIME NOT NULL
+	)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-dev-b-full", "agent-1", "user-1", "msg-1", "target-dev-b", model.TaskStatusQueued, "dev-b", "2030-01-01T00:00:00Z").Error)
+
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	for i := 0; i < cap(connB.Send); i++ {
+		connB.Send <- []byte("already queued")
+	}
+
+	a := &App{
+		DB:           db,
+		CacheClient:  cacheClient,
+		mgr:          mgr,
+		coreCtx:      context.Background(),
+		AgentService: service.NewAgentService(db, nil, mgr, cacheClient),
+	}
+	const payload = `{"task_id":"task-dev-b-full","target_id":"target-dev-b"}`
+	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", payload))
+
+	a.pushPendingTargetTasks(context.Background(), "user-1", "dev-b", connB.ID)
+
+	remaining, err := cacheClient.PopPendingTargetTasksForDevice(context.Background(), "user-1", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []string{payload}, remaining)
+}
+
 func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
