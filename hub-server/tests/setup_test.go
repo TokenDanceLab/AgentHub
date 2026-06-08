@@ -39,6 +39,19 @@ var (
 	testJWT         config.JWTConfig
 )
 
+type testMessageServiceWithReactions struct {
+	*service.MessageService
+	reactions *service.MessageReactionService
+}
+
+func (s testMessageServiceWithReactions) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return s.reactions.AddMessageReaction(ctx, userID, sessionID, msgID, reaction)
+}
+
+func (s testMessageServiceWithReactions) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return s.reactions.RemoveMessageReaction(ctx, userID, sessionID, msgID, reaction)
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
@@ -87,7 +100,11 @@ func TestMain(m *testing.M) {
 	sessionService := service.NewSessionService(db, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 	messageService := service.NewMessageService(db, bus, cacheClient)
-	messageHandler := handler.NewMessageHandler(messageService)
+	messageReactionService := service.NewMessageReactionService(db, bus)
+	messageHandler := handler.NewMessageHandler(testMessageServiceWithReactions{
+		MessageService: messageService,
+		reactions:      messageReactionService,
+	})
 	agentService := service.NewAgentService(db, bus, mgr, cacheClient)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
