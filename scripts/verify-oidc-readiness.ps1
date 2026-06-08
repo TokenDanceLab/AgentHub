@@ -59,12 +59,23 @@ function Assert-NotContains([string]$RelativePath, [string]$Pattern, [string]$La
     }
 }
 
-function Find-WorkspaceRoot {
+$WorkspaceDocCandidates = @(
+    "docs\identity\relying-party.md",
+    "docs\relying-party-readiness.md"
+)
+
+function Find-WorkspaceDocs {
     $current = $RepoRoot
     while ($null -ne $current) {
-        $candidate = Join-Path $current "docs/relying-party-readiness.md"
-        if (Test-Path -LiteralPath $candidate) {
-            return $current
+        foreach ($relativePath in $WorkspaceDocCandidates) {
+            $candidate = Join-Path $current $relativePath
+            if (Test-Path -LiteralPath $candidate) {
+                return [pscustomobject]@{
+                    Root = $current
+                    RelativePath = $relativePath
+                    Path = $candidate
+                }
+            }
         }
         $parent = Split-Path -Parent $current
         if ($parent -eq $current -or [string]::IsNullOrWhiteSpace($parent)) {
@@ -119,13 +130,15 @@ Assert-Contains "app/web/README.md" "BFF/HttpOnly cookie" "Web README keeps high
 
 if (-not $SkipWorkspaceDocs) {
     Step "Workspace governance docs"
-    $workspaceRoot = Find-WorkspaceRoot
-    if ($null -eq $workspaceRoot) {
-        Fail "workspace docs not found; rerun with -SkipWorkspaceDocs only for AgentHub-only clones"
+    $workspaceDocs = Find-WorkspaceDocs
+    if ($null -eq $workspaceDocs) {
+        $searched = $WorkspaceDocCandidates -join ", "
+        Fail "workspace docs not found. Searched workspace docs: $searched. Rerun with -SkipWorkspaceDocs only for AgentHub-only clones."
     } else {
-        $readiness = Get-Content -Raw -LiteralPath (Join-Path $workspaceRoot "docs/relying-party-readiness.md")
+        Pass "workspace docs source: $($workspaceDocs.RelativePath)"
+        $readiness = Get-Content -Raw -LiteralPath $workspaceDocs.Path
         if ($readiness -match "AgentHub Hub Server \| Partial") {
-            Pass "root readiness matrix still marks AgentHub Hub Server Partial"
+            Pass "root relying-party matrix still marks AgentHub Hub Server Partial"
         } else {
             Fail "root readiness matrix must not mark AgentHub Hub Server release-ready without live evidence"
         }
