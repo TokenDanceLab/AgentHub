@@ -21,7 +21,8 @@ type ExecutionTarget struct {
 	WorkspaceAllowlist string     `gorm:"column:workspace_allowlist;type:jsonb;default:'[]'" json:"workspace_allowlist,omitempty"`
 	TrustLevel         string     `gorm:"column:trust_level;type:varchar(32);default:'local'" json:"trust_level,omitempty"`
 	HealthState        string     `gorm:"column:health_state;type:varchar(32);default:'unknown'" json:"health_state,omitempty"`
-	AuthMethod         string     `gorm:"column:auth_method;type:varchar(32);default:''" json:"auth_method,omitempty"`
+	AuthMethod         string     `gorm:"column:auth_method;type:varchar(32);default:''" json:"-"`
+	AuthCredential     string     `gorm:"-" json:"-"`
 	IsOnline           bool       `gorm:"column:is_online;default:false" json:"is_online"`
 	LastSeenAt         *time.Time `gorm:"column:last_seen_at;type:timestamptz" json:"last_seen_at,omitempty"`
 	Capabilities       string     `gorm:"column:capabilities;type:jsonb;default:'{}'" json:"capabilities,omitempty"`
@@ -53,6 +54,13 @@ var validExecutionTargetHealthStates = map[string]struct{}{
 	"offline":  {},
 }
 
+var validExecutionTargetAuthMethods = map[string]struct{}{
+	"none":           {},
+	"ssh_tunnel":     {},
+	"tailscale_mtls": {},
+	"hub_jwt":        {},
+}
+
 func (e *ExecutionTarget) BeforeCreate(tx *gorm.DB) error {
 	if e.ID == "" {
 		id, err := uuidv7.New()
@@ -81,6 +89,9 @@ func (e *ExecutionTarget) Validate() error {
 	if e.HealthState != "" && !isAllowedExecutionTargetValue(e.HealthState, validExecutionTargetHealthStates) {
 		return fmt.Errorf("health_state is not supported")
 	}
+	if e.AuthMethod != "" && !IsValidExecutionTargetAuthMethod(e.AuthMethod) {
+		return fmt.Errorf("auth_method is not supported")
+	}
 	if e.Capabilities != "" && !isJSONObject(e.Capabilities) {
 		return fmt.Errorf("capabilities must be a JSON object")
 	}
@@ -93,4 +104,8 @@ func (e *ExecutionTarget) Validate() error {
 func isAllowedExecutionTargetValue(value string, allowed map[string]struct{}) bool {
 	_, ok := allowed[value]
 	return ok
+}
+
+func IsValidExecutionTargetAuthMethod(value string) bool {
+	return isAllowedExecutionTargetValue(value, validExecutionTargetAuthMethods)
 }

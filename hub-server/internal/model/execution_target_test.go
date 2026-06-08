@@ -68,6 +68,7 @@ func TestExecutionTarget_Validate_RejectsUnsupportedPolicyValues(t *testing.T) {
 		{"target_type", func(et *ExecutionTarget) { et.TargetType = "unknown" }},
 		{"trust_level", func(et *ExecutionTarget) { et.TrustLevel = "root" }},
 		{"health_state", func(et *ExecutionTarget) { et.HealthState = "green" }},
+		{"auth_method", func(et *ExecutionTarget) { et.AuthMethod = "edge-secret-token-should-not-leak" }},
 	}
 
 	for _, tt := range tests {
