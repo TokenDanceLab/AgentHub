@@ -354,6 +354,88 @@ func TestGetRuns(t *testing.T) {
 	}
 }
 
+func TestArtifactPreviewMetadataLookupRoutes(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	h.ensureDefaults()
+	if _, err := h.Store.CreateRun("run_evidence", "proj_local", "thread_local"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	artifact, err := h.Store.UpsertArtifact(store.Artifact{
+		ID:        "artifact_readonly",
+		RunID:     "run_evidence",
+		Kind:      "patch",
+		Path:      "changes.diff",
+		SizeBytes: 42,
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact returned error: %v", err)
+	}
+	preview, err := h.Store.UpsertPreview(store.Preview{
+		ID:     "preview_readonly",
+		RunID:  "run_evidence",
+		URL:    "http://127.0.0.1:4173",
+		Status: "ready",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/artifacts?runId=run_evidence", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/artifacts status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var listBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&listBody); err != nil {
+		t.Fatalf("failed to decode artifact list: %v", err)
+	}
+	listBody = unwrapSuccess(listBody)
+	items, ok := listBody["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("artifact list items = %#v, want one item", listBody["items"])
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/artifacts/artifact_readonly", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET artifact metadata status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var artifactBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&artifactBody); err != nil {
+		t.Fatalf("failed to decode artifact body: %v", err)
+	}
+	artifactBody = unwrapSuccess(artifactBody)
+	if artifactBody["id"] != artifact.ID || artifactBody["runId"] != "run_evidence" || artifactBody["threadId"] != "thread_local" {
+		t.Fatalf("artifact body = %#v, want stored metadata", artifactBody)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/previews/preview_readonly", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET preview metadata status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var previewBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&previewBody); err != nil {
+		t.Fatalf("failed to decode preview body: %v", err)
+	}
+	previewBody = unwrapSuccess(previewBody)
+	if previewBody["id"] != preview.ID || previewBody["runId"] != "run_evidence" || previewBody["url"] != "http://127.0.0.1:4173" {
+		t.Fatalf("preview body = %#v, want stored metadata", previewBody)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/artifacts/missing", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET missing artifact status = %d, want 404 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestProjectThreadRoutes(t *testing.T) {
 	h := newTestHandler()
 	mux := http.NewServeMux()
