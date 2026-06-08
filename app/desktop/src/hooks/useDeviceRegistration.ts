@@ -8,6 +8,8 @@ import { APP_VERSION } from '@/config';
 import type { HubClient } from '@/api/hubClient';
 import { getOrCreateDeviceId } from '@/api/deviceId';
 
+export const DESKTOP_DEVICE_CAPABILITIES = ['local_edge', 'agent.dispatch', 'agent.control'];
+
 export type DeviceRegistrationStatus = 'idle' | 'registering' | 'registered' | 'error';
 
 export interface DeviceRegistrationState {
@@ -44,6 +46,7 @@ export function useDeviceRegistration(
       .registerDevice({
         device_id: deviceId,
         app_version: APP_VERSION,
+        capabilities: DESKTOP_DEVICE_CAPABILITIES,
       })
       .then(() => {
         if (cancelled) return;
