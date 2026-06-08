@@ -583,9 +583,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
 	}
 
+	// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
+	// descriptors; otherwise structured parsers can race with Wait and see
+	// transient "file already closed" read errors.
+	wg.Wait()
 	waitErr := cmd.Wait()
 	slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(waitErr))
-	wg.Wait()
 
 	// Context budget compaction check: after the stream completes, evaluate
 	// whether the context budget exceeded the auto-compaction threshold.
