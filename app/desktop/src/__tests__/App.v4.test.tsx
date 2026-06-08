@@ -223,6 +223,7 @@ describe('Desktop App v4 root', () => {
       expect(mockedUseHubIntegration).toHaveBeenCalledWith({
         hubWS: mockHubWS,
         hubClient: mockHubClient,
+        edgeBaseUrl: 'http://127.0.0.1:3210',
       });
     });
     expect(mockedUseHubEventStream).toHaveBeenCalledWith(getAccessToken);

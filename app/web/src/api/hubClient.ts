@@ -450,6 +450,7 @@ export interface AgentTeamRun {
   session_id?: string;
   trigger_user_id?: string;
   trigger_message?: string;
+  target_id?: string;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
   created_at?: string;
   updated_at?: string;
