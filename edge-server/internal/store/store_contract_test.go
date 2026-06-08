@@ -13,11 +13,12 @@ type repositoryContractStore interface {
 }
 
 type repositoryContractHandle struct {
-	name  string
-	store repositoryContractStore
-	path  string
-	flush func()
-	close func()
+	name   string
+	store  repositoryContractStore
+	path   string
+	flush  func()
+	close  func()
+	reopen func(t *testing.T, path string) repositoryContractHandle
 }
 
 func TestRepositoryContract(t *testing.T) {
@@ -49,6 +50,49 @@ func TestRepositoryContract(t *testing.T) {
 					path:  path,
 					flush: s.Flush,
 					close: s.Close,
+					reopen: func(t *testing.T, path string) repositoryContractHandle {
+						t.Helper()
+						restored, err := NewFile(path)
+						if err != nil {
+							t.Fatalf("NewFile restore returned error: %v", err)
+						}
+						return repositoryContractHandle{
+							name:  "file",
+							store: restored,
+							path:  path,
+							flush: restored.Flush,
+							close: restored.Close,
+						}
+					},
+				}
+			},
+		},
+		{
+			name: "sqlite",
+			new: func(t *testing.T) repositoryContractHandle {
+				path := filepath.Join(t.TempDir(), "edge-store.db")
+				s, err := NewSQLite(path)
+				if err != nil {
+					t.Fatalf("NewSQLite returned error: %v", err)
+				}
+				return repositoryContractHandle{
+					name:  "sqlite",
+					store: s,
+					path:  path,
+					close: s.Close,
+					reopen: func(t *testing.T, path string) repositoryContractHandle {
+						t.Helper()
+						restored, err := NewSQLite(path)
+						if err != nil {
+							t.Fatalf("NewSQLite restore returned error: %v", err)
+						}
+						return repositoryContractHandle{
+							name:  "sqlite",
+							store: restored,
+							path:  path,
+							close: restored.Close,
+						}
+					},
 				}
 			},
 		},
@@ -112,6 +156,65 @@ func TestRepositoryContractFileStoreSnapshotRestore(t *testing.T) {
 	restored, err := NewFile(path)
 	if err != nil {
 		t.Fatalf("NewFile restore returned error: %v", err)
+	}
+	defer restored.Close()
+
+	if got := restored.ListProjects(); len(got) != 1 || got[0].ID != project.ID {
+		t.Fatalf("restored projects = %#v, want %s", got, project.ID)
+	}
+	if got := restored.ListThreads(project.ID); len(got) != 1 || got[0].ID != thread.ID {
+		t.Fatalf("restored threads = %#v, want %s", got, thread.ID)
+	}
+	if got := restored.ListRuns(thread.ID); len(got) != 1 || got[0].ID != run.ID {
+		t.Fatalf("restored runs = %#v, want %s", got, run.ID)
+	}
+	if got := restored.ListThreadItems(thread.ID); len(got) != 1 || got[0].ID != item.ID || got[0].Content != "contract item" {
+		t.Fatalf("restored items = %#v, want item_contract content", got)
+	}
+	if got := restored.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "Delicious233" {
+		t.Fatalf("restored pins = %#v, want item_contract pin", got)
+	}
+}
+
+func TestRepositoryContractSQLiteStoreRestore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+
+	project, err := s.CreateProject("proj_contract", "Contract Project")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := s.CreateThread("thread_contract", project.ID, "Contract Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := s.CreateRun("run_contract", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	item, err := s.CreateItem(Item{
+		ID:        "item_contract",
+		ProjectID: project.ID,
+		ThreadID:  thread.ID,
+		RunID:     run.ID,
+		Type:      "run",
+		Status:    "created",
+		Content:   "contract item",
+	})
+	if err != nil {
+		t.Fatalf("CreateItem returned error: %v", err)
+	}
+	if _, err := s.PinThreadItem(thread.ID, item.ID, "Delicious233"); err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
+	s.Close()
+
+	restored, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite restore returned error: %v", err)
 	}
 	defer restored.Close()
 
@@ -324,28 +427,24 @@ func runRepositoryThreadDeleteCascadeContract(t *testing.T, handle repositoryCon
 		t.Fatalf("pins after thread delete = %#v, want empty", got)
 	}
 
-	if handle.path == "" {
+	if handle.path == "" || handle.reopen == nil {
 		return
 	}
-	handle.flush()
-	handle.close()
+	closeContractHandle(handle)
 
-	restored, err := NewFile(handle.path)
-	if err != nil {
-		t.Fatalf("NewFile restore returned error: %v", err)
-	}
-	defer restored.Close()
+	restored := handle.reopen(t, handle.path)
+	defer closeContractHandle(restored)
 
-	if _, ok := restored.GetThread(thread.ID); ok {
+	if _, ok := restored.store.GetThread(thread.ID); ok {
 		t.Fatal("restored thread exists after persisted thread delete")
 	}
-	if _, ok := restored.GetRun(run.ID); ok {
+	if _, ok := restored.store.GetRun(run.ID); ok {
 		t.Fatal("restored run exists after persisted thread delete")
 	}
-	if _, ok := restored.GetItem(item.ID); ok {
+	if _, ok := restored.store.GetItem(item.ID); ok {
 		t.Fatal("restored item exists after persisted thread delete")
 	}
-	if got := restored.ListThreadPins(thread.ID); len(got) != 0 {
+	if got := restored.store.ListThreadPins(thread.ID); len(got) != 0 {
 		t.Fatalf("restored pins after thread delete = %#v, want empty", got)
 	}
 }
