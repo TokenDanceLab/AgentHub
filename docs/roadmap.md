@@ -1,90 +1,127 @@
-# AgentHub 路线图
+# AgentHub Roadmap
 
-> 最后更新：2026-06-08 21:30 +08:00
-> 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
-> 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
-> 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
+> Last updated: 2026-06-08 22:10 +08:00
+> Fact source: `origin/dev/delicious233`
+> Current dev baseline: `7f393bfb` after runtime evidence inspector and macOS unsigned dry policy
+> Stable RC tag: `v0.3.0-rc.1 @ 0c79f277`
 
-## 目标
+Historical merge logs are archived in [archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md) and [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md). This file tracks only current status, next slices, blockers, and cleanup.
 
-AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平台：IM 聊天、单聊/群聊、多 Agent 调度、上下文连续、代码/Diff/网页/文件产物预览与操作，以及 Desktop、Web、Hub、Edge、CLI adapter 的真实端到端闭环。
+## Goal
 
-比赛需求入口：`D:\Code\TokenDance\docs\competition\bytedance.md`。AgentHub 当前证据入口：[competition/teamrun-e2e-evidence.md](competition/teamrun-e2e-evidence.md)。该证据只证明桥接链路与打包路径，不代表最终 3 分钟视频或两 runtime 实跑完成。
+AgentHub must become a runnable multi-agent collaboration product for IM chat, single/group conversations, multi-agent orchestration, persistent context, artifact/diff/preview evidence, and Desktop/Web/Hub/Edge/CLI adapter end-to-end operation.
 
-## 当前基线
+Competition requirements live in `D:\Code\TokenDance\docs\competition\bytedance.md`. Current AgentHub evidence starts at [competition/teamrun-e2e-evidence.md](competition/teamrun-e2e-evidence.md); it is dry/offline evidence, not final real runtime demo proof.
 
-| 项 | 状态 |
-|---|---|
-| dev | `origin/dev/delicious233`；具体 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
-| 稳定候选 | `v0.3.0-rc.1 @ 0c79f277` |
-| 主工作树 | 若 live `git status --short --branch` 显示 dirty 或落后于 `origin/dev/delicious233`，只读，不直接 pull/merge/stage；具体 HEAD 和远端基线以 live `git status --short --branch` 与 `git log -1 origin/dev/delicious233` 为准 |
-| 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
-| 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、Projects create/update UI gate、ExecutionTarget contract、Edge pins/store/event contracts、Edge SQLite opt-in + relational migration、TeamRun fixture/dry evidence gate、Artifact/Diff/Preview read-only Edge 前置、runtime evidence 写入、artifact/preview metadata lookup、artifact content planned/404 readiness contract |
-| 当前短切片 | `codex/preview-lifecycle-readiness`：只补 Edge preview stopped readiness/contract：`preview.stopped` 写回本地 metadata、`POST /v1/previews/{previewId}:stop` 将已有 preview 转为 `stopped` 并清空 ready URL、shared state 接收 stopped 事件；不做 preview start、真实 dev server/进程停止、browser launching、Hub preview store、Web 直连 Edge、mobile 或真实 CLI/model gate |
-| 仍未完成 | Desktop target preference/Tauri host 集成、登录端到端、Tauri 正式签名发布与 macOS 打包、TeamRun 真实演示、preview start/runner 生产化与 artifact content/apply/discard、Projects delete/soft-delete policy、artifact/workspace relationship proposal、D1b/D2/D3 gate |
-| 当前候选切片 | `codex/desktop-target-tauri-host`：Desktop-owned Local Edge target preference 与 Tauri host readiness，待 rebase/verify/merge；`codex/runtime-evidence-inspector`：shared RightInspector read-only 消费 Edge runtime evidence snapshot，已 rebase 到 `9bf674f0` 后补 review blocker 修复，并通过 focused gate 复验，待 review/merge；`codex/preview-lifecycle-readiness`：Edge preview stopped readiness/contract，待 focused gate/merge |
-| 外部依赖 | 后端旧整合线合并由 backend merge Agent 负责；本路线图只记录其状态和对后续切片的影响，不接管合并 |
+## Current State
 
-## P0 执行顺序
+| Area | Status | Next decision |
+|---|---|---|
+| Baseline | `origin/dev/delicious233 @ 7f393bfb`; main worktree is dirty/stale and must stay read-only | Continue from isolated `.worktrees/*` only |
+| Backend merge | Long backend thread is closed; backend merge Agent still absorbs old backend line by small slices | Do not whole-merge `feat/backend-edge-hub`; preserve semantic slice rule |
+| Web boundary | Web remains Hub-only; no Local Edge/Tauri/filesystem direct access | Keep `verify-web-hub-boundary.ps1` in every Web/shared slice |
+| Desktop boundary | Desktop may use Local Edge and Tauri host; it must not spawn CLI directly | Finish target preference and Tauri host readiness |
+| Projects | Hub `/web/projects` list/create/get/update and Web create/update UI are merged | Define delete/soft-delete/orphan policy and artifact/workspace relation |
+| Agent/runtime inventory | AgentProfile read/mutate and ExecutionTarget request contracts are merged; LobeHub runtime branding is merged on dev | Marketplace publish/install and routing behavior stay separate |
+| Edge store | SQLite opt-in snapshot backend and relational migration tests are merged | Repair/reconcile stale `codex/edge-sql-store` worktree before cleanup |
+| Runtime evidence | Edge read-only diff/artifact/preview indexes, runtime evidence writer, metadata lookup, content planned/404 contract, preview stop metadata, and shared inspector consumption are merged | Implement preview start/fake runner; artifact content source fields before content route |
+| Login | Fake/local and packaged readiness gates are merged | Real TokenDanceID packaged E2E requires approved test OAuth client, account, browser window, and no-secret evidence |
+| Tauri packaging | Version/readiness checks, installer smoke, release dry topology, and macOS unsigned dry policy are merged | Full build, signing, notarization, staple, and release upload remain approval-gated |
+| Mobile | Separate low-priority owner track | Do not mix with Desktop/Web/Hub/Edge critical path |
 
-| 顺序 | 切片 | 边界 | 最低门禁 |
-|---:|---|---|---|
-| 1 | Roadmap/tag/worktree 收口 | `v0.3.0-rc.1` 已打；roadmap 压缩；分支清理先审计不批量删 | docs diff-check、root governance、worktree audit |
-| 2 | Edge SQL/store migration | SQLite opt-in snapshot backend 和 relational migration v2 已合入；后续只做 runtime evidence 写入和真正 artifact lifecycle，不再把 schema 混进 UI 切片 | Edge store contract、cmd store config tests、edge short gate |
-| 3 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动；mapper 首片已合入，当前收口 Local Edge target preference / Tauri host readiness | Desktop platform、Edge focused、Rust host tests |
-| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；已补 Hub state expiry/replay、OIDC `-LocalOnly` gate 和 packaged Desktop loopback/keyring readiness；真实 packaged 登录仍只做 proposal/gate | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
-| 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；`codex/tauri-package-readiness` 已补版本对齐、独立 release readiness workflow、updater metadata gate 和 generated artifact ignore gate；`codex/tauri-installer-smoke` 补 Windows installer smoke preflight，仅检查本地工具链、sidecar/NSIS/portable 输入和 ignored 输出位置，不跑完整签名发布；`codex/release-dry-topology` 只明确 topology/preflight only 边界：静态 readiness/preflight 不跑 `pnpm tauri build`，Windows unsigned NSIS/portable + updater metadata 只作为命名/上传边界或 manual workflow_dispatch opt-in job；`codex/macos-unsigned-dry-policy` 只记录 future macOS arm64 unsigned sidecar/bundle policy 边界，签名/notarization/release 创建继续另批审批 | `scripts/verify-tauri-package-readiness.ps1`、`scripts/verify-tauri-installer-smoke.ps1`、installer artifact 检查、release dry policy |
-| 6 | ByteDance / TeamRun demo | dry fixture evidence pack 已合入；真实 IM 群聊、多 Agent 调度、证据 inspector、录屏脚本仍待 runtime/UI 证据 | readiness script、manifest、截图/视频/接口导出 |
-| 7 | Artifact/Diff/Preview 生产化 | read-only Edge API 首片已补 `GET /v1/runs/{runId}/diff`、`GET /v1/artifacts`、`GET /v1/previews`，runtime evidence 写入、metadata lookup 和 artifact content planned/404 readiness 已进入主干；当前短切片只补 preview stopped metadata transition，不做 preview start/runner 或 artifact content/apply/discard | Edge API、shared inspector、Desktop smoke；Web 仍不直连 Edge |
-| 8 | Projects delete/soft-delete policy | create/update UI gate 已在 `fd7be0f9` 合入；后续只推进 delete/soft-delete/orphan policy 与 artifact/workspace relationship proposal | Web/Hub proposal、artifact/workspace owner 边界、delete policy review |
-| 9 | Release signing / macOS | Windows Authenticode；macOS arm64 unsigned dry 当前只做 future sidecar/bundle policy boundary，Developer ID signing、entitlements、notarization、staple 另起 approval slice | `Get-AuthenticodeSignature`、`codesign`、`spctl`、`stapler` |
-| 10 | D1b/D2/D3 gates | 先 policy；D3 继续 opt-in | CI policy、release review、artifact redaction |
+## P0 Topology
 
-## P1 后续
+1. **Stabilize baseline and cleanup**
+   - Correct docs against live `origin/dev/delicious233`.
+   - Delete only clean merged worktrees after final `status` and ancestor checks.
+   - Preserve dirty, mobile-owned, backend-owned, and broken worktrees.
 
-- Contacts mutation/schema。
-- Agent marketplace、publish、install。
-- Tasks/TeamRun 页面正式映射。
-- Settings DB-backed preferences。
-- Projects delete/soft-delete/orphan policy 与 artifact/workspace relationship proposal。
-- `release.yml` 保留 tag release 语义；`release-readiness.yml` 只做内测 dry package policy、Windows installer smoke preflight 和 macOS arm64 unsigned dry policy boundary。Windows Authenticode 与 macOS Developer ID/notarization 自动化另起 approval slice。
-- Mobile v4 plan 已收敛到 `app/mobile/docs/mobile-v4-plan.md`；低优先级支线，主参考飞书 IM mobile、辅参考 Codex mobile chat，后续不混入 Desktop/Web v4 主门禁。
+2. **Edge artifact/preview production path**
+   - Next worker: preview fake runner and `POST /v1/previews` contract.
+   - Next proposal: artifact content source fields in memory/file/sqlite stores.
+   - Non-goals: real process management, browser launching, Web direct Edge, Hub preview store, mobile, real CLI/model.
 
-## 分支和 Worktree
+3. **Desktop local execution closure**
+   - Finish Desktop target preference/Tauri host readiness if not fully merged.
+   - Verify Desktop uses Local Edge runtime ids and never bypasses Edge to spawn CLI.
+   - Keep Web unchanged.
 
-| Worktree / branch | 处理 |
-|---|---|
-| main `D:\Code\TokenDance\AgentHub` | 若 live `git status --short --branch` 显示 dirty 或 behind，只读；不要直接开发；具体状态以 live status 和 `git log -1 origin/dev/delicious233` 为准 |
-| `.worktrees/roadmap-release-readiness` / `codex/roadmap-release-readiness` | 当前 docs 切片；完成后推 dev，再清理 |
-| `.worktrees/backend` / `feat/backend-edge-hub` | 旧整合线；`git cherry -v origin/dev/delicious233 feat/backend-edge-hub` 仍有未吸收提交；由 backend merge Agent 继续处理，本路线图只跟踪风险和依赖 |
-| `backend-api-contract-0607`、`backend-cli-e2e-0607`、`backend-docs`、`backend-johnny-pick`、`backend-oidc-log-0607`、`backend-openapi`、`backend-release-artifact-0607` | 历史候选；逐个 `status` + `cherry` 后归档或抽取 |
-| `backend-edge-split`、`backend-tests` | dirty 风险；保留，先审独有改动 |
-| `integrate-codex-adapter-precheck` | 复核是否已被 A0+A 吸收后清理 |
-| mobile worktrees | 低优先级支线，不混主线 |
-| `.worktrees/lobe-icons-runtime-branding` / `codex/lobe-icons-runtime-branding` | Worker F ready-for-review：shared `RuntimeBrandIcon` / `designIcons` registry uses `@lobehub/icons` model/runtime/provider helpers where available and local fallback icons for internal tools/runtimes; model-card status styling is scoped; touches only shared workbench icon surfaces and small Desktop settings cards. |
-| `.worktrees/login-real-readiness-gate` / `codex/login-real-readiness-gate` | 当前登录下一片：新增 packaged real login dry readiness gate，只读扫描 fake/local、packaged readiness、future real E2E 边界；不连接 TokenDance ID、不打开浏览器、不读取 secrets、不跑真实 CLI/model。 |
-| `.worktrees/preview-lifecycle-readiness` / `codex/preview-lifecycle-readiness` | 当前 preview lifecycle readiness 短切片：只补 stopped metadata transition、OpenAPI/events/shared state 合同和 focused tests；不启动/停止真实进程，不接 Hub/Web/mobile。 |
+4. **TeamRun/ByteDance demo evidence**
+   - Upgrade from dry fixture evidence to real UI/runtime evidence where allowed.
+   - Keep D3 real CLI/model blocked until runner, budget, environment approval, and artifact redaction are approved.
 
-清理规则：每个 worktree 清理前必须记录 `git status --short --branch` 和 `git rev-list --left-right --count HEAD...origin/dev/delicious233` 或等价 cherry 证据；dirty worktree 不批量删。
+5. **Login real E2E**
+   - Use existing fake/local and packaged readiness gates as preconditions.
+   - Real login test needs explicit approval for test OAuth client, test account, Hub test environment, browser window, and evidence boundaries.
 
-## 工程规则
+6. **Packaging/release**
+   - Internal Windows dry package evidence first.
+   - macOS unsigned arm64 validation can be added as dry validation.
+   - Authenticode, Developer ID signing, notarization, staple, updater production metadata, and release asset upload are separate approval slices.
 
-- 所有实现用独立 worktree；主工作树只读到专门清理计划完成。
-- 分支清理必须先由 subagent 出只读报告，主负责人逐项删除；禁止“一把删”。
-- 主负责人管分支、合并、验证、roadmap；subagent 做明确实现切片或只读审计。
-- Web 不引入 Local Edge/Tauri/filesystem；Desktop 不绕过 Edge 直接启 CLI。
-- mock/demo 只能做预览和 fixture；生产项必须定义 owner/schema/mutation/loading/error/empty。
-- 不提交 token、生产日志、本机 CLI 输出、私有服务器地址、个人路径截图或模型响应全文。
-- 真实 CLI/model gate 只在 runner、预算、approval、artifact redaction 明确后运行。
+## Active Parallel Queue
 
-## 下一步
+| Lane | Worktree / branch | Owner | Scope | State |
+|---|---|---|---|---|
+| Docs/control | `.worktrees/docs-projects-ui-status-sync` / `codex/docs-projects-ui-status-sync` | main | Roadmap compression and cleanup ledger | active |
+| Cleanup audit | subagent read-only | main | merged/broken/dirty worktree classification | audit complete; cleanup pending |
+| Backend merge | backend merge Agent | backend owner | old backend line small-slice absorption | external active |
+| Mobile | mobile owner worktrees | mobile owner | Feishu-style mobile redesign | external active; not on critical path |
+| Next Edge | new worktree TBD | worker | preview fake runner and start contract | ready to dispatch after docs push |
+| Next artifact | new worktree TBD | worker/explorer | content source schema proposal | ready to dispatch after docs push |
+| Next demo | new worktree TBD | worker/explorer | TeamRun real evidence topology | ready to dispatch after docs push |
 
-1. 提交本轮 roadmap/governance 刷新；推送由主负责人统一执行。
-2. Edge SQLite opt-in backend、Edge relational schema/migration、登录 fake/local gate、Tauri Windows installer/updater metadata readiness、TeamRun dry evidence、Artifact/Diff/Preview read-only Edge 前置和 runtime evidence 写入已合入；`codex/tauri-package-readiness` follow-up 已补 generated artifact ignore gate，待 review；真实登录和正式签名继续拆独立 proposal。
-   - `codex/packaged-login-e2e` 已补 packaged Desktop loopback/keyring readiness 的 local/static gate，不连接真实 TokenDanceID、不打开真实登录窗口；真实 packaged E2E 仍需单独 proposal/gate。
-   - `codex/login-real-readiness-gate` 补 `scripts/verify-packaged-login-real-readiness.ps1` dry gate 和脚本测试，明确 fake/local、packaged readiness、future real E2E 三层；真实 packaged login 仍 blocked，除非另行批准浏览器登录窗口、测试 OAuth client、测试账号和 Hub 测试环境。
-3. Desktop Edge mapper 首切片已合入：已接入 Edge agents/model catalog/Local Edge target mapper，并在 review 修正 StartRunRequest adapter id 映射、移除 provider 提交字段、阻断 Desktop live 空线程/demo transcript fallback；Projects create/update UI gate 已在 `fd7be0f9 feat(web): 收口 Hub Projects 创建更新 UI gate` 合入；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge target preference、Tauri host readiness command 和 sidecar launch args 测试，安装包联调后置。
-4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness；`codex/macos-unsigned-dry-policy` 只把 macOS arm64 unsigned dry 纳入 policy/readiness：验证 future `agenthub-edge-aarch64-apple-darwin` sidecar、future `AgentHub.app` / `AgentHub.dmg` bundle 命名和 workflow artifact-only 边界，不跑 `pnpm tauri build`、`codesign`、`notarytool`、`stapler` 或 release upload。
-5. `codex/runtime-evidence-inspector` 已补 shared RightInspector read-only snapshot 消费和 Desktop 既有 Edge evidence hook 接线，并修复 raw run id 选择、Desktop App v4 测试 harness、artifact metadata 非交互行与 preview 切 tab 行为；`codex/artifact-lifecycle-next` 已补 Edge artifact/preview metadata lookup；`codex/artifact-content-contract` 只记录 content readiness blocker 并用测试保持 planned/404；`codex/preview-lifecycle-readiness` 只补 preview stopped metadata transition 和 `POST /v1/previews/{previewId}:stop` metadata route readiness。下一片 preview runner 的写入范围应限定为 Edge lifecycle/API/store/OpenAPI tests：`POST /v1/previews` 创建 `starting` preview 记录、绑定 run/workspace/artifact、启动抽象 PreviewRunner 接口的 fake 实现并发出 `preview.ready` / `preview.stopped`，Desktop 仍只消费 read-only snapshot；不得加入真实 server process management、browser launching、Hub preview store、Web 直连 Edge、mobile 或真实 CLI/model。
-6. TeamRun 下一步从 dry fixture evidence 升级到真实 runtime/UI 证据，但仍不跑未批准的 D3 real CLI/model gate。
-7. Worker F LobeHub icon slice is ready for review on `codex/lobe-icons-runtime-branding` after rebase to current `origin/dev/delicious233`: focused registry/render tests, icon-governance test, Desktop typecheck, Web typecheck, and diff check are the completed gates; full shared `lint` remains blocked by pre-existing shared test/story/module issues unrelated to this icon slice.
+## Blocked Gates
+
+| Gate | Blocker | Required before unblocking |
+|---|---|---|
+| Real CLI/model D3 | runner, budget, environment approval, artifact redaction | Dedicated opt-in workflow and no-secret artifact policy |
+| Real packaged login | no approved test OAuth/account/browser evidence boundary | Test OAuth client, test account, Hub test env, explicit browser approval |
+| Artifact content route | no persisted safe content root/source fields | Store content source fields, path policy, MIME/size/checksum contract |
+| Artifact apply/discard | mutation semantics not defined | Workspace ownership, reversible patch policy, audit trail |
+| Preview real runner | process lifecycle policy not defined | Fake runner first, then process management proposal |
+| Signing/notarization | secrets and release policy not approved | Separate release proposal and secret boundary |
+| Projects delete | orphan policy undefined | `deleted_at` or hard-delete policy plus artifact/session relation rules |
+
+## Branch And Worktree Ledger
+
+Cleanup is staged. Do not bulk-delete.
+
+| Category | Items | Action |
+|---|---|---|
+| Clean merged candidates | backend merge helper worktrees, `runtime-evidence-inspector`, `macos-unsigned-dry-policy`, `docs-projects-ui-status-sync` after push | Final status check, then remove worktree and local branch |
+| Dirty merged/risky | `backend-merge-edge-control-stubs`, `message-attachments-readthrough`, `oidc-callback-redaction`, `tauri-package-next`, `ws-typing-membership`, `mobile-feishu-chat-redesign` | Preserve until dirty diff is audited |
+| Broken | `.worktrees/edge-sql-store` missing object; unregistered residual dirs such as `lobe-icons-runtime-branding` and `edge-store-contract` | Recreate or inspect before deletion |
+| Backend-owned | `backend*`, `feat/backend-edge-hub`, `integrate-codex-adapter-precheck` | Backend merge owner or explicit review only |
+| Mobile-owned | `mobile-*` | Leave to mobile owner |
+| Old `web-projects-readthrough` | branch-only, unique old docs/test shape | Keep until docs extraction and create/get-detail coverage decision are closed |
+
+Minimum cleanup evidence per item:
+
+```powershell
+git status --short --branch
+git rev-list --left-right --count HEAD...origin/dev/delicious233
+git merge-base --is-ancestor HEAD origin/dev/delicious233
+```
+
+## Engineering Rules
+
+- Use isolated worktrees for all implementation.
+- Main worktree is read-only until explicitly cleaned.
+- Coordinator owns topology, merge order, verification, cleanup, and roadmap.
+- Subagents own bounded implementation/review slices with disjoint write scopes.
+- Web cannot import Local Edge, Tauri, filesystem, or Desktop capability.
+- Desktop cannot bypass Edge to start CLI.
+- Shared UI cannot store backend URLs, tokens, or runtime-specific side effects.
+- Mock/demo is never production evidence.
+- Do not commit secrets, production logs, raw model outputs, private server paths, or personal local evidence.
+
+## Next Dispatch
+
+After this Roadmap slice is pushed:
+
+1. Spawn Edge preview fake-runner worker.
+2. Spawn artifact content-source proposal worker.
+3. Spawn TeamRun real evidence topology explorer.
+4. Spawn cleanup worker for clean merged worktrees only.
+5. Keep mobile and backend merge owners isolated.
