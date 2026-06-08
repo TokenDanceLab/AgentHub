@@ -1122,6 +1122,9 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		scope,
 	)
 	emitter = newHubCallbackEmitter(e, run.ID, emitter)
+	if evidenceEmitter := newRuntimeEvidenceEmitter(e.store, run, emitter); evidenceEmitter != nil {
+		emitter = evidenceEmitter
+	}
 	transcriptEmitter := newThreadTranscriptEmitter(e.store, run, emitter)
 	if transcriptEmitter != nil {
 		emitter = transcriptEmitter
