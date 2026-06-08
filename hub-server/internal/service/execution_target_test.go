@@ -2,6 +2,10 @@ package service
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -144,6 +148,41 @@ func TestExecutionTargetPingRequiresLiveProofForRemoteTargets(t *testing.T) {
 			require.Equal(t, "unknown", target.HealthState)
 		})
 	}
+}
+
+func TestExecutionTargetPingDoesNotUseAuthMethodAsBearerCredential(t *testing.T) {
+	var gotAuth string
+	edge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(edge.Close)
+
+	edgeURL, err := url.Parse(edge.URL)
+	require.NoError(t, err)
+	port, err := strconv.Atoi(edgeURL.Port())
+	require.NoError(t, err)
+
+	db := newExecutionTargetTestDB(t)
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-cloud",
+		OwnerID:            "owner-1",
+		Name:               "Cloud target",
+		TargetType:         "cloud_edge",
+		Host:               edgeURL.Hostname(),
+		Port:               port,
+		WorkspaceRoot:      "/workspace",
+		WorkspaceAllowlist: `["/workspace"]`,
+		TrustLevel:         "cloud",
+		HealthState:        "unknown",
+		AuthMethod:         "hub_jwt",
+		Capabilities:       "{}",
+		Metadata:           "{}",
+	}).Error)
+	svc := NewExecutionTargetService(db)
+
+	require.NoError(t, svc.Ping(context.Background(), "target-cloud", "owner-1"))
+	require.Empty(t, gotAuth, "auth_method is a public strategy enum and must not be reused as a bearer credential")
 }
 
 func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
