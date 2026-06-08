@@ -24,6 +24,8 @@ type MessageService interface {
 	ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
 	MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
 	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
+	AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
 }
 
 type MessageHandler struct {
@@ -236,6 +238,56 @@ func (h *MessageHandler) UnpinMessage(c *gin.Context) {
 		return
 	}
 	OK(c, nil)
+}
+
+func (h *MessageHandler) AddMessageReaction(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		Reaction  string `json:"reaction"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.AddMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
+}
+
+func (h *MessageHandler) RemoveMessageReaction(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		Reaction  string `json:"reaction"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.RemoveMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
 }
 
 func (h *MessageHandler) ListPins(c *gin.Context) {
