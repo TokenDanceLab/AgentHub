@@ -66,6 +66,8 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($scriptText -match "verify-packaged-login-real-readiness\.ps1") "script links packaged real-readiness dry gate"
     Assert-True ($scriptText -match "verify-web-hub-boundary\.ps1") "script links Web Hub-only boundary gate"
     Assert-True ($scriptText -match "verify-tauri-package-readiness\.ps1") "script links Tauri package readiness and macOS dry policy"
+    Assert-True ($scriptText -notmatch 'login fixture topology\|') "script roadmap assertion does not allow broad login fixture topology fallback"
+    Assert-True ($scriptText -match 'Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI/SDK adapter') "script roadmap assertion requires the concrete P0 remote-control chain"
 }
 
 $run = Invoke-CheckedScript "scripts\verify-login-fixture-topology.ps1"
