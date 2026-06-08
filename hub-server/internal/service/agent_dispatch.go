@@ -344,7 +344,13 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			slog.Error("failed to mark agent task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
 			return
 		}
-		s.mgr.PushToConn(connID, frame)
+		result := s.mgr.PushToConn(connID, frame)
+		if !result.Queued {
+			slog.Warn("agent task websocket dispatch not queued; preserving pending task", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+			if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
+				slog.Error("failed to preserve agent task after websocket dispatch failure", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
+			}
+		}
 		return
 	}
 

@@ -416,6 +416,44 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 	require.Equal(t, model.TaskStatusCancelled, stored.Status)
 }
 
+func TestDispatchTaskPreservesNonTargetTaskWhenDeliveryBufferFull(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"task-dispatch-full", "agent-1", "user-1", "msg-1", model.TaskStatusQueued, "dev-a", "2030-01-01T00:00:00Z").Error)
+
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+	for i := 0; i < cap(conn.Send); i++ {
+		conn.Send <- []byte("already queued")
+	}
+
+	cache := &mockAgentCache{routeID: conn.ID}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-dispatch-full",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run on online desktop", "", "", nil)
+
+	snapshot := cache.snapshot()
+	require.Equal(t, "user-1", snapshot.pushedUser)
+	require.Len(t, snapshot.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
+	require.Equal(t, task.ID, payload.TaskID)
+}
+
 func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
