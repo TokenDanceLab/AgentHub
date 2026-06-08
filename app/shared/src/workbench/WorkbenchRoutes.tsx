@@ -18,6 +18,7 @@ import type {
   DocRow,
   DocsPane,
   ProjectArtifact,
+  ProjectDraft,
   ProjectFilter,
   ProjectInfo,
   ProjectTab,
@@ -82,6 +83,11 @@ export interface WorkbenchRoutesProps {
   focusedAgentId?: string | undefined;
   projects?: ProjectInfo[] | undefined;
   projectsStatus?: WorkbenchProjectsStatus | undefined;
+  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onProjectUpdate?: ((
+    projectId: string,
+    draft: ProjectDraft,
+  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
@@ -100,6 +106,8 @@ export interface WorkbenchAgentProfilesStatus {
 export interface WorkbenchProjectsStatus {
   loading?: boolean | undefined;
   error?: string | undefined;
+  actionError?: string | undefined;
+  saving?: boolean | undefined;
 }
 
 export interface WorkbenchContactsData {
@@ -408,6 +416,8 @@ export function WorkbenchRoutes({
   focusedAgentId,
   projects,
   projectsStatus,
+  onProjectCreate,
+  onProjectUpdate,
   onAgentCreate,
   onAgentUpdate,
   onAgentDelete,
@@ -1023,8 +1033,12 @@ export function WorkbenchRoutes({
             setProjectPreview(createProjectArtifactPreview(id, artifact));
           }}
           onClosePreview={() => setProjectPreview(null)}
+          onProjectCreate={onProjectCreate}
           onProjectSelect={setProjectId}
+          onProjectUpdate={onProjectUpdate}
           onTabChange={setProjectTab}
+          projectActionError={projectsStatus?.actionError}
+          projectSaving={projectsStatus?.saving}
           projects={sourceProjects}
           projectsError={projectsStatus?.error}
           projectsLoading={projectsStatus?.loading}
