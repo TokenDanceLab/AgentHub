@@ -55,6 +55,11 @@ func newExecutionTargetTestDB(t *testing.T) *gorm.DB {
 			deleted_at DATETIME
 		)
 	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE UNIQUE INDEX idx_execution_targets_active_local_edge_device_unique
+		ON execution_targets(owner_id, target_type, device_id)
+		WHERE deleted_at IS NULL AND target_type = 'local_edge' AND device_id IS NOT NULL
+	`).Error)
 	return db
 }
 
@@ -368,6 +373,52 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineT
 
 	var count int64
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesWinnerAfterCreateConflict(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	svc := NewExecutionTargetService(db)
+	deviceID := "15151515-1515-4151-8151-151515151515"
+	seedDevice(t, db, deviceID, "owner-1", "desktop")
+
+	insertedWinner := false
+	require.NoError(t, db.Callback().Create().Before("gorm:create").Register("test:desktop_target_race_winner", func(tx *gorm.DB) {
+		target, ok := tx.Statement.Dest.(*model.ExecutionTarget)
+		if !ok || insertedWinner || target.DeviceID == nil {
+			return
+		}
+		if target.OwnerID != "owner-1" || target.TargetType != "local_edge" || *target.DeviceID != deviceID {
+			return
+		}
+		insertedWinner = true
+		if err := tx.Exec(`
+			INSERT INTO execution_targets
+				(id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, is_online, capabilities, metadata)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "target-race-winner", "owner-1", deviceID, "Desktop race winner", "local_edge", `["/old"]`, "local", "offline", false, `{}`, `{}`).Error; err != nil {
+			tx.AddError(err)
+		}
+	}))
+
+	target, err := svc.UpsertLocalEdgeForDesktopDevice(context.Background(), &model.Device{
+		ID:           deviceID,
+		UserID:       "owner-1",
+		DeviceType:   "desktop",
+		AppVersion:   "0.2.2",
+		Capabilities: `["local_edge","agent.dispatch"]`,
+	})
+	require.NoError(t, err)
+	require.True(t, insertedWinner, "test must inject a conflicting first-registration winner")
+	require.Equal(t, "target-race-winner", target.ID)
+	require.Equal(t, "Desktop Local Edge 15151515", target.Name)
+	require.True(t, target.IsOnline)
+	require.Equal(t, "healthy", target.HealthState)
+	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
+	require.JSONEq(t, `{"device_capabilities":["local_edge","agent.dispatch"]}`, target.Capabilities)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("owner_id = ? AND target_type = ? AND device_id = ?", "owner-1", "local_edge", deviceID).Count(&count).Error)
 	require.Equal(t, int64(1), count)
 }
 
