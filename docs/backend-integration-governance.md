@@ -1,6 +1,6 @@
 # 后端合并与端到端联调治理
 
-> 最后更新：2026-06-08 21:51 +08:00
+> 最后更新：2026-06-09 00:02 +08:00
 > 目标：把后端、Edge、Hub、Desktop、Web 的开发从并行堆积切回可审查、可合并、可验证的主线节奏。
 
 ## 当前基线
@@ -151,6 +151,7 @@ next: Main owner reviews the isolated icon diff and decides merge order.
 28. **Preview lifecycle readiness**：`codex/preview-lifecycle-readiness` 只补 preview stopped metadata contract：Edge lifecycle 持久化 `preview.stopped` 到现有 preview 记录，`POST /v1/previews/{previewId}:stop` 将已有本地 preview 转为 `stopped` 并清空 ready URL，OpenAPI 标记 stop implemented，shared event/state 接收 stopped 事件供 Desktop inspector 的 read-only evidence surface 使用。该片不实现 `POST /v1/previews` start，不启动或停止真实 dev server/OS process，不打开 browser，不新增 Hub preview store，不让 Web 直连 Edge，不改 mobile，不跑真实 CLI/model。
 29. **Preview fake-runner start contract**：`codex/preview-runner-fake` 只补 Edge fake preview runner interface 与 `POST /v1/previews` metadata contract。API 为已有 run 创建 `starting` preview metadata，fake runner 测试可把同一条记录标记为 `ready` 或 `stopped`；OpenAPI 补请求 schema，但 route-status gate 继续把 start 归为 planned，直到真实 process runner policy 单独收口。该片不启动真实 dev server、不管理真实 OS process、不打开 browser、不做 artifact content/apply/discard、不新增 Hub preview store、不让 Web 直连 Edge、不改 Desktop/mobile、不跑真实 CLI/model。
 30. **SDK AgentSpec contract draft**：`codex/agent-spec-schema` 只补 `AgentHubAgentSpec` docs/schema/fixture 合同草案，OpenAPI 仅新增 component-only `experimental/contract draft` schema，不声明任何 endpoint 已接收或返回该完整 shape；后续 SDK PoC 只按 fixture 顺序推进，审批前不安装 SDK、不跑真实 CLI/model。
+31. **SDK fixture mapper golden tests**：`codex/sdk-fixture-mapper` 只新增 Edge adapter fixture mapper 和 golden tests，把 Claude SDK-like / OpenAI Agents SDK-like fixture JSON 投影到既有 AgentHub runtime/evidence events：`run.agent.tool_call`、`run.agent.permission_requested`、`run.agent.route_decision`、`run.agent.file_change`、`artifact.created` 和 `run.agent.result`。mapper 不实现/注册 adapter，不安装 SDK 包，不运行真实 CLI/model，不改 Hub API、Web/Desktop/mobile 或 Tauri；输出保持 workspace-relative/basename-only path 和常见 secret/token 字段脱敏。
 
 当前不允许把 `feat/backend-edge-hub` dirty diff 一次性合进 `dev/delicious233`，因为它同时改 runtime 行为、脚本框架、CI release gate、项目 skill 和治理文档，review 面过宽，失败时无法快速定位。
 
