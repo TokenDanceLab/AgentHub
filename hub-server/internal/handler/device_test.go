@@ -140,9 +140,51 @@ func TestDeviceHandler_Register_InternalError(t *testing.T) {
 	}
 }
 
-func TestDeviceHandler_CloudEdgeRegisterIssuesEdgeScopedJWT(t *testing.T) {
+func TestDeviceHandler_RegisterRejectsMismatchedJWTDeviceID(t *testing.T) {
+	called := false
 	svc := &mockDeviceService{
 		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+			called = true
+			return nil, errcode.ErrInternal
+		},
+	}
+	h := handler.NewDeviceHandler(svc)
+
+	c, w := newGinCtx("POST", "/edge/devices/register", map[string]any{
+		"device_id": testDeviceID,
+	}, "user_id", "u1", "device_type", "desktop", "device_id", "22222222-2222-4222-8222-222222222222")
+	h.Register(c)
+
+	if called {
+		t.Fatal("service should not be called when JWT device_id does not match the registered device")
+	}
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != "device_id does not match JWT claims" {
+		t.Fatalf("message = %q, want JWT device mismatch", resp.Error.Message)
+	}
+}
+
+func TestDeviceHandler_CloudEdgeRegisterAllowsDifferentCallerDeviceAndIssuesEdgeScopedJWT(t *testing.T) {
+	called := false
+	svc := &mockDeviceService{
+		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+			called = true
+			if deviceID != testDeviceID {
+				t.Fatalf("deviceID = %q, want %s", deviceID, testDeviceID)
+			}
+			if userID != "u1" {
+				t.Fatalf("userID = %q, want u1", userID)
+			}
 			if deviceType != "cloud_edge" {
 				t.Fatalf("deviceType = %q, want cloud_edge", deviceType)
 			}
@@ -158,16 +200,21 @@ func TestDeviceHandler_CloudEdgeRegisterIssuesEdgeScopedJWT(t *testing.T) {
 	h := handler.NewDeviceHandler(svc)
 	h.SetJWTConfig("hub-secret-at-least-32-bytes-long!!", time.Hour)
 
+	callerDeviceID := "22222222-2222-4222-8222-222222222222"
 	c, w := newGinCtx("POST", "/cloud/edge/register", map[string]any{
 		"device_id":    testDeviceID,
 		"app_version":  "1.0.0",
 		"capabilities": []string{"edge"},
-	}, "user_id", "u1", "device_id", testDeviceID)
+	}, "user_id", "u1", "device_id", callerDeviceID)
 	h.CloudEdgeRegister(c)
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
+	if !called {
+		t.Fatal("service should be called for a distinct cloud edge device id")
+	}
+
 	var resp handler.Response
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -183,6 +230,9 @@ func TestDeviceHandler_CloudEdgeRegisterIssuesEdgeScopedJWT(t *testing.T) {
 	}
 	if err := json.Unmarshal(data, &body); err != nil {
 		t.Fatalf("unmarshal response data: %v", err)
+	}
+	if body.DeviceID != testDeviceID {
+		t.Fatalf("response device_id = %q, want %s", body.DeviceID, testDeviceID)
 	}
 	if body.DeviceType != "cloud_edge" {
 		t.Fatalf("response device_type = %q, want cloud_edge", body.DeviceType)
