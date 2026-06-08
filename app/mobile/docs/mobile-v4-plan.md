@@ -20,6 +20,7 @@ The product direction is:
 |---|---|
 | Priority | P1/P2 planning branch; do not mix into Desktop/Web v4 gates. |
 | Implementation | No UI implementation in this consolidation pass. |
+| Technology direction | Expo + React Native is the recommended long-term Mobile mainline; the existing Tauri package is a frozen legacy prototype. See [mobile-expo-rn-migration-plan.md](mobile-expo-rn-migration-plan.md). |
 | Dev port | Mobile is allocated `5175` as the strict preview/dev boundary; the existing app config may still need a later code slice to migrate from older local values. |
 | Remote control | Mobile controls or observes Hub/Edge-mediated remote runs only through Hub contracts, approvals, stop/retry actions, and read-only evidence surfaces. |
 | Identity | TokenDance ID remains the identity source. Feishu/Lark is an IM/collaboration reference and integration entry, not a second login system. |
@@ -78,7 +79,7 @@ This is a planning sequence, not a current implementation commitment:
 | Milestone | Goal | Gate |
 |---|---|---|
 | M0 | Consolidate Mobile v4 plan and README pointer. | `git diff --check`, scoped status. |
-| M1 | Port and QA harness alignment for `5175`. | Mobile dev/preview starts on `5175`; QA scripts target `5175`. |
+| M1 | Expo/RN spike scaffold and Tauri freeze boundary. | `app/mobile-rn` starts, imports only RN-safe shared contracts, and leaves `app/mobile` as legacy reference. |
 | M2 | Feishu-style IM queue design and data projection. | Phone queue screenshots for full, filtered, empty, recovery, unread, muted, bot, Agent, external. |
 | M3 | Codex-style thread/composer and inline run blocks. | Long-thread, send/stop, context chips, command blocks, file/diff/approval states. |
 | M4 | Hub-mediated remote-control flow. | Stop/retry/approval/offline/session-failure states with confirmation sheets. |
