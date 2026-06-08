@@ -606,6 +606,41 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("item not found")))
 }
 
+func (h *Handler) GetRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
+	repository := ensureStore(h)
+	if _, ok := repository.GetRun(runID); !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+	files := repository.ListRunDiffFiles(runID)
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"runId": runID,
+		"files": runDiffFilesResponse(files),
+	})
+}
+
+func (h *Handler) GetArtifacts(w http.ResponseWriter, r *http.Request) {
+	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListArtifacts(runID)))
+}
+
+func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
+	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListPreviews(runID)))
+}
+
+func runDiffFilesResponse(files []store.RunDiffFile) []map[string]any {
+	out := make([]map[string]any, 0, len(files))
+	for _, file := range files {
+		out = append(out, map[string]any{
+			"path":   file.Path,
+			"diff":   file.Diff,
+			"status": file.Status,
+		})
+	}
+	return out
+}
+
 // ---------------------------------------------------------------------------
 // GET /v1/agents
 // ---------------------------------------------------------------------------
@@ -1401,6 +1436,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			h.PostCancelRun(w, r)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/diff") && r.Method == http.MethodGet {
+			runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/diff")
+			h.GetRunDiff(w, r, runID)
+			return
+		}
 		if r.Method == http.MethodGet {
 			runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
 			if run, ok := ensureStore(h).GetRun(runID); ok {
@@ -1411,6 +1451,20 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
+	})
+	mux.HandleFunc("/v1/artifacts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.GetArtifacts(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
+	mux.HandleFunc("/v1/previews", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.GetPreviews(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
 	mux.HandleFunc("/v1/metrics", h.GetMetrics)
 	mux.HandleFunc("/v1/events", h.GetEvents)
