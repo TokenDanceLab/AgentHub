@@ -1,4 +1,5 @@
 import React from 'react';
+import { RuntimeBrandIcon } from '../RuntimeBrandIcon';
 import styles from './ToolCardBlock.module.css';
 
 /** Status labels matching the demo's statusLabel() mapping */
@@ -29,14 +30,6 @@ const statusClassMap: Record<string, string> = {
   pending: styles.statusPending ?? '',
 };
 
-const toolGlyphMap: Record<string, string> = {
-  Read: 'R',
-  rg: 'G',
-  Shell: '>',
-  Write: 'W',
-  Edit: 'E',
-};
-
 /**
  * ToolCardBlock — horizontal card showing a tool execution with
  * colored icon, name, path, and status badge.
@@ -50,12 +43,16 @@ export const ToolCardBlock: React.FC<ToolCardBlockProps> = ({
   icon,
   description,
 }) => {
-  const glyph = icon ?? toolGlyphMap[toolName] ?? toolName.slice(0, 1).toUpperCase();
+  const glyph = icon;
   const statusClass = statusClassMap[status] ?? '';
 
   return (
     <div className={`${styles.card} tool-card agent-tool-card`} data-card-surface>
-      <div className={styles.icon}>{glyph}</div>
+      <div className={styles.icon}>
+        {glyph ? glyph : (
+          <RuntimeBrandIcon kind="tool" name={toolName} size="compact" framed={false} />
+        )}
+      </div>
 
       <div className={styles.main}>
         <div className={styles.name}>{toolName}</div>

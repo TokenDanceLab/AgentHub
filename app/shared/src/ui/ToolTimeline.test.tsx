@@ -1,7 +1,18 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ToolTimeline, type ToolTimelineBlock, type ToolTimelineLabels } from './ToolTimeline';
+
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="claude-code-icon" />,
+  Codex: ({ size }: { size?: number }) => <span data-size={size} data-testid="codex-icon" />,
+  ModelIcon: ({ model, size }: { model: string; size?: number }) => <span data-model={model} data-size={size} data-testid="model-icon" />,
+  OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
+}));
+
+vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({
+  default: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
+}));
 
 describe('ToolTimeline', () => {
   it('returns null when fewer than 2 entries', () => {
@@ -31,6 +42,19 @@ describe('ToolTimeline', () => {
     render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('Read')).toBeDefined();
     expect(screen.getByText('Write')).toBeDefined();
+  });
+
+  it('renders tool_use markers through the shared runtime brand resolver', () => {
+    const blocks: ToolTimelineBlock[] = [
+      { kind: 'tool_use', callId: 'c1', toolName: 'Read', input: {}, status: 'completed' },
+      { kind: 'tool_use', callId: 'c2', toolName: 'apply_patch', input: {}, status: 'running' },
+    ];
+    const { container } = render(<ToolTimeline blocks={blocks as any} />);
+
+    const toolIcons = container.querySelectorAll('[data-runtime-brand-kind="tool"]');
+    expect(toolIcons).toHaveLength(2);
+    expect(toolIcons[0]?.getAttribute('data-runtime-brand-fallback')).toBe('read');
+    expect(toolIcons[1]?.getAttribute('data-runtime-brand-fallback')).toBe('write');
   });
 
   it('displays basename for file_change blocks', () => {
