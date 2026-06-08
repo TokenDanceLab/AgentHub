@@ -76,6 +76,8 @@ Offline evidence readiness and packaging:
 ```powershell
 .\scripts\export-teamrun-demo-fixture-evidence.ps1
 .\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\teamrun-evidence.json -Mode FixtureRehearsal
+.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\mock-remote-control-evidence.json -Mode Mock
+.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\real-remote-control-evidence.json -Mode RealTested
 .\scripts\package-teamrun-demo-evidence.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\teamrun-evidence.json
 .\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\submission-evidence\<stamp>\teamrun-evidence.json -Mode FixtureRehearsal
 .\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\submission-evidence\<stamp>\teamrun-evidence.json -VideoPath .tmp\submission-evidence\<stamp>\demo.mp4
@@ -91,6 +93,65 @@ recording. Fixture evidence must pass readiness only with
 `-Mode FixtureRehearsal`; the default `Submission` gate intentionally rejects
 fixture-only evidence.
 
+## Evidence Taxonomy
+
+The readiness gate intentionally separates four evidence levels. Do not use a
+stronger label until the listed proof exists.
+
+| Mode | Accepted input | Explicitly blocked from | Required proof |
+|---|---|---|---|
+| `FixtureRehearsal` | Frozen fixture scenario/exported fixture evidence with `source.fixture_only=true` and all real/runtime/submission claims false | `Submission`, real demo claims | Existing fixture contract fields only. This proves shape and rehearsal plumbing, not execution. |
+| `Mock` | Synthetic remote-control evidence with `source.mock_only=true` or `remote_control_manifest.mode=Mock` and all real/runtime/submission claims false | `RealTested`, `Submission` | `remote_control_manifest` fields for the chain, but no real runtime proof. This is useful for offline script tests only. |
+| `RealTested` | A real Web -> Hub -> Desktop Edge -> Local Edge -> CLI adapter run with real runtime claims true | `Submission` unless final recording/submission claims and video exist | `remote_control_manifest` plus `real_proof` refs for web action, Hub dispatch, Desktop Edge dispatch, Local Edge run, CLI adapter run, and Hub state export. |
+| `Submission` | Final package evidence from a real run | Fixture/mock packages | Everything from `RealTested`, plus `final_recording_complete=true`, `submission_ready=true`, and an existing `-VideoPath`. |
+
+The remote-control manifest required by `Mock`, `RealTested`, and `Submission`
+evidence is deterministic JSON and does not require live services to validate:
+
+```json
+{
+  "remote_control_manifest": {
+    "hubTaskId": "hub-task-001",
+    "targetId": "target-desktop-edge-001",
+    "edgeDeviceId": "desktop-edge-device-001",
+    "edgeRunId": "edge-run-001",
+    "adapterId": "codex-cli-adapter",
+    "mode": "RealTested",
+    "startedAt": "2026-06-09T00:00:00+08:00",
+    "eventRefs": [
+      "hub:agent.dispatch:evt-001",
+      "desktop-edge:task.accepted:evt-002",
+      "local-edge:run.started:evt-003",
+      "adapter:run.completed:evt-004"
+    ],
+    "redaction": {
+      "status": "redacted",
+      "checkedAt": "2026-06-09T00:05:00+08:00"
+    }
+  }
+}
+```
+
+For `RealTested` and `Submission`, the evidence JSON must also include:
+
+```json
+{
+  "real_proof": {
+    "webActionRef": "screenshot:web-start-teamrun.png",
+    "hubDispatchRef": "api:/web/agent-teams/<teamId>/runs/<runId>/events#evt-001",
+    "desktopEdgeRef": "desktop-edge-log:dispatch-accepted",
+    "localEdgeRunRef": "local-edge:/v1/runs/<edgeRunId>",
+    "cliAdapterRef": "adapter-log:<adapterId>-run-001",
+    "hubStateExportRef": "api:/web/agent-teams/<teamId>/runs/<runId>/state"
+  }
+}
+```
+
+The readiness script checks this shape offline. It does not prove that a local
+machine has the logs or screenshots named by those refs; the demo operator must
+keep those files in the ignored evidence package and record the final video
+before using `Submission`.
+
 ## Demo Evidence To Capture
 
 The final competition package still needs a real run, not only unit tests:
@@ -98,6 +159,7 @@ The final competition package still needs a real run, not only unit tests:
 - Screen recording: one group/team conversation where the user mentions or starts the supervisor Agent Profile, the supervisor delegates to a worker Agent Profile, and the worker returns a visible result.
 - Screenshot set: Desktop transcript, right-side evidence inspector, TeamRun Console state, route/task/event list.
 - Exported event proof: responses from `/web/agent-teams/:teamId/runs/:runId/state`, `/events`, `/tasks`, and `/assignments`.
+- Remote-control chain proof: one manifest tying together `hubTaskId`, `targetId`, `edgeDeviceId`, `edgeRunId`, `adapterId`, mode, start time, event refs, and redaction status for Web -> Hub -> Desktop Edge -> Local Edge -> CLI adapter.
 - Runtime proof: the two participating Agent Profiles must be real configured profiles. Runtime adapter IDs such as `claude-code`, `codex`, or `opencode` are execution mechanisms, not user-facing Agent identities.
 - Submission package proof: `.tmp/submission-evidence/<stamp>/manifest.md`
   generated by `scripts/package-teamrun-demo-evidence.ps1`, then checked by
