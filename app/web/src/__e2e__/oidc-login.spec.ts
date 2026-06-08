@@ -101,7 +101,7 @@ function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCPar
 }
 
 function buildWebRedirectUri(): string {
-  return 'http://localhost:5173/auth/tokendance/callback';
+  return 'http://localhost:5174/auth/tokendance/callback';
 }
 
 // ── Tests ────────────────────────────────────────
@@ -147,7 +147,7 @@ test.describe('Web OIDC Login — Happy Path', () => {
         state: 'web-test-state-mock-12345',
         codeVerifier: 'web-test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri: 'http://localhost:5173/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5174/auth/tokendance/callback',
         createdAt: Date.now(),
       }));
     });

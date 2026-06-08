@@ -42,7 +42,7 @@ CLIENT_SECRET="agenthub-dev-secret-change-me"
 # Pre-computed bcrypt hash for the above secret.
 # To regenerate: go run scripts/bcrypt-hash.go "your-secret"
 BCRYPT_HASH='$2a$10$CFRzH1R6MEUVU88nLzRSo.1qX7DtG6sPTqOrZ5HNfp1awu0ei0XpS'
-REDIRECT_URIS='["http://127.0.0.1/callback","http://localhost:5173/auth/tokendance/callback"]'
+REDIRECT_URIS='["http://127.0.0.1/callback","http://localhost:5174/auth/tokendance/callback","http://127.0.0.1:5174/auth/tokendance/callback"]'
 GRANT_TYPES='["authorization_code","refresh_token"]'
 SCOPES='["openid","profile","email"]'
 
@@ -145,13 +145,14 @@ code "AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://localhost:3000"
 code "AGENTHUB_TOKENDANCE_ID_CLIENT_ID=$CLIENT_ID"
 code "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=$CLIENT_SECRET"
 code "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1/callback"
-code "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS=http://127.0.0.1/callback,http://localhost:5173/auth/tokendance/callback"
+code "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS=http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback,http://127.0.0.1:5174/auth/tokendance/callback"
 echo ''
 info "Add to TokenDance ID config (configs/config.yaml):"
 echo ''
 code "security:"
 code "  allowed_origins:"
-code "    - http://localhost:5173"
+code "    - http://localhost:5174"
+code "    - http://127.0.0.1:5174"
 code "    - http://localhost:3000"
 echo ''
 info "Done. Restart Hub Server to apply changes:"
