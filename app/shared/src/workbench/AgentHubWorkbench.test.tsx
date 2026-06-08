@@ -74,8 +74,8 @@ describe('AgentHubWorkbench', () => {
       adapterId: 'codex',
       deviceId: 'desktop-device-1',
       sourceLabel: 'Hub replay',
-      modeLabel: 'Real',
-      targetLabel: 'Desktop local_edge',
+      modeLabel: 'Replay',
+      targetLabel: 'Edge run evidence',
     },
     {
       id: 'thinking-1',
@@ -210,8 +210,8 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
     expect(screen.getByText('Hub replay for desktop run')).toBeInTheDocument();
     expect(screen.getByText('Source: Hub replay')).toBeInTheDocument();
-    expect(screen.getByText('Mode: Real')).toBeInTheDocument();
-    expect(screen.getByText('Target: Desktop local_edge')).toBeInTheDocument();
+    expect(screen.getByText('Mode: Replay')).toBeInTheDocument();
+    expect(screen.getByText('Target: Edge run evidence')).toBeInTheDocument();
     expect(screen.getByText('Hub task: task-v4')).toBeInTheDocument();
     expect(screen.getByText('Edge run: edge-run-v4')).toBeInTheDocument();
     expect(screen.getByText('Adapter: codex')).toBeInTheDocument();
