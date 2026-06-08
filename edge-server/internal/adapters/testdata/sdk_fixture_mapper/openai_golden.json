@@ -128,6 +128,7 @@
       "sourceEventId": "openai_result_1",
       "success": true,
       "summary": "OpenAI Agents SDK-like fixture completed.",
+      "terminalReason": "completed",
       "traceRefs": [
         "trace:openai:root"
       ]
