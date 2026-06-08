@@ -73,18 +73,19 @@ type ReplyToInfo struct {
 }
 
 type MessageResponse struct {
-	ID           string       `json:"id"`
-	SessionID    string       `json:"session_id"`
-	SeqID        int64        `json:"seq_id"`
-	ClientMsgID  string       `json:"client_msg_id"`
-	SenderType   string       `json:"sender_type"`
-	SenderID     string       `json:"sender_id"`
-	ContentType  string       `json:"content_type"`
-	Content      string       `json:"content"`
-	ReplyToMsgID *string      `json:"reply_to_message_id,omitempty"`
-	ReplyTo      *ReplyToInfo `json:"reply_to,omitempty"`
-	Recalled     bool         `json:"recalled"`
-	CreatedAt    string       `json:"created_at"`
+	ID           string             `json:"id"`
+	SessionID    string             `json:"session_id"`
+	SeqID        int64              `json:"seq_id"`
+	ClientMsgID  string             `json:"client_msg_id"`
+	SenderType   string             `json:"sender_type"`
+	SenderID     string             `json:"sender_id"`
+	ContentType  string             `json:"content_type"`
+	Content      string             `json:"content"`
+	ReplyToMsgID *string            `json:"reply_to_message_id,omitempty"`
+	ReplyTo      *ReplyToInfo       `json:"reply_to,omitempty"`
+	Attachments  []model.Attachment `json:"attachments,omitempty"`
+	Recalled     bool               `json:"recalled"`
+	CreatedAt    string             `json:"created_at"`
 }
 
 type SendMessageResponse struct {
@@ -412,6 +413,7 @@ func (s *MessageService) GetMessagesIncremental(ctx context.Context, sessionID, 
 
 func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageResponse {
 	result := make([]MessageResponse, len(msgs))
+	attachmentsByMessage := s.attachmentsByMessageID(msgs)
 
 	replyToIDs := make(map[string]bool)
 	for _, m := range msgs {
@@ -450,6 +452,10 @@ func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageRespo
 			CreatedAt:    m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
+		if len(attachmentsByMessage[m.ID]) > 0 {
+			resp.Attachments = attachmentsByMessage[m.ID]
+		}
+
 		if m.ReplyToMsgID != nil && replyMessages != nil {
 			if replyMsg, ok := replyMessages[*m.ReplyToMsgID]; ok {
 				replyContent := replyMsg.Content
@@ -472,6 +478,31 @@ func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageRespo
 		result[i] = resp
 	}
 	return result
+}
+
+func (s *MessageService) attachmentsByMessageID(msgs []model.Message) map[string][]model.Attachment {
+	messageIDs := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, msg := range msgs {
+		if msg.ContentType != model.ContentTypeFile || msg.ID == "" {
+			continue
+		}
+		if _, exists := seen[msg.ID]; exists {
+			continue
+		}
+		seen[msg.ID] = struct{}{}
+		messageIDs = append(messageIDs, msg.ID)
+	}
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	attachmentsByMessage, err := repository.ListAttachmentsByMessageIDs(s.db, messageIDs)
+	if err != nil {
+		slog.Warn("failed to load message attachments", "error", err)
+		return nil
+	}
+	return attachmentsByMessage
 }
 
 func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string) error {

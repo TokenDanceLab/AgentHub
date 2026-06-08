@@ -782,6 +782,39 @@ func TestGetMessages_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestGetMessages_ReadsAttachmentsFromMessageAttachmentRelation(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db}
+
+	seedMessageSessionMember(t, db, "sess-read-attachments", "reader-1")
+	require.NoError(t, db.Exec(`INSERT INTO messages (
+		id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-file-1", "sess-read-attachments", 1, "client-file-1", "user", "sender-1", "file",
+		`{"attachment_id":"att-read-1","name":"report.txt"}`, false, time.Now(),
+	).Error)
+	require.NoError(t, db.Exec(`INSERT INTO attachments (
+		id, hash, size, mime_type, original_name, uploader_user_id, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"att-read-1", "hash-read-1", 128, "text/plain", "report.txt", "sender-1", time.Now(),
+	).Error)
+	require.NoError(t, db.Exec(`INSERT INTO message_attachments (
+		session_id, message_id, attachment_id, created_at
+	) VALUES (?, ?, ?, ?)`,
+		"sess-read-attachments", "msg-file-1", "att-read-1", time.Now(),
+	).Error)
+
+	msgs, err := svc.GetMessages(context.Background(), "sess-read-attachments", "reader-1", 0, 50)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	require.Len(t, msgs[0].Attachments, 1)
+	assert.Equal(t, "att-read-1", msgs[0].Attachments[0].ID)
+	assert.Equal(t, "hash-read-1", msgs[0].Attachments[0].Hash)
+	assert.Equal(t, int64(128), msgs[0].Attachments[0].Size)
+	assert.Equal(t, "text/plain", msgs[0].Attachments[0].MimeType)
+	assert.Equal(t, "report.txt", msgs[0].Attachments[0].OriginalName)
+}
+
 // ==================== MarkRead ====================
 
 func TestMarkRead_NotMember(t *testing.T) {
