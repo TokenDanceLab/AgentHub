@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -82,6 +83,16 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			payload TEXT NOT NULL,
 			created_at DATETIME
 		)`,
+		`CREATE TABLE agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT NOT NULL,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT,
+			status TEXT NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
 	}
 	for _, stmt := range ddl {
 		require.NoError(t, db.Exec(stmt).Error)
@@ -102,6 +113,40 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 	).Error)
 
 	return db
+}
+
+type mockTeamRouteHandler struct {
+	calls []mockRouteCall
+	err   error
+}
+
+type mockRouteCall struct {
+	userID   string
+	teamID   string
+	runID    string
+	decision model.CoordinatorRouteDecision
+}
+
+func (m *mockTeamRouteHandler) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
+	m.calls = append(m.calls, mockRouteCall{
+		userID:   userID,
+		teamID:   teamID,
+		runID:    runID,
+		decision: decision,
+	})
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &model.AgentTeamAssignment{ID: "assignment-1", TeamRunID: runID}, nil
+}
+
+func seedAgentRunEventTeamRun(t *testing.T, db *gorm.DB, status string) {
+	t.Helper()
+	now := time.Now()
+	require.NoError(t, db.Exec(
+		`INSERT INTO agent_team_runs (id, team_id, session_id, trigger_user_id, trigger_message, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"team-run-1", "team-1", "sess-1", "owner-1", "start team run", status, now, now,
+	).Error)
 }
 
 func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
@@ -141,6 +186,101 @@ func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("agent.stream event was not published")
 	}
+}
+
+func TestHandleTaskStreamAutoParsesRunningTeamRunRouteDecision(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
+	handler := &mockTeamRouteHandler{}
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc.SetTeamRouteHandler(handler)
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route","reasoning":"needs backend"}`),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, handler.calls, 1)
+	call := handler.calls[0]
+	require.Equal(t, "owner-1", call.userID)
+	require.Equal(t, "team-1", call.teamID)
+	require.Equal(t, "team-run-1", call.runID)
+	require.Equal(t, "delegate", call.decision.Action)
+	require.Equal(t, "member-2", call.decision.NextWorker)
+	require.Equal(t, "Implement the route", call.decision.Instructions)
+}
+
+func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  string
+		payload json.RawMessage
+		wantErr error
+	}{
+		{
+			name:    "invalid json",
+			status:  model.TeamRunStatusRunning,
+			payload: json.RawMessage(`{"action":`),
+			wantErr: errcode.ErrBadRequest,
+		},
+		{
+			name:    "non decision",
+			status:  model.TeamRunStatusRunning,
+			payload: json.RawMessage(`{"type":"run.output.batch","content":"hello"}`),
+		},
+		{
+			name:    "invalid action",
+			status:  model.TeamRunStatusRunning,
+			payload: json.RawMessage(`{"action":"handoff","next_worker":"member-2","instructions":"Implement"}`),
+		},
+		{
+			name:    "non running team run",
+			status:  model.TeamRunStatusCompleted,
+			payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement"}`),
+		},
+		{
+			name:    "no team run",
+			payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement"}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newAgentRunEventTestDB(t)
+			if tt.status != "" {
+				seedAgentRunEventTeamRun(t, db, tt.status)
+			}
+			handler := &mockTeamRouteHandler{}
+			svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+			svc.SetTeamRouteHandler(handler)
+
+			err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+				Payload: tt.payload,
+			})
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Empty(t, handler.calls)
+		})
+	}
+}
+
+func TestHandleTaskStreamRouteDecisionHandlerErrorDoesNotFailStream(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
+	handler := &mockTeamRouteHandler{err: errors.New("route handler unavailable")}
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc.SetTeamRouteHandler(handler)
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route"}`),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, handler.calls, 1)
 }
 
 func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {
