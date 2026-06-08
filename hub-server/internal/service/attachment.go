@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -184,8 +185,16 @@ func (s *AttachmentService) ProbeAttachment(ctx context.Context, userID, hash st
 }
 
 func (s *AttachmentService) SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error) {
+	return s.SaveAttachmentWithMetadata(ctx, uploaderID, hash, mimeType, originalName, size, "")
+}
+
+func (s *AttachmentService) SaveAttachmentWithMetadata(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64, metadata string) (*model.Attachment, error) {
 	if !IsValidAttachmentHash(hash) {
 		return nil, errcode.ErrBadRequest
+	}
+	normalizedMetadata, err := NormalizeAttachmentMetadataJSON(metadata)
+	if err != nil {
+		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
 	}
 
 	// Hash-based dedup: if the same uploader already uploaded this hash,
@@ -200,11 +209,33 @@ func (s *AttachmentService) SaveAttachment(ctx context.Context, uploaderID, hash
 		MimeType:       mimeType,
 		OriginalName:   originalName,
 		UploaderUserID: uploaderID,
+		Metadata:       normalizedMetadata,
 	}
 	if err := repository.CreateAttachment(s.db, a); err != nil {
 		return nil, err
 	}
 	return a, nil
+}
+
+func NormalizeAttachmentMetadataJSON(metadata string) (string, error) {
+	metadata = strings.TrimSpace(metadata)
+	if metadata == "" {
+		return "{}", nil
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(metadata), &payload); err != nil {
+		return "", fmt.Errorf("metadata must be valid JSON: %w", err)
+	}
+	if payload == nil {
+		return "", fmt.Errorf("metadata must be a JSON object")
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return string(normalized), nil
 }
 
 // StoreBlob writes attachment content to the configured object storage.

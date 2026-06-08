@@ -128,6 +128,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			mime_type TEXT NOT NULL,
 			original_name TEXT DEFAULT '',
 			uploader_user_id TEXT NOT NULL,
+			metadata TEXT NOT NULL DEFAULT '{}',
 			created_at DATETIME
 		)`,
 		`CREATE TABLE agent_instances (
@@ -1169,6 +1170,7 @@ func TestAttachmentRepo_CreateAndGet(t *testing.T) {
 		MimeType:       "image/png",
 		OriginalName:   "screenshot.png",
 		UploaderUserID: "user-att",
+		Metadata:       `{"origin":"test"}`,
 	}
 	err := CreateAttachment(db, a)
 	require.NoError(t, err)
@@ -1179,6 +1181,7 @@ func TestAttachmentRepo_CreateAndGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "abc123hash", fetched.Hash)
 	assert.Equal(t, int64(2048), fetched.Size)
+	assert.JSONEq(t, `{"origin":"test"}`, fetched.Metadata)
 
 	// Get by hash
 	fetched, err = GetAttachmentByHash(db, "abc123hash")
