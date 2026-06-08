@@ -74,7 +74,7 @@ next: <1-3 steps>
 
 1. Web 分支不得引入 Local Edge、Tauri、filesystem 或 Desktop runtime capability；Web 只能经 Hub REST/WS 和 Hub-issued session。
 2. Desktop 本地执行不得绕过 Edge；UI 只能经 platform adapter 到 Edge REST/WS，不得直接启动 CLI 或拼 shell。
-3. Hub dispatch 必须绑定 exact `agent_instance_id` 和 exact Desktop device / ExecutionTarget；离线只能进对应 user/device/target queue，禁止 fallback 到其他在线 Desktop。
+3. Hub dispatch 必须绑定 exact `agent_instance_id` 和 owner-scoped `local_edge` ExecutionTarget / exact Desktop device；离线只能进对应 user/device/target queue，禁止 fallback 到其他在线 Desktop。Remote/cloud/relay target dispatch 仍是后续 relay/provisioning 片，不走当前 Web `/web/agent-tasks` 合同。
 4. Edge `agentId` 必须显式校验 adapter registry；未知 runtime 不得静默 fallback 到默认 adapter。
 5. 任何把 mock/demo 当验收证据的 PR 必须标注为 demo；生产接入项必须提供真实 Desktop->Edge 或 Web->Hub->Edge->Runtime 事件链证据。
 6. Claude/OpenAI 等 Agent SDK 只能作为 Edge runtime/provider adapter 实验接入；Hub AgentProfile、TeamRun、memory、approval、ExecutionTarget 和 Web/Tauri 产品模型必须继续使用 AgentHub 自有 `AgentHubAgentSpec` / DSL 边界，不得暴露 SDK 对象或让 Web/Tauri 直接调用 SDK。
@@ -154,7 +154,7 @@ next: <1-3 steps>
 0. **Shared data contract**：先扩 `AgentHubPlatform` / shared data ports。当前 ports 已覆盖 conversations、run submit、attachments、preview、Contacts 只读 Hub `listContacts()`、Web Projects read-through 和 Projects create/update UI gate；仍缺 docs、tasks、targets、message actions、Contacts mutation/error/empty/schema，以及 Projects delete/soft-delete policy 和 artifact/workspace relationship。real mode 禁止静默 demo fallback。
 1. **Chat 主链路**：Desktop 走 Edge threads/items/runs/events；Web 走 Hub sessions/messages/ws/agent-tasks。
 2. **Agent/Profile/Runtime/Target**：Desktop 接 Edge `/v1/agents` 和 `/v1/model-catalog`；Web 接 Hub `/web/agent-profiles`、`/client/sessions/{id}/agents` 和 ExecutionTarget inventory。
-3. **Hub + Exact Edge routing**：Hub 只能路由到 owner-scoped exact device；目标 Edge 离线、无权限或 workspace 越界时 fail closed。
+3. **Hub + Exact Edge routing**：Hub 只能路由到 owner-scoped `local_edge` exact device；目标 Edge 离线、无权限、非 local-edge 或 workspace 越界时 fail closed。
 4. **Edge + CLI adapters**：Codex、Claude Code、OpenCode 输出统一为 AgentHub typed events；路径、失败摘要、runtime output 先脱敏再 callback。
 5. **Inspector Evidence / Artifact / Diff / Preview**：补 Edge planned routes 或删除客户端假调用；`/v1/runs/{runId}/diff`、artifact index/content、preview lifecycle 用真实 API/事件替代 UI mock。
 6. **Permission/Approval**：permission request、policy decision、UI decision、Edge ack、Hub audit、TeamEvent 必须能用同一 run/task ID 串起来。
