@@ -146,6 +146,7 @@ Assert-GitIgnored "dist/AgentHub_${desktopVersion}_x64-setup.exe" "Windows setup
 Assert-GitIgnored "dist/AgentHub_${desktopVersion}_x64-portable.zip" "Windows portable.zip dry artifact"
 Assert-GitIgnored "dist/latest.json" "Updater latest.json dry artifact"
 Assert-GitIgnored "dist/AgentHub_${desktopVersion}_x64-setup.exe.sig" "Updater signature dry artifact"
+Assert-GitIgnored "dist/agenthub-edge-windows-amd64.exe" "Windows sidecar dry intermediate"
 Assert-GitIgnored "app/desktop/src-tauri/target/release/bundle/nsis/AgentHub_${desktopVersion}_x64-setup.exe" "Tauri NSIS bundle output"
 Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-pc-windows-msvc.exe" "Windows sidecar binary"
 Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin" "macOS arm64 sidecar binary"
