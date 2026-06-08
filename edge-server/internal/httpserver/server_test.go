@@ -21,7 +21,7 @@ func TestCORSMiddlewareAllowsTrustedLocalOrigin(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), false)
+	}), false, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	req.Header.Set("Origin", "http://localhost:5199")
@@ -45,7 +45,7 @@ func TestCORSMiddlewareRejectsUntrustedOrigin(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), false)
+	}), false, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	req.Header.Set("Origin", "https://example.com")
@@ -61,12 +61,57 @@ func TestCORSMiddlewareRejectsUntrustedOrigin(t *testing.T) {
 	}
 }
 
+func TestCORSMiddlewareRemoteModeRejectsOriginOutsideAllowlist(t *testing.T) {
+	called := false
+	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), true, []string{"https://app.example"})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+	if called {
+		t.Fatal("handler should not be called for a remote origin outside the allowlist")
+	}
+}
+
+func TestCORSMiddlewareRemoteModeAllowsOriginInAllowlist(t *testing.T) {
+	called := false
+	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), true, []string{"https://app.example"})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	req.Header.Set("Origin", "https://app.example")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if !called {
+		t.Fatal("handler was not called for an allowed remote origin")
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example" {
+		t.Fatalf("Access-Control-Allow-Origin = %q", got)
+	}
+}
+
 func TestCORSMiddlewareAllowsNoOrigin(t *testing.T) {
 	called := false
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), false)
+	}), false, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	rec := httptest.NewRecorder()
@@ -185,7 +230,7 @@ func TestCORSMiddlewareAllowsLocalhostVariants(t *testing.T) {
 			handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusOK)
-			}), false)
+			}), false, nil)
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 			req.Header.Set("Origin", tt.origin)
@@ -211,7 +256,7 @@ func TestCORSMiddlewareAllowsLocalhostVariants(t *testing.T) {
 func TestCORSWithOptionsRequest(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called for OPTIONS")
-	}), false)
+	}), false, nil)
 
 	req := httptest.NewRequest(http.MethodOptions, "/v1/health", nil)
 	req.Header.Set("Origin", "http://localhost:5199")
@@ -228,7 +273,7 @@ func TestCORSHeadersSet(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}), false)
+	}), false, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	req.Header.Set("Origin", "http://localhost:5199")
@@ -340,6 +385,39 @@ func TestLocalAuthMiddlewareRequiresTokenForStateChangingRoutes(t *testing.T) {
 	}
 	if called {
 		t.Fatal("handler should not be called without a token")
+	}
+}
+
+func TestLocalAuthMiddlewareRequiresTokenForReadRoutes(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{"GET project list", http.MethodGet, "/v1/projects"},
+		{"HEAD project list", http.MethodHead, "/v1/projects"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}), "edge-secret", "")
+
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want 401", rec.Code)
+			}
+			if called {
+				t.Fatal("handler should not be called without a token")
+			}
+		})
 	}
 }
 
