@@ -21,6 +21,12 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	if cfg.StoreFile != "" {
 		t.Fatalf("StoreFile = %q, want empty", cfg.StoreFile)
 	}
+	if cfg.StoreBackend != "" {
+		t.Fatalf("StoreBackend = %q, want empty", cfg.StoreBackend)
+	}
+	if cfg.StoreDB != "" {
+		t.Fatalf("StoreDB = %q, want empty", cfg.StoreDB)
+	}
 	if cfg.RunnerProfile != "" {
 		t.Fatalf("RunnerProfile = %q, want empty", cfg.RunnerProfile)
 	}
@@ -76,6 +82,121 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 	}
 	if got, want := []string(cfg.RunnerEnv), []string{"AGENTHUB_PROFILE_RUN={{run.id}}", "AGENTHUB_PROFILE_THREAD={{run.threadId}}"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("RunnerEnv = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigParsesMemoryStoreBackend(t *testing.T) {
+	cfg, err := buildConfig([]string{"--store-backend", "memory"})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.StoreBackend != "memory" {
+		t.Fatalf("StoreBackend = %q, want memory", cfg.StoreBackend)
+	}
+}
+
+func TestBuildConfigParsesFileStoreBackend(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--store-backend", "file",
+		"--store-file", "edge-store.json",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.StoreBackend != "file" {
+		t.Fatalf("StoreBackend = %q, want file", cfg.StoreBackend)
+	}
+	if cfg.StoreFile != "edge-store.json" {
+		t.Fatalf("StoreFile = %q, want edge-store.json", cfg.StoreFile)
+	}
+}
+
+func TestBuildConfigParsesSQLiteStoreBackend(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--store-backend", "sqlite",
+		"--store-db", "edge-store.db",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.StoreBackend != "sqlite" {
+		t.Fatalf("StoreBackend = %q, want sqlite", cfg.StoreBackend)
+	}
+	if cfg.StoreDB != "edge-store.db" {
+		t.Fatalf("StoreDB = %q, want edge-store.db", cfg.StoreDB)
+	}
+}
+
+func TestBuildConfigRejectsInvalidStoreBackend(t *testing.T) {
+	_, err := buildConfig([]string{"--store-backend", "postgres"})
+	if err == nil || !strings.Contains(err.Error(), "supported values: memory, file, sqlite") {
+		t.Fatalf("buildConfig error = %v, want supported backend list", err)
+	}
+}
+
+func TestBuildConfigRejectsMemoryStoreWithFile(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-backend", "memory",
+		"--store-file", "edge-store.json",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-file cannot be combined with --store-backend memory") {
+		t.Fatalf("buildConfig error = %v, want memory/file conflict", err)
+	}
+}
+
+func TestBuildConfigRejectsMemoryStoreWithDB(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-backend", "memory",
+		"--store-db", "edge-store.db",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-db cannot be combined with --store-backend memory") {
+		t.Fatalf("buildConfig error = %v, want memory/db conflict", err)
+	}
+}
+
+func TestBuildConfigRejectsFileStoreWithoutFile(t *testing.T) {
+	_, err := buildConfig([]string{"--store-backend", "file"})
+	if err == nil || !strings.Contains(err.Error(), "--store-backend file requires --store-file") {
+		t.Fatalf("buildConfig error = %v, want file path requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsFileStoreWithDB(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-backend", "file",
+		"--store-file", "edge-store.json",
+		"--store-db", "edge-store.db",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-db cannot be combined with --store-backend file") {
+		t.Fatalf("buildConfig error = %v, want file/db conflict", err)
+	}
+}
+
+func TestBuildConfigRejectsSQLiteStoreWithoutDB(t *testing.T) {
+	_, err := buildConfig([]string{"--store-backend", "sqlite"})
+	if err == nil || !strings.Contains(err.Error(), "--store-backend sqlite requires --store-db") {
+		t.Fatalf("buildConfig error = %v, want sqlite db requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsStoreDBWithoutSQLiteBackend(t *testing.T) {
+	_, err := buildConfig([]string{"--store-db", "edge-store.db"})
+	if err == nil || !strings.Contains(err.Error(), "--store-db requires --store-backend sqlite") {
+		t.Fatalf("buildConfig error = %v, want sqlite backend requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsStoreFileWithSQLiteStore(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-file", "edge-store.json",
+		"--store-backend", "sqlite",
+		"--store-db", "edge-store.db",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-file cannot be combined with --store-backend sqlite") {
+		t.Fatalf("buildConfig error = %v, want store backend conflict", err)
 	}
 }
 
@@ -288,6 +409,16 @@ func TestNewStoreFromConfigUsesMemoryStoreByDefault(t *testing.T) {
 	}
 }
 
+func TestNewStoreFromConfigUsesMemoryStore(t *testing.T) {
+	repository, err := newStoreFromConfig(config{StoreBackend: "memory"})
+	if err != nil {
+		t.Fatalf("newStoreFromConfig returned error: %v", err)
+	}
+	if _, ok := repository.(*store.Store); !ok {
+		t.Fatalf("repository type = %T, want *store.Store", repository)
+	}
+}
+
 func TestNewStoreFromConfigUsesFileStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "edge-store.json")
 
@@ -303,6 +434,54 @@ func TestNewStoreFromConfigUsesFileStore(t *testing.T) {
 	_, _ = fileStore.CreateProject("proj_test", "Test Project")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("store file was not written: %v", err)
+	}
+}
+
+func TestNewStoreFromConfigRejectsFileStoreWithoutFile(t *testing.T) {
+	_, err := newStoreFromConfig(config{StoreBackend: "file"})
+	if err == nil || !strings.Contains(err.Error(), "--store-backend file requires --store-file") {
+		t.Fatalf("newStoreFromConfig error = %v, want file path requirement", err)
+	}
+}
+
+func TestNewStoreFromConfigUsesSQLiteStore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+
+	repository, err := newStoreFromConfig(config{StoreBackend: "sqlite", StoreDB: path})
+	if err != nil {
+		t.Fatalf("newStoreFromConfig returned error: %v", err)
+	}
+	sqliteStore, ok := repository.(*store.SQLiteStore)
+	if !ok {
+		t.Fatalf("repository type = %T, want *store.SQLiteStore", repository)
+	}
+	defer sqliteStore.Close()
+
+	_, _ = sqliteStore.CreateProject("proj_test", "Test Project")
+	restored, err := store.NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite restored returned error: %v", err)
+	}
+	defer restored.Close()
+	if got := restored.ListProjects(); len(got) != 1 || got[0].ID != "proj_test" {
+		t.Fatalf("restored projects = %#v, want proj_test", got)
+	}
+}
+
+func TestNewStoreFromConfigReturnsSQLiteStoreErrors(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	path := filepath.Join(blocker, "edge-store.db")
+
+	_, err := newStoreFromConfig(config{StoreBackend: "sqlite", StoreDB: path})
+	if err == nil {
+		t.Fatal("newStoreFromConfig returned nil error for invalid sqlite store")
+	}
+	if !strings.Contains(err.Error(), "open sqlite store") {
+		t.Fatalf("newStoreFromConfig error = %v, want clear sqlite store error", err)
 	}
 }
 
@@ -574,6 +753,47 @@ func TestBuildConfigEnvVarStoreFile(t *testing.T) {
 	}
 	if cfg.StoreFile != "env-store.json" {
 		t.Fatalf("StoreFile = %q, want env-store.json from env", cfg.StoreFile)
+	}
+}
+
+func TestBuildConfigEnvVarMemoryStore(t *testing.T) {
+	t.Setenv("AGENTHUB_STORE_BACKEND", "memory")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.StoreBackend != "memory" {
+		t.Fatalf("StoreBackend = %q, want memory from env", cfg.StoreBackend)
+	}
+}
+
+func TestBuildConfigEnvVarFileStore(t *testing.T) {
+	t.Setenv("AGENTHUB_STORE_BACKEND", "file")
+	t.Setenv("AGENTHUB_STORE_FILE", "env-store.json")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.StoreBackend != "file" {
+		t.Fatalf("StoreBackend = %q, want file from env", cfg.StoreBackend)
+	}
+	if cfg.StoreFile != "env-store.json" {
+		t.Fatalf("StoreFile = %q, want env-store.json from env", cfg.StoreFile)
+	}
+}
+
+func TestBuildConfigEnvVarSQLiteStore(t *testing.T) {
+	t.Setenv("AGENTHUB_STORE_BACKEND", "sqlite")
+	t.Setenv("AGENTHUB_STORE_DB", "env-store.db")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.StoreBackend != "sqlite" {
+		t.Fatalf("StoreBackend = %q, want sqlite from env", cfg.StoreBackend)
+	}
+	if cfg.StoreDB != "env-store.db" {
+		t.Fatalf("StoreDB = %q, want env-store.db from env", cfg.StoreDB)
 	}
 }
 
