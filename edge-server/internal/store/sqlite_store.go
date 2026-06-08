@@ -275,6 +275,33 @@ func (s *SQLiteStore) ListThreadPins(threadID string) []ThreadPin {
 	return s.store.ListThreadPins(threadID)
 }
 
+func (s *SQLiteStore) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
+	diffFile, err := s.store.UpsertRunDiffFile(file)
+	return persistAfterSQLiteWrite(s, diffFile, err)
+}
+
+func (s *SQLiteStore) ListRunDiffFiles(runID string) []RunDiffFile {
+	return s.store.ListRunDiffFiles(runID)
+}
+
+func (s *SQLiteStore) UpsertArtifact(artifact Artifact) (Artifact, error) {
+	created, err := s.store.UpsertArtifact(artifact)
+	return persistAfterSQLiteWrite(s, created, err)
+}
+
+func (s *SQLiteStore) ListArtifacts(runID string) []Artifact {
+	return s.store.ListArtifacts(runID)
+}
+
+func (s *SQLiteStore) UpsertPreview(preview Preview) (Preview, error) {
+	created, err := s.store.UpsertPreview(preview)
+	return persistAfterSQLiteWrite(s, created, err)
+}
+
+func (s *SQLiteStore) ListPreviews(runID string) []Preview {
+	return s.store.ListPreviews(runID)
+}
+
 func ensureSQLiteDirectory(path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

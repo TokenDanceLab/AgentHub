@@ -12,6 +12,15 @@ type repositoryContractStore interface {
 	RunCleaner
 }
 
+type repositoryEvidenceStore interface {
+	UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error)
+	ListRunDiffFiles(runID string) []RunDiffFile
+	UpsertArtifact(artifact Artifact) (Artifact, error)
+	ListArtifacts(runID string) []Artifact
+	UpsertPreview(preview Preview) (Preview, error)
+	ListPreviews(runID string) []Preview
+}
+
 type repositoryContractHandle struct {
 	name   string
 	store  repositoryContractStore
@@ -111,6 +120,9 @@ func TestRepositoryContract(t *testing.T) {
 			})
 			t.Run("cleanup_cascade", func(t *testing.T) {
 				runRepositoryCleanupCascadeContract(t, factory.new(t))
+			})
+			t.Run("artifact_diff_preview_readonly", func(t *testing.T) {
+				runRepositoryArtifactDiffPreviewContract(t, factory.new(t))
 			})
 		})
 	}
@@ -490,6 +502,109 @@ func runRepositoryCleanupCascadeContract(t *testing.T, handle repositoryContract
 	}
 	if got := repo.ListThreadPins(thread.ID); len(got) != 0 {
 		t.Fatalf("pins after cleanup = %#v, want empty", got)
+	}
+}
+
+func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryContractHandle) {
+	defer closeContractHandle(handle)
+	repo := handle.store
+	evidence, ok := repo.(repositoryEvidenceStore)
+	if !ok {
+		t.Fatalf("%s store does not implement artifact/diff/preview evidence contract", handle.name)
+	}
+
+	project, _ := repo.CreateProject("proj_contract", "Contract Project")
+	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread")
+	run, err := repo.CreateRun("run_contract", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+
+	if _, err := evidence.UpsertRunDiffFile(RunDiffFile{RunID: "missing", Path: "src/app.ts", Diff: "+new", Status: "modified"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpsertRunDiffFile missing run error = %v, want ErrNotFound", err)
+	}
+	diffFile, err := evidence.UpsertRunDiffFile(RunDiffFile{
+		RunID:  run.ID,
+		Path:   "src/app.ts",
+		Diff:   "@@ -1 +1 @@\n-old\n+new",
+		Status: "modified",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile returned error: %v", err)
+	}
+	if diffFile.CreatedAt == "" || diffFile.UpdatedAt == "" {
+		t.Fatalf("diff timestamps = %#v, want created and updated", diffFile)
+	}
+	diffFile, err = evidence.UpsertRunDiffFile(RunDiffFile{
+		RunID:  run.ID,
+		Path:   "src/app.ts",
+		Diff:   "@@ -1 +1 @@\n-old\n+newer",
+		Status: "modified",
+	})
+	if err != nil {
+		t.Fatalf("UpsertRunDiffFile update returned error: %v", err)
+	}
+	if diffFile.Diff != "@@ -1 +1 @@\n-old\n+newer" {
+		t.Fatalf("updated diff = %#v, want newer diff", diffFile.Diff)
+	}
+	if got := evidence.ListRunDiffFiles(run.ID); len(got) != 1 || got[0].Path != "src/app.ts" || got[0].Diff != diffFile.Diff {
+		t.Fatalf("ListRunDiffFiles = %#v, want updated src/app.ts diff", got)
+	}
+
+	artifact, err := evidence.UpsertArtifact(Artifact{
+		ID:        "artifact_contract",
+		RunID:     run.ID,
+		ThreadID:  thread.ID,
+		Kind:      "patch",
+		Path:      "changes.diff",
+		SizeBytes: 42,
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact returned error: %v", err)
+	}
+	if artifact.CreatedAt == "" || artifact.UpdatedAt == "" {
+		t.Fatalf("artifact timestamps = %#v, want created and updated", artifact)
+	}
+	if got := evidence.ListArtifacts(run.ID); len(got) != 1 || got[0].ID != artifact.ID || got[0].ThreadID != thread.ID {
+		t.Fatalf("ListArtifacts(run) = %#v, want scoped artifact", got)
+	}
+
+	preview, err := evidence.UpsertPreview(Preview{
+		ID:       "preview_contract",
+		RunID:    run.ID,
+		ThreadID: thread.ID,
+		URL:      "http://127.0.0.1:4173",
+		Status:   "ready",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview returned error: %v", err)
+	}
+	if preview.CreatedAt == "" || preview.UpdatedAt == "" {
+		t.Fatalf("preview timestamps = %#v, want created and updated", preview)
+	}
+	if got := evidence.ListPreviews(run.ID); len(got) != 1 || got[0].ID != preview.ID || got[0].Status != "ready" {
+		t.Fatalf("ListPreviews(run) = %#v, want scoped preview", got)
+	}
+
+	if handle.path == "" || handle.reopen == nil {
+		return
+	}
+	closeContractHandle(handle)
+
+	restored := handle.reopen(t, handle.path)
+	defer closeContractHandle(restored)
+	restoredEvidence, ok := restored.store.(repositoryEvidenceStore)
+	if !ok {
+		t.Fatalf("restored %s store does not implement evidence contract", restored.name)
+	}
+	if got := restoredEvidence.ListRunDiffFiles(run.ID); len(got) != 1 || got[0].Diff != diffFile.Diff {
+		t.Fatalf("restored diffs = %#v, want persisted diff", got)
+	}
+	if got := restoredEvidence.ListArtifacts(run.ID); len(got) != 1 || got[0].ID != artifact.ID {
+		t.Fatalf("restored artifacts = %#v, want persisted artifact", got)
+	}
+	if got := restoredEvidence.ListPreviews(run.ID); len(got) != 1 || got[0].ID != preview.ID {
+		t.Fatalf("restored previews = %#v, want persisted preview", got)
 	}
 }
 

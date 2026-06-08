@@ -21,6 +21,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
 | 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、ExecutionTarget contract、Edge pins/store/event contracts、TeamRun fixture/evidence gate |
 | 仍未完成 | Edge SQL 后续 relational migration、Desktop target preference/Tauri host 集成、登录端到端、Tauri 正式签名发布与 macOS 打包、TeamRun 真实演示、Artifact/Diff/Preview 生产化、Projects mutation UI、D1b/D2/D3 gate |
+| 当前候选切片 | `codex/artifact-diff-preview-readonly`：Artifact/Diff/Preview read-only Edge 前置，待 review/merge |
 | 外部依赖 | 后端旧整合线合并由 backend merge Agent 负责；本路线图只记录其状态和对后续切片的影响，不接管合并 |
 
 ## P0 执行顺序
@@ -33,7 +34,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；已补 Hub state expiry/replay 与 OIDC `-LocalOnly` gate；后续覆盖 packaged Desktop loopback/keyring | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
 | 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；`codex/tauri-package-readiness` 已补版本对齐、独立 release readiness workflow 和 updater metadata gate；正式签名发布仍后置 | `scripts/verify-tauri-package-readiness.ps1`、installer artifact 检查、release dry policy |
 | 6 | ByteDance / TeamRun demo | IM 群聊、多 Agent 调度、证据 inspector、录屏脚本 | readiness script、manifest、截图/视频/接口导出 |
-| 7 | Artifact/Diff/Preview 生产化 | 去掉 demo evidence，补真实 artifact/diff/preview API | Edge API、shared inspector、Desktop/Web smoke |
+| 7 | Artifact/Diff/Preview 生产化 | read-only Edge API 首片已补 `GET /v1/runs/{runId}/diff`、`GET /v1/artifacts`、`GET /v1/previews`；下一步再补 runtime evidence 写入、preview lifecycle、artifact content/apply/discard | Edge API、shared inspector、Desktop smoke；Web 仍不直连 Edge |
 | 8 | Projects create/update UI | Web/Hub only；不做 delete；排在存储/安装/登录之后 | Web focused、shared focused、Web typecheck、Web boundary |
 | 9 | Release signing / macOS | Windows Authenticode；macOS arm64 dry validation 另起 proposal 后再做 Developer ID signing、entitlements、notarization、staple | `Get-AuthenticodeSignature`、`codesign`、`spctl`、`stapler` |
 | 10 | D1b/D2/D3 gates | 先 policy；D3 继续 opt-in | CI policy、release review、artifact redaction |
@@ -78,4 +79,5 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 2. Edge SQLite opt-in backend、登录 fake/local gate、Tauri Windows installer/updater metadata readiness 已合入；Edge relational schema/migration、真实登录和正式签名继续拆独立 proposal。
 3. Desktop Edge mapper 首切片正在合入：已接入 Edge agents/model catalog/Local Edge target mapper，并在 review 修正 StartRunRequest adapter id 映射、移除 provider 提交字段、阻断 Desktop live 空线程/demo transcript fallback；下一步补 target preference mutation、Tauri host readiness 和安装包联调。
 4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness。
-5. 开 ByteDance/TeamRun demo evidence worker。
+5. Review/merge Artifact/Diff/Preview read-only Edge 前置；下一片只接 runtime evidence 写入和 inspector snapshot，不碰 preview start/stop 或 artifact apply/discard。
+6. 开 ByteDance/TeamRun demo evidence worker。
