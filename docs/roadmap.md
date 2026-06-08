@@ -20,7 +20,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 主工作树 | `D:\Code\TokenDance\AgentHub @ a4b27d63`，behind 23 且 dirty；只读，不直接 pull/merge/stage |
 | 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
 | 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、ExecutionTarget contract、Edge pins/store/event contracts、TeamRun fixture/evidence gate |
-| 仍未完成 | Edge SQL、Desktop Edge mapper、登录端到端、Tauri 内测安装包/正式签名发布、TeamRun 真实演示、Artifact/Diff/Preview 生产化、Projects mutation UI、D1b/D2/D3 gate |
+| 仍未完成 | Edge SQL 后续 migration、Desktop Edge mapper、登录端到端、Tauri 内测安装包/正式签名发布、TeamRun 真实演示、Artifact/Diff/Preview 生产化、Projects mutation UI、D1b/D2/D3 gate |
 | 外部依赖 | 后端旧整合线合并由 backend merge Agent 负责；本路线图只记录其状态和对后续切片的影响，不接管合并 |
 
 ## P0 执行顺序
@@ -28,7 +28,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | 顺序 | 切片 | 边界 | 最低门禁 |
 |---:|---|---|---|
 | 1 | Roadmap/tag/worktree 收口 | `v0.3.0-rc.1` 已打；roadmap 压缩；分支清理先审计不批量删 | docs diff-check、root governance、worktree audit |
-| 2 | Edge SQL/store migration | 优先于继续 UI 产品面；先锁 G0 repository contract，SQLite 作为 opt-in backend，默认 memory/file 不变 | Edge store contract、migration tests、edge short gate |
+| 2 | Edge SQL/store migration | G0 contract 已覆盖 memory/file/sqlite；`codex/edge-sql-store` 新增 SQLite opt-in snapshot backend，并显式支持 memory/file/sqlite backend 值；留空 backend 继续按旧规则自动选择 memory/file；后续再拆 relational migration | Edge store contract、cmd store config tests、edge short gate |
 | 3 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动；给安装包提供可运行侧车基线 | Desktop platform、Edge focused、Rust host tests |
 | 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；覆盖 Web session、Desktop loopback/keyring、Hub state expiry/replay | Web/Desktop auth tests、Hub OIDC tests、OIDC script `-LocalOnly` gate |
 | 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；版本对齐；updater metadata 从“可选复制”改为 gate | Tauri build/package dry run、installer artifact 检查、release policy |
@@ -75,7 +75,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 ## 下一步
 
 1. 提交并推送本轮 roadmap/governance 刷新。
-2. 开 Edge SQL/store migration proposal/worker，先锁 G0 contract，再做 SQLite opt-in backend。
+2. Review/merge Edge SQLite opt-in backend；下一片再拆 relational schema/migration。
 3. 并行开 Desktop Edge mapper worker 和登录 fake/local gate worker，为安装包提供可运行前置条件。
    - 登录 fake/local gate 已补 Hub stale state `created_at` 拒绝和 `verify-oidc-flow.ps1 -LocalOnly` fake/static gate；该 gate 不连接 live Hub 或 TokenDance ID。
 4. 开 Tauri Windows installer/updater metadata worker；macOS 正式签名另起 proposal。
