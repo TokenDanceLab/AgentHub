@@ -24,6 +24,7 @@ type dispatchPayload struct {
 	AgentType        string `json:"agent_type"`
 	CustomAgentID    string `json:"custom_agent_id,omitempty"`
 	TargetID         string `json:"target_id,omitempty"`
+	EdgeDeviceID     string `json:"edge_device_id,omitempty"`
 	SessionID        string `json:"session_id"`
 	TriggerMessageID string `json:"trigger_message_id"`
 	TriggerUserID    string `json:"trigger_user_id"`
@@ -271,6 +272,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		AgentInstanceID:  ai.ID,
 		AgentType:        normalizeRuntimeAgentType(ai.AgentType),
 		TargetID:         task.TargetID,
+		EdgeDeviceID:     task.EdgeDeviceID,
 		SessionID:        ai.SessionID,
 		TriggerMessageID: task.TriggerMessageID,
 		TriggerUserID:    task.TriggeredByUserID,
