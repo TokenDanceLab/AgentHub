@@ -126,6 +126,10 @@ func (s messageServiceWithReactions) RemoveMessageReaction(ctx context.Context, 
 	return s.reactions.RemoveMessageReaction(ctx, userID, sessionID, msgID, reaction)
 }
 
+func (s messageServiceWithReactions) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+	return s.reactions.ListMessageReactions(ctx, userID, sessionID, msgID)
+}
+
 // Run starts the Hub Server and blocks until a shutdown signal is received.
 func (a *App) Run(ctx context.Context) error {
 	a.startTime = time.Now()

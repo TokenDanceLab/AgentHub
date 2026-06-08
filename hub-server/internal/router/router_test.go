@@ -174,6 +174,9 @@ func (routerMessageServiceStub) AddMessageReaction(ctx context.Context, userID, 
 func (routerMessageServiceStub) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
 	return nil, nil
 }
+func (routerMessageServiceStub) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+	return nil, nil
+}
 
 func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -229,6 +232,7 @@ func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
 		method string
 		path   string
 	}{
+		{method: http.MethodGet, path: "/client/messages/msg-1/reactions?session_id=sess-1"},
 		{method: http.MethodPost, path: "/client/messages/msg-1/reactions"},
 		{method: http.MethodDelete, path: "/client/messages/msg-1/reactions"},
 	} {

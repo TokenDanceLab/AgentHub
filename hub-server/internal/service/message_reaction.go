@@ -100,6 +100,35 @@ func (s *MessageReactionService) RemoveMessageReaction(ctx context.Context, user
 	return resp, nil
 }
 
+func (s *MessageReactionService) ListMessageReactions(ctx context.Context, userID, sessionID, messageID string) ([]MessageReactionResponse, error) {
+	if err := s.ensureMessageReactionAccess(sessionID, messageID, userID); err != nil {
+		return nil, err
+	}
+
+	summaries, err := repository.ReactionSummariesByMessage(s.db, sessionID, messageID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := make([]MessageReactionResponse, 0, len(summaries))
+	for _, summary := range summaries {
+		item := MessageReactionResponse{
+			MessageID: messageID,
+			SessionID: sessionID,
+			Reaction:  summary.Reaction,
+			Count:     summary.Count,
+		}
+		for _, reactedUserID := range summary.UserIDs {
+			if reactedUserID == userID {
+				item.ReactedByMe = true
+				break
+			}
+		}
+		resp = append(resp, item)
+	}
+	return resp, nil
+}
+
 func normalizeMessageReaction(reaction string) (string, error) {
 	reaction = strings.TrimSpace(reaction)
 	if reaction == "" || len([]rune(reaction)) > maxMessageReactionLength {

@@ -77,6 +77,27 @@ func TestMessageReactionService_RemoveReactionIsIdempotent(t *testing.T) {
 	assert.False(t, resp.ReactedByMe)
 }
 
+func TestMessageReactionService_ListMessageReactionsReturnsGroupedSummaries(t *testing.T) {
+	db := newMessageReactionTestDB(t)
+	seedMessageReactionSession(t, db, "sess-list", "user-1", "user-2", "user-3")
+	seedMessageReactionMessage(t, db, "sess-list", "msg-list")
+
+	svc := &MessageReactionService{db: db, bus: newTestBus(t)}
+
+	_, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-list", "msg-list", "heart")
+	require.NoError(t, err)
+	_, err = svc.AddMessageReaction(context.Background(), "user-2", "sess-list", "msg-list", "heart")
+	require.NoError(t, err)
+	_, err = svc.AddMessageReaction(context.Background(), "user-3", "sess-list", "msg-list", "thumbs_up")
+	require.NoError(t, err)
+
+	resp, err := svc.ListMessageReactions(context.Background(), "user-1", "sess-list", "msg-list")
+	require.NoError(t, err)
+	require.Len(t, resp, 2)
+	assert.Equal(t, serviceReactionSummary("msg-list", "sess-list", "heart", 2, true), resp[0])
+	assert.Equal(t, serviceReactionSummary("msg-list", "sess-list", "thumbs_up", 1, false), resp[1])
+}
+
 func TestMessageReactionService_RejectsInvalidReaction(t *testing.T) {
 	db := newMessageReactionTestDB(t)
 	seedMessageReactionSession(t, db, "sess-invalid", "user-1")
@@ -102,6 +123,17 @@ func TestMessageReactionService_RequiresSessionMembership(t *testing.T) {
 	require.ErrorIs(t, err, errcode.SessionNotMember)
 }
 
+func TestMessageReactionService_ListMessageReactionsRequiresSessionMembership(t *testing.T) {
+	db := newMessageReactionTestDB(t)
+	seedMessageReactionSession(t, db, "sess-list-member", "user-1")
+	seedMessageReactionMessage(t, db, "sess-list-member", "msg-list-member")
+
+	svc := &MessageReactionService{db: db}
+
+	_, err := svc.ListMessageReactions(context.Background(), "user-2", "sess-list-member", "msg-list-member")
+	require.ErrorIs(t, err, errcode.SessionNotMember)
+}
+
 func TestMessageReactionService_RejectsMessageOutsideSession(t *testing.T) {
 	db := newMessageReactionTestDB(t)
 	seedMessageReactionSession(t, db, "sess-a", "user-1")
@@ -112,6 +144,28 @@ func TestMessageReactionService_RejectsMessageOutsideSession(t *testing.T) {
 
 	_, err := svc.AddMessageReaction(context.Background(), "user-1", "sess-a", "msg-other", "heart")
 	require.ErrorIs(t, err, errcode.MsgNotFound)
+}
+
+func TestMessageReactionService_ListMessageReactionsRejectsMessageOutsideSession(t *testing.T) {
+	db := newMessageReactionTestDB(t)
+	seedMessageReactionSession(t, db, "sess-list-a", "user-1")
+	seedMessageReactionSession(t, db, "sess-list-b", "user-1")
+	seedMessageReactionMessage(t, db, "sess-list-b", "msg-list-other")
+
+	svc := &MessageReactionService{db: db}
+
+	_, err := svc.ListMessageReactions(context.Background(), "user-1", "sess-list-a", "msg-list-other")
+	require.ErrorIs(t, err, errcode.MsgNotFound)
+}
+
+func serviceReactionSummary(messageID, sessionID, reaction string, count int, reactedByMe bool) MessageReactionResponse {
+	return MessageReactionResponse{
+		MessageID:   messageID,
+		SessionID:   sessionID,
+		Reaction:    reaction,
+		Count:       count,
+		ReactedByMe: reactedByMe,
+	}
 }
 
 func newMessageReactionTestDB(t *testing.T) *gorm.DB {
