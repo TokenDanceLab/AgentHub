@@ -91,6 +91,7 @@ next: Main owner reviews the isolated icon diff and decides merge order.
 3. Hub dispatch 必须绑定 exact `agent_instance_id` 和 exact Desktop device / ExecutionTarget；离线只能进对应 user/device/target queue，禁止 fallback 到其他在线 Desktop。
 4. Edge `agentId` 必须显式校验 adapter registry；未知 runtime 不得静默 fallback 到默认 adapter。
 5. 任何把 mock/demo 当验收证据的 PR 必须标注为 demo；生产接入项必须提供真实 Desktop->Edge 或 Web->Hub->Edge->Runtime 事件链证据。
+6. Claude/OpenAI 等 Agent SDK 只能作为 Edge runtime/provider adapter 实验接入；Hub AgentProfile、TeamRun、memory、approval、ExecutionTarget 和 Web/Tauri 产品模型必须继续使用 AgentHub 自有 `AgentHubAgentSpec` / DSL 边界，不得暴露 SDK 对象或让 Web/Tauri 直接调用 SDK。
 
 ## 合并切片
 
