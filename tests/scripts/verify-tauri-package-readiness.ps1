@@ -176,6 +176,32 @@ function New-RogueMacOSReleaseActionFixture {
     return $tempRoot
 }
 
+function New-FixedStableReleaseFixture {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    $workflowPath = Join-Path $tempRoot ".github\workflows\release.yml"
+    $workflowText = Get-Content $workflowPath -Raw -Encoding UTF8
+    $workflowText = [regex]::Replace($workflowText, '(?m)^          prerelease:\s*.*$', '          prerelease: false', 1)
+    Set-Content $workflowPath $workflowText -Encoding UTF8
+
+    & git -C $tempRoot init -q
+    return $tempRoot
+}
+
 function New-TaggedReleaseFixture {
     param(
         [string]$TagName
@@ -340,6 +366,8 @@ Assert-True ($smokeScriptText -notmatch "pnpm\s+tauri\s+build|softprops/action-g
 
 Assert-True ($workflowText -match "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*tags:" -and $workflowText -match "softprops/action-gh-release") "release workflow keeps tag release semantics"
 Assert-True ($workflowText -match "TAURI_SIGNING_PRIVATE_KEY") "release workflow keeps production signing secret boundary"
+Assert-True ($workflowText -match "prerelease:\s*\$\{\{\s*contains\(github\.ref_name,\s*'-'\)\s*\}\}") "release workflow marks hyphenated semver tags as GitHub prereleases"
+Assert-True ($scriptText -match "Release workflow prerelease policy" -and $scriptText -match "fixed stable") "checker rejects fixed-stable release prerelease policy"
 Assert-True ($readinessWorkflowText -match "workflow_dispatch") "release readiness workflow is manual/dry policy gated"
 Assert-True ($readinessWorkflowText -match "\.github/workflows/release\.yml") "release readiness workflow watches release.yml"
 Assert-True ($readinessWorkflowText -match "app/desktop/src-tauri/Cargo\.lock") "release readiness workflow watches Cargo.lock"
@@ -428,6 +456,16 @@ foreach ($hostShell in $scriptHosts) {
     }
     finally {
         Remove-Item -Recurse -Force $rcMismatchRoot -ErrorAction SilentlyContinue
+    }
+
+    $fixedStableRoot = New-FixedStableReleaseFixture
+    try {
+        $fixedStable = Invoke-Script $hostShell @("-RepoRoot", $fixedStableRoot) $fixedStableRoot
+        Assert-True ($fixedStable.ExitCode -ne 0) "readiness checker rejects release workflow with fixed prerelease false under $($fixedStable.Host)" $fixedStable.Output
+        Assert-True ($fixedStable.Output -match "prerelease" -and $fixedStable.Output -match "fixed stable|hyphenated") "fixed prerelease failure names the RC/stable release boundary under $($fixedStable.Host)" $fixedStable.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $fixedStableRoot -ErrorAction SilentlyContinue
     }
 
     foreach ($rogueMacOSCommand in @(

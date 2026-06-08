@@ -386,6 +386,17 @@ function Assert-NoMacOSUnsignedDryReleaseActions {
     Pass "macOS unsigned dry policy job '$JobName' has no GitHub Release upload or updater metadata publication actions"
 }
 
+function Assert-ReleaseWorkflowPrereleasePolicy {
+    param([string]$WorkflowText)
+
+    Step "Release workflow prerelease policy"
+    $releaseBlock = Get-WorkflowJobBlock $WorkflowText "release"
+    Assert-True ($releaseBlock -match "softprops/action-gh-release@v2") "release job creates GitHub Releases through softprops/action-gh-release"
+    Assert-True ($releaseBlock -notmatch "(?m)^\s*prerelease:\s*false\s*$") "release job is not fixed stable for all v* tags"
+    Assert-True ($releaseBlock -match "prerelease:\s*\$\{\{\s*contains\(github\.ref_name,\s*'-'\)\s*\}\}") "hyphenated semver tags are marked as GitHub prereleases"
+    Pass "RC/pre-release tags avoid the stable releases/latest updater channel; stable tags remain prerelease=false"
+}
+
 Step "Desktop version metadata"
 $package = Read-Json "app\desktop\package.json"
 $tauri = Read-Json "app\desktop\src-tauri\tauri.conf.json"
@@ -425,6 +436,7 @@ Step "Tag release policy"
 Assert-True ($releaseWorkflowText -match "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*tags:") "release workflow keeps tag push trigger"
 Assert-True ($releaseWorkflowText -match "softprops/action-gh-release") "release workflow keeps GitHub Release creation"
 Assert-True ($releaseWorkflowText -match "TAURI_SIGNING_PRIVATE_KEY") "release workflow keeps production Tauri signing secret boundary"
+Assert-ReleaseWorkflowPrereleasePolicy $releaseWorkflowText
 
 Step "Dry release policy"
 Assert-True ($readinessWorkflowText -match "workflow_dispatch") "release readiness workflow is manually runnable"
