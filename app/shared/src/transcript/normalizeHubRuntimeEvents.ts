@@ -210,6 +210,8 @@ function runtimeModeLabel(
   if (['replay', 'unknown', 'unverified'].includes(normalized)) return 'Replay';
   if ([
     'real',
+    'verified',
+    'live',
     'real-tested',
     'real-verified',
     'verified-real',
