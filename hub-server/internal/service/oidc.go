@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -25,6 +26,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/pkg/reqlog"
 )
 
 // OIDCService handles TokenDance ID OIDC Authorization Code + PKCE login flow.
@@ -278,7 +280,12 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		slog.Error("oidc token endpoint unreachable", "error", err, "token_url", tokenURL)
+		slog.Error("oidc provider code exchange unreachable",
+			"provider", oidcProviderHost(tokenURL),
+			"request_id", reqlog.GetRequestID(ctx),
+			"error_category", "network_error",
+			"error", err,
+		)
 		return nil, fmt.Errorf("token endpoint request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -289,17 +296,16 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// Truncate body to avoid logging potentially sensitive token exchange data.
-		bodyPreview := string(body)
-		if len(bodyPreview) > 128 {
-			bodyPreview = bodyPreview[:128] + "...(truncated)"
-		}
-		slog.Error("oidc token endpoint returned non-200",
+		category := oidcProviderErrorCategory(body)
+		slog.Error("oidc provider code exchange failed",
 			"status", resp.StatusCode,
-			"response_body_preview", bodyPreview,
-			"redirect_uri_sent", redirectURI,
+			"provider", oidcProviderHost(tokenURL),
+			"request_id", reqlog.GetRequestID(ctx),
+			"error_category", category,
+			"body_len", len(body),
+			"body_sha256", oidcBodySHA256(body),
 		)
-		return nil, fmt.Errorf("token endpoint returned %d", resp.StatusCode)
+		return nil, fmt.Errorf("provider code exchange failed: status=%d category=%s", resp.StatusCode, category)
 	}
 
 	var tokenResp tokenEndpointResponse
@@ -307,6 +313,58 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 		return nil, fmt.Errorf("parse token response: %w", err)
 	}
 	return &tokenResp, nil
+}
+
+func oidcProviderHost(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Host == "" {
+		return "unknown"
+	}
+	return parsed.Host
+}
+
+func oidcBodySHA256(body []byte) string {
+	sum := sha256.Sum256(body)
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func oidcProviderErrorCategory(body []byte) string {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return "provider_error"
+	}
+	raw, ok := payload["error"].(string)
+	if !ok {
+		return "provider_error"
+	}
+	return sanitizeOIDCErrorCategory(raw)
+}
+
+func sanitizeOIDCErrorCategory(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > 64 {
+		return "provider_error"
+	}
+	lower := strings.ToLower(value)
+	for _, forbidden := range []string{
+		"access_token",
+		"refresh_token",
+		"id_token",
+		"client_secret",
+		"code_verifier",
+		"authorization code",
+	} {
+		if strings.Contains(lower, forbidden) {
+			return "provider_error"
+		}
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' || r == '.' {
+			continue
+		}
+		return "provider_error"
+	}
+	return value
 }
 
 func normalizeOIDCDevice(deviceType, deviceID string) (string, string, error) {

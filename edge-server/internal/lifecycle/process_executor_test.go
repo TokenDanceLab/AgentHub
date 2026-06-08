@@ -754,6 +754,9 @@ func TestProcessExecutorExtraEnvDoesNotTemplateParentEnvironment(t *testing.T) {
 func TestProcessExecutorNilEnvSanitizesParentEnvironment(t *testing.T) {
 	// Set a non-whitelisted var in the parent — it must NOT leak to the child.
 	t.Setenv("RANDOM_TEST_SECRET_TOKEN", "must-not-leak")
+	t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "edge-token")
+	t.Setenv("AGENTHUB_JWT_SECRET", "jwt-secret")
+	t.Setenv("AGENTHUB_DB_PASSWORD", "db-password")
 	// PATH is whitelisted — it SHOULD be visible to the child.
 	parentPath := os.Getenv("PATH")
 
@@ -766,7 +769,7 @@ func TestProcessExecutorNilEnvSanitizesParentEnvironment(t *testing.T) {
 		Args:    []string{processExecutorHelperRunFlag, "--", "sanitized-env"},
 		Env:     nil,
 		ExtraEnv: []string{
-			"AGENTHUB_PROCESS_EXECUTOR_HELPER=1",
+			"AGENTHUB_TEST_EXTRA_ENV=1",
 			"AGENTHUB_PARENT_PATH=" + parentPath,
 		},
 	}, nil, nil)
@@ -782,6 +785,18 @@ func TestProcessExecutorNilEnvSanitizesParentEnvironment(t *testing.T) {
 	// The random secret must NOT appear in the child environment.
 	if strings.Contains(stdoutText, "randomSecret=must-not-leak") {
 		t.Fatalf("stdout text = %q, must NOT contain leaked env value", stdoutText)
+	}
+	for _, leaked := range []string{
+		"edgeAuthToken=edge-token",
+		"jwtSecret=jwt-secret",
+		"dbPassword=db-password",
+	} {
+		if strings.Contains(stdoutText, leaked) {
+			t.Fatalf("stdout text = %q, must NOT contain leaked AGENTHUB_* secret", stdoutText)
+		}
+	}
+	if !strings.Contains(stdoutText, "testExtraEnv=1") {
+		t.Fatalf("stdout text = %q, want explicit ExtraEnv var to pass through", stdoutText)
 	}
 	// PATH must be present in the child.
 	if !strings.Contains(stdoutText, "sanitizedPath=") {
@@ -1140,6 +1155,18 @@ func TestProcessExecutorHelper(t *testing.T) {
 		randomSecret := os.Getenv("RANDOM_TEST_SECRET_TOKEN")
 		if randomSecret != "" {
 			fmt.Fprintf(os.Stdout, "randomSecret=%s\n", randomSecret)
+		}
+		if helper := os.Getenv("AGENTHUB_TEST_EXTRA_ENV"); helper != "" {
+			fmt.Fprintf(os.Stdout, "testExtraEnv=%s\n", helper)
+		}
+		if token := os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN"); token != "" {
+			fmt.Fprintf(os.Stdout, "edgeAuthToken=%s\n", token)
+		}
+		if secret := os.Getenv("AGENTHUB_JWT_SECRET"); secret != "" {
+			fmt.Fprintf(os.Stdout, "jwtSecret=%s\n", secret)
+		}
+		if password := os.Getenv("AGENTHUB_DB_PASSWORD"); password != "" {
+			fmt.Fprintf(os.Stdout, "dbPassword=%s\n", password)
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown helper mode %q\n", mode)

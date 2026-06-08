@@ -1,7 +1,10 @@
 package handler_test
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -205,6 +208,52 @@ func TestOIDCHandler_PostOIDCCallback_InvalidState(t *testing.T) {
 
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCCallback_DoesNotLeakTokenEndpointBody(t *testing.T) {
+	const rawProviderBody = `{"error":"invalid_grant","error_description":"authorization code auth-code-secret returned access_token provider-access-secret","access_token":"provider-access-secret","refresh_token":"provider-refresh-secret","id_token":"provider-id-secret"}`
+	var logBuf bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+	svc := &mockOIDCService{
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error) {
+			return nil, errcode.OIDCCodeExchangeFailed.WithMessage(rawProviderBody)
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/callback", map[string]string{
+		"code":          "auth-code-secret",
+		"state":         "state-123",
+		"code_verifier": "verifier",
+		"device_type":   "desktop",
+		"device_id":     testDeviceID,
+	})
+	h.PostOIDCCallback(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !contains(w.Body.String(), "OIDC_CODE_EXCHANGE_FAILED") {
+		t.Fatalf("expected OIDC_CODE_EXCHANGE_FAILED response, got %s", w.Body.String())
+	}
+	combined := w.Body.String() + "\n" + logBuf.String()
+	for _, forbidden := range []string{
+		rawProviderBody,
+		"auth-code-secret",
+		"provider-access-secret",
+		"provider-refresh-secret",
+		"provider-id-secret",
+		"access_token",
+		"refresh_token",
+		"id_token",
+	} {
+		if strings.Contains(combined, forbidden) {
+			t.Fatalf("OIDC callback leaked %q in response/logs: %s", forbidden, combined)
+		}
 	}
 }
 
