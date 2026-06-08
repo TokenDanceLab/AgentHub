@@ -18,6 +18,18 @@ func TestOpenAPIEdgeDeviceRegisterMatchesHubRouteAndEnvelope(t *testing.T) {
 
 	path := yamlMapField(t, paths, "/edge/devices/register", "paths./edge/devices/register")
 	post := yamlMapField(t, path, "post", "paths./edge/devices/register.post")
+	description := yamlScalarField(t, post, "description", "register description")
+	for _, want := range []string{
+		"may create or refresh",
+		"local_edge ExecutionTarget",
+		"/web/execution-targets",
+		"check-in freshness",
+		"not an active WebSocket route proof",
+	} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("register description missing %q: %s", want, description)
+		}
+	}
 
 	requestBody := yamlMapField(t, post, "requestBody", "register requestBody")
 	content := yamlMapField(t, requestBody, "content", "register requestBody.content")

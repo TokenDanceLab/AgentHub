@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -56,6 +57,11 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	if err := req.Validate(); err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
 	}
+	if req.DeviceID != nil {
+		if err := requireDeviceBelongsToOwner(ctx, s.db, ownerID, *req.DeviceID, ""); err != nil {
+			return nil, err
+		}
+	}
 
 	existing, err := repository.FindTargetByOwnerAndName(s.db, ownerID, req.Name)
 	if err == nil && existing != nil {
@@ -78,49 +84,58 @@ func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Con
 		return nil, errcode.ErrBadRequest
 	}
 
-	var conflicting model.ExecutionTarget
-	err := s.db.WithContext(ctx).
-		Where("device_id = ? AND target_type = ? AND owner_id <> ? AND deleted_at IS NULL", device.ID, "local_edge", device.UserID).
-		First(&conflicting).Error
-	if err == nil {
-		return nil, errcode.AuthDeviceMismatch
-	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
 	now := time.Now()
 	capabilities, metadata := desktopDeviceTargetFields(device)
 	name := desktopDeviceTargetName(device.ID)
 
-	var target model.ExecutionTarget
-	err = s.db.WithContext(ctx).
-		Where("owner_id = ? AND device_id = ? AND target_type = ? AND deleted_at IS NULL", device.UserID, device.ID, "local_edge").
-		Order("id ASC").
-		First(&target).Error
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	var result *model.ExecutionTarget
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := requireDeviceBelongsToOwner(ctx, tx, device.UserID, device.ID, "desktop"); err != nil {
+			return err
+		}
+
+		var matches []model.ExecutionTarget
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("owner_id = ? AND target_type = ? AND deleted_at IS NULL AND (device_id = ? OR name = ?)", device.UserID, "local_edge", device.ID, name).
+			Order("id ASC").
+			Find(&matches).Error; err != nil {
+			return err
+		}
+
+		if len(matches) > 1 {
+			return errcode.UserInvalidParam.WithMessage("multiple local_edge targets match desktop device registration")
+		}
+
+		target := model.ExecutionTarget{
+			OwnerID:    device.UserID,
+			TargetType: "local_edge",
+		}
+		if len(matches) == 1 {
+			target = matches[0]
+			if target.DeviceID != nil && *target.DeviceID != device.ID {
+				return errcode.UserInvalidParam.WithMessage("generated local_edge target name is bound to another desktop device")
+			}
+		}
+
+		refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata, now)
+		if target.ID == "" {
+			if err := repository.CreateExecutionTarget(tx, &target); err != nil {
+				return err
+			}
+		} else if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
+			return err
+		}
+
+		result = &target
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		target = model.ExecutionTarget{
-			OwnerID:            device.UserID,
-			DeviceID:           &device.ID,
-			Name:               name,
-			TargetType:         "local_edge",
-			WorkspaceAllowlist: "[]",
-			TrustLevel:         "local",
-			HealthState:        "healthy",
-			IsOnline:           true,
-			LastSeenAt:         &now,
-			Capabilities:       capabilities,
-			Metadata:           metadata,
-		}
-		if err := repository.CreateExecutionTarget(s.db.WithContext(ctx), &target); err != nil {
-			return nil, err
-		}
-		return &target, nil
-	}
+	return result, nil
+}
 
+func refreshDesktopLocalEdgeTarget(target *model.ExecutionTarget, device *model.Device, name, capabilities, metadata string, now time.Time) {
 	target.Name = name
 	target.DeviceID = &device.ID
 	target.TargetType = "local_edge"
@@ -131,10 +146,6 @@ func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Con
 	target.LastSeenAt = &now
 	target.Capabilities = capabilities
 	target.Metadata = metadata
-	if err := repository.UpdateExecutionTarget(s.db.WithContext(ctx), &target); err != nil {
-		return nil, err
-	}
-	return &target, nil
 }
 
 func desktopDeviceTargetName(deviceID string) string {
@@ -157,11 +168,33 @@ func desktopDeviceTargetFields(device *model.Device) (string, string) {
 		"device_capabilities": deviceCapabilities,
 	})
 	metadata, _ := json.Marshal(map[string]string{
-		"source":      "desktop_device_registration",
-		"device_type": device.DeviceType,
-		"app_version": device.AppVersion,
+		"source":       "desktop_device_registration",
+		"device_type":  device.DeviceType,
+		"app_version":  device.AppVersion,
+		"health_basis": "desktop_check_in_freshness_not_ws_route",
 	})
 	return string(capabilities), string(metadata)
+}
+
+func requireDeviceBelongsToOwner(ctx context.Context, db *gorm.DB, ownerID, deviceID, deviceType string) error {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil
+	}
+	device, err := repository.GetDeviceByID(db.WithContext(ctx), deviceID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AuthDeviceMismatch
+		}
+		return err
+	}
+	if device.UserID != ownerID {
+		return errcode.AuthDeviceMismatch
+	}
+	if deviceType != "" && device.DeviceType != deviceType {
+		return errcode.AuthDeviceMismatch
+	}
+	return nil
 }
 
 func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error) {
@@ -218,6 +251,9 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 		t.AuthMethod = req.AuthMethod
 	}
 	if req.DeviceID != nil {
+		if err := requireDeviceBelongsToOwner(ctx, s.db, ownerID, *req.DeviceID, ""); err != nil {
+			return nil, err
+		}
 		t.DeviceID = req.DeviceID
 	}
 	if req.Capabilities != "" {
