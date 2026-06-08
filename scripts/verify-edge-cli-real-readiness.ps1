@@ -131,7 +131,7 @@ Assert-Contains "edge-server\internal\lifecycle\process_executor.go" "adapterReg
 Assert-Contains "edge-server\internal\lifecycle\process_executor_test.go" "TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback" "lifecycle test covers explicit unknown runtime"
 Assert-Contains "edge-server\internal\lifecycle\process_executor_test.go" "unknown-runtime" "lifecycle test uses explicit unknown-runtime id"
 Assert-Contains "edge-server\internal\lifecycle\process_executor_test.go" "default adapter was invoked for unknown runtime" "lifecycle test proves no default fallback"
-Assert-Contains "docs\backend-integration-governance.md" "unknown runtime.*fallback|未知 runtime.*fallback" "governance docs require no fallback for unknown runtimes"
+Assert-Contains "docs\backend-integration-governance.md" "unknown runtime.*fallback|agentId.*adapter registry.*fallback" "governance docs require no fallback for unknown runtimes"
 
 Step "proposal/readiness artifact"
 Assert-Contains "docs\audit\p0-edge-cli-real-readiness.md" "No real CLI/model run" "audit doc records no real CLI/model run"
