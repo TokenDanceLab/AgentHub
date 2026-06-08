@@ -46,7 +46,9 @@ If an operator wants the verifier to start services, `-StartServices` requires a
 
 ## Future Real Evidence
 
-A future `RealTested=true` gate must derive Hub dispatch target from an observed Hub evidence source, such as a no-secret Hub state export, Hub debug endpoint, or Desktop bridge event log produced by the live Web -> Hub -> Desktop bridge -> Local Edge path. Caller-supplied URL parameters are insufficient for real dispatch proof.
+Observed dispatch proof is now handled by `scripts/verify-observed-localhost-dispatch.ps1`. That verifier requires a no-secret Hub/Desktop evidence manifest or loopback evidence endpoint with target registration, Hub dispatch, Desktop bridge accept, Edge run id, and Hub replay refs. Caller-supplied URL parameters remain insufficient for real dispatch proof.
+
+A future `RealTested=true` promotion still requires explicit operator approval and an approval-gated observed manifest. Without that gate, observed-dispatch reports keep `real_tested=false`.
 
 ## Non-Goals
 
