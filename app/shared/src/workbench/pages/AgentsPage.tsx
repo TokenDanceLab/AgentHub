@@ -1070,7 +1070,7 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
               <p>{model.description}</p>
               <small>{model.assignedAgents}</small>
             </div>
-            <span>{model.state}</span>
+            <span className={styles['model-state']}>{model.state}</span>
           </article>
         ))}
       </div>
