@@ -1,6 +1,6 @@
 # AgentHub 48h Sprint Roadmap
 
-> Last updated: 2026-06-09 00:45 +08:00
+> Last updated: 2026-06-09 00:55 +08:00
 > Baseline: `origin/dev/delicious233 @ 4700ad0b`
 > Integration worktree: `codex/p0-remote-control-integration` / `.worktrees/p0-remote-control-integration`
 
@@ -27,7 +27,7 @@ The sprint succeeds when Web can start or control work through Hub, Hub targets 
 
 | Step | Deliverable | Minimum proof |
 |---|---|---|
-| 1. Login/device readiness | Web and Desktop have Hub session/device state sufficient for routing, using fake/local gates unless real TokenDanceID is approved. | `scripts/verify-oidc-flow.ps1 -LocalOnly -SkipTD`; Desktop `/edge/devices/register`; Hub WS auth evidence. |
+| 1. Login/device readiness | Web and Desktop have Hub session/device state sufficient for routing, using fake/local gates unless real TokenDanceID is approved. | `scripts/verify-login-fixture-topology.ps1`; `scripts/verify-oidc-flow.ps1 -LocalOnly -SkipTD`; Desktop `/edge/devices/register`; Hub WS auth evidence. |
 | 2. Web -> Hub dispatch | Web starts a task or TeamRun with a concrete `target_id`; Hub persists `target_id` and `edge_device_id`. | Hub focused tests for `ExecutionTarget`, dispatch/control, offline exact-device queue, and no fallback. |
 | 3. Hub -> registered Desktop/Edge | Hub sends `agent.dispatch` / `agent.control` only to the recorded Desktop device or its queue. | Desktop `useHubIntegration` focused test plus captured WS payload shape. |
 | 4. Desktop -> Local Edge | Desktop active path mounts the Hub task bridge, converts dispatch into a Local Edge run, and never starts CLI directly. | Desktop App/bridge tests with Hub task id, Edge run id, adapter id, and failure/completion callback. |
@@ -62,11 +62,11 @@ ByteDance/TeamRun evidence must always state whether it is fixture rehearsal or 
 |---|---|---|
 | `.worktrees/p0-remote-control-integration` / `codex/p0-remote-control-integration` | active integration | Cherry-pick reviewed P0 slices, resolve docs conflicts, run combined gates, then return to dev. |
 | `.worktrees/roadmap-48h` / `codex/roadmap-48h` | clean, ahead 1 | Source of the short roadmap/governance sync. |
-| `.worktrees/p0-web-remote-target` / `codex/p0-web-remote-target` | clean, ahead 1 | Web target selection and Hub task start proof; review pending. |
+| `.worktrees/p0-web-remote-target` / `codex/p0-web-remote-target` | clean, ahead 1 | Web target selection and Hub task start proof; reviewed with no blockers. |
 | `.worktrees/p0-hub-target-dispatch` / `codex/p0-hub-target-dispatch` | clean, ahead 1 | Hub target-bound dispatch/control proof; reviewed with no blockers. |
 | `.worktrees/p0-desktop-edge-bridge` / `codex/p0-desktop-edge-bridge` | clean, ahead 1 | Desktop dispatch bridge proof; found active App mount blocker. |
 | `.worktrees/p0-desktop-bridge-mount` / `codex/p0-desktop-bridge-mount` | running | Mount Desktop Hub task bridge in the real v4 App active path. |
-| `.worktrees/p0-edge-cli-evidence` / `codex/p0-edge-cli-evidence` | clean, ahead 1 | Edge adapter/runtime event evidence proof; review pending. |
+| `.worktrees/p0-edge-cli-evidence` / `codex/p0-edge-cli-evidence` | clean, ahead 1 | Edge adapter/runtime event evidence proof; reviewed with no blockers. |
 | `.worktrees/p0-edge-permission-control` / `codex/p0-edge-permission-control` | running | Make `agent.control permission.decide` unblock or deny actual pending CLI permissions. |
 | `.worktrees/p0-teamrun-target-routing` / `codex/p0-teamrun-target-routing` | dirty | Propagate `target_id` through TeamRun supervisor and assignment dispatch. |
 | `.worktrees/p0-control-vocabulary-queue` / `codex/p0-control-vocabulary-queue` | running | Add shared `agent.control` vocabulary and FIFO offline replay if confirmed. |
@@ -97,6 +97,7 @@ git diff --check origin/dev/delicious233...HEAD
 Suggested slice gates:
 
 ```powershell
+.\scripts\verify-login-fixture-topology.ps1
 .\scripts\verify-oidc-flow.ps1 -LocalOnly -SkipTD
 .\scripts\verify-web-hub-boundary.ps1
 cd hub-server; go test ./internal/handler ./internal/service ./internal/router -run "ExecutionTarget|AgentTask|TeamRun|Dispatch|Control" -short -count=1
@@ -107,7 +108,7 @@ cd edge-server; go test ./internal/api ./internal/adapters ./internal/lifecycle 
 
 ## Next 6-12 Hours
 
-1. Integrate reviewed P0 slices into `codex/p0-remote-control-integration`: roadmap, Hub exact target, Edge CLI validation, evidence gate, login topology, Web target submit after review.
+1. Integrate reviewed P0 slices into `codex/p0-remote-control-integration`: roadmap, Hub exact target, Edge CLI validation, evidence gate, login topology, Web target submit.
 2. Finish missing active-path and contract gaps: Desktop bridge mount, TeamRun `target_id`, Edge blocking permission control, queue FIFO/shared `agent.control`.
 3. Run combined focused gates and fix integration breakages.
 4. Only after green integration: update dev from the clean integration branch, then tag a new RC candidate.
