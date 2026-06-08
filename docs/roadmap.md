@@ -1,6 +1,6 @@
 # AgentHub 48h Sprint Roadmap
 
-> Last updated: 2026-06-09 00:55 +08:00
+> Last updated: 2026-06-09 01:25 +08:00
 > Baseline: `origin/dev/delicious233 @ 4700ad0b`
 > Integration worktree: `codex/p0-remote-control-integration` / `.worktrees/p0-remote-control-integration`
 
@@ -21,7 +21,8 @@ P0 fixture topology now proves Web authenticated Hub session can address a regis
 ## Current Baseline
 
 - Backend is mainlined for this sprint: Hub/Edge contracts, target-bound dispatch, fake/local login gates, Desktop packaged Local Edge SQLite, Edge SQL readmodel, TeamRun fixture evidence, Web Projects/Icons, Tauri/macOS dry policy, and SDK fixture mapper are already on dev.
-- The local main worktree is dirty and behind; do not use it for implementation or evidence. Use isolated worktrees and integrate through `codex/p0-remote-control-integration`.
+- `codex/p0-remote-control-integration` is the unified P0 baseline for new work. It has absorbed Hub exact target dispatch, Web composer target selection, TeamRun target routing, Desktop Hub bridge mount, Edge CLI adapter validation, Edge brokered permission decisions, shared `agent.control`, FIFO exact-device replay, login topology, and evidence taxonomy.
+- The local main worktree is dirty and behind; do not use it for implementation or evidence. New implementation worktrees must fork from the unified P0 baseline or from `origin/dev/delicious233` only when explicitly marked as read-only/audit.
 - Global owner covers Web, Hub, Desktop, Edge, CLI adapter, evidence, packaging/deploy readiness, and docs. Mobile is external.
 - Web remains Hub-only. Desktop remains Local Edge/Tauri/host-capability only. No Web direct Local Edge access and no Desktop direct CLI spawn.
 
@@ -50,31 +51,34 @@ ByteDance/TeamRun evidence must always state whether it is fixture rehearsal or 
 
 | Lane | Purpose | Current owner/worktree | Exit proof |
 |---|---|---|---|
-| Tauri compile/package | Prove Desktop can actually build with bundled Local Edge policy. Signing/notarization remains gated. | P0 follow-up after bridge mount; stale `tauri-package-next` is reference only. | `app/desktop` typecheck, targeted Tauri Rust tests, then approved dry build/installer smoke. |
-| Web deploy/readiness | Prove Web production build and Hub-only boundary. Actual public deploy needs environment approval. | Web remote target worker first, deployment worker next. | Web typecheck/build, `verify-web-hub-boundary.ps1`, deployment dry manifest. |
-| Login and chat | Prove Web/Desktop auth topology, Hub sessions/messages, WS sync, and no silent demo fallback in real mode. | `codex/login-e2e-topology`; future real auth gate requires approval. | Fake/local auth topology gate, Hub session/message focused tests, real TokenDanceID only after approval. |
-| Hub/Edge dispatch sync | Prove exact target routing, offline queue semantics, callbacks, and event replay. | Hub dispatch, TeamRun target routing, queue/vocabulary workers. | Hub service/cache tests plus Desktop bridge tests. |
-| CLI adapter and permission control | Prove runtime id validation, no unknown fallback, and Hub `agent.control` can unblock or deny real permission waits. | Edge CLI evidence and Edge permission control workers. | Edge adapter/lifecycle/API tests; real CLI/model only after approval. |
-| Agent SDK strategy | Decide SDK value without leaking SDK objects into Hub/Web/Tauri product model. | `codex/sdk-agent-report` report-only. | Report and fixture-only next steps; no SDK package install or API/model call. |
-| Real E2E evidence | Produce final demo evidence after the chain is wired. | Evidence worker plus final QA pass. | Evidence manifest in `RealTested` or `Submission` mode, screenshots/log/API refs, video path, redaction status. |
+| Tauri compile/package | Prove Desktop can actually build with bundled Local Edge policy. Signing/notarization remains gated. | Audit report complete in `codex/audit-build-deploy`: Web/Desktop builds and Tauri `--no-bundle` pass; full installer proof missing. | `app/desktop` typecheck, targeted Tauri Rust tests, NSIS/portable dry proof, then approved installer smoke. |
+| Web deploy/readiness | Prove Web production build and Hub-only boundary. Actual public deploy needs environment approval. | Audit report complete in `codex/audit-build-deploy`: build passes but deploy pipeline/path is undefined and OIDC callback defaults need cleanup. | Web typecheck/build, `verify-web-hub-boundary.ps1`, deploy artifact manifest, OIDC callback `5174`/production allowlist sync. |
+| Login and chat | Prove Web/Desktop auth topology, Hub sessions/messages, WS sync, and no silent demo fallback in real mode. | Audit report complete in `codex/audit-login-chat-sync`; implementation follow-up needed for Web auth root and Desktop device registration mount. | Fake/local auth topology gate, Hub session/message focused tests, real TokenDanceID only after approval. |
+| Hub/Edge dispatch sync | Prove exact target routing, offline queue semantics, callbacks, and event replay. | Integrated in P0 baseline; final gap is combined fixture/e2e proof. | Hub service/cache tests plus Desktop bridge tests. |
+| CLI adapter and permission control | Prove runtime id validation, no unknown fallback, and Hub `agent.control` can unblock or deny real permission waits. | Integrated in P0 baseline; timeout policy remains P1 unless approved. | Edge adapter/lifecycle/API tests; real CLI/model only after approval. |
+| Agent SDK strategy | Decide SDK value without leaking SDK objects into Hub/Web/Tauri product model. | Report complete in `codex/sdk-agent-report`; next worker should implement fixture/sidecar adapter plan only. | Report and fixture-only next steps; no SDK package install or API/model call. |
+| Real E2E evidence | Produce final demo evidence after the chain is wired. | Next parallel worker after build/auth/device checks are green. | Evidence manifest in `RealTested` or `Submission` mode, screenshots/log/API refs, video path, redaction status. |
 
 ## Active Worktree Board
 
 | Worktree / branch | State | P0 action |
 |---|---|---|
-| `.worktrees/p0-remote-control-integration` / `codex/p0-remote-control-integration` | active integration | Cherry-pick reviewed P0 slices, resolve docs conflicts, run combined gates, then return to dev. |
-| `.worktrees/roadmap-48h` / `codex/roadmap-48h` | clean, ahead 1 | Source of the short roadmap/governance sync. |
-| `.worktrees/p0-web-remote-target` / `codex/p0-web-remote-target` | clean, ahead 1 | Web target selection and Hub task start proof; reviewed with no blockers. |
-| `.worktrees/p0-hub-target-dispatch` / `codex/p0-hub-target-dispatch` | clean, ahead 1 | Hub target-bound dispatch/control proof; reviewed with no blockers. |
-| `.worktrees/p0-desktop-edge-bridge` / `codex/p0-desktop-edge-bridge` | clean, ahead 1 | Desktop dispatch bridge proof; found active App mount blocker. |
-| `.worktrees/p0-desktop-bridge-mount` / `codex/p0-desktop-bridge-mount` | running | Mount Desktop Hub task bridge in the real v4 App active path. |
-| `.worktrees/p0-edge-cli-evidence` / `codex/p0-edge-cli-evidence` | clean, ahead 1 | Edge adapter/runtime event evidence proof; reviewed with no blockers. |
-| `.worktrees/p0-edge-permission-control` / `codex/p0-edge-permission-control` | running | Make `agent.control permission.decide` unblock or deny actual pending CLI permissions. |
-| `.worktrees/p0-teamrun-target-routing` / `codex/p0-teamrun-target-routing` | dirty | Propagate `target_id` through TeamRun supervisor and assignment dispatch. |
-| `.worktrees/p0-control-vocabulary-queue` / `codex/p0-control-vocabulary-queue` | running | Add shared `agent.control` vocabulary and FIFO offline replay if confirmed. |
-| `.worktrees/p0-remote-evidence` / `codex/p0-remote-evidence` | clean, ahead 1 | Evidence replay/package protocol proof. |
-| `.worktrees/login-e2e-topology` / `codex/login-e2e-topology` | clean, ahead 1 | Mock/topology auth gate; real TokenDanceID remains approval-gated. |
-| `.worktrees/sdk-agent-report` / `codex/sdk-agent-report` | report staged/uncommitted | P1 SDK value report; not a P0 blocker. |
+| `.worktrees/p0-remote-control-integration` / `codex/p0-remote-control-integration` | unified baseline | Only branch currently eligible to merge back to `dev/delicious233` after final combined gates. |
+| `.worktrees/roadmap-48h` / `codex/roadmap-48h` | absorbed | No further writes; superseded by unified baseline. |
+| `.worktrees/p0-web-remote-target` / `codex/p0-web-remote-target` | absorbed | Web composer target selection is in unified baseline. |
+| `.worktrees/p0-hub-target-dispatch` / `codex/p0-hub-target-dispatch` | absorbed | Hub target-bound dispatch/control is in unified baseline. |
+| `.worktrees/p0-desktop-edge-bridge` / `codex/p0-desktop-edge-bridge` | absorbed with follow-up | Bridge proof plus App mount are in unified baseline. |
+| `.worktrees/p0-desktop-bridge-mount` / `codex/p0-desktop-bridge-mount` | absorbed | Desktop v4 active path mounts the Hub task bridge and uses configured Edge base URL. |
+| `.worktrees/p0-edge-cli-evidence` / `codex/p0-edge-cli-evidence` | absorbed | Edge adapter/runtime event evidence proof is in unified baseline. |
+| `.worktrees/p0-edge-permission-control` / `codex/p0-edge-permission-control` | absorbed | Brokered permission decision path is in unified baseline; independent timeout remains P1. |
+| `.worktrees/p0-teamrun-target-routing` / `codex/p0-teamrun-target-routing` | absorbed with integration fix | Hub TeamRun target persistence/dispatch plus Web TeamRun target selection are in unified baseline. |
+| `.worktrees/p0-control-vocabulary-queue` / `codex/p0-control-vocabulary-queue` | absorbed | Shared `agent.control` and FIFO replay are in unified baseline. |
+| `.worktrees/p0-remote-evidence` / `codex/p0-remote-evidence` | absorbed | Evidence taxonomy/readiness gate is in unified baseline. |
+| `.worktrees/login-e2e-topology` / `codex/login-e2e-topology` | absorbed | Mock/topology auth gate is in unified baseline; real TokenDanceID remains approval-gated. |
+| `.worktrees/sdk-agent-report` / `codex/sdk-agent-report` | report ready | Keep as report source; do not merge into P0 integration unless docs/reference is requested. |
+| `.worktrees/audit-login-chat-sync` / `codex/audit-login-chat-sync` | report ready | Use report findings for next worker dispatch; bridge mount finding is superseded by unified baseline. |
+| `.worktrees/audit-scheduling-cli` / `codex/audit-scheduling-cli` | report ready | Use report findings for final e2e/evidence planning; several base blockers are superseded by unified baseline. |
+| `.worktrees/audit-build-deploy` / `codex/audit-build-deploy` | report ready | Build/deploy findings feed Desktop packaging and Web deploy workers. |
 | `.worktrees/edge-sql-store` / `codex/edge-sql-store` | broken object | Do not use for P0 unless recreated. |
 | `.worktrees/tauri-package-next` / `codex/tauri-package-next` | dirty, behind dev | P1 packaging reference only. |
 | `mobile-*` | external | Do not edit. |
@@ -108,9 +112,18 @@ cd edge-server; go test ./internal/api ./internal/adapters ./internal/lifecycle 
 .\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\teamrun-evidence.json -Mode FixtureRehearsal
 ```
 
-## Next 6-12 Hours
+## Parallel Dispatch Rules
 
-1. Integrate reviewed P0 slices into `codex/p0-remote-control-integration`: roadmap, Hub exact target, Edge CLI validation, evidence gate, login topology, Web target submit.
-2. Finish missing active-path and contract gaps: Desktop bridge mount, TeamRun `target_id`, Edge blocking permission control, queue FIFO/shared `agent.control`.
-3. Run combined focused gates and fix integration breakages.
-4. Only after green integration: update dev from the clean integration branch, then tag a new RC candidate.
+1. Main agent owns branch topology, integration, review, and final gate evidence. Workers own isolated implementation slices.
+2. New workers start from `codex/p0-remote-control-integration` after this unified baseline commit, not from the dirty main worktree.
+3. Each worker gets a disjoint write set, focused tests, and explicit non-goals. Workers do not push, merge to `dev/delicious233`, run real TokenDanceID, consume real CLI/model budget, sign/notarize, or deploy without approval.
+4. Completed worker branches require one read-only review pass before cherry-pick into the unified baseline.
+5. Mobile remains external; only send coordination to mobile thread for protocol/contract drift.
+
+## Next Parallel Wave
+
+1. **Desktop packaging worker**: produce NSIS/portable dry proof if toolchain permits, keep `--no-bundle` executable proof, document macOS as policy-only unless a macOS runner exists; no signing/notarization/upload.
+2. **Web auth + deploy worker**: mount/verify Web auth root, clean OIDC callback defaults (`5174` dev and production callback allowlist), production build, Hub-only deploy artifact manifest; no public deploy without approval.
+3. **Desktop device registration worker**: prove active Desktop app registers/refreshes Hub device and execution target used by Web/TeamRun routing.
+4. **Remote-control fixture E2E worker**: run local fake Hub/Desktop/Edge fixture chain and produce evidence manifest in `FixtureRehearsal` mode.
+5. **SDK adapter worker**: implement only fixture/sidecar mapping for Claude Agent SDK / OpenAI Agents SDK value path; no SDK install or model/API calls unless separately approved.
