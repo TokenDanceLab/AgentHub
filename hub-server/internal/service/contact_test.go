@@ -414,7 +414,8 @@ func TestAcceptFriendRequest_PublishesAcceptedEventAfterMutation(t *testing.T) {
 
 	payload := waitForServiceEventPayload(t, events)
 	assert.Equal(t, "req-1", payload["friendship_id"])
-	assert.Equal(t, "user-1", payload["user_id"])
+	assert.Equal(t, "sender", payload["user_id"])
+	assert.Equal(t, "user-1", payload["accepter_id"])
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
