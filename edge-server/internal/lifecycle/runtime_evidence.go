@@ -71,13 +71,15 @@ func (e *runtimeEvidenceEmitter) persistArtifact(payload map[string]any) {
 	if id == "" {
 		return
 	}
+	artifactPath := payloadString(payload, "path")
 	artifact := store.Artifact{
-		ID:        id,
-		RunID:     e.run.ID,
-		ThreadID:  e.run.ThreadID,
-		Kind:      payloadString(payload, "kind"),
-		Path:      evidencePathFromPayload(payload, "path"),
-		SizeBytes: payloadInt64(payload, "sizeBytes", "size_bytes"),
+		ID:            id,
+		RunID:         e.run.ID,
+		ThreadID:      e.run.ThreadID,
+		Kind:          payloadString(payload, "kind"),
+		Path:          evidencePathFromPayload(payload, "path"),
+		SizeBytes:     payloadInt64(payload, "sizeBytes", "size_bytes"),
+		ContentSource: store.NewArtifactContentSource("", artifactPath),
 	}
 	if _, err := e.writer.UpsertArtifact(artifact); err != nil {
 		slog.Warn("process: failed to persist runtime artifact evidence", "runId", e.run.ID, "artifactId", id, "err", err)

@@ -3,6 +3,8 @@ package store
 import (
 	"errors"
 	"fmt"
+	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -49,14 +51,21 @@ type RunDiffFile struct {
 }
 
 type Artifact struct {
-	ID        string `json:"id"`
-	RunID     string `json:"runId"`
-	ThreadID  string `json:"threadId"`
-	Kind      string `json:"kind"`
-	Path      string `json:"path"`
-	SizeBytes int64  `json:"sizeBytes"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID            string                 `json:"id"`
+	RunID         string                 `json:"runId"`
+	ThreadID      string                 `json:"threadId"`
+	Kind          string                 `json:"kind"`
+	Path          string                 `json:"path"`
+	SizeBytes     int64                  `json:"sizeBytes"`
+	ContentSource *ArtifactContentSource `json:"contentSource,omitempty"`
+	CreatedAt     string                 `json:"createdAt"`
+	UpdatedAt     string                 `json:"updatedAt"`
+}
+
+type ArtifactContentSource struct {
+	Kind     string `json:"kind"`
+	Path     string `json:"path"`
+	Readable bool   `json:"readable"`
 }
 
 type Preview struct {
@@ -197,7 +206,7 @@ func (s *Store) snapshot() fileSnapshot {
 		Items:         copyMap(s.items),
 		Pins:          copyMap(s.pins),
 		Diffs:         copyMap(s.diffs),
-		Artifacts:     copyMap(s.artifacts),
+		Artifacts:     cloneArtifactMap(s.artifacts),
 		Previews:      copyMap(s.previews),
 		ProjectOrder:  append([]string(nil), s.projectOrder...),
 		ThreadOrder:   append([]string(nil), s.threadOrder...),
@@ -220,7 +229,7 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.items = copyMap(snapshot.Items)
 	s.pins = copyMap(snapshot.Pins)
 	s.diffs = copyMap(snapshot.Diffs)
-	s.artifacts = copyMap(snapshot.Artifacts)
+	s.artifacts = cloneArtifactMap(snapshot.Artifacts)
 	s.previews = copyMap(snapshot.Previews)
 	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
 	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
@@ -238,6 +247,23 @@ func copyMap[K comparable, V any](source map[K]V) map[K]V {
 		copied[key] = value
 	}
 	return copied
+}
+
+func cloneArtifactMap(source map[string]Artifact) map[string]Artifact {
+	copied := make(map[string]Artifact, len(source))
+	for key, value := range source {
+		copied[key] = cloneArtifact(value)
+	}
+	return copied
+}
+
+func cloneArtifact(artifact Artifact) Artifact {
+	if artifact.ContentSource == nil {
+		return artifact
+	}
+	source := *artifact.ContentSource
+	artifact.ContentSource = &source
+	return artifact
 }
 
 func normalizeOrder[V any](order []string, items map[string]V) []string {
@@ -514,18 +540,20 @@ func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 	if artifact.Kind == "" {
 		artifact.Kind = "file"
 	}
+	artifact.Path = sanitizeArtifactDisplayPath(artifact.Path)
+	artifact.ContentSource = normalizeArtifactContentSource(artifact.ContentSource)
 	now := nowString()
 	if existing, ok := s.artifacts[artifact.ID]; ok {
 		artifact.CreatedAt = existing.CreatedAt
 		artifact.UpdatedAt = now
-		s.artifacts[artifact.ID] = artifact
-		return artifact, nil
+		s.artifacts[artifact.ID] = cloneArtifact(artifact)
+		return cloneArtifact(artifact), nil
 	}
 	artifact.CreatedAt = now
 	artifact.UpdatedAt = now
-	s.artifacts[artifact.ID] = artifact
+	s.artifacts[artifact.ID] = cloneArtifact(artifact)
 	s.artifactOrder = append(s.artifactOrder, artifact.ID)
-	return artifact, nil
+	return cloneArtifact(artifact), nil
 }
 
 func (s *Store) ListArtifacts(runID string) []Artifact {
@@ -534,7 +562,7 @@ func (s *Store) ListArtifacts(runID string) []Artifact {
 
 	artifacts := make([]Artifact, 0, len(s.artifactOrder))
 	for _, id := range s.artifactOrder {
-		artifact := s.artifacts[id]
+		artifact := cloneArtifact(s.artifacts[id])
 		if runID == "" || artifact.RunID == runID {
 			artifacts = append(artifacts, artifact)
 		}
@@ -547,7 +575,7 @@ func (s *Store) GetArtifact(id string) (Artifact, bool) {
 	defer s.mu.RUnlock()
 
 	artifact, ok := s.artifacts[id]
-	return artifact, ok
+	return cloneArtifact(artifact), ok
 }
 
 func (s *Store) UpsertPreview(preview Preview) (Preview, error) {
@@ -959,6 +987,161 @@ func threadPinKey(threadID, itemID string) string {
 
 func runDiffFileKey(runID, path string) string {
 	return runID + "\x00" + path
+}
+
+const (
+	ArtifactContentSourceWorkspaceRelative = "workspace_relative"
+	ArtifactContentSourceBasename          = "basename"
+)
+
+func NewArtifactContentSource(workspaceRoot, sourcePath string) *ArtifactContentSource {
+	sourcePath = strings.TrimSpace(sourcePath)
+	if sourcePath == "" {
+		return nil
+	}
+
+	if isPathAbsolute(sourcePath) {
+		if relPath, ok := workspaceRelativeSourcePath(workspaceRoot, sourcePath); ok {
+			return &ArtifactContentSource{
+				Kind:     ArtifactContentSourceWorkspaceRelative,
+				Path:     relPath,
+				Readable: true,
+			}
+		}
+		base := artifactBaseName(sourcePath)
+		if base == "" {
+			return nil
+		}
+		return &ArtifactContentSource{
+			Kind:     ArtifactContentSourceBasename,
+			Path:     base,
+			Readable: false,
+		}
+	}
+
+	if relPath, ok := safeWorkspaceRelativePath(sourcePath); ok {
+		return &ArtifactContentSource{
+			Kind:     ArtifactContentSourceWorkspaceRelative,
+			Path:     relPath,
+			Readable: true,
+		}
+	}
+	base := artifactBaseName(sourcePath)
+	if base == "" {
+		return nil
+	}
+	return &ArtifactContentSource{
+		Kind:     ArtifactContentSourceBasename,
+		Path:     base,
+		Readable: false,
+	}
+}
+
+func normalizeArtifactContentSource(source *ArtifactContentSource) *ArtifactContentSource {
+	if source == nil {
+		return nil
+	}
+	sourcePath := strings.TrimSpace(source.Path)
+	if source.Kind == ArtifactContentSourceWorkspaceRelative {
+		if relPath, ok := safeWorkspaceRelativePath(sourcePath); ok {
+			return &ArtifactContentSource{
+				Kind:     ArtifactContentSourceWorkspaceRelative,
+				Path:     relPath,
+				Readable: true,
+			}
+		}
+	}
+
+	base := artifactBaseName(sourcePath)
+	if base == "" {
+		return nil
+	}
+	return &ArtifactContentSource{
+		Kind:     ArtifactContentSourceBasename,
+		Path:     base,
+		Readable: false,
+	}
+}
+
+func sanitizeArtifactDisplayPath(value string) string {
+	if relPath, ok := safeWorkspaceRelativePath(value); ok {
+		return relPath
+	}
+	return artifactBaseName(value)
+}
+
+func workspaceRelativeSourcePath(workspaceRoot, sourcePath string) (string, bool) {
+	workspaceRoot = strings.TrimSpace(workspaceRoot)
+	if workspaceRoot == "" {
+		return "", false
+	}
+	root, err := filepath.Abs(workspaceRoot)
+	if err != nil {
+		return "", false
+	}
+	source, err := filepath.Abs(sourcePath)
+	if err != nil {
+		return "", false
+	}
+	relPath, err := filepath.Rel(root, source)
+	if err != nil {
+		return "", false
+	}
+	return safeWorkspaceRelativePath(relPath)
+}
+
+func safeWorkspaceRelativePath(value string) (string, bool) {
+	value = strings.ReplaceAll(strings.TrimSpace(value), "\\", "/")
+	if isWindowsDriveQualifiedPath(value) {
+		return "", false
+	}
+	value = path.Clean(value)
+	if value == "." || value == "" || isPathAbsolute(value) || value == ".." || strings.HasPrefix(value, "../") {
+		return "", false
+	}
+	return value, true
+}
+
+func artifactBaseName(value string) string {
+	value = strings.ReplaceAll(strings.TrimSpace(value), "\\", "/")
+	if isWindowsDriveQualifiedPath(value) {
+		value = strings.TrimPrefix(value[2:], "/")
+	}
+	value = path.Clean(value)
+	if value == "." || value == "" {
+		return ""
+	}
+	base := path.Base(value)
+	if base == "." || base == "/" {
+		return ""
+	}
+	return base
+}
+
+func isPathAbsolute(value string) bool {
+	value = strings.TrimSpace(value)
+	return filepath.IsAbs(value) || isPortablePathAbsolute(value)
+}
+
+func isPortablePathAbsolute(value string) bool {
+	value = strings.ReplaceAll(strings.TrimSpace(value), "\\", "/")
+	return path.IsAbs(value) || isWindowsDriveAbsolutePath(value) || isWindowsUNCPath(value)
+}
+
+func isWindowsDriveAbsolutePath(value string) bool {
+	return isWindowsDriveQualifiedPath(value) && len(value) >= 3 && value[2] == '/'
+}
+
+func isWindowsDriveQualifiedPath(value string) bool {
+	return len(value) >= 2 && isASCIIAlpha(value[0]) && value[1] == ':'
+}
+
+func isWindowsUNCPath(value string) bool {
+	return strings.HasPrefix(value, "//")
+}
+
+func isASCIIAlpha(value byte) bool {
+	return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z')
 }
 
 func normalizeEvidenceStatus(status string) string {
