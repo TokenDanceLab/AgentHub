@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { ContactMember, ProjectInfo, WorkbenchContactsData } from '@shared/workbench';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ContactMember, ProjectDraft, ProjectInfo, WorkbenchContactsData } from '@shared/workbench';
+import type { WorkbenchDataMode } from '@shared/demo';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   getWorkbenchDataModeOverrideSnapshot,
@@ -38,6 +39,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
   const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
   const authenticated = useHubStore((state) => state.authenticated);
   const hubReady = dataMode !== 'demo' && authenticated && Boolean(getAccessToken());
+  const queryClient = useQueryClient();
   const demoSnapshot = useSyncExternalStore(
     workbenchDemoRuntimeStore.subscribe,
     workbenchDemoRuntimeStore.getSnapshot,
@@ -108,6 +110,19 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     staleTime: 10_000,
     placeholderData: (previous) => previous,
   });
+  const createProject = useMutation({
+    mutationFn: (draft: ProjectDraft) => hubClient.createWorkspaceProject(projectDraftToHubRequest(draft)),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-projects'] });
+    },
+  });
+  const updateProject = useMutation({
+    mutationFn: ({ projectId, draft }: { projectId: string; draft: ProjectDraft }) =>
+      hubClient.updateWorkspaceProject(projectId, projectDraftToHubRequest(draft)),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-projects'] });
+    },
+  });
 
   const resolvedConversations = hubReady && activeHubSessionId
     ? conversations.map((conversation) =>
@@ -132,10 +147,20 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     contacts: resolveWebWorkbenchContacts(contacts.data, hubReady, dataMode),
     conversations: resolvedConversations,
     projects: resolveWebWorkbenchProjects(projects.data?.items, hubReady, dataMode),
-    projectsStatus: {
-      loading: dataMode === 'real' && projects.isFetching,
-      error: dataMode === 'real' && projects.error ? errorMessage(projects.error, 'Hub Projects 加载失败') : undefined,
-    },
+    projectsStatus: resolveWebProjectsStatus(
+      { isFetching: projects.isFetching, error: projects.error },
+      createProject.error,
+      updateProject.error,
+      hubReady,
+      dataMode,
+      createProject.isPending || updateProject.isPending,
+    ),
+    projectsActions: hubReady ? {
+      create: async (draft: ProjectDraft) => workspaceProjectToProjectInfo(await createProject.mutateAsync(draft)),
+      update: async (projectId: string, draft: ProjectDraft) => (
+        workspaceProjectToProjectInfo(await updateProject.mutateAsync({ projectId, draft }))
+      ),
+    } : undefined,
     transcript,
   };
 }
@@ -186,7 +211,7 @@ export function resolveWebWorkbenchProjects(
   dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
 ): ProjectInfo[] | undefined {
   if (!hubReady) {
-    return dataMode === 'real' ? [] : undefined;
+    return dataMode === 'demo' ? undefined : [];
   }
   return (projects ?? []).map(workspaceProjectToProjectInfo);
 }
@@ -207,8 +232,33 @@ export function workspaceProjectToProjectInfo(project: WorkspaceProject): Projec
   };
 }
 
+export function projectDraftToHubRequest(draft: ProjectDraft): { name: string; description: string } {
+  return {
+    name: draft.name.trim() || '未命名项目',
+    description: draft.description.trim(),
+  };
+}
+
+export function resolveWebProjectsStatus(
+  projects: { isFetching: boolean; error?: unknown },
+  createError: unknown,
+  updateError: unknown,
+  hubReady: boolean,
+  dataMode: WorkbenchDataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
+  saving = false,
+): { loading: boolean; error?: string | undefined; actionError?: string | undefined; saving: boolean } {
+  const effectiveRealMode = hubReady || dataMode === 'real';
+  return {
+    loading: effectiveRealMode && projects.isFetching,
+    error: effectiveRealMode && projects.error ? errorMessage(projects.error, 'Hub Projects 加载失败') : undefined,
+    actionError: effectiveRealMode ? errorMessage(createError ?? updateError, '') || undefined : undefined,
+    saving,
+  };
+}
+
 function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
   return fallback;
 }
 

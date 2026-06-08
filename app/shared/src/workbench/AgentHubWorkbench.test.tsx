@@ -8,6 +8,15 @@ import type { TranscriptBlock } from '../transcript/types';
 import { AgentHubWorkbench } from './AgentHubWorkbench';
 import { DESIGN_NAV_GLYPH_SIZE, DESIGN_NAV_GLYPH_STROKE_WIDTH } from './designIcons';
 
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: () => null,
+  Codex: () => null,
+  ModelIcon: () => null,
+  OpenCode: () => null,
+}));
+vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
+
 describe('AgentHubWorkbench', () => {
   afterEach(() => {
     cleanup();
@@ -821,6 +830,56 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(projectScope.getByRole('button', { name: '设置' }));
     expect(screen.getByRole('heading', { name: '项目设置' })).toBeInTheDocument();
     expect(screen.getAllByText('成员策略').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the Projects editor visible when Hub project submit fails', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleProjectCreate = vi.fn().mockRejectedValue(new Error('Hub Projects create failed'));
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[{
+          id: 'hub-project-1',
+          name: 'Hub 项目',
+          description: 'Hub workspace',
+          status: 'Hub',
+          meta: '0 runs',
+          members: [],
+          announcement: 'Hub workspace',
+          runs: [],
+          artifacts: [],
+          feed: [],
+        }]}
+        onProjectCreate={handleProjectCreate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    fireEvent.click(screen.getByRole('button', { name: '新建项目' }));
+    fireEvent.change(projectScope.getByLabelText('项目名称'), { target: { value: '失败项目' } });
+    fireEvent.click(projectScope.getByRole('button', { name: '创建项目' }));
+
+    await waitFor(() => {
+      expect(handleProjectCreate).toHaveBeenCalledWith({
+        name: '失败项目',
+        description: '',
+      });
+    });
+    expect(await projectScope.findByRole('alert')).toHaveTextContent('Hub Projects create failed');
+    expect(projectScope.getByRole('button', { name: '创建项目' })).toBeInTheDocument();
+    expect(projectScope.getByLabelText('项目名称')).toHaveValue('失败项目');
   });
 
   it('renders supplied Hub AgentProfiles on the Agents rail page instead of mock agents', () => {

@@ -79,6 +79,7 @@ export type {
   DocsPane,
   DocsPageNavItem,
   ProjectsPageProps,
+  ProjectDraft,
   ProjectInfo,
   ProjectRun,
   ProjectArtifact,

@@ -27,6 +27,7 @@ export type { DocsPageProps, DocRow, DocsPane, DocsPageNavItem } from './DocsPag
 export { ProjectsPage, DEFAULT_PROJECTS } from './ProjectsPage';
 export type {
   ProjectsPageProps,
+  ProjectDraft,
   ProjectInfo,
   ProjectRun,
   ProjectArtifact,
