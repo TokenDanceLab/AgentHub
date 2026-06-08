@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 18:29 +08:00
+> 最后更新：2026-06-08 19:25 +08:00
 > 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
@@ -62,6 +62,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | `integrate-codex-adapter-precheck` | 复核是否已被 A0+A 吸收后清理 |
 | mobile worktrees | 低优先级支线，不混主线 |
 | `.worktrees/lobe-icons-runtime-branding` / `codex/lobe-icons-runtime-branding` | Worker F ready-for-review：shared `RuntimeBrandIcon` / `designIcons` registry uses `@lobehub/icons` model/runtime/provider helpers where available and local fallback icons for internal tools/runtimes; model-card status styling is scoped; touches only shared workbench icon surfaces and small Desktop settings cards. |
+| `.worktrees/login-real-readiness-gate` / `codex/login-real-readiness-gate` | 当前登录下一片：新增 packaged real login dry readiness gate，只读扫描 fake/local、packaged readiness、future real E2E 边界；不连接 TokenDance ID、不打开浏览器、不读取 secrets、不跑真实 CLI/model。 |
 
 清理规则：每个 worktree 清理前必须记录 `git status --short --branch` 和 `git rev-list --left-right --count HEAD...origin/dev/delicious233` 或等价 cherry 证据；dirty worktree 不批量删。
 
@@ -80,6 +81,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 1. 提交并推送本轮 roadmap/governance 刷新。
 2. Edge SQLite opt-in backend、Edge relational schema/migration、登录 fake/local gate、Tauri Windows installer/updater metadata readiness、TeamRun dry evidence、Artifact/Diff/Preview read-only Edge 前置和 runtime evidence 写入已合入；`codex/tauri-package-readiness` follow-up 已补 generated artifact ignore gate，待 review；真实登录和正式签名继续拆独立 proposal。
    - `codex/packaged-login-e2e` 已补 packaged Desktop loopback/keyring readiness 的 local/static gate，不连接真实 TokenDanceID、不打开真实登录窗口；真实 packaged E2E 仍需单独 proposal/gate。
+   - `codex/login-real-readiness-gate` 补 `scripts/verify-packaged-login-real-readiness.ps1` dry gate 和脚本测试，明确 fake/local、packaged readiness、future real E2E 三层；真实 packaged login 仍 blocked，除非另行批准浏览器登录窗口、测试 OAuth client、测试账号和 Hub 测试环境。
 3. Desktop Edge mapper 首切片已合入：已接入 Edge agents/model catalog/Local Edge target mapper，并在 review 修正 StartRunRequest adapter id 映射、移除 provider 提交字段、阻断 Desktop live 空线程/demo transcript fallback；`codex/desktop-target-tauri-host` 正在收口 Desktop-owned Local Edge target preference、Tauri host readiness command 和 sidecar launch args 测试，安装包联调后置。
 4. macOS 正式签名、notarization、staple 另起 proposal，不混入 Windows readiness；当前 installer smoke 只记录 macOS arm64 unsigned compatibility note，不跑 `codesign`、`notarytool` 或 `stapler`。
 5. `codex/runtime-evidence-inspector` 已补 shared RightInspector read-only snapshot 消费和 Desktop 既有 Edge evidence hook 接线，并修复 raw run id 选择、Desktop App v4 测试 harness、artifact metadata 非交互行与 preview 切 tab 行为；不碰 preview start/stop、artifact apply/discard/content、Web 直连 Edge、Hub route 或真实 CLI/model。
