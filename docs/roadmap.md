@@ -1,9 +1,9 @@
 # AgentHub 48h Remote-Control Roadmap
 
-> Last updated: 2026-06-09 07:35 +08:00
+> Last updated: 2026-06-09 07:50 +08:00
 > Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
-> Active integration candidate: `origin/codex/p1-critical-evidence-integration` at `cc13a48e`
-> Current delta: integration is `ahead 73 / behind 0` from stable baseline
+> Active integration candidate: `origin/codex/p1-critical-evidence-integration` at `42d2c768`
+> Current delta: integration is `ahead 78 / behind 0` from stable baseline
 > Next tag candidate after accepted merge only: `v0.3.0-rc.6`
 
 This file is the sprint control board. Long history is archived in
@@ -47,9 +47,12 @@ The integration candidate bundles the reviewed P1 remote-control evidence line:
 | Edge CLI/SDK contract | Provider-neutral JSON fixture mapping for Claude/OpenAI/OpenCode/custom Agent shapes, recursive redaction, safe trace refs | Real SDK/model invocation |
 | Web event rendering | TeamRun console renders runtime summaries, target IDs, Edge run IDs, tool results, file changes, and failures | Live selected-run WebSocket proof |
 | Local stack gates | Fixture/readiness/approved-real runner plus live-chain topology verifier | Real login or real CLI by default |
+| Real evidence boundary | Manifest-only observed evidence now reports `observed_manifest_accepted=true` and keeps `real_tested=false` | Artifact/log/hash-dereferenced real verifier |
 | Login harness | Approval-gated real login E2E harness with secret redaction and safe artifact roots | Disposable TokenDanceID account proof |
-| Tauri packaging | Unsigned Windows NSIS setup and portable zip evidence report | Signing/notary/updater/release upload |
+| Tauri packaging | Unsigned Windows package evidence plus sidecar runtime evidence gate for app-data SQLite, logs, sidecar name, and macOS policy | Signing/notary/updater/release upload |
 | Web Projects state | Real/signed-out mode requires Hub sign-in instead of silently falling back to mock data | Full Projects CRUD UX polish |
+| Edge durable store | SQLite row-first store alpha persists Store contract rows before legacy snapshot fallback | Production durability rollout policy |
+| Runtime icons | LobeHub-backed runtime/provider icons plus custom fallback coverage | Broader UI visual QA |
 
 ## 48h Priority Order
 
@@ -59,9 +62,10 @@ The integration candidate bundles the reviewed P1 remote-control evidence line:
 | P0 | Local product-loop evidence | Worker + controller | One reproducible local run proves Hub/Web/Desktop/Local Edge/adapter fixture flow and produces sanitized evidence. |
 | P0 | Desktop usable package | Worker | Windows unsigned installer/portable package can launch Desktop, show Hub sign-in state, start/diagnose Local Edge, and preserve logs. |
 | P0 | Web real-mode remote UX | Worker | Web can select a Hub target, dispatch a task, and render replay/error states without mock fallback or direct Local Edge calls. |
-| P1 | Edge durable store alpha | Worker + reviewer | SQLite row-first store covers store contract key paths without regressing FileStore or migration guard. |
+| P0 | Real evidence verifier | Worker + reviewer | `real_tested=true` requires dereferencing artifact/log/hash and matching correlation/event ids; manifest text alone cannot promote. |
+| P1 | Edge durable store alpha | integrated | SQLite row-first store covers store contract key paths without regressing FileStore or migration guard. |
 | P1 | SDK/custom Agent product path | Researcher + worker | OpenAI/Claude/OpenCode/custom Agent registration fields and adapter contract are documented and mapped to concrete implementation slices. |
-| P1 | Runtime/tool icons | Worker | LobeHub icons cover major model/runtime/tool brands with fallback and tests. |
+| P1 | Runtime/tool icons | integrated | LobeHub icons cover major model/runtime/tool brands with fallback and tests. |
 | P1 | Release/deploy gates | Worker + controller | Web build/deploy, Tauri signing/notary/updater, and real CLI spend gates are documented as approval-controlled operations. |
 
 ## Parallel Topology
@@ -70,11 +74,12 @@ Current active delegation wave:
 
 | Agent | Lane | Write scope |
 |---|---|---|
-| P1 integration reviewer | Merge readiness | Read-only. |
-| Edge durable store worker | Edge SQLite alpha | `edge-server/internal/store/**`, edge store audit docs only. |
-| Tauri package worker | Desktop package/runtime evidence | `app/desktop/**`, Tauri scripts/tests/audit docs only. |
-| SDK/custom Agent researcher | Product architecture | Read-only report. |
-| Runtime icon worker | LobeHub icon polish | Shared runtime/icon UI and tests only. |
+| Local product-loop evidence worker | Reproducible local fixture/approved-real harness | `scripts/**`, `tests/scripts/**`, local-stack/product-loop audit docs only. |
+| Web remote UX worker | Web target selection, dispatch, run replay, real/mock states | `app/web/src/**`, narrow shared workbench files/tests only. |
+| Desktop Profile/Target worker | Desktop AgentProfile/ExecutionTarget/readiness wiring | `app/desktop/src/**`, `app/desktop/src-tauri/src/**` only. |
+| Real evidence verifier worker | Artifact/log/hash dereference for real evidence | `scripts/**`, `tests/scripts/**`, real-evidence audit docs only. |
+| Worktree cleanup auditor | Cleanup topology | Read-only. |
+| Deploy/release gap auditor | Web/Desktop release readiness | Read-only. |
 
 Controller owns this roadmap, integration branches, tags, final gates, cleanup,
 and conflict resolution. Workers must not push, merge, tag, edit this roadmap,
@@ -124,6 +129,7 @@ review before any `real_tested=true` claim.
 | Decision | Default until approved |
 |---|---|
 | Merge `cc13a48e` into `dev/delicious233` | Wait for reviewer and gate evidence. |
+| Merge `42d2c768` into `dev/delicious233` | Candidate is ready for next review/gate pass; controller owns final merge instruction. |
 | Push `v0.3.0-rc.6` | Blocked. Needs explicit release approval. |
 | Real TokenDanceID login test | Blocked. Needs disposable account/env approval. |
 | Real OpenAI/Claude/OpenCode invocation | Blocked. Needs spend/API approval and redacted evidence path. |
@@ -132,8 +138,8 @@ review before any `real_tested=true` claim.
 
 ## Next Controller Actions
 
-1. Finish read-only review and minimum merge-gate for `cc13a48e`.
-2. Integrate or reject worker outputs by disjoint lane; do not widen scope.
-3. If merge-gate passes, prepare merge instruction for `dev/delicious233`.
-4. After dev merge, decide whether to request `v0.3.0-rc.6` approval.
-5. Start approved local product-loop evidence run before any real spend.
+1. Collect current worker outputs and integrate only disjoint, verified slices.
+2. Run minimum merge-gate again after each integration batch.
+3. Prepare merge instruction for `dev/delicious233` when review remains clear.
+4. After dev merge, request explicit approval before creating `v0.3.0-rc.6`.
+5. Run local fixture product-loop evidence before any real login or model spend.
