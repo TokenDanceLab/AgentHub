@@ -11,10 +11,11 @@ import { DESIGN_NAV_GLYPH_SIZE, DESIGN_NAV_GLYPH_STROKE_WIDTH } from './designIc
 vi.mock('@lobehub/icons', () => ({
   ClaudeCode: () => null,
   Codex: () => null,
+  GeminiCLI: () => null,
   ModelIcon: () => null,
   OpenCode: () => null,
+  ProviderIcon: () => null,
 }));
-vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({ default: () => null }));
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 describe('AgentHubWorkbench', () => {

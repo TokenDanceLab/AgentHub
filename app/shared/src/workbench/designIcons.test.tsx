@@ -17,12 +17,10 @@ import {
 vi.mock('@lobehub/icons', () => ({
   ClaudeCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="claude-code-icon" />,
   Codex: ({ size }: { size?: number }) => <span data-size={size} data-testid="codex-icon" />,
+  GeminiCLI: ({ size }: { size?: number }) => <span data-size={size} data-testid="gemini-cli-icon" />,
   ModelIcon: ({ model, size }: { model: string; size?: number }) => <span data-model={model} data-size={size} data-testid="model-icon" />,
   OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
-}));
-
-vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({
-  default: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
+  ProviderIcon: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
 }));
 
 describe('design icon registry', () => {
