@@ -79,6 +79,10 @@ type AuditServiceConfig struct {
 
 // NewAuditService creates a new AuditService.
 func NewAuditService(db *gorm.DB, cfg *AuditServiceConfig) *AuditService {
+	if cfg == nil {
+		cfg = &AuditServiceConfig{}
+	}
+
 	bufSize := 1024
 	if cfg != nil && cfg.RetryBufferSize > 0 {
 		bufSize = cfg.RetryBufferSize
