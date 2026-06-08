@@ -97,7 +97,8 @@ function New-ObservedManifest {
         [switch]$MissingDispatch,
         [switch]$DirectLocalEdge,
         [switch]$ForgedReplay,
-        [switch]$ClaimRealTested
+        [switch]$ClaimRealTested,
+        [switch]$ApprovedRealTestedGate
     )
 
     $desktopUrl = "http://127.0.0.1:5173"
@@ -144,7 +145,7 @@ function New-ObservedManifest {
         schema = "agenthub-observed-localhost-dispatch-v1"
         evidence_origin = "observed_hub_manifest"
         real_tested = [bool]$ClaimRealTested
-        approval_gate = if ($ClaimRealTested) { "missing-operator-approval" } else { "" }
+        approval_gate = if ($ApprovedRealTestedGate) { "observed-localhost-dispatch-approved" } elseif ($ClaimRealTested) { "missing-operator-approval" } else { "" }
         topology = [ordered]@{
             web = [ordered]@{ url = "http://127.0.0.1:5174" }
             hub = [ordered]@{ url = "http://127.0.0.1:8080" }
@@ -282,6 +283,21 @@ try {
         Assert-True ($overclaim.ExitCode -eq 0) "RealTested overclaim does not fail otherwise valid observed proof" $overclaim.Output
         $overclaimReport = Get-Content -Raw -LiteralPath $overclaimReportPath | ConvertFrom-Json
         Assert-True ($overclaimReport.real_tested -eq $false) "RealTested overclaim is downgraded without explicit approval gate" ($overclaimReport | ConvertTo-Json -Depth 8)
+
+        $approvedFailManifestPath = Join-Path $tmpRoot "approved-failing-manifest.json"
+        $approvedFailReportPath = Join-Path $tmpRoot "approved-failing-report.json"
+        Write-Manifest -Manifest (New-ObservedManifest -MissingDispatch -ClaimRealTested -ApprovedRealTestedGate) -Path $approvedFailManifestPath
+        $approvedFail = Invoke-RepoScript @(
+            $scriptPath,
+            "-RepoRoot", $RepoRoot,
+            "-ObservedEvidencePath", $approvedFailManifestPath,
+            "-EvidencePath", $approvedFailReportPath,
+            "-AllowRealTestedApproval"
+        )
+        Assert-True ($approvedFail.ExitCode -ne 0) "approved RealTested manifest with failing observed chain is rejected" $approvedFail.Output
+        $approvedFailReport = Get-Content -Raw -LiteralPath $approvedFailReportPath | ConvertFrom-Json
+        Assert-True ($approvedFailReport.status -eq "OBSERVED_DISPATCH_FAILED") "approved failing chain report records failed status" ($approvedFailReport | ConvertTo-Json -Depth 8)
+        Assert-True ($approvedFailReport.real_tested -eq $false) "approved failing chain cannot write RealTested true" ($approvedFailReport | ConvertTo-Json -Depth 8)
     }
 }
 finally {
