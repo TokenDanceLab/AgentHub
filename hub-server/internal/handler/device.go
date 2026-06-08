@@ -143,8 +143,8 @@ type cloudEdgeRegisterResp struct {
 }
 
 // CloudEdgeRegister handles POST /cloud/edge/register.
-// It registers a cloud-hosted Edge server and issues a JWT for the cloud edge to
-// authenticate its WebSocket connection.
+// It registers a cloud-hosted Edge server and issues an Edge-scoped JWT for
+// Edge API authentication.
 func (h *DeviceHandler) CloudEdgeRegister(c *gin.Context) {
 	if h.jwtSecret == "" {
 		Fail(c, errcode.ErrInternal.WithMessage("JWT secret not configured for cloud edge registration"))
@@ -172,7 +172,6 @@ func (h *DeviceHandler) CloudEdgeRegister(c *gin.Context) {
 		return
 	}
 
-	// Register the cloud edge as a desktop-type device (cloud edge connects via WS like desktop).
 	device, err := h.deviceService.Register(deviceID, userID, "cloud_edge", req.AppVersion, req.Capabilities)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
@@ -183,12 +182,11 @@ func (h *DeviceHandler) CloudEdgeRegister(c *gin.Context) {
 		return
 	}
 
-	// Issue a JWT for the cloud edge to authenticate its WebSocket connection.
 	ttl := h.jwtTTL
 	if ttl == 0 {
 		ttl = 24 * time.Hour
 	}
-	cloudJWT, err := jwtutil.GenerateAccessToken(userID, "cloud_edge", device.ID, h.jwtSecret, ttl)
+	cloudJWT, err := jwtutil.GenerateEdgeToken(userID, device.ID, h.jwtSecret, ttl)
 	if err != nil {
 		Fail(c, errcode.ErrInternal.WithMessage("failed to generate cloud edge JWT"))
 		return
