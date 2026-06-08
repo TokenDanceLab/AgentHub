@@ -344,6 +344,66 @@ func TestStartEventSubscriptionsPushesFriendAcceptedToUser(t *testing.T) {
 	require.Equal(t, "user-1", frame.Payload["user_id"])
 }
 
+func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.T) {
+	mgr := ws.NewManager()
+	mgr.ResolveMembers = func(sessionID string) []string {
+		if sessionID == "sess-1" {
+			return []string{"user-1"}
+		}
+		return nil
+	}
+
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{mgr: mgr, bus: bus}
+	a.startEventSubscriptions(context.Background())
+
+	tests := []struct {
+		name      string
+		eventType string
+		frameType string
+		action    string
+		count     int
+	}{
+		{name: "added", eventType: "message.reaction_added", frameType: ws.TypeMessageReactionAdded, action: "added", count: 2},
+		{name: "removed", eventType: "message.reaction_removed", frameType: ws.TypeMessageReactionRemoved, action: "removed", count: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bus.Publish(context.Background(), service.Event{
+				Type: tt.eventType,
+				Payload: service.MessageReactionEventPayload{
+					Action:    tt.action,
+					UserID:    "user-2",
+					MessageID: "msg-1",
+					SessionID: "sess-1",
+					Reaction:  "heart",
+					Count:     tt.count,
+				},
+			})
+
+			frame := readAppTestFrame(t, conn)
+			require.Equal(t, tt.frameType, frame.Type)
+			require.Equal(t, tt.action, frame.Payload["action"])
+			require.Equal(t, "user-2", frame.Payload["user_id"])
+			require.Equal(t, "msg-1", frame.Payload["message_id"])
+			require.Equal(t, "sess-1", frame.Payload["session_id"])
+			require.Equal(t, "heart", frame.Payload["reaction"])
+			require.Equal(t, float64(tt.count), frame.Payload["count"])
+			require.NotContains(t, frame.Payload, "reacted_by_me")
+		})
+	}
+}
+
 func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
 	mgr := ws.NewManager()
 	mgr.ResolveMembers = func(sessionID string) []string {

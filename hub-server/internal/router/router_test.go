@@ -84,6 +84,12 @@ func (routerMessageServiceStub) MarkRead(ctx context.Context, userID, sessionID 
 func (routerMessageServiceStub) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
 	return nil, nil
 }
+func (routerMessageServiceStub) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return nil, nil
+}
+func (routerMessageServiceStub) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return nil, nil
+}
 
 func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -112,5 +118,45 @@ func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 
 	if w.Code == http.StatusNotFound || w.Code == http.StatusMethodNotAllowed {
 		t.Fatalf("PUT /client/messages/:id was not registered; status=%d body=%q", w.Code, w.Body.String())
+	}
+}
+
+func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+	metrics.Register()
+
+	r := gin.New()
+	SetupRoutes(
+		r,
+		&config.Config{},
+		"",
+		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
+		nil, nil, nil, nil, nil,
+		handler.NewMessageHandler(routerMessageServiceStub{}),
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	)
+
+	for _, tt := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/client/messages/msg-1/reactions"},
+		{method: http.MethodDelete, path: "/client/messages/msg-1/reactions"},
+	} {
+		t.Run(tt.method, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			w := httptest.NewRecorder()
+
+			r.ServeHTTP(w, req)
+
+			if w.Code == http.StatusNotFound || w.Code == http.StatusMethodNotAllowed {
+				t.Fatalf("%s %s was not registered; status=%d body=%q", tt.method, tt.path, w.Code, w.Body.String())
+			}
+		})
 	}
 }
