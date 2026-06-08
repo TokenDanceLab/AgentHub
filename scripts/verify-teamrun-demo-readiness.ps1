@@ -12,6 +12,8 @@ param(
     [string]$EvidencePath,
     [string]$ManifestPath,
     [string]$VideoPath,
+    [ValidateSet("Submission", "FixtureRehearsal")]
+    [string]$Mode = "Submission",
     [switch]$RequireVideo
 )
 
@@ -103,7 +105,7 @@ if ($resolvedEvidence -and (Test-Path -LiteralPath $resolvedEvidence)) {
 
 if ($evidence) {
     Step "Evidence shape"
-    foreach ($field in @("state", "tasks", "assignments", "events", "runtime_profiles")) {
+    foreach ($field in @("state", "tasks", "assignments", "events", "runtime_profiles", "screenshot_or_video_rehearsal")) {
         if ($null -ne $evidence.$field) {
             Pass "evidence contains $field"
         } else {
@@ -131,22 +133,79 @@ if ($evidence) {
     }
 
     Step "Fixture boundary"
-    if ($evidence.contract -eq "teamrun-demo-evidence-v1" -and $null -ne $evidence.source -and $evidence.source.fixture_only -eq $true) {
-        Pass "fixture-only evidence contract"
-    } else {
-        Fail "fixture-only evidence contract"
+    $fixtureOnly = $false
+    if ($null -ne $evidence.source -and $evidence.source.fixture_only -eq $true) {
+        $fixtureOnly = $true
     }
 
-    if ($null -ne $evidence.claims -and $evidence.claims.real_runtime_executed -eq $false) {
-        Pass "evidence does not claim real runtime execution"
+    if ($evidence.contract -eq "teamrun-demo-evidence-v1") {
+        Pass "teamrun evidence contract"
     } else {
-        Fail "evidence does not claim real runtime execution"
+        Fail "teamrun evidence contract"
     }
 
-    if ($null -ne $evidence.claims -and $evidence.claims.final_recording_complete -eq $false) {
-        Pass "evidence does not claim final demo recording"
+    if ($fixtureOnly) {
+        Pass "fixture-only source is declared"
     } else {
-        Fail "evidence does not claim final demo recording"
+        Pass "source is not marked fixture-only"
+    }
+
+    if ($null -eq $evidence.claims) {
+        Fail "evidence claims are present"
+    } else {
+        Pass "evidence claims are present"
+
+        if ($fixtureOnly -and (
+                $evidence.claims.real_runtime_executed -ne $false -or
+                $evidence.claims.final_recording_complete -ne $false -or
+                $evidence.claims.submission_ready -ne $false)) {
+            Fail "fixture evidence cannot claim real runtime, final recording, or submission readiness"
+        } elseif ($fixtureOnly) {
+            Pass "fixture evidence keeps runtime, recording, and submission claims false"
+        }
+
+        if ($Mode -eq "FixtureRehearsal") {
+            if ($fixtureOnly -and
+                $evidence.claims.real_runtime_executed -eq $false -and
+                $evidence.claims.final_recording_complete -eq $false -and
+                $evidence.claims.submission_ready -eq $false) {
+                Pass "fixture rehearsal mode accepts honest fixture claims"
+            } else {
+                Fail "fixture rehearsal mode requires honest fixture claims"
+            }
+        } else {
+            if ($fixtureOnly) {
+                Fail "submission mode rejects fixture-only evidence"
+            } else {
+                Pass "submission mode evidence is not fixture-only"
+            }
+            if ($evidence.claims.real_runtime_executed -eq $true) {
+                Pass "submission mode has real runtime execution claim"
+            } else {
+                Fail "submission mode requires real_runtime_executed=true"
+            }
+            if ($evidence.claims.final_recording_complete -eq $true) {
+                Pass "submission mode has final recording claim"
+            } else {
+                Fail "submission mode requires final_recording_complete=true"
+            }
+            if ($evidence.claims.submission_ready -eq $true) {
+                Pass "submission mode has submission-ready claim"
+            } else {
+                Fail "submission mode requires submission_ready=true"
+            }
+        }
+    }
+
+    if ($null -ne $evidence.screenshot_or_video_rehearsal) {
+        if ($fixtureOnly -and (
+                $evidence.screenshot_or_video_rehearsal.real_runtime_executed -ne $false -or
+                $evidence.screenshot_or_video_rehearsal.final_recording_complete -ne $false -or
+                $evidence.screenshot_or_video_rehearsal.submission_ready -ne $false)) {
+            Fail "fixture screenshot/video rehearsal metadata keeps readiness claims false"
+        } else {
+            Pass "screenshot/video rehearsal metadata is honest"
+        }
     }
 }
 
@@ -173,7 +232,11 @@ if ($resolvedManifest -and (Test-Path -LiteralPath $resolvedManifest)) {
 
 Step "Video"
 $resolvedVideo = Resolve-RepoPath $VideoPath
-if ($RequireVideo) {
+$videoRequired = $false
+if ($RequireVideo -or $Mode -eq "Submission") {
+    $videoRequired = $true
+}
+if ($videoRequired) {
     if ($resolvedVideo -and (Test-Path -LiteralPath $resolvedVideo)) {
         Pass "final demo video exists"
     } else {
