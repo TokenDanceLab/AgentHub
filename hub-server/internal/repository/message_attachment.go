@@ -50,6 +50,7 @@ func ListAttachmentsByMessageIDs(db *gorm.DB, messageIDs []string) (map[string][
 		MimeType       string
 		OriginalName   string
 		UploaderUserID string
+		Metadata       string
 		CreatedAt      time.Time
 	}
 	if err := db.Table("message_attachments AS ma").
@@ -61,6 +62,7 @@ func ListAttachmentsByMessageIDs(db *gorm.DB, messageIDs []string) (map[string][
 			a.mime_type,
 			a.original_name,
 			a.uploader_user_id,
+			a.metadata,
 			a.created_at
 		`).
 		Joins("INNER JOIN attachments AS a ON a.id = ma.attachment_id").
@@ -78,6 +80,7 @@ func ListAttachmentsByMessageIDs(db *gorm.DB, messageIDs []string) (map[string][
 			MimeType:       row.MimeType,
 			OriginalName:   row.OriginalName,
 			UploaderUserID: row.UploaderUserID,
+			Metadata:       row.Metadata,
 			CreatedAt:      row.CreatedAt,
 		})
 	}
