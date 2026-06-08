@@ -133,8 +133,8 @@ describe('createHubClient', () => {
     );
   });
 
-  it('lists and updates Hub workspace projects through the Web-owned route', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  it('lists, creates, gets, and updates Hub workspace projects through the Web-owned route', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).includes('/web/projects?')) {
         return new Response(
           JSON.stringify({
@@ -151,6 +151,32 @@ describe('createHubClient', () => {
                 },
               ],
               page: { hasMore: false },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (String(input).endsWith('/web/projects') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: {
+              id: '00000000-0000-0000-0000-00000000p102',
+              name: 'New Project',
+              description: 'Created from Web',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (String(input).endsWith('/web/projects/project%2Fid') && !init?.method) {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: {
+              id: '00000000-0000-0000-0000-00000000p101',
+              name: 'AgentHub Demo',
+              description: 'Loaded from detail',
             },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -176,6 +202,8 @@ describe('createHubClient', () => {
     });
 
     const list = await client.listWorkspaceProjects({ q: 'AgentHub', pageCursor: 'cursor-1', pageSize: 20 });
+    const created = await client.createWorkspaceProject({ name: 'New Project', description: 'Created from Web' });
+    const detail = await client.getWorkspaceProject('project/id');
     const updated = await client.updateWorkspaceProject('project/id', { description: '' });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -187,6 +215,21 @@ describe('createHubClient', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
+      'https://hub.example.test/web/projects',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'New Project', description: 'Created from Web' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'https://hub.example.test/web/projects/project%2Fid',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
       'https://hub.example.test/web/projects/project%2Fid',
       expect.objectContaining({
         method: 'PATCH',
@@ -194,6 +237,8 @@ describe('createHubClient', () => {
       }),
     );
     expect(list.items[0]).toMatchObject({ name: 'AgentHub Demo', description: 'Competition workspace' });
+    expect(created).toMatchObject({ name: 'New Project', description: 'Created from Web' });
+    expect(detail).toMatchObject({ name: 'AgentHub Demo', description: 'Loaded from detail' });
     expect(updated).toMatchObject({ name: 'AgentHub Demo', description: '' });
   });
 
