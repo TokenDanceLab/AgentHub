@@ -91,6 +91,8 @@ go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code --
 | `--runner-profile` / `AGENTHUB_RUNNER_PROFILE` | 兼容旧名称的 Runtime preset：`agenthub-runner-mock`、`claude-code`、`codex`、`opencode` |
 | `--workspace-allowlist` / `AGENTHUB_WORKSPACE_ALLOWLIST` | 限制 `/v1/runs` 请求里的 `workDir` 必须位于允许的 workspace root 内；flag 可重复，环境变量使用系统 path-list 分隔符 |
 | `--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` | 可选本地 Edge token；为空保持本地开发兼容，非空时除 `/v1/health` 和 CORS preflight 外的 Edge API 都需要 token |
+| `--hub-jwt-secret` / `AGENTHUB_HUB_JWT_SECRET` | Hub 签发 Edge-scoped HS256 JWT 的共享校验密钥；启用时必须同时设置 `--edge-device-id` / `AGENTHUB_EDGE_DEVICE_ID` |
+| `--edge-device-id` / `AGENTHUB_EDGE_DEVICE_ID` | 当前 Edge 的设备 ID，用于校验 Hub JWT 中的 `device_id` 是否绑定到本 Edge |
 | `--claude-code-path` / `AGENTHUB_CLAUDE_CODE_PATH` | Claude Code CLI 路径，默认 `claude` |
 | `--codex-path` / `AGENTHUB_CODEX_PATH` | Codex CLI 路径，默认 `codex` |
 | `--opencode-path` / `AGENTHUB_OPENCODE_PATH` | OpenCode CLI 路径，默认 `opencode` |
@@ -99,6 +101,8 @@ go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code --
 Store backend 的 operator 模式是 memory、file、sqlite：留空 backend 时保持旧兼容规则，不配置持久化参数默认 memory，已有 `--store-file` / `AGENTHUB_STORE_FILE` 部署继续使用 JSON file store；显式 `--store-backend memory` 会拒绝同时设置 `--store-file` 或 `--store-db`；显式 `--store-backend file` 必须设置 `--store-file`；新 SQLite 持久化使用 `--store-backend sqlite --store-db <path>`。
 
 本地 Edge token 启用后，REST 请求使用 `Authorization: Bearer <token>` 或 `X-AgentHub-Edge-Token: <token>`。浏览器 WebSocket 无法设置自定义 header，所以 `/v1/events` 使用 `?access_token=<token>`。这只覆盖本地回环 Edge 的进程调用边界；Remote/Cloud/Hub relay Target 仍需要 Hub session、device proof、Target 权限和审计。
+
+Hub JWT trust chain 启用后，`--hub-jwt-secret` requires `--edge-device-id`，否则 Edge 无法校验 Hub JWT 是否绑定到当前 Edge 设备。
 
 `--workspace-allowlist` 是 Execution Target 的本地执行护栏：配置后，带 `workDir` 的 `/v1/runs` 请求必须落在至少一个 allowlist root 内，否则 Edge 返回 `workspace_not_allowed` 且不会创建 run 或启动 Runtime。未配置时保持本地开发兼容；Remote/Cloud Target 仍需要 Hub 侧 target 注册、路由授权、设备证明和远程审批闭环。
 
