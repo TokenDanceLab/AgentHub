@@ -153,6 +153,24 @@ var sqliteMigrations = []sqliteMigration{
 			`ALTER TABLE edge_artifacts DROP COLUMN content_source_kind`,
 		},
 	},
+	{
+		version: 4,
+		name:    "row_first_store_contract",
+		up: []string{
+			`CREATE TABLE IF NOT EXISTS agenthub_store_rows (
+  row_kind TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  order_index INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(row_kind, row_id)
+)`,
+			`CREATE INDEX IF NOT EXISTS idx_agenthub_store_rows_kind_order ON agenthub_store_rows(row_kind, order_index)`,
+		},
+		down: []string{
+			`DROP TABLE IF EXISTS agenthub_store_rows`,
+		},
+	},
 }
 
 func runSQLiteMigrations(db *sql.DB) error {
