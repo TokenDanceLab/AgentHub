@@ -1,6 +1,6 @@
 # AgentHub 路线图
 
-> 最后更新：2026-06-08 10:39 +08:00
+> 最后更新：2026-06-08 11:16 +08:00
 > 当前主线：`origin/dev/delicious233`，以最新远端 dev 为开发事实源
 > 稳定候选：`v0.3.0-rc.1 @ 0c79f277`
 > 历史流水已归档：[archive/roadmap-pre-refresh-20260608-1008.md](archive/roadmap-pre-refresh-20260608-1008.md)、[archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md)
@@ -17,10 +17,11 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 |---|---|
 | dev | `origin/dev/delicious233`；具体 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
 | 稳定候选 | `v0.3.0-rc.1 @ 0c79f277` |
-| 主工作树 | `D:\Code\TokenDance\AgentHub @ a4b27d63`，behind 20 且 dirty；只读，不直接 pull/merge/stage |
+| 主工作树 | `D:\Code\TokenDance\AgentHub @ a4b27d63`，behind 23 且 dirty；只读，不直接 pull/merge/stage |
 | 后端线程 | 已关闭；后续 backend/API/Edge 由主线程按短切片派 subagent/worktree |
 | 已合入主干 | shared v4 workbench、Web Hub-only 主链路、Contacts/AgentProfile/Projects read-through、AgentProfile mutation、Hub Projects P1、ExecutionTarget contract、Edge pins/store/event contracts、TeamRun fixture/evidence gate |
-| 仍未完成 | Edge SQL、Tauri 打包/安装程序、macOS 打包策略、登录端到端、Desktop Edge mapper、TeamRun 真实演示、Artifact/Diff/Preview 生产化、Projects mutation UI、D1b/D2/D3 gate |
+| 仍未完成 | Edge SQL、Desktop Edge mapper、登录端到端、Tauri 内测安装包/正式签名发布、TeamRun 真实演示、Artifact/Diff/Preview 生产化、Projects mutation UI、D1b/D2/D3 gate |
+| 外部依赖 | 后端旧整合线合并由 backend merge Agent 负责；本路线图只记录其状态和对后续切片的影响，不接管合并 |
 
 ## P0 执行顺序
 
@@ -28,13 +29,14 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 |---:|---|---|---|
 | 1 | Roadmap/tag/worktree 收口 | `v0.3.0-rc.1` 已打；roadmap 压缩；分支清理先审计不批量删 | docs diff-check、root governance、worktree audit |
 | 2 | Edge SQL/store migration | 优先于继续 UI 产品面；先锁 G0 repository contract，SQLite 作为 opt-in backend，默认 memory/file 不变 | Edge store contract、migration tests、edge short gate |
-| 3 | Tauri 打包与安装程序 | Windows installer 先闭环；macOS 单独确认签名、entitlements、notarization | Tauri build/package dry run、installer artifact 检查、release policy |
-| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口 | Web/Desktop auth tests、Hub OIDC tests、OIDC script gate |
-| 5 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动 | Desktop platform、Edge focused、Rust host tests |
+| 3 | Desktop Edge mapper / ExecutionTarget | Desktop 只经 Local Edge；Web 不动；给安装包提供可运行侧车基线 | Desktop platform、Edge focused、Rust host tests |
+| 4 | 登录链路联调 | 先 fake/local；真实登录另批窗口；覆盖 Web session 和 Desktop loopback/keyring | Web/Desktop auth tests、Hub OIDC tests、OIDC script gate |
+| 5 | Tauri 内测安装包 | Windows NSIS + portable zip 先做内部可安装包；版本对齐；updater metadata 从“可选复制”改为 gate | Tauri build/package dry run、installer artifact 检查、release policy |
 | 6 | ByteDance / TeamRun demo | IM 群聊、多 Agent 调度、证据 inspector、录屏脚本 | readiness script、manifest、截图/视频/接口导出 |
 | 7 | Artifact/Diff/Preview 生产化 | 去掉 demo evidence，补真实 artifact/diff/preview API | Edge API、shared inspector、Desktop/Web smoke |
 | 8 | Projects create/update UI | Web/Hub only；不做 delete；排在存储/安装/登录之后 | Web focused、shared focused、Web typecheck、Web boundary |
-| 9 | D1b/D2/D3 gates | 先 policy；D3 继续 opt-in | CI policy、release review、artifact redaction |
+| 9 | Release signing / macOS | Windows Authenticode；macOS arm64 DMG proof 后再做 Developer ID signing、entitlements、notarization、staple | `Get-AuthenticodeSignature`、`codesign`、`spctl`、`stapler` |
+| 10 | D1b/D2/D3 gates | 先 policy；D3 继续 opt-in | CI policy、release review、artifact redaction |
 
 ## P1 后续
 
@@ -43,7 +45,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 - Tasks/TeamRun 页面正式映射。
 - Settings DB-backed preferences。
 - Projects create/update UI 与 delete/soft-delete/orphan policy。
-- Release workflow、Windows installer、macOS signing/notarization 自动化。
+- Release workflow、Windows installer、updater metadata gate、macOS signing/notarization 自动化。
 - Mobile v4 IM / remote client 支线。
 
 ## 分支和 Worktree
@@ -51,12 +53,11 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 | Worktree / branch | 处理 |
 |---|---|
 | main `D:\Code\TokenDance\AgentHub` | behind + dirty，只读；不要直接开发 |
-| `.worktrees/roadmap-refresh` / `codex/roadmap-refresh` | 当前 docs 切片；完成后推 dev，再清理 |
-| `.worktrees/backend` / `feat/backend-edge-hub` | 旧整合线；不再自行推进，只按需抽小切片 |
+| `.worktrees/roadmap-release-readiness` / `codex/roadmap-release-readiness` | 当前 docs 切片；完成后推 dev，再清理 |
+| `.worktrees/backend` / `feat/backend-edge-hub` | 旧整合线；`git cherry -v origin/dev/delicious233 feat/backend-edge-hub` 仍有未吸收提交；由 backend merge Agent 继续处理，本路线图只跟踪风险和依赖 |
 | `backend-api-contract-0607`、`backend-cli-e2e-0607`、`backend-docs`、`backend-johnny-pick`、`backend-oidc-log-0607`、`backend-openapi`、`backend-release-artifact-0607` | 历史候选；逐个 `status` + `cherry` 后归档或抽取 |
 | `backend-edge-split`、`backend-tests` | dirty 风险；保留，先审独有改动 |
 | `integrate-codex-adapter-precheck` | 复核是否已被 A0+A 吸收后清理 |
-| `johnny-dev` | detached clean；按协作者边界处理 |
 | mobile worktrees | 低优先级支线，不混主线 |
 
 清理规则：每个 worktree 清理前必须记录 `git status --short --branch` 和 `git rev-list --left-right --count HEAD...origin/dev/delicious233` 或等价 cherry 证据；dirty worktree 不批量删。
@@ -74,9 +75,7 @@ AgentHub 要完成一个可运行、可解释、可演示的多 Agent 协作平�
 ## 下一步
 
 1. 提交并推送本轮 roadmap/governance 刷新。
-2. 等 Edge SQL/store、Tauri 打包、worktree 清理 subagent 审计返回，必要结论回写 roadmap。
-3. 开 Edge SQL/store migration proposal/worker。
-4. 开 Tauri Windows installer + macOS packaging proposal/worker。
-5. 并行开登录链路 fake/local gate worker。
-6. 开 Desktop Edge mapper worker。
-7. 开 ByteDance/TeamRun demo evidence worker。
+2. 开 Edge SQL/store migration proposal/worker，先锁 G0 contract，再做 SQLite opt-in backend。
+3. 并行开 Desktop Edge mapper worker 和登录 fake/local gate worker，为安装包提供可运行前置条件。
+4. 开 Tauri Windows installer/updater metadata worker；macOS 正式签名另起 proposal。
+5. 开 ByteDance/TeamRun demo evidence worker。
