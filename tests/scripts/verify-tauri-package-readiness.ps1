@@ -54,6 +54,18 @@ Assert-True ($scriptText -match "package\.json" -and $scriptText -match "Cargo\.
 Assert-True ($scriptText -match "agenthub-edge-x86_64-pc-windows-msvc\.exe") "checker enforces Windows sidecar binary name"
 Assert-True ($scriptText -match "latest\.json" -and $scriptText -match "\.sig") "checker requires updater metadata and signature"
 Assert-True ($scriptText -match "portable\.zip" -and $scriptText -match "setup\.exe") "checker requires installer and portable artifacts"
+Assert-True ($scriptText -match "check-ignore" -and $scriptText -match "Assert-GitIgnored") "checker verifies generated package artifacts stay ignored before dry builds"
+foreach ($artifactPattern in @(
+    'dist/AgentHub_${desktopVersion}_x64-setup.exe',
+    'dist/AgentHub_${desktopVersion}_x64-portable.zip',
+    "dist/latest.json",
+    'dist/AgentHub_${desktopVersion}_x64-setup.exe.sig',
+    'app/desktop/src-tauri/target/release/bundle/nsis/AgentHub_${desktopVersion}_x64-setup.exe',
+    "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-pc-windows-msvc.exe",
+    "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin"
+)) {
+    Assert-True ($scriptText -match [regex]::Escape($artifactPattern)) "checker covers ignored generated artifact path $artifactPattern"
+}
 Assert-True ($scriptText -match "unsigned" -and $scriptText -match "aarch64-apple-darwin" -and $scriptText -match "policy note") "checker records macOS arm64 unsigned policy note without formal signing claims"
 
 Assert-True ($workflowText -match "(?ms)on:\s*\r?\n\s*push:\s*\r?\n\s*tags:" -and $workflowText -match "softprops/action-gh-release") "release workflow keeps tag release semantics"
