@@ -75,10 +75,10 @@ Offline evidence readiness and packaging:
 
 ```powershell
 .\scripts\export-teamrun-demo-fixture-evidence.ps1
-.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\teamrun-evidence.json
+.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\teamrun-evidence.json -Mode FixtureRehearsal
 .\scripts\package-teamrun-demo-evidence.ps1 -EvidencePath .tmp\teamrun-evidence\<stamp>\teamrun-evidence.json
-.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\submission-evidence\<stamp>\teamrun-evidence.json
-.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\submission-evidence\<stamp>\teamrun-evidence.json -VideoPath .tmp\submission-evidence\<stamp>\demo.mp4 -RequireVideo
+.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\submission-evidence\<stamp>\teamrun-evidence.json -Mode FixtureRehearsal
+.\scripts\verify-teamrun-demo-readiness.ps1 -EvidencePath .tmp\submission-evidence\<stamp>\teamrun-evidence.json -VideoPath .tmp\submission-evidence\<stamp>\demo.mp4
 ```
 
 `docs/competition/teamrun-demo-scenario.json` freezes the fixture-only evidence
@@ -86,7 +86,10 @@ contract used before the final recording exists. The exporter emits local
 fixture evidence from that scenario manifest only. These scripts only export,
 validate, or package local evidence files. They do not run real CLI/model gates,
 start services, upload artifacts, or make the final video claim unless
-`-RequireVideo` is passed with an existing recording.
+real evidence is checked in default `Submission` mode with an existing
+recording. Fixture evidence must pass readiness only with
+`-Mode FixtureRehearsal`; the default `Submission` gate intentionally rejects
+fixture-only evidence.
 
 ## Demo Evidence To Capture
 
@@ -106,6 +109,9 @@ The current frozen contract is `teamrun-demo-evidence-v1` in
 `docs/competition/teamrun-demo-scenario.json`. It requires:
 
 - `state`, `tasks`, `assignments`, `events`, and `runtime_profiles`.
+- `screenshot_or_video_rehearsal` metadata describing the rehearsal capture
+  plan and explicitly preserving false runtime, recording, and submission
+  claims.
 - at least two runtime profile types, currently fixture labels only.
 - explicit claims that `real_runtime_executed`, `final_recording_complete`,
   `live_hub_runtime_verified`, and `submission_ready` are all false.
@@ -114,6 +120,8 @@ The current frozen contract is `teamrun-demo-evidence-v1` in
 This fixture contract is useful for UI/readiness plumbing and reviewer-facing
 evidence shape. It is not the final screen recording, not a live Hub proof, and
 not evidence that Codex/OpenCode/Claude or any other real runtime executed.
+The readiness gate blocks fixture evidence in `Submission` mode, and the package
+script blocks `-PackageMode Submission` for fixture evidence.
 
 ## Demo Script
 
