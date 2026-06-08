@@ -27,14 +27,33 @@ function Read-Text([string]$RelativePath) {
     return Get-Content (Join-Path $RepoRoot $RelativePath) -Raw -Encoding UTF8
 }
 
+function Get-ScriptHosts {
+    $hosts = [ordered]@{}
+    foreach ($command in @("powershell", "pwsh")) {
+        $resolved = Get-Command $command -ErrorAction SilentlyContinue
+        if ($resolved) {
+            $hosts[$command] = [pscustomobject]@{
+                Name = $command
+                Path = $resolved.Source
+            }
+        }
+    }
+
+    return @($hosts.Values)
+}
+
 function Invoke-Script {
-    param([string[]]$Arguments)
+    param(
+        [pscustomobject]$HostShell,
+        [string[]]$Arguments
+    )
 
     $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
+    $output = & $HostShell.Path -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
     return [pscustomobject]@{
         ExitCode = $LASTEXITCODE
         Output = $output
+        Host = $HostShell.Name
     }
 }
 
@@ -60,6 +79,7 @@ foreach ($artifactPattern in @(
     'dist/AgentHub_${desktopVersion}_x64-portable.zip',
     "dist/latest.json",
     'dist/AgentHub_${desktopVersion}_x64-setup.exe.sig',
+    "dist/agenthub-edge-windows-amd64.exe",
     'app/desktop/src-tauri/target/release/bundle/nsis/AgentHub_${desktopVersion}_x64-setup.exe',
     "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-pc-windows-msvc.exe",
     "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin"
@@ -77,9 +97,14 @@ Assert-True ($readinessWorkflowText -match "verify-tauri-package-readiness\.ps1"
 Assert-True ($readinessWorkflowText -notmatch "softprops/action-gh-release") "release readiness workflow does not create a GitHub Release"
 Assert-True ($readinessWorkflowText -notmatch "TAURI_SIGNING_PRIVATE_KEY") "release readiness workflow does not require production signing secrets"
 
-$ok = Invoke-Script @("-RepoRoot", $RepoRoot)
-Assert-True ($ok.ExitCode -eq 0) "readiness checker passes current repository policy" $ok.Output
+$scriptHosts = Get-ScriptHosts
+Assert-True ($scriptHosts.Count -gt 0) "at least one PowerShell host is available for checker child process"
 
-$missingUpdater = Invoke-Script @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", (Join-Path $RepoRoot "does-not-exist"), "-RequireBuiltArtifacts")
-Assert-True ($missingUpdater.ExitCode -ne 0) "built artifact gate fails when updater metadata is missing" $missingUpdater.Output
-Assert-True ($missingUpdater.Output -match "latest\.json") "missing updater metadata failure names latest.json" $missingUpdater.Output
+foreach ($hostShell in $scriptHosts) {
+    $ok = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot)
+    Assert-True ($ok.ExitCode -eq 0) "readiness checker passes current repository policy under $($ok.Host)" $ok.Output
+
+    $missingUpdater = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot, "-BuiltArtifactsRoot", (Join-Path $RepoRoot "does-not-exist"), "-RequireBuiltArtifacts")
+    Assert-True ($missingUpdater.ExitCode -ne 0) "built artifact gate fails when updater metadata is missing under $($missingUpdater.Host)" $missingUpdater.Output
+    Assert-True ($missingUpdater.Output -match "latest\.json") "missing updater metadata failure names latest.json under $($missingUpdater.Host)" $missingUpdater.Output
+}
