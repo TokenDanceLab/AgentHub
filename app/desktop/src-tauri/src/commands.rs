@@ -60,7 +60,7 @@ pub async fn get_edge_host_readiness(
     state: State<'_, SharedEdgeManager>,
 ) -> Result<EdgeHostReadiness, String> {
     let mgr = state.lock().await;
-    Ok(mgr.host_readiness())
+    Ok(edge_host_readiness_snapshot(&mgr))
 }
 
 #[tauri::command]
@@ -107,6 +107,10 @@ pub async fn stop_edge(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus
     let mut mgr = state.lock().await;
     mgr.stop().await?;
     Ok(mgr.status())
+}
+
+fn edge_host_readiness_snapshot(mgr: &crate::edge_manager::EdgeManager) -> EdgeHostReadiness {
+    mgr.host_readiness()
 }
 
 // ── File Explorer Commands ──
@@ -796,6 +800,40 @@ fn walk_dir(
     });
 
     Ok(entries)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::edge_manager::EdgeManager;
+
+    #[test]
+    fn edge_host_readiness_command_snapshot_is_sidecar_only() {
+        let manager = EdgeManager::new_fallback(
+            PathBuf::from("edge-server/agenthub-edge"),
+            PathBuf::from("agenthub-edge-store.json"),
+        );
+
+        let readiness = edge_host_readiness_snapshot(&manager);
+
+        assert_eq!(readiness.sidecar_name, "agenthub-edge");
+        assert_eq!(readiness.target_id, "local-edge");
+        assert_eq!(readiness.route, "local-edge-api");
+        assert_eq!(readiness.bind_addr, "127.0.0.1:3210");
+        assert_eq!(
+            readiness.sidecar_args,
+            vec![
+                "--store-file",
+                "<app-data>/agenthub-edge-store.json",
+                "--addr",
+                "127.0.0.1:3210",
+                "--runner-profile",
+                "claude-code",
+            ]
+        );
+        assert!(!readiness.running);
+        assert!(!readiness.direct_cli_spawn);
+    }
 }
 
 // ── Workspace settings persistence (JSON file in app data dir) ──
