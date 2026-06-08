@@ -29,18 +29,10 @@ type SQLiteStore struct {
 }
 
 func NewSQLite(path string) (*SQLiteStore, error) {
-	if strings.TrimSpace(path) == "" {
-		return nil, errors.New("store db path is required")
-	}
-	if err := ensureSQLiteDirectory(path); err != nil {
-		return nil, fmt.Errorf("verify sqlite store path: %w", err)
-	}
-
-	db, err := sql.Open("sqlite", path)
+	db, err := openSQLiteDatabase(path)
 	if err != nil {
-		return nil, fmt.Errorf("open sqlite database: %w", err)
+		return nil, err
 	}
-	db.SetMaxOpenConns(1)
 
 	s := &SQLiteStore{
 		db:    db,
@@ -79,12 +71,7 @@ func (s *SQLiteStore) LastPersistError() error {
 }
 
 func (s *SQLiteStore) migrate() error {
-	if _, err := s.db.Exec(`
-CREATE TABLE IF NOT EXISTS agenthub_store_snapshots (
-  key TEXT PRIMARY KEY,
-  payload TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-)`); err != nil {
+	if err := runSQLiteMigrations(s.db); err != nil {
 		return fmt.Errorf("migrate sqlite store: %w", err)
 	}
 	return nil
