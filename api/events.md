@@ -301,6 +301,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | `message.pin` | 消息置顶，payload: `{ message_id, session_id, pinned_by }` |
 | `message.unpin` | 取消置顶，payload: `{ message_id, session_id }` |
 | `message.read` | 消息已读回执，payload: `{ message_id, session_id, read_by, last_read_seq }` |
+| `message.reaction_added` | 消息 reaction 已添加 (service-emitted + WS routed to session)，payload: `{ action, user_id, message_id, session_id, reaction, count }`；不包含 `reacted_by_me`，该字段只属于 REST reaction response 的当前用户视角 |
+| `message.reaction_removed` | 消息 reaction 已移除 (service-emitted + WS routed to session)，payload: `{ action, user_id, message_id, session_id, reaction, count }`；不包含 `reacted_by_me`，该字段只属于 REST reaction response 的当前用户视角 |
 
 ```json
 {"type":"message.new","seq_id":42,"payload":{"message_id":"msg_01HX...","session_id":"sess_01HX...","sender_id":"user_01HX...","sender_type":"user","content":{"text":"Hello"},"content_type":"text","created_at":"2026-05-25T12:00:00Z"}}
@@ -310,11 +312,11 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `session.created` | 会话创建 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, type, name, owner_id, members[] }` |
-| `session.dissolved` | 群解散 (service-emitted; WS subscription wiring pending)，payload: `{ session_id }` |
-| `session.member_joined` | 成员加入 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, member_id, member_type }` |
-| `session.member_left` | 成员离开 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, member_id }` |
-| `session.info_updated` | 会话信息变更 (service-emitted; WS subscription wiring pending)，payload: `{ session_id, changes{} }` |
+| `session.created` | 会话创建 (service-emitted + WS routed/pushed to members, or session fallback)，payload: `{ session_id, type, name, owner_id, members[] }` |
+| `session.dissolved` | 群解散 (service-emitted + WS routed/pushed to session)，payload: `{ session_id }` |
+| `session.member_joined` | 成员加入 (service-emitted + WS routed/pushed to session)，payload: `{ session_id, member_id, member_type }` |
+| `session.member_left` | 成员离开 (service-emitted + WS routed/pushed to session)，payload: `{ session_id, member_id }` |
+| `session.info_updated` | 会话信息变更 (service-emitted + WS routed/pushed to session)，payload: `{ session_id, changes{} }` |
 
 #### Device 事件（Hub→Client）
 
@@ -346,8 +348,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `friend.request` | 收到好友请求 (service-emitted; WS subscription wiring pending)，payload: `{ request_id, from_user_id, message }` |
-| `friend.accepted` | 好友请求被接受 (service-emitted; WS subscription wiring pending)，payload: `{ friendship_id, user_id }` |
+| `friend.request` | 收到好友请求 (service-emitted; receiver_id/push contract gap remains)，payload: `{ request_id, from_user_id, message }`；当前 payload 尚未携带 `receiver_id`，因此接收方 WS push contract 仍需补齐 |
+| `friend.accepted` | 好友请求被接受 (service-emitted + WS pushed to accepting user)，payload: `{ friendship_id, user_id }` |
 
 ### 7.4 代码示例
 
