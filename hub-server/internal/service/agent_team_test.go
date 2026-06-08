@@ -472,6 +472,13 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
 	agentSvc := &mockAgentTeamAgentSvc{}
 	svc := NewAgentTeamService(db, agentSvc, nil)
+	bus := NewBus()
+	t.Cleanup(bus.Close)
+	events := make(chan Event, 1)
+	bus.Subscribe("team.run.started", func(ctx context.Context, event Event) {
+		events <- event
+	})
+	svc.SetBus(bus)
 
 	now := time.Now()
 	agentProfileID := "agent-1"
@@ -536,7 +543,83 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	assert.NotEmpty(t, agentSvc.triggerMessageID)
 	assert.Contains(t, agentSvc.modelParams, "structured_output_schema")
 	assert.Contains(t, agentSvc.modelParams, "AgentHub TeamRun supervisor mode")
+	event := readAgentTeamEvent(t, events)
+	assert.Equal(t, "team.run.started", event.Type)
+	payload, ok := event.Payload.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "team-1", payload["team_id"])
+	assert.Equal(t, run.ID, payload["run_id"])
+	assert.Equal(t, run.SessionID, payload["session_id"])
+	assert.Equal(t, "user-1", payload["user_id"])
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	bus := NewBus()
+	t.Cleanup(bus.Close)
+	events := make(chan Event, 1)
+	bus.Subscribe("team.assignment.completed", func(ctx context.Context, event Event) {
+		events <- event
+	})
+	svc.SetBus(bus)
+
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "Ship it",
+		Status:       model.AssignmentStatusRunning,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+
+	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", assignment.ID, "done text"))
+
+	event := readAgentTeamEvent(t, events)
+	assert.Equal(t, "team.assignment.completed", event.Type)
+	payload, ok := event.Payload.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, run.ID, payload["team_run_id"])
+	assert.Equal(t, assignment.ID, payload["assignment_id"])
+	assert.Equal(t, run.SessionID, payload["session_id"])
+	assert.Equal(t, "done text", payload["result"])
+}
+
+func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	bus := NewBus()
+	t.Cleanup(bus.Close)
+	events := make(chan Event, 1)
+	bus.Subscribe("team.assignment.failed", func(ctx context.Context, event Event) {
+		events <- event
+	})
+	svc.SetBus(bus)
+
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "Ship it",
+		Status:       model.AssignmentStatusRunning,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+
+	require.NoError(t, svc.FailAssignment(context.Background(), "user-1", assignment.ID, "blocked"))
+
+	event := readAgentTeamEvent(t, events)
+	assert.Equal(t, "team.assignment.failed", event.Type)
+	payload, ok := event.Payload.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, run.ID, payload["team_run_id"])
+	assert.Equal(t, assignment.ID, payload["assignment_id"])
+	assert.Equal(t, run.SessionID, payload["session_id"])
+	assert.Equal(t, "blocked", payload["reason"])
 }
 
 func TestAgentTeamService_GetTeamRunStateReplaysEvents(t *testing.T) {
@@ -1789,6 +1872,17 @@ func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	_, err = svc.ListTeamEvents(context.Background(), "other-user", team.ID, run.ID)
 	require.Error(t, err)
 	assert.Equal(t, errcode.AgentNotFound, err)
+}
+
+func readAgentTeamEvent(t *testing.T, events <-chan Event) Event {
+	t.Helper()
+	select {
+	case event := <-events:
+		return event
+	case <-time.After(time.Second):
+		t.Fatal("agent team event was not published")
+	}
+	return Event{}
 }
 
 func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
