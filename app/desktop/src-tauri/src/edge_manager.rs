@@ -16,6 +16,9 @@ const LOCAL_EDGE_TARGET_ID: &str = "local-edge";
 const LOCAL_EDGE_ROUTE: &str = "local-edge-api";
 const DEFAULT_RUNNER_PROFILE: &str = "claude-code";
 const EDGE_STORE_DB_FILE_NAME: &str = "agenthub-edge.sqlite";
+const EDGE_STORE_BACKEND: &str = "sqlite";
+const EDGE_STORE_READINESS_MANIFEST_SCHEMA: &str = "agenthub-edge-sqlite-readiness-v1";
+const EDGE_STORE_EXPECTED_MIGRATION_VERSION: u16 = 4;
 const READINESS_STORE_DB_PLACEHOLDER: &str = "<app-data>/agenthub-edge.sqlite";
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -38,7 +41,10 @@ pub struct EdgeHostReadiness {
     pub route: &'static str,
     pub bind_addr: String,
     pub health_url: String,
+    pub store_backend: &'static str,
     pub store_db_policy: &'static str,
+    pub store_readiness_manifest_schema: &'static str,
+    pub expected_store_migration_version: u16,
     pub log_paths: EdgeLogPaths,
     pub sidecar_args: Vec<String>,
     pub preflight: EdgePreflight,
@@ -415,7 +421,10 @@ impl EdgeManager {
             route: LOCAL_EDGE_ROUTE,
             bind_addr: edge_bind_addr(status.port),
             health_url: edge_health_url(status.port),
+            store_backend: EDGE_STORE_BACKEND,
             store_db_policy: READINESS_STORE_DB_PLACEHOLDER,
+            store_readiness_manifest_schema: EDGE_STORE_READINESS_MANIFEST_SCHEMA,
+            expected_store_migration_version: EDGE_STORE_EXPECTED_MIGRATION_VERSION,
             log_paths,
             sidecar_args: edge_launch_args(
                 READINESS_STORE_DB_PLACEHOLDER,
@@ -739,6 +748,12 @@ mod tests {
         assert_eq!(readiness.target_id, "local-edge");
         assert_eq!(readiness.port, 3210);
         assert_eq!(readiness.bind_addr, "127.0.0.1:3210");
+        assert_eq!(readiness.store_backend, "sqlite");
+        assert_eq!(
+            readiness.store_readiness_manifest_schema,
+            "agenthub-edge-sqlite-readiness-v1"
+        );
+        assert_eq!(readiness.expected_store_migration_version, 4);
         assert_eq!(
             readiness.sidecar_args,
             vec![
@@ -770,6 +785,7 @@ mod tests {
         let readiness = manager.host_readiness();
 
         assert_eq!(readiness.health_url, "http://127.0.0.1:3210/v1/health");
+        assert_eq!(readiness.store_backend, "sqlite");
         assert_eq!(readiness.store_db_policy, "<app-data>/agenthub-edge.sqlite");
         assert!(!readiness.preflight.sidecar_available);
         assert!(!readiness.preflight.fallback_executable_available);

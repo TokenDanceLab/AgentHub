@@ -3,7 +3,10 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"sort"
 )
+
+const SQLiteReadinessManifestSchema = "agenthub-edge-sqlite-readiness-v1"
 
 type SQLiteReadinessReport struct {
 	Path                   string
@@ -12,6 +15,23 @@ type SQLiteReadinessReport struct {
 	AppliedMigrations      []SQLiteMigrationInfo
 	RowCounts              map[string]int
 	ProjectionCounts       map[string]int
+}
+
+type SQLiteReadinessManifest struct {
+	Schema                   string
+	Status                   string
+	Path                     string
+	IntegrityCheck           string
+	LatestMigrationVersion   int
+	ExpectedMigrationVersion int
+	MigrationStatus          string
+	AppliedMigrations        []SQLiteMigrationInfo
+	MissingMigrationVersions []int
+	UnknownMigrationVersions []int
+	RequiredRowKinds         []string
+	RequiredProjectionTables []string
+	RowCounts                map[string]int
+	ProjectionCounts         map[string]int
 }
 
 func SQLiteReadiness(path string) (SQLiteReadinessReport, error) {
@@ -53,6 +73,69 @@ func SQLiteReadiness(path string) (SQLiteReadinessReport, error) {
 	return report, nil
 }
 
+func (report SQLiteReadinessReport) Manifest() SQLiteReadinessManifest {
+	manifest := SQLiteReadinessManifest{
+		Schema:                   SQLiteReadinessManifestSchema,
+		Status:                   "ready",
+		Path:                     report.Path,
+		IntegrityCheck:           report.IntegrityCheck,
+		LatestMigrationVersion:   report.LatestMigrationVersion,
+		ExpectedMigrationVersion: LatestSQLiteMigrationVersion(),
+		MigrationStatus:          "current",
+		AppliedMigrations:        append([]SQLiteMigrationInfo(nil), report.AppliedMigrations...),
+		RequiredRowKinds:         sqliteReadinessRowKinds(),
+		RequiredProjectionTables: sqliteReadinessProjectionTables(),
+		RowCounts:                copyIntMap(report.RowCounts),
+		ProjectionCounts:         copyIntMap(report.ProjectionCounts),
+	}
+
+	applied := map[int]bool{}
+	for _, migration := range report.AppliedMigrations {
+		applied[migration.Version] = true
+		if _, ok := sqliteMigrationByVersion(migration.Version); !ok {
+			manifest.UnknownMigrationVersions = append(manifest.UnknownMigrationVersions, migration.Version)
+		}
+	}
+	for _, migration := range sqliteMigrations {
+		if !applied[migration.version] {
+			manifest.MissingMigrationVersions = append(manifest.MissingMigrationVersions, migration.version)
+		}
+	}
+
+	switch {
+	case report.IntegrityCheck != "ok":
+		manifest.Status = "blocked"
+	case len(manifest.UnknownMigrationVersions) > 0:
+		manifest.Status = "blocked"
+		manifest.MigrationStatus = "unknown"
+	case len(manifest.MissingMigrationVersions) > 0:
+		manifest.Status = "blocked"
+		manifest.MigrationStatus = "behind"
+	case report.LatestMigrationVersion > manifest.ExpectedMigrationVersion:
+		manifest.Status = "blocked"
+		manifest.MigrationStatus = "ahead"
+	}
+
+	sort.Ints(manifest.MissingMigrationVersions)
+	sort.Ints(manifest.UnknownMigrationVersions)
+	return manifest
+}
+
+func SQLiteReadinessManifestForPath(path string) (SQLiteReadinessManifest, error) {
+	report, err := SQLiteReadiness(path)
+	if err != nil {
+		return SQLiteReadinessManifest{}, err
+	}
+	return report.Manifest(), nil
+}
+
+func LatestSQLiteMigrationVersion() int {
+	if len(sqliteMigrations) == 0 {
+		return 0
+	}
+	return sqliteMigrations[len(sqliteMigrations)-1].version
+}
+
 func readSQLiteStoreRowCounts(db *sql.DB, counts map[string]int) error {
 	rows, err := db.Query(`SELECT row_kind, COUNT(*) FROM agenthub_store_rows GROUP BY row_kind`)
 	if err != nil {
@@ -75,14 +158,7 @@ func readSQLiteStoreRowCounts(db *sql.DB, counts map[string]int) error {
 }
 
 func readSQLiteProjectionCounts(db *sql.DB, counts map[string]int) error {
-	for _, table := range []string{
-		"edge_owners",
-		"edge_workspaces",
-		"edge_runs",
-		"edge_artifacts",
-		"edge_diffs",
-		"edge_previews",
-	} {
+	for _, table := range sqliteReadinessProjectionTables() {
 		var count int
 		if err := db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&count); err != nil {
 			return fmt.Errorf("read sqlite projection count %s: %w", table, err)
@@ -90,4 +166,36 @@ func readSQLiteProjectionCounts(db *sql.DB, counts map[string]int) error {
 		counts[table] = count
 	}
 	return nil
+}
+
+func sqliteReadinessRowKinds() []string {
+	return []string{
+		sqliteRowKindProject,
+		sqliteRowKindThread,
+		sqliteRowKindRun,
+		sqliteRowKindItem,
+		sqliteRowKindPin,
+		sqliteRowKindDiff,
+		sqliteRowKindArtifact,
+		sqliteRowKindPreview,
+	}
+}
+
+func sqliteReadinessProjectionTables() []string {
+	return []string{
+		"edge_owners",
+		"edge_workspaces",
+		"edge_runs",
+		"edge_artifacts",
+		"edge_diffs",
+		"edge_previews",
+	}
+}
+
+func copyIntMap(values map[string]int) map[string]int {
+	out := make(map[string]int, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }

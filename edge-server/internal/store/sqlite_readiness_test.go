@@ -1,8 +1,11 @@
 package store
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestSQLiteStoreReadinessRestoresAfterEachDurableWrite(t *testing.T) {
@@ -122,6 +125,22 @@ func TestSQLiteStoreReadinessRestoresAfterEachDurableWrite(t *testing.T) {
 	if got := report.ProjectionCounts["edge_artifacts"]; got != 1 {
 		t.Fatalf("edge_artifacts projection count = %d, want 1", got)
 	}
+	manifest := report.Manifest()
+	if manifest.Schema != SQLiteReadinessManifestSchema {
+		t.Fatalf("manifest schema = %q, want %q", manifest.Schema, SQLiteReadinessManifestSchema)
+	}
+	if manifest.Status != "ready" || manifest.MigrationStatus != "current" {
+		t.Fatalf("manifest status = %q migration = %q, want ready/current", manifest.Status, manifest.MigrationStatus)
+	}
+	if manifest.ExpectedMigrationVersion != LatestSQLiteMigrationVersion() || manifest.ExpectedMigrationVersion != 4 {
+		t.Fatalf("manifest expected migration = %d, want latest 4", manifest.ExpectedMigrationVersion)
+	}
+	if len(manifest.MissingMigrationVersions) != 0 || len(manifest.UnknownMigrationVersions) != 0 {
+		t.Fatalf("manifest missing=%v unknown=%v, want none", manifest.MissingMigrationVersions, manifest.UnknownMigrationVersions)
+	}
+	if got := manifest.RowCounts["artifact"]; got != 1 {
+		t.Fatalf("manifest artifact row count = %d, want 1", got)
+	}
 
 	assertSQLiteReadinessRoundTrip(t, path, func(t *testing.T, restored *SQLiteStore) {
 		if got := restored.ListRunDiffFiles(run.ID); len(got) != 1 || got[0].Path != "src/readiness.go" {
@@ -134,6 +153,64 @@ func TestSQLiteStoreReadinessRestoresAfterEachDurableWrite(t *testing.T) {
 			t.Fatalf("restored preview = %#v ok=%v, want ready preview", got, ok)
 		}
 	})
+}
+
+func TestSQLiteReadinessManifestBlocksStaleMigrationState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-readiness-stale.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	s.Close()
+
+	deleteSQLiteReadinessMigrationRecord(t, path, 4)
+
+	report, err := SQLiteReadiness(path)
+	if err != nil {
+		t.Fatalf("SQLiteReadiness returned error: %v", err)
+	}
+	manifest := report.Manifest()
+	if manifest.Status != "blocked" || manifest.MigrationStatus != "behind" {
+		t.Fatalf("manifest status = %q migration = %q, want blocked/behind", manifest.Status, manifest.MigrationStatus)
+	}
+	if got, want := manifest.MissingMigrationVersions, []int{4}; len(got) != 1 || got[0] != want[0] {
+		t.Fatalf("missing migrations = %v, want %v", got, want)
+	}
+}
+
+func TestSQLiteReadinessManifestForPathReturnsSerializableStatus(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-readiness-manifest.db")
+	s, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	s.Close()
+
+	manifest, err := SQLiteReadinessManifestForPath(path)
+	if err != nil {
+		t.Fatalf("SQLiteReadinessManifestForPath returned error: %v", err)
+	}
+	if manifest.Schema != "agenthub-edge-sqlite-readiness-v1" {
+		t.Fatalf("manifest schema = %q", manifest.Schema)
+	}
+	if manifest.Status != "ready" || manifest.IntegrityCheck != "ok" {
+		t.Fatalf("manifest status = %q integrity = %q, want ready/ok", manifest.Status, manifest.IntegrityCheck)
+	}
+	if len(manifest.RequiredRowKinds) != 8 || len(manifest.RequiredProjectionTables) != 6 {
+		t.Fatalf("required row kinds=%v projection tables=%v", manifest.RequiredRowKinds, manifest.RequiredProjectionTables)
+	}
+}
+
+func deleteSQLiteReadinessMigrationRecord(t *testing.T, path string, version int) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open sqlite returned error: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`DELETE FROM agenthub_sqlite_migrations WHERE version = ?`, version); err != nil {
+		t.Fatalf("delete migration record returned error: %v", err)
+	}
 }
 
 func reopenSQLiteReadinessStore(t *testing.T, path string) *SQLiteStore {
