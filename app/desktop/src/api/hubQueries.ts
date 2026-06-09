@@ -21,6 +21,91 @@ export function useHubContacts(opts?: { enabled?: boolean }) {
   });
 }
 
+export function useHubSearchUser() {
+  return useMutation({
+    mutationFn: (query: string) => getHubClient().searchUser(query),
+  });
+}
+
+export function useHubSendFriendRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, message }: { userId: string; message?: string }) =>
+      getHubClient().sendFriendRequest(userId, message),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+    },
+  });
+}
+
+export function useHubAcceptFriendRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (requestId: string) => getHubClient().acceptFriendRequest(requestId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+    },
+  });
+}
+
+export function useHubRejectFriendRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (requestId: string) => getHubClient().rejectFriendRequest(requestId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+    },
+  });
+}
+
+export function useHubRemoveContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => getHubClient().removeContact(userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+    },
+  });
+}
+
+export function useHubBlockContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => getHubClient().blockContact(userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+    },
+  });
+}
+
+export function useHubUnblockContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => getHubClient().unblockContact(userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+    },
+  });
+}
+
+export function useHubUpdateContactRemark() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, remark }: { userId: string; remark: string }) =>
+      getHubClient().updateContactRemark(userId, remark),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+    },
+  });
+}
+
+export function useHubCreateContactGroup() {
+  return useMutation({
+    mutationFn: ({ name, memberIds }: { name: string; memberIds: string[] }) =>
+      getHubClient().createGroupSession({ name, member_ids: memberIds }),
+  });
+}
+
 // ── Workspace Projects ────────────────────────────────────────────
 
 export interface WorkspaceProjectPage {

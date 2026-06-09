@@ -13,6 +13,7 @@ import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
 import type { ProjectDraft, ProjectInfo } from '@shared/workbench';
 import type { WorkbenchContactsData } from '@shared/workbench';
+import type { WorkbenchContactsActions } from '@shared/workbench/WorkbenchRoutes';
 import {
   resolveHubContacts,
   resolveHubProjects,
@@ -21,6 +22,15 @@ import {
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import {
   useHubContacts,
+  useHubSearchUser,
+  useHubSendFriendRequest,
+  useHubAcceptFriendRequest,
+  useHubRejectFriendRequest,
+  useHubRemoveContact,
+  useHubBlockContact,
+  useHubUnblockContact,
+  useHubUpdateContactRemark,
+  useHubCreateContactGroup,
   useHubWorkspaceProjects,
   useCreateHubWorkspaceProject,
   useUpdateHubWorkspaceProject,
@@ -36,6 +46,7 @@ export interface DesktopWorkbenchModel {
   agents: WorkbenchAgent[];
   conversations: WorkbenchConversation[];
   contacts?: WorkbenchContactsData;
+  contactsActions?: WorkbenchContactsActions;
   dataMode: string;
   isDemo: boolean;
   projects?: ProjectInfo[];
@@ -75,6 +86,17 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const projectsQuery = useHubWorkspaceProjects({ enabled: hubReady });
   const createProjectMutation = useCreateHubWorkspaceProject();
   const updateProjectMutation = useUpdateHubWorkspaceProject();
+
+  // Contact mutation hooks.
+  const searchUserMutation = useHubSearchUser();
+  const sendFriendRequestMutation = useHubSendFriendRequest();
+  const acceptFriendRequestMutation = useHubAcceptFriendRequest();
+  const rejectFriendRequestMutation = useHubRejectFriendRequest();
+  const removeContactMutation = useHubRemoveContact();
+  const blockContactMutation = useHubBlockContact();
+  const unblockContactMutation = useHubUnblockContact();
+  const updateContactRemarkMutation = useHubUpdateContactRemark();
+  const createContactGroupMutation = useHubCreateContactGroup();
 
   const threadsQuery = useThreads(undefined, { enabled: !useDemo });
   const threads = useDemo ? [] : threadsQuery.data?.items ?? [];
@@ -173,18 +195,34 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     },
   } : undefined;
 
+  const resolvedContactsActions: WorkbenchContactsActions | undefined = hubReady ? {
+    onSearchUser: (query: string) => searchUserMutation.mutateAsync(query),
+    onSendFriendRequest: (userId: string, message?: string) =>
+      sendFriendRequestMutation.mutateAsync(message !== undefined ? { userId, message } : { userId }),
+    onAcceptRequest: (requestId: string) => acceptFriendRequestMutation.mutateAsync(requestId),
+    onRejectRequest: (requestId: string) => rejectFriendRequestMutation.mutateAsync(requestId),
+    onRemoveContact: (userId: string) => removeContactMutation.mutateAsync(userId),
+    onBlockContact: (userId: string) => blockContactMutation.mutateAsync(userId),
+    onUnblockContact: (userId: string) => unblockContactMutation.mutateAsync(userId),
+    onUpdateRemark: (userId: string, remark: string) =>
+      updateContactRemarkMutation.mutateAsync({ userId, remark }),
+    onCreateGroup: (name: string, memberIds: string[]) =>
+      createContactGroupMutation.mutateAsync({ name, memberIds }),
+  } : undefined;
+
   const liveModel = {
     activeConversationId,
     ...(activeThread?.projectId ? { activeProjectId: activeThread.projectId } : {}),
     ...(activeThread?.threadId ? { activeThreadId: activeThread.threadId } : {}),
     agents: [],
-    contacts: resolvedContacts,
+    ...(resolvedContacts != null ? { contacts: resolvedContacts } : {}),
+    ...(resolvedContactsActions != null ? { contactsActions: resolvedContactsActions } : {}),
     conversations,
     dataMode,
     isDemo: false,
     projects: resolvedProjects,
-    projectsStatus: resolvedProjectsStatus,
-    projectsActions: resolvedProjectsActions,
+    ...(resolvedProjectsStatus != null ? { projectsStatus: resolvedProjectsStatus } : {}),
+    ...(resolvedProjectsActions != null ? { projectsActions: resolvedProjectsActions } : {}),
     transcript,
   };
 
