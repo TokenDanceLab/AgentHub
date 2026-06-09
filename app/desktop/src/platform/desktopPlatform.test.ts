@@ -104,7 +104,10 @@ describe('createDesktopPlatform', () => {
         route: 'local-edge-api',
         bind_addr: '127.0.0.1:3210',
         health_url: 'http://127.0.0.1:3210/v1/health',
+        store_backend: 'sqlite',
         store_db_policy: '<app-data>/agenthub-edge.sqlite',
+        store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+        expected_store_migration_version: 4,
         log_paths: {
           directory: '<app-data>/edge-logs',
           stdout: '<app-data>/edge-logs/local-edge.stdout.log',
@@ -138,7 +141,10 @@ describe('createDesktopPlatform', () => {
       target_id: 'local-edge',
       route: 'local-edge-api',
       health_url: 'http://127.0.0.1:3210/v1/health',
+      store_backend: 'sqlite',
       store_db_policy: '<app-data>/agenthub-edge.sqlite',
+      store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+      expected_store_migration_version: 4,
       direct_cli_spawn: false,
     }));
     expect(readiness.log_paths).toEqual(expect.objectContaining({
@@ -184,7 +190,10 @@ describe('createDesktopPlatform', () => {
           route: 'local-edge-api',
           bind_addr: '127.0.0.1:3210',
           health_url: 'http://127.0.0.1:3210/v1/health',
+          store_backend: 'sqlite',
           store_db_policy: '<app-data>/agenthub-edge.sqlite',
+          store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+          expected_store_migration_version: 4,
           log_paths: {
             directory: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs',
             stdout: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stdout.log',
@@ -260,7 +269,10 @@ describe('createDesktopPlatform', () => {
     }));
     expect(diagnostics.readiness).toEqual(expect.objectContaining({
       direct_cli_spawn: false,
+      store_backend: 'sqlite',
       store_db_policy: '<app-data>/agenthub-edge.sqlite',
+      store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+      expected_store_migration_version: 4,
     }));
     expect(diagnostics).not.toHaveProperty('command');
     expect(diagnostics).not.toHaveProperty('cliPath');

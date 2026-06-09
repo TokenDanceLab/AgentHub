@@ -43,7 +43,10 @@ export interface DesktopEdgeHostReadiness {
   route: 'local-edge-api';
   bind_addr: string;
   health_url: string;
+  store_backend: 'sqlite';
   store_db_policy: '<app-data>/agenthub-edge.sqlite';
+  store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1';
+  expected_store_migration_version: 4;
   log_paths: {
     directory: string;
     stdout: string;
