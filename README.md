@@ -12,13 +12,13 @@ AgentHub 是一个面向 AI Agent 团队协作的开源工作台。它把 Web、
 
 ## 当前状态
 
-AgentHub 正在进入 `v0.3.0-rc.7` 候选阶段。当前主线优先级是稳定 `dev/delicious233`，再合入 `master`，然后发布 Windows Desktop 与 Android 预览版本。
+AgentHub 正在进入 `v0.3.0-rc.7` 候选阶段。当前集成线是 `dev/release-0.3.0-rc7`：先吸收已确认的 Mobile RN 增量和 release gate 修复，再合入 `master`，然后生成 Windows Desktop 与 Android 预览证据。
 
 | 模块 | 状态 | 说明 |
 |---|---|---|
 | Web 工作台 | 可开发验证 | 已接 Hub 项目、任务、审批、Artifact、项目群线程和 Agent 消息合同 |
 | Desktop 工作台 | 可开发验证 | Tauri 2，本地 Edge/CLI readiness 和 Windows 打包门禁正在收口 |
-| Mobile | 已合入 dev | Expo / React Native 路线已进入 `app/mobile-rn`，Android/iOS release gate 仍需设备证据 |
+| Mobile | 已合入 rc7 集成线 | Expo / React Native 路线已进入 `app/mobile-rn`，本轮吸收 native capability settings 与 motion feedback；Android/iOS release gate 仍需设备证据 |
 | Hub Server | 可开发验证 | 项目、AgentProfile、ExecutionTarget、任务、审批和消息合同已持续收口 |
 | Edge Server | 可开发验证 | CLI adapter、SQLite readiness、SDK fixture 和本地执行证据仍在强化 |
 | 真实登录/真实 CLI | 未标记完成 | TokenDanceID 与真实 CLI/model/API 需要单独的 approved-real 证据，不用 fixture 代替 |
@@ -127,9 +127,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-p0-ap
 
 ## 发布节奏
 
-1. `dev/delicious233` 先达到完整绿色 CI。
-2. 清理或关闭已过时的 PR 与 worktree。
-3. 新建 `dev/delicious233 -> master` promote PR。
+1. `dev/release-0.3.0-rc7` 先达到完整绿色 CI 和 release gate。
+2. 清理或关闭已过时的 PR、分支与 worktree。
+3. 新建 `dev/release-0.3.0-rc7 -> master` promote PR。
 4. 合入 `master` 后打 `v0.3.0-rc.7` tag。
 5. 生成 Windows Desktop 和 Android 预览证据；签名、公证、商店发布另走批准。
 

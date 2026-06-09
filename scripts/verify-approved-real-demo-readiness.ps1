@@ -203,7 +203,7 @@ function Add-Segment {
         status = $status
         exit_code = $ExitCode
         evidence = $Evidence
-        output_excerpt = if ($Output.Length -gt 1200) { $Output.Substring(0, 1200) } else { $Output }
+        output_excerpt = if (($Output -as [string]).Length -gt 1200) { ($Output -as [string]).Substring(0, 1200) } else { ($Output -as [string]) }
     }
     if ($ExitCode -eq 0) {
         Pass "$Name"
