@@ -81,6 +81,7 @@ function New-RogueTauriBuildFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -124,6 +125,7 @@ function New-RogueMacOSCommandFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -158,6 +160,7 @@ function New-RogueMacOSReleaseActionFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -194,6 +197,7 @@ function New-FixedStableReleaseFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -228,6 +232,7 @@ function New-TaggedReleaseFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -279,6 +284,7 @@ function New-DirtyGeneratedSchemaFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -298,6 +304,32 @@ function New-DirtyGeneratedSchemaFixture {
     return $tempRoot
 }
 
+function New-MissingBundledSidecarFixture {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
+    New-Item -ItemType Directory $tempRoot -Force | Out-Null
+
+    foreach ($relativePath in @(
+        ".gitignore",
+        ".github\workflows\release.yml",
+        ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
+        "app\desktop\package.json",
+        "app\desktop\src-tauri\Cargo.toml",
+        "app\desktop\src-tauri\Cargo.lock",
+        "app\desktop\src-tauri\tauri.conf.json",
+        "app\desktop\src-tauri\gen\schemas\desktop-schema.json",
+        "app\desktop\src-tauri\gen\schemas\windows-schema.json",
+        "docs\backend-integration-governance.md"
+    )) {
+        Copy-FixtureFile $relativePath $tempRoot
+    }
+
+    & git -C $tempRoot init -q
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" add .
+    & git -C $tempRoot -c user.name="AgentHub Test" -c user.email="agenthub-test@example.invalid" commit -q -m "fixture"
+    return $tempRoot
+}
+
 function New-DeletedGeneratedSchemaFixture {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-tauri-readiness-$(New-Guid)"
     New-Item -ItemType Directory $tempRoot -Force | Out-Null
@@ -306,6 +338,7 @@ function New-DeletedGeneratedSchemaFixture {
         ".gitignore",
         ".github\workflows\release.yml",
         ".github\workflows\release-readiness.yml",
+        "scripts\verify-tauri-package-dry.ps1",
         "app\desktop\package.json",
         "app\desktop\src-tauri\Cargo.toml",
         "app\desktop\src-tauri\Cargo.lock",
@@ -412,6 +445,9 @@ Assert-True ($scriptText -match "artifact-manifest\.json" -and $scriptText -matc
 Assert-True ($scriptText -match "ZipFile" -and $scriptText -match "AgentHub\.exe" -and $scriptText -match "agenthub-edge\.exe" -and $scriptText -match "README\.txt") "checker inspects portable zip contents"
 Assert-True ($scriptText -match "check-ignore" -and $scriptText -match "Assert-GitIgnored") "checker verifies generated package artifacts stay ignored before dry builds"
 Assert-True ($scriptText -match "Generated Tauri schema policy" -and $scriptText -match "src-tauri/gen/schemas" -and $scriptText -match "git status") "checker verifies generated Tauri schemas are clean"
+Assert-True ($scriptText -match "Windows unsigned/dev package reproducibility contract" -and $scriptText -match "Assert-WindowsUnsignedDevPackageContract") "checker verifies the unsigned Windows/dev package reproducibility contract"
+Assert-True ($scriptText -match "verify-tauri-package-dry\.ps1" -and $scriptText -match "windows-desktop-package-dry" -and $scriptText -match "--no-bundle") "checker binds package readiness to the dry build script, dev executable compile, and report mode"
+Assert-True ($scriptText -match "stdout" -and $scriptText -match "stderr" -and $scriptText -match "edge_health_url|health_url" -and $scriptText -match "direct_cli_spawn") "checker requires Local Edge diagnostics to stay reproducible in package readiness"
 Assert-True ($scriptText -match "update-index" -and $scriptText -match "--refresh") "checker refreshes the Git index before generated schema dirtiness checks"
 Assert-True ($scriptText -match "required generated schema directory" -and $scriptText -match "required generated schema file") "checker fails missing generated schema directory or files"
 foreach ($artifactPattern in @(
@@ -463,6 +499,19 @@ Assert-True ($scriptHosts.Count -gt 0) "at least one PowerShell host is availabl
 foreach ($hostShell in $scriptHosts) {
     $ok = Invoke-Script $hostShell @("-RepoRoot", $RepoRoot)
     Assert-True ($ok.ExitCode -eq 0) "readiness checker passes current repository policy under $($ok.Host)" $ok.Output
+
+    $missingBundledSidecarRoot = New-MissingBundledSidecarFixture
+    try {
+        $optionalBundledSidecar = Invoke-Script $hostShell @("-RepoRoot", $missingBundledSidecarRoot) $missingBundledSidecarRoot
+        Assert-True ($optionalBundledSidecar.ExitCode -eq 0) "readiness checker treats bundled sidecar binary as optional for static policy under $($optionalBundledSidecar.Host)" $optionalBundledSidecar.Output
+
+        $requiredBundledSidecar = Invoke-Script $hostShell @("-RepoRoot", $missingBundledSidecarRoot, "-RequireBundledSidecar") $missingBundledSidecarRoot
+        Assert-True ($requiredBundledSidecar.ExitCode -ne 0) "readiness checker fails missing bundled sidecar only when -RequireBundledSidecar is set under $($requiredBundledSidecar.Host)" $requiredBundledSidecar.Output
+        Assert-True ($requiredBundledSidecar.Output -match "Windows bundled Local Edge sidecar" -and $requiredBundledSidecar.Output -match "missing") "required sidecar failure names the bundled Local Edge sidecar boundary under $($requiredBundledSidecar.Host)" $requiredBundledSidecar.Output
+    }
+    finally {
+        Remove-Item -Recurse -Force $missingBundledSidecarRoot -ErrorAction SilentlyContinue
+    }
 
     $smokeOutput = & $hostShell.Path -NoProfile -ExecutionPolicy Bypass -File $smokeScriptPath -RepoRoot $RepoRoot 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq 0) "installer smoke preflight passes without full build under $($hostShell.Name)" $smokeOutput
