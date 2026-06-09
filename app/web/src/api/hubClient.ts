@@ -229,6 +229,64 @@ export interface AgentRunEventSummary {
   elapsed_ms?: number;
 }
 
+export interface AgentTaskApproval {
+  approval_id: string;
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  request_id?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  status?: string;
+  reason?: string;
+  decided_by?: string;
+  created_at?: string;
+  decided_at?: string;
+  edge_control?: Record<string, unknown>;
+}
+
+export interface AgentTaskApprovalList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  approvals: AgentTaskApproval[];
+  pending?: AgentTaskApproval[];
+  decided?: AgentTaskApproval[];
+  last_event_seq?: number;
+}
+
+export interface AgentTaskArtifact {
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  path?: string;
+  action?: string;
+  tool_name?: string;
+  status?: string;
+  artifact_id?: string;
+  name?: string;
+  mime_type?: string;
+  size_bytes?: number;
+  created_at?: string;
+}
+
+export interface AgentTaskArtifactList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  artifacts: AgentTaskArtifact[];
+  last_event_seq?: number;
+}
+
+export interface TaskApprovalDecisionRequest {
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
 export interface AgentRunEvent {
   id: string;
   task_id: string;
@@ -1067,6 +1125,18 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     getTaskRunEventSummary: (taskId: string) =>
       request<AgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/summary`),
+
+    listTaskApprovals: (taskId: string) =>
+      request<AgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
+
+    decideTaskApproval: (taskId: string, approvalId: string, decision: TaskApprovalDecisionRequest) =>
+      request<AgentTaskApproval>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`, {
+        method: 'POST',
+        body: JSON.stringify(decision),
+      }),
+
+    listTaskArtifacts: (taskId: string) =>
+      request<AgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
 
     // ── Custom agents ──────────────────────────────────
 
