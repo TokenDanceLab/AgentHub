@@ -98,7 +98,22 @@ export interface WorkbenchRoutesProps {
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
   /** 用户在通讯录/群聊等处点击联系人，希望开始私聊时触发。 */
   onStartConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
+  /** Contact mutation actions — passed through to ContactsPage. */
+  contactsActions?: WorkbenchContactsActions | undefined;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+}
+
+/** Contact mutation callbacks wired to Hub API. */
+export interface WorkbenchContactsActions {
+  onSearchUser?: ((query: string) => Promise<unknown> | void) | undefined;
+  onSendFriendRequest?: ((userId: string, message?: string) => Promise<unknown> | void) | undefined;
+  onAcceptRequest?: ((requestId: string) => Promise<unknown> | void) | undefined;
+  onRejectRequest?: ((requestId: string) => Promise<unknown> | void) | undefined;
+  onRemoveContact?: ((userId: string) => Promise<unknown> | void) | undefined;
+  onBlockContact?: ((userId: string) => Promise<unknown> | void) | undefined;
+  onUnblockContact?: ((userId: string) => Promise<unknown> | void) | undefined;
+  onUpdateRemark?: ((userId: string, remark: string) => Promise<unknown> | void) | undefined;
+  onCreateGroup?: ((name: string, memberIds: string[]) => Promise<unknown> | void) | undefined;
 }
 
 export interface WorkbenchAgentProfilesStatus {
@@ -990,6 +1005,13 @@ export function WorkbenchRoutes({
           recentShortcuts={contactsData.recentShortcuts ?? []}
           serviceDesks={contactsData.serviceDesks ?? []}
           starredContacts={contactsData.starredContacts ?? []}
+          onSearchUser={contactsActions?.onSearchUser}
+          onSendFriendRequest={contactsActions?.onSendFriendRequest}
+          onAcceptRequest={contactsActions?.onAcceptRequest}
+          onRejectRequest={contactsActions?.onRejectRequest}
+          onRemoveContact={contactsActions?.onRemoveContact}
+          onBlockContact={contactsActions?.onBlockContact}
+          onUpdateRemark={contactsActions?.onUpdateRemark}
         />
       );
     case 'docs':
