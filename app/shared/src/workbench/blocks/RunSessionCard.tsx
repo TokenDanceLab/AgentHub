@@ -13,6 +13,8 @@ interface RunSessionCardProps {
   /** Explicit replay/source labels so mock, fixture, and real runs are distinguishable. */
   sourceLabel?: string | undefined;
   modeLabel?: string | undefined;
+  agentLabel?: string | undefined;
+  runtimeLabel?: string | undefined;
   targetLabel?: string | undefined;
   taskId?: string | undefined;
   edgeRunId?: string | undefined;
@@ -42,9 +44,11 @@ function markClass(status?: RunSessionCardProps['status']): string {
  */
 export const RunSessionCard: React.FC<RunSessionCardProps> = ({
   adapterId,
+  agentLabel,
   deviceId,
   edgeRunId,
   modeLabel,
+  runtimeLabel,
   title,
   meta,
   runId,
@@ -56,6 +60,8 @@ export const RunSessionCard: React.FC<RunSessionCardProps> = ({
   const evidence = [
     sourceLabel ? { label: 'Source', value: sourceLabel } : undefined,
     modeLabel ? { label: 'Mode', value: modeLabel } : undefined,
+    agentLabel ? { label: 'Agent', value: agentLabel } : undefined,
+    runtimeLabel ? { label: 'Runtime', value: runtimeLabel } : undefined,
     targetLabel ? { label: 'Target', value: targetLabel } : undefined,
     taskId ? { label: 'Hub task', value: taskId } : undefined,
     edgeRunId ? { label: 'Edge run', value: edgeRunId } : undefined,

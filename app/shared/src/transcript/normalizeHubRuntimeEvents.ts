@@ -8,6 +8,10 @@ export interface HubRuntimeEventTranscriptInput {
   edge_run_id?: string;
   edge_device_id?: string;
   adapter_id?: string;
+  agent_label?: string;
+  display_name?: string;
+  runtime_id?: string;
+  runtime_label?: string;
   evidence_mode?: string;
   runtime_mode?: string;
   target_label?: string;
@@ -44,6 +48,10 @@ export function hubRuntimeEventFromPayload(payload: unknown): HubRuntimeEventTra
   const edgeRunId = stringField(payload.edge_run_id);
   const edgeDeviceId = stringField(payload.edge_device_id);
   const adapterId = stringField(payload.adapter_id);
+  const agentLabel = stringField(payload.agent_label);
+  const displayName = stringField(payload.display_name);
+  const runtimeId = stringField(payload.runtime_id);
+  const runtimeLabel = stringField(payload.runtime_label);
   const evidenceMode = stringField(payload.evidence_mode);
   const runtimeMode = stringField(payload.runtime_mode);
   const targetLabel = stringField(payload.target_label);
@@ -59,6 +67,10 @@ export function hubRuntimeEventFromPayload(payload: unknown): HubRuntimeEventTra
     ...(edgeRunId ? { edge_run_id: edgeRunId } : {}),
     ...(edgeDeviceId ? { edge_device_id: edgeDeviceId } : {}),
     ...(adapterId ? { adapter_id: adapterId } : {}),
+    ...(agentLabel ? { agent_label: agentLabel } : {}),
+    ...(displayName ? { display_name: displayName } : {}),
+    ...(runtimeId ? { runtime_id: runtimeId } : {}),
+    ...(runtimeLabel ? { runtime_label: runtimeLabel } : {}),
     ...(evidenceMode ? { evidence_mode: evidenceMode } : {}),
     ...(runtimeMode ? { runtime_mode: runtimeMode } : {}),
     ...(targetLabel ? { target_label: targetLabel } : {}),
@@ -78,6 +90,8 @@ interface HubRuntimeSessionSummary {
   edgeRunId?: string;
   deviceId?: string;
   adapterId?: string;
+  agentLabel?: string;
+  runtimeLabel?: string;
   sessionId?: string;
   modeLabel?: string;
   targetLabel?: string;
@@ -113,6 +127,8 @@ function hubRuntimeSessionBlocks(events: HubRuntimeEventTranscriptInput[]): Tran
     const nextTaskId = previous?.taskId ?? taskId;
     const nextEdgeRunId = previous?.edgeRunId ?? edgeRunId;
     const nextSessionId = previous?.sessionId ?? sessionId;
+    const nextAgentLabel = previous?.agentLabel ?? runtimeAgentLabel(event, payload);
+    const nextRuntimeLabel = previous?.runtimeLabel ?? runtimeRuntimeLabel(event, payload);
     const nextModeLabel = previous?.modeLabel ?? runtimeModeLabel(event, payload);
     const nextTargetLabel = previous?.targetLabel ?? runtimeTargetLabel(event, payload);
     summaries.set(key, {
@@ -121,6 +137,8 @@ function hubRuntimeSessionBlocks(events: HubRuntimeEventTranscriptInput[]): Tran
       ...(nextEdgeRunId ? { edgeRunId: nextEdgeRunId } : {}),
       ...(deviceId ? { deviceId } : {}),
       ...(adapterId ? { adapterId } : {}),
+      ...(nextAgentLabel ? { agentLabel: nextAgentLabel } : {}),
+      ...(nextRuntimeLabel ? { runtimeLabel: nextRuntimeLabel } : {}),
       ...(nextSessionId ? { sessionId: nextSessionId } : {}),
       ...(nextModeLabel ? { modeLabel: nextModeLabel } : {}),
       ...(nextTargetLabel ? { targetLabel: nextTargetLabel } : {}),
@@ -135,6 +153,8 @@ function hubRuntimeSessionBlocks(events: HubRuntimeEventTranscriptInput[]): Tran
     title: 'Hub task replay',
     status: summary.status,
     meta: sessionMeta(summary),
+    ...(summary.agentLabel ? { agentLabel: summary.agentLabel } : {}),
+    ...(summary.runtimeLabel ? { runtimeLabel: summary.runtimeLabel } : {}),
     ...(summary.edgeRunId ? { runId: summary.edgeRunId, edgeRunId: summary.edgeRunId } : {}),
     ...(summary.taskId ? { taskId: summary.taskId } : {}),
     ...(summary.deviceId ? { deviceId: summary.deviceId } : {}),
@@ -189,6 +209,43 @@ function sessionMeta(summary: HubRuntimeSessionSummary): string {
     summary.adapterId ? 'adapter evidence' : undefined,
   ].filter(Boolean);
   return parts.join(' · ') || 'Hub runtime event replay';
+}
+
+function runtimeAgentLabel(
+  event: HubRuntimeEventTranscriptInput,
+  payload: Record<string, unknown> | null,
+): string | undefined {
+  return firstString(
+    event.agent_label,
+    event.display_name,
+    payload?.agent_label,
+    payload?.agentLabel,
+    payload?.display_name,
+    payload?.displayName,
+    payload?.profile_label,
+    payload?.profileLabel,
+    payload?.agent_name,
+    payload?.agentName,
+  );
+}
+
+function runtimeRuntimeLabel(
+  event: HubRuntimeEventTranscriptInput,
+  payload: Record<string, unknown> | null,
+): string | undefined {
+  return firstString(
+    event.runtime_label,
+    event.runtime_id,
+    payload?.runtime_label,
+    payload?.runtimeLabel,
+    payload?.runtime_id,
+    payload?.runtimeId,
+    payload?.adapter_label,
+    payload?.adapterLabel,
+    payload?.adapter_id,
+    payload?.adapterId,
+    event.adapter_id,
+  );
 }
 
 function runtimeModeLabel(
