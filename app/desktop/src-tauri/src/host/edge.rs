@@ -1,6 +1,5 @@
 use crate::edge_manager::{EdgeHostReadiness, EdgeStatus, SharedEdgeManager};
-use crate::oidc_server::{check_loopback_callback_readiness, LoopbackReadiness};
-use crate::secure_store::{check_credential_store_readiness, CredentialStoreReadiness};
+use crate::host::auth::{build_packaged_login_readiness, PackagedLoginReadiness};
 use serde::Serialize;
 use std::collections::VecDeque;
 use std::env;
@@ -46,19 +45,6 @@ pub struct LocalCliDiscoveryManifest {
     pub items: Vec<LocalCliDiscoveryItem>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct PackagedLoginRealE2EGate {
-    pub status: String,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct PackagedLoginReadiness {
-    pub loopback: LoopbackReadiness,
-    pub credential_store: CredentialStoreReadiness,
-    pub real_e2e: PackagedLoginRealE2EGate,
-}
-
 #[tauri::command]
 pub async fn get_edge_status(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
     let mgr = state.lock().await;
@@ -82,15 +68,7 @@ pub async fn get_local_edge_diagnostics(
     let mgr = state.lock().await;
     let readiness = mgr.host_readiness_for_app(&app);
     let status = mgr.status();
-    let packaged_login = PackagedLoginReadiness {
-        loopback: check_loopback_callback_readiness(),
-        credential_store: check_credential_store_readiness(),
-        real_e2e: PackagedLoginRealE2EGate {
-            status: "proposal_only".to_string(),
-            reason: "Real packaged login E2E requires an explicit TokenDance ID/browser gate."
-                .to_string(),
-        },
-    };
+    let packaged_login = build_packaged_login_readiness();
     let log_tail = LocalEdgeLogTail {
         stdout: read_log_tail(&readiness.log_paths.stdout, 20),
         stderr: read_log_tail(&readiness.log_paths.stderr, 20),
@@ -225,15 +203,7 @@ fn read_cli_version(path: &str) -> Option<String> {
 
 #[tauri::command]
 pub async fn get_packaged_login_readiness() -> Result<PackagedLoginReadiness, String> {
-    Ok(PackagedLoginReadiness {
-        loopback: check_loopback_callback_readiness(),
-        credential_store: check_credential_store_readiness(),
-        real_e2e: PackagedLoginRealE2EGate {
-            status: "proposal_only".to_string(),
-            reason: "Real packaged login E2E requires an explicit TokenDance ID/browser gate."
-                .to_string(),
-        },
-    })
+    Ok(build_packaged_login_readiness())
 }
 
 fn read_log_tail(path: &str, max_lines: usize) -> Vec<String> {
