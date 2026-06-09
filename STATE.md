@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 15:58 +08:00
+最后更新：2026-06-09 16:07 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web 单任务 approval/artifact contract 消费、Edge fixture adapter runner、Hub file-change diff projection、runtime/provider icon polish、Real/Mock boundary、Desktop exact target observed bridge；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
-| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web task approval/artifact contract consumption、Edge fixture adapter runner contract、Hub task file-change diff metadata、runtime/provider icons polish、real-mode explicit boundary、Desktop exact target sidecar evidence |
+| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web 单任务 approval/artifact contract 消费、Edge fixture adapter runner、Hub file-change diff projection、runtime/provider icon polish、Real/Mock boundary、Desktop exact target observed bridge、Tauri package smoke gate、SDK fixture capability evidence、localhost observed loop gate；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web task approval/artifact contract consumption、Edge fixture adapter runner contract、Hub task file-change diff metadata、runtime/provider icons polish、real-mode explicit boundary、Desktop exact target sidecar evidence、Tauri package readiness hardening、SDK fixture capability evidence、localhost observed loop runner |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
@@ -42,6 +42,9 @@
 - Runtime/provider icons polish 集成提交：`6eee0af6 feat(ui): polish runtime provider icons`，基于 LobeHub icon registry 强化 OpenAI-compatible/custom、MCP、AgentProfile、ExecutionTarget、Target Health 等 fallback，不改主题和大布局。
 - Real/Mock boundary 集成提交：`04aef85c fix(web): make real mode boundaries explicit`，`observed/approved-real` 下缺 Agents/Projects/Tasks 数据时不再静默回 mock，而是展示明确空态/错误态；demo/mock/fixture 仍保留样例数据。
 - Desktop exact target observed bridge 集成提交：`e0a6591c test(desktop): bind observed sidecar smoke to exact target`，让 Hub dispatch queue、Edge run body、Desktop readiness/diagnostics 和 sidecar observed fixture 记录 expected/observed `target_id` / `edge_device_id`，区分 matched/mismatch/offline/missing，仍不启动真实 CLI/model/API。
+- Tauri package smoke gate 集成提交：`29982e85 test(desktop): harden tauri package smoke gate`，强化 Windows unsigned/dev package reproducibility、sidecar placement、Local Edge diagnostics、macOS unsigned policy boundary；不执行真实 build/sign/notarize/release upload。
+- SDK fixture capability evidence 集成提交：`c49d2ee1 test(edge): expand sdk fixture capability evidence`，扩展 SDK-like / custom OpenAI-compatible fixture metadata、RuntimeManifest capability/health 和 golden tests；不安装 SDK 包、不联网、不跑真实 CLI/model/API。
+- localhost observed loop gate 集成提交：`b9e53b25 test(e2e): add localhost observed loop gate`，新增 no-spend localhost observed runner、manifest、safe artifact root、direct Hub-to-Edge rejection、local stack readiness 组合；当前仍 `RealTested=false`。
 
 当前不声明已经完成：
 
@@ -70,6 +73,9 @@
 | Runtime/provider icons | worker/Nietzsche | 已集成并验证 controller：`6eee0af6` | shared icon resolver/fallback；无截图验证，无大布局改动 |
 | Real/Mock boundary | worker/Plato | 已集成并验证 controller：`04aef85c` | shared real-mode 空态/错误态，不改后端合同 |
 | Desktop exact target observed bridge | worker/Maxwell | 已集成并验证 controller：`e0a6591c` | fixture/observed target binding，不跑真实 CLI/model/API |
+| Tauri package smoke | worker/Curie | 已集成并验证 controller：`29982e85` | readiness/policy + fixture smoke，不做真实签名、公证、release upload |
+| SDK fixture capability | worker/Meitner | 已集成并验证 controller：`c49d2ee1` | Edge fixture capability/golden tests，不安装或运行真实 SDK/CLI |
+| localhost observed loop gate | worker/Gauss | 已集成并验证 controller：`b9e53b25` | runner/manifest/readiness-only gate，`RealTested=false` |
 | State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
 
@@ -83,9 +89,9 @@
 
 ## 下一步优先级
 
-1. **localhost observed loop gate**：在不消耗真实模型、不部署的前提下，统一 Web、Hub、Desktop sidecar、Local Edge、fixture adapter、Hub replay、Web render 的 localhost observed runner、manifest、日志和清理策略。
-2. **Web artifact/diff inspector consumption**：基于 Hub file-change diff metadata，把单任务 diff/edit/review 状态投影进 Web real-mode transcript 和右侧 inspector。
-3. **Tauri package smoke / AgentSDK fixture capability**：继续收口 unsigned package/readiness gate 和 SDK/custom Agent no-spend fixture evidence。
+1. **Web artifact/diff inspector consumption**：基于 Hub file-change diff metadata，把单任务 diff/edit/review 状态投影进 Web real-mode transcript 和右侧 inspector。
+2. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
+3. **Agent Builder fixture UI / IM @Agent 操作补强**：把 SDK/custom Agent fixture evidence、runtime icons、target health 和 real/mock boundary 落到用户可见的 Agent/Profile/任务入口。
 4. **受控 approved-real 方案**：已具备 preflight manifest gate；真实登录、真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
 
 ## 安全规则
