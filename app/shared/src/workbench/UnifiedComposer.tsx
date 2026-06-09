@@ -47,6 +47,8 @@ export function UnifiedComposer({
   const targetSelectionRequired = Boolean(executionTargets) && composer.mentions.length > 0;
   const targetSelected = !targetSelectionRequired || executionTargetId.trim().length > 0;
   const submitDisabled = !canSubmitComposer(composer) || isSubmitting || !targetSelected;
+  const selectedTargetLabel = executionTargets?.find((target) => target.id === executionTargetId)?.label;
+  const selectedAgentLabel = composer.mentions.map((mention) => `@${mention.label}`).join(', ');
   const targetStatus = targetSelectionRequired && !executionTargetId
     ? executionTargets && executionTargets.length > 0
       ? 'Select a Desktop/Edge target before starting.'
@@ -123,6 +125,17 @@ export function UnifiedComposer({
           ))}
         </div>
       )}
+      {composer.mentions.length > 0 && (
+        <div className={styles.composerMainchain} aria-label="@Agent main chain">
+          <span data-state="selected">Agent {selectedAgentLabel}</span>
+          <span data-state={targetSelected ? 'selected' : 'missing'}>
+            Target {selectedTargetLabel ?? 'missing'}
+          </span>
+          <span data-state={canSubmitComposer(composer) && targetSelected ? 'selected' : 'missing'}>
+            Task {canSubmitComposer(composer) && targetSelected ? 'ready' : 'draft required'}
+          </span>
+        </div>
+      )}
       <div className={styles.composerRow}>
         <textarea
           aria-label="Composer input"
@@ -181,7 +194,7 @@ export function UnifiedComposer({
         )}
 
         <button
-          aria-label="发送消息"
+          aria-label={composer.mentions.length > 0 ? '启动 Agent 任务' : '发送消息'}
           className={styles.sendButton}
           disabled={submitDisabled}
           type="submit"
