@@ -193,6 +193,7 @@ export function formatLocalEdgeDiagnosticText(
     `  stdout: ${readiness.log_paths.stdout}`,
     `  stderr: ${readiness.log_paths.stderr}`,
     formatDesktopEdgeDispatchDiagnostics(dispatchReadiness),
+    formatLocalCliDiscoveryDiagnostics(diagnostics.local_cli_discovery),
     `  login loopback: ${diagnostics.packaged_login.loopback.available ? 'ready' : 'blocked'}`,
     `  credential store: ${diagnostics.packaged_login.credential_store.available ? 'ready' : 'blocked'}`,
     `  real login e2e: ${diagnostics.packaged_login.real_e2e.status}`,
@@ -200,4 +201,32 @@ export function formatLocalEdgeDiagnosticText(
       ? `  stderr tail: ${diagnostics.log_tail.stderr.slice(-3).join(' | ')}`
       : null,
   ].filter(Boolean).join('\n');
+}
+
+function formatLocalCliDiscoveryDiagnostics(
+  discovery: DesktopLocalEdgeDiagnostics['local_cli_discovery'],
+): string | null {
+  if (!discovery) return null;
+
+  const lines = [
+    'Local CLI discovery',
+    `  mode: ${discovery.mode}`,
+    `  readiness manifest: ${discovery.readinessManifest}`,
+    `  readiness script: ${discovery.readinessScript}`,
+    ...discovery.items.map((item) => [
+      `  ${item.id}: ${item.installed ? 'installed' : 'missing'}`,
+      `version=${item.version || 'unknown'}`,
+      `path=${formatDiagnosticCliPath(item.path)}`,
+      `boundary=${item.noSpend ? 'no-spend' : 'requires-approval'}`,
+    ].join(' ')),
+  ];
+
+  return lines.join('\n');
+}
+
+function formatDiagnosticCliPath(path: string): string {
+  const normalized = path.trim();
+  if (!normalized) return 'unknown';
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] ?? normalized : normalized;
 }

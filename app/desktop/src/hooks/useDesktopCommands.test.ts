@@ -53,6 +53,38 @@ const diagnostics: DesktopLocalEdgeDiagnostics = {
       stderr: '<app-data>/edge-logs/local-edge.stderr.log',
     },
   },
+  local_cli_discovery: {
+    mode: 'no-spend-discovery',
+    readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+    readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+    generatedAt: '2026-06-09T00:00:00.000Z',
+    items: [
+      {
+        id: 'codex',
+        name: 'Codex CLI',
+        installed: true,
+        version: '0.27.0',
+        path: 'C:/Users/Ding/AppData/Roaming/npm/codex.cmd',
+        noSpend: true,
+      },
+      {
+        id: 'claude-code',
+        name: 'Claude Code',
+        installed: true,
+        version: '2.1.4',
+        path: 'claude',
+        noSpend: true,
+      },
+      {
+        id: 'opencode',
+        name: 'OpenCode',
+        installed: false,
+        version: null,
+        path: 'opencode',
+        noSpend: true,
+      },
+    ],
+  },
   packaged_login: {
     loopback: {
       available: true,
@@ -126,6 +158,14 @@ describe('formatLocalEdgeDiagnosticText', () => {
     expect(text).toContain('logs: <app-data>/edge-logs');
     expect(text).toContain('stdout: <app-data>/edge-logs/local-edge.stdout.log');
     expect(text).toContain('stderr: <app-data>/edge-logs/local-edge.stderr.log');
+    expect(text).toContain('Local CLI discovery');
+    expect(text).toContain('mode: no-spend-discovery');
+    expect(text).toContain('readiness manifest: docs/audit/p0-edge-cli-real-readiness.md');
+    expect(text).toContain('readiness script: scripts/verify-edge-cli-real-readiness.ps1');
+    expect(text).toContain('codex: installed version=0.27.0 path=codex.cmd boundary=no-spend');
+    expect(text).toContain('claude-code: installed version=2.1.4 path=claude boundary=no-spend');
+    expect(text).toContain('opencode: missing version=unknown path=opencode boundary=no-spend');
+    expect(text).not.toContain('C:/Users/Ding');
     expect(text).not.toMatch(/sidecar_args|command|cliPath|AGENTHUB_EDGE_AUTH_TOKEN|bearer|access_token/i);
   });
 });
