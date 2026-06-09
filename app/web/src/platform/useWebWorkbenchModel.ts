@@ -35,6 +35,12 @@ import type {
 } from '@/api/hubClient';
 import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
+import {
+  useCreateHubWorkspaceProject,
+  useHubWorkspaceProject,
+  useHubWorkspaceProjects,
+  useUpdateHubWorkspaceProject,
+} from '@/api/projectQueries';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import {
@@ -164,37 +170,17 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     placeholderData: (previous) => previous,
   });
 
-  const projects = useQuery({
-    queryKey: ['web-v4', 'hub-projects', hubReady],
-    queryFn: () => hubClient.listWorkspaceProjects({ pageSize: 50 }),
-    enabled: hubReady,
-    staleTime: 10_000,
-    placeholderData: (previous) => previous,
-  });
+  const projects = useHubWorkspaceProjects({ enabled: hubReady, getToken: getAccessToken });
   const selectedProjectDetailId = hubReady
     ? selectedProjectId ?? projects.data?.items[0]?.id
     : undefined;
-  const selectedProject = useQuery({
-    queryKey: ['web-v4', 'hub-project', selectedProjectDetailId],
-    queryFn: () => hubClient.getWorkspaceProject(selectedProjectDetailId!),
+  const selectedProject = useHubWorkspaceProject({
+    projectId: selectedProjectDetailId,
     enabled: Boolean(selectedProjectDetailId),
-    staleTime: 10_000,
-    placeholderData: (previous) => previous,
+    getToken: getAccessToken,
   });
-  const createProject = useMutation({
-    mutationFn: (draft: ProjectDraft) => hubClient.createWorkspaceProject(projectDraftToHubRequest(draft)),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-projects'] });
-    },
-  });
-  const updateProject = useMutation({
-    mutationFn: ({ projectId, draft }: { projectId: string; draft: ProjectDraft }) =>
-      hubClient.updateWorkspaceProject(projectId, projectDraftToHubRequest(draft)),
-    onSettled: (_data, _error, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-projects'] });
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-project', variables.projectId] });
-    },
-  });
+  const createProject = useCreateHubWorkspaceProject({ getToken: getAccessToken });
+  const updateProject = useUpdateHubWorkspaceProject({ getToken: getAccessToken });
   const decideApproval = useMutation({
     mutationFn: (action: ApprovalDecisionAction) => decideWebApprovalWithHubClient(hubClient, action),
     onSettled: () => {
@@ -278,9 +264,14 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       { isFetching: selectedProject.isFetching, error: selectedProject.error },
     ),
     projectsActions: hubReady ? {
-      create: async (draft: ProjectDraft) => workspaceProjectToProjectInfo(await createProject.mutateAsync(draft)),
+      create: async (draft: ProjectDraft) => (
+        workspaceProjectToProjectInfo(await createProject.mutateAsync(projectDraftToHubRequest(draft)))
+      ),
       update: async (projectId: string, draft: ProjectDraft) => (
-        workspaceProjectToProjectInfo(await updateProject.mutateAsync({ projectId, draft }))
+        workspaceProjectToProjectInfo(await updateProject.mutateAsync({
+          projectId,
+          draft: projectDraftToHubRequest(draft),
+        }))
       ),
     } : undefined,
     onApprovalDecision: hubReady
