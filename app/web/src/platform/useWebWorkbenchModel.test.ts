@@ -4,6 +4,7 @@ import {
   decideWebApprovalWithHubClient,
   mergeHubTaskContractEvents,
   mergeHubRuntimeEvents,
+  parseWorkspaceProjectThreadMessageContent,
   projectDraftToHubRequest,
   mergeWorkspaceProjectDetail,
   resolveWebRuntimeEvidence,
@@ -114,6 +115,95 @@ describe('useWebWorkbenchModel helpers', () => {
         name: 'AgentHub Demo',
         runs: [],
         artifacts: [],
+      }),
+    ]);
+  });
+
+  it('projects Hub Project Group threads, @Agent metadata, and orchestrator queue into visible project slots', () => {
+    const message = {
+      id: 'message-1',
+      project_id: 'project-1',
+      thread_id: 'thread-1',
+      seq_id: 7,
+      client_msg_id: 'client-message-1',
+      sender_type: 'user',
+      sender_id: 'user-1',
+      content_type: 'text',
+      content: JSON.stringify({
+        text: '@Reviewer audit the Web A2A slice',
+        metadata: {
+          im_kind: 'project_group',
+          mentions: [{ type: 'agent', id: 'agent-reviewer', display_name: 'Reviewer' }],
+          orchestrator_queue: {
+            status: 'queued',
+            route: 'review',
+            correlation_id: 'corr-project-1',
+          },
+        },
+      }),
+      created_at: '2026-06-09T12:34:00Z',
+    };
+
+    expect(parseWorkspaceProjectThreadMessageContent(message)).toEqual({
+      text: '@Reviewer audit the Web A2A slice',
+      agentMentions: ['Reviewer'],
+      queue: {
+        status: 'queued',
+        route: 'review',
+        correlationId: 'corr-project-1',
+      },
+    });
+
+    expect(resolveWebWorkbenchProjects([
+      {
+        id: 'project-1',
+        name: 'AgentHub Web',
+        description: 'Project Group mainchain',
+      },
+    ], true, 'approved-real', {
+      'project-1': {
+        threads: [{
+          id: 'thread-1',
+          project_id: 'project-1',
+          type: 'group',
+          name: 'Web/A2A 项目群',
+          owner_user_id: 'owner-1',
+          role: 'owner',
+          member_count: 3,
+          last_message_at: '2026-06-09T12:34:00Z',
+          created_at: '2026-06-09T12:00:00Z',
+        }],
+        messages: [message],
+      },
+    })).toEqual([
+      expect.objectContaining({
+        id: 'project-1',
+        status: 'Hub group',
+        meta: '1 threads · 1 messages',
+        members: ['owner', 'Reviewer'],
+        runs: [
+          expect.objectContaining({
+            id: 'thread-thread-1',
+            name: 'Project group: Web/A2A 项目群',
+            status: 'running',
+            owner: 'owner',
+            meta: '3 members',
+          }),
+          expect.objectContaining({
+            id: 'queue-message-1',
+            name: 'Orchestrator queue: review',
+            status: 'waiting',
+            owner: 'Reviewer',
+            meta: 'corr-project-1',
+          }),
+        ],
+        feed: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'message-message-1',
+            time: '12:34',
+            text: '@Reviewer audit the Web A2A slice -> @Reviewer · queue queued',
+          }),
+        ]),
       }),
     ]);
   });
@@ -260,6 +350,56 @@ describe('useWebWorkbenchModel helpers', () => {
     )).toEqual({
       loading: false,
       error: 'Hub project detail failed',
+      actionError: undefined,
+      saving: false,
+    });
+  });
+
+  it('surfaces Project Group loading and errors only in real Hub project mode', () => {
+    expect(resolveWebProjectsStatus(
+      { isFetching: false, error: undefined },
+      undefined,
+      undefined,
+      true,
+      'approved-real',
+      false,
+      { isFetching: false },
+      { isFetching: true },
+    )).toEqual({
+      loading: true,
+      error: undefined,
+      actionError: undefined,
+      saving: false,
+    });
+
+    expect(resolveWebProjectsStatus(
+      { isFetching: false, error: undefined },
+      undefined,
+      undefined,
+      true,
+      'approved-real',
+      false,
+      { isFetching: false },
+      { isFetching: false, error: new Error('Hub Project Group unavailable') },
+    )).toEqual({
+      loading: false,
+      error: 'Hub Project Group unavailable',
+      actionError: undefined,
+      saving: false,
+    });
+
+    expect(resolveWebProjectsStatus(
+      { isFetching: false, error: undefined },
+      undefined,
+      undefined,
+      false,
+      'auto',
+      false,
+      { isFetching: false },
+      { isFetching: false, error: new Error('ignored in demo auto mode') },
+    )).toEqual({
+      loading: false,
+      error: undefined,
       actionError: undefined,
       saving: false,
     });

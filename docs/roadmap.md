@@ -37,6 +37,8 @@ Web / Desktop / Mobile / IM
 看到路由、执行、审批、Diff、Preview、Artifact 和完成状态回放。没有真实
 Hub/Target/Task 数据时必须显式空态或错误态，不能静默回 demo。
 
+P0 远控拓扑固定为 Web -> Hub -> Desktop/Edge -> Local Edge -> CLI/SDK adapter -> replay。该链路的 fixture、observed、approved-real 和 production 证据必须分开记录。
+
 | 方向 | 路线项 | 完成标准 |
 |---|---|---|
 | IM / @Agent 主链 | 单聊、项目群、`@Agent`、Orchestrator route decision、消息 pin、目标选择和启动按钮收敛到一屏主链 | 用户不用理解 Runtime 术语，也能知道当前 Agent、Target、Task 是否可启动、排队、执行或失败。 |

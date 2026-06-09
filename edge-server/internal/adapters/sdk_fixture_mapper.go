@@ -642,10 +642,24 @@ func normalizeSDKWorkspacePath(value string) string {
 	if cleaned == "." {
 		return ""
 	}
-	if path.IsAbs(cleaned) || filepath.IsAbs(value) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+	if isSDKAbsoluteOrEscapingPath(value, cleaned) {
 		return path.Base(cleaned)
 	}
 	return strings.TrimPrefix(cleaned, "./")
+}
+
+func isSDKAbsoluteOrEscapingPath(original, cleaned string) bool {
+	if path.IsAbs(cleaned) || filepath.IsAbs(original) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return true
+	}
+	return hasSDKWindowsDriveRoot(cleaned) || hasSDKWindowsDriveRoot(strings.ReplaceAll(original, "\\", "/"))
+}
+
+func hasSDKWindowsDriveRoot(value string) bool {
+	return len(value) >= 3 &&
+		((value[0] >= 'a' && value[0] <= 'z') || (value[0] >= 'A' && value[0] <= 'Z')) &&
+		value[1] == ':' &&
+		value[2] == '/'
 }
 
 var (

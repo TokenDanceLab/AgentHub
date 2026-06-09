@@ -77,6 +77,8 @@ function Redact-Text {
     param([string]$Value)
     if ([string]::IsNullOrEmpty($Value)) { return $Value }
     $safe = $Value -replace [regex]::Escape($RepoRoot), "<repo>"
+    $jsonEscapedRepoRoot = $RepoRoot.Replace("\", "\\")
+    $safe = $safe -replace [regex]::Escape($jsonEscapedRepoRoot), "<repo>"
     $safe = $safe -replace $SecretLikePattern, "<redacted-secret>"
     return $safe
 }
@@ -250,7 +252,8 @@ New-Item -ItemType Directory -Force -Path $ArtifactRoot, $EvidenceDir | Out-Null
 
 $tokenEvidence = if ([string]::IsNullOrWhiteSpace($TokenDanceIDReadinessPath)) { Join-Path $ArtifactRoot "tokendance-id-readiness.json" } else { Resolve-InputPath $TokenDanceIDReadinessPath }
 $edgeEvidence = if ([string]::IsNullOrWhiteSpace($DesktopEdgeCliSmokePath)) { Join-Path $ArtifactRoot "desktop-edge-cli-smoke.json" } else { Resolve-InputPath $DesktopEdgeCliSmokePath }
-$demoManifest = if ([string]::IsNullOrWhiteSpace($DemoReadinessManifestPath)) { Join-Path $ArtifactRoot "demo-readiness\redacted-manifest.json" } else { Resolve-InputPath $DemoReadinessManifestPath }
+$defaultDemoRoot = Join-Path $RepoRoot ".tmp\approved-real-demo-readiness\p0-gold-path-$PID"
+$demoManifest = if ([string]::IsNullOrWhiteSpace($DemoReadinessManifestPath)) { Join-Path $defaultDemoRoot "redacted-manifest.json" } else { Resolve-InputPath $DemoReadinessManifestPath }
 
 if ($Failures.Count -eq 0) {
     if ($SkipTokenDanceIDReadiness) {
@@ -282,7 +285,7 @@ if ($Failures.Count -eq 0) {
     if ($SkipDemoReadiness) {
         Add-Segment "hub_replay_web_redacted_manifest" "approved-real-demo" "SKIPPED" $null "" "Skipped by caller."
     } elseif ([string]::IsNullOrWhiteSpace($DemoReadinessManifestPath)) {
-        $demoRoot = Join-Path $ArtifactRoot "demo-readiness"
+        $demoRoot = $defaultDemoRoot
         $demoArgs = @("-RepoRoot", $RepoRoot, "-ArtifactRoot", $demoRoot, "-ManifestPath", $demoManifest, "-TimeoutSec", ([string]$TimeoutSec))
         if (-not [string]::IsNullOrWhiteSpace($PreflightManifestPath)) {
             $demoArgs += @("-PreflightManifestPath", (Resolve-InputPath $PreflightManifestPath))
