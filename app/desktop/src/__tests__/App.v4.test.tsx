@@ -10,7 +10,7 @@ import { useHubExecutionTargets, useSyncLocalEdgeExecutionTarget } from '@/api/e
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
-import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
+import { useCreateThread, useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
 import { queryClient } from '@/api/queryClient';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
@@ -34,6 +34,7 @@ vi.mock('@/api/eventClient', () => ({
 }));
 
 vi.mock('@/api/threadQueries', () => ({
+  useCreateThread: vi.fn(),
   useThreadPins: vi.fn(),
   useThreadMessages: vi.fn(),
   useThreads: vi.fn(),
@@ -123,6 +124,7 @@ const mockedUseModelCatalog = vi.mocked(useModelCatalog);
 const mockedUseRunEvidence = vi.mocked(useRunEvidence);
 const mockedCreateEventStream = vi.mocked(createEventStream);
 const mockedUseCreateRun = vi.mocked(useCreateRun);
+const mockedUseCreateThread = vi.mocked(useCreateThread);
 const mockedCreateHubClient = vi.mocked(createHubClient);
 const mockedQueryClient = vi.mocked(queryClient);
 const mockedUseAuth = vi.mocked(useAuth);
@@ -195,6 +197,9 @@ describe('Desktop App v4 root', () => {
     mockedUseCreateRun.mockReturnValue({
       mutateAsync: createRunMutateAsync,
     } as ReturnType<typeof useCreateRun>);
+    mockedUseCreateThread.mockReturnValue({
+      mutateAsync: vi.fn(),
+    } as ReturnType<typeof useCreateThread>);
     mockedUseAgentList.mockReturnValue({
       data: { items: [], page: { hasMore: false } },
     } as ReturnType<typeof useAgentList>);
@@ -298,6 +303,40 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByLabelText('@Agent')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    // Demo mode should write 'mock' to localStorage
+    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('mock');
+  });
+
+  it('enters observed mode workbench when clicking Connect Local Edge', () => {
+    render(<App />);
+
+    // The "连接 Local Edge" button should be enabled since edgeOnline is true in mock
+    const edgeButton = screen.getByRole('button', { name: '连接 Local Edge' });
+    expect(edgeButton).toBeEnabled();
+
+    fireEvent.click(edgeButton);
+
+    // Should enter workbench (same shell as demo)
+    expect(screen.getByRole('group', { name: 'Desktop navigation controls' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
+
+    // Should write 'observed' to localStorage (not 'mock')
+    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('observed');
+  });
+
+  it('disables Connect Local Edge when Edge is offline', () => {
+    mockedUseHealth.mockReturnValue({
+      online: false,
+      health: null,
+      lastError: 'Local Edge health check failed',
+      refetch: refetchHealth,
+    } as ReturnType<typeof useHealth>);
+
+    render(<App />);
+
+    const edgeButton = screen.getByRole('button', { name: 'Local Edge 未运行' });
+    expect(edgeButton).toBeDisabled();
   });
 
   it('returns to the Desktop login card from the account logout action', () => {

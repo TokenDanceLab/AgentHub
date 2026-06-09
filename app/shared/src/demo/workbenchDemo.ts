@@ -27,6 +27,7 @@ export interface WorkbenchDemoRuntimeStore {
   submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult>;
   pinMessage(conversationId: string, messageId: string, pinnedBy?: string): void;
   unpinMessage(conversationId: string, messageId: string): void;
+  addConversation(conversation: WorkbenchConversation): void;
 }
 
 const ROLE_BUILDER = '#5e8dcc';
@@ -729,6 +730,16 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
       const nextPins = pins.filter((pin) => pin.conversationId !== conversationId || pin.messageId !== messageId);
       if (nextPins.length === pins.length) return;
       pins = nextPins;
+      emit();
+    },
+    addConversation(conversation: WorkbenchConversation): void {
+      const existing = demoConversationsBase.find((item) => item.id === conversation.id);
+      if (existing) return;
+      demoConversationsBase.push(conversation);
+      transcripts = {
+        ...transcripts,
+        [conversation.id]: createConversationPreviewTranscript(conversation.id),
+      };
       emit();
     },
   };
