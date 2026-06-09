@@ -50,6 +50,14 @@ describe('AgentsPage profile catalog rendering', () => {
     expect(screen.getByText('MCP / Memory')).toBeInTheDocument();
     expect(screen.getByText('agents-md')).toBeInTheDocument();
     expect(screen.getByText('project-memory')).toBeInTheDocument();
+
+    const specPanel = screen.getByLabelText('Builder AgentSpec fixture');
+    expect(within(specPanel).getByText('no-spend')).toBeInTheDocument();
+    expect(within(specPanel).getByText('claude-code · Claude Code')).toBeInTheDocument();
+    expect(within(specPanel).getByText('TokenDance Gateway / DeepSeek-V4-Pro')).toBeInTheDocument();
+    expect(within(specPanel).getByText('read_file · write_file · shell · git_diff · browser_screenshot')).toBeInTheDocument();
+    expect(within(specPanel).getByText('project · project-policy')).toBeInTheDocument();
+    expect(within(specPanel).getByText(/不导入 SDK、不启动 CLI、不调用模型/)).toBeInTheDocument();
   });
 
   it('shows market profile configuration summaries before install', () => {
