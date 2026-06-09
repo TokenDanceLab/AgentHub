@@ -43,7 +43,7 @@ fn ensure_store() -> Result<(), String> {
         .clone()
 }
 
-fn credential_store_readiness_from_result(result: Result<(), String>) -> CredentialStoreReadiness {
+pub fn credential_store_readiness_from_result(result: Result<(), String>) -> CredentialStoreReadiness {
     match result {
         Ok(()) => CredentialStoreReadiness {
             available: true,
