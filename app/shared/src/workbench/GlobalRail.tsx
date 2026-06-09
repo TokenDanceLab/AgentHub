@@ -34,12 +34,14 @@ export interface GlobalRailProps {
   activePage?: GlobalRailPage;
   /** Called when the user clicks a navigation item. When omitted, internal state is used. */
   onNavigate?: (page: GlobalRailPage) => void;
-  onToggleTheme?: () => void;
+  onLogout?: (() => void) | undefined;
+  onToggleTheme?: (() => void) | undefined;
 }
 
 export function GlobalRail({
   activePage: activePageProp,
   onNavigate,
+  onLogout,
   onToggleTheme,
 }: GlobalRailProps): React.ReactElement {
   const [internalPage, setInternalPage] = useState<GlobalRailPage>('chat');
@@ -67,6 +69,12 @@ export function GlobalRail({
   }
 
   function handleProfileAction(action: string): void {
+    if (action === '退出登录') {
+      setProfileOpen(false);
+      onLogout?.();
+      showToast('已退出登录');
+      return;
+    }
     showToast(profileActionLabel(action));
   }
 
@@ -133,6 +141,8 @@ export function GlobalRail({
           { label: '我的个人名片' },
           { label: '我的二维码与链接' },
           { label: '登录更多账号' },
+          { divider: true },
+          { label: '退出登录', style: 'danger' },
         ]}
         actions={[
           { label: '编辑资料' },

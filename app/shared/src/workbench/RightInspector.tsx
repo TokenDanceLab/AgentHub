@@ -318,7 +318,7 @@ export function RightInspector({
             tasks={overviewTasks}
             files={overviewFiles}
             taskSectionTitle={runtimeEvidence ? '运行证据' : '概览'}
-            kicker={runtimeEvidence ? runtimeEvidenceOverviewKicker(runtimeEvidence) : undefined}
+            {...(runtimeEvidence ? { kicker: runtimeEvidenceOverviewKicker(runtimeEvidence) } : {})}
             primaryFileLabel={runtimeEvidence ? 'Hub replay 产物' : '文件'}
             {...(runtimeEvidence ? { workingFileLabel: '运行快照' } : {})}
             onFileClick={handleFileClick}

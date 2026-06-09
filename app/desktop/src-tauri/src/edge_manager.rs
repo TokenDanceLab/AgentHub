@@ -16,6 +16,7 @@ const LOCAL_EDGE_TARGET_ID: &str = "local-edge";
 const LOCAL_EDGE_ROUTE: &str = "local-edge-api";
 const DEFAULT_RUNNER_PROFILE: &str = "claude-code";
 const EDGE_STORE_DB_FILE_NAME: &str = "agenthub-edge.sqlite";
+const EDGE_AUTH_TOKEN_FILE: &str = "edge-auth-token";
 const EDGE_STORE_BACKEND: &str = "sqlite";
 const EDGE_STORE_READINESS_MANIFEST_SCHEMA: &str = "agenthub-edge-sqlite-readiness-v1";
 const EDGE_STORE_EXPECTED_MIGRATION_VERSION: u16 = 4;
@@ -192,7 +193,20 @@ impl EdgeManager {
             .unwrap_or(EDGE_STORE_DB_FILE_NAME)
             .to_string();
 
-        let args = edge_launch_args(&store_path_str, &addr);
+        // Resolve home directory for workspace allowlist.
+        let home_dir = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .ok();
+        let args = edge_launch_args(&store_path_str, &addr, home_dir.as_deref());
+
+        // Persist auth token to a file so external dev tools (e.g. Vite dev
+        // server) can pick it up without needing a Tauri invoke bridge.
+        {
+            let token_path = store_path.parent().map(|p| p.join(EDGE_AUTH_TOKEN_FILE));
+            if let Some(ref p) = token_path {
+                let _ = std::fs::write(p, &auth_token);
+            }
+        }
 
         // ── Try sidecar first (release / bundled builds) ─────────────────
         let sidecar_result = app_handle.shell().sidecar(EDGE_SIDECAR_NAME);
@@ -429,6 +443,7 @@ impl EdgeManager {
             sidecar_args: edge_launch_args(
                 READINESS_STORE_DB_PLACEHOLDER,
                 &edge_bind_addr(status.port),
+                None, // readiness snapshot omits workspace allowlist paths
             ),
             preflight: edge_preflight(
                 sidecar_available,
@@ -494,8 +509,8 @@ fn edge_binary_candidates() -> Vec<PathBuf> {
     candidates
 }
 
-fn edge_launch_args(store_path: &str, addr: &str) -> Vec<String> {
-    vec![
+fn edge_launch_args(store_path: &str, addr: &str, workspace_allowlist: Option<&str>) -> Vec<String> {
+    let mut args = vec![
         "--store-backend".to_string(),
         "sqlite".to_string(),
         "--store-db".to_string(),
@@ -504,7 +519,16 @@ fn edge_launch_args(store_path: &str, addr: &str) -> Vec<String> {
         addr.to_string(),
         "--runner-profile".to_string(),
         DEFAULT_RUNNER_PROFILE.to_string(),
-    ]
+    ];
+    // Default workspace allowlist: restrict to user's home directory.
+    // Desktop is a local tool — allowing home and subdirectories is a
+    // reasonable default while still satisfying the fail-closed AH-SR-006
+    // security requirement.
+    if let Some(dir) = workspace_allowlist {
+        args.push("--workspace-allowlist".to_string());
+        args.push(dir.to_string());
+    }
+    args
 }
 
 fn edge_bind_addr(port: u16) -> String {
@@ -561,7 +585,7 @@ async fn observe_fixture_sidecar_smoke(
         app_data_dir,
         store_db_path,
         log_paths: log_paths.clone(),
-        sidecar_args: edge_launch_args(&store_db, &addr),
+        sidecar_args: edge_launch_args(&store_db, &addr, None),
         health_url,
         health_online: true,
         health_version: data
@@ -714,7 +738,7 @@ mod tests {
 
     #[test]
     fn edge_launch_args_keep_runtime_behind_local_edge() {
-        let args = edge_launch_args("fixtures/app-data/agenthub-edge.sqlite", "127.0.0.1:3210");
+        let args = edge_launch_args("fixtures/app-data/agenthub-edge.sqlite", "127.0.0.1:3210", None);
 
         assert_eq!(
             args,
@@ -730,6 +754,31 @@ mod tests {
             ]
         );
         assert!(!args.iter().any(|arg| arg == "claude" || arg == "codex"));
+    }
+
+    #[test]
+    fn edge_launch_args_includes_workspace_allowlist_when_provided() {
+        let args = edge_launch_args(
+            "fixtures/app-data/agenthub-edge.sqlite",
+            "127.0.0.1:3210",
+            Some("C:\\Users\\Test"),
+        );
+
+        assert_eq!(
+            args,
+            vec![
+                "--store-backend",
+                "sqlite",
+                "--store-db",
+                "fixtures/app-data/agenthub-edge.sqlite",
+                "--addr",
+                "127.0.0.1:3210",
+                "--runner-profile",
+                "claude-code",
+                "--workspace-allowlist",
+                "C:\\Users\\Test",
+            ]
+        );
     }
 
     #[test]
