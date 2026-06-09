@@ -14,7 +14,7 @@ import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
 import { useHealth } from '@/hooks/useHealth';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
-import { mapLocalEdgeExecutionTarget } from '@/platform/edgeCapabilityMapper';
+import { mapLocalEdgeExecutionTarget, resolveDesktopEdgeDispatchReadiness } from '@/platform/edgeCapabilityMapper';
 
 function DesktopHubTaskBridgeActive() {
   const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
@@ -42,16 +42,28 @@ function DesktopHubTaskBridgeActive() {
     () => findRegisteredLocalEdgeTarget(hubTargets.data?.items ?? [], deviceRegistration.deviceId),
     [deviceRegistration.deviceId, hubTargets.data?.items],
   );
-  const dispatchTarget = useMemo(() => {
-    if (!deviceRegistration.deviceId || !registeredLocalEdgeTarget) return null;
-    if (!registeredLocalEdgeTarget.is_online || registeredLocalEdgeTarget.health_state !== 'healthy') {
-      return null;
-    }
-    return {
-      targetId: registeredLocalEdgeTarget.id,
-      deviceId: deviceRegistration.deviceId,
-    };
-  }, [deviceRegistration.deviceId, registeredLocalEdgeTarget]);
+  const dispatchReadiness = useMemo(
+    () => resolveDesktopEdgeDispatchReadiness({
+      hubSessionActive: true,
+      deviceId: deviceReady ? deviceRegistration.deviceId : null,
+      edgeOnline,
+      localEdgeTarget,
+      registeredLocalEdgeTarget,
+      hubTargetsLoading: hubTargets.isLoading,
+      hubTargetsError: hubTargets.isError,
+      hubTargetsPaginationLimited: hubTargets.data?.page.hasMore === true,
+    }),
+    [
+      deviceRegistration.deviceId,
+      deviceReady,
+      edgeOnline,
+      hubTargets.data?.page.hasMore,
+      hubTargets.isError,
+      hubTargets.isLoading,
+      localEdgeTarget,
+      registeredLocalEdgeTarget,
+    ],
+  );
 
   useEffect(() => {
     if (!deviceReady) return;
@@ -95,10 +107,10 @@ function DesktopHubTaskBridgeActive() {
   ]);
 
   useHubIntegration({
-    hubWS: deviceReady && dispatchTarget ? hubRealtime.hubWS : null,
+    hubWS: deviceReady && dispatchReadiness.dispatchReady ? hubRealtime.hubWS : null,
     hubClient,
     edgeBaseUrl,
-    dispatchTarget,
+    dispatchTarget: dispatchReadiness.dispatchTarget,
   });
   return null;
 }

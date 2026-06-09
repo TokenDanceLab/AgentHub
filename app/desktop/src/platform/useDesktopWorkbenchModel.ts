@@ -30,7 +30,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     getWorkbenchDataModeOverrideSnapshot,
   );
   const dataMode = getWorkbenchDataMode(dataModeOverride);
-  const useDemo = dataMode === 'demo' || (dataMode === 'auto' && isBrowserPreview());
+  const useDemo = dataMode === 'fixture' || (dataMode === 'auto' && isBrowserPreview());
   const demoSnapshot = useSyncExternalStore(
     workbenchDemoRuntimeStore.subscribe,
     workbenchDemoRuntimeStore.getSnapshot,
