@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Monitor, Globe2, Server, Computer } from 'lucide-react';
+import { Monitor, Globe2, Server, Computer, PackageCheck } from 'lucide-react';
 import type { RunnerHealthItem } from '@shared/types';
 import Panel from '../primitives/Panel';
 import ExecutionTargetCard from '../primitives/ExecutionTargetCard';
@@ -11,6 +11,7 @@ import styles from '../primitives/primitives.module.css';
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { emptyLocalCliDiscoveryManifest, type LocalCliDiscoveryManifest } from '../cliDiscovery';
+import type { DesktopLocalEdgeDiagnostics } from '@/platform/desktopPlatform';
 
 interface ExecutionTargetsSectionProps {
   edgeOnline: boolean;
@@ -30,6 +31,7 @@ interface ExecutionTargetsSectionProps {
   localEdgeTargetSyncError?: string | null;
   onSyncLocalEdgeTarget?: () => void;
   cliDiscovery?: LocalCliDiscoveryManifest;
+  localEdgeDiagnostics?: DesktopLocalEdgeDiagnostics | null;
 }
 
 export default function ExecutionTargetsSection({
@@ -41,6 +43,7 @@ export default function ExecutionTargetsSection({
   localEdgeTargetSyncError = null,
   onSyncLocalEdgeTarget,
   cliDiscovery = emptyLocalCliDiscoveryManifest,
+  localEdgeDiagnostics = null,
 }: ExecutionTargetsSectionProps) {
   const { t } = useTranslation();
   const localEdgeMetric = edgeOnline
@@ -153,6 +156,9 @@ export default function ExecutionTargetsSection({
       {syncErrorBody ? (
         <Callout title={t('settings.localEdgeTargetReadiness')} body={syncErrorBody} />
       ) : null}
+      {localEdgeDiagnostics ? (
+        <DesktopHostReadinessCard diagnostics={localEdgeDiagnostics} />
+      ) : null}
       <LocalCliDiscoveryCard discovery={cliDiscovery} />
       {runnerItems.length > 0 ? (
         <div className={styles.runnerList}>
@@ -162,5 +168,40 @@ export default function ExecutionTargetsSection({
         <Callout title={t('settings.runnerInventory')} body={t('settings.runnerInventoryDesc')} />
       )}
     </Panel>
+  );
+}
+
+function DesktopHostReadinessCard({ diagnostics }: { diagnostics: DesktopLocalEdgeDiagnostics }) {
+  const { t } = useTranslation();
+  const readiness = diagnostics.readiness;
+  const sidecarSmoke = diagnostics.log_tail.stdout.slice(-1)[0] ?? diagnostics.log_tail.stderr.slice(-1)[0] ?? readiness.preflight.status;
+
+  return (
+    <div className={styles.profileCard} aria-label={t('settings.desktopHostReadiness')}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <PackageCheck size={18} />
+        </div>
+        <div>
+          <strong>{t('settings.desktopHostReadiness')}</strong>
+          <span>{t('settings.desktopHostReadinessDesc')}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${readiness.preflight.status === 'ready' ? styles.profileStatus_available : ''}`}>
+          {readiness.preflight.status}
+        </em>
+      </div>
+
+      <div className={styles.profileMeta}>
+        <span>{t('settings.desktopHostStatus')}: {diagnostics.status.running ? t('settings.desktopHostRunning') : t('settings.desktopHostStopped')}</span>
+        <span>{t('settings.desktopHostSidecar')}: {readiness.preflight.sidecar_available ? t('settings.desktopHostSidecarAvailable') : t('settings.desktopHostSidecarMissing')}</span>
+        <span>{t('settings.desktopHostFallback')}: {readiness.preflight.fallback_executable_available ? t('settings.desktopHostSidecarAvailable') : t('settings.desktopHostSidecarMissing')}</span>
+        <span>{t('settings.desktopHostAuthToken')}: {readiness.preflight.auth_token_ready ? t('settings.desktopHostReady') : t('settings.desktopHostBlocked')}</span>
+        <span>{t('settings.desktopHostStore')}: {readiness.store_backend} {readiness.store_db_policy}</span>
+        <span>{t('settings.desktopHostHealth')}: {diagnostics.status.health_url}</span>
+        <span>{t('settings.desktopHostLogs')}: {readiness.log_paths.directory}</span>
+        <span>{t('settings.desktopHostSidecarSmoke')}: {sidecarSmoke}</span>
+        <span>{t('settings.desktopHostNoDirectCliSpawn')}</span>
+      </div>
+    </div>
   );
 }

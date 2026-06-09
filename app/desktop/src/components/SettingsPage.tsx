@@ -80,7 +80,11 @@ import {
   resolveAvailableDefaultAgentId,
 } from '@/utils/defaultAgent';
 import { mapLocalEdgeExecutionTarget } from '@/platform/edgeCapabilityMapper';
-import { readLocalCliDiscovery } from '@/platform/desktopPlatform';
+import {
+  readLocalCliDiscovery,
+  readLocalEdgeDiagnostics,
+  type DesktopLocalEdgeDiagnostics,
+} from '@/platform/desktopPlatform';
 import {
   buildLocalCliDiscoveryFromAgents,
   type LocalCliDiscoveryManifest,
@@ -183,6 +187,7 @@ export default function SettingsPage({
   const [paletteIndex, setPaletteIndex] = useState(0);
   const paletteInputRef = useRef<HTMLInputElement>(null);
   const [hostCliDiscovery, setHostCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
+  const [localEdgeDiagnostics, setLocalEdgeDiagnostics] = useState<DesktopLocalEdgeDiagnostics | null>(null);
 
   // Keyboard shortcuts
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
@@ -312,6 +317,19 @@ export default function SettingsPage({
       })
       .catch(() => {
         if (!cancelled) setHostCliDiscovery(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    readLocalEdgeDiagnostics()
+      .then((diagnostics) => {
+        if (!cancelled) setLocalEdgeDiagnostics(diagnostics);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalEdgeDiagnostics(null);
       });
     return () => {
       cancelled = true;
@@ -585,6 +603,7 @@ export default function SettingsPage({
               localEdgeTargetSyncError={syncLocalEdgeTarget.error instanceof Error ? syncLocalEdgeTarget.error.message : null}
               onSyncLocalEdgeTarget={handleSyncLocalEdgeTarget}
               cliDiscovery={cliDiscovery}
+              localEdgeDiagnostics={localEdgeDiagnostics}
             />
           )}
 
