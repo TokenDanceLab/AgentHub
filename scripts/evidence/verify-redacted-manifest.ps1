@@ -58,6 +58,23 @@ function Test-TextRedaction([string]$PathValue) {
     return ($content -notmatch $SensitiveValuePattern)
 }
 
+function Get-Sha256 {
+    param([string]$Path)
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $bytes = $sha.ComputeHash($stream)
+            return (($bytes | ForEach-Object { $_.ToString("x2") }) -join "")
+        } finally {
+            $sha.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($ManifestPath) -and -not [string]::IsNullOrWhiteSpace($PackagePath)) {
     $ManifestPath = Join-Path $PackagePath "redacted-manifest.json"
 }
@@ -135,7 +152,7 @@ if ($manifest) {
             continue
         }
 
-        $actualHash = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
+        $actualHash = Get-Sha256 $full
         if ($actualHash -eq ([string]$file.sha256).ToLowerInvariant()) {
             Pass "file hash matches: $relative"
         } else {
