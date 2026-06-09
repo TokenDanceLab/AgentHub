@@ -22,24 +22,24 @@ class FakeSocket implements HubWebSocketLike {
   }
 
   emitClose() {
-    this.onclose?.({ code: 1000, reason: 'TokenDance test close' });
+    this.onclose?.({ code: 1000, reason: 'test close' });
   }
 }
 
 describe('Mobile Hub event stream', () => {
-  it('builds the Hub event URL with a since cursor and emits open status', () => {
+  it('builds the Hub WS URL with /client/ws path and since cursor', () => {
     const sockets: FakeSocket[] = [];
     const statuses: string[] = [];
     const createWebSocket = vi.fn((url: string) => {
       const socket = new FakeSocket();
       sockets.push(socket);
-      expect(url).toBe('wss://hub.tokendance.test/v1/events?since=evt-Delicious233');
+      expect(url).toBe('wss://hub.example.test/client/ws?since=123');
       return socket;
     });
 
     createHubEventStream({
-      baseUrl: 'https://hub.tokendance.test/mobile/',
-      since: 'evt-Delicious233',
+      baseUrl: 'https://hub.example.test/mobile/',
+      since: '123',
       createWebSocket,
       onStatusChange: (status) => statuses.push(status),
     });
@@ -50,7 +50,20 @@ describe('Mobile Hub event stream', () => {
     expect(statuses).toEqual(['connecting', 'open']);
   });
 
-  it('parses known JSON events and discards unknown event types', () => {
+  it('includes token in WS URL query parameter', () => {
+    const createWebSocket = vi.fn((_url: string) => new FakeSocket());
+
+    createHubEventStream({
+      baseUrl: 'https://hub.example.test',
+      token: 'test-jwt',
+      createWebSocket,
+    });
+
+    const url = createWebSocket.mock.calls[0]?.[0] as string;
+    expect(url).toContain('token=test-jwt');
+  });
+
+  it('parses known Hub server event types (message.new, session.created, etc.)', () => {
     const socket = new FakeSocket();
     const events: unknown[] = [];
     const errors: unknown[] = [];
@@ -62,35 +75,45 @@ describe('Mobile Hub event stream', () => {
       onError: (error) => errors.push(error),
     });
 
+    // Server frame format: { type, payload, seq_id }
     socket.emitMessage(
       JSON.stringify({
-        id: 'evt-TokenDance',
-        type: 'thread.updated',
-        createdAt: '2026-06-08T08:00:00.000Z',
-        payload: { title: 'Delicious233 TokenDance thread' },
+        type: 'message.new',
+        payload: { session_id: 's1', content: 'hello' },
+        seq_id: 42,
       }),
     );
     socket.emitMessage(
       JSON.stringify({
-        id: 'evt-ignored',
+        type: 'session.created',
+        payload: { session_id: 's2', name: 'New Chat' },
+        seq_id: 43,
+      }),
+    );
+    // Unknown type should be discarded
+    socket.emitMessage(
+      JSON.stringify({
         type: 'workspace.unknown',
-        createdAt: '2026-06-08T08:01:00.000Z',
         payload: { title: 'ignored' },
       }),
     );
 
     expect(events).toEqual([
       {
-        id: 'evt-TokenDance',
-        type: 'thread.updated',
-        createdAt: '2026-06-08T08:00:00.000Z',
-        payload: { title: 'Delicious233 TokenDance thread' },
+        type: 'message.new',
+        payload: { session_id: 's1', content: 'hello' },
+        seq_id: 42,
+      },
+      {
+        type: 'session.created',
+        payload: { session_id: 's2', name: 'New Chat' },
+        seq_id: 43,
       },
     ]);
     expect(errors).toEqual([]);
   });
 
-  it('reports parse and socket errors without needing a browser WebSocket', () => {
+  it('reports parse and socket errors', () => {
     const socket = new FakeSocket();
     const statuses: string[] = [];
     const errors: Array<{ kind: string; message: string }> = [];
@@ -103,17 +126,12 @@ describe('Mobile Hub event stream', () => {
     });
 
     socket.emitMessage('{not-json');
-    socket.emitMessage(JSON.stringify({ id: 'evt-incomplete', type: 'run.updated' }));
-    socket.emitError(new Error('TokenDance fake socket failed'));
+    socket.emitError(new Error('fake socket failed'));
 
     expect(errors).toEqual([
       expect.objectContaining({
         kind: 'parse_error',
         message: 'Unable to parse Hub WebSocket event JSON',
-      }),
-      expect.objectContaining({
-        kind: 'invalid_event',
-        message: 'Hub WebSocket event is missing required fields',
       }),
       expect.objectContaining({
         kind: 'socket_error',
@@ -138,10 +156,8 @@ describe('Mobile Hub event stream', () => {
     stream.close();
     socket.emitMessage(
       JSON.stringify({
-        id: 'evt-after-close',
-        type: 'run.updated',
-        createdAt: '2026-06-08T08:02:00.000Z',
-        payload: { title: 'TokenDance closed stream' },
+        type: 'message.new',
+        payload: { content: 'after close' },
       }),
     );
 
