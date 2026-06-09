@@ -79,6 +79,8 @@ token、密码、client secret、cookie、authorization 值不得进入文档、
 | Target Routing / Health | target 注册、心跳、健康降级、exact-device dispatch、用户可读修复建议 | Web/Mobile/IM 能判断目标是否可控制，失败时知道缺 Desktop、缺 Edge、缺 runtime 还是未登录。 |
 | Approval / Artifact 一致性 | 单任务和 TeamRun 使用同一 approval/artifact 投影语义 | 前端不需要为单任务和团队任务维护两套控制逻辑。 |
 
+2026-06-09 记录：AgentProfile/市场 48h 小切片已先落到 shared fixture catalog，覆盖 runtime/model/provider、skills、MCP、tool allowlist、memory、avatar、approval 和 target preference，并投影到 Agents 页面/Agent Builder/市场卡片摘要；当前仍是 fixture/demo 合同，不触发真实 CLI/model/API。下一步缺口是 Hub `AgentProfile` 持久化字段映射、市场安装/发布 mutation、真实头像 asset 管线和 strict real-mode 空态/错误态。
+
 ## P2：发布和多平台扩展
 
 目标：让 Web、Desktop、Mobile、IM 进入可控 beta。

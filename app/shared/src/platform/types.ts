@@ -43,11 +43,18 @@ export interface WorkbenchAgent {
   model?: string | undefined;
   runtimeId?: string | undefined;
   provider?: string | undefined;
+  avatarRef?: string | undefined;
+  avatarColor?: string | undefined;
   approvalPolicy?: string | undefined;
   permissionMode?: string | undefined;
   reasoningEffort?: string | undefined;
   skills?: string[] | undefined;
+  mcpServers?: string[] | undefined;
   toolAllowlist?: string[] | undefined;
+  memorySources?: string[] | undefined;
+  memoryRetention?: string | undefined;
+  memorySummary?: string | undefined;
+  targetPreferences?: string[] | undefined;
 }
 
 export interface ConversationPort {
