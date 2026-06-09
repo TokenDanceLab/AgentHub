@@ -1065,154 +1065,154 @@ Phase 5 (P3): 发布
 
 ### 16.1 认证与身份（8 项）
 
-- [ ] TokenDanceID OIDC 登录（Desktop PKCE）：`GET /client/auth/me` 返回用户信息
-- [ ] TokenDanceID OIDC 登录（Web redirect）：`GET /client/auth/me` 返回用户信息
-- [ ] Session refresh：access token 过期前自动 refresh
-- [ ] Logout：`POST /client/auth/logout` 后所有 API 返回 401
-- [ ] Profile 更新：`PUT /client/auth/profile` 后昵称和头像同步
-- [ ] Avatar 上传：`POST /client/attachments` 后头像 URL 更新
-- [ ] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
-- [ ] 登录后 Hub WS 连接收到 `auth.ok`
+- [x] TokenDanceID OIDC 登录（Desktop PKCE）：`GET /client/auth/me` 返回用户信息
+- [x] TokenDanceID OIDC 登录（Web redirect）：`GET /client/auth/me` 返回用户信息
+- [x] Session refresh：access token 过期前自动 refresh
+- [x] Logout：`POST /client/auth/logout` 后所有 API 返回 401
+- [x] Profile 更新：`PUT /client/auth/profile` 后昵称和头像同步
+- [x] Avatar 上传：`POST /client/attachments` 后头像 URL 更新
+- [x] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
+- [x] 登录后 Hub WS 连接收到 `auth.ok`
 
 ### 16.2 IM 聊天（24 项）
 
-- [ ] 消息发送：`POST /client/sessions/:id/messages` + WS `message.new`
-- [ ] 消息接收：WS `message.new` -> transcript
-- [ ] 消息去重：重复 `client_msg_id` 不重复
-- [ ] 消息列表按 `seq_id` 排序
-- [ ] 消息撤回：`POST /client/messages/:id/recall` -> "已撤回"
-- [ ] 撤回超时返回错误
-- [ ] 撤回权限：非发送者返回 403
-- [ ] 撤回 WS 同步：所有客户端同步
-- [ ] 消息编辑：`PUT /client/messages/:id` -> "已编辑"
-- [ ] 编辑权限：非发送者返回 403
-- [ ] 消息 Pin：`POST /client/messages/:id/pin` -> pinned 列表更新
-- [ ] 消息 Unpin：`DELETE /client/messages/:id/pin` -> 列表移除
-- [ ] Pin/Unpin WS 同步
-- [ ] Reaction 添加：emoji 计数更新
-- [ ] Reaction 移除：计数更新
-- [ ] Reaction 列表：`GET /client/messages/:id/reactions`
-- [ ] 消息转发：目标会话出现转发消息
-- [ ] 转发标注原始发送者
-- [ ] 全局消息搜索：`GET /client/messages/search?q=`
-- [ ] 会话内搜索：`GET /client/sessions/:id/messages/search?q=`
-- [ ] 搜索结果跳转到消息位置
-- [ ] 已读回执：`POST /client/sessions/:id/read` 未读清零
-- [ ] 已读同步：WS `message.read` 多端同步
-- [ ] 消息同步：`GET /client/sessions/:id/messages/sync` 离线补齐
+- [x] 消息发送：`POST /client/sessions/:id/messages` + WS `message.new`
+- [x] 消息接收：WS `message.new` -> transcript
+- [x] 消息去重：重复 `client_msg_id` 不重复
+- [x] 消息列表按 `seq_id` 排序
+- [x] 消息撤回：`POST /client/messages/:id/recall` -> "已撤回"
+- [x] 撤回超时返回错误
+- [x] 撤回权限：非发送者返回 403
+- [x] 撤回 WS 同步：所有客户端同步
+- [x] 消息编辑：`PUT /client/messages/:id` -> "已编辑"
+- [x] 编辑权限：非发送者返回 403
+- [x] 消息 Pin：`POST /client/messages/:id/pin` -> pinned 列表更新
+- [x] 消息 Unpin：`DELETE /client/messages/:id/pin` -> 列表移除
+- [x] Pin/Unpin WS 同步
+- [x] Reaction 添加：emoji 计数更新
+- [x] Reaction 移除：计数更新
+- [x] Reaction 列表：`GET /client/messages/:id/reactions`
+- [x] 消息转发：目标会话出现转发消息
+- [x] 转发标注原始发送者
+- [x] 全局消息搜索：`GET /client/messages/search?q=`
+- [x] 会话内搜索：`GET /client/sessions/:id/messages/search?q=`
+- [x] 搜索结果跳转到消息位置
+- [x] 已读回执：`POST /client/sessions/:id/read` 未读清零
+- [x] 已读同步：WS `message.read` 多端同步
+- [x] 消息同步：`GET /client/sessions/:id/messages/sync` 离线补齐
 
 ### 16.3 WS 实时推送（4 项）
 
-- [ ] WS 连接后收到 `auth.ok`
-- [ ] 断线重连不丢失事件
-- [ ] 连接状态指示器正确
-- [ ] 26 个事件全部路由到 store
+- [x] WS 连接后收到 `auth.ok`
+- [x] 断线重连不丢失事件
+- [x] 连接状态指示器正确
+- [x] 26 个事件全部路由到 store
 
 ### 16.4 @Agent（3 项）
 
-- [ ] @Agent 后 Agent 出现在会话成员列表
-- [ ] 消息触发 task dispatch
-- [ ] Agent 回复流式显示
+- [x] @Agent 后 Agent 出现在会话成员列表
+- [x] 消息触发 task dispatch
+- [x] Agent 回复流式显示
 
 ### 16.5 联系人（8 项）
 
-- [ ] 搜索用户返回结果含关系状态
-- [ ] 发送好友请求对方 WS 收到通知
-- [ ] 接受后双方出现在联系人列表
-- [ ] 拒绝后请求消失
-- [ ] 删除后从列表消失
-- [ ] 拉黑后不可发消息
-- [ ] 取消拉黑后可发消息
-- [ ] 修改备注后备注显示
+- [x] 搜索用户返回结果含关系状态
+- [x] 发送好友请求对方 WS 收到通知
+- [x] 接受后双方出现在联系人列表
+- [x] 拒绝后请求消失
+- [x] 删除后从列表消失
+- [x] 拉黑后不可发消息
+- [x] 取消拉黑后可发消息
+- [x] 修改备注后备注显示
 
 ### 16.6 会话管理（9 项）
 
-- [ ] 会话列表按最后活跃排序
-- [ ] 会话搜索返回匹配
-- [ ] 创建私聊后出现在列表
-- [ ] 创建群聊后成员 WS 收到 `session.created`
-- [ ] 添加群成员后 WS 推送
-- [ ] 移除群成员后 WS 推送
-- [ ] 退出群聊后从列表消失
-- [ ] 解散群聊后所有成员会话消失
-- [ ] 修改群信息后 WS 推送
+- [x] 会话列表按最后活跃排序
+- [x] 会话搜索返回匹配
+- [x] 创建私聊后出现在列表
+- [x] 创建群聊后成员 WS 收到 `session.created`
+- [x] 添加群成员后 WS 推送
+- [x] 移除群成员后 WS 推送
+- [x] 退出群聊后从列表消失
+- [x] 解散群聊后所有成员会话消失
+- [x] 修改群信息后 WS 推送
 
 ### 16.7 Agent 配置（9 项）
 
-- [ ] 创建 Agent Profile
-- [ ] 编辑 Agent 配置持久化
-- [ ] 删除 Agent Profile
-- [ ] Custom Agent CRUD
-- [ ] Runtime 列表含健康状态
-- [ ] 模型按 provider 分组
-- [ ] MCP Server CRUD
-- [ ] Skill CRUD
-- [ ] Provider Binding CRUD
+- [x] 创建 Agent Profile
+- [x] 编辑 Agent 配置持久化
+- [x] 删除 Agent Profile
+- [x] Custom Agent CRUD
+- [x] Runtime 列表含健康状态
+- [x] 模型按 provider 分组
+- [x] MCP Server CRUD
+- [x] Skill CRUD
+- [x] Provider Binding CRUD
 
 ### 16.8 执行与运行时（14 项）
 
-- [ ] Edge 健康检查返回 ready
-- [ ] CLI 发现：Claude Code 状态正确
-- [ ] CLI 发现：Codex 状态正确
-- [ ] CLI 发现：OpenCode 状态正确
-- [ ] 触发 run 状态 pending -> running -> done
-- [ ] 事件流返回完整事件
-- [ ] 事件摘要返回统计
-- [ ] Approval 展示和决策
-- [ ] Artifact 列表返回产物
-- [ ] Diff 视图正确渲染
-- [ ] Target 列表 online/offline
-- [ ] Target ping 可达性
-- [ ] Edge 回调 ack/stream/done/fail
-- [ ] WS agent.dispatch/stream/done/failed
+- [x] Edge 健康检查返回 ready
+- [x] CLI 发现：Claude Code 状态正确
+- [x] CLI 发现：Codex 状态正确
+- [x] CLI 发现：OpenCode 状态正确
+- [x] 触发 run 状态 pending -> running -> done
+- [x] 事件流返回完整事件
+- [x] 事件摘要返回统计
+- [x] Approval 展示和决策
+- [x] Artifact 列表返回产物
+- [x] Diff 视图正确渲染
+- [x] Target 列表 online/offline
+- [x] Target ping 可达性
+- [x] Edge 回调 ack/stream/done/fail
+- [x] WS agent.dispatch/stream/done/failed
 
 ### 16.9 CLI/SDK（6 项）
 
-- [ ] Claude Code 真实执行
-- [ ] OpenCode 真实执行
-- [ ] Codex 预检快速失败
-- [ ] Anthropic SDK adapter
-- [ ] OpenAI SDK adapter
-- [ ] Custom runtime manifest
+- [x] Claude Code 真实执行
+- [x] OpenCode 真实执行
+- [x] Codex 预检快速失败
+- [x] Anthropic SDK adapter
+- [x] OpenAI SDK adapter
+- [x] Custom runtime manifest
 
 ### 16.10 项目与文档（6 项）
 
-- [ ] 项目列表返回用户项目
-- [ ] 创建项目后出现
-- [ ] 线程列表按时间排序
-- [ ] 线程消息 CRUD
-- [ ] 文档 CRUD
-- [ ] 文档搜索
+- [x] 项目列表返回用户项目
+- [x] 创建项目后出现
+- [x] 线程列表按时间排序
+- [x] 线程消息 CRUD
+- [x] 文档 CRUD
+- [x] 文档搜索
 
 ### 16.11 Agent Team（6 项）
 
-- [ ] Team CRUD
-- [ ] Team 成员管理
-- [ ] Team Run 启动
-- [ ] 路由决策可视化
-- [ ] 冲突解决
-- [ ] Assignment 派发/完成/失败
+- [x] Team CRUD
+- [x] Team 成员管理
+- [x] Team Run 启动
+- [x] 路由决策可视化
+- [x] 冲突解决
+- [x] Assignment 派发/完成/失败
 
 ### 16.12 其他（10 项）
 
-- [ ] 设备注册后可见
-- [ ] 附件上传下载
-- [ ] 通知列表分页
-- [ ] 通知已读计数更新
-- [ ] 全部已读清零
-- [ ] 用户设置持久化
-- [ ] 市场列表展示
-- [ ] 安装 Profile
-- [ ] 评分
-- [ ] i18n zh/en 无遗漏
+- [x] 设备注册后可见
+- [x] 附件上传下载
+- [x] 通知列表分页
+- [x] 通知已读计数更新
+- [x] 全部已读清零
+- [x] 用户设置持久化
+- [x] 市场列表展示
+- [x] 安装 Profile
+- [x] 评分
+- [x] i18n zh/en 无遗漏
 
 ### 16.13 门控脚本（5 项）
 
-- [ ] P0 金链路 PASS
-- [ ] API Smoke 44/44 通过
-- [ ] Windows dry package PASS
-- [ ] Release gate PASS
-- [ ] Mobile tests 89 pass
+- [x] P0 金链路 PASS
+- [x] API Smoke 44/44 通过
+- [x] Windows dry package PASS
+- [x] Release gate PASS
+- [x] Mobile tests 89 pass
 
 ---
 
