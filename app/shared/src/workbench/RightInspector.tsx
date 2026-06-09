@@ -506,6 +506,14 @@ function RuntimeEvidencePanel({
                 <DesignFileIcon className={styles.fileIcon} name={file.filePath} />
                 <span className={styles.fileName}>{file.filePath}</span>
                 <span className={styles.fileMeta}>{diffMeta(file)}</span>
+                {file.editId && <span className={styles.fileMeta}>edit {file.editId}</span>}
+                {file.reviewStatus && <span className={styles.fileMeta}>review {file.reviewStatus}</span>}
+                {file.canApply !== undefined && (
+                  <span className={styles.fileMeta}>apply {file.canApply ? 'available' : 'unavailable'}</span>
+                )}
+                {file.canRevert !== undefined && (
+                  <span className={styles.fileMeta}>revert {file.canRevert ? 'available' : 'unavailable'}</span>
+                )}
               </button>
             </li>
           ))}

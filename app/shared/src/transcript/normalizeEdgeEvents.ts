@@ -460,6 +460,16 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
     stringField(event.payload.action) ??
     stringField(event.payload.status),
   );
+  const editId = stringField(event.payload.editId) ?? stringField(event.payload.edit_id);
+  const reviewStatus = stringField(event.payload.reviewStatus) ?? stringField(event.payload.review_status);
+  const canApply = booleanField(event.payload.canApply) ?? booleanField(event.payload.can_apply);
+  const canRevert = booleanField(event.payload.canRevert) ?? booleanField(event.payload.can_revert);
+  const metadata = {
+    ...(editId ? { editId } : {}),
+    ...(reviewStatus ? { reviewStatus } : {}),
+    ...(canApply != null ? { canApply } : {}),
+    ...(canRevert != null ? { canRevert } : {}),
+  };
 
   if (patch) {
     const additions = diffStat(patch, '+');
@@ -483,6 +493,7 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
         content: line.content,
       })),
       patch,
+      ...metadata,
     };
   }
 
@@ -491,6 +502,7 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
     kind: 'file_change',
     path,
     action,
+    ...metadata,
   };
 }
 
@@ -832,6 +844,10 @@ function numberField(value: unknown): number | undefined {
   if (typeof value !== 'string' || !value.trim()) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function booleanField(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
 }
 
 function formatCost(value: number | undefined): string | undefined {

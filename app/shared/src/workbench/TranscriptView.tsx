@@ -453,6 +453,10 @@ function renderFileChangeBlock(
           action={block.action}
           {...(block.additions != null ? { additions: block.additions } : {})}
           {...(block.deletions != null ? { deletions: block.deletions } : {})}
+          {...(block.editId ? { editId: block.editId } : {})}
+          {...(block.reviewStatus ? { reviewStatus: block.reviewStatus } : {})}
+          {...(block.canApply != null ? { canApply: block.canApply } : {})}
+          {...(block.canRevert != null ? { canRevert: block.canRevert } : {})}
           {...(block.lines?.length && diffControls ? {
             diffExpanded,
             onToggleDiff: () => diffControls.onToggleDiff(block.id),
@@ -708,6 +712,10 @@ function renderRunStepChild(
             action={block.action}
             {...(block.additions != null ? { additions: block.additions } : {})}
             {...(block.deletions != null ? { deletions: block.deletions } : {})}
+            {...(block.editId ? { editId: block.editId } : {})}
+            {...(block.reviewStatus ? { reviewStatus: block.reviewStatus } : {})}
+            {...(block.canApply != null ? { canApply: block.canApply } : {})}
+            {...(block.canRevert != null ? { canRevert: block.canRevert } : {})}
             onReview={onReviewFile ? () => onReviewFile(fileItemFromPath(block.path)) : undefined}
             path={block.path}
           />

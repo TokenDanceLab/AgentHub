@@ -238,6 +238,10 @@ describe('AgentHubWorkbench', () => {
             status: 'modified',
             additions: 1,
             deletions: 1,
+            editId: 'edit-runtime-1',
+            reviewStatus: 'needs_review',
+            canApply: false,
+            canRevert: true,
             hunks: [{
               header: '@@ -1 +1 @@',
               lines: [
@@ -281,6 +285,10 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('Run run-edge-1')).toBeInTheDocument();
     expect(screen.getAllByText('Edge / 1')).toHaveLength(3);
     expect(screen.getByRole('button', { name: '打开 diff src/runtime.ts' })).toBeInTheDocument();
+    expect(screen.getByText('edit edit-runtime-1')).toBeInTheDocument();
+    expect(screen.getByText('review needs_review')).toBeInTheDocument();
+    expect(screen.getByText('apply unavailable')).toBeInTheDocument();
+    expect(screen.getByText('revert available')).toBeInTheDocument();
     expect(screen.getByLabelText('产物 metadata reports/runtime.patch')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '查看产物 reports/runtime.patch' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '打开预览 preview-1' })).toBeInTheDocument();

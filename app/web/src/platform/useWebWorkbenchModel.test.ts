@@ -405,6 +405,62 @@ describe('useWebWorkbenchModel helpers', () => {
     ]));
   });
 
+  it('projects Hub single-task file-change diff metadata into transcript and runtime evidence', () => {
+    const projected = mergeHubTaskContractEvents([], undefined, {
+      task_id: 'task-1',
+      edge_run_id: 'edge-run-1',
+      session_id: 'hub-session-1',
+      artifacts: [{
+        task_id: 'task-1',
+        edge_run_id: 'edge-run-1',
+        session_id: 'hub-session-1',
+        source_event_id: 'evt-file-change-1',
+        event_seq: 7,
+        artifact_id: 'artifact-file-change-1',
+        path: 'src/runtime.ts',
+        action: 'modified',
+        status: 'file_change',
+        tool_name: 'Edit',
+        diff: '@@ -1 +1 @@\n-old runtime\n+new runtime\n',
+        edit_id: 'edit-runtime-1',
+        review_status: 'needs_review',
+        can_apply: false,
+        can_revert: true,
+        created_at: '2026-06-09T05:00:04Z',
+      }],
+      last_event_seq: 7,
+    });
+    const transcript = resolveWebWorkbenchTranscript(true, 'hub-session-1', [], projected);
+
+    expect(transcript).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'edge-event-hub-runtime-evt-file-change-1',
+        kind: 'file_change',
+        path: 'src/runtime.ts',
+        action: 'modified',
+        patch: '@@ -1 +1 @@\n-old runtime\n+new runtime',
+        editId: 'edit-runtime-1',
+        reviewStatus: 'needs_review',
+        canApply: false,
+        canRevert: true,
+      }),
+    ]));
+    expect(resolveWebRuntimeEvidence(transcript)).toEqual(expect.objectContaining({
+      runId: 'edge-run-1',
+      diffs: [expect.objectContaining({
+        filePath: 'src/runtime.ts',
+        status: 'modified',
+        additions: 1,
+        deletions: 1,
+        editId: 'edit-runtime-1',
+        reviewStatus: 'needs_review',
+        canApply: false,
+        canRevert: true,
+      })],
+      sources: { diff: 'event', artifacts: 'none', previews: 'none' },
+    }));
+  });
+
   it('submits single-task approval decisions through the Hub task contract when agentTaskId is present', async () => {
     const hubClient = {
       decideTaskApproval: vi.fn().mockResolvedValue(undefined),
