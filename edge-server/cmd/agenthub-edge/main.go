@@ -121,6 +121,9 @@ func main() {
 		slog.Error("failed to initialize store", "err", err)
 		os.Exit(1)
 	}
+	if seedErr := store.SeedIfEmpty(repository); seedErr != nil {
+		slog.Warn("seed failed", "error", seedErr)
+	}
 
 	adapterReg := buildAdapterRegistry(cfg)
 
