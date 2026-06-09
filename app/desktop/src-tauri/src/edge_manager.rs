@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+#[cfg(any(test, debug_assertions))]
+use std::time::Duration;
 use tauri::{Manager, Runtime};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -57,6 +59,25 @@ pub struct EdgePreflight {
     pub auth_token_ready: bool,
     pub status: &'static str,
     pub blocker: Option<String>,
+}
+
+#[cfg(any(test, debug_assertions))]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgeObservedSidecarSmoke {
+    pub mode: &'static str,
+    pub sidecar_name: &'static str,
+    pub app_data_dir: PathBuf,
+    pub store_db_path: PathBuf,
+    pub log_paths: EdgeLogPaths,
+    pub sidecar_args: Vec<String>,
+    pub health_url: String,
+    pub health_online: bool,
+    pub health_version: Option<String>,
+    pub edge_id: Option<String>,
+    pub preflight: EdgePreflight,
+    pub stdout_tail: Vec<String>,
+    pub stderr_tail: Vec<String>,
+    pub direct_cli_spawn: bool,
 }
 
 /// Wrapper for the two child-process types: Tauri sidecar (release) or
@@ -201,7 +222,10 @@ impl EdgeManager {
                                     }
                                 }
                                 CommandEvent::Error(e) => {
-                                    append_edge_log_line(&stderr_log, &format!("sidecar error: {}", e));
+                                    append_edge_log_line(
+                                        &stderr_log,
+                                        &format!("sidecar error: {}", e),
+                                    );
                                     log::error!("[edge] error: {}", e);
                                 }
                                 CommandEvent::Terminated(payload) => {
@@ -227,7 +251,8 @@ impl EdgeManager {
                     return Ok(());
                 }
                 Err(e) => {
-                    let message = format!("Sidecar spawn failed, falling back to direct path: {}", e);
+                    let message =
+                        format!("Sidecar spawn failed, falling back to direct path: {}", e);
                     append_edge_log_line(&log_paths.stderr, &message);
                     log::warn!("{}", message);
                 }
@@ -258,12 +283,14 @@ impl EdgeManager {
             })?;
 
         let pid = child.id().unwrap_or(0);
-        let stdout_task = child.stdout.take().map(|stdout| {
-            spawn_pipe_logger(stdout, log_paths.stdout.clone(), log::Level::Info)
-        });
-        let stderr_task = child.stderr.take().map(|stderr| {
-            spawn_pipe_logger(stderr, log_paths.stderr.clone(), log::Level::Warn)
-        });
+        let stdout_task = child
+            .stdout
+            .take()
+            .map(|stdout| spawn_pipe_logger(stdout, log_paths.stdout.clone(), log::Level::Info));
+        let stderr_task = child
+            .stderr
+            .take()
+            .map(|stderr| spawn_pipe_logger(stderr, log_paths.stderr.clone(), log::Level::Warn));
         log::info!(
             "Edge Server started via direct path (pid={}, path={:?})",
             pid,
@@ -468,6 +495,60 @@ fn edge_health_url(port: u16) -> String {
     format!("http://{}/v1/health", edge_bind_addr(port))
 }
 
+#[cfg(any(test, debug_assertions))]
+async fn observe_fixture_sidecar_smoke(
+    app_data_dir: PathBuf,
+    port: u16,
+) -> Result<EdgeObservedSidecarSmoke, String> {
+    let store_db_path = edge_store_db_path(app_data_dir.clone());
+    let store_db = store_db_path.to_string_lossy().to_string();
+    let addr = edge_bind_addr(port);
+    let health_url = edge_health_url(port);
+    let log_paths = edge_log_paths(app_data_dir.clone());
+
+    let body = reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .map_err(|e| format!("Failed to build Local Edge fixture health client: {}", e))?
+        .get(&health_url)
+        .send()
+        .await
+        .map_err(|e| format!("Local Edge fixture health request failed: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Local Edge fixture health returned an error: {}", e))?
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("Local Edge fixture health JSON was invalid: {}", e))?;
+    let data = body
+        .get("data")
+        .filter(|_| body.get("code").and_then(|v| v.as_str()) == Some("OK"))
+        .unwrap_or(&body);
+
+    Ok(EdgeObservedSidecarSmoke {
+        mode: "fixture",
+        sidecar_name: EDGE_SIDECAR_NAME,
+        app_data_dir,
+        store_db_path,
+        log_paths: log_paths.clone(),
+        sidecar_args: edge_launch_args(&store_db, &addr),
+        health_url,
+        health_online: true,
+        health_version: data
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        edge_id: data
+            .get("edgeId")
+            .or_else(|| data.get("edge_id"))
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        preflight: edge_preflight(true, false, true, None),
+        stdout_tail: read_edge_log_tail(&log_paths.stdout, 20),
+        stderr_tail: read_edge_log_tail(&log_paths.stderr, 20),
+        direct_cli_spawn: false,
+    })
+}
+
 fn edge_store_db_path(app_data_dir: PathBuf) -> PathBuf {
     app_data_dir.join(EDGE_STORE_DB_FILE_NAME)
 }
@@ -515,7 +596,11 @@ fn edge_preflight(
         sidecar_available,
         fallback_executable_available,
         auth_token_ready,
-        status: if blocker.is_some() { "blocked" } else { "ready" },
+        status: if blocker.is_some() {
+            "blocked"
+        } else {
+            "ready"
+        },
         blocker,
     }
 }
@@ -537,11 +622,7 @@ fn append_edge_log_line(path: &str, line: &str) {
     }
 }
 
-fn spawn_pipe_logger<T>(
-    pipe: T,
-    log_path: String,
-    level: log::Level,
-) -> tokio::task::JoinHandle<()>
+fn spawn_pipe_logger<T>(pipe: T, log_path: String, level: log::Level) -> tokio::task::JoinHandle<()>
 where
     T: tokio::io::AsyncRead + Unpin + Send + 'static,
 {
@@ -569,13 +650,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
 
     #[test]
     fn edge_launch_args_keep_runtime_behind_local_edge() {
-        let args = edge_launch_args(
-            "fixtures/app-data/agenthub-edge.sqlite",
-            "127.0.0.1:3210",
-        );
+        let args = edge_launch_args("fixtures/app-data/agenthub-edge.sqlite", "127.0.0.1:3210");
 
         assert_eq!(
             args,
@@ -646,7 +727,9 @@ mod tests {
         assert_eq!(readiness.preflight.status, "blocked");
         assert_eq!(
             readiness.preflight.blocker,
-            Some("Local Edge sidecar is not bundled and fallback executable is missing".to_string())
+            Some(
+                "Local Edge sidecar is not bundled and fallback executable is missing".to_string()
+            )
         );
         assert!(!readiness.direct_cli_spawn);
     }
@@ -684,8 +767,94 @@ mod tests {
     fn packaged_store_db_path_lives_under_app_data() {
         let path = edge_store_db_path(PathBuf::from("fixtures/app-data"));
 
-        assert_eq!(path, PathBuf::from("fixtures/app-data/agenthub-edge.sqlite"));
+        assert_eq!(
+            path,
+            PathBuf::from("fixtures/app-data/agenthub-edge.sqlite")
+        );
     }
+
+    #[test]
+    fn observed_fixture_smoke_reads_health_app_data_logs_and_spawn_boundary() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("fixture health listener");
+        let port = listener.local_addr().expect("fixture addr").port();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("fixture request");
+            let mut request = [0_u8; 1024];
+            let _ = stream.read(&mut request);
+            let body =
+                r#"{"code":"OK","data":{"status":"ok","version":"v1","edgeId":"local-fixture"}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .expect("fixture response");
+        });
+
+        let app_data_dir = std::env::temp_dir().join(format!(
+            "agenthub-observed-sidecar-smoke-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&app_data_dir);
+        let log_paths = edge_log_paths(app_data_dir.clone());
+        append_edge_log_line(&log_paths.stdout, "fixture sidecar ready");
+        append_edge_log_line(&log_paths.stderr, "fixture sidecar stderr captured");
+
+        let evidence = tauri::async_runtime::block_on(observe_fixture_sidecar_smoke(
+            app_data_dir.clone(),
+            port,
+        ))
+        .expect("observed fixture smoke evidence");
+        server.join().expect("fixture server joined");
+
+        assert_eq!(evidence.sidecar_name, "agenthub-edge");
+        assert_eq!(evidence.mode, "fixture");
+        assert_eq!(
+            evidence.health_url,
+            format!("http://127.0.0.1:{port}/v1/health")
+        );
+        assert!(evidence.health_online);
+        assert_eq!(evidence.health_version.as_deref(), Some("v1"));
+        assert_eq!(evidence.edge_id.as_deref(), Some("local-fixture"));
+        assert_eq!(evidence.store_db_path, edge_store_db_path(app_data_dir));
+        assert_eq!(evidence.log_paths.stdout, log_paths.stdout);
+        assert!(evidence
+            .stdout_tail
+            .contains(&"fixture sidecar ready".to_string()));
+        assert!(evidence
+            .stderr_tail
+            .contains(&"fixture sidecar stderr captured".to_string()));
+        assert_eq!(evidence.preflight.status, "ready");
+        assert!(!evidence.direct_cli_spawn);
+        assert!(!evidence.sidecar_args.iter().any(|arg| {
+            matches!(
+                arg.as_str(),
+                "codex" | "codex.exe" | "claude" | "claude.exe" | "opencode" | "opencode.exe"
+            )
+        }));
+
+        let _ = std::fs::remove_dir_all(evidence.app_data_dir);
+    }
+}
+
+#[cfg(any(test, debug_assertions))]
+fn read_edge_log_tail(path: &str, max_lines: usize) -> Vec<String> {
+    if max_lines == 0 || path.starts_with("<app-data>") {
+        return Vec::new();
+    }
+
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut tail = std::collections::VecDeque::with_capacity(max_lines);
+    for line in content.lines() {
+        if tail.len() == max_lines {
+            tail.pop_front();
+        }
+        tail.push_back(line.to_string());
+    }
+    tail.into_iter().collect()
 }
 
 pub fn resolve_edge_path() -> PathBuf {
