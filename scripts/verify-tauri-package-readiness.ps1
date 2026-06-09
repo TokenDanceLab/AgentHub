@@ -74,6 +74,20 @@ function Assert-GitPathClean {
 
     $dirty = @($status | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
     if ($dirty.Count -gt 0) {
+        $untracked = @($dirty | Where-Object { [string]$_ -match '^\?\?' })
+        if ($untracked.Count -gt 0) {
+            Fail "$Label has untracked generated changes: $($untracked -join '; ')"
+        }
+
+        & git -C $RepoRoot diff --quiet -- $RelativePath
+        $worktreeDiffExit = $LASTEXITCODE
+        & git -C $RepoRoot diff --cached --quiet -- $RelativePath
+        $indexDiffExit = $LASTEXITCODE
+        if ($worktreeDiffExit -eq 0 -and $indexDiffExit -eq 0) {
+            Pass "$Label has no content changes ($RelativePath)"
+            return
+        }
+
         Fail "$Label has uncommitted generated changes: $($dirty -join '; ')"
     }
 
