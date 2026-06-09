@@ -135,12 +135,13 @@ if (Test-Path -LiteralPath $gatePath) {
 
     Assert-True ($run.ExitCode -eq 0) "localhost product-loop harness exits successfully" $run.Output
     foreach ($text in @(
-        "Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay",
+        "Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay -> Web render",
         "Web starts TeamRun through Hub-only boundary",
         "Hub routes to the registered Desktop/Edge target",
         "Desktop bridge dispatches only to Local Edge",
         "Local Edge runs fixture/SDK adapter without CLI/model spend",
         "Hub replay records completed localhost fixture chain",
+        "Web renders Hub replay into localhost fixture view",
         "localhost fixture services started with identity markers",
         "Hub rejects forged and out-of-order callbacks before replay",
         "RealTested=false"
@@ -201,7 +202,8 @@ if (Test-Path -LiteralPath $gatePath) {
             "desktop.dispatch.accepted",
             "edge.run.started",
             "adapter.run.completed",
-            "hub.replay.recorded"
+            "hub.replay.recorded",
+            "web.replay.rendered"
         )
         $lastIndex = -1
         foreach ($type in $requiredTypes) {
