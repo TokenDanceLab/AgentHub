@@ -121,6 +121,43 @@ function Find-PowerShell {
     return $null
 }
 
+function Join-NativeArguments {
+    param([string[]]$Arguments)
+
+    $quoted = foreach ($arg in $Arguments) {
+        if ($null -eq $arg) { '""'; continue }
+        if ($arg -notmatch '[\s"]' -and $arg.Length -gt 0) { $arg; continue }
+
+        $builder = [System.Text.StringBuilder]::new()
+        [void]$builder.Append('"')
+        $slashes = 0
+        foreach ($char in $arg.ToCharArray()) {
+            if ($char -eq '\') {
+                $slashes++
+                continue
+            }
+            if ($char -eq '"') {
+                [void]$builder.Append(('\' * (($slashes * 2) + 1)))
+                [void]$builder.Append('"')
+                $slashes = 0
+                continue
+            }
+            if ($slashes -gt 0) {
+                [void]$builder.Append(('\' * $slashes))
+                $slashes = 0
+            }
+            [void]$builder.Append($char)
+        }
+        if ($slashes -gt 0) {
+            [void]$builder.Append(('\' * ($slashes * 2)))
+        }
+        [void]$builder.Append('"')
+        $builder.ToString()
+    }
+
+    return ($quoted -join " ")
+}
+
 function Invoke-RepoScript {
     param(
         [string]$RelativePath,
@@ -141,9 +178,7 @@ function Invoke-RepoScript {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.WorkingDirectory = $RepoRoot
-    foreach ($arg in @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + $Arguments) {
-        [void]$psi.ArgumentList.Add($arg)
-    }
+    $psi.Arguments = Join-NativeArguments (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + $Arguments)
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdout = $proc.StandardOutput.ReadToEnd()
     $stderr = $proc.StandardError.ReadToEnd()
@@ -225,7 +260,7 @@ function Add-Segment {
         status = $Status
         exit_code = $ExitCode
         evidence = $Evidence
-        output_excerpt = if ($Output.Length -gt 1200) { $Output.Substring(0, 1200) } else { $Output }
+        output_excerpt = if (($Output -as [string]).Length -gt 1200) { ($Output -as [string]).Substring(0, 1200) } else { ($Output -as [string]) }
     }
     if ($Status -eq "PASS") { Pass $Name } elseif ($Status -eq "SKIPPED") { Add-Warning "$Name skipped" } else { Add-Failure "$Name blocked" }
 }
