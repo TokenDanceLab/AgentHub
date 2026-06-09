@@ -1,6 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 01:40 +08:00
+最后更新：2026-06-10 20:00 +08:00
+当前 dev HEAD：`0e901fce` (`dev/release-0.3.0-rc7`)
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
@@ -144,7 +145,9 @@
 - 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
 - `v0.3.0-rc.6` 已存在且指向 `fa6cd35e`，保留为历史 RC 基线；后续 tag 需先通过独立 release gate。
 - Desktop 下一版候选已按 `0.3.0-rc.7` 准备；只有 release gate 通过并获人工确认后才允许创建 `v0.3.0-rc.7` tag。
-- 2026-06-09 handoff 记录 PR #297 已合并且当时无 open PR；release promote 前仍需重新查询 GitHub 确认。
+- 2026-06-10 本轮数据流打通复验：`tests\scripts\verify-real-api-smoke.ps1 -RepoRoot .` **44/44 断言通过**（Hub 健康 → Edge 健康 → 认证 → 联系人/会话/文档 CRUD → Edge run 生命周期 → 运行历史）。
+- 2026-06-10 Playwright E2E：`app\e2e\chat-real.spec.ts` 9 个测试覆盖 Hub API + Edge API + Web UI 聊天流程。
+- 2026-06-10 真实 Hub API 验证：16/20 端点返回 200（contacts、sessions、messages、documents、WebSocket 等）。未覆盖端点为需要真实 TokenDanceID 登录或真实 CLI/API key 的场景。
 - 第一批清理候选只包含已被 dev 吸收且 worktree clean 的分支；`dev/johnny`、`feat/backend-edge-hub`、`codex/backend-*` 属于旧大分叉，只能 cherry-pick 级复查。
 
 ## Release Gate 快照
@@ -161,12 +164,13 @@
 
 ## 下一步优先级
 
-1. **P0 approved-real 金链路总 gate**：`verify-real-api-smoke.ps1` 已通过 44/44 断言（2026-06-10）。当前 Hub OIDC 禁用且使用直接 JWT 签发进行 dev 测试；真实 TokenDanceID 登录仍需 env 变量、OAuth client 配置和操作员批准。
-2. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。已添加预检功能以快速失败，并提供描述性错误。
-3. **真实 SDK API 消耗（Anthropic / OpenAI）**：适配器已实现但不阻塞——需要各自的 API key。在密钥缺失时，适配器报告 `Available=false`。
-4. **localhost observed service runner 升级**：在现有的无花费清单门控基础上，逐步挂钩 Web dev 服务器、Local Edge mock/SQLite 和 Hub 健康/服务探测。
-5. **Windows/Tauri unsigned package smoke**：当前的 dry gate 可以生成 unsigned NSIS 安装程序、便携式 zip、Windows Local Edge 侧车和 `artifact-manifest.json` 哈希证据；签名、公证、release upload 和 updater `latest.json`/`.sig` 需另行批准推进。
-6. **受控 approved-real CLI/SDK 方案**：已具备 preflight manifest gate；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
+1. **TokenDanceID 真实登录全链路**：Hub OIDC handler 已实现，但 `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` 等环境变量未配置，登录仍走直接 JWT 签发。这是所有真实数据流的 P0 阻塞项——配置后所有 Hub API 查询自动激活。
+2. **Web 前端真实数据对接**：TokenDanceID 登录打通后，Web 侧 `hubClient` / `hubWS` / React Query hooks 全部就绪，可逐页从 mock 切换到 Hub 真实数据。当前 IM 聊天 10 个 chat actions、联系人、会话、文档 CRUD 的前端方法和 API 调用均已实现。
+3. **Desktop 真实数据对接**：Desktop 侧 auth token 管道、Hub WS 实时缓存失效、chat actions、联系人 actions、agent profile 合并策略、settings 三层回退均已实现。TokenDanceID 登录后可验证全链路。
+4. **localhost 服务组合升级**：`verify-real-api-smoke.ps1` 已通过 44/44 断言；可逐步将 Web dev server、Local Edge SQLite/real adapter、Hub 健康探测接入自动组合。
+5. **SDK 真实 API 消耗**：`AnthropicSDKAdapter` 和 `OpenAISDKAdapter` 已实现 HTTP direct call + SSE streaming，仅缺 API key。适配器在 key 缺失时 `Available=false`，不阻塞其他流程。
+6. **Windows/Tauri unsigned package smoke**：dry gate 已通过，NSIS installer + portable zip + sidecar hash manifest 已产出。签名、公证、release upload 需另获批准。
+7. **受控 approved-real CLI/SDK 方案**：preflight manifest gate 已就绪；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
 
 ## 安全规则
 

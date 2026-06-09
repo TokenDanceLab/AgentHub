@@ -1,6 +1,6 @@
 # AgentHub 架构文档
 
-> 最后更新：2026-06-07 | 当前架构基准：Desktop/Web v4 shared workbench clean rebuild
+> 最后更新：2026-06-10 | 当前架构基准：Desktop/Web v4 shared workbench clean rebuild + 2026-06-10 数据流打通
 
 ## 1. 产品定位
 
