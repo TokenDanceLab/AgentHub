@@ -157,8 +157,13 @@ export function useHubSyncMessages() {
 }
 
 export function useHubMarkRead() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (sessionId: string) => getHubClient().markRead(sessionId),
+    mutationFn: ({ sessionId, lastReadSeq }: { sessionId: string; lastReadSeq: number }) =>
+      getHubClient().markRead(sessionId, lastReadSeq),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+    },
   });
 }
 
@@ -186,7 +191,8 @@ export function useHubEditMessage() {
 export function useHubPinMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (messageId: string) => getHubClient().pinMessage(messageId),
+    mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
+      getHubClient().pinMessage(messageId, sessionId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
     },
@@ -196,7 +202,8 @@ export function useHubPinMessage() {
 export function useHubUnpinMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (messageId: string) => getHubClient().unpinMessage(messageId),
+    mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
+      getHubClient().unpinMessage(messageId, sessionId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
     },
@@ -206,8 +213,8 @@ export function useHubUnpinMessage() {
 export function useHubForwardMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, targetSessionId }: { messageId: string; targetSessionId: string }) =>
-      getHubClient().forwardMessage(messageId, targetSessionId),
+    mutationFn: ({ messageId, targetSessionIds }: { messageId: string; targetSessionIds: string[] }) =>
+      getHubClient().forwardMessage(messageId, targetSessionIds),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
     },
@@ -224,8 +231,8 @@ export function useHubSearchMessages() {
 export function useHubAddReaction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      getHubClient().addReaction(messageId, emoji),
+    mutationFn: ({ messageId, sessionId, emoji }: { messageId: string; sessionId: string; emoji: string }) =>
+      getHubClient().addMessageReaction(messageId, sessionId, { emoji }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
     },
@@ -235,11 +242,18 @@ export function useHubAddReaction() {
 export function useHubRemoveReaction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      getHubClient().removeReaction(messageId, emoji),
+    mutationFn: ({ messageId, sessionId, emoji }: { messageId: string; sessionId: string; emoji: string }) =>
+      getHubClient().removeMessageReaction(messageId, sessionId, { emoji }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
     },
+  });
+}
+
+export function useHubListReactions() {
+  return useMutation({
+    mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
+      getHubClient().listMessageReactions(messageId, sessionId),
   });
 }
 

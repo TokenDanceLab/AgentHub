@@ -238,6 +238,98 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const unblockContact = useUnblockContact();
   const updateContactRemark = useUpdateContactRemark();
   const createGroupSession = useCreateGroupSession();
+
+  // ── Chat action mutations ──────────────────────────────────────────
+
+  const recallMessageMut = useMutation({
+    mutationFn: (messageId: string) => hubClient.recallMessage(messageId),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+    },
+  });
+
+  const editMessageMut = useMutation({
+    mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
+      hubClient.editMessage(messageId, { content }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+    },
+  });
+
+  const pinMessageMut = useMutation({
+    mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
+      hubClient.pinMessage(messageId, sessionId),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-pins', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+    },
+  });
+
+  const unpinMessageMut = useMutation({
+    mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
+      hubClient.unpinMessage(messageId, sessionId),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-pins', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+    },
+  });
+
+  const forwardMessageMut = useMutation({
+    mutationFn: ({ messageId, targetSessionIds }: { messageId: string; targetSessionIds: string[] }) =>
+      hubClient.forwardMessage(messageId, targetSessionIds),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+    },
+  });
+
+  const searchMessagesMut = useMutation({
+    mutationFn: (params: { q: string; session_id?: string; content_type?: string; from?: string; to?: string }) =>
+      hubClient.searchMessages(params),
+  });
+
+  const searchSessionMessagesMut = useMutation({
+    mutationFn: ({ sessionId, params }: {
+      sessionId: string;
+      params: { q: string; content_type?: string; from?: string; to?: string };
+    }) => hubClient.searchSessionMessages(sessionId, params),
+  });
+
+  const markReadMut = useMutation({
+    mutationFn: ({ sessionId, lastReadSeq }: { sessionId: string; lastReadSeq: number }) =>
+      hubClient.markRead(sessionId, lastReadSeq),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+    },
+  });
+
+  const addReactionMut = useMutation({
+    mutationFn: ({ messageId, sessionId, emoji }: { messageId: string; sessionId: string; emoji: string }) =>
+      hubClient.addMessageReaction(messageId, sessionId, { emoji }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+    },
+  });
+
+  const removeReactionMut = useMutation({
+    mutationFn: ({ messageId, sessionId, emoji }: { messageId: string; sessionId: string; emoji: string }) =>
+      hubClient.removeMessageReaction(messageId, sessionId, { emoji }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+    },
+  });
+
+  // Auto mark-as-read when user opens a session
+  useEffect(() => {
+    if (!hubReady || !activeHubSessionId) return;
+    const currentMessages = messages.data;
+    if (!currentMessages || currentMessages.length === 0) return;
+    const lastSeq = currentMessages[currentMessages.length - 1]?.seq_id;
+    if (lastSeq == null) return;
+    markReadMut.mutate({ sessionId: activeHubSessionId, lastReadSeq: lastSeq });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubReady, activeHubSessionId]);
+
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
   const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
     target.target_type === 'local_edge' &&
@@ -302,6 +394,18 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       onUnblockContact: (userId: string) => unblockContact.mutateAsync(userId),
       onUpdateRemark: (userId: string, remark: string) => updateContactRemark.mutateAsync({ userId, remark }),
       onCreateGroup: (name: string, memberIds: string[]) => createGroupSession.mutateAsync({ name, memberIds }),
+    } : undefined,
+    chatActions: hubReady ? {
+      onRecallMessage: (messageId: string) => recallMessageMut.mutateAsync(messageId),
+      onEditMessage: (messageId: string, content: string) => editMessageMut.mutateAsync({ messageId, content }),
+      onPinMessage: (messageId: string, sessionId: string) => pinMessageMut.mutateAsync({ messageId, sessionId }),
+      onUnpinMessage: (messageId: string, sessionId: string) => unpinMessageMut.mutateAsync({ messageId, sessionId }),
+      onForwardMessage: (messageId: string, targetSessionIds: string[]) => forwardMessageMut.mutateAsync({ messageId, targetSessionIds }),
+      onSearchMessages: (params: { q: string; session_id?: string; content_type?: string; from?: string; to?: string }) => searchMessagesMut.mutateAsync(params),
+      onSearchSessionMessages: (sessionId: string, params: { q: string; content_type?: string; from?: string; to?: string }) => searchSessionMessagesMut.mutateAsync({ sessionId, params }),
+      onMarkRead: (sessionId: string, lastReadSeq: number) => markReadMut.mutateAsync({ sessionId, lastReadSeq }),
+      onAddReaction: (messageId: string, sessionId: string, emoji: string) => addReactionMut.mutateAsync({ messageId, sessionId, emoji }),
+      onRemoveReaction: (messageId: string, sessionId: string, emoji: string) => removeReactionMut.mutateAsync({ messageId, sessionId, emoji }),
     } : undefined,
     conversations: resolvedConversations,
     composerExecutionTargets,
