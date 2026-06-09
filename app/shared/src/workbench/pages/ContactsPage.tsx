@@ -142,6 +142,23 @@ export interface ContactsPageProps {
   onCopyInvite?: (() => void) | undefined;
   /** Called when phone invite is submitted */
   onSendPhoneInvite?: ((countryCode: string, phone: string, note: string) => void) | undefined;
+
+  // ── Hub mutation callbacks ──
+
+  /** Called when user searches for a Hub user by ID or name */
+  onSearchUser?: ((query: string) => Promise<unknown> | void) | undefined;
+  /** Called when user sends a friend request */
+  onSendFriendRequest?: ((userId: string, message?: string) => Promise<unknown> | void) | undefined;
+  /** Called when user accepts a pending friend request */
+  onAcceptRequest?: ((requestId: string) => Promise<unknown> | void) | undefined;
+  /** Called when user rejects a pending friend request */
+  onRejectRequest?: ((requestId: string) => Promise<unknown> | void) | undefined;
+  /** Called when user removes a contact */
+  onRemoveContact?: ((userId: string) => Promise<unknown> | void) | undefined;
+  /** Called when user blocks a contact */
+  onBlockContact?: ((userId: string) => Promise<unknown> | void) | undefined;
+  /** Called when user updates a contact remark */
+  onUpdateRemark?: ((userId: string, remark: string) => Promise<unknown> | void) | undefined;
 }
 
 // ── Design icons ──

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ContactMember, ProjectDraft, ProjectInfo, RuntimeEvidenceSnapshot, WorkbenchContactsData } from '@shared/workbench';
+import type { ProjectDraft, ProjectInfo, RuntimeEvidenceSnapshot } from '@shared/workbench';
 import type { WorkbenchDataMode } from '@shared/demo';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
@@ -13,6 +13,12 @@ import {
   workbenchDataModeLabel,
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
+import {
+  contactInfoToMember,
+  hubEmptyContacts,
+  resolveHubContacts,
+  type HubContactLike,
+} from '@shared/workbench/hubDataMapping';
 import {
   normalizeHubMessagesToTranscript,
   normalizeHubRuntimeEventsToTranscript,
@@ -30,7 +36,6 @@ import type {
   AgentTaskApprovalList,
   AgentTaskArtifact,
   AgentTaskArtifactList,
-  ContactInfo,
   WorkspaceProject,
   WorkspaceProjectThread,
   WorkspaceProjectThreadMessage,
@@ -45,6 +50,18 @@ import {
   useHubWorkspaceProjects,
   useUpdateHubWorkspaceProject,
 } from '@/api/projectQueries';
+import {
+  useSearchHubUser,
+  useSendFriendRequest,
+  useAcceptFriendRequest,
+  useRejectFriendRequest,
+  useRemoveContact,
+  useBlockContact,
+  useUnblockContact,
+  useUpdateContactRemark,
+  useCreateGroupSession,
+  useListFriendRequests,
+} from '@/api/contactQueries';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import {
@@ -209,6 +226,18 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       }
     },
   });
+
+  // Contact mutation hooks (Hub)
+  const searchUser = useSearchHubUser();
+  const sendFriendRequest = useSendFriendRequest();
+  const friendRequests = useListFriendRequests({ enabled: hubReady });
+  const acceptFriendRequest = useAcceptFriendRequest();
+  const rejectFriendRequest = useRejectFriendRequest();
+  const removeContact = useRemoveContact();
+  const blockContact = useBlockContact();
+  const unblockContact = useUnblockContact();
+  const updateContactRemark = useUpdateContactRemark();
+  const createGroupSession = useCreateGroupSession();
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
   const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
     target.target_type === 'local_edge' &&
@@ -262,7 +291,18 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
 
   return {
     activeConversationId,
-    contacts: resolveWebWorkbenchContacts(contacts.data, hubReady, dataMode),
+    contacts: resolveHubContacts(contacts.data as HubContactLike[] | undefined, hubReady, dataMode),
+    contactsActions: hubReady ? {
+      onSearchUser: (query: string) => searchUser.mutateAsync(query),
+      onSendFriendRequest: (userId: string, message?: string) => sendFriendRequest.mutateAsync({ userId, message }),
+      onAcceptRequest: (requestId: string) => acceptFriendRequest.mutateAsync(requestId),
+      onRejectRequest: (requestId: string) => rejectFriendRequest.mutateAsync(requestId),
+      onRemoveContact: (userId: string) => removeContact.mutateAsync(userId),
+      onBlockContact: (userId: string) => blockContact.mutateAsync(userId),
+      onUnblockContact: (userId: string) => unblockContact.mutateAsync(userId),
+      onUpdateRemark: (userId: string, remark: string) => updateContactRemark.mutateAsync({ userId, remark }),
+      onCreateGroup: (name: string, memberIds: string[]) => createGroupSession.mutateAsync({ name, memberIds }),
+    } : undefined,
     conversations: resolvedConversations,
     composerExecutionTargets,
     projects: resolveWebWorkbenchProjects(
@@ -576,45 +616,11 @@ function previewStatus(status: string): 'starting' | 'ready' | 'stopped' {
   return 'ready';
 }
 
-const webHubEmptyContacts: WorkbenchContactsData = {
-  members: [],
-  externalContacts: [],
-  pendingContacts: [],
-  starredContacts: [],
-  groups: [],
-  recentShortcuts: [],
-  orgName: 'TokenDance',
-  orgInitials: 'TD',
-};
+export { hubEmptyContacts as webHubEmptyContacts } from '@shared/workbench/hubDataMapping';
 
-function contactInfoToMember(contact: ContactInfo): ContactMember {
-  const displayName = contact.remark?.trim() || contact.nickname?.trim() || contact.username || contact.user_id;
-  return {
-    id: contact.user_id,
-    name: displayName,
-    initials: contactInitials(displayName),
-    org: contact.type === 'external' ? '外部联系人' : 'TokenDance',
-    status: contact.online ? '在线' : '离线',
-    tag: contact.type === 'external' ? 'External' : 'Hub',
-  };
-}
+export { contactInfoToMember } from '@shared/workbench/hubDataMapping';
 
-export function resolveWebWorkbenchContacts(
-  contacts: ContactInfo[] | undefined,
-  hubReady: boolean,
-  dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
-): WorkbenchContactsData | undefined {
-  if (!hubReady) {
-    return isWorkbenchRealDataMode(dataMode) ? webHubEmptyContacts : undefined;
-  }
-  const members = contacts?.map(contactInfoToMember) ?? [];
-  return {
-    ...webHubEmptyContacts,
-    members,
-    starredContacts: members.slice(0, 2),
-    recentShortcuts: members.slice(0, 3).map((member) => member.name),
-  };
-}
+export { resolveHubContacts as resolveWebWorkbenchContacts } from '@shared/workbench/hubDataMapping';
 
 export function resolveWebWorkbenchProjects(
   projects: WorkspaceProject[] | undefined,
@@ -969,20 +975,6 @@ function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   if (typeof error === 'string' && error.trim()) return error;
   return fallback;
-}
-
-function contactInitials(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return 'U';
-  const chars = Array.from(trimmed);
-  const asciiWords = trimmed.match(/[A-Za-z0-9]+/g);
-  if (asciiWords && asciiWords.length > 0) {
-    return asciiWords
-      .slice(0, 2)
-      .map((word) => word[0]?.toUpperCase() ?? '')
-      .join('') || 'U';
-  }
-  return chars.slice(0, 2).join('').toUpperCase();
 }
 
 export function resolveWebWorkbenchTranscript(
