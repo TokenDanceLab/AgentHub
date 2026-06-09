@@ -90,6 +90,7 @@ export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
     id: agent.profileId ?? agent.id,
     name: agent.name,
     ...(agent.description ? { description: agent.description } : {}),
+    ...(agent.runtimeId ? { icon: agent.runtimeId } : {}),
     status: agent.status,
     ...(agent.model ? { model: agent.model } : {}),
     ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
@@ -99,6 +100,7 @@ export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
     ...(agent.reasoningEffort ? { reasoningEffort: agent.reasoningEffort } : {}),
     ...(agent.skills ? { skills: agent.skills } : {}),
     ...(agent.toolAllowlist ? { toolAllowlist: agent.toolAllowlist } : {}),
+    ...(agent.targetPreferences ? { targetPreferences: agent.targetPreferences } : {}),
   };
 }
 
