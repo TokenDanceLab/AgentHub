@@ -20,7 +20,7 @@
 
 读完 roadmap、architecture 和当前任务计划即可开始工作。
 
-端口速记：Desktop/Tauri 前端是 `5173`，Web 前端是 `5174`，Mobile 预览是 `5175` 且不参与本轮 v4 对齐，`5176/desktop` 是只读的 `agenthub-design` design demo。
+端口速记：Desktop/Tauri 前端是 `5173`，Web 前端是 `5174`，Mobile RN Expo Web 视觉预览是 `5177`，`5176/desktop` 是只读的 `agenthub-design` design demo。
 
 ## 按需查阅
 

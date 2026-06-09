@@ -95,7 +95,7 @@ Desktop / Mobile / Web
 |------|------|
 | **Desktop App** (Tauri) | Local execution workspace, IM chat, diff approval, multi-agent management |
 | **Web App** | Browser workspace for remote viewing, approval, and collaboration |
-| **Mobile App** (Tauri Android) | Mobile IM, approvals, previews |
+| **Mobile App** (Expo + React Native) | Mobile IM, approvals, previews |
 | **Edge Server** | Local execution node, Agent CLI process management, EventStore |
 | **Hub Server** | Accounts, IM groups, multi-device sync, device routing, audit |
 | **Agent Runtime** | Claude Code / Codex / OpenCode CLI adapters |
@@ -120,7 +120,7 @@ Local execution works without Hub — Desktop only needs Local Edge for the full
 |---|------|
 | Frontend | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens |
 | Desktop | Tauri 2.5 |
-| Mobile | Tauri 2.5 (Android) |
+| Mobile | Expo SDK 56 + React Native 0.85 + React 19.2 |
 | Edge Server | Go 1.25 + WebSocket + Agent Runtime adapters |
 | Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis |
 | Realtime | WebSocket typed events |
@@ -135,7 +135,7 @@ AgentHub/
 ├── app/
 │   ├── desktop/          # Tauri desktop app
 │   ├── web/              # Web workspace
-│   ├── mobile/           # Mobile app
+│   ├── mobile-rn/        # Expo + React Native mobile app
 │   └── shared/           # Shared types, API client, @shared/ui
 ├── edge-server/          # Edge execution node
 ├── hub-server/           # Hub central service

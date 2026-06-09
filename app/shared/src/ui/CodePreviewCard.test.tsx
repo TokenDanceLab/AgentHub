@@ -7,13 +7,13 @@ describe('CodePreviewCard', () => {
   it('renders a dense code preview with title and lines', () => {
     render(
       <CodePreviewCard
-        title="app/mobile/src/views/RunStatusView.tsx"
+        title="app/mobile-rn/src/screens/TasksScreen.tsx"
         code={"+import { CodePreviewCard } from '@agenthub/shared/ui';\n-<pre>old diff</pre>"}
         meta="+1 -1"
       />,
     );
 
-    expect(screen.getByText('app/mobile/src/views/RunStatusView.tsx')).toBeInTheDocument();
+    expect(screen.getByText('app/mobile-rn/src/screens/TasksScreen.tsx')).toBeInTheDocument();
     expect(screen.getByText('+1 -1')).toBeInTheDocument();
     expect(screen.getByText("+import { CodePreviewCard } from '@agenthub/shared/ui';")).toBeInTheDocument();
     expect(screen.getByText('-<pre>old diff</pre>')).toBeInTheDocument();

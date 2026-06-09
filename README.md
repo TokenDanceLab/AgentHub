@@ -95,7 +95,7 @@ Desktop / Mobile / Web
 |------|------|
 | **Desktop App**（Tauri） | 本地执行工作台，IM 聊天、Diff 审批、多 Agent 管理 |
 | **Web App** | 浏览器工作台，远程查看、审批协作 |
-| **Mobile App**（Tauri Android） | 移动端 IM、审批、预览 |
+| **Mobile App**（Expo + React Native） | 移动端 IM、审批、预览 |
 | **Edge Server** | 本地执行节点，Agent CLI 进程管理，EventStore |
 | **Hub Server** | 账号、IM 群聊、多端同步、设备路由、审计 |
 | **Agent Runtime** | Claude Code / Codex / OpenCode CLI 适配器 |
@@ -120,7 +120,7 @@ Desktop / Mobile / Web
 |---|------|
 | 前端 | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens |
 | Desktop | Tauri 2.5 |
-| Mobile | Tauri 2.5（Android） |
+| Mobile | Expo SDK 56 + React Native 0.85 + React 19.2 |
 | Edge Server | Go 1.25 + WebSocket + Agent Runtime adapters |
 | Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis |
 | 实时通信 | WebSocket typed events |
@@ -135,7 +135,7 @@ AgentHub/
 ├── app/
 │   ├── desktop/          # Tauri 桌面端
 │   ├── web/              # Web 工作台
-│   ├── mobile/           # Mobile 端
+│   ├── mobile-rn/        # Expo + React Native Mobile 端
 │   └── shared/           # 前端共享类型、API client、@shared/ui
 ├── edge-server/          # Edge 执行节点
 ├── hub-server/           # Hub 中心服务
