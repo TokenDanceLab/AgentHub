@@ -1,7 +1,15 @@
 /* ═══ Pages barrel exports ═══ */
 
 export { AgentsPage } from './AgentsPage';
-export type { AgentsPageProps, AgentsPaneId, AgentState, ToolPermission, RiskLevel, ModelState } from './AgentsPage';
+export type {
+  AgentConfig,
+  AgentsPageProps,
+  AgentsPaneId,
+  AgentState,
+  ToolPermission,
+  RiskLevel,
+  ModelState,
+} from './AgentsPage';
 
 export { ContactsPage } from './ContactsPage';
 export type {
@@ -19,6 +27,7 @@ export type { DocsPageProps, DocRow, DocsPane, DocsPageNavItem } from './DocsPag
 export { ProjectsPage, DEFAULT_PROJECTS } from './ProjectsPage';
 export type {
   ProjectsPageProps,
+  ProjectDraft,
   ProjectInfo,
   ProjectRun,
   ProjectArtifact,

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,105 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
+
+func TestWrapNotFound(t *testing.T) {
+	mappedErr := errors.New("mapped not found")
+
+	assert.NoError(t, WrapNotFound(nil, mappedErr))
+	assert.ErrorIs(t, WrapNotFound(gorm.ErrRecordNotFound, mappedErr), mappedErr)
+	assert.ErrorIs(t, WrapNotFound(errors.Join(errors.New("lookup failed"), gorm.ErrRecordNotFound), mappedErr), mappedErr)
+
+	otherErr := errors.New("other")
+	assert.ErrorIs(t, WrapNotFound(otherErr, mappedErr), otherErr)
+}
+
+func TestListDevicesByUserOrdersMostRecentFirst(t *testing.T) {
+	db := setupSQLite(t)
+	now := time.Now()
+	require.NoError(t, CreateUser(db, &model.User{ID: "user-a", Username: "user-a", Nickname: "User A"}))
+	require.NoError(t, CreateUser(db, &model.User{ID: "user-b", Username: "user-b", Nickname: "User B"}))
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-old",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now.Add(-time.Hour),
+	}).Error)
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-new",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now,
+	}).Error)
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-other",
+		UserID:       "user-b",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now.Add(time.Hour),
+	}).Error)
+
+	devices, err := ListDevicesByUser(db, "user-a")
+	require.NoError(t, err)
+	require.Len(t, devices, 2)
+	assert.Equal(t, "device-new", devices[0].ID)
+	assert.Equal(t, "device-old", devices[1].ID)
+}
+
+func TestUpdateDeviceAppliesProvidedFields(t *testing.T) {
+	db := setupSQLite(t)
+	oldLastActive := time.Now().Add(-time.Hour)
+	newLastActive := time.Now()
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-update",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		AppVersion:   "1.0.0",
+		Capabilities: `["shell"]`,
+		LastActiveAt: oldLastActive,
+	}).Error)
+
+	err := UpdateDevice(db, "device-update", map[string]interface{}{
+		"app_version":    "1.1.0",
+		"capabilities":   `["shell","browser"]`,
+		"last_active_at": newLastActive,
+	})
+	require.NoError(t, err)
+
+	device, err := GetDeviceByID(db, "device-update")
+	require.NoError(t, err)
+	assert.Equal(t, "1.1.0", device.AppVersion)
+	assert.Equal(t, `["shell","browser"]`, device.Capabilities)
+	assert.WithinDuration(t, newLastActive, device.LastActiveAt, time.Second)
+}
+
+func TestDeleteDeviceRemovesOnlyTargetDevice(t *testing.T) {
+	db := setupSQLite(t)
+	now := time.Now()
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-delete",
+		UserID:       "user-a",
+		DeviceType:   "desktop",
+		Capabilities: "[]",
+		LastActiveAt: now,
+	}).Error)
+	require.NoError(t, db.Create(&model.Device{
+		ID:           "device-keep",
+		UserID:       "user-a",
+		DeviceType:   "mobile",
+		Capabilities: "[]",
+		LastActiveAt: now,
+	}).Error)
+
+	require.NoError(t, DeleteDevice(db, "device-delete"))
+
+	_, err := GetDeviceByID(db, "device-delete")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	kept, err := GetDeviceByID(db, "device-keep")
+	require.NoError(t, err)
+	assert.Equal(t, "device-keep", kept.ID)
+}
 
 // setupSQLite creates an in-memory SQLite database with tables matching the
 // production PostgreSQL schema. Raw SQL is used instead of AutoMigrate because
@@ -56,6 +156,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			tokendance_sub_linked_at DATETIME DEFAULT NULL,
 			announcement TEXT DEFAULT '',
 			owner_user_id TEXT,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved INTEGER NOT NULL DEFAULT 0,
@@ -85,6 +186,8 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL DEFAULT '',
 			reply_to_message_id TEXT,
 			recalled INTEGER NOT NULL DEFAULT 0,
+			edited BOOLEAN NOT NULL DEFAULT FALSE,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 		`CREATE TABLE message_pins (
@@ -100,6 +203,15 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			attachment_id TEXT NOT NULL,
 			created_at DATETIME,
 			PRIMARY KEY (message_id, attachment_id)
+		)`,
+		`CREATE TABLE message_reactions (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			message_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			reaction TEXT NOT NULL,
+			created_at DATETIME,
+			UNIQUE (session_id, message_id, user_id, reaction)
 		)`,
 		`CREATE TABLE friendships (
 			id TEXT PRIMARY KEY,
@@ -128,6 +240,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			mime_type TEXT NOT NULL,
 			original_name TEXT DEFAULT '',
 			uploader_user_id TEXT NOT NULL,
+			metadata TEXT NOT NULL DEFAULT '{}',
 			created_at DATETIME
 		)`,
 		`CREATE TABLE agent_instances (
@@ -205,6 +318,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			session_id TEXT,
 			trigger_user_id TEXT NOT NULL,
 			trigger_message TEXT DEFAULT '',
+			target_id TEXT,
 			status TEXT NOT NULL DEFAULT 'queued',
 			created_at DATETIME,
 			updated_at DATETIME
@@ -308,6 +422,36 @@ func setupSQLite(t *testing.T) *gorm.DB {
 		require.NoError(t, db.Exec(ddl).Error, "DDL: %s", ddl[:60])
 	}
 	return db
+}
+
+func TestUpdateMessageContentMarksEditedAndStoresTimestamp(t *testing.T) {
+	db := setupSQLite(t)
+	require.NoError(t, db.Exec(`INSERT INTO messages (
+		id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-edit", "sess-edit", 1, "client-edit", "user", "user-1", "text", `{"text":"before"}`, false, time.Now(),
+	).Error)
+
+	require.NoError(t, UpdateMessageContent(db, "msg-edit", "text", `{"text":"after"}`))
+
+	var stored struct {
+		ContentType string
+		Content     string
+		Edited      bool
+		EditedAt    *time.Time
+	}
+	require.NoError(t, db.Table("messages").Where("id = ?", "msg-edit").First(&stored).Error)
+	assert.Equal(t, "text", stored.ContentType)
+	assert.JSONEq(t, `{"text":"after"}`, stored.Content)
+	assert.True(t, stored.Edited)
+	if stored.EditedAt == nil {
+		t.Fatal("edited_at was not set")
+	}
+}
+
+func TestUpdateMessageContentReturnsNotFoundWhenNoRowsChange(t *testing.T) {
+	db := setupSQLite(t)
+	require.ErrorIs(t, UpdateMessageContent(db, "missing", "text", `{"text":"after"}`), gorm.ErrRecordNotFound)
 }
 
 // =============================================================================
@@ -806,6 +950,114 @@ func TestMessageRepo_Pins(t *testing.T) {
 	assert.Equal(t, int64(0), count)
 }
 
+func TestMessageReactionRepo_AddListCountAndRemove(t *testing.T) {
+	db := setupSQLite(t)
+	s := createTestSession(t, db)
+	msg := &model.Message{
+		SessionID:   s.ID,
+		SeqID:       1,
+		ClientMsgID: "reaction-client-1",
+		SenderType:  model.SenderTypeUser,
+		SenderID:    "sender-1",
+		ContentType: model.ContentTypeText,
+		Content:     `{"text":"hello"}`,
+	}
+	require.NoError(t, InsertMessage(db, msg))
+
+	reaction := &model.MessageReaction{
+		SessionID: s.ID,
+		MessageID: msg.ID,
+		UserID:    "user-1",
+		Reaction:  "thumbs_up",
+	}
+	require.NoError(t, AddReaction(db, reaction))
+	require.NotEmpty(t, reaction.ID)
+
+	reactions, err := ListReactionsByMessage(db, s.ID, msg.ID)
+	require.NoError(t, err)
+	require.Len(t, reactions, 1)
+	assert.Equal(t, "thumbs_up", reactions[0].Reaction)
+	assert.Equal(t, "user-1", reactions[0].UserID)
+
+	byMessage, err := ListReactionsByMessages(db, s.ID, []string{msg.ID, "missing-message"})
+	require.NoError(t, err)
+	require.Len(t, byMessage[msg.ID], 1)
+	assert.Empty(t, byMessage["missing-message"])
+
+	counts, err := ReactionCountsByMessage(db, s.ID, []string{msg.ID, "missing-message"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), counts[msg.ID])
+	assert.Zero(t, counts["missing-message"])
+
+	summaries, err := ReactionSummariesByMessage(db, s.ID, msg.ID)
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+	assert.Equal(t, "thumbs_up", summaries[0].Reaction)
+	assert.Equal(t, 1, summaries[0].Count)
+	assert.Equal(t, []string{"user-1"}, summaries[0].UserIDs)
+
+	require.NoError(t, RemoveReaction(db, s.ID, msg.ID, "user-1", "thumbs_up"))
+
+	reactions, err = ListReactionsByMessage(db, s.ID, msg.ID)
+	require.NoError(t, err)
+	assert.Empty(t, reactions)
+}
+
+func TestMessageReactionRepo_AddReactionIsIdempotentForDuplicateUserReaction(t *testing.T) {
+	db := setupSQLite(t)
+	s := createTestSession(t, db)
+	msg := &model.Message{
+		SessionID:   s.ID,
+		SeqID:       1,
+		ClientMsgID: "reaction-client-duplicate",
+		SenderType:  model.SenderTypeUser,
+		SenderID:    "sender-1",
+		ContentType: model.ContentTypeText,
+		Content:     `{"text":"hello"}`,
+	}
+	require.NoError(t, InsertMessage(db, msg))
+
+	reaction := model.MessageReaction{
+		SessionID: s.ID,
+		MessageID: msg.ID,
+		UserID:    "user-1",
+		Reaction:  "heart",
+	}
+	require.NoError(t, AddReaction(db, &reaction))
+	require.NoError(t, AddReaction(db, &model.MessageReaction{
+		SessionID: s.ID,
+		MessageID: msg.ID,
+		UserID:    "user-1",
+		Reaction:  "heart",
+	}))
+
+	counts, err := ReactionCountsByMessage(db, s.ID, []string{msg.ID})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), counts[msg.ID])
+}
+
+func TestMessageReactionRepo_RemoveReactionIsIdempotentForMissingRows(t *testing.T) {
+	db := setupSQLite(t)
+
+	require.NoError(t, RemoveReaction(db, "missing-session", "missing-message", "missing-user", "heart"))
+}
+
+func TestMessageReactionRepo_EmptyInputsReturnEmptyMaps(t *testing.T) {
+	db := setupSQLite(t)
+
+	byMessage, err := ListReactionsByMessages(db, "session-1", nil)
+	require.NoError(t, err)
+	assert.Empty(t, byMessage)
+
+	counts, err := ReactionCountsByMessage(db, "session-1", nil)
+	require.NoError(t, err)
+	assert.Empty(t, counts)
+
+	summaries, err := ReactionSummariesByMessage(db, "session-1", "message-1")
+	require.NoError(t, err)
+	assert.Empty(t, summaries)
+}
+
 func TestMessageAttachmentRepo_CreateAndAccess(t *testing.T) {
 	db := setupSQLite(t)
 	s := createTestSession(t, db)
@@ -849,6 +1101,58 @@ func TestMessageAttachmentRepo_CreateAndAccess(t *testing.T) {
 	allowed, err = CanUserAccessReferencedAttachment(db, "viewer-1", "att-1")
 	require.NoError(t, err)
 	assert.False(t, allowed)
+}
+
+func TestMessageAttachmentRepo_ListAttachmentsByMessageIDs(t *testing.T) {
+	db := setupSQLite(t)
+	s := createTestSession(t, db)
+
+	msgWithAttachment := &model.Message{
+		SessionID:   s.ID,
+		SeqID:       1,
+		ClientMsgID: "attach-client-1",
+		SenderType:  model.SenderTypeUser,
+		SenderID:    "owner-1",
+		ContentType: model.ContentTypeFile,
+		Content:     `{"attachment_id":"att-1"}`,
+	}
+	msgWithoutAttachment := &model.Message{
+		SessionID:   s.ID,
+		SeqID:       2,
+		ClientMsgID: "attach-client-2",
+		SenderType:  model.SenderTypeUser,
+		SenderID:    "owner-1",
+		ContentType: model.ContentTypeText,
+		Content:     `{"text":"plain"}`,
+	}
+	require.NoError(t, InsertMessage(db, msgWithAttachment))
+	require.NoError(t, InsertMessage(db, msgWithoutAttachment))
+
+	require.NoError(t, db.Exec(
+		`INSERT INTO attachments (id, hash, size, mime_type, original_name, uploader_user_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"att-1", "hash-1", 42, "text/plain", "notes.txt", "owner-1", `{"height":3,"width":2}`, time.Now(),
+	).Error)
+	require.NoError(t, CreateMessageAttachmentReferences(db, []model.MessageAttachment{{
+		SessionID:    s.ID,
+		MessageID:    msgWithAttachment.ID,
+		AttachmentID: "att-1",
+	}}))
+
+	attachmentsByMessage, err := ListAttachmentsByMessageIDs(db, []string{msgWithAttachment.ID, msgWithoutAttachment.ID})
+	require.NoError(t, err)
+
+	require.Len(t, attachmentsByMessage[msgWithAttachment.ID], 1)
+	assert.Equal(t, "att-1", attachmentsByMessage[msgWithAttachment.ID][0].ID)
+	assert.Equal(t, "hash-1", attachmentsByMessage[msgWithAttachment.ID][0].Hash)
+	assert.Equal(t, int64(42), attachmentsByMessage[msgWithAttachment.ID][0].Size)
+	assert.Equal(t, "text/plain", attachmentsByMessage[msgWithAttachment.ID][0].MimeType)
+	assert.Equal(t, "notes.txt", attachmentsByMessage[msgWithAttachment.ID][0].OriginalName)
+	assert.JSONEq(t, `{"height":3,"width":2}`, attachmentsByMessage[msgWithAttachment.ID][0].Metadata)
+	assert.Empty(t, attachmentsByMessage[msgWithoutAttachment.ID])
+
+	empty, err := ListAttachmentsByMessageIDs(db, nil)
+	require.NoError(t, err)
+	assert.Empty(t, empty)
 }
 
 func TestMessageRepo_GetByIDs(t *testing.T) {
@@ -1018,6 +1322,23 @@ func TestFriendshipRepo_BlockAndDelete(t *testing.T) {
 	assert.Nil(t, found)
 }
 
+func TestFriendshipRepo_DeleteFriendshipDeletesLoadedRow(t *testing.T) {
+	db := setupSQLite(t)
+
+	target := &model.Friendship{UserID: "delete-u1", FriendID: "delete-u2", Status: model.StatusPending}
+	other := &model.Friendship{UserID: "keep-u1", FriendID: "keep-u2", Status: model.StatusBlocked}
+	require.NoError(t, CreateFriendship(db, target))
+	require.NoError(t, CreateFriendship(db, other))
+
+	require.NoError(t, DeleteFriendship(db, target))
+
+	_, err := GetFriendshipByID(db, target.ID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	kept, err := GetFriendshipByID(db, other.ID)
+	require.NoError(t, err)
+	assert.Equal(t, other.ID, kept.ID)
+}
+
 func TestFriendshipRepo_Upsert(t *testing.T) {
 	db := setupSQLite(t)
 
@@ -1118,6 +1439,7 @@ func TestAttachmentRepo_CreateAndGet(t *testing.T) {
 		MimeType:       "image/png",
 		OriginalName:   "screenshot.png",
 		UploaderUserID: "user-att",
+		Metadata:       `{"origin":"test"}`,
 	}
 	err := CreateAttachment(db, a)
 	require.NoError(t, err)
@@ -1128,6 +1450,7 @@ func TestAttachmentRepo_CreateAndGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "abc123hash", fetched.Hash)
 	assert.Equal(t, int64(2048), fetched.Size)
+	assert.JSONEq(t, `{"origin":"test"}`, fetched.Metadata)
 
 	// Get by hash
 	fetched, err = GetAttachmentByHash(db, "abc123hash")

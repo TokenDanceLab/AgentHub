@@ -261,6 +261,86 @@ func TestCallbackClient_NoRetryOnClientError(t *testing.T) {
 	}
 }
 
+func TestCallbackClient_ErrorDoesNotLeakHubResponseBody(t *testing.T) {
+	rawBody := `{"error":"invalid","access_token":"hub-access-token-secret","client_secret":"hub-client-secret-value","path":"C:\\Users\\Example\\agenthub\\hub-server\\.env"}`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(rawBody))
+	}))
+	defer srv.Close()
+
+	client := hub.NewCallbackClient(srv.URL, "test-token")
+	err := client.TaskAck(context.Background(), "task-001", "run-001")
+	if err == nil {
+		t.Fatal("expected error for 400 response")
+	}
+
+	errText := err.Error()
+	for _, leaked := range []string{
+		"hub-access-token-secret",
+		"hub-client-secret-value",
+		"C:\\Users\\Example\\agenthub\\hub-server\\.env",
+		"access_token",
+		"client_secret",
+	} {
+		if strings.Contains(errText, leaked) {
+			t.Fatalf("callback error leaked %q: %s", leaked, errText)
+		}
+	}
+	for _, expected := range []string{
+		"status=400",
+		"body_len=",
+		"body_sha256_prefix=",
+		"category=client_error",
+	} {
+		if !strings.Contains(errText, expected) {
+			t.Fatalf("callback error missing %q: %s", expected, errText)
+		}
+	}
+}
+
+func TestCallbackClient_AppRejectedErrorDoesNotLeakHubMessage(t *testing.T) {
+	rawBody := `{"code":"REJECTED","message":"client_secret=hub-client-secret-value access_token=hub-access-token-secret C:\\Users\\Example\\agenthub\\hub-server\\.env"}`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(rawBody))
+	}))
+	defer srv.Close()
+
+	client := hub.NewCallbackClient(srv.URL, "test-token")
+	err := client.TaskAck(context.Background(), "task-001", "run-001")
+	if err == nil {
+		t.Fatal("expected error for non-OK Hub application code")
+	}
+
+	errText := err.Error()
+	for _, leaked := range []string{
+		"hub-access-token-secret",
+		"hub-client-secret-value",
+		"C:\\Users\\Example\\agenthub\\hub-server\\.env",
+		"access_token",
+		"client_secret",
+		"REJECTED",
+	} {
+		if strings.Contains(errText, leaked) {
+			t.Fatalf("callback error leaked %q: %s", leaked, errText)
+		}
+	}
+	for _, expected := range []string{
+		"status=200",
+		"body_len=",
+		"body_sha256_prefix=",
+		"category=app_rejected",
+	} {
+		if !strings.Contains(errText, expected) {
+			t.Fatalf("callback error missing %q: %s", expected, errText)
+		}
+	}
+}
+
 func TestCallbackClient_ContextCancellation(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Hang until context is cancelled

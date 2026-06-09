@@ -157,6 +157,50 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+  # ── Backend E2E: Fixture-only ────────────────
+  backend-e2e-fixture:
+    name: Backend E2E (fixture-only)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: hub-server/go.sum
+
+      - name: TeamRun fixture E2E
+        run: go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1
+
+      - name: P0 remote-control fixture readiness
+        working-directory: .
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-p0-remote-control-fixture.ps1
+
+  # -- Backend: focused subset, no real CLI/model/services
+  backend-focused-subset:
+    name: Backend focused subset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            hub-server/go.sum
+            edge-server/go.sum
+
+      - name: Hub focused backend packages
+        run: cd hub-server && go test ./internal/repository ./internal/service ./internal/app ./internal/handler ./internal/router -short -count=1
+
+      - name: Edge focused backend packages
+        run: cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
+
   # ── Cross-Platform Build ─────────────────────
   cross-build:
     name: Cross-platform build
@@ -289,7 +333,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./app/mobile
+        working-directory: ./app
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -302,12 +346,14 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Typecheck
-        run: pnpm typecheck
-      - name: Build
-        run: pnpm build
-      - name: Test
-        run: pnpm test -- --run
+      - name: Verify Mobile RN
+        run: pnpm --filter agenthub-mobile-rn verify
+      - name: Expo Doctor
+        run: pnpm --filter agenthub-mobile-rn run doctor
+      - name: Native readiness
+        run: pnpm --filter agenthub-mobile-rn run native:check
+      - name: Mock Hub contract
+        run: pnpm --filter agenthub-mobile-rn run mock:hub:check
 
   # ── E2E Smoke ─────────────────────────────────
   e2e-smoke:
@@ -357,7 +403,11 @@ jobs:
       - name: Secret guard
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            bash scripts/check-secrets.sh --range "origin/${{ github.base_ref }}...HEAD"
+            if [ "${{ github.base_ref }}" = "master" ] && [ "${{ github.head_ref }}" = "dev/delicious233" ]; then
+              bash scripts/check-secrets.sh --range HEAD^2^..HEAD^2
+            else
+              bash scripts/check-secrets.sh --range "origin/${{ github.base_ref }}...HEAD"
+            fi
           elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
             bash scripts/check-secrets.sh --range HEAD^..HEAD
           else

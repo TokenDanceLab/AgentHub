@@ -6,6 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -28,11 +31,20 @@ import (
 )
 
 type mockAttachmentService struct {
-	probeCalled      bool
-	saveCalled       bool
-	saveMimeType     string
-	saveOriginalName string
-	getAttachment    *model.Attachment
+	probeCalled        bool
+	saveCalled         bool
+	storeCalled        bool
+	getBlobCalled      bool
+	saveMimeType       string
+	saveOriginalName   string
+	saveMetadata       string
+	getAttachment      *model.Attachment
+	allowedMimeTypes   map[string]bool
+	remoteStorage      bool
+	presignURL         string
+	presignHash        string
+	presignType        string
+	presignDisposition string
 }
 
 func (m *mockAttachmentService) ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error) {
@@ -47,6 +59,14 @@ func (m *mockAttachmentService) SaveAttachment(ctx context.Context, uploaderID, 
 	return &model.Attachment{Hash: hash, Size: size, MimeType: mimeType, OriginalName: originalName}, nil
 }
 
+func (m *mockAttachmentService) SaveAttachmentWithMetadata(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64, metadata string) (*model.Attachment, error) {
+	m.saveCalled = true
+	m.saveMimeType = mimeType
+	m.saveOriginalName = originalName
+	m.saveMetadata = metadata
+	return &model.Attachment{Hash: hash, Size: size, MimeType: mimeType, OriginalName: originalName, Metadata: metadata}, nil
+}
+
 func (m *mockAttachmentService) GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error) {
 	if m.getAttachment != nil {
 		return m.getAttachment, nil
@@ -59,10 +79,12 @@ func (m *mockAttachmentService) MaxUploadSize() int64 {
 }
 
 func (m *mockAttachmentService) StoreBlob(ctx context.Context, hash string, r io.Reader, contentType string) (bool, error) {
+	m.storeCalled = true
 	return true, nil
 }
 
 func (m *mockAttachmentService) GetBlob(ctx context.Context, hash string) (io.ReadCloser, error) {
+	m.getBlobCalled = true
 	return io.NopCloser(strings.NewReader("")), nil
 }
 
@@ -71,11 +93,28 @@ func (m *mockAttachmentService) DeleteBlob(ctx context.Context, hash string) err
 }
 
 func (m *mockAttachmentService) BlobLocalPath(hash string) string {
+	if m.remoteStorage {
+		return ""
+	}
 	relPath := service.PathFromHash(hash)
 	if relPath == "" {
 		return ""
 	}
 	return filepath.Join(".", relPath, hash)
+}
+
+func (m *mockAttachmentService) PresignBlobURL(ctx context.Context, hash string, contentType string, contentDisposition string) (string, error) {
+	m.presignHash = hash
+	m.presignType = contentType
+	m.presignDisposition = contentDisposition
+	return m.presignURL, nil
+}
+
+func (m *mockAttachmentService) IsAttachmentMimeTypeAllowed(mimeType string) bool {
+	if m.allowedMimeTypes == nil {
+		return true
+	}
+	return m.allowedMimeTypes[mimeType]
 }
 
 func TestAttachmentUploadRejectsMalformedHashBeforePathDerivation(t *testing.T) {
@@ -268,6 +307,117 @@ func TestAttachmentUploadSniffsMimeTypeInsteadOfTrustingMultipartHeader(t *testi
 	}
 }
 
+func TestAttachmentUploadRejectsDisallowedSniffedMimeBeforeStorage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Chdir(t.TempDir())
+
+	content := []byte("opaque binary payload")
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+
+	svc := &mockAttachmentService{allowedMimeTypes: map[string]bool{
+		"text/plain": false,
+	}}
+	h := handler.NewAttachmentHandler(svc)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("hash", hash); err != nil {
+		t.Fatalf("WriteField hash returned error: %v", err)
+	}
+	if err := writer.WriteField("original_name", "payload.bin"); err != nil {
+		t.Fatalf("WriteField original_name returned error: %v", err)
+	}
+	part, err := writer.CreateFormFile("file", "payload.bin")
+	if err != nil {
+		t.Fatalf("CreateFormFile returned error: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("part.Write returned error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close returned error: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "user-1")
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/attachments", &body)
+	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	h.Upload(c)
+
+	if w.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("expected status 415, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Error.Code != "ATTACH_TYPE_NOT_ALLOWED" {
+		t.Fatalf("expected ATTACH_TYPE_NOT_ALLOWED, got %s", resp.Error.Code)
+	}
+	if svc.storeCalled {
+		t.Fatal("StoreBlob should not be called for a disallowed MIME type")
+	}
+	if svc.saveCalled {
+		t.Fatal("SaveAttachment should not be called for a disallowed MIME type")
+	}
+}
+
+func TestAttachmentUploadExtractsPNGDimensionsIntoMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Chdir(t.TempDir())
+
+	content := makePNGAttachmentBytes(t, 2, 3)
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+
+	svc := &mockAttachmentService{}
+	h := handler.NewAttachmentHandler(svc)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("hash", hash); err != nil {
+		t.Fatalf("WriteField hash returned error: %v", err)
+	}
+	if err := writer.WriteField("original_name", "preview.png"); err != nil {
+		t.Fatalf("WriteField original_name returned error: %v", err)
+	}
+	part, err := writer.CreateFormFile("file", "preview.png")
+	if err != nil {
+		t.Fatalf("CreateFormFile returned error: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("part.Write returned error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close returned error: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "user-1")
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/attachments", &body)
+	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	h.Upload(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if svc.saveMimeType != "image/png" {
+		t.Fatalf("saved MIME type = %q, want image/png", svc.saveMimeType)
+	}
+	if svc.saveMetadata != `{"height":3,"width":2}` {
+		t.Fatalf("saved metadata = %q, want PNG dimensions", svc.saveMetadata)
+	}
+}
+
 func TestAttachmentUploadUsesConfiguredLocalStorageDir(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	workDir := t.TempDir()
@@ -336,6 +486,18 @@ func TestAttachmentUploadUsesConfiguredLocalStorageDir(t *testing.T) {
 	}
 }
 
+func makePNGAttachmentBytes(t *testing.T, width, height int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	img.Set(width-1, height-1, color.RGBA{G: 255, A: 255})
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("png.Encode returned error: %v", err)
+	}
+	return buf.Bytes()
+}
+
 func TestAttachmentDownloadFormatsUnsafeFilenameSafely(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Chdir(t.TempDir())
@@ -385,5 +547,63 @@ func TestAttachmentDownloadFormatsUnsafeFilenameSafely(t *testing.T) {
 	}
 	if params["filename"] == "" {
 		t.Fatalf("Content-Disposition missing sanitized filename: %q", disposition)
+	}
+}
+
+func TestAttachmentDownloadRedirectsToPresignedRemoteURLWithSafeDisposition(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	content := []byte("remote body")
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+
+	svc := &mockAttachmentService{
+		remoteStorage: true,
+		presignURL:    "https://s3.example.test/bucket/object?signature=abc",
+		getAttachment: &model.Attachment{
+			ID:           "att-remote",
+			Hash:         hash,
+			Size:         int64(len(content)),
+			MimeType:     "text/plain; charset=utf-8",
+			OriginalName: "..\\evil\"\r\nX-Injected: yes.txt",
+		},
+	}
+	h := handler.NewAttachmentHandler(svc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "user-1")
+	c.Params = []gin.Param{{Key: "id", Value: "att-remote"}}
+	c.Request = httptest.NewRequest(http.MethodGet, "/client/attachments/att-remote", nil)
+
+	h.Download(c)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("expected status 302, got %d: %s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Location"); got != svc.presignURL {
+		t.Fatalf("Location = %q, want presigned URL", got)
+	}
+	if svc.getBlobCalled {
+		t.Fatal("GetBlob should not be called when presigned redirect is available")
+	}
+	if svc.presignHash != hash {
+		t.Fatalf("presign hash = %q, want %q", svc.presignHash, hash)
+	}
+	if svc.presignType != "text/plain; charset=utf-8" {
+		t.Fatalf("presign content type = %q, want sanitized attachment content type", svc.presignType)
+	}
+	if strings.ContainsAny(svc.presignDisposition, "\r\n") {
+		t.Fatalf("presign disposition contains raw newline bytes: %q", svc.presignDisposition)
+	}
+	mediaType, params, err := mime.ParseMediaType(svc.presignDisposition)
+	if err != nil {
+		t.Fatalf("presign disposition is not parseable: %q: %v", svc.presignDisposition, err)
+	}
+	if mediaType != "attachment" {
+		t.Fatalf("presign disposition media type = %q, want attachment", mediaType)
+	}
+	if params["filename"] != "evil\"X-Injected: yes.txt" {
+		t.Fatalf("presign filename = %q, want sanitized base filename", params["filename"])
 	}
 }

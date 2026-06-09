@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +23,12 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	}
 	if cfg.StoreFile != "" {
 		t.Fatalf("StoreFile = %q, want empty", cfg.StoreFile)
+	}
+	if cfg.StoreBackend != "" {
+		t.Fatalf("StoreBackend = %q, want empty", cfg.StoreBackend)
+	}
+	if cfg.StoreDB != "" {
+		t.Fatalf("StoreDB = %q, want empty", cfg.StoreDB)
 	}
 	if cfg.RunnerProfile != "" {
 		t.Fatalf("RunnerProfile = %q, want empty", cfg.RunnerProfile)
@@ -76,6 +85,146 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 	}
 	if got, want := []string(cfg.RunnerEnv), []string{"AGENTHUB_PROFILE_RUN={{run.id}}", "AGENTHUB_PROFILE_THREAD={{run.threadId}}"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("RunnerEnv = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigParsesMemoryStoreBackend(t *testing.T) {
+	cfg, err := buildConfig([]string{"--store-backend", "memory"})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.StoreBackend != "memory" {
+		t.Fatalf("StoreBackend = %q, want memory", cfg.StoreBackend)
+	}
+}
+
+func TestBuildConfigParsesFileStoreBackend(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--store-backend", "file",
+		"--store-file", "edge-store.json",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.StoreBackend != "file" {
+		t.Fatalf("StoreBackend = %q, want file", cfg.StoreBackend)
+	}
+	if cfg.StoreFile != "edge-store.json" {
+		t.Fatalf("StoreFile = %q, want edge-store.json", cfg.StoreFile)
+	}
+}
+
+func TestBuildConfigParsesSQLiteStoreBackend(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--store-backend", "sqlite",
+		"--store-db", "edge-store.db",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.StoreBackend != "sqlite" {
+		t.Fatalf("StoreBackend = %q, want sqlite", cfg.StoreBackend)
+	}
+	if cfg.StoreDB != "edge-store.db" {
+		t.Fatalf("StoreDB = %q, want edge-store.db", cfg.StoreDB)
+	}
+}
+
+func TestBuildConfigParsesStoreReadiness(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--store-readiness",
+		"--store-backend", "sqlite",
+		"--store-db", "edge-store.db",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if !cfg.StoreReadiness {
+		t.Fatal("StoreReadiness = false, want true")
+	}
+	if cfg.StoreBackend != "sqlite" || cfg.StoreDB != "edge-store.db" {
+		t.Fatalf("store config = backend %q db %q, want sqlite edge-store.db", cfg.StoreBackend, cfg.StoreDB)
+	}
+}
+
+func TestBuildConfigRejectsStoreReadinessWithoutSQLite(t *testing.T) {
+	_, err := buildConfig([]string{"--store-readiness", "--store-backend", "memory"})
+	if err == nil || !strings.Contains(err.Error(), "--store-readiness requires --store-backend sqlite") {
+		t.Fatalf("buildConfig error = %v, want store-readiness sqlite requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsInvalidStoreBackend(t *testing.T) {
+	_, err := buildConfig([]string{"--store-backend", "postgres"})
+	if err == nil || !strings.Contains(err.Error(), "supported values: memory, file, sqlite") {
+		t.Fatalf("buildConfig error = %v, want supported backend list", err)
+	}
+}
+
+func TestBuildConfigRejectsMemoryStoreWithFile(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-backend", "memory",
+		"--store-file", "edge-store.json",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-file cannot be combined with --store-backend memory") {
+		t.Fatalf("buildConfig error = %v, want memory/file conflict", err)
+	}
+}
+
+func TestBuildConfigRejectsMemoryStoreWithDB(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-backend", "memory",
+		"--store-db", "edge-store.db",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-db cannot be combined with --store-backend memory") {
+		t.Fatalf("buildConfig error = %v, want memory/db conflict", err)
+	}
+}
+
+func TestBuildConfigRejectsFileStoreWithoutFile(t *testing.T) {
+	_, err := buildConfig([]string{"--store-backend", "file"})
+	if err == nil || !strings.Contains(err.Error(), "--store-backend file requires --store-file") {
+		t.Fatalf("buildConfig error = %v, want file path requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsFileStoreWithDB(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-backend", "file",
+		"--store-file", "edge-store.json",
+		"--store-db", "edge-store.db",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-db cannot be combined with --store-backend file") {
+		t.Fatalf("buildConfig error = %v, want file/db conflict", err)
+	}
+}
+
+func TestBuildConfigRejectsSQLiteStoreWithoutDB(t *testing.T) {
+	_, err := buildConfig([]string{"--store-backend", "sqlite"})
+	if err == nil || !strings.Contains(err.Error(), "--store-backend sqlite requires --store-db") {
+		t.Fatalf("buildConfig error = %v, want sqlite db requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsStoreDBWithoutSQLiteBackend(t *testing.T) {
+	_, err := buildConfig([]string{"--store-db", "edge-store.db"})
+	if err == nil || !strings.Contains(err.Error(), "--store-db requires --store-backend sqlite") {
+		t.Fatalf("buildConfig error = %v, want sqlite backend requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsStoreFileWithSQLiteStore(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--store-file", "edge-store.json",
+		"--store-backend", "sqlite",
+		"--store-db", "edge-store.db",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--store-file cannot be combined with --store-backend sqlite") {
+		t.Fatalf("buildConfig error = %v, want store backend conflict", err)
 	}
 }
 
@@ -288,6 +437,16 @@ func TestNewStoreFromConfigUsesMemoryStoreByDefault(t *testing.T) {
 	}
 }
 
+func TestNewStoreFromConfigUsesMemoryStore(t *testing.T) {
+	repository, err := newStoreFromConfig(config{StoreBackend: "memory"})
+	if err != nil {
+		t.Fatalf("newStoreFromConfig returned error: %v", err)
+	}
+	if _, ok := repository.(*store.Store); !ok {
+		t.Fatalf("repository type = %T, want *store.Store", repository)
+	}
+}
+
 func TestNewStoreFromConfigUsesFileStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "edge-store.json")
 
@@ -303,6 +462,299 @@ func TestNewStoreFromConfigUsesFileStore(t *testing.T) {
 	_, _ = fileStore.CreateProject("proj_test", "Test Project")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("store file was not written: %v", err)
+	}
+}
+
+func TestNewStoreFromConfigRejectsFileStoreWithoutFile(t *testing.T) {
+	_, err := newStoreFromConfig(config{StoreBackend: "file"})
+	if err == nil || !strings.Contains(err.Error(), "--store-backend file requires --store-file") {
+		t.Fatalf("newStoreFromConfig error = %v, want file path requirement", err)
+	}
+}
+
+func TestNewStoreFromConfigUsesSQLiteStore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "edge-store.db")
+
+	repository, err := newStoreFromConfig(config{StoreBackend: "sqlite", StoreDB: path})
+	if err != nil {
+		t.Fatalf("newStoreFromConfig returned error: %v", err)
+	}
+	sqliteStore, ok := repository.(*store.SQLiteStore)
+	if !ok {
+		t.Fatalf("repository type = %T, want *store.SQLiteStore", repository)
+	}
+	defer sqliteStore.Close()
+
+	_, _ = sqliteStore.CreateProject("proj_test", "Test Project")
+	restored, err := store.NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite restored returned error: %v", err)
+	}
+	defer restored.Close()
+	if got := restored.ListProjects(); len(got) != 1 || got[0].ID != "proj_test" {
+		t.Fatalf("restored projects = %#v, want proj_test", got)
+	}
+}
+
+func TestSQLiteDurableObservedFixtureSmoke(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "edge-observed-fixture.db")
+	cfg, err := buildConfig([]string{
+		"--store-backend", "sqlite",
+		"--store-db", dbPath,
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	repository, err := newStoreFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("newStoreFromConfig returned error: %v", err)
+	}
+	sqliteStore, ok := repository.(*store.SQLiteStore)
+	if !ok {
+		t.Fatalf("repository type = %T, want *store.SQLiteStore", repository)
+	}
+
+	project, err := sqliteStore.CreateProject("proj_observed_fixture", "Observed Fixture Project")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := sqliteStore.CreateThread("thread_observed_fixture", project.ID, "Observed Fixture Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := sqliteStore.CreateRun("run_observed_fixture", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := sqliteStore.SetRunStatus(run.ID, "started"); !ok {
+		t.Fatalf("SetRunStatus(%s, started) returned false", run.ID)
+	}
+	item, err := sqliteStore.CreateItem(store.Item{
+		ID:        "item_observed_fixture",
+		ProjectID: project.ID,
+		ThreadID:  thread.ID,
+		RunID:     run.ID,
+		Type:      "run",
+		Status:    "observed",
+		Content:   "FixtureOnlyObserved: Edge SQLite durable alpha smoke",
+	})
+	if err != nil {
+		t.Fatalf("CreateItem returned error: %v", err)
+	}
+	if _, err := sqliteStore.PinThreadItem(thread.ID, item.ID, "durable-smoke"); err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
+	sqliteStore.Close()
+
+	assertObservedSQLiteRows(t, dbPath, map[string]int{
+		"project": 1,
+		"thread":  1,
+		"run":     1,
+		"item":    1,
+		"pin":     1,
+	})
+	assertObservedSQLiteRunProjection(t, dbPath, run.ID, project.ID, thread.ID, "started")
+
+	deleteObservedSQLiteSnapshot(t, dbPath)
+	reopenedRepository, err := newStoreFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("newStoreFromConfig restore returned error: %v", err)
+	}
+	reopened, ok := reopenedRepository.(*store.SQLiteStore)
+	if !ok {
+		t.Fatalf("restored repository type = %T, want *store.SQLiteStore", reopenedRepository)
+	}
+	defer reopened.Close()
+
+	if got, ok := reopened.GetThread(thread.ID); !ok || got.ProjectID != project.ID || got.Title != thread.Title {
+		t.Fatalf("restored thread = %#v ok=%v, want project/title preserved", got, ok)
+	}
+	if got, ok := reopened.GetRun(run.ID); !ok || got.ThreadID != thread.ID || got.Status != "started" || got.StartedAt == "" {
+		t.Fatalf("restored run = %#v ok=%v, want started fixture run", got, ok)
+	}
+	if got := reopened.ListThreadItems(thread.ID); len(got) != 1 || got[0].ID != item.ID || got[0].Content != item.Content {
+		t.Fatalf("restored thread items = %#v, want observed fixture item", got)
+	}
+	if got := reopened.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "durable-smoke" {
+		t.Fatalf("restored pins = %#v, want observed fixture pin", got)
+	}
+}
+
+func TestRunStoreReadinessPrintsSQLiteManifest(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "edge-readiness-report.db")
+	repository, err := store.NewSQLite(dbPath)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	project, err := repository.CreateProject("proj_readiness_report", "Readiness Report")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := repository.CreateThread("thread_readiness_report", project.ID, "Readiness Report Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := repository.CreateRun("run_readiness_report", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := repository.SetRunStatus(run.ID, "started"); !ok {
+		t.Fatalf("SetRunStatus(%s, started) returned false", run.ID)
+	}
+	repository.Close()
+
+	var out bytes.Buffer
+	err = runStoreReadiness(config{
+		StoreBackend:   "sqlite",
+		StoreDB:        dbPath,
+		StoreReadiness: true,
+	}, &out)
+	if err != nil {
+		t.Fatalf("runStoreReadiness returned error: %v", err)
+	}
+
+	var report struct {
+		Path                   string         `json:"path"`
+		IntegrityCheck         string         `json:"integrity_check"`
+		LatestMigrationVersion int            `json:"latest_migration_version"`
+		RowCounts              map[string]int `json:"row_counts"`
+		ProjectionCounts       map[string]int `json:"projection_counts"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("readiness JSON was not valid: %v\n%s", err, out.String())
+	}
+	if report.Path != dbPath {
+		t.Fatalf("Path = %q, want %q", report.Path, dbPath)
+	}
+	if report.IntegrityCheck != "ok" {
+		t.Fatalf("IntegrityCheck = %q, want ok", report.IntegrityCheck)
+	}
+	if report.LatestMigrationVersion == 0 {
+		t.Fatal("LatestMigrationVersion = 0, want applied migrations")
+	}
+	if report.RowCounts["project"] != 1 || report.RowCounts["thread"] != 1 || report.RowCounts["run"] != 1 {
+		t.Fatalf("RowCounts = %#v, want project/thread/run rows", report.RowCounts)
+	}
+	if report.ProjectionCounts["edge_runs"] != 1 {
+		t.Fatalf("edge_runs projection count = %d, want 1", report.ProjectionCounts["edge_runs"])
+	}
+}
+
+func TestRunStoreReadinessBlocksStaleSQLiteMigrationState(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "edge-readiness-blocked.db")
+	repository, err := store.NewSQLite(dbPath)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	repository.Close()
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM agenthub_sqlite_migrations WHERE version = ?`, store.LatestSQLiteMigrationVersion()); err != nil {
+		_ = db.Close()
+		t.Fatalf("delete latest migration returned error: %v", err)
+	}
+	_ = db.Close()
+
+	var out bytes.Buffer
+	err = runStoreReadiness(config{
+		StoreBackend:   "sqlite",
+		StoreDB:        dbPath,
+		StoreReadiness: true,
+	}, &out)
+	if err == nil || !strings.Contains(err.Error(), "blocked") {
+		t.Fatalf("runStoreReadiness error = %v, want blocked readiness error", err)
+	}
+
+	var manifest struct {
+		Schema                   string `json:"schema"`
+		Status                   string `json:"status"`
+		MigrationStatus          string `json:"migration_status"`
+		ExpectedMigrationVersion int    `json:"expected_migration_version"`
+		MissingMigrationVersions []int  `json:"missing_migration_versions"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &manifest); err != nil {
+		t.Fatalf("blocked readiness JSON was not valid: %v\n%s", err, out.String())
+	}
+	if manifest.Schema != store.SQLiteReadinessManifestSchema {
+		t.Fatalf("Schema = %q, want %q", manifest.Schema, store.SQLiteReadinessManifestSchema)
+	}
+	if manifest.Status != "blocked" || manifest.MigrationStatus != "behind" {
+		t.Fatalf("manifest status = %q migration = %q, want blocked/behind", manifest.Status, manifest.MigrationStatus)
+	}
+	if got := manifest.MissingMigrationVersions; len(got) != 1 || got[0] != manifest.ExpectedMigrationVersion {
+		t.Fatalf("missing migrations = %v, want latest %d", got, manifest.ExpectedMigrationVersion)
+	}
+}
+
+func assertObservedSQLiteRows(t *testing.T, dbPath string, want map[string]int) {
+	t.Helper()
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	defer db.Close()
+
+	for kind, wantCount := range want {
+		var got int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM agenthub_store_rows WHERE row_kind = ?`, kind).Scan(&got); err != nil {
+			t.Fatalf("query agenthub_store_rows kind %s returned error: %v", kind, err)
+		}
+		if got != wantCount {
+			t.Fatalf("agenthub_store_rows kind %s count = %d, want %d", kind, got, wantCount)
+		}
+	}
+}
+
+func assertObservedSQLiteRunProjection(t *testing.T, dbPath, runID, workspaceID, threadID, status string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	defer db.Close()
+
+	var gotWorkspaceID, gotThreadID, gotStatus, gotStartedAt string
+	if err := db.QueryRow(
+		`SELECT workspace_id, thread_id, status, started_at FROM edge_runs WHERE run_id = ?`,
+		runID,
+	).Scan(&gotWorkspaceID, &gotThreadID, &gotStatus, &gotStartedAt); err != nil {
+		t.Fatalf("query edge_runs returned error: %v", err)
+	}
+	if gotWorkspaceID != workspaceID || gotThreadID != threadID || gotStatus != status || gotStartedAt == "" {
+		t.Fatalf("edge_runs projection = workspace=%q thread=%q status=%q started=%q, want workspace=%q thread=%q status=%q with started_at", gotWorkspaceID, gotThreadID, gotStatus, gotStartedAt, workspaceID, threadID, status)
+	}
+}
+
+func deleteObservedSQLiteSnapshot(t *testing.T, dbPath string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`DELETE FROM agenthub_store_snapshots`); err != nil {
+		t.Fatalf("delete agenthub_store_snapshots returned error: %v", err)
+	}
+}
+
+func TestNewStoreFromConfigReturnsSQLiteStoreErrors(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	path := filepath.Join(blocker, "edge-store.db")
+
+	_, err := newStoreFromConfig(config{StoreBackend: "sqlite", StoreDB: path})
+	if err == nil {
+		t.Fatal("newStoreFromConfig returned nil error for invalid sqlite store")
+	}
+	if !strings.Contains(err.Error(), "open sqlite store") {
+		t.Fatalf("newStoreFromConfig error = %v, want clear sqlite store error", err)
 	}
 }
 
@@ -515,6 +967,19 @@ func TestBuildConfigAgentFlags(t *testing.T) {
 	}
 }
 
+func TestBuildConfigSkillsDirs(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--skills-dir", "first",
+		"--skills-dir", "second",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if len(cfg.SkillsDirs) != 2 || cfg.SkillsDirs[0] != "first" || cfg.SkillsDirs[1] != "second" {
+		t.Fatalf("SkillsDirs = %#v, want [first second]", []string(cfg.SkillsDirs))
+	}
+}
+
 // --- Environment variable fallback tests ---
 
 func TestBuildConfigEnvVarAddr(t *testing.T) {
@@ -561,6 +1026,47 @@ func TestBuildConfigEnvVarStoreFile(t *testing.T) {
 	}
 	if cfg.StoreFile != "env-store.json" {
 		t.Fatalf("StoreFile = %q, want env-store.json from env", cfg.StoreFile)
+	}
+}
+
+func TestBuildConfigEnvVarMemoryStore(t *testing.T) {
+	t.Setenv("AGENTHUB_STORE_BACKEND", "memory")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.StoreBackend != "memory" {
+		t.Fatalf("StoreBackend = %q, want memory from env", cfg.StoreBackend)
+	}
+}
+
+func TestBuildConfigEnvVarFileStore(t *testing.T) {
+	t.Setenv("AGENTHUB_STORE_BACKEND", "file")
+	t.Setenv("AGENTHUB_STORE_FILE", "env-store.json")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.StoreBackend != "file" {
+		t.Fatalf("StoreBackend = %q, want file from env", cfg.StoreBackend)
+	}
+	if cfg.StoreFile != "env-store.json" {
+		t.Fatalf("StoreFile = %q, want env-store.json from env", cfg.StoreFile)
+	}
+}
+
+func TestBuildConfigEnvVarSQLiteStore(t *testing.T) {
+	t.Setenv("AGENTHUB_STORE_BACKEND", "sqlite")
+	t.Setenv("AGENTHUB_STORE_DB", "env-store.db")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.StoreBackend != "sqlite" {
+		t.Fatalf("StoreBackend = %q, want sqlite from env", cfg.StoreBackend)
+	}
+	if cfg.StoreDB != "env-store.db" {
+		t.Fatalf("StoreDB = %q, want env-store.db from env", cfg.StoreDB)
 	}
 }
 
@@ -627,6 +1133,83 @@ func TestBuildConfigParsesLocalAuthTokenFromFlag(t *testing.T) {
 	}
 	if cfg.LocalAuthToken != "edge-secret" {
 		t.Fatalf("LocalAuthToken = %q, want trimmed token", cfg.LocalAuthToken)
+	}
+}
+
+func TestBuildConfigParsesEdgeDeviceID(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		args []string
+		want string
+	}{
+		{
+			name: "flag",
+			env:  " env-edge-device ",
+			args: []string{"--edge-device-id", " flag-edge-device "},
+			want: "flag-edge-device",
+		},
+		{
+			name: "env",
+			env:  " env-edge-device ",
+			want: "env-edge-device",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("AGENTHUB_EDGE_DEVICE_ID", tt.env)
+			cfg, err := buildConfig(tt.args)
+			if err != nil {
+				t.Fatalf("buildConfig returned error: %v", err)
+			}
+			if got := cfg.EdgeDeviceID; got != tt.want {
+				t.Fatalf("EdgeDeviceID = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildConfigRejectsHubJWTSecretWithoutEdgeDeviceID(t *testing.T) {
+	_, err := buildConfig([]string{"--hub-jwt-secret", " hub-secret "})
+	if err == nil || !strings.Contains(err.Error(), "--hub-jwt-secret requires --edge-device-id") {
+		t.Fatalf("buildConfig error = %v, want hub jwt edge device requirement", err)
+	}
+}
+
+func TestBuildConfigParsesAllowedOriginsFromFlag(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--allowed-origin", " https://app.example.com ",
+		"--allowed-origin", "http://edge.example.com:3210",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	want := []string{"https://app.example.com", "http://edge.example.com:3210"}
+	if len(cfg.AllowedOrigins) != len(want) {
+		t.Fatalf("AllowedOrigins = %v, want %v", []string(cfg.AllowedOrigins), want)
+	}
+	for i := range want {
+		if cfg.AllowedOrigins[i] != want[i] {
+			t.Fatalf("AllowedOrigins[%d] = %q, want %q", i, cfg.AllowedOrigins[i], want[i])
+		}
+	}
+}
+
+func TestBuildConfigEnvVarAllowedOrigins(t *testing.T) {
+	t.Setenv("AGENTHUB_ALLOWED_ORIGINS", "https://app.example.com,http://edge.example.com:3210")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	want := []string{"https://app.example.com", "http://edge.example.com:3210"}
+	if len(cfg.AllowedOrigins) != len(want) {
+		t.Fatalf("AllowedOrigins = %v, want %v", []string(cfg.AllowedOrigins), want)
+	}
+	for i := range want {
+		if cfg.AllowedOrigins[i] != want[i] {
+			t.Fatalf("AllowedOrigins[%d] = %q, want %q", i, cfg.AllowedOrigins[i], want[i])
+		}
 	}
 }
 

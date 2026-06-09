@@ -1,28 +1,65 @@
-use crate::edge_manager::{EdgeStatus, SharedEdgeManager};
+use crate::edge_manager::{EdgeHostReadiness, EdgeStatus, SharedEdgeManager};
+use crate::oidc_server::{check_loopback_callback_readiness, LoopbackReadiness};
+use crate::secure_store::{check_credential_store_readiness, CredentialStoreReadiness};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::env;
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::RwLock;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
+
+#[derive(Debug, Default)]
+pub struct WorkspaceFileAccessState {
+    allowed_roots: RwLock<Vec<PathBuf>>,
+}
+
+impl WorkspaceFileAccessState {
+    fn allowed_roots(&self) -> Result<Vec<PathBuf>, String> {
+        let roots = self
+            .allowed_roots
+            .read()
+            .map_err(|_| "Workspace file access state is unavailable".to_string())?;
+        if roots.is_empty() {
+            return Err("No allowed workspace directories configured".to_string());
+        }
+        Ok(roots.clone())
+    }
+
+    fn replace_roots(&self, roots: Vec<PathBuf>) -> Result<(), String> {
+        let mut guard = self
+            .allowed_roots
+            .write()
+            .map_err(|_| "Workspace file access state is unavailable".to_string())?;
+        *guard = roots;
+        Ok(())
+    }
+
+    fn add_root(&self, root: PathBuf) -> Result<(), String> {
+        let mut guard = self
+            .allowed_roots
+            .write()
+            .map_err(|_| "Workspace file access state is unavailable".to_string())?;
+        if !guard.iter().any(|existing| existing == &root) {
+            guard.push(root);
+        }
+        Ok(())
+    }
+}
 
 /// Validate that a path is within an allowed directory.
 /// Returns the canonicalized path on success.
 fn validate_path(path: &Path, allowlist: &[PathBuf]) -> Result<PathBuf, String> {
-    let canonical = path
-        .canonicalize()
-        .or_else(|_| {
-            // For non-existent paths, canonicalize the parent and join
-            if let Some(parent) = path.parent() {
-                parent.canonicalize().map(|p| p.join(path.file_name().unwrap_or_default()))
-            } else {
-                Err(std::io::Error::new(std::io::ErrorKind::NotFound, "path has no parent"))
-            }
-        })
-        .map_err(|e| format!("Cannot resolve path '{}': {}", path.display(), e))?;
-
     if allowlist.is_empty() {
-        return Ok(canonical);
+        return Err("No allowed workspace directories configured".to_string());
     }
+
+    let canonical = resolve_for_boundary(path)
+        .map_err(|e| format!("Cannot resolve path '{}': {}", path.display(), e))?;
 
     let allowed = allowlist.iter().any(|dir| {
         let dir_canonical = dir.canonicalize().unwrap_or_else(|_| dir.clone());
@@ -37,6 +74,154 @@ fn validate_path(path: &Path, allowlist: &[PathBuf]) -> Result<PathBuf, String> 
             path.display()
         ))
     }
+}
+
+fn resolve_for_boundary(path: &Path) -> std::io::Result<PathBuf> {
+    if path.exists() {
+        return path.canonicalize();
+    }
+
+    let mut missing: Vec<OsString> = Vec::new();
+    let mut ancestor = path;
+    while !ancestor.exists() {
+        let name = ancestor.file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "path has no existing ancestor",
+            )
+        })?;
+        missing.push(name.to_os_string());
+        ancestor = ancestor.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "path has no existing ancestor",
+            )
+        })?;
+    }
+
+    let mut canonical = ancestor.canonicalize()?;
+    for component in missing.iter().rev() {
+        canonical.push(component);
+    }
+    Ok(canonical)
+}
+
+fn validate_state_path(path: &Path, access: &WorkspaceFileAccessState) -> Result<PathBuf, String> {
+    validate_path(path, &access.allowed_roots()?)
+}
+
+fn workspace_roots_from_store_data(data: &WorkspaceStoreData) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    for entry in &data.workspaces {
+        let path = PathBuf::from(entry.path.trim());
+        if !path.is_absolute() || !path.is_dir() {
+            continue;
+        }
+        let canonical = path.canonicalize().unwrap_or(path);
+        if !roots.iter().any(|root| root == &canonical) {
+            roots.push(canonical);
+        }
+    }
+    roots
+}
+
+fn replace_workspace_roots_from_store(
+    access: &WorkspaceFileAccessState,
+    data: &WorkspaceStoreData,
+) -> Result<(), String> {
+    let roots = authorized_workspace_roots_from_store_data(access, data)?;
+    access.replace_roots(roots)
+}
+
+fn replace_workspace_roots_from_trusted_store(
+    access: &WorkspaceFileAccessState,
+    data: &WorkspaceStoreData,
+) -> Result<(), String> {
+    access.replace_roots(workspace_roots_from_store_data(data))
+}
+
+fn authorized_workspace_roots_from_store_data(
+    access: &WorkspaceFileAccessState,
+    data: &WorkspaceStoreData,
+) -> Result<Vec<PathBuf>, String> {
+    let roots = workspace_roots_from_store_data(data);
+    if roots.is_empty() {
+        return Ok(Vec::new());
+    }
+    let allowed = access.allowed_roots().map_err(|_| {
+        "Workspace store sync contains workspace roots that are not authorized by the host; use the native workspace picker before syncing"
+            .to_string()
+    })?;
+    let mut authorized = Vec::new();
+    for root in roots {
+        let canonical = validate_path(&root, &allowed).map_err(|_| {
+            format!(
+                "Workspace root '{}' is not authorized by the host; use the native workspace picker before syncing",
+                root.display()
+            )
+        })?;
+        if !authorized.iter().any(|existing| existing == &canonical) {
+            authorized.push(canonical);
+        }
+    }
+    Ok(authorized)
+}
+
+fn authorize_workspace_root_from_host_path(
+    path: impl AsRef<Path>,
+    access: &WorkspaceFileAccessState,
+) -> Result<PathBuf, String> {
+    let path = path.as_ref();
+    if !path.is_absolute() {
+        return Err(format!(
+            "Workspace root '{}' must be an absolute path",
+            path.display()
+        ));
+    }
+    let canonical = path
+        .canonicalize()
+        .map_err(|e| format!("Cannot resolve workspace root '{}': {}", path.display(), e))?;
+    if !canonical.is_dir() {
+        return Err(format!(
+            "Workspace root '{}' is not a directory",
+            canonical.display()
+        ));
+    }
+    access.add_root(canonical.clone())?;
+    Ok(canonical)
+}
+
+fn workspace_store_entry_for_authorized_root(path: PathBuf) -> WorkspaceStoreEntry {
+    WorkspaceStoreEntry {
+        name: path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| path.display().to_string()),
+        path: path.to_string_lossy().to_string(),
+        last_opened_at: current_unix_millis(),
+        branch: None,
+        settings: None,
+    }
+}
+
+fn upsert_workspace_store_entry(
+    mut data: WorkspaceStoreData,
+    entry: WorkspaceStoreEntry,
+) -> WorkspaceStoreData {
+    let entry_path = entry.path.to_lowercase();
+    data.workspaces
+        .retain(|existing| existing.path.to_lowercase() != entry_path);
+    data.workspaces.insert(0, entry);
+    data.workspaces.truncate(10);
+    data
+}
+
+fn current_unix_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().try_into().unwrap_or(u64::MAX))
+        .unwrap_or(0)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -54,13 +239,248 @@ pub async fn get_edge_status(state: State<'_, SharedEdgeManager>) -> Result<Edge
 }
 
 #[tauri::command]
-pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
+pub async fn get_edge_host_readiness(
+    app: tauri::AppHandle,
+    state: State<'_, SharedEdgeManager>,
+) -> Result<EdgeHostReadiness, String> {
     let mgr = state.lock().await;
-    Ok(mgr.local_auth_token().to_string())
+    Ok(mgr.host_readiness_for_app(&app))
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalEdgeLogTail {
+    pub stdout: Vec<String>,
+    pub stderr: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalEdgeDiagnostics {
+    pub readiness: EdgeHostReadiness,
+    pub status: EdgeStatus,
+    pub local_cli_discovery: LocalCliDiscoveryManifest,
+    pub packaged_login: PackagedLoginReadiness,
+    pub log_tail: LocalEdgeLogTail,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalCliDiscoveryItem {
+    pub id: String,
+    pub name: String,
+    pub installed: bool,
+    pub version: Option<String>,
+    pub path: String,
+    pub no_spend: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalCliDiscoveryManifest {
+    pub mode: String,
+    pub readiness_manifest: String,
+    pub readiness_script: String,
+    pub generated_at: Option<String>,
+    pub items: Vec<LocalCliDiscoveryItem>,
 }
 
 #[tauri::command]
-pub async fn start_edge(app: tauri::AppHandle, state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
+pub async fn get_local_edge_diagnostics(
+    app: tauri::AppHandle,
+    state: State<'_, SharedEdgeManager>,
+) -> Result<LocalEdgeDiagnostics, String> {
+    let mgr = state.lock().await;
+    let readiness = mgr.host_readiness_for_app(&app);
+    let status = mgr.status();
+    let packaged_login = PackagedLoginReadiness {
+        loopback: check_loopback_callback_readiness(),
+        credential_store: check_credential_store_readiness(),
+        real_e2e: PackagedLoginRealE2EGate {
+            status: "proposal_only".to_string(),
+            reason: "Real packaged login E2E requires an explicit TokenDance ID/browser gate."
+                .to_string(),
+        },
+    };
+    let log_tail = LocalEdgeLogTail {
+        stdout: read_log_tail(&readiness.log_paths.stdout, 20),
+        stderr: read_log_tail(&readiness.log_paths.stderr, 20),
+    };
+
+    Ok(LocalEdgeDiagnostics {
+        readiness,
+        status,
+        local_cli_discovery: build_local_cli_discovery(),
+        packaged_login,
+        log_tail,
+    })
+}
+
+#[tauri::command]
+pub async fn get_local_cli_discovery() -> Result<LocalCliDiscoveryManifest, String> {
+    Ok(build_local_cli_discovery())
+}
+
+#[tauri::command]
+pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
+    let mgr = state.lock().await;
+    mgr.local_auth_token().map(str::to_string)
+}
+
+fn build_local_cli_discovery() -> LocalCliDiscoveryManifest {
+    LocalCliDiscoveryManifest {
+        mode: "no-spend-discovery".to_string(),
+        readiness_manifest: "docs/audit/p0-edge-cli-real-readiness.md".to_string(),
+        readiness_script: "scripts/verify-edge-cli-real-readiness.ps1".to_string(),
+        generated_at: None,
+        items: vec![
+            discover_cli("codex", "Codex CLI", "codex", "AGENTHUB_CODEX_PATH"),
+            discover_cli(
+                "claude-code",
+                "Claude Code",
+                "claude",
+                "AGENTHUB_CLAUDE_CODE_PATH",
+            ),
+            discover_cli(
+                "opencode",
+                "OpenCode",
+                "opencode",
+                "AGENTHUB_OPENCODE_PATH",
+            ),
+        ],
+    }
+}
+
+fn discover_cli(id: &str, name: &str, command: &str, env_var: &str) -> LocalCliDiscoveryItem {
+    let configured = env::var(env_var)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| command.to_string());
+    let resolved_path = resolve_cli_path(&configured);
+    let installed = resolved_path.is_some();
+    let path = resolved_path.unwrap_or(configured);
+    let version = if installed {
+        read_cli_version(&path)
+    } else {
+        None
+    };
+
+    LocalCliDiscoveryItem {
+        id: id.to_string(),
+        name: name.to_string(),
+        installed,
+        version,
+        path,
+        no_spend: true,
+    }
+}
+
+fn resolve_cli_path(command: &str) -> Option<String> {
+    let candidate = Path::new(command);
+    if candidate.is_absolute() || command.contains('/') || command.contains('\\') {
+        if candidate.exists() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+        return None;
+    }
+
+    let lookup = if cfg!(target_os = "windows") {
+        ("where.exe", command)
+    } else {
+        ("which", command)
+    };
+    let output = Command::new(lookup.0).arg(lookup.1).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(str::to_string)
+}
+
+fn read_cli_version(path: &str) -> Option<String> {
+    let mut child = Command::new(path)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                let output = child.wait_with_output().ok()?;
+                let text = if output.stdout.is_empty() {
+                    String::from_utf8_lossy(&output.stderr)
+                } else {
+                    String::from_utf8_lossy(&output.stdout)
+                };
+                return text
+                    .lines()
+                    .map(str::trim)
+                    .find(|line| !line.is_empty())
+                    .map(|line| line.chars().take(120).collect());
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            Err(_) => return None,
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    Some("version probe timed out".to_string())
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PackagedLoginRealE2EGate {
+    pub status: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PackagedLoginReadiness {
+    pub loopback: LoopbackReadiness,
+    pub credential_store: CredentialStoreReadiness,
+    pub real_e2e: PackagedLoginRealE2EGate,
+}
+
+#[tauri::command]
+pub async fn get_packaged_login_readiness() -> Result<PackagedLoginReadiness, String> {
+    Ok(PackagedLoginReadiness {
+        loopback: check_loopback_callback_readiness(),
+        credential_store: check_credential_store_readiness(),
+        real_e2e: PackagedLoginRealE2EGate {
+            status: "proposal_only".to_string(),
+            reason: "Real packaged login E2E requires an explicit TokenDance ID/browser gate."
+                .to_string(),
+        },
+    })
+}
+
+fn read_log_tail(path: &str, max_lines: usize) -> Vec<String> {
+    if max_lines == 0 || path.starts_with("<app-data>") {
+        return Vec::new();
+    }
+
+    let Ok(content) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut tail = VecDeque::with_capacity(max_lines);
+    for line in content.lines() {
+        if tail.len() == max_lines {
+            tail.pop_front();
+        }
+        tail.push_back(line.to_string());
+    }
+    tail.into_iter().collect()
+}
+
+#[tauri::command]
+pub async fn start_edge(
+    app: tauri::AppHandle,
+    state: State<'_, SharedEdgeManager>,
+) -> Result<EdgeStatus, String> {
     let mut mgr = state.lock().await;
     mgr.start(&app).await?;
     Ok(mgr.status())
@@ -73,18 +493,28 @@ pub async fn stop_edge(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus
     Ok(mgr.status())
 }
 
+#[cfg(test)]
+fn edge_host_readiness_snapshot(mgr: &crate::edge_manager::EdgeManager) -> EdgeHostReadiness {
+    mgr.host_readiness()
+}
+
 // ── File Explorer Commands ──
 
 /// Walk a directory and return a tree of FileEntry nodes.
 /// Respects .gitignore patterns when a .gitignore file exists at the root.
 #[tauri::command]
-pub async fn read_dir_tree(dir: String) -> Result<Vec<FileEntry>, String> {
+pub async fn read_dir_tree(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<Vec<FileEntry>, String> {
     let root = Path::new(&dir);
+    let root = validate_state_path(root, &access)?;
     if !root.is_dir() {
         return Err(format!("Not a directory: {}", dir));
     }
-    let gitignore_patterns = load_gitignore(root);
-    walk_dir(root, root, &gitignore_patterns)
+    let roots = access.allowed_roots()?;
+    let gitignore_patterns = load_gitignore(&root);
+    walk_dir(&root, &root, &gitignore_patterns, &roots)
 }
 
 /// Create a new file at the given path. Parent directories must exist.
@@ -93,13 +523,11 @@ pub async fn read_dir_tree(dir: String) -> Result<Vec<FileEntry>, String> {
 pub async fn create_file(
     path: String,
     content: Option<String>,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if p.exists() {
         return Err(format!("File already exists: {}", path));
     }
@@ -107,24 +535,22 @@ pub async fn create_file(
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
     let data = content.unwrap_or_default();
-    fs::write(p, data).map_err(|e| format!("Failed to write file: {}", e))
+    fs::write(&p, data).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 /// Create a new directory at the given path. Creates parents as needed.
 #[tauri::command]
 pub async fn create_folder(
     path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if p.exists() {
         return Err(format!("Path already exists: {}", path));
     }
-    fs::create_dir_all(p).map_err(|e| format!("Failed to create folder: {}", e))
+    fs::create_dir_all(&p).map_err(|e| format!("Failed to create folder: {}", e))
 }
 
 /// Rename/move a file or directory from old_path to new_path.
@@ -132,15 +558,13 @@ pub async fn create_folder(
 pub async fn rename_entry(
     old_path: String,
     new_path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let src = Path::new(&old_path);
     let dst = Path::new(&new_path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(src, &dirs)?;
-        validate_path(dst, &dirs)?;
-    }
+    let src = validate_state_path(src, &access)?;
+    let dst = validate_state_path(dst, &access)?;
     if !src.exists() {
         return Err(format!("Source does not exist: {}", old_path));
     }
@@ -150,7 +574,7 @@ pub async fn rename_entry(
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
-    fs::rename(src, dst).map_err(|e| format!("Failed to rename: {}", e))
+    fs::rename(&src, &dst).map_err(|e| format!("Failed to rename: {}", e))
 }
 
 /// Copy a file. Directories are copied recursively.
@@ -158,15 +582,14 @@ pub async fn rename_entry(
 pub async fn copy_entry(
     src_path: String,
     dst_path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let src = Path::new(&src_path);
     let dst = Path::new(&dst_path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(src, &dirs)?;
-        validate_path(dst, &dirs)?;
-    }
+    let roots = access.allowed_roots()?;
+    let src = validate_path(src, &roots)?;
+    let dst = validate_path(dst, &roots)?;
     if !src.exists() {
         return Err(format!("Source does not exist: {}", src_path));
     }
@@ -177,22 +600,31 @@ pub async fn copy_entry(
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
     if src.is_dir() {
-        copy_dir_recursive(src, dst).map_err(|e| format!("Failed to copy directory: {}", e))
+        copy_dir_recursive(&src, &dst, &roots)
+            .map_err(|e| format!("Failed to copy directory: {}", e))
     } else {
-        fs::copy(src, dst).map_err(|e| format!("Failed to copy file: {}", e))?;
+        fs::copy(&src, &dst).map_err(|e| format!("Failed to copy file: {}", e))?;
         Ok(())
     }
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+fn copy_dir_recursive(src: &Path, dst: &Path, allowlist: &[PathBuf]) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
         let src_path = entry.path();
+        if file_type.is_symlink() {
+            return Err(std::io::Error::other(format!(
+                "Refusing to copy symbolic link: {}",
+                src_path.display()
+            )));
+        }
+        validate_path(&src_path, allowlist).map_err(std::io::Error::other)?;
         let dst_path = dst.join(entry.file_name());
         if file_type.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
+            validate_path(&dst_path, allowlist).map_err(std::io::Error::other)?;
+            copy_dir_recursive(&src_path, &dst_path, allowlist)?;
         } else {
             fs::copy(&src_path, &dst_path)?;
         }
@@ -204,20 +636,18 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 #[tauri::command]
 pub async fn delete_entry(
     path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if !p.exists() {
         return Err(format!("Path does not exist: {}", path));
     }
     if p.is_dir() {
-        fs::remove_dir_all(p).map_err(|e| format!("Failed to delete directory: {}", e))
+        fs::remove_dir_all(&p).map_err(|e| format!("Failed to delete directory: {}", e))
     } else {
-        fs::remove_file(p).map_err(|e| format!("Failed to delete file: {}", e))
+        fs::remove_file(&p).map_err(|e| format!("Failed to delete file: {}", e))
     }
 }
 
@@ -225,20 +655,18 @@ pub async fn delete_entry(
 #[tauri::command]
 pub async fn read_file(
     path: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<String, String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if !p.exists() {
         return Err(format!("File does not exist: {}", path));
     }
     if p.is_dir() {
         return Err(format!("Path is a directory, not a file: {}", path));
     }
-    fs::read_to_string(p).map_err(|e| format!("Failed to read file: {}", e))
+    fs::read_to_string(&p).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 /// Write content to a file, creating it if it does not exist or overwriting if it does.
@@ -247,20 +675,18 @@ pub async fn read_file(
 pub async fn write_file(
     path: String,
     content: String,
-    allowed_dirs: Option<Vec<String>>,
+    _allowed_dirs: Option<Vec<String>>,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
     let p = Path::new(&path);
-    if let Some(dirs) = &allowed_dirs {
-        let dirs: Vec<PathBuf> = dirs.iter().map(PathBuf::from).collect();
-        validate_path(p, &dirs)?;
-    }
+    let p = validate_state_path(p, &access)?;
     if p.is_dir() {
         return Err(format!("Path is a directory: {}", path));
     }
     if let Some(parent) = p.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
     }
-    fs::write(p, &content).map_err(|e| format!("Failed to write file: {}", e))
+    fs::write(&p, &content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 // ── Git Integration ──
@@ -288,13 +714,17 @@ pub struct GitFileStatus {
 /// Run `git status --porcelain -b` in the given directory and return
 /// structured data about the branch and changed files.
 #[tauri::command]
-pub async fn git_status(dir: String) -> Result<GitStatus, String> {
+pub async fn git_status(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<GitStatus, String> {
     let work_dir = Path::new(&dir);
+    let work_dir = validate_state_path(work_dir, &access)?;
 
     // Run git status --porcelain -b
     let output = Command::new("git")
         .args(["status", "--porcelain", "-b"])
-        .current_dir(work_dir)
+        .current_dir(&work_dir)
         .output()
         .map_err(|e| format!("Failed to run git: {}", e))?;
 
@@ -551,28 +981,50 @@ fn parse_porcelain_line(line: &str) -> Option<GitFileStatus> {
 /// Run `git diff` (unstaged changes) in the given directory and return
 /// the raw unified diff output.
 #[tauri::command]
-pub async fn git_diff_unstaged(dir: String) -> Result<String, String> {
-    run_git_diff(&dir, &["diff"])
+pub async fn git_diff_unstaged(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<String, String> {
+    run_git_diff(&dir, &["diff"], &access)
 }
 
 /// Run `git diff --cached` (staged changes) in the given directory and return
 /// the raw unified diff output.
 #[tauri::command]
-pub async fn git_diff_staged(dir: String) -> Result<String, String> {
-    run_git_diff(&dir, &["diff", "--cached"])
+pub async fn git_diff_staged(
+    dir: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<String, String> {
+    run_git_diff(&dir, &["diff", "--cached"], &access)
 }
 
 /// Run `git diff` for a specific file (unstaged) and return
 /// the raw unified diff output.
 #[tauri::command]
-pub async fn git_diff_file(dir: String, file_path: String) -> Result<String, String> {
-    run_git_diff(&dir, &["diff", "--", &file_path])
+pub async fn git_diff_file(
+    dir: String,
+    file_path: String,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<String, String> {
+    let work_dir = validate_state_path(Path::new(&dir), &access)?;
+    let target = work_dir.join(&file_path);
+    validate_state_path(&target, &access)?;
+    run_git_diff_path(&work_dir, &["diff", "--", &file_path])
 }
 
-fn run_git_diff(dir: &str, args: &[&str]) -> Result<String, String> {
+fn run_git_diff(
+    dir: &str,
+    args: &[&str],
+    access: &WorkspaceFileAccessState,
+) -> Result<String, String> {
+    let work_dir = validate_state_path(Path::new(dir), access)?;
+    run_git_diff_path(&work_dir, args)
+}
+
+fn run_git_diff_path(work_dir: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .args(args)
-        .current_dir(dir)
+        .current_dir(work_dir)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
@@ -707,6 +1159,7 @@ fn walk_dir(
     current: &Path,
     root: &Path,
     gitignore_patterns: &[String],
+    allowlist: &[PathBuf],
 ) -> Result<Vec<FileEntry>, String> {
     let mut entries: Vec<FileEntry> = Vec::new();
 
@@ -729,14 +1182,22 @@ fn walk_dir(
 
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(_) => continue,
+        };
 
         if is_ignored(&path, root, gitignore_patterns) {
             continue;
         }
 
-        let is_dir = path.is_dir();
+        if validate_path(&path, allowlist).is_err() {
+            continue;
+        }
+
+        let is_dir = file_type.is_dir();
         let children = if is_dir {
-            match walk_dir(&path, root, gitignore_patterns) {
+            match walk_dir(&path, root, gitignore_patterns, allowlist) {
                 Ok(children) => Some(children),
                 Err(_) => Some(Vec::new()),
             }
@@ -760,6 +1221,374 @@ fn walk_dir(
     });
 
     Ok(entries)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::edge_manager::EdgeManager;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TestDir {
+        path: PathBuf,
+    }
+
+    impl TestDir {
+        fn new(name: &str) -> Self {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock should be after UNIX_EPOCH")
+                .as_nanos();
+            let path =
+                std::env::temp_dir().join(format!("agenthub-desktop-file-boundary-{name}-{nonce}"));
+            fs::create_dir_all(&path).expect("test directory should be created");
+            Self { path }
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn edge_host_readiness_command_snapshot_is_sidecar_only() {
+        let manager = EdgeManager::new(
+            PathBuf::from("edge-server/agenthub-edge"),
+            PathBuf::from("agenthub-edge.sqlite"),
+        )
+        .expect("test token generation should succeed");
+
+        let readiness = edge_host_readiness_snapshot(&manager);
+
+        assert_eq!(readiness.sidecar_name, "agenthub-edge");
+        assert_eq!(readiness.target_id, "local-edge");
+        assert_eq!(readiness.route, "local-edge-api");
+        assert_eq!(readiness.bind_addr, "127.0.0.1:3210");
+        assert_eq!(readiness.health_url, "http://127.0.0.1:3210/v1/health");
+        assert_eq!(
+            readiness.log_paths.stdout,
+            "<app-data>/edge-logs/local-edge.stdout.log"
+        );
+        assert!(readiness.preflight.auth_token_ready);
+        assert_eq!(
+            readiness.sidecar_args,
+            vec![
+                "--store-backend",
+                "sqlite",
+                "--store-db",
+                "<app-data>/agenthub-edge.sqlite",
+                "--addr",
+                "127.0.0.1:3210",
+                "--runner-profile",
+                "claude-code",
+            ]
+        );
+        assert!(!readiness.running);
+        assert!(!readiness.direct_cli_spawn);
+    }
+
+    #[test]
+    fn local_cli_discovery_missing_probe_is_no_spend() {
+        let item = discover_cli(
+            "codex",
+            "Codex CLI",
+            "agenthub-definitely-missing-cli-for-test",
+            "AGENTHUB_MISSING_CLI_FOR_TEST",
+        );
+
+        assert_eq!(item.id, "codex");
+        assert_eq!(item.name, "Codex CLI");
+        assert!(!item.installed);
+        assert_eq!(item.version, None);
+        assert_eq!(item.path, "agenthub-definitely-missing-cli-for-test");
+        assert!(item.no_spend);
+    }
+
+    #[test]
+    fn local_cli_discovery_manifest_advertises_readiness_gate() {
+        let manifest = build_local_cli_discovery();
+
+        assert_eq!(manifest.mode, "no-spend-discovery");
+        assert_eq!(
+            manifest.readiness_manifest,
+            "docs/audit/p0-edge-cli-real-readiness.md"
+        );
+        assert_eq!(
+            manifest.readiness_script,
+            "scripts/verify-edge-cli-real-readiness.ps1"
+        );
+        assert_eq!(manifest.items.len(), 3);
+        assert!(manifest.items.iter().all(|item| item.no_spend));
+        assert!(manifest
+            .items
+            .iter()
+            .all(|item| ["codex", "claude-code", "opencode"].contains(&item.id.as_str())));
+    }
+
+    #[test]
+    fn validate_path_rejects_empty_allowlist() {
+        let dir = TestDir::new("empty-allowlist");
+        let file = dir.path.join("notes.txt");
+
+        let err = validate_path(&file, &[]).expect_err("empty allowlist must fail closed");
+
+        assert!(err.contains("No allowed workspace directories"));
+    }
+
+    #[test]
+    fn validate_path_allows_nonexistent_child_inside_allowed_workspace() {
+        let dir = TestDir::new("inside");
+        let file = dir.path.join("nested").join("deeper").join("notes.txt");
+
+        let resolved = validate_path(&file, &[dir.path.clone()])
+            .expect("child under allowed workspace should pass");
+
+        assert!(resolved.starts_with(dir.path.canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn validate_path_rejects_path_outside_allowed_workspace() {
+        let allowed = TestDir::new("allowed");
+        let outside = TestDir::new("outside");
+        let file = outside.path.join("secret.txt");
+        fs::write(&file, "outside").expect("outside file should be created");
+
+        let err =
+            validate_path(&file, &[allowed.path.clone()]).expect_err("outside path must be denied");
+
+        assert!(err.contains("outside allowed directories"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn validate_path_rejects_symlink_that_escapes_workspace() {
+        let allowed = TestDir::new("symlink-allowed");
+        let outside = TestDir::new("symlink-outside");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        let link = allowed.path.join("linked-secret.txt");
+        std::os::unix::fs::symlink(&outside_file, &link).expect("symlink should be created");
+
+        let err = validate_path(&link, &[allowed.path.clone()])
+            .expect_err("symlink target outside workspace must be denied");
+
+        assert!(err.contains("outside allowed directories"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn validate_path_rejects_symlink_that_escapes_workspace() {
+        let allowed = TestDir::new("symlink-allowed");
+        let outside = TestDir::new("symlink-outside");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        let link = allowed.path.join("linked-secret.txt");
+        if std::os::windows::fs::symlink_file(&outside_file, &link).is_err() {
+            return;
+        }
+
+        let err = validate_path(&link, &[allowed.path.clone()])
+            .expect_err("symlink target outside workspace must be denied");
+
+        assert!(err.contains("outside allowed directories"));
+    }
+
+    #[test]
+    fn workspace_file_access_state_rejects_unseeded_paths() {
+        let dir = TestDir::new("unseeded-state");
+        let access = WorkspaceFileAccessState::default();
+
+        let err = validate_state_path(&dir.path, &access)
+            .expect_err("unseeded workspace file access state must fail closed");
+
+        assert!(err.contains("No allowed workspace directories"));
+    }
+
+    #[test]
+    fn workspace_store_sync_cannot_grant_unknown_existing_directory() {
+        let dir = TestDir::new("store-sync-unknown");
+        let access = WorkspaceFileAccessState::default();
+        let data = WorkspaceStoreData {
+            workspaces: vec![WorkspaceStoreEntry {
+                name: "unknown".to_string(),
+                path: dir.path.to_string_lossy().to_string(),
+                last_opened_at: 1,
+                branch: None,
+                settings: None,
+            }],
+        };
+
+        let err = replace_workspace_roots_from_store(&access, &data)
+            .expect_err("renderer workspace-store sync must not grant unknown roots");
+
+        assert!(err.contains("not authorized"));
+        assert!(validate_state_path(&dir.path, &access).is_err());
+    }
+
+    #[test]
+    fn workspace_store_sync_round_trips_already_authorized_workspace() {
+        let dir = TestDir::new("store-sync-authorized");
+        let access = WorkspaceFileAccessState::default();
+        let canonical = dir.path.canonicalize().unwrap();
+        access
+            .replace_roots(vec![canonical.clone()])
+            .expect("test root should be seeded");
+        let data = WorkspaceStoreData {
+            workspaces: vec![WorkspaceStoreEntry {
+                name: "authorized".to_string(),
+                path: dir.path.to_string_lossy().to_string(),
+                last_opened_at: 1,
+                branch: Some("main".to_string()),
+                settings: None,
+            }],
+        };
+
+        replace_workspace_roots_from_store(&access, &data)
+            .expect("already-authorized workspace should persist and remain allowed");
+
+        let resolved = validate_state_path(&dir.path, &access)
+            .expect("authorized workspace should still be allowed");
+        assert_eq!(resolved, canonical);
+    }
+
+    #[test]
+    fn host_authorized_workspace_root_can_seed_file_access() {
+        let dir = TestDir::new("host-authorized-root");
+        let access = WorkspaceFileAccessState::default();
+
+        let canonical = authorize_workspace_root_from_host_path(&dir.path, &access)
+            .expect("host-selected directory should be authorized");
+
+        assert_eq!(canonical, dir.path.canonicalize().unwrap());
+        let file = dir.path.join("notes.txt");
+        fs::write(&file, "inside").expect("workspace file should be written");
+        let resolved =
+            validate_state_path(&file, &access).expect("file under host-selected root should pass");
+        assert_eq!(resolved, file.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn host_authorized_workspace_root_rejects_relative_paths() {
+        let access = WorkspaceFileAccessState::default();
+
+        let err = authorize_workspace_root_from_host_path("relative/workspace", &access)
+            .expect_err("relative host path should not be authorized");
+
+        assert!(err.contains("must be an absolute path"));
+        assert!(access.allowed_roots().is_err());
+    }
+
+    #[test]
+    fn workspace_store_upsert_keeps_latest_authorized_root_first() {
+        let data = WorkspaceStoreData {
+            workspaces: vec![
+                WorkspaceStoreEntry {
+                    name: "old".to_string(),
+                    path: "C:/repo".to_string(),
+                    last_opened_at: 1,
+                    branch: Some("old-branch".to_string()),
+                    settings: None,
+                },
+                WorkspaceStoreEntry {
+                    name: "other".to_string(),
+                    path: "C:/other".to_string(),
+                    last_opened_at: 2,
+                    branch: None,
+                    settings: None,
+                },
+            ],
+        };
+        let entry = WorkspaceStoreEntry {
+            name: "repo".to_string(),
+            path: "c:/repo".to_string(),
+            last_opened_at: 3,
+            branch: None,
+            settings: None,
+        };
+
+        let updated = upsert_workspace_store_entry(data, entry);
+
+        assert_eq!(updated.workspaces.len(), 2);
+        assert_eq!(updated.workspaces[0].name, "repo");
+        assert_eq!(updated.workspaces[0].path, "c:/repo");
+        assert_eq!(updated.workspaces[1].name, "other");
+    }
+
+    #[test]
+    fn workspace_store_roots_keep_only_existing_absolute_directories() {
+        let dir = TestDir::new("store-roots");
+        let data = WorkspaceStoreData {
+            workspaces: vec![
+                WorkspaceStoreEntry {
+                    name: "valid".to_string(),
+                    path: dir.path.to_string_lossy().to_string(),
+                    last_opened_at: 1,
+                    branch: None,
+                    settings: None,
+                },
+                WorkspaceStoreEntry {
+                    name: "relative".to_string(),
+                    path: "relative/path".to_string(),
+                    last_opened_at: 2,
+                    branch: None,
+                    settings: None,
+                },
+                WorkspaceStoreEntry {
+                    name: "missing".to_string(),
+                    path: dir.path.join("missing").to_string_lossy().to_string(),
+                    last_opened_at: 3,
+                    branch: None,
+                    settings: None,
+                },
+            ],
+        };
+
+        let roots = workspace_roots_from_store_data(&data);
+
+        assert_eq!(roots, vec![dir.path.canonicalize().unwrap()]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copy_dir_recursive_rejects_nested_symlink() {
+        let allowed = TestDir::new("copy-symlink-allowed");
+        let outside = TestDir::new("copy-symlink-outside");
+        let src = allowed.path.join("src");
+        let dst = allowed.path.join("dst");
+        fs::create_dir_all(&src).expect("source directory should be created");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        std::os::unix::fs::symlink(&outside_file, src.join("linked-secret.txt"))
+            .expect("symlink should be created");
+
+        let err = copy_dir_recursive(&src, &dst, &[allowed.path.clone()])
+            .expect_err("copy should reject nested symlink");
+
+        assert!(err.to_string().contains("Refusing to copy symbolic link"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn copy_dir_recursive_rejects_nested_symlink() {
+        let allowed = TestDir::new("copy-symlink-allowed");
+        let outside = TestDir::new("copy-symlink-outside");
+        let src = allowed.path.join("src");
+        let dst = allowed.path.join("dst");
+        fs::create_dir_all(&src).expect("source directory should be created");
+        let outside_file = outside.path.join("secret.txt");
+        fs::write(&outside_file, "outside").expect("outside file should be created");
+        if std::os::windows::fs::symlink_file(&outside_file, src.join("linked-secret.txt")).is_err()
+        {
+            return;
+        }
+
+        let err = copy_dir_recursive(&src, &dst, &[allowed.path.clone()])
+            .expect_err("copy should reject nested symlink");
+
+        assert!(err.to_string().contains("Refusing to copy symbolic link"));
+    }
 }
 
 // ── Workspace settings persistence (JSON file in app data dir) ──
@@ -799,29 +1628,93 @@ fn workspace_store_path(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
     data_dir.join("workspace-store.json")
 }
 
+pub fn seed_workspace_file_access_from_store(
+    app: &tauri::AppHandle,
+    access: &WorkspaceFileAccessState,
+) -> Result<(), String> {
+    let path = workspace_store_path(app);
+    if !path.exists() {
+        access.replace_roots(Vec::new())?;
+        return Ok(());
+    }
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
+    let data: WorkspaceStoreData = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse workspace store: {}", e))?;
+    replace_workspace_roots_from_trusted_store(access, &data)
+}
+
 #[tauri::command]
-pub async fn read_workspace_store(app: tauri::AppHandle) -> Result<WorkspaceStoreData, String> {
+pub async fn read_workspace_store(
+    app: tauri::AppHandle,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<WorkspaceStoreData, String> {
     let path = workspace_store_path(&app);
     if !path.exists() {
+        access.replace_roots(Vec::new())?;
         return Ok(WorkspaceStoreData::default());
     }
     let content =
         fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
-    serde_json::from_str(&content).map_err(|e| format!("Failed to parse workspace store: {}", e))
+    let data: WorkspaceStoreData = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse workspace store: {}", e))?;
+    replace_workspace_roots_from_trusted_store(&access, &data)?;
+    Ok(data)
 }
 
 #[tauri::command]
 pub async fn write_workspace_store(
     app: tauri::AppHandle,
     data: WorkspaceStoreData,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<(), String> {
+    let roots = authorized_workspace_roots_from_store_data(&access, &data)?;
     let path = workspace_store_path(&app);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create app data dir: {}", e))?;
     }
     let content = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
-    fs::write(&path, &content).map_err(|e| format!("Failed to write workspace store: {}", e))
+    fs::write(&path, &content).map_err(|e| format!("Failed to write workspace store: {}", e))?;
+    access.replace_roots(roots)
+}
+
+#[tauri::command]
+pub async fn choose_workspace_root(
+    app: tauri::AppHandle,
+    access: State<'_, WorkspaceFileAccessState>,
+) -> Result<Option<WorkspaceStoreEntry>, String> {
+    let selected = app
+        .dialog()
+        .file()
+        .set_title("Choose workspace folder")
+        .blocking_pick_folder();
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|e| format!("Failed to resolve selected workspace folder: {}", e))?;
+    let canonical = authorize_workspace_root_from_host_path(path, &access)?;
+    let entry = workspace_store_entry_for_authorized_root(canonical);
+    let store_path = workspace_store_path(&app);
+    let existing = if store_path.exists() {
+        let content = fs::read_to_string(&store_path)
+            .map_err(|e| format!("Failed to read workspace store: {}", e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse workspace store: {}", e))?
+    } else {
+        WorkspaceStoreData::default()
+    };
+    let next = upsert_workspace_store_entry(existing, entry.clone());
+    if let Some(parent) = store_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create app data dir: {}", e))?;
+    }
+    let content = serde_json::to_string_pretty(&next)
+        .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
+    fs::write(&store_path, &content)
+        .map_err(|e| format!("Failed to write workspace store: {}", e))?;
+    Ok(Some(entry))
 }
 
 // ── Workspace Content Search ──
@@ -847,8 +1740,10 @@ pub struct FileGrepMatch {
 pub async fn search_workspace_content(
     dir: String,
     query: String,
+    access: State<'_, WorkspaceFileAccessState>,
 ) -> Result<Vec<FileGrepMatch>, String> {
     let work_dir = Path::new(&dir);
+    let work_dir = validate_state_path(work_dir, &access)?;
     if !work_dir.is_dir() {
         return Err(format!("Not a directory: {}", dir));
     }
@@ -865,7 +1760,7 @@ pub async fn search_workspace_content(
             &query,
             ".",
         ])
-        .current_dir(work_dir)
+        .current_dir(&work_dir)
         .output();
 
     let output = match output {
@@ -874,7 +1769,7 @@ pub async fn search_workspace_content(
             // Fallback: system grep
             Command::new("grep")
                 .args(["-rn", "-i", "--color=never", "-e", &query, "."])
-                .current_dir(work_dir)
+                .current_dir(&work_dir)
                 .output()
                 .map_err(|e| format!("Neither rg nor grep is available: {}", e))?
         }

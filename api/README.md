@@ -74,6 +74,7 @@ api/
 4. 新增 Profile、Runtime、Skill、MCP、Execution Target 字段时，同步检查 Desktop/Web/Edge/Hub 的类型定义。
 5. 新增鉴权行为时，同步 `README.md`、`hub-server/README.md` 和根 workspace 的 identity docs。
 6. 如果代码里已有路由但 OpenAPI 未覆盖，在 PR 或交接里明确标注“实现先行，契约待补”，不要让下游误以为接口不存在。
+7. Hub OpenAPI 扩展字段必须跟 router middleware 对齐：`x-agenthub-role: admin` 对应 `RequireAdmin()`；`x-agenthub-device-type` 对应 `DeviceTypeCheck(...)`，没有该 middleware 的路由不要标设备类型。
 
 ## 验证
 

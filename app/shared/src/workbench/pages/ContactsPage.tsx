@@ -171,7 +171,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'internal', label: '组织内联系人', icon: 'users' },
   { id: 'external', label: '外部联系人', icon: 'external' },
-  { id: 'new', label: '新的联系人', icon: 'userPlus', badge: 2 },
+  { id: 'new', label: '新的联系人', icon: 'userPlus' },
   { id: 'starred', label: '星标联系人', icon: 'star' },
   { id: 'groups', label: '我的群组', icon: 'groups' },
   { id: 'service', label: '服务台', icon: 'service' },
@@ -620,6 +620,11 @@ export function ContactsPage({
   onSendPhoneInvite,
 }: ContactsPageProps): React.ReactElement {
   const resolvedPending = pendingContacts ?? WORKBENCH_MOCK_PENDING_CONTACTS;
+  const navItems = NAV_ITEMS.map((item) =>
+    item.id === 'new' && resolvedPending.length > 0
+      ? { ...item, badge: resolvedPending.length }
+      : item,
+  );
   const [activeProfile, setActiveProfile] = useState<ContactProfile | null>(null);
 
   const openMemberProfile = useCallback((member: ContactMember, anchor: HTMLElement) => {
@@ -878,7 +883,7 @@ export function ContactsPage({
           </button>
         </div>
 
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <button
             key={item.id}
             type="button"

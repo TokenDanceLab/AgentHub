@@ -5,6 +5,7 @@ import {
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
   type DesignNavIconName,
 } from '../designIcons';
+import type { LocalCliDiscoveryManifest } from '../../platform';
 import styles from './SettingsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -73,6 +74,8 @@ export interface SettingsPageProps {
   logLevel: string;
   /** Design-system validation mode. */
   designSystemValidation: string;
+  /** Optional Desktop host CLI discovery status. */
+  localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
   /** State strategy toggles. */
   stateStrategies: Record<'empty' | 'invalid' | 'missing', boolean>;
   /** Called when the user selects a different pane. */
@@ -253,7 +256,11 @@ interface DataModeControlProps {
 function DataModeControl({ active, onChange }: DataModeControlProps): React.ReactElement {
   const normalized = normalizeSettingsDataMode(active);
   return (
-    <SettingSegment options={['自动', 'Mock', '正常']} active={normalized} onChange={onChange} />
+    <SettingSegment
+      options={['Auto', 'Mock', 'Fixture', 'Observed', 'Approved real']}
+      active={normalized}
+      onChange={onChange}
+    />
   );
 }
 
@@ -318,11 +325,15 @@ function SettingPath({ value, onCopy }: SettingPathProps): React.ReactElement {
 
 /* ── Data mode status ── */
 
-function normalizeSettingsDataMode(value: string): '自动' | 'Mock' | '正常' {
+function normalizeSettingsDataMode(value: string): 'Auto' | 'Mock' | 'Fixture' | 'Observed' | 'Approved real' {
   const key = value.trim().toLowerCase();
-  if (key === 'mock' || key === 'demo') return 'Mock';
-  if (key === '正常' || key === 'normal' || key === 'real') return '正常';
-  return '自动';
+  if (key === 'mock') return 'Mock';
+  if (key === 'fixture' || key === 'demo') return 'Fixture';
+  if (key === 'observed' || key === 'replay') return 'Observed';
+  if (key === 'approved real' || key === 'approved-real' || key === 'approved_real' || key === 'normal' || key === 'real') {
+    return 'Approved real';
+  }
+  return 'Auto';
 }
 
 function DataModeStatus({
@@ -333,27 +344,43 @@ function DataModeStatus({
   const normalized = normalizeSettingsDataMode(mode);
   const detail = normalized === 'Mock'
     ? {
-      label: 'Mock fixture',
-      title: '固定使用 agenthub-design 的演示数据',
-      copy: '用于 1:1 视觉对齐、截图验收和离线前端开发，不请求 Hub 或本地 Edge 数据。',
+      label: 'Mock data',
+      title: 'Pinned mock workbench data',
+      copy: 'Uses local mock data only. Hub and local Edge are not contacted.',
       desktop: '5173: demo transcript',
       web: '5174: demo transcript',
     }
-    : normalized === '正常'
+    : normalized === 'Fixture'
       ? {
-        label: 'Normal data',
-        title: '只使用真实 Hub / Edge 数据',
-        copy: '没有认证、线程或消息时显示真实空状态，不再回退到设计 fixture。',
-        desktop: '5173: Edge thread data',
-        web: '5174: Hub session data',
+        label: 'Fixture data',
+        title: 'Pinned shared workbench fixture',
+        copy: 'Uses deterministic fixture data for UI and screenshot verification.',
+        desktop: '5173: fixture transcript',
+        web: '5174: fixture transcript',
       }
-      : {
-        label: 'Auto fallback',
-        title: '优先真实数据，开发预览自动回退 Mock',
-        copy: 'Desktop 浏览器预览和 Web 未登录状态使用 fixture；Tauri/已登录 Web 优先真实数据。',
-        desktop: '5173: Tauri real / browser mock',
-        web: '5174: authenticated real / anonymous mock',
-      };
+      : normalized === 'Observed'
+        ? {
+          label: 'Observed data',
+          title: 'Hub observed replay only',
+          copy: 'Uses observed Hub sessions, messages, and replayed runtime events. It does not fall back to mock data.',
+          desktop: '5173: observed Edge snapshot',
+          web: '5174: observed Hub replay',
+        }
+        : normalized === 'Approved real'
+          ? {
+            label: 'Approved real',
+            title: 'Approved real Hub / Edge data only',
+            copy: 'Uses authenticated Hub and Edge data only. Empty or signed-out states stay explicit.',
+            desktop: '5173: Edge thread data',
+            web: '5174: Hub session data',
+          }
+          : {
+            label: 'Auto fallback',
+            title: 'Prefer real data, allow development fallback',
+            copy: 'Uses real data when available and fixture data only for explicit development fallback paths.',
+            desktop: '5173: Tauri real / browser fixture',
+            web: '5174: authenticated real / anonymous fixture',
+          };
 
   return (
     <section className={styles.modeStatus} aria-label="数据模式状态">
@@ -375,6 +402,35 @@ function DataModeStatus({
         </div>
       </dl>
     </section>
+  );
+}
+
+function LocalCliDiscoveryStatus({
+  discovery,
+}: {
+  discovery: LocalCliDiscoveryManifest;
+}): React.ReactElement {
+  return (
+    <SettingsSection title="CLI 诊断">
+      <SettingsRow label="发现模式" description="只做 no-spend CLI 状态发现；不执行 Run、带 prompt 的命令、模型调用或 secrets。">
+        <SettingValue value={discovery.mode} />
+      </SettingsRow>
+      <SettingsRow label="就绪 manifest" description="后续 approved-real 验证必须对齐的 readiness 文档。">
+        <SettingPath value={discovery.readinessManifest} />
+      </SettingsRow>
+      <SettingsRow label="就绪脚本" description="静态 gate 和 no-spend command discovery 的验证入口。">
+        <SettingPath value={discovery.readinessScript} />
+      </SettingsRow>
+      {discovery.items.map((item) => (
+        <SettingsRow
+          key={item.id}
+          label={item.name}
+          description={`${item.version ? `version ${item.version}` : 'version unknown'} · ${item.path}`}
+        >
+          <SettingValue value={`${item.installed ? 'installed' : 'missing'} · ${item.noSpend ? 'no-spend' : 'requires approval'}`} />
+        </SettingsRow>
+      ))}
+    </SettingsSection>
   );
 }
 
@@ -535,7 +591,7 @@ function LocalDevPane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow label="热更新覆盖层" description="保留 Vite 错误 overlay，开发时能直接看到语法问题。">
           <SettingSwitch active={props.hrmOverlayEnabled} onChange={(v) => props.onChangeSetting('hrmOverlayEnabled', v)} />
         </SettingsRow>
-        <SettingsRow label="数据模式" description="自动优先真实数据；Mock 固定设计 fixture；正常只走真实数据。">
+        <SettingsRow label="数据模式" description="Auto 可开发回退；Mock/Fixture 固定本地数据；Observed/Approved real 不回退。">
           <DataModeControl active={props.dataMode} onChange={(v) => props.onChangeSetting('dataMode', v)} />
         </SettingsRow>
         <SettingsRow label="发送快捷键" description="默认 Enter 发送；需要换行时使用 Ctrl / Cmd + Enter。">
@@ -556,6 +612,8 @@ function LocalDevPane(props: SettingsPageProps): React.ReactElement {
           <SettingValue value={props.designSystemValidation} />
         </SettingsRow>
       </SettingsSection>
+
+      {props.localCliDiscovery ? <LocalCliDiscoveryStatus discovery={props.localCliDiscovery} /> : null}
     </>
   );
 }

@@ -1,0 +1,105 @@
+{
+  "provider": "opencode-agent-sdk-fixture",
+  "events": [
+    {
+      "id": "opencode_session_1",
+      "type": "sidecar_session_ready",
+      "sessionId": "opencode_session_1",
+      "model": "opencode/gpt-5.1-fixture",
+      "permissionMode": "approval-required",
+      "tools": ["read", "edit", "bash"],
+      "metadata": {
+        "sidecar_transport": "http-sse",
+        "workspace_path": "./fixture-workspace"
+      },
+      "traceRefs": ["trace:opencode:session"]
+    },
+    {
+      "id": "opencode_tool_running_1",
+      "type": "tool_state",
+      "sessionId": "opencode_session_1",
+      "callId": "part_edit_report",
+      "toolName": "edit",
+      "status": "running",
+      "input": {
+        "path": "docs/audit/sdk-adapter-fixture.md"
+      },
+      "metadata": {
+        "title": "Edit fixture report"
+      }
+    },
+    {
+      "id": "opencode_tool_completed_1",
+      "type": "tool_state",
+      "sessionId": "opencode_session_1",
+      "callId": "part_edit_report",
+      "toolName": "edit",
+      "status": "completed",
+      "input": {
+        "path": "docs/audit/sdk-adapter-fixture.md"
+      },
+      "output": "updated fixture report",
+      "metadata": {
+        "api_token": "not-real",
+        "durationMs": 42
+      },
+      "attachments": [
+        {
+          "path": "D:\\fixtures\\private\\trace.json",
+          "mime": "application/json",
+          "secret": "raw-provider-payload"
+        }
+      ],
+      "traceRefs": ["trace:opencode:tool-edit"]
+    },
+    {
+      "id": "opencode_permission_1",
+      "type": "permission.asked",
+      "requestId": "perm_opencode_shell",
+      "callId": "part_bash",
+      "toolName": "bash",
+      "riskLevel": "high",
+      "reason": "OpenCode sidecar requested shell approval",
+      "input": {
+        "command": "go test ./internal/adapters -run SDKFixture -short -count=1"
+      }
+    },
+    {
+      "id": "opencode_tool_error_1",
+      "type": "tool_state",
+      "sessionId": "opencode_session_1",
+      "callId": "part_failed_bash",
+      "toolName": "bash",
+      "status": "error",
+      "input": {
+        "command": "exit 1",
+        "cwd": "..\\outside-workspace"
+      },
+      "error": "fixture command failed",
+      "metadata": {
+        "stderr_path": "C:\\private\\stderr.log",
+        "session_token": "not-real"
+      },
+      "traceRefs": ["trace:opencode:tool-error"]
+    },
+    {
+      "id": "opencode_status_1",
+      "type": "session.updated",
+      "sessionId": "opencode_session_1",
+      "status": "idle",
+      "metadata": {
+        "mode": "build",
+        "provider": "fixture"
+      }
+    },
+    {
+      "id": "opencode_result_1",
+      "type": "run_result",
+      "sessionId": "opencode_session_1",
+      "success": true,
+      "summary": "OpenCode sidecar fixture completed.",
+      "traceRefs": ["trace:opencode:root"],
+      "evidenceRefs": ["event:opencode_tool_completed_1"]
+    }
+  ]
+}

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FolderOpen } from 'lucide-react';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import SelectControl from '../primitives/SelectControl';
 import Switch from '../primitives/Switch';
 import { writeStoredValue } from '../utils';
 import {
+  chooseWorkspaceRootFromBackend,
   getSelectedWorkspace,
   readWorkspaceSettings,
   writeWorkspaceSettings,
@@ -45,6 +47,7 @@ export default function WorktreeSection({ worktreeIsolation, setWorktreeIsolatio
   const [workspaceDefaultModel, setWorkspaceDefaultModel] = useState('');
   const [workspacePermissionMode, setWorkspacePermissionMode] = useState('');
   const [workspaceCustomInstructions, setWorkspaceCustomInstructions] = useState('');
+  const [choosingWorkspace, setChoosingWorkspace] = useState(false);
 
   const loadWorkspaceSettings = useCallback((ws: WorkspaceEntry | null) => {
     setCurrentWorkspace(ws);
@@ -93,14 +96,46 @@ export default function WorktreeSection({ worktreeIsolation, setWorktreeIsolatio
     }
   };
 
+  const handleChooseWorkspace = async () => {
+    setChoosingWorkspace(true);
+    try {
+      const selected = await chooseWorkspaceRootFromBackend();
+      if (selected) {
+        loadWorkspaceSettings(selected);
+        window.dispatchEvent(new CustomEvent('agenthub:workdir-selected'));
+      }
+    } catch {
+      // Keep the previous workspace state when the native picker fails.
+    } finally {
+      setChoosingWorkspace(false);
+    }
+  };
+
   const workspaceDisplay = currentWorkspace
     ? `${currentWorkspace.name} (${currentWorkspace.path})`
     : t('settings.noWorkspaceSelected');
 
+  const chooseWorkspaceControl = (
+    <button
+      type="button"
+      className={styles.secondaryBtn}
+      onClick={() => void handleChooseWorkspace()}
+      disabled={choosingWorkspace}
+      aria-label={t('settings.chooseWorkspace')}
+    >
+      <FolderOpen size={14} />
+      <span>{t('settings.chooseWorkspace')}</span>
+    </button>
+  );
+
   if (!currentWorkspace) {
     return (
       <Panel title={t('settings.worktree')} description={t('settings.worktreeDesc')}>
-        <SettingRow title={t('settings.defaultWorkspace')} description={t('settings.noWorkspaceSelected')} />
+        <SettingRow
+          title={t('settings.defaultWorkspace')}
+          description={t('settings.noWorkspaceSelected')}
+          control={chooseWorkspaceControl}
+        />
         <SettingRow
           title={t('settings.worktreeIsolation')}
           description={t('settings.worktreeIsolationDesc')}
@@ -114,7 +149,11 @@ export default function WorktreeSection({ worktreeIsolation, setWorktreeIsolatio
   return (
     <>
       <Panel title={t('settings.worktree')} description={t('settings.worktreeDesc')}>
-        <SettingRow title={t('settings.defaultWorkspace')} description={workspaceDisplay} />
+        <SettingRow
+          title={t('settings.defaultWorkspace')}
+          description={workspaceDisplay}
+          control={chooseWorkspaceControl}
+        />
         <SettingRow
           title={t('settings.worktreeIsolation')}
           description={t('settings.worktreeIsolationDesc')}

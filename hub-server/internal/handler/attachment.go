@@ -22,12 +22,15 @@ import (
 type AttachmentService interface {
 	ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error)
 	SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error)
+	SaveAttachmentWithMetadata(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64, metadata string) (*model.Attachment, error)
 	GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error)
 	MaxUploadSize() int64
+	IsAttachmentMimeTypeAllowed(mimeType string) bool
 	StoreBlob(ctx context.Context, hash string, r io.Reader, contentType string) (bool, error)
 	GetBlob(ctx context.Context, hash string) (io.ReadCloser, error)
 	DeleteBlob(ctx context.Context, hash string) error
 	BlobLocalPath(hash string) string
+	PresignBlobURL(ctx context.Context, hash string, contentType string, contentDisposition string) (string, error)
 }
 
 type AttachmentHandler struct {
@@ -126,6 +129,15 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
+	if !h.service.IsAttachmentMimeTypeAllowed(mimeType) {
+		Fail(c, errcode.AttachTypeNotAllowed)
+		return
+	}
+	metadata, err := service.ExtractImageMetadataJSON(tmpPath, mimeType)
+	if err != nil {
+		Fail(c, errcode.ErrInternal)
+		return
+	}
 
 	// Commit the blob to object storage (local or S3).
 	// Re-open the temp file for reading.
@@ -142,7 +154,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	a, err := h.service.SaveAttachment(c.Request.Context(), userID, hash, mimeType, originalName, written)
+	a, err := h.service.SaveAttachmentWithMetadata(c.Request.Context(), userID, hash, mimeType, originalName, written, metadata)
 	if err != nil {
 		if createdBlob {
 			_ = h.service.DeleteBlob(c.Request.Context(), hash)
@@ -182,7 +194,14 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 		return
 	}
 
-	// Remote storage: stream from S3.
+	// Remote storage: redirect to a presigned URL when available, then
+	// fall back to Hub streaming for stores that cannot presign.
+	presignedURL, err := h.service.PresignBlobURL(c.Request.Context(), a.Hash, safeAttachmentContentType(a.MimeType), formatAttachmentDisposition(a.OriginalName))
+	if err == nil && presignedURL != "" {
+		c.Redirect(http.StatusFound, presignedURL)
+		return
+	}
+
 	reader, err := h.service.GetBlob(c.Request.Context(), a.Hash)
 	if err != nil {
 		Fail(c, errcode.AttachNotFound)

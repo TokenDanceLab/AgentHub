@@ -43,14 +43,24 @@ func TestDefaultCORSOrigins(t *testing.T) {
 		{name: "production", env: "production", want: "https://hub.vectorcontrol.tech"},
 		{name: "prod alias", env: "prod", want: "https://hub.vectorcontrol.tech"},
 		{name: "release alias", env: "release", want: "https://hub.vectorcontrol.tech"},
-		{name: "development", env: "development", want: "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173"},
-		{name: "staging", env: "staging", want: "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173"},
-		{name: "empty env", env: "", want: "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173"},
+		{name: "development", env: "development", want: "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"},
+		{name: "staging", env: "staging", want: "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"},
+		{name: "empty env", env: "", want: "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := defaultCORSOrigins(tt.env)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestDefaultCORSOriginsIncludesWebDevPortOutsideProduction(t *testing.T) {
+	for _, env := range []string{"", "development", "staging"} {
+		t.Run(env, func(t *testing.T) {
+			origins := splitAndTrim(defaultCORSOrigins(env))
+			assert.Contains(t, origins, "http://localhost:5174")
+			assert.Contains(t, origins, "http://127.0.0.1:5174")
 		})
 	}
 }
@@ -139,6 +149,18 @@ func TestValidateCORSOriginsForEnvironment(t *testing.T) {
 		err := validateCORSOriginsForEnvironment("production", []string{"http://localhost:3000"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "localhost")
+	})
+
+	t.Run("rejects web dev loopback origins in production", func(t *testing.T) {
+		origins := []string{
+			"http://localhost:5174",
+			"http://127.0.0.1:5174",
+		}
+		for _, origin := range origins {
+			err := validateCORSOriginsForEnvironment("production", []string{origin})
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), origin)
+		}
 	})
 
 	t.Run("allows remote origins in production", func(t *testing.T) {

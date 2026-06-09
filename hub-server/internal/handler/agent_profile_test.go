@@ -93,6 +93,55 @@ func TestAgentProfileHandlerCreateProfileSuccess(t *testing.T) {
 	require.Contains(t, w.Body.String(), "p-1")
 }
 
+func TestAgentProfileHandlerCreateProfileNormalizesJSONLikeFields(t *testing.T) {
+	svc := &mockAgentProfileService{
+		createFn: func(ctx context.Context, ownerID string, req *model.AgentProfile) (*model.AgentProfile, error) {
+			require.Equal(t, "user-1", ownerID)
+			require.JSONEq(t, `{"codex":"gpt-5"}`, req.ModelMapping)
+			require.JSONEq(t, `["skill-1","skill-2"]`, req.Skills)
+			require.JSONEq(t, `["mcp-1"]`, req.MCPServers)
+			require.JSONEq(t, `["shell"]`, req.ToolAllowlist)
+			require.JSONEq(t, `{"mode":"default"}`, req.ApprovalPolicy)
+			require.JSONEq(t, `{"edge":"local"}`, req.TargetPreferences)
+			return &model.AgentProfile{ID: "p-1", Name: req.Name}, nil
+		},
+	}
+	h := handler.NewAgentProfileHandler(svc)
+	body := map[string]interface{}{
+		"name":               "test-profile",
+		"runtime_id":         "codex",
+		"model_mapping":      map[string]interface{}{"codex": "gpt-5"},
+		"skills":             []string{"skill-1", "skill-2"},
+		"mcp_servers":        []string{"mcp-1"},
+		"tool_allowlist":     []string{"shell"},
+		"approval_policy":    map[string]interface{}{"mode": "default"},
+		"target_preferences": map[string]interface{}{"edge": "local"},
+	}
+	c, w := newGinCtx(http.MethodPost, "/web/agent-profiles", body, "user_id", "user-1")
+
+	h.CreateProfile(c)
+
+	require.Equal(t, 200, w.Code)
+	require.True(t, svc.createCalled)
+}
+
+func TestAgentProfileHandlerCreateProfileRejectsInvalidJSONLikeField(t *testing.T) {
+	svc := &mockAgentProfileService{}
+	h := handler.NewAgentProfileHandler(svc)
+	body := map[string]interface{}{
+		"name":          "test-profile",
+		"runtime_id":    "codex",
+		"model_mapping": []string{"not-an-object"},
+	}
+	c, w := newGinCtx(http.MethodPost, "/web/agent-profiles", body, "user_id", "user-1")
+
+	h.CreateProfile(c)
+
+	require.Equal(t, 400, w.Code)
+	require.Contains(t, w.Body.String(), "BAD_REQUEST")
+	require.False(t, svc.createCalled)
+}
+
 func TestAgentProfileHandlerCreateProfileBadRequest(t *testing.T) {
 	svc := &mockAgentProfileService{}
 	h := handler.NewAgentProfileHandler(svc)
@@ -137,6 +186,51 @@ func TestAgentProfileHandlerUpdateProfileSuccess(t *testing.T) {
 
 	require.Equal(t, 200, w.Code)
 	require.True(t, svc.updateCalled)
+}
+
+func TestAgentProfileHandlerUpdateProfileNormalizesJSONLikeFields(t *testing.T) {
+	svc := &mockAgentProfileService{
+		updateFn: func(ctx context.Context, id, ownerID string, updates map[string]interface{}) (*model.AgentProfile, error) {
+			require.Equal(t, "profile-1", id)
+			require.JSONEq(t, `{"codex":"gpt-5"}`, updates["model_mapping"].(string))
+			require.JSONEq(t, `["skill-1"]`, updates["skills"].(string))
+			require.JSONEq(t, `["mcp-1"]`, updates["mcp_servers"].(string))
+			require.JSONEq(t, `["shell"]`, updates["tool_allowlist"].(string))
+			require.JSONEq(t, `{"mode":"default"}`, updates["approval_policy"].(string))
+			require.JSONEq(t, `{"edge":"local"}`, updates["target_preferences"].(string))
+			return &model.AgentProfile{ID: id, Name: "Updated"}, nil
+		},
+	}
+	h := handler.NewAgentProfileHandler(svc)
+	body := map[string]interface{}{
+		"model_mapping":      `{"codex":"gpt-5"}`,
+		"skills":             []string{"skill-1"},
+		"mcp_servers":        []string{"mcp-1"},
+		"tool_allowlist":     []string{"shell"},
+		"approval_policy":    map[string]interface{}{"mode": "default"},
+		"target_preferences": map[string]interface{}{"edge": "local"},
+	}
+	c, w := newGinCtx(http.MethodPut, "/web/agent-profiles/profile-1", body, "user_id", "user-1")
+	c.Params = gin.Params{{Key: "id", Value: "profile-1"}}
+
+	h.UpdateProfile(c)
+
+	require.Equal(t, 200, w.Code)
+	require.True(t, svc.updateCalled)
+}
+
+func TestAgentProfileHandlerUpdateProfileRejectsInvalidJSONLikeField(t *testing.T) {
+	svc := &mockAgentProfileService{}
+	h := handler.NewAgentProfileHandler(svc)
+	body := map[string]interface{}{"skills": map[string]interface{}{"not": "array"}}
+	c, w := newGinCtx(http.MethodPut, "/web/agent-profiles/profile-1", body, "user_id", "user-1")
+	c.Params = gin.Params{{Key: "id", Value: "profile-1"}}
+
+	h.UpdateProfile(c)
+
+	require.Equal(t, 400, w.Code)
+	require.Contains(t, w.Body.String(), "BAD_REQUEST")
+	require.False(t, svc.updateCalled)
 }
 
 func TestAgentProfileHandlerUpdateProfileBadRequest(t *testing.T) {
@@ -326,7 +420,9 @@ func (m *mockAgentProfileService) Publish(ctx context.Context, id, ownerID strin
 	return nil
 }
 
-func (m *mockAgentProfileService) Unpublish(ctx context.Context, id, ownerID string) error { return nil }
+func (m *mockAgentProfileService) Unpublish(ctx context.Context, id, ownerID string) error {
+	return nil
+}
 
 func (m *mockAgentProfileService) Install(ctx context.Context, id, installerID string) (*model.AgentProfile, error) {
 	m.installCalled = true

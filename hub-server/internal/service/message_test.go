@@ -374,6 +374,61 @@ func TestSendMessage_FileContentRecordsAttachmentReference(t *testing.T) {
 	}
 }
 
+func TestSendMessage_ImageContentWithAttachmentIDRecordsAndReadsAttachment(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 10}}
+	ctx := context.Background()
+
+	seedMessageSessionMember(t, db, "sess-image", "user-1")
+	require.NoError(t, db.Exec(`INSERT INTO attachments (id, hash, size, mime_type, original_name, uploader_user_id) VALUES (?, ?, ?, ?, ?, ?)`,
+		"77777777-7777-4777-8777-777777777778", "8888888888888888888888888888888888888888888888888888888888888888", 34, "image/png", "chart.png", "user-1").Error)
+
+	resp, err := svc.SendMessage(ctx, "sess-image", "user-1", SendMessageRequest{
+		ClientMsgID: "55555555-5555-4555-8555-555555555556",
+		ContentType: "image",
+		Content:     `{"attachment_id":"77777777-7777-4777-8777-777777777778","alt":"chart"}`,
+	})
+	require.NoError(t, err)
+
+	var count int64
+	require.NoError(t, db.Table("message_attachments").
+		Where("session_id = ? AND message_id = ? AND attachment_id = ?", "sess-image", resp.MessageID, "77777777-7777-4777-8777-777777777778").
+		Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+
+	msgs, err := svc.GetMessages(ctx, "sess-image", "user-1", 0, 50)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	require.Len(t, msgs[0].Attachments, 1)
+	assert.Equal(t, "77777777-7777-4777-8777-777777777778", msgs[0].Attachments[0].ID)
+	assert.Equal(t, "8888888888888888888888888888888888888888888888888888888888888888", msgs[0].Attachments[0].Hash)
+	assert.Equal(t, int64(34), msgs[0].Attachments[0].Size)
+	assert.Equal(t, "image/png", msgs[0].Attachments[0].MimeType)
+	assert.Equal(t, "chart.png", msgs[0].Attachments[0].OriginalName)
+}
+
+func TestSendMessage_ImageContentWithURLDoesNotRequireAttachment(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 11}}
+	ctx := context.Background()
+
+	seedMessageSessionMember(t, db, "sess-image-url", "user-1")
+
+	resp, err := svc.SendMessage(ctx, "sess-image-url", "user-1", SendMessageRequest{
+		ClientMsgID: "55555555-5555-4555-8555-555555555557",
+		ContentType: "image",
+		Content:     `{"url":"https://example.test/chart.png","alt":"chart"}`,
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.MessageID)
+
+	msgs, err := svc.GetMessages(ctx, "sess-image-url", "user-1", 0, 50)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	assert.Empty(t, msgs[0].Attachments)
+	assert.JSONEq(t, `{"url":"https://example.test/chart.png","alt":"chart"}`, msgs[0].Content)
+}
+
 func TestSendMessage_FileContentRejectsInvalidAttachmentID(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
 	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 8}}
@@ -782,6 +837,72 @@ func TestGetMessages_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestGetMessages_ReadsAttachmentsFromMessageAttachmentRelation(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db}
+
+	seedMessageSessionMember(t, db, "sess-read-attachments", "reader-1")
+	require.NoError(t, db.Exec(`INSERT INTO messages (
+		id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-file-1", "sess-read-attachments", 1, "client-file-1", "user", "sender-1", "file",
+		`{"attachment_id":"att-read-1","name":"report.txt"}`, false, time.Now(),
+	).Error)
+	require.NoError(t, db.Exec(`INSERT INTO attachments (
+		id, hash, size, mime_type, original_name, uploader_user_id, metadata, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"att-read-1", "hash-read-1", 128, "text/plain", "report.txt", "sender-1", `{"height":3,"width":2}`, time.Now(),
+	).Error)
+	require.NoError(t, db.Exec(`INSERT INTO message_attachments (
+		session_id, message_id, attachment_id, created_at
+	) VALUES (?, ?, ?, ?)`,
+		"sess-read-attachments", "msg-file-1", "att-read-1", time.Now(),
+	).Error)
+
+	msgs, err := svc.GetMessages(context.Background(), "sess-read-attachments", "reader-1", 0, 50)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	require.Len(t, msgs[0].Attachments, 1)
+	assert.Equal(t, "att-read-1", msgs[0].Attachments[0].ID)
+	assert.Equal(t, "hash-read-1", msgs[0].Attachments[0].Hash)
+	assert.Equal(t, int64(128), msgs[0].Attachments[0].Size)
+	assert.Equal(t, "text/plain", msgs[0].Attachments[0].MimeType)
+	assert.Equal(t, "report.txt", msgs[0].Attachments[0].OriginalName)
+	assert.JSONEq(t, `{"height":3,"width":2}`, msgs[0].Attachments[0].Metadata)
+}
+
+// ==================== ForwardMessage ====================
+
+func TestForwardMessage_PreservesOriginalSenderIdentity(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 7}}
+	ctx := context.Background()
+
+	seedMessageSessionMember(t, db, "sess-forward-src", "forwarder-1")
+	seedMessageSessionMember(t, db, "sess-forward-target", "forwarder-1")
+	require.NoError(t, db.Exec(`INSERT INTO messages (
+		id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-forward-original", "sess-forward-src", 1, "client-forward-original",
+		"agent", "agent-42", "text", `{"text":"agent answer"}`, false, time.Now(),
+	).Error)
+
+	require.NoError(t, svc.ForwardMessage(ctx, "forwarder-1", "msg-forward-original", []string{"sess-forward-target"}))
+
+	var forwarded struct {
+		SenderType string
+		SenderID   string
+		SeqID      int64
+	}
+	require.NoError(t, db.Table("messages").
+		Select("sender_type, sender_id, seq_id").
+		Where("session_id = ? AND content = ?", "sess-forward-target", `{"text":"agent answer"}`).
+		First(&forwarded).Error)
+	assert.Equal(t, "agent", forwarded.SenderType)
+	assert.Equal(t, "agent-42", forwarded.SenderID)
+	assert.Equal(t, int64(7), forwarded.SeqID)
+}
+
 // ==================== MarkRead ====================
 
 func TestMarkRead_NotMember(t *testing.T) {
@@ -944,6 +1065,7 @@ func newMessageAttachmentTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE sessions (
 			id TEXT PRIMARY KEY,
 			type TEXT NOT NULL,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved BOOLEAN NOT NULL DEFAULT FALSE,
@@ -968,6 +1090,8 @@ func newMessageAttachmentTestDB(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL,
 			reply_to_message_id TEXT,
 			recalled BOOLEAN NOT NULL DEFAULT FALSE,
+			edited BOOLEAN NOT NULL DEFAULT FALSE,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,
@@ -978,6 +1102,7 @@ func newMessageAttachmentTestDB(t *testing.T) *gorm.DB {
 			mime_type TEXT NOT NULL,
 			original_name TEXT DEFAULT '',
 			uploader_user_id TEXT NOT NULL,
+			metadata TEXT NOT NULL DEFAULT '{}',
 			created_at DATETIME
 		)`,
 		`CREATE TABLE message_attachments (

@@ -229,6 +229,72 @@ export interface AgentRunEventSummary {
   elapsed_ms?: number;
 }
 
+export interface AgentTaskApproval {
+  approval_id: string;
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  request_id?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  status?: string;
+  reason?: string;
+  decided_by?: string;
+  created_at?: string;
+  decided_at?: string;
+  edge_control?: Record<string, unknown>;
+}
+
+export interface AgentTaskApprovalList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  approvals: AgentTaskApproval[];
+  pending?: AgentTaskApproval[];
+  decided?: AgentTaskApproval[];
+  last_event_seq?: number;
+}
+
+export interface AgentTaskArtifact {
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  path?: string;
+  action?: string;
+  tool_name?: string;
+  status?: string;
+  artifact_id?: string;
+  name?: string;
+  mime_type?: string;
+  size_bytes?: number;
+  diff?: string;
+  patch?: string;
+  edit_id?: string;
+  review_status?: string;
+  can_apply?: boolean;
+  can_revert?: boolean;
+  type?: string;
+  kind?: string;
+  created_at?: string;
+}
+
+export interface AgentTaskArtifactList {
+  task_id: string;
+  edge_run_id?: string;
+  session_id?: string;
+  artifacts: AgentTaskArtifact[];
+  last_event_seq?: number;
+}
+
+export interface TaskApprovalDecisionRequest {
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
 export interface AgentRunEvent {
   id: string;
   task_id: string;
@@ -276,6 +342,7 @@ export interface AgentProfile {
   skills?: string;
   mcp_servers?: string;
   tool_allowlist?: string;
+  memory_policy?: string;
   approval_policy?: string;
   permission_mode?: string;
   target_preferences?: string;
@@ -297,11 +364,36 @@ export interface AgentProfileListResponse {
   };
 }
 
+export interface CreateAgentProfileRequest {
+  name: string;
+  description?: string;
+  runtime_id: string;
+  model?: string;
+  provider?: string;
+  reasoning_effort?: string;
+  permission_mode?: string;
+  skills?: string;
+  mcp_servers?: string;
+  tool_allowlist?: string;
+  approval_policy?: string;
+  target_preferences?: string;
+  context_budget_max_tokens?: number;
+}
+
+export type UpdateAgentProfileRequest = Partial<CreateAgentProfileRequest>;
+
 // 鈹€鈹€ Execution targets 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export type ExecutionTargetType = 'local_edge' | 'hub_relay' | 'remote_ssh' | 'tailscale' | 'cloud_edge';
 export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay';
-export type ExecutionTargetHealthState = 'unknown' | 'healthy' | 'degraded' | 'offline';
+export type ExecutionTargetHealthState =
+  | 'unknown'
+  | 'healthy'
+  | 'online'
+  | 'degraded'
+  | 'offline'
+  | 'mismatch'
+  | 'stale';
 
 export interface ExecutionTarget {
   id: string;
@@ -331,6 +423,67 @@ export interface ExecutionTargetListResponse {
     nextCursor?: string;
     hasMore: boolean;
   };
+}
+
+// ── Hub workspace projects ─────────────────────
+
+export interface WorkspaceProject {
+  id: string;
+  name: string;
+  description?: string;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WorkspaceProjectListResponse {
+  items: WorkspaceProject[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface CreateWorkspaceProjectRequest {
+  name: string;
+  description?: string;
+}
+
+export type UpdateWorkspaceProjectRequest = Partial<CreateWorkspaceProjectRequest>;
+
+export interface WorkspaceProjectThread {
+  id: string;
+  project_id: string;
+  type: string;
+  name: string;
+  owner_user_id?: string;
+  role?: string;
+  member_count: number;
+  last_message_at?: string;
+  created_at: string;
+}
+
+export interface CreateWorkspaceProjectThreadRequest {
+  name: string;
+}
+
+export interface SendWorkspaceProjectThreadMessageRequest {
+  client_msg_id?: string;
+  content_type?: string;
+  content: string;
+}
+
+export interface WorkspaceProjectThreadMessage {
+  id: string;
+  project_id: string;
+  thread_id: string;
+  seq_id: number;
+  client_msg_id: string;
+  sender_type: string;
+  sender_id: string;
+  content_type: string;
+  content: string;
+  created_at: string;
 }
 
 // 鈹€鈹€ Auth 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
@@ -407,6 +560,7 @@ export interface AgentTeamRun {
   session_id?: string;
   trigger_user_id?: string;
   trigger_message?: string;
+  target_id?: string;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
   created_at?: string;
   updated_at?: string;
@@ -620,6 +774,7 @@ export interface AddAgentTeamMemberRequest {
 
 export interface StartAgentTeamRunRequest {
   trigger_message: string;
+  target_id?: string;
 }
 
 interface HubEnvelope<T> {
@@ -1023,6 +1178,18 @@ export function createHubClient(opts: HubClientOptions = {}) {
     getTaskRunEventSummary: (taskId: string) =>
       request<AgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/summary`),
 
+    listTaskApprovals: (taskId: string) =>
+      request<AgentTaskApprovalList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals`),
+
+    decideTaskApproval: (taskId: string, approvalId: string, decision: TaskApprovalDecisionRequest) =>
+      request<AgentTaskApproval>(`/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`, {
+        method: 'POST',
+        body: JSON.stringify(decision),
+      }),
+
+    listTaskArtifacts: (taskId: string) =>
+      request<AgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
+
     // ── Custom agents ──────────────────────────────────
 
     listCustomAgents: () =>
@@ -1053,6 +1220,21 @@ export function createHubClient(opts: HubClientOptions = {}) {
     }) =>
       request<AgentProfileListResponse>(`/web/agent-profiles${qs(params ?? {})}`),
 
+    createAgentProfile: (data: CreateAgentProfileRequest) =>
+      request<AgentProfile>('/web/agent-profiles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateAgentProfile: (id: string, data: UpdateAgentProfileRequest) =>
+      request<AgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentProfile: (id: string) =>
+      request<undefined>(`/web/agent-profiles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
     // 鈹€鈹€ Execution targets 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     listExecutionTargets: (params?: {
@@ -1064,6 +1246,54 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     pingExecutionTarget: (id: string) =>
       request<undefined>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
+
+    // ── Hub workspace projects ─────────────────
+
+    listWorkspaceProjects: (params?: {
+      q?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<WorkspaceProjectListResponse>(`/web/projects${qs(params ?? {})}`),
+
+    getWorkspaceProject: (id: string) =>
+      request<WorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`),
+
+    createWorkspaceProject: (data: CreateWorkspaceProjectRequest) =>
+      request<WorkspaceProject>('/web/projects', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateWorkspaceProject: (id: string, data: UpdateWorkspaceProjectRequest) =>
+      request<WorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    listWorkspaceProjectThreads: (projectId: string) =>
+      request<WorkspaceProjectThread[]>(`/web/projects/${encodeURIComponent(projectId)}/threads`),
+
+    createWorkspaceProjectThread: (projectId: string, data: CreateWorkspaceProjectThreadRequest) =>
+      request<WorkspaceProjectThread>(`/web/projects/${encodeURIComponent(projectId)}/threads`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listWorkspaceProjectThreadMessages: (projectId: string, threadId: string, params?: { limit?: number }) =>
+      request<WorkspaceProjectThreadMessage[]>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params ?? {})}`,
+      ),
+
+    sendWorkspaceProjectThreadMessage: (
+      projectId: string,
+      threadId: string,
+      data: SendWorkspaceProjectThreadMessageRequest,
+    ) =>
+      request<WorkspaceProjectThreadMessage>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
 
     // ── Agent teams / TeamRun console ────────────────
 

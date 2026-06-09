@@ -1,0 +1,68 @@
+{
+  "provider": "claude-sdk-fixture",
+  "events": [
+    {
+      "id": "claude_tool_1",
+      "type": "tool_call",
+      "sessionId": "claude_session_1",
+      "traceId": "trace_claude_1",
+      "toolUseId": "toolu_read",
+      "toolName": "Read",
+      "input": {
+        "file_path": "edge-server/internal/adapters/adapter.go"
+      },
+      "traceRefs": ["trace:claude:span-tool-read"],
+      "evidenceRefs": ["event:claude_tool_1"]
+    },
+    {
+      "id": "claude_perm_1",
+      "type": "permission_request",
+      "requestId": "perm_claude_1",
+      "toolUseId": "toolu_bash",
+      "toolName": "Bash",
+      "riskLevel": "high",
+      "reason": "shell command requires approval",
+      "input": {
+        "command": "go test ./internal/adapters -short -count=1"
+      },
+      "traceRefs": ["trace:claude:permission"]
+    },
+    {
+      "id": "claude_route_1",
+      "type": "handoff_suggestion",
+      "action": "delegate",
+      "targetAgent": "reviewer",
+      "nextWorker": "reviewer",
+      "instructions": "Review mapped event evidence.",
+      "reason": "Provider suggested a review handoff.",
+      "evidenceRefs": ["event:claude_perm_1", "trace:claude:permission"]
+    },
+    {
+      "id": "claude_file_1",
+      "type": "file_change",
+      "toolUseId": "toolu_write",
+      "toolName": "Write",
+      "path": "edge-server/internal/adapters/sdk_fixture_mapper.go",
+      "kind": "modified",
+      "diff": "@@ fixture diff @@"
+    },
+    {
+      "id": "claude_artifact_1",
+      "type": "artifact",
+      "artifactId": "artifact_claude_report",
+      "path": "artifacts/claude-fixture-report.md",
+      "kind": "markdown",
+      "sizeBytes": 128,
+      "summary": "Fixture report",
+      "traceRefs": ["trace:claude:artifact"]
+    },
+    {
+      "id": "claude_result_1",
+      "type": "result",
+      "success": true,
+      "summary": "Claude SDK-like fixture completed.",
+      "traceRefs": ["trace:claude:root"],
+      "evidenceRefs": ["artifact:artifact_claude_report"]
+    }
+  ]
+}

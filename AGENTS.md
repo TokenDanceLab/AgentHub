@@ -47,9 +47,9 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 | 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
 | 后端 | Hub Server、TokenDance ID 接入、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` |
 | 客户端（Desktop） | Desktop Tauri、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验、tray | `app/desktop/`、`edge-server/` |
-| 客户端（Mobile） | Mobile Tauri、移动端 UI、OIDC deep-link | `app/mobile/` |
+| 客户端（Mobile） | Expo/React Native 移动端、OIDC deep-link、SecureStore、Notifications | `app/mobile-rn/` |
 
-Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri/`，不共享 Rust crate，不互相修改对方的配置。
+Desktop 是 Tauri 项目；Mobile 主线是 Expo + React Native development build。Mobile 不再维护旧 Tauri 实现，旧 Tauri Mobile package 已从活跃源码树移除。
 
 共享边界：
 
@@ -60,17 +60,17 @@ Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri
 
 ### Desktop / Web / Mobile 端口与资源分配
 
-Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能互相抢占。Mobile 不进入本轮 v4 重构，只保留独立预览端口。
+Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能互相抢占。Mobile RN 使用独立 Expo Web 视觉预览端口。
 
 | 资源 | Desktop/Tauri | Web | Mobile |
 |---|---|---|---|
-| Vite 开发端口 | **5173** (strict) | **5174** (strict) | **5175** (strict，非本轮主线) |
-| 前端源码 | `app/desktop/src/` | `app/web/src/` | `app/mobile/src/` |
-| 平台入口 | `app/desktop/src/App.tsx` + Tauri host adapter | `app/web/src/App.tsx` + Hub/Web adapter | Mobile native adaptation |
-| Tauri 项目 | `app/desktop/src-tauri/` | 无 | `app/mobile/src-tauri/` |
-| Rust crate | `agenthub-desktop` | 无 | `agenthub-mobile` |
-| Tauri identifier | `com.agenthub.desktop` | 无 | `com.agenthub.mobile` |
-| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) | 稳定子集 |
+| Vite/Expo Web 开发端口 | **5173** (strict) | **5174** (strict) | **5177** |
+| 前端源码 | `app/desktop/src/` | `app/web/src/` | `app/mobile-rn/src/` |
+| 平台入口 | `app/desktop/src/App.tsx` + Tauri host adapter | `app/web/src/App.tsx` + Hub/Web adapter | `app/mobile-rn/src/App.tsx` + Expo/RN adapters |
+| Native 项目 | `app/desktop/src-tauri/` | 无 | Expo development build (`app/mobile-rn/app.config.ts`, `eas.json`) |
+| Native package | `agenthub-desktop` | 无 | `agenthub-mobile-rn` |
+| App identifier | `com.agenthub.desktop` | 无 | `tech.vectorcontrol.agenthub.mobile` |
+| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) | RN-safe contracts only |
 | Storybook | 6006 | 共用 shared/desktop story | 无 |
 
 其他固定端口：
@@ -83,11 +83,11 @@ Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能�
 | OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
 | Web 工作台 | 5174 | `app/web/vite.config.ts` |
 
-Rust/Tauri 隔离规则：
+Native 隔离规则：
 
-- **Desktop Agent 只能修改** `app/desktop/src-tauri/`，**Mobile Agent 只能修改** `app/mobile/src-tauri/`。
-- 任何 Agent 不得修改对方的 `tauri.conf.json`、`Cargo.toml`、`lib.rs`。
-- 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate，两边各自在 `Cargo.toml` 中 `[dependencies]` 引用。
+- **Desktop Agent 只能修改** `app/desktop/src-tauri/` 的 Tauri/Rust 能力；Mobile Agent 不新增或恢复旧 Tauri Mobile native host。
+- 任何 Agent 不得修改对方的 native 配置。Mobile native 配置集中在 `app/mobile-rn/app.config.ts`、`eas.json` 和 Expo plugin 配置。
+- 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate；Mobile RN 默认不消费 Rust crate。
 - Desktop 特有功能（tray、Edge 进程管理、keyring）不往 Web/Mobile 移植；Web 只能通过 Hub/Web adapter 访问远端能力；Mobile 特有功能（deep link、platform secure store）不往 desktop 移植。
 - 共享的前端代码（类型、hooks、i18n、UI 组件）放 `app/shared/`，两个项目通过 `workspace:*` 引用。
 
@@ -179,25 +179,14 @@ git diff --check                  # 无冲突标记、无行尾空格
 git status --short --branch       # 确认只改了允许的路径
 ```
 
-### 模型分配策略
+### 并行团队调度策略
 
-> AgentHub 项目专用。这里的 `opus` / `sonnet` / `haiku` 是本地 Claude CLI 路由别名，不等于公开 Claude 模型名；Codex 自带 agent 工具单独建模。dev-loop skill 同步更新。
-> 本轮 Desktop/Web v4 clean rebuild 的代码实现主力是 **GLM-5.1 对应的本地 Claude CLI 路由**。如果用户或网关把某个 alias 重新指向 GLM-5.1，派任务前用 `claude -p ... --output-format json` 或 `claude-subagent` skill 的探针确认实际路由，再写入任务卡；不要按公开模型名猜测。
+> 具体执行口径以仓库级 skill 为准，不在本文件硬编码模型、供应商或本地 alias 映射。
 
-| 入口 | 别名/模型 | 上下文 | 强项 | 优先使用场景 |
-|---|---|---:|---|---|
-| Codex 自带 agent 工具 | GPT-5.5 low/mid | 256k | 前端、看图、UI/视觉判断、常规实现和审查 | 前端 UI、截图对比、局部体验判断、常规 code review |
-| Codex 自带 agent 工具 | GPT-5.5 xhigh | 256k | 最强架构推理和复杂工程设计 | 复杂架构、关键方案、跨模块取舍、主 Agent 复核前的高强度 sidecar |
-| Claude CLI | **opus** = DeepSeek-V4-Pro | 1M | 速度快、强推理、长上下文 | 大范围阅读、文档整理、roadmap/architecture 归纳、竞品/仓库查找、复杂方案审查 |
-| Claude CLI | **sonnet** = GLM-5.1 | 200k | 强代码和 agentic 能力 | 窄范围代码实现、测试修复、Go/TS 小切片、明确文件集的重构 |
-| Claude CLI | **haiku** = DeepSeek-V4-Flash | 200k | 速度快、轻量反馈 | 快速检查、轻量 review、日志/文档/小范围 UI 可读性审查 |
-
-- **主 Agent（本 session）**：负责架构设计、规划、分支治理、文档、开发进度管理、整体工程化设计和任务拆解。
-- **Codex GPT-5.5 low/mid**：用于看图、前端 UI、截图对比和常规前端判断。
-- **Codex GPT-5.5 xhigh**：用于复杂架构推理、关键方案和高风险设计复核。
-- **Claude opus**：DeepSeek-V4-Pro，1M 上下文，速度快、强推理，用于长文本、找东西、简单文档、架构整理、大范围归纳和复杂方案审查。
-- **Claude sonnet**：GLM-5.1，200k 上下文，强代码模型，用于明确路径内的代码实现和 focused tests；每次只给必要文件。
-- **Claude haiku**：DeepSeek-V4-Flash，200k 上下文，用于快速检查、轻量 review、日志/文档/小范围 UI 可读性审查，不派它做代码主力。
+- 通用多团队、多 subagent 并行开发、审查、测试和文档同步，读 `.agents/skills/dev-team/SKILL.md`。
+- Codex 专用 Leader/Worker 编队，读 `.agents/skills/dev-team-codex/SKILL.md`。
+- `dev-loop` 仍负责长程单线推进、交叉审查和循环验证；需要并行攻坚时由 `dev-team` 或 `dev-team-codex` 接管分队调度。
+- 每个 subagent 必须有明确写入范围、禁改范围、验证命令和回报格式；主 Agent 负责集成审查和最终验证。
 
 ### Agent 间进度同步
 
@@ -205,7 +194,7 @@ git status --short --branch       # 确认只改了允许的路径
 
 ### 仓库级 Skill
 
-- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`。
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`、`.agents/skills/dev-team-codex/`。
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）默认先读 `.agents/skills/dev-loop/SKILL.md`；本轮 Desktop/Web v4 clean rebuild 是用户明确排除 dev-loop 的例外，按 roadmap/plan 直接推进。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。

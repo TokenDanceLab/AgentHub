@@ -6,7 +6,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 Push-Location $RepoRoot
 try {

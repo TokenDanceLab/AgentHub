@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -45,6 +49,15 @@ type recordingRepository struct {
 func (r *recordingRepository) CreateProject(id, name string) (store.Project, error) {
 	r.createProjectCalls++
 	return r.Repository.CreateProject(id, name)
+}
+
+type corruptPinRepository struct {
+	store.Repository
+	pins []store.ThreadPin
+}
+
+func (r *corruptPinRepository) ListThreadPins(threadID string) []store.ThreadPin {
+	return append([]store.ThreadPin(nil), r.pins...)
 }
 
 type fakeRunExecutor struct {
@@ -344,6 +357,173 @@ func TestGetRuns(t *testing.T) {
 	}
 }
 
+func TestArtifactPreviewMetadataLookupRoutes(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	h.ensureDefaults()
+	if _, err := h.Store.CreateRun("run_evidence", "proj_local", "thread_local"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	artifact, err := h.Store.UpsertArtifact(store.Artifact{
+		ID:        "artifact_readonly",
+		RunID:     "run_evidence",
+		Kind:      "patch",
+		Path:      "changes.diff",
+		SizeBytes: 42,
+	})
+	if err != nil {
+		t.Fatalf("UpsertArtifact returned error: %v", err)
+	}
+	preview, err := h.Store.UpsertPreview(store.Preview{
+		ID:     "preview_readonly",
+		RunID:  "run_evidence",
+		URL:    "http://127.0.0.1:4173",
+		Status: "ready",
+	})
+	if err != nil {
+		t.Fatalf("UpsertPreview returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/artifacts?runId=run_evidence", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/artifacts status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var listBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&listBody); err != nil {
+		t.Fatalf("failed to decode artifact list: %v", err)
+	}
+	listBody = unwrapSuccess(listBody)
+	items, ok := listBody["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("artifact list items = %#v, want one item", listBody["items"])
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/artifacts/artifact_readonly", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET artifact metadata status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var artifactBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&artifactBody); err != nil {
+		t.Fatalf("failed to decode artifact body: %v", err)
+	}
+	artifactBody = unwrapSuccess(artifactBody)
+	if artifactBody["id"] != artifact.ID || artifactBody["runId"] != "run_evidence" || artifactBody["threadId"] != "thread_local" {
+		t.Fatalf("artifact body = %#v, want stored metadata", artifactBody)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/previews/preview_readonly", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET preview metadata status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var previewBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&previewBody); err != nil {
+		t.Fatalf("failed to decode preview body: %v", err)
+	}
+	previewBody = unwrapSuccess(previewBody)
+	if previewBody["id"] != preview.ID || previewBody["runId"] != "run_evidence" || previewBody["url"] != "http://127.0.0.1:4173" {
+		t.Fatalf("preview body = %#v, want stored metadata", previewBody)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/previews/preview_readonly:stop", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST preview stop status = %d, want 202 body=%s", rec.Code, rec.Body.String())
+	}
+	var stoppedBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&stoppedBody); err != nil {
+		t.Fatalf("failed to decode stopped preview body: %v", err)
+	}
+	stoppedBody = unwrapSuccess(stoppedBody)
+	if stoppedBody["id"] != preview.ID || stoppedBody["status"] != "stopped" {
+		t.Fatalf("stopped preview body = %#v, want stopped metadata", stoppedBody)
+	}
+	if _, hasURL := stoppedBody["url"]; hasURL {
+		t.Fatalf("stopped preview url = %#v, want omitted url", stoppedBody["url"])
+	}
+	storedPreview, ok := h.Store.GetPreview(preview.ID)
+	if !ok || storedPreview.Status != "stopped" || storedPreview.URL != "" || storedPreview.CreatedAt != preview.CreatedAt || storedPreview.UpdatedAt == "" {
+		t.Fatalf("stored stopped preview = %#v, want stopped transition with preserved createdAt", storedPreview)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/previews/missing:stop", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST missing preview stop status = %d, want 404 body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/artifacts/missing", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET missing artifact status = %d, want 404 body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/artifacts/artifact_readonly/content", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET artifact content status = %d, want 404 while content route remains planned body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPostPreviewsStartsFakePreviewMetadata(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	h.ensureDefaults()
+	if _, err := h.Store.CreateRun("run_preview_start", "proj_local", "thread_local"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/previews", strings.NewReader(`{
+		"previewId": "preview_fake_start",
+		"runId": "run_preview_start"
+	}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST /v1/previews status = %d, want 202 body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode preview body: %v", err)
+	}
+	body = unwrapSuccess(body)
+	if body["id"] != "preview_fake_start" || body["runId"] != "run_preview_start" || body["threadId"] != "thread_local" || body["status"] != "starting" {
+		t.Fatalf("preview start body = %#v, want starting metadata", body)
+	}
+	if _, hasURL := body["url"]; hasURL {
+		t.Fatalf("starting preview url = %#v, want omitted url", body["url"])
+	}
+	stored, ok := h.Store.GetPreview("preview_fake_start")
+	if !ok || stored.Status != "starting" || stored.URL != "" || stored.RunID != "run_preview_start" || stored.ThreadID != "thread_local" {
+		t.Fatalf("stored preview = %#v ok=%v, want starting metadata", stored, ok)
+	}
+}
+
+func TestPostPreviewsRejectsMissingRun(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/previews", strings.NewReader(`{"previewId":"preview_missing","runId":"run_missing"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST /v1/previews missing run status = %d, want 404 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestProjectThreadRoutes(t *testing.T) {
 	h := newTestHandler()
 	mux := http.NewServeMux()
@@ -440,6 +620,39 @@ func TestThreadUpdateArchiveDeleteRoutes(t *testing.T) {
 	}
 	if items := h.Store.ListThreadItems("thread_manage"); len(items) != 0 {
 		t.Fatalf("items after delete = %#v, want none", items)
+	}
+}
+
+func TestGetAgentInstanceRoute(t *testing.T) {
+	h := newTestHandler()
+	h.AgentRegistry = agents.NewRegistry()
+	if err := h.AgentRegistry.Register(&agents.AgentInstance{
+		ID:        "agent_worker_1",
+		AdapterID: "codex",
+		Name:      "Contract Worker",
+		Status:    agents.StatusBusy,
+		RunID:     "run_contract",
+		ParentID:  "agent_parent",
+	}); err != nil {
+		t.Fatalf("Register returned error: %v", err)
+	}
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/agent-instances/agent_worker_1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/agent-instances/agent_worker_1 status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	body = unwrapSuccess(body)
+	if body["id"] != "agent_worker_1" || body["adapterId"] != "codex" || body["runId"] != "run_contract" {
+		t.Fatalf("agent instance body = %#v, want registered instance", body)
 	}
 }
 
@@ -1268,9 +1481,9 @@ func TestPostThreadMessageCreatesItem(t *testing.T) {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
 
-		var itemRaw map[string]any
+	var itemRaw map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
-				t.Fatalf("failed to decode item body: %v", err)
+		t.Fatalf("failed to decode item body: %v", err)
 	}
 	itemRaw = unwrapSuccess(itemRaw)
 	itemBytes, _ := json.Marshal(itemRaw)
@@ -1310,9 +1523,9 @@ func TestPostThreadMessageUsesRequestedRole(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
 	}
-		var itemRaw map[string]any
+	var itemRaw map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
-				t.Fatalf("failed to decode item body: %v", err)
+		t.Fatalf("failed to decode item body: %v", err)
 	}
 	itemRaw = unwrapSuccess(itemRaw)
 	itemBytes, _ := json.Marshal(itemRaw)
@@ -1320,6 +1533,160 @@ func TestPostThreadMessageUsesRequestedRole(t *testing.T) {
 	json.Unmarshal(itemBytes, &item)
 	if item.Role != "assistant" {
 		t.Fatalf("item role = %q, want assistant", item.Role)
+	}
+}
+
+func TestThreadPinsPersistPerThreadItem(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	_, ch, _ := h.Bus.Subscribe(0)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages", strings.NewReader(`{"content":"pin this message"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
+	}
+	var itemRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&itemRaw); err != nil {
+		t.Fatalf("failed to decode item body: %v", err)
+	}
+	itemRaw = unwrapSuccess(itemRaw)
+	itemID := itemRaw["itemId"].(string)
+	drainEvents(t, ch, 2)
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/pins", strings.NewReader(`{"itemId":"`+itemID+`","pinnedBy":" Delicious233 "}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads/thread_local/pins status = %d, want 201 body=%s", rec.Code, rec.Body.String())
+	}
+	assertNextEvent(t, ch, "thread.pin.created", "thread_local", itemID)
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/pins", strings.NewReader(`{"itemId":"`+itemID+`","pinnedBy":"AgentHub"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST duplicate /pins status = %d, want 201 body=%s", rec.Code, rec.Body.String())
+	}
+	assertNextEvent(t, ch, "thread.pin.created", "thread_local", itemID)
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/threads/thread_local/pins", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads/thread_local/pins status = %d, want 200", rec.Code)
+	}
+	var pinsRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&pinsRaw); err != nil {
+		t.Fatalf("failed to decode pins body: %v", err)
+	}
+	pinsRaw = unwrapSuccess(pinsRaw)
+	pins := pinsRaw["items"].([]any)
+	if len(pins) != 1 {
+		t.Fatalf("pins = %d, want 1", len(pins))
+	}
+	pin := pins[0].(map[string]any)
+	if pin["itemId"] != itemID || pin["pinnedBy"] != "AgentHub" {
+		t.Fatalf("pin = %#v, want updated pinned item metadata", pin)
+	}
+	item := pin["item"].(map[string]any)
+	if item["content"] != "pin this message" {
+		t.Fatalf("pin item content = %q", item["content"])
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/v1/threads/thread_local/pins?itemId="+itemID, nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("DELETE /v1/threads/thread_local/pins status = %d, want 204", rec.Code)
+	}
+	assertNextEvent(t, ch, "thread.pin.deleted", "thread_local", itemID)
+	if pins := h.Store.ListThreadPins("thread_local"); len(pins) != 0 {
+		t.Fatalf("stored pins = %#v, want empty", pins)
+	}
+}
+
+func TestThreadPinsRejectInvalidRequests(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	item, err := h.Store.CreateThreadMessage("item_local", "thread_local", "user", "hello")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+	_, _ = h.Store.CreateThread("thread_other", "proj_local", "Other")
+	otherItem, err := h.Store.CreateThreadMessage("item_other", "thread_other", "user", "other")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage other returned error: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		want   int
+	}{
+		{name: "get unknown thread", method: http.MethodGet, path: "/v1/threads/thread_missing/pins", want: http.StatusNotFound},
+		{name: "post bad json", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{"itemId":`, want: http.StatusBadRequest},
+		{name: "post missing item", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{}`, want: http.StatusBadRequest},
+		{name: "post unknown item", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{"itemId":"item_missing"}`, want: http.StatusNotFound},
+		{name: "post cross thread item", method: http.MethodPost, path: "/v1/threads/thread_local/pins", body: `{"itemId":"` + otherItem.ID + `"}`, want: http.StatusNotFound},
+		{name: "delete missing item id", method: http.MethodDelete, path: "/v1/threads/thread_local/pins", want: http.StatusBadRequest},
+		{name: "delete missing pin", method: http.MethodDelete, path: "/v1/threads/thread_local/pins?itemId=" + item.ID, want: http.StatusNotFound},
+		{name: "wrong method", method: http.MethodPatch, path: "/v1/threads/thread_local/pins", want: http.StatusMethodNotAllowed},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != tt.want {
+				t.Fatalf("%s %s status = %d, want %d body=%s", tt.method, tt.path, rec.Code, tt.want, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestThreadPinsSkipCrossThreadSnapshotPin(t *testing.T) {
+	base := store.New()
+	_, _ = base.CreateProject("proj_local", "Local")
+	_, _ = base.CreateThread("thread_local", "proj_local", "Local")
+	_, _ = base.CreateThread("thread_other", "proj_local", "Other")
+	otherItem, err := base.CreateThreadMessage("item_other", "thread_other", "user", "other")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage other returned error: %v", err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	h := newTestHandler()
+	h.Store = &corruptPinRepository{
+		Repository: base,
+		pins: []store.ThreadPin{{
+			ThreadID:  "thread_local",
+			ItemID:    otherItem.ID,
+			PinnedAt:  now,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/threads/thread_local/pins", nil)
+	rec := httptest.NewRecorder()
+	h.GetThreadPins(rec, req, "thread_local")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads/thread_local/pins status = %d, want 200", rec.Code)
+	}
+	var pinsRaw map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&pinsRaw); err != nil {
+		t.Fatalf("failed to decode pins body: %v", err)
+	}
+	pinsRaw = unwrapSuccess(pinsRaw)
+	pins := pinsRaw["items"].([]any)
+	if len(pins) != 0 {
+		t.Fatalf("pins = %#v, want cross-thread snapshot pin skipped", pins)
 	}
 }
 
@@ -1601,6 +1968,116 @@ func TestPostPermissionDecideConsumesPendingRequestAndPublishesEvent(t *testing.
 	}
 }
 
+func TestPostPermissionDecideUnblocksWaitingPermissionRequest(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		decision string
+		reason   string
+	}{
+		{name: "allow", decision: "allow"},
+		{name: "deny", decision: "deny", reason: "not safe"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHandler()
+			broker := h.ensurePermissionBroker()
+			wait, ok := broker.Begin(adapters.PermissionScope{
+				ProjectID: "proj_1",
+				ThreadID:  "thread_1",
+				RunID:     "run_1",
+			}, adapters.PermissionRequest{
+				RequestID: "req_1",
+				ToolName:  "Bash",
+				ToolUseID: "tool_1",
+			})
+			if !ok {
+				t.Fatal("failed to begin pending permission request")
+			}
+
+			resultCh := make(chan adapters.PermissionDecision, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			go func() {
+				resultCh <- wait(ctx)
+			}()
+
+			body := fmt.Sprintf(`{"runId":"run_1","requestId":"req_1","decision":%q,"reason":%q}`, tt.decision, tt.reason)
+			req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(body))
+			rec := httptest.NewRecorder()
+			h.PostPermissionDecide(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+			}
+			select {
+			case got := <-resultCh:
+				if got.Behavior != tt.decision {
+					t.Fatalf("Behavior = %q, want %q", got.Behavior, tt.decision)
+				}
+				if got.Message != tt.reason {
+					t.Fatalf("Message = %q, want %q", got.Message, tt.reason)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for broker decision")
+			}
+		})
+	}
+}
+
+func TestRegisterRoutesInstallsPermissionBrokerOnClaudeAdapter(t *testing.T) {
+	h := newTestHandler()
+	adapterRegistry := adapters.NewRegistry()
+	claude := adapters.NewClaudeCodeAdapter("claude", "", "")
+	if err := adapterRegistry.Register(claude); err != nil {
+		t.Fatalf("register adapter: %v", err)
+	}
+	h.AdapterRegistry = adapterRegistry
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	inner, _ := json.Marshal(adapters.ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
+		ToolUseID: "tool_1",
+	})
+	msg, _ := json.Marshal(adapters.ControlMessage{
+		Type:      "control_request",
+		RequestID: "req_1",
+		Request:   inner,
+	})
+	var stdin bytes.Buffer
+	done := make(chan error, 1)
+	run := store.Run{ID: "run_1", ProjectID: "proj_1", ThreadID: "thread_1", Status: "started"}
+
+	go func() {
+		done <- claude.ParseStream(context.Background(), strings.NewReader(string(msg)+"\n"), &stdin, adapters.NewBusEventEmitter(h.Bus), run)
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("ParseStream returned before /permissions/decide: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+	h.PostPermissionDecide(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("ParseStream: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("ParseStream did not resume after /permissions/decide")
+	}
+	if !strings.Contains(stdin.String(), `"behavior":"allow"`) {
+		t.Fatalf("stdin response = %s, want allow control response", stdin.String())
+	}
+}
+
 func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
 	h := newTestHandler()
 	h.ensurePermissionRegistry().Register(PendingPermission{
@@ -1858,6 +2335,57 @@ func TestMuxRunsSubPathUnknown(t *testing.T) {
 	}
 }
 
+func TestArtifactDiffPreviewReadOnlyRoutesReturnEmptySnapshots(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	h.ensureDefaults()
+	if _, err := h.Store.CreateRun("run_evidence", "proj_local", "thread_local"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/run_evidence/diff", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET run diff status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var diffBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&diffBody); err != nil {
+		t.Fatalf("decode diff body: %v", err)
+	}
+	diffBody = unwrapSuccess(diffBody)
+	if diffBody["runId"] != "run_evidence" {
+		t.Fatalf("diff runId = %#v, want run_evidence", diffBody["runId"])
+	}
+	files, ok := diffBody["files"].([]any)
+	if !ok || len(files) != 0 {
+		t.Fatalf("diff files = %#v, want empty array", diffBody["files"])
+	}
+
+	for _, path := range []string{"/v1/artifacts", "/v1/previews"} {
+		req = httptest.NewRequest(http.MethodGet, path, nil)
+		rec = httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, want 200 body=%s", path, rec.Code, rec.Body.String())
+		}
+		var listBody map[string]any
+		if err := json.NewDecoder(rec.Body).Decode(&listBody); err != nil {
+			t.Fatalf("decode %s body: %v", path, err)
+		}
+		listBody = unwrapSuccess(listBody)
+		items, ok := listBody["items"].([]any)
+		if !ok || len(items) != 0 {
+			t.Fatalf("%s items = %#v, want empty array", path, listBody["items"])
+		}
+		page, ok := listBody["page"].(map[string]any)
+		if !ok || page["hasMore"] != false {
+			t.Fatalf("%s page = %#v, want hasMore=false", path, listBody["page"])
+		}
+	}
+}
+
 // ── WebSocket upgrade test ──
 
 func TestWebSocketUpgrade(t *testing.T) {
@@ -2059,6 +2587,32 @@ func TestPostThreadMessageGeneratesEvents(t *testing.T) {
 	}
 	if messageCreated == nil {
 		t.Fatal("message.created payload was not captured")
+	}
+}
+
+func drainEvents(t *testing.T, ch <-chan events.EventEnvelope, count int) {
+	t.Helper()
+	for i := 0; i < count; i++ {
+		select {
+		case <-ch:
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("timed out draining event %d of %d", i+1, count)
+		}
+	}
+}
+
+func assertNextEvent(t *testing.T, ch <-chan events.EventEnvelope, wantType, wantThreadID, wantItemID string) {
+	t.Helper()
+	select {
+	case evt := <-ch:
+		if evt.Type != wantType {
+			t.Fatalf("event type = %q, want %q", evt.Type, wantType)
+		}
+		if evt.Scope["threadId"] != wantThreadID || evt.Scope["itemId"] != wantItemID {
+			t.Fatalf("event scope = %#v, want thread/item", evt.Scope)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("timed out waiting for %s event", wantType)
 	}
 }
 

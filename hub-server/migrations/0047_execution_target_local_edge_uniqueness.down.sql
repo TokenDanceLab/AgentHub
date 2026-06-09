@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_execution_targets_active_local_edge_device_unique;

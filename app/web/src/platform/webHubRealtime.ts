@@ -34,6 +34,7 @@ const AGENT_EVENTS = new Set<string>([
 export interface WebHubRealtimeOptions {
   enabled: boolean;
   runtimeSessionId?: string | null;
+  runtimeTaskId?: string | null;
   onRuntimeEvent?: (event: HubRuntimeEventTranscriptInput) => void;
   createSocket?: CreateHubWS;
   getToken?: () => string | null;
@@ -42,18 +43,21 @@ export interface WebHubRealtimeOptions {
 export function useWebHubRealtime({
   enabled,
   runtimeSessionId,
+  runtimeTaskId,
   onRuntimeEvent,
   createSocket = createHubWS,
   getToken = getAccessToken,
 }: WebHubRealtimeOptions): void {
   const queryClient = useQueryClient();
   const runtimeSessionIdRef = useRef(runtimeSessionId);
+  const runtimeTaskIdRef = useRef(runtimeTaskId);
   const onRuntimeEventRef = useRef(onRuntimeEvent);
 
   useEffect(() => {
     runtimeSessionIdRef.current = runtimeSessionId;
+    runtimeTaskIdRef.current = runtimeTaskId;
     onRuntimeEventRef.current = onRuntimeEvent;
-  }, [onRuntimeEvent, runtimeSessionId]);
+  }, [onRuntimeEvent, runtimeSessionId, runtimeTaskId]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -61,7 +65,13 @@ export function useWebHubRealtime({
     const socket = createSocket({ getToken });
     const unsubscribe = socket.onAny((type, payload) => {
       invalidateWebWorkbenchHubQueries(queryClient, type, payload);
-      dispatchHubRuntimeEvent(type, payload, runtimeSessionIdRef.current, onRuntimeEventRef.current);
+      dispatchHubRuntimeEvent(
+        type,
+        payload,
+        runtimeSessionIdRef.current,
+        onRuntimeEventRef.current,
+        runtimeTaskIdRef.current,
+      );
     });
 
     socket.connect();
@@ -77,10 +87,14 @@ export function dispatchHubRuntimeEvent(
   payload: unknown,
   runtimeSessionId: string | null | undefined,
   onRuntimeEvent: ((event: HubRuntimeEventTranscriptInput) => void) | undefined,
+  runtimeTaskId?: string | null,
 ): void {
-  if (eventType !== HUB_EVENTS.AGENT_STREAM || !onRuntimeEvent || !runtimeSessionId) return;
+  if (!onRuntimeEvent || !runtimeSessionId) return;
 
-  const event = hubRuntimeEventFromPayload(payload);
+  const parsed = eventType === HUB_EVENTS.AGENT_STREAM
+    ? hubRuntimeEventFromPayload(payload)
+    : hubTerminalRuntimeEventFromPayload(eventType, payload, runtimeSessionId, runtimeTaskId);
+  const event = attachRuntimeSession(parsed, runtimeSessionId, runtimeTaskId);
   if (!event || event.session_id !== runtimeSessionId) return;
   onRuntimeEvent(event);
 }
@@ -93,6 +107,10 @@ export function invalidateWebWorkbenchHubQueries(
   const touchesSessions = SESSION_EVENTS.has(eventType) || MESSAGE_EVENTS.has(eventType) || AGENT_EVENTS.has(eventType);
   if (!touchesSessions) return;
 
+  if (AGENT_EVENTS.has(eventType)) {
+    recordRealtimeAgentTaskIndex(queryClient, eventType, payload);
+  }
+
   void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
 
   if (!MESSAGE_EVENTS.has(eventType) && !AGENT_EVENTS.has(eventType)) return;
@@ -102,7 +120,123 @@ export function invalidateWebWorkbenchHubQueries(
     queryKey: sessionId
       ? ['web-v4', 'hub-messages', sessionId]
       : ['web-v4', 'hub-messages'],
-  });
+    });
+}
+
+function recordRealtimeAgentTaskIndex(
+  queryClient: QueryClient,
+  eventType: string,
+  payload: unknown,
+): void {
+  const taskId = readString(payload, 'task_id', 'taskId');
+  if (!taskId) return;
+  const task = {
+    taskId,
+    ...(readSessionId(payload) ? { sessionId: readSessionId(payload) } : {}),
+    ...(readString(payload, 'edge_run_id', 'edgeRunId', 'run_id', 'runId') ? {
+      edgeRunId: readString(payload, 'edge_run_id', 'edgeRunId', 'run_id', 'runId'),
+    } : {}),
+    status: realtimeTaskStatus(eventType),
+  };
+
+  queryClient.setQueryData(['web-v4', 'agent-task-index', taskId], task);
+  if (task.sessionId) {
+    queryClient.setQueryData(['web-v4', 'active-agent-task', task.sessionId], task);
+  }
+  void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', taskId] });
+  void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-summary', taskId] });
+}
+
+function realtimeTaskStatus(eventType: string): string {
+  switch (eventType) {
+    case HUB_EVENTS.AGENT_DONE:
+      return 'completed';
+    case HUB_EVENTS.AGENT_FAILED:
+      return 'failed';
+    case HUB_EVENTS.AGENT_CANCEL:
+      return 'cancelled';
+    default:
+      return 'running';
+  }
+}
+
+function hubTerminalRuntimeEventFromPayload(
+  eventType: string,
+  payload: unknown,
+  runtimeSessionId: string,
+  runtimeTaskId: string | null | undefined,
+): HubRuntimeEventTranscriptInput | null {
+  const taskId = readString(payload, 'task_id', 'taskId');
+  const sessionId = readSessionId(payload) ?? (taskId === runtimeTaskId ? runtimeSessionId : undefined);
+  if (!taskId || !sessionId) return null;
+  const edgeRunId = readString(payload, 'edge_run_id', 'edgeRunId', 'run_id', 'runId');
+  const createdAt = readString(payload, 'created_at', 'createdAt');
+
+  if (eventType === HUB_EVENTS.AGENT_DONE) {
+    const content = readString(payload, 'result_summary', 'final_content', 'content') ?? 'Agent task completed.';
+    return compactRuntimeEvent({
+      task_id: taskId,
+      ...(edgeRunId ? { edge_run_id: edgeRunId } : {}),
+      session_id: sessionId,
+      event_type: 'run.agent.result',
+      payload: {
+        content,
+        success: true,
+        ...(readPayloadValue(payload, 'usage') ? { usage: readPayloadValue(payload, 'usage') } : {}),
+      },
+      ...(createdAt ? { created_at: createdAt } : {}),
+    });
+  }
+
+  if (eventType === HUB_EVENTS.AGENT_FAILED) {
+    const error = readString(payload, 'error', 'error_message', 'reason') ?? 'Agent task failed.';
+    return compactRuntimeEvent({
+      task_id: taskId,
+      ...(edgeRunId ? { edge_run_id: edgeRunId } : {}),
+      session_id: sessionId,
+      event_type: 'run.failed',
+      payload: { error, success: false },
+      ...(createdAt ? { created_at: createdAt } : {}),
+    });
+  }
+
+  if (eventType === HUB_EVENTS.AGENT_CANCEL) {
+    const reason = readString(payload, 'reason', 'error', 'error_message') ?? 'Agent task cancelled.';
+    return compactRuntimeEvent({
+      task_id: taskId,
+      ...(edgeRunId ? { edge_run_id: edgeRunId } : {}),
+      session_id: sessionId,
+      event_type: 'run.cancelled',
+      payload: { error: reason, success: false },
+      ...(createdAt ? { created_at: createdAt } : {}),
+    });
+  }
+
+  return null;
+}
+
+function attachRuntimeSession(
+  event: HubRuntimeEventTranscriptInput | null,
+  runtimeSessionId: string,
+  runtimeTaskId: string | null | undefined,
+): HubRuntimeEventTranscriptInput | null {
+  if (!event) return null;
+  if (event.session_id || !runtimeTaskId || event.task_id !== runtimeTaskId) return event;
+  return { ...event, session_id: runtimeSessionId };
+}
+
+function compactRuntimeEvent(event: HubRuntimeEventTranscriptInput): HubRuntimeEventTranscriptInput {
+  return {
+    ...(event.id ? { id: event.id } : {}),
+    ...(event.task_id ? { task_id: event.task_id } : {}),
+    ...(event.edge_run_id ? { edge_run_id: event.edge_run_id } : {}),
+    ...(event.session_id ? { session_id: event.session_id } : {}),
+    ...(event.agent_instance_id ? { agent_instance_id: event.agent_instance_id } : {}),
+    ...(event.event_seq != null ? { event_seq: event.event_seq } : {}),
+    ...(event.event_type ? { event_type: event.event_type } : {}),
+    ...(event.payload !== undefined ? { payload: event.payload } : {}),
+    ...(event.created_at ? { created_at: event.created_at } : {}),
+  };
 }
 
 function readSessionId(payload: unknown): string | undefined {
@@ -116,4 +250,19 @@ function readSessionId(payload: unknown): string | undefined {
   const nestedRecord = nested as HubPayload;
   const nestedSession = nestedRecord.session_id ?? nestedRecord.sessionId;
   return typeof nestedSession === 'string' && nestedSession.trim() ? nestedSession : undefined;
+}
+
+function readString(payload: unknown, ...keys: string[]): string | undefined {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+  const record = payload as HubPayload;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function readPayloadValue(payload: unknown, key: string): unknown {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+  return (payload as HubPayload)[key];
 }

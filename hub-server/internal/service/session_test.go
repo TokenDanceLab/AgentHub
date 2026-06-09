@@ -187,6 +187,36 @@ func TestCreateGroupSession_AllowsOwnerOnlyWorkspace(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestCreateGroupSession_PublishesCreatedEvent(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "friend_id" FROM "friendships" WHERE user_id = $1 AND status = $2`)).
+		WithArgs("owner-1", "accepted").
+		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("u2"))
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "sessions"`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "session_members"`)).
+		WillReturnResult(sqlmock.NewResult(2, 2))
+	mock.ExpectCommit()
+
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "session.created")
+	svc := &SessionService{db: db, cacheClient: testSessionCache(t), bus: bus}
+	resp, err := svc.CreateGroupSession(context.Background(), "owner-1", "Workspace", []string{"u2"})
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.Equal(t, resp.SessionID, payload["session_id"])
+	assert.Equal(t, "group", payload["type"])
+	assert.Equal(t, "Workspace", payload["name"])
+	assert.Equal(t, "owner-1", payload["owner_id"])
+	assert.Equal(t, []string{"owner-1", "u2"}, payload["members"])
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== getSession (tested via DeleteForMe) ====================
 
 func TestDeleteForMe_SessionNotFound(t *testing.T) {
@@ -260,6 +290,42 @@ func TestDeleteForMe_Success(t *testing.T) {
 	svc := NewSessionService(db, nil)
 	err := svc.DeleteForMe(context.Background(), "user-1", "sess-1")
 	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDeleteForMe_PublishesMemberLeftEvent(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2`)).
+		WithArgs("sess-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("sess-1", "group", false, "owner-1"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE`)).
+		WithArgs("sess-1", "user", "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL ORDER BY "session_members"."id" LIMIT $4`)).
+		WithArgs("sess-1", "user", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
+			AddRow("mem-1", "sess-1", "user", "user-1", "member"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "agent_instances" WHERE`)).
+		WithArgs("sess-1", "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id = $4 AND left_at IS NULL`)).
+		WithArgs(sqlmock.AnyArg(), "sess-1", "user", "user-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "session.member_left")
+	svc := &SessionService{db: db, cacheClient: testSessionCache(t), bus: bus}
+	err := svc.DeleteForMe(context.Background(), "user-1", "sess-1")
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.Equal(t, "sess-1", payload["session_id"])
+	assert.Equal(t, "user-1", payload["member_id"])
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -467,6 +533,40 @@ func TestUpdateGroupInfo_NonOwnerRejected(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestUpdateGroupInfo_PublishesInfoUpdatedEvent(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2`)).
+		WithArgs("sess-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("sess-1", "group", false, "owner-1"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE`)).
+		WithArgs("sess-1", "user", "owner-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL ORDER BY "session_members"."id" LIMIT $4`)).
+		WithArgs("sess-1", "user", "owner-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
+			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "sessions" SET`)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	name := "New name"
+	avatarURL := "https://example.test/avatar.png"
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "session.info_updated")
+	svc := &SessionService{db: db, cacheClient: testSessionCache(t), bus: bus}
+	err := svc.UpdateGroupInfo(context.Background(), "owner-1", "sess-1", &name, &avatarURL, nil)
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.Equal(t, "sess-1", payload["session_id"])
+	assert.Equal(t, map[string]interface{}{"name": name, "avatar_url": avatarURL}, payload["changes"])
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== B5: #113 owner must transfer/dissolve before DeleteForMe ====================
 
 func TestDeleteForMe_OwnerWithOtherMembersRejected(t *testing.T) {
@@ -626,6 +726,38 @@ func TestSessionLifecycle_CreateAddDissolveReject(t *testing.T) {
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestDissolveGroup_PublishesDissolvedEvent(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2`)).
+		WithArgs("sess-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("sess-1", "group", false, "owner-1"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE`)).
+		WithArgs("sess-1", "user", "owner-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL ORDER BY "session_members"."id" LIMIT $4`)).
+		WithArgs("sess-1", "user", "owner-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
+			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "sessions" SET`)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "session.dissolved")
+	svc := &SessionService{db: db, cacheClient: testSessionCache(t), bus: bus}
+	err := svc.DissolveGroup(context.Background(), "owner-1", "sess-1")
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.Equal(t, "sess-1", payload["session_id"])
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 	db, mock, sqlDB := newMockDBSession(t)
 	defer sqlDB.Close()
@@ -684,5 +816,47 @@ func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 	svc := NewSessionService(db, testSessionCache(t))
 	err := svc.AddGroupMembers(context.Background(), "user-1", "sess-1", []string{"user-2", "user-2", "user-3"})
 	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAddGroupMembers_PublishesMemberJoinedEvents(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2`)).
+		WithArgs("sess-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("sess-1", "group", false, "owner-1"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL`)).
+		WithArgs("sess-1", "user", "owner-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL ORDER BY "session_members"."id" LIMIT $4`)).
+		WithArgs("sess-1", "user", "owner-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
+			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "friend_id" FROM "friendships" WHERE user_id = $1 AND status = $2`)).
+		WithArgs("owner-1", "accepted").
+		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("u2"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL`)).
+		WithArgs("sess-1", "user", "u2").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NOT NULL`)).
+		WithArgs("sess-1", "user", "u2").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "session_members"`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	bus := newTestBus(t)
+	events := captureServiceEvents(bus, "session.member_joined")
+	svc := &SessionService{db: db, cacheClient: testSessionCache(t), bus: bus}
+	err := svc.AddGroupMembers(context.Background(), "owner-1", "sess-1", []string{"u2"})
+	require.NoError(t, err)
+
+	payload := waitForServiceEventPayload(t, events)
+	assert.Equal(t, "sess-1", payload["session_id"])
+	assert.Equal(t, "u2", payload["member_id"])
+	assert.Equal(t, "user", payload["member_type"])
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

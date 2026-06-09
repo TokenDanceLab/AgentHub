@@ -182,6 +182,99 @@ func TestPushToConn_AfterUnregister(t *testing.T) {
 	}))
 }
 
+func TestPushToConnReportsDeliveryResult(t *testing.T) {
+	t.Run("queued", func(t *testing.T) {
+		m := NewManager()
+		c := &Conn{
+			ID:   "conn-ok",
+			Send: make(chan []byte, 1),
+		}
+		m.mu.Lock()
+		m.conns[c.ID] = c
+		m.mu.Unlock()
+
+		result := m.PushToConn(c.ID, NewFrame(TypeMessageNew, map[string]string{
+			"session_id": "sess-1",
+		}))
+
+		require.True(t, result.Queued)
+		require.Equal(t, DeliveryStatusQueued, result.Status)
+		require.NoError(t, result.Err)
+		require.Len(t, c.Send, 1)
+	})
+
+	t.Run("missing connection", func(t *testing.T) {
+		m := NewManager()
+
+		result := m.PushToConn("missing-conn", NewFrame(TypeMessageNew, map[string]string{
+			"session_id": "sess-1",
+		}))
+
+		require.False(t, result.Queued)
+		require.Equal(t, DeliveryStatusConnNotFound, result.Status)
+		require.ErrorIs(t, result.Err, ErrDeliveryConnNotFound)
+	})
+
+	t.Run("closed connection", func(t *testing.T) {
+		m := NewManager()
+		c := &Conn{
+			ID:   "conn-closed",
+			Send: make(chan []byte, 1),
+		}
+		m.mu.Lock()
+		m.conns[c.ID] = c
+		m.mu.Unlock()
+		c.closeSend()
+
+		result := m.PushToConn(c.ID, NewFrame(TypeMessageNew, map[string]string{
+			"session_id": "sess-1",
+		}))
+
+		require.False(t, result.Queued)
+		require.Equal(t, DeliveryStatusConnClosed, result.Status)
+		require.ErrorIs(t, result.Err, ErrDeliveryConnClosed)
+	})
+
+	t.Run("send buffer full", func(t *testing.T) {
+		m := NewManager()
+		c := &Conn{
+			ID:   "conn-full",
+			Send: make(chan []byte, 1),
+		}
+		c.Send <- []byte("already queued")
+		m.mu.Lock()
+		m.conns[c.ID] = c
+		m.mu.Unlock()
+
+		result := m.PushToConn(c.ID, NewFrame(TypeMessageNew, map[string]string{
+			"session_id": "sess-1",
+		}))
+
+		require.False(t, result.Queued)
+		require.Equal(t, DeliveryStatusBufferFull, result.Status)
+		require.ErrorIs(t, result.Err, ErrDeliveryBufferFull)
+		require.Len(t, c.Send, 1)
+	})
+
+	t.Run("marshal error", func(t *testing.T) {
+		m := NewManager()
+		c := &Conn{
+			ID:   "conn-marshal",
+			Send: make(chan []byte, 1),
+		}
+		m.mu.Lock()
+		m.conns[c.ID] = c
+		m.mu.Unlock()
+
+		result := m.PushToConn(c.ID, NewFrame(TypeMessageNew, make(chan int)))
+
+		require.False(t, result.Queued)
+		require.Equal(t, DeliveryStatusMarshalError, result.Status)
+		require.ErrorIs(t, result.Err, ErrDeliveryMarshalError)
+		require.Empty(t, c.Send)
+	})
+}
+
 func TestPushToConn_ConcurrentShutdownRace(t *testing.T) {
 	// Stress-test the race between PushToConn and Shutdown.
 	m := NewManager()

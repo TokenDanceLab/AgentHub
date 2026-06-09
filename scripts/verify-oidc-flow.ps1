@@ -14,6 +14,7 @@ Prerequisites:
 
 Usage:
   .\scripts\verify-oidc-flow.ps1                        # Full check
+  .\scripts\verify-oidc-flow.ps1 -LocalOnly             # Local fake/static gate; no live Hub/TokenDance ID calls
   .\scripts\verify-oidc-flow.ps1 -SkipHub               # Check only TokenDance ID
   .\scripts\verify-oidc-flow.ps1 -SkipTD                # Check only Hub Server
   .\scripts\verify-oidc-flow.ps1 -Interactive            # Run manual browser flow guide
@@ -21,16 +22,26 @@ Usage:
 
 [CmdletBinding()]
 param(
+    [switch]$LocalOnly,
     [switch]$SkipHub,
     [switch]$SkipTD,
     [switch]$Interactive,
     [string]$HubUrl = "http://localhost:8080",
     [string]$TdUrl = "http://localhost:3000",
-    [int]$TimeoutSec = 10
+    [int]$TimeoutSec = 10,
+    [string]$RepoRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $scriptDir = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        $PSScriptRoot
+    } else {
+        Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    $RepoRoot = (Resolve-Path (Join-Path $scriptDir "..")).ProviderPath
+}
 
 $Passed = 0
 $Failed = 0
@@ -109,7 +120,107 @@ function Assert-Status([int]$Actual, [int]$Expected, [string]$Label) {
     }
 }
 
+function Assert-FieldPresent([object]$Obj, [string]$Field, [string]$Label) {
+    if ($null -ne $Obj -and $Obj.$Field) {
+        Pass "$Label is present"
+    } else {
+        Fail "$Label — field '$Field' missing or empty"
+    }
+}
+
+function Assert-FileContains([string]$Path, [string]$Pattern, [string]$Label) {
+    if (-not (Test-Path $Path)) {
+        Fail "$Label — missing file: $Path"
+        return
+    }
+
+    $content = Get-Content -LiteralPath $Path -Raw
+    if ($content -match $Pattern) {
+        Pass $Label
+    } else {
+        Fail "$Label — expected pattern not found"
+    }
+}
+
+function Test-PackagedDesktopReadiness {
+    param([string]$Root)
+
+    Step "Packaged Desktop loopback/keyring readiness"
+
+    $oidcServerPath = Join-Path $Root "app\desktop\src-tauri\src\oidc_server.rs"
+    $secureStorePath = Join-Path $Root "app\desktop\src-tauri\src\secure_store.rs"
+    $commandsPath = Join-Path $Root "app\desktop\src-tauri\src\commands.rs"
+    $libPath = Join-Path $Root "app\desktop\src-tauri\src\lib.rs"
+
+    Assert-FileContains $oidcServerPath "pub fn check_loopback_callback_readiness\(\)" "  Desktop loopback readiness source is wired"
+    Assert-FileContains $oidcServerPath 'TcpListener::bind\("127\.0\.0\.1:0"\)' "  Desktop loopback readiness uses random localhost bind"
+    Assert-FileContains $secureStorePath "pub fn check_credential_store_readiness\(\)" "  Desktop keyring readiness source is wired"
+    Assert-FileContains $secureStorePath "Entry::new\(SERVICE, HUB_REFRESH_TOKEN_USER\)" "  Desktop keyring readiness checks Hub refresh-token credential entry"
+    Assert-FileContains $commandsPath "pub async fn get_packaged_login_readiness\(\)" "  Desktop packaged login readiness command exists"
+    Assert-FileContains $commandsPath 'status: "proposal_only"\.to_string\(\)' "  Real packaged login E2E remains proposal-only"
+    Assert-FileContains $libPath "commands::get_packaged_login_readiness" "  Desktop readiness command is registered in Tauri invoke handler"
+}
+
+function Get-Sha256Prefix([string]$Text) {
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text))
+        return ([BitConverter]::ToString($hash).Replace("-", "").ToLowerInvariant()).Substring(0, 12)
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
+function Redact-OidcConfigValue([string]$Name, [string]$Value) {
+    if ($Name -match "(?i)secret|token|password|key") {
+        return "<redacted len=$($Value.Length) sha256_prefix=$(Get-Sha256Prefix $Value)>"
+    }
+    return $Value
+}
+
+function Redact-UrlQuery([string]$Url) {
+    $queryStart = $Url.IndexOf("?")
+    if ($queryStart -lt 0) {
+        return $Url
+    }
+
+    $prefix = $Url.Substring(0, $queryStart)
+    $queryAndFragment = $Url.Substring($queryStart + 1)
+    $fragment = ""
+    $fragmentStart = $queryAndFragment.IndexOf("#")
+    if ($fragmentStart -ge 0) {
+        $fragment = $queryAndFragment.Substring($fragmentStart)
+        $queryAndFragment = $queryAndFragment.Substring(0, $fragmentStart)
+    }
+
+    $redactedPairs = @()
+    foreach ($pair in $queryAndFragment.Split("&")) {
+        if ([string]::IsNullOrWhiteSpace($pair)) {
+            continue
+        }
+        $key = $pair.Split("=", 2)[0]
+        if ([string]::IsNullOrWhiteSpace($key)) {
+            $redactedPairs += "<redacted>"
+        } else {
+            $redactedPairs += "$key=<redacted>"
+        }
+    }
+
+    if ($redactedPairs.Count -eq 0) {
+        return "$prefix?$fragment"
+    }
+    return "$prefix?$($redactedPairs -join '&')$fragment"
+}
+
 Banner "TokenDance ID OIDC Full-Link Smoke Verification"
+
+if ($LocalOnly) {
+    $SkipHub = $true
+    $SkipTD = $true
+    Step "Local-only fake/static gate"
+    Pass "Live Hub and TokenDance ID phases are skipped"
+    Test-PackagedDesktopReadiness $RepoRoot
+}
 
 # ═══════════════════════════════════════════════════
 # Phase 1: TokenDance ID Provider
@@ -232,8 +343,8 @@ if (-not $SkipHub) {
 
         if ($authData.state -and $authData.authorization_url) {
             Pass "  POST /client/auth/oidc/authorize — returns state + authorization_url"
-            Assert-Field $authData "state" "    state"
-            Assert-Field $authData "authorization_url" "    authorization_url"
+            Assert-FieldPresent $authData "state" "    state"
+            Assert-FieldPresent $authData "authorization_url" "    authorization_url"
 
             # Verify authorization URL structure
             $authUrlParsed = $authData.authorization_url
@@ -246,7 +357,7 @@ if (-not $SkipHub) {
 
             # Store for later phases
             $global:VerifyState = $authData.state
-            $global:VerifyAuthUrl = $authData.authorization_url
+            $global:VerifyAuthUrl = Redact-UrlQuery $authData.authorization_url
             $global:VerifyCodeVerifier = $codeVerifier
             $global:VerifyDeviceId = $deviceId
             Pass "  Authorization URL is well-formed OIDC PKCE request"
@@ -314,10 +425,14 @@ Step "Phase 3 — Full-Flow Diagnostics"
 
 # 3.1 Verify auth URL can be opened
 if ($global:VerifyAuthUrl) {
-    Pass "  Authorization URL generated — open in browser to complete login:"
-    Write-Host "    $($global:VerifyAuthUrl)" -ForegroundColor Cyan
+    Pass "  Authorization URL generated — redacted diagnostic form:"
+    Write-Host "    $(Redact-UrlQuery $global:VerifyAuthUrl)" -ForegroundColor Cyan
 } else {
-    Warn "  Authorization URL not available (Phase 2 may have failed)"
+    if ($LocalOnly) {
+        Warn "  Authorization URL not available because live Hub authorize is skipped"
+    } else {
+        Warn "  Authorization URL not available because Hub authorize did not complete"
+    }
 }
 
 # 3.2 Check required env vars in hub-server/.env
@@ -334,10 +449,11 @@ if (Test-Path $hubEnvPath) {
     foreach ($var in $envVars) {
         if ($hubEnv -match $var.Pattern) {
             $value = $Matches[1].Trim()
+            $displayValue = Redact-OidcConfigValue $var.Name $value
             if ($value -and $value -notlike "*fill in*" -and $value -notlike "*your-*" -and $value -notlike "<*") {
-                Pass "  $($var.Name) is configured ($value)"
+                Pass "  $($var.Name) is configured ($displayValue)"
             } else {
-                Fail "  $($var.Name) has placeholder value: `"$value`" — fill in real value"
+                Fail "  $($var.Name) has placeholder value: `"$displayValue`" — fill in real value"
             }
         } else {
             Fail "  $($var.Name) is not in hub-server/.env"
@@ -415,8 +531,12 @@ Write-Host "  Passed: $Passed  |  Failed: $Failed  |  Total: $($Passed + $Failed
 Write-Host "$('=' * 60)" -ForegroundColor Magenta
 
 if ($Failed -eq 0) {
-    Write-Host "`n  All checks passed. The OIDC infrastructure is correctly wired.`n" -ForegroundColor Green
-    Write-Host "  Next step: run Desktop app for end-to-end browser flow.`n" -ForegroundColor Green
+    if ($LocalOnly) {
+        Write-Host "`n  Local-only fake/static OIDC checks passed. No live Hub or TokenDance ID calls were made.`n" -ForegroundColor Green
+    } else {
+        Write-Host "`n  All checks passed. The OIDC infrastructure is correctly wired.`n" -ForegroundColor Green
+        Write-Host "  Next step: run Desktop app for end-to-end browser flow.`n" -ForegroundColor Green
+    }
 } elseif ($Failed -le 2) {
     Write-Host "`n  Minor issues found. Review warnings above and re-run.`n" -ForegroundColor Yellow
 } else {

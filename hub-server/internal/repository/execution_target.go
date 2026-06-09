@@ -5,12 +5,21 @@ import (
 
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const defaultTargetPageSize = 50
 
 func CreateExecutionTarget(db *gorm.DB, t *model.ExecutionTarget) error {
 	return db.Create(t).Error
+}
+
+func CreateExecutionTargetIfNotExists(db *gorm.DB, t *model.ExecutionTarget) (bool, error) {
+	result := db.Clauses(clause.OnConflict{DoNothing: true}).Create(t)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 func GetExecutionTargetByID(db *gorm.DB, id string) (*model.ExecutionTarget, error) {
@@ -69,12 +78,25 @@ func FindTargetByOwnerAndName(db *gorm.DB, ownerID, name string) (*model.Executi
 func UpdateTargetOnlineStatus(db *gorm.DB, id string, isOnline bool) error {
 	updates := map[string]interface{}{
 		"is_online":    isOnline,
-		"health_state": "healthy",
+		"health_state": "online",
 		"last_seen_at": time.Now(),
 	}
 	if !isOnline {
 		delete(updates, "last_seen_at")
 		updates["health_state"] = "offline"
+	}
+	return db.Model(&model.ExecutionTarget{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(updates).Error
+}
+
+func UpdateTargetHealthState(db *gorm.DB, id, healthState string, isOnline bool) error {
+	updates := map[string]interface{}{
+		"is_online":    isOnline,
+		"health_state": healthState,
+	}
+	if isOnline {
+		updates["last_seen_at"] = time.Now()
 	}
 	return db.Model(&model.ExecutionTarget{}).
 		Where("id = ? AND deleted_at IS NULL", id).
