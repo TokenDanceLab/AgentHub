@@ -63,6 +63,7 @@
     "react-syntax-highlighter": "^16.1.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "ws": "^8.21.0",
     "zustand": "^5.0.14"
   }
 }
