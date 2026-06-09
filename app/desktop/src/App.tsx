@@ -17,6 +17,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { createDesktopPlatform } from '@/platform/desktopPlatform';
 import { mapEdgeAgentsToWorkbenchAgents } from '@/platform/edgeCapabilityMapper';
 import { useDesktopWorkbenchModel } from '@/platform/useDesktopWorkbenchModel';
+import {
+  useAgentProfileList,
+  useCreateAgentProfile,
+  useUpdateAgentProfile,
+  useDeleteAgentProfile,
+  edgeAgentProfileToWorkbenchAgent,
+} from '@/api/agentProfileQueries';
+import type { AgentConfig } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 
 export default function App() {
@@ -90,6 +98,13 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
   const { data: agentData } = useAgentList(liveEdgeEnabled);
   const { data: modelCatalog } = useModelCatalog(liveEdgeEnabled);
+  const { data: profileData } = useAgentProfileList(liveEdgeEnabled);
+  const createAgentProfile = useCreateAgentProfile();
+  const updateAgentProfile = useUpdateAgentProfile();
+  const deleteAgentProfile = useDeleteAgentProfile();
+  const [agentActionError, setAgentActionError] = useState<string | undefined>();
+  const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
+  const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const createRun = useCreateRun();
   const createThread = useCreateThread();
   const activeRunId = useMemo(() => {
