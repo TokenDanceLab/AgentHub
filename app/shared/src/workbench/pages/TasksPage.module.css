@@ -612,6 +612,17 @@
   stroke-linejoin: round;
 }
 
+.emptyState {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--bdr);
+  color: var(--text-2);
+  background: var(--surface-low);
+  font: 500 0.8125rem/1.4 var(--font-sans);
+}
+
 .groupCount {
   color: var(--text-3);
   font: 500 0.75rem var(--font-sans);
