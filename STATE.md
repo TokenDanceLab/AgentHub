@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 13:20 +08:00
+最后更新：2026-06-09 13:27 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -48,6 +48,7 @@
 | Web real-mode visual smoke | Trump/Web | 已重启：thread `019eaaac-7583-79e2-8267-0ac29826ed28` | 只改 `app/web/**` 和必要 `app/shared/**`；收口 Hub-only UI、real/fixture 标签、inspector evidence overview 和 visual smoke |
 | Hub 单任务 approval/artifact | Johnny/backend | 已派发：thread `019eab05-39ef-7b70-bece-4b2a853fe9e8` | 只改 Hub/API；补 `/web/agent-tasks` approval decision 与 artifact metadata/list 最小合同 |
 | Desktop sidecar binary/package smoke | Desktop/Tauri | 已派发：thread `019eab05-4365-72a1-962b-278fb3c7888f` | 只改 Desktop/Tauri package/readiness 脚本；验证 Windows sidecar binary placement，不提交二进制 |
+| Edge SQLite durable hardening | Johnny/Edge | 已派发：thread `019eab08-71aa-72e0-9912-f23060e22e09` | 只改 Edge store/durable gate；验证 approval/artifact/replay/pins 重启恢复，不声明完整 production DB |
 | Hub/Event/Replay 合同审计 | Johnny/backend | 已产出报告 | 指向单任务 approval/artifact Hub 合同缺口；后续进入实现 worker |
 | State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
