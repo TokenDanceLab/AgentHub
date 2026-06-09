@@ -1419,6 +1419,111 @@ paths:
                   data:
                     $ref: "#/components/schemas/AgentRunEventSummary"
 
+  /web/agent-tasks/{id}/approvals:
+    x-agenthub-device-type: web
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTaskApprovals
+      summary: List projected approval requests and decisions for one agent task.
+      description: Owner-scoped metadata projection from AgentRunEvent permission request and decision events. It does not mutate Edge state.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Approval projection for the task.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  data:
+                    $ref: "#/components/schemas/AgentTaskApprovalList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /web/agent-tasks/{id}/approvals/{approvalId}/decide:
+    x-agenthub-device-type: web
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubDecideTaskApproval
+      summary: Decide a pending approval for one agent task.
+      description: Records a run.agent.permission_decided event, returns the projected approval, and pushes or queues an agent.control permission.decide frame to the exact Desktop/Edge device that owns the task. This route does not execute real CLI/model work by itself.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Approval decision recorded and control payload delivered or queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  data:
+                    $ref: "#/components/schemas/AgentTaskApproval"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /web/agent-tasks/{id}/artifacts:
+    x-agenthub-device-type: web
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTaskArtifacts
+      summary: List artifact metadata projected for one agent task.
+      description: Metadata/list-only projection from run.agent.file_change and artifact.created events. It does not expose content, apply, or discard actions.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Artifact metadata projection for the task.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  data:
+                    $ref: "#/components/schemas/AgentTaskArtifactList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
   /edge/agent-tasks/{id}/ack:
     x-agenthub-device-type: desktop
     parameters:
@@ -5365,6 +5470,129 @@ components:
         elapsed_ms:
           type: integer
           format: int64
+    TaskApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [allow, deny]
+        reason:
+          type: string
+    AgentTaskApprovalList:
+      type: object
+      properties:
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+          maxLength: 128
+        session_id:
+          type: string
+        approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTaskApproval"
+        pending:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTaskApproval"
+        decided:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTaskApproval"
+        last_event_seq:
+          type: integer
+          format: int64
+    AgentTaskApproval:
+      type: object
+      properties:
+        approval_id:
+          type: string
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+          maxLength: 128
+        session_id:
+          type: string
+        source_event_id:
+          type: string
+        event_seq:
+          type: integer
+          format: int64
+        request_id:
+          type: string
+        tool_name:
+          type: string
+        tool_use_id:
+          type: string
+        status:
+          type: string
+        reason:
+          type: string
+        decided_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: string
+          format: date-time
+        edge_control:
+          $ref: "#/components/schemas/TeamApprovalEdgeControl"
+    AgentTaskArtifactList:
+      type: object
+      properties:
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+          maxLength: 128
+        session_id:
+          type: string
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTaskArtifact"
+        last_event_seq:
+          type: integer
+          format: int64
+    AgentTaskArtifact:
+      type: object
+      properties:
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+          maxLength: 128
+        session_id:
+          type: string
+        source_event_id:
+          type: string
+        event_seq:
+          type: integer
+          format: int64
+        path:
+          type: string
+        action:
+          type: string
+        tool_name:
+          type: string
+        status:
+          type: string
+        artifact_id:
+          type: string
+        name:
+          type: string
+        mime_type:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
     HubTaskDoneRequest:
       type: object
       properties:
