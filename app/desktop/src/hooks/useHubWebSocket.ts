@@ -161,7 +161,7 @@ export function useHubWebSocket(options?: UseHubWebSocketOptions): UseHubWebSock
       }
     };
 
-    ws.onclose = (ev: MessageEvent) => {
+    ws.onclose = (ev: CloseEvent) => {
       wsRef.current = null;
       setConnected(false);
 

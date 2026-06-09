@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore, useEffect } from 'react';
 import {
   demoWorkbenchAgents,
   getWorkbenchDataModeOverrideSnapshot,
@@ -22,7 +22,7 @@ import {
   type HubContactLike,
 } from '@shared/workbench/hubDataMapping';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
-import { useHubSessions, useHubMessages } from '@/api/sessionQueries';
+import { useHubSessions, useHubMessages, useHubSendMessage, useHubRecallMessage, useHubEditMessage, useHubPinMessage, useHubUnpinMessage, useHubMarkRead } from '@/api/sessionQueries';
 import {
   useHubContacts,
   useHubSearchUser,
@@ -41,6 +41,17 @@ import {
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
+import { useHubWebSocket } from '@/hooks/useHubWebSocket';
+import { useQueryClient } from '@tanstack/react-query';
+
+export interface DesktopChatActions {
+  sendMessage: (sessionId: string, content: string, contentType?: string) => Promise<unknown>;
+  recallMessage: (messageId: string) => Promise<unknown>;
+  editMessage: (messageId: string, content: string) => Promise<unknown>;
+  pinMessage: (messageId: string, sessionId: string) => Promise<unknown>;
+  unpinMessage: (messageId: string, sessionId: string) => Promise<unknown>;
+  markRead: (sessionId: string, lastReadSeq: number) => Promise<unknown>;
+}
 
 export interface DesktopWorkbenchModel {
   activeConversationId: string;
@@ -50,6 +61,7 @@ export interface DesktopWorkbenchModel {
   conversations: WorkbenchConversation[];
   contacts?: WorkbenchContactsData;
   contactsActions?: WorkbenchContactsActions;
+  chatActions?: DesktopChatActions;
   dataMode: string;
   isDemo: boolean;
   projects?: ProjectInfo[];
@@ -84,6 +96,44 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const hubAuthenticated = useHubStore((state) => state.authenticated);
   const hubReady = !useDemo && hubAuthenticated && Boolean(getAccessToken());
 
+  // Hub WebSocket — invalidate React Query caches when real-time events arrive.
+  const queryClient = useQueryClient();
+  const hubWS = useHubWebSocket({ enabled: hubReady });
+
+  // When a Hub WS event arrives, invalidate the relevant query caches so
+  // React Query refetches fresh data from the Hub REST API.
+  useEffect(() => {
+    if (!hubWS.lastEvent) return;
+
+    const { type } = hubWS.lastEvent;
+    switch (type) {
+      case 'message.new':
+      case 'message.edited':
+      case 'message.recall':
+      case 'message.pin':
+      case 'message.unpin':
+      case 'message.reaction_added':
+      case 'message.reaction_removed':
+      case 'message.read':
+        void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+        break;
+      case 'session.created':
+      case 'session.dissolved':
+      case 'session.member_joined':
+      case 'session.member_left':
+      case 'session.info_updated':
+        void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+        break;
+      case 'friend.request':
+      case 'friend.accepted':
+        void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
+        break;
+      case 'notification.new':
+        void queryClient.invalidateQueries({ queryKey: ['hub', 'notifications'] });
+        break;
+    }
+  }, [hubWS.lastEvent, queryClient]);
+
   // Hub data queries — only active in live mode when Hub is authenticated.
   const contactsQuery = useHubContacts({ enabled: hubReady });
   const projectsQuery = useHubWorkspaceProjects({ enabled: hubReady });
@@ -104,6 +154,14 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const unblockContactMutation = useHubUnblockContact();
   const updateContactRemarkMutation = useHubUpdateContactRemark();
   const createContactGroupMutation = useHubCreateContactGroup();
+
+  // Chat mutation hooks (Hub IM).
+  const sendMessageMutation = useHubSendMessage();
+  const recallMessageMutation = useHubRecallMessage();
+  const editMessageMutation = useHubEditMessage();
+  const pinMessageMutation = useHubPinMessage();
+  const unpinMessageMutation = useHubUnpinMessage();
+  const markReadMutation = useHubMarkRead();
 
   const threadsQuery = useThreads(undefined, { enabled: !useDemo });
   const threads = useDemo ? [] : threadsQuery.data?.items ?? [];
@@ -200,13 +258,11 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     [projectsQuery.data?.items, hubReady, dataMode],
   );
 
-  const resolvedProjectsStatus = useMemo(() => ({
-    loading: hubReady && projectsQuery.isFetching,
-    error: hubReady && projectsQuery.error
-      ? errorMessage(projectsQuery.error, 'Hub Projects 加载失败')
-      : undefined,
+  const resolvedProjectsStatus = hubReady ? {
+    loading: projectsQuery.isFetching,
+    ...(projectsQuery.error ? { error: errorMessage(projectsQuery.error, 'Hub Projects 加载失败') } : {}),
     saving: createProjectMutation.isPending || updateProjectMutation.isPending,
-  }), [hubReady, projectsQuery.isFetching, projectsQuery.error, createProjectMutation.isPending, updateProjectMutation.isPending]);
+  } : undefined;
 
   const resolvedProjectsActions = hubReady ? {
     create: async (draft: ProjectDraft): Promise<ProjectInfo> => {
@@ -218,8 +274,8 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     },
     update: async (projectId: string, draft: ProjectDraft): Promise<ProjectInfo> => {
       const result = await updateProjectMutation.mutateAsync({
-        projectId,
-        draft: {
+        id: projectId,
+        data: {
           name: draft.name.trim() || '未命名项目',
           description: draft.description.trim(),
         },
@@ -243,6 +299,27 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
       createContactGroupMutation.mutateAsync({ name, memberIds }),
   } : undefined;
 
+  const resolvedChatActions: DesktopChatActions | undefined = hubReady ? {
+    sendMessage: (sessionId: string, content: string, contentType = 'text/plain') =>
+      sendMessageMutation.mutateAsync({
+        sessionId,
+        data: {
+          client_msg_id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          content_type: contentType,
+          content,
+        },
+      }),
+    recallMessage: (messageId: string) => recallMessageMutation.mutateAsync(messageId),
+    editMessage: (messageId: string, content: string) =>
+      editMessageMutation.mutateAsync({ messageId, data: { content } }),
+    pinMessage: (messageId: string, sessionId: string) =>
+      pinMessageMutation.mutateAsync({ messageId, sessionId }),
+    unpinMessage: (messageId: string, sessionId: string) =>
+      unpinMessageMutation.mutateAsync({ messageId, sessionId }),
+    markRead: (sessionId: string, lastReadSeq: number) =>
+      markReadMutation.mutateAsync({ sessionId, lastReadSeq }),
+  } : undefined;
+
   const liveModel = {
     activeConversationId,
     ...(activeThread?.projectId ? { activeProjectId: activeThread.projectId } : {}),
@@ -250,12 +327,14 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     agents: [],
     ...(resolvedContacts != null ? { contacts: resolvedContacts } : {}),
     ...(resolvedContactsActions != null ? { contactsActions: resolvedContactsActions } : {}),
+    ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     conversations,
     dataMode,
     isDemo: false,
-    projects: resolvedProjects,
+    ...(resolvedProjects != null ? { projects: resolvedProjects } : {}),
     ...(resolvedProjectsStatus != null ? { projectsStatus: resolvedProjectsStatus } : {}),
     ...(resolvedProjectsActions != null ? { projectsActions: resolvedProjectsActions } : {}),
+    ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     transcript,
   };
 
