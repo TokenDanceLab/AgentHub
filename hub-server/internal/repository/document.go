@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"time"
-
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
@@ -62,15 +60,11 @@ func UpdateDocument(db *gorm.DB, id string, patch map[string]interface{}) error 
 	return nil
 }
 
-// SoftDeleteDocument marks a document as deleted by setting status and deleted_at.
+// SoftDeleteDocument marks a document as deleted by setting status.
 func SoftDeleteDocument(db *gorm.DB, id string) error {
-	now := time.Now()
 	result := db.Model(&model.Document{}).
 		Where("id = ? AND status = ?", id, model.DocumentStatusActive).
-		Updates(map[string]interface{}{
-			"status":     model.DocumentStatusDeleted,
-			"deleted_at": &now,
-		})
+		Update("status", model.DocumentStatusDeleted)
 	if result.Error != nil {
 		return result.Error
 	}
