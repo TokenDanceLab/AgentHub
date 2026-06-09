@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 16:57 +08:00
+最后更新：2026-06-09 19:35 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -85,6 +85,7 @@
 | localhost observed loop gate | worker/Gauss | 已集成并验证 controller：`b9e53b25` | runner/manifest/readiness-only gate，`RealTested=false` |
 | localhost services probe | worker/Ptolemy | 已集成并验证 controller：`935704b5` | service probe manifests 和 fail-closed readiness，不启动真实服务 |
 | localhost real stack smoke | localhost observed worker | 分支 `codex/localhost-services-real-loop` 已新增脚本/文档/test，待集成 | 启动或探测 Web/Desktop/Hub/Local Edge 的 no-spend 本地服务子集；Local Edge 使用 `agenthub-runner-mock` + SQLite，`RealTested=false` |
+| approved-real/no-secret demo readiness | Codex approved-real demo worker | 本 worktree 进行中：`codex/approved-real-demo-readiness` | 统一 runner 串联 localhost observed fixture replay、可选 localhost real-stack smoke、approved-real preflight 读取和 redacted manifest；默认 `READY_FOR_APPROVAL`/`BLOCKED`，`RealLoginTested=false`、`RealCliTested=false`、`MockAdapterUsed=true`，不跑真实登录/CLI/model/API，不碰 Mobile |
 | Agent Builder fixture UI | worker/Franklin | 已集成并验证 controller：`6c855195` | Desktop Builder fixture/no-spend evidence，可见但不声明 live SDK execution |
 | Web artifact/diff inspector | worker/Erdos | 已集成并验证 controller：`01ff715d` | Web/shared 只读消费 Hub file-change diff metadata；不实现 apply/revert |
 | IM/@Agent mainchain UX | worker/Raman | 已集成并验证 controller：`8258983f` | Agent/Target/Task 状态和消息 pin UI；不扩展 Hub pin 持久化 |
@@ -103,9 +104,10 @@
 ## 下一步优先级
 
 1. **真实 TokenDanceID 登录打通**：先跑 no-secret readiness gates，再用一次性测试账号和已批准环境运行真实登录链路，不把 secret 写入仓库。
-2. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
-3. **Windows/Tauri unsigned package smoke**：验证 sidecar binary、no-bundle build 和 unsigned installer readiness；签名、公证、release upload 另行推进。
-4. **受控 approved-real CLI/SDK 方案**：已具备 preflight manifest gate；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
+2. **approved-real 录屏前审批**：先运行 `scripts\verify-approved-real-demo-readiness.ps1` 产出 redacted manifest；若状态是 `READY_FOR_APPROVAL`，再由人工批准真实 TokenDanceID 测试账号/安全 env、录屏范围和是否允许真实 CLI/model/API。无批准时只能演示 fixture/mock replay。
+3. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
+4. **Windows/Tauri unsigned package smoke**：验证 sidecar binary、no-bundle build 和 unsigned installer readiness；签名、公证、release upload 另行推进。
+5. **受控 approved-real CLI/SDK 方案**：已具备 preflight manifest gate；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
 
 ## 安全规则
 
