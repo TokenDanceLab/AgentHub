@@ -343,9 +343,16 @@ func runStoreReadiness(cfg config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	manifest := report.Manifest()
 	encoder := json.NewEncoder(out)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(report)
+	if err := encoder.Encode(manifest); err != nil {
+		return err
+	}
+	if manifest.Status != "ready" {
+		return fmt.Errorf("sqlite store readiness blocked: status=%s migration_status=%s", manifest.Status, manifest.MigrationStatus)
+	}
+	return nil
 }
 
 func applyRunnerProfile(cfg *config) error {
