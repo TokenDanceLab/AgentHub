@@ -6569,10 +6569,30 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CoordinatorRouteDecision"
+        route_audit_log:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamRouteAuditState"
         budget:
           $ref: "#/components/schemas/TeamBudget"
         terminal_reason:
           type: string
+
+    TeamRouteAuditState:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted, rejected]
+        action:
+          type: string
+          enum: [delegate, review, approve, finish]
+        subtask_id: { type: string, format: uuid }
+        parent_task_id: { type: string, format: uuid }
+        agent_id: { type: string }
+        reason: { type: string }
+        correlation_id: { type: string }
+        created_at: { type: string, format: date-time }
 
     TeamMemberState:
       type: object
@@ -6797,6 +6817,19 @@ components:
         feedback: { type: string }
         summary: { type: string }
         blocked_reason: { type: string }
+        accepted: { type: boolean }
+        subtask_id:
+          type: string
+          description: Hub queued TeamTask id for accepted route decisions.
+        parent_task_id:
+          type: string
+          description: Optional parent TeamTask id for subtask replay.
+        agent_id:
+          type: string
+          description: Target agent/member id recorded for audit and rejected-route replay.
+        reason:
+          type: string
+          description: Accepted or rejected route audit reason.
         correlation_id: { type: string }
 
     CreateAgentProfileRequest:

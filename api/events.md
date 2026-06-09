@@ -171,7 +171,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.tool_call` | P0 | Agent 请求工具调用 |
 | `run.agent.tool_result` | P0 | 工具调用执行结果 |
 | `run.agent.file_change` | P0 | 文件变更。每个文件一条事件；payload: `{ callId, toolName, path, files?: string[], kind: "created"\|"modified"\|"deleted", action, status, rawKind?, outsideWorkspace?, diff? }`。`files` 为同一 file_change item 中所有变更的聚合路径数组，必须和 `path` 使用同一套 workspace-relative 或 `<outside-workspace>/<basename>` 脱敏规则；Edge lifecycle 将单文件 `path`/`kind`/`diff` 写入本地 run diff evidence snapshot |
-| `run.agent.route_decision` | P1 | Runtime structured output 中解析出的 `CoordinatorRouteDecision`；Desktop bridge 会用 dispatch payload 中的 TeamRun context 自动 POST 到 Hub route decision endpoint |
+| `run.agent.route_decision` | P1 | Runtime structured output 中解析出的 `CoordinatorRouteDecision`；Desktop bridge 会用 dispatch payload 中的 TeamRun context 自动 POST 到 Hub route decision endpoint；Hub replay 会保留 `correlation_id`，并在 accepted/rejected audit 中暴露 `subtask_id`、`parent_task_id`、`agent_id`、`reason` |
 | `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
 | `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |
 | `run.agent.compact_boundary` | P1 | 上下文压缩边界 |
@@ -264,8 +264,8 @@ Agent SDK-like 与 OpenAI Agents SDK-like 静态 JSON 样例可映射到
 
 | type | 阶段 | 说明 |
 |---|---|---|
-| `team.route.decided` | P1 | Supervisor typed route decision 已接受，payload 为 `CoordinatorRouteDecision` |
-| `team.route.rejected` | P1 | Supervisor route decision 被 schema、任务数、活跃 subagent 或重复 route guardrail 拒绝，payload 包含 `decision` 和 `reason` |
+| `team.route.decided` | P1 | Supervisor typed route decision 已接受，payload 为 `CoordinatorRouteDecision`，包含 `accepted=true`、queued `subtask_id`、可选 `parent_task_id`、`agent_id`、`reason` 和 `correlation_id` |
+| `team.route.rejected` | P1 | Supervisor route decision 被 schema、任务数、活跃 subagent 或重复 route guardrail 拒绝，payload 包含 `decision` 和 `reason`；replay 的 `route_audit_log` 标记 `status=rejected` 且保留 `agent_id` / `correlation_id` |
 | `team.task.created` | P1 | TeamTask 已从 accepted route decision 创建 |
 | `team.approval.decided` | P1 | TeamRun approval 人工决策已记录，payload 包含 `approval_id`、`agent_task_id`、`edge_run_id`、`decision`、`decided_by`、`edge_control` |
 | `assignment.created` | P1 | TeamAssignment 已创建 |
