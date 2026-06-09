@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 11:03 +08:00
+最后更新：2026-06-09 12:54 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | 以 `origin/dev/delicious233` 最新提交为准；P0 实现基线为 `249c4a21`，本文所在提交是其后的状态同步 |
-| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard 和状态同步已合入 |
+| 当前 dev | `origin/dev/delicious233 = bf1a7ab5 test(edge): 增加 CLI JSON readiness 门禁` |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate 已合入 |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
@@ -27,6 +27,9 @@
 - Edge SQLite store、迁移、row/projection tests，Desktop sidecar 默认使用 app-data SQLite 路径。
 - SDK fixture mapper，用 fixture 覆盖 OpenAI/Claude 形状事件到现有 Edge 事件合同的映射。
 - 基于 `@lobehub/icons` 的 runtime/provider/model/tool icon 组件和 fallback。
+- Edge SQLite durable observed fixture smoke：覆盖 `agenthub-edge --store-backend sqlite --store-db <temp.db>` 配置入口、snapshot rows、run projection、pins 和 alpha durability 边界。
+- Desktop sidecar observed fixture smoke：覆盖 fixture/mock sidecar health、SQLite app-data path、stdout/stderr log path、health URL、preflight/readiness、no direct CLI spawn，并保留缺真实 sidecar binary 时 strict gate 失败。
+- CLI JSON readiness checker：覆盖 Codex `exec --json`、Claude Code `stream-json` permission bridge、OpenCode `run --format json` permission risk、命令计划脱敏和 no-spend fixture boundary。
 
 当前不声明已经完成：
 
@@ -39,10 +42,12 @@
 
 | 线程 | 负责人 | 状态 | 边界 |
 |---|---|---|---|
-| Edge SQLite durable 复核 | Johnny/backend | 运行中 | 先确认主线 SQLite 是否只需验证/收口；不重复 cherry-pick 旧分支 |
-| Desktop/Tauri 复核 | Trump/Desktop | 运行中 | 只读评估 Desktop Edge mapper、unsigned package smoke、macOS 风险 |
-| SDK/runtime 研究 | SDK researcher | 运行中 | 输出 Claude/OpenAI Agent SDK、自定义 runtime、Lobe icons 具体报告 |
-| State/worktree 审计 | state auditor | 运行中 | 只读整理 worktree/branch，给出清理候选；不删除 |
+| Edge SQLite durable observed smoke | Johnny/backend | 已合入 dev：`63fb6273` | fixture-only alpha durability gate；不代表完整 relational CRUD |
+| Desktop sidecar observed smoke | Trump/Desktop | 已合入 dev：`79e1e453` | fixture/mock sidecar 证据；真实打包仍需要 sidecar binary |
+| CLI JSON readiness checker | Edge/SDK worker | 已合入 dev：`bf1a7ab5` | 静态/fixture JSON 合同；不运行真实 CLI/model/API |
+| Web real-mode visual smoke | Trump/Web | 运行中 | 只改 `app/web/**` 和必要 `app/shared/**`；检查 Hub-only UI、标签和 visual smoke |
+| Hub/Event/Replay 合同审计 | Johnny/backend | 报告中 | 指向单任务 approval/artifact Hub 合同缺口；只读不写 |
+| State/worktree 审计 | state auditor | 待复核 | 只读整理 worktree/branch，给出清理候选；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
 
 ## 分支治理
@@ -55,11 +60,11 @@
 
 ## 下一步优先级
 
-1. **真实产品闭环验收**：在 fixture gate 之外，准备受控 observed/approved-real 路径，验证 Web -> Hub -> Desktop -> Edge -> adapter -> replay -> Web。
-2. **Desktop/Tauri 可安装可启动**：先做 Windows unsigned package smoke，再拆 macOS sidecar/app-data/signing/notarization 风险。
-3. **Edge SQLite durable 收口**：基于当前 dev 已有 SQLite store 做迁移/重启/packaged-sidecar 证据，不重复实现旧分支。
-4. **Web real-mode 继续收口**：Projects、Targets、Runs、Approvals、Artifacts 全部保持 Hub-only，不静默 fallback mock。
-5. **SDK/custom runtime**：先做 manifest/registry/fixture contract 和图标专业化；真实 SDK/API 调用放到批准后的独立切片。
+1. **Web real-mode 继续收口**：Projects、Targets、Runs、Approvals、Artifacts、Transcript、Replay 全部保持 Hub-only，不静默 fallback mock；完成 visual smoke 后再合入。
+2. **Hub 单任务 approval/artifact 合同**：补 `/web/agent-tasks` 维度的 approval decision 和 artifact metadata/list/action 最小合同，复用 TeamRun projection 形状，支撑 Web/Mobile/IM 远控 UI。
+3. **Desktop/Tauri 可安装可启动**：准备 Windows Local Edge sidecar binary 的 build/placement/package smoke；真实签名、公证、release upload 仍需独立批准。
+4. **真实产品闭环验收**：在 fixture gate 之外，准备受控 observed/approved-real 路径，验证 Web -> Hub -> Desktop -> Edge -> adapter -> replay -> Web。
+5. **SDK/custom runtime 真实接入**：先保留 CLI JSON readiness 和 fixture custom runtime；真实 OpenAI/Claude/OpenCode SDK/API 调用放到批准后的独立切片。
 
 ## 安全规则
 
