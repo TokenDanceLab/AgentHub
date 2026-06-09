@@ -9,6 +9,7 @@ import {
   type WorkbenchDataMode,
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
+import { normalizeHubMessagesToTranscript } from '@shared/transcript';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
 import type { ProjectDraft, ProjectInfo } from '@shared/workbench';
@@ -17,9 +18,11 @@ import type { WorkbenchContactsActions } from '@shared/workbench/WorkbenchRoutes
 import {
   resolveHubContacts,
   resolveHubProjects,
+  hubSessionToConversation,
   type HubContactLike,
 } from '@shared/workbench/hubDataMapping';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
+import { useHubSessions, useHubMessages } from '@/api/sessionQueries';
 import {
   useHubContacts,
   useHubSearchUser,
@@ -87,6 +90,10 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const createProjectMutation = useCreateHubWorkspaceProject();
   const updateProjectMutation = useUpdateHubWorkspaceProject();
 
+  // Hub sessions & messages — IM conversation path (alongside Edge threads).
+  const hubSessionsQuery = useHubSessions({ enabled: hubReady });
+  const hubSessions = hubSessionsQuery.data ?? [];
+
   // Contact mutation hooks.
   const searchUserMutation = useHubSearchUser();
   const sendFriendRequestMutation = useHubSendFriendRequest();
@@ -100,16 +107,31 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
 
   const threadsQuery = useThreads(undefined, { enabled: !useDemo });
   const threads = useDemo ? [] : threadsQuery.data?.items ?? [];
+
+  // Determine whether to use Hub sessions as the primary conversation source.
+  // Hub sessions provide IM/social conversations; Edge threads provide execution threads.
+  const useHubConversations = hubReady && hubSessions.length > 0;
+
+  // Active conversation: prefer Hub session match, then Edge thread match.
+  const activeHubSession = useHubConversations
+    ? hubSessions.find((s) => s.id === selectedConversationId) ?? hubSessions[0]
+    : undefined;
   const activeThread = useDemo
     ? undefined
     : threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0];
-  const activeConversationId = activeThread?.threadId ?? selectedConversationId ?? '';
+  const activeConversationId = activeHubSession?.id ?? activeThread?.threadId ?? selectedConversationId ?? '';
+
+  // Edge thread messages (execution path).
   const threadItemsQuery = useThreadMessages(useDemo ? null : activeThread?.threadId ?? null);
   const threadPinsQuery = useThreadPins(useDemo ? null : activeThread?.threadId ?? null);
   const threadItems = threadItemsQuery.data?.items;
   const threadPins = threadPinsQuery.data?.items;
   const persistedUntilMs = useMemo(() => latestThreadItemTimestampMs(threadItems), [threadItems]);
   const liveTranscript = useDesktopEdgeEvents(useDemo ? undefined : activeThread?.threadId, persistedUntilMs);
+
+  // Hub session messages (IM path) — only when a Hub session is active.
+  const hubMessagesQuery = useHubMessages(activeHubSession?.id ?? '', { enabled: hubReady && !!activeHubSession?.id });
+  const hubMessages = hubMessagesQuery.data ?? [];
 
   const demoModel = useMemo(() => {
     const selectedDemoConversation = demoSnapshot.conversations.some((conversation) => conversation.id === selectedConversationId)
@@ -127,24 +149,35 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   }, [dataMode, demoSnapshot, selectedConversationId]);
 
   const conversations = useMemo(() => {
-    if (threads.length === 0) return [];
-    return threads.map((thread) =>
+    // Merge Hub sessions + Edge threads into a unified conversation list.
+    const hubConversationList = useHubConversations
+      ? hubSessions.map((session) => hubSessionToConversation(session))
+      : [];
+    const edgeConversationList = threads.map((thread) =>
       threadToConversation(
         thread,
         thread.threadId === activeThread?.threadId ? threadPins : undefined,
       ),
     );
-  }, [activeThread?.threadId, threadPins, threads]);
+    // Hub sessions first (IM/social), then Edge threads (execution).
+    if (hubConversationList.length === 0 && edgeConversationList.length === 0) return [];
+    return [...hubConversationList, ...edgeConversationList];
+  }, [activeThread?.threadId, hubSessions, threadPins, threads, useHubConversations]);
 
   const transcript = useMemo(() => {
+    // If a Hub session is active, use Hub messages for the transcript.
+    if (activeHubSession) {
+      return normalizeHubMessagesToTranscript(hubMessages);
+    }
+    // Otherwise, use the Edge thread transcript path.
     const items = threadItems ?? [];
     const persistedTranscript = normalizeThreadItemsToTranscript(items);
     if (persistedTranscript.length > 0 || liveTranscript.length > 0) {
       return [...persistedTranscript, ...liveTranscript];
     }
-    if (threads.length === 0) return EMPTY_TRANSCRIPT;
+    if (threads.length === 0 && hubSessions.length === 0) return EMPTY_TRANSCRIPT;
     return [];
-  }, [liveTranscript, threadItems, threads.length]);
+  }, [activeHubSession, hubMessages, liveTranscript, threadItems, threads.length, hubSessions.length]);
 
   // Resolve Hub contacts for the workbench contacts page.
   const resolvedContacts = useMemo(
