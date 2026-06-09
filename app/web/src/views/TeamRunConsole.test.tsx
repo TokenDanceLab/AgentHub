@@ -359,6 +359,110 @@ describe('TeamRunConsole target routing', () => {
     });
   });
 
+  it('shows selected run and target context for real Hub replay', async () => {
+    executionTargetsState.items = [{
+      id: 'target-local-edge-alpha',
+      name: 'Alpha Desktop',
+      target_type: 'local_edge',
+      is_online: true,
+      health_state: 'healthy',
+    }];
+    teamRunsState.runs = [{
+      id: 'run-real-replay',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([{
+      id: 'event-1',
+      team_run_id: 'run-real-replay',
+      seq: 1,
+      type: 'team.run.started',
+      payload: JSON.stringify({ reason: 'Hub replay started' }),
+      created_at: '2026-06-09T09:00:01Z',
+    }]);
+    hubClientMock.getTeamRun.mockResolvedValueOnce({
+      id: 'run-real-replay',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Real Hub replay')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Run run-real-replay')).toBeInTheDocument();
+    expect(screen.getByText('Target Alpha Desktop')).toBeInTheDocument();
+    expect(screen.getByText('1 replay event')).toBeInTheDocument();
+  });
+
+  it('warns when the selected replay run target is offline or unavailable', async () => {
+    executionTargetsState.items = [{
+      id: 'target-local-edge-alpha',
+      name: 'Alpha Desktop',
+      target_type: 'local_edge',
+      is_online: false,
+      health_state: 'offline',
+    }];
+    teamRunsState.runs = [{
+      id: 'run-offline-target',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRun.mockResolvedValueOnce({
+      id: 'run-offline-target',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Replay target offline or unavailable: Alpha Desktop/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Web keeps this view Hub-sourced and does not contact the Desktop\/Edge runtime directly/)).toBeInTheDocument();
+  });
+
+  it('distinguishes empty selected-run replay from mock event data', async () => {
+    teamRunsState.runs = [{
+      id: 'run-empty-replay',
+      team_id: 'team-1',
+      status: 'completed',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRun.mockResolvedValueOnce({
+      id: 'run-empty-replay',
+      team_id: 'team-1',
+      status: 'completed',
+      created_at: '2026-06-09T09:00:00Z',
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Completed'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Hub replay has no recorded events for this selected run.')).toBeInTheDocument();
+    });
+    expect(screen.getByText('0 replay events')).toBeInTheDocument();
+  });
+
   it('uses an explicit team select button instead of making the row interactive', () => {
     teamRunsState.runs = [{
       id: 'run-1',

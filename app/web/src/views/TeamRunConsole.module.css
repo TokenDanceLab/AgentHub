@@ -346,6 +346,34 @@
   color: var(--color-text-secondary, #9ca3af);
 }
 
+.replayContext {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.replayContext > span {
+  max-width: 100%;
+}
+
+.replayPill {
+  padding: 2px 7px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  background: var(--color-surface-variant, rgba(255, 255, 255, 0.05));
+  color: var(--color-text, #e5e7eb);
+  font-weight: 600;
+}
+
+.replayWarning {
+  color: var(--color-warning, #f59e0b);
+}
+
 .runControls {
   margin-top: 10px;
 }
