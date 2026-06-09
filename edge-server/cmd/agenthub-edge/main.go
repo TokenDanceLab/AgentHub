@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -20,6 +22,7 @@ type config struct {
 	StoreFile          string
 	StoreBackend       string
 	StoreDB            string
+	StoreReadiness     bool
 	RunnerProfile      string
 	RunnerCommand      string
 	RunnerArgs         repeatedString
@@ -103,6 +106,14 @@ func main() {
 	if err != nil {
 		slog.Error("invalid configuration", "err", err)
 		os.Exit(2)
+	}
+
+	if cfg.StoreReadiness {
+		if err := runStoreReadiness(cfg, os.Stdout); err != nil {
+			slog.Error("store readiness failed", "err", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	repository, err := newStoreFromConfig(cfg)
@@ -200,6 +211,7 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.StoreFile, "store-file", getEnv("AGENTHUB_STORE_FILE", ""), "JSON store snapshot file path")
 	fs.StringVar(&cfg.StoreBackend, "store-backend", getEnv("AGENTHUB_STORE_BACKEND", ""), "store backend; empty = legacy auto, supported: memory, file, sqlite")
 	fs.StringVar(&cfg.StoreDB, "store-db", getEnv("AGENTHUB_STORE_DB", ""), "SQLite store database path; requires --store-backend sqlite")
+	fs.BoolVar(&cfg.StoreReadiness, "store-readiness", false, "print store readiness JSON and exit; currently supports --store-backend sqlite")
 	fs.StringVar(&cfg.RunnerProfile, "runner-profile", getEnv("AGENTHUB_RUNNER_PROFILE", ""), "runner profile preset; supported: agenthub-runner-mock, claude-code, codex, opencode")
 	fs.StringVar(&cfg.RunnerCommand, "runner-command", getEnv("AGENTHUB_RUNNER_COMMAND", ""), "local process executable to run for each run; empty uses the built-in mock executor")
 	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", getEnv("AGENTHUB_RUNNER_WORKDIR", ""), "working directory for --runner-command; empty inherits the edge process working directory")
@@ -271,6 +283,9 @@ func buildConfig(args []string) (config, error) {
 	default:
 		return config{}, fmt.Errorf("unknown --store-backend %q; supported values: memory, file, sqlite", cfg.StoreBackend)
 	}
+	if cfg.StoreReadiness && cfg.StoreBackend != "sqlite" {
+		return config{}, fmt.Errorf("--store-readiness requires --store-backend sqlite")
+	}
 	// --tailscale implies --remote-mode and tailscale-aware registration with Hub
 	if cfg.Tailscale {
 		cfg.RemoteMode = true
@@ -318,6 +333,19 @@ func buildConfig(args []string) (config, error) {
 		return config{}, fmt.Errorf("unexpected positional arguments: %v", fs.Args())
 	}
 	return cfg, nil
+}
+
+func runStoreReadiness(cfg config, out io.Writer) error {
+	if cfg.StoreBackend != "sqlite" || cfg.StoreDB == "" {
+		return fmt.Errorf("--store-readiness requires --store-backend sqlite and --store-db")
+	}
+	report, err := store.SQLiteReadiness(cfg.StoreDB)
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(out)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(report)
 }
 
 func applyRunnerProfile(cfg *config) error {
