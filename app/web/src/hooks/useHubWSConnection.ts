@@ -1,3 +1,4 @@
+// NOTE: This hook is currently unused in the active workbench code path. See GH-xxx.
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import { createHubWS, type HubWSHandle } from '@/api/hubWS';
