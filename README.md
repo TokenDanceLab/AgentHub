@@ -10,16 +10,18 @@ AgentHub 是一个面向 AI Agent 团队协作的开源工作台。它把 Web、
 ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
 ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
 
-## 📖 文档导航
+## 📖 文档
 
-| 你是… | 先读 |
+| 你想… | 去哪 |
 |---|---|
-| **产品评委** | [竞争力定位](docs/competition/competitive-positioning.md) → [关键设计决策](docs/design-decisions.md) → [威胁模型](docs/governance/threat-model.md) → [架构](docs/architecture.md) |
-| **想看完整文档** | [官网文档站](https://hub.vectorcontrol.tech/docs)（角色化导航 + 架构图 + 中英双语） |
-| **想本地跑** | [快速开始](#快速开始) ↓ → [官网 Installation](https://hub.vectorcontrol.tech/docs/installation) |
-| **想看架构** | [架构](#架构) ↓ → [官网 Architecture](https://hub.vectorcontrol.tech/docs/architecture) → [Hub & Edge](https://hub.vectorcontrol.tech/docs/hub-edge) |
+| 了解产品与概念 | [官网文档站](https://hub.vectorcontrol.tech/docs)（角色化导航 + 架构图 + 中英双语） |
+| 本地跑起来 | [快速开始](#快速开始) ↓ · [Installation](https://hub.vectorcontrol.tech/docs/installation) · [Quickstart](https://hub.vectorcontrol.tech/docs/quickstart) |
+| 理解架构 | [架构](#架构) ↓ · [Architecture](https://hub.vectorcontrol.tech/docs/architecture) · [Hub & Edge](https://hub.vectorcontrol.tech/docs/hub-edge) |
+| 接入 Runtime | [Adapters](https://hub.vectorcontrol.tech/docs/adapters) · [Agent Profiles](https://hub.vectorcontrol.tech/docs/agent-profiles) · [Run Lifecycle](https://hub.vectorcontrol.tech/docs/run-lifecycle) |
+| 自托管 / 安全 | [Deployment](https://hub.vectorcontrol.tech/docs/deployment) · [Security](https://hub.vectorcontrol.tech/docs/security) · [威胁模型](docs/governance/threat-model.md) |
+| 技术决策 | [关键设计决策](docs/design-decisions.md) · [ADR](docs/adr/) |
 
-**亮点速览**：三端原生（Tauri Desktop + Web + Android Mobile）· Go Hub-Edge 分布式 · 三 Runtime 完整协议适配（Claude Code/Codex/OpenCode）· 三级审批 + SecurityHook · 44 条安全风险台账 · OpenAPI 5636 行契约 · Glass 拟态设计系统。
+**产品形态**：三端原生（Tauri Desktop + Web + Android Mobile）· Go Hub-Edge 分布式 · 多 Runtime 统一调度（Claude Code / Codex / OpenCode）· 审批流与安全边界 · Glass 拟态设计系统。
 
 ## 当前状态
 
@@ -156,3 +158,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-p0-ap
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+---
+
+AgentHub 是一个开源产品化项目，正在持续迭代。本项目参加 **飞书 AI 全栈开发挑战赛**，赛题「AgentHub — 多 Agent 协作平台」。
