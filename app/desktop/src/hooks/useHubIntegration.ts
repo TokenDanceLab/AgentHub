@@ -343,6 +343,18 @@ function extractRunOutputBatch(payload: Record<string, unknown>): string {
     .join('');
 }
 
+function extractCreatedRunId(value: unknown): string {
+  const root = parseRecord(value);
+  const isEnvelope =
+    typeof root.code === 'string' && Object.prototype.hasOwnProperty.call(root, 'data');
+  const run = isEnvelope ? parseRecord(root.data) : root;
+  const runId = getFirstString(run.id, run.runId);
+  if (!runId) {
+    throw new Error(`Edge run created but no id/runId in response${isEnvelope ? ' data' : ''}`);
+  }
+  return runId;
+}
+
 // ── Hook ──────────────────────────────────────────────
 
 export function useHubIntegration(
@@ -443,6 +455,8 @@ export function useHubIntegration(
         case 'run.agent.tool_call':
         case 'run.agent.tool_result':
         case 'run.agent.file_change':
+        case 'run.agent.permission_requested':
+        case 'run.agent.permission_decided':
           // Forward the canonical typed runtime event so Hub can persist and replay it.
           hubClient
             .streamTaskEvent(taskId, event.type, payload, { runId })
@@ -602,11 +616,7 @@ export function useHubIntegration(
           throw new Error(`Edge POST /v1/runs returned ${runResp.status}: ${errorText}`);
         }
 
-        const run = (await runResp.json()) as { id?: string; runId?: string };
-        const runId = run.id || run.runId || '';
-        if (!runId) {
-          throw new Error('Edge run created but no id/runId in response');
-        }
+        const runId = extractCreatedRunId(await runResp.json());
 
         // Map taskId ↔ runId and mark running
         store.getState().updateTask(taskId, { runId, status: 'running' });
