@@ -21,10 +21,7 @@ import { createEventStream, type StreamHandle } from '@/api/eventClient';
 import { edgeAuthHeaders } from '@/api/edgeAuth';
 import type { EventEnvelope } from '@shared/events';
 import { HUB_EVENTS } from '@shared/hubEvents';
-import {
-  useTaskBridgeStore,
-  type AgentTask,
-} from '@/stores/taskBridgeStore';
+import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 
 export type { AgentTask };
 export { useTaskBridgeStore };
@@ -64,7 +61,7 @@ function parseRecord(value: unknown): Record<string, unknown> {
   try {
     const parsed = JSON.parse(value);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
+      ? (parsed as Record<string, unknown>)
       : {};
   } catch {
     return {};
@@ -117,13 +114,17 @@ function parseStringArray(value: unknown): string[] | undefined {
     }
   }
   if (!Array.isArray(source)) return undefined;
-  const values = source.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+  const values = source.filter(
+    (item): item is string => typeof item === 'string' && item.trim() !== '',
+  );
   return values.length > 0 ? values : undefined;
 }
 
 function parseStringRecord(value: unknown): Record<string, string> | undefined {
   const record = parseRecord(value);
-  const entries = Object.entries(record).filter((entry): entry is [string, string] => typeof entry[1] === 'string');
+  const entries = Object.entries(record).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  );
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
@@ -158,13 +159,17 @@ function normalizeRouteDecision(value: unknown): CoordinatorRouteDecision | null
   });
 }
 
-function routeDecisionFromRuntimePayload(payload: Record<string, unknown>): CoordinatorRouteDecision | null {
-  return normalizeRouteDecision(payload.structuredOutput)
-    ?? normalizeRouteDecision(payload.structured_output)
-    ?? normalizeRouteDecision(payload.routeDecision)
-    ?? normalizeRouteDecision(payload.route_decision)
-    ?? normalizeRouteDecision(payload.decision)
-    ?? normalizeRouteDecision(payload);
+function routeDecisionFromRuntimePayload(
+  payload: Record<string, unknown>,
+): CoordinatorRouteDecision | null {
+  return (
+    normalizeRouteDecision(payload.structuredOutput) ??
+    normalizeRouteDecision(payload.structured_output) ??
+    normalizeRouteDecision(payload.routeDecision) ??
+    normalizeRouteDecision(payload.route_decision) ??
+    normalizeRouteDecision(payload.decision) ??
+    normalizeRouteDecision(payload)
+  );
 }
 
 interface TeamRouteContext {
@@ -185,6 +190,14 @@ interface HubDispatchTarget {
   deviceId: string;
 }
 
+interface DispatchTargetBindingEvidence {
+  expectedTargetId: string;
+  observedTargetId?: string;
+  expectedEdgeDeviceId: string;
+  observedEdgeDeviceId?: string;
+  status: 'matched' | 'mismatch';
+}
+
 const HUB_AGENT_CONTROL_EVENT = 'agent.control';
 
 function isTerminalBridgeTask(task: AgentTask): boolean {
@@ -196,12 +209,22 @@ function getTeamRouteContext(task: AgentTask): TeamRouteContext | null {
   const modelParams = parseRecord(data.model_params);
   const nested = parseRecord(modelParams.agenthub_team_context);
   const teamId = getFirstString(data.team_id, data.teamId, nested.team_id, nested.teamId);
-  const teamRunId = getFirstString(data.team_run_id, data.teamRunId, nested.team_run_id, nested.teamRunId);
+  const teamRunId = getFirstString(
+    data.team_run_id,
+    data.teamRunId,
+    nested.team_run_id,
+    nested.teamRunId,
+  );
   if (!teamId || !teamRunId) return null;
   return compactRecord<TeamRouteContext>({
     teamId,
     teamRunId,
-    teamMemberRole: getFirstString(data.team_member_role, data.teamMemberRole, nested.team_member_role, nested.teamMemberRole),
+    teamMemberRole: getFirstString(
+      data.team_member_role,
+      data.teamMemberRole,
+      nested.team_member_role,
+      nested.teamMemberRole,
+    ),
   });
 }
 
@@ -242,12 +265,7 @@ function parsePermissionDecisionControl(payload: unknown): EdgePermissionDecisio
 }
 
 function permissionDecisionControlKey(control: EdgePermissionDecisionControl): string {
-  return [
-    control.runId,
-    control.requestId,
-    control.decision,
-    control.reason ?? '',
-  ].join('\u001f');
+  return [control.runId, control.requestId, control.decision, control.reason ?? ''].join('\u001f');
 }
 
 function validateDispatchTarget(
@@ -265,14 +283,58 @@ function validateDispatchTarget(
   return `Dispatch target mismatch: expected ${dispatchTarget.targetId} for device ${dispatchTarget.deviceId}`;
 }
 
+function buildDispatchTargetBinding(
+  data: Record<string, unknown>,
+  dispatchTarget: HubDispatchTarget | null | undefined,
+): DispatchTargetBindingEvidence | null {
+  if (!dispatchTarget) return null;
+  const observedTargetId = getFirstString(data.target_id, data.targetId);
+  const observedEdgeDeviceId = getFirstString(data.edge_device_id, data.edgeDeviceId);
+  const status =
+    observedTargetId === dispatchTarget.targetId && observedEdgeDeviceId === dispatchTarget.deviceId
+      ? 'matched'
+      : 'mismatch';
+
+  return compactRecord<DispatchTargetBindingEvidence>({
+    expectedTargetId: dispatchTarget.targetId,
+    observedTargetId,
+    expectedEdgeDeviceId: dispatchTarget.deviceId,
+    observedEdgeDeviceId,
+    status,
+  });
+}
+
+function bindDispatchPayload(
+  data: Record<string, unknown>,
+  binding: DispatchTargetBindingEvidence | null,
+): Record<string, unknown> {
+  if (!binding) return data;
+  return {
+    ...data,
+    target_binding: compactRecord<Record<string, unknown>>({
+      expected_target_id: binding.expectedTargetId,
+      observed_target_id: binding.observedTargetId,
+      expected_edge_device_id: binding.expectedEdgeDeviceId,
+      observed_edge_device_id: binding.observedEdgeDeviceId,
+      status: binding.status,
+    }),
+  };
+}
+
 async function postEdgePermissionDecision(
   edgeBaseUrl: string,
   control: EdgePermissionDecisionControl,
 ): Promise<void> {
-  const resp = await fetch(`${edgeBaseUrl}/v1/permissions/decide`, edgeRequestInit({
-    method: 'POST',
-    body: JSON.stringify(control),
-  }, { 'Content-Type': 'application/json' }));
+  const resp = await fetch(
+    `${edgeBaseUrl}/v1/permissions/decide`,
+    edgeRequestInit(
+      {
+        method: 'POST',
+        body: JSON.stringify(control),
+      },
+      { 'Content-Type': 'application/json' },
+    ),
+  );
   if (!resp.ok) {
     const errorText = await resp.text().catch(() => 'Unknown error');
     throw new Error(`Edge POST /v1/permissions/decide returned ${resp.status}: ${errorText}`);
@@ -282,48 +344,120 @@ async function postEdgePermissionDecision(
 function normalizeRuntimeAgentId(agentId: string): string {
   const key = agentId.trim().toLowerCase();
   if (!key) return '';
-  if (key === 'claude' || key.includes('claude-code') || key.includes('claude')) return 'claude-code';
+  if (key === 'claude' || key.includes('claude-code') || key.includes('claude'))
+    return 'claude-code';
   if (key.includes('opencode')) return 'opencode';
   if (key.includes('codex') || key.includes('gpt')) return 'codex';
   return key;
 }
 
-function buildEdgeRunBody(data: Record<string, unknown>, threadId: string, prompt: string, agentId: string): Record<string, unknown> {
+function buildEdgeRunBody(
+  data: Record<string, unknown>,
+  threadId: string,
+  prompt: string,
+  agentId: string,
+  targetBinding: DispatchTargetBindingEvidence | null,
+): Record<string, unknown> {
   const modelParams = parseRecord(data.model_params);
-  const allowedTools = parseStringArray(data.tool_whitelist)
-    ?? parseStringArray(modelParams.tool_allowlist)
-    ?? parseStringArray(modelParams.allowed_tools)
-    ?? parseStringArray(modelParams.allowedTools);
+  const allowedTools =
+    parseStringArray(data.tool_whitelist) ??
+    parseStringArray(modelParams.tool_allowlist) ??
+    parseStringArray(modelParams.allowed_tools) ??
+    parseStringArray(modelParams.allowedTools);
 
   return compactRecord<Record<string, unknown>>({
     threadId,
     prompt: prompt || undefined,
     agentId: agentId || undefined,
     model: getFirstString(modelParams.model, data.model),
-    reasoningEffort: getFirstString(modelParams.reasoning_effort, modelParams.reasoningEffort, data.reasoning_effort, data.reasoningEffort),
-    thinkingMode: getFirstString(modelParams.thinking_mode, modelParams.thinkingMode, data.thinking_mode, data.thinkingMode),
-    maxThinkingTokens: getFirstNumber(modelParams.max_thinking_tokens, modelParams.maxThinkingTokens, data.max_thinking_tokens, data.maxThinkingTokens),
-    permissionMode: getFirstString(modelParams.permission_mode, modelParams.permissionMode, data.permission_mode, data.permissionMode),
+    reasoningEffort: getFirstString(
+      modelParams.reasoning_effort,
+      modelParams.reasoningEffort,
+      data.reasoning_effort,
+      data.reasoningEffort,
+    ),
+    thinkingMode: getFirstString(
+      modelParams.thinking_mode,
+      modelParams.thinkingMode,
+      data.thinking_mode,
+      data.thinkingMode,
+    ),
+    maxThinkingTokens: getFirstNumber(
+      modelParams.max_thinking_tokens,
+      modelParams.maxThinkingTokens,
+      data.max_thinking_tokens,
+      data.maxThinkingTokens,
+    ),
+    permissionMode: getFirstString(
+      modelParams.permission_mode,
+      modelParams.permissionMode,
+      data.permission_mode,
+      data.permissionMode,
+    ),
     workDir: getFirstString(modelParams.work_dir, modelParams.workDir, data.work_dir, data.workDir),
-    includePartial: getFirstBoolean(modelParams.include_partial, modelParams.includePartial, data.include_partial, data.includePartial),
-    structuredOutputSchema: getFirstString(modelParams.structured_output_schema, modelParams.structuredOutputSchema, data.structured_output_schema, data.structuredOutputSchema),
-    systemPrompt: getFirstString(data.system_prompt, data.systemPrompt, modelParams.system_prompt, modelParams.systemPrompt),
-    appendSystemPrompt: getFirstString(modelParams.append_system_prompt, modelParams.appendSystemPrompt, data.append_system_prompt, data.appendSystemPrompt),
+    includePartial: getFirstBoolean(
+      modelParams.include_partial,
+      modelParams.includePartial,
+      data.include_partial,
+      data.includePartial,
+    ),
+    structuredOutputSchema: getFirstString(
+      modelParams.structured_output_schema,
+      modelParams.structuredOutputSchema,
+      data.structured_output_schema,
+      data.structuredOutputSchema,
+    ),
+    systemPrompt: getFirstString(
+      data.system_prompt,
+      data.systemPrompt,
+      modelParams.system_prompt,
+      modelParams.systemPrompt,
+    ),
+    appendSystemPrompt: getFirstString(
+      modelParams.append_system_prompt,
+      modelParams.appendSystemPrompt,
+      data.append_system_prompt,
+      data.appendSystemPrompt,
+    ),
     allowedTools,
-    configOverrides: parseStringRecord(modelParams.config_overrides) ?? parseStringRecord(modelParams.configOverrides),
+    configOverrides:
+      parseStringRecord(modelParams.config_overrides) ??
+      parseStringRecord(modelParams.configOverrides),
     ephemeral: getFirstBoolean(modelParams.ephemeral, data.ephemeral),
+    hubTaskId: getFirstString(data.task_id),
+    targetId: targetBinding?.expectedTargetId,
+    edgeDeviceId: targetBinding?.expectedEdgeDeviceId,
+    dispatchTargetEvidence: targetBinding
+      ? {
+          expectedTargetId: targetBinding.expectedTargetId,
+          observedTargetId: targetBinding.observedTargetId,
+          expectedEdgeDeviceId: targetBinding.expectedEdgeDeviceId,
+          observedEdgeDeviceId: targetBinding.observedEdgeDeviceId,
+          targetStatus: targetBinding.status,
+        }
+      : undefined,
   });
 }
 
-async function ensureEdgeThread(edgeBaseUrl: string, threadId: string, title: string): Promise<void> {
-  const resp = await fetch(`${edgeBaseUrl}/v1/threads`, edgeRequestInit({
-    method: 'POST',
-    body: JSON.stringify({
-      projectId: 'proj_local',
-      threadId,
-      title,
-    }),
-  }, { 'Content-Type': 'application/json' }));
+async function ensureEdgeThread(
+  edgeBaseUrl: string,
+  threadId: string,
+  title: string,
+): Promise<void> {
+  const resp = await fetch(
+    `${edgeBaseUrl}/v1/threads`,
+    edgeRequestInit(
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: 'proj_local',
+          threadId,
+          title,
+        }),
+      },
+      { 'Content-Type': 'application/json' },
+    ),
+  );
   if (!resp.ok) {
     const errorText = await resp.text().catch(() => 'Unknown error');
     throw new Error(`Edge POST /v1/threads returned ${resp.status}: ${errorText}`);
@@ -357,10 +491,14 @@ function extractCreatedRunId(value: unknown): string {
 
 // ── Hook ──────────────────────────────────────────────
 
-export function useHubIntegration(
-  options: HubIntegrationOptions,
-): HubIntegrationHandle {
-  const { hubWS, hubClient, edgeBaseUrl = 'http://127.0.0.1:3210', dispatchTarget = null, onDispatch } = options;
+export function useHubIntegration(options: HubIntegrationOptions): HubIntegrationHandle {
+  const {
+    hubWS,
+    hubClient,
+    edgeBaseUrl = 'http://127.0.0.1:3210',
+    dispatchTarget = null,
+    onDispatch,
+  } = options;
 
   const streamRef = useRef<StreamHandle | null>(null);
   const outputByRunRef = useRef<Map<string, string>>(new Map());
@@ -372,29 +510,27 @@ export function useHubIntegration(
   const rememberOutput = useCallback((runId: string, content: string) => {
     if (!content) return;
     const prev = outputByRunRef.current.get(runId) ?? '';
-    outputByRunRef.current.set(
-      runId,
-      (prev + content).slice(-FINAL_OUTPUT_MAX_CHARS),
-    );
+    outputByRunRef.current.set(runId, (prev + content).slice(-FINAL_OUTPUT_MAX_CHARS));
   }, []);
 
   const forgetOutput = useCallback((runId: string) => {
     outputByRunRef.current.delete(runId);
   }, []);
 
-  const postRouteDecision = useCallback((task: AgentTask, decision: CoordinatorRouteDecision) => {
-    const context = getTeamRouteContext(task);
-    if (!context) return;
-    if (context.teamMemberRole && context.teamMemberRole !== 'supervisor') return;
+  const postRouteDecision = useCallback(
+    (task: AgentTask, decision: CoordinatorRouteDecision) => {
+      const context = getTeamRouteContext(task);
+      if (!context) return;
+      if (context.teamMemberRole && context.teamMemberRole !== 'supervisor') return;
 
-    const key = routeDecisionKey(task.taskId, decision);
-    if (postedRouteDecisionsRef.current.has(key)) return;
-    postedRouteDecisionsRef.current.add(key);
+      const key = routeDecisionKey(task.taskId, decision);
+      if (postedRouteDecisionsRef.current.has(key)) return;
+      postedRouteDecisionsRef.current.add(key);
 
-    hubClient
-      .postTeamRouteDecision(context.teamId, context.teamRunId, decision)
-      .catch(() => {});
-  }, [hubClient]);
+      hubClient.postTeamRouteDecision(context.teamId, context.teamRunId, decision).catch(() => {});
+    },
+    [hubClient],
+  );
 
   // ── Initialise Edge event stream once ─────────────────
 
@@ -458,9 +594,7 @@ export function useHubIntegration(
         case 'run.agent.permission_requested':
         case 'run.agent.permission_decided':
           // Forward the canonical typed runtime event so Hub can persist and replay it.
-          hubClient
-            .streamTaskEvent(taskId, event.type, payload, { runId })
-            .catch(() => {});
+          hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           break;
 
         case 'run.agent.route_decision': {
@@ -490,9 +624,7 @@ export function useHubIntegration(
             });
           } else {
             const error =
-              typeof payload.error === 'string'
-                ? payload.error
-                : 'Agent reported failure';
+              typeof payload.error === 'string' ? payload.error : 'Agent reported failure';
             hubClient.failTask(taskId, error, runId).catch(() => {});
             store.getState().updateTask(taskId, {
               status: 'failed',
@@ -514,10 +646,7 @@ export function useHubIntegration(
         }
 
         case 'run.failed': {
-          const error =
-            typeof payload.error === 'string'
-              ? payload.error
-              : 'Run lifecycle failure';
+          const error = typeof payload.error === 'string' ? payload.error : 'Run lifecycle failure';
           hubClient.failTask(taskId, error, runId).catch(() => {});
           store.getState().updateTask(taskId, {
             status: 'failed',
@@ -562,15 +691,19 @@ export function useHubIntegration(
       }
 
       const taskId = data.task_id;
+      const targetBinding = buildDispatchTargetBinding(data, dispatchTarget);
+      const dispatchPayload = bindDispatchPayload(data, targetBinding);
       const targetError = validateDispatchTarget(data, dispatchTarget);
       if (targetError) {
         store.getState().addTask({
           taskId,
-          agentId: normalizeRuntimeAgentId(getString(data, 'agent_type') || getString(data, 'agent_id')),
+          agentId: normalizeRuntimeAgentId(
+            getString(data, 'agent_type') || getString(data, 'agent_id'),
+          ),
           prompt: getString(data, 'prompt') || getString(data, 'content'),
           threadId: getString(data, 'thread_id') || getString(data, 'session_id') || 'hub-dispatch',
           status: 'failed',
-          dispatchPayload: data,
+          dispatchPayload,
           error: targetError,
           createdAt: new Date().toISOString(),
         });
@@ -578,12 +711,12 @@ export function useHubIntegration(
         return;
       }
 
-      const agentId = normalizeRuntimeAgentId(getString(data, 'agent_type') || getString(data, 'agent_id'));
+      const agentId = normalizeRuntimeAgentId(
+        getString(data, 'agent_type') || getString(data, 'agent_id'),
+      );
       const prompt = getString(data, 'prompt') || getString(data, 'content');
       const threadId =
-        getString(data, 'thread_id') ||
-        getString(data, 'session_id') ||
-        'hub-dispatch';
+        getString(data, 'thread_id') || getString(data, 'session_id') || 'hub-dispatch';
 
       // Build initial task record
       const task: AgentTask = {
@@ -592,7 +725,7 @@ export function useHubIntegration(
         prompt,
         threadId,
         status: 'queued',
-        dispatchPayload: data,
+        dispatchPayload,
         createdAt: new Date().toISOString(),
       };
 
@@ -606,10 +739,18 @@ export function useHubIntegration(
           getString(data, 'display_name') || 'Hub dispatch',
         );
 
-        const runResp = await fetch(`${edgeBaseUrl}/v1/runs`, edgeRequestInit({
-          method: 'POST',
-          body: JSON.stringify(buildEdgeRunBody(data, threadId, prompt, agentId)),
-        }, { 'Content-Type': 'application/json' }));
+        const runResp = await fetch(
+          `${edgeBaseUrl}/v1/runs`,
+          edgeRequestInit(
+            {
+              method: 'POST',
+              body: JSON.stringify(
+                buildEdgeRunBody(data, threadId, prompt, agentId, targetBinding),
+              ),
+            },
+            { 'Content-Type': 'application/json' },
+          ),
+        );
 
         if (!runResp.ok) {
           const errorText = await runResp.text().catch(() => 'Unknown error');
@@ -649,9 +790,12 @@ export function useHubIntegration(
       if (!runId) return;
 
       try {
-        await fetch(`${edgeBaseUrl}/v1/runs/${encodeURIComponent(runId)}:cancel`, edgeRequestInit({
-          method: 'POST',
-        }));
+        await fetch(
+          `${edgeBaseUrl}/v1/runs/${encodeURIComponent(runId)}:cancel`,
+          edgeRequestInit({
+            method: 'POST',
+          }),
+        );
         store.getState().updateTask(taskId, {
           status: 'failed',
           error: 'Cancelled by Hub',
@@ -667,13 +811,19 @@ export function useHubIntegration(
       if (!control) {
         const kind = getFirstString(parseRecord(payload).kind);
         if (kind === 'permission.decide') {
-          console.warn('[useHubIntegration] Malformed agent.control permission.decide payload:', payload);
+          console.warn(
+            '[useHubIntegration] Malformed agent.control permission.decide payload:',
+            payload,
+          );
         }
         return;
       }
       const targetError = validateDispatchTarget(parseRecord(payload), dispatchTarget);
       if (targetError) {
-        console.warn('[useHubIntegration] Refusing agent.control for another Desktop target:', targetError);
+        console.warn(
+          '[useHubIntegration] Refusing agent.control for another Desktop target:',
+          targetError,
+        );
         return;
       }
 
@@ -688,7 +838,10 @@ export function useHubIntegration(
         deliveredAgentControlsRef.current.add(key);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        console.warn('[useHubIntegration] Failed to apply agent.control permission.decide:', errorMsg);
+        console.warn(
+          '[useHubIntegration] Failed to apply agent.control permission.decide:',
+          errorMsg,
+        );
       } finally {
         inFlightAgentControlsRef.current.delete(key);
       }
@@ -703,10 +856,7 @@ export function useHubIntegration(
 
   // ── Return stable handle ──────────────────────────────
 
-  const getTaskByRunId = useCallback(
-    (runId: string) => store.getState().getTaskByRunId(runId),
-    [],
-  );
+  const getTaskByRunId = useCallback((runId: string) => store.getState().getTaskByRunId(runId), []);
 
   const getRunByTaskId = useCallback(
     (taskId: string) => store.getState().getRunByTaskId(taskId),
@@ -715,8 +865,8 @@ export function useHubIntegration(
 
   // Read tasks reactively from the store
   const tasks = store((s) => s.tasks);
-  const activeTaskCount = store((s) =>
-    s.tasks.filter((t) => t.status === 'running' || t.status === 'queued').length,
+  const activeTaskCount = store(
+    (s) => s.tasks.filter((t) => t.status === 'running' || t.status === 'queued').length,
   );
 
   return {
