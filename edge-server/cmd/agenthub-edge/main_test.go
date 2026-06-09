@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,6 +130,31 @@ func TestBuildConfigParsesSQLiteStoreBackend(t *testing.T) {
 	}
 	if cfg.StoreDB != "edge-store.db" {
 		t.Fatalf("StoreDB = %q, want edge-store.db", cfg.StoreDB)
+	}
+}
+
+func TestBuildConfigParsesStoreReadiness(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--store-readiness",
+		"--store-backend", "sqlite",
+		"--store-db", "edge-store.db",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if !cfg.StoreReadiness {
+		t.Fatal("StoreReadiness = false, want true")
+	}
+	if cfg.StoreBackend != "sqlite" || cfg.StoreDB != "edge-store.db" {
+		t.Fatalf("store config = backend %q db %q, want sqlite edge-store.db", cfg.StoreBackend, cfg.StoreDB)
+	}
+}
+
+func TestBuildConfigRejectsStoreReadinessWithoutSQLite(t *testing.T) {
+	_, err := buildConfig([]string{"--store-readiness", "--store-backend", "memory"})
+	if err == nil || !strings.Contains(err.Error(), "--store-readiness requires --store-backend sqlite") {
+		t.Fatalf("buildConfig error = %v, want store-readiness sqlite requirement", err)
 	}
 }
 
@@ -551,6 +578,66 @@ func TestSQLiteDurableObservedFixtureSmoke(t *testing.T) {
 	}
 	if got := reopened.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "durable-smoke" {
 		t.Fatalf("restored pins = %#v, want observed fixture pin", got)
+	}
+}
+
+func TestRunStoreReadinessPrintsSQLiteReport(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "edge-readiness-report.db")
+	repository, err := store.NewSQLite(dbPath)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	project, err := repository.CreateProject("proj_readiness_report", "Readiness Report")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := repository.CreateThread("thread_readiness_report", project.ID, "Readiness Report Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := repository.CreateRun("run_readiness_report", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := repository.SetRunStatus(run.ID, "started"); !ok {
+		t.Fatalf("SetRunStatus(%s, started) returned false", run.ID)
+	}
+	repository.Close()
+
+	var out bytes.Buffer
+	err = runStoreReadiness(config{
+		StoreBackend:   "sqlite",
+		StoreDB:        dbPath,
+		StoreReadiness: true,
+	}, &out)
+	if err != nil {
+		t.Fatalf("runStoreReadiness returned error: %v", err)
+	}
+
+	var report struct {
+		Path                   string         `json:"path"`
+		IntegrityCheck         string         `json:"integrity_check"`
+		LatestMigrationVersion int            `json:"latest_migration_version"`
+		RowCounts              map[string]int `json:"row_counts"`
+		ProjectionCounts       map[string]int `json:"projection_counts"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("readiness JSON was not valid: %v\n%s", err, out.String())
+	}
+	if report.Path != dbPath {
+		t.Fatalf("Path = %q, want %q", report.Path, dbPath)
+	}
+	if report.IntegrityCheck != "ok" {
+		t.Fatalf("IntegrityCheck = %q, want ok", report.IntegrityCheck)
+	}
+	if report.LatestMigrationVersion == 0 {
+		t.Fatal("LatestMigrationVersion = 0, want applied migrations")
+	}
+	if report.RowCounts["project"] != 1 || report.RowCounts["thread"] != 1 || report.RowCounts["run"] != 1 {
+		t.Fatalf("RowCounts = %#v, want project/thread/run rows", report.RowCounts)
+	}
+	if report.ProjectionCounts["edge_runs"] != 1 {
+		t.Fatalf("edge_runs projection count = %d, want 1", report.ProjectionCounts["edge_runs"])
 	}
 }
 

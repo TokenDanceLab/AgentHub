@@ -9,12 +9,12 @@ import (
 const SQLiteReadinessManifestSchema = "agenthub-edge-sqlite-readiness-v1"
 
 type SQLiteReadinessReport struct {
-	Path                   string
-	IntegrityCheck         string
-	LatestMigrationVersion int
-	AppliedMigrations      []SQLiteMigrationInfo
-	RowCounts              map[string]int
-	ProjectionCounts       map[string]int
+	Path                   string                `json:"path"`
+	IntegrityCheck         string                `json:"integrity_check"`
+	LatestMigrationVersion int                   `json:"latest_migration_version"`
+	AppliedMigrations      []SQLiteMigrationInfo `json:"applied_migrations"`
+	RowCounts              map[string]int        `json:"row_counts"`
+	ProjectionCounts       map[string]int        `json:"projection_counts"`
 }
 
 type SQLiteReadinessManifest struct {
