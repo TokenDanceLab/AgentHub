@@ -28,6 +28,8 @@ import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import {
   resolveWebWorkbenchConversations,
+  readStoredWebActiveAgentTask,
+  webActiveAgentTaskQueryKey,
   webConversationWithPinnedMessages,
   webHubEmptyTranscript,
 } from './webPlatform';
@@ -80,9 +82,21 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     setLiveRuntimeEvents((current) => appendHubRuntimeEvent(current, event));
   }, []);
 
+  const activeAgentTask = useQuery({
+    queryKey: activeHubSessionId
+      ? webActiveAgentTaskQueryKey(activeHubSessionId)
+      : ['web-v4', 'active-agent-task', 'none'],
+    queryFn: () => readStoredWebActiveAgentTask(activeHubSessionId!),
+    enabled: Boolean(activeHubSessionId),
+    staleTime: Number.POSITIVE_INFINITY,
+    placeholderData: (previous) => previous,
+  });
+  const activeAgentTaskId = activeAgentTask.data?.taskId;
+
   useWebHubRealtime({
     enabled: hubReady,
     runtimeSessionId: activeHubSessionId,
+    runtimeTaskId: activeAgentTaskId ?? null,
     onRuntimeEvent: appendLiveRuntimeEvent,
   });
 
@@ -90,6 +104,21 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     queryKey: ['web-v4', 'hub-messages', activeHubSessionId],
     queryFn: () => hubClient.getMessages(activeHubSessionId!, { limit: 80 }),
     enabled: Boolean(activeHubSessionId),
+    staleTime: 5_000,
+    placeholderData: (previous) => previous,
+  });
+
+  const replayedRuntimeEvents = useQuery({
+    queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId],
+    queryFn: () => hubClient.listTaskRunEvents(activeAgentTaskId!),
+    enabled: Boolean(activeAgentTaskId),
+    staleTime: 5_000,
+    placeholderData: (previous) => previous,
+  });
+  const activeAgentTaskSummary = useQuery({
+    queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId],
+    queryFn: () => hubClient.getTaskRunEventSummary(activeAgentTaskId!),
+    enabled: Boolean(activeAgentTaskId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
   });
@@ -175,7 +204,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       hubReady,
       activeHubSessionId,
       messages.data,
-      liveRuntimeEvents,
+      mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents),
       dataMode,
     );
   const surfacedTranscript = executionTargetStatus.block
@@ -214,7 +243,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
         ? executionTargetLabel(executionTargetStatus.selectedTarget)
         : undefined,
       replayLabel: activeHubSessionId
-        ? `Hub replay: ${liveRuntimeEvents.length} runtime event${liveRuntimeEvents.length === 1 ? '' : 's'} observed`
+        ? activeAgentTaskId
+          ? `Hub replay: task ${activeAgentTaskId} · ${activeAgentTaskSummary.data?.total_events ?? mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents).length} runtime event${(activeAgentTaskSummary.data?.total_events ?? mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents).length) === 1 ? '' : 's'} observed`
+          : `Hub replay: ${liveRuntimeEvents.length} runtime event${liveRuntimeEvents.length === 1 ? '' : 's'} observed`
         : realMode
           ? 'Hub replay: no active Hub session'
           : 'Fixture replay: shared demo transcript',
@@ -488,6 +519,18 @@ export function appendHubRuntimeEvent(
   const incomingKey = hubRuntimeEventKey(incoming);
   const replaced = current.filter((event) => hubRuntimeEventKey(event) !== incomingKey);
   return [...replaced, incoming].slice(-limit);
+}
+
+export function mergeHubRuntimeEvents(
+  replayed: HubRuntimeEventTranscriptInput[] | undefined,
+  live: HubRuntimeEventTranscriptInput[],
+  limit = 400,
+): HubRuntimeEventTranscriptInput[] {
+  let merged = replayed ?? [];
+  for (const event of live) {
+    merged = appendHubRuntimeEvent(merged, event, limit);
+  }
+  return merged.slice(-limit);
 }
 
 function hubRuntimeEventKey(event: HubRuntimeEventTranscriptInput): string {
