@@ -6,7 +6,7 @@ export interface TranscriptAuthor {
   role: TranscriptAuthorRole;
 }
 
-export type EvidenceRefKind = 'tool' | 'file' | 'artifact' | 'preview' | 'run';
+export type EvidenceRefKind = 'tool' | 'file' | 'artifact' | 'preview' | 'run' | 'approval';
 export type EvidenceRefStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export interface EvidenceRef {
@@ -17,6 +17,14 @@ export interface EvidenceRef {
   path?: string;
   uri?: string;
   mimeType?: string;
+}
+
+export interface ApprovalDecisionAction {
+  approvalId: string;
+  decision: 'allow' | 'deny';
+  teamId?: string;
+  teamRunId?: string;
+  agentTaskId?: string;
 }
 
 interface TranscriptBlockBase {
@@ -55,6 +63,7 @@ export interface ArtifactTranscriptBlock extends TranscriptBlockBase {
   title: string;
   artifactId?: string;
   artifactKind?: string;
+  threadId?: string;
   path?: string;
   uri?: string;
   mimeType?: string;
@@ -66,6 +75,7 @@ export interface ArtifactTranscriptBlock extends TranscriptBlockBase {
 export interface PreviewTranscriptBlock extends TranscriptBlockBase {
   kind: 'preview';
   previewId: string;
+  threadId?: string;
   status: EvidenceRefStatus;
   url?: string;
 }
@@ -99,6 +109,9 @@ export interface PermissionRequestTranscriptBlock extends TranscriptBlockBase {
   requestId: string;
   title: string;
   status: 'pending';
+  teamId?: string;
+  teamRunId?: string;
+  agentTaskId?: string;
   toolName?: string;
   risk?: 'low' | 'medium' | 'high' | 'critical';
   reason?: string;
@@ -110,6 +123,9 @@ export interface PermissionResultTranscriptBlock extends TranscriptBlockBase {
   title: string;
   status: EvidenceRefStatus;
   decision: string;
+  teamId?: string;
+  teamRunId?: string;
+  agentTaskId?: string;
   toolName?: string;
   reason?: string;
 }

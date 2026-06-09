@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ContactMember, ProjectDraft, ProjectInfo, WorkbenchContactsData } from '@shared/workbench';
+import type { ContactMember, ProjectDraft, ProjectInfo, RuntimeEvidenceSnapshot, WorkbenchContactsData } from '@shared/workbench';
 import type { WorkbenchDataMode } from '@shared/demo';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
@@ -16,6 +16,9 @@ import {
 import {
   normalizeHubMessagesToTranscript,
   normalizeHubRuntimeEventsToTranscript,
+  collectTranscriptEvidence,
+  resolveCurrentTranscriptRunId,
+  type ApprovalDecisionAction,
   type HubMessageTranscriptInput,
   type HubRuntimeEventTranscriptInput,
   type TranscriptBlock,
@@ -170,6 +173,16 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-project', variables.projectId] });
     },
   });
+  const decideApproval = useMutation({
+    mutationFn: (action: ApprovalDecisionAction) => decideWebApprovalWithHubClient(hubClient, action),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      if (activeAgentTaskId) {
+        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId] });
+        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId] });
+      }
+    },
+  });
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
   const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
     target.target_type === 'local_edge' &&
@@ -236,6 +249,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
         workspaceProjectToProjectInfo(await updateProject.mutateAsync({ projectId, draft }))
       ),
     } : undefined,
+    onApprovalDecision: hubReady
+      ? (action: ApprovalDecisionAction) => decideApproval.mutateAsync(action)
+      : undefined,
+    runtimeEvidence: resolveWebRuntimeEvidence(surfacedTranscript),
     workbenchStatus: {
       dataMode: workbenchDataModeLabel(dataMode),
       targetState: executionTargetStatus.state,
@@ -252,6 +269,84 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     },
     transcript: surfacedTranscript,
   };
+}
+
+type WebApprovalHubClient = Pick<ReturnType<typeof createHubClient>, 'decideTeamApproval'>;
+
+export async function decideWebApprovalWithHubClient(
+  client: WebApprovalHubClient,
+  action: ApprovalDecisionAction,
+): Promise<void> {
+  if (!action.teamId || !action.teamRunId) {
+    throw new Error('Hub TeamRun approval decision requires teamId and teamRunId');
+  }
+  await client.decideTeamApproval(action.teamId, action.teamRunId, action.approvalId, {
+    decision: action.decision,
+  });
+}
+
+export function resolveWebRuntimeEvidence(transcript: TranscriptBlock[]): RuntimeEvidenceSnapshot {
+  const runId = resolveCurrentTranscriptRunId(transcript);
+  const evidence = collectTranscriptEvidence(transcript);
+  const artifactBlocks = transcript.filter((block): block is Extract<TranscriptBlock, { kind: 'artifact' }> =>
+    block.kind === 'artifact'
+  );
+  const previewBlocks = transcript.filter((block): block is Extract<TranscriptBlock, { kind: 'preview' }> =>
+    block.kind === 'preview'
+  );
+  const artifacts = artifactBlocks.map((block) => ({
+    id: block.artifactId ?? artifactIdFromEvidence(block.evidenceRefs?.find((ref) => ref.kind === 'artifact')?.id) ?? block.id,
+    runId: artifactRunId(block, runId),
+    threadId: block.threadId ?? '',
+    kind: block.artifactKind ?? 'artifact',
+    path: block.path ?? block.title,
+    sizeBytes: 0,
+    createdAt: block.createdAt ?? '',
+  }));
+  const previews = previewBlocks.map((block) => ({
+    id: block.previewId,
+    runId: previewRunId(block, runId),
+    threadId: block.threadId ?? '',
+    ...(block.url ? { url: block.url } : {}),
+    status: previewStatus(block.status),
+    createdAt: block.createdAt ?? '',
+  }));
+  return {
+    ...(runId ? { runId } : {}),
+    diffs: [],
+    artifacts,
+    previews,
+    sources: {
+      diff: 'none',
+      artifacts: evidence.some((ref) => ref.kind === 'artifact') ? 'event' : 'none',
+      previews: evidence.some((ref) => ref.kind === 'preview') ? 'event' : 'none',
+    },
+  };
+}
+
+function artifactIdFromEvidence(id: string | undefined): string | undefined {
+  if (!id?.startsWith('artifact-')) return undefined;
+  return id.slice('artifact-'.length);
+}
+
+function artifactRunId(block: Extract<TranscriptBlock, { kind: 'artifact' }>, fallback: string | undefined): string {
+  return block.evidenceRefs
+    ?.find((ref) => ref.kind === 'run')
+    ?.id
+    .replace(/^run-/, '') ?? fallback ?? '';
+}
+
+function previewRunId(block: Extract<TranscriptBlock, { kind: 'preview' }>, fallback: string | undefined): string {
+  return block.evidenceRefs
+    ?.find((ref) => ref.kind === 'run')
+    ?.id
+    .replace(/^run-/, '') ?? fallback ?? '';
+}
+
+function previewStatus(status: string): 'starting' | 'ready' | 'stopped' {
+  if (status === 'running' || status === 'pending') return 'starting';
+  if (status === 'failed') return 'stopped';
+  return 'ready';
 }
 
 const webHubEmptyContacts: WorkbenchContactsData = {

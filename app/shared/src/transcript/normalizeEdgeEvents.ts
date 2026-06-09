@@ -511,12 +511,13 @@ function permissionRequestedBlock(event: EventEnvelope): TranscriptBlock | null 
   return {
     ...blockBase(event, EDGE_AUTHOR, [
       ...runEvidence(runId, 'pending'),
-      ...toolEvidence(requestId, toolName, 'pending'),
+      approvalEvidence(requestId, toolName, 'pending'),
     ]),
     kind: 'permission_request',
     requestId,
     title: `Permission requested: ${toolName}`,
     status: 'pending',
+    ...approvalHubContext(event),
     toolName,
     ...(risk ? { risk } : {}),
     ...(reason ? { reason } : {}),
@@ -539,13 +540,14 @@ function permissionDecidedBlock(event: EventEnvelope): TranscriptBlock | null {
   return {
     ...blockBase(event, EDGE_AUTHOR, [
       ...runEvidence(runId, status),
-      ...toolEvidence(requestId, toolName, status),
+      approvalEvidence(requestId, toolName, status),
     ]),
     kind: 'permission_result',
     requestId,
     title: `Permission ${decision}: ${toolName}`,
     status,
     decision,
+    ...approvalHubContext(event),
     toolName,
     ...(reason ? { reason } : {}),
   };
@@ -585,6 +587,7 @@ function artifactCreatedBlock(event: EventEnvelope): TranscriptBlock | null {
     title,
     artifactId,
     ...(artifactKind ? { artifactKind } : {}),
+    ...(event.scope.conversationId ? { threadId: event.scope.conversationId } : {}),
     ...(path ? { path } : {}),
     ...(uri ? { uri } : {}),
     ...(mimeType ? { mimeType } : {}),
@@ -611,6 +614,7 @@ function previewReadyBlock(event: EventEnvelope): TranscriptBlock | null {
     ]),
     kind: 'preview',
     previewId,
+    ...(event.scope.conversationId ? { threadId: event.scope.conversationId } : {}),
     status,
     ...(url ? { url } : {}),
   };
@@ -633,6 +637,7 @@ function previewStoppedBlock(event: EventEnvelope): TranscriptBlock | null {
     ]),
     kind: 'preview',
     previewId,
+    ...(event.scope.conversationId ? { threadId: event.scope.conversationId } : {}),
     status: 'completed',
   };
 }
@@ -691,6 +696,41 @@ function toolEvidence(
     label,
     status,
   }];
+}
+
+function approvalEvidence(
+  id: string,
+  label: string,
+  status: EvidenceRefStatus,
+): EvidenceRef {
+  return {
+    id: `approval-${id}`,
+    kind: 'approval',
+    label: `${label} approval`,
+    status,
+  };
+}
+
+function approvalHubContext(event: EventEnvelope): {
+  teamId?: string;
+  teamRunId?: string;
+  agentTaskId?: string;
+} {
+  const teamId = stringField(event.payload.team_id) ?? stringField(event.payload.teamId);
+  const teamRunId =
+    stringField(event.payload.team_run_id) ??
+    stringField(event.payload.teamRunId) ??
+    stringField(event.payload.run_id) ??
+    stringField(event.payload.runId);
+  const agentTaskId =
+    stringField(event.payload.agent_task_id) ??
+    stringField(event.payload.agentTaskId) ??
+    stringField(event.scope.taskId);
+  return {
+    ...(teamId ? { teamId } : {}),
+    ...(teamRunId ? { teamRunId } : {}),
+    ...(agentTaskId ? { agentTaskId } : {}),
+  };
 }
 
 function fileEvidence(path: string): EvidenceRef {
