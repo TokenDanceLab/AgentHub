@@ -1481,6 +1481,17 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     deleteDocument: (docId: string) =>
       request<void>(`/web/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' }),
+
+    // ── Settings (user preferences) ────────────────────
+
+    fetchSettings: () =>
+      request<Record<string, string>>('/client/settings'),
+
+    patchSettings: (values: Record<string, string>) =>
+      request<Record<string, string>>('/client/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ values }),
+      }),
   };
 }
 
