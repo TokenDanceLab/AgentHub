@@ -2,7 +2,7 @@
 // Thin wrappers around hubClient methods.
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createHubClient, type HubDocument } from '@/api/hubClient';
+import { createHubClient, type HubDocumentListItem } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import type { DocRow } from '@shared/workbench/pages';
 
@@ -39,7 +39,7 @@ export function useCreateDocument() {
 
 // ── Mapping ──────────────────────────────────────────────────────
 
-export function hubDocToDocRow(doc: HubDocument): DocRow {
+export function hubDocToDocRow(doc: HubDocumentListItem): DocRow {
   const tag = doc.tag?.trim();
   return {
     id: doc.id,

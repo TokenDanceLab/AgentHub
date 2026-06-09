@@ -386,7 +386,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     contacts: resolveHubContacts(contacts.data as HubContactLike[] | undefined, hubReady, dataMode),
     contactsActions: hubReady ? {
       onSearchUser: (query: string) => searchUser.mutateAsync(query),
-      onSendFriendRequest: (userId: string, message?: string) => sendFriendRequest.mutateAsync({ userId, message }),
+      onSendFriendRequest: (userId: string, message?: string) => sendFriendRequest.mutateAsync({ userId, ...(message != null ? { message } : {}) }),
       onAcceptRequest: (requestId: string) => acceptFriendRequest.mutateAsync(requestId),
       onRejectRequest: (requestId: string) => rejectFriendRequest.mutateAsync(requestId),
       onRemoveContact: (userId: string) => removeContact.mutateAsync(userId),
