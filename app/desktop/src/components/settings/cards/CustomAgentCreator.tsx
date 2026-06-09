@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import { RuntimeIcon } from '@shared/ui/RuntimeIcon';
+import { buildAgentHubAgentSpecV1, formatAgentHubAgentSpecV1 } from '@shared/agentSpec';
 import type { AgentTemplate } from '../agent-creation/agentCreationTypes';
 import { saveCustomAgent, loadCustomAgents, type StoredCustomAgent } from '../agent-creation/agentStore';
 import { emojiOptions, modelOptions, reasoningOptions, capabilityLabels } from '../agent-creation/agentTemplates';
@@ -424,6 +425,43 @@ export default function CustomAgentCreator({
     }, 800);
   }, [testInput, draft]);
 
+  const agentSpec = useMemo(() => buildAgentHubAgentSpecV1({
+    name: draft.name.trim() || 'Custom Agent Fixture',
+    description: draft.description,
+    emoji: draft.emoji,
+    runtimeId: draft.runtimeProfile.toLowerCase().includes('codex') ? 'codex' : 'custom-runtime',
+    runtimeProfile: draft.runtimeProfile,
+    provider: draft.provider,
+    model: draft.model,
+    reasoningEffort: draft.reasoningEffort,
+    temperature: draft.temperature,
+    maxOutputTokens: draft.maxTokens,
+    skills: draft.knowledgeBase.trim() ? ['knowledge-base-fixture'] : [],
+    mcpServers: draft.tools.includes('mcp')
+      ? [{ id: 'mcp-fixture', transport: 'stdio', command: 'agenthub-mcp-fixture' }]
+      : [],
+    toolAllowlist: draft.tools,
+    memoryPolicy: { mode: 'project', retention: 'ephemeral-fixture' },
+    approvalPolicy: {
+      mode: draft.approvalPolicy,
+      requireApprovalFor: draft.tools.filter((tool) => ['write_file', 'edit_file', 'execute_command'].includes(tool)),
+    },
+    targetPreference: {
+      mode: draft.executionTarget.toLowerCase().includes('local') ? 'local-edge' : 'hub-relay',
+      targetId: 'local-edge-fixture',
+      health: draft.targetHealth.replace(/\s+/g, '-'),
+    },
+  }), [draft]);
+
+  const agentSpecPreview = useMemo(() => formatAgentHubAgentSpecV1(agentSpec), [agentSpec]);
+
+  const handleExportAgentSpec = useCallback(() => {
+    try {
+      localStorage.setItem('agenthub-settings.lastAgentSpecV1Export', agentSpecPreview);
+    } catch { /* storage full */ }
+    void navigator.clipboard?.writeText(agentSpecPreview).catch(() => undefined);
+  }, [agentSpecPreview]);
+
   const testInputKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTestSend(); }
   }, [handleTestSend]);
@@ -754,6 +792,25 @@ export default function CustomAgentCreator({
                   <Send size={14} />
                   {t('settings.agentCreator.testSend')}
                 </button>
+              </div>
+
+              <div className={styles.profileCard}>
+                <div className={styles.profileHeader}>
+                  <div className={styles.profileIcon}>
+                    <RuntimeIcon kind="runtime" name="Codex" size="compact" title="AgentHubAgentSpec v1" />
+                  </div>
+                  <div>
+                    <strong>{t('settings.agentCreator.agentSpecPreview')}</strong>
+                    <span>Fixture export for SDK mapper, AgentProfile, and TeamRun task input.</span>
+                  </div>
+                  <button type="button" className={styles.secondaryBtn} onClick={handleExportAgentSpec}>
+                    <FileText size={14} />
+                    {t('settings.agentCreator.exportAgentSpec')}
+                  </button>
+                </div>
+                <pre style={{ maxHeight: 220, overflow: 'auto', fontSize: 11, lineHeight: 1.45, margin: 0 }}>
+                  {agentSpecPreview}
+                </pre>
               </div>
             </div>
           )}

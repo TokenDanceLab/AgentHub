@@ -140,6 +140,55 @@ func TestSDKFixtureMapperProviderOfflineEventMatrix(t *testing.T) {
 	}
 }
 
+func TestAgentHubAgentSpecV1BuildsSDKFixtureStream(t *testing.T) {
+	spec := AgentHubAgentSpecV1{
+		SchemaVersion: "agenthub.agent_spec.v1",
+		ID:            "fixture-builder",
+		Name:          "Fixture Builder",
+		Runtime: AgentSpecRuntimeV1{
+			ID:              "codex",
+			Profile:         "codex-local-profile",
+			Provider:        "tokendance-gateway",
+			Model:           "deepseek-v4-flash",
+			ReasoningEffort: "high",
+		},
+		ToolAllowlist: []string{"read_file", "write_file", "grep"},
+		MCPServers:    []AgentSpecMCPServerV1{{ID: "filesystem", Transport: "stdio", Command: "mcp-server-filesystem"}},
+		ApprovalPolicy: map[string]any{
+			"mode":                 "workspace-write",
+			"require_approval_for": []any{"write_file"},
+		},
+		TargetPreference: map[string]any{
+			"mode":      "local-edge",
+			"target_id": "local-edge-fixture",
+			"health":    "fixture-healthy",
+		},
+		Fixture: AgentSpecFixturePolicyV1{Mode: "fixture-only", NoSpend: true, LiveRuntimeAllowed: false},
+	}
+
+	stream, err := AgentSpecV1ToSDKFixtureStream(spec)
+	if err != nil {
+		t.Fatalf("AgentSpecV1ToSDKFixtureStream: %v", err)
+	}
+	if stream.Provider != SDKFixtureProviderOpenAI {
+		t.Fatalf("provider = %q, want %q", stream.Provider, SDKFixtureProviderOpenAI)
+	}
+
+	mapped := MapSDKFixtureStream(stream, testSDKFixtureScope())
+	if len(mapped) != 2 {
+		t.Fatalf("mapped events = %d, want 2", len(mapped))
+	}
+	if mapped[0].Type != BusEventStatusChange || mapped[1].Type != BusEventSessionInit {
+		t.Fatalf("mapped event types = %s, %s", mapped[0].Type, mapped[1].Type)
+	}
+	if mapped[0].Payload["runtimeId"] != "codex" || mapped[0].Payload["fixtureOnly"] != true || mapped[0].Payload["noSpendDefault"] != true {
+		t.Fatalf("capability payload = %#v", mapped[0].Payload)
+	}
+	if mapped[1].Payload["model"] != "deepseek-v4-flash" || strings.Join(mapped[1].Payload["tools"].([]string), ",") != "read_file,write_file,grep" {
+		t.Fatalf("session payload = %#v", mapped[1].Payload)
+	}
+}
+
 func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.T) {
 	providers := []struct {
 		name       string
