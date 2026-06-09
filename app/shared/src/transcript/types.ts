@@ -129,6 +129,8 @@ export interface RunSessionTranscriptBlock extends TranscriptBlockBase {
   title: string;
   status?: 'running' | 'completed' | 'failed';
   meta?: string;
+  agentLabel?: string;
+  runtimeLabel?: string;
   runId?: string;
   taskId?: string;
   edgeRunId?: string;

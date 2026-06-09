@@ -553,10 +553,12 @@ function renderRunSessionBlock(
       <div className={styles.agentRunShell}>
         <RunSessionCard
           adapterId={block.adapterId}
+          agentLabel={block.agentLabel}
           deviceId={block.deviceId}
           edgeRunId={block.edgeRunId}
           meta={block.meta}
           modeLabel={block.modeLabel}
+          runtimeLabel={block.runtimeLabel}
           runId={block.runId}
           sourceLabel={block.sourceLabel}
           status={block.status}
