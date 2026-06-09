@@ -44,6 +44,8 @@ vi.mock('react-i18next', () => ({
         'settings.wizard.next': 'Next',
         'settings.wizard.finish': 'Save local draft',
         'settings.agentCreator.publishToHub': 'Publish to Hub',
+        'settings.agentCreator.agentSpecPreview': 'AgentHubAgentSpec v1 preview',
+        'settings.agentCreator.exportAgentSpec': 'Export AgentSpec fixture',
       };
       return text[key] ?? key;
     },
@@ -111,5 +113,27 @@ describe('CustomAgentCreator', () => {
         ]),
       }),
     ]);
+  });
+
+  it('shows a fixture export preview for AgentHubAgentSpec v1 on the final step', () => {
+    render(
+      <CustomAgentCreator
+        agents={[]}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Fixture Builder' } });
+    for (let i = 0; i < 4; i += 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    }
+
+    expect(screen.getByText('AgentHubAgentSpec v1 preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export AgentSpec fixture' })).toBeInTheDocument();
+    expect(screen.getByText(/"schema_version": "agenthub\.agent_spec\.v1"/)).toBeInTheDocument();
+    expect(screen.getByText(/"tool_allowlist": \[/)).toBeInTheDocument();
+    expect(screen.getByText(/"target_preference": \{/)).toBeInTheDocument();
+    expect(screen.getByText(/"no_spend": true/)).toBeInTheDocument();
   });
 });
