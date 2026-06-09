@@ -10,6 +10,15 @@ AgentHub 是一个面向 AI Agent 团队协作的开源工作台。它把 Web、
 ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
 ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
 
+## 完整文档
+
+| 你想… | 看这里 |
+|---|---|
+| 了解产品功能和定位 | [产品设计文档](https://ncn24qi9j5mt.feishu.cn/docx/EJFad8sZNo6ajWxHEoHcW3wHn1b) |
+| 了解技术架构和设计决策 | [技术架构文档](https://ncn24qi9j5mt.feishu.cn/docx/YvPgdfyBio53s0x3aGzcT9oPnZe) |
+| 了解开发过程和 AI 协作 | [AI 协作记录](https://ncn24qi9j5mt.feishu.cn/docx/R0cNdLWClo7qUJxuctrcytLun4g) |
+| 浏览完整文档站 | [hub.vectorcontrol.tech/docs](https://hub.vectorcontrol.tech/docs) |
+
 ## 📖 文档
 
 | 你想… | 去哪 |
