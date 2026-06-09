@@ -21,11 +21,7 @@ export default function App() {
   const { online: edgeOnline } = useHealth();
 
   function continueDemo(): void {
-    if (edgeOnline) {
-      writeWorkbenchDataModeOverride('approved-real');
-    } else {
-      writeWorkbenchDataModeOverride('mock');
-    }
+    writeWorkbenchDataModeOverride('mock');
     setEntryMode('demo');
   }
 
