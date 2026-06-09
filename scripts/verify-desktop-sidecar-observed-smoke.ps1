@@ -51,7 +51,13 @@ $edgeManager = Get-Content $edgeManagerPath -Raw -Encoding UTF8
 Step "Observed Desktop sidecar fixture smoke source gate"
 Assert-Contains $edgeManager "EdgeObservedSidecarSmoke" "Observed smoke evidence struct exists"
 Assert-Contains $edgeManager "observe_fixture_sidecar_smoke" "Observed smoke fixture helper exists"
+Assert-Contains $edgeManager "EdgeObservedTargetBinding" "Observed smoke target binding evidence struct exists"
+Assert-Contains $edgeManager "observed_target_binding" "Observed smoke target binding resolver exists"
 Assert-Contains $edgeManager "mode:\s*`"fixture`"" "Observed smoke is explicitly fixture scoped"
+Assert-Contains $edgeManager "expected_target_id" "Observed smoke records expected Hub target"
+Assert-Contains $edgeManager "observed_target_id" "Observed smoke records observed Hub target"
+Assert-Contains $edgeManager "expected_edge_device_id" "Observed smoke records expected Desktop device"
+Assert-Contains $edgeManager "observed_edge_device_id" "Observed smoke records observed Desktop device"
 Assert-Contains $edgeManager "edge_store_db_path\(app_data_dir\.clone\(\)\)" "Observed smoke reads SQLite app-data path"
 Assert-Contains $edgeManager "edge_log_paths\(app_data_dir\.clone\(\)\)" "Observed smoke reads stdout/stderr log paths"
 Assert-Contains $edgeManager "edge_health_url\(port\)" "Observed smoke reads Local Edge health URL"
@@ -64,15 +70,15 @@ if (-not $SkipCargoTest) {
     Step "Focused Rust observed sidecar fixture smoke"
     Push-Location (Join-Path $RepoRoot "app\desktop\src-tauri")
     try {
-        cargo test observed_fixture_smoke --lib
+        cargo test observed_ --lib
         if ($LASTEXITCODE -ne 0) {
-            Fail "cargo test observed_fixture_smoke --lib failed"
+            Fail "cargo test observed_ --lib failed"
         }
     }
     finally {
         Pop-Location
     }
-    Pass "cargo test observed_fixture_smoke --lib passed"
+    Pass "cargo test observed_ --lib passed"
 }
 
 Write-Host "`nDesktop sidecar observed fixture smoke OK" -ForegroundColor Green

@@ -66,6 +66,7 @@ pub struct EdgePreflight {
 pub struct EdgeObservedSidecarSmoke {
     pub mode: &'static str,
     pub sidecar_name: &'static str,
+    pub target_binding: EdgeObservedTargetBinding,
     pub app_data_dir: PathBuf,
     pub store_db_path: PathBuf,
     pub log_paths: EdgeLogPaths,
@@ -78,6 +79,16 @@ pub struct EdgeObservedSidecarSmoke {
     pub stdout_tail: Vec<String>,
     pub stderr_tail: Vec<String>,
     pub direct_cli_spawn: bool,
+}
+
+#[cfg(any(test, debug_assertions))]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgeObservedTargetBinding {
+    pub expected_target_id: String,
+    pub observed_target_id: Option<String>,
+    pub expected_edge_device_id: String,
+    pub observed_edge_device_id: Option<String>,
+    pub status: &'static str,
 }
 
 /// Wrapper for the two child-process types: Tauri sidecar (release) or
@@ -499,6 +510,10 @@ fn edge_health_url(port: u16) -> String {
 async fn observe_fixture_sidecar_smoke(
     app_data_dir: PathBuf,
     port: u16,
+    expected_target_id: &str,
+    expected_edge_device_id: &str,
+    observed_target_id: Option<&str>,
+    observed_edge_device_id: Option<&str>,
 ) -> Result<EdgeObservedSidecarSmoke, String> {
     let store_db_path = edge_store_db_path(app_data_dir.clone());
     let store_db = store_db_path.to_string_lossy().to_string();
@@ -527,6 +542,13 @@ async fn observe_fixture_sidecar_smoke(
     Ok(EdgeObservedSidecarSmoke {
         mode: "fixture",
         sidecar_name: EDGE_SIDECAR_NAME,
+        target_binding: observed_target_binding(
+            expected_target_id,
+            expected_edge_device_id,
+            observed_target_id,
+            observed_edge_device_id,
+            true,
+        ),
         app_data_dir,
         store_db_path,
         log_paths: log_paths.clone(),
@@ -547,6 +569,33 @@ async fn observe_fixture_sidecar_smoke(
         stderr_tail: read_edge_log_tail(&log_paths.stderr, 20),
         direct_cli_spawn: false,
     })
+}
+
+#[cfg(any(test, debug_assertions))]
+fn observed_target_binding(
+    expected_target_id: &str,
+    expected_edge_device_id: &str,
+    observed_target_id: Option<&str>,
+    observed_edge_device_id: Option<&str>,
+    edge_online: bool,
+) -> EdgeObservedTargetBinding {
+    let status = if !edge_online {
+        "offline"
+    } else if observed_target_id == Some(expected_target_id)
+        && observed_edge_device_id == Some(expected_edge_device_id)
+    {
+        "matched"
+    } else {
+        "mismatch"
+    };
+
+    EdgeObservedTargetBinding {
+        expected_target_id: expected_target_id.to_string(),
+        observed_target_id: observed_target_id.map(str::to_string),
+        expected_edge_device_id: expected_edge_device_id.to_string(),
+        observed_edge_device_id: observed_edge_device_id.map(str::to_string),
+        status,
+    }
 }
 
 fn edge_store_db_path(app_data_dir: PathBuf) -> PathBuf {
@@ -804,12 +853,33 @@ mod tests {
         let evidence = tauri::async_runtime::block_on(observe_fixture_sidecar_smoke(
             app_data_dir.clone(),
             port,
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-local-1"),
+            Some("desktop-device-1"),
         ))
         .expect("observed fixture smoke evidence");
         server.join().expect("fixture server joined");
 
         assert_eq!(evidence.sidecar_name, "agenthub-edge");
         assert_eq!(evidence.mode, "fixture");
+        assert_eq!(evidence.target_binding.status, "matched");
+        assert_eq!(
+            evidence.target_binding.expected_target_id,
+            "hub-target-local-1"
+        );
+        assert_eq!(
+            evidence.target_binding.observed_target_id.as_deref(),
+            Some("hub-target-local-1")
+        );
+        assert_eq!(
+            evidence.target_binding.expected_edge_device_id,
+            "desktop-device-1"
+        );
+        assert_eq!(
+            evidence.target_binding.observed_edge_device_id.as_deref(),
+            Some("desktop-device-1")
+        );
         assert_eq!(
             evidence.health_url,
             format!("http://127.0.0.1:{port}/v1/health")
@@ -835,6 +905,36 @@ mod tests {
         }));
 
         let _ = std::fs::remove_dir_all(evidence.app_data_dir);
+    }
+
+    #[test]
+    fn observed_target_binding_distinguishes_match_mismatch_and_offline() {
+        let matched = observed_target_binding(
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-local-1"),
+            Some("desktop-device-1"),
+            true,
+        );
+        assert_eq!(matched.status, "matched");
+
+        let mismatch = observed_target_binding(
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-other"),
+            Some("desktop-device-1"),
+            true,
+        );
+        assert_eq!(mismatch.status, "mismatch");
+
+        let offline = observed_target_binding(
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-local-1"),
+            Some("desktop-device-1"),
+            false,
+        );
+        assert_eq!(offline.status, "offline");
     }
 }
 

@@ -84,6 +84,7 @@ export interface DesktopEdgeDispatchReadiness {
   dispatchReady: boolean;
   disabledReason: DesktopEdgeDispatchDisabledReason | null;
   dispatchTarget: { targetId: string; deviceId: string } | null;
+  targetBinding: DesktopEdgeTargetBindingEvidence;
   route: 'local-edge-api';
   targetType: 'local_edge';
   targetId: string | null;
@@ -104,6 +105,14 @@ export interface DesktopEdgeDispatchReadiness {
   directCliSpawn: false;
 }
 
+export interface DesktopEdgeTargetBindingEvidence {
+  expectedTargetId: string | null;
+  observedTargetId: string | null;
+  expectedEdgeDeviceId: string | null;
+  observedEdgeDeviceId: string | null;
+  status: 'matched' | 'mismatch' | 'offline' | 'missing';
+}
+
 export function mapEdgeAgentsToWorkbenchAgents(
   agents: AgentInfo[],
   modelCatalog?: ModelCatalogResponse,
@@ -116,8 +125,10 @@ export function mapEdgeAgentsToWorkbenchAgents(
       ...(agent.description ? { description: agent.description } : {}),
       status: agent.status,
       runtimeId: agent.runtimeId ?? agent.id,
-      ...(agent.provider ?? model?.provider ? { provider: agent.provider ?? model?.provider } : {}),
-      ...(agent.model ?? model?.value ? { model: agent.model ?? model?.value } : {}),
+      ...((agent.provider ?? model?.provider)
+        ? { provider: agent.provider ?? model?.provider }
+        : {}),
+      ...((agent.model ?? model?.value) ? { model: agent.model ?? model?.value } : {}),
       ...(agent.approvalPolicy ? { approvalPolicy: agent.approvalPolicy } : {}),
       ...(agent.permissionMode ? { permissionMode: agent.permissionMode } : {}),
       ...(agent.reasoningEffort ? { reasoningEffort: agent.reasoningEffort } : {}),
@@ -127,7 +138,9 @@ export function mapEdgeAgentsToWorkbenchAgents(
   });
 }
 
-export function mapLocalEdgeExecutionTarget(snapshot: EdgeRuntimeInventorySnapshot): DesktopExecutionTarget {
+export function mapLocalEdgeExecutionTarget(
+  snapshot: EdgeRuntimeInventorySnapshot,
+): DesktopExecutionTarget {
   const onlineRunnerCount = snapshot.runners.filter((runner) => runner.status === 'online').length;
   return {
     id: 'local-edge',
@@ -139,10 +152,12 @@ export function mapLocalEdgeExecutionTarget(snapshot: EdgeRuntimeInventorySnapsh
     onlineRunnerCount,
     agentCount: snapshot.agents.length,
     modelCount: snapshot.modelCatalog?.items.length ?? 0,
-    capabilityIds: Array.from(new Set([
-      ...snapshot.runners.flatMap((runner) => runner.capabilities ?? []),
-      ...snapshot.agents.flatMap((agent) => capabilityLabels(agent.capabilities)),
-    ])).sort(),
+    capabilityIds: Array.from(
+      new Set([
+        ...snapshot.runners.flatMap((runner) => runner.capabilities ?? []),
+        ...snapshot.agents.flatMap((agent) => capabilityLabels(agent.capabilities)),
+      ]),
+    ).sort(),
   };
 }
 
@@ -158,7 +173,8 @@ export function resolveDesktopEdgeDispatchReadiness(
   if (input.hubTargetsError) return buildDispatchReadiness(input, 'hub-targets-error');
   if (!deviceId) return buildDispatchReadiness(input, 'missing-device');
   if (!input.edgeOnline) return buildDispatchReadiness(input, 'local-edge-offline');
-  if (input.hubTargetsPaginationLimited) return buildDispatchReadiness(input, 'hub-target-pagination-limited');
+  if (input.hubTargetsPaginationLimited)
+    return buildDispatchReadiness(input, 'hub-target-pagination-limited');
   if (!target) return buildDispatchReadiness(input, 'missing-local-edge-target');
   if (target.target_type !== 'local_edge' || target.device_id !== deviceId) {
     return buildDispatchReadiness(input, 'local-edge-target-mismatch');
@@ -166,11 +182,16 @@ export function resolveDesktopEdgeDispatchReadiness(
   if (target.is_online !== true || target.health_state === 'offline') {
     return buildDispatchReadiness(input, 'local-edge-target-offline');
   }
-  if (target.health_state === 'degraded') return buildDispatchReadiness(input, 'local-edge-target-degraded');
-  if (target.health_state !== 'healthy') return buildDispatchReadiness(input, 'local-edge-target-unknown');
-  if (input.localEdgeTarget.status === 'degraded') return buildDispatchReadiness(input, 'local-edge-health-degraded');
-  if (input.localEdgeTarget.status !== 'healthy') return buildDispatchReadiness(input, 'local-edge-health-unknown');
-  if (input.hostReadiness?.preflight?.status === 'blocked') return buildDispatchReadiness(input, 'host-preflight-blocked');
+  if (target.health_state === 'degraded')
+    return buildDispatchReadiness(input, 'local-edge-target-degraded');
+  if (target.health_state !== 'healthy')
+    return buildDispatchReadiness(input, 'local-edge-target-unknown');
+  if (input.localEdgeTarget.status === 'degraded')
+    return buildDispatchReadiness(input, 'local-edge-health-degraded');
+  if (input.localEdgeTarget.status !== 'healthy')
+    return buildDispatchReadiness(input, 'local-edge-health-unknown');
+  if (input.hostReadiness?.preflight?.status === 'blocked')
+    return buildDispatchReadiness(input, 'host-preflight-blocked');
 
   return {
     ...base,
@@ -182,7 +203,9 @@ export function resolveDesktopEdgeDispatchReadiness(
   };
 }
 
-export function formatDesktopEdgeDispatchDiagnostics(readiness: DesktopEdgeDispatchReadiness | null | undefined): string | null {
+export function formatDesktopEdgeDispatchDiagnostics(
+  readiness: DesktopEdgeDispatchReadiness | null | undefined,
+): string | null {
   if (!readiness) return null;
   return [
     'Local Edge dispatch',
@@ -193,6 +216,7 @@ export function formatDesktopEdgeDispatchDiagnostics(readiness: DesktopEdgeDispa
     `  target id: ${readiness.targetId ?? 'n/a'}`,
     readiness.targetName ? `  target name: ${readiness.targetName}` : null,
     `  device id: ${readiness.deviceId ?? 'n/a'}`,
+    `  target binding: ${readiness.targetBinding.status}`,
     `  local edge status: ${readiness.localEdgeStatus}`,
     `  hub target health: ${readiness.hubTargetHealthState ?? 'n/a'}`,
     `  hub target online: ${readiness.hubTargetOnline ?? 'n/a'}`,
@@ -204,18 +228,28 @@ export function formatDesktopEdgeDispatchDiagnostics(readiness: DesktopEdgeDispa
     `  stdout: ${readiness.logPaths.stdout ?? 'n/a'}`,
     `  stderr: ${readiness.logPaths.stderr ?? 'n/a'}`,
     `  direct cli spawn: ${readiness.directCliSpawn}`,
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
-function selectModelForAgent(agent: AgentInfo, modelCatalog?: ModelCatalogResponse): ModelCatalogResponse['items'][number] | undefined {
+function selectModelForAgent(
+  agent: AgentInfo,
+  modelCatalog?: ModelCatalogResponse,
+): ModelCatalogResponse['items'][number] | undefined {
   if (!modelCatalog?.items.length) return undefined;
   const runtimeId = agent.runtimeId ?? agent.id;
-  const runtimeMatches = modelCatalog.items.filter((item) => (
-    item.runtimeId === runtimeId ||
-    item.sourceId === runtimeId ||
-    (agent.provider && item.provider === agent.provider)
-  ));
-  return runtimeMatches.find((item) => item.default) ?? runtimeMatches[0] ?? modelCatalog.items.find((item) => item.default);
+  const runtimeMatches = modelCatalog.items.filter(
+    (item) =>
+      item.runtimeId === runtimeId ||
+      item.sourceId === runtimeId ||
+      (agent.provider && item.provider === agent.provider),
+  );
+  return (
+    runtimeMatches.find((item) => item.default) ??
+    runtimeMatches[0] ??
+    modelCatalog.items.find((item) => item.default)
+  );
 }
 
 function capabilityLabels(capabilities: AgentInfo['capabilities']): string[] {
@@ -248,15 +282,17 @@ function buildDispatchReadiness(
   disabledReason: DesktopEdgeDispatchDisabledReason | null,
 ): DesktopEdgeDispatchReadiness {
   const target = input.registeredLocalEdgeTarget ?? null;
+  const deviceId = input.deviceId?.trim() || null;
   return {
     dispatchReady: false,
     disabledReason,
     dispatchTarget: null,
+    targetBinding: resolveTargetBinding(input, disabledReason),
     route: 'local-edge-api',
     targetType: 'local_edge',
     targetId: target?.id ?? null,
     targetName: target?.name ?? null,
-    deviceId: input.deviceId?.trim() || null,
+    deviceId,
     localEdgeStatus: input.localEdgeTarget.status,
     hubTargetHealthState: target?.health_state ?? null,
     hubTargetOnline: typeof target?.is_online === 'boolean' ? target.is_online : null,
@@ -270,5 +306,50 @@ function buildDispatchReadiness(
       stderr: input.hostReadiness?.log_paths?.stderr ?? null,
     },
     directCliSpawn: false,
+  };
+}
+
+function resolveTargetBinding(
+  input: DesktopEdgeDispatchReadinessInput,
+  disabledReason: DesktopEdgeDispatchDisabledReason | null,
+): DesktopEdgeTargetBindingEvidence {
+  const target = input.registeredLocalEdgeTarget ?? null;
+  const deviceId = input.deviceId?.trim() || null;
+  const expectedTargetId = target?.id ?? null;
+  const observedTargetId = target?.id ?? null;
+  const expectedEdgeDeviceId = deviceId;
+  const observedEdgeDeviceId = target?.device_id ?? null;
+
+  const identityMatches = Boolean(
+    expectedTargetId &&
+    expectedEdgeDeviceId &&
+    observedTargetId === expectedTargetId &&
+    observedEdgeDeviceId === expectedEdgeDeviceId,
+  );
+  const status: DesktopEdgeTargetBindingEvidence['status'] = (() => {
+    if (!expectedTargetId || !expectedEdgeDeviceId || !observedTargetId || !observedEdgeDeviceId) {
+      return 'missing';
+    }
+    if (!identityMatches) return 'mismatch';
+    if (
+      disabledReason === 'local-edge-offline' ||
+      disabledReason === 'local-edge-target-offline' ||
+      disabledReason === 'local-edge-target-degraded' ||
+      disabledReason === 'local-edge-target-unknown' ||
+      disabledReason === 'local-edge-health-degraded' ||
+      disabledReason === 'local-edge-health-unknown' ||
+      disabledReason === 'host-preflight-blocked'
+    ) {
+      return 'offline';
+    }
+    return 'matched';
+  })();
+
+  return {
+    expectedTargetId,
+    observedTargetId,
+    expectedEdgeDeviceId,
+    observedEdgeDeviceId,
+    status,
   };
 }
