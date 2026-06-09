@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -317,6 +318,44 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 	}
 	if strings.TrimSpace(params.Prompt) == "" {
 		return nil, errors.New("prompt is required")
+	}
+
+	// Validate workDir against workspace allowlist (AH-SR-006).
+	// This mirrors the REST API validation in Handler.validateWorkDirAllowed.
+	if params.WorkDir != "" {
+		if len(s.workspaceAllowlist) == 0 {
+			return nil, errors.New("workspace allowlist is not configured; cannot accept workDir")
+		}
+		allowed := false
+		candidate, err := filepath.Abs(params.WorkDir)
+		if err != nil {
+			return nil, fmt.Errorf("invalid workDir: %w", err)
+		}
+		for _, root := range s.workspaceAllowlist {
+			root = strings.TrimSpace(root)
+			if root == "" {
+				continue
+			}
+			absRoot, err := filepath.Abs(root)
+			if err != nil {
+				continue
+			}
+			rel, err := filepath.Rel(absRoot, candidate)
+			if err != nil {
+				continue
+			}
+			if !strings.HasPrefix(rel, "..") && rel != "." {
+				allowed = true
+				break
+			}
+			if strings.EqualFold(filepath.Clean(candidate), filepath.Clean(absRoot)) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return nil, errors.New("workDir is outside the Edge workspace allowlist")
+		}
 	}
 
 	// Verify project and thread exist
