@@ -81,40 +81,52 @@ const hostReadiness = {
 describe('edgeCapabilityMapper', () => {
   it('maps Edge agents and model catalog into shared workbench agents without Hub or Tauri details', () => {
     const agents = mapEdgeAgentsToWorkbenchAgents(
-      [{
-        id: 'codex-local',
-        name: 'Codex Local',
-        description: 'Local Codex adapter',
-        runtimeId: 'codex',
-        status: 'available',
-        capabilities,
-      }],
-      {
-        items: [{
-          id: 'codex-gpt-5.1',
-          value: 'gpt-5.1-codex',
-          label: 'GPT-5.1 Codex',
-          provider: 'tokendance-gateway',
+      [
+        {
+          id: 'codex-local',
+          name: 'Codex Local',
+          description: 'Local Codex adapter',
           runtimeId: 'codex',
-          sourceId: 'codex',
-          sourceLabel: 'Codex',
           status: 'available',
-          default: true,
-        }],
+          capabilities,
+        },
+      ],
+      {
+        items: [
+          {
+            id: 'codex-gpt-5.1',
+            value: 'gpt-5.1-codex',
+            label: 'GPT-5.1 Codex',
+            provider: 'tokendance-gateway',
+            runtimeId: 'codex',
+            sourceId: 'codex',
+            sourceLabel: 'Codex',
+            status: 'available',
+            default: true,
+          },
+        ],
         sources: [],
       },
     );
 
-    expect(agents).toEqual([expect.objectContaining({
-      id: 'codex-local',
-      name: 'Codex Local',
-      description: 'Local Codex adapter',
-      status: 'available',
-      runtimeId: 'codex',
-      model: 'gpt-5.1-codex',
-      provider: 'tokendance-gateway',
-      skills: expect.arrayContaining(['streaming', 'tool-calls', 'file-changes', 'mcp', 'permission-hooks']),
-    })]);
+    expect(agents).toEqual([
+      expect.objectContaining({
+        id: 'codex-local',
+        name: 'Codex Local',
+        description: 'Local Codex adapter',
+        status: 'available',
+        runtimeId: 'codex',
+        model: 'gpt-5.1-codex',
+        provider: 'tokendance-gateway',
+        skills: expect.arrayContaining([
+          'streaming',
+          'tool-calls',
+          'file-changes',
+          'mcp',
+          'permission-hooks',
+        ]),
+      }),
+    ]);
     expect(JSON.stringify(agents)).not.toMatch(/https?:|tauri|access_token|bearer/i);
   });
 
@@ -126,36 +138,42 @@ describe('edgeCapabilityMapper', () => {
         { id: 'runner-1', status: 'online' },
         { id: 'runner-2', status: 'offline' },
       ],
-      agents: [{
-        id: 'codex-local',
-        name: 'Codex Local',
-        status: 'available',
-        capabilities,
-      }],
-      modelCatalog: {
-        items: [{
-          id: 'codex-gpt-5.1',
-          value: 'gpt-5.1-codex',
-          label: 'GPT-5.1 Codex',
-          sourceId: 'codex',
-          sourceLabel: 'Codex',
+      agents: [
+        {
+          id: 'codex-local',
+          name: 'Codex Local',
           status: 'available',
-        }],
+          capabilities,
+        },
+      ],
+      modelCatalog: {
+        items: [
+          {
+            id: 'codex-gpt-5.1',
+            value: 'gpt-5.1-codex',
+            label: 'GPT-5.1 Codex',
+            sourceId: 'codex',
+            sourceLabel: 'Codex',
+            status: 'available',
+          },
+        ],
         sources: [],
       },
     };
 
-    expect(mapLocalEdgeExecutionTarget(snapshot)).toEqual(expect.objectContaining({
-      id: 'local-edge',
-      type: 'local_edge',
-      name: 'Local Edge',
-      status: 'healthy',
-      route: 'local-edge-api',
-      runnerCount: 2,
-      onlineRunnerCount: 1,
-      agentCount: 1,
-      modelCount: 1,
-    }));
+    expect(mapLocalEdgeExecutionTarget(snapshot)).toEqual(
+      expect.objectContaining({
+        id: 'local-edge',
+        type: 'local_edge',
+        name: 'Local Edge',
+        status: 'healthy',
+        route: 'local-edge-api',
+        runnerCount: 2,
+        onlineRunnerCount: 1,
+        agentCount: 1,
+        modelCount: 1,
+      }),
+    );
   });
 
   it('marks dispatch ready only when Desktop device, Hub local_edge target, Local Edge health, and host preflight match', () => {
@@ -168,20 +186,31 @@ describe('edgeCapabilityMapper', () => {
       hostReadiness,
     });
 
-    expect(readiness).toEqual(expect.objectContaining({
-      dispatchReady: true,
-      disabledReason: null,
-      dispatchTarget: {
+    expect(readiness).toEqual(
+      expect.objectContaining({
+        dispatchReady: true,
+        disabledReason: null,
+        dispatchTarget: {
+          targetId: 'hub-target-local-1',
+          deviceId: 'desktop-device-1',
+        },
         targetId: 'hub-target-local-1',
         deviceId: 'desktop-device-1',
-      },
-      targetId: 'hub-target-local-1',
-      deviceId: 'desktop-device-1',
-      healthUrl: 'http://127.0.0.1:3210/v1/health',
-      preflightStatus: 'ready',
-      storeDbPolicy: '<app-data>/agenthub-edge.sqlite',
-    }));
-    expect(JSON.stringify(readiness)).not.toMatch(/sidecar_args|command|cliPath|AGENTHUB_EDGE_AUTH_TOKEN|bearer|access_token/i);
+        healthUrl: 'http://127.0.0.1:3210/v1/health',
+        preflightStatus: 'ready',
+        storeDbPolicy: '<app-data>/agenthub-edge.sqlite',
+        targetBinding: {
+          expectedTargetId: 'hub-target-local-1',
+          observedTargetId: 'hub-target-local-1',
+          expectedEdgeDeviceId: 'desktop-device-1',
+          observedEdgeDeviceId: 'desktop-device-1',
+          status: 'matched',
+        },
+      }),
+    );
+    expect(JSON.stringify(readiness)).not.toMatch(
+      /sidecar_args|command|cliPath|AGENTHUB_EDGE_AUTH_TOKEN|bearer|access_token/i,
+    );
   });
 
   it.each([
@@ -189,10 +218,41 @@ describe('edgeCapabilityMapper', () => {
     ['missing-device', { deviceId: null }],
     ['local-edge-offline', { edgeOnline: false }],
     ['missing-local-edge-target', { registeredLocalEdgeTarget: null }],
-    ['local-edge-target-mismatch', { registeredLocalEdgeTarget: { ...registeredLocalEdgeTarget, device_id: 'other-device' } }],
-    ['local-edge-target-degraded', { registeredLocalEdgeTarget: { ...registeredLocalEdgeTarget, health_state: 'degraded' as const } }],
-    ['local-edge-target-unknown', { registeredLocalEdgeTarget: { ...registeredLocalEdgeTarget, health_state: 'unknown' as const } }],
-    ['host-preflight-blocked', { hostReadiness: { ...hostReadiness, preflight: { ...hostReadiness.preflight, status: 'blocked' as const, blocker: 'sidecar missing' } } }],
+    [
+      'local-edge-target-mismatch',
+      { registeredLocalEdgeTarget: { ...registeredLocalEdgeTarget, device_id: 'other-device' } },
+    ],
+    [
+      'local-edge-target-degraded',
+      {
+        registeredLocalEdgeTarget: {
+          ...registeredLocalEdgeTarget,
+          health_state: 'degraded' as const,
+        },
+      },
+    ],
+    [
+      'local-edge-target-unknown',
+      {
+        registeredLocalEdgeTarget: {
+          ...registeredLocalEdgeTarget,
+          health_state: 'unknown' as const,
+        },
+      },
+    ],
+    [
+      'host-preflight-blocked',
+      {
+        hostReadiness: {
+          ...hostReadiness,
+          preflight: {
+            ...hostReadiness.preflight,
+            status: 'blocked' as const,
+            blocker: 'sidecar missing',
+          },
+        },
+      },
+    ],
   ])('disables dispatch with reason %s', (reason, overrides) => {
     const readiness = resolveDesktopEdgeDispatchReadiness({
       hubSessionActive: true,
@@ -207,6 +267,22 @@ describe('edgeCapabilityMapper', () => {
     expect(readiness.dispatchReady).toBe(false);
     expect(readiness.dispatchTarget).toBeNull();
     expect(readiness.disabledReason).toBe(reason);
+    expect(readiness.targetBinding.status).toBe(
+      reason === 'local-edge-offline' ||
+        reason === 'local-edge-target-offline' ||
+        reason === 'local-edge-target-degraded' ||
+        reason === 'local-edge-target-unknown' ||
+        reason === 'host-preflight-blocked'
+        ? 'offline'
+        : reason === 'missing-device' ||
+            reason === 'hub-targets-loading' ||
+            reason === 'hub-targets-error' ||
+            reason === 'missing-local-edge-target'
+          ? 'missing'
+          : reason === 'signed-out'
+            ? 'matched'
+            : 'mismatch',
+    );
   });
 
   it('formats redacted dispatch diagnostics with disabled reason and target metadata', () => {
@@ -225,10 +301,13 @@ describe('edgeCapabilityMapper', () => {
     expect(text).toContain('dispatch disabled reason: local-edge-target-offline');
     expect(text).toContain('target id: hub-target-local-1');
     expect(text).toContain('device id: desktop-device-1');
+    expect(text).toContain('target binding: offline');
     expect(text).toContain('health: http://127.0.0.1:3210/v1/health');
     expect(text).toContain('preflight: ready');
     expect(text).toContain('store: <app-data>/agenthub-edge.sqlite');
     expect(text).toContain('logs: <app-data>/edge-logs');
-    expect(text).not.toMatch(/sidecar_args|command|cliPath|AGENTHUB_EDGE_AUTH_TOKEN|bearer|access_token/i);
+    expect(text).not.toMatch(
+      /sidecar_args|command|cliPath|AGENTHUB_EDGE_AUTH_TOKEN|bearer|access_token/i,
+    );
   });
 });
