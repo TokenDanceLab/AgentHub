@@ -1,7 +1,7 @@
 # AgentHub Mobile v4 Plan
 
 > Status: low-priority planning source. This document does not implement UI, change ports, start services, or define a release gate.
-> Owner scope: `app/mobile/README.md`, `app/mobile/docs/**`, optional `docs/mobile/**`, and one short `docs/roadmap.md` status line.
+> Owner scope for the current Worker J planning pass: `app/mobile-rn/README.md`, `app/mobile/docs/mobile-expo-rn-migration-plan.md`, and `app/mobile/docs/mobile-v4-plan.md`.
 
 ## Positioning
 
@@ -9,20 +9,25 @@ Mobile v4 is a secondary AgentHub client surface. It should make remote collabor
 
 The product direction is:
 
-- Primary reference: Feishu/Lark IM mobile, especially conversation density, identity badges, bottom navigation, search/new entry placement, unread handling, and recovery in context.
-- Secondary reference: Codex mobile chat, especially long task-thread reading, inline command/run status, bottom composer, model/permission/context chips, and stop/send action placement.
+- Visual and component source: AgentHub Desktop/Web v4 shared workbench, `agenthub-design/desktop` semantics, and the TokenDance/AgentHub design-system docs. Mobile inherits the same TokenDance/AgentHub token intent, neutral glass, compact operational density, status colors, transcript/run/approval concepts, and component vocabulary.
+- Primary interaction reference: Feishu/Lark IM mobile only for conversation density, identity badges, bottom navigation, search/new entry placement, unread handling, and recovery in context.
+- Secondary interaction reference: Codex mobile chat, especially long task-thread reading, inline command/run status, bottom composer, model/permission/context chips, and stop/send action placement.
 - Execution model: Hub-mediated remote control. Mobile talks to Hub and remote targets; it does not start Local Edge, own Desktop runtime orchestration, or expose local filesystem capability.
-- Design model: one AgentHub design system across Desktop, Web, and Mobile. Mobile adapts layout, safe areas, gestures, confirmations, and native bridge behavior, but does not create a separate visual language.
+- Design model: one AgentHub design system across Desktop, Web, and Mobile. Feishu informs mobile information architecture; AgentHub Desktop/shared design owns visual hierarchy and component semantics. Mobile adapts layout, safe areas, gestures, confirmations, and native bridge behavior, but does not create a separate visual language.
+- Theme and locale model: light-first visual default, optional system/dark/OLED theme modes, and system locale. Dark/OLED tokens and zh/en i18n remain required, but the first visual polish target is the white/light experience.
 
 ## Current Boundaries
 
 | Area | Boundary |
 |---|---|
 | Priority | P1/P2 planning branch; do not mix into Desktop/Web v4 gates. |
-| Implementation | No UI implementation in this consolidation pass. |
-| Dev port | Mobile is allocated `5175` as the strict preview/dev boundary; the existing app config may still need a later code slice to migrate from older local values. |
+| Implementation | `app/mobile-rn` now contains the Expo/RN scaffold, stateful mobile surfaces, mock Hub preview, and 5177 visual QA harness. This is browser visual/design evidence only, not native replacement evidence. |
+| Technology direction | Expo + React Native is the recommended long-term Mobile mainline; the existing Tauri package is a frozen legacy prototype. See [mobile-expo-rn-migration-plan.md](mobile-expo-rn-migration-plan.md). |
+| Dev port | Legacy Mobile keeps the `5175` resource boundary. The new `app/mobile-rn` Expo Web visual preview is fixed at `5177` for browser inspection and screenshot QA. |
 | Remote control | Mobile controls or observes Hub/Edge-mediated remote runs only through Hub contracts, approvals, stop/retry actions, and read-only evidence surfaces. |
 | Identity | TokenDance ID remains the identity source. Feishu/Lark is an IM/collaboration reference and integration entry, not a second login system. |
+| Design authority | AgentHub v4 shared workbench, `docs/architecture.md`, root TokenDance design docs, `app/shared/src/designTokens.ts`, Desktop theme tokens, and `agenthub-design/desktop`. Feishu is reference material for mobile IM ergonomics only, not a token or component authority. |
+| Locale/i18n | Mobile defaults to system locale, keeps zh/en strings in the RN i18n layer, and preserves AgentHub identity, runtime, session, API-key, and approval terminology. |
 | Secrets | Do not document production hosts, secret paths, TokenDance API keys, provider tokens, private logs, or local operator paths. |
 
 ## Core Experience
@@ -34,7 +39,7 @@ Phone should start from an actionable IM queue, not a scaled desktop shell:
 1. Conversation list with Agent, human, group, bot, external, muted, unread, and recent-run state.
 2. Thread view with messages, run steps, tool output, file changes, approvals, remote-control status, and results in one transcript.
 3. Bottom composer with add/context entry, text input, send/stop, and horizontally scrollable model, permission, target, and runtime chips.
-4. Run/review queue for pending approvals, active runs, failures, stopped runs, and next-review shortcuts.
+4. Tasks activity surface for pending approvals, active runs, failures, stopped runs, and next-review shortcuts.
 5. Account/device surface for TokenDance ID session, Hub session, native bridge readiness, notification permission, language, and current device capability.
 
 Remote-control affordances stay contextual: a thread-bound remote strip, approval bottom sheets, read-only logs/diff/file previews, stop/retry actions, and inline recovery when Hub session, WebSocket, or target reachability fails.
@@ -55,21 +60,63 @@ Tablet inspector semantics should match Desktop/Web: evidence, diff, file previe
 
 Mobile v4 reuses shared semantics before inventing local UI:
 
-- Token layer: map Mobile CSS through `--td-*` design tokens; add aliases before hardcoding colors, radii, shadows, or focus states.
-- Shared contracts: reuse transcript, evidence, run state, approval state, surface metadata, status labels, and i18n semantics.
-- Stable shared components: prefer shared empty states, status notices, badges, bottom sheets, segmented controls, activity cards, code/file previews, and TokenDance mark where they fit Mobile ergonomics.
-- Local-only components: keep native safe-area handling, keyboard avoidance, bottom navigation, pull/retry gestures, platform bridge readiness, and mobile confirmation flow inside `app/mobile`.
+- Token layer: map RN tokens from AgentHub Desktop/shared `--td-*` intent first. Add `app/mobile-rn/src/theme/tokens.ts` before feature screens and prohibit component-level hardcoded palettes.
+- Shared contracts: reuse transcript, evidence, run state, approval state, surface metadata, status labels, and i18n semantics when imports are RN-safe.
+- RN component layer: rewrite AgentHub component semantics as native primitives instead of importing React DOM/CSS modules. Required first primitives are Button, IconButton, Surface, Badge, StatusPill, ListRow, SearchField, SegmentedControl, BottomSheet, EmptyState, ErrorNotice, AppShell, BottomTabs, ScreenHeader, QueueList, ThreadPane, and InspectorSheet.
+- Feishu-style adaptation: bottom tabs, queue density, unread/identity badges, search/new entry, contextual recovery, account rail/drawer rhythm, and sheet flows should feel mobile-native, but must use AgentHub v4 surfaces, status language, icons, and run/approval vocabulary.
+- Local-only components: keep native safe-area handling, keyboard avoidance, bottom navigation, pull/retry gestures, platform bridge readiness, and mobile confirmation flow inside `app/mobile-rn`.
 - Promotion rule: promote a Mobile component to `app/shared` only when at least one Desktop/Web surface can also consume it without platform assumptions.
+
+## Mobile Design Contract
+
+The RN app starts by defining a clean design foundation:
+
+- `src/theme/**` owns all colors, radii, spacing, type, shadows, focus, status, light/dark/OLED-ready variants, and reduced-motion constants.
+- `src/components/primitives/**` owns generic controls and must expose loading, disabled, pressed/focus, error, and long-label states.
+- `src/components/layout/**` owns shell, bottom tabs, headers, queue/thread/inspector layout, safe-area behavior, and tablet split panes.
+- `src/components/icons/**` owns RN-safe icon semantics aligned with shared `DesignNavIcon` names where possible.
+- Screen components consume primitives and layout slots. They do not define one-off colors, new button styles, or separate typography scales.
+
+AgentHub Desktop concepts map to Mobile as follows:
+
+| Desktop/shared concept | Mobile RN adaptation |
+|---|---|
+| Global rail | Bottom tabs plus compact account/command entry |
+| Conversation sidebar | Feishu-style queue list with search, unread, identity, status, and recovery rows |
+| Workspace transcript | Native thread screen with message/run/tool/diff/approval blocks in one scroll flow |
+| Unified composer | Keyboard-aware bottom composer dock with send/stop/context chips |
+| Right inspector | Bottom sheet on phone; right pane on large tablet |
+| Approval/diff/artifact cards | RN cards using the same status vocabulary and evidence-first hierarchy |
+| Desktop glass surfaces | RN neutral glass-like surfaces where platform performance permits; OLED uses solid surfaces |
+
+Design non-negotiables:
+
+- No separate Mobile palette, rounded marketing cards, decorative gradients, or empty framed cards.
+- No card nesting; use lists, panels, sheets, and compact status surfaces.
+- Body text stays readable on mobile; touch targets are at least 44px.
+- Agent Runtime, Agent Profile, Agent Configuration, Execution Target, TokenDance ID, and TokenDance API key wording stays aligned with AgentHub docs.
+- Realistic workflow state is required before visual claims: full queue, active run, approval, diff/file preview, session failure, and send pending/error/retry.
 
 ## Visual QA Boundary
 
 Mobile v4 visual QA must prove real mobile states, not only empty screens:
 
-- Phone: `390x844` light and dark, no horizontal page overflow, no clipped Chinese labels, no touch targets below 44px.
+- Phone: `390x844` light-first system appearance plus dark coverage, no horizontal page overflow, no clipped Chinese labels, no touch targets below 44px.
 - Compact phone: one shorter viewport for keyboard/recovery/action feedback.
 - Tablet: `768x1024`, `1024x768`, and one `>= 1024px` three-column viewport before claiming tablet readiness.
-- Required states: full IM queue, empty queue, filtered-empty queue, active remote run, pending approval, approval pending/error/resolved, remote target offline, Hub/session failure, long message, long command output, diff/file preview, send pending/error/retry, and bottom-sheet confirmation.
-- Port separation: Mobile QA runs on `5175`; Desktop/Web/design comparisons remain on their own ports and should not share a running preview.
+- Required states: full IM queue, empty queue, filtered-empty queue, active remote run, pending approval, approval pending/error/resolved, remote target offline, Hub/session failure, long message, long command output, diff/file preview, send pending/error/retry, account drawer, and bottom-sheet confirmation.
+- Port separation: Mobile RN browser QA runs on `5177`; legacy Mobile keeps `5175`; Desktop/Web/design comparisons remain on their own ports and should not share a running preview.
+- Gate behavior: concurrent Mobile workers may add stricter screenshots or native-device proof, but must not remove the 5177 browser preview, horizontal-overflow check, 44px touch-target check, or required realistic workflow states to make a pass easier.
+
+## Concurrent Worker Scope
+
+Worker J owns planning alignment only:
+
+- `app/mobile-rn/README.md`
+- `app/mobile/docs/mobile-expo-rn-migration-plan.md`
+- `app/mobile/docs/mobile-v4-plan.md`
+
+Worker J must not create a new worktree, change implementation files, revert other workers, or edit legacy Tauri Mobile code. Other concurrent workers should keep their code/config/test writes in their assigned `app/mobile-rn/**` slices and treat this plan as the shared boundary for Expo/RN mainline direction, 5177 visual preview, light-first visual default, system-locale/i18n behavior, Desktop/design-system authority, Feishu-only IM interaction reference, and visual QA gating.
 
 ## Milestone Shape
 
@@ -78,16 +125,26 @@ This is a planning sequence, not a current implementation commitment:
 | Milestone | Goal | Gate |
 |---|---|---|
 | M0 | Consolidate Mobile v4 plan and README pointer. | `git diff --check`, scoped status. |
-| M1 | Port and QA harness alignment for `5175`. | Mobile dev/preview starts on `5175`; QA scripts target `5175`. |
+| M1 | Expo/RN spike scaffold, design foundation, and Tauri freeze boundary. | `app/mobile-rn` starts, defines Desktop-aligned RN tokens/primitives/layout, imports only RN-safe shared contracts, and leaves `app/mobile` as legacy reference. |
 | M2 | Feishu-style IM queue design and data projection. | Phone queue screenshots for full, filtered, empty, recovery, unread, muted, bot, Agent, external. |
 | M3 | Codex-style thread/composer and inline run blocks. | Long-thread, send/stop, context chips, command blocks, file/diff/approval states. |
 | M4 | Hub-mediated remote-control flow. | Stop/retry/approval/offline/session-failure states with confirmation sheets. |
 | M5 | Tablet layout. | Two-column and three-column tablet screenshots with inspector evidence. |
 | M6 | Shared UI cleanup and stale Mobile UI removal. | No active duplicate message model or second design system. |
 
+Current M1 progress:
+
+- `app/mobile-rn` exists and is wired into the pnpm workspace and Vitest workspace.
+- RN design foundation exists for tokens, theme provider, primitives, icons, layout shell, motion constants, i18n strings, safe area, five-tab Desktop-aligned phone navigation, and tablet-ready inspector semantics.
+- Stateful Chat, Thread detail, Tasks, Projects, Agent Profiles, More overflow, Settings, and Account surfaces use realistic AgentHub workflow fixture data with Feishu-style queue density and AgentHub Desktop/Web v4 vocabulary. Mobile folds Desktop Contacts, Docs, and Settings into More instead of inventing run-state tabs; More remains phone overflow, while Settings and avatar/Profile keep separate semantics.
+- Chat composer and transcript details now follow the shared workbench direction more closely: text/send/recovery stay on the first screen, review context is shown as compact chips, and approval/diff/run/tool transcript blocks render as structured evidence cards rather than generic IM bubbles.
+- Typed first-slice facades now cover Hub REST/event URL behavior, API error redaction, local mock Hub REST/event-stream self-check, injectable Hub event parsing, injectable AppState/event lifecycle resync, local HTTP Hub contract fetch, Hub session storage abstraction, SecureStore adapter boundary plus default Expo SecureStore loader, TokenDance ID AuthSession/OIDC deep-link parsing plus default Expo AuthSession/WebBrowser bridge, AgentHub thread/run/approval deep-link bridge routing plus default Expo Linking bridge, and notification response bridge routing plus default Expo Notifications bridge.
+- Automated gates cover `typecheck`, package-local lint, 15-file/72-test Vitest suite, `expo-doctor`, `native:check`, Expo config parsing, no-secret development-build shape checks, fixed-port 5177 visual QA, Hub API error redaction, forbidden import negative coverage, source/docs/config/script privacy and secret scanning, visible/accessibility text privacy checks, visual source hygiene scanning for raw component palettes/shadows/type drift, zh/en i18n key parity, en-US light scene, light-surface brightness, OLED account scene, More/Settings/Agent Profile/Projects semantics, tablet Chat two-column split-pane, tablet Chat three-column inspector, tablet inspector Overview/Files/Browser tabs, and preview scenarios for evidence inspector, empty queue, offline chat, notification intent, deep link, send-error retry, send pending, compact keyboard send pending/error, approval approve/reject confirmation, approval submit error, resolved approval, diff preview, many-file/empty file preview, and browser preview loading/ready/error/empty states.
+- Remaining M1 gaps before moving to M2/M3 depth: real device/emulator development build install, iOS development build or simulator route, SecureStore/AuthSession device runtime proof, native notification delivery proof, live Hub REST/WS runtime proof, filtered-empty queue, long localized/long command stress, real artifact/browser URL evidence beyond the local preview readiness/error matrix, and native-device preview behavior.
+
 ## Verification For This Planning Slice
 
 ```powershell
-git diff --check -- app/mobile/README.md app/mobile/docs/mobile-v4-plan.md docs/roadmap.md
+git diff --check -- app/mobile-rn/README.md app/mobile/docs/mobile-expo-rn-migration-plan.md app/mobile/docs/mobile-v4-plan.md
 git status --short --branch
 ```
