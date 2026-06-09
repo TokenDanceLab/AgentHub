@@ -2,6 +2,7 @@ use crate::edge_manager::{EdgeHostReadiness, EdgeStatus, SharedEdgeManager};
 use crate::oidc_server::{check_loopback_callback_readiness, LoopbackReadiness};
 use crate::secure_store::{check_credential_store_readiness, CredentialStoreReadiness};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -245,6 +246,50 @@ pub async fn get_edge_host_readiness(
     Ok(mgr.host_readiness_for_app(&app))
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalEdgeLogTail {
+    pub stdout: Vec<String>,
+    pub stderr: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalEdgeDiagnostics {
+    pub readiness: EdgeHostReadiness,
+    pub status: EdgeStatus,
+    pub packaged_login: PackagedLoginReadiness,
+    pub log_tail: LocalEdgeLogTail,
+}
+
+#[tauri::command]
+pub async fn get_local_edge_diagnostics(
+    app: tauri::AppHandle,
+    state: State<'_, SharedEdgeManager>,
+) -> Result<LocalEdgeDiagnostics, String> {
+    let mgr = state.lock().await;
+    let readiness = mgr.host_readiness_for_app(&app);
+    let status = mgr.status();
+    let packaged_login = PackagedLoginReadiness {
+        loopback: check_loopback_callback_readiness(),
+        credential_store: check_credential_store_readiness(),
+        real_e2e: PackagedLoginRealE2EGate {
+            status: "proposal_only".to_string(),
+            reason: "Real packaged login E2E requires an explicit TokenDance ID/browser gate."
+                .to_string(),
+        },
+    };
+    let log_tail = LocalEdgeLogTail {
+        stdout: read_log_tail(&readiness.log_paths.stdout, 20),
+        stderr: read_log_tail(&readiness.log_paths.stderr, 20),
+    };
+
+    Ok(LocalEdgeDiagnostics {
+        readiness,
+        status,
+        packaged_login,
+        log_tail,
+    })
+}
+
 #[tauri::command]
 pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
     let mgr = state.lock().await;
@@ -275,6 +320,24 @@ pub async fn get_packaged_login_readiness() -> Result<PackagedLoginReadiness, St
                 .to_string(),
         },
     })
+}
+
+fn read_log_tail(path: &str, max_lines: usize) -> Vec<String> {
+    if max_lines == 0 || path.starts_with("<app-data>") {
+        return Vec::new();
+    }
+
+    let Ok(content) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut tail = VecDeque::with_capacity(max_lines);
+    for line in content.lines() {
+        if tail.len() == max_lines {
+            tail.pop_front();
+        }
+        tail.push_back(line.to_string());
+    }
+    tail.into_iter().collect()
 }
 
 #[tauri::command]
@@ -1068,7 +1131,10 @@ mod tests {
         assert_eq!(readiness.route, "local-edge-api");
         assert_eq!(readiness.bind_addr, "127.0.0.1:3210");
         assert_eq!(readiness.health_url, "http://127.0.0.1:3210/v1/health");
-        assert_eq!(readiness.log_paths.stdout, "<app-data>/edge-logs/local-edge.stdout.log");
+        assert_eq!(
+            readiness.log_paths.stdout,
+            "<app-data>/edge-logs/local-edge.stdout.log"
+        );
         assert!(readiness.preflight.auth_token_ready);
         assert_eq!(
             readiness.sidecar_args,
