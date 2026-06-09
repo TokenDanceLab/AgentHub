@@ -40,7 +40,7 @@ token、密码、client secret、cookie、authorization 值不得进入文档、
 
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| IM / @Agent 主链 | Agent/联系人式入口、目标选择、任务输入、启动运行、路由状态、回放面板 | 用户能从一个 Web 页面启动任务，不需要理解后端运行时术语。 |
+| IM / @Agent 主链 | Agent/联系人式入口、目标选择、任务输入、启动运行、路由状态、回放面板；当前 shared message fixture 已覆盖 human -> agent、agent -> agent、项目群 @Agent queued 和 orchestrator route decision 的可见投影 | 用户能从一个 Web 页面启动任务，不需要理解后端运行时术语；后续仍需真实 agent-authored message ingest、群成员权限、项目群创建、任务队列持久化和 route decision 执行闭环。 |
 | Target Health | Hub、Desktop、Web 统一展示目标、运行时、Profile、Workspace 健康 | Web/Desktop 能清楚展示 ready/offline/degraded/missing/signed-out，并给出下一步。 |
 | Transcript Blocks | 路由、子任务、权限请求、工具调用、文件变更、产物、预览、失败、完成等类型化时间线 | 用户看到的是结构化工作记录，不是原始 JSON 或控制台噪声。 |
 | Artifact / Diff / Preview 最小闭环 | 文件变更、artifact、diff、预览、apply/revert 状态进入同一条任务流和右侧 inspector | 用户能在远控任务里检查输出、差异、预览和执行结果，而不是离开聊天流找日志。 |
