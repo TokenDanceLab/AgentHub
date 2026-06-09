@@ -139,6 +139,8 @@ docs/handoffs/
 tmp/
 .expo/
 **/.expo/
+app/mobile-rn/android/
+app/mobile-rn/ios/
 .claude-flow/
 .od/
 .swarm/

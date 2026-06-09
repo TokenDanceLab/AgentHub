@@ -425,6 +425,10 @@ function getSurfaceConfig(
       description: t.settingsDescription,
       panes: [
         { label: t.workspaceSettings, value: 'workspace' },
+        { label: t.appearanceSettings, value: 'appearance' },
+        { label: t.notifications, value: 'notifications' },
+        { label: t.agentDefaults, value: 'agent-defaults' },
+        { label: t.localRuntimeState, value: 'runtime' },
         { label: t.identityAndSession, value: 'identity' },
         { label: t.approvalPolicy, value: 'approval' },
       ],
@@ -441,6 +445,50 @@ function getSurfaceConfig(
             rows: [
               row('settings', t.workspaceSettings, t.workspaceSettingsDescription, 'AgentHub'),
               row('file', t.docsRetention, t.docsRetentionDescription, t.cloudDocs, 'docs'),
+            ],
+          },
+        ],
+        appearance: [
+          {
+            title: t.appearanceSettings,
+            description: t.appearanceSettingsDescription,
+            rows: [
+              row('settings', t.themeSystem, t.appearanceSystemDescription, t.selected),
+              row('settings', t.themeLight, t.appearanceLightDescription, t.done),
+              row('settings', t.themeOled, t.appearanceOledDescription, t.account, 'account', onOpenAccount),
+            ],
+          },
+        ],
+        notifications: [
+          {
+            title: t.notifications,
+            description: t.notificationSettingsDescription,
+            rows: [
+              row('bell', t.notificationPermission, t.notificationPermissionDescription, t.needsAction, 'account', onOpenAccount),
+              row('approval', t.approvalNotifications, t.approvalNotificationsDescription, t.reviewRequired, 'tasks'),
+              row('runs', t.taskDigestNotifications, t.taskDigestNotificationsDescription, t.tasks, 'tasks'),
+            ],
+          },
+        ],
+        'agent-defaults': [
+          {
+            title: t.agentDefaults,
+            description: t.agentDefaultsDescription,
+            rows: [
+              row('agent', t.defaultAgentProfile, t.defaultAgentProfileDescription, t.agentProfile, 'agents'),
+              row('cloud', t.defaultModelRoute, t.agentsModelRouteDescription, t.agentConfiguration, 'agents'),
+              row('shield', t.highRiskWrites, t.highRiskWritesDescription, t.reviewRequired, 'tasks'),
+            ],
+          },
+        ],
+        runtime: [
+          {
+            title: t.localRuntimeState,
+            description: t.localRuntimeStateDescription,
+            rows: [
+              row('status', t.nativeBuildReadiness, t.nativeBuildReadinessDescription, t.needsAction),
+              row('cloud', t.mockHubTarget, t.mockHubTargetDescription, t.done),
+              row('shield', t.secureStoreReadiness, t.secureStoreReadinessDescription, t.needsAction, 'account', onOpenAccount),
             ],
           },
         ],

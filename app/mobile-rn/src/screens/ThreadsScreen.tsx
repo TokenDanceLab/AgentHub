@@ -1,7 +1,8 @@
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AgentHubIcon } from '@/components/icons';
-import { EmptyState } from '@/components/primitives';
+import { BottomSheet, EmptyState, SearchField } from '@/components/primitives';
 import { useStrings } from '@/i18n/strings';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileAppFixture, MobileThread } from '@/types';
@@ -24,12 +25,38 @@ export function ThreadsScreen({
   const pendingTaskCount = fixture.runs.filter((run) => run.status === 'approval_required').length;
   const activeTaskCount = fixture.runs.filter((run) => run.status === 'running' || run.status === 'queued').length;
   const failedTaskCount = fixture.runs.filter((run) => run.status === 'failed').length;
-  const isEmpty = fixture.threads.length === 0;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [newEntryOpen, setNewEntryOpen] = useState(false);
+  const visibleThreads = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return fixture.threads;
+    }
+
+    return fixture.threads.filter((thread) => (
+      thread.title.toLowerCase().includes(normalizedQuery)
+      || thread.subtitle.toLowerCase().includes(normalizedQuery)
+      || thread.statusDetail?.toLowerCase().includes(normalizedQuery)
+    ));
+  }, [fixture.threads, query]);
+  const isEmpty = visibleThreads.length === 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: tokens.color.panel }}>
-      <HomeHeader onOpenAccount={onOpenAccount} />
+      <HomeHeader
+        searchActive={searchOpen}
+        onOpenAccount={onOpenAccount}
+        onOpenNewEntry={() => setNewEntryOpen(true)}
+        onToggleSearch={() => setSearchOpen((current) => !current)}
+      />
       <ScrollView contentContainerStyle={{ paddingBottom: tokens.space.lg }}>
+        {searchOpen ? (
+          <View style={{ paddingHorizontal: tokens.space.md, paddingVertical: tokens.space.sm }}>
+            <SearchField placeholder={t.searchMessages} value={query} onChangeText={setQuery} />
+          </View>
+        ) : null}
         {fixture.account.hubSession === 'expired' ? (
           <CompactRecoveryBanner />
         ) : null}
@@ -42,11 +69,15 @@ export function ThreadsScreen({
         ) : null}
         {isEmpty ? (
           <View style={{ paddingHorizontal: tokens.space.lg, paddingTop: tokens.space.md }}>
-            <EmptyState icon="chat" title={t.emptyQueueTitle} description={t.emptyQueueDescription} />
+            <EmptyState
+              icon="chat"
+              title={query.trim() ? t.noMessageResultsTitle : t.emptyQueueTitle}
+              description={query.trim() ? t.noMessageResultsDescription : t.emptyQueueDescription}
+            />
           </View>
         ) : (
           <View style={{ paddingTop: 0 }}>
-            {fixture.threads.map((thread) => (
+            {visibleThreads.map((thread) => (
               <ThreadListItem
                 key={thread.id}
                 onPress={() => onSelectThread(thread.id)}
@@ -57,6 +88,10 @@ export function ThreadsScreen({
           </View>
         )}
       </ScrollView>
+      <NewEntrySheet
+        visible={newEntryOpen}
+        onClose={() => setNewEntryOpen(false)}
+      />
     </View>
   );
 }
@@ -102,7 +137,17 @@ function CompactRecoveryBanner(): React.ReactElement {
   );
 }
 
-function HomeHeader({ onOpenAccount }: { onOpenAccount: () => void }): React.ReactElement {
+function HomeHeader({
+  searchActive,
+  onOpenAccount,
+  onOpenNewEntry,
+  onToggleSearch,
+}: {
+  searchActive: boolean;
+  onOpenAccount: () => void;
+  onOpenNewEntry: () => void;
+  onToggleSearch: () => void;
+}): React.ReactElement {
   const { tokens } = useAgentHubTheme();
   const t = useStrings();
 
@@ -169,8 +214,8 @@ function HomeHeader({ onOpenAccount }: { onOpenAccount: () => void }): React.Rea
           {t.workspaceSubtitle}
         </Text>
       </View>
-      <HeaderIcon accessibilityLabel={t.search} icon="search" />
-      <HeaderIcon accessibilityLabel={t.add} icon="plusCircle" />
+      <HeaderIcon accessibilityLabel={t.search} active={searchActive} icon="search" onPress={onToggleSearch} />
+      <HeaderIcon accessibilityLabel={t.add} icon="plusCircle" onPress={onOpenNewEntry} />
     </View>
   );
 }
@@ -233,11 +278,15 @@ function TaskDigestStrip({
 }
 
 function HeaderIcon({
+  active = false,
   accessibilityLabel,
   icon,
+  onPress,
 }: {
+  active?: boolean;
   accessibilityLabel: string;
   icon: 'search' | 'plusCircle';
+  onPress: () => void;
 }) {
   const { tokens } = useAgentHubTheme();
 
@@ -245,17 +294,74 @@ function HeaderIcon({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
       style={{
         width: 44,
         height: 44,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 22,
-        backgroundColor: 'transparent',
+        backgroundColor: active ? tokens.color.accentSoft : 'transparent',
       }}
     >
-      <AgentHubIcon color={tokens.color.ink} name={icon} size={20} />
+      <AgentHubIcon color={active ? tokens.color.accent : tokens.color.ink} name={icon} size={20} />
     </Pressable>
+  );
+}
+
+function NewEntrySheet({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}): React.ReactElement {
+  const { tokens } = useAgentHubTheme();
+  const t = useStrings();
+  const actions = [
+    { icon: 'chat' as const, title: t.newChatWithAgentHub, subtitle: t.newChatWithAgentHubDescription },
+    { icon: 'approval' as const, title: t.newReviewThread, subtitle: t.newReviewThreadDescription },
+    { icon: 'file' as const, title: t.newProjectMessage, subtitle: t.newProjectMessageDescription },
+  ];
+
+  return (
+    <BottomSheet
+      title={t.newEntryTitle}
+      visible={visible}
+      onClose={onClose}
+      primaryAction={{ label: t.close, onPress: onClose }}
+    >
+      <View style={{ gap: tokens.space.xs }}>
+        {actions.map((action) => (
+          <Pressable
+            accessibilityRole="button"
+            key={action.title}
+            onPress={onClose}
+            style={({ pressed }) => ({
+              minHeight: 58,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: tokens.space.sm,
+              borderRadius: tokens.radius.panel,
+              backgroundColor: pressed ? tokens.color.tint : tokens.color.surfaceStrong,
+              paddingHorizontal: tokens.space.md,
+              paddingVertical: tokens.space.sm,
+            })}
+          >
+            <AgentHubIcon color={tokens.color.accent} name={action.icon} size={20} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ color: tokens.color.ink, ...tokens.type.role.rowTitle }}>
+                {action.title}
+              </Text>
+              <Text numberOfLines={2} style={{ color: tokens.color.inkMuted, ...tokens.type.role.meta }}>
+                {action.subtitle}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </BottomSheet>
   );
 }
 
