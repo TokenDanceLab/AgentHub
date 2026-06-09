@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -17,6 +18,18 @@ func TestOpenAPIEdgeDeviceRegisterMatchesHubRouteAndEnvelope(t *testing.T) {
 
 	path := yamlMapField(t, paths, "/edge/devices/register", "paths./edge/devices/register")
 	post := yamlMapField(t, path, "post", "paths./edge/devices/register.post")
+	description := yamlScalarField(t, post, "description", "register description")
+	for _, want := range []string{
+		"may create or refresh",
+		"local_edge ExecutionTarget",
+		"/web/execution-targets",
+		"check-in freshness",
+		"not an active WebSocket route proof",
+	} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("register description missing %q: %s", want, description)
+		}
+	}
 
 	requestBody := yamlMapField(t, post, "requestBody", "register requestBody")
 	content := yamlMapField(t, requestBody, "content", "register requestBody.content")
@@ -71,6 +84,47 @@ func TestOpenAPIHubAuthDeviceIDsUseUUIDContract(t *testing.T) {
 	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCCallbackRequest")
 }
 
+func TestOpenAPICloudEdgeRegisterDocumentsEdgeScopedJWTAndNoCallerDeviceMatch(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	path := yamlMapField(t, paths, "/cloud/edge/register", "paths./cloud/edge/register")
+	post := yamlMapField(t, path, "post", "paths./cloud/edge/register.post")
+
+	description := yamlScalarField(t, post, "description", "cloud edge register description")
+	for _, want := range []string{"aud=agenthub-edge", "purpose=edge-api", "device_type=edge"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("cloud edge register description missing %q: %s", want, description)
+		}
+	}
+	for _, stale := range []string{"desktop device type", "WebSocket auth"} {
+		if strings.Contains(description, stale) {
+			t.Fatalf("cloud edge register description contains stale wording %q: %s", stale, description)
+		}
+	}
+	if strings.Contains(description, "must match") || strings.Contains(description, "JWT device_id claim") {
+		t.Fatalf("cloud edge register description must not require caller JWT device match: %s", description)
+	}
+
+	requestSchema := requestBodySchema(t, post, "cloud edge register")
+	properties := yamlMapField(t, requestSchema, "properties", "cloud edge register request properties")
+	deviceID := yamlMapField(t, properties, "device_id", "cloud edge register device_id")
+	deviceDescription := yamlScalarField(t, deviceID, "description", "cloud edge register device_id description")
+	if strings.Contains(deviceDescription, "must match") || strings.Contains(deviceDescription, "JWT device_id") {
+		t.Fatalf("cloud edge device_id description must not require caller JWT device match: %s", deviceDescription)
+	}
+
+	responses := yamlMapField(t, post, "responses", "cloud edge register responses")
+	okResp := yamlMapField(t, responses, "200", "cloud edge register responses.200")
+	okContent := yamlMapField(t, okResp, "content", "cloud edge register responses.200.content")
+	okJSON := yamlMapField(t, okContent, "application/json", "cloud edge register responses.200.application/json")
+	responseSchema := yamlMapField(t, okJSON, "schema", "cloud edge register responses.200.schema")
+	data := yamlMapField(t, yamlMapField(t, responseSchema, "properties", "cloud edge register response properties"), "data", "cloud edge register response data")
+	jwtField := yamlMapField(t, yamlMapField(t, data, "properties", "cloud edge register data properties"), "jwt", "cloud edge register jwt")
+	if got := yamlScalarField(t, jwtField, "description", "cloud edge register jwt description"); got != "Edge-scoped JWT for Edge API auth." {
+		t.Fatalf("jwt description = %q, want Edge-scoped JWT for Edge API auth.", got)
+	}
+}
+
 func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
@@ -107,6 +161,120 @@ func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	requireMaxLength(t, yamlMapField(t, doneProps, "final_content", "HubTaskDoneRequest.properties.final_content"), "1048576", "done final_content")
 }
 
+func TestOpenAPIClientMessageReactionsMatchesHubContract(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	path := yamlMapField(t, paths, "/client/messages/{id}/reactions", "paths./client/messages/{id}/reactions")
+	get := yamlMapField(t, path, "get", "paths./client/messages/{id}/reactions.get")
+	parameters := yamlSequenceField(t, get, "parameters", "message reaction get parameters")
+	if !parameterNamed(parameters, "session_id") {
+		t.Fatal("GET message reactions must document session_id query parameter")
+	}
+	getData := responseEnvelopeData(t, get, "message reaction get")
+	if got := yamlScalarField(t, getData, "type", "message reaction get response data.type"); got != "array" {
+		t.Fatalf("GET reaction response data type = %v, want array", got)
+	}
+	getItems := yamlMapField(t, getData, "items", "message reaction get response data.items")
+	if got := yamlScalarField(t, getItems, "$ref", "message reaction get response data.items.$ref"); got != "#/components/schemas/MessageReactionResponse" {
+		t.Fatalf("GET reaction response item ref = %v, want MessageReactionResponse", got)
+	}
+
+	for _, method := range []string{"post", "delete"} {
+		op := yamlMapField(t, path, method, "paths./client/messages/{id}/reactions."+method)
+		schema := requestBodySchema(t, op, "message reaction "+method)
+		if got := yamlScalarField(t, schema, "$ref", "message reaction "+method+" requestBody schema.$ref"); got != "#/components/schemas/MessageReactionRequest" {
+			t.Fatalf("%s reaction request body ref = %v, want MessageReactionRequest", method, got)
+		}
+		data := responseEnvelopeData(t, op, "message reaction "+method)
+		if got := yamlScalarField(t, data, "$ref", "message reaction "+method+" response data.$ref"); got != "#/components/schemas/MessageReactionResponse" {
+			t.Fatalf("%s reaction response data ref = %v, want MessageReactionResponse", method, got)
+		}
+	}
+
+	request := yamlMapField(t, schemas, "MessageReactionRequest", "components.schemas.MessageReactionRequest")
+	required := yamlStringSlice(t, yamlField(t, request, "required", "MessageReactionRequest.required"), "MessageReactionRequest.required")
+	if !containsString(required, "session_id") || !containsString(required, "reaction") {
+		t.Fatalf("MessageReactionRequest.required = %v, want session_id and reaction", required)
+	}
+	requestProps := yamlMapField(t, request, "properties", "MessageReactionRequest.properties")
+	requireMaxLength(t, yamlMapField(t, requestProps, "reaction", "MessageReactionRequest.properties.reaction"), "64", "message reaction")
+
+	response := yamlMapField(t, schemas, "MessageReactionResponse", "components.schemas.MessageReactionResponse")
+	responseRequired := yamlStringSlice(t, yamlField(t, response, "required", "MessageReactionResponse.required"), "MessageReactionResponse.required")
+	for _, field := range []string{"message_id", "session_id", "reaction", "count", "reacted_by_me"} {
+		if !containsString(responseRequired, field) {
+			t.Fatalf("MessageReactionResponse.required = %v, want %s", responseRequired, field)
+		}
+	}
+	responseProps := yamlMapField(t, response, "properties", "MessageReactionResponse.properties")
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "message_id", "MessageReactionResponse.properties.message_id"), "type", "message_id type"); got != "string" {
+		t.Fatalf("message_id type = %v, want string", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "session_id", "MessageReactionResponse.properties.session_id"), "type", "session_id type"); got != "string" {
+		t.Fatalf("session_id type = %v, want string", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "reaction", "MessageReactionResponse.properties.reaction"), "type", "reaction type"); got != "string" {
+		t.Fatalf("reaction type = %v, want string", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "count", "MessageReactionResponse.properties.count"), "type", "count type"); got != "integer" {
+		t.Fatalf("count type = %v, want integer", got)
+	}
+	if got := yamlScalarField(t, yamlMapField(t, responseProps, "reacted_by_me", "MessageReactionResponse.properties.reacted_by_me"), "type", "reacted_by_me type"); got != "boolean" {
+		t.Fatalf("reacted_by_me type = %v, want boolean", got)
+	}
+}
+
+func TestOpenAPIProviderBindingSchemasMatchHubModelAndDoNotExposeCredentials(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	assertSchemaHasOnlyProperties(t, schemas, "ProviderBinding", []string{
+		"id",
+		"provider",
+		"binding_name",
+		"base_url",
+		"is_available",
+		"quota_used",
+		"quota_limit",
+		"last_checked",
+		"metadata",
+		"created_at",
+		"updated_at",
+	})
+	assertSchemaRequiredFields(t, schemas, "ProviderBinding", []string{
+		"id",
+		"provider",
+		"is_available",
+		"quota_used",
+		"quota_limit",
+		"created_at",
+		"updated_at",
+	})
+
+	assertSchemaHasOnlyProperties(t, schemas, "CreateProviderBindingRequest", []string{
+		"provider",
+		"binding_name",
+		"base_url",
+		"is_available",
+		"quota_limit",
+		"metadata",
+	})
+	assertSchemaRequiredFields(t, schemas, "CreateProviderBindingRequest", []string{"provider"})
+
+	assertSchemaHasOnlyProperties(t, schemas, "UpdateProviderBindingRequest", []string{
+		"provider",
+		"binding_name",
+		"base_url",
+		"is_available",
+		"quota_used",
+		"quota_limit",
+		"last_checked",
+		"metadata",
+	})
+}
+
 func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
@@ -115,7 +283,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/client/ws":                                                          {"get"},
 		"/client/auth/refresh":                                                {"post"},
 		"/client/auth/oidc/authorize":                                         {"post"},
-		"/client/auth/oidc/callback":                                          {"post"},
+		"/client/auth/oidc/callback":                                          {"get", "post"},
 		"/client/auth/me":                                                     {"get"},
 		"/client/auth/logout":                                                 {"post"},
 		"/client/auth/profile":                                                {"put"},
@@ -146,8 +314,10 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/client/sessions/{id}/agents":                                        {"post"},
 		"/client/sessions/{id}/messages/search":                               {"get"},
 		"/client/sessions/search":                                             {"get"},
+		"/client/messages/{id}":                                               {"put"},
 		"/client/messages/{id}/recall":                                        {"post"},
 		"/client/messages/{id}/pin":                                           {"post", "delete"},
+		"/client/messages/{id}/reactions":                                     {"get", "post", "delete"},
 		"/client/messages/{id}/forward":                                       {"post"},
 		"/client/messages/search":                                             {"get"},
 		"/client/attachments/probe":                                           {"post"},
@@ -161,10 +331,15 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/edge/agent-tasks/{id}/stream":                                       {"post"},
 		"/edge/agent-tasks/{id}/done":                                         {"post"},
 		"/edge/agent-tasks/{id}/fail":                                         {"post"},
+		"/cloud/edge/register":                                                {"post"},
 		"/web/agent-tasks":                                                    {"post"},
 		"/web/agent-tasks/{id}/cancel":                                        {"post"},
+		"/web/agent-tasks/{id}/summary":                                       {"get"},
 		"/web/agent-tasks/{id}/events/summary":                                {"get"},
 		"/web/agent-tasks/{id}/events":                                        {"get"},
+		"/web/agent-tasks/{id}/approvals":                                     {"get"},
+		"/web/agent-tasks/{id}/approvals/{approvalId}/decide":                 {"post"},
+		"/web/agent-tasks/{id}/artifacts":                                     {"get"},
 		"/web/custom-agents":                                                  {"get", "post"},
 		"/web/custom-agents/{id}":                                             {"put", "delete"},
 		"/web/agent-profiles":                                                 {"get", "post"},
@@ -188,6 +363,10 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/web/execution-targets":                                              {"get", "post"},
 		"/web/execution-targets/{id}":                                         {"get", "patch", "delete"},
 		"/web/execution-targets/{id}/ping":                                    {"post"},
+		"/web/projects":                                                       {"get", "post"},
+		"/web/projects/{id}":                                                  {"get", "patch"},
+		"/web/projects/{id}/threads":                                          {"get", "post"},
+		"/web/projects/{id}/threads/{threadId}/messages":                      {"get", "post"},
 		"/web/audit-events":                                                   {"get"},
 		"/web/relay/commands":                                                 {"post"},
 		"/web/relay/commands/{id}":                                            {"get"},
@@ -267,6 +446,272 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 	}
 }
 
+func TestOpenAPIProjectThreadMessageContractDocumentsA2AMetadata(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	threadMessages := yamlMapField(t, paths, "/web/projects/{id}/threads/{threadId}/messages", "paths.projectThreadMessages")
+	post := yamlMapField(t, threadMessages, "post", "paths.projectThreadMessages.post")
+	description := yamlScalarField(t, post, "description", "project thread message description")
+	for _, want := range []string{"metadata", "@Agent mention", "orchestrator queue", "trigger_message_id"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("project thread message description missing %q: %s", want, description)
+		}
+	}
+	requestSchema := requestBodySchema(t, post, "project thread message")
+	if got := yamlScalarField(t, requestSchema, "$ref", "project thread message request ref"); got != "#/components/schemas/SendWorkspaceThreadMessageRequest" {
+		t.Fatalf("project thread message request ref = %v, want SendWorkspaceThreadMessageRequest", got)
+	}
+
+	request := yamlMapField(t, schemas, "SendWorkspaceThreadMessageRequest", "schemas.SendWorkspaceThreadMessageRequest")
+	required := yamlStringSlice(t, yamlField(t, request, "required", "SendWorkspaceThreadMessageRequest.required"), "SendWorkspaceThreadMessageRequest.required")
+	if !containsString(required, "content") {
+		t.Fatalf("SendWorkspaceThreadMessageRequest.required = %v, want content", required)
+	}
+	content := yamlMapField(t, yamlMapField(t, request, "properties", "SendWorkspaceThreadMessageRequest.properties"), "content", "SendWorkspaceThreadMessageRequest.properties.content")
+	contentDescription := yamlScalarField(t, content, "description", "SendWorkspaceThreadMessageRequest.content.description")
+	for _, want := range []string{"im_kind", "mentions", "orchestrator_queue"} {
+		if !strings.Contains(contentDescription, want) {
+			t.Fatalf("content description missing %q: %s", want, contentDescription)
+		}
+	}
+
+	response := yamlMapField(t, schemas, "WorkspaceThreadMessage", "schemas.WorkspaceThreadMessage")
+	responseRequired := yamlStringSlice(t, yamlField(t, response, "required", "WorkspaceThreadMessage.required"), "WorkspaceThreadMessage.required")
+	for _, want := range []string{"project_id", "thread_id", "content"} {
+		if !containsString(responseRequired, want) {
+			t.Fatalf("WorkspaceThreadMessage.required = %v, want %s", responseRequired, want)
+		}
+	}
+}
+
+func TestOpenAPITaskApprovalArtifactRoutesDocumentEnvelope(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+
+	approvals := yamlMapField(t, paths, "/web/agent-tasks/{id}/approvals", "paths.agent-task-approvals")
+	approvalsGet := yamlMapField(t, approvals, "get", "paths.agent-task-approvals.get")
+	approvalsData := responseEnvelopeData(t, approvalsGet, "task approvals")
+	approvalsRef := yamlField(t, approvalsData, "$ref", "task approvals data ref")
+	if approvalsRef.Value != "#/components/schemas/AgentTaskApprovalList" {
+		t.Fatalf("task approvals data ref = %q", approvalsRef.Value)
+	}
+
+	decide := yamlMapField(t, paths, "/web/agent-tasks/{id}/approvals/{approvalId}/decide", "paths.agent-task-approval-decide")
+	decidePost := yamlMapField(t, decide, "post", "paths.agent-task-approval-decide.post")
+	decideData := responseEnvelopeData(t, decidePost, "task approval decide")
+	decideRef := yamlField(t, decideData, "$ref", "task approval decide data ref")
+	if decideRef.Value != "#/components/schemas/AgentTaskApproval" {
+		t.Fatalf("task approval decide data ref = %q", decideRef.Value)
+	}
+
+	artifacts := yamlMapField(t, paths, "/web/agent-tasks/{id}/artifacts", "paths.agent-task-artifacts")
+	artifactsGet := yamlMapField(t, artifacts, "get", "paths.agent-task-artifacts.get")
+	artifactsData := responseEnvelopeData(t, artifactsGet, "task artifacts")
+	artifactsRef := yamlField(t, artifactsData, "$ref", "task artifacts data ref")
+	if artifactsRef.Value != "#/components/schemas/AgentTaskArtifactList" {
+		t.Fatalf("task artifacts data ref = %q", artifactsRef.Value)
+	}
+
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+	artifactSchema := yamlMapField(t, schemas, "AgentTaskArtifact", "schemas.AgentTaskArtifact")
+	artifactProperties := yamlMapField(t, artifactSchema, "properties", "schemas.AgentTaskArtifact.properties")
+	for _, property := range []string{"diff", "edit_id", "hash", "review_status", "can_apply", "can_revert"} {
+		if yamlOptionalMapField(artifactProperties, property) == nil {
+			t.Fatalf("AgentTaskArtifact schema missing %s", property)
+		}
+	}
+}
+
+func TestOpenAPIRouteMiddlewareMetadataMatchesRouter(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+
+	adminRoutes := []struct {
+		path   string
+		method string
+	}{
+		{"/web/agent-profiles/{id}/publish", "post"},
+		{"/web/skills/{id}/publish", "post"},
+		{"/web/skills/{id}/unpublish", "post"},
+		{"/web/mcp-servers/{id}/publish", "post"},
+		{"/web/mcp-servers/{id}/unpublish", "post"},
+		{"/web/audit-events", "get"},
+		{"/web/relay/commands", "post"},
+		{"/web/relay/commands/{id}", "get"},
+		{"/web/relay/commands/{id}/ack", "post"},
+	}
+	for _, route := range adminRoutes {
+		assertOperationRole(t, paths, route.path, route.method, "admin")
+	}
+
+	deviceRoutes := map[string]string{
+		"/edge/devices/register":                              "desktop",
+		"/edge/agent-tasks/{id}/ack":                          "desktop",
+		"/edge/agent-tasks/{id}/stream":                       "desktop",
+		"/edge/agent-tasks/{id}/done":                         "desktop",
+		"/edge/agent-tasks/{id}/fail":                         "desktop",
+		"/web/agent-tasks":                                    "web",
+		"/web/agent-tasks/{id}/cancel":                        "web",
+		"/web/agent-tasks/{id}/summary":                       "web",
+		"/web/agent-tasks/{id}/events/summary":                "web",
+		"/web/agent-tasks/{id}/events":                        "web",
+		"/web/custom-agents":                                  "web",
+		"/web/custom-agents/{id}":                             "web",
+		"/web/agent-profiles":                                 "web",
+		"/web/agent-profiles/{id}":                            "web",
+		"/web/agent-profiles/{id}/publish":                    "web",
+		"/web/agent-profiles/{id}/install":                    "web",
+		"/web/skills":                                         "web",
+		"/web/skills/{id}":                                    "web",
+		"/web/skills/{id}/publish":                            "web",
+		"/web/skills/{id}/unpublish":                          "web",
+		"/web/mcp-servers":                                    "web",
+		"/web/mcp-servers/{id}":                               "web",
+		"/web/mcp-servers/{id}/publish":                       "web",
+		"/web/mcp-servers/{id}/unpublish":                     "web",
+		"/web/market/profiles":                                "web",
+		"/web/market/profiles/{id}":                           "web",
+		"/web/market/profiles/{id}/install":                   "web",
+		"/web/market/profiles/{id}/rate":                      "web",
+		"/web/provider-bindings":                              "web",
+		"/web/provider-bindings/{id}":                         "web",
+		"/web/execution-targets":                              "web",
+		"/web/execution-targets/{id}":                         "web",
+		"/web/execution-targets/{id}/ping":                    "web",
+		"/web/projects":                                       "web",
+		"/web/projects/{id}":                                  "web",
+		"/web/projects/{id}/threads":                          "web",
+		"/web/projects/{id}/threads/{threadId}/messages":      "web",
+		"/web/audit-events":                                   "web",
+		"/web/relay/commands":                                 "web",
+		"/web/relay/commands/{id}":                            "web",
+		"/web/relay/commands/{id}/ack":                        "web",
+		"/web/devices":                                        "web",
+		"/web/agent-teams":                                    "web",
+		"/web/agent-teams/{id}":                               "web",
+		"/web/agent-teams/{id}/members":                       "web",
+		"/web/agent-teams/{id}/members/{member_id}":           "web",
+		"/web/agent-teams/{id}/runs":                          "web",
+		"/web/agent-teams/{id}/runs/{run_id}":                 "web",
+		"/web/agent-teams/{id}/runs/{run_id}/state":           "web",
+		"/web/agent-teams/{id}/runs/{run_id}/tasks":           "web",
+		"/web/agent-teams/{id}/runs/{run_id}/events":          "web",
+		"/web/agent-teams/{id}/runs/{run_id}/route-decisions": "web",
+		"/web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide":       "web",
+		"/web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve":      "web",
+		"/web/agent-teams/{id}/runs/{run_id}/assignments":                          "web",
+		"/web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/dispatch": "web",
+		"/web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/complete": "web",
+		"/web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/fail":     "web",
+	}
+	for path, want := range deviceRoutes {
+		assertPathDeviceType(t, paths, path, want)
+	}
+	assertPathHasNoDeviceType(t, paths, "/cloud/edge/register")
+}
+
+func TestOpenAPIBackendMigrationAuditCoverage(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+
+	assertOperationStatus(t, paths, "/client/auth/oidc/callback", "get", "implemented")
+	assertOperationStatus(t, paths, "/client/auth/oidc/callback", "post", "implemented")
+	oidcCallback := yamlMapField(t, paths, "/client/auth/oidc/callback", "paths./client/auth/oidc/callback")
+	oidcGet := yamlMapField(t, oidcCallback, "get", "paths./client/auth/oidc/callback.get")
+	oidcGetResponses := yamlMapField(t, oidcGet, "responses", "paths./client/auth/oidc/callback.get.responses")
+	_ = yamlMapField(t, oidcGetResponses, "200", "paths./client/auth/oidc/callback.get.responses.200")
+	_ = yamlMapField(t, oidcGetResponses, "400", "paths./client/auth/oidc/callback.get.responses.400")
+
+	assertOperationStatus(t, paths, "/cloud/edge/register", "post", "implemented")
+	assertPathHasNoDeviceType(t, paths, "/cloud/edge/register")
+
+	adminRoutes := []struct {
+		path   string
+		method string
+	}{
+		{"/web/agent-profiles/{id}/publish", "post"},
+		{"/web/skills/{id}/publish", "post"},
+		{"/web/skills/{id}/unpublish", "post"},
+		{"/web/mcp-servers/{id}/publish", "post"},
+		{"/web/mcp-servers/{id}/unpublish", "post"},
+		{"/web/audit-events", "get"},
+		{"/web/relay/commands", "post"},
+		{"/web/relay/commands/{id}", "get"},
+		{"/web/relay/commands/{id}/ack", "post"},
+	}
+	for _, route := range adminRoutes {
+		assertOperationRole(t, paths, route.path, route.method, "admin")
+	}
+
+	assertPathDeviceType(t, paths, "/edge/devices/register", "desktop")
+	assertPathDeviceType(t, paths, "/edge/agent-tasks/{id}/ack", "desktop")
+	assertPathDeviceType(t, paths, "/web/agent-tasks", "web")
+	assertPathDeviceType(t, paths, "/web/agent-profiles", "web")
+	assertPathDeviceType(t, paths, "/web/audit-events", "web")
+}
+
+func TestOpenAPIHubWebSocketDocumentsUpgradeAuth(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	wsGet := yamlMapField(t, yamlMapField(t, paths, "/client/ws", "paths./client/ws"), "get", "paths./client/ws.get")
+
+	description := yamlScalarField(t, wsGet, "description", "paths./client/ws.get.description")
+	for _, want := range []string{"HTTP upgrade", "WSAuthMiddleware", "TokenDance ID RS256 bearer tokens"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("/client/ws description missing %q: %s", want, description)
+		}
+	}
+
+	security := yamlSequenceField(t, wsGet, "security", "paths./client/ws.get.security")
+	if !securityRequirementIncludes(security, "hubWebSocketQueryToken") {
+		t.Fatal("/client/ws security must include hubWebSocketQueryToken for browser upgrade auth")
+	}
+	if !securityRequirementIncludes(security, "bearerAuth") {
+		t.Fatal("/client/ws security must include bearerAuth for native Authorization header auth")
+	}
+
+	params := yamlSequenceField(t, wsGet, "parameters", "paths./client/ws.get.parameters")
+	if !parameterNamed(params, "access_token") {
+		t.Fatal("/client/ws parameters must document access_token query auth")
+	}
+}
+
+func TestOpenAPIHubWebSocketFrameSchemas(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	components := yamlMapField(t, spec, "components", "components")
+	schemas := yamlMapField(t, components, "schemas", "components.schemas")
+
+	frame := yamlMapField(t, schemas, "HubWebSocketFrame", "components.schemas.HubWebSocketFrame")
+	required := yamlStringSlice(t, yamlField(t, frame, "required", "HubWebSocketFrame.required"), "HubWebSocketFrame.required")
+	for _, field := range []string{"type", "payload"} {
+		if !containsString(required, field) {
+			t.Fatalf("HubWebSocketFrame.required = %v, want %q", required, field)
+		}
+	}
+	frameProps := yamlMapField(t, frame, "properties", "HubWebSocketFrame.properties")
+	frameType := yamlMapField(t, frameProps, "type", "HubWebSocketFrame.properties.type")
+	enum := yamlStringSlice(t, yamlField(t, frameType, "enum", "HubWebSocketFrame.properties.type.enum"), "HubWebSocketFrame.properties.type.enum")
+	for _, eventType := range []string{
+		"message.edited",
+		"message.reaction_added",
+		"message.reaction_removed",
+		"device.online",
+		"device.offline",
+		"team.run.started",
+		"team.assignment.done",
+		"team.assignment.failed",
+	} {
+		if !containsString(enum, eventType) {
+			t.Fatalf("HubWebSocketFrame type enum missing %q: %v", eventType, enum)
+		}
+	}
+
+	assertSchemaHasOnlyProperties(t, schemas, "HubDevicePresencePayload", []string{"user_id"})
+	assertSchemaRequiredFields(t, schemas, "HubDevicePresencePayload", []string{"user_id"})
+}
+
 func assertSchemaRequiresUUIDDeviceID(t *testing.T, schemas *yaml.Node, schemaName string) {
 	t.Helper()
 	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
@@ -287,6 +732,17 @@ func requestBodySchema(t *testing.T, post *yaml.Node, name string) *yaml.Node {
 	content := yamlMapField(t, body, "content", name+" requestBody.content")
 	jsonBody := yamlMapField(t, content, "application/json", name+" requestBody.application/json")
 	return yamlMapField(t, jsonBody, "schema", name+" requestBody.schema")
+}
+
+func responseEnvelopeData(t *testing.T, op *yaml.Node, name string) *yaml.Node {
+	t.Helper()
+	responses := yamlMapField(t, op, "responses", name+" responses")
+	okResp := yamlMapField(t, responses, "200", name+" responses.200")
+	okContent := yamlMapField(t, okResp, "content", name+" responses.200.content")
+	okJSON := yamlMapField(t, okContent, "application/json", name+" responses.200.application/json")
+	responseSchema := yamlMapField(t, okJSON, "schema", name+" responses.200.schema")
+	responseProperties := yamlMapField(t, responseSchema, "properties", name+" responses.200.schema.properties")
+	return yamlMapField(t, responseProperties, "data", name+" responses.200.schema.properties.data")
 }
 
 func loadOpenAPISpec(t *testing.T) *yaml.Node {
@@ -423,10 +879,75 @@ func sequenceRequires(items []*yaml.Node, requiredField string) bool {
 	return false
 }
 
+func securityRequirementIncludes(items []*yaml.Node, scheme string) bool {
+	for _, item := range items {
+		if yamlOptionalMapField(item, scheme) != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func parameterNamed(items []*yaml.Node, name string) bool {
+	for _, item := range items {
+		nameNode := yamlOptionalMapField(item, "name")
+		if nameNode != nil && nameNode.Kind == yaml.ScalarNode && nameNode.Value == name {
+			return true
+		}
+	}
+	return false
+}
+
 func requireMaxLength(t *testing.T, node *yaml.Node, want string, field string) {
 	t.Helper()
 	if got := yamlScalarField(t, node, "maxLength", field+" maxLength"); got != want {
 		t.Fatalf("%s maxLength = %v, want %s", field, got, want)
+	}
+}
+
+func assertSchemaHasOnlyProperties(t *testing.T, schemas *yaml.Node, schemaName string, want []string) {
+	t.Helper()
+	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
+	properties := yamlMapField(t, schema, "properties", "components.schemas."+schemaName+".properties")
+	actual := map[string]struct{}{}
+	for i := 0; i+1 < len(properties.Content); i += 2 {
+		key := properties.Content[i].Value
+		actual[key] = struct{}{}
+	}
+	for _, field := range want {
+		if _, ok := actual[field]; !ok {
+			t.Fatalf("%s.properties missing %q", schemaName, field)
+		}
+		delete(actual, field)
+	}
+	for field := range actual {
+		t.Fatalf("%s.properties contains unexpected field %q", schemaName, field)
+	}
+	for _, field := range []string{"api_key", "api_base", "models", "is_default", "credential", "credentials", "token", "secret", "access_token", "refresh_token"} {
+		if yamlOptionalMapField(properties, field) != nil {
+			t.Fatalf("%s.properties must not expose credential-like field %q", schemaName, field)
+		}
+	}
+}
+
+func assertSchemaRequiredFields(t *testing.T, schemas *yaml.Node, schemaName string, want []string) {
+	t.Helper()
+	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
+	requiredNode := yamlOptionalMapField(schema, "required")
+	if len(want) == 0 {
+		if requiredNode != nil {
+			t.Fatalf("%s.required = %v, want absent", schemaName, requiredNode.Value)
+		}
+		return
+	}
+	if requiredNode == nil {
+		t.Fatalf("%s.required is missing", schemaName)
+	}
+	required := yamlStringSlice(t, requiredNode, schemaName+".required")
+	for _, field := range want {
+		if !containsString(required, field) {
+			t.Fatalf("%s.required = %v, want %q", schemaName, required, field)
+		}
 	}
 }
 
@@ -465,6 +986,40 @@ func assertOperationIsNotImplemented(t *testing.T, paths *yaml.Node, path string
 	status := yamlOptionalMapField(op, "x-agenthub-status")
 	if status != nil && status.Kind == yaml.ScalarNode && status.Value == "implemented" {
 		t.Fatalf("legacy operation %s %s must not be marked implemented", method, path)
+	}
+}
+
+func assertOperationStatus(t *testing.T, paths *yaml.Node, path string, method string, want string) {
+	t.Helper()
+	pathNode := yamlMapField(t, paths, path, "paths."+path)
+	op := yamlMapField(t, pathNode, method, "paths."+path+"."+method)
+	if got := yamlScalarField(t, op, "x-agenthub-status", "paths."+path+"."+method+".x-agenthub-status"); got != want {
+		t.Fatalf("%s %s status = %q, want %q", method, path, got, want)
+	}
+}
+
+func assertOperationRole(t *testing.T, paths *yaml.Node, path string, method string, want string) {
+	t.Helper()
+	pathNode := yamlMapField(t, paths, path, "paths."+path)
+	op := yamlMapField(t, pathNode, method, "paths."+path+"."+method)
+	if got := yamlScalarField(t, op, "x-agenthub-role", "paths."+path+"."+method+".x-agenthub-role"); got != want {
+		t.Fatalf("%s %s role = %q, want %q", method, path, got, want)
+	}
+}
+
+func assertPathDeviceType(t *testing.T, paths *yaml.Node, path string, want string) {
+	t.Helper()
+	pathNode := yamlMapField(t, paths, path, "paths."+path)
+	if got := yamlScalarField(t, pathNode, "x-agenthub-device-type", "paths."+path+".x-agenthub-device-type"); got != want {
+		t.Fatalf("%s device type = %q, want %q", path, got, want)
+	}
+}
+
+func assertPathHasNoDeviceType(t *testing.T, paths *yaml.Node, path string) {
+	t.Helper()
+	pathNode := yamlMapField(t, paths, path, "paths."+path)
+	if got := yamlOptionalMapField(pathNode, "x-agenthub-device-type"); got != nil {
+		t.Fatalf("%s must not carry x-agenthub-device-type because no DeviceTypeCheck middleware protects it", path)
 	}
 }
 

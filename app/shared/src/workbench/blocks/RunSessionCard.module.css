@@ -49,8 +49,28 @@
 }
 
 .meta {
+  display: block;
   color: var(--text-2);
   font: 400 0.75rem var(--font-sans);
+}
+
+.evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.evidencePill {
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  background: var(--surface-2);
+  font: 400 0.6875rem var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 .runId {

@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from './hubClient';
 import type {
+  CreateExecutionTargetRequest,
   ExecutionTarget,
   ExecutionTargetHealthState,
   ExecutionTargetListResponse,
   ExecutionTargetTrustLevel,
   ExecutionTargetType,
 } from './hubClient';
+import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 
@@ -35,6 +37,12 @@ export interface ExecutionTargetInventorySummary {
   byType: Record<ExecutionTargetType, number>;
 }
 
+export interface SyncLocalEdgeExecutionTargetInput {
+  deviceId: string;
+  localEdgeTarget: DesktopExecutionTarget;
+  registeredTargetId?: string;
+}
+
 interface ExecutionTargetInventoryResponse {
   items: ExecutionTargetInventoryItem[];
   page: ExecutionTargetListResponse['page'];
@@ -55,6 +63,8 @@ const emptyExecutionTargets: ExecutionTargetInventoryResponse = {
   items: [],
   page: { hasMore: false },
 };
+const executionTargetPageSize = 50;
+const maxExecutionTargetPages = 10;
 
 function parseWorkspaceAllowlist(value: ExecutionTarget['workspace_allowlist']): string[] {
   if (Array.isArray(value)) {
@@ -105,10 +115,26 @@ export async function fetchExecutionTargets(
   const client = createHubClient(
     baseUrl ? { baseUrl, getToken: () => token } : { getToken: () => token },
   );
-  const res = await client.listExecutionTargets({ pageSize: 50 });
+  const items: ExecutionTargetInventoryItem[] = [];
+  let page: ExecutionTargetListResponse['page'] = { hasMore: false };
+  let pageCursor: string | undefined;
+
+  for (let i = 0; i < maxExecutionTargetPages; i += 1) {
+    const res = await client.listExecutionTargets({
+      pageSize: executionTargetPageSize,
+      ...(pageCursor ? { pageCursor } : {}),
+    });
+    items.push(...res.items.map(normalizeExecutionTarget));
+    page = res.page;
+    if (!page.hasMore || !page.nextCursor) {
+      return { items, page };
+    }
+    pageCursor = page.nextCursor;
+  }
+
   return {
-    items: res.items.map(normalizeExecutionTarget),
-    page: res.page,
+    items,
+    page: { ...page, hasMore: true },
   };
 }
 
@@ -144,6 +170,14 @@ export function summarizeExecutionTargets(targets: ExecutionTargetInventoryItem[
   };
 }
 
+export function findRegisteredLocalEdgeTarget(
+  targets: ExecutionTargetInventoryItem[],
+  deviceId: string | null | undefined,
+): ExecutionTargetInventoryItem | null {
+  if (!deviceId) return null;
+  return targets.find((target) => target.target_type === 'local_edge' && target.device_id === deviceId) ?? null;
+}
+
 export function useHubExecutionTargets(enabledOrOptions: boolean | UseHubExecutionTargetsOptions) {
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const options = typeof enabledOrOptions === 'boolean'
@@ -177,6 +211,60 @@ export function usePingHubExecutionTarget(options: { getToken?: () => string | n
           : { getToken: () => token },
       );
       await client.pingExecutionTarget(targetId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['execution-targets'] });
+    },
+  });
+}
+
+function buildLocalEdgeTargetPayload(
+  deviceId: string,
+  localEdgeTarget: DesktopExecutionTarget,
+): CreateExecutionTargetRequest {
+  return {
+    name: 'AgentHub Desktop Local Edge',
+    target_type: 'local_edge',
+    device_id: deviceId,
+    trust_level: 'local',
+    auth_method: 'hub_jwt',
+    workspace_allowlist: [],
+    capabilities: {
+      route: localEdgeTarget.route,
+      runner_count: localEdgeTarget.runnerCount,
+      online_runner_count: localEdgeTarget.onlineRunnerCount,
+      agent_count: localEdgeTarget.agentCount,
+      model_count: localEdgeTarget.modelCount,
+      capability_ids: localEdgeTarget.capabilityIds,
+    },
+    metadata: {
+      source: 'agenthub-desktop',
+      registration: 'desktop-local-edge-readiness',
+      target_id: localEdgeTarget.id,
+      status: localEdgeTarget.status,
+    },
+  };
+}
+
+export function useSyncLocalEdgeExecutionTarget(options: { getToken?: () => string | null; baseUrl?: string } = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ deviceId, localEdgeTarget, registeredTargetId }: SyncLocalEdgeExecutionTargetInput) => {
+      const token = (options.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      if (!deviceId) throw new Error('Desktop device id is required');
+      const client = createHubClient(
+        options.baseUrl
+          ? { baseUrl: options.baseUrl, getToken: () => token }
+          : { getToken: () => token },
+      );
+      const payload = buildLocalEdgeTargetPayload(deviceId, localEdgeTarget);
+      if (registeredTargetId) {
+        await client.updateExecutionTarget(registeredTargetId, payload);
+        return;
+      }
+      await client.createExecutionTarget(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['execution-targets'] });

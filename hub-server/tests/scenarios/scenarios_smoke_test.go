@@ -117,6 +117,7 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			name TEXT DEFAULT '',
 			avatar_url TEXT DEFAULT '',
 			announcement TEXT DEFAULT '',
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved INTEGER NOT NULL DEFAULT 0,
@@ -153,6 +154,8 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			sender_id TEXT NOT NULL,
 			content_type TEXT NOT NULL,
 			content TEXT NOT NULL DEFAULT '',
+			edited INTEGER NOT NULL DEFAULT 0,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 		`CREATE TABLE pending_agent_tasks (

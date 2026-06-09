@@ -117,10 +117,39 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `thread.updated` | P0 | Thread 状态或标题更新 |
 | `thread.deleted` | P0 | Thread 删除 |
 | `thread.forked` | P1 | Thread 分支创建 (planned) |
+| `thread.pin.created` | P0 | Edge 本地 Thread item 置顶，payload 为 `ThreadPin`，scope: `{ threadId, itemId }` |
+| `thread.pin.deleted` | P0 | Edge 本地 Thread item 取消置顶，payload: `{ threadId, itemId }`，scope: `{ threadId, itemId }` |
 | `message.created` | P0 | 消息创建 |
 | `message.delta` | P0 | Agent 消息流式增量 |
 | `item.created` | P0 | Thread Item 创建 |
 | `item.updated` | P0 | Thread Item 状态更新 (planned) |
+
+`message.created` 的 text/content JSON 可以携带 IM 编排 metadata，用于 shared transcript 和后续 Hub task/orchestrator queue 投影；metadata 不启动真实 runtime，也不替代 `/web/agent-tasks` 的 `trigger_message_id` 合同。
+
+```json
+{
+  "text": "@Reviewer 检查 shared transcript contract",
+  "metadata": {
+    "im_kind": "project_group",
+    "mentions": [
+      { "id": "agent-reviewer", "label": "Reviewer", "runtime_id": "codex" }
+    ],
+    "agent_task": { "task_id": "task-reviewer-1", "status": "queued" },
+    "orchestrator_queue": {
+      "status": "queued",
+      "route": "review",
+      "correlation_id": "corr-reviewer-1"
+    },
+    "route_decision": {
+      "action": "dispatch",
+      "target_agent": "Reviewer",
+      "summary": "Route shared transcript contract review to Reviewer."
+    }
+  }
+}
+```
+
+当前 fixture contract 覆盖 human -> agent、agent -> agent、项目群 @Agent 和 orchestrator route decision 的 transcript 可见状态；真实 agent-authored message ingest、群成员权限、消息幂等、任务队列持久化和 route decision 执行仍归后续 Hub/TeamRun 切片。
 
 ### Execution / Runtime
 
@@ -136,10 +165,10 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.persistence_error` | P0 | 持久化错误，payload: `{ runId, error }` |
 | `approval.requested` | P0 | 请求用户审批 (planned) |
 | `approval.decided` | P0 | 用户已审批 (planned) |
-| `artifact.created` | P0 | 产物创建 (planned) |
+| `artifact.created` | P0 | 产物创建；Edge lifecycle 将该事件的 artifact metadata 写入本地 evidence store，当前只读 REST 合同通过 `GET /v1/artifacts` 暴露 metadata snapshot；不包含 content/apply/discard |
 | `artifact.updated` | P1 | 产物元数据更新 (planned) |
-| `preview.ready` | P0 | 预览可用 (planned) |
-| `preview.stopped` | P1 | 预览停止 (planned) |
+| `preview.ready` | P0 | 预览可用；Edge lifecycle 将该事件的 preview metadata 写入本地 evidence store，当前只读 REST 合同通过 `GET /v1/previews` / `GET /v1/previews/{previewId}` 暴露 metadata snapshot；start 生命周期后续补齐 |
+| `preview.stopped` | P1 | 预览停止；Edge lifecycle 将该事件写回同一条 preview metadata，状态转为 `stopped` 并清空 ready URL；真实进程停止仍由后续 preview runner slice 实现 |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
 | `run.cancelled` | P0 | AgentRun 已取消（已实现） |
@@ -148,16 +177,18 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |
 | `run.agent.tool_call` | P0 | Agent 请求工具调用 |
 | `run.agent.tool_result` | P0 | 工具调用执行结果 |
-| `run.agent.file_change` | P0 | 文件变更，payload: `{ path, kind: "created"\|"modified"\|"deleted", diff? }` |
-| `run.agent.route_decision` | P1 | Runtime structured output 中解析出的 `CoordinatorRouteDecision`；Desktop bridge 会用 dispatch payload 中的 TeamRun context 自动 POST 到 Hub route decision endpoint |
+| `run.agent.file_change` | P0 | 文件变更。每个文件一条事件；payload: `{ callId, toolName, path, files?: string[], kind: "created"\|"modified"\|"deleted", action, status, rawKind?, outsideWorkspace?, diff? }`。`files` 为同一 file_change item 中所有变更的聚合路径数组，必须和 `path` 使用同一套 workspace-relative 或 `<outside-workspace>/<basename>` 脱敏规则；Edge lifecycle 将单文件 `path`/`kind`/`diff` 写入本地 run diff evidence snapshot |
+| `run.agent.route_decision` | P1 | Runtime structured output 中解析出的 `CoordinatorRouteDecision`；Desktop bridge 会用 dispatch payload 中的 TeamRun context 自动 POST 到 Hub route decision endpoint；Hub replay 会保留 `correlation_id`，并在 accepted/rejected audit 中暴露 `subtask_id`、`parent_task_id`、`agent_id`、`reason` |
 | `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
 | `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |
 | `run.agent.compact_boundary` | P1 | 上下文压缩边界 |
 | `run.agent.api_retry` | P1 | API 重试通知 |
 | `run.agent.task_started` | P1 | 子代理任务启动 |
 | `run.agent.task_dispatched` | P1 | 子代理任务已派发 |
+| `run.agent.task_dispatch_failed` | P1 | 子代理派发失败，payload: `{ taskId, error }` |
 | `run.agent.task_progress` | P1 | 子代理任务进度 |
 | `run.agent.task_notification` | P1 | 子代理任务完成/失败 |
+| `run.agent.sub_agent_status` | P1 | 子代理运行状态更新，payload: `{ agentId, status, taskId?, runId? }` |
 | `run.agent.sub_agents_complete` | P1 | 所有子代理执行完毕，payload: `{ parentId, childCount, allComplete }` |
 | `run.agent.session_state_changed` | P1 | 会话状态变更（idle/running/requires_action） |
 | `run.agent.status_change` | P1 | Agent 适配器状态变更 |
@@ -173,13 +204,87 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.rate_limit` | P1 | 速率限制通知 |
 | `run.agent.permission_requested` | P1 | Agent 请求权限审批 |
 | `run.agent.permission_decided` | P1 | 权限审批结果 |
+| `run.agent.cli_invocation_plan` | P1 | CLI/SDK/custom Agent 的无执行调用计划；payload 只包含脱敏 command shape、flags、config keys、env names、workspace basename 和 fixture/no-spend/approval flags |
+
+### Edge Adapter Fixture JSON Contract
+
+本节记录 Edge adapter 测试使用的 no-spend AgentHubAgentSpec -> RuntimeInvocation
+fixture/compiler 和 contract mapper。它只说明 Claude Agent SDK-like、OpenAI Agents
+SDK-like、OpenCode sidecar、Codex CLI JSON 和 custom Agent runtime 的静态 JSON
+fixture 映射，不声明生产 SDK 包已安装、真实模型/API 已调用，或真实 runtime path
+已可用。生产 adapter 只有在 approved real runner/smoke 切片证明后，才能声明同样的
+`run.agent.*` event shape 来自真实路径。Fixture 信号必须先编译成 AgentHub-owned
+RuntimeInvocation fixture，再映射到现有 `run.agent.*` vocabulary，最后进入 Hub/Web replay。
+Replay shape 保持：
+
+```json
+{"type":"agent.stream","payload":{"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"edge_run_id":"run_01","event_seq":1}}
+```
+
+Provider-specific 字段留在 Edge adapter 边界内。Fixture event payload 必须脱敏 raw
+prompt、API token、authorization header、secret-like key、绝对 workspace path 和
+provider trace body。路径安全时保留 workspace-relative；否则只保留 basename。
+当前离线矩阵只覆盖静态 fixture evidence，不安装 SDK 包、不联网、不跑真实模型/API。
+
+`AgentHubAgentSpec` fixture compiler 输出 `agenthub.runtime_invocation.fixture.v1`：
+
+| Field | Requirement |
+|---|---|
+| `execution_mode` | 固定为 `fixture` |
+| `no_spend_default` | 固定为 `true` |
+| `live_runtime_allowed` | 固定为 `false`；输入 spec 若允许 live runtime 必须被拒绝 |
+| `adapter_strategy` | `sdk-json-fixture`、`cli-json-fixture` 或 `custom-runtime-fixture` |
+| `parser_contract` | 只列 AgentHub-owned `run.agent.*` / `artifact.created` event vocabulary |
+| `cli_invocation_plan` | 仅 CLI JSON fixture strategy 可出现；必须只包含脱敏 command shape，不含 prompt、env value、绝对路径或真实执行证明 |
+
+Contract fixture mappings:
+
+| Fixture signal | AgentHub event | Required payload notes |
+|---|---|---|
+| `invocation_plan` / `cli_invocation_plan` | `run.agent.cli_invocation_plan` | `adapterId`, basename `commandName`, `argFlags`, `configKeys`, env variable names only, basename `workDir`, `promptRedacted`, `executionMode: fixture`, `noSpendDefault: true`, `approvalRequired: true`, `redactionApplied: true`, `observed: false`, `realTested: false` |
+| `status` / `session.updated` | `run.agent.status_change` | `sessionId`, `status`, optional `summary`, `reason`, redacted `metadata` |
+| `progress` / `task_progress` | `run.agent.task_progress` | `taskId`, `description`, `status`, optional `percent`, `lastToolName`, `summary` |
+| `assistant_message` / `message_output` / `text_block` | `run.agent.text_block` | `content`, provider/session/trace/evidence refs |
+| `tool_call` / provider tool use | `run.agent.tool_call` | `callId`, `toolName`, redacted `input`, provider/session/trace refs |
+| `tool_result` / provider tool output | `run.agent.tool_result` | `callId`, `toolName`, `content`, `isError`, redacted attachments/metadata; direct `tool_result` and completed `tool_state` use the same attachment/metadata redaction path |
+| `file_change` / `artifact_file` | `run.agent.file_change` | `callId`, `toolName`, workspace-relative or basename `path`, `kind`, optional `diff` |
+| `permission_request` / `guardrail_signal` | `run.agent.permission_requested` | `requestId`, `toolName`, `toolUseId`, redacted `input`, `riskLevel`, `reason`, optional guardrail decision |
+| `artifact` / `artifact_created` | `artifact.created` | `artifactId`, workspace-relative or basename `path`, `kind`, `sizeBytes`, `summary`, evidence refs |
+| `usage` / `context_usage` | `run.agent.context_usage` | `inputTokens`, `outputTokens`, `totalTokens`, optional `totalCostUsd`, `model`, `sessionId` |
+| `terminal_result` / `run_result` | `run.agent.result` | `success`, `summary`, `terminalReason: completed\|error\|cancelled`, optional nested `usage`; arbitrary provider reason strings stay in sanitized `reason`, not `terminalReason` |
+| `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted `error`, sanitized `reason` |
+| `cancelled` / `cancellation` | `run.agent.result` | Adapter-level cancellation signal only: `success: false`, `cancelled: true`, `terminalReason: cancelled`; lifecycle-owned `run.cancelled` is still emitted by `ProcessExecutor` |
+
+Artifact/demo evidence packages that leave a local run directory must include a
+redacted manifest before they are treated as product-loop evidence. The manifest
+is offline metadata only; it does not run CLI/model/API calls and is not a
+competition submission bundle.
+
+Required manifest fields:
+
+| Field | Requirement |
+| --- | --- |
+| `schema` | `agenthub-redacted-evidence-manifest-v1` |
+| `evidence_boundary.label` | one of `fixture`, `observed`, `RealTested`, `approved-real` |
+| `evidence_boundary.*` | boolean flags for the four boundaries so fixture, observed replay, real-tested evidence, and approved-real packaging cannot be conflated |
+| `path_boundary` | package-root statement plus package-relative file paths only; no absolute source path disclosure |
+| `redaction.status` | `passed` after scanning text evidence for token/password/client secret/cookie/authorization value patterns |
+| `files[].path` | package-relative path under the evidence package root |
+| `files[].sha256` | SHA-256 hash for every packaged artifact, evidence JSON, screenshot, and video; the manifest itself is parsed and scanned by the checker rather than self-hashed |
+
+48h 低风险离线矩阵的 fixture evidence 位于
+`edge-server/internal/adapters/sdk_fixture_mapper_test.go`。当前矩阵验证 Claude
+Agent SDK-like 与 OpenAI Agents SDK-like 静态 JSON 样例可映射到
+`text_block`、`tool_call`、`tool_result`、`file_change`、
+`permission_requested`、`result` 和 `artifact.created`，同时验证 replay 不泄漏
+示例 token。
 
 ### AgentTeam / TeamRun
 
 | type | 阶段 | 说明 |
 |---|---|---|
-| `team.route.decided` | P1 | Supervisor typed route decision 已接受，payload 为 `CoordinatorRouteDecision` |
-| `team.route.rejected` | P1 | Supervisor route decision 被 schema、任务数、活跃 subagent 或重复 route guardrail 拒绝，payload 包含 `decision` 和 `reason` |
+| `team.route.decided` | P1 | Supervisor typed route decision 已接受，payload 为 `CoordinatorRouteDecision`，包含 `accepted=true`、queued `subtask_id`、可选 `parent_task_id`、`agent_id`、`reason` 和 `correlation_id` |
+| `team.route.rejected` | P1 | Supervisor route decision 被 schema、任务数、活跃 subagent 或重复 route guardrail 拒绝，payload 包含 `decision` 和 `reason`；replay 的 `route_audit_log` 标记 `status=rejected` 且保留 `agent_id` / `correlation_id` |
 | `team.task.created` | P1 | TeamTask 已从 accepted route decision 创建 |
 | `team.approval.decided` | P1 | TeamRun approval 人工决策已记录，payload 包含 `approval_id`、`agent_task_id`、`edge_run_id`、`decision`、`decided_by`、`edge_control` |
 | `assignment.created` | P1 | TeamAssignment 已创建 |
@@ -245,8 +350,10 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | 字段 | 类型 | 必填 | 描述 |
 |-------|------|:---:|------|
 | `type` | string | 是 | 事件类型，使用 dot.notation 格式（如 `message.new`） |
-| `seq_id` | number | 否 | 当前连接内单调递增序号 |
+| `seq_id` | number | 否 | 服务端保留字段，用于需要排序/游标的 Hub-emitted frames；未排序事件、认证帧和客户端事件应省略 |
 | `payload` | object | 视事件而定 | 事件载荷，结构由 `type` 决定 |
+
+`seq_id` 不是客户端可写字段。当前实现中 `Frame.seq_id` 使用 `omitempty`，所以 `auth.ok`、`auth.fail`、`typing`、device presence 和 agent control/dispatch 默认不带 `seq_id`；消息分页游标仍以 message payload 内的 `seq_id` 为准。
 
 对比 Edge EventEnvelope：
 
@@ -290,10 +397,13 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | type | 说明 |
 |------|------|
 | `message.new` | 新消息，payload: `{ message_id, session_id, sender_id, sender_type, content, content_type, seq_id, reply_to_message_id, created_at }` |
+| `message.edited` | 消息已编辑，payload: 完整 message 对象，包含 `id`, `session_id`, `content`, `content_type`, `edited`, `edited_at` |
 | `message.recall` | 消息撤回，payload: `{ message_id, session_id, recalled_by }` |
 | `message.pin` | 消息置顶，payload: `{ message_id, session_id, pinned_by }` |
 | `message.unpin` | 取消置顶，payload: `{ message_id, session_id }` |
 | `message.read` | 消息已读回执，payload: `{ message_id, session_id, read_by, last_read_seq }` |
+| `message.reaction_added` | 消息 reaction 已添加 (service-emitted + WS routed to session)，payload: `{ action, user_id, message_id, session_id, reaction, count }`；不包含 `reacted_by_me`，该字段只属于 REST reaction response 的当前用户视角 |
+| `message.reaction_removed` | 消息 reaction 已移除 (service-emitted + WS routed to session)，payload: `{ action, user_id, message_id, session_id, reaction, count }`；不包含 `reacted_by_me`，该字段只属于 REST reaction response 的当前用户视角 |
 
 ```json
 {"type":"message.new","seq_id":42,"payload":{"message_id":"msg_01HX...","session_id":"sess_01HX...","sender_id":"user_01HX...","sender_type":"user","content":{"text":"Hello"},"content_type":"text","created_at":"2026-05-25T12:00:00Z"}}
@@ -303,25 +413,25 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `session.created` | 会话创建 (defined, not yet emitted)，payload: `{ session_id, type, name, owner_id, members[] }` |
-| `session.dissolved` | 群解散 (defined, not yet emitted)，payload: `{ session_id }` |
-| `session.member_joined` | 成员加入 (defined, not yet emitted)，payload: `{ session_id, member_id, member_type }` |
-| `session.member_left` | 成员离开 (defined, not yet emitted)，payload: `{ session_id, member_id }` |
-| `session.info_updated` | 会话信息变更 (defined, not yet emitted)，payload: `{ session_id, changes{} }` |
+| `session.created` | 会话创建 (service-emitted + WS routed/pushed to members, or session fallback)，payload: `{ session_id, type, name, owner_id, members[] }` |
+| `session.dissolved` | 群解散 (service-emitted + WS routed/pushed to session)，payload: `{ session_id }` |
+| `session.member_joined` | 成员加入 (service-emitted + WS routed/pushed to session)，payload: `{ session_id, member_id, member_type }` |
+| `session.member_left` | 成员离开 (service-emitted + WS routed/pushed to session)，payload: `{ session_id, member_id }` |
+| `session.info_updated` | 会话信息变更 (service-emitted + WS routed/pushed to session)，payload: `{ session_id, changes{} }` |
 
 #### Device 事件（Hub→Client）
 
 | type | 说明 |
 |------|------|
-| `device.online` | 设备上线，payload: `{ user_id, device_id, device_type }` |
-| `device.offline` | 设备下线，payload: `{ user_id, device_id, device_type }` |
+| `device.online` | 用户在线 presence，payload: `{ user_id }`；这是 user-level presence 广播，不暴露具体 device |
+| `device.offline` | 用户离线 presence，payload: `{ user_id }`；这是 user-level presence 广播，不暴露具体 device |
 | `device.kicked` | 设备被踢下线，payload: `{ device_id, reason }` |
 
 #### Agent Task 事件（Hub↔Edge）
 
 | type | 方向 | 说明 |
 |------|------|------|
-| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, agent_type, session_id, prompt, trigger_message_id, trigger_user_id, display_name, model_params?, target_id?, team_id?, team_run_id?, team_member_id?, team_member_role? }`；`agent_type` 必须是 Edge Runtime adapter id（如 `claude-code`、`codex`、`opencode`），`prompt` 来自触发消息文本。Web 触发可用 `agent_type` / `agent_instance_id` / `custom_agent_id` 指定 Agent，可用 `target_id` 指定 owner-scoped Execution Target；Hub 会校验 target owner、当前可调度 target type 和绑定 desktop device，把 `target_id` 与 `edge_device_id` 持久化，只向该 device 的 Desktop/Edge WS 下发。TeamRun supervisor dispatch 会携带 team context，Desktop bridge 用它把 `run.agent.route_decision` / result `structuredOutput` 自动绑定到 Hub route decision endpoint。目标 device 离线时进入 target/device 专属队列，等待同一 device reconnect replay，禁止 fallback 到其他在线 desktop。该切片仍不代表远程/云 target 已完成；Remote/Cloud 还需要 relay/provisioning、设备证明、workspace allowlist 同步和审批证明。 |
+| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, agent_type, session_id, prompt, trigger_message_id, trigger_user_id, display_name, model_params?, target_id?, edge_device_id?, team_id?, team_run_id?, team_member_id?, team_member_role? }`；`agent_type` 必须是 Edge Runtime adapter id（如 `claude-code`、`codex`、`opencode`），`prompt` 来自触发消息文本。Web 触发可用 `agent_type` / `agent_instance_id` / `custom_agent_id` 指定 Agent，可用 `target_id` 指定 owner-scoped Execution Target；Hub 会校验 target owner、当前可调度 target type 和绑定 desktop device，把 `target_id` 与 `edge_device_id` 持久化，并在 target-bound `local_edge` dispatch payload 中同时携带两者，只向该 device 的 Desktop/Edge WS 下发。TeamRun supervisor dispatch 会携带 team context，Desktop bridge 用它把 `run.agent.route_decision` / result `structuredOutput` 自动绑定到 Hub route decision endpoint。目标 device 离线时进入 target/device 专属队列，等待同一 device reconnect replay，禁止 fallback 到其他在线 desktop；replay 会先读取 Redis payload，只有 Hub DB 任务状态成功标记为 dispatched 后才 ack 删除该 payload，避免 DB 更新失败时丢任务。该切片仍不代表远程/云 target 已完成；Remote/Cloud 还需要 relay/provisioning、设备证明、workspace allowlist 同步和审批证明。 |
 | `agent.stream` | Edge→Hub/Hub→Client | typed runtime event，payload: `{ id, task_id, edge_run_id, session_id, agent_instance_id, event_seq, event_type, payload, created_at }`；Hub 仍会为当前聊天 UI 同步投影一条 `message.new`。 |
 | `agent.done` | Edge→Hub | agent 任务完成，payload: `{ task_id, result_summary, usage{} }` |
 | `agent.failed` | Edge→Hub | agent 任务失败，payload: `{ task_id, error }` |
@@ -339,8 +449,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `friend.request` | 收到好友请求，payload: `{ request_id, from_user_id, message }` |
-| `friend.accepted` | 好友请求被接受，payload: `{ friendship_id, user_id }` |
+| `friend.request` | 收到好友请求 (service-emitted; receiver_id/push contract gap remains)，payload: `{ request_id, from_user_id, message }`；当前 payload 尚未携带 `receiver_id`，因此接收方 WS push contract 仍需补齐 |
+| `friend.accepted` | 好友请求被接受 (service-emitted + WS pushed to accepting user)，payload: `{ friendship_id, user_id }` |
 
 ### 7.4 代码示例
 
@@ -355,7 +465,7 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 {"type":"message.new","seq_id":42,"payload":{"message_id":"msg_01HX...","session_id":"sess_01HX...","sender_id":"user_01HX...","sender_type":"user","content":{"text":"Hello"},"content_type":"text","created_at":"2026-05-25T12:00:00Z"}}
 
 // 服务端推送设备上线
-{"type":"device.online","payload":{"user_id":"user_01HX...","device_id":"device_01HX...","device_type":"desktop"}}
+{"type":"device.online","payload":{"user_id":"user_01HX..."}}
 
 // Edge 上报 agent 任务完成
 {"type":"agent.done","payload":{"task_id":"task_01HX...","result_summary":"Tests passed. 3/3 OK.","usage":{"input_tokens":1234,"output_tokens":567}}}
@@ -364,5 +474,5 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 {"type":"agent.stream","payload":{"id":"evt_01HX...","task_id":"task_01HX...","edge_run_id":"run_01HX...","session_id":"sess_01HX...","agent_instance_id":"agent_01HX...","event_seq":1,"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"created_at":"2026-05-25T12:00:00Z"}}
 
 // Hub 推送 exact-device permission decision control
-{"type":"agent.control","payload":{"kind":"permission.decide","agent_task_id":"task_01HX...","edge_device_id":"device_01HX...","team_id":"team_01HX...","team_run_id":"run_team_01HX...","approval_id":"req_01HX...","edge_control":{"runId":"edge_run_01HX...","requestId":"req_01HX...","decision":"allow","reason":"Known safe command"}}}
+{"type":"agent.control","payload":{"kind":"permission.decide","agent_task_id":"task_01HX...","target_id":"target_01HX...","edge_device_id":"device_01HX...","team_id":"team_01HX...","team_run_id":"run_team_01HX...","approval_id":"req_01HX...","edge_control":{"runId":"edge_run_01HX...","requestId":"req_01HX...","decision":"allow","reason":"Known safe command"}}}
 ```

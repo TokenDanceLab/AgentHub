@@ -32,17 +32,19 @@ fn set_close_to_tray(state: tauri::State<'_, CloseToTrayState>, enabled: bool) {
 
 pub fn run() {
     let edge_path = resolve_edge_path();
-    let store_path = std::env::temp_dir().join("agenthub-edge-store.json");
+    let store_path = std::env::temp_dir().join("agenthub-edge.sqlite");
     let edge = Arc::new(Mutex::new(
-        EdgeManager::new(edge_path.clone(), store_path.clone())
-            .unwrap_or_else(|e| {
-                log::error!("Failed to initialize local Edge auth token: {e}. Edge connections will not authenticate.");
-                EdgeManager::new_fallback(edge_path, store_path)
-            }),
+        EdgeManager::new(edge_path.clone(), store_path.clone()).unwrap_or_else(|e| {
+            log::error!(
+                "Failed to initialize local Edge auth token: {e}. Local Edge startup is blocked."
+            );
+            EdgeManager::new_unavailable(edge_path, store_path, e)
+        }),
     ));
 
     let close_to_tray = Arc::new(AtomicBool::new(true));
     let quitting = Arc::new(AtomicBool::new(false));
+    let workspace_file_access = commands::WorkspaceFileAccessState::default();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -50,11 +52,16 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(edge.clone())
+        .manage(workspace_file_access)
         .manage(CloseToTrayState(close_to_tray.clone()))
         .manage(QuittingState(quitting.clone()))
         .invoke_handler(tauri::generate_handler![
             commands::get_edge_status,
+            commands::get_edge_host_readiness,
+            commands::get_local_edge_diagnostics,
+            commands::get_local_cli_discovery,
             commands::get_edge_auth_token,
+            commands::get_packaged_login_readiness,
             commands::start_edge,
             commands::stop_edge,
             commands::read_dir_tree,
@@ -71,6 +78,7 @@ pub fn run() {
             commands::git_diff_file,
             commands::read_workspace_store,
             commands::write_workspace_store,
+            commands::choose_workspace_root,
             commands::validate_allowlist,
             commands::search_workspace_content,
             oidc_server::start_oidc_callback_server,
@@ -91,6 +99,10 @@ pub fn run() {
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+            let access = app.state::<commands::WorkspaceFileAccessState>();
+            if let Err(error) = commands::seed_workspace_file_access_from_store(&handle, &access) {
+                log::warn!("Failed to seed workspace file access state: {error}");
+            }
             tray::build_tray(&handle)?;
             let edge_for_start = edge.clone();
             let start_handle = handle.clone();

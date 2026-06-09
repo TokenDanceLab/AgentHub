@@ -62,6 +62,9 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	if _, err := s.CreateThreadMessage("item_a", threadA.ID, "assistant", "hello"); err != nil {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
 	}
+	if _, err := s.PinThreadItem(threadA.ID, "item_a", "Delicious233"); err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
 
 	s.Flush()
 	s.Close()
@@ -92,6 +95,9 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	}
 	if got, ok := restored.GetItem("item_a"); !ok || got.Content != "hello" || got.Role != "assistant" {
 		t.Fatalf("GetItem(item_a) = %#v, %v, want restored message item", got, ok)
+	}
+	if got := restored.ListThreadPins(threadA.ID); len(got) != 1 || got[0].ItemID != "item_a" || got[0].PinnedBy != "Delicious233" {
+		t.Fatalf("ListThreadPins(thread_a) = %#v, want restored item_a pin", got)
 	}
 }
 
@@ -124,6 +130,9 @@ func TestFileStoreCleanupRunsPersistsRemovedRunsAndItems(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateItem returned error: %v", err)
 	}
+	if _, err := s.PinThreadItem(thread.ID, "item_test", "Delicious233"); err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
 
 	result := s.CleanupRuns(RunCleanupOptions{
 		Now:         time.Now().UTC().Add(48 * time.Hour),
@@ -153,6 +162,9 @@ func TestFileStoreCleanupRunsPersistsRemovedRunsAndItems(t *testing.T) {
 	}
 	if got := restored.ListThreadItems(thread.ID); len(got) != 0 {
 		t.Fatalf("ListThreadItems = %#v, want empty after cleanup persistence", got)
+	}
+	if got := restored.ListThreadPins(thread.ID); len(got) != 0 {
+		t.Fatalf("ListThreadPins = %#v, want empty after cleanup persistence", got)
 	}
 }
 
@@ -263,10 +275,15 @@ func TestFileStoreFillsMissingOrderFromSnapshotMaps(t *testing.T) {
     "item_a": {"itemId": "item_a", "projectId": "proj_a", "threadId": "thread_a", "type": "event", "status": "created", "createdAt": "2026-05-23T00:00:00Z"},
     "item_b": {"itemId": "item_b", "projectId": "proj_b", "threadId": "thread_b", "type": "event", "status": "created", "createdAt": "2026-05-23T00:00:00Z"}
   },
+  "pins": {
+    "thread_a\u0000item_a": {"threadId": "thread_a", "itemId": "item_a", "pinnedBy": "A", "pinnedAt": "2026-05-23T00:00:00Z", "createdAt": "2026-05-23T00:00:00Z", "updatedAt": "2026-05-23T00:00:00Z"},
+    "thread_b\u0000item_b": {"threadId": "thread_b", "itemId": "item_b", "pinnedBy": "B", "pinnedAt": "2026-05-23T00:00:01Z", "createdAt": "2026-05-23T00:00:01Z", "updatedAt": "2026-05-23T00:00:01Z"}
+  },
   "projectOrder": ["proj_b", "missing", "proj_b"],
   "threadOrder": ["thread_b"],
   "runOrder": ["run_b"],
-  "itemOrder": ["item_b"]
+  "itemOrder": ["item_b"],
+  "pinOrder": ["thread_b\u0000item_b"]
 }`)
 	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
@@ -292,6 +309,12 @@ func TestFileStoreFillsMissingOrderFromSnapshotMaps(t *testing.T) {
 	}
 	if got := s.ListThreadItems("thread_a"); len(got) != 1 || got[0].ID != "item_a" {
 		t.Fatalf("ListThreadItems(thread_a) = %#v, want item_a", got)
+	}
+	if got := s.ListThreadPins("thread_b"); len(got) != 1 || got[0].ItemID != "item_b" {
+		t.Fatalf("ListThreadPins(thread_b) = %#v, want item_b pin", got)
+	}
+	if got := s.ListThreadPins("thread_a"); len(got) != 1 || got[0].ItemID != "item_a" {
+		t.Fatalf("ListThreadPins(thread_a) = %#v, want sorted missing item_a pin", got)
 	}
 }
 

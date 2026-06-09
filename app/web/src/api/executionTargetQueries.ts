@@ -30,6 +30,8 @@ export interface ExecutionTargetInventorySummary {
   healthy: number;
   degraded: number;
   offline: number;
+  mismatch: number;
+  stale: number;
   unknown: number;
   byType: Record<ExecutionTargetType, number>;
 }
@@ -48,7 +50,15 @@ const executionTargetTypes: ExecutionTargetType[] = [
 ];
 
 const trustLevels: ExecutionTargetTrustLevel[] = ['local', 'remote', 'cloud', 'relay'];
-const healthStates: ExecutionTargetHealthState[] = ['unknown', 'healthy', 'degraded', 'offline'];
+const healthStates: ExecutionTargetHealthState[] = [
+  'unknown',
+  'healthy',
+  'online',
+  'degraded',
+  'offline',
+  'mismatch',
+  'stale',
+];
 
 const emptyExecutionTargets: ExecutionTargetInventoryResponse = {
   items: [],
@@ -93,6 +103,16 @@ function normalizeExecutionTarget(target: ExecutionTarget): ExecutionTargetInven
   };
 }
 
+export function selectOnlineLocalEdgeExecutionTarget(
+  targets: Array<Pick<ExecutionTarget, 'id' | 'target_type' | 'is_online' | 'health_state'>>,
+): Pick<ExecutionTarget, 'id' | 'target_type' | 'is_online' | 'health_state'> | undefined {
+  return targets.find((target) =>
+    target.target_type === 'local_edge' &&
+    target.is_online === true &&
+    (target.health_state === 'online' || target.health_state === 'healthy')
+  );
+}
+
 export async function fetchExecutionTargets(
   preferHub: boolean,
   getToken: () => string | null = getAccessToken,
@@ -118,14 +138,18 @@ export function summarizeExecutionTargets(targets: ExecutionTargetInventoryItem[
   let healthy = 0;
   let degraded = 0;
   let offline = 0;
+  let mismatch = 0;
+  let stale = 0;
   let unknown = 0;
 
   for (const target of targets) {
     byType[target.target_type] += 1;
     if (target.is_online) online += 1;
-    if (target.health_state === 'healthy') healthy += 1;
+    if (target.health_state === 'healthy' || target.health_state === 'online') healthy += 1;
     else if (target.health_state === 'degraded') degraded += 1;
     else if (target.health_state === 'offline') offline += 1;
+    else if (target.health_state === 'mismatch') mismatch += 1;
+    else if (target.health_state === 'stale') stale += 1;
     else unknown += 1;
   }
 
@@ -135,6 +159,8 @@ export function summarizeExecutionTargets(targets: ExecutionTargetInventoryItem[
     healthy,
     degraded,
     offline,
+    mismatch,
+    stale,
     unknown,
     byType,
   };

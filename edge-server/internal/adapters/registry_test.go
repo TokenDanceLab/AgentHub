@@ -12,7 +12,7 @@ type stubAdapter struct {
 	id string
 }
 
-func (s *stubAdapter) Metadata() AdapterMetadata      { return AdapterMetadata{ID: s.id, Name: s.id} }
+func (s *stubAdapter) Metadata() AdapterMetadata       { return AdapterMetadata{ID: s.id, Name: s.id} }
 func (s *stubAdapter) Capabilities() AgentCapabilities { return AgentCapabilities{} }
 func (s *stubAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	return "", nil, nil, ""
@@ -21,7 +21,7 @@ func (s *stubAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin i
 	return nil
 }
 func (s *stubAdapter) NeedsStdin() bool { return false }
-func (s *stubAdapter) Available() bool   { return true }
+func (s *stubAdapter) Available() bool  { return true }
 
 func TestRegistryRegisterAndGet(t *testing.T) {
 	r := NewRegistry()
@@ -125,5 +125,19 @@ func TestRegistryDefaultRoleNotFound(t *testing.T) {
 	_, ok := r.Default("nonexistent-role")
 	if ok {
 		t.Error("expected not found for unset role")
+	}
+}
+
+func TestValidateCLIAdapterID(t *testing.T) {
+	for _, id := range []string{"claude-code", "codex", "opencode"} {
+		if err := ValidateCLIAdapterID(id); err != nil {
+			t.Fatalf("ValidateCLIAdapterID(%q) returned error: %v", id, err)
+		}
+	}
+
+	for _, id := range []string{"", "claude", "openai", "agenthub-runner-mock", "unknown-runtime"} {
+		if err := ValidateCLIAdapterID(id); err == nil {
+			t.Fatalf("ValidateCLIAdapterID(%q) returned nil, want error", id)
+		}
 	}
 }

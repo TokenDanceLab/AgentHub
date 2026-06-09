@@ -38,6 +38,7 @@ type Handler struct {
 	Registry           *runners.Registry
 	Store              store.Repository
 	Executor           lifecycle.RunExecutor
+	PreviewRunner      lifecycle.PreviewRunner
 	AdapterRegistry    *adapters.Registry // nil if no agent adapters configured
 	AgentRegistry      *agents.Registry   // runtime agent instance registry
 	MessageQueue       *agents.Queue      // inter-agent message queue
@@ -55,10 +56,12 @@ type Handler struct {
 	HubJWTSecret string
 
 	PermissionRegistry *PermissionRegistry
+	PermissionBroker   *adapters.PermissionDecisionBroker
 
-	runCreateMu              sync.Mutex
-	permissionRegistryMu     sync.Mutex
-	permissionObserverCancel func()
+	runCreateMu               sync.Mutex
+	permissionRegistryMu      sync.Mutex
+	permissionObserverCancel  func()
+	permissionBrokerInstalled bool
 }
 
 var upgrader = websocket.Upgrader{
@@ -177,16 +180,57 @@ func ensureBus(h *Handler) *events.Bus {
 	return h.Bus
 }
 
+func ensurePreviewRunner(h *Handler, repository store.Repository) lifecycle.PreviewRunner {
+	if h.PreviewRunner == nil {
+		h.PreviewRunner = lifecycle.NewFakePreviewRunner(repository)
+	}
+	return h.PreviewRunner
+}
+
 func (h *Handler) ensurePermissionRegistry() *PermissionRegistry {
 	h.permissionRegistryMu.Lock()
 	defer h.permissionRegistryMu.Unlock()
 	if h.PermissionRegistry == nil {
 		h.PermissionRegistry = NewPermissionRegistry(0)
 	}
+	if h.PermissionBroker == nil {
+		h.PermissionBroker = adapters.NewPermissionDecisionBroker()
+	}
+	h.installPermissionBrokerLocked()
 	if h.permissionObserverCancel == nil {
 		h.permissionObserverCancel = ensureBus(h).AddObserver(h.PermissionRegistry.ObserveEvent)
 	}
 	return h.PermissionRegistry
+}
+
+type permissionBrokerConfigurer interface {
+	SetPermissionBroker(*adapters.PermissionDecisionBroker)
+}
+
+func (h *Handler) ensurePermissionBroker() *adapters.PermissionDecisionBroker {
+	h.permissionRegistryMu.Lock()
+	defer h.permissionRegistryMu.Unlock()
+	if h.PermissionBroker == nil {
+		h.PermissionBroker = adapters.NewPermissionDecisionBroker()
+	}
+	h.installPermissionBrokerLocked()
+	return h.PermissionBroker
+}
+
+func (h *Handler) installPermissionBrokerLocked() {
+	if h.permissionBrokerInstalled || h.PermissionBroker == nil || h.AdapterRegistry == nil {
+		return
+	}
+	for _, metadata := range h.AdapterRegistry.List() {
+		adapter, ok := h.AdapterRegistry.Get(metadata.ID)
+		if !ok {
+			continue
+		}
+		if configurable, ok := adapter.(permissionBrokerConfigurer); ok {
+			configurable.SetPermissionBroker(h.PermissionBroker)
+		}
+	}
+	h.permissionBrokerInstalled = true
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -528,6 +572,75 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 	writeSuccess(w, http.StatusCreated, item)
 }
 
+func (h *Handler) GetThreadPins(w http.ResponseWriter, r *http.Request, threadID string) {
+	repository := ensureStore(h)
+	if _, ok := repository.GetThread(threadID); !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		return
+	}
+	pins := repository.ListThreadPins(threadID)
+	items := make([]map[string]any, 0, len(pins))
+	for _, pin := range pins {
+		item, ok := repository.GetItem(pin.ItemID)
+		if !ok || item.ThreadID != threadID {
+			continue
+		}
+		items = append(items, map[string]any{
+			"threadId":  pin.ThreadID,
+			"itemId":    pin.ItemID,
+			"pinnedBy":  pin.PinnedBy,
+			"pinnedAt":  pin.PinnedAt,
+			"createdAt": pin.CreatedAt,
+			"updatedAt": pin.UpdatedAt,
+			"item":      item,
+		})
+	}
+	writeSuccess(w, http.StatusOK, listResponse(items))
+}
+
+func (h *Handler) PostThreadPin(w http.ResponseWriter, r *http.Request, threadID string) {
+	var req struct {
+		ItemID   string `json:"itemId"`
+		PinnedBy string `json:"pinnedBy"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	itemID := strings.TrimSpace(req.ItemID)
+	if itemID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("itemId is required")))
+		return
+	}
+	pin, err := ensureStore(h).PinThreadItem(threadID, itemID, req.PinnedBy)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread item not found")))
+		return
+	}
+	h.Bus.Publish("thread.pin.created", map[string]any{
+		"threadId": threadID,
+		"itemId":   itemID,
+	}, pin)
+	writeSuccess(w, http.StatusCreated, pin)
+}
+
+func (h *Handler) DeleteThreadPin(w http.ResponseWriter, r *http.Request, threadID string) {
+	itemID := strings.TrimSpace(r.URL.Query().Get("itemId"))
+	if itemID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("itemId is required")))
+		return
+	}
+	if ok := ensureStore(h).DeleteThreadPin(threadID, itemID); !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread pin not found")))
+		return
+	}
+	h.Bus.Publish("thread.pin.deleted", map[string]any{
+		"threadId": threadID,
+		"itemId":   itemID,
+	}, map[string]any{"threadId": threadID, "itemId": itemID})
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	itemID := strings.TrimPrefix(r.URL.Path, "/v1/items/")
 	if item, ok := ensureStore(h).GetItem(itemID); ok {
@@ -535,6 +648,119 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("item not found")))
+}
+
+func (h *Handler) GetRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
+	repository := ensureStore(h)
+	if _, ok := repository.GetRun(runID); !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+	files := repository.ListRunDiffFiles(runID)
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"runId": runID,
+		"files": runDiffFilesResponse(files),
+	})
+}
+
+func (h *Handler) GetArtifacts(w http.ResponseWriter, r *http.Request) {
+	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListArtifacts(runID)))
+}
+
+func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID string) {
+	artifactID = strings.TrimSpace(artifactID)
+	if artifactID == "" || strings.Contains(artifactID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+		return
+	}
+	if artifact, ok := ensureStore(h).GetArtifact(artifactID); ok {
+		writeSuccess(w, http.StatusOK, artifact)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+}
+
+func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
+	runID := strings.TrimSpace(r.URL.Query().Get("runId"))
+	writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListPreviews(runID)))
+}
+
+func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PreviewID string `json:"previewId"`
+		RunID     string `json:"runId"`
+		ThreadID  string `json:"threadId"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	if req.RunID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("runId is required")))
+		return
+	}
+	if strings.TrimSpace(req.PreviewID) == "" {
+		req.PreviewID = genID("preview_")
+	}
+
+	repository := ensureStore(h)
+	preview, err := ensurePreviewRunner(h, repository).StartPreview(lifecycle.PreviewStartRequest{
+		PreviewID: req.PreviewID,
+		RunID:     req.RunID,
+		ThreadID:  req.ThreadID,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+	writeSuccess(w, http.StatusAccepted, preview)
+}
+
+func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID string) {
+	previewID = strings.TrimSpace(previewID)
+	if previewID == "" || strings.Contains(previewID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	if preview, ok := ensureStore(h).GetPreview(previewID); ok {
+		writeSuccess(w, http.StatusOK, preview)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+}
+
+func (h *Handler) PostPreviewStop(w http.ResponseWriter, r *http.Request, previewID string) {
+	previewID = strings.TrimSpace(previewID)
+	if previewID == "" || strings.Contains(previewID, "/") {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	repository := ensureStore(h)
+	preview, ok := repository.GetPreview(previewID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	stopped, err := ensurePreviewRunner(h, repository).StopPreview(preview.ID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	writeSuccess(w, http.StatusAccepted, stopped)
+}
+
+func runDiffFilesResponse(files []store.RunDiffFile) []map[string]any {
+	out := make([]map[string]any, 0, len(files))
+	for _, file := range files {
+		out = append(out, map[string]any{
+			"path":   file.Path,
+			"diff":   file.Diff,
+			"status": file.Status,
+		})
+	}
+	return out
 }
 
 // ---------------------------------------------------------------------------
@@ -1154,10 +1380,16 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	permission, ok := h.ensurePermissionRegistry().Consume(req.RunID, req.RequestID)
-	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPermissionRequestNotFound))
-		return
+	registry := h.ensurePermissionRegistry()
+	permission, ok := pendingPermissionFromBroker(h.ensurePermissionBroker(), req.RunID, req.RequestID, req.Decision, req.Reason)
+	if ok {
+		_, _ = registry.Consume(req.RunID, req.RequestID)
+	} else {
+		permission, ok = registry.Consume(req.RunID, req.RequestID)
+		if !ok {
+			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPermissionRequestNotFound))
+			return
+		}
 	}
 
 	scope := map[string]any{"runId": permission.RunID}
@@ -1178,6 +1410,24 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("permission decided by Desktop", "requestId", req.RequestID, "decision", req.Decision)
 	writeSuccess(w, http.StatusOK, map[string]any{"status": "ok"})
+}
+
+func pendingPermissionFromBroker(broker *adapters.PermissionDecisionBroker, runID, requestID, decision, reason string) (PendingPermission, bool) {
+	pending, ok := broker.Decide(runID, requestID, adapters.PermissionDecision{
+		Behavior: decision,
+		Message:  reason,
+	})
+	if !ok {
+		return PendingPermission{}, false
+	}
+	return PendingPermission{
+		ProjectID: pending.ProjectID,
+		ThreadID:  pending.ThreadID,
+		RunID:     pending.RunID,
+		RequestID: pending.RequestID,
+		ToolName:  pending.ToolName,
+		ToolUseID: pending.ToolUseID,
+	}, true
 }
 
 // ---------------------------------------------------------------------------
@@ -1271,6 +1521,20 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			h.GetThreadItems(w, r, threadID)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/pins") {
+			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/pins")
+			switch r.Method {
+			case http.MethodGet:
+				h.GetThreadPins(w, r, threadID)
+			case http.MethodPost:
+				h.PostThreadPin(w, r, threadID)
+			case http.MethodDelete:
+				h.DeleteThreadPin(w, r, threadID)
+			default:
+				writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			}
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, "/messages") && r.Method == http.MethodPost {
 			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/messages")
 			h.PostThreadMessage(w, r, threadID)
@@ -1318,6 +1582,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			h.PostCancelRun(w, r)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/diff") && r.Method == http.MethodGet {
+			runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/diff")
+			h.GetRunDiff(w, r, runID)
+			return
+		}
 		if r.Method == http.MethodGet {
 			runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
 			if run, ok := ensureStore(h).GetRun(runID); ok {
@@ -1328,6 +1597,47 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
+	})
+	mux.HandleFunc("/v1/artifacts", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.GetArtifacts(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
+	mux.HandleFunc("/v1/artifacts/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			artifactID := strings.TrimPrefix(r.URL.Path, "/v1/artifacts/")
+			h.GetArtifact(w, r, artifactID)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
+	mux.HandleFunc("/v1/previews", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetPreviews(w, r)
+		case http.MethodPost:
+			h.PostPreview(w, r)
+		default:
+			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		}
+	})
+	mux.HandleFunc("/v1/previews/", func(w http.ResponseWriter, r *http.Request) {
+		previewPath := strings.TrimPrefix(r.URL.Path, "/v1/previews/")
+		if strings.HasSuffix(previewPath, ":stop") {
+			if r.Method == http.MethodPost {
+				h.PostPreviewStop(w, r, strings.TrimSuffix(previewPath, ":stop"))
+				return
+			}
+			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			return
+		}
+		if r.Method == http.MethodGet {
+			h.GetPreview(w, r, previewPath)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
 	mux.HandleFunc("/v1/metrics", h.GetMetrics)
 	mux.HandleFunc("/v1/events", h.GetEvents)

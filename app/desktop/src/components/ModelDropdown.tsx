@@ -1,8 +1,8 @@
 // Custom model/agent dropdown — Portal-rendered, high-density two-line items.
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check, Bot } from 'lucide-react';
-import { Claude, ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { ChevronDown, Check } from 'lucide-react';
+import { RuntimeBrandIcon } from '@shared/workbench';
 import { resolveModelDisplayName, type ModelDisplayNameMap } from '@/utils/modelDisplay';
 import styles from './ModelDropdown.module.css';
 
@@ -27,23 +27,17 @@ interface Props {
   modelDisplayNames?: ModelDisplayNameMap;
 }
 
-function AgentDot({ name }: { name: string }) {
-  const n = name.toLowerCase();
-  const compact = n.replace(/[\s_-]+/g, '');
-  if (compact === 'claudecode') return <ClaudeCode size={18} />;
-  if (n.includes('codex')) return <Codex size={18} />;
-  if (n.includes('opencode')) return <OpenCode size={18} />;
-  return <Bot size={16} />;
-}
-
-function ModelDot() {
-  return <Bot size={15} strokeWidth={1.9} />;
-}
-
-function ModelIcon({ name }: { name: string }) {
-  const n = name.toLowerCase();
-  if (n.includes('claude')) return <Claude size={18} />;
-  return <ModelDot />;
+function OptionBrandIcon({ option }: { option: Option }) {
+  return (
+    <RuntimeBrandIcon
+      kind={option.isAgent ? 'runtime' : 'model'}
+      name={option.value || option.label}
+      provider={option.group}
+      size="normal"
+      framed={false}
+      title={option.label}
+    />
+  );
 }
 
 export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight, variant = 'default', modelDisplayNames }: Props) {
@@ -149,7 +143,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
               className={`${styles.item} ${compact ? styles.itemCompact : ''} ${opt.value === value ? styles.itemActive : ''}`}
               onClick={() => handleSelect(opt.value)}>
               <span className={styles.itemIcon}>
-                {opt.isAgent ? <AgentDot name={opt.label} /> : <ModelIcon name={opt.label} />}
+                <OptionBrandIcon option={opt} />
               </span>
               <span className={styles.itemBody}>
                 <span className={styles.itemName}>{resolveModelDisplayName(opt.label, modelDisplayNames)}</span>

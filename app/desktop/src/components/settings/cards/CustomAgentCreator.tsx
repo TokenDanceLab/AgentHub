@@ -6,6 +6,8 @@ import {
   Variable, BookOpen, ChevronLeft, ChevronRight, Check,
 } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
+import { RuntimeIcon } from '@shared/ui/RuntimeIcon';
+import { buildAgentHubAgentSpecV1, formatAgentHubAgentSpecV1 } from '@shared/agentSpec';
 import type { AgentTemplate } from '../agent-creation/agentCreationTypes';
 import { saveCustomAgent, loadCustomAgents, type StoredCustomAgent } from '../agent-creation/agentStore';
 import { emojiOptions, modelOptions, reasoningOptions, capabilityLabels } from '../agent-creation/agentTemplates';
@@ -23,6 +25,12 @@ export interface CustomAgentDraft {
   tools: string[];
   model: string;
   provider: string;
+  runtimeProfile: string;
+  executionTarget: string;
+  targetHealth: string;
+  approvalPolicy: string;
+  workspaceTrust: string;
+  evidenceMode: string;
   temperature: number;
   maxTokens: number;
   reasoningEffort: string;
@@ -89,6 +97,37 @@ const TOTAL_STEPS = WIZARD_STEPS.length;
 
 interface TestMessage { role: 'user' | 'assistant'; content: string; }
 
+const FIXTURE_EVIDENCE_TAGS = [
+  'fixture-only',
+  'adapter-ready',
+  'no-spend',
+  'runtime:codex-local-profile',
+  'profile:local-custom-agent',
+  'target:local-edge-fixture-healthy',
+  'approval:workspace-write',
+  'workspace:trusted',
+] as const;
+
+function providerDisplayName(provider: string): string {
+  if (provider === 'tokendance-gateway') return 'TokenDance Gateway';
+  return provider || 'Custom provider';
+}
+
+function buildFixtureEvidenceTags(tools: string[]): string[] {
+  return Array.from(new Set([...tools, ...FIXTURE_EVIDENCE_TAGS]));
+}
+
+function buildFixtureEvidenceRows(draft: CustomAgentDraft): string[] {
+  return [
+    `Runtime profile: ${draft.runtimeProfile}`,
+    `Provider/model: ${providerDisplayName(draft.provider)} / ${draft.model}`,
+    `Tools/MCP: ${draft.tools.length} tools, MCP adapter-ready`,
+    `Approval policy: ${draft.approvalPolicy}`,
+    `Workspace trust: ${draft.workspaceTrust}`,
+    `Target health: ${draft.executionTarget} ${draft.targetHealth}`,
+  ];
+}
+
 function applyVariables(prompt: string): string {
   const now = new Date();
   return prompt
@@ -111,6 +150,12 @@ function makeDefaultDraft(): CustomAgentDraft {
     tools: ['read_file', 'write_file', 'execute_command', 'search_code', 'grep', 'glob'],
     model: 'deepseek-v4-flash',
     provider: 'tokendance-gateway',
+    runtimeProfile: 'Codex local profile',
+    executionTarget: 'Local Edge',
+    targetHealth: 'fixture healthy',
+    approvalPolicy: 'workspace-write',
+    workspaceTrust: 'trusted local workspace',
+    evidenceMode: 'fixture-only',
     temperature: 0.5,
     maxTokens: 8192,
     reasoningEffort: 'high',
@@ -132,6 +177,12 @@ function draftFromStoredAgent(stored: StoredCustomAgent): CustomAgentDraft {
     tools: toolKeys.length > 0 ? toolKeys : ['read_file', 'write_file', 'execute_command', 'search_code', 'grep', 'glob'],
     model: stored.model,
     provider: 'tokendance-gateway',
+    runtimeProfile: 'Codex local profile',
+    executionTarget: 'Local Edge',
+    targetHealth: 'fixture healthy',
+    approvalPolicy: 'workspace-write',
+    workspaceTrust: 'trusted local workspace',
+    evidenceMode: 'fixture-only',
     temperature: stored.temperature,
     maxTokens: stored.maxTokens,
     reasoningEffort: stored.reasoningEffort,
@@ -161,6 +212,12 @@ function draftFromTemplate(template: AgentTemplate): CustomAgentDraft {
     tools: toolKeys,
     model: template.modelPreference.model,
     provider: 'tokendance-gateway',
+    runtimeProfile: 'Codex local profile',
+    executionTarget: 'Local Edge',
+    targetHealth: 'fixture healthy',
+    approvalPolicy: 'workspace-write',
+    workspaceTrust: 'trusted local workspace',
+    evidenceMode: 'fixture-only',
     temperature: template.modelPreference.temperature,
     maxTokens: template.modelPreference.maxTokens,
     reasoningEffort: template.modelPreference.reasoningEffort,
@@ -306,7 +363,7 @@ export default function CustomAgentCreator({
         name: draft.name.trim(),
         agentType: draft.agentType,
         systemPrompt: draft.systemPrompt,
-        capabilities: draft.tools,
+        capabilities: buildFixtureEvidenceTags(draft.tools),
         source: 'local',
         updatedAt: now,
       };
@@ -367,6 +424,43 @@ export default function CustomAgentCreator({
       setTestRunning(false);
     }, 800);
   }, [testInput, draft]);
+
+  const agentSpec = useMemo(() => buildAgentHubAgentSpecV1({
+    name: draft.name.trim() || 'Custom Agent Fixture',
+    description: draft.description,
+    emoji: draft.emoji,
+    runtimeId: draft.runtimeProfile.toLowerCase().includes('codex') ? 'codex' : 'custom-runtime',
+    runtimeProfile: draft.runtimeProfile,
+    provider: draft.provider,
+    model: draft.model,
+    reasoningEffort: draft.reasoningEffort,
+    temperature: draft.temperature,
+    maxOutputTokens: draft.maxTokens,
+    skills: draft.knowledgeBase.trim() ? ['knowledge-base-fixture'] : [],
+    mcpServers: draft.tools.includes('mcp')
+      ? [{ id: 'mcp-fixture', transport: 'stdio', command: 'agenthub-mcp-fixture' }]
+      : [],
+    toolAllowlist: draft.tools,
+    memoryPolicy: { mode: 'project', retention: 'ephemeral-fixture' },
+    approvalPolicy: {
+      mode: draft.approvalPolicy,
+      requireApprovalFor: draft.tools.filter((tool) => ['write_file', 'edit_file', 'execute_command'].includes(tool)),
+    },
+    targetPreference: {
+      mode: draft.executionTarget.toLowerCase().includes('local') ? 'local-edge' : 'hub-relay',
+      targetId: 'local-edge-fixture',
+      health: draft.targetHealth.replace(/\s+/g, '-'),
+    },
+  }), [draft]);
+
+  const agentSpecPreview = useMemo(() => formatAgentHubAgentSpecV1(agentSpec), [agentSpec]);
+
+  const handleExportAgentSpec = useCallback(() => {
+    try {
+      localStorage.setItem('agenthub-settings.lastAgentSpecV1Export', agentSpecPreview);
+    } catch { /* storage full */ }
+    void navigator.clipboard?.writeText(agentSpecPreview).catch(() => undefined);
+  }, [agentSpecPreview]);
 
   const testInputKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTestSend(); }
@@ -483,6 +577,31 @@ export default function CustomAgentCreator({
                     <option key={at.value} value={at.value}>{t(at.label)}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className={styles.profileCard}>
+                <div className={styles.profileHeader}>
+                  <div className={styles.profileIcon}>
+                    <RuntimeIcon kind="runtime" name="Codex" size="compact" title="Codex local profile" />
+                  </div>
+                  <div>
+                    <strong>Fixture-only evidence</strong>
+                    <span>Adapter-ready builder preview; no live SDK execution.</span>
+                  </div>
+                  <em className={`${styles.profileStatus} ${styles.profileStatus_available}`}>
+                    {draft.evidenceMode}
+                  </em>
+                </div>
+                <div className={styles.profileMeta}>
+                  {buildFixtureEvidenceRows(draft).map((row) => (
+                    <span key={row}>{row}</span>
+                  ))}
+                </div>
+                <div className={styles.profileMeta}>
+                  <span>No live SDK execution</span>
+                  <span>No model/API spend</span>
+                  <span>adapter-ready</span>
+                </div>
               </div>
             </div>
           )}
@@ -673,6 +792,25 @@ export default function CustomAgentCreator({
                   <Send size={14} />
                   {t('settings.agentCreator.testSend')}
                 </button>
+              </div>
+
+              <div className={styles.profileCard}>
+                <div className={styles.profileHeader}>
+                  <div className={styles.profileIcon}>
+                    <RuntimeIcon kind="runtime" name="Codex" size="compact" title="AgentHubAgentSpec v1" />
+                  </div>
+                  <div>
+                    <strong>{t('settings.agentCreator.agentSpecPreview')}</strong>
+                    <span>Fixture export for SDK mapper, AgentProfile, and TeamRun task input.</span>
+                  </div>
+                  <button type="button" className={styles.secondaryBtn} onClick={handleExportAgentSpec}>
+                    <FileText size={14} />
+                    {t('settings.agentCreator.exportAgentSpec')}
+                  </button>
+                </div>
+                <pre style={{ maxHeight: 220, overflow: 'auto', fontSize: 11, lineHeight: 1.45, margin: 0 }}>
+                  {agentSpecPreview}
+                </pre>
               </div>
             </div>
           )}

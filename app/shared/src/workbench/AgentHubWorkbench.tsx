@@ -6,10 +6,16 @@ import {
   composerReducer,
   createInitialComposerState,
 } from '../composer';
-import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '../platform';
+import type {
+  AgentHubPlatform,
+  LocalCliDiscoveryManifest,
+  WorkbenchAgent,
+  WorkbenchConversation,
+} from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
 import type { TranscriptBlock } from '../transcript';
+import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationSidebar } from './ConversationSidebar';
 import {
   ContextMenu,
@@ -20,13 +26,17 @@ import {
   type MultiSelectBarAction,
 } from './floating';
 import { GlobalRail, type GlobalRailPage } from './GlobalRail';
-import { RightInspector } from './RightInspector';
+import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
+import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
+import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
+import type { AgentConfig, ProjectDraft } from './pages';
+import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
@@ -47,6 +57,34 @@ const DEFAULT_BROWSER_PREVIEW_URL_BY_SURFACE = {
   desktop: 'http://127.0.0.1:5176/desktop/',
   web: 'http://127.0.0.1:5176/desktop/',
 } as const;
+
+type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
+
+interface MainchainNode {
+  id: string;
+  label: string;
+  detail: string;
+  state: MainchainStatusKind;
+}
+
+interface MainchainSummary {
+  nodes: MainchainNode[];
+  exportEnabled: boolean;
+  exportLabel: string;
+  exportDetail: string;
+}
+
+const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
+  mode: 'no-spend-discovery',
+  readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+  readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+  generatedAt: null,
+  items: [
+    { id: 'codex', name: 'Codex CLI', installed: false, version: null, path: 'codex', noSpend: true },
+    { id: 'claude-code', name: 'Claude Code', installed: false, version: null, path: 'claude', noSpend: true },
+    { id: 'opencode', name: 'OpenCode', installed: false, version: null, path: 'opencode', noSpend: true },
+  ],
+};
 
 interface AgentProfileState {
   id: string;
@@ -75,17 +113,62 @@ export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
   conversations: WorkbenchConversation[];
   agents?: WorkbenchAgent[];
+  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
+  workbenchStatus?: {
+    dataMode?: string | undefined;
+    replayLabel?: string | undefined;
+    targetLabel?: string | undefined;
+    targetState?: string | undefined;
+  } | undefined;
+  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
+  contacts?: WorkbenchContactsData | undefined;
+  projects?: ProjectInfo[] | undefined;
+  activeProjectId?: string | undefined;
+  projectsStatus?: {
+    loading?: boolean | undefined;
+    error?: string | undefined;
+    actionError?: string | undefined;
+    saving?: boolean | undefined;
+  } | undefined;
   activeConversationId?: string;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
+  onActiveProjectChange?: ((projectId: string) => void) | undefined;
+  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
+  onAgentsRetry?: (() => void) | undefined;
+  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onProjectUpdate?: ((
+    projectId: string,
+    draft: ProjectDraft,
+  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
+  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   transcript: TranscriptBlock[];
 }
 
 export function AgentHubWorkbench({
   platform,
   conversations,
-  agents = [],
+  agents,
+  composerExecutionTargets,
+  workbenchStatus,
+  agentProfilesStatus,
+  contacts,
+  projects,
+  activeProjectId,
+  projectsStatus,
   activeConversationId,
   onActiveConversationChange,
+  onActiveProjectChange,
+  onAgentCreate,
+  onAgentUpdate,
+  onAgentDelete,
+  onAgentsRetry,
+  onProjectCreate,
+  onProjectUpdate,
+  onApprovalDecision,
+  runtimeEvidence,
   transcript,
 }: AgentHubWorkbenchProps): React.ReactElement {
   const fallbackConversationId = conversations[0]?.id ?? 'default';
@@ -104,6 +187,7 @@ export function AgentHubWorkbench({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const [activePage, setActivePage] = useState<GlobalRailPage>('chat');
+  const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [contextMenu, setContextMenu] = useState<{
     blockId: string;
     title: string;
@@ -117,6 +201,7 @@ export function AgentHubWorkbench({
   const [selectBarRect, setSelectBarRect] = useState<{ left: number; width: number } | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [localCliDiscovery, setLocalCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
   const [activeAgentProfile, setActiveAgentProfile] = useState<AgentProfileState | null>(null);
   const [activeHumanProfile, setActiveHumanProfile] = useState<HumanProfileState | null>(null);
   const [focusedAgentId, setFocusedAgentId] = useState<string | undefined>(undefined);
@@ -141,6 +226,16 @@ export function AgentHubWorkbench({
   );
   const composerSubmitBehavior = useComposerSubmitBehavior();
   const evidence = collectTranscriptEvidence(transcript);
+  const mainchainSummary = buildMainchainSummary({
+    composerTargetLabel: composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label,
+    evidence,
+    platformSurface: platform.surface,
+    runtimeEvidence,
+    selectedExecutionTargetId,
+    targetRequired: Boolean(composerExecutionTargets),
+    transcript,
+    workbenchStatus,
+  });
 
   useEffect(() => {
     selectionModeRef.current = selectionMode;
@@ -155,18 +250,47 @@ export function AgentHubWorkbench({
   }, [sidebarWidth]);
   const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
   const isChatPage = activePage === 'chat';
-  const mentionableAgents: ComposerMention[] = agents.map((agent) => ({
+  const mentionableAgents: ComposerMention[] = (agents ?? []).map((agent) => ({
     id: agent.id,
     label: agent.name,
     ...(agent.description ? { description: agent.description } : {}),
     ...(agent.status ? { status: agent.status } : {}),
     ...(agent.model ? { model: agent.model } : {}),
+    ...(agent.provider ? { provider: agent.provider } : {}),
     ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
   }));
 
   useEffect(() => {
     dispatchComposer({ type: 'setConversationId', conversationId: currentConversationId });
   }, [currentConversationId]);
+
+  useEffect(() => {
+    if (!composerExecutionTargets || !selectedExecutionTargetId) return;
+    if (!composerExecutionTargets.some((target) => target.id === selectedExecutionTargetId)) {
+      setSelectedExecutionTargetId('');
+    }
+  }, [composerExecutionTargets, selectedExecutionTargetId]);
+
+  useEffect(() => {
+    if (activePage !== 'settings' || platform.surface !== 'desktop' || !platform.host?.localCliDiscovery) {
+      setLocalCliDiscovery(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLocalCliDiscovery(LOCAL_CLI_DISCOVERY_FALLBACK);
+    platform.host.localCliDiscovery()
+      .then((discovery) => {
+        if (!cancelled) setLocalCliDiscovery(discovery);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalCliDiscovery(LOCAL_CLI_DISCOVERY_FALLBACK);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage, platform]);
 
   useEffect(() => {
     if (!inspectorResizing) return;
@@ -302,7 +426,11 @@ export function AgentHubWorkbench({
 
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
     try {
-      await platform.runs.submitComposerIntent(buildComposerIntent(composer));
+      const intent = buildComposerIntent(composer);
+      await platform.runs.submitComposerIntent({
+        ...intent,
+        ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}),
+      });
       dispatchComposer({ type: 'resetAfterSubmit' });
     } catch {
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
@@ -496,7 +624,7 @@ export function AgentHubWorkbench({
 
   function agentProfileByName(agentName: string): Omit<AgentProfileState, 'anchor'> | null {
     const normalized = agentName.toLowerCase();
-    const runtimeAgent = agents.find((agent) => agent.name.toLowerCase() === normalized);
+    const runtimeAgent = (agents ?? []).find((agent) => agent.name.toLowerCase() === normalized);
     const configured = configuredAgentProfiles().find((agent) => (
       agent.name.toLowerCase() === normalized || agent.id.toLowerCase() === normalized
     ));
@@ -590,10 +718,22 @@ export function AgentHubWorkbench({
         return block.text.slice(0, 28) || block.author.name;
       case 'tool_call':
         return block.toolName;
+      case 'tool_result':
+        return `${block.toolName} result`;
+      case 'file_change':
+        return block.path;
+      case 'permission_request':
+      case 'permission_result':
+      case 'failure':
+      case 'finished':
+        return block.title;
+      case 'preview':
+        return block.url ?? block.previewId;
       case 'diff':
       case 'approval':
       case 'artifact':
       case 'subagent':
+      case 'subtask':
       case 'child_agent':
       case 'run_session':
       case 'run_step_group':
@@ -813,6 +953,22 @@ export function AgentHubWorkbench({
     showWorkbenchToast(multiActionLabel(action, count));
   }
 
+  function exportMainchainEvidence(): void {
+    if (!mainchainSummary.exportEnabled) {
+      showWorkbenchToast('暂无可导出的主链证据');
+      return;
+    }
+    copyText(JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      surface: platform.surface,
+      status: workbenchStatus,
+      nodes: mainchainSummary.nodes,
+      evidence,
+      runtimeEvidence,
+    }, null, 2));
+    showWorkbenchToast('已复制主链证据 JSON');
+  }
+
   function contextMenuGroups(blockId: string): Array<Array<ContextMenuItem>> {
     return [
       [
@@ -933,6 +1089,10 @@ export function AgentHubWorkbench({
               inspectorCollapsed={inspectorCollapsed}
               onToggleInspector={toggleInspector}
             />
+            <MainchainStatusStrip
+              summary={mainchainSummary}
+              onExportEvidence={exportMainchainEvidence}
+            />
             <TranscriptView
               actionedBlockIds={actionedBlockIds}
               contextBlockId={contextMenu?.blockId}
@@ -942,6 +1102,9 @@ export function AgentHubWorkbench({
               onBlockPointerUp={handleBlockPointerUp}
               onBlockSelect={handleBlockSelect}
               onAgentProfileOpen={openAgentProfile}
+              onApprovalDecision={(action) => {
+                void onApprovalDecision?.(action);
+              }}
               onReviewFile={openReviewFile}
               pinnedAnnouncement={activeConversation?.pinnedAnnouncement ? {
                 ...activeConversation.pinnedAnnouncement,
@@ -957,10 +1120,14 @@ export function AgentHubWorkbench({
               <UnifiedComposer
                 composer={composer}
                 dispatchComposer={dispatchComposer}
+                executionTargets={composerExecutionTargets}
+                executionTargetId={selectedExecutionTargetId}
                 inputRef={composerInputRef}
                 mentionableAgents={mentionableAgents}
+                onExecutionTargetChange={setSelectedExecutionTargetId}
                 onPickLocalAttachments={platform.attachments?.pickFiles}
                 onSubmit={submitComposer}
+                status={workbenchStatus}
                 submitBehavior={composerSubmitBehavior}
                 targetLabel={activeConversation?.title ?? 'AgentHub'}
               />
@@ -971,8 +1138,22 @@ export function AgentHubWorkbench({
             <WorkbenchRoutes
               activePage={activePage}
               agents={agents}
+              agentProfilesStatus={agentProfilesStatus}
+              dataMode={workbenchStatus?.dataMode}
+              contacts={contacts}
               focusedAgentId={focusedAgentId}
+              projects={projects}
+              activeProjectId={activeProjectId}
+              projectsStatus={projectsStatus}
+              onActiveProjectChange={onActiveProjectChange}
+              onProjectCreate={onProjectCreate}
+              onProjectUpdate={onProjectUpdate}
+              onAgentCreate={onAgentCreate}
+              onAgentUpdate={onAgentUpdate}
+              onAgentDelete={onAgentDelete}
+              onAgentsRetry={onAgentsRetry}
               onAgentProfileOpen={openAgentProfileFromConfig}
+              localCliDiscovery={localCliDiscovery}
             />
           </section>
         )}
@@ -989,6 +1170,7 @@ export function AgentHubWorkbench({
           minWidth={INSPECTOR_MIN_WIDTH}
           onOpenPreview={platform.preview?.openEvidence}
           reviewFileRequest={reviewFileRequest}
+          runtimeEvidence={runtimeEvidence}
           onResizeBy={resizeInspectorBy}
           onResizeStart={beginInspectorResize}
           width={inspectorWidth}
@@ -1072,6 +1254,197 @@ export function AgentHubWorkbench({
       <Toast message={toastMessage} visible={toastVisible} />
     </div>
   );
+}
+
+function MainchainStatusStrip({
+  onExportEvidence,
+  summary,
+}: {
+  onExportEvidence: () => void;
+  summary: MainchainSummary;
+}): React.ReactElement {
+  return (
+    <section className={styles.mainchainStrip} aria-label="Demo main chain status">
+      <div className={styles.mainchainTrack} role="list">
+        {summary.nodes.map((node) => (
+          <div className={styles.mainchainNode} data-state={node.state} key={node.id} role="listitem">
+            <span className={styles.mainchainDot} aria-hidden="true" />
+            <span className={styles.mainchainCopy}>
+              <strong>{node.label}</strong>
+              <em>{node.detail}</em>
+            </span>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className={styles.mainchainExport}
+        disabled={!summary.exportEnabled}
+        onClick={onExportEvidence}
+        title={summary.exportDetail}
+      >
+        {summary.exportLabel}
+      </button>
+    </section>
+  );
+}
+
+function buildMainchainSummary({
+  composerTargetLabel,
+  evidence,
+  platformSurface,
+  runtimeEvidence,
+  selectedExecutionTargetId,
+  targetRequired,
+  transcript,
+  workbenchStatus,
+}: {
+  composerTargetLabel?: string | undefined;
+  evidence: EvidenceRef[];
+  platformSurface: AgentHubPlatform['surface'];
+  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  selectedExecutionTargetId: string;
+  targetRequired: boolean;
+  transcript: TranscriptBlock[];
+  workbenchStatus?: AgentHubWorkbenchProps['workbenchStatus'];
+}): MainchainSummary {
+  const runSession = transcript.find((block) => block.kind === 'run_session');
+  const taskId = runSession?.kind === 'run_session' ? runSession.taskId : undefined;
+  const edgeRunId = runSession?.kind === 'run_session' ? runSession.edgeRunId : undefined;
+  const runId = runtimeEvidence?.runId ?? (runSession?.kind === 'run_session' ? runSession.runId : undefined);
+  const artifactCount = runtimeEvidence
+    ? runtimeEvidence.artifacts.length
+    : evidence.filter((item) => item.kind === 'artifact').length;
+  const approvalCount = evidence.filter((item) => item.kind === 'approval').length
+    + transcript.filter((block) => block.kind === 'approval' || block.kind === 'permission_request').length;
+  const diffCount = runtimeEvidence?.diffs.length ?? evidence.filter((item) => item.kind === 'file').length;
+  const previewCount = runtimeEvidence?.previews.length ?? evidence.filter((item) => item.kind === 'preview').length;
+  const routeBlocks = transcript.filter((block) => block.kind === 'route_decision');
+  const workerBlocks = transcript.filter((block) => (
+    block.kind === 'subagent' || block.kind === 'subtask' || block.kind === 'child_agent'
+  ));
+  const eventBlocks = transcript.filter((block) => (
+    block.kind === 'agent_timeline' || block.kind === 'tool_call' || block.kind === 'run_step_group'
+  ));
+  const supervisorLabel = runSession?.kind === 'run_session'
+    ? runSession.agentLabel ?? runSession.author.name
+    : routeBlocks[0]?.author.name ?? 'Supervisor';
+  const workerLabel = workerBlocks.map((block) => {
+    if (block.kind === 'subagent' || block.kind === 'subtask') return block.worker;
+    return block.agent;
+  }).find(Boolean) ?? routeBlocks.find((block) => block.kind === 'route_decision')?.targetAgent;
+  const evidencePathDetail = `${approvalCount} approval / ${artifactCount} artifact`;
+  const hasRuntimeEvidence = Boolean(runtimeEvidence && (
+    runtimeEvidence.diffs.length > 0
+    || runtimeEvidence.artifacts.length > 0
+    || runtimeEvidence.previews.length > 0
+    || runtimeEvidence.runId
+    || runtimeEvidence.loading?.diff
+    || runtimeEvidence.loading?.artifacts
+    || runtimeEvidence.loading?.previews
+    || runtimeEvidence.errors?.diff
+    || runtimeEvidence.errors?.artifacts
+    || runtimeEvidence.errors?.previews
+  ));
+  const hasExportEvidence = evidence.length > 0 || hasRuntimeEvidence || Boolean(runSession);
+  const targetLabel = composerTargetLabel
+    ?? workbenchStatus?.targetLabel
+    ?? (runSession?.kind === 'run_session' ? runSession.targetLabel : undefined);
+  const targetBlocked = targetRequired
+    && !selectedExecutionTargetId
+    && (workbenchStatus?.targetState === 'no-target' || !targetLabel);
+  const targetState = targetBlocked
+    ? 'blocked'
+    : targetLabel
+      ? 'done'
+      : targetRequired
+        ? 'waiting'
+        : 'empty';
+
+  const nodes: MainchainNode[] = [
+    {
+      id: 'web',
+      label: platformSurface === 'web' ? 'Web' : 'Shared UI',
+      detail: platformSurface === 'web' ? 'Shared/Web workbench' : 'Desktop shared workbench',
+      state: 'done',
+    },
+    {
+      id: 'hub-task',
+      label: 'Hub task',
+      detail: taskId ? taskId : workbenchStatus?.replayLabel ?? '等待 task/replay',
+      state: taskId ? 'done' : workbenchStatus?.replayLabel ? 'active' : 'waiting',
+    },
+    {
+      id: 'supervisor',
+      label: 'Supervisor',
+      detail: supervisorLabel,
+      state: supervisorLabel === 'Supervisor' ? 'waiting' : 'done',
+    },
+    {
+      id: 'worker',
+      label: 'Worker',
+      detail: workerLabel ?? '等待 worker route',
+      state: workerLabel ? 'active' : 'waiting',
+    },
+    {
+      id: 'route-event',
+      label: 'Route + event',
+      detail: `${routeBlocks.length} route / ${eventBlocks.length} event`,
+      state: routeBlocks.length + eventBlocks.length > 0 ? 'done' : 'empty',
+    },
+    {
+      id: 'target',
+      label: 'Exact target',
+      detail: targetLabel ?? (targetBlocked ? '没有在线 Desktop/Edge target' : '待选择 Desktop/Edge target'),
+      state: targetState,
+    },
+    {
+      id: 'edge',
+      label: 'Active run',
+      detail: edgeRunId ?? runId ?? runtimeEvidenceSourceSummary(runtimeEvidence),
+      state: runId || edgeRunId ? 'active' : hasRuntimeEvidence ? 'done' : 'waiting',
+    },
+    {
+      id: 'replay',
+      label: 'Replay',
+      detail: transcript.length > 0 ? `${transcript.length} transcript blocks` : '暂无 transcript',
+      state: transcript.length > 0 ? 'done' : 'empty',
+    },
+    {
+      id: 'evidence-path',
+      label: 'Approval/artifact',
+      detail: artifactCount + approvalCount + diffCount + previewCount > 0
+        ? `${evidencePathDetail} / ${diffCount} diff / ${previewCount} preview`
+        : '无 approval/artifact evidence',
+      state: approvalCount > 0 ? 'active' : artifactCount + diffCount + previewCount > 0 ? 'done' : 'empty',
+    },
+  ];
+
+  return {
+    nodes,
+    exportEnabled: hasExportEvidence,
+    exportLabel: hasExportEvidence ? '导出证据 JSON' : '等待证据',
+    exportDetail: hasExportEvidence
+      ? '复制 Web -> Hub task -> target -> Edge -> replay/artifact/approval evidence JSON'
+      : '暂无 transcript、runtime evidence 或 run session 可导出',
+  };
+}
+
+function runtimeEvidenceSourceSummary(runtimeEvidence: RuntimeEvidenceSnapshot | undefined): string {
+  if (!runtimeEvidence) return '等待 Edge evidence';
+  const loading = [
+    runtimeEvidence.loading?.diff ? 'diff loading' : undefined,
+    runtimeEvidence.loading?.artifacts ? 'artifact loading' : undefined,
+    runtimeEvidence.loading?.previews ? 'preview loading' : undefined,
+  ].filter(Boolean);
+  if (loading.length > 0) return loading.join(' / ');
+  const errors = [
+    runtimeEvidence.errors?.diff ? 'diff error' : undefined,
+    runtimeEvidence.errors?.artifacts ? 'artifact error' : undefined,
+    runtimeEvidence.errors?.previews ? 'preview error' : undefined,
+  ].filter(Boolean);
+  if (errors.length > 0) return errors.join(' / ');
+  return 'Edge evidence empty';
 }
 
 function configuredAgentProfiles(): Array<Omit<AgentProfileState, 'anchor'>> {

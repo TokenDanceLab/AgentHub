@@ -47,15 +47,16 @@ type App struct {
 	Version string
 
 	// Service layer
-	AuthService         *service.AuthService
-	ContactService      *service.ContactService
-	SessionService      *service.SessionService
-	MessageService      *service.MessageService
-	AgentService        *service.AgentService
-	AgentControlService *service.AgentControlService
-	AttachmentService   *service.AttachmentService
-	NotificationService *service.NotificationService
-	DeviceService       *service.DeviceService
+	AuthService            *service.AuthService
+	ContactService         *service.ContactService
+	SessionService         *service.SessionService
+	MessageService         *service.MessageService
+	MessageReactionService *service.MessageReactionService
+	AgentService           *service.AgentService
+	AgentControlService    *service.AgentControlService
+	AttachmentService      *service.AttachmentService
+	NotificationService    *service.NotificationService
+	DeviceService          *service.DeviceService
 
 	// OIDC (optional — only when TokenDance ID is configured)
 	OIDCService *service.OIDCService
@@ -80,6 +81,7 @@ type App struct {
 	MarketHandler          *handler.MarketHandler
 	ProviderBindingHandler *handler.ProviderBindingHandler
 	ExecutionTargetHandler *handler.ExecutionTargetHandler
+	WorkspaceHandler       *handler.WorkspaceHandler
 	AuditHandler           *handler.AuditHandler
 	AgentTeamHandler       *handler.AgentTeamHandler
 
@@ -109,6 +111,23 @@ func New(cfg *config.Config, db *gorm.DB, cacheClient *cache.Client) *App {
 		coreCtx:     coreCtx,
 		coreCancel:  coreCancel,
 	}
+}
+
+type messageServiceWithReactions struct {
+	*service.MessageService
+	reactions *service.MessageReactionService
+}
+
+func (s messageServiceWithReactions) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return s.reactions.AddMessageReaction(ctx, userID, sessionID, msgID, reaction)
+}
+
+func (s messageServiceWithReactions) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return s.reactions.RemoveMessageReaction(ctx, userID, sessionID, msgID, reaction)
+}
+
+func (s messageServiceWithReactions) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+	return s.reactions.ListMessageReactions(ctx, userID, sessionID, msgID)
 }
 
 // Run starts the Hub Server and blocks until a shutdown signal is received.
@@ -168,8 +187,9 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
-	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
+	a.SessionService = service.NewSessionService(a.DB, a.CacheClient, a.bus)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
+	a.MessageReactionService = service.NewMessageReactionService(a.DB, a.bus)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
 	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 	a.DeviceService = service.NewDeviceService(a.DB)
@@ -194,7 +214,12 @@ func (a *App) Run(ctx context.Context) error {
 	// Execution Target service
 	targetSvc := service.NewExecutionTargetService(a.DB)
 	targetSvc.SetCache(a.CacheClient)
+	a.DeviceService.SetDesktopTargetRegistrar(targetSvc)
 	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
+
+	// Workspace service
+	workspaceSvc := service.NewWorkspaceService(a.DB)
+	a.WorkspaceHandler = handler.NewWorkspaceHandler(workspaceSvc)
 
 	// Audit service
 	auditSvc := service.NewAuditService(a.DB, &service.AuditServiceConfig{
@@ -218,6 +243,8 @@ func (a *App) Run(ctx context.Context) error {
 		MaxTeamRunBudgetUsagePct: a.Config.AgentTeam.MaxTeamRunBudgetUsagePct,
 	})
 	a.AgentTeamService.SetControlService(a.AgentControlService)
+	a.AgentTeamService.SetBus(a.bus)
+	a.AgentService.SetTeamRouteHandler(a.AgentTeamService)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 
 	// Relay service
@@ -237,7 +264,10 @@ func (a *App) Run(ctx context.Context) error {
 	a.DeviceHandler.SetJWTConfig(a.Config.JWT.Secret, a.Config.JWT.AccessTTL)
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
-	a.MessageHandler = handler.NewMessageHandler(a.MessageService)
+	a.MessageHandler = handler.NewMessageHandler(messageServiceWithReactions{
+		MessageService: a.MessageService,
+		reactions:      a.MessageReactionService,
+	})
 	a.AgentHandler = handler.NewAgentHandler(a.AgentService)
 	a.CustomAgentHandler = handler.NewCustomAgentHandler(a.AgentService)
 	a.AttachmentHandler = handler.NewAttachmentHandler(a.AttachmentService)
@@ -369,6 +399,7 @@ func (a *App) setupRouter() *gin.Engine {
 		a.AuditHandler,
 		a.RelayHandler,
 		a.AgentTeamHandler,
+		a.WorkspaceHandler,
 	)
 	return r
 }
@@ -433,6 +464,9 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		if !ok {
 			return
 		}
+		if msg.SenderType == model.SenderTypeAgent {
+			return
+		}
 		frame := ws.NewFrame(ws.TypeMessageNew, msg)
 		a.mgr.PushToSession(msg.SessionID, frame)
 	})
@@ -466,6 +500,24 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		frame := ws.NewFrame(ws.TypeMessageUnpin, payload)
 		a.mgr.PushToSession(payload["session_id"], frame)
 	})
+
+	for _, reactionEvent := range []struct {
+		eventType string
+		frameType string
+	}{
+		{eventType: ws.TypeMessageReactionAdded, frameType: ws.TypeMessageReactionAdded},
+		{eventType: ws.TypeMessageReactionRemoved, frameType: ws.TypeMessageReactionRemoved},
+	} {
+		reactionEvent := reactionEvent
+		a.bus.Subscribe(reactionEvent.eventType, func(ctx context.Context, event service.Event) {
+			payload, ok := event.Payload.(service.MessageReactionEventPayload)
+			if !ok {
+				return
+			}
+			frame := ws.NewFrame(reactionEvent.frameType, payload)
+			a.mgr.PushToSession(payload.SessionID, frame)
+		})
+	}
 
 	a.bus.Subscribe("message.read", func(ctx context.Context, event service.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
@@ -538,6 +590,37 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		a.mgr.PushToSession(sessionID, frame)
 	})
 
+	for _, teamEvent := range []struct {
+		eventType        string
+		frameType        string
+		pushUserIfNoSess bool
+	}{
+		{eventType: "team.run.started", frameType: ws.TypeTeamRunStarted, pushUserIfNoSess: true},
+		{eventType: "team.event", frameType: ws.TypeTeamEvent},
+		{eventType: "team.assignment.completed", frameType: ws.TypeTeamAssignmentDone},
+		{eventType: "team.assignment.failed", frameType: ws.TypeTeamAssignmentFailed},
+	} {
+		teamEvent := teamEvent
+		a.bus.Subscribe(teamEvent.eventType, func(ctx context.Context, event service.Event) {
+			payload, ok := event.Payload.(map[string]interface{})
+			if !ok {
+				return
+			}
+			frame := ws.NewFrame(teamEvent.frameType, payload)
+			sessionID, _ := payload["session_id"].(string)
+			if sessionID != "" {
+				a.mgr.PushToSession(sessionID, frame)
+				return
+			}
+			if teamEvent.pushUserIfNoSess {
+				userID, _ := payload["user_id"].(string)
+				if userID != "" {
+					a.mgr.PushToUser(userID, frame)
+				}
+			}
+		})
+	}
+
 	a.bus.Subscribe("friend.request", func(ctx context.Context, event service.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
@@ -548,6 +631,71 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 			a.NotificationService.Notify(ctx, receiverID, model.TypeFriendRequest, payload)
 		}
 	})
+
+	a.bus.Subscribe(ws.TypeFriendAccepted, func(ctx context.Context, event service.Event) {
+		payload, ok := event.Payload.(map[string]interface{})
+		if !ok {
+			return
+		}
+		userID, _ := payload["user_id"].(string)
+		if userID == "" {
+			return
+		}
+		a.mgr.PushToUser(userID, ws.NewFrame(ws.TypeFriendAccepted, payload))
+	})
+
+	a.bus.Subscribe(ws.TypeSessionCreated, func(ctx context.Context, event service.Event) {
+		payload, ok := event.Payload.(map[string]interface{})
+		if !ok {
+			return
+		}
+		frame := ws.NewFrame(ws.TypeSessionCreated, payload)
+		if members := payloadStringSlice(payload, "members"); len(members) > 0 {
+			for _, userID := range members {
+				a.mgr.PushToUser(userID, frame)
+			}
+			return
+		}
+		sessionID, _ := payload["session_id"].(string)
+		a.mgr.PushToSession(sessionID, frame)
+	})
+
+	for _, eventType := range []string{
+		ws.TypeSessionMemberJoined,
+		ws.TypeSessionMemberLeft,
+		ws.TypeSessionInfoUpdated,
+		ws.TypeSessionDissolved,
+	} {
+		eventType := eventType
+		a.bus.Subscribe(eventType, func(ctx context.Context, event service.Event) {
+			payload, ok := event.Payload.(map[string]interface{})
+			if !ok {
+				return
+			}
+			sessionID, _ := payload["session_id"].(string)
+			if sessionID == "" {
+				return
+			}
+			a.mgr.PushToSession(sessionID, ws.NewFrame(eventType, payload))
+		})
+	}
+}
+
+func payloadStringSlice(payload map[string]interface{}, key string) []string {
+	switch value := payload[key].(type) {
+	case []string:
+		return value
+	case []interface{}:
+		result := make([]string, 0, len(value))
+		for _, item := range value {
+			if s, ok := item.(string); ok && s != "" {
+				result = append(result, s)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 // startTaskScheduler periodically scans for expired agent tasks and publishes timeout events.
@@ -659,12 +807,19 @@ func (a *App) hubConfigDumper() debugpkg.ConfigDumper {
 			"db_port":        cfg.DB.Port,
 			"db_name":        cfg.DB.Name,
 			"db_user":        cfg.DB.User,
-			"db_password":    cfg.DB.Password,
+			"db_password":    redactConfigSecret(cfg.DB.Password),
 			"redis_addr":     cfg.Redis.Addr,
-			"redis_password": cfg.Redis.Password,
-			"jwt_secret":     cfg.JWT.Secret,
+			"redis_password": redactConfigSecret(cfg.Redis.Password),
+			"jwt_secret":     redactConfigSecret(cfg.JWT.Secret),
 		}
 	}
+}
+
+func redactConfigSecret(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	return "[REDACTED]"
 }
 
 func (a *App) hubStateDumper() debugpkg.StateDumper {
@@ -757,36 +912,52 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 }
 
 func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, connID string) {
-	tasks, err := a.CacheClient.PopPendingTargetTasksForDevice(ctx, userID, deviceID)
+	tasks, err := a.CacheClient.ListPendingTargetTasksForDevice(ctx, userID, deviceID)
 	if err != nil || len(tasks) == 0 {
 		return
 	}
-	for _, taskJSON := range tasks {
+	for _, task := range tasks {
 		var payload json.RawMessage
-		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
+		if json.Unmarshal([]byte(task.Payload), &payload) == nil {
 			var meta struct {
 				TaskID string `json:"task_id"`
 			}
-			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
+			if json.Unmarshal([]byte(task.Payload), &meta) == nil && meta.TaskID != "" {
 				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID); err != nil {
 					slog.Error("failed to mark target-bound queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", deviceID, "error", err)
 					continue
 				}
 			}
-			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+			if !result.Queued {
+				slog.Warn("target-bound queued task replay not queued; keeping pending task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+				continue
+			}
+			if err := a.CacheClient.AckPendingTargetTask(ctx, userID, task.TargetID, deviceID, task.Payload); err != nil {
+				slog.Error("failed to ack target-bound queued task", "task_id", meta.TaskID, "target_id", task.TargetID, "user_id", userID, "device_id", deviceID, "error", err)
+				continue
+			}
 		}
 	}
 }
 
 func (a *App) pushPendingAgentControls(ctx context.Context, userID, deviceID, connID string) {
-	controls, err := a.CacheClient.PopPendingAgentControlsForDevice(ctx, userID, deviceID)
+	controls, err := a.CacheClient.ListPendingAgentControlsForDevice(ctx, userID, deviceID)
 	if err != nil || len(controls) == 0 {
 		return
 	}
 	for _, controlJSON := range controls {
 		var payload json.RawMessage
 		if json.Unmarshal([]byte(controlJSON), &payload) == nil {
-			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, payload))
+			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, payload))
+			if !result.Queued {
+				slog.Warn("agent control replay not queued; keeping pending control", "user_id", userID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+				continue
+			}
+			if err := a.CacheClient.AckPendingAgentControl(ctx, userID, deviceID, controlJSON); err != nil {
+				slog.Error("failed to ack pending agent control", "user_id", userID, "device_id", deviceID, "error", err)
+				continue
+			}
 		}
 	}
 }
@@ -801,6 +972,7 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	if conn != nil {
 		edgeDeviceID = conn.DeviceID
 	}
+	failedTasks := make([]string, 0)
 	for _, taskJSON := range tasks {
 		var payload json.RawMessage
 		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
@@ -813,7 +985,16 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 					continue
 				}
 			}
-			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+			result := a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+			if !result.Queued {
+				slog.Warn("queued task replay not queued; requeueing pending task", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+				failedTasks = append(failedTasks, taskJSON)
+			}
+		}
+	}
+	for i := len(failedTasks) - 1; i >= 0; i-- {
+		if err := a.CacheClient.PushPendingTask(ctx, userID, failedTasks[i]); err != nil {
+			slog.Error("failed to requeue pending task after websocket delivery failure", "user_id", userID, "conn_id", connID, "error", err)
 		}
 	}
 }

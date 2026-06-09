@@ -8,12 +8,14 @@ import { HEALTH_POLL_MS } from '@/config';
 export interface HealthState {
   online: boolean;
   health: HealthResponse | null;
+  lastError: string | null;
   refetch: () => void;
 }
 
 export function useHealth(): HealthState {
   const [online, setOnline] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
   const poll = useCallback(async () => {
@@ -22,10 +24,12 @@ export function useHealth(): HealthState {
       if (!mountedRef.current) return;
       setHealth(h);
       setOnline(true);
-    } catch {
+      setLastError(null);
+    } catch (error) {
       if (!mountedRef.current) return;
       setOnline(false);
       setHealth(null);
+      setLastError(error instanceof Error ? error.message : 'Local Edge health check failed');
     }
   }, []);
 
@@ -41,5 +45,5 @@ export function useHealth(): HealthState {
     };
   }, [poll]);
 
-  return { online, health, refetch: poll };
+  return { online, health, lastError, refetch: poll };
 }

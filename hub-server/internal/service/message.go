@@ -73,24 +73,37 @@ type ReplyToInfo struct {
 }
 
 type MessageResponse struct {
-	ID           string       `json:"id"`
-	SessionID    string       `json:"session_id"`
-	SeqID        int64        `json:"seq_id"`
-	ClientMsgID  string       `json:"client_msg_id"`
-	SenderType   string       `json:"sender_type"`
-	SenderID     string       `json:"sender_id"`
-	ContentType  string       `json:"content_type"`
-	Content      string       `json:"content"`
-	ReplyToMsgID *string      `json:"reply_to_message_id,omitempty"`
-	ReplyTo      *ReplyToInfo `json:"reply_to,omitempty"`
-	Recalled     bool         `json:"recalled"`
-	CreatedAt    string       `json:"created_at"`
+	ID           string             `json:"id"`
+	SessionID    string             `json:"session_id"`
+	SeqID        int64              `json:"seq_id"`
+	ClientMsgID  string             `json:"client_msg_id"`
+	SenderType   string             `json:"sender_type"`
+	SenderID     string             `json:"sender_id"`
+	ContentType  string             `json:"content_type"`
+	Content      string             `json:"content"`
+	ReplyToMsgID *string            `json:"reply_to_message_id,omitempty"`
+	ReplyTo      *ReplyToInfo       `json:"reply_to,omitempty"`
+	Attachments  []model.Attachment `json:"attachments,omitempty"`
+	Recalled     bool               `json:"recalled"`
+	Edited       bool               `json:"edited"`
+	EditedAt     string             `json:"edited_at,omitempty"`
+	CreatedAt    string             `json:"created_at"`
 }
 
 type SendMessageResponse struct {
 	MessageID string `json:"message_id"`
 	SeqID     int64  `json:"seq_id"`
 	CreatedAt string `json:"created_at"`
+}
+
+type EditMessageRequest struct {
+	ContentType string `json:"content_type"`
+	Content     string `json:"content"`
+}
+
+type EditMessageResponse struct {
+	MessageID string `json:"message_id"`
+	EditedAt  string `json:"edited_at"`
 }
 
 var validContentTypes = map[string]bool{
@@ -138,6 +151,9 @@ func validateContentPayload(contentType string, payload map[string]interface{}) 
 	case model.ContentTypeLinkCard:
 		return requireContentString(payload, "url", contentType)
 	case model.ContentTypeImage:
+		if hasContentString(payload, "attachment_id") {
+			return nil
+		}
 		return requireContentString(payload, "url", contentType)
 	case model.ContentTypeDeployCard:
 		return nil
@@ -291,7 +307,7 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 }
 
 func attachmentIDsFromContent(contentType, content string) ([]string, bool) {
-	if contentType != model.ContentTypeFile {
+	if contentType != model.ContentTypeFile && contentType != model.ContentTypeImage {
 		return nil, true
 	}
 
@@ -412,6 +428,7 @@ func (s *MessageService) GetMessagesIncremental(ctx context.Context, sessionID, 
 
 func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageResponse {
 	result := make([]MessageResponse, len(msgs))
+	attachmentsByMessage := s.attachmentsByMessageID(msgs)
 
 	replyToIDs := make(map[string]bool)
 	for _, m := range msgs {
@@ -447,7 +464,15 @@ func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageRespo
 			Content:      m.Content,
 			ReplyToMsgID: m.ReplyToMsgID,
 			Recalled:     m.Recalled,
+			Edited:       m.Edited,
 			CreatedAt:    m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		if m.EditedAt != nil {
+			resp.EditedAt = m.EditedAt.Format("2006-01-02T15:04:05Z07:00")
+		}
+
+		if len(attachmentsByMessage[m.ID]) > 0 {
+			resp.Attachments = attachmentsByMessage[m.ID]
 		}
 
 		if m.ReplyToMsgID != nil && replyMessages != nil {
@@ -472,6 +497,31 @@ func (s *MessageService) toMessageResponses(msgs []model.Message) []MessageRespo
 		result[i] = resp
 	}
 	return result
+}
+
+func (s *MessageService) attachmentsByMessageID(msgs []model.Message) map[string][]model.Attachment {
+	messageIDs := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, msg := range msgs {
+		if (msg.ContentType != model.ContentTypeFile && msg.ContentType != model.ContentTypeImage) || msg.ID == "" {
+			continue
+		}
+		if _, exists := seen[msg.ID]; exists {
+			continue
+		}
+		seen[msg.ID] = struct{}{}
+		messageIDs = append(messageIDs, msg.ID)
+	}
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	attachmentsByMessage, err := repository.ListAttachmentsByMessageIDs(s.db, messageIDs)
+	if err != nil {
+		slog.Warn("failed to load message attachments", "error", err)
+		return nil
+	}
+	return attachmentsByMessage
 }
 
 func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string) error {
@@ -503,6 +553,66 @@ func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string
 	s.bus.Publish(ctx, Event{Type: "message.recall", Payload: msg})
 
 	return nil
+}
+
+func (s *MessageService) EditMessage(ctx context.Context, msgID, userID string, req EditMessageRequest) (*EditMessageResponse, error) {
+	msg, err := repository.GetMessageByID(s.db, msgID)
+	if err != nil {
+		return nil, errcode.MsgNotFound
+	}
+
+	if _, err := repository.GetActiveMember(s.db, msg.SessionID, model.MemberTypeUser, userID); err != nil {
+		return nil, errcode.SessionNotMember
+	}
+	if msg.Recalled {
+		return nil, errcode.MsgNotEditable
+	}
+	if msg.SenderType != model.SenderTypeUser {
+		return nil, errcode.MsgNotEditable
+	}
+	if msg.SenderID != userID {
+		return nil, errcode.SessionNotMember
+	}
+	if config.MessageEditWindow > 0 && time.Since(msg.CreatedAt) > config.MessageEditWindow {
+		return nil, errcode.MsgEditTimeout
+	}
+	if !validContentTypes[req.ContentType] {
+		return nil, errcode.ErrBadRequest
+	}
+
+	content, err := normalizeMessageContent(req.ContentType, req.Content)
+	if err != nil {
+		slog.Warn("invalid message edit content", "content_type", req.ContentType, "error", err)
+		return nil, errcode.ErrBadRequest
+	}
+	attachmentIDs, ok := attachmentIDsFromContent(req.ContentType, content)
+	if !ok {
+		return nil, errcode.ErrBadRequest
+	}
+	for _, attachmentID := range attachmentIDs {
+		if err := s.ensureAttachmentReferenceAllowed(userID, attachmentID); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := repository.UpdateMessageContent(s.db, msgID, req.ContentType, content); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.MsgNotFound
+		}
+		return nil, err
+	}
+
+	updated, err := repository.GetMessageByID(s.db, msgID)
+	if err != nil {
+		return nil, err
+	}
+	s.bus.Publish(ctx, Event{Type: "message.edited", Payload: updated})
+
+	editedAt := ""
+	if updated.EditedAt != nil {
+		editedAt = updated.EditedAt.Format("2006-01-02T15:04:05Z07:00")
+	}
+	return &EditMessageResponse{MessageID: msgID, EditedAt: editedAt}, nil
 }
 
 func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgID string) error {
@@ -676,8 +786,8 @@ func (s *MessageService) forwardOne(ctx context.Context, userID string, msg *mod
 	forwarded := &model.Message{
 		SessionID:   sessionID,
 		ClientMsgID: uuidv7.Must(),
-		SenderType:  model.SenderTypeUser,
-		SenderID:    userID,
+		SenderType:  msg.SenderType,
+		SenderID:    msg.SenderID,
 		ContentType: msg.ContentType,
 		Content:     msg.Content,
 		SeqID:       seq,

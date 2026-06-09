@@ -150,9 +150,11 @@ export function useSendRun(deps: UseSendRunDeps): UseSendRunReturn {
         ...(opts?.modelAlias ? { modelAlias: opts.modelAlias } : {}),
         ...(opts?.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
       };
+      const runRequestOptions = useModelSettingsStore.getState().resolveRunRequestOptions(modelSettingsInput);
+      delete runRequestOptions.provider;
       const req: StartRunRequest = {
         prompt,
-        ...useModelSettingsStore.getState().resolveRunRequestOptions(modelSettingsInput),
+        ...runRequestOptions,
       };
       const customInstructions = readCustomInstructions();
       if (customInstructions) req.appendSystemPrompt = customInstructions;

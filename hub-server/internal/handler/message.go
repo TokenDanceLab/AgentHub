@@ -16,6 +16,7 @@ type MessageService interface {
 	SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
 	GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
 	GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
+	EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
 	RecallMessage(ctx context.Context, msgID, userID string) error
 	PinMessage(ctx context.Context, userID, sessionID, msgID string) error
 	UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error
@@ -23,6 +24,9 @@ type MessageService interface {
 	ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
 	MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
 	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
+	AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error)
 }
 
 type MessageHandler struct {
@@ -154,6 +158,28 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 	OK(c, result)
 }
 
+func (h *MessageHandler) EditMessage(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+
+	var req service.EditMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.EditMessage(c.Request.Context(), msgID, userID, req)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
+}
+
 func (h *MessageHandler) RecallMessage(c *gin.Context) {
 	userID := c.GetString("user_id")
 	msgID := c.Param("id")
@@ -213,6 +239,77 @@ func (h *MessageHandler) UnpinMessage(c *gin.Context) {
 		return
 	}
 	OK(c, nil)
+}
+
+func (h *MessageHandler) AddMessageReaction(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		Reaction  string `json:"reaction"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.AddMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
+}
+
+func (h *MessageHandler) RemoveMessageReaction(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		Reaction  string `json:"reaction"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.RemoveMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
+}
+
+func (h *MessageHandler) ListMessageReactions(c *gin.Context) {
+	userID := c.GetString("user_id")
+	msgID := c.Param("id")
+	sessionID := c.Query("session_id")
+	if sessionID == "" {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	result, err := h.service.ListMessageReactions(c.Request.Context(), userID, sessionID, msgID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, result)
 }
 
 func (h *MessageHandler) ListPins(c *gin.Context) {

@@ -1,0 +1,159 @@
+name: Release Readiness
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/workflows/release-readiness.yml"
+      - "app/desktop/package.json"
+      - "app/desktop/src-tauri/Cargo.toml"
+      - "app/desktop/src-tauri/Cargo.lock"
+      - "app/desktop/src-tauri/tauri.conf.json"
+      - "scripts/**release**"
+      - "scripts/**tauri**"
+      - "tests/scripts/**"
+  workflow_dispatch:
+    inputs:
+      run_windows_package_dry:
+        description: "Run the Windows Tauri package dry build. This uploads artifacts only to the workflow run."
+        required: false
+        default: false
+        type: boolean
+      run_macos_unsigned_dry_policy:
+        description: "Record macOS arm64 unsigned dry sidecar/bundle policy boundaries only. This never builds, signs, notarizes, staples, or releases."
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+
+jobs:
+  readiness-policy:
+    name: Static package readiness policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Tauri package readiness policy
+        shell: pwsh
+        run: ./scripts/verify-tauri-package-readiness.ps1 -RepoRoot .
+
+  windows-installer-smoke-preflight:
+    name: Windows installer smoke preflight
+    needs: readiness-policy
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify Windows installer smoke preflight
+        shell: pwsh
+        run: ./scripts/verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain
+
+  windows-package-dry:
+    name: Windows NSIS and portable dry package
+    needs: windows-installer-smoke-preflight
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows_package_dry == true }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build unsigned Windows package dry run
+        shell: pwsh
+        run: ./scripts/verify-tauri-package-dry.ps1 -RepoRoot . -ArtifactsRoot dist -RunWindowsBundle -StrictToolchain
+
+      - name: Upload dry package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package-dry
+          path: dist/
+
+  macos-unsigned-dry-policy:
+    name: macOS unsigned dry sidecar and bundle policy
+    needs: readiness-policy
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_unsigned_dry_policy == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record unsigned macOS dry policy boundary
+        shell: pwsh
+        run: |
+          $version = (Get-Content "app/desktop/package.json" -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory dist -Force | Out-Null
+
+          $policy = [ordered]@{
+            mode = "policy-only"
+            platform = "macos-arm64"
+            sidecarBinary = "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin"
+            appBundle = "AgentHub.app"
+            dmgArtifact = "AgentHub_${version}_aarch64.dmg"
+            workflowArtifact = "macos-unsigned-package-dry"
+            distribution = "workflow-artifact-only"
+            forbidden = @(
+              "full Tauri package build",
+              "Developer ID signing",
+              "macOS signing command",
+              "notarytool notarization",
+              "stapler staple",
+              "GitHub Release upload",
+              "production updater metadata publication"
+            )
+            approvalGate = @(
+              "Apple Developer ID signing",
+              "notarytool notarization",
+              "stapler staple",
+              "GitHub Release upload",
+              "production updater metadata publication"
+            )
+          }
+
+          $policy |
+            ConvertTo-Json -Depth 6 |
+            Out-File "dist/macos-unsigned-dry-policy.json" -Encoding UTF8
+
+          Write-Host "Policy/readiness only: this macOS unsigned dry slice validates future arm64 sidecar and bundle boundaries."
+          Write-Host "Future sidecar basename: app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin."
+          Write-Host "Future unsigned bundle outputs: AgentHub.app and AgentHub_${version}_aarch64.dmg, scoped to workflow artifacts only."
+          Write-Host "No full Tauri package build, Developer ID signing, macOS signing command, notarization command, stapling command, GitHub Release upload, or updater production metadata publication is performed here."
+          Write-Host "Apple Developer ID signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice."
+
+      - name: Upload macOS unsigned dry policy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-unsigned-package-dry
+          path: dist/macos-unsigned-dry-policy.json

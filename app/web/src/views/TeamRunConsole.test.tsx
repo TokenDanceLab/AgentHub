@@ -1,0 +1,863 @@
+import '@testing-library/jest-dom/vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import TeamRunConsole from './TeamRunConsole';
+
+const startTeamRunMock = vi.hoisted(() => vi.fn());
+const refetchTeamsMock = vi.hoisted(() => vi.fn());
+const executionTargetsState = vi.hoisted(() => ({
+  items: [] as Array<{
+    id: string;
+    name?: string;
+    target_type: string;
+    is_online: boolean;
+    health_state: string;
+  }>,
+  isLoading: false,
+  isFetching: false,
+  error: null as unknown,
+}));
+const teamRunsState = vi.hoisted(() => ({
+  runs: [] as Array<{
+    id: string;
+    team_id: string;
+    target_id?: string;
+    status: string;
+    created_at?: string;
+  }>,
+}));
+const hubClientMock = vi.hoisted(() => ({
+  getTeamRunState: vi.fn(),
+  listTeamTasks: vi.fn(),
+  listTeamEvents: vi.fn(),
+  getAgentTeam: vi.fn(),
+  getTeamRun: vi.fn(),
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (_key: string, fallback?: string, options?: Record<string, string>) => {
+      let text = fallback ?? _key;
+      for (const [key, value] of Object.entries(options ?? {})) {
+        text = text.replace(`{{${key}}}`, value);
+      }
+      return text;
+    },
+  }),
+}));
+
+vi.mock('@/stores/hubStore', () => ({
+  useHubStore: (selector: (state: { authenticated: boolean }) => unknown) =>
+    selector({ authenticated: true }),
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  getAccessToken: () => 'hub-token',
+}));
+
+vi.mock('@/api/executionTargetQueries', () => ({
+  useHubExecutionTargets: () => ({
+    data: { items: executionTargetsState.items, page: { hasMore: false } },
+    isLoading: executionTargetsState.isLoading,
+    isFetching: executionTargetsState.isFetching,
+    error: executionTargetsState.error,
+  }),
+  selectOnlineLocalEdgeExecutionTarget: (
+    targets: Array<{ id: string; target_type: string; is_online: boolean; health_state: string }>,
+  ) => targets.find((target) =>
+    target.target_type === 'local_edge' &&
+    target.is_online &&
+    target.health_state !== 'offline'
+  ),
+}));
+
+vi.mock('@/api/agentTeamQueries', () => ({
+  useHubAgentTeams: (options: { selectedRunId?: string }) => ({
+    data: {
+      teams: [{ id: 'team-1', name: 'P0 Team', description: 'Remote control team' }],
+      bundles: [{
+        team: { id: 'team-1', name: 'P0 Team', description: 'Remote control team', members: [] },
+        runs: teamRunsState.runs,
+      }],
+      selectedTeam: { id: 'team-1', name: 'P0 Team', description: 'Remote control team', members: [] },
+      selectedRun: options.selectedRunId
+        ? teamRunsState.runs.find((run) => run.id === options.selectedRunId)
+        : undefined,
+      tasks: [],
+      events: [],
+    },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: refetchTeamsMock,
+  }),
+  useCreateAgentTeam: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useStartTeamRun: () => ({ mutateAsync: startTeamRunMock, isPending: false }),
+  useDecideTeamApproval: () => ({ mutateAsync: vi.fn() }),
+}));
+
+vi.mock('@/api/hubClient', () => ({
+  createHubClient: () => hubClientMock,
+}));
+
+describe('TeamRunConsole target routing', () => {
+  beforeEach(() => {
+    startTeamRunMock.mockReset();
+    refetchTeamsMock.mockReset();
+    executionTargetsState.items = [];
+    executionTargetsState.isLoading = false;
+    executionTargetsState.isFetching = false;
+    executionTargetsState.error = null;
+    teamRunsState.runs = [];
+    hubClientMock.getTeamRunState.mockReset();
+    hubClientMock.listTeamTasks.mockReset();
+    hubClientMock.listTeamEvents.mockReset();
+    hubClientMock.getAgentTeam.mockReset();
+    hubClientMock.getTeamRun.mockReset();
+    hubClientMock.getTeamRunState.mockResolvedValue({ members: [], approvals: [], conflicts: [] });
+    hubClientMock.listTeamTasks.mockResolvedValue([]);
+    hubClientMock.listTeamEvents.mockResolvedValue([]);
+    hubClientMock.getAgentTeam.mockResolvedValue({
+      id: 'team-1',
+      name: 'P0 Team',
+      description: 'Remote control team',
+      members: [],
+    });
+    hubClientMock.getTeamRun.mockResolvedValue({
+      id: 'run-1',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    });
+    startTeamRunMock.mockResolvedValue({ id: 'run-1', status: 'queued' });
+  });
+
+  it('starts TeamRun with the selected online local_edge target id', async () => {
+    executionTargetsState.items = [{
+      id: 'target-local-edge-1',
+      target_type: 'local_edge',
+      is_online: true,
+      health_state: 'healthy',
+    }];
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-1' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
+      target: { value: 'Run the remote control fixture' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+
+    await waitFor(() => {
+      expect(startTeamRunMock).toHaveBeenCalledWith({
+        teamId: 'team-1',
+        run: {
+          trigger_message: 'Run the remote control fixture',
+          target_id: 'target-local-edge-1',
+        },
+      });
+    });
+  });
+
+  it('does not start TeamRun when no online local_edge target is available', () => {
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
+      target: { value: 'Run without target' },
+    });
+
+    expect(screen.getByText('No online local_edge execution target is available.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go' })).toBeDisabled();
+    expect(startTeamRunMock).not.toHaveBeenCalled();
+  });
+
+  it('does not silently choose the first online local_edge target before user selection', () => {
+    executionTargetsState.items = [
+      {
+        id: 'target-local-edge-alpha',
+        name: 'Alpha Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+      {
+        id: 'target-local-edge-beta',
+        name: 'Beta Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+    ];
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
+      target: { value: 'Run without explicit target' },
+    });
+
+    expect(screen.getByText('Select a Desktop/Edge target before starting.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go' })).toBeDisabled();
+    expect(startTeamRunMock).not.toHaveBeenCalled();
+  });
+
+  it('lets the user choose which online local_edge target receives the TeamRun', async () => {
+    executionTargetsState.items = [
+      {
+        id: 'target-local-edge-alpha',
+        name: 'Alpha Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+      {
+        id: 'target-local-edge-beta',
+        name: 'Beta Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+    ];
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-beta' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
+      target: { value: 'Run on beta desktop' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+
+    await waitFor(() => {
+      expect(startTeamRunMock).toHaveBeenCalledWith({
+        teamId: 'team-1',
+        run: {
+          trigger_message: 'Run on beta desktop',
+          target_id: 'target-local-edge-beta',
+        },
+      });
+    });
+  });
+
+  it('keeps a selected target when the start form is closed and reopened', () => {
+    executionTargetsState.items = [{
+      id: 'target-local-edge-alpha',
+      name: 'Alpha Desktop',
+      target_type: 'local_edge',
+      is_online: true,
+      health_state: 'healthy',
+    }];
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-alpha' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+
+    expect(screen.getByLabelText('Desktop/Edge target')).toHaveValue('target-local-edge-alpha');
+    expect(screen.getByText('Target: Alpha Desktop')).toBeInTheDocument();
+  });
+
+  it('clears a selected target when Hub no longer reports it online', async () => {
+    executionTargetsState.items = [
+      {
+        id: 'target-local-edge-alpha',
+        name: 'Alpha Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+      {
+        id: 'target-local-edge-beta',
+        name: 'Beta Desktop',
+        target_type: 'local_edge',
+        is_online: true,
+        health_state: 'healthy',
+      },
+    ];
+    const { rerender } = render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-alpha' },
+    });
+
+    executionTargetsState.items = [{
+      id: 'target-local-edge-beta',
+      name: 'Beta Desktop',
+      target_type: 'local_edge',
+      is_online: true,
+      health_state: 'healthy',
+    }];
+    rerender(<TeamRunConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Desktop/Edge target')).toHaveValue('');
+    });
+    expect(screen.getByText('Select a Desktop/Edge target before starting.')).toBeInTheDocument();
+  });
+
+  it('shows a Hub dispatch error when the selected target run cannot start', async () => {
+    executionTargetsState.items = [{
+      id: 'target-local-edge-alpha',
+      name: 'Alpha Desktop',
+      target_type: 'local_edge',
+      is_online: true,
+      health_state: 'healthy',
+    }];
+    startTeamRunMock.mockRejectedValueOnce(new Error('Hub dispatch denied target access'));
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByRole('button', { name: /Start TeamRun/i }));
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-alpha' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('What should the team do?...'), {
+      target: { value: 'Run on alpha desktop' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Hub dispatch failed: Hub dispatch denied target access')).toBeInTheDocument();
+    });
+  });
+
+  it('shows a Hub replay error when run state cannot be loaded', async () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRunState.mockRejectedValueOnce(new Error('Hub replay unavailable'));
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Unable to load Hub run replay: Hub replay unavailable')).toBeInTheDocument();
+    });
+  });
+
+  it('shows selected run and target context for real Hub replay', async () => {
+    executionTargetsState.items = [{
+      id: 'target-local-edge-alpha',
+      name: 'Alpha Desktop',
+      target_type: 'local_edge',
+      is_online: true,
+      health_state: 'healthy',
+    }];
+    teamRunsState.runs = [{
+      id: 'run-real-replay',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([{
+      id: 'event-1',
+      team_run_id: 'run-real-replay',
+      seq: 1,
+      type: 'team.run.started',
+      payload: JSON.stringify({ reason: 'Hub replay started' }),
+      created_at: '2026-06-09T09:00:01Z',
+    }]);
+    hubClientMock.getTeamRun.mockResolvedValueOnce({
+      id: 'run-real-replay',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Real Hub replay')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Run run-real-replay')).toBeInTheDocument();
+    expect(screen.getByText('Target Alpha Desktop')).toBeInTheDocument();
+    expect(screen.getByText('1 replay event')).toBeInTheDocument();
+  });
+
+  it('warns when the selected replay run target is offline or unavailable', async () => {
+    executionTargetsState.items = [{
+      id: 'target-local-edge-alpha',
+      name: 'Alpha Desktop',
+      target_type: 'local_edge',
+      is_online: false,
+      health_state: 'offline',
+    }];
+    teamRunsState.runs = [{
+      id: 'run-offline-target',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRun.mockResolvedValueOnce({
+      id: 'run-offline-target',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Replay target offline or unavailable: Alpha Desktop/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Web keeps this view Hub-sourced and does not contact the Desktop\/Edge runtime directly/)).toBeInTheDocument();
+  });
+
+  it('distinguishes empty selected-run replay from mock event data', async () => {
+    teamRunsState.runs = [{
+      id: 'run-empty-replay',
+      team_id: 'team-1',
+      status: 'completed',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRun.mockResolvedValueOnce({
+      id: 'run-empty-replay',
+      team_id: 'team-1',
+      status: 'completed',
+      created_at: '2026-06-09T09:00:00Z',
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Completed'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Hub replay has no recorded events for this selected run.')).toBeInTheDocument();
+    });
+    expect(screen.getByText('0 replay events')).toBeInTheDocument();
+  });
+
+  it('uses an explicit team select button instead of making the row interactive', () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+
+    render(<TeamRunConsole />);
+
+    const teamSelect = screen.getByRole('button', { name: 'Select team P0 Team' });
+    fireEvent.click(teamSelect);
+
+    expect(teamSelect).toBeInTheDocument();
+    expect(teamSelect.parentElement).not.toHaveAttribute('role');
+    expect(teamSelect.parentElement).not.toHaveAttribute('tabindex');
+    expect(screen.getByRole('button', { name: /Running/i })).toBeInTheDocument();
+  });
+
+  it('activates a run with Enter without invoking parent team selection', async () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([{
+      id: 'event-1',
+      team_run_id: 'run-1',
+      seq: 1,
+      type: 'team.run.started',
+      payload: JSON.stringify({ reason: 'Keyboard selected run replay' }),
+      created_at: '2026-06-09T09:00:01Z',
+    }]);
+
+    render(<TeamRunConsole />);
+
+    const teamSelect = screen.getByRole('button', { name: 'Select team P0 Team' });
+    fireEvent.keyDown(teamSelect, {
+      key: 'Enter',
+      code: 'Enter',
+    });
+    fireEvent.click(teamSelect);
+    const runButton = screen.getByRole('button', { name: /Running/i });
+    fireEvent.keyDown(runButton, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(runButton);
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Keyboard selected run replay')).toBeInTheDocument();
+    });
+    expect(hubClientMock.getTeamRunState).toHaveBeenCalledWith('team-1', 'run-1');
+  });
+
+  it('loads and renders replayed Hub events for a selected run in sequence order', async () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'event-2',
+        team_run_id: 'run-1',
+        seq: 2,
+        type: 'agent.message',
+        payload: JSON.stringify({ summary: 'Second replay event' }),
+        created_at: '2026-06-09T09:00:02Z',
+      },
+      {
+        id: 'event-1',
+        team_run_id: 'run-1',
+        seq: 1,
+        type: 'team.run.started',
+        payload: JSON.stringify({ reason: 'First replay event' }),
+        created_at: '2026-06-09T09:00:01Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('First replay event')).toBeInTheDocument();
+      expect(screen.getByText('Second replay event')).toBeInTheDocument();
+    });
+    const renderedText = document.body.textContent ?? '';
+    expect(renderedText.indexOf('First replay event')).toBeLessThan(renderedText.indexOf('Second replay event'));
+    expect(hubClientMock.listTeamEvents).toHaveBeenCalledWith('team-1', 'run-1');
+  });
+
+  it('renders CLI runtime events from Hub run state when the event endpoint is empty', async () => {
+    teamRunsState.runs = [{
+      id: 'run-1',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRunState.mockResolvedValueOnce({
+      members: [],
+      approvals: [],
+      conflicts: [],
+      run_events: [
+        {
+          agent_task_id: 'task-cli-1',
+          edge_run_id: 'run-edge-1',
+          event_seq: 1,
+          event_type: 'run.agent.tool_call',
+          payload: JSON.stringify({
+            callId: 'call-read',
+            toolName: 'read_file',
+            status: 'running',
+            target_id: 'target-local-edge-alpha',
+          }),
+          created_at: '2026-06-09T09:00:01Z',
+        },
+        {
+          agent_task_id: 'task-cli-1',
+          edge_run_id: 'run-edge-1',
+          event_seq: 2,
+          event_type: 'run.agent.tool_result',
+          payload: JSON.stringify({
+            callId: 'call-read',
+            toolName: 'read_file',
+            output: 'package.json loaded',
+          }),
+          created_at: '2026-06-09T09:00:02Z',
+        },
+        {
+          agent_task_id: 'task-cli-1',
+          edge_run_id: 'run-edge-1',
+          event_seq: 3,
+          event_type: 'run.agent.result',
+          payload: JSON.stringify({
+            success: true,
+            content: 'Remote fixture completed',
+          }),
+          created_at: '2026-06-09T09:00:03Z',
+        },
+      ],
+    });
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tool read_file requested/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Tool read_file result: package\.json loaded/)).toBeInTheDocument();
+    expect(screen.getByText(/Result succeeded: Remote fixture completed/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Edge run run-edge-1/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Target target-local-edge-alpha/).length).toBeGreaterThan(0);
+  });
+
+  it('unwraps Hub agent.stream payloads for SDK-like route and dispatch events', async () => {
+    teamRunsState.runs = [{
+      id: 'run-sdk',
+      team_id: 'team-1',
+      target_id: 'target-local-edge-alpha',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'evt-route',
+        team_run_id: 'run-sdk',
+        seq: 10,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-sdk-1',
+          edge_run_id: 'run-sdk-edge',
+          event_seq: 10,
+          event_type: 'run.agent.route_decision',
+          payload: {
+            action: 'delegate',
+            next_worker: 'reviewer',
+            instructions: 'Review generated patch',
+          },
+        },
+        created_at: '2026-06-09T09:00:10Z',
+      },
+      {
+        id: 'evt-dispatch-failed',
+        team_run_id: 'run-sdk',
+        seq: 11,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-sdk-1',
+          edge_run_id: 'run-sdk-edge',
+          event_seq: 11,
+          event_type: 'run.agent.task_dispatch_failed',
+          payload: {
+            taskId: 'child-task-1',
+            error: 'target queue rejected replay',
+          },
+        },
+        created_at: '2026-06-09T09:00:11Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Route delegate -> reviewer: Review generated patch/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Dispatch failed for child-task-1: target queue rejected replay/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Hub task task-sdk-1/).length).toBeGreaterThan(0);
+  });
+
+  it('orders merged Hub events and state runtime events by timestamp before source sequence', async () => {
+    teamRunsState.runs = [{
+      id: 'run-order',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.getTeamRunState.mockResolvedValueOnce({
+      members: [],
+      approvals: [],
+      conflicts: [],
+      run_events: [
+        {
+          agent_task_id: 'task-order',
+          edge_run_id: 'run-edge-order',
+          event_seq: 1,
+          event_type: 'run.agent.result',
+          payload: JSON.stringify({ success: true, summary: 'State event should render second' }),
+          created_at: '2026-06-09T09:00:03Z',
+        },
+      ],
+    });
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'event-late-low-seq',
+        team_run_id: 'run-order',
+        seq: 1,
+        type: 'agent.message',
+        payload: JSON.stringify({ summary: 'Endpoint event should render third' }),
+        created_at: '2026-06-09T09:00:04Z',
+      },
+      {
+        id: 'event-early-high-seq',
+        team_run_id: 'run-order',
+        seq: 99,
+        type: 'agent.message',
+        payload: JSON.stringify({ summary: 'Endpoint event should render first' }),
+        created_at: '2026-06-09T09:00:01Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Endpoint event should render first')).toBeInTheDocument();
+      expect(screen.getByText(/Result succeeded: State event should render second/)).toBeInTheDocument();
+      expect(screen.getByText('Endpoint event should render third')).toBeInTheDocument();
+    });
+    const renderedText = document.body.textContent ?? '';
+    expect(renderedText.indexOf('Endpoint event should render first')).toBeLessThan(renderedText.indexOf('State event should render second'));
+    expect(renderedText.indexOf('State event should render second')).toBeLessThan(renderedText.indexOf('Endpoint event should render third'));
+  });
+
+  it('preserves runtime result summary, tool error flags, and file change kind labels', async () => {
+    teamRunsState.runs = [{
+      id: 'run-detail',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'evt-result-summary',
+        team_run_id: 'run-detail',
+        seq: 1,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 1,
+          event_type: 'run.agent.result',
+          payload: { success: true, summary: 'Reviewer-ready terminal summary' },
+        },
+        created_at: '2026-06-09T09:00:01Z',
+      },
+      {
+        id: 'evt-tool-is-error',
+        team_run_id: 'run-detail',
+        seq: 2,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 2,
+          event_type: 'run.agent.tool_result',
+          payload: { toolName: 'bash', isError: true, output: 'command denied' },
+        },
+        created_at: '2026-06-09T09:00:02Z',
+      },
+      {
+        id: 'evt-tool-is-error-snake',
+        team_run_id: 'run-detail',
+        seq: 3,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 3,
+          event_type: 'run.agent.tool_result',
+          payload: { tool_name: 'read_file', is_error: true },
+        },
+        created_at: '2026-06-09T09:00:03Z',
+      },
+      {
+        id: 'evt-file-kind',
+        team_run_id: 'run-detail',
+        seq: 4,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-detail',
+          event_seq: 4,
+          event_type: 'run.agent.file_change',
+          payload: { kind: 'deleted', path: 'tmp/output.log' },
+        },
+        created_at: '2026-06-09T09:00:04Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Result succeeded: Reviewer-ready terminal summary/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Tool bash result failed: command denied/)).toBeInTheDocument();
+    expect(screen.getByText(/Tool read_file result failed/)).toBeInTheDocument();
+    expect(screen.getByText(/File change deleted: tmp\/output\.log/)).toBeInTheDocument();
+  });
+
+  it('keeps malformed and unknown agent.stream payloads understandable', async () => {
+    teamRunsState.runs = [{
+      id: 'run-malformed',
+      team_id: 'team-1',
+      status: 'running',
+      created_at: '2026-06-09T09:00:00Z',
+    }];
+    hubClientMock.listTeamEvents.mockResolvedValueOnce([
+      {
+        id: 'evt-malformed-stream',
+        team_run_id: 'run-malformed',
+        seq: 1,
+        type: 'agent.stream',
+        payload: '{"event_type":',
+        created_at: '2026-06-09T09:00:01Z',
+      },
+      {
+        id: 'evt-unknown-stream',
+        team_run_id: 'run-malformed',
+        seq: 2,
+        type: 'agent.stream',
+        payload: {
+          task_id: 'task-unknown',
+          event_seq: 7,
+          event_type: 'run.agent.custom_signal',
+          payload: { message: 'custom provider emitted signal' },
+        },
+        created_at: '2026-06-09T09:00:02Z',
+      },
+    ]);
+
+    render(<TeamRunConsole />);
+
+    fireEvent.click(screen.getByText('P0 Team'));
+    fireEvent.click(screen.getByText('Running'));
+    fireEvent.click(screen.getByRole('button', { name: /events/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/\{"event_type":/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/custom provider emitted signal/)).toBeInTheDocument();
+    expect(screen.getByText(/Hub task task-unknown/)).toBeInTheDocument();
+  });
+});

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/agenthub/hub-server/internal/app"
 	"github.com/agenthub/hub-server/internal/cache"
@@ -12,6 +13,11 @@ import (
 )
 
 func main() {
+	if err := normalizeWorkingDirectory(); err != nil {
+		slog.Error("failed to normalize working directory", "error", err)
+		os.Exit(1)
+	}
+
 	cfg, err := config.Load("configs/config.yaml")
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
@@ -46,4 +52,31 @@ func main() {
 		slog.Error("application exited with error", "error", err)
 		os.Exit(1)
 	}
+}
+
+func normalizeWorkingDirectory() error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	if hasHubServerLayout(cwd) {
+		return nil
+	}
+
+	hubServerDir := filepath.Join(cwd, "hub-server")
+	if hasHubServerLayout(hubServerDir) {
+		return os.Chdir(hubServerDir)
+	}
+
+	return nil
+}
+
+func hasHubServerLayout(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "configs", "config.yaml")); err != nil {
+		return false
+	}
+
+	info, err := os.Stat(filepath.Join(dir, "migrations"))
+	return err == nil && info.IsDir()
 }

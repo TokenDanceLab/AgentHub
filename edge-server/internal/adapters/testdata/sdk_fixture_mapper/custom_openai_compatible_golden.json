@@ -1,0 +1,183 @@
+[
+  {
+    "type": "run.agent.status_change",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "adapterId": "custom-openai-compatible",
+      "adapterMode": "fixture",
+      "capabilities": {
+        "fileChanges": true,
+        "fixtureOnly": true,
+        "mcpIntegration": true,
+        "noSpendDefault": true,
+        "permissionHooks": true,
+        "streaming": true,
+        "toolCalls": true,
+        "transports": [
+          "fixture-file"
+        ]
+      },
+      "fixtureOnly": true,
+      "fixtureTransport": "fixture-file",
+      "health": {
+        "checks": {
+          "spend": "blocked",
+          "transport": "fixture-only"
+        },
+        "metadata": {
+          "api_key": "[redacted]",
+          "workspace_path": "private"
+        },
+        "reason": "custom OpenAI-compatible fixture uses no SDK package or model call",
+        "state": "fixture-ready"
+      },
+      "noSpendDefault": true,
+      "provider": "custom-openai-compatible-fixture",
+      "rawSdkObjectPolicy": "never-expose-above-edge-adapter",
+      "runtimeId": "custom-openai-compatible",
+      "sourceEventId": "custom_capability_1",
+      "status": "fixture-ready",
+      "workspacePathPolicy": "workspace-relative-or-basename"
+    }
+  },
+  {
+    "type": "run.agent.tool_call",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "custom_call_patch",
+      "input": {
+        "authorization": "[redacted]",
+        "path": "edge-server/internal/adapters/runtime_manifest.go"
+      },
+      "provider": "custom-openai-compatible-fixture",
+      "sessionId": "custom_session_1",
+      "sourceEventId": "custom_tool_1",
+      "status": "pending",
+      "toolName": "workspace.patch",
+      "traceRefs": [
+        "trace:custom:tool-call"
+      ]
+    }
+  },
+  {
+    "type": "run.agent.tool_result",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "custom_call_patch",
+      "content": "patched runtime manifest fixture evidence",
+      "isError": false,
+      "provider": "custom-openai-compatible-fixture",
+      "sessionId": "custom_session_1",
+      "sourceEventId": "custom_tool_result_1",
+      "toolName": "workspace.patch"
+    }
+  },
+  {
+    "type": "run.agent.permission_requested",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "input": {
+        "command": "go test ./internal/adapters -run TestSDKFixtureMapper -count=1",
+        "cwd": "AgentHub"
+      },
+      "provider": "custom-openai-compatible-fixture",
+      "reason": "custom runtime requested test execution approval",
+      "requestId": "perm_custom_shell",
+      "riskLevel": "medium",
+      "sourceEventId": "custom_permission_1",
+      "toolName": "shell.test",
+      "toolUseId": "custom_call_test"
+    }
+  },
+  {
+    "type": "run.agent.route_decision",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "action": "delegate",
+      "instructions": "Collect custom runtime fixture proof.",
+      "next_worker": "fixture-evidence-worker",
+      "provider": "custom-openai-compatible-fixture",
+      "reasoning": "custom OpenAI-compatible runtime asked AgentHub to route evidence work",
+      "sourceEventId": "custom_route_1",
+      "targetAgent": "fixture-evidence-worker"
+    }
+  },
+  {
+    "type": "run.agent.file_change",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "callId": "custom_call_patch",
+      "diff": "@@ custom fixture diff @@",
+      "kind": "created",
+      "path": "edge-server/internal/adapters/testdata/sdk_fixture_mapper/custom_openai_compatible_fixture.json",
+      "provider": "custom-openai-compatible-fixture",
+      "sourceEventId": "custom_file_1",
+      "toolName": "workspace.patch"
+    }
+  },
+  {
+    "type": "artifact.created",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "artifactId": "artifact_custom_fixture",
+      "id": "artifact_custom_fixture",
+      "kind": "json",
+      "metadata": {
+        "provider": "custom-openai-compatible",
+        "token": "[redacted]"
+      },
+      "path": "custom-fixture-evidence.json",
+      "provider": "custom-openai-compatible-fixture",
+      "sizeBytes": 512,
+      "sourceEventId": "custom_artifact_1",
+      "summary": "Custom OpenAI-compatible fixture evidence"
+    }
+  },
+  {
+    "type": "run.agent.result",
+    "scope": {
+      "projectId": "proj_fixture",
+      "runId": "run_fixture",
+      "threadId": "thread_fixture"
+    },
+    "payload": {
+      "evidenceRefs": [
+        "artifact:artifact_custom_fixture"
+      ],
+      "provider": "custom-openai-compatible-fixture",
+      "sessionId": "custom_session_1",
+      "sourceEventId": "custom_result_1",
+      "success": true,
+      "summary": "Custom OpenAI-compatible fixture completed.",
+      "terminalReason": "completed"
+    }
+  }
+]

@@ -73,7 +73,7 @@ const DESIGN_FILE_ICON_TYPES = new Set<DesignFileIconType>([
 
 export function getDesignFileIconType(
   type: string | undefined,
-  name: string | undefined,
+  name: string | undefined
 ): DesignFileIconType {
   const fileName = (name ?? '').toLowerCase();
   if (fileName === '.gitignore' || fileName.startsWith('.git')) return 'git';
@@ -81,7 +81,7 @@ export function getDesignFileIconType(
   const ext = fileName.match(/\.([a-z0-9]+)$/)?.[1];
   const normalized = (ext || type || 'file').toLowerCase().replace(/[^a-z0-9-]/g, '');
   return DESIGN_FILE_ICON_TYPES.has(normalized as DesignFileIconType)
-    ? normalized as DesignFileIconType
+    ? (normalized as DesignFileIconType)
     : 'file';
 }
 
@@ -247,11 +247,7 @@ function fileSvg(type: DesignFileIconType): React.ReactElement {
   }
 }
 
-export function DesignFileIcon({
-  className,
-  name,
-  type,
-}: IconProps): React.ReactElement {
+export function DesignFileIcon({ className, name, type }: IconProps): React.ReactElement {
   const normalized = getDesignFileIconType(type, name);
   return (
     <span
@@ -732,11 +728,7 @@ function navIconPaths(name: DesignNavIconName): React.ReactNode {
     case 'checkCircle':
       return (
         <>
-          <path
-            d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"
-            fill="currentColor"
-            stroke="none"
-          />
+          <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z" fill="currentColor" stroke="none" />
           <path
             d="m10.8 15.8-4-4 1.4-1.4 2.6 2.6 5.9-5.9 1.4 1.4-7.3 7.3Z"
             fill="var(--surface)"
@@ -915,7 +907,9 @@ export function DesignOpenWithIcon({
     case 'vscode':
       return <img alt="VS Code" className={imageClassName ?? className} src={vscodeIcon} />;
     case 'visualStudio':
-      return <img alt="Visual Studio" className={imageClassName ?? className} src={visualStudioIcon} />;
+      return (
+        <img alt="Visual Studio" className={imageClassName ?? className} src={visualStudioIcon} />
+      );
     case 'cursor':
       return <DesignBrandPathIcon className={className} icon={siCursor} />;
     case 'antigravity':
@@ -939,7 +933,9 @@ export function DesignOpenWithIcon({
     case 'wsl':
       return <DesignBrandPathIcon className={className} icon={siLinux} />;
     case 'androidStudio':
-      return <img alt="Android Studio" className={imageClassName ?? className} src={androidStudioIcon} />;
+      return (
+        <img alt="Android Studio" className={imageClassName ?? className} src={androidStudioIcon} />
+      );
     case 'folder':
       return (
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
@@ -958,12 +954,7 @@ function DesignBrandPathIcon({
   icon: { hex: string; path: string; title: string };
 }): React.ReactElement {
   return (
-    <svg
-      aria-label={icon.title}
-      className={className}
-      role="img"
-      viewBox="0 0 24 24"
-    >
+    <svg aria-label={icon.title} className={className} role="img" viewBox="0 0 24 24">
       <path d={icon.path} fill={`#${icon.hex}`} />
     </svg>
   );

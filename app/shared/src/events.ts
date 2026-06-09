@@ -246,6 +246,16 @@ export interface PreviewReadyEvent extends EventEnvelope {
   };
 }
 
+export interface PreviewStoppedEvent extends EventEnvelope {
+  type: 'preview.stopped';
+  payload: {
+    previewId: string;
+    runId?: string;
+    threadId?: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface ErrorEvent extends EventEnvelope {
   type: 'error';
   payload: {
@@ -283,6 +293,7 @@ export type AnyEvent =
   | ApprovalDecidedEvent
   | ArtifactCreatedEvent
   | PreviewReadyEvent
+  | PreviewStoppedEvent
   // Common
   | ErrorEvent
   // Fallback
