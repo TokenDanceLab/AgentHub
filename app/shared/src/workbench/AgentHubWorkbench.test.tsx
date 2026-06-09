@@ -1283,6 +1283,32 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
+  it('installs a marketplace fixture into the runnable Agents page', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agent 市场' }));
+
+    fireEvent.click(screen.getAllByRole('button', { name: '安装' })[0]!);
+
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    expect(within(page).getAllByText('Target: local_edge · fixture-local-edge').length).toBeGreaterThan(0);
+    expect(within(page).getByDisplayValue('local_edge · fixture-local-edge')).toBeInTheDocument();
+    expect(within(page).getByDisplayValue('ask-before-write')).toBeInTheDocument();
+  });
+
   it('does not render mock Agents, Projects, or Tasks when approved-real data is missing', () => {
     const platform = createMockPlatform({
       surface: 'web',
