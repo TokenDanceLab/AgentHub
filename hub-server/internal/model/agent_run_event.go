@@ -72,3 +72,56 @@ type AgentRunEventSummary struct {
 	FinishedAt       *time.Time     `json:"finished_at,omitempty"`
 	ElapsedMs        int64          `json:"elapsed_ms,omitempty"`
 }
+
+type AgentTaskApprovalList struct {
+	TaskID       string              `json:"task_id"`
+	EdgeRunID    string              `json:"edge_run_id,omitempty"`
+	SessionID    string              `json:"session_id,omitempty"`
+	Approvals    []AgentTaskApproval `json:"approvals"`
+	Pending      []AgentTaskApproval `json:"pending"`
+	Decided      []AgentTaskApproval `json:"decided"`
+	LastEventSeq int64               `json:"last_event_seq,omitempty"`
+}
+
+type AgentTaskApproval struct {
+	ApprovalID    string                   `json:"approval_id"`
+	TaskID        string                   `json:"task_id"`
+	EdgeRunID     string                   `json:"edge_run_id,omitempty"`
+	SessionID     string                   `json:"session_id,omitempty"`
+	SourceEventID string                   `json:"source_event_id,omitempty"`
+	EventSeq      int64                    `json:"event_seq,omitempty"`
+	RequestID     string                   `json:"request_id"`
+	ToolName      string                   `json:"tool_name,omitempty"`
+	ToolUseID     string                   `json:"tool_use_id,omitempty"`
+	Status        string                   `json:"status"`
+	Reason        string                   `json:"reason,omitempty"`
+	DecidedBy     string                   `json:"decided_by,omitempty"`
+	CreatedAt     time.Time                `json:"created_at"`
+	DecidedAt     *time.Time               `json:"decided_at,omitempty"`
+	EdgeControl   *TeamApprovalEdgeControl `json:"edge_control,omitempty"`
+}
+
+type AgentTaskArtifactList struct {
+	TaskID       string              `json:"task_id"`
+	EdgeRunID    string              `json:"edge_run_id,omitempty"`
+	SessionID    string              `json:"session_id,omitempty"`
+	Artifacts    []AgentTaskArtifact `json:"artifacts"`
+	LastEventSeq int64               `json:"last_event_seq,omitempty"`
+}
+
+type AgentTaskArtifact struct {
+	TaskID        string    `json:"task_id"`
+	EdgeRunID     string    `json:"edge_run_id,omitempty"`
+	SessionID     string    `json:"session_id,omitempty"`
+	SourceEventID string    `json:"source_event_id,omitempty"`
+	EventSeq      int64     `json:"event_seq,omitempty"`
+	Path          string    `json:"path"`
+	Action        string    `json:"action,omitempty"`
+	ToolName      string    `json:"tool_name,omitempty"`
+	Status        string    `json:"status,omitempty"`
+	ArtifactID    string    `json:"artifact_id,omitempty"`
+	Name          string    `json:"name,omitempty"`
+	MimeType      string    `json:"mime_type,omitempty"`
+	SizeBytes     int64     `json:"size_bytes,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}

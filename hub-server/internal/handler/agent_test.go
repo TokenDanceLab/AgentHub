@@ -24,6 +24,9 @@ type mockAgentService struct {
 	handleTaskFail         func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 	listTaskRunEvents      func(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error)
 	getTaskRunEventSummary func(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error)
+	listTaskApprovals      func(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error)
+	decideTaskApproval     func(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error)
+	listTaskArtifacts      func(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error)
 }
 
 func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error) {
@@ -87,6 +90,27 @@ func (m *mockAgentService) GetTaskRunEventSummary(ctx context.Context, userID, t
 		return nil, nil
 	}
 	return m.getTaskRunEventSummary(ctx, userID, taskID)
+}
+
+func (m *mockAgentService) ListTaskApprovals(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error) {
+	if m.listTaskApprovals == nil {
+		return nil, nil
+	}
+	return m.listTaskApprovals(ctx, userID, taskID)
+}
+
+func (m *mockAgentService) DecideTaskApproval(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error) {
+	if m.decideTaskApproval == nil {
+		return nil, nil
+	}
+	return m.decideTaskApproval(ctx, userID, taskID, approvalID, decision)
+}
+
+func (m *mockAgentService) ListTaskArtifacts(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error) {
+	if m.listTaskArtifacts == nil {
+		return nil, nil
+	}
+	return m.listTaskArtifacts(ctx, userID, taskID)
 }
 
 func TestAgentHandler_AddAgentToSession(t *testing.T) {
@@ -463,6 +487,133 @@ func TestAgentHandler_TaskEventSummary(t *testing.T) {
 	require.True(t, called)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "10")
+}
+
+func TestAgentHandler_TaskApprovals(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentService{
+		listTaskApprovals: func(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "task-1", taskID)
+			return &model.AgentTaskApprovalList{
+				TaskID: "task-1",
+				Pending: []model.AgentTaskApproval{{
+					ApprovalID: "req-1",
+					TaskID:     "task-1",
+					RequestID:  "req-1",
+					Status:     "pending",
+				}},
+			}, nil
+		},
+	}
+	h := NewAgentHandler(svc)
+
+	r := gin.New()
+	r.GET("/web/agent-tasks/:id/approvals", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.TaskApprovals(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/web/agent-tasks/task-1/approvals", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"task_id":"task-1"`)
+	assert.Contains(t, w.Body.String(), `"approval_id":"req-1"`)
+}
+
+func TestAgentHandler_DecideTaskApproval(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("success", func(t *testing.T) {
+		called := false
+		svc := &mockAgentService{
+			decideTaskApproval: func(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error) {
+				called = true
+				assert.Equal(t, "user-1", userID)
+				assert.Equal(t, "task-1", taskID)
+				assert.Equal(t, "req-1", approvalID)
+				assert.Equal(t, "allow", decision.Decision)
+				assert.Equal(t, "known safe", decision.Reason)
+				return &model.AgentTaskApproval{ApprovalID: "req-1", TaskID: "task-1", RequestID: "req-1", Status: "allow"}, nil
+			},
+		}
+		h := NewAgentHandler(svc)
+
+		r := gin.New()
+		r.POST("/web/agent-tasks/:id/approvals/:approval_id/decide", func(c *gin.Context) {
+			c.Set("user_id", "user-1")
+			h.DecideTaskApproval(c)
+		})
+
+		body := bytes.NewBufferString(`{"decision":"allow","reason":"known safe"}`)
+		req := httptest.NewRequest(http.MethodPost, "/web/agent-tasks/task-1/approvals/req-1/decide", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.True(t, called)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), `"status":"allow"`)
+	})
+
+	t.Run("bad request", func(t *testing.T) {
+		svc := &mockAgentService{}
+		h := NewAgentHandler(svc)
+		r := gin.New()
+		r.POST("/web/agent-tasks/:id/approvals/:approval_id/decide", func(c *gin.Context) {
+			c.Set("user_id", "user-1")
+			h.DecideTaskApproval(c)
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/web/agent-tasks/task-1/approvals/req-1/decide", bytes.NewBufferString(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+func TestAgentHandler_TaskArtifacts(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentService{
+		listTaskArtifacts: func(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "task-1", taskID)
+			return &model.AgentTaskArtifactList{
+				TaskID: "task-1",
+				Artifacts: []model.AgentTaskArtifact{{
+					TaskID: "task-1",
+					Path:   "src/a.go",
+					Action: "modified",
+				}},
+			}, nil
+		},
+	}
+	h := NewAgentHandler(svc)
+
+	r := gin.New()
+	r.GET("/web/agent-tasks/:id/artifacts", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.TaskArtifacts(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/web/agent-tasks/task-1/artifacts", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"path":"src/a.go"`)
 }
 
 func TestAgentHandler_TaskDone(t *testing.T) {

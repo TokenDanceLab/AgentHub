@@ -26,6 +26,12 @@ type AgentService interface {
 	GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error)
 }
 
+type agentTaskProjectionService interface {
+	ListTaskApprovals(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error)
+	DecideTaskApproval(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error)
+	ListTaskArtifacts(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error)
+}
+
 type AgentHandler struct {
 	service AgentService
 }
@@ -235,6 +241,77 @@ func (h *AgentHandler) TaskEventSummary(c *gin.Context) {
 		return
 	}
 	OK(c, summary)
+}
+
+// TaskApprovals GET /web/agent-tasks/:id/approvals
+func (h *AgentHandler) TaskApprovals(c *gin.Context) {
+	userID := c.GetString("user_id")
+	taskID := c.Param("id")
+	projectionSvc, ok := h.service.(agentTaskProjectionService)
+	if !ok {
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	approvals, err := projectionSvc.ListTaskApprovals(c.Request.Context(), userID, taskID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, approvals)
+}
+
+// DecideTaskApproval POST /web/agent-tasks/:id/approvals/:approval_id/decide
+func (h *AgentHandler) DecideTaskApproval(c *gin.Context) {
+	var req decideApprovalReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	taskID := c.Param("id")
+	projectionSvc, ok := h.service.(agentTaskProjectionService)
+	if !ok {
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	approval, err := projectionSvc.DecideTaskApproval(c.Request.Context(), userID, taskID, c.Param("approval_id"), model.TeamApprovalDecision{
+		Decision: req.Decision,
+		Reason:   req.Reason,
+	})
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, approval)
+}
+
+// TaskArtifacts GET /web/agent-tasks/:id/artifacts
+func (h *AgentHandler) TaskArtifacts(c *gin.Context) {
+	userID := c.GetString("user_id")
+	taskID := c.Param("id")
+	projectionSvc, ok := h.service.(agentTaskProjectionService)
+	if !ok {
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	artifacts, err := projectionSvc.ListTaskArtifacts(c.Request.Context(), userID, taskID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, artifacts)
 }
 
 func runEventFilterFromQuery(c *gin.Context) (model.AgentRunEventFilter, error) {
