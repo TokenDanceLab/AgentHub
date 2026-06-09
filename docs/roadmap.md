@@ -82,9 +82,9 @@ CLI/SDK Runtime，并把结果回放到 Web。
 | 负责人 | 产品区域 |
 |---|---|
 | Controller Codex | 总路线图、分支集成、Desktop/Tauri/Local Edge 路径、发布 gate、最终验证 |
-| Trump | Web 和 shared 前端产品体验 |
+| Trump | Web、Mobile 和 shared 前端产品体验 |
 | Johnny | Hub、Edge、事件合同、后端路由、持久化 |
-| Mobile 负责人 | Mobile app 和移动端专属体验，通过共享 Hub 合同对齐 |
+| Mobile 执行线程 | 作为 Trump 下属执行线程推进 Mobile app，通过共享 Hub 合同对齐 |
 | Evidence/docs 负责人 | 比赛材料、截图、demo、外部报告、提交包 |
 
 ## 依赖顺序

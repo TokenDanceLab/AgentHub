@@ -43,7 +43,8 @@
 ## 任务分配包
 
 用户是顶层产品负责人。Controller Codex 向用户负责，并协调 Trump、
-Johnny、Mobile 负责人、Evidence/docs 负责人和 subagent。
+Johnny、Evidence/docs 负责人和 subagent。Mobile 线程现在并入 Trump
+统筹，只在需要移动端执行或协议对齐时作为 Trump 下属线程使用。
 
 ### Controller Codex
 
@@ -67,7 +68,8 @@ Johnny、Mobile 负责人、Evidence/docs 负责人和 subagent。
 
 ### Trump
 
-职责：Web 和 shared 前端产品体验。
+职责：Web、Mobile 和 shared 前端产品体验。Trump 需要直接启动 Web
+本地页面调 UI 细节，不能只停留在代码和单元测试。
 
 分支：
 
@@ -75,6 +77,7 @@ Johnny、Mobile 负责人、Evidence/docs 负责人和 subagent。
 |---|---|---|
 | `codex/p0-web-agent-main-chain` | IM/@Agent 入口、目标选择、启动运行、target health、mock/real 标签 | `app/web/**`、`app/shared/**` |
 | `codex/p0-web-transcript-artifacts` | typed transcript blocks 和最小 artifact/diff/preview cards | `app/shared/**`、`app/web/**` tests |
+| `codex/mobile-expo-rn-plan` | 当前 Mobile 收口分支；补齐远程控制协议和 Web 主链语义对齐 | `app/mobile/**`，仅在必要时改 shared 类型 |
 
 任务：
 
@@ -83,7 +86,9 @@ Johnny、Mobile 负责人、Evidence/docs 负责人和 subagent。
 3. 明确 mock/fixture/observed/approved-real 模式；real mode 不得静默 fallback 到 mock。
 4. 渲染 typed transcript blocks：route decision、subtask、permission request/result、file change、tool result、artifact、preview、failure、finished。
 5. artifact/diff/preview cards 只基于现有事件合同或 Johnny 提供的新合同实现。
-6. 不改 backend schema、Hub handler、Edge handler。
+6. 启动本地 Web dev server，实际点击主链页面、检查布局、空态、错误态、目标健康态、回放态和移动视口，不只跑测试。
+7. 管理正在收口的 `codex/mobile-expo-rn-plan` 分支和 Mobile 线程，让 Mobile 使用同一套 Hub target/run/approval/replay 语义；非必要不打断该分支的收口节奏。
+8. 不改 backend schema、Hub handler、Edge handler。
 
 建议验证：
 
@@ -91,6 +96,7 @@ Johnny、Mobile 负责人、Evidence/docs 负责人和 subagent。
 corepack.cmd pnpm --dir app\web typecheck
 corepack.cmd pnpm --dir app\web exec vitest run --reporter=dot
 corepack.cmd pnpm --dir app\shared exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot
+corepack.cmd pnpm --dir app\web dev
 ```
 
 ### Johnny
@@ -141,4 +147,4 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-live-chain-topolo
 - 未获明确发布审批，不创建/推送 `v0.3.0-rc.6`。
 - 未获明确审批，不跑真实登录、真实模型消耗、部署、签名、公证、updater、release upload。
 - 未获明确审批，不对 bad-tree 问题做 destructive git maintenance。
-- Mobile 由线程 `019ea616-0dbf-7263-a785-87fdb2e9d8a4` 负责；这里只协调协议漂移。
+- Mobile 线程 `019ea616-0dbf-7263-a785-87fdb2e9d8a4` 现在归 Trump 统筹；Controller 只在协议漂移或阻塞时介入。
