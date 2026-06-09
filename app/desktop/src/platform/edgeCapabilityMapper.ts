@@ -28,6 +28,82 @@ export interface DesktopExecutionTarget {
   capabilityIds: string[];
 }
 
+export type DesktopEdgeDispatchDisabledReason =
+  | 'signed-out'
+  | 'hub-targets-loading'
+  | 'hub-targets-error'
+  | 'missing-device'
+  | 'local-edge-offline'
+  | 'hub-target-pagination-limited'
+  | 'missing-local-edge-target'
+  | 'local-edge-target-mismatch'
+  | 'local-edge-target-offline'
+  | 'local-edge-target-degraded'
+  | 'local-edge-target-unknown'
+  | 'local-edge-health-degraded'
+  | 'local-edge-health-unknown'
+  | 'host-preflight-blocked';
+
+export interface DesktopEdgeRegisteredTargetSnapshot {
+  id: string;
+  name?: string;
+  device_id?: string | null;
+  target_type?: string;
+  health_state?: string;
+  is_online?: boolean;
+}
+
+export interface DesktopEdgeHostReadinessSnapshot {
+  health_url?: string;
+  store_db_policy?: string;
+  log_paths?: {
+    directory?: string;
+    stdout?: string;
+    stderr?: string;
+  };
+  preflight?: {
+    status?: string;
+    blocker?: string | null;
+  };
+  direct_cli_spawn?: boolean;
+}
+
+export interface DesktopEdgeDispatchReadinessInput {
+  hubSessionActive: boolean;
+  deviceId?: string | null;
+  edgeOnline: boolean;
+  localEdgeTarget: DesktopExecutionTarget;
+  registeredLocalEdgeTarget?: DesktopEdgeRegisteredTargetSnapshot | null;
+  hubTargetsLoading?: boolean;
+  hubTargetsError?: boolean;
+  hubTargetsPaginationLimited?: boolean;
+  hostReadiness?: DesktopEdgeHostReadinessSnapshot | null;
+}
+
+export interface DesktopEdgeDispatchReadiness {
+  dispatchReady: boolean;
+  disabledReason: DesktopEdgeDispatchDisabledReason | null;
+  dispatchTarget: { targetId: string; deviceId: string } | null;
+  route: 'local-edge-api';
+  targetType: 'local_edge';
+  targetId: string | null;
+  targetName: string | null;
+  deviceId: string | null;
+  localEdgeStatus: DesktopExecutionTarget['status'];
+  hubTargetHealthState: string | null;
+  hubTargetOnline: boolean | null;
+  healthUrl: string | null;
+  preflightStatus: string | null;
+  preflightBlocker: string | null;
+  storeDbPolicy: string | null;
+  logPaths: {
+    directory: string | null;
+    stdout: string | null;
+    stderr: string | null;
+  };
+  directCliSpawn: false;
+}
+
 export function mapEdgeAgentsToWorkbenchAgents(
   agents: AgentInfo[],
   modelCatalog?: ModelCatalogResponse,
@@ -70,6 +146,67 @@ export function mapLocalEdgeExecutionTarget(snapshot: EdgeRuntimeInventorySnapsh
   };
 }
 
+export function resolveDesktopEdgeDispatchReadiness(
+  input: DesktopEdgeDispatchReadinessInput,
+): DesktopEdgeDispatchReadiness {
+  const target = input.registeredLocalEdgeTarget ?? null;
+  const deviceId = input.deviceId?.trim() || null;
+  const base = buildDispatchReadiness(input, null);
+
+  if (!input.hubSessionActive) return buildDispatchReadiness(input, 'signed-out');
+  if (input.hubTargetsLoading) return buildDispatchReadiness(input, 'hub-targets-loading');
+  if (input.hubTargetsError) return buildDispatchReadiness(input, 'hub-targets-error');
+  if (!deviceId) return buildDispatchReadiness(input, 'missing-device');
+  if (!input.edgeOnline) return buildDispatchReadiness(input, 'local-edge-offline');
+  if (input.hubTargetsPaginationLimited) return buildDispatchReadiness(input, 'hub-target-pagination-limited');
+  if (!target) return buildDispatchReadiness(input, 'missing-local-edge-target');
+  if (target.target_type !== 'local_edge' || target.device_id !== deviceId) {
+    return buildDispatchReadiness(input, 'local-edge-target-mismatch');
+  }
+  if (target.is_online !== true || target.health_state === 'offline') {
+    return buildDispatchReadiness(input, 'local-edge-target-offline');
+  }
+  if (target.health_state === 'degraded') return buildDispatchReadiness(input, 'local-edge-target-degraded');
+  if (target.health_state !== 'healthy') return buildDispatchReadiness(input, 'local-edge-target-unknown');
+  if (input.localEdgeTarget.status === 'degraded') return buildDispatchReadiness(input, 'local-edge-health-degraded');
+  if (input.localEdgeTarget.status !== 'healthy') return buildDispatchReadiness(input, 'local-edge-health-unknown');
+  if (input.hostReadiness?.preflight?.status === 'blocked') return buildDispatchReadiness(input, 'host-preflight-blocked');
+
+  return {
+    ...base,
+    dispatchReady: true,
+    dispatchTarget: {
+      targetId: target.id,
+      deviceId,
+    },
+  };
+}
+
+export function formatDesktopEdgeDispatchDiagnostics(readiness: DesktopEdgeDispatchReadiness | null | undefined): string | null {
+  if (!readiness) return null;
+  return [
+    'Local Edge dispatch',
+    `  dispatch ready: ${readiness.dispatchReady}`,
+    readiness.disabledReason ? `  dispatch disabled reason: ${readiness.disabledReason}` : null,
+    `  route: ${readiness.route}`,
+    `  target type: ${readiness.targetType}`,
+    `  target id: ${readiness.targetId ?? 'n/a'}`,
+    readiness.targetName ? `  target name: ${readiness.targetName}` : null,
+    `  device id: ${readiness.deviceId ?? 'n/a'}`,
+    `  local edge status: ${readiness.localEdgeStatus}`,
+    `  hub target health: ${readiness.hubTargetHealthState ?? 'n/a'}`,
+    `  hub target online: ${readiness.hubTargetOnline ?? 'n/a'}`,
+    `  health: ${readiness.healthUrl ?? 'n/a'}`,
+    `  preflight: ${readiness.preflightStatus ?? 'n/a'}`,
+    readiness.preflightBlocker ? `  preflight blocker: ${readiness.preflightBlocker}` : null,
+    `  store: ${readiness.storeDbPolicy ?? 'n/a'}`,
+    `  logs: ${readiness.logPaths.directory ?? 'n/a'}`,
+    `  stdout: ${readiness.logPaths.stdout ?? 'n/a'}`,
+    `  stderr: ${readiness.logPaths.stderr ?? 'n/a'}`,
+    `  direct cli spawn: ${readiness.directCliSpawn}`,
+  ].filter(Boolean).join('\n');
+}
+
 function selectModelForAgent(agent: AgentInfo, modelCatalog?: ModelCatalogResponse): ModelCatalogResponse['items'][number] | undefined {
   if (!modelCatalog?.items.length) return undefined;
   const runtimeId = agent.runtimeId ?? agent.id;
@@ -104,4 +241,34 @@ function normalizeLocalEdgeStatus(
   if (healthStatus === 'degraded') return 'degraded';
   if (onlineRunnerCount > 0) return 'healthy';
   return 'unknown';
+}
+
+function buildDispatchReadiness(
+  input: DesktopEdgeDispatchReadinessInput,
+  disabledReason: DesktopEdgeDispatchDisabledReason | null,
+): DesktopEdgeDispatchReadiness {
+  const target = input.registeredLocalEdgeTarget ?? null;
+  return {
+    dispatchReady: false,
+    disabledReason,
+    dispatchTarget: null,
+    route: 'local-edge-api',
+    targetType: 'local_edge',
+    targetId: target?.id ?? null,
+    targetName: target?.name ?? null,
+    deviceId: input.deviceId?.trim() || null,
+    localEdgeStatus: input.localEdgeTarget.status,
+    hubTargetHealthState: target?.health_state ?? null,
+    hubTargetOnline: typeof target?.is_online === 'boolean' ? target.is_online : null,
+    healthUrl: input.hostReadiness?.health_url ?? null,
+    preflightStatus: input.hostReadiness?.preflight?.status ?? null,
+    preflightBlocker: input.hostReadiness?.preflight?.blocker ?? null,
+    storeDbPolicy: input.hostReadiness?.store_db_policy ?? null,
+    logPaths: {
+      directory: input.hostReadiness?.log_paths?.directory ?? null,
+      stdout: input.hostReadiness?.log_paths?.stdout ?? null,
+      stderr: input.hostReadiness?.log_paths?.stderr ?? null,
+    },
+    directCliSpawn: false,
+  };
 }
