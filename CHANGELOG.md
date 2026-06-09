@@ -4,13 +4,16 @@
 
 ### 发布定位
 - 统一收口 `dev/release-0.3.0-rc7` 集成线，基线来自 `origin/master` 的 PR #297 合并提交 `b7e9c1a4`。
-- 本候选版本面向 Windows Desktop 与 Android 预览包证据，不声明生产可用、签名发布、商店发布或真实模型消耗完成。
-- `master` 合入、tag、GitHub Release upload、签名、公证和 updater metadata 仍需要人工确认。
+- 本候选版本面向 Windows Desktop 与 Android 本地 release APK 证据，不声明生产签名、商店发布或真实模型消耗完成。
+- `master` 合入、tag、GitHub Release upload 已完成；Windows 签名、公证和 updater metadata 仍需要独立发布窗口。
 
 ### Mobile
 - 合入 Expo / React Native 主线 `app/mobile-rn` 的 native capability settings，可在账号和工作台入口展示媒体、存储、通知、SecureStore、deep link 等 readiness 状态。
 - 统一 Mobile 底部导航、分段控件、账号页和工作台页的 motion/press feedback。
 - 新增 `useNativeCapabilities` 测试，锁定 Mobile native readiness 的 no-secret 合同。
+- 新增 `app/mobile-rn/scripts/package-android.ps1` 和 `pnpm android:package`，在 Windows 上通过 `D:\ah\a` 短路径 junction 与 `D:\p\a` pnpm virtual store 构建 `assembleRelease` APK，规避 Expo/RN/Gradle root mismatch 与 `expo-modules-core` CMake/ninja 长路径失败。
+- Android adaptive icon 改为透明安全区 foreground，避免桌面图标被系统 mask 裁切；启动器短名改为 `AgentHub`。
+- 本地 Android release APK 已安装到 Wi-Fi ADB 设备 `192.168.1.105:5555` 并成功打开内置 demo，不再依赖 Metro。
 
 ### Desktop / Web / Hub / Edge
 - 保留 Web -> Hub -> Desktop/Edge -> CLI/SDK adapter -> replay 的 P0 主链为本轮最高优先级。
@@ -22,11 +25,12 @@
 - 修复 approved-real readiness manifest 中 `$Output` 为空时的 `output_excerpt` 处理。
 - `tests\scripts\verify-p0-approved-real-gold-path.ps1 -RepoRoot .`、`tests\scripts\verify-approved-real-demo-readiness.ps1 -RepoRoot .`、`app/mobile-rn` 的 `pnpm verify`、`pnpm native:check` 和 `pnpm mock:hub:check` 已通过。
 - Windows unsigned dry package 已产出 `AgentHub_0.3.0-rc.7_x64-setup.exe`、`AgentHub_0.3.0-rc.7_x64-portable.zip`、Desktop exe 与 Edge sidecar，并记录 SHA-256 manifest。
+- Android 本地 release APK 已产出 `AgentHub-Mobile_0.3.0-rc.7_android-release.apk`，SHA-256: `F11E4C3B970C0C08B63ADD6BC37B8A5B4B7767EE5705D64D8176A59C23E5AD4C`。
 
 ### 已知阻塞
 - TokenDanceID 真实登录链路仍缺 approved test account/client 环境证据。
-- Android 本地 APK 在 Windows 长路径 / CMake / Ninja 链路下尚未产出，需要改走 EAS/Linux runner 或进一步收短原生构建路径后复验。
-- Windows 签名安装包、macOS 签名/公证、Android release signing、GitHub Release upload 和 updater metadata 不在默认自动执行范围内。
+- Android release signing、Play/App Store 分发、iOS simulator/EAS 路线仍未完成；当前 Android APK 是本地 debug-signing release APK。
+- Windows 签名安装包、macOS 签名/公证和 updater metadata 不在默认自动执行范围内。
 - 开放的 Critical/High 安全风险必须关闭或明确 accepted risk 后才能发布 stable。
 
 ## [0.1.0] — 2026-05-27
