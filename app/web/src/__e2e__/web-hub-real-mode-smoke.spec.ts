@@ -331,6 +331,11 @@ async function writeSmokeArtifact(page: Page, scenario: HubScenario, requests: S
     directLocalEdge: false,
     realCliOrModelExecuted: false,
     tokenDanceIdSecretUsed: false,
+    RealLoginTested: false,
+    RealCliTested: false,
+    MockAdapterUsed: true,
+    HubSessionSource: 'stubbed-hub-session',
+    WebReplayObserved: true,
     requestedEndpoints: Array.from(requests).sort(),
     screenshot: path.relative(process.cwd(), screenshotPath).replace(/\\/g, '/'),
   }, null, 2)}\n`);
