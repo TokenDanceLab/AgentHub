@@ -475,7 +475,7 @@ func TestOpenAPITaskApprovalArtifactRoutesDocumentEnvelope(t *testing.T) {
 	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
 	artifactSchema := yamlMapField(t, schemas, "AgentTaskArtifact", "schemas.AgentTaskArtifact")
 	artifactProperties := yamlMapField(t, artifactSchema, "properties", "schemas.AgentTaskArtifact.properties")
-	for _, property := range []string{"diff", "edit_id", "review_status", "can_apply", "can_revert"} {
+	for _, property := range []string{"diff", "edit_id", "hash", "review_status", "can_apply", "can_revert"} {
 		if yamlOptionalMapField(artifactProperties, property) == nil {
 			t.Fatalf("AgentTaskArtifact schema missing %s", property)
 		}

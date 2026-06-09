@@ -66,6 +66,44 @@ export interface RuntimeEvidenceInspectorModel {
   emptyDetail: string;
 }
 
+export type DiffProposalReviewStatus = 'review' | 'approved' | 'rejected';
+
+export interface DiffProposalEvidenceInput {
+  diff: FileDiff;
+  artifactId?: string | undefined;
+  approvalId?: string | undefined;
+  correlationId?: string | undefined;
+}
+
+export interface DiffProposalEvidenceModel {
+  filePath: string;
+  reviewStatus: DiffProposalReviewStatus;
+  canApply: boolean;
+  canRevert: boolean;
+  editId: string;
+  hash: string;
+  artifactId: string;
+  approvalId: string;
+  correlationId: string;
+  exportLabel: string;
+}
+
+export interface DiffProposalEvidenceManifest {
+  schema: 'agenthub-diff-proposal-evidence-manifest-v1';
+  generatedAt: string;
+  proposals: Array<{
+    file_path: string;
+    review_status: DiffProposalReviewStatus;
+    can_apply: boolean;
+    can_revert: boolean;
+    edit_id: string;
+    hash: string;
+    artifact_id: string;
+    approval_id: string;
+    correlation_id: string;
+  }>;
+}
+
 export function buildInspectorEvidenceModel(evidence: EvidenceRef[]): InspectorEvidenceModel {
   const model: InspectorEvidenceModel = {
     total: evidence.length,
@@ -118,6 +156,43 @@ export function buildInspectorEvidenceModel(evidence: EvidenceRef[]): InspectorE
   return model;
 }
 
+export function buildDiffProposalEvidenceModel(input: DiffProposalEvidenceInput): DiffProposalEvidenceModel {
+  const reviewStatus = normalizeDiffProposalReviewStatus(input.diff.reviewStatus);
+  return {
+    filePath: input.diff.filePath,
+    reviewStatus,
+    canApply: Boolean(input.diff.canApply),
+    canRevert: Boolean(input.diff.canRevert),
+    editId: input.diff.editId ?? '',
+    hash: input.diff.hash ?? '',
+    artifactId: input.artifactId ?? '',
+    approvalId: input.approvalId ?? '',
+    correlationId: input.correlationId ?? '',
+    exportLabel: reviewStatus === 'approved' ? 'Export approved evidence' : 'Export evidence',
+  };
+}
+
+export function buildDiffProposalEvidenceManifest(
+  proposals: DiffProposalEvidenceModel[],
+  generatedAt = new Date().toISOString(),
+): DiffProposalEvidenceManifest {
+  return {
+    schema: 'agenthub-diff-proposal-evidence-manifest-v1',
+    generatedAt,
+    proposals: proposals.map((proposal) => ({
+      file_path: proposal.filePath,
+      review_status: proposal.reviewStatus,
+      can_apply: proposal.canApply,
+      can_revert: proposal.canRevert,
+      edit_id: proposal.editId,
+      hash: proposal.hash,
+      artifact_id: proposal.artifactId,
+      approval_id: proposal.approvalId,
+      correlation_id: proposal.correlationId,
+    })),
+  };
+}
+
 export function evidenceStatusLabel(status: EvidenceRefStatus | undefined): string {
   switch (status) {
     case 'pending':
@@ -130,6 +205,21 @@ export function evidenceStatusLabel(status: EvidenceRefStatus | undefined): stri
       return '失败';
     default:
       return '记录';
+  }
+}
+
+function normalizeDiffProposalReviewStatus(status: string | undefined): DiffProposalReviewStatus {
+  switch (status) {
+    case 'approved':
+    case 'allow':
+    case 'accepted':
+      return 'approved';
+    case 'rejected':
+    case 'deny':
+    case 'denied':
+      return 'rejected';
+    default:
+      return 'review';
   }
 }
 
