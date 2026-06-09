@@ -361,7 +361,7 @@
 .workspace {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -372,6 +372,170 @@
 .workspace[data-mode='workbench'] {
   grid-template-rows: minmax(0, 1fr);
   background: var(--surface);
+}
+
+.mainchainStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 18px;
+  border-bottom: 1px solid var(--bdr);
+  background: color-mix(in srgb, var(--surface) 86%, var(--app-bg));
+}
+
+.mainchainTrack {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(66px, 1fr));
+  gap: 6px;
+}
+
+.mainchainNode {
+  position: relative;
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-2);
+  overflow: hidden;
+}
+
+.mainchainNode::after {
+  position: absolute;
+  top: 50%;
+  right: -7px;
+  width: 7px;
+  height: 1px;
+  background: var(--bdr-strong);
+  content: '';
+}
+
+.mainchainNode:last-child::after {
+  display: none;
+}
+
+.mainchainNode[data-state='done'] {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--bdr));
+  background: color-mix(in srgb, var(--success-bg) 58%, var(--surface));
+}
+
+.mainchainNode[data-state='active'] {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--bdr));
+  background: color-mix(in srgb, var(--primary-light) 72%, var(--surface));
+  color: var(--text-1);
+}
+
+.mainchainNode[data-state='waiting'] {
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--bdr));
+  background: color-mix(in srgb, var(--warning-bg) 44%, var(--surface));
+}
+
+.mainchainNode[data-state='blocked'] {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--bdr));
+  background: color-mix(in srgb, var(--danger-bg) 48%, var(--surface));
+  color: var(--danger);
+}
+
+.mainchainNode[data-state='empty'] {
+  opacity: 0.78;
+}
+
+.mainchainDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--text-3);
+  flex: 0 0 auto;
+}
+
+.mainchainNode[data-state='done'] .mainchainDot {
+  background: var(--success);
+}
+
+.mainchainNode[data-state='active'] .mainchainDot {
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.mainchainNode[data-state='waiting'] .mainchainDot {
+  background: var(--warning);
+}
+
+.mainchainNode[data-state='blocked'] .mainchainDot {
+  background: var(--danger);
+}
+
+.mainchainCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mainchainCopy strong,
+.mainchainCopy em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mainchainCopy strong {
+  color: var(--text-1);
+  font: 600 0.6875rem/1.2 var(--font-sans);
+}
+
+.mainchainCopy em {
+  color: var(--text-3);
+  font: 400 0.625rem/1.2 var(--font-sans);
+  font-style: normal;
+}
+
+.mainchainExport {
+  flex: 0 0 auto;
+  max-width: 128px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font: 600 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    background var(--dur-normal) var(--ease);
+}
+
+.mainchainExport:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.mainchainExport:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mainchainExport:disabled {
+  color: var(--text-3);
+  background: var(--surface-low);
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .workbenchPageHost {
