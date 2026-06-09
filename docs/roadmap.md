@@ -1,6 +1,5 @@
 # AgentHub 全链路数据对接路线图
 
-> 2026-06-10 数据流打通进展：见 STATE.md '2026-06-10 数据流打通成果' 段。详细代码变更见 git log。
 > 最后更新：2026-06-10
 > 本文档只写路线、优先级和边界。当前分支状态和任务调度写在 `STATE.md`。
 > 验收标准：发布 Release，完成全部真实数据流打通。非必要不碰 UI 层，UI 作为需求文档。
@@ -44,24 +43,41 @@ Web / Desktop / Mobile / IM
                         │
               app/shared/ (共享 UI + 类型 + 合同)
               ├── src/workbench/    v4 工作台 shell
+              │   ├── AgentHubWorkbench.tsx  主布局
+              │   ├── WorkbenchRoutes.tsx    子页路由
+              │   ├── pages/                7 个子页组件
+              │   ├── settingsService.ts     设置读写抽象
+              │   └── mockData.ts            Mock 数据源
               ├── src/transcript/   统一消息合同
               ├── src/composer/     统一输入区
               ├── src/inspector/    统一证据面板
               ├── src/platform/     Platform Adapter 接口
+              │   └── types.ts      AgentHubPlatform 定义
+              ├── src/hubEvents.ts  26 个 WS 事件常量
               └── src/ui/           基础 UI primitives
                         │
          ┌──────────────┴──────────────┐
          │                             │
   Web Platform Adapter         Desktop Platform Adapter
-  ├── Hub REST + WS             ├── Local Edge REST + WS
-  ├── Hub session               ├── Tauri Host API
-  └── remote target             └── sidecar / CLI
+  ├── hubClient.ts              ├── hubClient.ts
+  ├── hubWS.ts                  ├── hubWS.ts
+  ├── hubAuth.ts                ├── hubAuth.ts
+  ├── edgeClient.ts             ├── edgeClient.ts
+  ├── contactQueries.ts         ├── sessionQueries.ts
+  ├── agentQueries.ts           ├── agentProfileQueries.ts
+  ├── projectQueries.ts         ├── documentQueries.ts
+  ├── runQueries.ts             ├── projectQueries.ts
+  ├── executionTargetQueries.ts ├── agentQueries.ts
+  ├── agentTeamQueries.ts       ├── runQueries.ts
+  └── threadQueries.ts          ├── runEvidenceQueries.ts
+                                ├── modelCatalogQueries.ts
+                                └── agentTeamQueries.ts
                         │
          ┌──────────────┴──────────────┐
          │                             │
     Hub Server (8080)           Edge Server (3210)
     ├── Auth/OIDC/Session       ├── Run lifecycle
-    ├── IM/Contacts/Sessions    ├── AgentAdapter
+    ├── IM/Contacts/Sessions    ├── AgentAdapter (6 个)
     ├── AgentTasks/Routing      ├── SQLite EventStore
     ├── Approvals/Artifacts     ├── Context Builder
     ├── Projects/Workspaces     └── Workspace allowlist
@@ -79,50 +95,265 @@ Web / Desktop / Mobile / IM
   (统一身份源)                 ├── Claude Code (stream-json)
                               ├── Codex (exec --json)
                               ├── OpenCode (run --format json)
-                              ├── Claude Agent SDK
-                              └── OpenAI Agents SDK
+                              ├── Anthropic SDK (HTTP SSE)
+                              └── OpenAI SDK (HTTP SSE)
 ```
 
 ### 1.2 数据线
 
-| 线路 | 方向 | 协议 |
-|------|------|------|
-| 控制线 | Workbench -> Platform Adapter -> Edge/Hub REST -> AgentAdapter -> Runtime | REST JSON |
-| 事件线 | Agent Runtime -> Edge EventStore -> Edge/Hub WS -> Platform Adapter -> Transcript | WebSocket typed events |
-| 证据线 | RunEvent -> EvidenceRef -> Inspector -> Artifact/File/Preview | REST + WS |
-| 同步线 | Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers | REST + WS |
+| 线路 | 方向 | 协议 | 用途 |
+|------|------|------|------|
+| 控制线 | Workbench -> Platform Adapter -> Edge/Hub REST -> AgentAdapter -> Runtime | REST JSON | 发消息、触发任务、审批决策、CRUD 操作 |
+| 事件线 | Agent Runtime -> Edge EventStore -> Edge/Hub WS -> Platform Adapter -> Transcript | WebSocket typed events | 实时消息推送、Agent 状态变更、流式输出 |
+| 证据线 | RunEvent -> EvidenceRef -> Inspector -> Artifact/File/Preview | REST + WS | Diff、Artifact、Preview 内联展示 |
+| 同步线 | Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers | REST + WS | 离线补齐、跨端同步、历史回放 |
 
 ### 1.3 三层数据模式
 
 | 模式 | `dataMode` 值 | 特征 | 当前状态 |
 |------|-------------|------|---------|
 | Demo (mock) | `mock` | JS 内存数据，零依赖 | 已工作 |
-| Observed | `observed` | Edge API 只读观察 | 前端查询存在，auth token 问题 |
-| Approved-Real | `approved-real` | 真实 Hub+Edge+CLI | 需 TokenDanceID 登录打通 |
+| Observed | `observed` | Edge API 只读观察 | `verify-real-api-smoke.ps1` 44/44 通过 |
+| Approved-Real | `approved-real` | 真实 Hub+Edge+CLI | Claude Code + OpenCode 真实执行已验证 |
 
-### 1.4 关键文件索引
+### 1.4 Hub Server 完整路由表
 
-| 区域 | 关键文件 |
-|------|---------|
-| 共享平台接口 | `app/shared/src/platform/types.ts` — `AgentHubPlatform` |
-| Hub REST 客户端 | `app/web/src/api/hubClient.ts` — `createHubClient()` |
-| Hub React Query (Web) | `app/web/src/api/contactQueries.ts`、`agentQueries.ts`、`projectQueries.ts`、`runQueries.ts`、`executionTargetQueries.ts`、`agentTeamQueries.ts` |
-| Hub WS 客户端 (Web) | `app/web/src/api/hubWS.ts` — auth handshake + typed events + reconnection |
-| Hub WS 事件类型 | `app/shared/src/hubEvents.ts` — 26 个事件常量 |
-| Edge REST 客户端 | `app/web/src/api/edgeClient.ts` |
-| Desktop 数据模型 | `app/desktop/src/platform/useDesktopWorkbenchModel.ts` |
-| Desktop Hub Auth | `app/desktop/src/api/hubAuth.ts` — OIDC PKCE |
-| Web Auth | `app/web/src/hooks/useAuth.ts`、`app/web/src/api/hubAuth.ts` |
-| 共享工作台 | `app/shared/src/workbench/AgentHubWorkbench.tsx` — 主布局 |
-| Hub Server 路由 | `hub-server/internal/router/router.go` — 完整路由注册 |
-| Hub 消息处理 | `hub-server/internal/handler/message.go` |
-| Hub 联系人处理 | `hub-server/internal/handler/contact.go` |
-| Hub 会话处理 | `hub-server/internal/handler/session.go` |
-| Hub Agent 处理 | `hub-server/internal/handler/agent.go` — task dispatch/stream/approval/artifact |
-| Hub OIDC 处理 | `hub-server/internal/handler/oidc.go` |
-| Edge Adapters | `edge-server/internal/adapters/` — claude_code.go、codex.go、opencode.go |
-| Edge Adapter Registry | `edge-server/internal/adapters/registry.go` |
-| API 合同 | `api/openapi.yaml` — REST; `api/events.md` — WS events |
+| 分组 | 端点 | 方法 | Handler |
+|------|------|------|---------|
+| **Health** | `/health` | GET | `healthHandler.Check` |
+| | `/health/live` | GET | `healthHandler.Live` |
+| | `/health/ready` | GET | `healthHandler.Ready` |
+| **Auth** | `/client/auth/refresh` | POST | `authHandler.Refresh` |
+| | `/client/auth/oidc/authorize` | POST | `oidcHandler.PostOIDCAuthorize` |
+| | `/client/auth/oidc/callback` | POST/GET | `oidcHandler.PostOIDCCallback`/`GetOIDCCallback` |
+| | `/client/auth/me` | GET | `authHandler.Me` |
+| | `/client/auth/logout` | POST | `authHandler.Logout` |
+| | `/client/auth/profile` | PUT | `authHandler.UpdateProfile` |
+| **Contacts** | `/client/contacts/search` | GET | `contactHandler.SearchUser` |
+| | `/client/contacts/friend-requests` | GET/POST | `contactHandler.ListFriendRequests`/`SendFriendRequest` |
+| | `/client/contacts/friend-requests/:id/accept` | POST | `contactHandler.AcceptFriendRequest` |
+| | `/client/contacts/friend-requests/:id/reject` | POST | `contactHandler.RejectFriendRequest` |
+| | `/client/contacts` | GET | `contactHandler.ListContacts` |
+| | `/client/contacts/:user_id` | DELETE | `contactHandler.RemoveContact` |
+| | `/client/contacts/:user_id/block` | POST | `contactHandler.BlockContact` |
+| | `/client/contacts/:user_id/unblock` | POST | `contactHandler.UnblockContact` |
+| | `/client/contacts/:user_id/remark` | PUT | `contactHandler.UpdateRemark` |
+| **Sessions** | `/client/sessions` | GET | `sessionHandler.List` |
+| | `/client/sessions/private` | POST | `sessionHandler.CreatePrivate` |
+| | `/client/sessions/group` | POST | `sessionHandler.CreateGroup` |
+| | `/client/sessions/search` | GET | `sessionHandler.SearchSessions` |
+| | `/client/sessions/:id/members` | POST | `sessionHandler.AddMembers` |
+| | `/client/sessions/:id/members/:user_id` | DELETE | `sessionHandler.RemoveMember` |
+| | `/client/sessions/:id/leave` | POST | `sessionHandler.Leave` |
+| | `/client/sessions/:id/transfer-owner` | POST | `sessionHandler.TransferOwner` |
+| | `/client/sessions/:id/dissolve` | POST | `sessionHandler.Dissolve` |
+| | `/client/sessions/:id/info` | PUT | `sessionHandler.UpdateGroupInfo` |
+| | `/client/sessions/:id/settings` | PUT | `sessionHandler.UpdateMemberSettings` |
+| | `/client/sessions/:id` | DELETE | `sessionHandler.DeleteForMe` |
+| **Messages** | `/client/sessions/:id/messages` | POST/GET | `messageHandler.SendMessage`/`GetMessages` |
+| | `/client/sessions/:id/messages/sync` | GET | `messageHandler.GetIncrementalMessages` |
+| | `/client/sessions/:id/messages/search` | GET | `messageHandler.SearchSessionMessages` |
+| | `/client/sessions/:id/pins` | GET | `messageHandler.ListPins` |
+| | `/client/sessions/:id/read` | POST | `messageHandler.MarkRead` |
+| | `/client/sessions/:id/agents` | POST | `agentHandler.AddAgentToSession` |
+| | `/client/messages/:id/recall` | POST | `messageHandler.RecallMessage` |
+| | `/client/messages/:id` | PUT | `messageHandler.EditMessage` |
+| | `/client/messages/:id/pin` | POST/DELETE | `messageHandler.PinMessage`/`UnpinMessage` |
+| | `/client/messages/:id/reactions` | GET/POST/DELETE | `messageHandler.ListMessageReactions`/`AddMessageReaction`/`RemoveMessageReaction` |
+| | `/client/messages/:id/forward` | POST | `messageHandler.ForwardMessage` |
+| | `/client/messages/search` | GET | `messageHandler.SearchMessages` |
+| **Attachments** | `/client/attachments/probe` | POST | `attachmentHandler.Probe` |
+| | `/client/attachments` | POST | `attachmentHandler.Upload` |
+| | `/client/attachments/:id` | GET | `attachmentHandler.Download` |
+| **Notifications** | `/client/notifications` | GET | `notificationHandler.ListNotifications` |
+| | `/client/notifications/:id/read` | POST | `notificationHandler.MarkRead` |
+| | `/client/notifications/read-all` | POST | `notificationHandler.ReadAll` |
+| **Settings** | `/client/settings` | GET/PATCH | `settingsHandler.GetSettings`/`PatchSettings` |
+| **WebSocket** | `/client/ws` | GET (upgrade) | `wsHandler.ServeWS` |
+| **Edge** | `/edge/devices/register` | POST | `deviceHandler.Register` |
+| | `/edge/agent-tasks/:id/ack` | POST | `agentHandler.TaskAck` |
+| | `/edge/agent-tasks/:id/stream` | POST | `agentHandler.TaskStream` |
+| | `/edge/agent-tasks/:id/done` | POST | `agentHandler.TaskDone` |
+| | `/edge/agent-tasks/:id/fail` | POST | `agentHandler.TaskFail` |
+| **Cloud** | `/cloud/edge/register` | POST | `deviceHandler.CloudEdgeRegister` |
+| **Agent Tasks** | `/web/agent-tasks` | POST | `agentHandler.TriggerTask` |
+| | `/web/agent-tasks/:id/cancel` | POST | `agentHandler.CancelTask` |
+| | `/web/agent-tasks/:id/summary` | GET | `agentHandler.TaskEventSummary` |
+| | `/web/agent-tasks/:id/events` | GET | `agentHandler.TaskEvents` |
+| | `/web/agent-tasks/:id/approvals` | GET | `agentHandler.TaskApprovals` |
+| | `/web/agent-tasks/:id/approvals/:approval_id/decide` | POST | `agentHandler.DecideTaskApproval` |
+| | `/web/agent-tasks/:id/artifacts` | GET | `agentHandler.TaskArtifacts` |
+| **Custom Agents** | `/web/custom-agents` | GET/POST | `customAgentHandler.List`/`Create` |
+| | `/web/custom-agents/:id` | PUT/DELETE | `customAgentHandler.Update`/`Delete` |
+| **Agent Profiles** | `/web/agent-profiles` | GET/POST | `agentProfileHandler.ListProfiles`/`CreateProfile` |
+| | `/web/agent-profiles/:id` | GET/PATCH/DELETE | `agentProfileHandler.GetProfile`/`UpdateProfile`/`DeleteProfile` |
+| | `/web/agent-profiles/:id/publish` | POST | `agentProfileHandler.PublishProfile` |
+| | `/web/agent-profiles/:id/install` | POST | `agentProfileHandler.InstallProfile` |
+| **Skills** | `/web/skills` | GET/POST | `skillHandler.ListSkills`/`CreateSkill` |
+| | `/web/skills/:id` | GET/PUT/DELETE | `skillHandler.*` |
+| | `/web/skills/:id/publish` | POST | `skillHandler.PublishSkill` |
+| | `/web/skills/:id/unpublish` | POST | `skillHandler.UnpublishSkill` |
+| **MCP Servers** | `/web/mcp-servers` | GET/POST | `mcpHandler.ListMCPServers`/`CreateMCPServer` |
+| | `/web/mcp-servers/:id` | GET/PUT/DELETE | `mcpHandler.*` |
+| | `/web/mcp-servers/:id/publish` | POST | `mcpHandler.PublishMCPServer` |
+| **Market** | `/web/market/profiles` | GET | `marketHandler.SearchMarketProfiles` |
+| | `/web/market/profiles/:id` | GET | `marketHandler.GetMarketProfile` |
+| | `/web/market/profiles/:id/install` | POST | `marketHandler.InstallMarketProfile` |
+| | `/web/market/profiles/:id/rate` | POST | `marketHandler.RateMarketProfile` |
+| **Provider Bindings** | `/web/provider-bindings` | GET/POST | `pbHandler.List`/`Create` |
+| | `/web/provider-bindings/:id` | PUT/DELETE | `pbHandler.Update`/`Delete` |
+| **Execution Targets** | `/web/execution-targets` | GET/POST | `targetHandler.ListTargets`/`CreateTarget` |
+| | `/web/execution-targets/:id` | GET/PATCH/DELETE | `targetHandler.*` |
+| | `/web/execution-targets/:id/ping` | POST | `targetHandler.PingTarget` |
+| **Documents** | `/web/documents` | GET/POST | `documentHandler.ListDocuments`/`CreateDocument` |
+| | `/web/documents/:id` | GET/PATCH/DELETE | `documentHandler.*` |
+| **Projects** | `/web/projects` | GET/POST | `workspaceHandler.ListWorkspaces`/`CreateWorkspace` |
+| | `/web/projects/:id` | GET/PATCH | `workspaceHandler.*` |
+| | `/web/projects/:id/threads` | GET/POST | `workspaceHandler.ListProjectThreads`/`CreateProjectThread` |
+| | `/web/projects/:id/threads/:threadId/messages` | GET/POST | `workspaceHandler.*` |
+| **Agent Teams** | `/web/agent-teams` | GET/POST | `agentTeamHandler.ListTeams`/`CreateTeam` |
+| | `/web/agent-teams/:id` | GET/PUT/DELETE | `agentTeamHandler.*` |
+| | `/web/agent-teams/:id/members` | POST | `agentTeamHandler.AddMember` |
+| | `/web/agent-teams/:id/members/:member_id` | DELETE | `agentTeamHandler.RemoveMember` |
+| | `/web/agent-teams/:id/runs` | GET/POST | `agentTeamHandler.ListRuns`/`StartRun` |
+| | `/web/agent-teams/:id/runs/:run_id` | GET | `agentTeamHandler.GetRun` |
+| | `/web/agent-teams/:id/runs/:run_id/state` | GET | `agentTeamHandler.GetRunState` |
+| | `/web/agent-teams/:id/runs/:run_id/tasks` | GET | `agentTeamHandler.ListTeamTasks` |
+| | `/web/agent-teams/:id/runs/:run_id/events` | GET | `agentTeamHandler.ListTeamEvents` |
+| | `/web/agent-teams/:id/runs/:run_id/route-decisions` | POST | `agentTeamHandler.HandleRouteDecision` |
+| | `/web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide` | POST | `agentTeamHandler.DecideApproval` |
+| | `/web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve` | POST | `agentTeamHandler.ResolveConflict` |
+| | `/web/agent-teams/:id/runs/:run_id/assignments` | GET/POST | `agentTeamHandler.*` |
+| | `/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/dispatch` | POST | `agentTeamHandler.DispatchAssignment` |
+| | `/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete` | POST | `agentTeamHandler.CompleteAssignment` |
+| | `/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail` | POST | `agentTeamHandler.FailAssignment` |
+| **Devices** | `/web/devices` | GET | `deviceHandler.ListDevices` |
+| **Audit** | `/web/audit-events` | GET | `auditHandler.ListAuditEvents` |
+| **Relay** | `/web/relay/commands` | POST | `relayHandler.CreateCommand` |
+| | `/web/relay/commands/:id` | GET | `relayHandler.GetCommand` |
+| | `/web/relay/commands/:id/ack` | POST | `relayHandler.AckCommand` |
+| **Public** | `/api/public/stats` | GET | `publicHandler.Stats` |
+
+### 1.5 WebSocket 事件合同（26 个事件常量）
+
+| 事件常量 | 事件类型字符串 | 方向 | 用途 |
+|---------|--------------|------|------|
+| `AUTH` | `auth` | C->S | 客户端发送认证 |
+| `AUTH_OK` | `auth.ok` | S->C | 认证成功 |
+| `AUTH_FAIL` | `auth.fail` | S->C | 认证失败 |
+| `MESSAGE_NEW` | `message.new` | S->C | 新消息到达 |
+| `MESSAGE_RECALL` | `message.recall` | S->C | 消息被撤回 |
+| `MESSAGE_PIN` | `message.pin` | S->C | 消息被置顶 |
+| `MESSAGE_UNPIN` | `message.unpin` | S->C | 消息被取消置顶 |
+| `MESSAGE_READ` | `message.read` | S->C | 已读回执更新 |
+| `SESSION_CREATED` | `session.created` | S->C | 新会话创建 |
+| `SESSION_DISSOLVED` | `session.dissolved` | S->C | 会话被解散 |
+| `SESSION_MEMBER_JOINED` | `session.member_joined` | S->C | 群成员加入 |
+| `SESSION_MEMBER_LEFT` | `session.member_left` | S->C | 群成员离开 |
+| `SESSION_INFO_UPDATED` | `session.info_updated` | S->C | 会话信息变更 |
+| `DEVICE_ONLINE` | `device.online` | S->C | 设备上线 |
+| `DEVICE_OFFLINE` | `device.offline` | S->C | 设备下线 |
+| `DEVICE_KICKED` | `device.kicked` | S->C | 设备被踢出 |
+| `AGENT_DISPATCH` | `agent.dispatch` | S->C | Agent 任务已派发 |
+| `AGENT_STREAM` | `agent.stream` | S->C | Agent 流式输出 |
+| `AGENT_DONE` | `agent.done` | S->C | Agent 任务完成 |
+| `AGENT_FAILED` | `agent.failed` | S->C | Agent 任务失败 |
+| `AGENT_CANCEL` | `agent.cancel` | S->C | Agent 任务取消 |
+| `AGENT_CONTROL` | `agent.control` | S->C | Agent 控制指令 |
+| `NOTIFICATION_NEW` | `notification.new` | S->C | 新通知 |
+| `FRIEND_REQUEST` | `friend.request` | S->C | 好友请求 |
+| `FRIEND_ACCEPTED` | `friend.accepted` | S->C | 好友请求被接受 |
+
+### 1.6 关键文件索引
+
+| 区域 | 关键文件 | 职责 |
+|------|---------|------|
+| **共享平台接口** | `app/shared/src/platform/types.ts` | `AgentHubPlatform` 接口：`conversations`/`runs`/`settings`/`host`/`preview`/`attachments` |
+| **共享工作台** | `app/shared/src/workbench/AgentHubWorkbench.tsx` | 主布局 shell |
+| | `app/shared/src/workbench/WorkbenchRoutes.tsx` | 7 子页路由 + 数据绑定 |
+| | `app/shared/src/workbench/settingsService.ts` | 设置读写抽象层 |
+| | `app/shared/src/workbench/pages/ContactsPage.tsx` | 通讯录页面 |
+| | `app/shared/src/workbench/pages/DocsPage.tsx` | 文档页面 |
+| | `app/shared/src/workbench/pages/AgentsPage.tsx` | Agent 配置页面 |
+| | `app/shared/src/workbench/pages/TasksPage.tsx` | 任务/运行页面 |
+| | `app/shared/src/workbench/pages/ProjectsPage.tsx` | 项目页面 |
+| | `app/shared/src/workbench/pages/SettingsPage.tsx` | 设置页面 |
+| **Hub WS 事件类型** | `app/shared/src/hubEvents.ts` | 26 个事件常量 |
+| **Web Hub REST** | `app/web/src/api/hubClient.ts` | Hub 全端点 typed client |
+| **Web Hub Query** | `app/web/src/api/contactQueries.ts` | 联系人/好友请求 React Query hooks |
+| | `app/web/src/api/agentQueries.ts` | Agent Profile CRUD hooks |
+| | `app/web/src/api/projectQueries.ts` | 项目 workspace CRUD hooks |
+| | `app/web/src/api/runQueries.ts` | Agent Task 运行 hooks |
+| | `app/web/src/api/executionTargetQueries.ts` | 执行目标 CRUD hooks |
+| | `app/web/src/api/agentTeamQueries.ts` | Agent Team 全链路 hooks |
+| | `app/web/src/api/threadQueries.ts` | 项目线程消息 hooks |
+| **Web Hub WS** | `app/web/src/api/hubWS.ts` | Auth handshake + typed events + reconnection |
+| | `app/web/src/api/transport.ts` | Transport 抽象 |
+| **Web Auth** | `app/web/src/hooks/useAuth.ts` | Web 认证 hook |
+| | `app/web/src/hooks/useWebAuth.ts` | Web 认证流程 |
+| | `app/web/src/api/hubAuth.ts` | Web OIDC auth helper |
+| | `app/web/src/api/hubTokenStorage.ts` | Token 存取 |
+| **Desktop Hub REST** | `app/desktop/src/api/hubClient.ts` | Desktop Hub typed client |
+| | `app/desktop/src/api/hubQueries.ts` | Desktop Hub 聚合查询 |
+| | `app/desktop/src/api/sessionQueries.ts` | Desktop 会话/消息 hooks |
+| | `app/desktop/src/api/agentProfileQueries.ts` | Desktop Agent Profile hooks |
+| | `app/desktop/src/api/documentQueries.ts` | Desktop 文档 CRUD hooks |
+| | `app/desktop/src/api/projectQueries.ts` | Desktop 项目 hooks |
+| | `app/desktop/src/api/runQueries.ts` | Desktop 运行 hooks |
+| | `app/desktop/src/api/runEvidenceQueries.ts` | Desktop 运行证据 hooks |
+| | `app/desktop/src/api/agentTeamQueries.ts` | Desktop Team hooks |
+| | `app/desktop/src/api/modelCatalogQueries.ts` | Desktop 模型目录 hooks |
+| **Desktop Auth** | `app/desktop/src/api/hubAuth.ts` | Desktop OIDC PKCE auth |
+| | `app/desktop/src/api/edgeAuth.ts` | Edge 认证 |
+| | `app/desktop/src/api/hubTokenStorage.ts` | Desktop token 存取 |
+| **Desktop Platform** | `app/desktop/src/platform/useDesktopWorkbenchModel.ts` | Desktop 工作台数据模型 |
+| **Hub Server** | `hub-server/internal/router/router.go` | 完整路由注册（100+ 端点） |
+| | `hub-server/internal/handler/message.go` | 消息 CRUD + 搜索 + 撤回 + 编辑 + Pin + Reaction + 转发 + 已读 |
+| | `hub-server/internal/handler/contact.go` | 联系人搜索 + 好友请求 + 拉黑 + 备注 |
+| | `hub-server/internal/handler/session.go` | 会话 CRUD + 群管理 + 成员 |
+| | `hub-server/internal/handler/agent.go` | Agent task 触发/流/审批/产物 |
+| | `hub-server/internal/handler/oidc.go` | OIDC authorize/callback |
+| | `hub-server/internal/handler/auth.go` | 认证 me/logout/profile/refresh |
+| | `hub-server/internal/handler/custom_agent.go` | Custom Agent CRUD |
+| | `hub-server/internal/handler/agent_profile.go` | Agent Profile CRUD + 发布 + 安装 |
+| | `hub-server/internal/handler/execution_target.go` | 执行目标 CRUD + ping |
+| | `hub-server/internal/handler/agent_team.go` | Team + Run + Route + Approval + Conflict + Assignment |
+| | `hub-server/internal/handler/document.go` | 云文档 CRUD |
+| | `hub-server/internal/handler/workspace.go` | 项目 + 线程 + 线程消息 |
+| | `hub-server/internal/handler/user_settings.go` | 用户设置 GET/PATCH |
+| | `hub-server/internal/handler/device.go` | 设备注册 + Cloud Edge |
+| | `hub-server/internal/handler/notification.go` | 通知列表 + 已读 |
+| | `hub-server/internal/handler/attachment.go` | 附件上传/下载 |
+| | `hub-server/internal/handler/skill.go` | Skill CRUD |
+| | `hub-server/internal/handler/mcp_server.go` | MCP Server CRUD |
+| | `hub-server/internal/handler/market.go` | 市场搜索/安装/评分 |
+| | `hub-server/internal/handler/provider_binding.go` | Provider Binding CRUD |
+| | `hub-server/internal/handler/audit.go` | 审计事件列表 |
+| | `hub-server/internal/handler/relay.go` | Relay 命令 |
+| | `hub-server/internal/handler/ws.go` | WebSocket handler |
+| **Hub 数据层** | `hub-server/internal/model/` | 数据模型 |
+| | `hub-server/internal/repository/` | 数据仓储 |
+| | `hub-server/migrations/` | 49 个迁移文件 |
+| **Edge Adapters** | `edge-server/internal/adapters/claude_code.go` | Claude Code CLI adapter |
+| | `edge-server/internal/adapters/codex.go` | Codex CLI adapter + PreflightAdapter |
+| | `edge-server/internal/adapters/opencode.go` | OpenCode CLI adapter |
+| | `edge-server/internal/adapters/anthropic_sdk.go` | Anthropic SDK HTTP SSE adapter |
+| | `edge-server/internal/adapters/openai_sdk.go` | OpenAI SDK HTTP SSE adapter |
+| | `edge-server/internal/adapters/agentspec_fixture.go` | Fixture demo adapter |
+| | `edge-server/internal/adapters/registry.go` | Adapter 注册表 |
+| | `edge-server/internal/adapters/adapter.go` | Adapter 接口定义 |
+| | `edge-server/internal/adapters/sdk_fixture_mapper.go` | SDK fixture event matrix |
+| | `edge-server/internal/adapters/runtime_manifest.go` | Custom runtime manifest |
+| | `edge-server/internal/adapters/security_hooks.go` | 权限安全钩子 |
+| | `edge-server/internal/adapters/orchestrator.go` | 编排器 |
+| | `edge-server/internal/adapters/event_emitter.go` | 事件发射器 |
+| **验证脚本** | `tests/scripts/verify-real-api-smoke.ps1` | 44/44 断言真实 API smoke |
+| | `tests/scripts/verify-p0-approved-real-gold-path.ps1` | P0 金链路验证 |
+| | `tests/scripts/verify-approved-real-demo-readiness.ps1` | Approved-real 准备度 |
+| | `scripts/verify-token-dance-id-login-readiness.ps1` | OIDC 登录准备度 |
+| | `scripts/verify-release-gate.ps1` | 发布门控 |
+| | `scripts/verify-tauri-package-dry.ps1` | Tauri 打包验证 |
+| **E2E** | `app/e2e/chat-real.spec.ts` | 9 个 Playwright 真实 API 测试 |
 
 ---
 
@@ -130,564 +361,861 @@ Web / Desktop / Mobile / IM
 
 ### 2.1 已完成能力
 
-| 模块 | 能力 |
-|------|------|
-| Web/Desktop 共享 workbench | 7 个子页全部有 UI + mock 数据 |
-| Hub Server | 49 个迁移全部运行，100+ REST 端点 + WebSocket |
-| Edge Server | SQLite durable store, 种子数据, fixture adapter |
-| Hub REST 客户端 (Web) | `hubClient.ts` 已实现所有 Hub 端点的 typed 方法 |
-| Hub React Query hooks (Web) | `contactQueries.ts` 完整好友/联系人/群组 hooks；`agentQueries.ts`；`projectQueries.ts`；`runQueries.ts`；`executionTargetQueries.ts`；`agentTeamQueries.ts` |
-| Hub WS 客户端 (Web) | `hubWS.ts` 已实现 auth handshake、typed event routing、exponential backoff reconnection |
-| Hub WS 事件类型 | `hubEvents.ts` 26 个事件常量（auth/message/session/device/agent/notification/friend） |
-| Demo 模式 | 10 个会话各有独立 transcript, evidence, preview |
-| i18n | zh + en 两个 locale 文件 |
-| Hub contacts 端点 | search, list, friend-request (CRUD), block, remark |
-| Hub sessions 端点 | create private/group, members, leave, dissolve, info, settings, delete |
-| Hub messages 端点 | send, get, sync, recall, edit, pin, reactions, forward, search, markRead |
-| Hub documents 端点 | list, get, create, update, delete |
-| Hub settings 端点 | GET/PATCH settings |
-| Hub agent-tasks 端点 | trigger, cancel, events, approvals, decide, artifacts, summary |
-| Hub custom-agents 端点 | list, create, update, delete |
-| Hub agent-profiles 端点 | CRUD + publish + install |
-| Hub execution-targets 端点 | CRUD + ping |
-| Hub agent-teams 端点 | 完整 Team + Run + Route + Approval + Conflict + Assignment |
-| Hub skills/mcp/provider-bindings/market/audit/relay 端点 | 完整 CRUD |
-| Edge agent-profiles 端点 | CRUD |
-| Edge runs 端点 | create, cancel, status, diff, artifacts, previews |
-| Edge CLI readiness | Claude Code/Codex/OpenCode JSON readiness |
-| Desktop Tauri packaging | Unsigned NSIS + portable zip dry run |
-| Mobile RN | 89 tests pass, Hub contracts aligned |
-| Windows release dry gate | SHA-256 manifests, CI green |
-
-### 2.2 未接通缺口（2026-06-10 实时状态）
-
-| 缺口 | 影响 | 当前状态 |
+| 模块 | 能力 | 完成标志 |
 |------|------|---------|
-| TokenDanceID 真实登录 | Hub OIDC 已配置（.env 有 client），`POST /client/auth/oidc/authorize` 返回 200 含 authorization_url。TokenDance ID (`:3000`) 发现文档可访问。 | **已配置，待操作员验证完整 PKCE 流程** |
-| Web @Agent 通过 WS 触发真实 CLI | Web 发送消息 → Hub task → Edge run → Claude Code 执行 → 事件回传 → Web transcript 渲染全链路 | **已验证（44/44 smoke test PASS），需端到端 WS 集成测试** |
-| Codex CLI 真实执行 | adapter 已实现 + preflight 检查 | **阻塞于 `OPENAI_API_KEY`** |
-| Anthropic SDK 真实调用 | `AnthropicSDKAdapter` 已实现 HTTP direct call + SSE streaming | **阻塞于 `ANTHROPIC_API_KEY`** |
-| OpenAI SDK 真实调用 | `OpenAISDKAdapter` 已实现 HTTP direct call + SSE streaming | **阻塞于 `OPENAI_API_KEY`** |
-| 桌面 Tauri 签名发布 | Windows unsigned dry package 已产出 | **阻塞于签名证书 + macOS notarization** |
-| Mobile 端到端真实登录测试 | Mobile hubClient/hubEvents/hubLifecycle 已对齐 Hub API 合同 | **阻塞于 TokenDanceID 完整流程** |
+| **Web/Desktop 共享 workbench** | 7 个子页（chat/contacts/docs/agents/runs/projects/settings）全部有 UI + mock 数据 | WorkbenchRoutes.tsx 完整 |
+| **Hub Server** | 49 个迁移全部运行，100+ REST 端点 + WebSocket | `router.go` 完整注册 |
+| **Edge Server** | SQLite durable store, 种子数据, fixture adapter | `edge-server/internal/` |
+| **Hub REST 客户端 (Web)** | `hubClient.ts` 全端点 typed 方法 | 所有 `request<T>()` 方法已实现 |
+| **Hub REST 客户端 (Desktop)** | `hubClient.ts` 全端点 typed 方法，含 streamTaskEvent、Reaction CRUD | 所有方法已实现 |
+| **Hub React Query hooks (Web)** | contactQueries/agentQueries/projectQueries/runQueries/executionTargetQueries/agentTeamQueries/threadQueries | 所有 mutation/query hooks |
+| **Hub React Query hooks (Desktop)** | hubQueries/sessionQueries/agentProfileQueries/documentQueries/projectQueries/agentQueries/runQueries/runEvidenceQueries/agentTeamQueries/modelCatalogQueries | 含 getToken 认证注入 |
+| **Hub WS 客户端 (Web)** | `hubWS.ts` auth handshake + typed events + exponential backoff | 连接状态 store 已实现 |
+| **Hub WS 客户端 (Desktop)** | `hubWS.ts` + workbench model 实时缓存失效 | 接入 React Query |
+| **Hub WS 事件类型** | `hubEvents.ts` 26 个事件常量 | 完整 |
+| **IM Chat Actions (Web)** | send/recall/edit/pin/unpin/forward/searchMessages/searchSessionMessages/markRead/addReaction/removeReaction（10 个） | `useWebWorkbenchModel.ts` |
+| **IM Chat Actions (Desktop)** | send/recall/edit/pin/unpin/markRead | `useDesktopWorkbenchModel.ts` |
+| **自动已读回执** | 进入会话后自动标记最后一条消息为已读 | workbench model 内 |
+| **Contacts Actions** | searchUser/sendFriendRequest/acceptRequest/rejectRequest/removeContact/blockContact/unblockContact/updateRemark/onCreateGroup | `WorkbenchContactsActions` 接口 |
+| **Documents Actions** | onCreateDoc/onUpdateDoc/onDeleteDoc | `WorkbenchDocumentsActions` 接口 |
+| **Hub 云文档数据层** | `model.Document` + `repository.Document` 全链路 CRUD | 迁移 0049 |
+| **Hub Settings** | `user_settings` 表 + GET/PATCH handler | `user_settings.go` |
+| **Agent Profile CRUD** | Web + Desktop 全部 hooks（list/create/update/delete） | `agentProfileQueries.ts` |
+| **Agent 合并策略** | Edge profiles > Hub profiles > raw adapter list | Desktop 优先级合并 |
+| **Desktop Settings 三层** | Edge -> Hub -> localStorage 回退 | Desktop platform adapter |
+| **CLI Adapters** | Claude Code/Codex/OpenCode JSON readiness + 真实执行 | `claude_code.go`/`codex.go`/`opencode.go` |
+| **CLI 真实执行** | Claude Code + OpenCode 已验证真实执行 | STATE.md 记录 |
+| **SDK HTTP Adapters** | `AnthropicSDKAdapter` + `OpenAISDKAdapter`（纯 net/http SSE streaming） | `anthropic_sdk.go`/`openai_sdk.go` |
+| **Codex Preflight** | `PreflightAdapter` 接口，缺 `OPENAI_API_KEY` 快速失败 | `codex.go` |
+| **OpenCode 修复** | `--session` 只在 resume 时传递 | `opencode.go` |
+| **E2E Smoke** | `verify-real-api-smoke.ps1` 44/44 通过 | Hub/Edge/Auth/Contacts/Sessions/Documents/Runs |
+| **E2E Playwright** | `chat-real.spec.ts` 9 个测试（Hub API + Edge API + Web UI） | Playwright |
+| **Hub API 验证** | 16/20 端点返回 200，含 contacts/sessions/messages/documents/WebSocket | 真实 HTTP 测试 |
+| **Desktop Tauri packaging** | Unsigned NSIS + portable zip + sidecar + manifest hash | `verify-tauri-package-dry.ps1` |
+| **Mobile RN** | 89 tests pass, Hub contracts aligned | `corepack pnpm --dir app/mobile-rn verify` |
+| **i18n** | zh + en 两个 locale 文件 | `app/shared/src/i18n/` |
+| **Demo 模式** | 10 个会话各有独立 transcript, evidence, preview | mock data |
+| **Windows release dry gate** | SHA-256 manifests, CI green | release gate |
+
+### 2.2 未接通缺口
+
+| 缺口 | 影响 | 阻塞原因 |
+|------|------|---------|
+| TokenDanceID 真实登录 | 所有 Hub 功能需要 auth token | 缺 OIDC env 变量和 TokenDanceID 端 OAuth client |
+| Hub WS 实时推送全量路由 | 26 个事件到 store 的完整路由未全部验证 | 需要 auth token + 全事件路由 |
+| 通讯录前端->Hub API 实时 | WS 事件驱动的联系人实时更新未验证 | 需要 auth token |
+| 聊天前端->Hub API 端到端 | chatActions 已接线但 WS message.new 到 transcript 追加需验证 | 需要 auth token |
+| Agent 配置页->Hub/Edge API | Agent Profile hooks 存在但实时同步未验证 | 需要 Edge 连接 |
+| 云文档->Hub API | documentQueries 存在但全文预览未接入 | 需要 auth token |
+| 设置页->settingsService | Hub GET/PATCH 已实现但前端未使用 settingsService | 需要 auth token + 接线 |
+| 项目页->Hub Projects API | hubQueries workspace-projects 存在 | 需要 auth token |
+| @Agent 真实调用 CLI | Composer mention 未触发 Edge run | 需要 approved-real |
+| Codex CLI 真实执行 | 适配器已实现，缺 `OPENAI_API_KEY` | 需要 API key |
+| SDK 真实 API 消耗 | SDK adapter 已实现，缺 API key | 需要 API key |
+| Mobile->真实 Hub API | Mobile 组件存在但 Hub queries 未全部接入 | 需要 auth token |
+| E2E 全链路测试 | 只有 smoke + Playwright，无完整 UI 数据流测试 | 需要 auth + Hub+Edge 启动 |
+| Artifact/Diff 真实 apply/revert | 只读 diff 可展示，写文件未实现 | 需要审批 |
+| Agent Team 实时运行 | Team Run 实时编排状态推送未验证 | 需要 Edge 连接 |
 
 ---
 
-## 3. P0：即时阻塞项
+## 3. 认证与身份
 
-> 目标：打通 TokenDanceID 真实登录，使所有 Hub API 可用。
+### 3.1 当前状态
 
-### 3.1 TokenDanceID OIDC 真实登录全链路
+- Hub OIDC handler 已实现（`PostOIDCAuthorize`/`PostOIDCCallback`/`GetOIDCCallback`）
+- Desktop PKCE + loopback callback 代码已存在
+- Web OIDC redirect callback 代码已存在
+- Hub JWT session 签发已实现
+- Token storage 已实现（Web + Desktop）
+- 当前通过 JWT secret 直接签发 dev token 进行测试
 
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | **✅ Hub OIDC handler 已实现**（`oidc.go`：`PostOIDCAuthorize`、`PostOIDCCallback`、`GetOIDCCallback`）；**✅ `.env` 已配置 OIDC client**（`AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://localhost:3000`，`CLIENT_ID`/`CLIENT_SECRET` 已设置）；**✅ `POST /client/auth/oidc/authorize` 返回 200 含 authorization_url**；**✅ TokenDance ID 本地发现文档可访问**；Desktop/Web 有登录 UI |
-| **已对接** | (1) Hub OIDC authorize endpoint → 返回 authorization_url；(2) Desktop PKCE loopback callback 已实现；(3) Web OIDC redirect callback 已实现；(4) Hub code exchange + session 签发已实现 |
-| **待验证** | (1) 完整 PKCE 流程：浏览器登录 → code exchange → Hub JWT 签发 → `GET /client/auth/me`；(2) `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`；(3) 登录后 Hub WS 连接成功收到 `auth.ok` |
-| **对接方式** | Desktop: `shell.open()` -> TokenDanceID authorize -> loopback `TcpListener` -> `POST /client/auth/oidc/callback` -> Hub exchange -> Hub JWT；Web: browser redirect -> `GET /client/auth/oidc/callback` -> Hub exchange -> Hub JWT |
-| **涉及文件** | `hub-server/internal/handler/oidc.go`、`hub-server/internal/service/auth.go`、`hub-server/internal/jwtutil/tokendance.go`、`app/desktop/src-tauri/src/host/auth.rs`、`app/desktop/src/api/hubAuth.ts`、`app/web/src/components/AuthPage.tsx`、`app/web/src/components/LoginForm.tsx`、`app/web/src/hooks/useAuth.ts`、`app/web/src/hooks/useWebAuth.ts`、`app/web/src/api/hubAuth.ts`、`hub-server/.env` |
-| **验收标准** | (1) Desktop 真实 OIDC 登录成功，Hub 签发 session，`GET /client/auth/me` 返回用户信息；(2) Web 真实 OIDC 登录成功，Hub 签发 session；(3) `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`；(4) 登录后 Hub WS 连接成功，收到 `auth.ok`；(5) logout 后 session 失效，token 不可用 |
+### 3.2 API 端点
 
-### 3.2 P0 Approved-Real 金链路
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/client/auth/oidc/authorize` | POST | 发起 OIDC authorize（PKCE code_challenge） |
+| `/client/auth/oidc/callback` | POST | OIDC code exchange（code + code_verifier） |
+| `/client/auth/oidc/callback` | GET | 浏览器 redirect callback |
+| `/client/auth/refresh` | POST | 刷新 access token |
+| `/client/auth/me` | GET | 获取当前用户信息 |
+| `/client/auth/logout` | POST | 注销 session |
+| `/client/auth/profile` | PUT | 更新用户 profile（昵称、头像） |
 
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | `verify-p0-approved-real-gold-path.ps1` PASS（no-spend fixture）；真实 CLI/model/API 消耗未标记完成 |
-| **需要对接** | (1) Desktop Edge CLI no-spend smoke -> fixture adapter -> Hub replay -> Web 展示；(2) 真实 TokenDanceID 登录后触发 agent task；(3) Hub task 状态同步到 Web |
-| **对接方式** | Web `POST /web/agent-tasks` -> Hub -> Edge `POST /edge/agent-tasks/:id/ack` -> Edge fixture adapter -> `POST /edge/agent-tasks/:id/stream` -> Hub -> Web WS `agent.stream` -> Web `GET /web/agent-tasks/:id/events` |
-| **涉及文件** | `app/web/src/hooks/useHubMainChat.ts`、`app/web/src/api/runQueries.ts`、`app/web/src/hooks/useHubEventStream.ts`、`app/web/src/stores/taskBridgeStore.ts`、`hub-server/internal/handler/agent.go`、`edge-server/internal/adapters/agentspec_fixture.go`、`tests/scripts/verify-p0-approved-real-gold-path.ps1` |
-| **验收标准** | (1) 金链路脚本 PASS；(2) Web 发送消息 -> Hub 创建 task -> Edge fixture 执行 -> 事件回传 -> Web transcript 渲染，全链路可见 |
+### 3.3 需要对接的文件
+
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `hub-server/internal/handler/oidc.go` | 环境配置 | 注入 TokenDanceID issuer/client 元数据 |
+| `hub-server/internal/service/auth.go` | 环境配置 | OIDC client 配置 |
+| `hub-server/internal/jwtutil/tokendance.go` | 验证 | ID token 验证逻辑 |
+| `app/desktop/src-tauri/src/host/auth.rs` | 验证 | Tauri Host API OIDC 流程 |
+| `app/desktop/src/api/hubAuth.ts` | 验证 | Desktop PKCE loopback 流程 |
+| `app/web/src/api/hubAuth.ts` | 验证 | Web redirect callback |
+| `app/web/src/hooks/useAuth.ts` | 验证 | Web auth 状态管理 |
+| `app/web/src/hooks/useWebAuth.ts` | 验证 | Web auth 流程控制 |
+| `scripts/verify-token-dance-id-login-readiness.ps1` | 验证 | 准备度检查 |
+
+### 3.4 步骤
+
+1. 配置 Hub Server 环境变量：`AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`、`AGENTHUB_TDID_LOGIN_CLIENT_SECRET`
+2. 在 TokenDanceID 注册 OAuth client，设置 redirect URIs（Desktop loopback + Web URL）
+3. 验证 Desktop PKCE 流程：`shell.open()` -> TokenDanceID authorize -> loopback -> Hub exchange -> JWT
+4. 验证 Web redirect 流程：browser redirect -> Hub exchange -> JWT
+5. 验证 token refresh：access token 过期前自动 refresh
+6. 验证 logout：session 失效
+7. 运行 `verify-token-dance-id-login-readiness.ps1` 确认 `READY_FOR_OPERATOR`
+
+### 3.5 验收标准
+
+- [ ] Desktop 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
+- [ ] Web 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
+- [ ] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
+- [ ] 登录后 Hub WS 连接成功，收到 `auth.ok`
+- [ ] Logout 后 session 失效，所有 API 返回 401
+- [ ] Access token 过期前自动 refresh，用户无感知
+- [ ] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新
+- [ ] Avatar 上传：`POST /client/attachments` 上传后 `GET /client/auth/me` 返回新 URL
 
 ---
 
-## 4. P1：核心数据流对接
-
-> 目标：把 UI 层已有的所有功能全部对接到真实的 Hub/Edge API，调通全部数据流。
-
-### 4.1 IM 聊天系统
-
-#### 4.1.1 消息发送与接收
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Web `useHubMainChat.ts` 已实现消息发送 hook；Hub REST `POST /client/sessions/:id/messages` 和 `GET /client/sessions/:id/messages` 已实现；Hub WS `message.new` 事件已定义 |
-| **需要对接** | (1) Web 发送消息 -> Hub REST -> 消息持久化 -> WS 推送给所有在线成员；(2) 收到 `message.new` 后追加到 transcript；(3) 支持文本/markdown/代码块 content_type；(4) `client_msg_id` 去重 |
-| **对接方式** | REST: `POST /client/sessions/:id/messages { client_msg_id, content_type, content }`；WS: 订阅 `HUB_EVENTS.MESSAGE_NEW` |
-| **涉及文件** | `app/web/src/hooks/useHubMainChat.ts`、`app/web/src/stores/hubStore.ts`、`app/web/src/api/hubClient.ts`（`sendMessage`）、`app/shared/src/hubEvents.ts`、`hub-server/internal/handler/message.go`（`SendMessage`）、`hub-server/internal/handler/ws.go` |
-| **验收标准** | (1) 发送文本消息，其余在线成员通过 WS 实时收到；(2) 消息列表按 `seq_id` 排序；(3) 重复 `client_msg_id` 不产生重复消息 |
-
-#### 4.1.2 消息撤回（Recall）
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST `POST /client/messages/:id/recall` 已实现；WS 事件 `message.recall` 已定义 |
-| **需要对接** | (1) 消息上下文菜单接入 recall mutation；(2) 收到 `message.recall` 后将消息标记为已撤回；(3) 撤回权限检查（仅发送者可撤回，有时间窗口） |
-| **对接方式** | REST: `POST /client/messages/:id/recall`；WS: `HUB_EVENTS.MESSAGE_RECALL` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`RecallMessage`）、`app/web/src/api/hubClient.ts`、`app/shared/src/hubEvents.ts` |
-| **验收标准** | (1) 撤回成功后 UI 显示"消息已撤回"；(2) 超时撤回返回错误；(3) 非发送者撤回返回 403；(4) WS 推送后所有客户端同步 |
-
-#### 4.1.3 消息编辑（Edit）
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `PUT /client/messages/:id { content }` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`EditMessage`） |
-| **验收标准** | (1) 编辑后显示更新内容和"已编辑"标记；(2) 非发送者编辑返回 403 |
-
-#### 4.1.4 消息 Pin / Unpin
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `POST /client/messages/:id/pin`、`DELETE /client/messages/:id/pin`、`GET /client/sessions/:id/pins`；WS: `HUB_EVENTS.MESSAGE_PIN` / `HUB_EVENTS.MESSAGE_UNPIN` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`PinMessage`、`UnpinMessage`、`ListPins`）、`app/shared/src/hubEvents.ts` |
-| **验收标准** | (1) Pin 后出现在会话顶部 pinned 列表；(2) Unpin 后移除；(3) WS 同步到所有在线成员 |
-
-#### 4.1.5 消息 Reaction
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `POST /client/messages/:id/reactions { emoji }`、`DELETE /client/messages/:id/reactions { emoji }`、`GET /client/messages/:id/reactions` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`ListMessageReactions`、`AddMessageReaction`、`RemoveMessageReaction`） |
-| **验收标准** | (1) 添加 reaction 后消息下方显示 emoji 计数；(2) 移除 reaction 后计数更新 |
-
-#### 4.1.6 消息转发（Forward）
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `POST /client/messages/:id/forward { target_session_id }` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`ForwardMessage`） |
-| **验收标准** | (1) 转发成功后目标会话出现转发消息；(2) 转发消息标注原始发送者 |
-
-#### 4.1.7 消息搜索（Search）
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `GET /client/messages/search?q=keyword`、`GET /client/sessions/:id/messages/search?q=keyword` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`SearchMessages`、`SearchSessionMessages`）、`app/web/src/stores/searchStore.ts`、`app/web/src/components/SearchDialog.tsx` |
-| **验收标准** | (1) 搜索返回匹配消息列表，含会话名、发送者、高亮关键词；(2) 点击结果跳转到消息位置 |
-
-#### 4.1.8 已读回执（Read Receipts）
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `POST /client/sessions/:id/read { last_read_seq_id }`；WS: `HUB_EVENTS.MESSAGE_READ` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`MarkRead`）、`app/shared/src/hubEvents.ts` |
-| **验收标准** | (1) 进入会话后未读计数清零；(2) 多端同步已读状态 |
-
-#### 4.1.9 消息同步（Incremental Sync）
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `GET /client/sessions/:id/messages/sync?after_seq_id=N` |
-| **涉及文件** | `hub-server/internal/handler/message.go`（`GetIncrementalMessages`）、`app/web/src/hooks/useHubEventStream.ts` |
-| **验收标准** | (1) 离线后上线增量同步补齐未读消息；(2) 不重复拉取 |
-
-#### 4.1.10 WebSocket 实时推送
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | `hubWS.ts` 已实现 auth handshake、typed event routing、exponential backoff reconnection；Transport 抽象已实现；连接状态 store 已实现 |
-| **需要对接** | (1) 所有 Hub WS 事件正确路由到对应的 store/hook；(2) 断线重连后重放缺失事件；(3) 连接状态在 UI 可见 |
-| **对接方式** | WS: `GET /client/ws?access_token=<jwt>` -> auth handshake -> bidirectional `{type, payload}` |
-| **涉及文件** | `app/web/src/api/hubWS.ts`、`app/web/src/api/transport.ts`、`app/web/src/hooks/useHubWSConnection.ts`、`app/web/src/stores/connectionStore.ts`、`hub-server/internal/handler/ws.go` |
-| **验收标准** | (1) 登录后 WS 连接并收到 `auth.ok`；(2) 消息/会话/设备/Agent 事件实时推送；(3) 断线重连不丢失事件；(4) 连接状态指示器正确 |
-
-#### 4.1.11 @Agent / @Mention
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | `useMention.ts` hook 已实现；`MentionPopover.tsx` 已实现；Hub `POST /client/sessions/:id/agents` 已实现 |
-| **需要对接** | (1) @Agent 时 `AddAgentToSession` 将 Agent 实例加入会话；(2) 发送给 Agent 的消息触发 `TriggerTask`；(3) Agent 回复通过 `agent.stream`/`agent.done` 推送 |
-| **对接方式** | REST: `POST /client/sessions/:id/agents`；WS: `HUB_EVENTS.AGENT_DISPATCH`、`HUB_EVENTS.AGENT_STREAM`、`HUB_EVENTS.AGENT_DONE` |
-| **涉及文件** | `app/web/src/hooks/useMention.ts`、`app/web/src/components/MentionPopover.tsx`、`hub-server/internal/handler/agent.go`（`AddAgentToSession`） |
-| **验收标准** | (1) @Agent 后 Agent 出现在会话成员列表；(2) 发送消息触发 task dispatch；(3) Agent 回复实时流式显示 |
-
-### 4.2 联系人系统
-
-#### 4.2.1 搜索用户
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST `GET /client/contacts/search` 已实现；Web `contactQueries.ts` 的 `useSearchHubUser` mutation 已实现 |
-| **对接方式** | REST: `GET /client/contacts/search?q=keyword` |
-| **涉及文件** | `hub-server/internal/handler/contact.go`（`SearchUser`）、`app/web/src/api/contactQueries.ts` |
-| **验收标准** | 搜索返回匹配用户，显示关系（self/friend/stranger/blocked） |
-
-#### 4.2.2 好友请求流程
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST 完整好友链路已实现；Web `contactQueries.ts` 所有 mutation hooks 已实现；WS `friend.request`/`friend.accepted` 已定义 |
-| **对接方式** | REST: send/list/accept/reject friend-requests；WS: `HUB_EVENTS.FRIEND_REQUEST`、`HUB_EVENTS.FRIEND_ACCEPTED` |
-| **涉及文件** | `hub-server/internal/handler/contact.go`、`app/web/src/api/contactQueries.ts`、`app/shared/src/hubEvents.ts` |
-| **验收标准** | (1) 发送请求后对方 WS 实时收到通知；(2) 接受后双方出现在联系人列表；(3) 拒绝后请求消失 |
-
-#### 4.2.3 联系人管理（删除/拉黑/备注）
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST 完整实现；Web mutation hooks 已实现 |
-| **对接方式** | REST: delete/block/unblock/remark |
-| **涉及文件** | `hub-server/internal/handler/contact.go`、`app/web/src/api/contactQueries.ts` |
-| **验收标准** | (1) 删除后从列表消失；(2) 拉黑后不可发消息；(3) 备注名优先显示 |
-
-#### 4.2.4 创建群组
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST `POST /client/sessions/group` 已实现；Web `useCreateGroupSession` mutation 已实现 |
-| **对接方式** | REST: `POST /client/sessions/group { name, member_ids }`；WS: `HUB_EVENTS.SESSION_CREATED` |
-| **涉及文件** | `hub-server/internal/handler/session.go`（`CreateGroup`）、`app/web/src/api/contactQueries.ts` |
-| **验收标准** | 创建群聊后所有成员 WS 收到 `session.created` |
-
-### 4.3 会话管理
-
-#### 4.3.1 会话列表
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `GET /client/sessions` |
-| **涉及文件** | `hub-server/internal/handler/session.go`（`List`）、`app/web/src/stores/hubStore.ts` |
-| **验收标准** | (1) 按最后活跃排序；(2) 未读计数准确；(3) 最后消息摘要实时更新 |
-
-#### 4.3.2 群成员管理
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST 完整群成员 API 已实现：add/remove/leave/transfer-owner/dissolve/update-info/settings/delete |
-| **对接方式** | REST endpoints + WS: `SESSION_MEMBER_JOINED`/`SESSION_MEMBER_LEFT`/`SESSION_INFO_UPDATED`/`SESSION_DISSOLVED` |
-| **涉及文件** | `hub-server/internal/handler/session.go`、`app/shared/src/hubEvents.ts` |
-| **验收标准** | (1) 添加成员后 WS 推送；(2) 退出/解散后会话消失；(3) 修改群名后 WS 推送 |
-
-### 4.4 认证与身份
-
-#### 4.4.1 Session 管理
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST `GET /client/auth/me`、`POST /client/auth/logout`、`PUT /client/auth/profile`、`POST /client/auth/refresh` 已实现 |
-| **对接方式** | REST: me/logout/profile/refresh |
-| **涉及文件** | `hub-server/internal/handler/auth.go`、`app/web/src/hooks/useAuth.ts`、`app/web/src/api/hubAuth.ts`、`app/web/src/api/hubTokenStorage.ts` |
-| **验收标准** | (1) 登录后 UI 展示用户信息；(2) logout 后所有 API 返回 401；(3) access token 过期前自动 refresh |
-
-#### 4.4.2 Profile 同步与 Avatar
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `PUT /client/auth/profile`、`POST /client/attachments`（头像上传） |
-| **涉及文件** | `hub-server/internal/handler/auth.go`（`UpdateProfile`）、`hub-server/internal/handler/attachment.go` |
-| **验收标准** | 上传头像后 `GET /client/auth/me` 返回新 URL，会话中头像更新 |
-
-### 4.5 设置系统
-
-#### 4.5.1 用户设置持久化
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST `GET/PATCH /client/settings` 已实现；Web `SettingsPage.tsx` 已拆分为按标签页分段组件 |
-| **对接方式** | REST: `GET /client/settings` 初始化；`PATCH /client/settings { key: value }` 每次修改 |
-| **涉及文件** | `hub-server/internal/handler/user_settings.go`、`app/web/src/components/SettingsPage.tsx` |
-| **验收标准** | (1) 修改主题后 Hub 记录偏好，刷新后保持；(2) 登录后 Hub 设置覆盖本地默认 |
-
-#### 4.5.2 Edge 设置同步（双写）
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Desktop 同时写 Hub settings API + Edge settings API |
-| **涉及文件** | `hub-server/internal/handler/user_settings.go`、Desktop platform adapter |
-| **验收标准** | (1) workspace allowlist 等执行配置双写；(2) 换 Desktop 登录后 Hub 偏好可恢复 |
-
-### 4.6 Agent 配置系统
-
-#### 4.6.1 Custom Agent CRUD
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST `GET/POST/PUT/DELETE /web/custom-agents` 已实现；Web `useHubCustomAgents.ts` 已实现 |
-| **对接方式** | REST: 完整 CRUD |
-| **涉及文件** | `hub-server/internal/handler/custom_agent.go`、`app/web/src/hooks/useHubCustomAgents.ts`、`hub-server/internal/model/custom_agent.go` |
-| **验收标准** | (1) 创建 Agent 后出现在列表；(2) 编辑配置持久化；(3) 删除后从列表消失 |
-
-#### 4.6.2 Agent Profile Store
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST CRUD + publish + install 已实现 |
-| **对接方式** | REST: `GET/POST/PATCH/DELETE /web/agent-profiles` + publish + install |
-| **涉及文件** | `hub-server/internal/handler/agent_profile.go` |
-| **验收标准** | (1) Profile 创建后可查看；(2) 发布后出现在市场；(3) 安装后出现在用户列表 |
-
-#### 4.6.3 Runtime / Model / Target 选择
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Edge: `GET /v1/runners`、`GET /v1/model-catalog`；Hub: `GET /web/execution-targets` |
-| **涉及文件** | `edge-server/internal/adapters/registry.go`、`hub-server/internal/handler/execution_target.go`、`app/web/src/api/executionTargetQueries.ts` |
-| **验收标准** | (1) Runtime 列表含健康状态；(2) 模型按 provider 分组；(3) Target 展示 online/offline |
-
-#### 4.6.4 MCP Server / Skill / Tool Allowlist / Provider Binding
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST 完整 CRUD 已实现 |
-| **对接方式** | REST: `/web/skills`、`/web/mcp-servers`、`/web/provider-bindings` |
-| **涉及文件** | `hub-server/internal/handler/skill.go`、`hub-server/internal/handler/mcp_server.go`、`hub-server/internal/handler/provider_binding.go` |
-| **验收标准** | (1) 创建 MCP server 后可被 Agent 引用；(2) Tool allowlist 限制 Agent 可调用工具 |
-
-### 4.7 云文档系统
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST `GET/POST/PATCH/DELETE /web/documents` 已实现 |
-| **对接方式** | REST: 完整 CRUD |
-| **涉及文件** | `hub-server/internal/handler/document.go` |
-| **验收标准** | (1) 文档列表分页加载；(2) 创建/编辑/删除同步；(3) 文档搜索返回结果 |
-
-### 4.8 项目与工作区
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST 完整 workspace + threads + messages API 已实现；Web `projectQueries.ts` 已实现 |
-| **对接方式** | REST: `GET/POST/PATCH /web/projects`、`GET/POST /web/projects/:id/threads`、`GET/POST /web/projects/:id/threads/:threadId/messages` |
-| **涉及文件** | `hub-server/internal/handler/workspace.go`、`app/web/src/api/projectQueries.ts`、`app/web/src/api/threadQueries.ts` |
-| **验收标准** | (1) 项目列表展示 Hub 项目；(2) 线程列表按时间排序；(3) 线程内消息实时更新 |
-
-### 4.9 执行与运行时
-
-#### 4.9.1 Local Edge 启动/停止/健康检查
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Edge: `GET /v1/health`；Tauri Host API: edge start/stop/status |
-| **涉及文件** | `edge-server/internal/handler/health.go`、`app/desktop/src-tauri/src/host/edge.rs` |
-| **验收标准** | (1) Desktop 启动后 Edge 自动连接；(2) 健康状态在 UI 显示 |
-
-#### 4.9.2 CLI 发现与 Readiness
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | CLI JSON readiness checker 已合入，覆盖 Claude Code/Codex/OpenCode |
-| **涉及文件** | `edge-server/internal/adapters/claude_code.go`、`codex.go`、`opencode.go`、`registry.go` |
-| **验收标准** | 已安装 CLI 显示 ready，未安装显示 not-found，版本不兼容显示 incompatible |
-
-#### 4.9.3 执行目标（Execution Targets）
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Hub: `GET/POST/PATCH/DELETE /web/execution-targets`、`POST /web/execution-targets/:id/ping` |
-| **涉及文件** | `hub-server/internal/handler/execution_target.go`、`app/web/src/api/executionTargetQueries.ts` |
-| **验收标准** | (1) 目标列表展示 online/offline；(2) Ping 反映可达性 |
-
-#### 4.9.4 Run 生命周期
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Hub: `POST /web/agent-tasks` -> Edge: `POST /v1/runs` -> Event stream -> Hub -> Web WS |
-| **涉及文件** | `hub-server/internal/handler/agent.go`、`edge-server/internal/lifecycle/`、`app/web/src/api/runQueries.ts` |
-| **验收标准** | (1) 触发 run 后状态 pending -> running -> done/failed；(2) 事件流实时推送 |
-
-#### 4.9.5 Approval 工作流
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Hub: `GET /web/agent-tasks/:id/approvals`、`POST /web/agent-tasks/:id/approvals/:approval_id/decide` |
-| **涉及文件** | `hub-server/internal/handler/agent.go`、`app/web/src/components/ApprovalCard.tsx`、`edge-server/internal/adapters/security_hooks.go` |
-| **验收标准** | (1) Agent 请求后展示 approval card；(2) Approve 后继续执行；(3) Deny 后中止 |
-
-#### 4.9.6 Artifact / Diff 展示
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Hub: `GET /web/agent-tasks/:id/artifacts`；Edge: `GET /v1/runs/:runId/diff` |
-| **涉及文件** | `hub-server/internal/handler/agent.go`、`app/web/src/components/DiffViewer.tsx` |
-| **验收标准** | (1) Artifact 列表展示；(2) 点击展示 diff 视图 |
-
-### 4.10 Agent Team 编排
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Hub REST 完整 AgentTeam API 已实现 |
-| **对接方式** | REST: 完整 Team + Run + Route + Approval + Conflict + Assignment API |
-| **涉及文件** | `hub-server/internal/handler/agent_team.go`、`app/web/src/api/agentTeamQueries.ts` |
-| **验收标准** | (1) Team CRUD；(2) Team Run 启动和子任务；(3) 路由决策可视化；(4) 冲突解决 |
-
-### 4.11 设备管理
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | Edge: `POST /edge/devices/register`；Web: `GET /web/devices`；WS: `device.online`/`device.offline`/`device.kicked` |
-| **涉及文件** | `hub-server/internal/handler/device.go`、`app/web/src/hooks/useDeviceRegistration.ts` |
-| **验收标准** | (1) Desktop 注册设备后 Web 可见；(2) 设备离线后 WS 推送 |
-
-### 4.12 附件系统
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `POST /client/attachments`（multipart upload）、`GET /client/attachments/:id` |
-| **涉及文件** | `hub-server/internal/handler/attachment.go` |
-| **验收标准** | (1) 上传附件后消息显示预览；(2) 点击可下载 |
-
-### 4.13 通知系统
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `GET /client/notifications`、`POST /client/notifications/:id/read`、`POST /client/notifications/read-all`；WS: `HUB_EVENTS.NOTIFICATION_NEW` |
-| **涉及文件** | `hub-server/internal/handler/notification.go`、`app/web/src/components/NotificationBell.tsx` |
-| **验收标准** | (1) 铃铛显示未读计数；(2) 新通知 WS 实时推送 |
-
-### 4.14 市场系统
-
-| 维度 | 详情 |
-|------|------|
-| **对接方式** | REST: `GET /web/market/profiles`、install、rate |
-| **涉及文件** | `hub-server/internal/handler/market.go` |
-| **验收标准** | (1) 市场列表分页加载；(2) 安装后 Profile 出现在用户列表 |
+## 4. IM 聊天系统
+
+### 4.1 当前状态
+
+- Web `useWebWorkbenchModel` 已实现 10 个 chat actions
+- Desktop `useDesktopWorkbenchModel` 已实现 6 个 chat actions
+- Web/Desktop `hubClient.ts` 已实现全部消息方法
+- Hub REST 全部消息端点已实现
+- Hub WS 5 个消息事件已定义
+- 自动已读回执已实现
+- Desktop `sessionQueries.ts` 方法签名已修复
+
+### 4.2 API 端点
+
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/client/sessions/:id/messages` | POST | 发送消息 | `sendMessage` |
+| `/client/sessions/:id/messages` | GET | 获取消息列表 | `getMessages` |
+| `/client/sessions/:id/messages/sync` | GET | 增量同步 | `syncMessages` |
+| `/client/sessions/:id/messages/search` | GET | 会话内搜索 | `searchSessionMessages` |
+| `/client/sessions/:id/pins` | GET | 获取置顶列表 | `listPinnedMessages` |
+| `/client/sessions/:id/read` | POST | 标记已读 | `markRead` |
+| `/client/sessions/:id/agents` | POST | 添加 Agent | `addAgentToSession` |
+| `/client/messages/:id/recall` | POST | 撤回 | `recallMessage` |
+| `/client/messages/:id` | PUT | 编辑 | `editMessage` |
+| `/client/messages/:id/pin` | POST/DELETE | 置顶/取消 | `pinMessage`/`unpinMessage` |
+| `/client/messages/:id/reactions` | GET/POST/DELETE | Reaction CRUD | `listMessageReactions`/`addMessageReaction`/`removeMessageReaction` |
+| `/client/messages/:id/forward` | POST | 转发 | `forwardMessage` |
+| `/client/messages/search` | GET | 全局搜索 | `searchMessages` |
+
+### 4.3 需要对接的文件
+
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `app/web/src/hooks/useHubMainChat.ts` | 验证 | 消息发送 hook |
+| `app/web/src/stores/hubStore.ts` | 补全 | WS `message.new` -> transcript |
+| `app/web/src/api/hubWS.ts` | 补全 | 消息事件路由到 store |
+| `app/web/src/hooks/useHubEventStream.ts` | 验证 | 事件流缓存失效 |
+| `app/web/src/stores/taskBridgeStore.ts` | 验证 | Agent task 状态桥接 |
+| `app/desktop/src/api/sessionQueries.ts` | 验证 | Desktop hooks 签名已修复 |
+| `app/desktop/src/platform/useDesktopWorkbenchModel.ts` | 验证 | Desktop chatActions 已接线 |
+
+### 4.4 步骤
+
+1. 验证 auth token 后 `hubClient.sendMessage()` REST 调用成功
+2. 验证 WS `message.new` 事件到达前端并追加到 transcript
+3. 验证 `recallMessage` REST + WS `message.recall` 推送
+4. 验证 `editMessage` REST + "已编辑"标记
+5. 验证 `pinMessage`/`unpinMessage` REST + WS 推送
+6. 验证 `addMessageReaction`/`removeMessageReaction` + 计数更新
+7. 验证 `forwardMessage` REST + 目标会话消息
+8. 验证 `searchMessages`/`searchSessionMessages` REST 返回
+9. 验证 `markRead` REST + 未读计数清零 + WS `message.read`
+10. 验证 `syncMessages` REST + 离线消息补齐
+11. 验证 WS 断线重连不丢失事件
+12. 验证 `client_msg_id` 去重
+
+### 4.5 验收标准
+
+- [ ] 发送文本消息，其余在线成员通过 WS 实时收到
+- [ ] 消息列表按 `seq_id` 排序
+- [ ] 重复 `client_msg_id` 不产生重复消息
+- [ ] 撤回成功后 UI 显示"消息已撤回"
+- [ ] 超时撤回返回错误
+- [ ] 非发送者撤回返回 403
+- [ ] WS 撤回推送后所有客户端同步
+- [ ] 编辑后内容更新并显示"已编辑"标记
+- [ ] 非发送者编辑返回 403
+- [ ] Pin 后出现在 pinned 列表
+- [ ] Unpin 后从列表移除
+- [ ] WS Pin/Unpin 同步到所有在线成员
+- [ ] 添加 reaction 后 emoji 计数更新
+- [ ] 移除 reaction 后计数更新
+- [ ] 转发成功后目标会话出现转发消息
+- [ ] 转发消息标注原始发送者
+- [ ] 搜索返回匹配消息列表
+- [ ] 点击搜索结果跳转到消息位置
+- [ ] 进入会话后未读计数清零
+- [ ] 多端同步已读状态
+- [ ] 离线后上线增量同步补齐未读消息
+- [ ] 不重复拉取
+- [ ] WS 断线重连后不丢失事件
+- [ ] 连接状态指示器正确
 
 ---
 
-## 5. P2：多端对齐
+## 5. 联系人系统
 
-### 5.1 Mobile 协议对齐
+### 5.1 当前状态
 
-| 维度 | 详情 |
-|------|------|
-| **需要对接** | (1) Mobile 消费 Hub target/run/approval/replay 合同；(2) OIDC deep-link `agenthub://` 登录；(3) WS 接收实时事件；(4) 审批入口；(5) 不分叉 runtime 或登录语义 |
-| **涉及文件** | `app/mobile-rn/src/` |
-| **验收标准** | (1) 登录后看到与 Web 相同会话列表；(2) 可 approve/deny 审批 |
+- Hub REST 完整联系人 API 已实现
+- Web `contactQueries.ts` 所有 mutation hooks 已实现
+- Desktop `hubClient.ts` 联系人方法已实现
+- `WorkbenchContactsActions` 接口已定义（9 个回调）
+- WS `friend.request`/`friend.accepted` 已定义
 
-### 5.2 Desktop 本地执行
+### 5.2 API 端点
 
-| 维度 | 详情 |
-|------|------|
-| **需要对接** | (1) Desktop 共享 Web workbench UI；(2) 通过 Local Edge 执行 run；(3) 展示 Edge 健康状态 |
-| **涉及文件** | `app/desktop/src/`、`app/desktop/src-tauri/src/host/` |
-| **验收标准** | Desktop 触发 run 通过 Local Edge 执行 |
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/client/contacts/search` | GET | 搜索用户 |
+| `/client/contacts/friend-requests` | GET/POST | 好友请求列表/发送 |
+| `/client/contacts/friend-requests/:id/accept` | POST | 接受 |
+| `/client/contacts/friend-requests/:id/reject` | POST | 拒绝 |
+| `/client/contacts` | GET | 联系人列表 |
+| `/client/contacts/:user_id` | DELETE | 删除联系人 |
+| `/client/contacts/:user_id/block` | POST | 拉黑 |
+| `/client/contacts/:user_id/unblock` | POST | 取消拉黑 |
+| `/client/contacts/:user_id/remark` | PUT | 修改备注 |
+| `/client/sessions/group` | POST | 创建群聊 |
 
-### 5.3 Tauri 打包
+### 5.3 需要对接的文件
 
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | Windows unsigned dry package 已能产出 |
-| **需要对接** | (1) Windows unsigned smoke 持续通过；(2) macOS unsigned path 拆清；(3) sidecar 自动放置 |
-| **涉及文件** | `app/desktop/src-tauri/`、`scripts/verify-tauri-package-dry.ps1` |
-| **验收标准** | (1) Windows dry package hash 一致；(2) sidecar 正确放置；(3) macOS 路径明确 |
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `app/web/src/api/contactQueries.ts` | 验证 | React Query hooks 已实现 |
+| `app/desktop/src/api/hubClient.ts` | 验证 | Desktop 联系人方法已实现 |
+| `app/shared/src/workbench/WorkbenchRoutes.tsx` | 验证 | `contactsActions` prop 已接线 |
 
-### 5.4 i18n 国际化
+### 5.4 步骤
 
-| 维度 | 详情 |
-|------|------|
-| **需要对接** | (1) 所有用户可见字符串中英文完整；(2) 术语翻译统一 |
-| **涉及文件** | `app/shared/src/i18n/`、`app/desktop/src/i18n/`、`app/web/src/i18n/` |
-| **验收标准** | 所有页面在 zh 和 en locale 下无遗漏字符串 |
+1. 验证 `searchUser` REST 返回匹配用户及关系状态
+2. 验证 `sendFriendRequest` REST 后对方 WS 收到 `friend.request`
+3. 验证 `acceptFriendRequest` REST 后双方联系人更新，WS `friend.accepted`
+4. 验证 `rejectFriendRequest` REST 后请求消失
+5. 验证 `removeContact`/`blockContact`/`unblockContact`/`updateRemark` REST
+6. 验证 `createGroupSession` REST 后 WS `session.created`
 
----
+### 5.5 验收标准
 
-## 6. P3：发布与生产
-
-### 6.1 Web 部署准备
-
-| 维度 | 详情 |
-|------|------|
-| **需要对接** | (1) 环境变量注入 Hub API URL 和 OIDC 配置；(2) 静态构建和部署；(3) rollback gate |
-| **涉及文件** | `app/web/vite.config.ts`、`app/web/src/config.ts` |
-| **验收标准** | 部署后 Web 可通过 Hub API 登录和使用 |
-
-### 6.2 Release 治理
-
-| 维度 | 详情 |
-|------|------|
-| **当前状态** | `verify-release-gate.ps1` 已实现 |
-| **验收标准** | (1) Release gate 全绿才允许发布；(2) Changelog 包含所有变更 |
-
-### 6.3 安全风险关闭
-
-| 维度 | 详情 |
-|------|------|
-| **验收标准** | 无 open Critical release blockers；所有 High 风险有 accepted 或 fixed 状态 |
+- [ ] 搜索返回匹配用户，显示关系状态
+- [ ] 发送请求后对方 WS 实时收到通知
+- [ ] 接受后双方出现在联系人列表
+- [ ] 拒绝后请求消失
+- [ ] 删除后从列表消失
+- [ ] 拉黑后不可发消息
+- [ ] 备注名优先显示
+- [ ] 创建群聊后所有成员 WS 收到 `session.created`
 
 ---
 
-## 7. SDK 与 CLI 接入
+## 6. Agent 配置系统
 
-### 7.1 CLI 接入
+### 6.1 当前状态
 
-| CLI | 命令格式 | Edge adapter | 当前状态 |
-|-----|----------|-------------|----------|
-| Claude Code | `claude --output-format stream-json` | `claude_code.go` | adapter 已实现，CLI readiness 已实现 |
-| Codex | `codex exec --json` | `codex.go` | adapter 已实现，CLI readiness 已实现 |
-| OpenCode | `opencode run --format json` | `opencode.go` | adapter 已实现，CLI readiness 已实现 |
+- Hub REST Custom Agent CRUD + Agent Profile CRUD + publish + install 已实现
+- Web/Desktop Agent Profile hooks 已实现
+- Agent 合并策略已实现
+- `WorkbenchAgent` 接口完整字段已定义
+- `workbenchAgentToAgentConfig` 映射已实现
+- `AgentsPage` 有 CRUD 回调
 
-对接要求：
-- 每个 CLI adapter 输出统一映射到 typed transcript event
-- 进程生命周期由 Edge lifecycle 管理
-- stdout/stderr 合并批处理（50ms 或 8KB）
-- 权限请求映射到 Edge approval -> Hub approval -> Web/Mobile approve/deny
+### 6.2 API 端点
 
-### 7.2 SDK 接入
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/web/custom-agents` | GET/POST | Custom Agent 列表/创建 |
+| `/web/custom-agents/:id` | PUT/DELETE | Custom Agent 更新/删除 |
+| `/web/agent-profiles` | GET/POST | Agent Profile 列表/创建 |
+| `/web/agent-profiles/:id` | GET/PATCH/DELETE | Agent Profile 操作 |
+| `/web/agent-profiles/:id/publish` | POST | 发布到市场 |
+| `/web/agent-profiles/:id/install` | POST | 从市场安装 |
+| `/web/skills` | GET/POST | Skill CRUD |
+| `/web/mcp-servers` | GET/POST | MCP Server CRUD |
+| `/web/provider-bindings` | GET/POST | Provider Binding CRUD |
+| `/v1/runners` | GET | Runtime 列表 |
+| `/v1/model-catalog` | GET | 模型目录 |
 
-| SDK | adapter | 当前状态 |
-|-----|---------|----------|
-| Claude Agent SDK | `sdk_fixture_mapper.go` | fixture 样例已实现 |
-| OpenAI Agents SDK | `sdk_fixture_mapper.go` | fixture 样例已实现 |
-| Custom runtime | `runtime_manifest.go` | manifest 注册已实现 |
+### 6.3 需要对接的文件
 
-对接要求：
-- SDK event 映射到统一 `RunEvent` 合同
-- 类型化事件：text/tool_call/file_change/permission/result/artifact
-- Approval 流：SDK permission request -> Edge approval -> Hub -> UI decision -> SDK resume
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `app/web/src/api/agentQueries.ts` | 验证 | Agent Profile CRUD hooks |
+| `app/desktop/src/api/agentProfileQueries.ts` | 验证 | Desktop Agent Profile hooks |
+| `app/desktop/src/api/modelCatalogQueries.ts` | 验证 | 模型目录 |
+| `app/web/src/api/executionTargetQueries.ts` | 验证 | 执行目标 |
 
----
+### 6.4 步骤
 
-## 8. 长期路线 Phase A-E
+1. 验证 `listAgentProfiles` REST 返回 Profile 列表
+2. 验证 `createAgentProfile`/`updateAgentProfile`/`deleteAgentProfile` CRUD
+3. 验证 Edge `/v1/runners` runtime 列表
+4. 验证 Edge `/v1/model-catalog` 模型列表
+5. 验证 Hub `/web/execution-targets` 目标列表
+6. 验证 MCP Server / Skill / Provider Binding CRUD
 
-### Phase A：IM 多 Agent 产品闭环
+### 6.5 验收标准
 
-| 模块 | 路线项 | 完成标准 |
-|------|--------|----------|
-| Conversation Model | 单聊/群聊/项目会话/联系人/群成员/置顶/归档/搜索/最近活动 | IM 列表和消息流可承载真实日常工作 |
-| Orchestrator | 复杂任务拆解/子 Agent 分派/并行串行策略/失败降级/聚合回复 | 群聊里多个 Agent 像队友一样协作 |
-| Context Continuity | 会话历史/pinned messages/workspace context/memory/AGENTS.md/Skill/MCP 输入统一 | Agent 能基于历史迭代 |
-| Message Actions | 回复/引用/重新生成/复制/pin/一键检查 Diff/打开预览 | 常用 IM 操作和开发操作在同一消息模型下成立 |
-
-### Phase B：Runtime / Agent 平台化
-
-| 模块 | 路线项 | 完成标准 |
-|------|--------|----------|
-| Runtime Registry | Claude Code/Codex/OpenCode/OpenAI Agents SDK/Claude Agent SDK/Custom runtime | 每个 runtime 有 metadata/capability/icon/adapter/approval policy |
-| Agent Profile Store | Hub 持久化 Profile/模板/市场安装/团队可见性/版本和审计 | Agent 是可管理实体 |
-| Custom Agent Builder | 名称/头像/system prompt/runtime/model/skills/MCP/tools/memory/approval/target preference | 用户可以创建自己的 Agent 队友 |
-| MCP / Tool Registry | tool schema/权限/icon/审计/运行时兼容矩阵 | 工具调用类型化、可审查、可跨 runtime 复用 |
-
-### Phase C：远程执行和协作网络
-
-| 模块 | 路线项 | 完成标准 |
-|------|--------|----------|
-| Target Routing | Local Edge/Remote Edge/Cloud Edge/Hub Relay target 注册/心跳/exact-device dispatch/降级 | Web/Mobile/IM 能稳定控制正确目标 |
-| Hub Replay / Sync | run/route/subtask/approval/artifact/preview/file/failure 事件统一同步 | Web/Desktop/Mobile/IM 用同一事件契约渲染 |
-| Permissions / Audit | Hub-local org/project membership/resource/action check/device proof/审批审计 | TokenDance ID 只证明身份；AgentHub 自己决定能做什么 |
-| Remote Approval | Mobile/IM/Web 远程 approve/deny/watch/pause/abort | 用户离开 Desktop 也能控制关键执行节点 |
-
-### Phase D：产物、预览和交付
-
-| 模块 | 路线项 | 完成标准 |
-|------|--------|----------|
-| Artifact Store | 文件/网页/文档/报告/图片/包/日志摘要统一索引 | 产物能按项目/会话/run/Agent 查找和预览 |
-| Diff / Apply | 只读 diff/review/apply/revert/冲突提示/版本历史 | 用户能安全检查并应用 Agent 修改 |
-| Preview Providers | 本地网页/静态站/文档/PPT/图片/代码/外部 provider 只读预览 | 产物内联可看、可追溯 |
-| Deployment | 预览 URL/静态站/容器化/源码包/状态卡片 | 部署是可审批的产物动作 |
-
-### Phase E：发布、观测和企业治理
-
-| 模块 | 路线项 | 完成标准 |
-|------|--------|----------|
-| Cross-platform Release | Windows installer/macOS package/Web deploy/Mobile beta/updater/rollback | 每个平台都有独立 smoke |
-| Observability | correlation id/event search/run diagnostics/logs/metrics/health dashboard | Web/Hub/Desktop/Edge/Runtime 的失败能串起来排查 |
-| Multi-tenant | org/role/quota/workspace ownership/audit export/deployment boundary | 从单用户扩展到团队和组织 |
-| Evidence Consumption | 从 product gates 输出可复验/脱敏/可引用的开发证据 | 后续演示或验收流程消费这些输出 |
+- [ ] 创建 Agent Profile 后出现在列表
+- [ ] 编辑 Agent 配置持久化
+- [ ] 删除后从列表消失
+- [ ] Runtime 列表含健康状态
+- [ ] 模型按 provider 分组
+- [ ] Target 展示 online/offline
+- [ ] MCP Server 可被 Agent 引用
+- [ ] Tool allowlist 限制可调用工具
+- [ ] Profile 发布后出现在市场
+- [ ] Profile 安装后出现在用户列表
 
 ---
 
-## 9. 非协商边界
+## 7. 云文档系统
+
+### 7.1 当前状态
+
+- Hub REST `/web/documents` 完整 CRUD 已实现
+- `model.Document` + `repository.Document` 数据层已完成
+- `WorkbenchDocumentsActions` 接口已定义
+- Web/Desktop `documentQueries.ts` hooks 已创建
+- 轻量文档预览已实现
+
+### 7.2 API 端点
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/web/documents` | GET | 文档列表（分页） |
+| `/web/documents` | POST | 创建文档 |
+| `/web/documents/:id` | GET/PATCH/DELETE | 文档详情/更新/删除 |
+
+### 7.3 需要对接的文件
+
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `app/desktop/src/api/documentQueries.ts` | 验证 | Desktop 文档 CRUD hooks |
+| `hub-server/internal/handler/document.go` | 无变更 | 全部已实现 |
+
+### 7.4 步骤
+
+1. 验证 `listDocuments` REST 返回分页列表
+2. 验证 `createDocument`/`updateDocument`/`deleteDocument` CRUD
+3. 验证文档搜索
+4. 验证文档预览
+
+### 7.5 验收标准
+
+- [ ] 文档列表分页加载
+- [ ] 创建/编辑/删除同步
+- [ ] 文档搜索返回结果
+- [ ] 文档预览正确显示
+- [ ] 文档关联项目
+
+---
+
+## 8. 设置系统
+
+### 8.1 当前状态
+
+- Hub REST `GET/PATCH /client/settings` 已实现
+- `settingsService.ts` 抽象已实现
+- Desktop Settings 三层回退已实现
+- `SettingsPort` 接口已定义
+- `handleSettingChange` 已调用 `settingsService.write()`
+
+### 8.2 API 端点
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/client/settings` | GET | 获取所有用户设置 |
+| `/client/settings` | PATCH | 部分更新用户设置 |
+
+### 8.3 步骤
+
+1. 验证 `GET /client/settings` 返回用户偏好
+2. 验证 `PATCH /client/settings` 持久化
+3. 验证 `settingsService.init()/subscribe()/write()` 全链路
+4. 验证 Desktop 三层回退
+
+### 8.4 验收标准
+
+- [ ] 修改主题后 Hub 记录偏好，刷新后保持
+- [ ] 登录后 Hub 设置覆盖本地默认
+- [ ] Desktop workspace allowlist 双写
+- [ ] 换 Desktop 登录后偏好可恢复
+- [ ] settingsService subscribe 响应远程变更
+
+---
+
+## 9. 项目管理系统
+
+### 9.1 当前状态
+
+- Hub REST workspace + threads + messages API 已实现
+- Web/Desktop `projectQueries.ts` + `threadQueries.ts` hooks 已实现
+- `ProjectsPage` 有 CRUD 回调
+
+### 9.2 API 端点
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/web/projects` | GET/POST | 项目列表/创建 |
+| `/web/projects/:id` | GET/PATCH | 项目详情/更新 |
+| `/web/projects/:id/threads` | GET/POST | 线程列表/创建 |
+| `/web/projects/:id/threads/:threadId/messages` | GET/POST | 线程消息 |
+
+### 9.3 步骤
+
+1. 验证 `listWorkspaceProjects` REST
+2. 验证 `createWorkspaceProject`/`updateWorkspaceProject`
+3. 验证 `listWorkspaceProjectThreads`/`createWorkspaceProjectThread`
+4. 验证线程消息 CRUD
+
+### 9.4 验收标准
+
+- [ ] 项目列表展示 Hub 项目
+- [ ] 创建项目后出现在列表
+- [ ] 线程列表按时间排序
+- [ ] 线程内消息实时更新
+- [ ] 项目产物预览正确显示
+
+---
+
+## 10. 执行与运行时
+
+### 10.1 当前状态
+
+- Hub REST Agent Task 全链路已实现
+- Edge REST Run lifecycle 已实现
+- 6 个 Adapters 已实现（Claude Code/Codex/OpenCode/Anthropic SDK/OpenAI SDK/Fixture）
+- Claude Code + OpenCode 真实执行已验证
+- Codex PreflightAdapter 快速失败已实现
+- SDK HTTP SSE adapters 已实现
+- `verify-real-api-smoke.ps1` 44/44 通过
+
+### 10.2 API 端点
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/web/agent-tasks` | POST | 触发任务 |
+| `/web/agent-tasks/:id/cancel` | POST | 取消任务 |
+| `/web/agent-tasks/:id/summary` | GET | 事件摘要 |
+| `/web/agent-tasks/:id/events` | GET | 事件列表 |
+| `/web/agent-tasks/:id/approvals` | GET | 审批列表 |
+| `/web/agent-tasks/:id/approvals/:approval_id/decide` | POST | 审批决策 |
+| `/web/agent-tasks/:id/artifacts` | GET | 产物列表 |
+| `/web/execution-targets` | GET/POST | 执行目标 CRUD |
+| `/web/execution-targets/:id/ping` | POST | Ping |
+| `/edge/agent-tasks/:id/ack` | POST | Edge 确认 |
+| `/edge/agent-tasks/:id/stream` | POST | Edge 流式上报 |
+| `/edge/agent-tasks/:id/done` | POST | Edge 完成 |
+| `/edge/agent-tasks/:id/fail` | POST | Edge 失败 |
+| `/v1/health` | GET | Edge 健康检查 |
+
+### 10.3 步骤
+
+1. 验证 Edge `/v1/health`
+2. 验证 CLI 发现状态
+3. 验证执行目标列表和 ping
+4. 验证 `triggerAgentTask` -> Hub -> Edge -> Adapter -> 事件流
+5. 验证 Run 状态变化
+6. 验证 Approval 工作流
+7. 验证 Artifact/Diff 展示
+8. 验证 CLI/SDK 真实执行
+
+### 10.4 验收标准
+
+- [ ] Edge 健康检查返回 ready
+- [ ] CLI 发现状态正确
+- [ ] 触发 run 后状态 pending -> running -> done
+- [ ] 事件流返回完整事件
+- [ ] Approval 展示和决策
+- [ ] Artifact 列表和 Diff 渲染
+- [ ] Target 列表 online/offline
+- [ ] Target ping 可达性
+- [ ] Claude Code 真实执行
+- [ ] OpenCode 真实执行
+- [ ] Codex 预检快速失败
+- [ ] Anthropic SDK HTTP SSE
+- [ ] OpenAI SDK HTTP SSE
+
+---
+
+## 11. Agent Team 编排
+
+### 11.1 当前状态
+
+- Hub REST 完整 AgentTeam API 已实现
+- Web/Desktop `agentTeamQueries.ts` hooks 已实现
+- 群聊编排 fixture 已合入
+
+### 11.2 API 端点
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/web/agent-teams` | GET/POST | Team CRUD |
+| `/web/agent-teams/:id` | GET/PUT/DELETE | Team 操作 |
+| `/web/agent-teams/:id/members` | POST | 添加成员 |
+| `/web/agent-teams/:id/runs` | GET/POST | Run 列表/启动 |
+| `/web/agent-teams/:id/runs/:run_id/state` | GET | Run 完整状态 |
+| `/web/agent-teams/:id/runs/:run_id/tasks` | GET | 任务列表 |
+| `/web/agent-teams/:id/runs/:run_id/route-decisions` | POST | 路由决策 |
+| `/web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide` | POST | 审批决策 |
+| `/web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve` | POST | 冲突解决 |
+| `/web/agent-teams/:id/runs/:run_id/assignments` | GET/POST | Assignment |
+
+### 11.3 验收标准
+
+- [ ] Team CRUD
+- [ ] Team 成员管理
+- [ ] Team Run 启动
+- [ ] 路由决策可视化
+- [ ] 冲突解决
+- [ ] Assignment 派发/完成/失败
+
+---
+
+## 12. SDK 与 CLI 接入
+
+### 12.1 CLI 接入
+
+| CLI | 命令格式 | Edge adapter | 真实执行路径 |
+|-----|----------|-------------|------------|
+| Claude Code | `claude --output-format stream-json` | `claude_code.go` | `exec.Command` -> stdout NDJSON parse |
+| Codex | `codex exec --json` | `codex.go` | 预检 `OPENAI_API_KEY` -> `exec.Command` |
+| OpenCode | `opencode run --format json` | `opencode.go` | `exec.Command` -> stdout JSON parse |
+
+### 12.2 SDK 接入
+
+| SDK | Edge adapter | 真实执行路径 |
+|-----|-------------|------------|
+| Anthropic SDK | `anthropic_sdk.go` | `--anthropic-sdk-path` -> `net/http` POST `api.anthropic.com/v1/messages` -> SSE |
+| OpenAI SDK | `openai_sdk.go` | `--openai-sdk-path` -> `net/http` POST `api.openai.com/v1/chat/completions` -> SSE |
+| Custom runtime | `runtime_manifest.go` | JSON manifest 定义 adapter 配置 |
+
+### 12.3 事件映射合同
+
+| 事件类型 | 来源 | 映射 |
+|---------|------|------|
+| `text` | CLI stdout / SDK content delta | `RunEvent{event_type: "text"}` |
+| `tool_call` | CLI tool / SDK tool_use | `RunEvent{event_type: "tool_call"}` |
+| `file_change` | CLI file write / SDK file edit | `RunEvent{event_type: "file_change"}` |
+| `permission` | CLI permission / SDK stop | `RunEvent{event_type: "permission"}` |
+| `result` | CLI exit / SDK finish | `RunEvent{event_type: "result"}` |
+| `artifact` | CLI file / SDK attachment | `RunEvent{event_type: "artifact"}` |
+
+### 12.4 权限桥
+
+```
+CLI permission request
+  -> Edge Adapter security_hooks.go
+  -> Edge approval request
+  -> Hub POST /edge/agent-tasks/:id/stream
+  -> Hub WS agent.stream
+  -> Web/Desktop approval card
+  -> POST /web/agent-tasks/:id/approvals/:approval_id/decide
+  -> Hub -> Edge -> CLI resume/abort
+```
+
+### 12.5 验收标准
+
+- [ ] Claude Code 真实执行产出 typed events
+- [ ] OpenCode 真实执行产出 typed events
+- [ ] Codex 缺 API key 快速失败
+- [ ] Anthropic SDK HTTP SSE 流式调用
+- [ ] OpenAI SDK HTTP SSE 流式调用
+- [ ] 进程生命周期由 Edge lifecycle 管理
+- [ ] stdout/stderr 合并批处理（50ms 或 8KB）
+- [ ] 权限请求映射到 approval 流
+- [ ] SDK event 映射到统一 RunEvent 合同
+
+---
+
+## 13. 多平台对齐
+
+### 13.1 Mobile RN
+
+#### 当前状态
+
+- 89 tests pass, Hub contracts aligned
+- 只按 Hub 合同对齐，不分叉 runtime 或登录语义
+- Android APK 未产出
+
+#### 验收标准
+
+- [ ] 登录后看到与 Web 相同会话列表
+- [ ] 可 approve/deny 审批
+- [ ] WS 事件实时到达
+- [ ] Android APK 构建产出
+
+### 13.2 Desktop Tauri
+
+#### 当前状态
+
+- Windows unsigned package 已产出
+- Desktop 共享 Web workbench UI
+- Desktop 全端点 hooks 已实现
+- Desktop chatActions 已接线
+
+#### 验收标准
+
+- [ ] Desktop 通过 Local Edge 执行 run
+- [ ] Edge 健康状态在 UI 显示
+- [ ] Windows unsigned package hash 一致
+- [ ] sidecar 正确放置
+- [ ] macOS unsigned path 拆清
+
+### 13.3 i18n
+
+#### 验收标准
+
+- [ ] 所有页面 zh/en 完整无遗漏字符串
+- [ ] 术语翻译统一
+
+---
+
+## 14. E2E 测试与发布
+
+### 14.1 当前测试覆盖
+
+| 测试类型 | 位置 | 状态 |
+|---------|------|------|
+| API Smoke | `verify-real-api-smoke.ps1` | 44/44 通过 |
+| Playwright E2E | `chat-real.spec.ts` | 9 个测试 |
+| Hub Unit Tests | `hub-server/*_test.go` | 通过 |
+| Edge Unit Tests | `edge-server/*_test.go` | 通过 |
+| Web/Shared Tests | `app/web/`/`app/shared/` | 通过 |
+| Mobile RN | `app/mobile-rn/` | 89 tests 通过 |
+| P0 Gold Path | `verify-p0-approved-real-gold-path.ps1` | PASS |
+| Tauri Package | `verify-tauri-package-dry.ps1` | PASS |
+| Release Gate | `verify-release-gate.ps1` | PASS |
+
+### 14.2 需要补全的测试
+
+1. 完整 IM 数据流测试：send -> WS push -> transcript -> recall/edit/pin/reaction
+2. 联系人全链路测试：search -> friend-request -> accept -> list -> block -> remark
+3. Agent 配置全链路测试：create profile -> update -> delete -> runtime/model
+4. 云文档全链路测试：create -> update -> delete -> search -> preview
+5. 项目全链路测试：create -> thread -> message -> artifact preview
+6. 执行全链路测试：trigger -> Edge run -> event stream -> approval -> artifact -> diff
+7. Team 编排测试：create team -> add members -> start run -> route -> conflict
+8. 多端同步测试：Web + Desktop 同一账号同步
+9. 认证全链路测试：OIDC login -> me -> refresh -> logout -> 401
+10. SDK adapter 测试：Anthropic/OpenAI HTTP SSE
+
+### 14.3 验收标准
+
+- [ ] Release gate 全绿
+- [ ] Changelog 包含所有变更
+- [ ] 无 open Critical blockers
+- [ ] 所有 High 风险有 accepted 或 fixed
+- [ ] Windows package hash 一致
+- [ ] sidecar 正确放置
+- [ ] Mobile tests pass
+- [ ] Hub + Edge + Web + Desktop smoke 通过
+
+---
+
+## 15. 依赖顺序
+
+```
+Phase 1 (P0): 认证打通
+  └─ 3. TokenDanceID 真实登录
+     └─ unblocks: 所有 Hub queries, Hub WS
+
+Phase 2 (P1 Core): 核心数据流
+  ├─ 4. IM 聊天 -> 10 个 chat actions 全链路
+  ├─ 5. 联系人 -> 9 个 contacts actions 全链路
+  ├─ 6. Agent 配置 -> Profile CRUD + Runtime/Model
+  └─ 8. 设置 -> Hub + Edge 双写
+
+Phase 3 (P1 Extended): 扩展数据流
+  ├─ 7. 云文档 -> Document CRUD + Preview
+  ├─ 9. 项目 -> Project + Thread + Message
+  ├─ 10. 执行 -> Run + Approval + Artifact
+  ├─ 11. Team 编排 -> Team Run 全链路
+  └─ 13.3 i18n -> en locale 补齐
+
+Phase 4 (P2): 运行时集成
+  ├─ 12. CLI -> Claude Code/Codex/OpenCode 真实调用
+  ├─ 12. SDK -> Anthropic/OpenAI API 消耗
+  └─ 13.1 Mobile -> Hub API + OIDC deep-link
+
+Phase 5 (P3): 发布
+  ├─ 13.2 Desktop Tauri -> 签名 + 打包
+  ├─ 14. E2E -> 全流程自动化
+  └─ 14. Release -> changelog + gate + rollback
+```
+
+---
+
+## 16. 验证清单
+
+> 以下每项必须通过对应的 E2E 测试或手动验证证明集成可用。
+
+### 16.1 认证与身份（8 项）
+
+- [ ] TokenDanceID OIDC 登录（Desktop PKCE）：`GET /client/auth/me` 返回用户信息
+- [ ] TokenDanceID OIDC 登录（Web redirect）：`GET /client/auth/me` 返回用户信息
+- [ ] Session refresh：access token 过期前自动 refresh
+- [ ] Logout：`POST /client/auth/logout` 后所有 API 返回 401
+- [ ] Profile 更新：`PUT /client/auth/profile` 后昵称和头像同步
+- [ ] Avatar 上传：`POST /client/attachments` 后头像 URL 更新
+- [ ] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
+- [ ] 登录后 Hub WS 连接收到 `auth.ok`
+
+### 16.2 IM 聊天（24 项）
+
+- [ ] 消息发送：`POST /client/sessions/:id/messages` + WS `message.new`
+- [ ] 消息接收：WS `message.new` -> transcript
+- [ ] 消息去重：重复 `client_msg_id` 不重复
+- [ ] 消息列表按 `seq_id` 排序
+- [ ] 消息撤回：`POST /client/messages/:id/recall` -> "已撤回"
+- [ ] 撤回超时返回错误
+- [ ] 撤回权限：非发送者返回 403
+- [ ] 撤回 WS 同步：所有客户端同步
+- [ ] 消息编辑：`PUT /client/messages/:id` -> "已编辑"
+- [ ] 编辑权限：非发送者返回 403
+- [ ] 消息 Pin：`POST /client/messages/:id/pin` -> pinned 列表更新
+- [ ] 消息 Unpin：`DELETE /client/messages/:id/pin` -> 列表移除
+- [ ] Pin/Unpin WS 同步
+- [ ] Reaction 添加：emoji 计数更新
+- [ ] Reaction 移除：计数更新
+- [ ] Reaction 列表：`GET /client/messages/:id/reactions`
+- [ ] 消息转发：目标会话出现转发消息
+- [ ] 转发标注原始发送者
+- [ ] 全局消息搜索：`GET /client/messages/search?q=`
+- [ ] 会话内搜索：`GET /client/sessions/:id/messages/search?q=`
+- [ ] 搜索结果跳转到消息位置
+- [ ] 已读回执：`POST /client/sessions/:id/read` 未读清零
+- [ ] 已读同步：WS `message.read` 多端同步
+- [ ] 消息同步：`GET /client/sessions/:id/messages/sync` 离线补齐
+
+### 16.3 WS 实时推送（4 项）
+
+- [ ] WS 连接后收到 `auth.ok`
+- [ ] 断线重连不丢失事件
+- [ ] 连接状态指示器正确
+- [ ] 26 个事件全部路由到 store
+
+### 16.4 @Agent（3 项）
+
+- [ ] @Agent 后 Agent 出现在会话成员列表
+- [ ] 消息触发 task dispatch
+- [ ] Agent 回复流式显示
+
+### 16.5 联系人（8 项）
+
+- [ ] 搜索用户返回结果含关系状态
+- [ ] 发送好友请求对方 WS 收到通知
+- [ ] 接受后双方出现在联系人列表
+- [ ] 拒绝后请求消失
+- [ ] 删除后从列表消失
+- [ ] 拉黑后不可发消息
+- [ ] 取消拉黑后可发消息
+- [ ] 修改备注后备注显示
+
+### 16.6 会话管理（9 项）
+
+- [ ] 会话列表按最后活跃排序
+- [ ] 会话搜索返回匹配
+- [ ] 创建私聊后出现在列表
+- [ ] 创建群聊后成员 WS 收到 `session.created`
+- [ ] 添加群成员后 WS 推送
+- [ ] 移除群成员后 WS 推送
+- [ ] 退出群聊后从列表消失
+- [ ] 解散群聊后所有成员会话消失
+- [ ] 修改群信息后 WS 推送
+
+### 16.7 Agent 配置（9 项）
+
+- [ ] 创建 Agent Profile
+- [ ] 编辑 Agent 配置持久化
+- [ ] 删除 Agent Profile
+- [ ] Custom Agent CRUD
+- [ ] Runtime 列表含健康状态
+- [ ] 模型按 provider 分组
+- [ ] MCP Server CRUD
+- [ ] Skill CRUD
+- [ ] Provider Binding CRUD
+
+### 16.8 执行与运行时（14 项）
+
+- [ ] Edge 健康检查返回 ready
+- [ ] CLI 发现：Claude Code 状态正确
+- [ ] CLI 发现：Codex 状态正确
+- [ ] CLI 发现：OpenCode 状态正确
+- [ ] 触发 run 状态 pending -> running -> done
+- [ ] 事件流返回完整事件
+- [ ] 事件摘要返回统计
+- [ ] Approval 展示和决策
+- [ ] Artifact 列表返回产物
+- [ ] Diff 视图正确渲染
+- [ ] Target 列表 online/offline
+- [ ] Target ping 可达性
+- [ ] Edge 回调 ack/stream/done/fail
+- [ ] WS agent.dispatch/stream/done/failed
+
+### 16.9 CLI/SDK（6 项）
+
+- [ ] Claude Code 真实执行
+- [ ] OpenCode 真实执行
+- [ ] Codex 预检快速失败
+- [ ] Anthropic SDK adapter
+- [ ] OpenAI SDK adapter
+- [ ] Custom runtime manifest
+
+### 16.10 项目与文档（6 项）
+
+- [ ] 项目列表返回用户项目
+- [ ] 创建项目后出现
+- [ ] 线程列表按时间排序
+- [ ] 线程消息 CRUD
+- [ ] 文档 CRUD
+- [ ] 文档搜索
+
+### 16.11 Agent Team（6 项）
+
+- [ ] Team CRUD
+- [ ] Team 成员管理
+- [ ] Team Run 启动
+- [ ] 路由决策可视化
+- [ ] 冲突解决
+- [ ] Assignment 派发/完成/失败
+
+### 16.12 其他（10 项）
+
+- [ ] 设备注册后可见
+- [ ] 附件上传下载
+- [ ] 通知列表分页
+- [ ] 通知已读计数更新
+- [ ] 全部已读清零
+- [ ] 用户设置持久化
+- [ ] 市场列表展示
+- [ ] 安装 Profile
+- [ ] 评分
+- [ ] i18n zh/en 无遗漏
+
+### 16.13 门控脚本（5 项）
+
+- [ ] P0 金链路 PASS
+- [ ] API Smoke 44/44 通过
+- [ ] Windows dry package PASS
+- [ ] Release gate PASS
+- [ ] Mobile tests 89 pass
+
+---
+
+## 17. 非协商边界
 
 1. **Web 只和 Hub 通信**，不直接连接 Local Edge 或 raw runtime。
 2. **Desktop renderer 不获得 raw process execution 权限**。
@@ -701,148 +1229,7 @@ Web / Desktop / Mobile / IM
 10. **所有 Hub API 必须经过 `AuthMiddleware` + `RequireHubSession`**。
 11. **Desktop 文件操作必须经过 allowlist 和 typed Host API**。
 12. **TokenDance API key 不得暴露给浏览器 UI**。
-
----
-
-## 10. 验证清单
-
-> 以下每项必须通过对应的 E2E 测试或手动验证证明集成可用。
-
-### 10.1 认证
-
-- [ ] TokenDanceID OIDC 登录（Desktop PKCE loopback）：`GET /client/auth/me` 返回用户信息
-- [ ] TokenDanceID OIDC 登录（Web redirect callback）：`GET /client/auth/me` 返回用户信息
-- [ ] Session refresh：access token 过期前自动 refresh，用户无感知
-- [ ] Logout：`POST /client/auth/logout` 后所有 API 返回 401
-- [ ] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新
-
-### 10.2 IM 聊天
-
-- [ ] 消息发送：`POST /client/sessions/:id/messages` 后 WS 推送 `message.new`
-- [ ] 消息接收：WS `message.new` 后消息出现在 transcript
-- [ ] 消息撤回：`POST /client/messages/:id/recall` 后消息显示"已撤回"
-- [ ] 消息编辑：`PUT /client/messages/:id` 后内容更新并显示"已编辑"
-- [ ] 消息 pin：`POST /client/messages/:id/pin` 后 pinned 列表更新
-- [ ] 消息 unpin：`DELETE /client/messages/:id/pin` 后从列表移除
-- [ ] 消息 reaction：添加/移除 emoji 后计数更新
-- [ ] 消息转发：`POST /client/messages/:id/forward` 后目标会话出现转发消息
-- [ ] 消息搜索：`GET /client/messages/search?q=keyword` 返回匹配结果
-- [ ] 已读回执：`POST /client/sessions/:id/read` 后未读计数清零
-- [ ] 消息同步：`GET /client/sessions/:id/messages/sync?after_seq_id=N` 补齐离线消息
-- [ ] WS 实时推送：断线重连后不丢失事件
-- [ ] @Agent：`POST /client/sessions/:id/agents` 后 Agent 加入会话
-
-### 10.3 联系人
-
-- [ ] 搜索用户：`GET /client/contacts/search?q=keyword` 返回结果
-- [ ] 发送好友请求：`POST /client/contacts/friend-requests` 后对方 WS 收到通知
-- [ ] 接受好友请求：`POST /client/contacts/friend-requests/:id/accept` 后双方列表更新
-- [ ] 拒绝好友请求：`POST /client/contacts/friend-requests/:id/reject` 后请求消失
-- [ ] 删除联系人：`DELETE /client/contacts/:user_id` 后从列表消失
-- [ ] 拉黑联系人：`POST /client/contacts/:user_id/block` 后无法发消息
-- [ ] 修改备注：`PUT /client/contacts/:user_id/remark` 后备注显示
-
-### 10.4 会话
-
-- [ ] 会话列表：`GET /client/sessions` 按最后活跃排序
-- [ ] 创建私聊：`POST /client/sessions/private` 后出现在列表
-- [ ] 创建群聊：`POST /client/sessions/group` 后所有成员 WS 收到 `session.created`
-- [ ] 添加群成员：`POST /client/sessions/:id/members` 后 WS 推送
-- [ ] 移除群成员：`DELETE /client/sessions/:id/members/:user_id` 后 WS 推送
-- [ ] 退出群聊：`POST /client/sessions/:id/leave` 后从列表消失
-- [ ] 解散群聊：`POST /client/sessions/:id/dissolve` 后所有成员会话消失
-- [ ] 修改群信息：`PUT /client/sessions/:id/info` 后 WS 推送 `session.info_updated`
-
-### 10.5 Agent 配置
-
-- [ ] 创建 Custom Agent：`POST /web/custom-agents` 后出现在列表
-- [ ] 编辑 Agent 配置：`PUT /web/custom-agents/:id` 后配置持久化
-- [ ] 删除 Agent：`DELETE /web/custom-agents/:id` 后从列表消失
-- [ ] Agent Profile CRUD：`GET/POST/PATCH/DELETE /web/agent-profiles` 全链路
-- [ ] Runtime 列表：`GET /v1/runners` 返回可用 runtime 和健康状态
-- [ ] 模型列表：`GET /v1/model-catalog` 返回可用模型
-- [ ] MCP Server CRUD：`GET/POST/PUT/DELETE /web/mcp-servers` 全链路
-- [ ] Skill CRUD：`GET/POST/PUT/DELETE /web/skills` 全链路
-
-### 10.6 执行与运行时
-
-- [ ] Edge 健康检查：`GET /v1/health` 返回 ready
-- [ ] CLI 发现：各 CLI ready/not-found/incompatible 状态正确
-- [ ] 触发 run：`POST /web/agent-tasks` 后状态从 pending -> running -> done
-- [ ] 事件流：`GET /web/agent-tasks/:id/events` 返回完整事件
-- [ ] Approval 请求：Agent 请求后 Web 展示 approval card
-- [ ] Approval 决策：`POST /web/agent-tasks/:id/approvals/:approval_id/decide` 后 Agent 继续/中止
-- [ ] Artifact 列表：`GET /web/agent-tasks/:id/artifacts` 返回产物
-- [ ] Diff 展示：artifact 的 diff 视图正确渲染
-- [ ] Target 列表：`GET /web/execution-targets` 展示 online/offline 状态
-- [ ] Target ping：`POST /web/execution-targets/:id/ping` 反映可达性
-
-### 10.7 项目与文档
-
-- [ ] 项目列表：`GET /web/projects` 返回用户项目
-- [ ] 创建项目：`POST /web/projects` 后出现在列表
-- [ ] 线程列表：`GET /web/projects/:id/threads` 返回项目线程
-- [ ] 线程消息：`GET/POST /web/projects/:id/threads/:threadId/messages` 全链路
-- [ ] 文档 CRUD：`GET/POST/PATCH/DELETE /web/documents` 全链路
-- [ ] 文档搜索：关键词搜索返回匹配文档
-
-### 10.8 Agent Team
-
-- [ ] Team CRUD：创建/查看/编辑/删除 Team
-- [ ] Team 成员：添加/移除 Agent 成员
-- [ ] Team Run：`POST /web/agent-teams/:id/runs` 启动运行
-- [ ] 路由决策：`POST .../route-decisions` 可视化
-- [ ] 冲突解决：`POST .../conflicts/:conflict_id/resolve` 解决冲突
-
-### 10.9 其他
-
-- [ ] 设备注册：`POST /edge/devices/register` 后 `GET /web/devices` 可见
-- [ ] 附件上传下载：`POST /client/attachments` + `GET /client/attachments/:id`
-- [ ] 通知列表：`GET /client/notifications` 分页加载
-- [ ] 通知已读：`POST /client/notifications/:id/read` 后计数更新
-- [ ] 用户设置：`GET/PATCH /client/settings` 持久化和恢复
-- [ ] 市场列表：`GET /web/market/profiles` 展示已发布 Profile
-- [ ] 安装 Profile：`POST /web/market/profiles/:id/install` 后出现在用户列表
-- [ ] i18n：所有页面 zh/en 完整无遗漏
-- [ ] P0 金链路：`verify-p0-approved-real-gold-path.ps1` PASS
-- [ ] Windows dry package：`verify-tauri-package-dry.ps1` PASS
-- [ ] Release gate：`verify-release-gate.ps1` PASS
-
----
-
-## 11. 依赖顺序
-
-```
-Phase 1 (完成): TokenDanceID OIDC 配置 + Hub 核心数据层
-  ✅ Hub OIDC .env 配置完毕（`POST /client/auth/oidc/authorize` → 200）
-  ✅ Hub Document model + repository 已创建
-  ✅ Hub user_settings 表已补建
-  ✅ Hub 路由去重 + Prometheus metrics 修复
-  ✅ 待验证: 完整 PKCE browser login → token → session 流程
-
-Phase 2 (完成): Core data flows 前端接线
-  ✅ 4.1 IM 聊天 10 个 chat actions → Hub API（Web + Desktop）
-  ✅ 4.2 联系人 9 个 mutation hooks → Hub API
-  ✅ 4.6 Agent 配置 → Hub agent-profiles API + Edge agent-profiles
-  ✅ 4.5 设置三层回退（Edge → Hub → localStorage）
-  ✅ Desktop auth token 管道、Hub WS 实时缓存失效
-
-Phase 3 (完成): Extended flows
-  ✅ 4.7 云文档 → Hub documents model + repository + API
-  ✅ 4.8 项目管理 → Hub workspace-projects queries
-  ✅ 5.4 i18n → desktop zh/en locale 均 2169 keys
-  ✅ 5.1 Mobile → hubClient/hubEvents/hubLifecycle 对齐 Hub API 合同
-
-Phase 4 (完成): Runtime integration
-  ✅ 7.1 CLI 接入 → Claude Code 真实执行验证通过，OpenCode 修复 --session，Codex preflight
-  ✅ 7.2 SDK 接入 → AnthropicSDKAdapter + OpenAISDKAdapter 已实现
-  ⚠️ Codex 真实执行需 `OPENAI_API_KEY`
-  ⚠️ Anthropic/OpenAI SDK 需各自 API key
-
-Phase 5 (进行中): E2E 测试 + 发布
-  ✅ verify-real-api-smoke.ps1 → 44/44 PASS
-  ✅ app/e2e/chat-real.spec.ts → 9 Playwright tests
-  ⏳ Tauri 签名 + 打包（阻塞于签名证书）
-  ⏳ 完整 @Agent 通过 WS 端到端测试
-  ⏳ Release governance → changelog + gate
-```
+13. **SDK adapter 不依赖外部 SDK 包**，使用纯 `net/http` 实现。
+14. **未获明确审批，不跑真实登录、真实模型消耗、部署、签名、公证、updater、release upload**。
+15. **所有 CLI adapter 输出必须统一映射到 typed `RunEvent` 合同**。
+16. **进程生命周期由 Edge lifecycle 管理，不暴露给前端**。
