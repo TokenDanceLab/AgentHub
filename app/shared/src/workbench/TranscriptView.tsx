@@ -526,12 +526,15 @@ function renderPermissionRequestBlock(
     <ApprovalCardBlock
       id={block.requestId}
       agentTaskId={block.agentTaskId}
+      correlationId={block.correlationId}
+      edgeDeviceId={block.edgeDeviceId}
       onDecision={onApprovalDecision}
       reason={block.reason}
       risk={block.risk}
       status={block.status}
       teamId={block.teamId}
       teamRunId={block.teamRunId}
+      targetId={block.targetId}
       title={block.title}
       toolName={block.toolName}
     />

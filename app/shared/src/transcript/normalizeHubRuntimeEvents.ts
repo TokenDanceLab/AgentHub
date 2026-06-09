@@ -327,6 +327,7 @@ function hubRuntimeEventToEdgeEnvelope(event: HubRuntimeEventTranscriptInput): E
       ...(event.session_id ? { conversationId: event.session_id } : {}),
       ...(event.task_id ? { taskId: event.task_id } : {}),
       ...(event.agent_instance_id ? { agentInstanceId: event.agent_instance_id } : {}),
+      ...(event.edge_device_id ? { deviceId: event.edge_device_id } : {}),
     },
     sentAt: event.created_at ?? '',
     payload: runtimePayloadRecord(event.payload, runId),
