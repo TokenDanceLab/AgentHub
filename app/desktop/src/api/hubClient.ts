@@ -494,6 +494,71 @@ export interface CustomAgent {
   updated_at?: string;
 }
 
+// ── Hub documents ─────────────────────────────────
+
+export interface HubDocument {
+  id: string;
+  owner_id: string;
+  project_id?: string | undefined;
+  title: string;
+  type: string;
+  source: string;
+  source_ref?: string | undefined;
+  tag?: string | undefined;
+  location: string;
+  status: string;
+  content?: string | undefined;
+  metadata: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HubDocumentListItem {
+  id: string;
+  owner_id: string;
+  project_id?: string | undefined;
+  title: string;
+  type: string;
+  source: string;
+  source_ref?: string | undefined;
+  tag?: string | undefined;
+  location: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HubDocumentListResponse {
+  items: HubDocumentListItem[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface CreateHubDocumentRequest {
+  title: string;
+  type?: string;
+  source?: string;
+  tag?: string;
+  location?: string;
+  content?: string;
+  metadata?: string;
+  project_id?: string;
+}
+
+export interface UpdateHubDocumentRequest {
+  title?: string;
+  type?: string;
+  source?: string;
+  tag?: string;
+  location?: string;
+  status?: string;
+  content?: string;
+  metadata?: string;
+  project_id?: string;
+}
+
 // ── Execution targets ───────────────────────────
 
 export interface HubNotification {
@@ -555,7 +620,142 @@ export interface CreateExecutionTargetRequest {
 
 export type UpdateExecutionTargetRequest = Partial<CreateExecutionTargetRequest>;
 
+// ── Agent profiles ───────────────────────
+
+export interface AgentProfile {
+  id: string;
+  owner_id?: string;
+  name: string;
+  description?: string;
+  runtime_id: string;
+  model?: string;
+  provider?: string;
+  reasoning_effort?: string;
+  model_mapping?: string;
+  skills?: string;
+  mcp_servers?: string;
+  tool_allowlist?: string;
+  memory_policy?: string;
+  approval_policy?: string;
+  permission_mode?: string;
+  target_preferences?: string;
+  context_budget_max_tokens?: number;
+  is_public?: boolean;
+  install_count?: number;
+  rating_avg?: number;
+  rating_count?: number;
+  version?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentProfileListResponse {
+  items: AgentProfile[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface CreateAgentProfileRequest {
+  name: string;
+  description?: string;
+  runtime_id: string;
+  model?: string;
+  provider?: string;
+  reasoning_effort?: string;
+  permission_mode?: string;
+  skills?: string;
+  mcp_servers?: string;
+  tool_allowlist?: string;
+  approval_policy?: string;
+  target_preferences?: string;
+  context_budget_max_tokens?: number;
+}
+
+export type UpdateAgentProfileRequest = Partial<CreateAgentProfileRequest>;
+
+// ── Hub workspace projects ──────────────────
+
+export interface WorkspaceProject {
+  id: string;
+  name: string;
+  description?: string;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WorkspaceProjectListResponse {
+  items: WorkspaceProject[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
+export interface CreateWorkspaceProjectRequest {
+  name: string;
+  description?: string;
+}
+
+export type UpdateWorkspaceProjectRequest = Partial<CreateWorkspaceProjectRequest>;
+
+export interface WorkspaceProjectThread {
+  id: string;
+  project_id: string;
+  type: string;
+  name: string;
+  owner_user_id?: string;
+  role?: string;
+  member_count: number;
+  last_message_at?: string;
+  created_at: string;
+}
+
+export interface CreateWorkspaceProjectThreadRequest {
+  name: string;
+}
+
+export interface SendWorkspaceProjectThreadMessageRequest {
+  client_msg_id?: string;
+  content_type?: string;
+  content: string;
+}
+
+export interface WorkspaceProjectThreadMessage {
+  id: string;
+  project_id: string;
+  thread_id: string;
+  seq_id: number;
+  client_msg_id: string;
+  sender_type: string;
+  sender_id: string;
+  content_type: string;
+  content: string;
+  created_at: string;
+}
+
 // 鈹€鈹€ Auth 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+// ── Documents ──────────────────────────────────────────────────
+
+export interface HubDocument {
+  id: string;
+  owner_id: string;
+  project_id?: string;
+  title: string;
+  type: string;
+  source: 'user' | 'artifact' | 'upload' | 'external';
+  source_ref?: string;
+  tag?: string;
+  location: string;
+  status: 'active' | 'archived' | 'deleted';
+  content?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface OIDCAuthorizeRequest {
   code_challenge: string;
@@ -1158,6 +1358,129 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     pingExecutionTarget: (id: string) =>
       request<EmptyHubResponse>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
+
+
+    // ── Hub documents ─────────────────────────────────
+
+    listDocuments: (params?: {
+      status?: string;
+      source?: string;
+      tag?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<HubDocumentListResponse>(`/web/documents${qs(params ?? {})}`),
+
+    getDocument: (id: string) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`),
+
+    createDocument: (data: CreateHubDocumentRequest) =>
+      request<HubDocument>('/web/documents', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateDocument: (id: string, data: UpdateHubDocumentRequest) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    deleteDocument: (id: string) =>
+      request<EmptyHubResponse>(`/web/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    // ── Agent profiles ─────────────────────
+
+    listAgentProfiles: (params?: {
+      runtime_id?: string;
+      q?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<AgentProfileListResponse>(`/web/agent-profiles${qs(params ?? {})}`),
+
+    getAgentProfile: (id: string) =>
+      request<AgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`),
+
+    createAgentProfile: (data: CreateAgentProfileRequest) =>
+      request<AgentProfile>('/web/agent-profiles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateAgentProfile: (id: string, data: UpdateAgentProfileRequest) =>
+      request<AgentProfile>(`/web/agent-profiles/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentProfile: (id: string) =>
+      request<EmptyHubResponse>(`/web/agent-profiles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    // ── Hub workspace projects ────────────────
+
+    listWorkspaceProjects: (params?: {
+      q?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<WorkspaceProjectListResponse>(`/web/projects${qs(params ?? {})}`),
+
+    getWorkspaceProject: (id: string) =>
+      request<WorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`),
+
+    createWorkspaceProject: (data: CreateWorkspaceProjectRequest) =>
+      request<WorkspaceProject>('/web/projects', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateWorkspaceProject: (id: string, data: UpdateWorkspaceProjectRequest) =>
+      request<WorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    listWorkspaceProjectThreads: (projectId: string) =>
+      request<WorkspaceProjectThread[]>(`/web/projects/${encodeURIComponent(projectId)}/threads`),
+
+    createWorkspaceProjectThread: (projectId: string, data: CreateWorkspaceProjectThreadRequest) =>
+      request<WorkspaceProjectThread>(`/web/projects/${encodeURIComponent(projectId)}/threads`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listWorkspaceProjectThreadMessages: (projectId: string, threadId: string, params?: { limit?: number }) =>
+      request<WorkspaceProjectThreadMessage[]>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params ?? {})}`,
+      ),
+
+    sendWorkspaceProjectThreadMessage: (
+      projectId: string,
+      threadId: string,
+      data: SendWorkspaceProjectThreadMessageRequest,
+    ) =>
+      request<WorkspaceProjectThreadMessage>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+
+    // ── Documents (cloud docs + artifact projection) ────────────────
+
+    listDocuments: (params?: { status?: string; source?: string; project_id?: string; search?: string; limit?: number }) =>
+      request<{ items: HubDocument[] }>(`/web/documents${qs(params ?? {})}`),
+
+    getDocument: (docId: string) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(docId)}`),
+
+    createDocument: (data: { title: string; type?: string; tag?: string; location?: string; content?: string }) =>
+      request<HubDocument>('/web/documents', { method: 'POST', body: JSON.stringify(data) }),
+
+    updateDocument: (docId: string, data: { title?: string; type?: string; tag?: string; content?: string }) =>
+      request<HubDocument>(`/web/documents/${encodeURIComponent(docId)}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+    deleteDocument: (docId: string) =>
+      request<void>(`/web/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' }),
   };
 }
 
