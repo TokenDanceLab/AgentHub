@@ -81,4 +81,9 @@ var (
 	OIDCCodeExchangeFailed = New("OIDC_CODE_EXCHANGE_FAILED", "failed to exchange authorization code", http.StatusBadRequest)
 	OIDCIDTokenInvalid     = New("OIDC_ID_TOKEN_INVALID", "id token validation failed", http.StatusBadRequest)
 	OIDCSubNotFound        = New("OIDC_SUB_NOT_FOUND", "no sub claim in id token", http.StatusBadRequest)
+
+	DocNotFound       = New("DOC_NOT_FOUND", "document not found", http.StatusNotFound)
+	DocAlreadyDeleted = New("DOC_ALREADY_DELETED", "document already deleted", http.StatusBadRequest)
+
+		ErrUnauthorized = New("UNAUTHORIZED", "authentication required", http.StatusUnauthorized)
 )
