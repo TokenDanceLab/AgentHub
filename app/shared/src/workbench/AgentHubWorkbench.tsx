@@ -151,6 +151,18 @@ export interface AgentHubWorkbenchProps {
   documents?: DocRow[] | undefined;
   /** Document mutation actions wired to Hub Documents API. */
   documentsActions?: WorkbenchDocumentsActions | undefined;
+  /** Model catalog items from Edge API. When provided, the Agents page
+   *  Models tab shows real model data instead of mock fixtures. */
+  modelCatalog?: Array<{
+    id: string;
+    label: string;
+    value: string;
+    provider?: string;
+    status: string;
+    description?: string;
+    default?: boolean;
+    tags?: string[];
+  }> | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   showComposerAgentPicker?: boolean | undefined;
   showComposerStatus?: boolean | undefined;
@@ -188,6 +200,7 @@ export function AgentHubWorkbench({
   contactsActions,
   documents,
   documentsActions,
+  modelCatalog,
   runtimeEvidence,
   showComposerAgentPicker = true,
   showComposerStatus = true,
@@ -1238,6 +1251,7 @@ export function AgentHubWorkbench({
               contactsActions={contactsActions}
               documentsActions={documentsActions}
               localCliDiscovery={localCliDiscovery}
+              modelCatalog={modelCatalog}
               settingsService={settingsService}
             />
           </section>
