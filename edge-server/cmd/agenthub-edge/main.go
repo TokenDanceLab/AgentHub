@@ -42,11 +42,12 @@ type config struct {
 	TailscaleIP string // tailscale IP for Hub registration identity
 
 	// Agent adapter configuration
-	AgentDefault   string // default agent adapter ID
-	ClaudeCodePath string // path to claude binary
-	CodexPath      string // path to codex binary
-	OpenCodePath   string // path to opencode binary
-	AgentModel     string // model override for the default agent
+	AgentDefault     string         // default agent adapter ID
+	ClaudeCodePath   string         // path to claude binary
+	CodexPath        string         // path to codex binary
+	OpenCodePath     string         // path to opencode binary
+	AgentModel       string         // model override for the default agent
+	RuntimeManifests repeatedString // fixture-only custom runtime manifests
 
 	// SKILL.md discovery
 	SkillsDirs repeatedString // additional dirs to search for SKILL.md files
@@ -74,6 +75,10 @@ func (v *repeatedString) Set(value string) error {
 }
 
 func main() {
+	if runtimeManifestFixtureReplayRequested(os.Args[1:]) {
+		return
+	}
+
 	logLevel := slog.LevelInfo
 	switch strings.ToLower(getEnv("AGENTHUB_LOG_LEVEL", "info")) {
 	case "debug":
@@ -138,6 +143,10 @@ func main() {
 		slog.Error("server exited with error", "err", err)
 		os.Exit(1)
 	}
+}
+
+func runtimeManifestFixtureReplayRequested(args []string) bool {
+	return len(args) == 1 && args[0] == adapters.RuntimeManifestFixtureReplayFlag
 }
 
 func getEnv(key, defaultVal string) string {
@@ -215,6 +224,8 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.CodexPath, "codex-path", getEnv("AGENTHUB_CODEX_PATH", "codex"), "path to codex binary")
 	fs.StringVar(&cfg.OpenCodePath, "opencode-path", getEnv("AGENTHUB_OPENCODE_PATH", "opencode"), "path to opencode binary")
 	fs.StringVar(&cfg.AgentModel, "agent-model", getEnv("AGENTHUB_AGENT_MODEL", ""), "model override for the default agent (e.g. claude-sonnet-4-6)")
+	cfg.RuntimeManifests = append(cfg.RuntimeManifests, splitPathList(getEnv("AGENTHUB_RUNTIME_MANIFESTS", ""))...)
+	fs.Var(&cfg.RuntimeManifests, "runtime-manifest", "fixture-only custom runtime manifest JSON path; may be repeated; env AGENTHUB_RUNTIME_MANIFESTS uses OS path-list separators")
 
 	cfg.SkillsDirs = append(cfg.SkillsDirs, splitPathList(getEnv("AGENTHUB_SKILLS_DIRS", ""))...)
 	fs.Var(&cfg.SkillsDirs, "skills-dir", "directory containing SKILL.md subdirectories; may be repeated; defaults to .agents/skills and .codex/skills")
@@ -290,6 +301,7 @@ func buildConfig(args []string) (config, error) {
 	cfg.RunnerCommand = strings.TrimSpace(cfg.RunnerCommand)
 	cfg.AgentDefault = strings.TrimSpace(cfg.AgentDefault)
 	cfg.AllowedOrigins = trimRepeatedStrings(cfg.AllowedOrigins)
+	cfg.RuntimeManifests = trimRepeatedStrings(cfg.RuntimeManifests)
 	if cfg.RunnerCommand == "" && len(cfg.RunnerArgs) > 0 {
 		return config{}, fmt.Errorf("--runner-arg requires --runner-command")
 	}
@@ -372,6 +384,19 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 			slog.Warn("failed to register opencode adapter", "err", err)
 		} else {
 			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpenCodePath)
+		}
+	}
+	for _, manifestPath := range cfg.RuntimeManifests {
+		manifest, err := adapters.LoadRuntimeManifestFile(manifestPath)
+		if err != nil {
+			slog.Warn("failed to load runtime manifest", "path", manifestPath, "err", err)
+			continue
+		}
+		a := adapters.NewRuntimeManifestAdapter(manifest)
+		if err := reg.Register(a); err != nil {
+			slog.Warn("failed to register runtime manifest adapter", "id", manifest.ID, "path", manifestPath, "err", err)
+		} else {
+			slog.Info("registered runtime manifest adapter", "id", a.Metadata().ID, "path", manifestPath, "fixture", manifest.Fixture.Type)
 		}
 	}
 	if cfg.ClaudeCodePath != "" {
