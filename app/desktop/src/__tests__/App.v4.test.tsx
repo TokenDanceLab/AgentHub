@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '@shared/demo';
 import type { EventEnvelope } from '@shared/events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '@/App';
+import App, { DesktopWorkbenchApp } from '@/App';
 import { createEventStream } from '@/api/eventClient';
 import { createHubClient } from '@/api/hubClient';
 import { useAgentList } from '@/api/agentQueries';
@@ -133,6 +134,7 @@ const mockedUseHubIntegration = vi.mocked(useHubIntegration);
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     Object.defineProperty(window, '__TAURI_INTERNALS__', {
       value: {},
       configurable: true,
@@ -247,14 +249,36 @@ describe('Desktop App v4 root', () => {
     } as ReturnType<typeof useThreadPins>);
   });
 
-  it('renders the shared v4 workbench as the active desktop route', () => {
+  it('shows the Desktop login card before entering the workbench', () => {
     render(<App />);
 
-    expect(screen.getByRole('img', { name: 'AgentHub' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Window controls' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '最小化' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '最大化' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '关闭' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Desktop navigation controls' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '切换左侧栏' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '后退' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '前进' })).not.toBeInTheDocument();
+    expect(screen.getByRole('main', { name: 'Desktop entry' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '登录 AgentHub' })).toBeInTheDocument();
+    expect(screen.getByAltText('AgentHub')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '切换主题' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '使用 TokenDance ID 继续' })).toBeInTheDocument();
+    expect(screen.getByTestId('tokendance-id-logo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '使用 Demo 模式继续' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Global rail' })).not.toBeInTheDocument();
+  });
+
+  it('enters a clean Desktop demo workbench from the login card', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
+
+    expect(screen.getByRole('group', { name: 'Desktop navigation controls' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '切换左侧栏' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '后退' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '前进' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Conversation sidebar' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'desktop');
@@ -268,12 +292,28 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'AgentHub' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Composer input')).toHaveAttribute('placeholder', '发消息给 AgentHub');
+    expect(screen.getByRole('heading')).toBeInTheDocument();
+    expect(screen.getByLabelText('Composer input')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '数据模式' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('@Agent')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('returns to the Desktop login card from the account logout action', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delicious233' }));
+    fireEvent.click(screen.getByRole('button', { name: '退出登录' }));
+
+    expect(screen.getByRole('heading', { name: '登录 AgentHub' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Global rail' })).not.toBeInTheDocument();
   });
 
   it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {
-    render(<App />);
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    render(<DesktopWorkbenchApp />);
 
     await waitFor(() => {
       expect(mockedUseHubIntegration).toHaveBeenCalledWith({
@@ -296,13 +336,14 @@ describe('Desktop App v4 root', () => {
   });
 
   it('waits for Desktop device registration before accepting Hub dispatch frames', async () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseDeviceRegistration.mockReturnValue({
       deviceId: '00000000-0000-4000-8000-00000000d001',
       status: 'registering',
       error: null,
     });
 
-    render(<App />);
+    render(<DesktopWorkbenchApp />);
 
     await waitFor(() => {
       expect(mockedUseHubIntegration).toHaveBeenCalledWith({
@@ -316,6 +357,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('uses Edge thread data when Desktop queries return conversations and items', () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseThreads.mockReturnValue({
       data: {
         items: [
@@ -362,7 +404,7 @@ describe('Desktop App v4 root', () => {
       },
     } as ReturnType<typeof useThreadMessages>);
 
-    render(<App />);
+    render(<DesktopWorkbenchApp />);
 
     expect(screen.getByRole('heading', { name: '真实 Edge 会话' })).toBeInTheDocument();
     expect(screen.getByText('把 Desktop 接到真实 thread')).toBeInTheDocument();
@@ -371,6 +413,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('merges live Edge events into the shared v4 transcript and evidence', () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseThreads.mockReturnValue({
       data: {
         items: [
@@ -393,7 +436,7 @@ describe('Desktop App v4 root', () => {
       },
     } as ReturnType<typeof useThreadMessages>);
 
-    const { rerender } = render(<App />);
+    const { rerender } = render(<DesktopWorkbenchApp />);
 
     act(() => {
       emitEdgeEvent({
@@ -460,13 +503,14 @@ describe('Desktop App v4 root', () => {
         page: { hasMore: false },
       },
     } as ReturnType<typeof useThreadMessages>);
-    rerender(<App />);
+    rerender(<DesktopWorkbenchApp />);
 
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
     expect(mockedCreateEventStream).toHaveBeenCalledTimes(1);
   });
 
   it('submits composer text to the active Edge thread through the v4 platform adapter', async () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseThreads.mockReturnValue({
       data: {
         items: [
@@ -489,7 +533,7 @@ describe('Desktop App v4 root', () => {
       },
     } as ReturnType<typeof useThreadMessages>);
 
-    render(<App />);
+    render(<DesktopWorkbenchApp />);
 
     fireEvent.change(screen.getByLabelText('Composer input'), {
       target: { value: '跑一下 v4 smoke' },

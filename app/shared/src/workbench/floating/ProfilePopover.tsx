@@ -14,13 +14,15 @@ interface ProfileMetaRow {
   value: string;
 }
 
-interface AccountMenuRow {
-  label: string;
-  style?: 'normal' | 'danger';
-  trail?: 'external' | null;
-  divider?: boolean;
-  onClick?: () => void;
-}
+type AccountMenuRow =
+  | { divider: true }
+  | {
+    label: string;
+    style?: 'normal' | 'danger';
+    trail?: 'external' | null;
+    divider?: false;
+    onClick?: () => void;
+  };
 
 interface AccountSpace {
   name: string;
