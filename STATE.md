@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 07:00 +08:00
-当前 dev HEAD：`a37111bb` (`dev/delicious233`)
+最后更新：2026-06-10 07:15 +08:00
+当前 dev HEAD：`b0c991ba` (`dev/delicious233`)
 
 ## Release Gate 快照 (Final)
 
