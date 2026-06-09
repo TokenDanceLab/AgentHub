@@ -32,6 +32,12 @@ Desktop target，由 Desktop 启动 Local Edge，再由 Edge 调用 CLI/SDK adap
 真实登录、真实 CLI/model、部署、签名和公证仍需单独审批；在审批前只做
 fixture、observed 或 no-spend readiness 证据。
 
+P0 远控认证与拓扑前置链路：`Web -> Hub -> 已注册 Desktop/Edge -> Local Edge -> CLI/SDK adapter`。
+真实 TokenDanceID/OIDC 登录和真实 CLI/model 执行仍是显式审批门。
+真实 TokenDanceID 登录需要先具备：已批准的 OAuth client、一次性或预批准测试账号、明确的 Hub/Web/Desktop
+测试环境、浏览器证据边界，以及 callback、session、target inventory、`/client/auth/me` 的脱敏证明；
+token、密码、client secret、cookie、authorization 值不得进入文档、日志、截图、commit 或报告。
+
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
 | IM / @Agent 主链 | Agent/联系人式入口、目标选择、任务输入、启动运行、路由状态、回放面板 | 用户能从一个 Web 页面启动任务，不需要理解后端运行时术语。 |
