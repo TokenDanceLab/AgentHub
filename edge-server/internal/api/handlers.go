@@ -166,7 +166,7 @@ func (h *Handler) ensureDefaults() {
 		return
 	}
 	_, _ = h.Store.CreateProject("proj_local", "Local Project")
-	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct")
+	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct", "", "")
 }
 
 func acceptedResponse(data map[string]any) map[string]any {
@@ -473,49 +473,13 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
 		return
 	}
-	// Merge profile defaults: profile fields fill in blanks, request fields win.
-	if req.ProfileID != "" {
-		if profile, ok := ensureStore(h).GetAgentProfile(req.ProfileID); ok {
-			if req.AgentID == "" {
-				req.AgentID = profile.AdapterID
-			}
-			if req.Model == "" {
-				req.Model = profile.Model
-			}
-			if req.Provider == "" {
-				req.Provider = profile.Provider
-			}
-			if req.ReasoningEffort == "" {
-				req.ReasoningEffort = profile.ReasoningEffort
-			}
-			if req.ThinkingMode == "" {
-				req.ThinkingMode = profile.ThinkingMode
-			}
-			if req.MaxThinkingTokens == 0 {
-				req.MaxThinkingTokens = profile.MaxThinkingTokens
-			}
-			if req.PermissionMode == "" {
-				req.PermissionMode = profile.PermissionMode
-			}
-			if req.SystemPrompt == "" {
-				req.SystemPrompt = profile.SystemPrompt
-			}
-			if len(req.AllowedTools) == 0 && len(profile.AllowedTools) > 0 {
-				req.AllowedTools = profile.AllowedTools
-			}
-			if req.MCPConfig == "" {
-				req.MCPConfig = profile.MCPConfig
-			}
-		}
-	}
-
 	if req.ProjectID == "" {
 		req.ProjectID = "proj_local"
 	}
 	if req.ThreadID == "" {
 		req.ThreadID = genID("thread_")
 	}
-	thread, err := ensureStore(h).CreateThread(req.ThreadID, req.ProjectID, req.Title, "")
+	thread, err := ensureStore(h).CreateThread(req.ThreadID, req.ProjectID, req.Title, "", "", "")
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project not found")))
 		return
@@ -886,7 +850,7 @@ func (h *Handler) PostAgentProfiles(w http.ResponseWriter, r *http.Request) {
 		AvatarRef         string   `json:"avatarRef"`
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithDetail(err.Error())))
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage(err.Error())))
 		return
 	}
 	profile := store.AgentProfile{
@@ -908,7 +872,7 @@ func (h *Handler) PostAgentProfiles(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := ensureStore(h).CreateAgentProfile(profile)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithDetail(err.Error())))
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage(err.Error())))
 		return
 	}
 	writeSuccess(w, http.StatusCreated, created)
@@ -926,7 +890,7 @@ func (h *Handler) GetAgentProfile(w http.ResponseWriter, r *http.Request, profil
 func (h *Handler) PatchAgentProfile(w http.ResponseWriter, r *http.Request, profileID string) {
 	var patch map[string]any
 	if err := decodeOptionalJSON(r, &patch); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithDetail(err.Error())))
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage(err.Error())))
 		return
 	}
 	profile, err := ensureStore(h).UpdateAgentProfile(profileID, patch)
@@ -935,7 +899,7 @@ func (h *Handler) PatchAgentProfile(w http.ResponseWriter, r *http.Request, prof
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
 			return
 		}
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithDetail(err.Error())))
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage(err.Error())))
 		return
 	}
 	writeSuccess(w, http.StatusOK, profile)
@@ -947,7 +911,7 @@ func (h *Handler) DeleteAgentProfile(w http.ResponseWriter, r *http.Request, pro
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithDetail(err.Error())))
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage(err.Error())))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -1008,6 +972,43 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
 		return
 	}
+
+	// Merge profile defaults: profile fields fill in blanks, request fields win.
+	if req.ProfileID != "" {
+		if profile, ok := ensureStore(h).GetAgentProfile(req.ProfileID); ok {
+			if req.AgentID == "" {
+				req.AgentID = profile.AdapterID
+			}
+			if req.Model == "" {
+				req.Model = profile.Model
+			}
+			if req.Provider == "" {
+				req.Provider = profile.Provider
+			}
+			if req.ReasoningEffort == "" {
+				req.ReasoningEffort = profile.ReasoningEffort
+			}
+			if req.ThinkingMode == "" {
+				req.ThinkingMode = profile.ThinkingMode
+			}
+			if req.MaxThinkingTokens == 0 {
+				req.MaxThinkingTokens = profile.MaxThinkingTokens
+			}
+			if req.PermissionMode == "" {
+				req.PermissionMode = profile.PermissionMode
+			}
+			if req.SystemPrompt == "" {
+				req.SystemPrompt = profile.SystemPrompt
+			}
+			if len(req.AllowedTools) == 0 && len(profile.AllowedTools) > 0 {
+				req.AllowedTools = profile.AllowedTools
+			}
+			if req.MCPConfig == "" {
+				req.MCPConfig = profile.MCPConfig
+			}
+		}
+	}
+
 	if req.ProjectID == "" {
 		req.ProjectID = "proj_local"
 	}
@@ -1850,7 +1851,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/agent-profiles/", func(w http.ResponseWriter, r *http.Request) {
 		profileID := strings.TrimPrefix(r.URL.Path, "/v1/agent-profiles/")
 		if profileID == "" {
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithDetail("profile id required")))
+			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("profile id required")))
 			return
 		}
 		switch r.Method {
