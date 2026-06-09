@@ -35,7 +35,9 @@ export interface HubEventStream {
 }
 
 // Event types matching hub-server/internal/ws/frame.go and hubEvents.ts
+// Plus legacy mobile-only types for backward compatibility.
 const knownEventTypes = new Set<HubWsEventType>([
+  // Real Hub server events
   'auth',
   'auth.ok',
   'auth.fail',
@@ -57,6 +59,12 @@ const knownEventTypes = new Set<HubWsEventType>([
   'friend.request',
   'friend.accepted',
   'error',
+  // Legacy mobile-only event types
+  'snapshot.updated',
+  'thread.updated',
+  'run.updated',
+  'approval.updated',
+  'presence.updated',
 ]);
 
 export function createHubEventStream(options: CreateHubEventStreamOptions): HubEventStream {
@@ -182,7 +190,7 @@ function parseHubWsEvent(data: unknown): ParsedHubEvent {
     kind: 'event',
     event: {
       type: type as HubWsEventType,
-      seq_id: typeof body.value.seq_id === 'number' ? body.value.seq_id : undefined,
+      ...(typeof body.value.seq_id === 'number' ? { seq_id: body.value.seq_id } : {}),
       payload: body.value.payload,
     },
   };
