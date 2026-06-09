@@ -149,6 +149,17 @@ const CtxSessionID ctxKey = "agenthub-session-id"
 // redact or relativize paths from CLI-native events.
 const CtxWorkDir ctxKey = "agenthub-work-dir"
 
+// ctxRunContext is used by SDK adapters (anthropic-sdk, openai-sdk) to extract
+// the full RunProcessContext from the context passed to ParseStream. SDK adapters
+// need the prompt, model, and other parameters to build their HTTP requests.
+const ctxRunContext ctxKey = "agenthub-run-context"
+
+// SDKAdapterContext returns a context with the RunProcessContext attached,
+// enabling SDK adapters to extract prompt/model parameters in ParseStream.
+func SDKAdapterContext(ctx context.Context, runCtx RunProcessContext) context.Context {
+	return context.WithValue(ctx, ctxRunContext, runCtx)
+}
+
 // --- Stream parse error handling ---
 
 // ParseStreamError wraps an error from ParseStream with a recoverability flag.
