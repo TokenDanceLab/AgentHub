@@ -374,6 +374,21 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		adapter = resolved
 	}
 
+	// Preflight check: if the adapter implements PreflightAdapter, verify
+	// it is properly configured (e.g. API keys, credentials) before launching
+	// the subprocess. This prevents hangs from CLIs that block on auth prompts.
+	if preflight, ok := adapter.(adapters.PreflightAdapter); ok && preflight != nil {
+		if err := preflight.PreflightCheck(); err != nil {
+			slog.Warn("process: adapter preflight check failed",
+				"runId", run.ID,
+				"agentId", runCtx.AgentID,
+				"err", err,
+			)
+			e.publishFailed(run, fmt.Errorf("adapter preflight failed: %w", err))
+			return
+		}
+	}
+
 	// Resolve adapter label for Prometheus metrics
 	var adapterLabel string
 	if e.metrics != nil {
