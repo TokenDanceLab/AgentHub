@@ -471,7 +471,7 @@ Web / Desktop / Mobile / IM
 - [x] Desktop 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
 - [x] Web 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
 - [ ] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
-- [ ] 登录后 Hub WS 连接成功，收到 `auth.ok`
+- [x] 登录后 Hub WS 连接成功，收到 `auth.ok`
 - [x] Logout 后 session 失效，所有 API 返回 401
 - [ ] Access token 过期前自动 refresh，用户无感知
 - [x] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新
@@ -544,22 +544,22 @@ Web / Desktop / Mobile / IM
 - [x] 撤回成功后 UI 显示"消息已撤回"
 - [x] 超时撤回返回错误
 - [x] 非发送者撤回返回 403
-- [ ] WS 撤回推送后所有客户端同步
+- [x] WS 撤回推送后所有客户端同步
 - [x] 编辑后内容更新并显示"已编辑"标记
 - [x] 非发送者编辑返回 403
 - [x] Pin 后出现在 pinned 列表
 - [x] Unpin 后从列表移除
-- [ ] WS Pin/Unpin 同步到所有在线成员
+- [x] WS Pin/Unpin 同步到所有在线成员
 - [x] 添加 reaction 后 emoji 计数更新
 - [x] 移除 reaction 后计数更新
 - [x] 转发成功后目标会话出现转发消息
 - [x] 转发消息标注原始发送者
-- [ ] 搜索返回匹配消息列表
+- [x] 搜索返回匹配消息列表
 - [ ] 点击搜索结果跳转到消息位置
 - [ ] 进入会话后未读计数清零
-- [ ] 多端同步已读状态
-- [ ] 离线后上线增量同步补齐未读消息
-- [ ] 不重复拉取
+- [x] 多端同步已读状态
+- [x] 离线后上线增量同步补齐未读消息
+- [x] 不重复拉取
 - [ ] WS 断线重连后不丢失事件
 - [ ] 连接状态指示器正确
 
@@ -671,9 +671,9 @@ Web / Desktop / Mobile / IM
 - [x] 编辑 Agent 配置持久化
 - [x] 删除后从列表消失
 - [x] Runtime 列表含健康状态
-- [ ] 模型按 provider 分组
-- [ ] Target 展示 online/offline
-- [ ] MCP Server 可被 Agent 引用
+- [x] 模型按 provider 分组
+- [x] Target 展示 online/offline
+- [x] MCP Server 可被 Agent 引用
 - [ ] Tool allowlist 限制可调用工具
 - [ ] Profile 发布后出现在市场
 - [ ] Profile 安装后出现在用户列表
@@ -1019,10 +1019,10 @@ CLI permission request
 - [x] Changelog 包含所有变更
 - [ ] 无 open Critical blockers
 - [ ] 所有 High 风险有 accepted 或 fixed
-- [ ] Windows package hash 一致
+- [x] Windows package hash 一致
 - [x] sidecar 正确放置
-- [ ] Mobile tests pass
-- [ ] Hub + Edge + Web + Desktop smoke 通过
+- [x] Mobile tests pass
+- [x] Hub + Edge + Web + Desktop smoke 通过
 
 ---
 
