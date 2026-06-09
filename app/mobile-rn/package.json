@@ -11,6 +11,7 @@
     "mock:hub:check": "node scripts/mock-hub.mjs --check",
     "start": "expo start --dev-client",
     "android": "expo run:android",
+    "android:package": "node scripts/package-android.mjs",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
@@ -50,6 +51,7 @@
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.9.1",
     "@types/react": "^19.1.1",
+    "babel-preset-expo": "56.0.14",
     "expo-doctor": "^1.18.10",
     "typescript": "~6.0.3",
     "vitest": "^4.1.7"

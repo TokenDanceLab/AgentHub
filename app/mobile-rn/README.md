@@ -81,6 +81,7 @@ Native development builds:
 ```powershell
 corepack pnpm native:check
 corepack pnpm android
+corepack pnpm android:package
 corepack pnpm ios
 npx eas-cli@20.1.0 build --profile development --platform android
 npx eas-cli@20.1.0 build --profile development --platform ios
@@ -96,18 +97,31 @@ corepack pnpm native:check
 
 iOS requires macOS/Xcode or EAS Build. Android requires Android Studio/SDK and a device or emulator. `eas.json` defines development, preview, and production profiles but intentionally does not include account-specific project IDs, credentials, or secrets. Do not use Expo Go for capability validation because OIDC deep links, SecureStore, notifications, camera/photo/file access, storage cleanup, and native config must be validated in a development build.
 
-Android development-build proof is separate from the 5177 web preview. Before claiming Android proof, run `corepack pnpm android` against an emulator/device or `npx eas-cli@20.1.0 build --profile development --platform android`, install the generated development build, open it, and verify the expected Hub snapshot/deep-link/session behavior on device. `native:check` is config readiness only.
+Android development-build proof is separate from the 5177 web preview. Before claiming Android proof, run `corepack pnpm android` against an emulator/device, `npx eas-cli@20.1.0 build --profile development --platform android`, or the local release APK packager below, install the generated build, open it, and verify the expected Hub snapshot/deep-link/session behavior on device. `native:check` is config readiness only.
+
+Local Android APK packaging on Windows:
+
+```powershell
+corepack pnpm android:package
+
+# Build, install, and launch on a Wi-Fi ADB device:
+corepack pnpm android:package -- -Version 0.3.0-rc.7 -InstallSerial 192.168.1.105:5555 -Launch
+```
+
+`android:package` runs `scripts/package-android.ps1`. On Windows it creates or reuses a short real-path junction at `D:\ah\agenthub-mobile`, installs dependencies with a short pnpm virtual store at `D:\p\agenthub-mobile`, regenerates the ignored native Android project from Expo config, builds `assembleRelease` by default so the JS bundle is embedded, and writes the APK plus `android-package-manifest.json` under `.tmp/android-package/`. Use `-Version` when producing a release-candidate artifact; otherwise the artifact name follows `app/mobile-rn/package.json`. Use this for local installable APK proof; `assembleDebug` is a Metro/dev-server build and is not valid offline install proof. The `v0.3.0-rc.7` local device proof used the explicit short paths `D:\ah\a` and `D:\p\a`.
+
+The Android launcher label is intentionally `AgentHub` so phone launchers do not truncate the name. The product lane remains AgentHub Mobile in repo docs and package naming. `assets/agenthub-adaptive-icon.png` is an Android adaptive-icon foreground with transparent padding; do not replace it with the full rounded app icon, or Android launchers can crop the mark.
 
 Native proof status:
 
 | Capability | Current evidence | Remaining gate |
 |---|---|---|
-| Expo config | `expo-doctor`, `native:check`, `app.config.ts`, and `eas.json` prove the no-secret development-build shape, AgentHub product icon assets, localization, notifications, SecureStore, `agenthub` scheme, Android package, iOS bundle ID, and default mock Hub URLs. | Install a development build on Android and iOS/simulator route. |
+| Expo config | `expo-doctor`, `native:check`, `app.config.ts`, `eas.json`, and the local `android:package` release APK prove the no-secret native shape, AgentHub product icon assets, localization, notifications, SecureStore, `agenthub` scheme, Android package, iOS bundle ID, and default mock Hub URLs. | iOS simulator or EAS development build route remains unverified. |
 | TokenDance ID OIDC | AuthSession helpers, default `expo-auth-session` redirect URI bridge, default `expo-web-browser` auth-session launcher, and `agenthub://auth/callback` parsing are covered by pure tests. | Complete mocked or local TokenDance ID + Hub session exchange in a development build. |
 | SecureStore | SecureStore adapter, default `expo-secure-store` adapter loader, and Hub session storage contracts are covered by tests/typecheck. | Prove persistence and logout clearing on device. |
 | Notifications | Notification intent parsing, response routing, default `expo-notifications` response bridge, and Android review channel configuration are covered by tests/typecheck and preview fixtures. | Prove native delivery/response opens the target thread or run on device. |
 | Media/files/storage | `expo-image-picker`, `expo-document-picker`, and `expo-file-system` are declared in config/dependencies; typed adapters cover camera/photo permission normalization, evidence media/document mapping, storage budget, and evidence cache cleanup. Settings and Account expose device capability rows. | Prove camera capture, photo/video picker, document picker, and evidence cache cleanup in a development build. |
-| Hub REST/WS | Typed client, event stream, lifecycle bridge, mock Hub, and local HTTP contract are covered by tests and `mock:hub:check`. | Prove against a live or local deployed Hub from a development build. |
+| Hub REST/WS | Typed client, event stream, lifecycle bridge, mock Hub, local HTTP contract, and Android release APK launch are covered by tests, `mock:hub:check`, and Wi-Fi ADB install/open proof. | Prove against a live or local deployed Hub from a development build. |
 
 ## Current Slice Status
 
