@@ -165,7 +165,12 @@ Invoke-Checked "Build Windows Local Edge sidecar" (Join-Path $RepoRoot "edge-ser
 }
 $sidecarIntermediate = Join-Path $RepoRoot "dist\agenthub-edge-windows-amd64.exe"
 Assert-True (Test-Path -LiteralPath $sidecarIntermediate) "Windows Local Edge sidecar intermediate exists"
-Copy-Item -LiteralPath $sidecarIntermediate -Destination (Join-Path $artifactRoot "agenthub-edge-windows-amd64.exe") -Force
+$sidecarArtifact = Join-Path $artifactRoot "agenthub-edge-windows-amd64.exe"
+$sidecarSourceFull = [IO.Path]::GetFullPath($sidecarIntermediate)
+$sidecarArtifactFull = [IO.Path]::GetFullPath($sidecarArtifact)
+if (-not [string]::Equals($sidecarSourceFull, $sidecarArtifactFull, [StringComparison]::OrdinalIgnoreCase)) {
+    Copy-Item -LiteralPath $sidecarIntermediate -Destination $sidecarArtifact -Force
+}
 
 Step "Prepare Tauri external sidecar"
 & (Join-Path $RepoRoot "scripts\prepare-tauri-sidecar-local.ps1") -RepoRoot $RepoRoot -SourceBinary $sidecarIntermediate -NoBuild
