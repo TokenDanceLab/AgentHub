@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "pnpm --filter agenthub-desktop dev",
     "dev:web": "pnpm --filter agenthub-web dev",
+    "dev:mobile-rn": "pnpm --filter agenthub-mobile-rn dev",
     "build": "pnpm -r build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

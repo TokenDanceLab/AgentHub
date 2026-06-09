@@ -5,7 +5,7 @@
 // Mobile flow:
 //   1. Generate PKCE code verifier + challenge
 //   2. Open system browser to TokenDance ID /authorize with PKCE params
-//   3. TokenDance ID redirects to custom URI scheme (agenthub://callback)
+//   3. TokenDance ID redirects to custom URI scheme (agenthub://auth/callback)
 //   4. Tauri deep-link plugin (future) captures the callback, exchanges code for token
 //   5. Token is stored via secure_store
 //
@@ -19,9 +19,9 @@ use tauri::AppHandle;
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
-const TOKENDANCE_ID_BASE: &str = "https://id.tokendance.com";
+const TOKENDANCE_ID_BASE: &str = "https://id.vectorcontrol.tech";
 const CLIENT_ID: &str = "agenthub_mobile";
-const REDIRECT_URI: &str = "agenthub://callback";
+const REDIRECT_URI: &str = "agenthub://auth/callback";
 
 fn generate_pkce_verifier() -> String {
     Alphanumeric.sample_string(&mut rand::thread_rng(), 64)
