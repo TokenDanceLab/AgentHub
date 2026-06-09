@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | `origin/dev/delicious233 = 249c4a21` |
-| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard 已合入 |
+| 当前 dev | 以 `origin/dev/delicious233` 最新提交为准；P0 实现基线为 `249c4a21`，本文所在提交是其后的状态同步 |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard 和状态同步已合入 |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
