@@ -207,7 +207,8 @@ func (a *recordingContextAdapter) NeedsStdin() bool { return false }
 func (a *recordingContextAdapter) Available() bool { return true }
 
 type fixtureSDKStreamAdapter struct {
-	id string
+	id   string
+	mode string
 }
 
 func (a *fixtureSDKStreamAdapter) Metadata() adapters.AdapterMetadata {
@@ -224,7 +225,11 @@ func (a *fixtureSDKStreamAdapter) Capabilities() adapters.AgentCapabilities {
 }
 
 func (a *fixtureSDKStreamAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
-	return os.Args[0], []string{processExecutorHelperRunFlag, "--", "sdk-fixture-json"}, append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"), ""
+	mode := a.mode
+	if mode == "" {
+		mode = "sdk-fixture-json"
+	}
+	return os.Args[0], []string{processExecutorHelperRunFlag, "--", mode}, append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"), ""
 }
 
 func (a *fixtureSDKStreamAdapter) ParseStream(ctx context.Context, stdout io.Reader, _ io.Writer, emitter adapters.EventEmitter, run store.Run) error {
@@ -234,7 +239,7 @@ func (a *fixtureSDKStreamAdapter) ParseStream(ctx context.Context, stdout io.Rea
 	}
 	stream, err := adapters.DecodeSDKFixtureStream(data)
 	if err != nil {
-		return err
+		return adapters.NewRecoverableParseError(err)
 	}
 	scope := map[string]any{
 		"projectId": run.ProjectID,
@@ -459,6 +464,164 @@ finished:
 			t.Fatalf("replay events missing %s: %v", want, eventTypeList(replay))
 		}
 	}
+}
+
+func TestProcessExecutorMapsFixtureProcessEventStreamContract(t *testing.T) {
+	bus := events.NewBus(200)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	adapter := &fixtureSDKStreamAdapter{id: "fixture-runner", mode: "sdk-fixture-runner-contract-json"}
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-fixture-process-json",
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{
+		AgentID:        "fixture-runner",
+		PermissionMode: "plan",
+		WorkDir:        "D:\\private\\fixture-workspace",
+	}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	live := collectEventsUntilRunDone(t, ch)
+	for _, want := range []string{
+		adapters.BusEventCLIInvocationPlan,
+		adapters.BusEventSessionInit,
+		adapters.BusEventTextBlock,
+		adapters.BusEventTaskProgress,
+		adapters.BusEventRouteDecision,
+		adapters.BusEventPermissionRequested,
+		adapters.BusEventFileChange,
+		"artifact.created",
+		adapters.BusEventResult,
+		"run.finished",
+	} {
+		if !hasEventType(live, want) {
+			t.Fatalf("live events missing %s: %v", want, eventTypeList(live))
+		}
+	}
+	if hasEventType(live, "run.failed") {
+		t.Fatalf("fixture process stream failed unexpectedly: %v", eventTypeList(live))
+	}
+
+	eventsJSON, err := json.Marshal(live)
+	if err != nil {
+		t.Fatalf("marshal live events: %v", err)
+	}
+	for _, leaked := range []string{
+		"sk-fixture-runner-123456",
+		"Bearer runner-secret-token",
+		"D:\\private",
+		"C:\\Users\\Ding\\private",
+		"/home/ding/private",
+	} {
+		if bytes.Contains(eventsJSON, []byte(leaked)) {
+			t.Fatalf("fixture process events leaked %q:\n%s", leaked, eventsJSON)
+		}
+	}
+
+	permission := findEventType(live, adapters.BusEventPermissionRequested)
+	if permission == nil {
+		t.Fatal("missing permission request event")
+	}
+	permissionPayload, ok := permission.Payload.(map[string]any)
+	if !ok {
+		t.Fatalf("permission payload = %T, want map", permission.Payload)
+	}
+	if permissionPayload["requestId"] != "perm_runner_write" || permissionPayload["riskLevel"] != "high" {
+		t.Fatalf("permission payload mismatch: %#v", permissionPayload)
+	}
+	input, ok := permissionPayload["input"].(map[string]any)
+	if !ok || input["api_token"] != "[redacted]" {
+		t.Fatalf("permission input was not redacted: %#v", permissionPayload["input"])
+	}
+
+	diffFiles := s.ListRunDiffFiles(run.ID)
+	if len(diffFiles) != 1 || diffFiles[0].Path != "fixture.patch" || diffFiles[0].Diff == "" {
+		t.Fatalf("ListRunDiffFiles = %#v, want redacted basename diff evidence", diffFiles)
+	}
+	artifacts := s.ListArtifacts(run.ID)
+	if len(artifacts) != 1 || artifacts[0].ID != "artifact_runner_report" || artifacts[0].Path != "runner-report.json" {
+		t.Fatalf("ListArtifacts = %#v, want redacted artifact evidence", artifacts)
+	}
+	items := s.ListThreadItems(run.ThreadID)
+	if len(items) != 1 || !strings.Contains(items[0].Content, "runner transcript fixture") {
+		t.Fatalf("ListThreadItems = %#v, want persisted fixture transcript", items)
+	}
+	if strings.Contains(items[0].Content, "sk-fixture-runner-123456") || strings.Contains(items[0].Content, "D:\\private") {
+		t.Fatalf("transcript leaked secret/path: %q", items[0].Content)
+	}
+}
+
+func TestProcessExecutorFixtureProcessMalformedAndErrorStreamDoesNotPanic(t *testing.T) {
+	t.Run("malformed_stream_finishes_with_warning", func(t *testing.T) {
+		bus := events.NewBus(100)
+		s := store.New()
+		run := newExecutorTestRun(t, s)
+		_, ch, _ := bus.Subscribe(0)
+
+		adapter := &fixtureSDKStreamAdapter{id: "fixture-runner", mode: "sdk-fixture-malformed-json"}
+		executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+			Command: "agenthub-fixture-process-json",
+		}, adapter, nil)
+		if err != nil {
+			t.Fatalf("NewProcessExecutor returned error: %v", err)
+		}
+		if err := executor.Start(run, RunProcessContext{AgentID: "fixture-runner"}); err != nil {
+			t.Fatalf("Start returned error: %v", err)
+		}
+
+		live := collectEventsUntilRunDone(t, ch)
+		if hasEventType(live, "run.failed") {
+			t.Fatalf("malformed fixture stream failed instead of warning: %v", eventTypeList(live))
+		}
+		if !hasEventType(live, adapters.BusEventContextWarning) || !hasEventType(live, "run.finished") {
+			t.Fatalf("malformed fixture stream events = %v, want warning and finished", eventTypeList(live))
+		}
+	})
+
+	t.Run("permission_and_error_stream_finishes_without_runner_failure", func(t *testing.T) {
+		bus := events.NewBus(100)
+		s := store.New()
+		run := newExecutorTestRun(t, s)
+		_, ch, _ := bus.Subscribe(0)
+
+		adapter := &fixtureSDKStreamAdapter{id: "fixture-runner", mode: "sdk-fixture-error-json"}
+		executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+			Command: "agenthub-fixture-process-json",
+		}, adapter, nil)
+		if err != nil {
+			t.Fatalf("NewProcessExecutor returned error: %v", err)
+		}
+		if err := executor.Start(run, RunProcessContext{AgentID: "fixture-runner"}); err != nil {
+			t.Fatalf("Start returned error: %v", err)
+		}
+
+		live := collectEventsUntilRunDone(t, ch)
+		if hasEventType(live, "run.failed") {
+			t.Fatalf("error fixture stream failed runner unexpectedly: %v", eventTypeList(live))
+		}
+		if !hasEventType(live, adapters.BusEventPermissionRequested) || !hasEventType(live, adapters.BusEventResult) || !hasEventType(live, "run.finished") {
+			t.Fatalf("error fixture stream events = %v, want permission, result, finished", eventTypeList(live))
+		}
+		result := findEventType(live, adapters.BusEventResult)
+		payload, ok := result.Payload.(map[string]any)
+		if !ok || payload["success"] != false || payload["terminalReason"] != "error" {
+			t.Fatalf("error result payload = %#v, want terminal error result", result.Payload)
+		}
+		payloadJSON, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("marshal error payload: %v", err)
+		}
+		if bytes.Contains(payloadJSON, []byte("sk-error-fixture-123456")) {
+			t.Fatalf("error payload leaked token: %s", payloadJSON)
+		}
+	})
 }
 
 func TestProcessExecutorPublishesCLIInvocationPlanAndReplaysFixtureStatus(t *testing.T) {
@@ -1317,6 +1480,19 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 	return executor
 }
 
+func collectEventsUntilRunDone(t *testing.T, ch <-chan events.EventEnvelope) []events.EventEnvelope {
+	t.Helper()
+	var live []events.EventEnvelope
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		live = append(live, evt)
+		switch evt.Type {
+		case "run.finished", "run.failed", "run.cancelled":
+			return live
+		}
+	}
+}
+
 func outputChunksText(chunks []map[string]any) string {
 	var text strings.Builder
 	for _, chunk := range chunks {
@@ -1480,6 +1656,125 @@ func TestProcessExecutorHelper(t *testing.T) {
 		data, err := json.Marshal(stream)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "marshal fixture stream: %v\n", err)
+			os.Exit(4)
+		}
+		fmt.Fprintln(os.Stdout, string(data))
+	case "sdk-fixture-runner-contract-json":
+		success := true
+		stream := adapters.SDKFixtureStream{
+			Provider: "agenthub-runner-process-fixture",
+			Events: []adapters.SDKFixtureEvent{
+				{
+					ID:             "runner_session_1",
+					Type:           "sidecar_session_ready",
+					SessionID:      "runner_session_1",
+					Model:          "fixture/model",
+					PermissionMode: "approval-required",
+					Tools:          []string{"read", "write", "bash"},
+				},
+				{
+					ID:        "runner_text_1",
+					Type:      "text_block",
+					SessionID: "runner_session_1",
+					Content:   "runner transcript fixture api_key=sk-fixture-runner-123456 path=D:\\private\\notes.md",
+				},
+				{
+					ID:           "runner_task_1",
+					Type:         "task_progress",
+					TaskID:       "task_runner_fixture",
+					Status:       "running",
+					Description:  "normalize fixture process stream",
+					LastToolName: "write",
+					Percent:      50,
+				},
+				{
+					ID:           "runner_route_1",
+					Type:         "route_suggestion",
+					Action:       "delegate",
+					NextWorker:   "edge-fixture-adapter-runner",
+					Instructions: "continue fixture-only contract validation",
+					Reason:       "approval and artifact evidence ready",
+				},
+				{
+					ID:        "runner_permission_1",
+					Type:      "permission.asked",
+					RequestID: "perm_runner_write",
+					CallID:    "call_write_fixture",
+					ToolName:  "write",
+					RiskLevel: "high",
+					Reason:    "write action requires approval evidence",
+					Input: map[string]any{
+						"path":      "C:\\Users\\Ding\\private\\fixture.patch",
+						"api_token": "sk-fixture-runner-123456",
+						"header":    "Authorization: Bearer runner-secret-token",
+					},
+				},
+				{
+					ID:       "runner_file_1",
+					Type:     "file_change",
+					ToolName: "write",
+					CallID:   "call_write_fixture",
+					Path:     "D:\\private\\fixture.patch",
+					Kind:     "modified",
+					Diff:     "@@ fixture @@\n-api_key=sk-fixture-runner-123456\n+api_key=[redacted]\n",
+				},
+				{
+					ID:         "runner_artifact_1",
+					Type:       "artifact",
+					ArtifactID: "artifact_runner_report",
+					Path:       "/home/ding/private/runner-report.json",
+					Kind:       "file",
+					SizeBytes:  256,
+					Summary:    "runner artifact summary token=sk-fixture-runner-123456",
+					Metadata: map[string]any{
+						"api_token": "sk-fixture-runner-123456",
+					},
+				},
+				{
+					ID:        "runner_result_1",
+					Type:      "run_result",
+					SessionID: "runner_session_1",
+					Success:   &success,
+					Summary:   "runner fixture completed with Authorization: Bearer runner-secret-token",
+				},
+			},
+		}
+		data, err := json.Marshal(stream)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "marshal runner fixture stream: %v\n", err)
+			os.Exit(4)
+		}
+		fmt.Fprintln(os.Stdout, string(data))
+	case "sdk-fixture-malformed-json":
+		fmt.Fprintln(os.Stdout, `{"provider":"agenthub-runner-process-fixture","events":[`)
+		fmt.Fprintln(os.Stdout, `not-json`)
+	case "sdk-fixture-error-json":
+		stream := adapters.SDKFixtureStream{
+			Provider: "agenthub-runner-process-fixture",
+			Events: []adapters.SDKFixtureEvent{
+				{
+					ID:        "error_permission_1",
+					Type:      "permission.asked",
+					RequestID: "perm_error_fixture",
+					ToolName:  "bash",
+					RiskLevel: "high",
+					Reason:    "fixture error stream approval event",
+					Input: map[string]any{
+						"command":   "go test ./internal/adapters -run SDKFixture -short -count=1",
+						"api_token": "sk-error-fixture-123456",
+					},
+				},
+				{
+					ID:     "error_result_1",
+					Type:   "error",
+					Error:  "runtime failed with api_key=sk-error-fixture-123456",
+					Reason: "fixture runtime error",
+				},
+			},
+		}
+		data, err := json.Marshal(stream)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "marshal error fixture stream: %v\n", err)
 			os.Exit(4)
 		}
 		fmt.Fprintln(os.Stdout, string(data))

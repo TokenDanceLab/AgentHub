@@ -41,6 +41,8 @@ type SDKFixtureEvent struct {
 	ToolUseID      string           `json:"toolUseId,omitempty"`
 	CallID         string           `json:"callId,omitempty"`
 	Input          map[string]any   `json:"input,omitempty"`
+	Text           string           `json:"text,omitempty"`
+	Content        string           `json:"content,omitempty"`
 	Output         string           `json:"output,omitempty"`
 	Error          string           `json:"error,omitempty"`
 	IsError        bool             `json:"isError,omitempty"`
@@ -137,6 +139,14 @@ func DecodeSDKFixtureStream(data []byte) (SDKFixtureStream, error) {
 
 func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
 	switch normalizeSDKFixtureType(event.Type) {
+	case "message", "assistant_message", "text_block":
+		return oneSDKMappedEvent(BusEventTextBlock, scope, commonSDKPayload(event, provider, map[string]any{
+			"content": firstNonEmpty(event.Content, event.Text, event.Output, event.Summary),
+		}))
+	case "text_delta", "delta":
+		return oneSDKMappedEvent(BusEventTextDelta, scope, commonSDKPayload(event, provider, map[string]any{
+			"content": firstNonEmpty(event.Content, event.Text, event.Output),
+		}))
 	case "invocation_plan", "cli_invocation_plan":
 		return oneSDKMappedEvent(BusEventCLIInvocationPlan, scope, commonSDKPayload(event, provider, map[string]any{
 			"adapterId":           event.AdapterID,
