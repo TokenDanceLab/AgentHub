@@ -186,18 +186,37 @@ export function createMockHubClient(delayMs = 80): HubClient {
 }
 
 export function createHubClient(options: CreateHubClientOptions): HubClient {
-  const getToken = () => {
-    const result = options.getAccessToken?.();
-    // Handle both sync and async token providers
-    if (result instanceof Promise) {
-      return result.then((t: string | null | undefined) => t ?? null);
+  // The shared Hub client expects a synchronous getToken().
+  // We eagerly resolve the async token and cache it for sync access.
+  let cachedToken: string | null | undefined = null;
+  let tokenPromise: Promise<string | null | undefined> | undefined;
+
+  const resolveToken = async (): Promise<string | null | undefined> => {
+    if (!options.getAccessToken) return null;
+    try {
+      const result = options.getAccessToken();
+      if (result instanceof Promise) {
+        return await result;
+      }
+      return result ?? null;
+    } catch {
+      return null;
     }
-    return result ?? null;
   };
+
+  const syncGetToken = (): string | null | undefined => {
+    return cachedToken;
+  };
+
+  // Kick off token resolution
+  tokenPromise = resolveToken().then((t) => {
+    cachedToken = t;
+    return t;
+  });
 
   const sharedOpts: HubClientOptions = {
     baseUrl: options.baseUrl,
-    getToken: getToken as () => string | null | undefined,
+    getToken: syncGetToken,
     ...(options.fetchImpl ? { fetch: options.fetchImpl } : {}),
   };
 
@@ -207,6 +226,12 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     shared,
 
     async getMobileSnapshot() {
+      // Ensure token is resolved before making API calls
+      if (tokenPromise) {
+        await tokenPromise;
+        tokenPromise = undefined;
+      }
+
       // Build a mobile snapshot from real Hub API data
       const [sessions, contacts] = await Promise.all([
         shared.listSessions().catch(() => [] as HubSession[]),
