@@ -212,6 +212,7 @@ function Write-Report {
     $desktopAccept = Get-Field -Object $Manifest -Name "desktop_accept"
     $edgeRun = Get-Field -Object $Manifest -Name "edge_run"
     $hubReplay = Get-Field -Object $Manifest -Name "hub_replay"
+    $webRender = Get-Field -Object $Manifest -Name "web_render"
 
     $validationPassed = ($Status -eq "OBSERVED_DISPATCH_PASSED" -and $Failures.Count -eq 0)
     $realTested = $false
@@ -244,9 +245,12 @@ function Write-Report {
             local_edge_url = Get-Field -Object $desktopAccept -Name "local_edge_url"
             edge_run_id = Get-Field -Object $edgeRun -Name "edge_run_id"
             adapter_id = Get-Field -Object $edgeRun -Name "adapter_id"
+            web_render_event_ref = Get-Field -Object $webRender -Name "event_ref"
+            web_render_source = Get-Field -Object $webRender -Name "render_source"
             replay_refs = @(
                 Get-Field -Object $hubReplay -Name "event_ref"
                 Get-Field -Object $hubReplay -Name "replay_ref"
+                Get-Field -Object $webRender -Name "replay_ref"
             ) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique
         }
         readiness_only_sources_rejected = $true
@@ -299,12 +303,14 @@ $dispatch = Get-Field -Object $Manifest -Name "dispatch"
 $desktopAccept = Get-Field -Object $Manifest -Name "desktop_accept"
 $edgeRun = Get-Field -Object $Manifest -Name "edge_run"
 $hubReplay = Get-Field -Object $Manifest -Name "hub_replay"
+$webRender = Get-Field -Object $Manifest -Name "web_render"
 
 if ($null -eq $registration) { Add-Failure "missing observed target registration" }
 if ($null -eq $dispatch) { Add-Failure "missing observed dispatch event" }
 if ($null -eq $desktopAccept) { Add-Failure "missing observed Desktop bridge accept event" }
 if ($null -eq $edgeRun) { Add-Failure "missing observed Edge run id" }
 if ($null -eq $hubReplay) { Add-Failure "missing observed Hub replay refs" }
+if ($null -eq $webRender) { Add-Failure "missing observed Web render proof" }
 
 $targetId = Require-Text -Object $registration -Name "target_id" -Label "target registration"
 $edgeDeviceId = Require-Text -Object $registration -Name "edge_device_id" -Label "target registration"
@@ -318,6 +324,9 @@ $edgeRunId = Require-Text -Object $edgeRun -Name "edge_run_id" -Label "Edge run"
 $adapterId = Require-Text -Object $edgeRun -Name "adapter_id" -Label "Edge run"
 $replayRef = Require-Text -Object $hubReplay -Name "replay_ref" -Label "Hub replay"
 $replayEventRef = Require-Text -Object $hubReplay -Name "event_ref" -Label "Hub replay"
+$webRenderEventRef = Require-Text -Object $webRender -Name "event_ref" -Label "Web render"
+$webRenderReplayRef = Require-Text -Object $webRender -Name "replay_ref" -Label "Web render"
+$webRenderSource = Require-Text -Object $webRender -Name "render_source" -Label "Web render"
 
 foreach ($urlPair in @(
     @{ Name = "target registration desktop_bridge_url"; Value = $registeredDesktopUrl },
@@ -345,8 +354,12 @@ Assert-Same -Left ([string](Get-Field -Object $hubReplay -Name "edge_device_id")
 Assert-Same -Left ([string](Get-Field -Object $desktopAccept -Name "hub_task_id")) -Right $hubTaskId -Message "Desktop accept hub_task_id does not match dispatch"
 Assert-Same -Left ([string](Get-Field -Object $edgeRun -Name "hub_task_id")) -Right $hubTaskId -Message "Edge run hub_task_id does not match dispatch"
 Assert-Same -Left ([string](Get-Field -Object $hubReplay -Name "hub_task_id")) -Right $hubTaskId -Message "Hub replay hub_task_id does not match dispatch"
+Assert-Same -Left ([string](Get-Field -Object $webRender -Name "hub_task_id")) -Right $hubTaskId -Message "Web render hub_task_id does not match dispatch"
+Assert-Same -Left ([string](Get-Field -Object $webRender -Name "team_run_id")) -Right ([string](Get-Field -Object $hubReplay -Name "team_run_id")) -Message "Web render team_run_id does not match Hub replay"
 Assert-Same -Left ([string](Get-Field -Object $hubReplay -Name "edge_run_id")) -Right $edgeRunId -Message "forged Hub replay reference"
+Assert-Same -Left ([string](Get-Field -Object $webRender -Name "edge_run_id")) -Right $edgeRunId -Message "Web render edge_run_id does not match Edge run"
 Assert-Same -Left ([string](Get-Field -Object $hubReplay -Name "adapter_id")) -Right $adapterId -Message "Hub replay adapter_id does not match Edge run"
+Assert-Same -Left ([string](Get-Field -Object $webRender -Name "adapter_id")) -Right $adapterId -Message "Web render adapter_id does not match Edge run"
 
 $registeredOrigin = Get-Origin $registeredDesktopUrl
 $dispatchOrigin = Get-Origin $dispatchTargetUrl
@@ -371,6 +384,7 @@ Require-ObservedEvent -EventRef ([string](Get-Field -Object $dispatch -Name "eve
 Require-ObservedEvent -EventRef ([string](Get-Field -Object $desktopAccept -Name "event_ref")) -ExpectedType "desktop.dispatch.accepted" -Label "Desktop accept"
 Require-ObservedEvent -EventRef ([string](Get-Field -Object $edgeRun -Name "event_ref")) -ExpectedType "edge.run.started" -Label "Edge run"
 Require-ObservedEvent -EventRef $replayEventRef -ExpectedType "hub.replay.recorded" -Label "Hub replay"
+Require-ObservedEvent -EventRef $webRenderEventRef -ExpectedType "web.replay.rendered" -Label "Web render"
 
 if ($replayRef -ne $replayEventRef) {
     Add-Failure "forged Hub replay reference"
@@ -378,13 +392,23 @@ if ($replayRef -ne $replayEventRef) {
 if ($null -eq (Get-EventByRef $replayRef)) {
     Add-Failure "forged Hub replay reference"
 }
+if ($webRenderReplayRef -ne $replayRef) {
+    Add-Failure "Web render replay_ref does not match Hub replay"
+}
+if ($webRenderSource -ne "hub-replay") {
+    Add-Failure "Web render source must be hub-replay"
+}
+if ((Get-Field -Object $webRender -Name "observed") -ne $true) {
+    Add-Failure "Web render proof is not marked observed"
+}
 
 $requiredTypes = @(
     "target.registered",
     "hub.agent.dispatch",
     "desktop.dispatch.accepted",
     "edge.run.started",
-    "hub.replay.recorded"
+    "hub.replay.recorded",
+    "web.replay.rendered"
 )
 $lastIndex = -1
 foreach ($type in $requiredTypes) {
