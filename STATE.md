@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 19:45 +08:00
+最后更新：2026-06-09 19:50 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
@@ -9,9 +9,9 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | `origin/dev/delicious233` 最新 HEAD 是 `7b54aae4 feat(agent): expose config capability readiness slice`。 |
+| 当前 dev | `origin/dev/delicious233` 最新 HEAD 是 `a95469dd feat(hub): add project group thread contract`。 |
 | RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
-| master | `origin/master = f3b91ab0`，落后 dev 约 373 个提交；release 前走 PR/merge gate，不直接改写 master。 |
+| master | `origin/master = f3b91ab0`，落后 dev 约 374 个提交；release 前走 PR/merge gate，不直接改写 master。 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 当前存在大量 dirty 文件且落后远端；新开发和文档收敛从最新 `origin/dev/delicious233` 开隔离 worktree。 |
 | 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
