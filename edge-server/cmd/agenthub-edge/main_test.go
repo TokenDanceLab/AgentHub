@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -465,6 +466,142 @@ func TestNewStoreFromConfigUsesSQLiteStore(t *testing.T) {
 	defer restored.Close()
 	if got := restored.ListProjects(); len(got) != 1 || got[0].ID != "proj_test" {
 		t.Fatalf("restored projects = %#v, want proj_test", got)
+	}
+}
+
+func TestSQLiteDurableObservedFixtureSmoke(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "edge-observed-fixture.db")
+	cfg, err := buildConfig([]string{
+		"--store-backend", "sqlite",
+		"--store-db", dbPath,
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	repository, err := newStoreFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("newStoreFromConfig returned error: %v", err)
+	}
+	sqliteStore, ok := repository.(*store.SQLiteStore)
+	if !ok {
+		t.Fatalf("repository type = %T, want *store.SQLiteStore", repository)
+	}
+
+	project, err := sqliteStore.CreateProject("proj_observed_fixture", "Observed Fixture Project")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := sqliteStore.CreateThread("thread_observed_fixture", project.ID, "Observed Fixture Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := sqliteStore.CreateRun("run_observed_fixture", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := sqliteStore.SetRunStatus(run.ID, "started"); !ok {
+		t.Fatalf("SetRunStatus(%s, started) returned false", run.ID)
+	}
+	item, err := sqliteStore.CreateItem(store.Item{
+		ID:        "item_observed_fixture",
+		ProjectID: project.ID,
+		ThreadID:  thread.ID,
+		RunID:     run.ID,
+		Type:      "run",
+		Status:    "observed",
+		Content:   "FixtureOnlyObserved: Edge SQLite durable alpha smoke",
+	})
+	if err != nil {
+		t.Fatalf("CreateItem returned error: %v", err)
+	}
+	if _, err := sqliteStore.PinThreadItem(thread.ID, item.ID, "durable-smoke"); err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
+	sqliteStore.Close()
+
+	assertObservedSQLiteRows(t, dbPath, map[string]int{
+		"project": 1,
+		"thread":  1,
+		"run":     1,
+		"item":    1,
+		"pin":     1,
+	})
+	assertObservedSQLiteRunProjection(t, dbPath, run.ID, project.ID, thread.ID, "started")
+
+	deleteObservedSQLiteSnapshot(t, dbPath)
+	reopenedRepository, err := newStoreFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("newStoreFromConfig restore returned error: %v", err)
+	}
+	reopened, ok := reopenedRepository.(*store.SQLiteStore)
+	if !ok {
+		t.Fatalf("restored repository type = %T, want *store.SQLiteStore", reopenedRepository)
+	}
+	defer reopened.Close()
+
+	if got, ok := reopened.GetThread(thread.ID); !ok || got.ProjectID != project.ID || got.Title != thread.Title {
+		t.Fatalf("restored thread = %#v ok=%v, want project/title preserved", got, ok)
+	}
+	if got, ok := reopened.GetRun(run.ID); !ok || got.ThreadID != thread.ID || got.Status != "started" || got.StartedAt == "" {
+		t.Fatalf("restored run = %#v ok=%v, want started fixture run", got, ok)
+	}
+	if got := reopened.ListThreadItems(thread.ID); len(got) != 1 || got[0].ID != item.ID || got[0].Content != item.Content {
+		t.Fatalf("restored thread items = %#v, want observed fixture item", got)
+	}
+	if got := reopened.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "durable-smoke" {
+		t.Fatalf("restored pins = %#v, want observed fixture pin", got)
+	}
+}
+
+func assertObservedSQLiteRows(t *testing.T, dbPath string, want map[string]int) {
+	t.Helper()
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	defer db.Close()
+
+	for kind, wantCount := range want {
+		var got int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM agenthub_store_rows WHERE row_kind = ?`, kind).Scan(&got); err != nil {
+			t.Fatalf("query agenthub_store_rows kind %s returned error: %v", kind, err)
+		}
+		if got != wantCount {
+			t.Fatalf("agenthub_store_rows kind %s count = %d, want %d", kind, got, wantCount)
+		}
+	}
+}
+
+func assertObservedSQLiteRunProjection(t *testing.T, dbPath, runID, workspaceID, threadID, status string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	defer db.Close()
+
+	var gotWorkspaceID, gotThreadID, gotStatus, gotStartedAt string
+	if err := db.QueryRow(
+		`SELECT workspace_id, thread_id, status, started_at FROM edge_runs WHERE run_id = ?`,
+		runID,
+	).Scan(&gotWorkspaceID, &gotThreadID, &gotStatus, &gotStartedAt); err != nil {
+		t.Fatalf("query edge_runs returned error: %v", err)
+	}
+	if gotWorkspaceID != workspaceID || gotThreadID != threadID || gotStatus != status || gotStartedAt == "" {
+		t.Fatalf("edge_runs projection = workspace=%q thread=%q status=%q started=%q, want workspace=%q thread=%q status=%q with started_at", gotWorkspaceID, gotThreadID, gotStatus, gotStartedAt, workspaceID, threadID, status)
+	}
+}
+
+func deleteObservedSQLiteSnapshot(t *testing.T, dbPath string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`DELETE FROM agenthub_store_snapshots`); err != nil {
+		t.Fatalf("delete agenthub_store_snapshots returned error: %v", err)
 	}
 }
 
