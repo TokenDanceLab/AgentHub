@@ -1,3 +1,4 @@
+// NOTE: This hook is currently unused in the active workbench code path. See GH-xxx.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createHubClient, type MessageResponse } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';

@@ -1,3 +1,4 @@
+// NOTE: This hook is currently unused in the active workbench code path. See GH-xxx.
 import { useEffect, useState } from 'react';
 import {
   createHubClient,

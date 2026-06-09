@@ -59,8 +59,10 @@ export class HubNetworkError extends Error {
 }
 
 // ── WebSocket event types (aligned with hub-server WS frames) ──
+// Includes legacy mobile-only types for UI layer backward compatibility.
 
 export type HubWsEventType =
+  // Real Hub server events (from hub-server/internal/ws/frame.go)
   | 'auth'
   | 'auth.ok'
   | 'auth.fail'
@@ -81,7 +83,13 @@ export type HubWsEventType =
   | 'notification.new'
   | 'friend.request'
   | 'friend.accepted'
-  | 'error';
+  | 'error'
+  // Legacy mobile-only event types (referenced by App.tsx UI layer)
+  | 'snapshot.updated'
+  | 'thread.updated'
+  | 'run.updated'
+  | 'approval.updated'
+  | 'presence.updated';
 
 export interface HubWsEvent<TPayload = unknown> {
   type: HubWsEventType;
