@@ -57,7 +57,9 @@ if (Test-Path -LiteralPath $cmdPath) {
 
 if (Test-Path -LiteralPath $cmdTestPath) {
     $cmdTestText = Get-Content -Raw -LiteralPath $cmdTestPath -Encoding UTF8
-    Assert-True ($cmdTestText -match "TestRunStoreReadinessPrintsSQLiteReport") "command test covers store-readiness JSON report"
+    Assert-True ($cmdTestText -match "TestRunStoreReadinessPrintsSQLiteManifest") "command test covers store-readiness JSON manifest"
+    Assert-True ($cmdTestText -match "SQLiteReadinessManifestSchema" -and $cmdTestText -match "Schema") "command test checks store-readiness manifest schema"
+    Assert-True ($cmdTestText -match "Status.*blocked" -and $cmdTestText -match "MigrationStatus.*behind") "command test covers blocked migration readiness status"
     Assert-True ($cmdTestText -match "latest_migration_version") "command test expects stable snake_case JSON"
 }
 

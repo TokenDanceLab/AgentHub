@@ -4,6 +4,7 @@ import ExecutionTargetsSection from './ExecutionTargetsSection';
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { localCliDiscoveryFixture } from '../cliDiscovery';
+import type { DesktopLocalEdgeDiagnostics } from '@/platform/desktopPlatform';
 
 vi.mock('@shared/workbench', () => ({
   RuntimeBrandIcon: ({ name }: { name?: string }) => <span data-testid="runtime-brand-icon">{name}</span>,
@@ -64,6 +65,23 @@ vi.mock('react-i18next', () => ({
         'settings.localCliMissing': 'missing',
         'settings.localCliVersion': 'version',
         'settings.localCliPath': 'path',
+        'settings.desktopHostReadiness': 'Tauri package readiness',
+        'settings.desktopHostReadinessDesc': 'Packaged Desktop preflight for the Local Edge sidecar, SQLite app-data store, and launch smoke. It never exposes process spawn commands or raw CLI args.',
+        'settings.desktopHostStatus': 'status',
+        'settings.desktopHostRunning': 'running',
+        'settings.desktopHostStopped': 'stopped',
+        'settings.desktopHostSidecar': 'sidecar',
+        'settings.desktopHostSidecarAvailable': 'available',
+        'settings.desktopHostSidecarMissing': 'missing',
+        'settings.desktopHostFallback': 'fallback executable',
+        'settings.desktopHostAuthToken': 'auth token',
+        'settings.desktopHostReady': 'ready',
+        'settings.desktopHostBlocked': 'blocked',
+        'settings.desktopHostStore': 'store',
+        'settings.desktopHostHealth': 'health',
+        'settings.desktopHostLogs': 'logs',
+        'settings.desktopHostSidecarSmoke': 'sidecar launch smoke',
+        'settings.desktopHostNoDirectCliSpawn': 'direct CLI spawn: disabled',
       };
       return text[key]
         ?.replace('{{name}}', String(values?.name))
@@ -98,6 +116,79 @@ const registeredTarget: ExecutionTargetInventoryItem = {
   is_online: true,
 };
 
+const localEdgeDiagnostics: DesktopLocalEdgeDiagnostics = {
+  readiness: {
+    running: true,
+    pid: 1234,
+    port: 3210,
+    sidecar_name: 'agenthub-edge',
+    target_id: 'local-edge',
+    route: 'local-edge-api',
+    bind_addr: '127.0.0.1:3210',
+    health_url: 'http://127.0.0.1:3210/v1/health',
+    store_backend: 'sqlite',
+    store_db_policy: '<app-data>/agenthub-edge.sqlite',
+    store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+    expected_store_migration_version: 4,
+    log_paths: {
+      directory: '<app-data>/edge-logs',
+      stdout: '<app-data>/edge-logs/local-edge.stdout.log',
+      stderr: '<app-data>/edge-logs/local-edge.stderr.log',
+    },
+    sidecar_args: [
+      '--store-backend',
+      'sqlite',
+      '--store-db',
+      '<app-data>/agenthub-edge.sqlite',
+      '--addr',
+      '127.0.0.1:3210',
+    ],
+    preflight: {
+      sidecar_available: true,
+      fallback_executable_available: false,
+      auth_token_ready: true,
+      status: 'ready',
+      blocker: null,
+    },
+    direct_cli_spawn: false,
+  },
+  status: {
+    running: true,
+    pid: 1234,
+    port: 3210,
+    health_url: 'http://127.0.0.1:3210/v1/health',
+    last_error: null,
+    log_paths: {
+      directory: '<app-data>/edge-logs',
+      stdout: '<app-data>/edge-logs/local-edge.stdout.log',
+      stderr: '<app-data>/edge-logs/local-edge.stderr.log',
+    },
+  },
+  local_cli_discovery: localCliDiscoveryFixture,
+  packaged_login: {
+    loopback: {
+      available: true,
+      bind_host: '127.0.0.1',
+      port: 49888,
+      redirect_uri: 'http://127.0.0.1:49888/callback',
+      error: null,
+    },
+    credential_store: {
+      available: true,
+      service: 'com.agenthub.desktop',
+      error: null,
+    },
+    real_e2e: {
+      status: 'proposal_only',
+      reason: 'Real packaged login E2E requires approval.',
+    },
+  },
+  log_tail: {
+    stdout: ['fixture sidecar ready'],
+    stderr: [],
+  },
+};
+
 function renderSection(overrides: Partial<React.ComponentProps<typeof ExecutionTargetsSection>> = {}) {
   return render(
     <ExecutionTargetsSection
@@ -113,6 +204,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof ExecutionT
       registeredLocalEdgeTarget={null}
       localEdgeTargetSyncStatus="idle"
       cliDiscovery={localCliDiscoveryFixture}
+      localEdgeDiagnostics={localEdgeDiagnostics}
       {...overrides}
     />,
   );
@@ -291,5 +383,24 @@ describe('ExecutionTargetsSection', () => {
     expect(screen.getAllByText('no-spend')).toHaveLength(3);
     expect(screen.getAllByText('installed')).toHaveLength(3);
     expect(screen.getByText(/does not execute runs, prompt-bearing commands, model calls, or secrets/i)).toBeInTheDocument();
+  });
+
+  it('shows Tauri package readiness and sidecar launch smoke without process-spawn details', () => {
+    renderSection();
+
+    expect(screen.getByText('Tauri package readiness')).toBeInTheDocument();
+    expect(screen.getByText(/Local Edge sidecar, SQLite app-data store, and launch smoke/i)).toBeInTheDocument();
+    expect(screen.getByText('status: running')).toBeInTheDocument();
+    expect(screen.getByText('sidecar: available')).toBeInTheDocument();
+    expect(screen.getByText('fallback executable: missing')).toBeInTheDocument();
+    expect(screen.getByText('auth token: ready')).toBeInTheDocument();
+    expect(screen.getByText('store: sqlite <app-data>/agenthub-edge.sqlite')).toBeInTheDocument();
+    expect(screen.getByText('health: http://127.0.0.1:3210/v1/health')).toBeInTheDocument();
+    expect(screen.getByText('logs: <app-data>/edge-logs')).toBeInTheDocument();
+    expect(screen.getByText('sidecar launch smoke: fixture sidecar ready')).toBeInTheDocument();
+    expect(screen.getByText('direct CLI spawn: disabled')).toBeInTheDocument();
+
+    const visibleText = document.body.textContent ?? '';
+    expect(visibleText).not.toMatch(/sidecar_args|--store-db|cliPath|AGENTHUB_EDGE_AUTH_TOKEN|bearer|access_token/i);
   });
 });

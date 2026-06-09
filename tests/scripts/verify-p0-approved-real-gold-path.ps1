@@ -36,9 +36,10 @@ function Invoke-RepoScript {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.WorkingDirectory = $RepoRoot
-    foreach ($arg in @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File") + $Arguments) {
-        [void]$psi.ArgumentList.Add($arg)
-    }
+    $allArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File") + $Arguments
+    $psi.Arguments = ($allArgs | ForEach-Object {
+        '"' + ([string]$_).Replace('"', '\"') + '"'
+    }) -join " "
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdout = $proc.StandardOutput.ReadToEnd()
@@ -169,6 +170,25 @@ try {
     $blockedJson = Get-Content -Raw -LiteralPath $blockedManifest | ConvertFrom-Json
     Assert-True ($blockedJson.status -eq "BLOCKED_WITH_EVIDENCE") "blocked manifest status is BLOCKED_WITH_EVIDENCE"
     Assert-True ((@($blockedJson.blockers) -match "Desktop target").Count -gt 0) "blocked manifest names Desktop/Edge/CLI evidence gap"
+
+    $defaultRoot = Join-Path $RepoRoot ".tmp\p0-approved-real-gold-path\script-default-test-$PID"
+    Remove-Item -LiteralPath $defaultRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $defaultRoot | Out-Null
+    $TempRoots += $defaultRoot
+    $defaultManifest = Join-Path $defaultRoot "redacted-manifest.json"
+    $defaultBlocked = Invoke-RepoScript @(
+        $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-ArtifactRoot", $defaultRoot,
+        "-ManifestPath", $defaultManifest
+    )
+    Assert-True ($defaultBlocked.ExitCode -ne 0) "default no-secret run blocks without operator metadata/evidence" $defaultBlocked.Output
+    Assert-True ($defaultBlocked.Output -match "Status: BLOCKED_WITH_EVIDENCE") "default no-secret run prints BLOCKED_WITH_EVIDENCE" $defaultBlocked.Output
+    Assert-True ($defaultBlocked.Output -notmatch "ArtifactRoot must stay under") "default no-secret run does not trip child artifact-root policy" $defaultBlocked.Output
+    Assert-True (Test-Path -LiteralPath $defaultManifest -PathType Leaf) "default no-secret run writes manifest"
+    $defaultManifestText = Get-Content -Raw -LiteralPath $defaultManifest
+    Assert-True ($defaultManifestText -notmatch [regex]::Escape($RepoRoot)) "default manifest redacts raw repo path"
+    Assert-True ($defaultManifestText -notmatch [regex]::Escape($RepoRoot.Replace("\", "\\"))) "default manifest redacts JSON-escaped repo path"
 }
 finally {
     foreach ($path in $TempRoots) {
