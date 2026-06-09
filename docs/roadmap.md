@@ -1017,7 +1017,7 @@ CLI permission request
 
 - [x] Release gate 全绿
 - [x] Changelog 包含所有变更
-- [ ] 无 open Critical blockers
+- [x] 无 open Critical blockers
 - [ ] 所有 High 风险有 accepted 或 fixed
 - [x] Windows package hash 一致
 - [x] sidecar 正确放置
