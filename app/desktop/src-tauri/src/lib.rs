@@ -1,6 +1,7 @@
 mod commands;
 mod edge_health;
 mod edge_manager;
+mod host;
 mod notifications;
 mod oidc_server;
 mod secure_store;
