@@ -11,6 +11,9 @@ interface ApprovalCardBlockProps {
   teamId?: string | undefined;
   teamRunId?: string | undefined;
   agentTaskId?: string | undefined;
+  targetId?: string | undefined;
+  edgeDeviceId?: string | undefined;
+  correlationId?: string | undefined;
   title?: string | undefined;
   toolName?: string | undefined;
   risk?: ApprovalRisk | undefined;
@@ -45,6 +48,9 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
   teamId,
   teamRunId,
   agentTaskId,
+  targetId,
+  edgeDeviceId,
+  correlationId,
   title = '部署/写入审批',
   toolName,
   risk = 'medium',
@@ -81,6 +87,9 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
                   ...(teamId ? { teamId } : {}),
                   ...(teamRunId ? { teamRunId } : {}),
                   ...(agentTaskId ? { agentTaskId } : {}),
+                  ...(targetId ? { targetId } : {}),
+                  ...(edgeDeviceId ? { edgeDeviceId } : {}),
+                  ...(correlationId ? { correlationId } : {}),
                 })}
                 type="button"
               >
@@ -94,6 +103,9 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
                   ...(teamId ? { teamId } : {}),
                   ...(teamRunId ? { teamRunId } : {}),
                   ...(agentTaskId ? { agentTaskId } : {}),
+                  ...(targetId ? { targetId } : {}),
+                  ...(edgeDeviceId ? { edgeDeviceId } : {}),
+                  ...(correlationId ? { correlationId } : {}),
                 })}
                 type="button"
               >

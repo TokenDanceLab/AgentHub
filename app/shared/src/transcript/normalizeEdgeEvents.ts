@@ -737,6 +737,9 @@ function approvalHubContext(event: EventEnvelope): {
   teamId?: string;
   teamRunId?: string;
   agentTaskId?: string;
+  targetId?: string;
+  edgeDeviceId?: string;
+  correlationId?: string;
 } {
   const teamId = stringField(event.payload.team_id) ?? stringField(event.payload.teamId);
   const teamRunId =
@@ -748,10 +751,24 @@ function approvalHubContext(event: EventEnvelope): {
     stringField(event.payload.agent_task_id) ??
     stringField(event.payload.agentTaskId) ??
     stringField(event.scope.taskId);
+  const targetId =
+    stringField(event.payload.target_id) ??
+    stringField(event.payload.targetId) ??
+    stringField(event.scope.targetId);
+  const edgeDeviceId =
+    stringField(event.payload.edge_device_id) ??
+    stringField(event.payload.edgeDeviceId) ??
+    stringField(event.scope.deviceId);
+  const correlationId =
+    stringField(event.payload.correlation_id) ??
+    stringField(event.payload.correlationId);
   return {
     ...(teamId ? { teamId } : {}),
     ...(teamRunId ? { teamRunId } : {}),
     ...(agentTaskId ? { agentTaskId } : {}),
+    ...(targetId ? { targetId } : {}),
+    ...(edgeDeviceId ? { edgeDeviceId } : {}),
+    ...(correlationId ? { correlationId } : {}),
   };
 }
 
