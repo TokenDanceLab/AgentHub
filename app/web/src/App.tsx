@@ -99,11 +99,11 @@ function WebWorkbenchRoot() {
     }
   }
 
-  async function handleProjectCreate(draft: ProjectDraft): Promise<ProjectInfo | void> {
+  async function handleProjectCreate(draft: ProjectDraft): Promise<ProjectInfo | undefined> {
     return workbench.projectsActions?.create(draft);
   }
 
-  async function handleProjectUpdate(projectId: string, draft: ProjectDraft): Promise<ProjectInfo | void> {
+  async function handleProjectUpdate(projectId: string, draft: ProjectDraft): Promise<ProjectInfo | undefined> {
     return workbench.projectsActions?.update(projectId, draft);
   }
 
