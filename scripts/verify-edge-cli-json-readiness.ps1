@@ -70,7 +70,8 @@ function Assert-GoTestPasses {
     $previousLocation = Get-Location
     try {
         Set-Location $edgeRoot
-        $output = & $go.Source test ./internal/adapters -run "Codex|Claude|OpenCode|CLI|JSON|Permission|Readiness" -short -count=1 2>&1
+        $readinessTests = "TestCLIJSONReadiness|TestCodexExecJSONReadiness|TestClaudeStreamJSONReadiness|TestOpenCodeJSONReadiness|TestCLIJSONReadinessModelProviderMetadataBaseline"
+        $output = & $go.Source test ./internal/adapters -run $readinessTests -short -count=1 2>&1
         if ($LASTEXITCODE -eq 0) {
             Pass "focused CLI JSON fixture parser tests pass"
         } else {
@@ -112,7 +113,7 @@ Assert-Contains "edge-server\internal\adapters\cli_json_readiness_test.go" "code
 Assert-Contains "edge-server\internal\adapters\cli_json_readiness_test.go" "stream-json|control_request" "Claude stream-json permission bridge fixture exists"
 Assert-Contains "edge-server\internal\adapters\cli_json_readiness_test.go" "permission\.asked|bypassPermissions" "OpenCode permission risk fixture exists"
 Assert-Contains "edge-server\internal\adapters\cli_json_readiness_test.go" "DefaultModels" "model/provider metadata baseline exists"
-Assert-Contains "edge-server\internal\adapters\invocation_plan.go" "PromptRedacted|NoSpendDefault|RealTested" "invocation plan carries redaction and no-spend flags"
+Assert-Contains "edge-server\internal\adapters\invocation_plan.go" "PromptRedacted|NoSpendDefault|RealCliTested|RealModelTested|TokenDanceIDLogin|MockAdapterUsed" "invocation plan carries split readiness, redaction, and no-spend flags"
 Assert-Contains "edge-server\internal\adapters\opencode.go" "permission\.asked" "OpenCode parser maps permission.asked"
 Assert-Contains "edge-server\internal\adapters\opencode.go" "decisionBridge" "OpenCode parser marks blocked non-interactive permission bridge"
 
