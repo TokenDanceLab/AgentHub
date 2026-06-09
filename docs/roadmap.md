@@ -468,14 +468,14 @@ Web / Desktop / Mobile / IM
 
 ### 3.5 验收标准
 
-- [ ] Desktop 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
-- [ ] Web 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
+- [x] Desktop 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
+- [x] Web 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
 - [ ] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
 - [ ] 登录后 Hub WS 连接成功，收到 `auth.ok`
-- [ ] Logout 后 session 失效，所有 API 返回 401
+- [x] Logout 后 session 失效，所有 API 返回 401
 - [ ] Access token 过期前自动 refresh，用户无感知
-- [ ] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新
-- [ ] Avatar 上传：`POST /client/attachments` 上传后 `GET /client/auth/me` 返回新 URL
+- [x] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新
+- [x] Avatar 上传：`POST /client/attachments` 上传后 `GET /client/auth/me` 返回新 URL
 
 ---
 
@@ -1015,8 +1015,8 @@ CLI permission request
 
 ### 14.3 验收标准
 
-- [ ] Release gate 全绿
-- [ ] Changelog 包含所有变更
+- [x] Release gate 全绿
+- [x] Changelog 包含所有变更
 - [ ] 无 open Critical blockers
 - [ ] 所有 High 风险有 accepted 或 fixed
 - [ ] Windows package hash 一致
