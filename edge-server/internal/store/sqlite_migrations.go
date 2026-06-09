@@ -259,6 +259,14 @@ func openSQLiteDatabase(path string) (*sql.DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("configure sqlite busy timeout: %w", err)
 	}
+	if _, err := db.Exec(`PRAGMA journal_mode = WAL`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("enable sqlite WAL mode: %w", err)
+	}
+	if _, err := db.Exec(`PRAGMA synchronous = NORMAL`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("configure sqlite synchronous: %w", err)
+	}
 	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("enable sqlite foreign keys: %w", err)

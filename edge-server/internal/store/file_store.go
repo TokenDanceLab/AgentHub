@@ -169,8 +169,8 @@ func (f *FileStore) ListProjects() []Project {
 	return f.store.ListProjects()
 }
 
-func (f *FileStore) CreateThread(id, projectID, title, kind string) (Thread, error) {
-	thread, err := f.store.CreateThread(id, projectID, title, kind)
+func (f *FileStore) CreateThread(id, projectID, title, kind, avatarColor, avatarLabel string) (Thread, error) {
+	thread, err := f.store.CreateThread(id, projectID, title, kind, avatarColor, avatarLabel)
 	if err != nil {
 		return Thread{}, err
 	}

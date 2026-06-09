@@ -17,7 +17,7 @@ func TestSQLiteProjectionWritesRunAndArtifactReadModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := s.CreateThread("thread_projection", project.ID, "Projection Thread")
+	thread, err := s.CreateThread("thread_projection", project.ID, "Projection Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestSQLiteProjectionDiffIDDoesNotCollideOnColonDelimitedRunAndPath(t *testi
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := s.CreateThread("thread_collision", project.ID, "Projection Collision")
+	thread, err := s.CreateThread("thread_collision", project.ID, "Projection Collision", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
