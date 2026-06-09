@@ -7,13 +7,17 @@ export type RuntimeIconFallback =
   | 'browser'
   | 'custom'
   | 'diff'
+  | 'health'
+  | 'mcp'
   | 'model'
+  | 'profile'
   | 'provider'
   | 'read'
   | 'runtime'
   | 'search'
   | 'shell'
   | 'task'
+  | 'target'
   | 'tool'
   | 'write';
 
@@ -124,13 +128,17 @@ export const runtimeIconRegistry: RuntimeIconRegistry = {
     browser: ['browser', 'web', 'screenshot'],
     custom: ['custom'],
     diff: ['diff', 'git'],
+    health: ['health', 'heartbeat', 'status'],
+    mcp: ['mcp', 'model-context-protocol'],
     model: [],
+    profile: ['profile', 'agent-profile', 'agentprofile'],
     provider: [],
     read: ['read'],
     runtime: [],
-    search: ['grep', 'glob', 'search', 'rg'],
+    search: ['grep', 'glob', 'search', 'ripgrep', 'rg'],
     shell: ['shell', 'bash', 'terminal'],
     task: ['task', 'subagent'],
+    target: ['target', 'execution-target', 'desktop-edge', 'local-edge', 'remote-edge'],
     tool: [],
     write: ['write', 'edit', 'patch'],
   },
@@ -249,15 +257,24 @@ function runtimeIconFallbackFor(kind: RuntimeIconKind, label: string): RuntimeIc
     for (const [fallback, keywords] of Object.entries(runtimeIconRegistry.toolFallbacks) as Array<
       [RuntimeIconFallback, string[]]
     >) {
-      if (keywords.some((part) => key.includes(part))) return fallback;
+      if (keywords.some((part) => runtimeIconKeywordMatches(key, part))) return fallback;
     }
     return 'tool';
   }
   if (kind === 'provider') return 'provider';
   if (kind === 'model') return 'model';
+  if (key.includes('health') || key.includes('heartbeat') || key.includes('status')) return 'health';
+  if (key.includes('mcp') || key.includes('model-context-protocol')) return 'mcp';
+  if (key.includes('agent-profile') || key.includes('agentprofile') || key.includes('profile')) return 'profile';
+  if (key.includes('target') || key.includes('edge')) return 'target';
   if (key.includes('custom')) return 'custom';
   if (key.includes('browser')) return 'browser';
   return 'runtime';
+}
+
+function runtimeIconKeywordMatches(key: string, part: string): boolean {
+  if (part.length <= 2) return key.split('-').includes(part);
+  return key.includes(part);
 }
 
 function runtimeIconFallbackValue(kind: RuntimeIconKind, label: string): string {

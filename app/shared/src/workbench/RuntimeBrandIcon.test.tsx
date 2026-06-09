@@ -100,6 +100,19 @@ describe('RuntimeBrandIcon', () => {
     });
   });
 
+  it('normalizes OpenAI-compatible custom providers to the OpenAI brand', () => {
+    expect(resolveRuntimeBrandIcon({ kind: 'provider', name: 'Custom OpenAI-compatible' })).toMatchObject({
+      source: 'lobehub',
+      value: 'openai',
+      lobeType: 'provider',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'model', name: 'routing-fast', provider: 'OpenAI Compatible API' })).toMatchObject({
+      source: 'lobehub',
+      value: 'openai',
+      lobeType: 'provider',
+    });
+  });
+
   it('falls back to local compact icons for internal runtimes and tools', () => {
     expect(resolveRuntimeBrandIcon({ kind: 'runtime', name: 'Browser Worker' })).toMatchObject({
       source: 'fallback',
@@ -122,6 +135,29 @@ describe('RuntimeBrandIcon', () => {
     expect(resolveRuntimeBrandIcon({ kind: 'tool', name: 'apply_patch' })).toMatchObject({
       source: 'fallback',
       fallback: 'write',
+    });
+  });
+
+  it('uses specific fallbacks for MCP, AgentProfile, target, and health surfaces', () => {
+    expect(resolveRuntimeBrandIcon({ kind: 'tool', name: 'MCP Server' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'mcp',
+      value: 'M',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'runtime', name: 'Agent Profile' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'profile',
+      value: 'AP',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'tool', name: 'Execution Target' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'target',
+      value: 'E',
+    });
+    expect(resolveRuntimeBrandIcon({ kind: 'tool', name: 'Target Health' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'health',
+      value: 'T',
     });
   });
 
