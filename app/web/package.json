@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --config playwright.config.ts",
+    "test:e2e:real-mode": "playwright test --config playwright.config.ts --project=chromium web-hub-real-mode-smoke.spec.ts task-contract.spec.ts",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

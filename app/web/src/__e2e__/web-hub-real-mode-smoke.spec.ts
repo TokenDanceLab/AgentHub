@@ -32,7 +32,7 @@ test.describe('Web Hub real-mode smoke', () => {
     await expect(page.getByRole('heading', { name: 'Real Hub session smoke' })).toBeVisible();
     await expect(page.getByText('Target: no-target')).toBeVisible();
     await expect(page.getByText('No online local_edge execution target is available.')).toBeVisible();
-    await expect(page.getByText('Hub replay: task task-web-smoke')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: task task-web-smoke' })).toBeVisible();
     await expect(page.getByText('reports/web-real-mode-smoke.md').first()).toBeVisible();
 
     await page.getByRole('button', { name: '项目' }).click();

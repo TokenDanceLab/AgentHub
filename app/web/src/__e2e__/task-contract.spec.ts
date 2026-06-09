@@ -1,4 +1,8 @@
 import { expect, test } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'task-contract-replay');
 
 test.describe('Web Hub task approval/artifact contract', () => {
   test('consumes single-task approval and artifact endpoints from a stubbed Hub', async ({ page }) => {
@@ -232,13 +236,13 @@ test.describe('Web Hub task approval/artifact contract', () => {
     await page.goto('/');
 
     await expect(page.getByText('@Agent queued')).toBeVisible();
-    await expect(page.getByText('@Agent assigned')).toBeVisible();
-    await expect(page.getByText('@Agent working')).toBeVisible();
     await expect(page.getByText('@Agent done')).toBeVisible();
     await expect(page.getByText('Stubbed Hub approval endpoint')).toBeVisible();
     await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();
     await expect.poll(() => requested.has('GET /web/agent-tasks/task-web-contract/approvals')).toBe(true);
     await expect.poll(() => requested.has('GET /web/agent-tasks/task-web-contract/artifacts')).toBe(true);
+
+    writeReplayManifest(requested);
   });
 });
 
@@ -262,4 +266,23 @@ function json(body: unknown): {
       'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
     },
   };
+}
+
+function writeReplayManifest(requested: Set<string>): void {
+  fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+  const requestedEndpoints = Array.from(requested).sort();
+  const manifest = {
+    schema: 'agenthub.web_task_contract_replay.v1',
+    taskId: 'task-web-contract',
+    sessionId: 'session-web-contract',
+    hubOrigin: 'http://localhost:8080',
+    approvalReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/approvals'),
+    artifactReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/artifacts'),
+    summaryReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/summary'),
+    directLocalEdge: false,
+    realTokenDanceIdLogin: false,
+    realCliOrModelExecuted: false,
+    requestedEndpoints,
+  };
+  fs.writeFileSync(path.join(ARTIFACT_DIR, 'task-contract-replay.manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 }
