@@ -78,4 +78,25 @@ describe('ApprovalCardBlock', () => {
       correlationId: 'corr-web-hub-edge-1',
     });
   });
+
+  it('shows diff proposal review state and exports evidence without deciding approval', () => {
+    const onDecision = vi.fn();
+    const onExportEvidence = vi.fn();
+    render(
+      <ApprovalCardBlock
+        id="approval-diff-1"
+        status="pending"
+        reviewStatus="approved"
+        evidenceLabel="Export approved evidence"
+        onDecision={onDecision}
+        onExportEvidence={onExportEvidence}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export approved evidence' }));
+
+    expect(screen.getByText('diff approved')).toBeInTheDocument();
+    expect(onExportEvidence).toHaveBeenCalledTimes(1);
+    expect(onDecision).not.toHaveBeenCalled();
+  });
 });

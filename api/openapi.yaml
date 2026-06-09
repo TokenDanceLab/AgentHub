@@ -5587,6 +5587,9 @@ components:
         edit_id:
           type: string
           description: Optional runtime edit identifier projected from run.agent.file_change.
+        hash:
+          type: string
+          description: Optional SHA-256 or runtime-provided hash for a diff proposal or artifact.
         review_status:
           type: string
           description: Optional review state projected from run.agent.file_change for inspector UI.
