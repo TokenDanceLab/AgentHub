@@ -1,34 +1,48 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+const EDGE_TOKEN_PATH = path.join(
+  process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
+  'com.agenthub.desktop',
+  'edge-auth-token',
+);
+
+function readEdgeTokenFile(): string {
+  try {
+    return fs.readFileSync(EDGE_TOKEN_PATH, 'utf-8').trim();
+  } catch {
+    return '';
+  }
+}
+
 /**
- * Reads the Edge auth token written by Tauri EdgeManager at startup.
- * This allows the Vite dev server to authenticate against Edge without
- * needing the Tauri invoke bridge (which only works inside Tauri WebView).
+ * Provides the Edge auth token to the frontend in two ways:
+ *
+ * 1. **Build-time define** (`VITE_EDGE_AUTH_TOKEN`) — seeds the initial token
+ *    on first page load so the very first API call succeeds.
+ *
+ * 2. **Dev server middleware** (`GET /__edge_token`) — returns the *current*
+ *    token from the file on every request, so the frontend can refresh after
+ *    Desktop restarts Edge with a new token without needing a Vite restart.
  */
-function edgeAuthTokenPlugin() {
+function edgeAuthTokenPlugin(): Plugin {
   return {
     name: 'edge-auth-token',
     config() {
-      const tokenPath = path.join(
-        process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
-        'com.agenthub.desktop',
-        'edge-auth-token',
-      );
-      let token = '';
-      try {
-        token = fs.readFileSync(tokenPath, 'utf-8').trim();
-      } catch {
-        // Token file doesn't exist yet — Edge may not have been started.
-      }
       return {
         define: {
-          'import.meta.env.VITE_EDGE_AUTH_TOKEN': JSON.stringify(token),
+          'import.meta.env.VITE_EDGE_AUTH_TOKEN': JSON.stringify(readEdgeTokenFile()),
         },
       };
+    },
+    configureServer(server) {
+      server.middlewares.use('/__edge_token', (_req, res) => {
+        res.setHeader('Content-Type', 'text/plain');
+        res.end(readEdgeTokenFile());
+      });
     },
   };
 }

@@ -96,6 +96,8 @@ export interface WorkbenchRoutesProps {
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
   onAgentsRetry?: (() => void) | undefined;
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
+  /** 用户在通讯录/群聊等处点击联系人，希望开始私聊时触发。 */
+  onStartConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
 }
 
@@ -497,6 +499,7 @@ export function WorkbenchRoutes({
   onAgentDelete,
   onAgentsRetry,
   onAgentProfileOpen,
+  onStartConversation,
   localCliDiscovery,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
@@ -977,6 +980,9 @@ export function WorkbenchRoutes({
           externalContacts={contactsData.externalContacts ?? []}
           groups={contactsData.groups ?? []}
           members={contactsData.members}
+          onMemberClick={onStartConversation ? (member) => {
+            onStartConversation({ name: member.name, id: member.id, kind: 'dm' });
+          } : undefined}
           onPaneChange={setContactsPane}
           orgInitials={contactsData.orgInitials ?? 'TD'}
           orgName={contactsData.orgName ?? 'TokenDance'}
