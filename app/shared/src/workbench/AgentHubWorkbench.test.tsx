@@ -290,10 +290,19 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('apply unavailable')).toBeInTheDocument();
     expect(screen.getByText('revert available')).toBeInTheDocument();
     expect(screen.getByLabelText('产物 metadata reports/runtime.patch')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Artifact workspace reports/runtime.patch' })).toBeInTheDocument();
+    expect(screen.getByText('Topic: thread-1')).toBeInTheDocument();
+    expect(screen.getByText('Version: run-edge-1')).toBeInTheDocument();
+    expect(screen.getByText('Preview: ready')).toBeInTheDocument();
+    expect(screen.getByText('Download: metadata only')).toBeInTheDocument();
+    expect(screen.getByText('Export: evidence bundle ready')).toBeInTheDocument();
+    expect(screen.getByText('Evidence: Edge')).toBeInTheDocument();
+    expect(screen.getByText('Diff projection: 1 file')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '查看产物 reports/runtime.patch' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '打开预览 preview-1' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /discard/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /revert/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '打开 diff src/runtime.ts' }));
     const diffPreview = screen.getByLabelText('src/runtime.ts 只读预览');
