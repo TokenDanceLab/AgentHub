@@ -1,8 +1,25 @@
 # AgentHub 文档
 
+> 双入口：**评审/新用户**走上半部分了解产品；**开发者**走下半部分接入开发。
+
+## 🏆 评审与产品入口（先读这些）
+
+| 顺序 | 文档 | 为什么 |
+|:----:|------|--------|
+| 1 | [competition/competitive-positioning.md](competition/competitive-positioning.md) | **我们在赛道里的位置**。工程规模对比 + 架构维度 + 独有能力 + 评分对应 |
+| 2 | [design-decisions.md](design-decisions.md) | **为什么这样选**。Go+CLI / Hub-Edge / 自研WS / Tauri / 三级审批 5 个关键决策 |
+| 3 | [architecture.md](architecture.md) | **怎么运作**。产品定位 + 三层架构 + 数据流 + 实现状态 |
+| 4 | [governance/threat-model.md](governance/threat-model.md) | **安全深度**。信任边界图 + 安全亮点卡（浓缩 44 条风险台账） |
+| 5 | [roadmap.md](roadmap.md) | **做到哪了，接下来做什么**。当前 Sprint + 已知缺口 |
+| 6 | [competition/teamrun-e2e-evidence.md](competition/teamrun-e2e-evidence.md) | **真实运行证据**。TeamRun 端到端 |
+
+> 完整对外文档（角色化导航 + 架构图 + 中英双语）：**https://hub.vectorcontrol.tech/docs**
+
+## 🔧 开发者入口
+
 > 新 Agent / 新开发者？按顺序读：**roadmap → architecture → v4 plan → integration governance → frontend progress → v4 audit → integration plan → legacy inventory**
 
-## 必读 (3 分钟)
+### 必读 (3 分钟)
 
 | 顺序 | 文档 | 为什么 |
 |:----:|------|--------|
@@ -37,9 +54,10 @@
 
 ```
 docs/
-├── README.md            ← 你在这里
+├── README.md            ← 你在这里（评审入口 + 开发者入口）
 ├── roadmap.md           ← Sprint 目标 + 待办清单
 ├── architecture.md      ← 三合一主文档
+├── design-decisions.md  ← 5 个关键技术决策（评审向）
 ├── desktop-web-v4-clean-rebuild-plan.md
 ├── backend-integration-governance.md
 ├── v4-frontend-progress-2026-06-07.md
@@ -49,10 +67,10 @@ docs/
 ├── v4-merge-pr-readiness-2026-06-07.md
 ├── v4-pr-draft.md
 ├── v4-clean-rebuild-decision-questions.md
-├── adr/                 ← 架构决策记录
+├── adr/                 ← 架构决策记录（11 篇）
+├── competition/         ← 竞品定位 + 真实运行证据（评审向）
 ├── designs/             ← 组件设计文档
-├── reference/           ← 技术参考 + 竞品、CLI、桌面 UX 和设计系统调研
-├── governance/          ← 分支规范、文档标准、安全风险
+├── governance/          ← 分支规范、文档标准、安全风险台账、威胁模型
 └── archive/             ← 历史归档 (INDEX.md 为索引)
 ```
 
