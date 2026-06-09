@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 08:37 +08:00
+最后更新：2026-06-09 09:05 +08:00
 
 本文记录当前事实、分支治理和任务分配。长期路线写在
 `docs/roadmap.md`。
@@ -9,16 +9,16 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 稳定 dev | `origin/dev/delicious233 = 19079563`，已打 `v0.3.0-rc.5` |
-| 当前集成分支 | `origin/codex/p1-critical-evidence-integration = a4dfa628` |
-| 集成分支相对 dev | `ahead 85 / behind 0` |
-| master | `origin/master = f3b91ab0`；集成分支相对 master 是 `ahead 272 / behind 1` |
+| 稳定 dev | `origin/dev/delicious233 = 15277af8`，已经由集成分支 fast-forward |
+| 当前集成分支 | `origin/codex/p1-critical-evidence-integration = 15277af8` |
+| 集成分支相对 dev | `ahead 0 / behind 0` |
+| master | `origin/master = f3b91ab0`；本轮先 defer，不作为当前阻塞项 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 过时且有 dirty 风险，当前隔离不用 |
 | Git 维护风险 | auto-gc 报 `fatal: bad tree object fff550960821b6454a476d755465c71d9deaa258` |
 
 ## 当前集成候选包含内容
 
-当前集成分支已经包含 P0/P1 远程控制证据线：
+当前 dev/集成分支已经包含 P0/P1 远程控制证据线：
 
 - Hub 精确 target 和 Edge dispatch proof。
 - Desktop Profile/Target readiness、Local Edge sidecar diagnostics。
@@ -36,8 +36,8 @@
 | 分支 | 负责人 | 用途 | 规则 |
 |---|---|---|---|
 | `codex/p1-critical-evidence-integration` | Controller Codex | 当前集成候选和 gate 分支 | 只推 controller 审核后的提交；worker 不直接改 Roadmap/STATE。 |
-| `dev/delicious233` | Controller Codex | 开发 baseline | 最低 gate 通过后，从干净集成分支 fast-forward。 |
-| `master` | Controller Codex | 稳定发布分支 | 先检查 master-only commit，不 force push。 |
+| `dev/delicious233` | Controller Codex | 当前开发 baseline | 已推进到 `15277af8`；下一轮 worker 从这里或同 SHA 集成分支开 worktree。 |
+| `master` | Controller Codex | 稳定发布分支 | 本轮 defer；后续用受控 promotion，不 force push。 |
 | `v0.3.0-rc.6` | 需要发布审批 | 下一个 rc tag 候选 | 未获明确审批前不创建、不推送。 |
 
 ## 任务分配包
@@ -54,17 +54,16 @@ Johnny、Evidence/docs 负责人和 subagent。Mobile 线程现在并入 Trump
 
 | 分支 | 用途 |
 |---|---|
-| `codex/p1-critical-evidence-integration` | 当前 controller 集成分支，只用于 gate 和 promoted baseline。 |
+| `codex/p1-critical-evidence-integration` | 当前 controller 集成分支，已与 dev 对齐。 |
 | `codex/p0-desktop-tauri-edge-build` | Desktop/Tauri/Local Edge 可用构建。 |
 | `codex/p0-product-loop-qa` | Web/backend/Desktop slice 合入后运行完整组合链路回归。 |
 
 任务：
 
-1. 在 `codex/p1-critical-evidence-integration` 上重跑最低 gate。
-2. gate 通过后，将 `dev/delicious233` fast-forward 到干净集成分支。
-3. 提升 master 前先检查 `origin/master` 独有提交。
-4. 负责 Desktop 启动流、Local Edge sidecar 启动/诊断、日志/app-data 持久、Windows unsigned package smoke。
-5. Trump 和 Johnny slice 可用后启动 QA 分支。
+1. 从 `origin/dev/delicious233 = 15277af8` 开下一轮实现 worktree。
+2. 暂停 master promotion；后续需要时再做受控 promotion，不 force push。
+3. 负责 Desktop 启动流、Local Edge sidecar 启动/诊断、日志/app-data 持久、Windows unsigned package smoke。
+4. Trump 和 Johnny slice 可用后启动 QA 分支。
 
 ### Trump
 
@@ -77,7 +76,7 @@ Johnny、Evidence/docs 负责人和 subagent。Mobile 线程现在并入 Trump
 |---|---|---|
 | `codex/p0-web-agent-main-chain` | IM/@Agent 入口、目标选择、启动运行、target health、mock/real 标签 | `app/web/**`、`app/shared/**` |
 | `codex/p0-web-transcript-artifacts` | typed transcript blocks 和最小 artifact/diff/preview cards | `app/shared/**`、`app/web/**` tests |
-| `codex/mobile-expo-rn-plan` | 当前 Mobile 收口分支；补齐远程控制协议和 Web 主链语义对齐 | `app/mobile/**`，仅在必要时改 shared 类型 |
+| `codex/mobile-expo-rn-plan` | Mobile 收口分支，当前已保存进度；后续由 Trump 统筹协议对齐 | `app/mobile/**`，仅在必要时改 shared 类型 |
 
 任务：
 
@@ -87,7 +86,7 @@ Johnny、Evidence/docs 负责人和 subagent。Mobile 线程现在并入 Trump
 4. 渲染 typed transcript blocks：route decision、subtask、permission request/result、file change、tool result、artifact、preview、failure、finished。
 5. artifact/diff/preview cards 只基于现有事件合同或 Johnny 提供的新合同实现。
 6. 启动本地 Web dev server，实际点击主链页面、检查布局、空态、错误态、目标健康态、回放态和移动视口，不只跑测试。
-7. 管理正在收口的 `codex/mobile-expo-rn-plan` 分支和 Mobile 线程，让 Mobile 使用同一套 Hub target/run/approval/replay 语义；非必要不打断该分支的收口节奏。
+7. 接收已经保存进度的 `codex/mobile-expo-rn-plan` 分支和 Mobile 线程，让 Mobile 使用同一套 Hub target/run/approval/replay 语义；非必要不打断该分支的收尾节奏。
 8. 不改 backend schema、Hub handler、Edge handler。
 
 建议验证：
@@ -134,11 +133,11 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-live-chain-topolo
 
 ## Controller 下一步
 
-1. 提交并推送 `docs/roadmap.md` 和 `STATE.md`。
-2. 在集成 worktree 重跑最低 gate。
-3. 若干净，将 `dev/delicious233` fast-forward 到集成分支。
-4. 检查 master-only commit，用受控 merge/promote 路径推进 master。
-5. 从新 baseline 启动下一轮 worker。
+1. 把本状态更新推送到 `dev/delicious233` 和 controller 集成分支。
+2. 从 `origin/dev/delicious233 = 15277af8` 创建下一轮 worktree。
+3. 向 Trump/Johnny 发送本文中的分工摘要。
+4. Controller 自己启动 Desktop/Tauri/Local Edge 分支。
+5. 等 Trump/Johnny slice 返回后启动 product-loop QA。
 
 ## 安全规则
 
