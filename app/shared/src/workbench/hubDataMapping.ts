@@ -9,8 +9,9 @@
  */
 
 import type { ContactMember, ProjectInfo } from './pages';
-import type { WorkbenchContactsData } from './pages/ContactsPage';
+import type { WorkbenchContactsData } from '@shared/workbench';
 import type { DocRow } from './pages/DocsPage';
+import type { WorkbenchConversation } from '../platform';
 import {
   isWorkbenchRealDataMode,
   isWorkbenchFixtureDataMode,
@@ -167,4 +168,63 @@ export function resolveHubDocuments(
     return isWorkbenchFixtureDataMode(dataMode) ? undefined : [];
   }
   return (documents ?? []).filter((doc) => doc.status !== 'deleted').map(hubDocumentToDocRow);
+}
+
+// ── Session → Conversation mapping ────────────────────────────────
+
+/**
+ * Minimal Hub session shape needed for conversation mapping.
+ * Both Desktop and Web hubClients define a compatible `Session` type.
+ */
+export interface HubSessionLike {
+  id: string;
+  type: string;
+  name?: string;
+  owner_user_id?: string;
+  members?: Array<{ member_id: string; role?: string }>;
+  unread_count?: number;
+  last_message_at?: string;
+  member_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export function hubSessionToConversation(session: HubSessionLike): WorkbenchConversation {
+  const kind: WorkbenchConversation['kind'] = session.type === 'private' ? 'direct' : 'group';
+  const title = session.name?.trim() || resolveSessionFallbackTitle(session);
+  const updatedLabel = session.updated_at || session.last_message_at
+    ? formatSessionTime(session.updated_at ?? session.last_message_at)
+    : undefined;
+
+  const memberNames = session.members
+    ?.filter((m) => m.member_id !== session.owner_user_id)
+    .map((m) => m.member_id);
+
+  return {
+    id: session.id,
+    title,
+    kind,
+    subtitle: session.member_count != null ? `${session.member_count} 人` : undefined,
+    updatedLabel,
+    avatarLabel: title.slice(0, 2).toUpperCase(),
+    ...(session.unread_count ? { unreadCount: session.unread_count } : {}),
+    ...(memberNames?.length ? { members: memberNames } : {}),
+  };
+}
+
+function resolveSessionFallbackTitle(session: HubSessionLike): string {
+  if (session.type === 'private') return '私聊';
+  return `群会话 ${session.id.slice(0, 4)}`;
+}
+
+function formatSessionTime(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return new Date(parsed).toLocaleString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+  });
 }
