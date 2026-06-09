@@ -42,12 +42,13 @@ describe('Mobile Hub client facade', () => {
     const sessionsResponse = [
       { session_id: 's1', type: 'private', name: 'Test Chat', unread_count: 3 },
     ];
-    const contactsResponse = [];
-    const fetchImpl = vi.fn(async (url: string) => {
-      if (url.includes('/client/sessions')) {
+    const contactsResponse: Record<string, unknown>[] = [];
+    const fetchImpl = vi.fn(async (url: string | Request | URL) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/client/sessions')) {
         return new Response(JSON.stringify({ code: 'OK', data: sessionsResponse }), { status: 200 });
       }
-      if (url.includes('/client/contacts')) {
+      if (urlStr.includes('/client/contacts')) {
         return new Response(JSON.stringify({ code: 'OK', data: contactsResponse }), { status: 200 });
       }
       return new Response(JSON.stringify({ code: 'OK', data: [] }), { status: 200 });
