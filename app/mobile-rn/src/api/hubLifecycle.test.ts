@@ -15,7 +15,7 @@ class FakeSocket implements HubWebSocketLike {
   }
 
   emitClose() {
-    this.onclose?.({ code: 1000, reason: 'TokenDance fake close' });
+    this.onclose?.({ code: 1000, reason: 'fake close' });
   }
 }
 
@@ -48,7 +48,7 @@ class FakeAppState {
 }
 
 describe('Mobile Hub lifecycle bridge', () => {
-  it('connects only while the app is foregrounded and resyncs from the last event cursor', () => {
+  it('connects to /client/ws and tracks cursor via seq_id', () => {
     const appState = new FakeAppState('active');
     const sockets: FakeSocket[] = [];
     const statuses: string[] = [];
@@ -61,20 +61,20 @@ describe('Mobile Hub lifecycle bridge', () => {
 
     const bridge = startHubLifecycleBridge({
       appState,
-      baseUrl: 'https://hub.tokendance.test',
+      baseUrl: 'https://hub.example.test',
       createWebSocket,
       onStatusChange: (status) => statuses.push(status),
       onResyncRequired: (resync) => resyncs.push(resync),
     });
 
-    expect(createWebSocket).toHaveBeenCalledWith('wss://hub.tokendance.test/v1/events');
+    expect(createWebSocket).toHaveBeenCalledWith('wss://hub.example.test/client/ws');
 
+    // Server frame: { type, payload, seq_id }
     sockets[0]?.emitMessage(
       JSON.stringify({
-        id: 'evt-Delicious233-2',
-        type: 'approval.updated',
-        createdAt: '2026-06-09T08:00:00.000Z',
-        payload: { approvalId: 'approval-TokenDance' },
+        type: 'message.new',
+        payload: { session_id: 's1', content: 'hello' },
+        seq_id: 10,
       }),
     );
 
@@ -85,11 +85,11 @@ describe('Mobile Hub lifecycle bridge', () => {
 
     appState.transition('active');
 
-    expect(resyncs).toEqual([{ reason: 'foreground', since: 'evt-Delicious233-2' }]);
+    expect(resyncs).toEqual([{ reason: 'foreground', since: '10' }]);
     expect(createWebSocket).toHaveBeenLastCalledWith(
-      'wss://hub.tokendance.test/v1/events?since=evt-Delicious233-2',
+      'wss://hub.example.test/client/ws?since=10',
     );
-    expect(bridge.getCursor()).toBe('evt-Delicious233-2');
+    expect(bridge.getCursor()).toBe('10');
   });
 
   it('stays suspended for an initially backgrounded app until foreground resumes', () => {
@@ -101,7 +101,7 @@ describe('Mobile Hub lifecycle bridge', () => {
       appState,
       baseUrl: 'http://127.0.0.1:8080',
       createWebSocket,
-      initialSince: 'evt-TokenDance-1',
+      initialSince: '5',
       onStatusChange: (status) => statuses.push(status),
     });
 
@@ -110,7 +110,7 @@ describe('Mobile Hub lifecycle bridge', () => {
 
     appState.transition('active');
 
-    expect(createWebSocket).toHaveBeenCalledWith('ws://127.0.0.1:8080/v1/events?since=evt-TokenDance-1');
+    expect(createWebSocket).toHaveBeenCalledWith('ws://127.0.0.1:8080/client/ws?since=5');
     expect(statuses).toContain('resync_required');
   });
 
@@ -126,27 +126,41 @@ describe('Mobile Hub lifecycle bridge', () => {
 
     startHubLifecycleBridge({
       appState,
-      baseUrl: 'https://hub.tokendance.test',
+      baseUrl: 'https://hub.example.test',
       createWebSocket,
-      initialSince: 'evt-before-close',
+      initialSince: '3',
       onResyncRequired: (resync) => resyncs.push(resync),
     });
 
     sockets[0]?.emitMessage(
       JSON.stringify({
-        id: 'evt-before-remote-close',
-        type: 'run.updated',
-        createdAt: '2026-06-09T08:01:00.000Z',
-        payload: { runId: 'run-TokenDance' },
+        type: 'session.created',
+        payload: { session_id: 's2', name: 'New Chat' },
+        seq_id: 7,
       }),
     );
     sockets[0]?.emitClose();
 
-    expect(resyncs).toEqual([{ reason: 'stream_closed', since: 'evt-before-remote-close' }]);
+    expect(resyncs).toEqual([{ reason: 'stream_closed', since: '7' }]);
     expect(createWebSocket).toHaveBeenLastCalledWith(
-      'wss://hub.tokendance.test/v1/events?since=evt-before-remote-close',
+      'wss://hub.example.test/client/ws?since=7',
     );
     expect(sockets).toHaveLength(2);
+  });
+
+  it('passes token to WS URL when provided', () => {
+    const appState = new FakeAppState('active');
+    const createWebSocket = vi.fn(() => new FakeSocket());
+
+    startHubLifecycleBridge({
+      appState,
+      baseUrl: 'https://hub.example.test',
+      token: 'test-jwt',
+      createWebSocket,
+    });
+
+    const url = createWebSocket.mock.calls[0]?.[0] as string;
+    expect(url).toContain('token=test-jwt');
   });
 
   it('removes AppState listeners and closes the active stream when stopped', () => {
@@ -155,7 +169,7 @@ describe('Mobile Hub lifecycle bridge', () => {
     const createWebSocket = vi.fn(() => socket);
     const bridge = startHubLifecycleBridge({
       appState,
-      baseUrl: 'https://hub.tokendance.test',
+      baseUrl: 'https://hub.example.test',
       createWebSocket,
     });
 
