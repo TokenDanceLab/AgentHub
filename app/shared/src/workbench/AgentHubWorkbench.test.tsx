@@ -1266,6 +1266,44 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
+  it('does not render mock Agents, Projects, or Tasks when approved-real data is missing', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agentProfilesStatus={{ loading: false, error: 'Hub AgentProfiles unavailable' }}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projectsStatus={{ loading: false, error: 'Hub Projects unavailable' }}
+        workbenchStatus={{ dataMode: 'approved-real' }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    const agentsPage = screen.getByRole('region', { name: 'Workbench page' });
+    expect(within(agentsPage).getByRole('alert')).toHaveTextContent('Hub AgentProfiles unavailable');
+    expect(within(agentsPage).getByRole('status')).toHaveTextContent('暂无 Agent Profile');
+    expect(within(agentsPage).queryByText('Browser QA')).not.toBeInTheDocument();
+    expect(within(agentsPage).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectsPage = screen.getByRole('region', { name: 'Workbench page' });
+    expect(within(projectsPage).getByRole('alert')).toHaveTextContent('Hub Projects unavailable');
+    expect(within(projectsPage).getByRole('heading', { name: '暂无项目' })).toBeInTheDocument();
+    expect(within(projectsPage).queryByRole('heading', { name: 'AI 游戏项目' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '任务' }));
+    const tasksPage = screen.getByRole('region', { name: 'Workbench page' });
+    expect(within(tasksPage).getByRole('status')).toHaveTextContent('Real Hub tasks are not loaded.');
+    expect(within(tasksPage).queryByRole('button', { name: /B0 SQLite 迁移方案/ })).not.toBeInTheDocument();
+    expect(within(tasksPage).queryByRole('button', { name: /Agent 市场卡片完善/ })).not.toBeInTheDocument();
+  });
+
   it('saves and deletes supplied Hub AgentProfiles through shared callbacks', async () => {
     const onAgentUpdate = vi.fn().mockResolvedValue(undefined);
     const onAgentDelete = vi.fn().mockResolvedValue(undefined);

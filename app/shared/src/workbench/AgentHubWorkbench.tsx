@@ -1053,6 +1053,7 @@ export function AgentHubWorkbench({
               activePage={activePage}
               agents={agents}
               agentProfilesStatus={agentProfilesStatus}
+              dataMode={workbenchStatus?.dataMode}
               contacts={contacts}
               focusedAgentId={focusedAgentId}
               projects={projects}
