@@ -426,6 +426,28 @@ export async function deleteAgentProfile(id: string): Promise<void> {
   if (!res.ok) throw await parseError(res);
 }
 
+// ── Settings ──────────────────────────────────────────────────────────
+
+export async function fetchSettings(): Promise<Record<string, string>> {
+  try {
+    const res = await edgeFetch(`${BASE}/v1/settings`, edgeRequestInit());
+    if (!res.ok) throw await parseError(res);
+    return unwrapEdgeResponse(await res.json()) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+export async function patchSettings(values: Record<string, string>): Promise<Record<string, string>> {
+  const res = await edgeFetch(`${BASE}/v1/settings`, {
+    method: 'PATCH',
+    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(values),
+  });
+  if (!res.ok) throw await parseError(res);
+  return unwrapEdgeResponse(await res.json()) as Record<string, string>;
+}
+
 // ── User profiles ─────────────────────────────────
 
 export async function fetchCurrentUser(): Promise<UserProfileInfo> {
