@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import logoUrl from '@/assets/tokendance-icon-rounded.svg';
+import logoUrl from '@/assets/agenthub-icon-rounded.svg';
 import styles from './DesktopChrome.module.css';
 
 type WindowCommand = 'minimize' | 'toggleMaximize' | 'close';
