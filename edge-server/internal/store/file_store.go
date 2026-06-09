@@ -25,14 +25,22 @@ type fileSnapshot struct {
 	Artifacts map[string]Artifact    `json:"artifacts"`
 	Previews  map[string]Preview     `json:"previews"`
 
-	ProjectOrder  []string `json:"projectOrder"`
-	ThreadOrder   []string `json:"threadOrder"`
-	RunOrder      []string `json:"runOrder"`
-	ItemOrder     []string `json:"itemOrder"`
-	PinOrder      []string `json:"pinOrder"`
-	DiffOrder     []string `json:"diffOrder"`
-	ArtifactOrder []string `json:"artifactOrder"`
-	PreviewOrder  []string `json:"previewOrder"`
+	UserProfiles  map[string]UserProfile  `json:"userProfiles,omitempty"`
+	AgentProfiles map[string]AgentProfile `json:"agentProfiles,omitempty"`
+
+	ProjectOrder      []string `json:"projectOrder"`
+	ThreadOrder       []string `json:"threadOrder"`
+	RunOrder          []string `json:"runOrder"`
+	ItemOrder         []string `json:"itemOrder"`
+	PinOrder          []string `json:"pinOrder"`
+	DiffOrder         []string `json:"diffOrder"`
+	ArtifactOrder     []string `json:"artifactOrder"`
+	PreviewOrder      []string `json:"previewOrder"`
+	UserProfileOrder  []string `json:"userProfileOrder,omitempty"`
+	AgentProfileOrder []string `json:"agentProfileOrder,omitempty"`
+
+	Settings      map[string]string `json:"settings,omitempty"`
+	SettingsMtime string            `json:"settingsMtime,omitempty"`
 }
 
 // FileStore wraps the in-memory store with a JSON snapshot saved asynchronously after writes.
@@ -161,8 +169,8 @@ func (f *FileStore) ListProjects() []Project {
 	return f.store.ListProjects()
 }
 
-func (f *FileStore) CreateThread(id, projectID, title string) (Thread, error) {
-	thread, err := f.store.CreateThread(id, projectID, title)
+func (f *FileStore) CreateThread(id, projectID, title, kind string) (Thread, error) {
+	thread, err := f.store.CreateThread(id, projectID, title, kind)
 	if err != nil {
 		return Thread{}, err
 	}
@@ -331,6 +339,59 @@ func (f *FileStore) GetPreview(id string) (Preview, bool) {
 	return f.store.GetPreview(id)
 }
 
+// ── AgentProfile delegating methods ──
+
+func (f *FileStore) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
+	created, err := f.store.CreateAgentProfile(profile)
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	f.schedulePersist()
+	return created, nil
+}
+
+func (f *FileStore) GetAgentProfile(id string) (AgentProfile, bool) {
+	return f.store.GetAgentProfile(id)
+}
+
+func (f *FileStore) ListAgentProfiles(adapterID string) []AgentProfile {
+	return f.store.ListAgentProfiles(adapterID)
+}
+
+func (f *FileStore) UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error) {
+	profile, err := f.store.UpdateAgentProfile(id, patch)
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	f.schedulePersist()
+	return profile, nil
+}
+
+func (f *FileStore) DeleteAgentProfile(id string) error {
+	if err := f.store.DeleteAgentProfile(id); err != nil {
+		return err
+	}
+	f.schedulePersist()
+	return nil
+}
+
+func (f *FileStore) CreateUserProfile(profile UserProfile) (UserProfile, error) {
+	created, err := f.store.CreateUserProfile(profile)
+	if err != nil {
+		return UserProfile{}, err
+	}
+	f.schedulePersist()
+	return created, nil
+}
+
+func (f *FileStore) GetUserProfile(id string) (UserProfile, bool) {
+	return f.store.GetUserProfile(id)
+}
+
+func (f *FileStore) ListUserProfiles() []UserProfile {
+	return f.store.ListUserProfiles()
+}
+
 func ensureFileSnapshotDirectory(path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -397,4 +458,20 @@ func saveFileSnapshot(path string, snapshot fileSnapshot) error {
 		return fmt.Errorf("replace store snapshot: %w", err)
 	}
 	return nil
+}
+
+func (f *FileStore) GetCurrentUser() (UserProfile, bool) {
+	return f.store.GetCurrentUser()
+}
+
+// ── UserSettings delegating methods ──
+
+func (f *FileStore) GetSettings() UserSettings {
+	return f.store.GetSettings()
+}
+
+func (f *FileStore) UpsertSettings(patch map[string]string) UserSettings {
+	result := f.store.UpsertSettings(patch)
+	f.schedulePersist()
+	return result
 }

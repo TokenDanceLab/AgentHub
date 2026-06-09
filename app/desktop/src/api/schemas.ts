@@ -187,6 +187,26 @@ export const PreviewSchema = z.object({
   createdAt: z.string(),
 });
 
+export const EdgeAgentProfileSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  adapterId: z.string(),
+  model: z.string().optional(),
+  provider: z.string().optional(),
+  reasoningEffort: z.string().optional(),
+  thinkingMode: z.string().optional(),
+  maxThinkingTokens: z.number().optional(),
+  permissionMode: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  allowedTools: z.array(z.string()).optional(),
+  mcpConfig: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  avatarRef: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export function safeParse<T>(schema: z.ZodTypeAny, data: unknown, label: string): T {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {

@@ -147,6 +147,57 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     [agentData?.items, modelCatalog],
   );
 
+  // Merge strategy: Edge profiles (user-configured) take priority over raw adapter list.
+  // When profiles exist, they represent the user's saved agent configurations.
+  // When no profiles exist yet, fall back to the raw adapter list.
+  const agents = useMemo(() => {
+    if (workbench.isDemo) return workbench.agents;
+    const profiles = profileData?.items;
+    if (profiles && profiles.length > 0) {
+      return profiles.map(edgeAgentProfileToWorkbenchAgent);
+    }
+    return edgeAgents;
+  }, [workbench.isDemo, workbench.agents, profileData?.items, edgeAgents]);
+
+  async function handleAgentCreate(agent: AgentConfig): Promise<void> {
+    setAgentActionError(undefined);
+    setSavingAgentId(agent.id);
+    try {
+      await createAgentProfile.mutateAsync(agent);
+    } catch (error) {
+      setAgentActionError(error instanceof Error ? error.message : 'Agent Profile 创建失败');
+      throw error;
+    } finally {
+      setSavingAgentId(undefined);
+    }
+  }
+
+  async function handleAgentUpdate(agent: AgentConfig): Promise<void> {
+    setAgentActionError(undefined);
+    setSavingAgentId(agent.id);
+    try {
+      await updateAgentProfile.mutateAsync({ id: agent.id, agent });
+    } catch (error) {
+      setAgentActionError(error instanceof Error ? error.message : 'Agent Profile 保存失败');
+      throw error;
+    } finally {
+      setSavingAgentId(undefined);
+    }
+  }
+
+  async function handleAgentDelete(agentId: string): Promise<void> {
+    setAgentActionError(undefined);
+    setDeletingAgentId(agentId);
+    try {
+      await deleteAgentProfile.mutateAsync(agentId);
+    } catch (error) {
+      setAgentActionError(error instanceof Error ? error.message : 'Agent Profile 删除失败');
+      throw error;
+    } finally {
+      setDeletingAgentId(undefined);
+    }
+  }
+
   const handleNavigateToConversation = useCallback((target: { name: string; id: string; kind: 'dm' | 'group' }) => {
     if (workbench.isDemo) {
       const existing = workbench.conversations.find((c) => c.id === target.id || c.title === target.name);
@@ -175,9 +226,22 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
       {liveEdgeEnabled ? <DesktopHubTaskBridge /> : null}
       <AgentHubWorkbench
         activeConversationId={workbench.activeConversationId}
-        agents={workbench.isDemo ? workbench.agents : edgeAgents}
+        agents={agents}
+        agentProfilesStatus={{
+          loading: liveEdgeEnabled && (profileData?.items === undefined),
+          error: agentActionError,
+          actionError: agentActionError,
+          savingAgentId,
+          deletingAgentId,
+        }}
         conversations={workbench.conversations}
         onActiveConversationChange={setSelectedConversationId}
+        onAgentCreate={handleAgentCreate}
+        onAgentUpdate={handleAgentUpdate}
+        onAgentDelete={handleAgentDelete}
+        onAgentsRetry={() => {
+          setAgentActionError(undefined);
+        }}
         onLogout={onLogout}
         onNavigateToConversation={handleNavigateToConversation}
         platform={desktopPlatform}

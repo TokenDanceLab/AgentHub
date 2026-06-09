@@ -16,6 +16,7 @@ import type {
   StartRunRequest,
   Artifact,
   Preview,
+  UserProfileInfo,
 } from '@shared/types';
 import { parseError } from '@shared/errors';
 import type { AppError } from '@shared/errors';
@@ -34,6 +35,7 @@ import {
   listResponseSchema,
   ThreadItemInfoSchema,
   ThreadPinInfoSchema,
+  EdgeAgentProfileSchema,
 } from './schemas';
 
 export type {
@@ -359,4 +361,83 @@ export async function decidePermission(req: PermissionDecideRequest): Promise<vo
     body: JSON.stringify(req),
   });
   if (!res.ok) throw await parseError(res);
+}
+
+// ── Agent Profile CRUD ────────────────────────
+
+export interface EdgeAgentProfile {
+  id: string;
+  name: string;
+  description?: string;
+  adapterId: string;
+  model?: string;
+  provider?: string;
+  reasoningEffort?: string;
+  thinkingMode?: string;
+  maxThinkingTokens?: number;
+  permissionMode?: string;
+  systemPrompt?: string;
+  allowedTools?: string[];
+  mcpConfig?: string;
+  skills?: string[];
+  avatarRef?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchAgentProfiles(adapterId?: string): Promise<ListResponse<EdgeAgentProfile>> {
+  const url = adapterId
+    ? `${BASE}/v1/agent-profiles?adapterId=${encodeURIComponent(adapterId)}`
+    : `${BASE}/v1/agent-profiles`;
+  const res = await edgeFetch(url, edgeRequestInit());
+  if (!res.ok) throw await parseError(res);
+  return safeParse<ListResponse<EdgeAgentProfile>>(
+    listResponseSchema(EdgeAgentProfileSchema),
+    unwrapEdgeResponse(await res.json()),
+    'agentProfiles',
+  );
+}
+
+export async function createAgentProfile(data: Record<string, unknown>): Promise<EdgeAgentProfile> {
+  const res = await edgeFetch(`${BASE}/v1/agent-profiles`, {
+    method: 'POST',
+    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse<EdgeAgentProfile>(EdgeAgentProfileSchema, unwrapEdgeResponse(await res.json()), 'createAgentProfile');
+}
+
+export async function updateAgentProfile(id: string, patch: Partial<EdgeAgentProfile>): Promise<EdgeAgentProfile> {
+  const res = await edgeFetch(`${BASE}/v1/agent-profiles/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse<EdgeAgentProfile>(EdgeAgentProfileSchema, unwrapEdgeResponse(await res.json()), 'updateAgentProfile');
+}
+
+export async function deleteAgentProfile(id: string): Promise<void> {
+  const res = await edgeFetch(`${BASE}/v1/agent-profiles/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    ...edgeRequestInit(),
+  });
+  if (!res.ok) throw await parseError(res);
+}
+
+// ── User profiles ─────────────────────────────────
+
+export async function fetchCurrentUser(): Promise<UserProfileInfo> {
+  const res = await edgeFetch(`${BASE}/v1/users/current`, edgeRequestInit());
+  if (!res.ok) throw await parseError(res);
+  const data = unwrapEdgeResponse(await res.json());
+  return {
+    userId: (data as Record<string, unknown>).userId as string ?? '',
+    displayName: (data as Record<string, unknown>).displayName as string ?? '',
+    avatarUrl: ((data as Record<string, unknown>).avatarUrl as string) || undefined,
+    status: ((data as Record<string, unknown>).status as string) || undefined,
+    createdAt: (data as Record<string, unknown>).createdAt as string ?? '',
+    updatedAt: (data as Record<string, unknown>).updatedAt as string ?? '',
+  };
 }
