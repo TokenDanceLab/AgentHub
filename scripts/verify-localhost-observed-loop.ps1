@@ -36,6 +36,14 @@ param(
     [string]$HubUrl = "http://127.0.0.1:8080",
     [string]$DesktopBridgeUrl = "http://127.0.0.1:5173",
     [string]$LocalEdgeUrl = "http://127.0.0.1:3210",
+    [string]$WebHealthPath = "/",
+    [string]$HubHealthPath = "/health/live",
+    [string]$DesktopHealthPath = "/",
+    [string]$EdgeHealthPath = "/v1/health",
+    [string]$ExpectedWebMarker = "agenthub-web-real-service-marker",
+    [string]$ExpectedHubMarker = "agenthub-hub-real-service-marker",
+    [string]$ExpectedDesktopMarker = "agenthub-desktop-bridge-real-service-marker",
+    [string]$ExpectedEdgeMarker = "agenthub-local-edge-real-service-marker",
     [string]$RegisteredTargetUrl = "",
     [string]$HubDispatchTargetUrl = "",
     [string]$RunNote = "",
@@ -87,9 +95,16 @@ if ([System.IO.Path]::IsPathRooted($ObservedDispatchReportPath)) {
 $Failures = @()
 $Warnings = @()
 $GeneratedAt = Get-Date
-$StartupLog = Join-Path $ArtifactRoot "logs\startup.log"
-$CleanupLog = Join-Path $ArtifactRoot "logs\cleanup.log"
+$LogRoot = Join-Path $ArtifactRoot "logs"
+$StartupLog = Join-Path $LogRoot "startup.log"
+$CleanupLog = Join-Path $LogRoot "cleanup.log"
 $ReadinessGatePath = Join-Path $ArtifactRoot "local-stack-readiness.json"
+$ServiceProbeManifestPath = Join-Path $ArtifactRoot "service-probe-manifest.json"
+$PidManifestPath = Join-Path $ArtifactRoot "service-pids.json"
+$HealthManifestPath = Join-Path $ArtifactRoot "service-health.json"
+$ServiceProbeStatus = "NOT_REQUESTED"
+$ServiceProbeExitCode = $null
+$ServiceProbeOutput = ""
 
 function Add-Failure([string]$Text) {
     $script:Failures += $Text
@@ -434,6 +449,132 @@ function Write-JsonFile {
     $json | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
+function Write-ServiceArtifacts {
+    param(
+        [string]$Status,
+        [object[]]$Services = @(),
+        [bool]$StartedByHarness = $false,
+        [string]$SourceEvidencePath = ""
+    )
+
+    $serviceManifest = [ordered]@{
+        schema = "agenthub-localhost-observed-loop-service-probe-v1"
+        status = $Status
+        real_tested = $false
+        generated_at = (Get-Date).ToString("o")
+        repo_root = $RepoRoot
+        artifact_root = $ArtifactRoot
+        source_evidence = $SourceEvidencePath
+        probe_services = [bool]$ProbeServices
+        start_services = [bool]$StartServices
+        start_plan_path = $StartServicePlanPath
+        started_by_harness = $StartedByHarness
+        no_real_tokendance_id_login = $true
+        no_real_cli_or_model_spend = if ($StartServices) { $null } else { $true }
+        cli_or_model_spend_claim = if ($StartServices) { "operator_attested_start_plan_not_verified_by_harness" } else { "not_started_by_harness" }
+        no_real_api_budget_spend_by_this_runner = $true
+        health_paths = [ordered]@{
+            web = $WebHealthPath
+            hub = $HubHealthPath
+            desktop_bridge = $DesktopHealthPath
+            local_edge = $EdgeHealthPath
+        }
+        expected_markers = [ordered]@{
+            web = $ExpectedWebMarker
+            hub = $ExpectedHubMarker
+            desktop_bridge = $ExpectedDesktopMarker
+            local_edge = $ExpectedEdgeMarker
+        }
+        services = @($Services)
+    }
+
+    $healthManifest = [ordered]@{
+        schema = "agenthub-localhost-observed-loop-health-v1"
+        status = $Status
+        real_tested = $false
+        generated_at = (Get-Date).ToString("o")
+        services = @($Services)
+    }
+
+    $pidManifest = [ordered]@{
+        schema = "agenthub-localhost-observed-loop-pids-v1"
+        status = $Status
+        real_tested = $false
+        generated_at = (Get-Date).ToString("o")
+        started_by_harness = $StartedByHarness
+        start_services = [bool]$StartServices
+        start_plan_path = $StartServicePlanPath
+        started_processes = @()
+        cleanup = [ordered]@{
+            strategy = "If StartServices is used, delegated verifier stops harness-started processes; otherwise remove the safe artifact root with Remove-Item after review."
+            cleanup_log = $CleanupLog
+        }
+    }
+
+    Write-JsonFile $serviceManifest $ServiceProbeManifestPath
+    Write-JsonFile $healthManifest $HealthManifestPath
+    Write-JsonFile $pidManifest $PidManifestPath
+}
+
+function Invoke-ServiceReadiness {
+    if (-not ($ProbeServices -or $StartServices)) {
+        Write-ServiceArtifacts -Status "NOT_REQUESTED"
+        return
+    }
+
+    $serviceArgs = @(
+        "-RepoRoot", $RepoRoot,
+        "-EvidencePath", $ServiceProbeManifestPath,
+        "-RealServices",
+        "-WebUrl", $WebUrl,
+        "-HubUrl", $HubUrl,
+        "-DesktopBridgeUrl", $DesktopBridgeUrl,
+        "-LocalEdgeUrl", $LocalEdgeUrl,
+        "-WebHealthPath", $WebHealthPath,
+        "-HubHealthPath", $HubHealthPath,
+        "-DesktopHealthPath", $DesktopHealthPath,
+        "-EdgeHealthPath", $EdgeHealthPath,
+        "-ExpectedWebMarker", $ExpectedWebMarker,
+        "-ExpectedHubMarker", $ExpectedHubMarker,
+        "-ExpectedDesktopMarker", $ExpectedDesktopMarker,
+        "-ExpectedEdgeMarker", $ExpectedEdgeMarker,
+        "-RegisteredTargetUrl", $RegisteredTargetUrl,
+        "-HubDispatchTargetUrl", $HubDispatchTargetUrl,
+        "-TimeoutSec", ([string]$TimeoutSec)
+    )
+    if ($StartServices) {
+        $serviceArgs += "-StartServices"
+        $serviceArgs += "-StartServicePlanPath"
+        $serviceArgs += $StartServicePlanPath
+    }
+
+    $servicesRun = Invoke-RepoScript "scripts\verify-localhost-real-services.ps1" $serviceArgs
+    $script:ServiceProbeExitCode = $servicesRun.ExitCode
+    $script:ServiceProbeOutput = $servicesRun.Output
+    Write-Host $servicesRun.Output
+
+    $services = @()
+    $startedByHarness = $false
+    if (Test-Path -LiteralPath $ServiceProbeManifestPath) {
+        try {
+            $serviceEvidence = Get-Content -Raw -LiteralPath $ServiceProbeManifestPath | ConvertFrom-Json
+            $services = @($serviceEvidence.services)
+            $startedByHarness = ($serviceEvidence.started_by_harness -eq $true)
+            $script:ServiceProbeStatus = [string]$serviceEvidence.status
+        }
+        catch {
+            $script:ServiceProbeStatus = "UNREADABLE_SERVICE_MANIFEST"
+        }
+    } else {
+        $script:ServiceProbeStatus = "MISSING_SERVICE_MANIFEST"
+    }
+
+    Write-ServiceArtifacts -Status $ServiceProbeStatus -Services $services -StartedByHarness $startedByHarness -SourceEvidencePath $ServiceProbeManifestPath
+    if ($servicesRun.ExitCode -ne 0) {
+        Add-Failure "localhost real-services readiness gate failed"
+    }
+}
+
 function New-ReadinessManifest {
     param([string]$Status)
 
@@ -474,10 +615,41 @@ function New-ReadinessManifest {
         }
         paths = [ordered]@{
             manifest = $ManifestPath
+            artifact_root = $ArtifactRoot
+            log_root = $LogRoot
             startup_log = $StartupLog
             cleanup_log = $CleanupLog
             readiness_gate = $ReadinessGatePath
             observed_dispatch_report = $ObservedDispatchReportPath
+            service_probe_manifest = $ServiceProbeManifestPath
+            pid_manifest = $PidManifestPath
+            health_manifest = $HealthManifestPath
+        }
+        service_probes = [ordered]@{
+            status = $ServiceProbeStatus
+            exit_code = $ServiceProbeExitCode
+            probe_services = [bool]$ProbeServices
+            start_services = [bool]$StartServices
+            start_plan_path = $StartServicePlanPath
+            service_probe_manifest = $ServiceProbeManifestPath
+            pid_manifest = $PidManifestPath
+            health_manifest = $HealthManifestPath
+            health_paths = [ordered]@{
+                web = $WebHealthPath
+                hub = $HubHealthPath
+                desktop_bridge = $DesktopHealthPath
+                local_edge = $EdgeHealthPath
+            }
+            expected_markers = [ordered]@{
+                web = $ExpectedWebMarker
+                hub = $ExpectedHubMarker
+                desktop_bridge = $ExpectedDesktopMarker
+                local_edge = $ExpectedEdgeMarker
+            }
+            cleanup = [ordered]@{
+                strategy = "Keep artifacts under the safe artifact root for review; remove that root with Remove-Item after capture. Harness-started child processes are delegated to verify-localhost-real-services.ps1 cleanup."
+                clean_artifact_root = [bool]$CleanArtifactRoot
+            }
         }
         required_environment_names = @($RequiredEnvironmentNames)
         supplied_environment_names = @(Get-SuppliedEnvironmentNameList)
@@ -504,6 +676,7 @@ function New-ReadinessManifest {
         claims = [ordered]@{
             real_tokendance_id_login = $false
             real_cli_or_model_invoked_by_this_runner = $false
+            real_api_budget_spend_by_this_runner = $false
             public_deploy_signing_release = $false
             mobile = $false
         }
@@ -623,6 +796,7 @@ Write-Host "No real TokenDanceID login, real CLI/model/API spend, deploy, signin
 Assert-StaticBoundary
 if ($Failures.Count -eq 0) {
     Initialize-ArtifactRoot
+    Invoke-ServiceReadiness
 }
 
 if ($Mode -eq "ReadinessOnly") {
