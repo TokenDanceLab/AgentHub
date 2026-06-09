@@ -136,6 +136,7 @@ function WebWorkbenchRoot() {
           deletingAgentId,
         }}
         contacts={workbench.contacts}
+        contactsActions={workbench.contactsActions}
         conversations={workbench.conversations}
         activeProjectId={selectedProjectId}
         projects={workbench.projects}
