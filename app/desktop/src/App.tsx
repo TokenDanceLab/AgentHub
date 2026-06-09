@@ -5,6 +5,7 @@ import { AgentHubWorkbench } from '@shared/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
 import type { WorkbenchConversation } from '@shared/platform';
 import { useAgentList } from '@/api/agentQueries';
+import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
@@ -24,7 +25,7 @@ import {
   useDeleteAgentProfile,
   edgeAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
-import type { AgentConfig } from '@shared/workbench';
+import type { AgentConfig, DocRow } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 
 export default function App() {
@@ -90,6 +91,16 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const createRun = useCreateRun();
   const createThread = useCreateThread();
   const { data: currentUser } = useCurrentUser(liveEdgeEnabled);
+  const { data: documentListData } = useDocumentList(undefined, { enabled: liveEdgeEnabled });
+  const createDocumentMutation = useCreateDocument();
+
+  const documents = useMemo<DocRow[] | undefined>(
+    () => (liveEdgeEnabled && documentListData?.items ? documentListData.items.map(hubDocToDocRow) : undefined),
+    [liveEdgeEnabled, documentListData?.items],
+  );
+  const documentsActions = useMemo(() => ({
+    onCreateDoc: liveEdgeEnabled ? async () => { await createDocumentMutation.mutateAsync({ title: '未命名文档' }); } : undefined,
+  }), [liveEdgeEnabled, createDocumentMutation]);
 
   const activeRunId = useMemo(() => {
     if (!workbench.activeThreadId) return undefined;
@@ -220,6 +231,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }}
         contacts={workbench.contacts}
         contactsActions={workbench.contactsActions}
+        documents={documents}
+        documentsActions={documentsActions}
         conversations={workbench.conversations}
         onActiveConversationChange={setSelectedConversationId}
         onAgentCreate={handleAgentCreate}
