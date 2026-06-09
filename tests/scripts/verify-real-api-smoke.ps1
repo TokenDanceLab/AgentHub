@@ -1064,6 +1064,7 @@ if ($null -ne $wsModulePath) {
     $wsTmp = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-e2e-ws-$PID.cjs"
     Set-Content -LiteralPath $wsTmp -Value $wsScript -Encoding UTF8
     try {
+        $env:NODE_PATH = "D:/Code/TokenDance/AgentHub/app/node_modules"
         $wsResult = & node $wsTmp 2>&1
         $wsExit = $LASTEXITCODE
         Write-Host ($wsResult -join "`n")
