@@ -24,7 +24,14 @@ import {
   type TranscriptBlock,
 } from '@shared/transcript';
 import { createHubClient } from '@/api/hubClient';
-import type { ContactInfo, WorkspaceProject } from '@/api/hubClient';
+import type {
+  AgentTaskApproval,
+  AgentTaskApprovalList,
+  AgentTaskArtifact,
+  AgentTaskArtifactList,
+  ContactInfo,
+  WorkspaceProject,
+} from '@/api/hubClient';
 import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { getAccessToken } from '@/hooks/useAuth';
@@ -125,6 +132,20 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     staleTime: 5_000,
     placeholderData: (previous) => previous,
   });
+  const activeAgentTaskApprovals = useQuery({
+    queryKey: ['web-v4', 'agent-task-approvals', activeAgentTaskId],
+    queryFn: () => hubClient.listTaskApprovals(activeAgentTaskId!),
+    enabled: Boolean(activeAgentTaskId),
+    staleTime: 5_000,
+    placeholderData: (previous) => previous,
+  });
+  const activeAgentTaskArtifacts = useQuery({
+    queryKey: ['web-v4', 'agent-task-artifacts', activeAgentTaskId],
+    queryFn: () => hubClient.listTaskArtifacts(activeAgentTaskId!),
+    enabled: Boolean(activeAgentTaskId),
+    staleTime: 5_000,
+    placeholderData: (previous) => previous,
+  });
 
   const pinnedMessages = useQuery({
     queryKey: ['web-v4', 'hub-pins', activeHubSessionId],
@@ -180,6 +201,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       if (activeAgentTaskId) {
         void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId] });
         void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId] });
+        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-approvals', activeAgentTaskId] });
+        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-artifacts', activeAgentTaskId] });
       }
     },
   });
@@ -211,18 +234,28 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     )
     : conversations;
 
+  const mergedRuntimeEvents = mergeHubTaskContractEvents(
+    mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents),
+    activeAgentTaskApprovals.data,
+    activeAgentTaskArtifacts.data,
+  );
   const transcript = !hubReady && !realMode
     ? workbenchDemoRuntimeStore.resolveTranscript(activeConversationId)
     : resolveWebWorkbenchTranscript(
       hubReady,
       activeHubSessionId,
       messages.data,
-      mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents),
+      mergedRuntimeEvents,
       dataMode,
     );
+  const taskContractStatusBlocks = resolveWebTaskContractStatusBlocks(
+    activeAgentTaskId,
+    activeAgentTaskApprovals.error,
+    activeAgentTaskArtifacts.error,
+  );
   const surfacedTranscript = executionTargetStatus.block
-    ? [executionTargetStatus.block, ...transcript]
-    : transcript;
+    ? [executionTargetStatus.block, ...taskContractStatusBlocks, ...transcript]
+    : [...taskContractStatusBlocks, ...transcript];
 
   return {
     activeConversationId,
@@ -261,7 +294,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
         : undefined,
       replayLabel: activeHubSessionId
         ? activeAgentTaskId
-          ? `Hub replay: task ${activeAgentTaskId} · ${activeAgentTaskSummary.data?.total_events ?? mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents).length} runtime event${(activeAgentTaskSummary.data?.total_events ?? mergeHubRuntimeEvents(replayedRuntimeEvents.data, liveRuntimeEvents).length) === 1 ? '' : 's'} observed`
+          ? `Hub replay: task ${activeAgentTaskId} · ${activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length} runtime event${(activeAgentTaskSummary.data?.total_events ?? mergedRuntimeEvents.length) === 1 ? '' : 's'} observed`
           : `Hub replay: ${liveRuntimeEvents.length} runtime event${liveRuntimeEvents.length === 1 ? '' : 's'} observed`
         : realMode
           ? 'Hub replay: no active Hub session'
@@ -271,18 +304,147 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   };
 }
 
-type WebApprovalHubClient = Pick<ReturnType<typeof createHubClient>, 'decideTeamApproval'>;
+type WebApprovalHubClient = Pick<ReturnType<typeof createHubClient>, 'decideTaskApproval' | 'decideTeamApproval'>;
 
 export async function decideWebApprovalWithHubClient(
   client: WebApprovalHubClient,
   action: ApprovalDecisionAction,
 ): Promise<void> {
-  if (!action.teamId || !action.teamRunId) {
-    throw new Error('Hub TeamRun approval decision requires teamId and teamRunId');
+  if (action.teamId && action.teamRunId) {
+    await client.decideTeamApproval(action.teamId, action.teamRunId, action.approvalId, {
+      decision: action.decision,
+    });
+    return;
   }
-  await client.decideTeamApproval(action.teamId, action.teamRunId, action.approvalId, {
-    decision: action.decision,
-  });
+  if (action.agentTaskId) {
+    await client.decideTaskApproval(action.agentTaskId, action.approvalId, {
+      decision: action.decision,
+    });
+    return;
+  }
+  throw new Error('Hub approval decision requires agentTaskId or teamId and teamRunId');
+}
+
+export function mergeHubTaskContractEvents(
+  runtimeEvents: HubRuntimeEventTranscriptInput[],
+  approvals: AgentTaskApprovalList | undefined,
+  artifacts: AgentTaskArtifactList | undefined,
+): HubRuntimeEventTranscriptInput[] {
+  let merged = runtimeEvents;
+  if (approvals) {
+    for (const approval of approvals.approvals) {
+      merged = appendHubRuntimeEvent(merged, taskApprovalToRuntimeEvent(approval, approvals), 400);
+    }
+  }
+  if (artifacts) {
+    for (const artifact of artifacts.artifacts) {
+      merged = appendHubRuntimeEvent(merged, taskArtifactToRuntimeEvent(artifact, artifacts), 400);
+    }
+  }
+  return merged;
+}
+
+function taskApprovalToRuntimeEvent(
+  approval: AgentTaskApproval,
+  list: AgentTaskApprovalList,
+): HubRuntimeEventTranscriptInput {
+  const status = normalizedStatus(approval.status);
+  const decided = status && !['pending', 'requested', 'running'].includes(status);
+  const toolName = approval.tool_name || 'permission';
+  return {
+    id: approval.source_event_id || approval.approval_id,
+    task_id: approval.task_id || list.task_id,
+    ...(approval.edge_run_id || list.edge_run_id ? { edge_run_id: approval.edge_run_id || list.edge_run_id } : {}),
+    ...(approval.session_id || list.session_id ? { session_id: approval.session_id || list.session_id } : {}),
+    ...(approval.event_seq != null ? { event_seq: approval.event_seq } : {}),
+    event_type: decided ? 'run.agent.permission_decided' : 'run.agent.permission_requested',
+    payload: {
+      approvalId: approval.approval_id,
+      requestId: approval.request_id || approval.approval_id,
+      toolName,
+      ...(approval.tool_use_id ? { toolUseId: approval.tool_use_id } : {}),
+      ...(approval.status ? { status: approval.status } : {}),
+      ...(approval.reason ? { reason: approval.reason } : {}),
+      ...(decided ? { decision: taskApprovalDecision(status) } : {}),
+      ...(approval.decided_by ? { decidedBy: approval.decided_by } : {}),
+      agent_task_id: approval.task_id || list.task_id,
+      ...(approval.edge_run_id || list.edge_run_id ? { edge_run_id: approval.edge_run_id || list.edge_run_id } : {}),
+    },
+    ...(approval.created_at || approval.decided_at ? { created_at: approval.created_at || approval.decided_at } : {}),
+  };
+}
+
+function taskArtifactToRuntimeEvent(
+  artifact: AgentTaskArtifact,
+  list: AgentTaskArtifactList,
+): HubRuntimeEventTranscriptInput {
+  const artifactId = artifact.artifact_id || artifact.source_event_id || artifact.path || artifact.name || 'artifact';
+  return {
+    id: artifact.source_event_id || artifactId,
+    task_id: artifact.task_id || list.task_id,
+    ...(artifact.edge_run_id || list.edge_run_id ? { edge_run_id: artifact.edge_run_id || list.edge_run_id } : {}),
+    ...(artifact.session_id || list.session_id ? { session_id: artifact.session_id || list.session_id } : {}),
+    ...(artifact.event_seq != null ? { event_seq: artifact.event_seq } : {}),
+    event_type: 'artifact.created',
+    payload: {
+      artifactId,
+      ...(artifact.path || artifact.name ? { path: artifact.path || artifact.name } : {}),
+      ...(artifact.name || artifact.path ? { title: artifact.name || artifact.path } : {}),
+      ...(artifact.action ? { action: artifact.action } : {}),
+      kind: artifact.status || artifact.action || 'artifact',
+      ...(artifact.tool_name ? { toolName: artifact.tool_name } : {}),
+      ...(artifact.mime_type ? { mimeType: artifact.mime_type } : {}),
+      ...(artifact.size_bytes != null ? { sizeBytes: artifact.size_bytes } : {}),
+      agent_task_id: artifact.task_id || list.task_id,
+      ...(artifact.edge_run_id || list.edge_run_id ? { edge_run_id: artifact.edge_run_id || list.edge_run_id } : {}),
+    },
+    ...(artifact.created_at ? { created_at: artifact.created_at } : {}),
+  };
+}
+
+function taskApprovalDecision(status: string | undefined): 'allow' | 'deny' {
+  return status === 'denied' || status === 'deny' || status === 'rejected' || status === 'failed'
+    ? 'deny'
+    : 'allow';
+}
+
+function normalizedStatus(status: string | undefined): string | undefined {
+  return status?.trim().toLowerCase();
+}
+
+function resolveWebTaskContractStatusBlocks(
+  taskId: string | undefined,
+  approvalError: unknown,
+  artifactError: unknown,
+): TranscriptBlock[] {
+  if (!taskId) return [];
+  const blocks: TranscriptBlock[] = [];
+  if (approvalError) {
+    blocks.push(webTaskContractErrorBlock(
+      'approvals',
+      taskId,
+      `Hub task approvals unavailable: ${errorMessage(approvalError, 'approval endpoint failed')}`,
+    ));
+  }
+  if (artifactError) {
+    blocks.push(webTaskContractErrorBlock(
+      'artifacts',
+      taskId,
+      `Hub task artifacts unavailable: ${errorMessage(artifactError, 'artifact endpoint failed')}`,
+    ));
+  }
+  return blocks;
+}
+
+function webTaskContractErrorBlock(channel: 'approvals' | 'artifacts', taskId: string, text: string): TranscriptBlock {
+  return {
+    id: `web-hub-task-contract-${channel}-${taskId}`,
+    kind: 'text',
+    author: { id: 'hub-task-contract', name: 'Hub task contract', role: 'system' },
+    text,
+    badgeLabel: 'Real Hub error',
+    badgeVariant: 'danger',
+  };
 }
 
 export function resolveWebRuntimeEvidence(transcript: TranscriptBlock[]): RuntimeEvidenceSnapshot {
