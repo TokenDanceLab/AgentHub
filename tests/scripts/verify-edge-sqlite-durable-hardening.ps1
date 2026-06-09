@@ -27,9 +27,13 @@ function Assert-True {
 
 $gatePath = Join-Path $RepoRoot "scripts\verify-edge-sqlite-durable-hardening.ps1"
 $testPath = Join-Path $RepoRoot "edge-server\internal\store\sqlite_durable_hardening_test.go"
+$cmdPath = Join-Path $RepoRoot "edge-server\cmd\agenthub-edge\main.go"
+$cmdTestPath = Join-Path $RepoRoot "edge-server\cmd\agenthub-edge\main_test.go"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "Edge SQLite durable hardening gate exists"
 Assert-True (Test-Path -LiteralPath $testPath) "SQLite durable hardening test exists"
+Assert-True (Test-Path -LiteralPath $cmdPath) "agenthub-edge command source exists"
+Assert-True (Test-Path -LiteralPath $cmdTestPath) "agenthub-edge command tests exist"
 
 if (Test-Path -LiteralPath $testPath) {
     $testText = Get-Content -Raw -LiteralPath $testPath -Encoding UTF8
@@ -44,11 +48,25 @@ if (Test-Path -LiteralPath $testPath) {
     Assert-True ($testText -match "edge_diffs") "test checks relational diff projection"
 }
 
+if (Test-Path -LiteralPath $cmdPath) {
+    $cmdText = Get-Content -Raw -LiteralPath $cmdPath -Encoding UTF8
+    Assert-True ($cmdText -match "store-readiness") "agenthub-edge exposes store-readiness flag"
+    Assert-True ($cmdText -match "runStoreReadiness") "agenthub-edge has store readiness exit path"
+    Assert-True ($cmdText -match "SQLiteReadiness") "agenthub-edge calls SQLiteReadiness"
+}
+
+if (Test-Path -LiteralPath $cmdTestPath) {
+    $cmdTestText = Get-Content -Raw -LiteralPath $cmdTestPath -Encoding UTF8
+    Assert-True ($cmdTestText -match "TestRunStoreReadinessPrintsSQLiteReport") "command test covers store-readiness JSON report"
+    Assert-True ($cmdTestText -match "latest_migration_version") "command test expects stable snake_case JSON"
+}
+
 if (Test-Path -LiteralPath $gatePath) {
     $gateText = Get-Content -Raw -LiteralPath $gatePath -Encoding UTF8
     Assert-True ($gateText -match "FixtureOnlyDurable") "gate declares fixture-only durable mode"
     Assert-True ($gateText -match "Non-goal: complete relational CRUD or production DB readiness") "gate preserves non-goal boundary"
     Assert-True ($gateText -match [regex]::Escape('go test ./internal/store -run "SQLite|Durable|Approval|Artifact|Replay|Pins" -count=1')) "gate runs focused durable store regex"
+    Assert-True ($gateText -match [regex]::Escape('go test ./cmd/agenthub-edge -run "StoreReadiness|SQLite" -count=1')) "gate runs focused agenthub-edge store-readiness regex"
     foreach ($forbidden in @(
         "(?m)^\s*&\s*(codex|claude|opencode|openai)\b",
         "\b(OPENAI_API_KEY|ANTHROPIC_API_KEY|CODEX_|CLAUDE_)\b",
