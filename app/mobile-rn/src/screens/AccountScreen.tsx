@@ -1,8 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
-import { Badge, Button } from '@/components/primitives';
+import { Badge, Button, MotionPressable } from '@/components/primitives';
 import { useStrings } from '@/i18n/strings';
+import { useNativeCapabilities } from '@/integrations/useNativeCapabilities';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileAccountState, MobileThemeMode } from '@/types';
 
@@ -18,6 +19,7 @@ interface AccountMenuItem {
   label: string;
   status?: string;
   color: string;
+  onPress?: () => void;
 }
 
 interface AccountMenuSection {
@@ -34,6 +36,7 @@ export function AccountScreen({
   const { tokens } = useAgentHubTheme();
   const { width } = useWindowDimensions();
   const t = useStrings();
+  const nativeCapabilities = useNativeCapabilities();
   const compact = width <= 420;
   const railWidth = compact ? 76 : 96;
   const drawerWidth = Math.min(width - railWidth, compact ? 318 : 390);
@@ -59,9 +62,27 @@ export function AccountScreen({
       title: t.deviceAndSettings,
       items: [
         { icon: 'bell', label: t.notificationPermission, status: account.notification, color: tokens.color.danger },
-        { icon: 'camera', label: t.cameraPermission, status: 'prompt', color: tokens.color.accent },
-        { icon: 'image', label: t.photoLibraryPermission, status: 'prompt', color: tokens.color.accent },
-        { icon: 'hardDrive', label: t.storageManagement, color: tokens.color.moss },
+        {
+          icon: 'camera',
+          label: t.cameraPermission,
+          status: nativeCapabilities.status.camera,
+          color: tokens.color.accent,
+          onPress: nativeCapabilities.requestCamera,
+        },
+        {
+          icon: 'image',
+          label: t.photoLibraryPermission,
+          status: nativeCapabilities.status.photos,
+          color: tokens.color.accent,
+          onPress: nativeCapabilities.requestPhotos,
+        },
+        {
+          icon: 'hardDrive',
+          label: t.storageManagement,
+          status: nativeCapabilities.status.ready ? 'active' : 'unavailable',
+          color: tokens.color.moss,
+          onPress: nativeCapabilities.clearCache,
+        },
         { icon: 'file', label: t.devices, color: tokens.color.accent },
         { icon: 'settings', label: t.settings, color: tokens.color.accent },
       ],
@@ -371,12 +392,14 @@ function AccountMenuSectionView({ section }: { section: AccountMenuSection }): R
       </Text>
       <View>
         {section.items.map((item) => (
-          <Pressable
+          <MotionPressable
             accessibilityLabel={item.label}
             accessibilityRole="button"
+            feedback="row"
             key={item.label}
+            onPress={item.onPress}
             style={({ pressed }) => ({
-              minHeight: tokens.touch.primary,
+              minHeight: 44,
               flexDirection: 'row',
               alignItems: 'center',
               gap: tokens.space.sm,
@@ -412,7 +435,7 @@ function AccountMenuSectionView({ section }: { section: AccountMenuSection }): R
             </Text>
             {item.status ? <AccountStatusBadge value={item.status} /> : null}
             <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={18} />
-          </Pressable>
+          </MotionPressable>
         ))}
       </View>
     </View>
@@ -424,9 +447,10 @@ function AccountStatusButton({ label, tone }: { label: string; tone: 'success' |
   const color = tone === 'success' ? tokens.color.moss : tokens.color.warning;
 
   return (
-    <Pressable
+    <MotionPressable
       accessibilityLabel={label}
       accessibilityRole="button"
+      feedback="control"
       hitSlop={6}
       style={({ pressed }) => ({
         minHeight: tokens.touch.minimum,
@@ -453,7 +477,7 @@ function AccountStatusButton({ label, tone }: { label: string; tone: 'success' |
       >
         {label}
       </Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 
@@ -470,6 +494,7 @@ function AccountStatusBadge({ value }: { value: string }): React.ReactElement {
     recovering: t.recovering,
     prompt: t.needsAction,
     signed_out: t.signedOut,
+    unavailable: t.unavailable,
   };
   const toneMap: Record<string, 'neutral' | 'success' | 'warning' | 'danger'> = {
     active: 'success',
@@ -482,6 +507,7 @@ function AccountStatusBadge({ value }: { value: string }): React.ReactElement {
     recovering: 'warning',
     prompt: 'warning',
     signed_out: 'danger',
+    unavailable: 'neutral',
   };
 
   return <Badge label={labelMap[value] ?? t.needsAction} size="micro" tone={toneMap[value] ?? 'warning'} />;

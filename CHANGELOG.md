@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.3.0-rc.7] — 2026-06-09
+
+### 发布定位
+- 统一收口 `dev/release-0.3.0-rc7` 集成线，基线来自 `origin/master` 的 PR #297 合并提交 `b7e9c1a4`。
+- 本候选版本面向 Windows Desktop 与 Android 预览包证据，不声明生产可用、签名发布、商店发布或真实模型消耗完成。
+- `master` 合入、tag、GitHub Release upload、签名、公证和 updater metadata 仍需要人工确认。
+
+### Mobile
+- 合入 Expo / React Native 主线 `app/mobile-rn` 的 native capability settings，可在账号和工作台入口展示媒体、存储、通知、SecureStore、deep link 等 readiness 状态。
+- 统一 Mobile 底部导航、分段控件、账号页和工作台页的 motion/press feedback。
+- 新增 `useNativeCapabilities` 测试，锁定 Mobile native readiness 的 no-secret 合同。
+
+### Desktop / Web / Hub / Edge
+- 保留 Web -> Hub -> Desktop/Edge -> CLI/SDK adapter -> replay 的 P0 主链为本轮最高优先级。
+- 当前可复验范围仍以 fixture、observed、no-spend 和 approved-real readiness 为主。
+- 真实 TokenDanceID 登录、真实 CLI/model/API 调用、远程控制真实 Desktop CLI 仍需额外 approved-real 证据。
+
+### Release Gate
+- 修复 `verify-p0-approved-real-gold-path.ps1` 在 Windows PowerShell 5.1 下依赖 `ProcessStartInfo.ArgumentList` 的兼容性问题。
+- 修复 approved-real readiness manifest 中 `$Output` 为空时的 `output_excerpt` 处理。
+- `tests\scripts\verify-p0-approved-real-gold-path.ps1 -RepoRoot .`、`tests\scripts\verify-approved-real-demo-readiness.ps1 -RepoRoot .`、`app/mobile-rn` 的 `pnpm verify`、`pnpm native:check` 和 `pnpm mock:hub:check` 已通过。
+- Windows unsigned dry package 已产出 `AgentHub_0.3.0-rc.7_x64-setup.exe`、`AgentHub_0.3.0-rc.7_x64-portable.zip`、Desktop exe 与 Edge sidecar，并记录 SHA-256 manifest。
+
+### 已知阻塞
+- TokenDanceID 真实登录链路仍缺 approved test account/client 环境证据。
+- Android 本地 APK 在 Windows 长路径 / CMake / Ninja 链路下尚未产出，需要改走 EAS/Linux runner 或进一步收短原生构建路径后复验。
+- Windows 签名安装包、macOS 签名/公证、Android release signing、GitHub Release upload 和 updater metadata 不在默认自动执行范围内。
+- 开放的 Critical/High 安全风险必须关闭或明确 accepted risk 后才能发布 stable。
+
 ## [0.1.0] — 2026-05-27
 
 ### Desktop Command Center (P0)

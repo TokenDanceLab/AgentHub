@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 19:58 +08:00
+最后更新：2026-06-10 00:10 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
@@ -9,10 +9,12 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | `origin/dev/delicious233` 最新 HEAD 是 `bf60d75d docs(state): sync project group contract baseline`。 |
+| 当前集成 dev | `dev/release-0.3.0-rc7` 从 `origin/master` 创建，已合入 Mobile RN release-gates 增量；本地 HEAD 当前领先 `origin/master`。 |
+| 上一条 dev | `origin/dev/delicious233 = fc0f0628` 已通过 PR #297 合入 `origin/master`，不再作为本轮新增事实源。 |
 | RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
-| master | `origin/master = f3b91ab0`，落后 dev 约 376 个提交；release 前走 PR/merge gate，不直接改写 master。 |
-| 主工作树 | `D:\Code\TokenDance\AgentHub` 当前存在大量 dirty 文件且落后远端；新开发和文档收敛从最新 `origin/dev/delicious233` 开隔离 worktree。 |
+| master | `origin/master = b7e9c1a4 Merge pull request #297 from TokenDanceLab/dev/delicious233`，是当前可信基线。 |
+| 当前工作树 | `D:\Code\TokenDance\AgentHub\.worktrees\r7`，分支 `dev/release-0.3.0-rc7`。 |
+| 主工作树 | `D:\Code\TokenDance\AgentHub` 仍保留为历史现场，分支 `dev/delicious233` 且 dirty；不作为事实源。 |
 | 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
 
@@ -88,17 +90,17 @@
 | Windows/Tauri packaging release dry | `codex/packaging-release-windows-tauri-20260609` 正在收口 release-readiness dry gate 复用本地 `verify-tauri-package-dry.ps1`，本地 artifact root `.tmp\tauri-package-release-20260609` 已产出 installer/portable/sidecar/hash manifest | unsigned workflow artifacts only；不签名、不公证、不上传 release、不提交二进制；macOS 仍是 future unsigned dry policy。 |
 | Edge/CLI/SDK/SQLite | 最新 dev 已合入 SQLite durable/readiness、fixture adapter runner、CLI JSON readiness、SDK capability/event matrix | 真实 CLI/model/API 消耗和 production durable store promotion 尚未完成。 |
 | Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、localhost probe/smoke、approved-real/no-secret gates、P0 approved-real gold-path harness | 缺账号/env 或缺 evidence 时必须输出 `BLOCKED_WITH_EVIDENCE`；本文不记录 secret 或证据包细节。 |
-| Mobile | 独立收口 | 只按 Hub target/run/approval/replay 合同对齐，不分叉 runtime 或登录语义。 |
+| Mobile | 已合入 rc7 集成线 | 当前新增来自 `codex/mobile-motion-release-gates`：native capability settings、motion press feedback、Account/Workbench readiness 展示；只按 Hub target/run/approval/replay 合同对齐，不分叉 runtime 或登录语义。 |
 
 ## 分支治理
 
-- 新实现必须从最新 `origin/dev/delicious233` 开隔离 worktree，不在主工作树开发。
+- 新实现必须从最新可信基线开隔离 worktree，不在主工作树开发；本轮 release 收口使用 `dev/release-0.3.0-rc7`。
 - Worker 不直接推 `dev/delicious233`、`master` 或 tag。
 - Controller 负责最终集成、验证、fast-forward/push。
 - 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
 - `v0.3.0-rc.6` 已存在且指向 `fa6cd35e`，保留为历史 RC 基线；后续 tag 需先通过独立 release gate。
 - Desktop 下一版候选已按 `0.3.0-rc.7` 准备；只有 release gate 通过并获人工确认后才允许创建 `v0.3.0-rc.7` tag。
-- 当前 open PR 仅保留 4 个：`#293`、`#296` 为 Mobile 线，`#294`、`#295` 为旧 Web 分支；release promote 前需要关闭、重开小票或明确接受风险。
+- 2026-06-09 handoff 记录 PR #297 已合并且当时无 open PR；release promote 前仍需重新查询 GitHub 确认。
 - 第一批清理候选只包含已被 dev 吸收且 worktree clean 的分支；`dev/johnny`、`feat/backend-edge-hub`、`codex/backend-*` 属于旧大分叉，只能 cherry-pick 级复查。
 
 ## Release Gate 快照
@@ -107,6 +109,10 @@
 - Web focused tests、Web typecheck、shared focused tests、Hub `go test ./... -short -count=1` 已通过。
 - Edge `go test ./... -short -count=1` 已在最新 dev 复跑通过；此前 `TestClaudeCodeParseStreamUsesBrokeredPermissionHandler` 未找到 pending Claude permission request 的失败按 transient flake 记录。
 - approved-real 金链路当前状态：Desktop Edge CLI no-spend PASS，Hub replay/Web manifest `READY_FOR_APPROVAL`，TokenDanceID readiness `BLOCKED`，缺 `AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`、`AGENTHUB_TDID_LOGIN_TEST_ACCOUNT_REF`。
+- 2026-06-10 00:xx 本轮复验：`tests\scripts\verify-p0-approved-real-gold-path.ps1 -RepoRoot .` PASS；`tests\scripts\verify-approved-real-demo-readiness.ps1 -RepoRoot .` PASS。
+- Mobile RN 新增集成复验：`corepack pnpm --dir app/mobile-rn verify` PASS，20 个 test files / 89 tests 通过；`corepack pnpm --dir app/mobile-rn native:check` PASS；`corepack pnpm --dir app/mobile-rn mock:hub:check` PASS。
+- Windows unsigned dry package 复验：`scripts\verify-tauri-package-dry.ps1 -RepoRoot . -ArtifactsRoot .tmp\tauri-package-release-rc7 -RunWindowsBundle -StrictToolchain` PASS，artifact root 为 `.tmp\tauri-package-release-rc7`。Manifest：`AgentHub_0.3.0-rc.7_x64-portable.zip` 16,746,708 bytes / `0C68CE0695467CF1F436C5BDF1F5658ED1CBD2D1F0548A48A37AD560BC44BF78`；`AgentHub_0.3.0-rc.7_x64-setup.exe` 12,198,380 bytes / `2C6FF0849AB6BF4FA3BBB495ACF2B922158FF6F889BE2AD3EF9AD32D3D85AC5B`；`agenthub-desktop.exe` 19,220,480 bytes / `24B768463573A9CB9BBEE58E40D7E092C55D2F8CE868E71C8DFEEB580B8B795B`；`agenthub-edge-windows-amd64.exe` 25,663,488 bytes / `ED1FED612216C2E4F46A5FC094E85EAD41E3A9133034119D2DF8F2345D43B88F`。
+- Android 本地 APK 仍未产出：Windows 原生构建此前阻断在 Expo modules CMake / Ninja 长路径链路；下一步需要 EAS/Linux runner 或进一步收短原生构建路径后复验，不能把 APK release 记为完成。
 - security risk register 仍有 High open release blockers；未获 waiver/closure 前不发布 stable，不把 remote/cloud/auth 口径写成 production-ready。
 
 ## 下一步优先级
