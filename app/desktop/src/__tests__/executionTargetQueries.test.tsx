@@ -6,6 +6,7 @@ import {
   findRegisteredLocalEdgeTarget,
   useHubExecutionTargets,
   usePingHubExecutionTarget,
+  useSyncLocalEdgeExecutionTarget,
 } from '@/api/executionTargetQueries';
 
 function createWrapper() {
@@ -90,6 +91,121 @@ describe('execution target queries', () => {
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://test.local/web/execution-targets/target-relay-1/ping');
     expect(init.method).toBe('POST');
+  });
+
+  it('creates a Hub local_edge target for the current Desktop without sending health or process fields', async () => {
+    const fetchSpy = mockFetch(201, {
+      code: 'ok',
+      data: {
+        id: 'local-target-current',
+        device_id: 'desktop-current',
+        name: 'AgentHub Desktop Local Edge',
+        target_type: 'local_edge',
+        trust_level: 'local',
+        health_state: 'unknown',
+        is_online: false,
+      },
+    });
+
+    const { result } = renderHook(
+      () => useSyncLocalEdgeExecutionTarget({ getToken: () => 'tok', baseUrl: 'http://test.local' }),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        deviceId: 'desktop-current',
+        localEdgeTarget: {
+          id: 'local-edge',
+          type: 'local_edge',
+          name: 'Local Edge',
+          status: 'healthy',
+          route: 'local-edge-api',
+          runnerCount: 1,
+          onlineRunnerCount: 1,
+          agentCount: 2,
+          modelCount: 3,
+          capabilityIds: ['streaming', 'workspace-allowlist'],
+        },
+      });
+    });
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://test.local/web/execution-targets');
+    expect(init.method).toBe('POST');
+    const body = JSON.parse(String(init.body));
+    expect(body).toEqual(expect.objectContaining({
+      device_id: 'desktop-current',
+      name: 'AgentHub Desktop Local Edge',
+      target_type: 'local_edge',
+      trust_level: 'local',
+      auth_method: 'hub_jwt',
+      capabilities: expect.objectContaining({
+        route: 'local-edge-api',
+        runner_count: 1,
+        online_runner_count: 1,
+        agent_count: 2,
+        model_count: 3,
+      }),
+      metadata: expect.objectContaining({
+        source: 'agenthub-desktop',
+        registration: 'desktop-local-edge-readiness',
+      }),
+    }));
+    expect(body).not.toHaveProperty('health_state');
+    expect(body).not.toHaveProperty('command');
+    expect(body).not.toHaveProperty('cliPath');
+    expect(body).not.toHaveProperty('sidecar_args');
+  });
+
+  it('updates an existing Hub local_edge target instead of creating a duplicate', async () => {
+    const fetchSpy = mockFetch(200, {
+      code: 'ok',
+      data: {
+        id: 'local-target-current',
+        device_id: 'desktop-current',
+        name: 'AgentHub Desktop Local Edge',
+        target_type: 'local_edge',
+        trust_level: 'local',
+        health_state: 'healthy',
+        is_online: true,
+      },
+    });
+
+    const { result } = renderHook(
+      () => useSyncLocalEdgeExecutionTarget({ getToken: () => 'tok', baseUrl: 'http://test.local' }),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        registeredTargetId: 'local-target-current',
+        deviceId: 'desktop-current',
+        localEdgeTarget: {
+          id: 'local-edge',
+          type: 'local_edge',
+          name: 'Local Edge',
+          status: 'healthy',
+          route: 'local-edge-api',
+          runnerCount: 1,
+          onlineRunnerCount: 1,
+          agentCount: 1,
+          modelCount: 1,
+          capabilityIds: ['streaming'],
+        },
+      });
+    });
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://test.local/web/execution-targets/local-target-current');
+    expect(init.method).toBe('PATCH');
+    const body = JSON.parse(String(init.body));
+    expect(body).toEqual(expect.objectContaining({
+      device_id: 'desktop-current',
+      target_type: 'local_edge',
+      trust_level: 'local',
+    }));
+    expect(body).not.toHaveProperty('health_state');
   });
 
   it('selects the registered local edge target for the current desktop device', () => {
