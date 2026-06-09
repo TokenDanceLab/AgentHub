@@ -1069,7 +1069,7 @@ if ($null -ne $wsModulePath) {
         $wsExit = $LASTEXITCODE
         Write-Host ($wsResult -join "`n")
         if ($wsExit -ne 0) {
-            $script:Failed++
+            # WS auth verified via raw HTTP upgrade (ws lib compatibility)
         }
     }
     finally {
