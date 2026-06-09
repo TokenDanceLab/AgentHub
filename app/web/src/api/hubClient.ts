@@ -451,6 +451,41 @@ export interface CreateWorkspaceProjectRequest {
 
 export type UpdateWorkspaceProjectRequest = Partial<CreateWorkspaceProjectRequest>;
 
+export interface WorkspaceProjectThread {
+  id: string;
+  project_id: string;
+  type: string;
+  name: string;
+  owner_user_id?: string;
+  role?: string;
+  member_count: number;
+  last_message_at?: string;
+  created_at: string;
+}
+
+export interface CreateWorkspaceProjectThreadRequest {
+  name: string;
+}
+
+export interface SendWorkspaceProjectThreadMessageRequest {
+  client_msg_id?: string;
+  content_type?: string;
+  content: string;
+}
+
+export interface WorkspaceProjectThreadMessage {
+  id: string;
+  project_id: string;
+  thread_id: string;
+  seq_id: number;
+  client_msg_id: string;
+  sender_type: string;
+  sender_id: string;
+  content_type: string;
+  content: string;
+  created_at: string;
+}
+
 // 鈹€鈹€ Auth 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface OIDCAuthorizeRequest {
@@ -1235,6 +1270,30 @@ export function createHubClient(opts: HubClientOptions = {}) {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+
+    listWorkspaceProjectThreads: (projectId: string) =>
+      request<WorkspaceProjectThread[]>(`/web/projects/${encodeURIComponent(projectId)}/threads`),
+
+    createWorkspaceProjectThread: (projectId: string, data: CreateWorkspaceProjectThreadRequest) =>
+      request<WorkspaceProjectThread>(`/web/projects/${encodeURIComponent(projectId)}/threads`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listWorkspaceProjectThreadMessages: (projectId: string, threadId: string, params?: { limit?: number }) =>
+      request<WorkspaceProjectThreadMessage[]>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params ?? {})}`,
+      ),
+
+    sendWorkspaceProjectThreadMessage: (
+      projectId: string,
+      threadId: string,
+      data: SendWorkspaceProjectThreadMessageRequest,
+    ) =>
+      request<WorkspaceProjectThreadMessage>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
 
     // ── Agent teams / TeamRun console ────────────────
 
