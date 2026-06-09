@@ -70,10 +70,18 @@ function Test-RequiredString($Object, [string]$Field, [string]$Label) {
 }
 
 function Invoke-Script([string]$Path, [string[]]$Arguments) {
+    $powershellExe = Find-PowerShell
+    if (-not $powershellExe) {
+        return [pscustomobject]@{
+            ExitCode = -1
+            Output = "PowerShell executable is unavailable."
+        }
+    }
+
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $Path @Arguments 2>&1 | Out-String
+        $output = & $powershellExe -NoProfile -ExecutionPolicy Bypass -File $Path @Arguments 2>&1 | Out-String
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -83,6 +91,20 @@ function Invoke-Script([string]$Path, [string[]]$Arguments) {
         ExitCode = $exitCode
         Output = $output
     }
+}
+
+function Find-PowerShell {
+    $pwsh = Get-Command "pwsh" -ErrorAction SilentlyContinue
+    if ($pwsh) {
+        return $pwsh.Source
+    }
+
+    $powershell = Get-Command "powershell" -ErrorAction SilentlyContinue
+    if ($powershell) {
+        return $powershell.Source
+    }
+
+    return $null
 }
 
 function Get-EventById($Events, [string]$Id) {

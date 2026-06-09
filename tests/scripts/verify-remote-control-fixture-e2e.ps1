@@ -102,6 +102,10 @@ Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
 
 if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $exporterPath) -and (Test-Path -LiteralPath $scenarioPath)) {
+    $scriptText = Get-Content -Raw -LiteralPath $gatePath -Encoding UTF8
+    Assert-True ($scriptText -match "Find-PowerShell") "remote-control fixture E2E gate resolves pwsh/powershell instead of hard-coding Windows PowerShell"
+    Assert-True ($scriptText -notmatch "& powershell\b") "remote-control fixture E2E gate does not hard-code powershell executable"
+
     $gateRun = Invoke-RepoScript @(
         $gatePath,
         "-ScenarioManifest", $scenarioPath,
