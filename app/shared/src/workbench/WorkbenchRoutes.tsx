@@ -442,7 +442,7 @@ export function WorkbenchRoutes({
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
   const sourceProjects = projects ?? WORKBENCH_MOCK_PROJECTS;
-  const [projectId, setProjectId] = useState(sourceProjects[0]?.id ?? null);
+  const [projectId, setProjectId] = useState(sourceProjects[0]?.id ?? '');
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [projectTab, setProjectTab] = useState<ProjectTab>('overview');
   const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
@@ -492,11 +492,11 @@ export function WorkbenchRoutes({
 
   React.useEffect(() => {
     if (sourceProjects.length === 0) {
-      setProjectId(null);
+      setProjectId('');
       return;
     }
     if (!projectId || !sourceProjects.some((project) => project.id === projectId)) {
-      setProjectId(sourceProjects[0]?.id ?? null);
+      setProjectId(sourceProjects[0]?.id ?? '');
     }
   }, [projectId, sourceProjects]);
 
