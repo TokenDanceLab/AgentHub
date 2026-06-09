@@ -68,11 +68,30 @@ function Join-NativeArguments {
     return ($quoted -join " ")
 }
 
+function Resolve-PowerShellExecutable {
+    $currentPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    if (-not [string]::IsNullOrWhiteSpace($currentPath) -and (Test-Path -LiteralPath $currentPath)) {
+        return $currentPath
+    }
+
+    $pwsh = Get-Command "pwsh" -ErrorAction SilentlyContinue
+    if ($pwsh) {
+        return $pwsh.Source
+    }
+
+    $windowsPowerShell = Get-Command "powershell" -ErrorAction SilentlyContinue
+    if ($windowsPowerShell) {
+        return $windowsPowerShell.Source
+    }
+
+    throw "Unable to locate a PowerShell executable for script self-tests."
+}
+
 function Invoke-RepoScript {
     param([string[]]$Arguments)
 
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = "powershell"
+    $psi.FileName = Resolve-PowerShellExecutable
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
@@ -182,6 +201,7 @@ if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $exporterPat
 
         $blankChainRefPath = Join-Path $tmpRoot "blank-chain-eventref.json"
         $blankChainRef = Get-Content -Raw -LiteralPath $evidencePath | ConvertFrom-Json
+        $blankChainStage = [string]$blankChainRef.remote_control_manifest.chain[3].stage
         $blankChainRef.remote_control_manifest.chain[3].eventRef = ""
         $blankChainRef | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $blankChainRefPath -Encoding UTF8
         $blankChainRefRun = Invoke-RepoScript @(
@@ -189,7 +209,8 @@ if ((Test-Path -LiteralPath $gatePath) -and (Test-Path -LiteralPath $exporterPat
             "-EvidencePath", $blankChainRefPath
         )
         Assert-True ($blankChainRefRun.ExitCode -ne 0) "remote-control fixture E2E gate fails blank chain eventRef" $blankChainRefRun.Output
-        Assert-True ($blankChainRefRun.Output -match "chain stage edge_events_callback eventRef is not blank") "blank chain eventRef failure is explicit" $blankChainRefRun.Output
+        $blankChainPattern = "chain stage $([regex]::Escape($blankChainStage)) eventRef is not blank"
+        Assert-True ($blankChainRefRun.Output -match $blankChainPattern) "blank chain eventRef failure is explicit" $blankChainRefRun.Output
     }
 }
 

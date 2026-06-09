@@ -64,7 +64,7 @@ describe('UnifiedComposer execution target selection', () => {
 
     expect(screen.getByLabelText('Desktop/Edge target')).toBeDisabled();
     expect(screen.getByText('No online Desktop/Edge target is available.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '发送消息' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
   });
 
   it('does not submit with Enter when a mentioned agent has no selected target', () => {
