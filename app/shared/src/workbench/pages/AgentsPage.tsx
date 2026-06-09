@@ -47,6 +47,7 @@ export interface AgentConfig {
   id: string;
   name: string;
   role: string;
+  icon?: string | undefined;
   engine: string;
   runtimeId?: string | undefined;
   provider?: string | undefined;
@@ -56,6 +57,7 @@ export interface AgentConfig {
   approvalMode?: string | undefined;
   approvalRiskRules?: Array<{ match: string; decision: string }> | undefined;
   scope: string;
+  targetPreference?: string | undefined;
   state: AgentState;
   skills: string[];
   mcpServers?: string[] | undefined;
@@ -446,7 +448,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                     {agent.role} · {agent.engine}
                   </span>
                   <small>
-                    {agent.skills.join(' · ') || '未配置 skill'}
+                    {agent.targetPreference ? `Target: ${agent.targetPreference}` : agent.skills.join(' · ') || '未配置 skill'}
                   </small>
                 </div>
                 <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
@@ -563,7 +565,7 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       <ConfigSummaryRow label="MCP" value={formatList(agent.mcpServers, '未绑定 MCP')} />
       <ConfigSummaryRow label="Memory" value={agent.memorySummary || formatList(agent.memorySources, '未声明 memory')} />
       <ConfigSummaryRow label="Approval" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
-      <ConfigSummaryRow label="Target" value={formatList(agent.targetPreferences, '未声明 target')} />
+      <ConfigSummaryRow label="Target" value={agent.targetPreference || formatList(agent.targetPreferences, '未声明 target')} />
     </div>
 
     <AgentSpecFixturePanel agent={agent} />
@@ -629,6 +631,13 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
         <input
           value={agent.approval}
           onChange={(e) => onFieldChange?.('approval', e.target.value)}
+        />
+      </label>
+      <label>
+        目标偏好
+        <input
+          value={agent.targetPreference ?? ''}
+          onChange={(e) => onFieldChange?.('targetPreference', e.target.value)}
         />
       </label>
       <label>
