@@ -16,7 +16,7 @@ function resolveDefaultHubBaseUrl(): string {
 }
 
 const config = {
-  name: 'AgentHub Mobile',
+  name: 'AgentHub',
   slug: 'agenthub-mobile',
   scheme: 'agenthub',
   version: '0.1.0',
