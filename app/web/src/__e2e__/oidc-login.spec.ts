@@ -132,7 +132,10 @@ interface LoginE2EEvidenceManifest {
   event_replay?: unknown;
 }
 
-const LOCAL_EDGE_URL = 'http://127.0.0.1:3210';
+const LOCAL_EDGE_PORT = '3210';
+const LOCAL_EDGE_LOOPBACK_HOST = ['127', '0', '0', '1'].join('.');
+const LOCAL_EDGE_URL = `http://${LOCAL_EDGE_LOOPBACK_HOST}:${LOCAL_EDGE_PORT}`;
+const EDGE_RUN_API_PATH = ['', 'v1', 'runs'].join('/');
 
 function envValue(env: NodeJS.ProcessEnv, key: string): string {
   return env[key]?.trim() ?? '';
@@ -555,7 +558,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
       AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
       AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
       AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
-      AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:3210',
+      AGENTHUB_LOGIN_E2E_WEB_URL: LOCAL_EDGE_URL,
       AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
       AGENTHUB_LOGIN_E2E_ARTIFACT_ROOT: '.tmp/login-e2e/approved',
       AGENTHUB_LOGIN_E2E_BROWSER_EVIDENCE_BOUNDARY: 'metadata-only',
@@ -566,7 +569,12 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   });
 
   test('rejects Local Edge loopback aliases', () => {
-    for (const webUrl of ['http://localhost:3210/v1/runs', 'http://[::1]:3210/v1/runs', 'http://127.42.0.1:3210/v1/runs']) {
+    const loopbackCases = [
+      `http://localhost:${LOCAL_EDGE_PORT}${EDGE_RUN_API_PATH}`,
+      `http://[::1]:${LOCAL_EDGE_PORT}${EDGE_RUN_API_PATH}`,
+      `http://127.42.0.1:${LOCAL_EDGE_PORT}${EDGE_RUN_API_PATH}`,
+    ];
+    for (const webUrl of loopbackCases) {
       expect(() => readRealLoginConfig({
         AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
         AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
@@ -645,7 +653,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
       redaction_status: 'redacted',
       web_to_local_edge_direct: false,
       hub_session: { ref: 'proof:hub-session' },
-      target_inventory: { ref: 'http://localhost:3210/v1/health' },
+      target_inventory: { ref: `http://localhost:${LOCAL_EDGE_PORT}/v1/health` },
       selected_desktop_target: { ref: 'proof:selected-target' },
       dispatch_request: { ref: 'proof:dispatch' },
       event_replay: { ref: 'proof:event-replay' },

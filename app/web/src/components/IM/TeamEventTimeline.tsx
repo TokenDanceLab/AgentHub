@@ -19,6 +19,7 @@ interface TeamEventTimelineProps {
   loading: boolean;
   error: string | null;
   memberNames: Record<string, string>;
+  emptyText?: string | undefined;
 }
 
 const EVENT_META: Record<string, { icon: typeof Clock; labelKey: string; className: string }> = {
@@ -74,6 +75,7 @@ export const TeamEventTimeline = memo(function TeamEventTimeline({
   loading,
   error,
   memberNames: _memberNames,
+  emptyText,
 }: TeamEventTimelineProps) {
   const { t } = useTranslation();
 
@@ -108,7 +110,7 @@ export const TeamEventTimeline = memo(function TeamEventTimeline({
       <div className={styles.container}>
         <div className={styles.empty}>
           <Clock size={32} className={styles.emptyIcon} />
-          <span>{t('teamRun.noEvents', 'No events recorded for this run.')}</span>
+          <span>{emptyText ?? t('teamRun.noEvents', 'No events recorded for this run.')}</span>
         </div>
       </div>
     );
