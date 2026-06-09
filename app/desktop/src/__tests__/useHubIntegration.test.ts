@@ -36,7 +36,10 @@ const hoisted = vi.hoisted(() => {
         }
       }
     },
-    updateTask: (taskId: string, updates: Partial<import('@/stores/taskBridgeStore').AgentTask>) => {
+    updateTask: (
+      taskId: string,
+      updates: Partial<import('@/stores/taskBridgeStore').AgentTask>,
+    ) => {
       storeTasks = storeTasks.map((t) => {
         if (t.taskId !== taskId) return t;
         const updated = { ...t, ...updates };
@@ -65,12 +68,24 @@ const hoisted = vi.hoisted(() => {
   });
 
   return {
-    get edgeHandlers() { return edgeHandlers; },
-    set edgeHandlers(v: Set<(event: EventEnvelope) => void>) { edgeHandlers = v; },
-    get mockStream() { return mockStream; },
-    set mockStream(v: StreamHandle | null) { mockStream = v; },
-    get storeTasks() { return storeTasks; },
-    get storeRunToTask() { return storeRunToTask; },
+    get edgeHandlers() {
+      return edgeHandlers;
+    },
+    set edgeHandlers(v: Set<(event: EventEnvelope) => void>) {
+      edgeHandlers = v;
+    },
+    get mockStream() {
+      return mockStream;
+    },
+    set mockStream(v: StreamHandle | null) {
+      mockStream = v;
+    },
+    get storeTasks() {
+      return storeTasks;
+    },
+    get storeRunToTask() {
+      return storeRunToTask;
+    },
     resetStore,
     getStoreState,
   };
@@ -302,9 +317,7 @@ describe('useHubIntegration', () => {
   // ── agent.dispatch → Edge run ──────────────────────────
 
   it('acks task and starts Edge run on agent.dispatch', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     const dp = makeDispatchPayload();
     await act(async () => {
@@ -337,9 +350,7 @@ describe('useHubIntegration', () => {
         status: 'started',
       },
     });
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -357,9 +368,7 @@ describe('useHubIntegration', () => {
       threadId: 'sess-1',
       status: 'started',
     });
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -378,9 +387,7 @@ describe('useHubIntegration', () => {
         status: 'started',
       },
     });
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -406,18 +413,27 @@ describe('useHubIntegration', () => {
     );
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        target_id: 'target-other',
-        edge_device_id: 'desktop-current',
-      }));
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        task_id: 'task-missing-target',
-        edge_device_id: 'desktop-current',
-      }));
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        task_id: 'task-missing-device',
-        target_id: 'target-current',
-      }));
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          target_id: 'target-other',
+          edge_device_id: 'desktop-current',
+        }),
+      );
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          task_id: 'task-missing-target',
+          edge_device_id: 'desktop-current',
+        }),
+      );
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          task_id: 'task-missing-device',
+          target_id: 'target-current',
+        }),
+      );
     });
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -449,10 +465,13 @@ describe('useHubIntegration', () => {
     );
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        target_id: 'target-current',
-        edge_device_id: 'desktop-current',
-      }));
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+        }),
+      );
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -468,13 +487,32 @@ describe('useHubIntegration', () => {
       threadId: 'sess-1',
       agentId: 'claude-code',
       prompt: 'Do something',
+      hubTaskId: 'task-1',
+      targetId: 'target-current',
+      edgeDeviceId: 'desktop-current',
+      dispatchTargetEvidence: {
+        expectedTargetId: 'target-current',
+        observedTargetId: 'target-current',
+        expectedEdgeDeviceId: 'desktop-current',
+        observedEdgeDeviceId: 'desktop-current',
+        targetStatus: 'matched',
+      },
+    });
+    expect(hoisted.storeTasks[0]?.dispatchPayload).toMatchObject({
+      target_id: 'target-current',
+      edge_device_id: 'desktop-current',
+      target_binding: {
+        expected_target_id: 'target-current',
+        observed_target_id: 'target-current',
+        expected_edge_device_id: 'desktop-current',
+        observed_edge_device_id: 'desktop-current',
+        status: 'matched',
+      },
     });
   });
 
   it('normalizes legacy Claude agent ids before starting Edge run', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ agent_type: 'claude' }));
@@ -485,28 +523,29 @@ describe('useHubIntegration', () => {
   });
 
   it('passes Hub profile runtime config into Edge run request', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        agent_type: 'codex',
-        system_prompt: 'You are a careful reviewer.',
-        tool_whitelist: '["Read","Grep"]',
-        model_params: JSON.stringify({
-          model: 'gpt-5.5',
-          reasoning_effort: 'high',
-          thinking_mode: 'adaptive',
-          permission_mode: 'plan',
-          work_dir: 'D:\\Code\\TokenDance\\AgentHub',
-          include_partial: true,
-          max_thinking_tokens: 4096,
-          append_system_prompt: 'Keep output concise.',
-          config_overrides: { reasoning_summary: 'auto' },
-          ephemeral: true,
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          agent_type: 'codex',
+          system_prompt: 'You are a careful reviewer.',
+          tool_whitelist: '["Read","Grep"]',
+          model_params: JSON.stringify({
+            model: 'gpt-5.5',
+            reasoning_effort: 'high',
+            thinking_mode: 'adaptive',
+            permission_mode: 'plan',
+            work_dir: 'D:\\Code\\TokenDance\\AgentHub',
+            include_partial: true,
+            max_thinking_tokens: 4096,
+            append_system_prompt: 'Keep output concise.',
+            config_overrides: { reasoning_summary: 'auto' },
+            ephemeral: true,
+          }),
         }),
-      }));
+      );
     });
 
     const fetchBody = fetchBodyFor('/v1/runs');
@@ -528,9 +567,7 @@ describe('useHubIntegration', () => {
   });
 
   it('maps taskId → runId and runId → taskId bidirectionally', async () => {
-    const { result } = renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    const { result } = renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -543,9 +580,7 @@ describe('useHubIntegration', () => {
   it('reports failure to Hub when fetch fails', async () => {
     fetchMock.mockRejectedValueOnce(new Error('Edge unavailable'));
 
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -555,9 +590,7 @@ describe('useHubIntegration', () => {
   });
 
   it('ignores dispatch with missing task_id', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, { task_id: '', agent_type: '' });
@@ -570,9 +603,7 @@ describe('useHubIntegration', () => {
   // ── Edge events → Hub callbacks ──────────────────────
 
   it('streams text_delta to Hub', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -591,23 +622,23 @@ describe('useHubIntegration', () => {
   });
 
   it('streams stdout run.output.batch to Hub and remembers it for final output', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.output.batch', {
-        runId: 'run-1',
-        stream: 'stdout',
-        chunks: [
-          { offset: 0, text: 'stdout part 1\n' },
-          { offset: 14, text: 'stdout part 2\n' },
-        ],
-      }));
+      fireEdgeEvent(
+        makeEvent('run.output.batch', {
+          runId: 'run-1',
+          stream: 'stdout',
+          chunks: [
+            { offset: 0, text: 'stdout part 1\n' },
+            { offset: 14, text: 'stdout part 2\n' },
+          ],
+        }),
+      );
       fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1', status: 'finished' }));
     });
 
@@ -632,29 +663,27 @@ describe('useHubIntegration', () => {
   });
 
   it('does not stream stderr run.output.batch to Hub', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.output.batch', {
-        runId: 'run-1',
-        stream: 'stderr',
-        chunks: [{ offset: 0, text: 'diagnostic only' }],
-      }));
+      fireEdgeEvent(
+        makeEvent('run.output.batch', {
+          runId: 'run-1',
+          stream: 'stderr',
+          chunks: [{ offset: 0, text: 'diagnostic only' }],
+        }),
+      );
     });
 
     expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
   });
 
   it('streams permission request and decision events to Hub', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -694,46 +723,45 @@ describe('useHubIntegration', () => {
   });
 
   it('posts supervisor route decisions from typed Edge events to Hub TeamRun', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        team_id: 'team-1',
-        team_run_id: 'team-run-1',
-        team_member_id: 'member-supervisor',
-        team_member_role: 'supervisor',
-      }));
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          team_id: 'team-1',
+          team_run_id: 'team-run-1',
+          team_member_id: 'member-supervisor',
+          team_member_role: 'supervisor',
+        }),
+      );
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.agent.route_decision', {
-        runId: 'run-1',
-        action: 'delegate',
-        next_worker: 'member-executor',
-        instructions: 'Implement the repository change.',
-        reasoning: 'Backend work is needed.',
-        correlation_id: 'route-1',
-      }));
+      fireEdgeEvent(
+        makeEvent('run.agent.route_decision', {
+          runId: 'run-1',
+          action: 'delegate',
+          next_worker: 'member-executor',
+          instructions: 'Implement the repository change.',
+          reasoning: 'Backend work is needed.',
+          correlation_id: 'route-1',
+        }),
+      );
     });
 
-    expect(hubClient.postTeamRouteDecision).toHaveBeenCalledWith(
-      'team-1',
-      'team-run-1',
-      {
-        action: 'delegate',
-        next_worker: 'member-executor',
-        instructions: 'Implement the repository change.',
-        reasoning: 'Backend work is needed.',
-        context: undefined,
-        approved: undefined,
-        feedback: undefined,
-        summary: undefined,
-        blocked_reason: undefined,
-        correlation_id: 'route-1',
-      },
-    );
+    expect(hubClient.postTeamRouteDecision).toHaveBeenCalledWith('team-1', 'team-run-1', {
+      action: 'delegate',
+      next_worker: 'member-executor',
+      instructions: 'Implement the repository change.',
+      reasoning: 'Backend work is needed.',
+      context: undefined,
+      approved: undefined,
+      feedback: undefined,
+      summary: undefined,
+      blocked_reason: undefined,
+      correlation_id: 'route-1',
+    });
     expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
       'task-1',
       'run.agent.route_decision',
@@ -750,55 +778,55 @@ describe('useHubIntegration', () => {
   });
 
   it('posts route decisions when TeamRun context is nested in model_params', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        model_params: JSON.stringify({
-          agenthub_team_context: {
-            team_id: 'team-nested',
-            team_run_id: 'team-run-nested',
-            team_member_role: 'supervisor',
-          },
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          model_params: JSON.stringify({
+            agenthub_team_context: {
+              team_id: 'team-nested',
+              team_run_id: 'team-run-nested',
+              team_member_role: 'supervisor',
+            },
+          }),
         }),
-      }));
+      );
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.agent.route_decision', {
-        runId: 'run-1',
-        action: 'delegate',
-        next_worker: 'member-executor',
-        instructions: 'Continue from the nested team context.',
-        correlation_id: 'route-nested',
-      }));
+      fireEdgeEvent(
+        makeEvent('run.agent.route_decision', {
+          runId: 'run-1',
+          action: 'delegate',
+          next_worker: 'member-executor',
+          instructions: 'Continue from the nested team context.',
+          correlation_id: 'route-nested',
+        }),
+      );
     });
 
-    expect(hubClient.postTeamRouteDecision).toHaveBeenCalledWith(
-      'team-nested',
-      'team-run-nested',
-      {
-        action: 'delegate',
-        next_worker: 'member-executor',
-        instructions: 'Continue from the nested team context.',
-        correlation_id: 'route-nested',
-      },
-    );
+    expect(hubClient.postTeamRouteDecision).toHaveBeenCalledWith('team-nested', 'team-run-nested', {
+      action: 'delegate',
+      next_worker: 'member-executor',
+      instructions: 'Continue from the nested team context.',
+      correlation_id: 'route-nested',
+    });
   });
 
   it('posts structuredOutput route decisions from result only once', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        team_id: 'team-1',
-        team_run_id: 'team-run-1',
-        team_member_role: 'supervisor',
-      }));
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          team_id: 'team-1',
+          team_run_id: 'team-run-1',
+          team_member_role: 'supervisor',
+        }),
+      );
     });
 
     const structuredOutput = {
@@ -810,7 +838,9 @@ describe('useHubIntegration', () => {
 
     act(() => {
       fireEdgeEvent(makeEvent('run.agent.route_decision', { runId: 'run-1', ...structuredOutput }));
-      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, structuredOutput }));
+      fireEdgeEvent(
+        makeEvent('run.agent.result', { runId: 'run-1', success: true, structuredOutput }),
+      );
     });
 
     expect(hubClient.postTeamRouteDecision).toHaveBeenCalledTimes(1);
@@ -822,41 +852,44 @@ describe('useHubIntegration', () => {
   });
 
   it('does not post route decisions for non-supervisor team members', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
-        team_id: 'team-1',
-        team_run_id: 'team-run-1',
-        team_member_role: 'executor',
-      }));
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({
+          team_id: 'team-1',
+          team_run_id: 'team-run-1',
+          team_member_role: 'executor',
+        }),
+      );
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.agent.route_decision', {
-        runId: 'run-1',
-        action: 'delegate',
-        next_worker: 'member-reviewer',
-        instructions: 'Review it.',
-      }));
+      fireEdgeEvent(
+        makeEvent('run.agent.route_decision', {
+          runId: 'run-1',
+          action: 'delegate',
+          next_worker: 'member-reviewer',
+          instructions: 'Review it.',
+        }),
+      );
     });
 
     expect(hubClient.postTeamRouteDecision).not.toHaveBeenCalled();
   });
 
   it('calls doneTask on successful run.agent.result', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
+      fireEdgeEvent(
+        makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }),
+      );
     });
 
     expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
@@ -866,24 +899,26 @@ describe('useHubIntegration', () => {
       { runId: 'run-1' },
     );
     expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done', 'run-1');
-    expect(hoisted.storeTasks).toContainEqual(expect.objectContaining({
-      taskId: 'task-1',
-      runId: 'run-1',
-      status: 'done',
-    }));
+    expect(hoisted.storeTasks).toContainEqual(
+      expect.objectContaining({
+        taskId: 'task-1',
+        runId: 'run-1',
+        status: 'done',
+      }),
+    );
   });
 
   it('uses remembered output for successful run.agent.result without content', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.agent.text_block', { runId: 'run-1', content: 'visible answer' }));
+      fireEdgeEvent(
+        makeEvent('run.agent.text_block', { runId: 'run-1', content: 'visible answer' }),
+      );
       fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true }));
     });
 
@@ -891,9 +926,7 @@ describe('useHubIntegration', () => {
   });
 
   it('calls failTask on failed run.agent.result', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -909,9 +942,7 @@ describe('useHubIntegration', () => {
   });
 
   it('calls failTask on run.failed event', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -925,9 +956,7 @@ describe('useHubIntegration', () => {
   });
 
   it('ignores Edge events for unknown runIds', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     act(() => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'unknown-run', content: 'x' }));
@@ -937,9 +966,7 @@ describe('useHubIntegration', () => {
   });
 
   it('does not subscribe to Hub events when hubWS is null', () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS: null, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS: null, hubClient }));
 
     expect(hubWS.on).not.toHaveBeenCalled();
     expect((hoisted.mockStream as StreamHandle).subscribe).toHaveBeenCalled();
@@ -948,9 +975,7 @@ describe('useHubIntegration', () => {
   // ── Hub cancel → Edge cancel ────────────────────────
 
   it('cancels Edge run when Hub sends agent.cancel', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -969,9 +994,7 @@ describe('useHubIntegration', () => {
   // ── Hub agent.control → Edge permission decision ──────
 
   it('applies Hub permission.decide agent.control to Local Edge', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
@@ -1002,9 +1025,7 @@ describe('useHubIntegration', () => {
   });
 
   it('accepts camelCase edgeControl agent.control payloads', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
@@ -1025,9 +1046,7 @@ describe('useHubIntegration', () => {
   });
 
   it('does not replay duplicate successful agent.control permission decisions in one session', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     const payload = {
       kind: 'permission.decide',
@@ -1130,9 +1149,7 @@ describe('useHubIntegration', () => {
 
     globalThis.fetch = nativeFetch as typeof globalThis.fetch;
     try {
-      renderHook(() =>
-        useHubIntegration({ hubWS, hubClient, edgeBaseUrl }),
-      );
+      renderHook(() => useHubIntegration({ hubWS, hubClient, edgeBaseUrl }));
 
       const payload = {
         kind: 'permission.decide',
@@ -1195,9 +1212,7 @@ describe('useHubIntegration', () => {
 
   it('ignores malformed agent.control permission decisions', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
@@ -1219,7 +1234,9 @@ describe('useHubIntegration', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('Malformed agent.control permission.decide payload');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain(
+      'Malformed agent.control permission.decide payload',
+    );
     warnSpy.mockRestore();
   });
 
@@ -1248,9 +1265,7 @@ describe('useHubIntegration', () => {
   // ── Cleanup ───────────────────────────────────────────
 
   it('cleans up subscriptions on unmount', () => {
-    const { unmount } = renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    const { unmount } = renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     expect(hubWS.on).toHaveBeenCalledWith(HUB_EVENTS.AGENT_DISPATCH, expect.any(Function));
     expect(hubWS.on).toHaveBeenCalledWith(HUB_EVENTS.AGENT_CANCEL, expect.any(Function));
@@ -1268,9 +1283,7 @@ describe('useHubIntegration', () => {
   // ── activeTaskCount ───────────────────────────────────
 
   it('tracks active task count', async () => {
-    const { result, rerender } = renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    const { result, rerender } = renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     expect(result.current.activeTaskCount).toBe(0);
 
@@ -1288,13 +1301,17 @@ describe('useHubIntegration', () => {
   it('handles concurrent agent.dispatch events independently', async () => {
     mockRunSequence('run-A', 'run-B');
 
-    const { result } = renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    const { result } = renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ task_id: 'task-A', session_id: 'sess-A' }));
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ task_id: 'task-B', session_id: 'sess-B' }));
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ task_id: 'task-A', session_id: 'sess-A' }),
+      );
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ task_id: 'task-B', session_id: 'sess-B' }),
+      );
     });
 
     expect(result.current.getRunByTaskId('task-A')).toBe('run-A');
@@ -1310,13 +1327,17 @@ describe('useHubIntegration', () => {
   it('cleans up mapping for one task without affecting others', async () => {
     mockRunSequence('run-A', 'run-B');
 
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ task_id: 'task-A', session_id: 'sess-A' }));
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ task_id: 'task-B', session_id: 'sess-B' }));
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ task_id: 'task-A', session_id: 'sess-A' }),
+      );
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ task_id: 'task-B', session_id: 'sess-B' }),
+      );
     });
 
     // Complete only task A via result event
@@ -1325,15 +1346,17 @@ describe('useHubIntegration', () => {
     });
 
     expect(hubClient.doneTask).toHaveBeenCalledWith('task-A', expect.any(String), 'run-A');
-    expect(hubClient.doneTask).not.toHaveBeenCalledWith('task-B', expect.any(String), expect.any(String));
+    expect(hubClient.doneTask).not.toHaveBeenCalledWith(
+      'task-B',
+      expect.any(String),
+      expect.any(String),
+    );
   });
 
   // ── Edge events after completion ──────────────────────
 
   it('ignores Edge events for a runId after result has been processed', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -1341,15 +1364,19 @@ describe('useHubIntegration', () => {
 
     // First result — should be processed
     act(() => {
-      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
+      fireEdgeEvent(
+        makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }),
+      );
     });
     expect(hubClient.doneTask).toHaveBeenCalledTimes(1);
     expect(hubClient.streamTaskEvent).toHaveBeenCalledTimes(1);
-    expect(hoisted.storeTasks).toContainEqual(expect.objectContaining({
-      taskId: 'task-1',
-      runId: 'run-1',
-      status: 'done',
-    }));
+    expect(hoisted.storeTasks).toContainEqual(
+      expect.objectContaining({
+        taskId: 'task-1',
+        runId: 'run-1',
+        status: 'done',
+      }),
+    );
 
     // Second event for the same runId is ignored while terminal evidence stays visible locally.
     act(() => {
@@ -1361,9 +1388,7 @@ describe('useHubIntegration', () => {
   // ── Edge cases ────────────────────────────────────────
 
   it('ignores agent.cancel with missing task_id', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_CANCEL, { task_id: '' });
@@ -1373,9 +1398,7 @@ describe('useHubIntegration', () => {
   });
 
   it('extracts model from model_params JSON when provided', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
       fireHubEvent(
@@ -1389,15 +1412,10 @@ describe('useHubIntegration', () => {
   });
 
   it('handles invalid model_params JSON gracefully', async () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     await act(async () => {
-      fireHubEvent(
-        HUB_EVENTS.AGENT_DISPATCH,
-        makeDispatchPayload({ model_params: 'not-json' }),
-      );
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ model_params: 'not-json' }));
     });
 
     const fetchBody = fetchBodyFor('/v1/runs');
@@ -1409,9 +1427,7 @@ describe('useHubIntegration', () => {
   it('calls onDispatch callback after successful Edge run creation', async () => {
     const onDispatch = vi.fn();
 
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient, onDispatch }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient, onDispatch }));
 
     await act(async () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
@@ -1429,9 +1445,7 @@ describe('useHubIntegration', () => {
   // ── Device registration is separate (tested in useDeviceRegistration) ──
 
   it('does not call registerDevice (delegated to useDeviceRegistration hook)', () => {
-    renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
     expect(hubClient.registerDevice).not.toHaveBeenCalled();
   });
@@ -1447,9 +1461,6 @@ describe('useHubIntegration', () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://192.168.1.1:3210/v1/runs',
-      expect.any(Object),
-    );
+    expect(fetchMock).toHaveBeenCalledWith('http://192.168.1.1:3210/v1/runs', expect.any(Object));
   });
 });
