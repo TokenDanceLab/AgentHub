@@ -32,7 +32,7 @@ git diff --cached --name-status
 - Desktop dev URL：`http://localhost:5173/`
 - Desktop 源码：`app/desktop/src/`
 - Tauri Desktop 源码：`app/desktop/src-tauri/`
-- Desktop UI 任务不要修改 `app/mobile/**`。
+- Desktop UI 任务不要修改 `app/mobile-rn/**`。
 - 临时 Playwright 脚本、截图、raw JSON 放在仓库 ignored 的 `.tmp/`。
 - 截图只截客户端 viewport。除非 bug 是原生窗口 chrome，否则不要用 OS 全屏截图。
 - 证据文件使用稳定命名，例如：
