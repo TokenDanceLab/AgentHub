@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RunListView } from '../views/RunListView';
+import { listRuns } from '@agenthub/shared';
+import { getMobileHubHealth } from '../native/hubHealth';
 import type { Run } from '@agenthub/shared';
 
 // ── Mock shared API ──
@@ -20,10 +22,11 @@ vi.mock('@agenthub/shared/components', () => ({
 
 // ── Mock shared UI ──
 vi.mock('@agenthub/shared/ui', () => ({
-  SurfaceHeader: ({ title, eyebrow }: { title?: string; eyebrow?: string }) => (
+  SurfaceHeader: ({ title, eyebrow, status }: { title?: string; eyebrow?: string; status?: { label: string } }) => (
     <header data-testid="surface-header">
       <span>{eyebrow}</span>
       <h1>{title}</h1>
+      {status && <span>{status.label}</span>}
     </header>
   ),
   SectionHeader: ({ title }: { title?: string }) => (
@@ -101,9 +104,21 @@ vi.mock('react-i18next', () => ({
         'queue.runs.signalOnline': 'Hub execution API online',
         'queue.runs.signalPending': 'Hub reachable; run sync pending',
         'queue.runs.signalOffline': 'Hub health unavailable',
+        'queue.runs.targetHealth.noTarget': 'Run route signal: no target route was returned for this Hub session.',
+        'queue.runs.targetHealth.offline': 'Run route signal: Hub health is offline, so replay is unavailable.',
+        'queue.runs.targetHealth.degraded': 'Run route signal: Hub is reachable, but run replay is still recovering.',
+        'queue.runs.targetHealth.ready': 'Run route signal: Hub run API is reachable. Mobile can replay returned runs; target health is not verified here yet.',
+        'queue.runs.targetHealth.wrongProfile': 'Run route signal: Hub rejected this profile or permission path. Switch Agent Profile or account before approving.',
+        'queue.runs.targetHealth.signedOut': 'Run route signal: signed out. Sign in before replaying runs or approvals.',
         'queue.status.connected': 'Connected',
         'queue.status.reachable': 'Reachable',
         'queue.status.offline': 'Offline',
+        'queue.targetHealth.noTarget': 'No target',
+        'queue.targetHealth.offline': 'Offline',
+        'queue.targetHealth.degraded': 'Degraded',
+        'queue.targetHealth.ready': 'Ready',
+        'queue.targetHealth.wrongProfile': 'Wrong profile',
+        'queue.targetHealth.signedOut': 'Signed out',
         'queue.statusLabels.queued': 'Queued',
         'queue.statusLabels.starting': 'Starting',
         'queue.statusLabels.running': 'Running',
@@ -207,5 +222,25 @@ describe('RunListView', () => {
     expect(screen.getByTestId('metric-active')).toBeInTheDocument();
     expect(screen.getByTestId('metric-review')).toBeInTheDocument();
     expect(screen.getByTestId('metric-total')).toBeInTheDocument();
+  });
+
+  it('labels ready target health when run replay is available', async () => {
+    vi.mocked(listRuns).mockResolvedValue({ items: [makeRun()], page: { hasMore: false } });
+    vi.mocked(getMobileHubHealth).mockResolvedValue({ status: 'ok' });
+
+    renderWithProviders(<RunListView {...defaultProps} />);
+
+    expect(await screen.findByText('Ready')).toBeInTheDocument();
+    expect(await screen.findByText('Run route signal: Hub run API is reachable. Mobile can replay returned runs; target health is not verified here yet.')).toBeInTheDocument();
+  });
+
+  it('labels signed-out target health when run replay returns 401', async () => {
+    vi.mocked(listRuns).mockRejectedValue(new Error('Hub returned 401'));
+    vi.mocked(getMobileHubHealth).mockResolvedValue({ status: 'ok' });
+
+    renderWithProviders(<RunListView {...defaultProps} />);
+
+    expect(await screen.findByText('Signed out')).toBeInTheDocument();
+    expect(await screen.findByText('Run route signal: signed out. Sign in before replaying runs or approvals.')).toBeInTheDocument();
   });
 });

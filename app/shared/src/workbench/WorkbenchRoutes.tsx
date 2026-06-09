@@ -450,7 +450,7 @@ export function WorkbenchRoutes({
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
   const sourceProjects = projects ?? WORKBENCH_MOCK_PROJECTS;
-  const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
+  const [localProjectId, setLocalProjectId] = useState<string | null>(sourceProjects[0]?.id ?? null);
   const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
     ? activeProjectId
     : null;

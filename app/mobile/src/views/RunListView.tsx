@@ -82,6 +82,7 @@ function runRowClassName(status: RunStatus): string {
 }
 
 type RunFilter = "all" | "review" | "active" | "closed";
+type MobileTargetHealth = "noTarget" | "offline" | "degraded" | "ready" | "wrongProfile" | "signedOut";
 
 function matchesRunFilter(run: Run, filter: RunFilter): boolean {
   if (filter === "all") {
@@ -100,6 +101,48 @@ function isClosedRun(run: Run): boolean {
   return ["finished", "failed", "cancelled"].includes(run.status);
 }
 
+function errorStatusCode(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const record = error as Record<string, unknown>;
+  const directStatus = record.status ?? record.statusCode;
+  if (typeof directStatus === "number") return directStatus;
+  const response = record.response;
+  if (response && typeof response === "object") {
+    const responseStatus = (response as Record<string, unknown>).status;
+    if (typeof responseStatus === "number") return responseStatus;
+  }
+  if (error instanceof Error) {
+    const match = error.message.match(/\b(401|403|404)\b/);
+    return match ? Number(match[1]) : undefined;
+  }
+  return undefined;
+}
+
+function inferMobileTargetHealth(input: {
+  hubReady: boolean;
+  runsError: unknown;
+  runsPending: boolean;
+  workflowUnavailable: boolean;
+}): MobileTargetHealth {
+  if (!input.hubReady) return "offline";
+  if (!input.workflowUnavailable) return input.runsPending ? "degraded" : "ready";
+
+  switch (errorStatusCode(input.runsError)) {
+    case 401:
+      return "signedOut";
+    case 403:
+      return "wrongProfile";
+    case 404:
+      return "noTarget";
+    default:
+      return "degraded";
+  }
+}
+
+function targetHealthTone(health: MobileTargetHealth): "online" | "offline" {
+  return health === "ready" || health === "degraded" ? "online" : "offline";
+}
+
 export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<RunFilter>("all");
@@ -114,6 +157,12 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
   const isConnected = health.data?.status === "ok";
   const workflowUnavailable = isConnected && runs.isError;
   const isRefreshing = runs.isFetching && !runs.isLoading;
+  const targetHealth = inferMobileTargetHealth({
+    hubReady: isConnected,
+    runsError: runs.error,
+    runsPending: runs.isLoading || isRefreshing,
+    workflowUnavailable,
+  });
   const items = runs.data?.items ?? [];
   const reviewRuns = items.filter((run) => run.status === "waiting_approval").length;
   const activeRuns = items.filter((run) => ["queued", "starting", "running"].includes(run.status)).length;
@@ -146,12 +195,8 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
         eyebrow={t("common.appName")}
         title={t("queue.runs.title")}
         status={{
-          label: isConnected
-            ? workflowUnavailable
-              ? t("queue.status.reachable")
-              : t("queue.status.connected")
-            : t("queue.status.offline"),
-          tone: isConnected ? "online" : "offline",
+          label: t(`queue.targetHealth.${targetHealth}`),
+          tone: targetHealthTone(targetHealth),
         }}
       />
 
@@ -180,11 +225,7 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
             ]}
           />
           <StatusNotice className="mobileSignalRow" icon={<Radio size={14} />}>
-            {isConnected
-              ? workflowUnavailable
-                ? t("queue.runs.signalPending")
-                : t("queue.runs.signalOnline")
-              : t("queue.runs.signalOffline")}
+            {t(`queue.runs.targetHealth.${targetHealth}`)}
           </StatusNotice>
           {isRefreshing && (
             <StatusNotice className="mobileRefreshStatus" icon={<RefreshCw size={13} className="mobileSpin" />}>
