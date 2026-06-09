@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import ExecutionTargetsSection from './ExecutionTargetsSection';
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
@@ -46,8 +46,16 @@ vi.mock('react-i18next', () => ({
         'settings.localEdgeTargetReadinessHubDegraded': 'Hub has this Desktop target, but its health is degraded.',
         'settings.localEdgeTargetReadinessHubUnknown': 'Hub has this Desktop target, but its health is not confirmed yet.',
         'settings.localEdgeTargetReadinessPaginationLimited': 'Hub target inventory is still paginated; Desktop cannot confirm whether this device target exists yet.',
+        'settings.localEdgeTargetRegisterAction': 'Register Local Edge target',
+        'settings.localEdgeTargetUpdateAction': 'Sync Local Edge target',
+        'settings.localEdgeTargetSyncing': 'Syncing Local Edge target...',
+        'settings.localEdgeTargetSyncError': 'Hub target sync failed: {{error}}',
       };
-      return text[key]?.replace('{{name}}', String(values?.name)).replace('{{targetId}}', String(values?.targetId)) ?? key;
+      return text[key]
+        ?.replace('{{name}}', String(values?.name))
+        .replace('{{targetId}}', String(values?.targetId))
+        .replace('{{error}}', String(values?.error))
+        ?? key;
     },
   }),
 }));
@@ -89,6 +97,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof ExecutionT
       desktopDeviceStatus="desktop...0001"
       deviceId="desktop-device-0001"
       registeredLocalEdgeTarget={null}
+      localEdgeTargetSyncStatus="idle"
       {...overrides}
     />,
   );
@@ -188,5 +197,63 @@ describe('ExecutionTargetsSection', () => {
 
     expect(screen.getByText('Hub target inventory is still paginated; Desktop cannot confirm whether this device target exists yet.')).toBeInTheDocument();
     expect(screen.queryByText('Local Edge is healthy, but Hub has not registered a local_edge target for this Desktop device yet.')).not.toBeInTheDocument();
+  });
+
+  it('offers a create action when Local Edge is online and Hub registration is missing', () => {
+    const onSync = vi.fn();
+    renderSection({ onSyncLocalEdgeTarget: onSync });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Register Local Edge target' }));
+
+    expect(onSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers an update action for an already registered local_edge target', () => {
+    const onSync = vi.fn();
+    renderSection({ registeredLocalEdgeTarget: registeredTarget, onSyncLocalEdgeTarget: onSync });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync Local Edge target' }));
+
+    expect(onSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows sync progress and error states without changing Local Edge readiness copy', () => {
+    const { rerender } = render(
+      <ExecutionTargetsSection
+        edgeOnline
+        health={{ status: 'healthy' }}
+        hubSessionActive
+        runnerSummary="1/1 available"
+        runnerItems={[]}
+        availableRunners={1}
+        localEdgeTarget={localEdgeTarget}
+        desktopDeviceStatus="desktop...0001"
+        deviceId="desktop-device-0001"
+        localEdgeTargetSyncStatus="syncing"
+        onSyncLocalEdgeTarget={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Syncing Local Edge target...' })).toBeDisabled();
+
+    rerender(
+      <ExecutionTargetsSection
+        edgeOnline
+        health={{ status: 'healthy' }}
+        hubSessionActive
+        runnerSummary="1/1 available"
+        runnerItems={[]}
+        availableRunners={1}
+        localEdgeTarget={localEdgeTarget}
+        desktopDeviceStatus="desktop...0001"
+        deviceId="desktop-device-0001"
+        localEdgeTargetSyncStatus="error"
+        localEdgeTargetSyncError="HTTP 409"
+        onSyncLocalEdgeTarget={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Hub target sync failed: HTTP 409')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Register Local Edge target' })).toBeEnabled();
   });
 });
