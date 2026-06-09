@@ -1853,7 +1853,7 @@ func TestSendSubAgentResult_Completed(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
 	_, _ = s.CreateProject("proj-agg", "agg-project")
-	_, _ = s.CreateThread("thread-agg", "proj-agg", "agg-thread")
+	_, _ = s.CreateThread("thread-agg", "proj-agg", "agg-thread", "")
 	_, _ = s.CreateRun("parent-run", "proj-agg", "thread-agg")
 	_, _ = s.CreateRun("child-run", "proj-agg", "thread-agg")
 
@@ -1913,7 +1913,7 @@ func TestSendSubAgentResult_Error(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
 	_, _ = s.CreateProject("proj-err", "err-project")
-	_, _ = s.CreateThread("thread-err", "proj-err", "err-thread")
+	_, _ = s.CreateThread("thread-err", "proj-err", "err-thread", "")
 	_, _ = s.CreateRun("parent-err", "proj-err", "thread-err")
 	_, _ = s.CreateRun("child-err", "proj-err", "thread-err")
 
@@ -1966,7 +1966,7 @@ func TestSendSubAgentResult_NoRegistryNoCrash(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
 	_, _ = s.CreateProject("proj-noreg", "no-reg-project")
-	_, _ = s.CreateThread("thread-noreg", "proj-noreg", "no-reg-thread")
+	_, _ = s.CreateThread("thread-noreg", "proj-noreg", "no-reg-thread", "")
 	_, _ = s.CreateRun("run-noreg", "proj-noreg", "thread-noreg")
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
@@ -1986,7 +1986,7 @@ func TestSendSubAgentResult_NonSubAgentNoAction(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
 	_, _ = s.CreateProject("proj-nosub", "nosub-project")
-	_, _ = s.CreateThread("thread-nosub", "proj-nosub", "nosub-thread")
+	_, _ = s.CreateThread("thread-nosub", "proj-nosub", "nosub-thread", "")
 	_, _ = s.CreateRun("run-nosub", "proj-nosub", "thread-nosub")
 
 	reg := agents.NewRegistry()

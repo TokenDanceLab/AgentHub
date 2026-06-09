@@ -82,6 +82,7 @@
   cursor: pointer;
   margin-bottom: 8px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .railButton {
@@ -299,6 +300,21 @@
   color: var(--text-inv);
   flex-shrink: 0;
   user-select: none;
+  overflow: hidden;
+}
+
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.workspaceAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 .conversationCopy {
@@ -580,6 +596,7 @@
   color: var(--text-inv);
   font: 600 13px var(--font-sans);
   flex-shrink: 0;
+  overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), var(--e-1);
 }
 
