@@ -25,10 +25,12 @@ import {
   edgeAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
 import type { AgentConfig } from '@shared/workbench';
+import type { DocRow } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
+import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
 
 export default function App() {
-  const [entryMode, setEntryMode] = useState<'entry' | 'demo' | 'workbench'>('entry');
+  const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
   const { online: edgeOnline } = useHealth();
   const { user } = useAuth();
 
@@ -39,12 +41,7 @@ export default function App() {
   }
 
   function continueDemo(): void {
-    writeWorkbenchDataModeOverride('mock');
-    setEntryMode('demo');
-  }
-
-  function connectEdge(): void {
-    writeWorkbenchDataModeOverride('observed');
+    writeWorkbenchDataModeOverride(edgeOnline ? 'observed' : 'mock');
     setEntryMode('workbench');
   }
 
@@ -59,9 +56,7 @@ export default function App() {
         <DesktopEntryGate
           onLoginSuccess={handleLoginSuccess}
           onContinueDemo={continueDemo}
-          onConnectEdge={connectEdge}
           onToggleTheme={toggleAppliedAgentHubTheme}
-          edgeOnline={edgeOnline}
         />
       ) : (
         <DesktopWorkbenchApp
@@ -97,6 +92,18 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const createRun = useCreateRun();
   const createThread = useCreateThread();
   const { data: currentUser } = useCurrentUser(liveEdgeEnabled);
+
+  // Documents: fetch from Hub when authenticated (non-demo)
+  const hubDocsEnabled = !workbench.isDemo;
+  const { data: hubDocList } = useDocumentList(undefined, { enabled: hubDocsEnabled });
+  const createDocMutation = useCreateDocument();
+
+  const documents = useMemo<DocRow[] | undefined>(() => {
+    if (workbench.isDemo) return undefined;
+    if (!hubDocList) return undefined;
+    return hubDocList.map(hubDocToDocRow);
+  }, [workbench.isDemo, hubDocList]);
+
   const activeRunId = useMemo(() => {
     if (!workbench.activeThreadId) return undefined;
     return resolveCurrentTranscriptRunId(workbench.transcript);
@@ -224,6 +231,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
           savingAgentId,
           deletingAgentId,
         }}
+        contacts={workbench.contacts}
         conversations={workbench.conversations}
         onActiveConversationChange={setSelectedConversationId}
         onAgentCreate={handleAgentCreate}
@@ -234,7 +242,11 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }}
         onLogout={onLogout}
         onNavigateToConversation={handleNavigateToConversation}
+        onProjectCreate={workbench.projectsActions?.create}
+        onProjectUpdate={workbench.projectsActions?.update}
         platform={desktopPlatform}
+        projects={workbench.projects}
+        projectsStatus={workbench.projectsStatus}
         runtimeEvidence={runtimeEvidence}
         showComposerAgentPicker={false}
         showComposerStatus={false}
