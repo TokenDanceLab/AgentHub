@@ -1,18 +1,28 @@
+import {
+  createHubClient as createSharedHubClient,
+  type HubClientOptions,
+  type HubClient as SharedHubClient,
+  type HubOidcAuthorizeRequest,
+  type HubOidcAuthorizeResponse,
+  type HubOidcCallbackRequest,
+  type HubOidcCallbackResponse,
+  type HubUserProfile,
+  type HubAuthResponse,
+  type HubSession,
+  type HubMessage,
+  type HubSearchResult,
+  type HubFriendRequest,
+  type HubContactInfo,
+  type HubCustomAgent,
+  type HubCustomAgentRequest,
+  type HubExecutionTarget,
+  type HubListResponse,
+} from '@agenthub/shared/hubClient';
+
 import { mobileFixture } from '@/data/mobileFixtures';
 import type { MobileAppFixture } from '@/types';
 
-type AccessTokenProvider = () => Promise<string | null | undefined> | string | null | undefined;
-type HubFetch = (input: string, init?: RequestInit) => Promise<Response>;
-
-export interface CreateHubClientOptions {
-  baseUrl: string;
-  getAccessToken?: AccessTokenProvider;
-  fetchImpl?: HubFetch;
-}
-
-export interface HubClient {
-  getMobileSnapshot: () => Promise<MobileAppFixture>;
-}
+// ── Mobile-specific error types (preserved for test compatibility) ──
 
 export interface HubErrorDetails {
   code: string;
@@ -48,175 +58,237 @@ export class HubNetworkError extends Error {
   }
 }
 
+// ── WebSocket event types (aligned with hub-server WS frames) ──
+
 export type HubWsEventType =
-  | 'snapshot.updated'
-  | 'thread.updated'
-  | 'run.updated'
-  | 'approval.updated'
-  | 'presence.updated'
+  | 'auth'
+  | 'auth.ok'
+  | 'auth.fail'
+  | 'message.new'
+  | 'message.recall'
+  | 'message.read'
+  | 'session.created'
+  | 'session.dissolved'
+  | 'session.info_updated'
+  | 'device.online'
+  | 'device.offline'
+  | 'device.kicked'
+  | 'agent.dispatch'
+  | 'agent.stream'
+  | 'agent.done'
+  | 'agent.failed'
+  | 'agent.cancel'
+  | 'notification.new'
+  | 'friend.request'
+  | 'friend.accepted'
   | 'error';
 
 export interface HubWsEvent<TPayload = unknown> {
-  id: string;
   type: HubWsEventType;
-  createdAt: string;
+  seq_id?: number;
   payload: TPayload;
 }
 
 export interface HubWsUrlOptions {
   since?: string;
+  token?: string;
+}
+
+// ── Mobile Hub client ──
+
+type AccessTokenProvider = () => Promise<string | null | undefined> | string | null | undefined;
+
+export interface CreateHubClientOptions {
+  baseUrl: string;
+  getAccessToken?: AccessTokenProvider;
+  fetchImpl?: typeof globalThis.fetch;
+}
+
+export interface HubClient {
+  // Re-export the shared Hub client for direct access
+  readonly shared: SharedHubClient;
+  // Legacy mobile snapshot (for fixture/fallback mode)
+  getMobileSnapshot: () => Promise<MobileAppFixture>;
+  // Auth
+  oidcAuthorize: (body: HubOidcAuthorizeRequest) => Promise<HubOidcAuthorizeResponse>;
+  oidcCallback: (body: HubOidcCallbackRequest) => Promise<HubOidcCallbackResponse>;
+  refresh: (refreshToken: string) => Promise<HubAuthResponse>;
+  logout: () => Promise<void>;
+  me: () => Promise<HubUserProfile>;
+  // Sessions
+  listSessions: () => Promise<HubSession[]>;
+  searchSessions: (q: string) => Promise<HubSession[]>;
+  // Messages
+  sendMessage: (sessionId: string, body: { client_msg_id: string; content_type: string; content: string }) => Promise<{ message_id: string; seq_id: number; created_at: string }>;
+  getMessages: (sessionId: string, params?: { before_seq?: number; limit?: number }) => Promise<HubMessage[]>;
+  syncMessages: (sessionId: string, params?: { after_seq?: number; limit?: number }) => Promise<HubMessage[]>;
+  markRead: (sessionId: string, lastReadSeq: number) => Promise<void>;
+  // Contacts
+  searchUser: (targetUserId: string) => Promise<HubSearchResult>;
+  listContacts: () => Promise<HubContactInfo[]>;
+  sendFriendRequest: (friendId: string, message?: string) => Promise<void>;
+  listFriendRequests: () => Promise<HubFriendRequest[]>;
+  acceptFriendRequest: (requestId: string) => Promise<void>;
+  rejectFriendRequest: (requestId: string) => Promise<void>;
+  blockContact: (targetUserId: string) => Promise<void>;
+  unblockContact: (targetUserId: string) => Promise<void>;
+  updateContactRemark: (friendUserId: string, remark: string) => Promise<void>;
+  // Custom Agents
+  listCustomAgents: () => Promise<HubCustomAgent[]>;
+  createCustomAgent: (body: HubCustomAgentRequest) => Promise<HubCustomAgent>;
+  // Execution Targets
+  listExecutionTargets: () => Promise<HubListResponse<HubExecutionTarget>>;
 }
 
 export function createMockHubClient(delayMs = 80): HubClient {
+  const shared = createSharedHubClient();
+
   return {
+    shared,
     async getMobileSnapshot() {
       await new Promise((resolve) => {
         setTimeout(resolve, delayMs);
       });
-
       return mobileFixture;
     },
+    oidcAuthorize: () => { throw new Error('Mock: OIDC not available'); },
+    oidcCallback: () => { throw new Error('Mock: OIDC not available'); },
+    refresh: () => { throw new Error('Mock: refresh not available'); },
+    logout: async () => {},
+    me: () => { throw new Error('Mock: me not available'); },
+    listSessions: async () => [],
+    searchSessions: async () => [],
+    sendMessage: () => { throw new Error('Mock: sendMessage not available'); },
+    getMessages: async () => [],
+    syncMessages: async () => [],
+    markRead: async () => {},
+    searchUser: () => { throw new Error('Mock: searchUser not available'); },
+    listContacts: async () => [],
+    sendFriendRequest: async () => {},
+    listFriendRequests: async () => [],
+    acceptFriendRequest: async () => {},
+    rejectFriendRequest: async () => {},
+    blockContact: async () => {},
+    unblockContact: async () => {},
+    updateContactRemark: async () => {},
+    listCustomAgents: async () => [],
+    createCustomAgent: () => { throw new Error('Mock: createCustomAgent not available'); },
+    listExecutionTargets: async () => ({ items: [], page: { hasMore: false } }),
   };
 }
 
 export function createHubClient(options: CreateHubClientOptions): HubClient {
-  const fetchImpl = options.fetchImpl ?? getGlobalFetch();
+  const getToken = () => {
+    const result = options.getAccessToken?.();
+    // Handle both sync and async token providers
+    if (result instanceof Promise) {
+      return result.then((t: string | null | undefined) => t ?? null);
+    }
+    return result ?? null;
+  };
+
+  const sharedOpts: HubClientOptions = {
+    baseUrl: options.baseUrl,
+    getToken: getToken as () => string | null | undefined,
+    ...(options.fetchImpl ? { fetch: options.fetchImpl } : {}),
+  };
+
+  const shared = createSharedHubClient(sharedOpts);
 
   return {
+    shared,
+
     async getMobileSnapshot() {
-      return requestJson<MobileAppFixture>({
-        baseUrl: options.baseUrl,
-        fetchImpl,
-        getAccessToken: options.getAccessToken,
-        path: '/v1/mobile/snapshot',
-      });
+      // Build a mobile snapshot from real Hub API data
+      const [sessions, contacts] = await Promise.all([
+        shared.listSessions().catch(() => [] as HubSession[]),
+        shared.listContacts().catch(() => [] as HubContactInfo[]),
+      ]);
+
+      return mapSessionsToMobileFixture(sessions, contacts);
     },
+
+    oidcAuthorize: (body) => shared.oidcAuthorize(body),
+    oidcCallback: (body) => shared.oidcCallback(body),
+    refresh: (refreshToken) => shared.refresh(refreshToken),
+    logout: () => shared.logout(),
+    me: () => shared.me(),
+    listSessions: () => shared.listSessions(),
+    searchSessions: (q) => shared.searchSessions(q),
+    sendMessage: (sessionId, body) => shared.sendMessage(sessionId, body),
+    getMessages: (sessionId, params) => shared.getMessages(sessionId, params),
+    syncMessages: (sessionId, params) => shared.syncMessages(sessionId, params),
+    markRead: (sessionId, lastReadSeq) => shared.markRead(sessionId, lastReadSeq),
+    searchUser: (targetUserId) => shared.searchUser(targetUserId),
+    listContacts: () => shared.listContacts(),
+    sendFriendRequest: (friendId, message) => shared.sendFriendRequest(friendId, message),
+    listFriendRequests: () => shared.listFriendRequests(),
+    acceptFriendRequest: (requestId) => shared.acceptFriendRequest(requestId),
+    rejectFriendRequest: (requestId) => shared.rejectFriendRequest(requestId),
+    blockContact: (targetUserId) => shared.blockContact(targetUserId),
+    unblockContact: (targetUserId) => shared.unblockContact(targetUserId),
+    updateContactRemark: (friendUserId, remark) => shared.updateContactRemark(friendUserId, remark),
+    listCustomAgents: () => shared.listCustomAgents(),
+    createCustomAgent: (body) => shared.createCustomAgent(body),
+    listExecutionTargets: () => shared.listExecutionTargets(),
   };
 }
+
+// ── WebSocket URL builder (aligned with hub-server /client/ws) ──
 
 export function createHubWsUrl(baseUrl: string, options: HubWsUrlOptions = {}): string {
   const url = new URL(baseUrl);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  url.pathname = '/v1/events';
+  url.pathname = '/client/ws';
   url.search = '';
 
   if (options.since) {
     url.searchParams.set('since', options.since);
   }
 
+  // Token goes in query for WS auth (server reads from query on upgrade)
+  if (options.token) {
+    url.searchParams.set('token', options.token);
+  }
+
   return url.toString();
 }
 
-async function requestJson<TBody>({
-  baseUrl,
-  fetchImpl,
-  getAccessToken,
-  path,
-}: {
-  baseUrl: string;
-  fetchImpl: HubFetch;
-  getAccessToken: AccessTokenProvider | undefined;
-  path: string;
-}): Promise<TBody> {
-  const headers: Record<string, string> = {
-    accept: 'application/json',
+// ── Session → Mobile fixture mapping ──
+
+function mapSessionsToMobileFixture(
+  sessions: HubSession[],
+  _contacts: HubContactInfo[],
+): MobileAppFixture {
+  return {
+    threads: sessions.map((session) => ({
+      id: session.session_id ?? session.id ?? '',
+      title: session.name ?? '',
+      subtitle: session.last_message?.content ?? '',
+      initials: extractInitials(session.name ?? ''),
+      unread: session.unread_count ?? 0,
+      muted: session.muted ?? false,
+      participantKind: (session.type === 'group' ? 'group' : 'agent') as 'agent' | 'group',
+      status: 'online' as const,
+      lastActivity: session.last_message_at ?? session.updated_at ?? new Date().toISOString(),
+    })),
+    runs: [],
+    transcript: {},
+    account: {
+      tokenDanceId: 'signed_in',
+      hubSession: 'active',
+      notification: 'granted',
+      hubSync: 'active',
+      deviceLabel: 'AgentHub Mobile',
+    },
   };
-  const accessToken = await getAccessToken?.();
-
-  if (accessToken) {
-    headers.authorization = `Bearer ${accessToken}`;
-  }
-
-  let response: Response;
-  try {
-    response = await fetchImpl(createHubRestUrl(baseUrl, path), {
-      headers,
-      method: 'GET',
-    });
-  } catch (error) {
-    throw new HubNetworkError('Network request to AgentHub failed', error);
-  }
-
-  const body = await parseJsonBody(response);
-
-  if (!response.ok) {
-    throw createApiError(response, body);
-  }
-
-  return body as TBody;
 }
 
-function createHubRestUrl(baseUrl: string, path: string): string {
-  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-  const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
-
-  return new URL(normalizedPath, normalizedBase).toString();
-}
-
-async function parseJsonBody(response: Response): Promise<unknown> {
-  const text = await response.text();
-
-  if (!text) {
-    return undefined;
+function extractInitials(name: string): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0]![0] ?? '') + (parts[1]![0] ?? '');
   }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-}
-
-function createApiError(response: Response, body: unknown): HubApiError {
-  const parsedError = parseErrorBody(body);
-  const message = redactSensitiveErrorText(
-    parsedError.message ?? response.statusText ?? `AgentHub request failed with ${response.status}`,
-  );
-  const code = redactSensitiveErrorText(parsedError.code ?? `http_${response.status}`);
-
-  return new HubApiError({
-    code,
-    message,
-    retryable: response.status >= 500 || response.status === 429,
-    status: response.status,
-  });
-}
-
-function redactSensitiveErrorText(text: string): string {
-  return text
-    .replace(/Authorization:\s*Bearer\s+[^\s,;]+/gi, 'Authorization: Bearer [redacted]')
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
-    .replace(/(access_token|refresh_token|id_token|client_secret|session_token)=([^&\s]+)/gi, '$1=[redacted]')
-    .replace(/(access_token|refresh_token|id_token|client_secret|session_token)["']?\s*[:=]\s*["']?[^"',\s}]+/gi, '$1=[redacted]');
-}
-
-function parseErrorBody(body: unknown): Partial<Pick<HubErrorDetails, 'code' | 'message'>> {
-  if (!body || typeof body !== 'object') {
-    return {};
-  }
-
-  const record = body as Record<string, unknown>;
-  const nestedError = record.error && typeof record.error === 'object' ? (record.error as Record<string, unknown>) : undefined;
-  const source = nestedError ?? record;
-  const code = typeof source.code === 'string' ? source.code : undefined;
-  const message = typeof source.message === 'string' ? source.message : undefined;
-  const parsed: Partial<Pick<HubErrorDetails, 'code' | 'message'>> = {};
-
-  if (code) {
-    parsed.code = code;
-  }
-
-  if (message) {
-    parsed.message = message;
-  }
-
-  return parsed;
-}
-
-function getGlobalFetch(): HubFetch {
-  if (typeof globalThis.fetch !== 'function') {
-    throw new HubNetworkError('No fetch implementation is available for AgentHub requests');
-  }
-
-  return globalThis.fetch.bind(globalThis) as HubFetch;
+  return name.slice(0, 2).toUpperCase();
 }

@@ -22,6 +22,7 @@ export interface HubEventStreamError {
 
 export interface CreateHubEventStreamOptions {
   baseUrl: string;
+  token?: string;
   since?: string;
   createWebSocket: HubWebSocketFactory;
   onEvent?: (event: HubWsEvent) => void;
@@ -33,24 +34,43 @@ export interface HubEventStream {
   close: () => void;
 }
 
+// Event types matching hub-server/internal/ws/frame.go and hubEvents.ts
 const knownEventTypes = new Set<HubWsEventType>([
-  'snapshot.updated',
-  'thread.updated',
-  'run.updated',
-  'approval.updated',
-  'presence.updated',
+  'auth',
+  'auth.ok',
+  'auth.fail',
+  'message.new',
+  'message.recall',
+  'message.read',
+  'session.created',
+  'session.dissolved',
+  'session.info_updated',
+  'device.online',
+  'device.offline',
+  'device.kicked',
+  'agent.dispatch',
+  'agent.stream',
+  'agent.done',
+  'agent.failed',
+  'agent.cancel',
+  'notification.new',
+  'friend.request',
+  'friend.accepted',
   'error',
 ]);
 
 export function createHubEventStream(options: CreateHubEventStreamOptions): HubEventStream {
   let closed = false;
-  const urlOptions: { since?: string; token?: string } = {};
+  const wsUrlOptions: { since?: string; token?: string } = {};
 
   if (options.since) {
-    urlOptions.since = options.since;
+    wsUrlOptions.since = options.since;
+  }
+  if (options.token) {
+    wsUrlOptions.token = options.token;
   }
 
-  const socket = options.createWebSocket(createHubWsUrl(options.baseUrl, urlOptions));
+  const socket = options.createWebSocket(createHubWsUrl(options.baseUrl, wsUrlOptions));
 
   options.onStatusChange?.('connecting');
 
@@ -147,11 +167,8 @@ function parseHubWsEvent(data: unknown): ParsedHubEvent {
     return { kind: 'discard' };
   }
 
-  if (
-    typeof body.value.id !== 'string' ||
-    typeof body.value.createdAt !== 'string' ||
-    !Object.hasOwn(body.value, 'payload')
-  ) {
+  // Server frames: { type: string, payload?: unknown, seq_id?: number }
+  if (!Object.hasOwn(body.value, 'payload') && !Object.hasOwn(body.value, 'type')) {
     return {
       kind: 'error',
       error: {
@@ -164,9 +181,8 @@ function parseHubWsEvent(data: unknown): ParsedHubEvent {
   return {
     kind: 'event',
     event: {
-      id: body.value.id,
       type: type as HubWsEventType,
-      createdAt: body.value.createdAt,
+      seq_id: typeof body.value.seq_id === 'number' ? body.value.seq_id : undefined,
       payload: body.value.payload,
     },
   };
