@@ -8,6 +8,8 @@ import {
 } from '../designIcons';
 import { resolveWorkbenchProfile } from '../profileRegistry';
 import { RuntimeBrandIcon } from '../RuntimeBrandIcon';
+import { agentConfigToAgentSpecFixture } from '../agentProfileCatalog';
+import { formatAgentHubAgentSpecV1 } from '../../agentSpec';
 import { Select } from '../../ui';
 import styles from './AgentsPage.module.css';
 
@@ -564,6 +566,8 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       <ConfigSummaryRow label="Target" value={formatList(agent.targetPreferences, '未声明 target')} />
     </div>
 
+    <AgentSpecFixturePanel agent={agent} />
+
     {/* Edit grid */}
     <div className={styles['agent-edit-grid']}>
       <label>
@@ -751,6 +755,35 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
     </div>
   </aside>
 );
+
+const AgentSpecFixturePanel: React.FC<{ agent: AgentConfig }> = ({ agent }) => {
+  const spec = agentConfigToAgentSpecFixture(agent);
+  const preview = formatAgentHubAgentSpecV1(spec);
+
+  return (
+    <section className={styles['agent-spec-fixture']} aria-label={`${agent.name} AgentSpec fixture`}>
+      <div className={styles['section-title-row']}>
+        <h3>AgentSpec fixture</h3>
+        <span>no-spend</span>
+      </div>
+      <div className={styles['agent-spec-grid']}>
+        <ConfigSummaryRow label="Runtime" value={`${spec.runtime.id} · ${spec.runtime.profile}`} />
+        <ConfigSummaryRow label="Model" value={`${spec.runtime.provider} / ${spec.runtime.model}`} />
+        <ConfigSummaryRow label="Tools" value={formatList(spec.tool_allowlist, '未声明 tool')} />
+        <ConfigSummaryRow label="MCP" value={formatList(spec.mcp_servers.map((server) => server.id), '未绑定 MCP')} />
+        <ConfigSummaryRow label="Memory" value={`${spec.memory_policy.mode} · ${spec.memory_policy.retention}`} />
+        <ConfigSummaryRow label="Approval" value={[
+          spec.approval_policy.mode,
+          formatList(spec.approval_policy.require_approval_for, ''),
+        ].filter(Boolean).join(' · ')} />
+      </div>
+      <pre className={styles['agent-spec-preview']}>{preview}</pre>
+      <p className={styles['agent-spec-note']}>
+        仅编译 fixture JSON，不导入 SDK、不启动 CLI、不调用模型。
+      </p>
+    </section>
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════════════
    2. Agent 市场 (Market)
