@@ -2,8 +2,8 @@
 
 > Date: 2026-06-09
 > Worker: Edge storage worker
-> Base: `origin/dev/delicious233` at `10815824`
-> Scope: Edge durable SQLite store readiness and local contract smoke. No Hub, Web, Desktop, CLI adapter execution, mobile, or roadmap files were changed.
+> Base: `origin/dev/delicious233` at `0a36b7d`
+> Scope: Edge durable SQLite store readiness, FileStore parity, migration/status manifest, and Desktop Local Edge startup preflight metadata. No Hub, Web Projects, CLI adapter execution, mobile, or roadmap files were changed.
 
 ## Summary
 
@@ -16,6 +16,8 @@ What exists on the current dev branch plus this slice:
 - Generic row restore exists: a SQLite database can restore projects, threads, runs, items, pins, diffs, artifacts, and previews from `agenthub_store_rows` when the snapshot is missing.
 - Relational projection tables exist for owners, workspaces, runs, artifacts, diffs, and previews.
 - `SQLiteReadiness(path)` reports applied migration version, `PRAGMA integrity_check`, generic row counts, and projection row counts for local smoke/preflight usage.
+- `SQLiteReadinessManifestForPath(path)` returns schema `agenthub-edge-sqlite-readiness-v1`, `ready` / `blocked` status, expected migration version, missing/unknown migration versions, required row kinds, required projection tables, and row/projection counts.
+- Desktop Local Edge host readiness exposes the SQLite backend, readiness manifest schema, expected migration version, app-data DB policy, logs, sidecar args, and preflight blockers before starting Local Edge.
 - Existing contract tests cover memory, file, and SQLite restore behavior; SQLite migration tests cover idempotent apply, rollback to snapshot-only schema, foreign keys, nested path creation, transient lock waiting, generic row restore, projection content, and per-write reopen readiness.
 
 What is not proven:
@@ -97,6 +99,9 @@ Existing tests that should remain required for any future SQLite store change:
 | Diff ID safety | `TestSQLiteProjectionDiffIDDoesNotCollideOnColonDelimitedRunAndPath`. |
 | Generic row restore | `TestSQLiteStoreRestoresContractRowsWhenSnapshotIsMissing`. |
 | Per-write local readiness | `TestSQLiteStoreReadinessRestoresAfterEachDurableWrite`. |
+| Migration/status manifest | `TestSQLiteReadinessManifestForPathReturnsSerializableStatus` and `TestSQLiteReadinessManifestBlocksStaleMigrationState`. |
+| FileStore row-kind parity | `TestFileStoreAndSQLiteReadinessRowKindParity`. |
+| Desktop startup preflight metadata | `edge_manager` tests plus Desktop platform/diagnostic formatter tests. |
 
 Add these before promoting SQLite to production durable store:
 
@@ -156,15 +161,18 @@ Phase 4: operator migration.
 
 ## Current Safe Slice Completed
 
-This slice adds a local readiness helper and a focused SQLite contract smoke:
+This slice adds a local readiness helper, manifest/status reporting, FileStore parity coverage, and Desktop preflight metadata:
 
 - `SQLiteReadiness(path)` reports migration version, integrity check, generic row counts, and projection counts.
+- `SQLiteReadinessManifestForPath(path)` reports schema `agenthub-edge-sqlite-readiness-v1`, ready/blocked status, latest/expected migration versions, missing/unknown migration versions, required row kinds, required projection tables, and row/projection counts.
 - `TestSQLiteStoreReadinessRestoresAfterEachDurableWrite` reopens after each key write boundary: project, thread, run status, replay item, pin, file-change diff, artifact content source, and preview.
+- `TestFileStoreAndSQLiteReadinessRowKindParity` writes the same local contract data to JSON FileStore and SQLite, then compares file snapshot counts with SQLite manifest row counts.
+- Desktop Local Edge host readiness now advertises `store_backend=sqlite`, `store_readiness_manifest_schema=agenthub-edge-sqlite-readiness-v1`, and `expected_store_migration_version=4` in the read-only preflight/diagnostic surface.
 - The slice remains fixture-only and local-temp-DB-only. It does not make a production durable-store claim.
 
 ## Non-Goals
 
-- No Hub, Web, Desktop, CLI adapter execution, mobile, or roadmap changes.
+- No Hub, Web Projects, CLI adapter execution, mobile, or roadmap changes.
 - No real CLI/model execution.
 - No public deploy or runtime configuration change.
 - No conversion from snapshot-backed SQLite preview to row-first durable store.

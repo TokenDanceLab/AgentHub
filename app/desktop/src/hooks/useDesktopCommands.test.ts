@@ -13,7 +13,10 @@ const diagnostics: DesktopLocalEdgeDiagnostics = {
     route: 'local-edge-api',
     bind_addr: '127.0.0.1:3210',
     health_url: 'http://127.0.0.1:3210/v1/health',
+    store_backend: 'sqlite',
     store_db_policy: '<app-data>/agenthub-edge.sqlite',
+    store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+    expected_store_migration_version: 4,
     log_paths: {
       directory: '<app-data>/edge-logs',
       stdout: '<app-data>/edge-logs/local-edge.stdout.log',
@@ -78,6 +81,13 @@ const dispatchReadiness: DesktopEdgeDispatchReadiness = {
   dispatchReady: false,
   disabledReason: 'local-edge-target-degraded',
   dispatchTarget: null,
+  targetBinding: {
+    expectedTargetId: 'local-edge',
+    observedTargetId: 'hub-target-local-1',
+    expectedEdgeDeviceId: 'desktop-device-1',
+    observedEdgeDeviceId: 'desktop-device-1',
+    status: 'mismatch',
+  },
   route: 'local-edge-api',
   targetType: 'local_edge',
   targetId: 'hub-target-local-1',
@@ -109,7 +119,10 @@ describe('formatLocalEdgeDiagnosticText', () => {
     expect(text).toContain('device id: desktop-device-1');
     expect(text).toContain('health: http://127.0.0.1:3210/v1/health');
     expect(text).toContain('preflight: ready');
+    expect(text).toContain('store backend: sqlite');
     expect(text).toContain('store: <app-data>/agenthub-edge.sqlite');
+    expect(text).toContain('store readiness manifest: agenthub-edge-sqlite-readiness-v1');
+    expect(text).toContain('expected store migration: 4');
     expect(text).toContain('logs: <app-data>/edge-logs');
     expect(text).toContain('stdout: <app-data>/edge-logs/local-edge.stdout.log');
     expect(text).toContain('stderr: <app-data>/edge-logs/local-edge.stderr.log');
