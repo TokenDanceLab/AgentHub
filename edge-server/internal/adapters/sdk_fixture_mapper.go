@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	SDKFixtureProviderClaude = "claude-sdk-fixture"
-	SDKFixtureProviderOpenAI = "openai-agents-sdk-fixture"
+	SDKFixtureProviderClaude                 = "claude-sdk-fixture"
+	SDKFixtureProviderOpenAI                 = "openai-agents-sdk-fixture"
+	SDKFixtureProviderOpenCode               = "opencode-agent-sdk-fixture"
+	SDKFixtureProviderCustomOpenAICompatible = "custom-openai-compatible-fixture"
 
 	sdkFixtureEventArtifactCreated = "artifact.created"
 )
@@ -68,27 +70,38 @@ type SDKFixtureEvent struct {
 	// Provider-neutral Edge contract fields. These are fixture-only projections
 	// of SDK/CLI signals and must stay redacted before they cross the adapter
 	// boundary.
-	AdapterID           string           `json:"adapterId,omitempty"`
-	CommandName         string           `json:"commandName,omitempty"`
-	ArgFlags            []string         `json:"argFlags,omitempty"`
-	ConfigKeys          []string         `json:"configKeys,omitempty"`
-	PositionalArgCount  int              `json:"positionalArgCount,omitempty"`
-	EnvNames            []string         `json:"envNames,omitempty"`
-	WorkDir             string           `json:"workDir,omitempty"`
-	PromptRedacted      bool             `json:"promptRedacted,omitempty"`
-	Observed            bool             `json:"observed,omitempty"`
-	RealTested          bool             `json:"realTested,omitempty"`
-	RealTestedReason    string           `json:"realTestedReason,omitempty"`
-	ExecutionMode       string           `json:"executionMode,omitempty"`
-	NoSpendDefault      bool             `json:"noSpendDefault,omitempty"`
-	RedactionApplied    bool             `json:"redactionApplied,omitempty"`
-	ApprovalRequired    bool             `json:"approvalRequired,omitempty"`
-	ApprovalEvidenceRef string           `json:"approvalEvidenceRef,omitempty"`
-	TaskID              string           `json:"taskId,omitempty"`
-	Description         string           `json:"description,omitempty"`
-	LastToolName        string           `json:"lastToolName,omitempty"`
-	Percent             float64          `json:"percent,omitempty"`
-	Usage               *SDKFixtureUsage `json:"usage,omitempty"`
+	AdapterID           string                  `json:"adapterId,omitempty"`
+	CommandName         string                  `json:"commandName,omitempty"`
+	ArgFlags            []string                `json:"argFlags,omitempty"`
+	ConfigKeys          []string                `json:"configKeys,omitempty"`
+	PositionalArgCount  int                     `json:"positionalArgCount,omitempty"`
+	EnvNames            []string                `json:"envNames,omitempty"`
+	WorkDir             string                  `json:"workDir,omitempty"`
+	PromptRedacted      bool                    `json:"promptRedacted,omitempty"`
+	Observed            bool                    `json:"observed,omitempty"`
+	RealTested          bool                    `json:"realTested,omitempty"`
+	RealTestedReason    string                  `json:"realTestedReason,omitempty"`
+	ExecutionMode       string                  `json:"executionMode,omitempty"`
+	NoSpendDefault      bool                    `json:"noSpendDefault,omitempty"`
+	RedactionApplied    bool                    `json:"redactionApplied,omitempty"`
+	ApprovalRequired    bool                    `json:"approvalRequired,omitempty"`
+	ApprovalEvidenceRef string                  `json:"approvalEvidenceRef,omitempty"`
+	TaskID              string                  `json:"taskId,omitempty"`
+	Description         string                  `json:"description,omitempty"`
+	LastToolName        string                  `json:"lastToolName,omitempty"`
+	Percent             float64                 `json:"percent,omitempty"`
+	Usage               *SDKFixtureUsage        `json:"usage,omitempty"`
+	Capabilities        *SDKFixtureCapabilities `json:"capabilities,omitempty"`
+	Health              *SDKFixtureHealth       `json:"health,omitempty"`
+
+	// Fixture evidence metadata. These fields describe the AgentHub-owned
+	// runtime adapter projection, not provider-native SDK objects.
+	RuntimeID           string `json:"runtimeId,omitempty"`
+	AdapterMode         string `json:"adapterMode,omitempty"`
+	FixtureTransport    string `json:"fixtureTransport,omitempty"`
+	WorkspacePathPolicy string `json:"workspacePathPolicy,omitempty"`
+	RawSDKObjectPolicy  string `json:"rawSdkObjectPolicy,omitempty"`
+	FixtureOnly         bool   `json:"fixtureOnly,omitempty"`
 }
 
 // SDKFixtureUsage is a provider-neutral usage/cost projection accepted only by
@@ -98,6 +111,31 @@ type SDKFixtureUsage struct {
 	OutputTokens int64   `json:"outputTokens,omitempty"`
 	TotalTokens  int64   `json:"totalTokens,omitempty"`
 	TotalCostUSD float64 `json:"totalCostUsd,omitempty"`
+}
+
+// SDKFixtureCapabilities is a fixture-only provider-neutral capability shape.
+// It mirrors AgentHub runtime abilities instead of provider SDK feature names.
+type SDKFixtureCapabilities struct {
+	Streaming       bool     `json:"streaming,omitempty"`
+	ToolCalls       bool     `json:"toolCalls,omitempty"`
+	FileChanges     bool     `json:"fileChanges,omitempty"`
+	PermissionHooks bool     `json:"permissionHooks,omitempty"`
+	ThinkingVisible bool     `json:"thinkingVisible,omitempty"`
+	MultiTurn       bool     `json:"multiTurn,omitempty"`
+	MCPIntegration  bool     `json:"mcpIntegration,omitempty"`
+	SubAgentSpawn   bool     `json:"subAgentSpawn,omitempty"`
+	FixtureOnly     bool     `json:"fixtureOnly,omitempty"`
+	NoSpendDefault  bool     `json:"noSpendDefault,omitempty"`
+	Transports      []string `json:"transports,omitempty"`
+}
+
+// SDKFixtureHealth records no-spend health evidence for fixture capability
+// checks. It must not contain provider credentials or raw SDK session objects.
+type SDKFixtureHealth struct {
+	State    string            `json:"state,omitempty"`
+	Reason   string            `json:"reason,omitempty"`
+	Checks   map[string]string `json:"checks,omitempty"`
+	Metadata map[string]any    `json:"metadata,omitempty"`
 }
 
 // SDKMappedEvent is the AgentHub-owned event projection emitted by the mapper.
@@ -180,6 +218,8 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 			"summary":   event.Summary,
 			"reason":    event.Reason,
 		}))
+	case "runtime_metadata", "capability_health", "capabilities", "health":
+		return oneSDKMappedEvent(BusEventStatusChange, scope, commonSDKPayload(event, provider, sdkFixtureCapabilityHealthPayload(event)))
 	case "progress", "task_progress":
 		return oneSDKMappedEvent(BusEventTaskProgress, scope, commonSDKPayload(event, provider, map[string]any{
 			"taskId":       firstNonEmpty(event.TaskID, event.ID),
@@ -394,11 +434,11 @@ func normalizeSDKFixtureType(value string) string {
 		return "tool_result"
 	case "approval_request", "permission", "can_use_tool":
 		return "permission_request"
-	case "permission_asked":
+	case "permission_asked", "permission_requested":
 		return "permission_request"
 	case "guardrail", "guardrail_triggered", "approval_signal":
 		return "guardrail_signal"
-	case "route", "handoff_suggestion":
+	case "route", "route_decision", "handoff_suggestion":
 		return "handoff_suggestion"
 	case "file", "file_update", "file_changed":
 		return "file_change"
@@ -477,6 +517,74 @@ func sdkUsagePayload(event SDKFixtureEvent) map[string]any {
 	}
 	if event.SessionID != "" {
 		payload["sessionId"] = event.SessionID
+	}
+	return payload
+}
+
+func sdkFixtureCapabilityHealthPayload(event SDKFixtureEvent) map[string]any {
+	healthState := "fixture-ready"
+	if event.Health != nil && strings.TrimSpace(event.Health.State) != "" {
+		healthState = event.Health.State
+	}
+	payload := map[string]any{
+		"status":              healthState,
+		"runtimeId":           firstNonEmpty(event.RuntimeID, event.AdapterID),
+		"adapterId":           event.AdapterID,
+		"adapterMode":         firstNonEmpty(event.AdapterMode, "fixture"),
+		"fixtureOnly":         true,
+		"noSpendDefault":      true,
+		"fixtureTransport":    firstNonEmpty(event.FixtureTransport, "fixture-file"),
+		"workspacePathPolicy": firstNonEmpty(event.WorkspacePathPolicy, "workspace-relative-or-basename"),
+		"rawSdkObjectPolicy":  firstNonEmpty(event.RawSDKObjectPolicy, "never-expose-above-edge-adapter"),
+	}
+	if event.Capabilities != nil {
+		payload["capabilities"] = sanitizeSDKValue(sdkFixtureCapabilitiesPayload(*event.Capabilities))
+	}
+	if event.Health != nil {
+		payload["health"] = sanitizeSDKValue(map[string]any{
+			"state":    healthState,
+			"reason":   event.Health.Reason,
+			"checks":   event.Health.Checks,
+			"metadata": event.Health.Metadata,
+		})
+	}
+	return payload
+}
+
+func sdkFixtureCapabilitiesPayload(capabilities SDKFixtureCapabilities) map[string]any {
+	payload := map[string]any{}
+	if capabilities.Streaming {
+		payload["streaming"] = true
+	}
+	if capabilities.ToolCalls {
+		payload["toolCalls"] = true
+	}
+	if capabilities.FileChanges {
+		payload["fileChanges"] = true
+	}
+	if capabilities.PermissionHooks {
+		payload["permissionHooks"] = true
+	}
+	if capabilities.ThinkingVisible {
+		payload["thinkingVisible"] = true
+	}
+	if capabilities.MultiTurn {
+		payload["multiTurn"] = true
+	}
+	if capabilities.MCPIntegration {
+		payload["mcpIntegration"] = true
+	}
+	if capabilities.SubAgentSpawn {
+		payload["subAgentSpawn"] = true
+	}
+	if capabilities.FixtureOnly {
+		payload["fixtureOnly"] = true
+	}
+	if capabilities.NoSpendDefault {
+		payload["noSpendDefault"] = true
+	}
+	if len(capabilities.Transports) > 0 {
+		payload["transports"] = envNamesOnly(capabilities.Transports)
 	}
 	return payload
 }
