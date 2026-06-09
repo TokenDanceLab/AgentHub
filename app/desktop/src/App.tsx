@@ -26,6 +26,8 @@ import {
   useUpdateAgentProfile,
   useDeleteAgentProfile,
   edgeAgentProfileToWorkbenchAgent,
+  useHubAgentProfiles,
+  hubAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
 import type { AgentConfig, DocRow } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
@@ -84,6 +86,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const { data: agentData } = useAgentList(liveEdgeEnabled);
   const { data: modelCatalog } = useModelCatalog(liveEdgeEnabled);
   const { data: profileData } = useAgentProfileList(liveEdgeEnabled);
+  const { data: hubProfileData } = useHubAgentProfiles({ enabled: !workbench.isDemo && !liveEdgeEnabled });
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
@@ -149,14 +152,20 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   // Merge strategy: Edge profiles (user-configured) take priority over raw adapter list.
   // When profiles exist, they represent the user's saved agent configurations.
   // When no profiles exist yet, fall back to the raw adapter list.
+  // When Edge is offline, fall back to Hub agent profiles.
   const agents = useMemo(() => {
     if (workbench.isDemo) return workbench.agents;
     const profiles = profileData?.items;
     if (profiles && profiles.length > 0) {
       return profiles.map(edgeAgentProfileToWorkbenchAgent);
     }
+    // Hub fallback when Edge is offline
+    const hubProfiles = hubProfileData;
+    if (hubProfiles && hubProfiles.length > 0) {
+      return hubProfiles.map(hubAgentProfileToWorkbenchAgent);
+    }
     return edgeAgents;
-  }, [workbench.isDemo, workbench.agents, profileData?.items, edgeAgents]);
+  }, [workbench.isDemo, workbench.agents, profileData?.items, hubProfileData, edgeAgents]);
 
   async function handleAgentCreate(agent: AgentConfig): Promise<void> {
     setAgentActionError(undefined);
