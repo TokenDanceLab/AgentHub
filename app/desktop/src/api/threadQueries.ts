@@ -14,11 +14,13 @@ import {
 } from './edgeClient';
 import type { ListResponse, ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
 
-export function useThreads(projectId?: string) {
+export function useThreads(projectId?: string, options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true;
   return useQuery<ListResponse<ThreadInfo>>({
     queryKey: ['threads', projectId],
     queryFn: () => fetchThreads(projectId),
-    refetchInterval: 10_000,
+    enabled,
+    refetchInterval: enabled ? 10_000 : false,
   });
 }
 

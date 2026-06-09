@@ -51,6 +51,9 @@ vi.mock('@shared/workbench', () => ({
     activeConversationId?: string;
     conversations?: Array<{ id: string; title: string }>;
     platform?: CapturedPlatform;
+    showComposerAgentPicker?: boolean;
+    showComposerStatus?: boolean;
+    showMainchainStatus?: boolean;
     transcript?: Array<{ text?: string }>;
   }) => {
     const activeConversation =
@@ -66,6 +69,15 @@ vi.mock('@shared/workbench', () => ({
           <div role="tablist" aria-label="右侧工作区" />
           <h1>{activeConversation?.title ?? 'AgentHub'}</h1>
           <input placeholder={`发消息给 ${activeConversation?.title ?? 'AgentHub'}`} />
+          {props.showMainchainStatus !== false ? (
+            <div role="region" aria-label="Demo main chain status" />
+          ) : null}
+          {props.showComposerAgentPicker !== false ? (
+            <button type="button">@Agent</button>
+          ) : null}
+          {props.showComposerStatus !== false ? (
+            <div role="status">Data: auto Target: hidden</div>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -175,12 +187,18 @@ describe('Web app root', () => {
     expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'web');
     expect(screen.queryByRole('group', { name: 'Window controls' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Desktop navigation controls' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '最小化' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '切换左侧栏' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '后退' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '前进' })).not.toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: '右侧工作区' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('发消息给 Agent 协作群')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();

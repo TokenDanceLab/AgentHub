@@ -1,14 +1,15 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import {
-  WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
+  demoWorkbenchAgents,
   getWorkbenchDataModeOverrideSnapshot,
+  isWorkbenchRealDataMode,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
   workbenchDemoRuntimeStore,
   type WorkbenchDataMode,
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
-import type { WorkbenchConversation } from '@shared/platform';
+import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
@@ -17,11 +18,15 @@ export interface DesktopWorkbenchModel {
   activeConversationId: string;
   activeProjectId?: string;
   activeThreadId?: string;
+  agents: WorkbenchAgent[];
   conversations: WorkbenchConversation[];
+  dataMode: string;
+  isDemo: boolean;
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
 }
 
 const EMPTY_TRANSCRIPT: ReturnType<typeof normalizeThreadItemsToTranscript> = [];
+const DESKTOP_DEMO_DEFAULT_CONVERSATION_ID = 'agent-collab';
 
 export function useDesktopWorkbenchModel(selectedConversationId?: string): DesktopWorkbenchModel {
   const dataModeOverride = useSyncExternalStore(
@@ -30,28 +35,39 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     getWorkbenchDataModeOverrideSnapshot,
   );
   const dataMode = getWorkbenchDataMode(dataModeOverride);
-  const useDemo = dataMode === 'fixture' || (dataMode === 'auto' && isBrowserPreview());
   const demoSnapshot = useSyncExternalStore(
     workbenchDemoRuntimeStore.subscribe,
     workbenchDemoRuntimeStore.getSnapshot,
     workbenchDemoRuntimeStore.getSnapshot,
   );
-  const threadsQuery = useThreads();
-  const threads = threadsQuery.data?.items ?? [];
-  const activeThread = threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0];
+  const useDemo = !isWorkbenchRealDataMode(dataMode);
+  const threadsQuery = useThreads(undefined, { enabled: !useDemo });
+  const threads = useDemo ? [] : threadsQuery.data?.items ?? [];
+  const activeThread = useDemo
+    ? undefined
+    : threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0];
   const activeConversationId = activeThread?.threadId ?? selectedConversationId ?? '';
-  const threadItemsQuery = useThreadMessages(activeThread?.threadId ?? null);
-  const threadPinsQuery = useThreadPins(activeThread?.threadId ?? null);
+  const threadItemsQuery = useThreadMessages(useDemo ? null : activeThread?.threadId ?? null);
+  const threadPinsQuery = useThreadPins(useDemo ? null : activeThread?.threadId ?? null);
   const threadItems = threadItemsQuery.data?.items;
   const threadPins = threadPinsQuery.data?.items;
   const persistedUntilMs = useMemo(() => latestThreadItemTimestampMs(threadItems), [threadItems]);
-  const liveTranscript = useDesktopEdgeEvents(activeThread?.threadId, persistedUntilMs);
+  const liveTranscript = useDesktopEdgeEvents(useDemo ? undefined : activeThread?.threadId, persistedUntilMs);
 
-  const demoModel = useMemo(() => ({
-    activeConversationId: selectedConversationId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
-    conversations: demoSnapshot.conversations,
-    transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedConversationId ?? WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID),
-  }), [demoSnapshot, selectedConversationId]);
+  const demoModel = useMemo(() => {
+    const selectedDemoConversation = demoSnapshot.conversations.some((conversation) => conversation.id === selectedConversationId)
+      ? selectedConversationId!
+      : DESKTOP_DEMO_DEFAULT_CONVERSATION_ID;
+
+    return {
+      activeConversationId: selectedDemoConversation,
+      agents: demoWorkbenchAgents,
+      conversations: demoSnapshot.conversations,
+      dataMode: dataMode === 'auto' ? 'mock (auto fallback)' : dataMode,
+      isDemo: true,
+      transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedDemoConversation),
+    };
+  }, [dataMode, demoSnapshot, selectedConversationId]);
 
   const conversations = useMemo(() => {
     if (threads.length === 0) return [];
@@ -77,16 +93,14 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     activeConversationId,
     ...(activeThread?.projectId ? { activeProjectId: activeThread.projectId } : {}),
     ...(activeThread?.threadId ? { activeThreadId: activeThread.threadId } : {}),
+    agents: [],
     conversations,
+    dataMode,
+    isDemo: false,
     transcript,
   };
 
   return useDemo ? demoModel : liveModel;
-}
-
-/** Browser preview (no Tauri shell) uses mock data for demo fidelity. */
-function isBrowserPreview(): boolean {
-  return typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window);
 }
 
 function getWorkbenchDataMode(override: WorkbenchDataMode | undefined): WorkbenchDataMode {

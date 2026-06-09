@@ -583,13 +583,9 @@ describe('AgentHubWorkbench', () => {
     expect(resizer).toHaveAttribute('aria-valuenow', '360');
 
     fireEvent.click(screen.getByRole('button', { name: '对话' }));
-    expect(shell).toHaveAttribute('data-sidebar-collapsed', 'true');
-
-    fireEvent.click(screen.getByRole('button', { name: '对话' }));
-    expect(shell).toHaveStyle({ '--sidebar-w': '260px' });
     expect(shell).toHaveAttribute('data-sidebar-collapsed', 'false');
 
-    for (let index = 0; index < 2; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       fireEvent.keyDown(resizer, { key: 'ArrowLeft', shiftKey: true });
     }
     expect(shell).toHaveStyle({ '--sidebar-w': '180px' });
@@ -598,6 +594,38 @@ describe('AgentHubWorkbench', () => {
     fireEvent.keyDown(resizer, { key: 'ArrowLeft', shiftKey: true });
     expect(shell).toHaveStyle({ '--sidebar-w': '180px' });
     expect(shell).toHaveAttribute('data-sidebar-collapsed', 'true');
+  });
+
+  it('toggles the conversation sidebar from the Desktop titlebar event', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    const shell = screen.getByTestId('agenthub-workbench');
+    expect(shell).toHaveAttribute('data-sidebar-collapsed', 'false');
+
+    act(() => {
+      window.dispatchEvent(new Event('agenthub:desktop-toggle-sidebar'));
+    });
+
+    expect(shell).toHaveAttribute('data-sidebar-collapsed', 'true');
+
+    act(() => {
+      window.dispatchEvent(new Event('agenthub:desktop-toggle-sidebar'));
+    });
+
+    expect(shell).toHaveAttribute('data-sidebar-collapsed', 'false');
   });
 
   it('renders pinned announcements from the active conversation only', () => {
@@ -1617,6 +1645,7 @@ describe('AgentHubWorkbench', () => {
     expect(within(dialog).getByRole('button', { name: '我的个人名片' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '我的二维码与链接' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '登录更多账号' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '退出登录' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '复制链接' }));
     expect(screen.getByText('已复制链接')).toBeInTheDocument();

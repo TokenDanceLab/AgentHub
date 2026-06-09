@@ -142,6 +142,9 @@ function WebWorkbenchRoot() {
         onApprovalDecision={workbench.onApprovalDecision}
         platform={webPlatform}
         runtimeEvidence={workbench.runtimeEvidence}
+        showComposerAgentPicker={false}
+        showComposerStatus={false}
+        showMainchainStatus={false}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
       />
