@@ -24,6 +24,7 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/router"
+	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/ws"
 	debugpkg "github.com/agenthub/pkg/debug"
@@ -57,6 +58,7 @@ type App struct {
 	AttachmentService      *service.AttachmentService
 	NotificationService    *service.NotificationService
 	DeviceService          *service.DeviceService
+		DocumentService        *service.DocumentService
 
 	// OIDC (optional — only when TokenDance ID is configured)
 	OIDCService *service.OIDCService
@@ -84,6 +86,7 @@ type App struct {
 	WorkspaceHandler       *handler.WorkspaceHandler
 	AuditHandler           *handler.AuditHandler
 	AgentTeamHandler       *handler.AgentTeamHandler
+		DocumentHandler        *handler.DocumentHandler
 
 	// AgentTeam
 	AgentTeamService *service.AgentTeamService
@@ -94,6 +97,9 @@ type App struct {
 
 	// Audit
 	AuditService *service.AuditService
+
+	// Settings
+	UserSettingsHandler *handler.UserSettingsHandler
 
 	// Goroutine lifecycle
 	coreCtx    context.Context
@@ -246,6 +252,14 @@ func (a *App) Run(ctx context.Context) error {
 	a.AgentTeamService.SetBus(a.bus)
 	a.AgentService.SetTeamRouteHandler(a.AgentTeamService)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
+	// Document service
+	a.DocumentService = service.NewDocumentService(a.DB)
+	a.DocumentHandler = handler.NewDocumentHandler(a.DocumentService)
+
+	// Settings service
+	settingsRepo := repository.NewUserSettingsRepository(a.DB)
+	settingsSvc := service.NewUserSettingsService(settingsRepo)
+	a.UserSettingsHandler = handler.NewUserSettingsHandler(settingsSvc)
 
 	// Relay service
 	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
@@ -399,6 +413,8 @@ func (a *App) setupRouter() *gin.Engine {
 		a.AuditHandler,
 		a.RelayHandler,
 		a.AgentTeamHandler,
+		a.DocumentHandler,
+		a.UserSettingsHandler,
 		a.WorkspaceHandler,
 	)
 	return r

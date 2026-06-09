@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/pkg/reqlog"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, workspaceHandlers ...*handler.WorkspaceHandler) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, documentHandler *handler.DocumentHandler, settingsHandler *handler.UserSettingsHandler, workspaceHandlers ...*handler.WorkspaceHandler) {
 	var workspaceHandler *handler.WorkspaceHandler
 	if len(workspaceHandlers) > 0 {
 		workspaceHandler = workspaceHandlers[0]
@@ -171,6 +171,17 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			notifications.POST("/:id/read", notificationHandler.MarkRead)
 			notifications.POST("/read-all", notificationHandler.ReadAll)
 		}
+
+		// Settings (user preferences — per-user key-value store)
+		if settingsHandler != nil {
+			settings := client.Group("/settings")
+			settings.Use(middleware.AuthMiddleware(cfg))
+			settings.Use(middleware.RequireHubSession())
+			{
+				settings.GET("", settingsHandler.GetSettings)
+				settings.PATCH("", settingsHandler.PatchSettings)
+			}
+		}
 	}
 
 	edge := r.Group("/edge")
@@ -270,6 +281,15 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.POST("/execution-targets/:id/ping", targetHandler.PingTarget)
 		}
 
+		// Documents (Docs Hub)
+		if documentHandler != nil {
+			web.GET("/documents", documentHandler.ListDocuments)
+			web.POST("/documents", documentHandler.CreateDocument)
+			web.GET("/documents/:id", documentHandler.GetDocument)
+			web.PATCH("/documents/:id", documentHandler.UpdateDocument)
+			web.DELETE("/documents/:id", documentHandler.DeleteDocument)
+		}
+
 		// Projects backed by Hub workspaces
 		if workspaceHandler != nil {
 			web.GET("/projects", workspaceHandler.ListWorkspaces)
@@ -320,6 +340,15 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete", agentTeamHandler.CompleteAssignment)
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail", agentTeamHandler.FailAssignment)
 			web.GET("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.ListAssignments)
+			}
 		}
-	}
+
+		// Documents (cloud docs + artifact projection)
+		if documentHandler != nil {
+			web.GET("/documents", documentHandler.ListDocuments)
+			web.GET("/documents/:id", documentHandler.GetDocument)
+			web.POST("/documents", documentHandler.CreateDocument)
+			web.PATCH("/documents/:id", documentHandler.UpdateDocument)
+			web.DELETE("/documents/:id", documentHandler.DeleteDocument)
+		}
 }
