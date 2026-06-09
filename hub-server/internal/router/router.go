@@ -342,13 +342,4 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.GET("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.ListAssignments)
 			}
 		}
-
-		// Documents (cloud docs + artifact projection)
-		if documentHandler != nil {
-			web.GET("/documents", documentHandler.ListDocuments)
-			web.GET("/documents/:id", documentHandler.GetDocument)
-			web.POST("/documents", documentHandler.CreateDocument)
-			web.PATCH("/documents/:id", documentHandler.UpdateDocument)
-			web.DELETE("/documents/:id", documentHandler.DeleteDocument)
-		}
 }
