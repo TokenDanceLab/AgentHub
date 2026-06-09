@@ -70,7 +70,7 @@ function Assert-GoTestPasses {
     $previousLocation = Get-Location
     try {
         Set-Location $edgeRoot
-        $readinessTests = "TestCLIJSONReadiness|TestCodexExecJSONReadiness|TestClaudeStreamJSONReadiness|TestOpenCodeJSONReadiness|TestCLIJSONReadinessModelProviderMetadataBaseline"
+        $readinessTests = "TestAgentHubAgentSpec|TestSDKFixtureMapper|TestCLIJSONReadiness|TestCodexExecJSONReadiness|TestClaudeStreamJSONReadiness|TestOpenCodeJSONReadiness|TestCLIJSONReadinessModelProviderMetadataBaseline"
         $output = & $go.Source test ./internal/adapters -run $readinessTests -short -count=1 2>&1
         if ($LASTEXITCODE -eq 0) {
             Pass "focused CLI JSON fixture parser tests pass"
@@ -108,6 +108,9 @@ $forbiddenPrimitivePattern = @(
 ) -join "|"
 
 Step "fixture contract files"
+Assert-Contains "edge-server\internal\adapters\agentspec_fixture.go" "CompileAgentSpecV1ToRuntimeInvocationFixture" "AgentHubAgentSpec runtime invocation fixture compiler exists"
+Assert-Contains "edge-server\internal\adapters\agentspec_fixture.go" "runtime_invocation\.fixture\.v1|NoSpendDefault|LiveRuntimeAllowed" "runtime invocation fixture carries no-spend live-runtime gate"
+Assert-Contains "edge-server\internal\adapters\sdk_fixture_mapper_test.go" "TestAgentHubAgentSpecV1CompilesSDKAndCLIInvocationFixtures" "AgentSpec compiler covers SDK and CLI fixture strategies"
 Assert-Contains "edge-server\internal\adapters\cli_json_readiness_test.go" "TestCLIJSONReadinessCommandPlansRedactPromptEnvAndPaths" "command plan redaction contract exists"
 Assert-Contains "edge-server\internal\adapters\cli_json_readiness_test.go" "codex exec --json|`"--json`"" "Codex exec JSONL fixture contract exists"
 Assert-Contains "edge-server\internal\adapters\cli_json_readiness_test.go" "stream-json|control_request" "Claude stream-json permission bridge fixture exists"

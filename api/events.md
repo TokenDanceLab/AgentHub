@@ -201,12 +201,13 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 
 ### Edge Adapter Fixture JSON Contract
 
-本节记录 Edge adapter 测试使用的 no-spend fixture/contract mapper。它只说明
-Claude Agent SDK-like、OpenAI Agents SDK-like、OpenCode sidecar 和 custom
-Agent runtime 的静态 JSON fixture 映射，不声明生产 SDK 包已安装、真实模型/API
-已调用，或真实 runtime path 已可用。生产 adapter 只有在 approved real
-runner/smoke 切片证明后，才能声明同样的 `run.agent.*` event shape 来自真实路径。
-Fixture 信号必须先映射到现有 `run.agent.*` vocabulary，再进入 Hub/Web replay。
+本节记录 Edge adapter 测试使用的 no-spend AgentHubAgentSpec -> RuntimeInvocation
+fixture/compiler 和 contract mapper。它只说明 Claude Agent SDK-like、OpenAI Agents
+SDK-like、OpenCode sidecar、Codex CLI JSON 和 custom Agent runtime 的静态 JSON
+fixture 映射，不声明生产 SDK 包已安装、真实模型/API 已调用，或真实 runtime path
+已可用。生产 adapter 只有在 approved real runner/smoke 切片证明后，才能声明同样的
+`run.agent.*` event shape 来自真实路径。Fixture 信号必须先编译成 AgentHub-owned
+RuntimeInvocation fixture，再映射到现有 `run.agent.*` vocabulary，最后进入 Hub/Web replay。
 Replay shape 保持：
 
 ```json
@@ -217,6 +218,17 @@ Provider-specific 字段留在 Edge adapter 边界内。Fixture event payload �
 prompt、API token、authorization header、secret-like key、绝对 workspace path 和
 provider trace body。路径安全时保留 workspace-relative；否则只保留 basename。
 当前离线矩阵只覆盖静态 fixture evidence，不安装 SDK 包、不联网、不跑真实模型/API。
+
+`AgentHubAgentSpec` fixture compiler 输出 `agenthub.runtime_invocation.fixture.v1`：
+
+| Field | Requirement |
+|---|---|
+| `execution_mode` | 固定为 `fixture` |
+| `no_spend_default` | 固定为 `true` |
+| `live_runtime_allowed` | 固定为 `false`；输入 spec 若允许 live runtime 必须被拒绝 |
+| `adapter_strategy` | `sdk-json-fixture`、`cli-json-fixture` 或 `custom-runtime-fixture` |
+| `parser_contract` | 只列 AgentHub-owned `run.agent.*` / `artifact.created` event vocabulary |
+| `cli_invocation_plan` | 仅 CLI JSON fixture strategy 可出现；必须只包含脱敏 command shape，不含 prompt、env value、绝对路径或真实执行证明 |
 
 Contract fixture mappings:
 
