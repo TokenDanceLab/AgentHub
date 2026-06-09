@@ -2,13 +2,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAccessToken } from '@/hooks/useAuth';
 import { createHubClient } from './hubClient';
 import type {
+  CreateWorkspaceProjectThreadRequest,
   CreateWorkspaceProjectRequest,
+  SendWorkspaceProjectThreadMessageRequest,
   UpdateWorkspaceProjectRequest,
   WorkspaceProject,
   WorkspaceProjectListResponse,
+  WorkspaceProjectThread,
+  WorkspaceProjectThreadMessage,
 } from './hubClient';
 
 export const workspaceProjectsQueryKey = ['web-v4', 'hub-projects'] as const;
+export const workspaceProjectThreadsQueryKey = ['web-v4', 'hub-project-threads'] as const;
 
 const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
   items: [],
@@ -60,6 +65,54 @@ export async function updateWorkspaceProject(
   return client.updateWorkspaceProject(projectId, draft);
 }
 
+export async function fetchWorkspaceProjectThreads(
+  projectId: string | undefined,
+  getToken: () => string | null = getAccessToken,
+): Promise<WorkspaceProjectThread[]> {
+  const token = getToken();
+  if (!projectId || !token) return [];
+
+  const client = createHubClient({ getToken: () => token });
+  return client.listWorkspaceProjectThreads(projectId);
+}
+
+export async function createWorkspaceProjectThread(
+  projectId: string,
+  draft: CreateWorkspaceProjectThreadRequest,
+  getToken: () => string | null = getAccessToken,
+): Promise<WorkspaceProjectThread> {
+  const token = getToken();
+  if (!token) throw new Error('Hub session is required');
+
+  const client = createHubClient({ getToken: () => token });
+  return client.createWorkspaceProjectThread(projectId, draft);
+}
+
+export async function fetchWorkspaceProjectThreadMessages(
+  projectId: string | undefined,
+  threadId: string | undefined,
+  getToken: () => string | null = getAccessToken,
+): Promise<WorkspaceProjectThreadMessage[]> {
+  const token = getToken();
+  if (!projectId || !threadId || !token) return [];
+
+  const client = createHubClient({ getToken: () => token });
+  return client.listWorkspaceProjectThreadMessages(projectId, threadId, { limit: 80 });
+}
+
+export async function sendWorkspaceProjectThreadMessage(
+  projectId: string,
+  threadId: string,
+  draft: SendWorkspaceProjectThreadMessageRequest,
+  getToken: () => string | null = getAccessToken,
+): Promise<WorkspaceProjectThreadMessage> {
+  const token = getToken();
+  if (!token) throw new Error('Hub session is required');
+
+  const client = createHubClient({ getToken: () => token });
+  return client.sendWorkspaceProjectThreadMessage(projectId, threadId, draft);
+}
+
 export function useHubWorkspaceProjects(options: {
   enabled: boolean;
   getToken?: () => string | null;
@@ -108,6 +161,75 @@ export function useUpdateHubWorkspaceProject(options: { getToken?: () => string 
     onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({ queryKey: workspaceProjectsQueryKey });
       void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-project', variables.projectId] });
+    },
+  });
+}
+
+export function useHubWorkspaceProjectThreads(options: {
+  projectId?: string | undefined;
+  enabled: boolean;
+  getToken?: () => string | null;
+}) {
+  return useQuery<WorkspaceProjectThread[]>({
+    queryKey: [...workspaceProjectThreadsQueryKey, options.projectId ?? 'none'],
+    queryFn: () => fetchWorkspaceProjectThreads(options.projectId, options.getToken ?? getAccessToken),
+    enabled: options.enabled && Boolean(options.projectId),
+    staleTime: 10_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useHubWorkspaceProjectThreadMessages(options: {
+  projectId?: string | undefined;
+  threadId?: string | undefined;
+  enabled: boolean;
+  getToken?: () => string | null;
+}) {
+  return useQuery<WorkspaceProjectThreadMessage[]>({
+    queryKey: [
+      'web-v4',
+      'hub-project-thread-messages',
+      options.projectId ?? 'none',
+      options.threadId ?? 'none',
+    ],
+    queryFn: () => fetchWorkspaceProjectThreadMessages(
+      options.projectId,
+      options.threadId,
+      options.getToken ?? getAccessToken,
+    ),
+    enabled: options.enabled && Boolean(options.projectId) && Boolean(options.threadId),
+    staleTime: 5_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useCreateHubWorkspaceProjectThread(options: { getToken?: () => string | null } = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, draft }: { projectId: string; draft: CreateWorkspaceProjectThreadRequest }) =>
+      createWorkspaceProjectThread(projectId, draft, options.getToken ?? getAccessToken),
+    onSettled: (_data, _error, variables) => {
+      void queryClient.invalidateQueries({ queryKey: [...workspaceProjectThreadsQueryKey, variables.projectId] });
+    },
+  });
+}
+
+export function useSendHubWorkspaceProjectThreadMessage(options: { getToken?: () => string | null } = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      { projectId, threadId, draft }: {
+        projectId: string;
+        threadId: string;
+        draft: SendWorkspaceProjectThreadMessageRequest;
+      },
+    ) => sendWorkspaceProjectThreadMessage(projectId, threadId, draft, options.getToken ?? getAccessToken),
+    onSettled: (_data, _error, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['web-v4', 'hub-project-thread-messages', variables.projectId, variables.threadId],
+      });
     },
   });
 }

@@ -242,6 +242,156 @@ describe('createHubClient', () => {
     expect(updated).toMatchObject({ name: 'AgentHub Demo', description: '' });
   });
 
+  it('uses Web project group thread routes for @Agent message contracts', async () => {
+    const a2aContent = {
+      text: '@Reviewer please inspect this Project Group slice',
+      metadata: {
+        im_kind: 'project_group',
+        mentions: [{ type: 'agent', id: 'agent-reviewer', display_name: 'Reviewer' }],
+        orchestrator_queue: {
+          status: 'queued',
+          route: 'review',
+          correlation_id: 'corr-project-agent-1',
+        },
+      },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/web/projects/project%2Fid/threads') && !init?.method) {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: [{
+              id: 'thread-1',
+              project_id: 'project/id',
+              type: 'group',
+              name: 'Project Group',
+              owner_user_id: 'user-1',
+              role: 'owner',
+              member_count: 3,
+              created_at: '2026-06-09T01:00:00Z',
+            }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/web/projects/project%2Fid/threads') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: {
+              id: 'thread-2',
+              project_id: 'project/id',
+              type: 'group',
+              name: 'Follow-up Group',
+              member_count: 1,
+              created_at: '2026-06-09T01:01:00Z',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.includes('/threads/thread%2Fid/messages?limit=80')) {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: [{
+              id: 'message-1',
+              project_id: 'project/id',
+              thread_id: 'thread/id',
+              seq_id: 1,
+              client_msg_id: 'client-message-1',
+              sender_type: 'user',
+              sender_id: 'user-1',
+              content_type: 'text',
+              content: JSON.stringify(a2aContent),
+              created_at: '2026-06-09T01:02:00Z',
+            }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            id: 'message-2',
+            project_id: 'project/id',
+            thread_id: 'thread/id',
+            seq_id: 2,
+            client_msg_id: 'client-message-2',
+            sender_type: 'user',
+            sender_id: 'user-1',
+            content_type: 'text',
+            content: JSON.stringify(a2aContent),
+            created_at: '2026-06-09T01:03:00Z',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createHubClient({
+      baseUrl: 'https://hub.example.test',
+      getToken: () => 'hub-access',
+    });
+
+    const threads = await client.listWorkspaceProjectThreads('project/id');
+    const createdThread = await client.createWorkspaceProjectThread('project/id', { name: 'Follow-up Group' });
+    const messages = await client.listWorkspaceProjectThreadMessages('project/id', 'thread/id', { limit: 80 });
+    const sent = await client.sendWorkspaceProjectThreadMessage('project/id', 'thread/id', {
+      client_msg_id: 'client-message-2',
+      content_type: 'text',
+      content: JSON.stringify(a2aContent),
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://hub.example.test/web/projects/project%2Fid/threads',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://hub.example.test/web/projects/project%2Fid/threads',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'Follow-up Group' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'https://hub.example.test/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'https://hub.example.test/web/projects/project%2Fid/threads/thread%2Fid/messages',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          client_msg_id: 'client-message-2',
+          content_type: 'text',
+          content: JSON.stringify(a2aContent),
+        }),
+      }),
+    );
+    expect(threads[0]).toMatchObject({ id: 'thread-1', name: 'Project Group', member_count: 3 });
+    expect(createdThread).toMatchObject({ id: 'thread-2', name: 'Follow-up Group' });
+    expect(JSON.parse(messages[0]!.content)).toMatchObject({
+      metadata: {
+        im_kind: 'project_group',
+        mentions: [{ id: 'agent-reviewer' }],
+        orchestrator_queue: { status: 'queued' },
+      },
+    });
+    expect(sent).toMatchObject({ id: 'message-2', thread_id: 'thread/id' });
+  });
+
   it('passes target_id when triggering a Hub agent task', async () => {
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({

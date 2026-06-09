@@ -55,7 +55,22 @@ function Copy-OptionalFile([string]$Source, [string]$DestinationDirectory) {
 }
 
 function Get-FileSha256([string]$PathValue) {
-    return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash.ToLowerInvariant()
+    $hashCommand = Get-Command "Get-FileHash" -ErrorAction SilentlyContinue
+    if ($hashCommand) {
+        return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+
+    $stream = [System.IO.File]::OpenRead((Resolve-Path -LiteralPath $PathValue).ProviderPath)
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return (($sha.ComputeHash($stream) | ForEach-Object { $_.ToString("x2") }) -join "")
+        } finally {
+            $sha.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
 }
 
 function Get-PackageRelativePath([string]$PathValue, [string]$RootPath) {
