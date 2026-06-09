@@ -25,6 +25,21 @@ var ModelAliases = map[string]map[string]string{
 		"sonnet": "newapi/deepseek-v4-pro",
 		"haiku":  "newapi/deepseek-v4-pro",
 	},
+	"anthropic-sdk": {
+		"opus":   "claude-opus-4-7",
+		"sonnet": "claude-sonnet-4-6",
+		"haiku":  "claude-haiku-4-5-20251001",
+		"4.7":    "claude-opus-4-7",
+		"4.6":    "claude-sonnet-4-6",
+		"4.5":    "claude-haiku-4-5-20251001",
+	},
+	"openai-sdk": {
+		"gpt-5":       "gpt-5.5",
+		"gpt-5-codex": "gpt-5.3-codex",
+		"gpt-5-mini":  "gpt-5.4-mini",
+		"gpt-5.5":     "gpt-5.5",
+		"o4":          "o4-mini",
+	},
 }
 
 // ReasoningEfforts maps generic effort levels to CLI-specific values.
@@ -48,6 +63,18 @@ var ReasoningEfforts = map[string]map[string]string{
 		"high":   "high",
 		"max":    "max",
 	},
+	"anthropic-sdk": {
+		"low":    "low",
+		"medium": "medium",
+		"high":   "high",
+		"max":    "max",
+	},
+	"openai-sdk": {
+		"low":    "low",
+		"medium": "medium",
+		"high":   "high",
+		"max":    "max",
+	},
 }
 
 // DefaultModels holds the default model per agent ID.
@@ -56,6 +83,8 @@ var DefaultModels = map[string]string{
 	"codex":        "gpt-5.5",
 	"opencode":     "newapi/deepseek-v4-pro",
 	"orchestrator": "claude-sonnet-4-6",
+	"anthropic-sdk": "claude-sonnet-4-6",
+	"openai-sdk":    "gpt-5.5",
 }
 
 // ResolveModel resolves a model identifier for a specific agent.
