@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -28,7 +30,13 @@ func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string)) {
 }
 
 func (h *WebSocketHandler) ServeWS(c *gin.Context) {
-	wsConn, err := websocket.Accept(c.Writer, c.Request, nil)
+	opts := &websocket.AcceptOptions{}
+	if !isProductionEnv() {
+		// Dev: allow any loopback origin (localhost / 127.0.0.1 on any port)
+		opts.InsecureSkipVerify = true
+	}
+
+	wsConn, err := websocket.Accept(c.Writer, c.Request, opts)
 	if err != nil {
 		slog.Warn("ws upgrade failed", "err", err)
 		return
@@ -221,5 +229,15 @@ func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 	default:
 		metrics.WSDroppedFrames.Inc()
 		slog.Warn("ws frame dropped: send buffer full", "conn_id", conn.ID, "user_id", conn.UserID)
+	}
+}
+
+// isProductionEnv returns true when running in production/release mode.
+func isProductionEnv() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AGENTHUB_ENV"))) {
+	case "production", "prod", "release":
+		return true
+	default:
+		return os.Getenv("GIN_MODE") == "release"
 	}
 }
