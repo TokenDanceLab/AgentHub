@@ -13,10 +13,13 @@ export type {
 export {
   WORKBENCH_DATA_MODE_STORAGE_KEY,
   getWorkbenchDataModeOverrideSnapshot,
+  isWorkbenchFixtureDataMode,
+  isWorkbenchRealDataMode,
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
+  workbenchDataModeLabel,
   writeWorkbenchDataModeOverride,
 } from './dataMode';
 export type {
