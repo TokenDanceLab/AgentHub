@@ -37,6 +37,7 @@ func TestBackendE2E_HubEdgeCallbackContract_DBWS_NoCLI(t *testing.T) {
 	mustOK(t, parse(postAuth("/edge/agent-tasks/"+task.ID+"/ack", desktopToken, map[string]string{
 		"run_id": edgeRunID,
 	})), "ack task")
+	assertTaskSummaryStatus(t, alice.Token, task.ID, model.TaskStatusRunning)
 
 	mustOK(t, parse(postAuth("/edge/agent-tasks/"+task.ID+"/stream", desktopToken, map[string]interface{}{
 		"run_id":     edgeRunID,
@@ -46,12 +47,14 @@ func TestBackendE2E_HubEdgeCallbackContract_DBWS_NoCLI(t *testing.T) {
 			"content": "contract stream chunk",
 		},
 	})), "stream task output")
+	assertTaskSummaryStatus(t, alice.Token, task.ID, model.TaskStatusRunning)
 
 	finalContent := `{"text":"Hub Edge callback contract final"}`
 	mustOK(t, parse(postAuth("/edge/agent-tasks/"+task.ID+"/done", desktopToken, map[string]string{
 		"run_id":        edgeRunID,
 		"final_content": finalContent,
 	})), "done task")
+	assertTaskSummaryStatus(t, alice.Token, task.ID, model.TaskStatusDone)
 
 	var storedTask model.PendingAgentTask
 	if err := db.Where("id = ?", task.ID).First(&storedTask).Error; err != nil {
@@ -110,5 +113,18 @@ func TestBackendE2E_HubEdgeCallbackContract_DBWS_NoCLI(t *testing.T) {
 	}
 	if finalPayload["text"] != "Hub Edge callback contract final" {
 		t.Fatalf("final message text = %q, want Hub Edge callback contract final", finalPayload["text"])
+	}
+}
+
+func assertTaskSummaryStatus(t *testing.T, token, taskID, want string) {
+	t.Helper()
+	resp := parse(get("/web/agent-tasks/"+taskID+"/summary", token))
+	mustOK(t, resp, "task summary")
+	var summary model.AgentRunEventSummary
+	if err := json.Unmarshal(resp.Data, &summary); err != nil {
+		t.Fatalf("decode task summary: %v", err)
+	}
+	if summary.Status != want {
+		t.Fatalf("task summary status = %q, want %q", summary.Status, want)
 	}
 }

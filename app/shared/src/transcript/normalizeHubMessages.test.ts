@@ -130,6 +130,38 @@ describe('normalizeHubMessagesToTranscript', () => {
         },
         created_at: '2026-06-09T01:00:03Z',
       },
+      {
+        id: 'group-working-reviewer',
+        session_id: 'project-group-session',
+        seq_id: 5,
+        sender_type: 'agent',
+        sender_id: 'agent-reviewer',
+        sender: { nickname: 'Reviewer' },
+        content: {
+          text: '我正在检查 shared transcript contract。',
+          im_kind: 'project_group',
+          from_agent: { id: 'agent-reviewer', label: 'Reviewer' },
+          mentions: [{ id: 'agent-reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+          agent_task: { task_id: 'task-reviewer-1', status: 'working' },
+        },
+        created_at: '2026-06-09T01:00:04Z',
+      },
+      {
+        id: 'group-done-reviewer',
+        session_id: 'project-group-session',
+        seq_id: 6,
+        sender_type: 'agent',
+        sender_id: 'agent-reviewer',
+        sender: { nickname: 'Reviewer' },
+        content: {
+          text: 'shared transcript contract 已复核完成。',
+          im_kind: 'project_group',
+          from_agent: { id: 'agent-reviewer', label: 'Reviewer' },
+          mentions: [{ id: 'agent-reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+          agent_task: { task_id: 'task-reviewer-1', status: 'done' },
+        },
+        created_at: '2026-06-09T01:00:05Z',
+      },
     ]);
 
     expect(blocks).toEqual([
@@ -165,6 +197,24 @@ describe('normalizeHubMessagesToTranscript', () => {
         displayDetail: 'IM project_group · mentions @Reviewer · task task-reviewer-1',
         badgeLabel: '@Agent assigned',
         badgeVariant: 'thinking',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-group-working-reviewer',
+        kind: 'text',
+        text: '我正在检查 shared transcript contract。',
+        displayTitle: 'Group @Agent',
+        displayDetail: 'IM project_group · mentions @Reviewer · task task-reviewer-1',
+        badgeLabel: '@Agent working',
+        badgeVariant: 'thinking',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-group-done-reviewer',
+        kind: 'text',
+        text: 'shared transcript contract 已复核完成。',
+        displayTitle: 'Group @Agent',
+        displayDetail: 'IM project_group · mentions @Reviewer · task task-reviewer-1',
+        badgeLabel: '@Agent done',
+        badgeVariant: 'success',
       }),
     ]);
   });

@@ -49,7 +49,7 @@ describe('workbench v4 demo data source', () => {
       kind: 'group',
       title: 'Agent 协作群',
     }));
-    expect(projectGroupMessageLoopHubMessages).toHaveLength(6);
+    expect(projectGroupMessageLoopHubMessages).toHaveLength(8);
     expect(projectGroupMessageLoopTranscript).toEqual([
       expect.objectContaining({
         id: 'hub-message-a2a-dm-builder',
@@ -82,6 +82,18 @@ describe('workbench v4 demo data source', () => {
         displayTitle: 'Group @Agent',
         badgeLabel: '@Agent assigned',
         badgeVariant: 'thinking',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-working-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent working',
+        badgeVariant: 'thinking',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-done-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent done',
+        badgeVariant: 'success',
       }),
     ]);
     expect(resolveDemoWorkbenchTranscript('agent-collab')).toEqual(projectGroupMessageLoopTranscript);
