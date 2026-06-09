@@ -36,9 +36,10 @@ function Invoke-RepoScript {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.WorkingDirectory = $RepoRoot
-    foreach ($arg in @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File") + $Arguments) {
-        [void]$psi.ArgumentList.Add($arg)
-    }
+    $allArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File") + $Arguments
+    $psi.Arguments = ($allArgs | ForEach-Object {
+        '"' + ([string]$_).Replace('"', '\"') + '"'
+    }) -join " "
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdout = $proc.StandardOutput.ReadToEnd()
