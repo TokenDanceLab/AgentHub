@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 12:54 +08:00
+最后更新：2026-06-09 13:20 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -9,7 +9,7 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | `origin/dev/delicious233 = bf1a7ab5 test(edge): 增加 CLI JSON readiness 门禁` |
+| 当前 dev | `origin/dev/delicious233 = 1b2a772b docs(state): 同步 P1 gate 合入基线` |
 | 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate 已合入 |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
@@ -45,9 +45,11 @@
 | Edge SQLite durable observed smoke | Johnny/backend | 已合入 dev：`63fb6273` | fixture-only alpha durability gate；不代表完整 relational CRUD |
 | Desktop sidecar observed smoke | Trump/Desktop | 已合入 dev：`79e1e453` | fixture/mock sidecar 证据；真实打包仍需要 sidecar binary |
 | CLI JSON readiness checker | Edge/SDK worker | 已合入 dev：`bf1a7ab5` | 静态/fixture JSON 合同；不运行真实 CLI/model/API |
-| Web real-mode visual smoke | Trump/Web | 运行中 | 只改 `app/web/**` 和必要 `app/shared/**`；检查 Hub-only UI、标签和 visual smoke |
-| Hub/Event/Replay 合同审计 | Johnny/backend | 报告中 | 指向单任务 approval/artifact Hub 合同缺口；只读不写 |
-| State/worktree 审计 | state auditor | 待复核 | 只读整理 worktree/branch，给出清理候选；不删除 |
+| Web real-mode visual smoke | Trump/Web | 已重启：thread `019eaaac-7583-79e2-8267-0ac29826ed28` | 只改 `app/web/**` 和必要 `app/shared/**`；收口 Hub-only UI、real/fixture 标签、inspector evidence overview 和 visual smoke |
+| Hub 单任务 approval/artifact | Johnny/backend | 已派发：thread `019eab05-39ef-7b70-bece-4b2a853fe9e8` | 只改 Hub/API；补 `/web/agent-tasks` approval decision 与 artifact metadata/list 最小合同 |
+| Desktop sidecar binary/package smoke | Desktop/Tauri | 已派发：thread `019eab05-4365-72a1-962b-278fb3c7888f` | 只改 Desktop/Tauri package/readiness 脚本；验证 Windows sidecar binary placement，不提交二进制 |
+| Hub/Event/Replay 合同审计 | Johnny/backend | 已产出报告 | 指向单任务 approval/artifact Hub 合同缺口；后续进入实现 worker |
+| State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
 
 ## 分支治理
@@ -61,10 +63,10 @@
 ## 下一步优先级
 
 1. **Web real-mode 继续收口**：Projects、Targets、Runs、Approvals、Artifacts、Transcript、Replay 全部保持 Hub-only，不静默 fallback mock；完成 visual smoke 后再合入。
-2. **Hub 单任务 approval/artifact 合同**：补 `/web/agent-tasks` 维度的 approval decision 和 artifact metadata/list/action 最小合同，复用 TeamRun projection 形状，支撑 Web/Mobile/IM 远控 UI。
+2. **Hub 单任务 approval/artifact 合同**：补 `/web/agent-tasks` 维度的 approval decision 和 artifact metadata/list 最小合同，复用 TeamRun projection 形状，支撑 Web/Mobile/IM 远控 UI。
 3. **Desktop/Tauri 可安装可启动**：准备 Windows Local Edge sidecar binary 的 build/placement/package smoke；真实签名、公证、release upload 仍需独立批准。
-4. **真实产品闭环验收**：在 fixture gate 之外，准备受控 observed/approved-real 路径，验证 Web -> Hub -> Desktop -> Edge -> adapter -> replay -> Web。
-5. **SDK/custom runtime 真实接入**：先保留 CLI JSON readiness 和 fixture custom runtime；真实 OpenAI/Claude/OpenCode SDK/API 调用放到批准后的独立切片。
+4. **组合链路 observed E2E**：等 Web + Hub approval/artifact + Desktop sidecar binary smoke 回来后，开单一 product-loop worktree，验证 Web -> Hub -> Desktop -> Edge -> adapter fixture -> replay -> Web。
+5. **受控 approved-real 方案**：先形成审批清单和成本/凭据边界；真实登录、真实 CLI/model/API 消耗、部署和签名必须另获批准。
 
 ## 安全规则
 
