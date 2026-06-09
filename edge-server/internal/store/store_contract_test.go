@@ -1,7 +1,9 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -346,6 +348,53 @@ func TestRepositoryContractSQLiteStoreRestore(t *testing.T) {
 	}
 	if got := restored.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "Delicious233" {
 		t.Fatalf("restored pins = %#v, want item_contract pin", got)
+	}
+}
+
+func TestFileStoreAndSQLiteReadinessRowKindParity(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "edge-store.json")
+	sqlitePath := filepath.Join(dir, "edge-store.db")
+
+	fileStore, err := NewFile(filePath)
+	if err != nil {
+		t.Fatalf("NewFile returned error: %v", err)
+	}
+	seedRepositoryReadinessParity(t, fileStore)
+	fileStore.Flush()
+	fileStore.Close()
+
+	sqliteStore, err := NewSQLite(sqlitePath)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	seedRepositoryReadinessParity(t, sqliteStore)
+	sqliteStore.Close()
+
+	fileCounts := readFileStoreSnapshotRowCounts(t, filePath)
+	manifest, err := SQLiteReadinessManifestForPath(sqlitePath)
+	if err != nil {
+		t.Fatalf("SQLiteReadinessManifestForPath returned error: %v", err)
+	}
+	if manifest.Status != "ready" {
+		t.Fatalf("SQLite readiness status = %q, want ready", manifest.Status)
+	}
+	for _, kind := range manifest.RequiredRowKinds {
+		if got, want := manifest.RowCounts[kind], fileCounts[kind]; got != want {
+			t.Fatalf("row kind %s sqlite count = %d, file count = %d", kind, got, want)
+		}
+	}
+	if got := manifest.ProjectionCounts["edge_runs"]; got != fileCounts[sqliteRowKindRun] {
+		t.Fatalf("edge_runs projection count = %d, want run row count %d", got, fileCounts[sqliteRowKindRun])
+	}
+	if got := manifest.ProjectionCounts["edge_artifacts"]; got != fileCounts[sqliteRowKindArtifact] {
+		t.Fatalf("edge_artifacts projection count = %d, want artifact row count %d", got, fileCounts[sqliteRowKindArtifact])
+	}
+	if got := manifest.ProjectionCounts["edge_diffs"]; got != fileCounts[sqliteRowKindDiff] {
+		t.Fatalf("edge_diffs projection count = %d, want diff row count %d", got, fileCounts[sqliteRowKindDiff])
+	}
+	if got := manifest.ProjectionCounts["edge_previews"]; got != fileCounts[sqliteRowKindPreview] {
+		t.Fatalf("edge_previews projection count = %d, want preview row count %d", got, fileCounts[sqliteRowKindPreview])
 	}
 }
 
@@ -1007,5 +1056,85 @@ func closeContractHandle(handle repositoryContractHandle) {
 	}
 	if handle.close != nil {
 		handle.close()
+	}
+}
+
+func seedRepositoryReadinessParity(t *testing.T, repo repositoryContractStore) {
+	t.Helper()
+	evidence, ok := repo.(repositoryEvidenceStore)
+	if !ok {
+		t.Fatalf("%T does not implement repository evidence store", repo)
+	}
+
+	project, err := repo.CreateProject("proj_parity", "Parity Project")
+	if err != nil {
+		t.Fatalf("CreateProject returned error: %v", err)
+	}
+	thread, err := repo.CreateThread("thread_parity", project.ID, "Parity Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := repo.CreateRun("run_parity", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := repo.SetRunStatus(run.ID, "started"); !ok {
+		t.Fatalf("SetRunStatus(%s, started) returned false", run.ID)
+	}
+	item, err := repo.CreateThreadMessage("item_parity", thread.ID, "assistant", "parity message")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+	if _, err := repo.PinThreadItem(thread.ID, item.ID, "parity"); err != nil {
+		t.Fatalf("PinThreadItem returned error: %v", err)
+	}
+	if _, err := evidence.UpsertRunDiffFile(RunDiffFile{
+		RunID:  run.ID,
+		Path:   "src/parity.go",
+		Diff:   "@@ -0 +1 @@\n+parity",
+		Status: "added",
+	}); err != nil {
+		t.Fatalf("UpsertRunDiffFile returned error: %v", err)
+	}
+	if _, err := evidence.UpsertArtifact(Artifact{
+		ID:        "artifact_parity",
+		RunID:     run.ID,
+		ThreadID:  thread.ID,
+		Kind:      "markdown",
+		Path:      "dist/parity.md",
+		SizeBytes: 32,
+	}); err != nil {
+		t.Fatalf("UpsertArtifact returned error: %v", err)
+	}
+	if _, err := evidence.UpsertPreview(Preview{
+		ID:       "preview_parity",
+		RunID:    run.ID,
+		ThreadID: thread.ID,
+		URL:      "http://127.0.0.1:4173/parity",
+		Status:   "ready",
+	}); err != nil {
+		t.Fatalf("UpsertPreview returned error: %v", err)
+	}
+}
+
+func readFileStoreSnapshotRowCounts(t *testing.T, path string) map[string]int {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	var snapshot fileSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		t.Fatalf("Unmarshal file snapshot returned error: %v", err)
+	}
+	return map[string]int{
+		sqliteRowKindProject:  len(snapshot.Projects),
+		sqliteRowKindThread:   len(snapshot.Threads),
+		sqliteRowKindRun:      len(snapshot.Runs),
+		sqliteRowKindItem:     len(snapshot.Items),
+		sqliteRowKindPin:      len(snapshot.Pins),
+		sqliteRowKindDiff:     len(snapshot.Diffs),
+		sqliteRowKindArtifact: len(snapshot.Artifacts),
+		sqliteRowKindPreview:  len(snapshot.Previews),
 	}
 }
