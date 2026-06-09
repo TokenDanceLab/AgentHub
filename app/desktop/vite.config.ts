@@ -1,9 +1,40 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
+/**
+ * Reads the Edge auth token written by Tauri EdgeManager at startup.
+ * This allows the Vite dev server to authenticate against Edge without
+ * needing the Tauri invoke bridge (which only works inside Tauri WebView).
+ */
+function edgeAuthTokenPlugin() {
+  return {
+    name: 'edge-auth-token',
+    config() {
+      const tokenPath = path.join(
+        process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
+        'com.agenthub.desktop',
+        'edge-auth-token',
+      );
+      let token = '';
+      try {
+        token = fs.readFileSync(tokenPath, 'utf-8').trim();
+      } catch {
+        // Token file doesn't exist yet — Edge may not have been started.
+      }
+      return {
+        define: {
+          'import.meta.env.VITE_EDGE_AUTH_TOKEN': JSON.stringify(token),
+        },
+      };
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), edgeAuthTokenPlugin()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
