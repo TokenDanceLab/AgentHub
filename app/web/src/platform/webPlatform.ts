@@ -42,6 +42,17 @@ interface SessionAgentInstanceBinding {
   agentInstance: AgentInstance;
 }
 
+export interface WebActiveAgentTask {
+  taskId: string;
+  sessionId?: string;
+  agentInstanceId?: string;
+  triggerMessageId?: string;
+  targetId?: string;
+  edgeRunId?: string;
+  edgeDeviceId?: string;
+  status: string;
+}
+
 export interface WebPlatformOptions {
   hubClient?: WebRunHubClient;
   queryClient?: QueryClient;
@@ -250,6 +261,19 @@ export async function submitWebComposerIntent(
   }
 
   const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, dispatchTarget, intent);
+  if (task.id) {
+    const targetId = task.target_id ?? dispatchTarget?.id;
+    recordWebAgentTaskIndex(options.queryClient, {
+      taskId: task.id,
+      sessionId: intent.conversationId,
+      agentInstanceId: task.agent_instance_id,
+      triggerMessageId: task.trigger_message_id || message.message_id,
+      ...(targetId ? { targetId } : {}),
+      ...(task.edge_run_id ? { edgeRunId: task.edge_run_id } : {}),
+      ...(task.edge_device_id ? { edgeDeviceId: task.edge_device_id } : {}),
+      status: task.status || 'queued',
+    });
+  }
   return { intentId: task.id || message.message_id };
 }
 
@@ -330,6 +354,78 @@ export function removeOptimisticHubMessage(
 
 function hubMessagesQueryKey(sessionId: string): [string, string, string] {
   return ['web-v4', 'hub-messages', sessionId];
+}
+
+export function webActiveAgentTaskQueryKey(sessionId: string): [string, string, string] {
+  return ['web-v4', 'active-agent-task', sessionId];
+}
+
+export function webAgentTaskIndexQueryKey(taskId: string): [string, string, string] {
+  return ['web-v4', 'agent-task-index', taskId];
+}
+
+export function recordWebAgentTaskIndex(
+  queryClient: QueryClient | undefined,
+  task: WebActiveAgentTask,
+): void {
+  queryClient?.setQueryData(webAgentTaskIndexQueryKey(task.taskId), task);
+  if (!task.sessionId) return;
+  queryClient?.setQueryData(webActiveAgentTaskQueryKey(task.sessionId), task);
+  writeStoredWebActiveAgentTask(task.sessionId, task);
+}
+
+export function readStoredWebActiveAgentTask(sessionId: string): WebActiveAgentTask | null {
+  if (typeof localStorage === 'undefined') return null;
+  const raw = localStorage.getItem(webActiveAgentTaskStorageKey(sessionId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    const taskId = stringField(record.taskId);
+    const status = stringField(record.status);
+    if (!taskId || !status) return null;
+    const storedSessionId = stringField(record.sessionId) ?? sessionId;
+    const agentInstanceId = stringField(record.agentInstanceId);
+    const triggerMessageId = stringField(record.triggerMessageId);
+    const targetId = stringField(record.targetId);
+    const edgeRunId = stringField(record.edgeRunId);
+    const edgeDeviceId = stringField(record.edgeDeviceId);
+    return compactActiveAgentTask({
+      taskId,
+      sessionId: storedSessionId,
+      ...(agentInstanceId ? { agentInstanceId } : {}),
+      ...(triggerMessageId ? { triggerMessageId } : {}),
+      ...(targetId ? { targetId } : {}),
+      ...(edgeRunId ? { edgeRunId } : {}),
+      ...(edgeDeviceId ? { edgeDeviceId } : {}),
+      status,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredWebActiveAgentTask(sessionId: string, task: WebActiveAgentTask): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(webActiveAgentTaskStorageKey(sessionId), JSON.stringify(compactActiveAgentTask(task)));
+}
+
+function webActiveAgentTaskStorageKey(sessionId: string): string {
+  return `agenthub.web.activeAgentTask.${sessionId}`;
+}
+
+function compactActiveAgentTask(task: WebActiveAgentTask): WebActiveAgentTask {
+  return {
+    taskId: task.taskId,
+    ...(task.sessionId ? { sessionId: task.sessionId } : {}),
+    ...(task.agentInstanceId ? { agentInstanceId: task.agentInstanceId } : {}),
+    ...(task.triggerMessageId ? { triggerMessageId: task.triggerMessageId } : {}),
+    ...(task.targetId ? { targetId: task.targetId } : {}),
+    ...(task.edgeRunId ? { edgeRunId: task.edgeRunId } : {}),
+    ...(task.edgeDeviceId ? { edgeDeviceId: task.edgeDeviceId } : {}),
+    status: task.status,
+  };
 }
 
 function sessionAgentBindingsQueryKey(sessionId: string): [string, string, string] {
@@ -469,6 +565,10 @@ function buildHubAgentTaskModelParams(intent: ComposerIntent): Record<string, un
       ...(attachment.truncated != null ? { truncated: attachment.truncated } : {}),
     })),
   };
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function newClientMessageId(): string {

@@ -309,6 +309,22 @@ describe('webPlatform workbench agent mapping', () => {
         content: expect.stringContaining('继续 v4 clean rebuild'),
       }),
     ]);
+    expect(queryClient.getQueryData(['web-v4', 'active-agent-task', 'hub-session-1'])).toEqual({
+      taskId: 'task-1',
+      sessionId: 'hub-session-1',
+      agentInstanceId: 'agent-instance-1',
+      triggerMessageId: 'hub-message-1',
+      targetId: 'target-local-edge-1',
+      status: 'queued',
+    });
+    expect(localStorage.getItem('agenthub.web.activeAgentTask.hub-session-1')).toBe(JSON.stringify({
+      taskId: 'task-1',
+      sessionId: 'hub-session-1',
+      agentInstanceId: 'agent-instance-1',
+      triggerMessageId: 'hub-message-1',
+      targetId: 'target-local-edge-1',
+      status: 'queued',
+    }));
   });
 
   it('does not silently choose the first online local_edge target for Web composer dispatch', async () => {

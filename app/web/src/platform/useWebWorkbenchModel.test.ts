@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendHubRuntimeEvent,
+  mergeHubRuntimeEvents,
   projectDraftToHubRequest,
   mergeWorkspaceProjectDetail,
   resolveWebWorkbenchContacts,
@@ -464,5 +465,40 @@ describe('useWebWorkbenchModel helpers', () => {
       { id: 'evt-1', event_type: 'run.agent.text_delta', payload: { content: 'b' } },
     ]);
     expect(limited.map((event) => event.id)).toEqual(['evt-2', 'evt-3']);
+  });
+
+  it('merges REST replayed and live Hub runtime events with live events winning duplicates', () => {
+    const merged = mergeHubRuntimeEvents([
+      {
+        id: 'evt-replay-1',
+        task_id: 'task-1',
+        edge_run_id: 'run-1',
+        event_seq: 1,
+        event_type: 'run.agent.text_block',
+        payload: { content: 'from replay' },
+      },
+      {
+        id: 'evt-terminal',
+        task_id: 'task-1',
+        edge_run_id: 'run-1',
+        event_seq: 2,
+        event_type: 'run.agent.result',
+        payload: { content: 'stale terminal', success: true },
+      },
+    ], [
+      {
+        id: 'evt-terminal',
+        task_id: 'task-1',
+        edge_run_id: 'run-1',
+        event_seq: 2,
+        event_type: 'run.agent.result',
+        payload: { content: 'fresh terminal', success: true },
+      },
+    ]);
+
+    expect(merged).toEqual([
+      expect.objectContaining({ id: 'evt-replay-1', payload: { content: 'from replay' } }),
+      expect.objectContaining({ id: 'evt-terminal', payload: { content: 'fresh terminal', success: true } }),
+    ]);
   });
 });
