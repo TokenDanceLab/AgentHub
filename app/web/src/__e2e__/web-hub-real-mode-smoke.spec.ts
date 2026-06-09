@@ -17,7 +17,7 @@ test.describe('Web Hub real-mode smoke', () => {
     await expect(page.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'chat');
     await expect(page.getByRole('status').filter({ hasText: 'Data: approved-real' })).toBeVisible();
     await expect(page.getByText('Target: signed-out')).toBeVisible();
-    await expect(page.getByText('Hub replay: no active Hub session')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: no active Hub session' })).toBeVisible();
     await expect(page.getByText('Sign in to Hub before Web can select a local_edge execution target.')).toBeVisible();
 
     await page.getByRole('button', { name: '项目' }).click();
@@ -75,9 +75,63 @@ test.describe('Web Hub real-mode smoke', () => {
 
     await writeSmokeArtifact(page, 'healthy-target', requests);
   });
+
+  test('creates a Hub task from Web target selection and hydrates replay through Hub only', async ({ page }) => {
+    const requests = await startAuthenticatedHubSmoke(page, 'healthy-target', { activeTask: false });
+    const dispatch = hubDispatchCapture(page);
+
+    await expect(page.getByText('Target: ready - Smoke Desktop Edge (target-web-smoke)')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: 0 runtime events observed' })).toBeVisible();
+
+    await page.getByLabel('@Agent').selectOption('agent-profile-web-smoke');
+    await page.getByLabel('Desktop/Edge target').selectOption('target-web-smoke');
+    await page.getByLabel('Composer input').fill('Create a Hub-routed remote control task.');
+    await page.getByRole('button', { name: '启动 Agent 任务' }).click();
+
+    await expect(page.getByText('Hub replay: task task-web-created')).toBeVisible();
+    await expect(page.getByText('Created task replay hydrated from Hub.')).toBeVisible();
+    await expect(page.getByText('reports/web-created-task.md').first()).toBeVisible();
+
+    await expect.poll(() => requests.has('POST /client/sessions/session-web-smoke/messages')).toBe(true);
+    await expect.poll(() => requests.has('POST /client/sessions/session-web-smoke/agents')).toBe(true);
+    await expect.poll(() => requests.has('POST /web/agent-tasks')).toBe(true);
+    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/events')).toBe(true);
+    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/summary')).toBe(true);
+    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/approvals')).toBe(true);
+    await expect.poll(() => requests.has('GET /web/agent-tasks/task-web-created/artifacts')).toBe(true);
+    await expect.poll(dispatch).toMatchObject({
+      triggerMessageId: 'message-web-created',
+      targetId: 'target-web-smoke',
+      directLocalEdge: false,
+    });
+
+    await writeSmokeArtifact(page, 'task-create-hydration', requests);
+  });
+
+  test('surfaces Hub target inventory errors without contacting Local Edge', async ({ page }) => {
+    const requests = await startAuthenticatedHubSmoke(page, 'target-error', { activeTask: false });
+
+    await expect(page.getByText('Target: error')).toBeVisible();
+    await expect(page.getByText('Hub execution targets unavailable: Hub target inventory unavailable')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: 0 runtime events observed' })).toBeVisible();
+    await expect.poll(() => requests.has('GET /web/execution-targets')).toBe(true);
+    await expect.poll(() => Array.from(requests).some((request) => request.includes('3210'))).toBe(false);
+
+    await writeSmokeArtifact(page, 'target-error', requests);
+  });
 });
 
-type HubScenario = 'no-target' | 'healthy-target';
+type HubScenario = 'no-target' | 'healthy-target' | 'target-error';
+
+interface HubSmokeOptions {
+  activeTask?: boolean;
+}
+
+interface DispatchCapture {
+  triggerMessageId?: string;
+  targetId?: string;
+  directLocalEdge: boolean;
+}
 
 async function setApprovedRealMode(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -85,9 +139,13 @@ async function setApprovedRealMode(page: Page): Promise<void> {
   });
 }
 
-async function startAuthenticatedHubSmoke(page: Page, scenario: HubScenario): Promise<Set<string>> {
+async function startAuthenticatedHubSmoke(
+  page: Page,
+  scenario: HubScenario,
+  options: HubSmokeOptions = {},
+): Promise<Set<string>> {
   const requests = await installHubStub(page, scenario);
-  await page.addInitScript(() => {
+  await page.addInitScript(({ activeTask }) => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
     window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-hub-token');
     window.sessionStorage.setItem('agenthub_token_source', 'hub');
@@ -95,12 +153,17 @@ async function startAuthenticatedHubSmoke(page: Page, scenario: HubScenario): Pr
       userId: 'user-web-smoke',
       username: 'web-smoke',
     }));
-    window.localStorage.setItem('agenthub.web.activeAgentTask.session-web-smoke', JSON.stringify({
-      taskId: 'task-web-smoke',
-      sessionId: 'session-web-smoke',
-      status: 'running',
-    }));
-  });
+    if (activeTask) {
+      window.localStorage.setItem('agenthub.web.activeAgentTask.session-web-smoke', JSON.stringify({
+        taskId: 'task-web-smoke',
+        sessionId: 'session-web-smoke',
+        status: 'running',
+      }));
+    } else {
+      window.localStorage.removeItem('agenthub.web.activeAgentTask.session-web-smoke');
+    }
+    window.sessionStorage.removeItem('agenthub.web.dispatchCapture');
+  }, { activeTask: options.activeTask ?? true });
 
   await page.goto('/');
   return requests;
@@ -118,13 +181,13 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
       return route.fulfill({ status: 204, headers: corsHeaders() });
     }
 
-    return fulfillHubRoute(route, url.pathname, scenario);
+    return fulfillHubRoute(page, route, url.pathname, scenario);
   });
 
   return requests;
 }
 
-function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario): Promise<void> {
+async function fulfillHubRoute(page: Page, route: Route, pathname: string, scenario: HubScenario): Promise<void> {
   if (pathname === '/client/auth/me') {
     return route.fulfill(json(hubEnvelope({
       id: 'user-web-smoke',
@@ -145,6 +208,13 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
   }
 
   if (pathname === '/client/sessions/session-web-smoke/messages') {
+    if (route.request().method() === 'POST') {
+      return route.fulfill(json(hubEnvelope({
+        message_id: 'message-web-created',
+        seq_id: 2,
+        created_at: '2026-06-09T08:01:00Z',
+      })));
+    }
     return route.fulfill(json(hubEnvelope([{
       id: 'message-web-smoke-1',
       session_id: 'session-web-smoke',
@@ -156,6 +226,17 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
       content: 'Review the Web -> Hub real-mode smoke boundary.',
       created_at: '2026-06-09T08:00:00Z',
     }])));
+  }
+
+  if (pathname === '/client/sessions/session-web-smoke/agents' && route.request().method() === 'POST') {
+    return route.fulfill(json(hubEnvelope({
+      id: 'agent-instance-web-smoke',
+      agent_type: 'codex',
+      session_id: 'session-web-smoke',
+      inviter_user_id: 'user-web-smoke',
+      display_name: 'Hub Smoke Builder',
+      created_at: '2026-06-09T08:01:01Z',
+    })));
   }
 
   if (pathname === '/client/sessions/session-web-smoke/pins') {
@@ -210,6 +291,14 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
   }
 
   if (pathname === '/web/execution-targets') {
+    if (scenario === 'target-error') {
+      return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 'target_inventory_unavailable', message: 'Hub target inventory unavailable' }),
+        headers: corsHeaders(),
+      });
+    }
     return route.fulfill(json(hubEnvelope({
       items: scenario === 'healthy-target' ? [{
         id: 'target-web-smoke',
@@ -223,6 +312,27 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
         last_seen_at: '2026-06-09T08:00:00Z',
       }] : [],
       page: { hasMore: false },
+    })));
+  }
+
+  if (pathname === '/web/agent-tasks' && route.request().method() === 'POST') {
+    const body = await route.request().postDataJSON() as Record<string, unknown>;
+    const capture: DispatchCapture = {
+      directLocalEdge: false,
+      ...(typeof body.trigger_message_id === 'string' ? { triggerMessageId: body.trigger_message_id } : {}),
+      ...(typeof body.target_id === 'string' ? { targetId: body.target_id } : {}),
+    };
+    await page.evaluate((payload) => {
+      window.sessionStorage.setItem('agenthub.web.dispatchCapture', JSON.stringify(payload));
+    }, capture);
+    return route.fulfill(json(hubEnvelope({
+      id: 'task-web-created',
+      agent_instance_id: 'agent-instance-web-smoke',
+      triggered_by_user_id: 'user-web-smoke',
+      trigger_message_id: 'message-web-created',
+      target_id: 'target-web-smoke',
+      status: 'queued',
+      edge_device_id: 'device-web-smoke',
     })));
   }
 
@@ -245,6 +355,22 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
     }])));
   }
 
+  if (pathname === '/web/agent-tasks/task-web-created/events') {
+    return route.fulfill(json(hubEnvelope([{
+      id: 'event-web-created-1',
+      task_id: 'task-web-created',
+      edge_run_id: 'edge-run-web-created',
+      session_id: 'session-web-smoke',
+      agent_instance_id: 'agent-instance-web-smoke',
+      event_seq: 1,
+      event_type: 'run.agent.text_block',
+      payload: {
+        content: 'Created task replay hydrated from Hub.',
+      },
+      created_at: '2026-06-09T08:01:02Z',
+    }])));
+  }
+
   if (pathname === '/web/agent-tasks/task-web-smoke/summary') {
     return route.fulfill(json(hubEnvelope({
       task_id: 'task-web-smoke',
@@ -258,6 +384,26 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
       artifact_count: 1,
       approval_count: 1,
       pending_approvals: 1,
+      decided_approvals: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      output_bytes: 0,
+    })));
+  }
+
+  if (pathname === '/web/agent-tasks/task-web-created/summary') {
+    return route.fulfill(json(hubEnvelope({
+      task_id: 'task-web-created',
+      edge_run_id: 'edge-run-web-created',
+      status: 'running',
+      total_events: 1,
+      last_event_seq: 1,
+      event_type_counts: { 'run.agent.text_block': 1 },
+      tool_call_count: 0,
+      step_count: 0,
+      artifact_count: 1,
+      approval_count: 0,
+      pending_approvals: 0,
       decided_approvals: 0,
       input_tokens: 0,
       output_tokens: 0,
@@ -289,6 +435,18 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
     })));
   }
 
+  if (pathname === '/web/agent-tasks/task-web-created/approvals') {
+    return route.fulfill(json(hubEnvelope({
+      task_id: 'task-web-created',
+      edge_run_id: 'edge-run-web-created',
+      session_id: 'session-web-smoke',
+      approvals: [],
+      pending: [],
+      decided: [],
+      last_event_seq: 1,
+    })));
+  }
+
   if (pathname === '/web/agent-tasks/task-web-smoke/artifacts') {
     return route.fulfill(json(hubEnvelope({
       task_id: 'task-web-smoke',
@@ -313,10 +471,41 @@ function fulfillHubRoute(route: Route, pathname: string, scenario: HubScenario):
     })));
   }
 
+  if (pathname === '/web/agent-tasks/task-web-created/artifacts') {
+    return route.fulfill(json(hubEnvelope({
+      task_id: 'task-web-created',
+      edge_run_id: 'edge-run-web-created',
+      session_id: 'session-web-smoke',
+      artifacts: [{
+        task_id: 'task-web-created',
+        edge_run_id: 'edge-run-web-created',
+        session_id: 'session-web-smoke',
+        source_event_id: 'event-web-created-artifact',
+        event_seq: 2,
+        artifact_id: 'artifact-web-created-1',
+        path: 'reports/web-created-task.md',
+        action: 'created',
+        type: 'artifact',
+        tool_name: 'Write',
+        mime_type: 'text/markdown',
+        size_bytes: 256,
+        created_at: '2026-06-09T08:01:03Z',
+      }],
+      last_event_seq: 2,
+    })));
+  }
+
   return route.fulfill(json(hubEnvelope({})));
 }
 
-async function writeSmokeArtifact(page: Page, scenario: HubScenario, requests: Set<string>): Promise<void> {
+function hubDispatchCapture(page: Page): () => Promise<DispatchCapture | null> {
+  return async () => page.evaluate(() => {
+    const raw = window.sessionStorage.getItem('agenthub.web.dispatchCapture');
+    return raw ? JSON.parse(raw) as DispatchCapture : null;
+  });
+}
+
+async function writeSmokeArtifact(page: Page, scenario: string, requests: Set<string>): Promise<void> {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
   const screenshotPath = path.join(ARTIFACT_DIR, `${scenario}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
