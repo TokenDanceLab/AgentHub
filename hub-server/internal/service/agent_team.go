@@ -616,18 +616,19 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 
 	state := &model.TeamRunState{
-		RunID:        run.ID,
-		TeamID:       run.TeamID,
-		Status:       run.Status,
-		Members:      make([]model.TeamMemberState, 0, len(members)),
-		Tasks:        make([]model.TeamTaskState, 0, len(tasks)),
-		Dependencies: make([]model.TeamTaskDependencyState, 0),
-		Assignments:  make([]model.TeamAssignmentState, 0, len(assignments)),
-		Approvals:    []model.TeamApprovalState{},
-		Artifacts:    []model.TeamArtifactState{},
-		Conflicts:    []model.TeamConflictState{},
-		RunEvents:    make([]model.TeamRunEventState, 0, len(runEvents)),
-		RouteLog:     []model.CoordinatorRouteDecision{},
+		RunID:         run.ID,
+		TeamID:        run.TeamID,
+		Status:        run.Status,
+		Members:       make([]model.TeamMemberState, 0, len(members)),
+		Tasks:         make([]model.TeamTaskState, 0, len(tasks)),
+		Dependencies:  make([]model.TeamTaskDependencyState, 0),
+		Assignments:   make([]model.TeamAssignmentState, 0, len(assignments)),
+		Approvals:     []model.TeamApprovalState{},
+		Artifacts:     []model.TeamArtifactState{},
+		Conflicts:     []model.TeamConflictState{},
+		RunEvents:     make([]model.TeamRunEventState, 0, len(runEvents)),
+		RouteLog:      []model.CoordinatorRouteDecision{},
+		RouteAuditLog: []model.TeamRouteAuditState{},
 	}
 
 	memberIndex := make(map[string]int, len(members))
@@ -748,6 +749,15 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			var decision model.CoordinatorRouteDecision
 			if err := json.Unmarshal([]byte(event.Payload), &decision); err == nil && decision.Action != "" {
 				state.RouteLog = append(state.RouteLog, decision)
+				state.RouteAuditLog = append(state.RouteAuditLog, routeAuditStateFromDecision("accepted", decision, "", event.CreatedAt))
+			}
+		case model.TeamEventRouteRejected:
+			var payload struct {
+				Decision model.CoordinatorRouteDecision `json:"decision"`
+				Reason   string                         `json:"reason"`
+			}
+			if err := json.Unmarshal([]byte(event.Payload), &payload); err == nil && payload.Decision.Action != "" {
+				state.RouteAuditLog = append(state.RouteAuditLog, routeAuditStateFromDecision("rejected", payload.Decision, payload.Reason, event.CreatedAt))
 			}
 		case model.TeamEventRunStarted:
 			state.Status = model.TeamRunStatusRunning
@@ -1717,6 +1727,7 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		TeamRunID:        runID,
 		AssignmentID:     &assignment.ID,
 		AssigneeMemberID: worker.ID,
+		ParentTaskID:     stringPtrOrNil(strings.TrimSpace(decision.ParentTaskID)),
 		Status:           model.TeamTaskStatusPending,
 		Objective:        decision.Instructions,
 		InputRefs:        "{}",
@@ -1726,6 +1737,9 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if err := repository.CreateTeamTask(s.db, task); err != nil {
 		return nil, err
 	}
+	decision.Accepted = true
+	decision.SubtaskID = firstNonEmptyString(decision.SubtaskID, task.ID)
+	decision.AgentID = firstNonEmptyString(decision.AgentID, worker.ID)
 
 	if err := s.appendTeamEvent(runID, model.TeamEventRouteDecided, decision); err != nil {
 		return nil, err
@@ -1833,10 +1847,26 @@ func (s *AgentTeamService) rejectRouteDecision(runID string, decision model.Coor
 }
 
 func (s *AgentTeamService) appendRouteRejected(runID string, decision model.CoordinatorRouteDecision, reason string) error {
+	decision.Accepted = false
+	decision.Reason = firstNonEmptyString(decision.Reason, reason)
+	decision.AgentID = firstNonEmptyString(decision.AgentID, decision.NextWorker)
 	return s.appendTeamEvent(runID, model.TeamEventRouteRejected, map[string]any{
 		"decision": decision,
 		"reason":   reason,
 	})
+}
+
+func routeAuditStateFromDecision(status string, decision model.CoordinatorRouteDecision, fallbackReason string, createdAt time.Time) model.TeamRouteAuditState {
+	return model.TeamRouteAuditState{
+		Status:        status,
+		Action:        decision.Action,
+		SubtaskID:     decision.SubtaskID,
+		ParentTaskID:  decision.ParentTaskID,
+		AgentID:       firstNonEmptyString(decision.AgentID, decision.NextWorker),
+		Reason:        firstNonEmptyString(decision.Reason, fallbackReason),
+		CorrelationID: decision.CorrelationID,
+		CreatedAt:     createdAt,
+	}
 }
 
 func (s *AgentTeamService) countMatchingRouteDecisions(runID string, decision model.CoordinatorRouteDecision) (int, error) {
