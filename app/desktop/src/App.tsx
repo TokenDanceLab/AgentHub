@@ -25,9 +25,7 @@ import {
   edgeAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
 import type { AgentConfig } from '@shared/workbench';
-import type { DocRow } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
-import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
@@ -41,7 +39,7 @@ export default function App() {
   }
 
   function continueDemo(): void {
-    writeWorkbenchDataModeOverride(edgeOnline ? 'observed' : 'mock');
+    writeWorkbenchDataModeOverride('mock');
     setEntryMode('workbench');
   }
 
@@ -92,17 +90,6 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const createRun = useCreateRun();
   const createThread = useCreateThread();
   const { data: currentUser } = useCurrentUser(liveEdgeEnabled);
-
-  // Documents: fetch from Hub when authenticated (non-demo)
-  const hubDocsEnabled = !workbench.isDemo;
-  const { data: hubDocList } = useDocumentList(undefined, { enabled: hubDocsEnabled });
-  const createDocMutation = useCreateDocument();
-
-  const documents = useMemo<DocRow[] | undefined>(() => {
-    if (workbench.isDemo) return undefined;
-    if (!hubDocList) return undefined;
-    return hubDocList.map(hubDocToDocRow);
-  }, [workbench.isDemo, hubDocList]);
 
   const activeRunId = useMemo(() => {
     if (!workbench.activeThreadId) return undefined;
@@ -233,13 +220,6 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }}
         contacts={workbench.contacts}
         conversations={workbench.conversations}
-        documents={documents}
-        documentsActions={{
-          onCreateDoc: workbench.isDemo ? undefined : async () => {
-            const title = `新建文档 ${new Date().toLocaleString('zh-CN')}`;
-            await createDocMutation.mutateAsync({ title });
-          },
-        }}
         onActiveConversationChange={setSelectedConversationId}
         onAgentCreate={handleAgentCreate}
         onAgentUpdate={handleAgentUpdate}
@@ -251,6 +231,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         onNavigateToConversation={handleNavigateToConversation}
         onProjectCreate={workbench.projectsActions?.create}
         onProjectUpdate={workbench.projectsActions?.update}
+          modelCatalog={modelCatalog?.items}
         platform={desktopPlatform}
         projects={workbench.projects}
         projectsStatus={workbench.projectsStatus}
