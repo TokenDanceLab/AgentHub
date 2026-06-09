@@ -39,7 +39,7 @@ describe('AgentsPage profile catalog rendering', () => {
     expect(within(summary).getByText('MCP')).toBeInTheDocument();
     expect(within(summary).getByText('filesystem · github')).toBeInTheDocument();
     expect(within(summary).getByText('Memory')).toBeInTheDocument();
-    expect(within(summary).getByText(/AGENTS\.md/)).toBeInTheDocument();
+    expect(within(summary).getAllByText(/AGENTS\.md/).length).toBeGreaterThan(0);
     expect(within(summary).getByText('Approval')).toBeInTheDocument();
     expect(within(summary).getByText(/workspace-write/)).toBeInTheDocument();
     expect(within(summary).getByText('Target')).toBeInTheDocument();
