@@ -51,6 +51,9 @@ function rawRunIdFromBlock(block: TranscriptBlock): string | undefined {
   switch (block.kind) {
     case 'run_session':
     case 'subagent':
+    case 'subtask':
+    case 'failure':
+    case 'finished':
       return cleanRunId(block.runId);
     case 'child_agent':
       return cleanRunId(block.runId) ?? cleanRunId(block.parentRunId);

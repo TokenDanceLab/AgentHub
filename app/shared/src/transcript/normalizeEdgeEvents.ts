@@ -47,8 +47,9 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
     case 'run.agent.thinking':
       return thinkingBlock(event);
     case 'run.agent.subagent':
-    case 'run.agent.subagent_task':
       return subagentBlock(event);
+    case 'run.agent.subagent_task':
+      return subtaskBlock(event);
     case 'run.agent.child_agent':
       return childAgentBlock(event);
     case 'run.agent.route_decision':
@@ -69,10 +70,14 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
       return permissionDecidedBlock(event);
     case 'artifact.created':
       return artifactCreatedBlock(event);
+    case 'preview.ready':
+      return previewReadyBlock(event);
+    case 'preview.stopped':
+      return previewStoppedBlock(event);
     case 'run.agent.result':
       return agentResultBlock(event);
     case 'run.finished':
-      return runTextBlock(event, 'finished', 'completed');
+      return runFinishedBlock(event);
     case 'run.failed':
       return runFailedBlock(event);
     case 'run.cancelled':
@@ -116,12 +121,31 @@ function runFailedBlock(event: EventEnvelope): TranscriptBlock | null {
   const reason =
     stringField(event.payload.reason) ??
     stringField(event.payload.error) ??
-    stringField(event.payload.message);
+    stringField(event.payload.message) ??
+    errorPayloadMessage(event.payload.error);
 
   return {
     ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'failed')),
-    kind: 'text',
-    text: reason ? `Run ${runId} failed: ${reason}` : `Run ${runId} failed`,
+    kind: 'failure',
+    title: `Run ${runId} failed`,
+    runId,
+    ...(reason ? { reason } : {}),
+  };
+}
+
+function runFinishedBlock(event: EventEnvelope): TranscriptBlock | null {
+  const runId = eventRunId(event);
+  if (!runId) return null;
+  const duration =
+    stringField(event.payload.duration) ??
+    durationLabel(numberField(event.payload.durationMs));
+
+  return {
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'completed')),
+    kind: 'finished',
+    title: `Run ${runId} finished`,
+    runId,
+    ...(duration ? { duration } : {}),
   };
 }
 
@@ -213,6 +237,39 @@ function subagentBlock(event: EventEnvelope): TranscriptBlock | null {
     title,
     worker,
     status,
+    ...(summary ? { summary } : {}),
+    ...(taskRunId ? { runId: taskRunId } : {}),
+  };
+}
+
+function subtaskBlock(event: EventEnvelope): TranscriptBlock | null {
+  const runId = eventRunId(event);
+  const taskRunId =
+    stringField(event.payload.taskRunId) ??
+    stringField(event.payload.taskId) ??
+    stringField(event.payload.id);
+  const title =
+    stringField(event.payload.title) ??
+    stringField(event.payload.task) ??
+    stringField(event.payload.name);
+  if (!title) return null;
+  const worker =
+    stringField(event.payload.worker) ??
+    stringField(event.payload.workerName) ??
+    stringField(event.payload.agent) ??
+    stringField(event.payload.agentName);
+  const status = normalizeEvidenceStatus(stringField(event.payload.status));
+  const summary =
+    cleanText(stringField(event.payload.summary)) ??
+    cleanText(stringField(event.payload.content)) ??
+    cleanText(stringField(event.payload.result));
+
+  return {
+    ...blockBase(event, AGENT_AUTHOR, runEvidence(runId, status)),
+    kind: 'subtask',
+    title,
+    status,
+    ...(worker ? { worker } : {}),
     ...(summary ? { summary } : {}),
     ...(taskRunId ? { runId: taskRunId } : {}),
   };
@@ -364,7 +421,7 @@ function toolResultBlock(event: EventEnvelope): TranscriptBlock | null {
       ...runEvidence(runId, status),
       ...toolEvidence(callId ?? toolName, `${toolName} result`, status),
     ]),
-    kind: 'tool_call',
+    kind: 'tool_result',
     toolName,
     status,
     ...(summary ? { summary } : {}),
@@ -380,6 +437,11 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
     fileEvidence(path),
   ];
   const patch = cleanText(stringField(event.payload.diff));
+  const action = normalizeFileAction(
+    stringField(event.payload.kind) ??
+    stringField(event.payload.action) ??
+    stringField(event.payload.status),
+  );
 
   if (patch) {
     const additions = diffStat(patch, '+');
@@ -393,9 +455,9 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
 
     return {
       ...blockBase(event, AGENT_AUTHOR, evidence),
-      kind: 'diff',
-      title: path,
-      files: [path],
+      kind: 'file_change',
+      path,
+      action,
       additions,
       deletions,
       lines: parsed.hunks.flatMap((hunk) => hunk.lines).map((line) => ({
@@ -406,11 +468,11 @@ function fileChangeBlock(event: EventEnvelope): TranscriptBlock | null {
     };
   }
 
-  const action = stringField(event.payload.kind) ?? stringField(event.payload.action) ?? 'modified';
   return {
     ...blockBase(event, AGENT_AUTHOR, evidence),
-    kind: 'artifact',
-    title: `${action} ${path}`,
+    kind: 'file_change',
+    path,
+    action,
   };
 }
 
@@ -433,7 +495,8 @@ function permissionRequestedBlock(event: EventEnvelope): TranscriptBlock | null 
       ...runEvidence(runId, 'pending'),
       ...toolEvidence(requestId, toolName, 'pending'),
     ]),
-    kind: 'approval',
+    kind: 'permission_request',
+    requestId,
     title: `Permission requested: ${toolName}`,
     status: 'pending',
     toolName,
@@ -451,16 +514,22 @@ function permissionDecidedBlock(event: EventEnvelope): TranscriptBlock | null {
   const status: EvidenceRefStatus = decision === 'deny' || decision === 'rejected' ? 'failed' : 'completed';
   const toolName = stringField(event.payload.toolName) ?? stringField(event.payload.kind) ?? 'permission';
   const runId = eventRunId(event);
+  const reason =
+    cleanText(stringField(event.payload.reason)) ??
+    cleanText(stringField(event.payload.summary));
 
   return {
     ...blockBase(event, EDGE_AUTHOR, [
       ...runEvidence(runId, status),
       ...toolEvidence(requestId, toolName, status),
     ]),
-    kind: 'approval',
+    kind: 'permission_result',
+    requestId,
     title: `Permission ${decision}: ${toolName}`,
     status,
+    decision,
     toolName,
+    ...(reason ? { reason } : {}),
   };
 }
 
@@ -472,11 +541,12 @@ function artifactCreatedBlock(event: EventEnvelope): TranscriptBlock | null {
     stringField(event.payload.url) ??
     stringField(event.payload.href);
   const mimeType = stringField(event.payload.mimeType) ?? stringField(event.payload.mediaType);
+  const artifactKind = stringField(event.payload.kind);
   const title =
     path ??
     stringField(event.payload.title) ??
     uri ??
-    stringField(event.payload.kind) ??
+    artifactKind ??
     artifactId;
   const runId = eventRunId(event);
 
@@ -495,6 +565,57 @@ function artifactCreatedBlock(event: EventEnvelope): TranscriptBlock | null {
     ]),
     kind: 'artifact',
     title,
+    artifactId,
+    ...(artifactKind ? { artifactKind } : {}),
+    ...(path ? { path } : {}),
+    ...(uri ? { uri } : {}),
+    ...(mimeType ? { mimeType } : {}),
+  };
+}
+
+function previewReadyBlock(event: EventEnvelope): TranscriptBlock | null {
+  const previewId = stringField(event.payload.previewId) ?? stringField(event.payload.id);
+  if (!previewId) return null;
+  const runId = eventRunId(event);
+  const url = stringField(event.payload.url);
+  const status = normalizeEvidenceStatus(stringField(event.payload.status) ?? 'completed');
+
+  return {
+    ...blockBase(event, EDGE_AUTHOR, [
+      ...runEvidence(runId, 'running'),
+      {
+        id: `preview-${previewId}`,
+        kind: 'preview',
+        label: url ?? previewId,
+        status,
+        ...(url ? { uri: url } : {}),
+      },
+    ]),
+    kind: 'preview',
+    previewId,
+    status,
+    ...(url ? { url } : {}),
+  };
+}
+
+function previewStoppedBlock(event: EventEnvelope): TranscriptBlock | null {
+  const previewId = stringField(event.payload.previewId) ?? stringField(event.payload.id);
+  if (!previewId) return null;
+  const runId = eventRunId(event);
+
+  return {
+    ...blockBase(event, EDGE_AUTHOR, [
+      ...runEvidence(runId, 'running'),
+      {
+        id: `preview-${previewId}`,
+        kind: 'preview',
+        label: previewId,
+        status: 'completed',
+      },
+    ]),
+    kind: 'preview',
+    previewId,
+    status: 'completed',
   };
 }
 
@@ -525,6 +646,7 @@ function blockBase(event: EventEnvelope, author: TranscriptAuthor, evidenceRefs:
   return {
     id: `edge-event-${event.id}`,
     author,
+    ...(event.sentAt ? { createdAt: event.sentAt } : {}),
     ...(evidenceRefs.length > 0 ? { evidenceRefs } : {}),
   };
 }
@@ -587,6 +709,7 @@ function normalizeEvidenceStatus(status: string | undefined): EvidenceRefStatus 
     case 'succeeded':
     case 'success':
     case 'approved':
+    case 'ready':
       return 'completed';
     default:
       return 'running';
@@ -612,6 +735,23 @@ function normalizeApprovalRisk(
       return 'critical';
     default:
       return undefined;
+  }
+}
+
+function normalizeFileAction(action: string | undefined): 'created' | 'modified' | 'deleted' {
+  switch (action?.trim().toLowerCase()) {
+    case 'created':
+    case 'create':
+    case 'added':
+    case 'add':
+      return 'created';
+    case 'deleted':
+    case 'delete':
+    case 'removed':
+    case 'remove':
+      return 'deleted';
+    default:
+      return 'modified';
   }
 }
 
@@ -657,6 +797,16 @@ function pathFromContent(content: string | undefined): string | undefined {
   if (!content) return undefined;
   const match = content.match(/(?:^|\s)([A-Za-z]:[\\/][^\s]+|[\w./-]+\.[\w.-]+)/);
   return match?.[1];
+}
+
+function errorPayloadMessage(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  return (
+    stringField(value.message) ??
+    stringField(value.Message) ??
+    stringField(value.reason) ??
+    stringField(value.error)
+  );
 }
 
 function timestampMs(event: EventEnvelope): number {

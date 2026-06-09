@@ -198,12 +198,22 @@ function renderTranscriptBlock(
       return renderTextBlock(block, onAgentProfileOpen, hideUserAvatar);
     case 'tool_call':
       return renderToolCallBlock(block);
+    case 'tool_result':
+      return renderToolResultBlock(block);
     case 'artifact':
       return renderArtifactBlock(block, onReviewFile, diffControls);
+    case 'preview':
+      return renderPreviewBlock(block);
+    case 'file_change':
+      return renderFileChangeBlock(block, onReviewFile, diffControls);
     case 'diff':
       return renderDiffBlock(block);
     case 'approval':
       return renderApprovalBlock(block);
+    case 'permission_request':
+      return renderPermissionRequestBlock(block);
+    case 'permission_result':
+      return renderPermissionResultBlock(block);
     case 'agent_timeline':
       return renderAgentTimelineBlock(block);
     case 'run_session':
@@ -214,6 +224,8 @@ function renderTranscriptBlock(
       return renderThinkingBlock(block);
     case 'subagent':
       return renderSubagentBlock(block);
+    case 'subtask':
+      return renderSubtaskBlock(block);
     case 'child_agent':
       return renderChildAgentBlock(block);
     case 'route_decision':
@@ -222,8 +234,12 @@ function renderTranscriptBlock(
       return renderContextUsageBlock(block);
     case 'result':
       return renderResultBlock(block);
+    case 'failure':
+      return renderFailureBlock(block);
+    case 'finished':
+      return renderFinishedBlock(block);
     default:
-      return <p className={styles.blockText}>{JSON.stringify(block)}</p>;
+      return assertNever(block);
   }
 }
 
@@ -328,6 +344,24 @@ function renderToolCallBlock(
   );
 }
 
+function renderToolResultBlock(
+  block: Extract<TranscriptBlock, { kind: 'tool_result' }>,
+): React.ReactElement {
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <div className={styles.agentRunDetail}>
+          <ToolCardBlock
+            description={block.summary}
+            status={block.status}
+            toolName={`${block.toolName} result`}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Artifact block ── */
 
 function renderArtifactBlock(
@@ -337,7 +371,7 @@ function renderArtifactBlock(
   pairedDiff?: Extract<TranscriptBlock, { kind: 'diff' }> | undefined,
 ): React.ReactElement {
   const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
-  const path = fileRef?.path ?? fileRef?.label;
+  const path = block.path ?? fileRef?.path ?? fileRef?.label;
 
   if (path) {
     return (
@@ -368,8 +402,63 @@ function renderArtifactBlock(
   }
 
   return (
-    <div className={styles.blockTitle}>
-      {block.title}
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <div className={styles.blockTitle}>{block.title}</div>
+        {(block.artifactKind || block.uri || block.mimeType) && (
+          <div className={styles.inlineMutedLoose}>
+            {[block.artifactKind, block.mimeType, block.uri].filter(Boolean).join(' / ')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function renderPreviewBlock(
+  block: Extract<TranscriptBlock, { kind: 'preview' }>,
+): React.ReactElement {
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <div className={styles.blockTitle}>Preview {block.previewId}</div>
+        <div className={styles.inlineMutedLoose}>
+          {[block.status, block.url].filter(Boolean).join(' / ')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderFileChangeBlock(
+  block: Extract<TranscriptBlock, { kind: 'file_change' }>,
+  onReviewFile?: ((file: FileItem) => void) | undefined,
+  diffControls?: InlineDiffControls | undefined,
+): React.ReactElement {
+  const diffExpanded = diffControls?.expandedDiffIds.has(block.id) ?? false;
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <FileChangeCard
+          action={block.action}
+          {...(block.additions != null ? { additions: block.additions } : {})}
+          {...(block.deletions != null ? { deletions: block.deletions } : {})}
+          {...(block.lines?.length && diffControls ? {
+            diffExpanded,
+            onToggleDiff: () => diffControls.onToggleDiff(block.id),
+          } : {})}
+          onReview={onReviewFile ? () => onReviewFile(fileItemFromPath(block.path)) : undefined}
+          path={block.path}
+        />
+        {block.lines?.length && diffExpanded && (
+          <DiffCard
+            additions={block.additions ?? 0}
+            deletions={block.deletions ?? 0}
+            filename={block.path}
+            lines={block.lines}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -408,6 +497,35 @@ function renderApprovalBlock(
       id={block.id}
       reason={block.reason}
       risk={block.risk}
+      status={block.status}
+      title={block.title}
+      toolName={block.toolName}
+    />
+  );
+}
+
+function renderPermissionRequestBlock(
+  block: Extract<TranscriptBlock, { kind: 'permission_request' }>,
+): React.ReactElement {
+  return (
+    <ApprovalCardBlock
+      id={block.requestId}
+      reason={block.reason}
+      risk={block.risk}
+      status={block.status}
+      title={block.title}
+      toolName={block.toolName}
+    />
+  );
+}
+
+function renderPermissionResultBlock(
+  block: Extract<TranscriptBlock, { kind: 'permission_result' }>,
+): React.ReactElement {
+  return (
+    <ApprovalCardBlock
+      id={block.requestId}
+      reason={block.reason ?? block.decision}
       status={block.status}
       title={block.title}
       toolName={block.toolName}
@@ -507,7 +625,7 @@ function findPairedDiffBlock(
 
 function artifactFilePath(block: Extract<TranscriptBlock, { kind: 'artifact' }>): string | undefined {
   const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
-  return fileRef?.path ?? fileRef?.label ?? block.title;
+  return block.path ?? fileRef?.path ?? fileRef?.label ?? block.title;
 }
 
 function renderRunStepChild(
@@ -529,9 +647,17 @@ function renderRunStepChild(
         />
       );
     }
+    case 'tool_result':
+      return (
+        <ToolCardBlock
+          description={block.summary}
+          status={block.status}
+          toolName={`${block.toolName} result`}
+        />
+      );
     case 'artifact': {
       const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
-      const path = fileRef?.path ?? fileRef?.label ?? block.title;
+      const path = block.path ?? fileRef?.path ?? fileRef?.label ?? block.title;
       return (
         <>
           <FileChangeCard
@@ -556,6 +682,26 @@ function renderRunStepChild(
         </>
       );
     }
+    case 'file_change':
+      return (
+        <>
+          <FileChangeCard
+            action={block.action}
+            {...(block.additions != null ? { additions: block.additions } : {})}
+            {...(block.deletions != null ? { deletions: block.deletions } : {})}
+            onReview={onReviewFile ? () => onReviewFile(fileItemFromPath(block.path)) : undefined}
+            path={block.path}
+          />
+          {block.lines?.length ? (
+            <DiffCard
+              additions={block.additions ?? 0}
+              deletions={block.deletions ?? 0}
+              filename={block.path}
+              lines={block.lines}
+            />
+          ) : null}
+        </>
+      );
     case 'diff':
       return (
         <DiffCard
@@ -570,6 +716,10 @@ function renderRunStepChild(
     default:
       return renderTranscriptBlock(block, undefined, onReviewFile, false, diffControls);
   }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported transcript block: ${JSON.stringify(value)}`);
 }
 
 /* ── V4 detail blocks ── */
@@ -610,6 +760,20 @@ function renderSubagentBlock(
       summary={block.summary}
       title={block.title}
       worker={block.worker}
+    />
+  );
+}
+
+function renderSubtaskBlock(
+  block: Extract<TranscriptBlock, { kind: 'subtask' }>,
+): React.ReactElement {
+  return (
+    <SubagentBlock
+      runId={block.runId}
+      status={block.status}
+      summary={block.summary}
+      title={block.title}
+      worker={block.worker ?? 'Agent'}
     />
   );
 }
@@ -672,6 +836,29 @@ function renderResultBlock(
       success={block.success}
       summary={block.summary}
       turns={block.turns}
+    />
+  );
+}
+
+function renderFailureBlock(
+  block: Extract<TranscriptBlock, { kind: 'failure' }>,
+): React.ReactElement {
+  return (
+    <ResultBlock
+      success={false}
+      summary={block.reason ?? block.title}
+    />
+  );
+}
+
+function renderFinishedBlock(
+  block: Extract<TranscriptBlock, { kind: 'finished' }>,
+): React.ReactElement {
+  return (
+    <ResultBlock
+      duration={block.duration}
+      success={true}
+      summary={block.title}
     />
   );
 }
