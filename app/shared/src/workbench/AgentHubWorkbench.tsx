@@ -32,14 +32,15 @@ import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
-import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions } from './WorkbenchRoutes';
+import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
-import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
-import type { AgentConfig, ProjectDraft } from './pages';
+import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
+import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
+import { createSettingsService, type SettingsService } from './settingsService';
 import styles from './AgentHubWorkbench.module.css';
 
 const INSPECTOR_MIN_WIDTH = 48;
@@ -146,6 +147,10 @@ export interface AgentHubWorkbenchProps {
   onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
   /** Contact mutation actions passed through to ContactsPage. */
   contactsActions?: WorkbenchContactsActions | undefined;
+  /** Document rows for DocsPage (real data first, mock fallback). */
+  documents?: DocRow[] | undefined;
+  /** Document mutation actions wired to Hub Documents API. */
+  documentsActions?: WorkbenchDocumentsActions | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   showComposerAgentPicker?: boolean | undefined;
   showComposerStatus?: boolean | undefined;
@@ -181,6 +186,8 @@ export function AgentHubWorkbench({
   onApprovalDecision,
   onNavigateToConversation,
   contactsActions,
+  documents,
+  documentsActions,
   runtimeEvidence,
   showComposerAgentPicker = true,
   showComposerStatus = true,
@@ -190,6 +197,12 @@ export function AgentHubWorkbench({
   userDisplayName,
   userAvatarUrl,
 }: AgentHubWorkbenchProps): React.ReactElement {
+  // Create settings service if platform provides a settings port
+  const settingsService = useMemo<SettingsService | null>(
+    () => platform.settings ? createSettingsService(platform.settings, WORKBENCH_MOCK_SETTINGS_DEFAULTS) : null,
+    [platform.settings],
+  );
+
   const fallbackConversationId = conversations[0]?.id ?? 'default';
   const [localConversationId, setLocalConversationId] = useState(fallbackConversationId);
   const controlledConversationExists = conversations.some((conversation) => conversation.id === activeConversationId);
@@ -1208,6 +1221,7 @@ export function AgentHubWorkbench({
               agentProfilesStatus={agentProfilesStatus}
               dataMode={workbenchStatus?.dataMode}
               contacts={contacts}
+              documents={documents}
               focusedAgentId={focusedAgentId}
               projects={projects}
               activeProjectId={activeProjectId}
@@ -1222,6 +1236,7 @@ export function AgentHubWorkbench({
               onAgentProfileOpen={openAgentProfileFromConfig}
               onStartConversation={onNavigateToConversation}
               contactsActions={contactsActions}
+              documentsActions={documentsActions}
               localCliDiscovery={localCliDiscovery}
             />
           </section>
