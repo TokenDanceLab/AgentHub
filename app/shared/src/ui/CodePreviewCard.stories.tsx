@@ -12,7 +12,7 @@ type Story = StoryObj<typeof CodePreviewCard>;
 
 export const DiffPreview: Story = {
   args: {
-    title: 'app/mobile/src/views/RunStatusView.tsx',
+    title: 'app/mobile-rn/src/screens/TasksScreen.tsx',
     meta: '+12 -4',
     code: [
       '+import { CodePreviewCard } from "@agenthub/shared/ui";',

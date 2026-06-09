@@ -21,7 +21,7 @@ Claude Code、Codex、OpenCode 是 Agent Runtime，不是用户直接管理的�
 5. 旧 Desktop/Web UI 文件是迁移素材，不是长期架构。
 6. Tauri Host API 必须从巨石 command 文件拆成可测试、可审计的能力模块。
 7. v4 目标消息合同是 shared `TranscriptBlock` / `EvidenceRef`；旧 `ChatView.types`、旧 `ChatMessage` 和旧 `FileDiff` 只能作为迁移输入或测试素材，不能继续作为 Desktop/Web 的目标跨端模型。
-8. Desktop/Tauri 前端固定使用 `5173`，Web 前端固定使用 `5174`。Mobile 不进入本轮 v4 重构，预览端口让到 `5175`，避免抢占 Web。
+8. Desktop/Tauri 前端固定使用 `5173`，Web 前端固定使用 `5174`。Mobile 主线已切到 Expo + React Native，浏览器视觉预览固定使用 `5177`，避免抢占 Desktop/Web/design demo 端口。
 
 ## 3. v4 工作台信息架构
 

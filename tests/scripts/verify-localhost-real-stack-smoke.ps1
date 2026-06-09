@@ -146,7 +146,8 @@ try {
         Assert-True ($scriptText -match "--store-backend" -and $scriptText -match "sqlite" -and $scriptText -match "--store-db") "script starts Local Edge with SQLite store"
         Assert-True ($scriptText -match 'real_cli_or_model_invoked\s*=\s*\$false') "script keeps real CLI/model invocation false"
         Assert-True ($scriptText -notmatch "claude-code|codex|opencode") "script does not start real CLI runtime profiles"
-        Assert-True ($scriptText -notmatch "app\\mobile|app/mobile") "script does not touch Mobile"
+        $mobileRnPathPattern = ("app" + "\\mobile-rn|app" + "/mobile-rn")
+        Assert-True ($scriptText -notmatch $mobileRnPathPattern) "script does not touch Mobile RN"
 
         $edgePort = Get-FreePort
         $hubPort = Get-FreePort
