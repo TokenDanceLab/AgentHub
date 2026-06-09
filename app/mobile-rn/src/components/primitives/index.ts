@@ -5,6 +5,7 @@ export { EmptyState } from './EmptyState';
 export { ErrorNotice } from './ErrorNotice';
 export { IconButton } from './IconButton';
 export { ListRow } from './ListRow';
+export { MotionPressable } from './MotionPressable';
 export { SearchField } from './SearchField';
 export { SegmentedControl } from './SegmentedControl';
 export { StatusPill } from './StatusPill';

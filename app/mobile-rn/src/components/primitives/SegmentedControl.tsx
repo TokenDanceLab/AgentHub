@@ -1,6 +1,8 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAgentHubTheme } from '@/theme';
+
+import { MotionPressable } from './MotionPressable';
 
 interface SegmentOption<T extends string> {
   label: string;
@@ -36,9 +38,10 @@ export function SegmentedControl<T extends string>({
         const selected = option.value === value;
 
         return (
-          <Pressable
+          <MotionPressable
             accessibilityRole="button"
             accessibilityState={{ selected }}
+            feedback="control"
             key={option.value}
             onPress={() => onChange(option.value)}
             style={{
@@ -61,7 +64,7 @@ export function SegmentedControl<T extends string>({
             >
               {option.label}
             </Text>
-          </Pressable>
+          </MotionPressable>
         );
       })}
     </View>
