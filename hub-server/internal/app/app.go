@@ -765,6 +765,9 @@ func (a *App) startWebSocketCleanup(ctx context.Context) {
 
 // startAdminServer starts the admin HTTP server with pprof, /metrics, /debug/config, /debug/state endpoints.
 func (a *App) startAdminServer() {
+	// Register Prometheus metrics unconditionally so middleware never nil-pointer dereferences.
+	metrics.Register()
+
 	adminPort := a.Config.Server.AdminPort
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
 	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
@@ -773,7 +776,6 @@ func (a *App) startAdminServer() {
 		return
 	}
 
-	metrics.Register()
 	adminMux := http.NewServeMux()
 	debugpkg.RegisterEndpoints(adminMux, debugpkg.MuxConfig{
 		HealthCheckers: map[string]debugpkg.HealthChecker{
