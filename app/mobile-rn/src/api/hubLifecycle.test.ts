@@ -150,7 +150,10 @@ describe('Mobile Hub lifecycle bridge', () => {
 
   it('passes token to WS URL when provided', () => {
     const appState = new FakeAppState('active');
-    const createWebSocket = vi.fn(() => new FakeSocket());
+    const createWebSocket = vi.fn((url: string) => {
+      expect(url).toContain('token=test-jwt');
+      return new FakeSocket();
+    });
 
     startHubLifecycleBridge({
       appState,
@@ -159,8 +162,7 @@ describe('Mobile Hub lifecycle bridge', () => {
       createWebSocket,
     });
 
-    const url = createWebSocket.mock.calls[0]?.[0] as string;
-    expect(url).toContain('token=test-jwt');
+    expect(createWebSocket).toHaveBeenCalledTimes(1);
   });
 
   it('removes AppState listeners and closes the active stream when stopped', () => {
