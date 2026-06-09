@@ -17,6 +17,7 @@ export {
   WORKBENCH_AGENT_PROFILE_FIXTURES,
   WORKBENCH_AGENT_SKILL_OPTIONS,
   WORKBENCH_AGENT_TOOL_OPTIONS,
+  agentConfigToAgentSpecFixture,
   agentProfileCatalogToConfig,
   agentProfileCatalogToMarketTemplate,
 } from './agentProfileCatalog';

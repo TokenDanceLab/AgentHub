@@ -7,6 +7,13 @@ import type {
   PolicyRule,
   ToolPermission,
 } from './pages/AgentsPage';
+import {
+  buildAgentHubAgentSpecV1,
+  type AgentHubAgentSpecDraftV1,
+  type AgentHubAgentSpecMCPServerV1,
+  type AgentHubAgentSpecMemoryPolicyV1,
+  type AgentHubAgentSpecV1,
+} from '../agentSpec';
 
 export type AgentProfileVisibility = 'private' | 'team' | 'marketplace' | 'fixture';
 export type AgentRuntimeId = 'codex' | 'claude-code' | 'opencode' | 'browser-worker';
@@ -298,6 +305,25 @@ export function agentProfileCatalogToMarketTemplate(item: AgentProfileCatalogIte
   };
 }
 
+export function agentConfigToAgentSpecFixture(agent: AgentConfig): AgentHubAgentSpecV1 {
+  return buildAgentHubAgentSpecV1({
+    id: agent.id,
+    name: agent.name,
+    description: agent.role,
+    avatar: { type: 'icon', value: agent.avatarRef ?? `agenthub:avatar/${agent.id}` },
+    runtimeId: agent.runtimeId ?? normalizeSpecId(agent.engine),
+    runtimeProfile: agent.engine,
+    provider: agent.provider ?? 'fixture-provider',
+    model: agent.model,
+    skills: agent.skills,
+    mcpServers: (agent.mcpServers ?? []).map(toMCPServerSpec),
+    toolAllowlist: (agent.toolAllowlist ?? Object.keys(agent.tools)).map(toToolSpecId),
+    memoryPolicy: toMemoryPolicySpec(agent),
+    approvalPolicy: toApprovalPolicySpec(agent),
+    targetPreference: toTargetPreferenceSpec(agent),
+  });
+}
+
 export const WORKBENCH_AGENT_PROFILE_FIXTURES: AgentConfig[] =
   AGENT_PROFILE_CATALOG.map(agentProfileCatalogToConfig);
 
@@ -347,4 +373,52 @@ function toolPermissionsFromAllowlist(allowlist: string[]): Record<string, ToolP
 
 function uniqueSorted(items: string[]): string[] {
   return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b));
+}
+
+function toMCPServerSpec(id: string): AgentHubAgentSpecMCPServerV1 {
+  return {
+    id,
+    transport: 'stdio',
+    command: `mcp-server-${normalizeSpecId(id)}`,
+  };
+}
+
+function toMemoryPolicySpec(agent: AgentConfig): AgentHubAgentSpecMemoryPolicyV1 {
+  const retention = agent.memoryRetention ?? 'no-persist-fixture';
+  const hasMemory = (agent.memorySources ?? []).length > 0 && retention !== 'disabled';
+  return {
+    mode: hasMemory && retention === 'project-policy' ? 'project' : hasMemory ? 'workspace' : 'none',
+    retention,
+  };
+}
+
+function toApprovalPolicySpec(agent: AgentConfig): AgentHubAgentSpecDraftV1['approvalPolicy'] {
+  const requireApprovalFor = [
+    ...Object.entries(agent.tools)
+      .filter(([, permission]) => permission === '需确认')
+      .map(([tool]) => toToolSpecId(tool)),
+    ...(agent.approvalRiskRules ?? [])
+      .filter((rule) => rule.decision === 'require-approval')
+      .map((rule) => toToolSpecId(rule.match)),
+  ];
+  return {
+    mode: agent.approvalMode ?? agent.approval,
+    ...(requireApprovalFor.length > 0 ? { requireApprovalFor: uniqueSorted(requireApprovalFor) } : {}),
+  };
+}
+
+function toTargetPreferenceSpec(agent: AgentConfig): AgentHubAgentSpecDraftV1['targetPreference'] {
+  const [target] = agent.targetPreferences ?? [];
+  return {
+    mode: target ?? 'local-edge',
+    health: agent.state === 'idle' || agent.state === 'waiting' ? 'fixture-pending' : 'fixture-ready',
+  };
+}
+
+function toToolSpecId(value: string): string {
+  return normalizeSpecId(value);
+}
+
+function normalizeSpecId(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'fixture';
 }

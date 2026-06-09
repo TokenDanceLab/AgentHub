@@ -441,6 +441,7 @@ export {
   TranscriptView,
   UnifiedComposer,
   WorkspaceHeader,
+  agentConfigToAgentSpecFixture,
 } from './workbench';
 export type {
   AgentHubWorkbenchProps,

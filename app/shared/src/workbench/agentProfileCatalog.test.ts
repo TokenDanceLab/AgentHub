@@ -3,6 +3,7 @@ import {
   AGENT_PROFILE_CATALOG,
   WORKBENCH_AGENT_MARKET_FIXTURES,
   WORKBENCH_AGENT_PROFILE_FIXTURES,
+  agentConfigToAgentSpecFixture,
   agentProfileCatalogToConfig,
 } from './agentProfileCatalog';
 
@@ -71,5 +72,52 @@ describe('agentProfileCatalog', () => {
       memorySummary: expect.stringContaining('AGENTS.md'),
       approvalSummary: expect.stringContaining('确认'),
     });
+  });
+
+  it('compiles the Builder AgentProfile into a no-spend AgentHubAgentSpec fixture', () => {
+    const builder = WORKBENCH_AGENT_PROFILE_FIXTURES.find((profile) => profile.id === 'builder-agent');
+    expect(builder).toBeDefined();
+
+    const spec = agentConfigToAgentSpecFixture(builder!);
+
+    expect(spec).toMatchObject({
+      schema_version: 'agenthub.agent_spec.v1',
+      id: 'builder-agent',
+      name: 'Builder',
+      runtime: {
+        id: 'claude-code',
+        profile: 'Claude Code',
+        provider: 'TokenDance Gateway',
+        model: 'DeepSeek-V4-Pro',
+      },
+      memory_policy: {
+        mode: 'project',
+        retention: 'project-policy',
+      },
+      approval_policy: {
+        mode: 'workspace-write',
+      },
+      target_preference: {
+        mode: 'local-edge',
+        health: 'fixture-ready',
+      },
+      fixture: {
+        mode: 'fixture-only',
+        no_spend: true,
+        live_runtime_allowed: false,
+      },
+    });
+    expect(spec.tool_allowlist).toEqual([
+      'read_file',
+      'write_file',
+      'shell',
+      'git_diff',
+      'browser_screenshot',
+    ]);
+    expect(spec.mcp_servers).toEqual([
+      { id: 'filesystem', transport: 'stdio', command: 'mcp-server-filesystem' },
+      { id: 'github', transport: 'stdio', command: 'mcp-server-github' },
+    ]);
+    expect(spec.approval_policy.require_approval_for).toContain('write_workspace_files');
   });
 });
