@@ -29,6 +29,25 @@ function Resolve-RepoPath([string]$RelativePath) {
     return Join-Path $RepoRoot $RelativePath
 }
 
+function Get-TestFileSha256([string]$PathValue) {
+    $hashCommand = Get-Command "Get-FileHash" -ErrorAction SilentlyContinue
+    if ($hashCommand) {
+        return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+
+    $stream = [System.IO.File]::OpenRead((Resolve-Path -LiteralPath $PathValue).ProviderPath)
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return (($sha.ComputeHash($stream) | ForEach-Object { $_.ToString("x2") }) -join "")
+        } finally {
+            $sha.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 function Join-NativeArguments {
     param([string[]]$Arguments)
 
@@ -253,7 +272,7 @@ if ((Test-Path -LiteralPath $scenarioPath) -and (Test-Path -LiteralPath $exporte
                 [ordered]@{
                     path = "leak.txt"
                     role = "leak"
-                    sha256 = (Get-FileHash -LiteralPath $leakPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    sha256 = Get-TestFileSha256 $leakPath
                     bytes = (Get-Item -LiteralPath $leakPath).Length
                     redacted = $true
                 }
