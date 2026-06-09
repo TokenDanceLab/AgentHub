@@ -133,6 +133,77 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
     }));
   });
 
+  it('projects Hub permission events into approval transcript blocks with Hub decision metadata', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-permission-requested',
+        task_id: 'agent-task-1',
+        edge_run_id: 'edge-run-1',
+        session_id: 'hub-session-1',
+        event_seq: 1,
+        event_type: 'run.agent.permission_requested',
+        payload: {
+          requestId: 'approval-1',
+          toolName: 'Bash',
+          command: 'pnpm test',
+          riskLevel: 'high',
+          team_id: 'team-1',
+          team_run_id: 'team-run-1',
+          agent_task_id: 'agent-task-1',
+        },
+        created_at: '2026-06-09T04:00:01Z',
+      },
+      {
+        id: 'evt-permission-decided',
+        task_id: 'agent-task-1',
+        edge_run_id: 'edge-run-1',
+        session_id: 'hub-session-1',
+        event_seq: 2,
+        event_type: 'run.agent.permission_decided',
+        payload: {
+          requestId: 'approval-1',
+          toolName: 'Bash',
+          decision: 'allow',
+          reason: 'operator approved',
+          team_id: 'team-1',
+          team_run_id: 'team-run-1',
+          agent_task_id: 'agent-task-1',
+        },
+        created_at: '2026-06-09T04:00:02Z',
+      },
+    ]);
+
+    expect(blocks).toEqual([
+      expect.objectContaining({ kind: 'run_session' }),
+      expect.objectContaining({
+        kind: 'permission_request',
+        requestId: 'approval-1',
+        teamId: 'team-1',
+        teamRunId: 'team-run-1',
+        agentTaskId: 'agent-task-1',
+        toolName: 'Bash',
+        risk: 'high',
+        reason: 'pnpm test',
+        evidenceRefs: [
+          { id: 'run-edge-run-1', kind: 'run', label: 'Run edge-run-1', status: 'pending' },
+          { id: 'approval-approval-1', kind: 'approval', label: 'Bash approval', status: 'pending' },
+        ],
+      }),
+      expect.objectContaining({
+        kind: 'permission_result',
+        requestId: 'approval-1',
+        teamId: 'team-1',
+        teamRunId: 'team-run-1',
+        agentTaskId: 'agent-task-1',
+        decision: 'allow',
+        evidenceRefs: [
+          { id: 'run-edge-run-1', kind: 'run', label: 'Run edge-run-1', status: 'completed' },
+          { id: 'approval-approval-1', kind: 'approval', label: 'Bash approval', status: 'completed' },
+        ],
+      }),
+    ]);
+  });
+
   it('ignores invalid Hub runtime payloads', () => {
     expect(hubRuntimeEventFromPayload({ event_type: '', payload: {} })).toBeNull();
     expect(hubRuntimeEventFromPayload('not an object')).toBeNull();

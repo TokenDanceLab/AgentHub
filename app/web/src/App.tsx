@@ -139,7 +139,9 @@ function WebWorkbenchRoot() {
         }}
         onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
+        onApprovalDecision={workbench.onApprovalDecision}
         platform={webPlatform}
+        runtimeEvidence={workbench.runtimeEvidence}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
       />

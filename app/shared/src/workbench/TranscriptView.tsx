@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TranscriptBlock, TranscriptAuthor } from '../transcript';
+import type { ApprovalDecisionAction, TranscriptBlock, TranscriptAuthor } from '../transcript';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { FileItem } from './inspector';
 import {
@@ -56,6 +56,7 @@ export interface TranscriptViewProps {
   onBlockPointerUp?: ((block: TranscriptBlock, event: TranscriptPointerEvent) => void) | undefined;
   onBlockSelect?: ((blockId: string, event?: { shiftKey?: boolean }) => void) | undefined;
   onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined;
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined;
   onReviewFile?: ((file: FileItem) => void) | undefined;
   /** Optional pinned announcement to show at the top of the transcript. */
   pinnedAnnouncement?: {
@@ -77,6 +78,7 @@ export function TranscriptView({
   onBlockPointerUp,
   onBlockSelect,
   onAgentProfileOpen,
+  onApprovalDecision,
   onReviewFile,
   selectedBlockIds = [],
   selectionMode = false,
@@ -174,7 +176,14 @@ export function TranscriptView({
                 onPointerUp={(event) => onBlockPointerUp?.(block, event)}
                 tabIndex={0}
               >
-                {renderTranscriptBlock(block, onAgentProfileOpen, onReviewFile, hideGroupedUserAvatar, diffControls)}
+                {renderTranscriptBlock(
+                  block,
+                  onAgentProfileOpen,
+                  onReviewFile,
+                  hideGroupedUserAvatar,
+                  diffControls,
+                  onApprovalDecision,
+                )}
               </li>
             </React.Fragment>
           );
@@ -192,6 +201,7 @@ function renderTranscriptBlock(
   onReviewFile?: ((file: FileItem) => void) | undefined,
   hideUserAvatar = false,
   diffControls?: InlineDiffControls | undefined,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
   switch (block.kind) {
     case 'text':
@@ -211,7 +221,7 @@ function renderTranscriptBlock(
     case 'approval':
       return renderApprovalBlock(block);
     case 'permission_request':
-      return renderPermissionRequestBlock(block);
+      return renderPermissionRequestBlock(block, onApprovalDecision);
     case 'permission_result':
       return renderPermissionResultBlock(block);
     case 'agent_timeline':
@@ -219,7 +229,7 @@ function renderTranscriptBlock(
     case 'run_session':
       return renderRunSessionBlock(block);
     case 'run_step_group':
-      return renderRunStepGroupBlock(block, onReviewFile, diffControls);
+      return renderRunStepGroupBlock(block, onReviewFile, diffControls, onApprovalDecision);
     case 'thinking':
       return renderThinkingBlock(block);
     case 'subagent':
@@ -506,13 +516,18 @@ function renderApprovalBlock(
 
 function renderPermissionRequestBlock(
   block: Extract<TranscriptBlock, { kind: 'permission_request' }>,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
   return (
     <ApprovalCardBlock
       id={block.requestId}
+      agentTaskId={block.agentTaskId}
+      onDecision={onApprovalDecision}
       reason={block.reason}
       risk={block.risk}
       status={block.status}
+      teamId={block.teamId}
+      teamRunId={block.teamRunId}
       title={block.title}
       toolName={block.toolName}
     />
@@ -575,6 +590,7 @@ function renderRunStepGroupBlock(
   block: Extract<TranscriptBlock, { kind: 'run_step_group' }>,
   onReviewFile?: ((file: FileItem) => void) | undefined,
   diffControls?: InlineDiffControls | undefined,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
   const renderedChildren: React.ReactNode[] = [];
   const consumedDiffIds = new Set<string>();
@@ -586,13 +602,13 @@ function renderRunStepGroupBlock(
       if (pairedDiff) consumedDiffIds.add(pairedDiff.id);
       renderedChildren.push(
         <React.Fragment key={child.id}>
-          {renderRunStepChild(child, onReviewFile, diffControls, pairedDiff)}
+          {renderRunStepChild(child, onReviewFile, diffControls, pairedDiff, onApprovalDecision)}
         </React.Fragment>,
       );
       continue;
     }
     renderedChildren.push(
-      <React.Fragment key={child.id}>{renderRunStepChild(child, onReviewFile, diffControls)}</React.Fragment>,
+      <React.Fragment key={child.id}>{renderRunStepChild(child, onReviewFile, diffControls, undefined, onApprovalDecision)}</React.Fragment>,
     );
   }
 
@@ -635,6 +651,7 @@ function renderRunStepChild(
   onReviewFile?: ((file: FileItem) => void) | undefined,
   diffControls?: InlineDiffControls | undefined,
   pairedDiff?: Extract<TranscriptBlock, { kind: 'diff' }> | undefined,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
   switch (block.kind) {
     case 'tool_call': {
@@ -716,7 +733,7 @@ function renderRunStepChild(
     case 'thinking':
       return renderNestedThinkingDetail(block);
     default:
-      return renderTranscriptBlock(block, undefined, onReviewFile, false, diffControls);
+      return renderTranscriptBlock(block, undefined, onReviewFile, false, diffControls, onApprovalDecision);
   }
 }
 

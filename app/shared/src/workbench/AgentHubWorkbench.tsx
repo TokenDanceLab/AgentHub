@@ -10,6 +10,7 @@ import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '..
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
 import type { TranscriptBlock } from '../transcript';
+import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationSidebar } from './ConversationSidebar';
 import {
   ContextMenu,
@@ -107,6 +108,7 @@ export interface AgentHubWorkbenchProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   transcript: TranscriptBlock[];
 }
@@ -131,6 +133,7 @@ export function AgentHubWorkbench({
   onAgentsRetry,
   onProjectCreate,
   onProjectUpdate,
+  onApprovalDecision,
   runtimeEvidence,
   transcript,
 }: AgentHubWorkbenchProps): React.ReactElement {
@@ -1013,6 +1016,9 @@ export function AgentHubWorkbench({
               onBlockPointerUp={handleBlockPointerUp}
               onBlockSelect={handleBlockSelect}
               onAgentProfileOpen={openAgentProfile}
+              onApprovalDecision={(action) => {
+                void onApprovalDecision?.(action);
+              }}
               onReviewFile={openReviewFile}
               pinnedAnnouncement={activeConversation?.pinnedAnnouncement ? {
                 ...activeConversation.pinnedAnnouncement,

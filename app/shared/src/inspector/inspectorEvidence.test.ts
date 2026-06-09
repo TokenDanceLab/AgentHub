@@ -18,12 +18,22 @@ describe('buildInspectorEvidenceModel', () => {
     const model = buildInspectorEvidenceModel(evidence);
 
     expect(model.total).toBe(4);
-    expect(model.counts).toEqual({ artifact: 1, file: 1, run: 1, tool: 1 });
+    expect(model.counts).toEqual({ approval: 0, artifact: 1, file: 1, preview: 0, run: 1, tool: 1 });
     expect(model.statuses).toEqual({ completed: 2, failed: 0, pending: 0, running: 1 });
     expect(model.runs.map((item) => item.id)).toEqual(['run-1']);
     expect(model.tools.map((item) => item.id)).toEqual(['tool-rg']);
     expect(model.files.map((item) => item.id)).toEqual(['file-app']);
     expect(model.artifacts.map((item) => item.id)).toEqual(['artifact-smoke']);
+  });
+
+  it('keeps approval refs visible for side-panel evidence grouping', () => {
+    const model = buildInspectorEvidenceModel([
+      { id: 'approval-1', kind: 'approval', label: 'Bash approval', status: 'pending' },
+    ]);
+
+    expect(model.counts.approval).toBe(1);
+    expect(model.approvals.map((item) => item.id)).toEqual(['approval-1']);
+    expect(model.statuses.pending).toBe(1);
   });
 
   it('formats v4 inspector status labels in Chinese', () => {
