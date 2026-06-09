@@ -166,6 +166,35 @@ func TestAgentHubAgentSpecV1BuildsSDKFixtureStream(t *testing.T) {
 		Fixture: AgentSpecFixturePolicyV1{Mode: "fixture-only", NoSpend: true, LiveRuntimeAllowed: false},
 	}
 
+	invocation, err := CompileAgentSpecV1ToRuntimeInvocationFixture(spec)
+	if err != nil {
+		t.Fatalf("CompileAgentSpecV1ToRuntimeInvocationFixture: %v", err)
+	}
+	if invocation.SchemaVersion != "agenthub.runtime_invocation.fixture.v1" {
+		t.Fatalf("runtime invocation schema = %q", invocation.SchemaVersion)
+	}
+	if invocation.AdapterStrategy != "cli-json-fixture" || invocation.Provider != SDKFixtureProviderOpenAI {
+		t.Fatalf("runtime invocation strategy/provider = %s/%s", invocation.AdapterStrategy, invocation.Provider)
+	}
+	if invocation.ExecutionMode != "fixture" || !invocation.NoSpendDefault || invocation.LiveRuntimeAllowed {
+		t.Fatalf("runtime invocation safety flags = %#v", invocation)
+	}
+	if invocation.Context.AgentID != "codex" || invocation.Context.Model != "deepseek-v4-flash" || invocation.Context.PermissionMode != "workspace-write" {
+		t.Fatalf("runtime invocation context = %#v", invocation.Context)
+	}
+	if strings.Join(invocation.Context.MCPServerIDs, ",") != "filesystem" {
+		t.Fatalf("runtime invocation MCP IDs = %#v", invocation.Context.MCPServerIDs)
+	}
+	if invocation.CLIInvocationPlan == nil {
+		t.Fatal("codex AgentSpec should compile to a redacted CLI invocation plan")
+	}
+	if invocation.CLIInvocationPlan.AdapterID != "codex" || invocation.CLIInvocationPlan.CommandName == "" || strings.ContainsAny(invocation.CLIInvocationPlan.CommandName, `\/`) {
+		t.Fatalf("CLI plan = %#v", invocation.CLIInvocationPlan)
+	}
+	if !invocation.CLIInvocationPlan.PromptRedacted || invocation.CLIInvocationPlan.Observed || invocation.CLIInvocationPlan.RealTested {
+		t.Fatalf("CLI plan safety flags = %#v", invocation.CLIInvocationPlan)
+	}
+
 	stream, err := AgentSpecV1ToSDKFixtureStream(spec)
 	if err != nil {
 		t.Fatalf("AgentSpecV1ToSDKFixtureStream: %v", err)
@@ -175,17 +204,83 @@ func TestAgentHubAgentSpecV1BuildsSDKFixtureStream(t *testing.T) {
 	}
 
 	mapped := MapSDKFixtureStream(stream, testSDKFixtureScope())
-	if len(mapped) != 2 {
-		t.Fatalf("mapped events = %d, want 2", len(mapped))
+	if len(mapped) != 3 {
+		t.Fatalf("mapped events = %d, want 3", len(mapped))
 	}
-	if mapped[0].Type != BusEventStatusChange || mapped[1].Type != BusEventSessionInit {
-		t.Fatalf("mapped event types = %s, %s", mapped[0].Type, mapped[1].Type)
+	if mapped[0].Type != BusEventCLIInvocationPlan || mapped[1].Type != BusEventStatusChange || mapped[2].Type != BusEventSessionInit {
+		t.Fatalf("mapped event types = %s, %s, %s", mapped[0].Type, mapped[1].Type, mapped[2].Type)
 	}
-	if mapped[0].Payload["runtimeId"] != "codex" || mapped[0].Payload["fixtureOnly"] != true || mapped[0].Payload["noSpendDefault"] != true {
-		t.Fatalf("capability payload = %#v", mapped[0].Payload)
+	commandName, _ := mapped[0].Payload["commandName"].(string)
+	if commandName == "" || strings.ContainsAny(commandName, `\/`) || mapped[0].Payload["noSpendDefault"] != true {
+		t.Fatalf("invocation plan payload = %#v", mapped[0].Payload)
 	}
-	if mapped[1].Payload["model"] != "deepseek-v4-flash" || strings.Join(mapped[1].Payload["tools"].([]string), ",") != "read_file,write_file,grep" {
-		t.Fatalf("session payload = %#v", mapped[1].Payload)
+	if mapped[1].Payload["runtimeId"] != "codex" || mapped[1].Payload["fixtureOnly"] != true || mapped[1].Payload["noSpendDefault"] != true {
+		t.Fatalf("capability payload = %#v", mapped[1].Payload)
+	}
+	if mapped[2].Payload["model"] != "deepseek-v4-flash" || strings.Join(mapped[2].Payload["tools"].([]string), ",") != "read_file,write_file,grep" {
+		t.Fatalf("session payload = %#v", mapped[2].Payload)
+	}
+}
+
+func TestAgentHubAgentSpecV1CompilesSDKAndCLIInvocationFixtures(t *testing.T) {
+	cases := []struct {
+		name         string
+		runtimeID    string
+		wantProvider string
+		wantStrategy string
+		wantCLIPlan  bool
+	}{
+		{"openai agents sdk", "openai-agents-sdk", SDKFixtureProviderOpenAI, "sdk-json-fixture", false},
+		{"claude agent sdk", "claude-agent-sdk", SDKFixtureProviderClaude, "sdk-json-fixture", false},
+		{"codex cli json", "codex", SDKFixtureProviderOpenAI, "cli-json-fixture", true},
+		{"opencode cli json", "opencode", SDKFixtureProviderOpenCode, "cli-json-fixture", true},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := AgentHubAgentSpecV1{
+				SchemaVersion: "agenthub.agent_spec.v1",
+				ID:            "fixture-" + strings.ReplaceAll(tt.runtimeID, "-", "_"),
+				Name:          tt.name,
+				Runtime: AgentSpecRuntimeV1{
+					ID:              tt.runtimeID,
+					Model:           "fixture-model",
+					ReasoningEffort: "medium",
+				},
+				ToolAllowlist: []string{"read_file", "edit_file"},
+				ApprovalPolicy: map[string]any{
+					"mode": "plan",
+				},
+				TargetPreference: map[string]any{
+					"mode":      "local-edge",
+					"workspace": `C:\Users\Ding\private\agenthub`,
+				},
+				Fixture: AgentSpecFixturePolicyV1{Mode: "fixture-only", NoSpend: true, LiveRuntimeAllowed: false},
+			}
+
+			invocation, err := CompileAgentSpecV1ToRuntimeInvocationFixture(spec)
+			if err != nil {
+				t.Fatalf("CompileAgentSpecV1ToRuntimeInvocationFixture: %v", err)
+			}
+			if invocation.Provider != tt.wantProvider || invocation.AdapterStrategy != tt.wantStrategy {
+				t.Fatalf("provider/strategy = %s/%s, want %s/%s", invocation.Provider, invocation.AdapterStrategy, tt.wantProvider, tt.wantStrategy)
+			}
+			if invocation.CLIInvocationPlan == nil != !tt.wantCLIPlan {
+				t.Fatalf("CLI plan presence = %#v, want %v", invocation.CLIInvocationPlan, tt.wantCLIPlan)
+			}
+			if !containsString(invocation.ParserContract, BusEventResult) || !containsString(invocation.ParserContract, BusEventPermissionRequested) {
+				t.Fatalf("parser contract missing core runtime events: %#v", invocation.ParserContract)
+			}
+			encoded := marshalSDKFixtureJSON(t, invocation)
+			for _, leaked := range []string{`C:\Users\Ding`, "fixture prompt", "API_KEY"} {
+				if strings.Contains(encoded, leaked) {
+					t.Fatalf("runtime invocation fixture leaked %q:\n%s", leaked, encoded)
+				}
+			}
+			if tt.wantCLIPlan && (!strings.Contains(encoded, `"cli_invocation_plan"`) || !strings.Contains(encoded, `"promptRedacted": true`)) {
+				t.Fatalf("CLI runtime invocation fixture missing redacted plan:\n%s", encoded)
+			}
+		})
 	}
 }
 
