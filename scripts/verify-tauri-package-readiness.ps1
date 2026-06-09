@@ -96,6 +96,22 @@ function Assert-GeneratedSchemaClean {
     }
 }
 
+function Assert-WindowsUnsignedDevPackageContract {
+    Step "Windows unsigned/dev package reproducibility contract"
+    Assert-FileExists "scripts\verify-tauri-package-dry.ps1" "Windows unsigned/dev package dry checker"
+
+    $dryText = Read-Text "scripts\verify-tauri-package-dry.ps1"
+    Assert-True ($dryText -match 'mode\s*=\s*"windows-desktop-package-dry"') "package dry report declares windows-desktop-package-dry mode"
+    Assert-True ($dryText -match 'signing\s*=\s*"out-of-scope"' -and $dryText -match 'notarization\s*=\s*"out-of-scope"' -and $dryText -match 'stapling\s*=\s*"out-of-scope"' -and $dryText -match 'releaseUpload\s*=\s*"out-of-scope"') "package dry report keeps signing, notarization, stapling, and release upload out of scope"
+    Assert-True ($dryText -match 'Build Tauri executable without bundling' -and $dryText -match '"--no-bundle"') "package dry checker proves the dev executable compile path with pnpm tauri build --no-bundle"
+    Assert-True ($dryText -match 'if\s*\(\$RunWindowsBundle\)' -and $dryText -match 'Build unsigned Tauri Windows NSIS package' -and $dryText -match '"pnpm",\s*"tauri",\s*"build"') "package dry checker gates the unsigned Windows NSIS package path behind -RunWindowsBundle"
+    Assert-True ($dryText -match 'GOOS\s*=\s*"windows"' -and $dryText -match 'GOARCH\s*=\s*"amd64"' -and $dryText -match 'agenthub-edge-windows-amd64\.exe') "package dry checker compiles the Windows Local Edge sidecar explicitly"
+    Assert-True ($dryText -match 'prepare-tauri-sidecar-local\.ps1' -and $dryText -match 'agenthub-edge-x86_64-pc-windows-msvc\.exe') "package dry checker places the sidecar at the Tauri Windows target-triple path"
+    Assert-True ($dryText -match 'package-dry-report\.json' -and $dryText -match 'artifact-manifest\.json' -and $dryText -match 'Get-FileHash') "package dry checker writes report and manifest evidence with artifact hashes"
+    Assert-True ($dryText -match 'RequireUpdaterMetadata' -and $dryText -match 'not_produced_unsigned_build') "package dry checker separates unsigned package proof from updater metadata/signature production"
+    Assert-True ($dryText -match 'Assert-SidecarSqlitePolicy' -and $dryText -match 'local-edge\\?\.stdout\\?\.log' -and $dryText -match 'local-edge\\?\.stderr\\?\.log' -and $dryText -match 'edge_health_url|health_url' -and $dryText -match 'direct_cli_spawn') "package dry checker preserves reproducible Local Edge diagnostics without renderer direct CLI spawn"
+}
+
 function Read-Json([string]$RelativePath) {
     $path = Join-Path $RepoRoot $RelativePath
     return Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -504,6 +520,7 @@ Assert-True ($installerSmokeBlock -notmatch "pnpm\s+tauri\s+build") "installer s
 Assert-WorkflowCommandExplicitOptIn $readinessWorkflowText "pnpm\s+tauri\s+build" "run_windows_package_dry" "windows-package-dry" "Full Tauri build"
 
 Assert-GeneratedSchemaClean
+Assert-WindowsUnsignedDevPackageContract
 
 Step "Generated artifact ignore policy"
 $desktopVersion = [string]$package.version
