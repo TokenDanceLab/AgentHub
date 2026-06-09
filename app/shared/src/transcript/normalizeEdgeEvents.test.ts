@@ -23,7 +23,7 @@ describe('normalizeEdgeEventsToTranscript', () => {
         runId: 'run-live',
         path: 'app/shared/src/transcript/normalizeEdgeEvents.ts',
         kind: 'modified',
-        diff: '@@ -1 +1 @@',
+        diff: '@@ -1 +1 @@\n-old\n+new',
       }),
       edgeEvent('evt-approval', 5, 'run.agent.permission_requested', {
         runId: 'run-live',
@@ -35,6 +35,12 @@ describe('normalizeEdgeEventsToTranscript', () => {
         artifactId: 'artifact-1',
         path: 'app/desktop/.tmp/visual-smoke-desktop.png',
         kind: 'screenshot',
+      }),
+      edgeEvent('evt-preview', 7, 'preview.ready', {
+        runId: 'run-live',
+        id: 'preview-1',
+        url: 'http://127.0.0.1:4173',
+        status: 'ready',
       }),
       edgeEvent('evt-finished', 7, 'run.finished', {
         runId: 'run-live',
@@ -77,9 +83,11 @@ describe('normalizeEdgeEventsToTranscript', () => {
       }),
       expect.objectContaining({
         id: 'edge-event-evt-file',
-        kind: 'diff',
-        title: 'app/shared/src/transcript/normalizeEdgeEvents.ts',
-        files: ['app/shared/src/transcript/normalizeEdgeEvents.ts'],
+        kind: 'file_change',
+        path: 'app/shared/src/transcript/normalizeEdgeEvents.ts',
+        action: 'modified',
+        additions: 1,
+        deletions: 1,
         evidenceRefs: [
           { id: 'run-run-live', kind: 'run', label: 'Run run-live', status: 'running' },
           {
@@ -92,7 +100,8 @@ describe('normalizeEdgeEventsToTranscript', () => {
       }),
       expect.objectContaining({
         id: 'edge-event-evt-approval',
-        kind: 'approval',
+        kind: 'permission_request',
+        requestId: 'perm-1',
         title: 'Permission requested: Write',
         status: 'pending',
       }),
@@ -112,9 +121,27 @@ describe('normalizeEdgeEventsToTranscript', () => {
         ],
       }),
       expect.objectContaining({
+        id: 'edge-event-evt-preview',
+        kind: 'preview',
+        previewId: 'preview-1',
+        status: 'completed',
+        url: 'http://127.0.0.1:4173',
+        evidenceRefs: [
+          { id: 'run-run-live', kind: 'run', label: 'Run run-live', status: 'running' },
+          {
+            id: 'preview-preview-1',
+            kind: 'preview',
+            label: 'http://127.0.0.1:4173',
+            status: 'completed',
+            uri: 'http://127.0.0.1:4173',
+          },
+        ],
+      }),
+      expect.objectContaining({
         id: 'edge-event-evt-finished',
-        kind: 'text',
-        text: 'Run run-live finished',
+        kind: 'finished',
+        title: 'Run run-live finished',
+        runId: 'run-live',
         evidenceRefs: [
           { id: 'run-run-live', kind: 'run', label: 'Run run-live', status: 'completed' },
         ],
@@ -233,7 +260,7 @@ describe('normalizeEdgeEventsToTranscript', () => {
         isThinking: true,
       }),
       expect.objectContaining({
-        kind: 'subagent',
+        kind: 'subtask',
         title: '复核 blocks 对齐',
         worker: 'Reviewer',
         status: 'running',
