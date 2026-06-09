@@ -80,6 +80,11 @@ import {
   resolveAvailableDefaultAgentId,
 } from '@/utils/defaultAgent';
 import { mapLocalEdgeExecutionTarget } from '@/platform/edgeCapabilityMapper';
+import { readLocalCliDiscovery } from '@/platform/desktopPlatform';
+import {
+  buildLocalCliDiscoveryFromAgents,
+  type LocalCliDiscoveryManifest,
+} from './settings/cliDiscovery';
 import styles from './SettingsPage.module.css';
 import {
   useStoredBooleanState,
@@ -177,6 +182,7 @@ export default function SettingsPage({
   const [paletteQuery, setPaletteQuery] = useState('');
   const [paletteIndex, setPaletteIndex] = useState(0);
   const paletteInputRef = useRef<HTMLInputElement>(null);
+  const [hostCliDiscovery, setHostCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
 
   // Keyboard shortcuts
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
@@ -294,6 +300,23 @@ export default function SettingsPage({
     }),
     [agents, edgeOnline, healthStatus, modelCatalog, runnerItems],
   );
+  const cliDiscovery = useMemo(
+    () => buildLocalCliDiscoveryFromAgents(agents, hostCliDiscovery),
+    [agents, hostCliDiscovery],
+  );
+  useEffect(() => {
+    let cancelled = false;
+    readLocalCliDiscovery()
+      .then((discovery) => {
+        if (!cancelled) setHostCliDiscovery(discovery);
+      })
+      .catch(() => {
+        if (!cancelled) setHostCliDiscovery(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const handleRefreshConnections = useCallback(() => {
     refetchHealth();
     refetchAgents();
@@ -561,6 +584,7 @@ export default function SettingsPage({
               localEdgeTargetSyncStatus={syncLocalEdgeTarget.isPending ? 'syncing' : syncLocalEdgeTarget.isError ? 'error' : 'idle'}
               localEdgeTargetSyncError={syncLocalEdgeTarget.error instanceof Error ? syncLocalEdgeTarget.error.message : null}
               onSyncLocalEdgeTarget={handleSyncLocalEdgeTarget}
+              cliDiscovery={cliDiscovery}
             />
           )}
 

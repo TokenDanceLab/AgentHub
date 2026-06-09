@@ -2,9 +2,10 @@
 <#
 AgentHub P0 Edge CLI real-readiness proposal gate.
 
-This script is intentionally static and secret-free. It reads repository files
-and proposal parameters only. It does not execute Codex, Claude Code, OpenCode,
-PowerShell child processes, network calls, or model/API commands.
+This script is intentionally secret-free. By default it reads repository files
+and proposal parameters only. With -DiscoverCommands it may run Get-Command plus
+runtime --version/--help probes; it never executes prompt-bearing CLI, network,
+secret, workspace, or model/API commands.
 #>
 
 [CmdletBinding()]
@@ -326,9 +327,11 @@ function Add-PrerequisiteResult {
 
 Write-Host "AgentHub P0 Edge CLI real-readiness proposal gate" -ForegroundColor Magenta
 Write-Host "Mode: $Mode" -ForegroundColor Magenta
-Write-Host "No Codex, Claude Code, or OpenCode command was executed." -ForegroundColor Magenta
 if ($DiscoverCommands) {
-    Write-Host "No prompt, model, or API command was executed; discovery is limited to Get-Command, --version, and --help." -ForegroundColor Magenta
+    Write-Host "Codex, Claude Code, and OpenCode probes are limited to Get-Command, --version, and --help." -ForegroundColor Magenta
+    Write-Host "No prompt, model, API, secret, approval, or workspace command is executed." -ForegroundColor Magenta
+} else {
+    Write-Host "No Codex, Claude Code, or OpenCode command was executed." -ForegroundColor Magenta
 }
 Write-Host "No network, secret, model, or API budget was consumed." -ForegroundColor Magenta
 

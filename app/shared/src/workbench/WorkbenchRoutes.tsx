@@ -10,7 +10,7 @@ import {
   readComposerSubmitBehavior,
   writeComposerSubmitBehavior,
 } from './workbenchPreferences';
-import type { WorkbenchAgent } from '../platform';
+import type { LocalCliDiscoveryManifest, WorkbenchAgent } from '../platform';
 import type {
   ContactsPane,
   ContactGroup,
@@ -96,6 +96,7 @@ export interface WorkbenchRoutesProps {
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
   onAgentsRetry?: (() => void) | undefined;
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
+  localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
 }
 
 export interface WorkbenchAgentProfilesStatus {
@@ -449,6 +450,7 @@ export function WorkbenchRoutes({
   onAgentDelete,
   onAgentsRetry,
   onAgentProfileOpen,
+  localCliDiscovery,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
@@ -1100,6 +1102,7 @@ export function WorkbenchRoutes({
           {...settings}
           activePane={settingsPane}
           onChangeSetting={handleSettingChange}
+          localCliDiscovery={localCliDiscovery}
           onSelectPane={setSettingsPane}
           spaceMeta="桌面设计 demo"
           spaceTitle="AgentHub Desktop"

@@ -5,6 +5,7 @@ import {
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
   type DesignNavIconName,
 } from '../designIcons';
+import type { LocalCliDiscoveryManifest } from '../../platform';
 import styles from './SettingsPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -73,6 +74,8 @@ export interface SettingsPageProps {
   logLevel: string;
   /** Design-system validation mode. */
   designSystemValidation: string;
+  /** Optional Desktop host CLI discovery status. */
+  localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
   /** State strategy toggles. */
   stateStrategies: Record<'empty' | 'invalid' | 'missing', boolean>;
   /** Called when the user selects a different pane. */
@@ -402,6 +405,35 @@ function DataModeStatus({
   );
 }
 
+function LocalCliDiscoveryStatus({
+  discovery,
+}: {
+  discovery: LocalCliDiscoveryManifest;
+}): React.ReactElement {
+  return (
+    <SettingsSection title="CLI 诊断">
+      <SettingsRow label="发现模式" description="只做 no-spend CLI 状态发现；不执行 Run、带 prompt 的命令、模型调用或 secrets。">
+        <SettingValue value={discovery.mode} />
+      </SettingsRow>
+      <SettingsRow label="就绪 manifest" description="后续 approved-real 验证必须对齐的 readiness 文档。">
+        <SettingPath value={discovery.readinessManifest} />
+      </SettingsRow>
+      <SettingsRow label="就绪脚本" description="静态 gate 和 no-spend command discovery 的验证入口。">
+        <SettingPath value={discovery.readinessScript} />
+      </SettingsRow>
+      {discovery.items.map((item) => (
+        <SettingsRow
+          key={item.id}
+          label={item.name}
+          description={`${item.version ? `version ${item.version}` : 'version unknown'} · ${item.path}`}
+        >
+          <SettingValue value={`${item.installed ? 'installed' : 'missing'} · ${item.noSpend ? 'no-spend' : 'requires approval'}`} />
+        </SettingsRow>
+      ))}
+    </SettingsSection>
+  );
+}
+
 /* ── State panel ── */
 
 export type StatePanelKind = 'empty' | 'invalid' | 'missing';
@@ -580,6 +612,8 @@ function LocalDevPane(props: SettingsPageProps): React.ReactElement {
           <SettingValue value={props.designSystemValidation} />
         </SettingsRow>
       </SettingsSection>
+
+      {props.localCliDiscovery ? <LocalCliDiscoveryStatus discovery={props.localCliDiscovery} /> : null}
     </>
   );
 }
