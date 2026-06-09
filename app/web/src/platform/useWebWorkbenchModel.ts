@@ -23,6 +23,7 @@ import {
   type HubRuntimeEventTranscriptInput,
   type TranscriptBlock,
 } from '@shared/transcript';
+import type { FileDiff } from '@shared/types/chat';
 import { createHubClient } from '@/api/hubClient';
 import type {
   AgentTaskApproval,
@@ -379,27 +380,40 @@ function taskArtifactToRuntimeEvent(
   list: AgentTaskArtifactList,
 ): HubRuntimeEventTranscriptInput {
   const artifactId = artifact.artifact_id || artifact.source_event_id || artifact.path || artifact.name || 'artifact';
+  const patch = artifact.diff || artifact.patch;
+  const artifactKind = artifact.type || artifact.kind || artifact.status;
+  const eventType = isTaskFileChangeArtifact(artifact) ? 'run.agent.file_change' : 'artifact.created';
   return {
     id: artifact.source_event_id || artifactId,
     task_id: artifact.task_id || list.task_id,
     ...(artifact.edge_run_id || list.edge_run_id ? { edge_run_id: artifact.edge_run_id || list.edge_run_id } : {}),
     ...(artifact.session_id || list.session_id ? { session_id: artifact.session_id || list.session_id } : {}),
     ...(artifact.event_seq != null ? { event_seq: artifact.event_seq } : {}),
-    event_type: 'artifact.created',
+    event_type: eventType,
     payload: {
       artifactId,
       ...(artifact.path || artifact.name ? { path: artifact.path || artifact.name } : {}),
       ...(artifact.name || artifact.path ? { title: artifact.name || artifact.path } : {}),
       ...(artifact.action ? { action: artifact.action } : {}),
-      kind: artifact.status || artifact.action || 'artifact',
+      kind: artifactKind || artifact.action || 'artifact',
       ...(artifact.tool_name ? { toolName: artifact.tool_name } : {}),
       ...(artifact.mime_type ? { mimeType: artifact.mime_type } : {}),
       ...(artifact.size_bytes != null ? { sizeBytes: artifact.size_bytes } : {}),
+      ...(patch ? { diff: patch } : {}),
+      ...(artifact.edit_id ? { edit_id: artifact.edit_id } : {}),
+      ...(artifact.review_status ? { review_status: artifact.review_status } : {}),
+      ...(artifact.can_apply != null ? { can_apply: artifact.can_apply } : {}),
+      ...(artifact.can_revert != null ? { can_revert: artifact.can_revert } : {}),
       agent_task_id: artifact.task_id || list.task_id,
       ...(artifact.edge_run_id || list.edge_run_id ? { edge_run_id: artifact.edge_run_id || list.edge_run_id } : {}),
     },
     ...(artifact.created_at ? { created_at: artifact.created_at } : {}),
   };
+}
+
+function isTaskFileChangeArtifact(artifact: AgentTaskArtifact): boolean {
+  const kind = normalizedStatus(artifact.type || artifact.kind || artifact.status);
+  return kind === 'file_change' || kind === 'diff' || Boolean(artifact.diff || artifact.patch || artifact.edit_id);
 }
 
 function taskApprovalDecision(status: string | undefined): 'allow' | 'deny' {
@@ -450,6 +464,9 @@ function webTaskContractErrorBlock(channel: 'approvals' | 'artifacts', taskId: s
 export function resolveWebRuntimeEvidence(transcript: TranscriptBlock[]): RuntimeEvidenceSnapshot {
   const runId = resolveCurrentTranscriptRunId(transcript);
   const evidence = collectTranscriptEvidence(transcript);
+  const fileChangeBlocks = transcript.filter((block): block is Extract<TranscriptBlock, { kind: 'file_change' }> =>
+    block.kind === 'file_change'
+  );
   const artifactBlocks = transcript.filter((block): block is Extract<TranscriptBlock, { kind: 'artifact' }> =>
     block.kind === 'artifact'
   );
@@ -465,6 +482,9 @@ export function resolveWebRuntimeEvidence(transcript: TranscriptBlock[]): Runtim
     sizeBytes: 0,
     createdAt: block.createdAt ?? '',
   }));
+  const diffs = fileChangeBlocks
+    .filter((block) => block.patch || block.lines?.length || block.editId || block.reviewStatus)
+    .map(fileChangeBlockToDiff);
   const previews = previewBlocks.map((block) => ({
     id: block.previewId,
     runId: previewRunId(block, runId),
@@ -475,15 +495,41 @@ export function resolveWebRuntimeEvidence(transcript: TranscriptBlock[]): Runtim
   }));
   return {
     ...(runId ? { runId } : {}),
-    diffs: [],
+    diffs,
     artifacts,
     previews,
     sources: {
-      diff: 'none',
+      diff: diffs.length > 0 ? 'event' : 'none',
       artifacts: evidence.some((ref) => ref.kind === 'artifact') ? 'event' : 'none',
       previews: evidence.some((ref) => ref.kind === 'preview') ? 'event' : 'none',
     },
   };
+}
+
+function fileChangeBlockToDiff(block: Extract<TranscriptBlock, { kind: 'file_change' }>): FileDiff {
+  return {
+    filePath: block.path,
+    status: fileDiffStatus(block.action),
+    additions: block.additions ?? block.lines?.filter((line) => line.type === 'add').length ?? 0,
+    deletions: block.deletions ?? block.lines?.filter((line) => line.type === 'del').length ?? 0,
+    hunks: [{
+      header: '@@ Hub task file change @@',
+      lines: (block.lines ?? []).map((line) => ({
+        type: line.type === 'add' ? 'added' : line.type === 'del' ? 'deleted' : 'context',
+        content: line.content,
+      })),
+    }],
+    ...(block.editId ? { editId: block.editId } : {}),
+    ...(block.reviewStatus ? { reviewStatus: block.reviewStatus } : {}),
+    ...(block.canApply != null ? { canApply: block.canApply } : {}),
+    ...(block.canRevert != null ? { canRevert: block.canRevert } : {}),
+  };
+}
+
+function fileDiffStatus(action: Extract<TranscriptBlock, { kind: 'file_change' }>['action']): FileDiff['status'] {
+  if (action === 'created') return 'added';
+  if (action === 'deleted') return 'deleted';
+  return 'modified';
 }
 
 function artifactIdFromEvidence(id: string | undefined): string | undefined {
