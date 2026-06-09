@@ -24,6 +24,122 @@ func TestSDKFixtureMapperCustomOpenAICompatibleGolden(t *testing.T) {
 	assertSDKFixtureGolden(t, "custom_openai_compatible")
 }
 
+func TestSDKFixtureMapperProviderOfflineEventMatrix(t *testing.T) {
+	cases := []struct {
+		name       string
+		fixture    string
+		wantTypes  []string
+		wantEvents map[string]string
+	}{
+		{
+			name: "claude agent sdk like",
+			fixture: `{
+				"provider": "claude-sdk-fixture",
+				"events": [
+					{"id": "claude_text", "type": "assistant_message", "content": "Claude fixture text", "evidenceRefs": ["event:claude_text"]},
+					{"id": "claude_tool", "type": "tool_use", "toolUseId": "toolu_read", "toolName": "Read", "input": {"file_path": "edge-server/internal/adapters/sdk_fixture_mapper.go"}},
+					{"id": "claude_tool_result", "type": "tool_result", "toolUseId": "toolu_read", "toolName": "Read", "output": "read fixture file"},
+					{"id": "claude_file", "type": "file_changed", "toolUseId": "toolu_write", "toolName": "Write", "path": "edge-server/internal/adapters/sdk_fixture_mapper.go", "kind": "modified"},
+					{"id": "claude_permission", "type": "permission_asked", "requestId": "perm_claude", "toolUseId": "toolu_bash", "toolName": "Bash", "riskLevel": "high", "reason": "offline fixture approval"},
+					{"id": "claude_artifact", "type": "artifact_created", "artifactId": "artifact_claude", "path": "artifacts/claude-fixture.md", "kind": "markdown", "evidenceRefs": ["event:claude_file"]},
+					{"id": "claude_result", "type": "terminal_result", "success": true, "summary": "Claude fixture complete", "evidenceRefs": ["artifact:artifact_claude"]}
+				]
+			}`,
+			wantTypes: []string{
+				BusEventTextBlock,
+				BusEventToolCall,
+				BusEventToolResult,
+				BusEventFileChange,
+				BusEventPermissionRequested,
+				sdkFixtureEventArtifactCreated,
+				BusEventResult,
+			},
+			wantEvents: map[string]string{
+				"claude_text":        BusEventTextBlock,
+				"claude_tool":        BusEventToolCall,
+				"claude_tool_result": BusEventToolResult,
+				"claude_file":        BusEventFileChange,
+				"claude_permission":  BusEventPermissionRequested,
+				"claude_artifact":    sdkFixtureEventArtifactCreated,
+				"claude_result":      BusEventResult,
+			},
+		},
+		{
+			name: "openai agents sdk like",
+			fixture: `{
+				"provider": "openai-agents-sdk-fixture",
+				"events": [
+					{"id": "openai_text", "type": "message_output", "content": "OpenAI fixture text", "evidenceRefs": ["event:openai_text"]},
+					{"id": "openai_tool", "type": "function_tool_call", "callId": "call_patch", "toolName": "apply_patch", "input": {"path": "edge-server/internal/adapters/sdk_fixture_mapper.go", "api_key": "sk-not-real"}},
+					{"id": "openai_tool_result", "type": "function_tool_output", "callId": "call_patch", "toolName": "apply_patch", "output": "patch applied"},
+					{"id": "openai_file", "type": "artifact_file", "callId": "call_patch", "toolName": "apply_patch", "path": "edge-server/internal/adapters/sdk_fixture_mapper_test.go", "kind": "modified"},
+					{"id": "openai_permission", "type": "guardrail_triggered", "requestId": "guard_openai", "callId": "call_shell", "toolName": "shell", "riskLevel": "medium", "reason": "offline guardrail approval"},
+					{"id": "openai_artifact", "type": "artifact_created", "artifactId": "artifact_openai", "path": "artifacts/openai-fixture.json", "kind": "json", "metadata": {"trace_url": "fixture://trace/openai", "token": "secret-token"}, "evidenceRefs": ["event:openai_file"]},
+					{"id": "openai_result", "type": "run_result", "success": true, "summary": "OpenAI fixture complete", "evidenceRefs": ["artifact:artifact_openai"]}
+				]
+			}`,
+			wantTypes: []string{
+				BusEventTextBlock,
+				BusEventToolCall,
+				BusEventToolResult,
+				BusEventFileChange,
+				BusEventPermissionRequested,
+				sdkFixtureEventArtifactCreated,
+				BusEventResult,
+			},
+			wantEvents: map[string]string{
+				"openai_text":        BusEventTextBlock,
+				"openai_tool":        BusEventToolCall,
+				"openai_tool_result": BusEventToolResult,
+				"openai_file":        BusEventFileChange,
+				"openai_permission":  BusEventPermissionRequested,
+				"openai_artifact":    sdkFixtureEventArtifactCreated,
+				"openai_result":      BusEventResult,
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			stream, err := DecodeSDKFixtureStream([]byte(tt.fixture))
+			if err != nil {
+				t.Fatalf("decode fixture: %v", err)
+			}
+
+			mapped := MapSDKFixtureStream(stream, testSDKFixtureScope())
+			gotTypes := make([]string, 0, len(mapped))
+			for _, evt := range mapped {
+				gotTypes = append(gotTypes, evt.Type)
+				sourceEventID, _ := evt.Payload["sourceEventId"].(string)
+				if wantType := tt.wantEvents[sourceEventID]; wantType != "" && evt.Type != wantType {
+					t.Fatalf("source event %s mapped to %s, want %s", sourceEventID, evt.Type, wantType)
+				}
+				if evt.Scope["runId"] != "run_fixture" {
+					t.Fatalf("mapped event %s lost replay scope: %#v", evt.Type, evt.Scope)
+				}
+				if evt.Payload["provider"] != stream.Provider {
+					t.Fatalf("mapped event %s provider = %#v, want %s", evt.Type, evt.Payload["provider"], stream.Provider)
+				}
+			}
+			if strings.Join(gotTypes, ",") != strings.Join(tt.wantTypes, ",") {
+				t.Fatalf("mapped types = %v, want %v", gotTypes, tt.wantTypes)
+			}
+
+			replay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
+			for _, leaked := range []string{"sk-not-real", "secret-token"} {
+				if strings.Contains(replay, leaked) {
+					t.Fatalf("offline fixture replay leaked %q:\n%s", leaked, replay)
+				}
+			}
+			for sourceEventID, eventType := range tt.wantEvents {
+				if !strings.Contains(replay, sourceEventID) || !strings.Contains(replay, eventType) {
+					t.Fatalf("replay missing source evidence %s or event type %s:\n%s", sourceEventID, eventType, replay)
+				}
+			}
+		})
+	}
+}
+
 func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.T) {
 	providers := []struct {
 		name       string

@@ -181,22 +181,22 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 
 ### Edge Adapter Fixture JSON Contract
 
-This section documents the no-spend fixture/contract mapper used by Edge
-adapter tests. It does not claim production Claude Agent SDK, OpenAI Agents SDK,
-OpenCode sidecar, or custom Agent runtime execution support. Production
-adapters may emit the same `run.agent.*` event shapes only after an approved
-real runner/smoke slice proves that runtime path. Fixture signals must map
-native-looking provider inputs into the existing `run.agent.*` vocabulary before
-Hub/Web replay. The replay shape remains:
+本节记录 Edge adapter 测试使用的 no-spend fixture/contract mapper。它只说明
+Claude Agent SDK-like、OpenAI Agents SDK-like、OpenCode sidecar 和 custom
+Agent runtime 的静态 JSON fixture 映射，不声明生产 SDK 包已安装、真实模型/API
+已调用，或真实 runtime path 已可用。生产 adapter 只有在 approved real
+runner/smoke 切片证明后，才能声明同样的 `run.agent.*` event shape 来自真实路径。
+Fixture 信号必须先映射到现有 `run.agent.*` vocabulary，再进入 Hub/Web replay。
+Replay shape 保持：
 
 ```json
 {"type":"agent.stream","payload":{"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"edge_run_id":"run_01","event_seq":1}}
 ```
 
-Provider-specific fields stay below the Edge adapter boundary. Fixture event
-payloads must redact raw prompts, API tokens, authorization headers,
-secret-like keys, absolute workspace paths, and provider trace bodies. Paths
-are workspace relative when safe; otherwise only the basename is retained.
+Provider-specific 字段留在 Edge adapter 边界内。Fixture event payload 必须脱敏 raw
+prompt、API token、authorization header、secret-like key、绝对 workspace path 和
+provider trace body。路径安全时保留 workspace-relative；否则只保留 basename。
+当前离线矩阵只覆盖静态 fixture evidence，不安装 SDK 包、不联网、不跑真实模型/API。
 
 Contract fixture mappings:
 
@@ -205,12 +205,23 @@ Contract fixture mappings:
 | `invocation_plan` / `cli_invocation_plan` | `run.agent.cli_invocation_plan` | `adapterId`, basename `commandName`, `argFlags`, `configKeys`, env variable names only, basename `workDir`, `promptRedacted`, `executionMode: fixture`, `noSpendDefault: true`, `approvalRequired: true`, `redactionApplied: true`, `observed: false`, `realTested: false` |
 | `status` / `session.updated` | `run.agent.status_change` | `sessionId`, `status`, optional `summary`, `reason`, redacted `metadata` |
 | `progress` / `task_progress` | `run.agent.task_progress` | `taskId`, `description`, `status`, optional `percent`, `lastToolName`, `summary` |
+| `assistant_message` / `message_output` / `text_block` | `run.agent.text_block` | `content`, provider/session/trace/evidence refs |
 | `tool_call` / provider tool use | `run.agent.tool_call` | `callId`, `toolName`, redacted `input`, provider/session/trace refs |
 | `tool_result` / provider tool output | `run.agent.tool_result` | `callId`, `toolName`, `content`, `isError`, redacted attachments/metadata; direct `tool_result` and completed `tool_state` use the same attachment/metadata redaction path |
+| `file_change` / `artifact_file` | `run.agent.file_change` | `callId`, `toolName`, workspace-relative or basename `path`, `kind`, optional `diff` |
+| `permission_request` / `guardrail_signal` | `run.agent.permission_requested` | `requestId`, `toolName`, `toolUseId`, redacted `input`, `riskLevel`, `reason`, optional guardrail decision |
+| `artifact` / `artifact_created` | `artifact.created` | `artifactId`, workspace-relative or basename `path`, `kind`, `sizeBytes`, `summary`, evidence refs |
 | `usage` / `context_usage` | `run.agent.context_usage` | `inputTokens`, `outputTokens`, `totalTokens`, optional `totalCostUsd`, `model`, `sessionId` |
 | `terminal_result` / `run_result` | `run.agent.result` | `success`, `summary`, `terminalReason: completed\|error\|cancelled`, optional nested `usage`; arbitrary provider reason strings stay in sanitized `reason`, not `terminalReason` |
 | `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted `error`, sanitized `reason` |
 | `cancelled` / `cancellation` | `run.agent.result` | Adapter-level cancellation signal only: `success: false`, `cancelled: true`, `terminalReason: cancelled`; lifecycle-owned `run.cancelled` is still emitted by `ProcessExecutor` |
+
+48h 低风险离线矩阵的 fixture evidence 位于
+`edge-server/internal/adapters/sdk_fixture_mapper_test.go`。当前矩阵验证 Claude
+Agent SDK-like 与 OpenAI Agents SDK-like 静态 JSON 样例可映射到
+`text_block`、`tool_call`、`tool_result`、`file_change`、
+`permission_requested`、`result` 和 `artifact.created`，同时验证 replay 不泄漏
+示例 token。
 
 ### AgentTeam / TeamRun
 
