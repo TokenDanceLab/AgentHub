@@ -22,12 +22,13 @@ func newTestServer(t *testing.T) (*Server, *store.Store) {
 	s := store.New()
 	// Create default project and thread
 	_, _ = s.CreateProject("proj_test", "Test Project")
-	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread", "")
+	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread", "", "", "")
 
 	bus := events.NewBus(100)
 	permReg := api.NewPermissionRegistry(0)
 
 	srv := NewServer(s, nil, bus, permReg)
+	srv.SetWorkspaceAllowlist([]string{"/tmp"})
 	return srv, s
 }
 

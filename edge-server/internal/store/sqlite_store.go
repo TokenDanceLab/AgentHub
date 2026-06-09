@@ -294,6 +294,16 @@ func applySQLiteRow(snapshot *fileSnapshot, kind, id, payload string) error {
 			}
 			snapshot.AgentProfiles[id] = value
 			snapshot.AgentProfileOrder = append(snapshot.AgentProfileOrder, id)
+		case sqliteRowKindUserProfile:
+			var value UserProfile
+			if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+				return fmt.Errorf("decode sqlite user_profile row %s: %w", id, err)
+			}
+			if snapshot.UserProfiles == nil {
+				snapshot.UserProfiles = map[string]UserProfile{}
+			}
+			snapshot.UserProfiles[id] = value
+			snapshot.UserProfileOrder = append(snapshot.UserProfileOrder, id)
 	default:
 		return fmt.Errorf("unknown sqlite store row kind %s", kind)
 	}
@@ -341,6 +351,9 @@ func replaceSQLiteRows(tx *sql.Tx, snapshot fileSnapshot) error {
 		return err
 	}
 	if err := insertSQLiteRows(tx, sqliteRowKindAgentProfile, snapshot.AgentProfileOrder, snapshot.AgentProfiles, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindUserProfile, snapshot.UserProfileOrder, snapshot.UserProfiles, now); err != nil {
 		return err
 	}
 	return nil
@@ -618,8 +631,8 @@ func (s *SQLiteStore) ListProjects() []Project {
 	return s.store.ListProjects()
 }
 
-func (s *SQLiteStore) CreateThread(id, projectID, title, kind string) (Thread, error) {
-	thread, err := s.store.CreateThread(id, projectID, title, kind)
+func (s *SQLiteStore) CreateThread(id, projectID, title, kind, avatarColor, avatarLabel string) (Thread, error) {
+	thread, err := s.store.CreateThread(id, projectID, title, kind, avatarColor, avatarLabel)
 	return persistAfterSQLiteWrite(s, thread, err)
 }
 
