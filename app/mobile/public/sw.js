@@ -11,7 +11,7 @@
 // Strategy: Cache-first for the shell, network-first for navigation.
 
 const CACHE_NAME = "agenthub-mobile-v1";
-const SHELL_ASSETS = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png"];
+const SHELL_ASSETS = ["/", "/index.html", "/manifest.json", "/agenthub-icon-192.png", "/agenthub-icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
