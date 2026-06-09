@@ -29,6 +29,92 @@
     "command_path": "operator-owned-codex-path",
     "command_plan": "codex exec --json with approved fixture prompt; do not execute in this gate"
   },
+  "runtime_readiness": [
+    {
+      "runtime_id": "codex",
+      "command_discovery": {
+        "command_name": "codex",
+        "installed": false,
+        "version_probe": "not-run in manifest fixture",
+        "help_probe": "not-run in manifest fixture"
+      },
+      "json_mode": {
+        "expected_flag_or_mode": "codex exec --json",
+        "dry_plan_only": true
+      },
+      "permission_boundary": {
+        "expected_mode": "operator-approved mode only; no default approval inference"
+      },
+      "budget": {
+        "stop_policy": "zero spend before separately approved real run"
+      },
+      "timeouts": {
+        "kill_policy": "approved real run must provide hard timeout and process-tree kill"
+      },
+      "artifacts": {
+        "root_policy": ".tmp/edge-cli-real-readiness or temp AgentHub edge-cli-real-readiness only"
+      },
+      "redaction_manifest": {
+        "policy": "env names only; stdout, stderr, and artifacts redacted before publication"
+      }
+    },
+    {
+      "runtime_id": "claude-code",
+      "command_discovery": {
+        "command_name": "claude",
+        "installed": false,
+        "version_probe": "not-run in manifest fixture",
+        "help_probe": "not-run in manifest fixture"
+      },
+      "json_mode": {
+        "expected_flag_or_mode": "claude --output-format stream-json",
+        "dry_plan_only": true
+      },
+      "permission_boundary": {
+        "expected_mode": "operator-approved permission mode only; approval bridge reviewed before prompt"
+      },
+      "budget": {
+        "stop_policy": "zero spend before separately approved real run"
+      },
+      "timeouts": {
+        "kill_policy": "approved real run must provide hard timeout and process-tree kill"
+      },
+      "artifacts": {
+        "root_policy": ".tmp/edge-cli-real-readiness or temp AgentHub edge-cli-real-readiness only"
+      },
+      "redaction_manifest": {
+        "policy": "env names only; stdout, stderr, and artifacts redacted before publication"
+      }
+    },
+    {
+      "runtime_id": "opencode",
+      "command_discovery": {
+        "command_name": "opencode",
+        "installed": false,
+        "version_probe": "not-run in manifest fixture",
+        "help_probe": "not-run in manifest fixture"
+      },
+      "json_mode": {
+        "expected_flag_or_mode": "opencode JSON event stream",
+        "dry_plan_only": true
+      },
+      "permission_boundary": {
+        "expected_mode": "default must not enable dangerously-skip-permissions; bypass requires explicit approval"
+      },
+      "budget": {
+        "stop_policy": "zero spend before separately approved real run"
+      },
+      "timeouts": {
+        "kill_policy": "approved real run must provide hard timeout and process-tree kill"
+      },
+      "artifacts": {
+        "root_policy": ".tmp/edge-cli-real-readiness or temp AgentHub edge-cli-real-readiness only"
+      },
+      "redaction_manifest": {
+        "policy": "env names only; stdout, stderr, and artifacts redacted before publication"
+      }
+    }
+  ],
   "urls": {
     "hub": "http://127.0.0.1:18080",
     "web": "http://127.0.0.1:5173",
