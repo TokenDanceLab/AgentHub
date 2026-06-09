@@ -117,6 +117,7 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			name TEXT DEFAULT '',
 			avatar_url TEXT DEFAULT '',
 			announcement TEXT DEFAULT '',
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved INTEGER NOT NULL DEFAULT 0,

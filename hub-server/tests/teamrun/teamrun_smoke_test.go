@@ -162,6 +162,7 @@ func teamTestDB(t *testing.T) *gorm.DB {
 			tokendance_sub_linked_at DATETIME DEFAULT NULL,
 			announcement TEXT DEFAULT '',
 			owner_user_id TEXT,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved INTEGER NOT NULL DEFAULT 0,
