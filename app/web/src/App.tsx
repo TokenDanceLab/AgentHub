@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
 import type { AgentConfig, ProjectDraft, ProjectInfo } from '@shared/workbench';
 import {
@@ -16,6 +16,7 @@ import {
   useDeleteAgentProfile,
   useUpdateAgentProfile,
 } from '@/api/agentQueries';
+import { createHubClient } from '@/api/hubClient';
 import AuthPage from '@/components/AuthPage';
 import {
   createWebPlatform,
@@ -23,6 +24,7 @@ import {
 } from '@/platform/webPlatform';
 import { useWebWorkbenchModel } from '@/platform/useWebWorkbenchModel';
 import { useWebAuth } from '@/hooks/useWebAuth';
+import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import styles from './App.module.css';
 
@@ -62,6 +64,16 @@ function WebWorkbenchRoot() {
   const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, 'Agent Profile 加载失败')
     : undefined;
+  const hubClientForConversations = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+
+  const handleNavigateToConversation = useCallback(async (target: { name: string; id: string; kind: 'dm' | 'group' }) => {
+    try {
+      const result = await hubClientForConversations.createPrivateSession({ target_user_id: target.id });
+      setSelectedConversationId(result.session_id);
+    } catch {
+      setSelectedConversationId(undefined);
+    }
+  }, [hubClientForConversations]);
 
   async function handleAgentCreate(agent: AgentConfig): Promise<void> {
     setAgentActionError(undefined);
@@ -140,6 +152,7 @@ function WebWorkbenchRoot() {
         onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
         onApprovalDecision={workbench.onApprovalDecision}
+        onNavigateToConversation={handleNavigateToConversation}
         platform={webPlatform}
         runtimeEvidence={workbench.runtimeEvidence}
         showComposerAgentPicker={false}

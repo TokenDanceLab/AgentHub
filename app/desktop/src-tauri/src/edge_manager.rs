@@ -163,6 +163,20 @@ impl EdgeManager {
             return Err("Edge Server is already running".into());
         }
 
+        // Pre-flight: check if port is already occupied by an existing Edge
+        // process (e.g. leftover from a previous Desktop session). If so, skip
+        // spawning a new one — the health poll will pick it up.
+        if is_edge_port_occupied(self.port) {
+            log::info!(
+                "Port {} already in use — assuming existing Edge server is running",
+                self.port
+            );
+            return Err(format!(
+                "Port {} is already in use by another process. Stop the existing Edge server first.",
+                self.port
+            ));
+        }
+
         let auth_token = match self.local_auth_token.as_ref() {
             Some(token) => token.clone(),
             None => {
@@ -337,6 +351,13 @@ impl EdgeManager {
     }
 
     pub async fn stop(&mut self) -> Result<(), String> {
+        // Clean up the persisted auth token file on stop.
+        {
+            let token_path = self.store_path.parent().map(|p| p.join(EDGE_AUTH_TOKEN_FILE));
+            if let Some(ref p) = token_path {
+                let _ = std::fs::remove_file(p);
+            }
+        }
         match self.child.take() {
             Some(EdgeChild::Sidecar {
                 child,
@@ -537,6 +558,20 @@ fn edge_bind_addr(port: u16) -> String {
 
 fn edge_health_url(port: u16) -> String {
     format!("http://{}/v1/health", edge_bind_addr(port))
+}
+
+/// Checks whether port 3210 is already occupied by probing for a health
+/// response. Returns `true` if an existing Edge server is already running
+/// on the expected port.
+fn is_edge_port_occupied(port: u16) -> bool {
+    // Synchronous TCP check — fast and sufficient for localhost.
+    use std::net::TcpStream;
+    let addr = edge_bind_addr(port);
+    TcpStream::connect_timeout(
+        &addr.parse().unwrap_or_else(|_| "127.0.0.1:3210".parse().unwrap()),
+        std::time::Duration::from_millis(500),
+    )
+    .is_ok()
 }
 
 #[cfg(any(test, debug_assertions))]
