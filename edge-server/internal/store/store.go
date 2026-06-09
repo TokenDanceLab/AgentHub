@@ -175,7 +175,7 @@ type Reader interface {
 
 type Writer interface {
 	CreateProject(id, name string) (Project, error)
-	CreateThread(id, projectID, title, kind string) (Thread, error)
+	CreateThread(id, projectID, title, kind, avatarColor, avatarLabel string) (Thread, error)
 	UpdateThread(id string, title *string, status *string) (Thread, bool)
 	DeleteThread(id string) bool
 	CreateRun(id, projectID, threadID string) (Run, error)
@@ -400,7 +400,7 @@ func (s *Store) ListProjects() []Project {
 	return projects
 }
 
-func (s *Store) CreateThread(id, projectID, title, kind string) (Thread, error) {
+func (s *Store) CreateThread(id, projectID, title, kind, avatarColor, avatarLabel string) (Thread, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -418,13 +418,15 @@ func (s *Store) CreateThread(id, projectID, title, kind string) (Thread, error) 
 	}
 	now := nowString()
 	thread := Thread{
-		ID:        id,
-		ProjectID: projectID,
-		Title:     title,
-		Kind:      kind,
-		Status:    "active",
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:          id,
+		ProjectID:   projectID,
+		Title:       title,
+		Kind:        kind,
+		AvatarColor: avatarColor,
+		AvatarLabel: avatarLabel,
+		Status:      "active",
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	s.threads[id] = thread
 	s.threadOrder = append(s.threadOrder, id)

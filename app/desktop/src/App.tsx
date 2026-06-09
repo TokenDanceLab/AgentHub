@@ -233,6 +233,13 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }}
         contacts={workbench.contacts}
         conversations={workbench.conversations}
+        documents={documents}
+        documentsActions={{
+          onCreateDoc: workbench.isDemo ? undefined : async () => {
+            const title = `新建文档 ${new Date().toLocaleString('zh-CN')}`;
+            await createDocMutation.mutateAsync({ title });
+          },
+        }}
         onActiveConversationChange={setSelectedConversationId}
         onAgentCreate={handleAgentCreate}
         onAgentUpdate={handleAgentUpdate}
