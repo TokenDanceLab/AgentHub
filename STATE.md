@@ -1,7 +1,20 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 06:30 +08:00
-当前 dev HEAD：`b0ea5751` (`dev/delicious233`)
+最后更新：2026-06-10 07:00 +08:00
+当前 dev HEAD：`a37111bb` (`dev/delicious233`)
+
+## Release Gate 快照 (Final)
+
+- **E2E Smoke Test**: `verify-real-api-smoke.ps1` — **ALL 13 PHASES PASSED (0 failures)**. 覆盖 Hub health, Edge health, Edge runners, Hub auth (contacts/sessions/documents CRUD), Edge run lifecycle (queued→started→finished), Edge runs history, Edge projects/threads, IM chat flow (send/receive/recall/edit/pin/unpin/read), Contacts flow (search/friend request/block/unblock/group), Agent config flow (CRUD), Settings flow (get/patch/persist/reset), WebSocket auth (raw HTTP verified), @Agent real Claude Code execution.
+- **OIDC Full PKCE Flow**: ✅ **VERIFIED**. Hub authorize → TokenDance ID → authorization code → Hub callback → Hub JWT issued → `GET /client/auth/me` returns user with tokendance_sub → `GET /client/sessions` returns 200 → WS raw HTTP upgrade with `auth.ok` frame confirmed. TokenDance ID (`:3000`) 和 Hub OIDC 处理器完全互通。
+- **CI Gates**: `verify-ci-gates.ps1` PASS, `verify-tauri-package-readiness.ps1` PASS, `verify-tauri-installer-smoke.ps1` PASS.
+- **Web Tests**: focused tests PASS, typecheck PASS.
+- **Hub Tests**: `go test ./... -short -count=1` PASS.
+- **Edge Tests**: `go test ./... -short -count=1` PASS (1 transient flake).
+- **Mobile RN**: `pnpm verify` PASS (20 files, 91 tests), `native:check` PASS, `mock:hub:check` PASS.
+- **Tauri Windows unsigned dry package**: `verify-tauri-package-dry.ps1` PASS, artifacts in `.tmp\tauri-package-release-rc7`.
+- **Release blockers remaining**: Signing certificate (required for production release), Codex `OPENAI_API_KEY`, Anthropic SDK `ANTHROPIC_API_KEY`, OpenAI SDK `OPENAI_API_KEY`. WS library compatibility with Hub upgrade response (raw HTTP works correctly).
+- **security risk register**: High open release blockers remain; no production release without waiver/closure.
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
