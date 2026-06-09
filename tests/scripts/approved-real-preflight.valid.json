@@ -1,0 +1,57 @@
+{
+  "mode": "approved-real",
+  "approved_by": "operator@example.invalid",
+  "approval_id": "AH-APPROVED-REAL-PREFLIGHT-20260609-001",
+  "artifact_root": ".tmp/approved-real-preflight/AH-APPROVED-REAL-PREFLIGHT-20260609-001",
+  "redaction_policy": {
+    "stdout": "redact secrets, tokens, prompts, and account material before artifact publication",
+    "stderr": "redact secrets, tokens, prompts, and account material before artifact publication",
+    "env": "env var names only; values remain in operator-owned secret store",
+    "artifacts": "raw artifacts reviewed by operator, redacted copies only"
+  },
+  "timeouts": {
+    "total_seconds": 900,
+    "per_step_seconds": 120,
+    "kill_policy": "hard timeout kills process tree and records redacted stop reason"
+  },
+  "budget": {
+    "max_usd": 2,
+    "max_requests": 3,
+    "max_tokens": 20000,
+    "stop_policy": "stop immediately on first unexpected spend, login failure, or unredacted output"
+  },
+  "target_runtime": {
+    "id": "codex",
+    "kind": "cli",
+    "profile": "operator-owned-codex-profile"
+  },
+  "cli": {
+    "command_path": "operator-owned-codex-path",
+    "command_plan": "codex exec --json with approved fixture prompt; do not execute in this gate"
+  },
+  "urls": {
+    "hub": "http://127.0.0.1:18080",
+    "web": "http://127.0.0.1:5173",
+    "desktop": "tauri://localhost",
+    "edge": "http://127.0.0.1:8765"
+  },
+  "test_identifiers": {
+    "account_id": "disposable-test-account-identifier",
+    "client_id": "tokendance-id-test-client-identifier",
+    "target_id": "desktop-target-operator-approved"
+  },
+  "approval_scope": {
+    "allowed_real_actions": [
+      "preflight-manifest-validation"
+    ],
+    "disallowed_actions": [
+      "real-login",
+      "real-cli-model-api",
+      "deploy",
+      "sign",
+      "notarize",
+      "release-upload",
+      "production-change"
+    ]
+  }
+}
