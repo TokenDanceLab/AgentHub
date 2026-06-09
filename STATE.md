@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 16:22 +08:00
+最后更新：2026-06-09 16:44 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -25,6 +25,7 @@
 - Web Agent 主链、target 选择、typed transcript blocks、artifact/replay 渲染基础。
 - Web boundary/deploy readiness、product-loop fixture QA、Tauri package/readiness gate。
 - Edge SQLite store、迁移、row/projection tests，Desktop sidecar 默认使用 app-data SQLite 路径。
+- Edge SQLite local readiness helper and per-write reopen contract are now in progress on `codex/edge-sqlite-store-readiness-next`; this remains fixture-only and does not promote SQLite to production row-first CRUD.
 - SDK fixture mapper，用 fixture 覆盖 OpenAI/Claude 形状事件到现有 Edge 事件合同的映射。
 - 基于 `@lobehub/icons` 的 runtime/provider/model/tool icon 组件和 fallback。
 - Edge SQLite durable observed fixture smoke：覆盖 `agenthub-edge --store-backend sqlite --store-db <temp.db>` 配置入口、snapshot rows、run projection、pins 和 alpha durability 边界。
@@ -69,6 +70,7 @@
 | Hub 单任务 approval/artifact | Johnny/backend | 已集成并验证 controller：`6b5a3e4e` | review branch `origin/codex/p1-hub-task-approval-artifacts` commit `8a76183f`；只改 Hub/API，补 `/web/agent-tasks` approval decision 与 artifact metadata/list 最小合同 |
 | Desktop sidecar binary/package smoke | Desktop/Tauri | 已集成并验证 controller：`74660003` | review branch `origin/codex/p1-desktop-sidecar-binary-smoke` commit `f70194c4`；本地 build/placement/smoke gate，不提交二进制、不签名/公证/release upload |
 | Edge SQLite durable hardening | Johnny/Edge | 已集成并验证 controller：`fd5fa202` | review branch `origin/codex/p1-edge-sqlite-durable-hardening` commit `28655b25`；fixture-only durable gate，不声明完整 production DB |
+| Edge SQLite local store readiness | Edge storage worker | 本 worktree 进行中：`codex/edge-sqlite-store-readiness-next` | local temp SQLite only；新增 readiness report + per-write reopen contract；不跑真实 CLI/model/API，不声明 production row-first CRUD |
 | Hub/Event/Replay 合同审计 | Johnny/backend | 已产出报告 | 指向单任务 approval/artifact Hub 合同缺口；后续进入实现 worker |
 | Approved-real preflight manifest | worker/Heisenberg | 已集成并验证 controller：`84a39563` | preflight-only manifest gate；不代表真实登录、真实 CLI/model/API 或生产动作完成 |
 | Web task approval/artifact consumption | worker/James | 已集成并验证 controller：`d9e174f9` | Web Hub-only 消费单任务 approval/artifact 合同；Playwright 使用 stubbed Hub，不代表真实服务联调 |
