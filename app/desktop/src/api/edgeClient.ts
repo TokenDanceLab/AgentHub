@@ -454,11 +454,13 @@ export async function fetchCurrentUser(): Promise<UserProfileInfo> {
   const res = await edgeFetch(`${BASE}/v1/users/current`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   const data = unwrapEdgeResponse(await res.json());
+  const rawAvatarUrl = (data as Record<string, unknown>).avatarUrl as string | undefined;
+  const rawStatus = (data as Record<string, unknown>).status as string | undefined;
   return {
     userId: (data as Record<string, unknown>).userId as string ?? '',
     displayName: (data as Record<string, unknown>).displayName as string ?? '',
-    avatarUrl: ((data as Record<string, unknown>).avatarUrl as string) || undefined,
-    status: ((data as Record<string, unknown>).status as string) || undefined,
+    ...(rawAvatarUrl ? { avatarUrl: rawAvatarUrl } : {}),
+    ...(rawStatus ? { status: rawStatus } : {}),
     createdAt: (data as Record<string, unknown>).createdAt as string ?? '',
     updatedAt: (data as Record<string, unknown>).updatedAt as string ?? '',
   };

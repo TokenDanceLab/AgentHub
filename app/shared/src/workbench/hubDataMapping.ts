@@ -9,7 +9,7 @@
  */
 
 import type { ContactMember, ProjectInfo } from './pages';
-import type { WorkbenchContactsData } from '@shared/workbench';
+import type { WorkbenchContactsData } from './WorkbenchRoutes';
 import type { DocRow } from './pages/DocsPage';
 import type { WorkbenchConversation } from '../platform';
 import {
@@ -133,10 +133,11 @@ export interface HubDocumentLike {
 }
 
 export function hubDocumentToDocRow(doc: HubDocumentLike): DocRow {
+  const tag = doc.tag?.trim();
   return {
     id: doc.id,
     title: doc.title?.trim() || '未命名文档',
-    tag: doc.tag?.trim() || undefined,
+    ...(tag ? { tag } : {}),
     location: doc.location?.trim() || '我的文档库',
     owner: doc.owner_id?.trim() || 'Hub',
     time: formatDocTime(doc.updated_at ?? doc.created_at),
