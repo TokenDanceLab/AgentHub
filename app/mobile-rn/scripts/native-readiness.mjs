@@ -1,6 +1,7 @@
 import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getConfig } from 'expo/config/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -21,28 +22,34 @@ const [packageJson, easJson, appConfigSource] = await Promise.all([
   readJson('eas.json'),
   readText('app.config.ts'),
 ]);
+const expoConfig = getConfig(projectRoot, { isPublicConfig: true }).exp;
+const plugins = (expoConfig.plugins ?? []).map((plugin) => Array.isArray(plugin) ? plugin[0] : plugin);
+const hubBaseUrl = typeof expoConfig.extra?.hubBaseUrl === 'string' ? expoConfig.extra.hubBaseUrl : '';
+const oidcIssuer = typeof expoConfig.extra?.oidcIssuer === 'string' ? expoConfig.extra.oidcIssuer : '';
 
 const checks = [];
 
 check('package declares Expo entrypoint', packageJson.main === 'index.ts');
 check('android script uses Expo native runner', packageJson.scripts?.android === 'expo run:android');
 check('ios script uses Expo native runner', packageJson.scripts?.ios === 'expo run:ios');
-check('Expo config declares agenthub scheme', appConfigSource.includes("scheme: 'agenthub'"));
-check('Expo config declares Android package', appConfigSource.includes("package: 'tech.vectorcontrol.agenthub.mobile'"));
-check('Expo config declares iOS bundle identifier', appConfigSource.includes("bundleIdentifier: 'tech.vectorcontrol.agenthub.mobile'"));
-check('Expo config supports tablet layout', appConfigSource.includes('supportsTablet: true'));
-check('Expo app icon uses AgentHub product asset', appConfigSource.includes("icon: './assets/agenthub-icon.png'"));
-check('Expo splash uses AgentHub product asset', appConfigSource.includes("image: './assets/agenthub-splash-icon.png'"));
-check('Android adaptive icon uses AgentHub product asset', appConfigSource.includes("foregroundImage: './assets/agenthub-adaptive-icon.png'"));
-check('Web favicon uses AgentHub product asset', appConfigSource.includes("favicon: './assets/agenthub-favicon.png'"));
-check('Notification icon uses AgentHub product asset', appConfigSource.includes("icon: './assets/agenthub-notification-icon.png'"));
+check('Resolved Expo config declares agenthub scheme', expoConfig.scheme === 'agenthub');
+check('Resolved Expo config declares Android package', expoConfig.android?.package === 'tech.vectorcontrol.agenthub.mobile');
+check('Resolved Expo config declares iOS bundle identifier', expoConfig.ios?.bundleIdentifier === 'tech.vectorcontrol.agenthub.mobile');
+check('Resolved Expo config supports tablet layout', expoConfig.ios?.supportsTablet === true);
+check('Resolved Expo app icon uses AgentHub product asset', expoConfig.icon === './assets/agenthub-icon.png');
+check('Resolved Expo splash uses AgentHub product asset', expoConfig.splash?.image === './assets/agenthub-splash-icon.png');
+check('Resolved Android adaptive icon uses AgentHub product asset', expoConfig.android?.adaptiveIcon?.foregroundImage === './assets/agenthub-adaptive-icon.png');
+check('Resolved Web favicon uses AgentHub product asset', expoConfig.web?.favicon === './assets/agenthub-favicon.png');
+check('Resolved notification icon uses AgentHub product asset', getNotificationPluginIcon(expoConfig) === './assets/agenthub-notification-icon.png');
 check('Native config does not reference legacy TokenDance asset filenames', !legacyTokenDanceAssetPattern.test(appConfigSource));
 check('Native config does not use TokenDance org icon assets for AgentHub', !/assets\/tokendance-/i.test(appConfigSource));
-check('Expo config includes localization plugin', appConfigSource.includes("'expo-localization'"));
-check('Expo config includes notifications plugin', appConfigSource.includes("'expo-notifications'"));
-check('Expo config includes SecureStore plugin', appConfigSource.includes("'expo-secure-store'"));
+check('Resolved Expo config includes localization plugin', plugins.includes('expo-localization'));
+check('Resolved Expo config includes notifications plugin', plugins.includes('expo-notifications'));
+check('Resolved Expo config includes SecureStore plugin', plugins.includes('expo-secure-store'));
 check('Expo config reads Hub URL from EXPO_PUBLIC_AGENTHUB_HUB_URL', appConfigSource.includes('EXPO_PUBLIC_AGENTHUB_HUB_URL'));
 check('Expo config reads TokenDance ID issuer from EXPO_PUBLIC_TOKENDANCE_ID_ISSUER', appConfigSource.includes('EXPO_PUBLIC_TOKENDANCE_ID_ISSUER'));
+check('Resolved Expo config exposes Hub base URL', /^https?:\/\//.test(hubBaseUrl));
+check('Resolved Expo config exposes TokenDance ID issuer', oidcIssuer.startsWith('https://'));
 check('EAS development profile enables development client', easJson.build?.development?.developmentClient === true);
 check('EAS development Android profile builds an APK', easJson.build?.development?.android?.buildType === 'apk');
 check('EAS development iOS profile targets simulator', easJson.build?.development?.ios?.simulator === true);
@@ -57,23 +64,21 @@ await Promise.all([
 ]);
 
 const targets = target === 'all'
-  ? ['android-emulator', 'ios-simulator']
+  ? []
   : [target];
 
 for (const item of targets) {
   if (item === 'android-emulator') {
-    const hubUrl = envHubUrl ?? 'http://10.0.2.2:8088';
-    check('Android emulator Hub URL uses emulator host loopback', hubUrl.startsWith('http://10.0.2.2:'));
+    check('Android emulator Hub URL uses emulator host loopback', hubBaseUrl.startsWith('http://10.0.2.2:'));
   }
 
   if (item === 'ios-simulator') {
-    const hubUrl = envHubUrl ?? 'http://127.0.0.1:8088';
-    check('iOS simulator Hub URL uses simulator localhost', hubUrl.startsWith('http://127.0.0.1:') || hubUrl.startsWith('http://localhost:'));
+    check('iOS simulator Hub URL uses simulator localhost', hubBaseUrl.startsWith('http://127.0.0.1:') || hubBaseUrl.startsWith('http://localhost:'));
   }
 
   if (item === 'physical') {
     check('Physical device Hub URL is provided explicitly', typeof envHubUrl === 'string' && envHubUrl.length > 0);
-    check('Physical device Hub URL does not use host-only loopback', typeof envHubUrl === 'string' && !/^https?:\/\/(?:127\.0\.0\.1|localhost|10\.0\.2\.2)(?::|\/|$)/.test(envHubUrl));
+    check('Physical device Hub URL does not use host-only loopback', !/^https?:\/\/(?:127\.0\.0\.1|localhost|10\.0\.2\.2)(?::|\/|$)/.test(hubBaseUrl));
   }
 }
 
@@ -85,8 +90,8 @@ const failures = checks.filter((item) => !item.ok);
 const summary = {
   target,
   checkedTargets: targets,
-  hubUrl: envHubUrl ?? '(target default)',
-  oidcIssuer: envIssuer ?? '(app default)',
+  hubUrl: hubBaseUrl,
+  oidcIssuer,
   checks,
   remainingDeviceProof: [
     'Install Android development build on emulator or device.',
@@ -129,4 +134,14 @@ async function checkAssetExists(name, relativePath) {
 function fail(message) {
   process.stderr.write(`${message}\n`);
   process.exit(1);
+}
+
+function getNotificationPluginIcon(config) {
+  const notificationPlugin = (config.plugins ?? []).find((plugin) => (
+    Array.isArray(plugin) && plugin[0] === 'expo-notifications'
+  ));
+
+  return Array.isArray(notificationPlugin) && notificationPlugin[1]
+    ? notificationPlugin[1].icon
+    : undefined;
 }

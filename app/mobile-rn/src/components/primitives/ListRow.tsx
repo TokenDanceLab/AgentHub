@@ -1,9 +1,10 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { AgentHubIcon } from '@/components/icons';
 import { useAgentHubTheme } from '@/theme';
 
 import { Badge } from './Badge';
+import { MotionPressable } from './MotionPressable';
 
 interface ListRowProps {
   title: string;
@@ -25,11 +26,16 @@ export function ListRow({
   onPress,
 }: ListRowProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
+  const isDisabled = !onPress;
+  const accessibilityLabel = [title, subtitle, meta, badge].filter(Boolean).join(', ');
 
   return (
-    <Pressable
+    <MotionPressable
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled: isDisabled }}
+      disabled={isDisabled}
+      feedback="row"
       onPress={onPress}
       style={({ pressed }) => [
         {
@@ -40,7 +46,7 @@ export function ListRow({
           borderWidth: 1,
           borderColor: selected ? tokens.color.accentSoft : tokens.color.line,
           borderRadius: tokens.radius.control,
-          backgroundColor: selected || pressed ? tokens.color.tint : tokens.color.surface,
+          backgroundColor: selected || (pressed && !isDisabled) ? tokens.color.tint : tokens.color.surface,
           paddingHorizontal: tokens.space.sm,
           paddingVertical: tokens.space.sm,
         },
@@ -82,6 +88,6 @@ export function ListRow({
         ) : null}
       </View>
       <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={16} />
-    </Pressable>
+    </MotionPressable>
   );
 }

@@ -1,7 +1,9 @@
-import { ActivityIndicator, Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
 import { useAgentHubTheme } from '@/theme';
+
+import { MotionPressable } from './MotionPressable';
 
 interface ButtonProps {
   label: string;
@@ -25,21 +27,23 @@ export function Button({
   const { tokens } = useAgentHubTheme();
   const isDisabled = disabled || loading;
   const palette = {
-    primary: { bg: tokens.color.accent, fg: tokens.color.onAccent, border: tokens.color.accent },
-    secondary: { bg: tokens.color.surfaceStrong, fg: tokens.color.ink, border: tokens.color.line },
-    danger: { bg: tokens.color.dangerSoft, fg: tokens.color.danger, border: tokens.color.dangerSoft },
-    ghost: { bg: 'transparent', fg: tokens.color.inkMuted, border: 'transparent' },
+    primary: { bg: tokens.color.accent, fg: tokens.color.onAccent, border: tokens.color.accent, pressedBg: tokens.color.accent },
+    secondary: { bg: tokens.color.surfaceStrong, fg: tokens.color.ink, border: tokens.color.line, pressedBg: tokens.color.tint },
+    danger: { bg: tokens.color.dangerSoft, fg: tokens.color.danger, border: tokens.color.dangerSoft, pressedBg: tokens.color.dangerSoft },
+    ghost: { bg: 'transparent', fg: tokens.color.inkMuted, border: 'transparent', pressedBg: tokens.color.tint },
   }[variant];
 
   return (
-    <Pressable
+    <MotionPressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
+      feedback="control"
       onPress={onPress}
       style={({ pressed }) => [
         {
-          minHeight: tokens.touch.minimum,
+          minHeight: tokens.touch.primary,
           minWidth: tokens.touch.minimum,
           flexDirection: 'row',
           alignItems: 'center',
@@ -48,9 +52,8 @@ export function Button({
           borderWidth: 1,
           borderColor: palette.border,
           borderRadius: tokens.radius.control,
-          backgroundColor: pressed && !isDisabled ? tokens.color.tint : palette.bg,
+          backgroundColor: pressed && !isDisabled ? palette.pressedBg : palette.bg,
           paddingHorizontal: tokens.space.md,
-          opacity: isDisabled ? 0.58 : 1,
         },
         style,
       ]}
@@ -70,6 +73,6 @@ export function Button({
       >
         {label}
       </Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
