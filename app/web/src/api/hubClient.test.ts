@@ -275,6 +275,120 @@ describe('createHubClient', () => {
     );
   });
 
+  it('consumes Hub single-task approval and artifact contracts through Web-owned routes', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/web/agent-tasks/task%2F1/approvals') && !init?.method) {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: {
+              task_id: 'task/1',
+              edge_run_id: 'edge-run-1',
+              session_id: 'hub-session-1',
+              approvals: [{
+                approval_id: 'approval-1',
+                task_id: 'task/1',
+                edge_run_id: 'edge-run-1',
+                session_id: 'hub-session-1',
+                source_event_id: 'evt-approval-1',
+                event_seq: 7,
+                request_id: 'perm-1',
+                tool_name: 'Write',
+                status: 'pending',
+                reason: 'Modify workspace file',
+                created_at: '2026-06-09T01:00:00Z',
+              }],
+              pending: [],
+              decided: [],
+              last_event_seq: 7,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/web/agent-tasks/task%2F1/artifacts') && !init?.method) {
+        return new Response(
+          JSON.stringify({
+            code: 'ok',
+            data: {
+              task_id: 'task/1',
+              edge_run_id: 'edge-run-1',
+              session_id: 'hub-session-1',
+              artifacts: [{
+                task_id: 'task/1',
+                edge_run_id: 'edge-run-1',
+                session_id: 'hub-session-1',
+                source_event_id: 'evt-artifact-1',
+                event_seq: 8,
+                artifact_id: 'artifact-1',
+                name: 'report.md',
+                path: 'reports/report.md',
+                action: 'created',
+                tool_name: 'Write',
+                mime_type: 'text/markdown',
+                size_bytes: 128,
+                created_at: '2026-06-09T01:00:01Z',
+              }],
+              last_event_seq: 8,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            approval_id: 'approval-1',
+            task_id: 'task/1',
+            edge_run_id: 'edge-run-1',
+            session_id: 'hub-session-1',
+            status: 'approved',
+            decided_at: '2026-06-09T01:00:02Z',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createHubClient({
+      baseUrl: 'https://hub.example.test',
+      getToken: () => 'hub-access',
+    });
+
+    const approvals = await client.listTaskApprovals('task/1');
+    const artifacts = await client.listTaskArtifacts('task/1');
+    const decision = await client.decideTaskApproval('task/1', 'approval/1', { decision: 'allow' });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://hub.example.test/web/agent-tasks/task%2F1/approvals',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://hub.example.test/web/agent-tasks/task%2F1/artifacts',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer hub-access' }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      'https://hub.example.test/web/agent-tasks/task%2F1/approvals/approval%2F1/decide',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ decision: 'allow' }),
+      }),
+    );
+    expect(approvals.approvals[0]).toMatchObject({ approval_id: 'approval-1', status: 'pending' });
+    expect(artifacts.artifacts[0]).toMatchObject({ artifact_id: 'artifact-1', path: 'reports/report.md' });
+    expect(decision).toMatchObject({ approval_id: 'approval-1', status: 'approved' });
+  });
+
   it('passes target_id when starting a Hub TeamRun', async () => {
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({
