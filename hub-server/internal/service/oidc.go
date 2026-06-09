@@ -137,6 +137,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	q.Set("state", state)
 	q.Set("code_challenge", codeChallenge)
 	q.Set("code_challenge_method", codeChallengeMethod)
+	q.Set("prompt", "consent")
 	authURL.RawQuery = q.Encode()
 	slog.Debug("oidc.authorize.url", "authorization_url_prefix", authURL.Scheme+"://"+authURL.Host+authURL.Path)
 
