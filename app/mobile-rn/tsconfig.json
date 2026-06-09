@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "strict": true,
+    "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
@@ -21,5 +22,5 @@
       "@agenthub/shared/*": ["../shared/src/*"]
     }
   },
-  "include": ["src", "app.config.ts"]
+  "include": ["src", "app.config.ts", "index.ts"]
 }

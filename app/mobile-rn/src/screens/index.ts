@@ -1,4 +1,5 @@
 export { AccountScreen } from './AccountScreen';
 export { ChatScreen } from './ChatScreen';
-export { RunsScreen } from './RunsScreen';
+export { TasksScreen } from './TasksScreen';
 export { ThreadsScreen } from './ThreadsScreen';
+export { WorkbenchSurfaceScreen } from './WorkbenchSurfaceScreen';

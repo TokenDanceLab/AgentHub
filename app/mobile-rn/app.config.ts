@@ -10,7 +10,7 @@ const config: ExpoConfig = {
   scheme: 'agenthub',
   version: '0.1.0',
   orientation: 'portrait',
-  userInterfaceStyle: 'automatic',
+  userInterfaceStyle: 'light',
   ios: {
     bundleIdentifier: 'tech.vectorcontrol.agenthub.mobile',
     supportsTablet: true,
@@ -18,6 +18,21 @@ const config: ExpoConfig = {
   android: {
     package: 'tech.vectorcontrol.agenthub.mobile',
   },
+  plugins: [
+    'expo-localization',
+    [
+      'expo-notifications',
+      {
+        color: '#0a84ff',
+      },
+    ],
+    [
+      'expo-secure-store',
+      {
+        faceIDPermission: 'Allow AgentHub to unlock the local Hub session with device biometrics.',
+      },
+    ],
+  ],
   extra: {
     hubBaseUrl: env?.EXPO_PUBLIC_AGENTHUB_HUB_URL ?? 'http://127.0.0.1:8080',
     oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? 'https://id.vectorcontrol.tech',

@@ -95,7 +95,7 @@ Desktop / Mobile / Web
 |------|------|
 | **Desktop App** (Tauri) | Local execution workspace, IM chat, diff approval, multi-agent management |
 | **Web App** | Browser workspace for remote viewing, approval, and collaboration |
-| **Mobile App** (Tauri Android) | Mobile IM, approvals, previews |
+| **Mobile App** (Expo/RN candidate, Tauri legacy) | Mobile IM, approvals, previews |
 | **Edge Server** | Local execution node, Agent CLI process management, EventStore |
 | **Hub Server** | Accounts, IM groups, multi-device sync, device routing, audit |
 | **Agent Runtime** | Claude Code / Codex / OpenCode CLI adapters |

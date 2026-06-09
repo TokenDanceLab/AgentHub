@@ -1,15 +1,15 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
-import { Badge } from '@/components/primitives';
+import { useStrings } from '@/i18n/strings';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileTab } from '@/types';
 
 interface TabItem {
+  activeValues?: MobileTab[];
   icon: AgentHubIconName;
   label: string;
   value: MobileTab;
-  badge?: string;
 }
 
 interface BottomTabsProps {
@@ -19,13 +19,6 @@ interface BottomTabsProps {
   unreadThreads: number;
 }
 
-const tabs: TabItem[] = [
-  { icon: 'chat', label: 'Threads', value: 'threads' },
-  { icon: 'send', label: 'Chat', value: 'chat' },
-  { icon: 'runs', label: 'Runs', value: 'runs' },
-  { icon: 'account', label: 'Account', value: 'account' },
-];
-
 export function BottomTabs({
   activeTab,
   onChange,
@@ -33,58 +26,77 @@ export function BottomTabs({
   unreadThreads,
 }: BottomTabsProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
+  const t = useStrings();
+  const tabs: TabItem[] = [
+    { activeValues: ['thread'], icon: 'chat', label: t.chatNav, value: 'chat' },
+    { icon: 'runs', label: t.tasks, value: 'tasks' },
+    { icon: 'grid', label: t.projects, value: 'projects' },
+    { icon: 'file', label: t.cloudDocs, value: 'docs' },
+    { activeValues: ['contacts', 'agents', 'settings', 'account', 'more'], icon: 'more', label: t.more, value: 'more' },
+  ];
 
   return (
     <View
       style={{
         flexDirection: 'row',
-        gap: tokens.space.xs,
-        borderTopWidth: 1,
+        alignItems: 'center',
+        gap: 2,
+        borderTopWidth: 0.5,
         borderTopColor: tokens.color.line,
         backgroundColor: tokens.color.panel,
         paddingHorizontal: tokens.space.sm,
-        paddingTop: tokens.space.sm,
-        paddingBottom: tokens.space.md,
+        paddingTop: 3,
+        paddingBottom: 4,
       }}
     >
       {tabs.map((tab) => {
-        const selected = tab.value === activeTab;
-        const badge = tab.value === 'threads' && unreadThreads > 0
-          ? String(unreadThreads)
-          : tab.value === 'runs' && pendingReviews > 0
-            ? String(pendingReviews)
-            : undefined;
+        const selected = tab.value === activeTab || tab.activeValues?.includes(activeTab) === true;
+        const badgeCount =
+          tab.value === 'chat' ? unreadThreads : tab.value === 'tasks' ? pendingReviews : 0;
 
         return (
           <Pressable
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            accessibilityLabel={tab.label}
+            hitSlop={4}
             key={tab.value}
             onPress={() => onChange(tab.value)}
             style={({ pressed }) => ({
-              minHeight: 54,
+              minHeight: 49,
               flex: 1,
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 2,
+              gap: 1,
               borderRadius: tokens.radius.control,
-              backgroundColor: selected || pressed ? tokens.color.tint : 'transparent',
+              backgroundColor: pressed ? tokens.color.surfaceStrong : 'transparent',
+              opacity: pressed ? 0.82 : 1,
             })}
           >
-            <View>
-              <AgentHubIcon color={selected ? tokens.color.accent : tokens.color.inkMuted} name={tab.icon} />
-              {badge ? (
-                <View style={{ position: 'absolute', top: -10, right: -18 }}>
-                  <Badge label={badge} tone="danger" />
-                </View>
+            <View
+              style={{
+                width: 34,
+                height: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <AgentHubIcon
+                color={selected ? tokens.color.accent : tokens.color.inkMuted}
+                name={tab.icon}
+                size={selected ? 22 : 21}
+              />
+              {badgeCount > 0 ? (
+                <TabUnreadBadge count={badgeCount} />
               ) : null}
             </View>
             <Text
               numberOfLines={1}
               style={{
                 color: selected ? tokens.color.accent : tokens.color.inkMuted,
-                fontSize: tokens.type.xs,
-                fontWeight: '800',
+                fontSize: 11,
+                fontWeight: selected ? tokens.type.weight.medium : tokens.type.weight.regular,
+                lineHeight: 13,
               }}
             >
               {tab.label}
@@ -92,6 +104,34 @@ export function BottomTabs({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function TabUnreadBadge({ count }: { count: number }): React.ReactElement {
+  const { tokens } = useAgentHubTheme();
+  const label = count > 99 ? '99+' : String(count);
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: -4,
+        right: -7,
+        minWidth: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 9,
+        borderWidth: 2,
+        borderColor: tokens.color.panel,
+        backgroundColor: tokens.color.danger,
+        paddingHorizontal: 3,
+      }}
+    >
+      <Text style={{ color: tokens.color.onDanger, fontSize: 11, fontWeight: '500', lineHeight: 12 }}>
+        {label}
+      </Text>
     </View>
   );
 }

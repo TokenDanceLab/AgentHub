@@ -81,6 +81,7 @@ Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能�
 | Edge Server (本地) | 3210 | Desktop 本地 Edge |
 | OIDC callback (Desktop) | 随机 (127.0.0.1:0) | Rust TcpListener 动态分配 |
 | OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
+| Mobile RN visual preview | 5177 | `app/mobile-rn` Expo Web 视觉预览和截图 QA；不替代 development build |
 | Web 工作台 | 5174 | `app/web/vite.config.ts` |
 
 Rust/Tauri / Expo 隔离规则：

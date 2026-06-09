@@ -42,7 +42,7 @@ export function SegmentedControl<T extends string>({
             key={option.value}
             onPress={() => onChange(option.value)}
             style={{
-              minHeight: 36,
+              minHeight: tokens.touch.minimum,
               flex: 1,
               alignItems: 'center',
               justifyContent: 'center',
@@ -56,7 +56,7 @@ export function SegmentedControl<T extends string>({
               style={{
                 color: selected ? tokens.color.accent : tokens.color.inkMuted,
                 fontSize: tokens.type.sm,
-                fontWeight: '800',
+                fontWeight: selected ? tokens.type.weight.medium : tokens.type.weight.regular,
               }}
             >
               {option.label}

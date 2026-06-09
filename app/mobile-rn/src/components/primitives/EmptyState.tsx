@@ -27,14 +27,14 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         borderColor: tokens.color.line,
         borderRadius: tokens.radius.panel,
         backgroundColor: tokens.color.surface,
-        padding: tokens.space.xl,
+        padding: tokens.space.lg,
       }}
     >
-      <AgentHubIcon color={tokens.color.accent} name={icon} size={28} />
-      <Text style={{ color: tokens.color.ink, fontSize: tokens.type.lg, fontWeight: '900', textAlign: 'center' }}>
+      <AgentHubIcon color={tokens.color.accent} name={icon} size={24} />
+      <Text style={{ color: tokens.color.ink, fontSize: tokens.type.base, fontWeight: tokens.type.weight.semibold, textAlign: 'center' }}>
         {title}
       </Text>
-      <Text style={{ color: tokens.color.inkMuted, fontSize: tokens.type.base, lineHeight: 22, textAlign: 'center' }}>
+      <Text style={{ color: tokens.color.inkMuted, fontSize: tokens.type.sm, lineHeight: 19, textAlign: 'center' }}>
         {description}
       </Text>
       {action ? <Button label={action.label} onPress={action.onPress} variant="secondary" /> : null}

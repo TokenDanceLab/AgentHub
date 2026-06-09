@@ -26,6 +26,7 @@ build/
 output/
 .next/
 .vite/
+.expo/
 *.tgz
 app/desktop/app/
 

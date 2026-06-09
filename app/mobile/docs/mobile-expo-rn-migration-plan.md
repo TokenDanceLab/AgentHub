@@ -4,7 +4,7 @@
 
 ## Decision
 
-AgentHub Mobile should move toward **Expo + React Native** for the long-term mobile mainline. The current `app/mobile` Tauri implementation is frozen as a legacy prototype and product-reference surface. New platform work should happen in a separate `app/mobile-rn` package until it reaches the replacement gate.
+AgentHub Mobile should move toward **Expo + React Native** as the long-term mobile mainline. The current `app/mobile` Tauri implementation is frozen as a legacy prototype and product-reference surface. New platform work should happen in a separate `app/mobile-rn` package until it reaches the replacement gate.
 
 Default spike target:
 
@@ -27,15 +27,17 @@ Mobile remains a Hub-mediated remote review and control client:
 - Mobile does not expose local filesystem capability.
 - Mobile does not consume TokenDance API keys or provider tokens.
 - TokenDance ID remains the identity source; Hub remains the product session and authorization boundary.
-- Feishu/Lark mobile IM is the primary interaction reference; Codex mobile chat is the secondary thread/composer reference.
+- Feishu/Lark mobile IM is an interaction reference for mobile ergonomics only; Codex mobile chat is the secondary thread/composer reference.
+- System locale drives the initial language choice. The RN app keeps zh/en copy in its own i18n layer and aligns Agent Runtime/Profile/Configuration/Execution Target, TokenDance ID, and TokenDance API key wording with AgentHub docs.
 
 ## Design System Boundary
 
 Mobile is an AgentHub v4 surface first and a Feishu-style mobile interaction surface second. The design direction is:
 
-1. **Visual source of truth**: inherit AgentHub Desktop/Web v4 and `agenthub-design/desktop` through the current shared workbench, Desktop theme tokens, and `app/shared/src/designTokens.ts`.
-2. **Interaction reference**: use Feishu/Lark mobile IM for queue density, identity badges, bottom navigation, search/new entry placement, unread handling, recovery, and native phone ergonomics.
-3. **Native adaptation**: implement RN primitives that preserve the AgentHub v4 material, density, status semantics, and typography while adapting safe areas, touch targets, sheets, gestures, keyboard avoidance, and tablet split panes.
+1. **Visual source of truth**: inherit AgentHub Desktop/Web v4 and `agenthub-design/desktop` through the current shared workbench, Desktop theme tokens, TokenDance/AgentHub design-system docs, and `app/shared/src/designTokens.ts`.
+2. **Light-first theme**: start visual QA and polish from the white/light appearance. Dark/OLED/system theme modes remain defined and testable, but they do not replace the light-first default.
+3. **Interaction reference**: use Feishu/Lark mobile IM only for queue density, identity badges, bottom navigation, search/new entry placement, unread handling, recovery, and native phone ergonomics.
+4. **Native adaptation**: implement RN primitives that preserve the AgentHub v4 material, density, status semantics, and typography while adapting safe areas, touch targets, sheets, gestures, keyboard avoidance, and tablet split panes.
 
 This is not a separate Mobile visual language and not a Feishu clone. Feishu informs the phone/tablet workflow; AgentHub v4 owns the tokens, component semantics, status colors, execution vocabulary, and visual hierarchy.
 
@@ -128,7 +130,11 @@ If a useful shared helper currently pulls DOM/CSS/Tauri transitively, extract a 
 
 Goal: create a minimal Expo/RN package that proves the stack and locks the Mobile design system boundary without replacing the legacy app.
 
-Current status: slice 1 scaffold has started in `app/mobile-rn`. It includes Expo/RN package wiring, AgentHub Desktop-aligned RN tokens, theme provider, primitives, layout shell, stateful Threads/Chat/Runs/Account surfaces, mock Hub/session/deep-link facades, and focused tests. This is not the replacement gate.
+Current status: slice 1 scaffold has started in `app/mobile-rn`. It includes Expo/RN package wiring, AgentHub Desktop-aligned RN tokens, theme provider, primitives, layout shell, stateful Chat/Thread detail/Tasks/Projects/Agent Profiles/More overflow/Settings/Account surfaces, preview scenario fixtures, mock Hub/session/deep-link facades, local mock Hub REST/event-stream script, injectable Hub event stream, AppState-driven Hub lifecycle bridge, default Expo AuthSession/WebBrowser/SecureStore/Linking/Notifications bridge loaders, notification/deep-link bridge contracts, and focused tests. This is not the replacement gate.
+
+Preview port: `app/mobile-rn` uses `http://localhost:5177` for Expo Web visual inspection and screenshot QA. This port is only a browser preview for design review; Android/iOS development builds remain the native capability gate.
+
+Worker J documentation write set: `app/mobile-rn/README.md`, `app/mobile/docs/mobile-expo-rn-migration-plan.md`, and `app/mobile/docs/mobile-v4-plan.md`. Concurrent implementation workers may own code/config/test slices under their assigned paths, but they must preserve the Expo/RN mainline direction, 5177 preview boundary, light-first/system-locale/i18n direction, Desktop/design-system authority, Feishu-only interaction-reference boundary, and the visual QA gate.
 
 Allowed write set:
 
@@ -157,16 +163,29 @@ Do not modify in the first implementation slice:
 
 ### Slice 1 Task Checklist
 
-- [ ] Scaffold `app/mobile-rn` with Expo development-build assumptions and pnpm workspace wiring.
-- [ ] Add `app.config.ts` with `agenthub` scheme, Android/iOS bundle identifiers, notification placeholders, and no production secrets.
-- [ ] Add `src/theme/tokens.ts` with AgentHub Desktop-aligned light/dark/OLED-ready token objects.
-- [ ] Add `src/theme/AgentHubThemeProvider.tsx`, navigation theme mapping, and a reduced-motion flag.
-- [ ] Add RN primitives: `Button`, `IconButton`, `Surface`, `Badge`, `StatusPill`, `ListRow`, `SearchField`, `SegmentedControl`, `BottomSheet`, `EmptyState`, `ErrorNotice`.
-- [ ] Add layout primitives: `AppShell`, `BottomTabs`, `ScreenHeader`, `QueueList`, `ThreadPane`, `InspectorSheet`.
-- [ ] Add four placeholder-but-stateful surfaces: Threads, Chat, Runs, Account. Each must use realistic seeded AgentHub workflow data, not blank cards.
-- [ ] Add OIDC/session/API/WS interfaces as typed facades with mock/local adapters; do not wire production hosts.
-- [ ] Add design snapshot fixtures for `390x844` phone and `768x1024` tablet budgets.
-- [ ] Add README verification commands and clearly label unsupported native build steps if local EAS/device setup is missing.
+- [x] Scaffold `app/mobile-rn` with Expo development-build assumptions and pnpm workspace wiring.
+- [x] Add `app.config.ts` with `agenthub` scheme, Android/iOS bundle identifiers, localization/notification/SecureStore plugin declarations, and no production secrets.
+- [x] Add no-secret `eas.json` development/preview/production build profiles.
+- [x] Add `src/theme/tokens.ts` with AgentHub Desktop-aligned light/dark/OLED-ready token objects.
+- [x] Add `src/theme/AgentHubThemeProvider.tsx`, navigation theme mapping, and a reduced-motion flag.
+- [x] Add RN primitives: `Button`, `IconButton`, `Surface`, `Badge`, `StatusPill`, `ListRow`, `SearchField`, `SegmentedControl`, `BottomSheet`, `EmptyState`, `ErrorNotice`.
+- [x] Add layout primitives: `AppShell`, `BottomTabs`, `ScreenHeader`, `InspectorSheet`.
+- [x] Add Desktop-aligned stateful surfaces: Chat, Thread detail, Tasks, Projects, Agent Profiles, More overflow, Settings, Account. Each must use realistic seeded AgentHub workflow data, not blank cards.
+- [x] Align Chat composer and transcript details with shared workbench semantics: first-screen text/send/recovery controls, review-context chips, structured approval/diff/run/tool evidence blocks, and no visible no-op attachment buttons.
+- [x] Add OIDC/session/API/WS interfaces as typed facades with mock/local adapters and default Expo native bridge loaders; do not wire production hosts.
+- [x] Add fixed-port 5177 preview scenarios for More, Settings, Agent Profiles, Projects, evidence inspector sheet, empty queue, offline chat, notification intent, deep-link selection, send-error retry, send pending, compact keyboard send pending/error, approval confirmation/error/resolved, diff preview, many-file/empty file preview, and browser preview loading/ready/error/empty states.
+- [x] Add local Hub HTTP contract tests, AuthSession helper tests, SecureStore adapter tests, deep-link bridge tests, and notification response bridge tests.
+- [x] Add a no-secret local mock Hub script for `GET /health`, `GET /v1/mobile/snapshot`, `GET /v1/threads`, and `GET /v1/events`, plus a self-check command.
+- [x] Add injectable AppState/Hub WebSocket lifecycle tests for foreground connect, background suspend, foreground resync, remote-close reconnect, and listener cleanup.
+- [x] Add design snapshot fixtures for `390x844` phone and `768x1024` tablet budgets.
+- [x] Add tablet Chat two-column split-pane screenshots for `768x1024` and `1024x768` budgets.
+- [x] Add `>=1024px` tablet Chat three-column inspector screenshot with queue, transcript, and persistent run/evidence pane.
+- [x] Add tablet inspector Overview/Files/Browser tab screenshots with read-only file/diff preview and browser/artifact readiness states.
+- [x] Add README verification commands and clearly label unsupported native build steps if local EAS/device setup is missing.
+- [ ] Prove Android development build install on a device or emulator.
+- [ ] Prove iOS development build or simulator path through macOS/Xcode or EAS Build.
+- [ ] Prove TokenDance ID AuthSession, SecureStore, notification, and deep-link behavior in a development build.
+- [ ] Prove Hub REST/WS against a live or locally deployed Hub from a development build, not only Expo Web.
 
 ### Slice 1 Verification Commands
 
@@ -175,18 +194,33 @@ Use the final command names from the scaffold, but the first slice should provid
 ```powershell
 cd app\mobile-rn
 corepack pnpm install
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm expo-doctor
+corepack pnpm verify
+corepack pnpm run doctor
+corepack pnpm native:check
 corepack pnpm start -- --clear
+corepack pnpm dev:web
+corepack pnpm visual:qa
+corepack pnpm verify:qa
 ```
 
-When visual automation is available, add a focused RN screenshot or story harness that checks:
+The first visual harness checks:
 
-- `390x844` Threads full queue, Chat long thread/composer, Runs pending approval, Account session/error.
-- `768x1024` queue + thread split and inspector sheet/pane behavior.
-- light and dark token rendering.
-- no horizontal overflow and no touch target below 44px.
+- `390x844` Chats full queue, Chat long thread/composer, Tasks pending review, Account session/error.
+- `390x844` English light home and OLED account coverage.
+- `390x844` More overflow, Settings, Agent Profiles, Projects, empty queue, offline chat, notification intent, deep-link selection, send-error retry, send pending, approval confirmation/error/resolved, and diff preview previews.
+- `390x560` compact keyboard send pending/error previews.
+- `768x1024` tablet budget with current Tasks surface.
+- `768x1024` zh and `1024x768` en tablet Chat split-pane budget with queue and thread visible together.
+- `1024x768` tablet Chat inspector budget with queue, transcript, persistent run inspector, changed files, approval action, and Hub session status visible together.
+- `1024x768` tablet inspector Files and Browser tab budgets with changed-file rows, selected-file and empty-file states, read-only diff preview, browser preview loading/ready/error/empty states, artifact preview readiness, and remote target status.
+- `768x1024` tablet diff-preview budget for dense changed-file rows.
+- five primary bottom tabs mirror AgentHub workbench semantics on phone: Chat, Tasks, Projects, Docs, More. Tasks is the second primary entry for review pressure; Contacts, Agent/Profile, Settings, and Account are folded into More or the avatar entry; Thread detail and Account hide global tabs. Chat may show task pressure as a compact digest, but task rows stay in the Tasks queue.
+- Feishu/Lark screenshot alignment is limited to mobile interaction density: continuous IM rows, inline identity badges, avatar/status placement, compact composer controls, and the account rail/drawer rhythm. Visible content stays AgentHub/Desktop aligned and uses only safe TokenDance/AgentHub/Delicious233 mock data.
+- light-first white appearance, plus dark token coverage where the harness supports it.
+- dark token rendering remains covered without replacing the light-first default.
+- no horizontal overflow, no private identity placeholders in visible or accessibility text, no readable text below 11px, and no touch target below 44px.
+
+Remaining visual depth before M2/M3 promotion: filtered-empty queue, long localized/long command stress, real artifact/browser URL evidence beyond the current readiness card, and native-device preview behavior.
 
 Current verified commands:
 
@@ -196,14 +230,32 @@ corepack pnpm --filter agenthub-mobile-rn typecheck
 corepack pnpm --filter agenthub-mobile-rn test
 corepack pnpm --filter agenthub-mobile-rn run doctor
 corepack pnpm --filter agenthub-mobile-rn lint
+corepack pnpm --filter agenthub-mobile-rn run mock:hub:check
+corepack pnpm --filter agenthub-mobile-rn visual:qa
+corepack pnpm --filter agenthub-mobile-rn verify
 ```
 
 Current verified results:
 
 - TypeScript passed.
-- Vitest passed: 5 files, 12 tests.
+- Vitest passed: 15 files, 72 tests.
 - Expo doctor passed: 21/21 checks.
+- Native readiness check passed for the no-secret Android emulator and iOS simulator development-build shape; physical devices still require a LAN Hub URL and install proof.
 - ESLint passed for `app/mobile-rn/src`.
+- Expo config parsed with localization, notifications, and secure-store plugins.
+- Local mock Hub check passed for health, mobile snapshot, and typed event-stream upgrade.
+- Security/privacy gates cover Hub API error redaction, forbidden shared/runtime import negative coverage, source/docs/config/script private-term scanning, inline secret pattern scanning, visual visible/accessibility privacy checks, and visual source hygiene scanning for raw component palettes/shadows/type drift.
+- Visual QA passed on the fixed 5177 preview for 38+ scenes: zh/en light chat queue, thread, evidence inspector sheet, tasks, account, More, Settings, Agent Profiles, Projects, OLED account, tablet tasks, tablet Chat split-pane in zh/en, tablet Chat three-column inspector Overview/Files/Browser tabs, empty queue, offline chat, notification intent, deep-link thread, send-error retry, send pending, compact keyboard send pending/error, approval approve/reject confirmation, approval submit error, resolved approval, phone/tablet diff preview, many-file/empty file preview, and browser preview loading/ready/error/empty states.
+
+Current native proof matrix:
+
+| Capability | Current proof | Still missing for replacement |
+|---|---|---|
+| Expo native config | `app.config.ts`, `eas.json`, `expo-doctor`, config parsing, and `native:check` cover the no-secret dev-build shape plus Android emulator/iOS simulator mock Hub URL defaults. | Android development build install and iOS/simulator build route; physical-device LAN Hub URL proof. |
+| TokenDance ID OIDC | AuthSession helper, default Expo AuthSession redirect URI bridge, default Expo WebBrowser auth-session launcher, and `agenthub://auth/callback` parsing tests. | Mocked or local TokenDance ID + Hub session exchange inside a development build. |
+| SecureStore | Adapter, default Expo SecureStore adapter loader, and Hub session storage tests with fake SecureStore. | Device persistence after restart and logout clearing. |
+| Notifications | Notification intent parser, native response bridge tests, default Expo Notifications response bridge, Android review channel configuration, and preview scenario. | Device notification delivery and tap-to-thread/run navigation. |
+| Hub REST/WS | Typed REST client, local HTTP contract, mock Hub health/snapshot/events, event stream parsing, and injectable lifecycle tests. | Development build proof against live or locally deployed Hub over device networking. |
 
 ## Parallel Worker Plan
 
@@ -216,9 +268,10 @@ The work can be parallelized once the `app/mobile-rn` package scaffold exists.
 | C. RN shell/navigation | `app/mobile-rn/src/App.tsx`, `src/navigation/**`, `src/components/layout/**` | Feishu-style bottom tabs, queue/thread push flow, tablet split shell using AgentHub v4 surfaces |
 | D. API/session | `src/api/**`, `src/session/**`, `src/config/**` | Hub REST/WS facade, SecureStore session, AuthSession/Linking boundary |
 | H. Theme/i18n governance | `src/i18n/**`, README design section | zh/en critical copy, identity/API-key wording, design-source notes |
-| E. Threads/Runs read-only | `src/screens/ThreadsScreen.tsx`, `RunsScreen.tsx`, `src/components/queue/**` | list/empty/error/refresh/pending-review states |
+| E. Threads/Tasks read-only | `src/screens/ThreadsScreen.tsx`, `TasksScreen.tsx`, `src/components/queue/**` | list/empty/error/refresh/pending-review states |
 | F. Chat/review | `src/screens/ChatScreen.tsx`, `src/components/chat/**`, `src/components/review/**` | messages, composer, approval sheet, send pending/error/retry |
 | G. QA harness | `scripts/**`, `e2e/**`, README verification section | typecheck/test/start/emulator screenshot gates |
+| J. Planning alignment | `app/mobile-rn/README.md`, `app/mobile/docs/mobile-expo-rn-migration-plan.md`, `app/mobile/docs/mobile-v4-plan.md` | Expo/RN mainline, 5177 preview, light-first i18n direction, design authority, worker write sets, and visual QA gate stay explicit |
 
 The integration owner alone should edit workspace-level files such as `app/pnpm-workspace.yaml`, `app/package.json`, lockfiles, and roadmap status.
 
@@ -229,6 +282,7 @@ Worker conflict rules:
 - Worker D owns API/session facades; UI workers call typed interfaces and do not fetch directly from screens.
 - Worker E and F may run in parallel only after primitives and layout names are stable.
 - Worker G can add harness files but must not change screen behavior to satisfy screenshots.
+- Worker J owns planning text only and must not modify implementation files, worktree setup, or other workers' code/config outputs.
 
 ## Replacement Gate
 
@@ -237,15 +291,15 @@ Do not replace or delete the Tauri package until `app/mobile-rn` proves:
 - Android development build installs and opens.
 - iOS development build route is documented and at least locally validated where possible.
 - `agenthub://auth/callback` opens the app and completes mocked or local TokenDance ID / Hub session exchange.
-- Hub session persists in SecureStore and clears on logout.
-- REST health/list and WebSocket typed event flow work against mock/local Hub.
-- Foreground/background lifecycle reconnects without stale approval state.
-- Push or local notification can route to a thread/run.
-- Four main surfaces exist: Threads, Chat, Runs, Account.
+- Hub session persists in SecureStore and clears on logout on a real development build. Current slice only proves the SecureStore adapter contract with a fake module.
+- REST health/list and typed event flow work against mock/local Hub. Current slice proves local HTTP snapshot/error contract, local mock Hub health/snapshot/thread/event-stream self-check, injectable event parsing tests, injectable AppState/event lifecycle tests, and event URL typing; live Hub runtime remains pending.
+- Foreground/background lifecycle reconnects without stale approval state. Current slice proves the injectable AppState state machine; native RN AppState plus runtime WebSocket proof remains pending.
+- Push or local notification can route to a thread/run on device. Current slice proves notification response parsing, native-response listener wiring, duplicate-response suppression, and typed navigation targets through an injectable bridge; actual device delivery remains pending.
+- Main surfaces exist for the Desktop mobile IA: Chat, Thread detail, Tasks, Projects, Agent Profiles, More overflow, Settings, Account, plus folded Contacts and Docs entries.
 - AgentHub Desktop/Web v4 design semantics are visible in RN: neutral glass surfaces, compact list rows, status pills, approval/diff/run cards, readable muted text, and restrained semantic accents.
 - Feishu-style mobile interaction ergonomics are visible without replacing AgentHub vocabulary: bottom tabs, dense queue, search/new entry, unread/recovery states, sheets, and native-safe touch behavior.
 - Phone `390x844` and tablet `768x1024` have no horizontal overflow and keep primary touch targets at least 44px.
-- Light/dark states are covered for Threads, Chat, Runs, and Account.
+- Light/dark states are covered for Chat, Thread detail, Tasks, and Account.
 - No React DOM, CSS module, Tauri, or browser-only API enters the RN runtime path through `@agenthub/shared`.
 
 ## Legacy Cleanup Policy
@@ -290,7 +344,7 @@ The current legacy app has these known mismatches and should not be treated as r
 ## Verification For This Planning Slice
 
 ```powershell
-git diff --check -- app/mobile/README.md app/mobile/docs/mobile-v4-plan.md app/mobile/docs/mobile-expo-rn-migration-plan.md
+git diff --check -- app/mobile-rn/README.md app/mobile/docs/mobile-expo-rn-migration-plan.md app/mobile/docs/mobile-v4-plan.md
 git status --short --branch
 ```
 

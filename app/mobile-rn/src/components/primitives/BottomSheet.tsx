@@ -1,5 +1,6 @@
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useStrings } from '@/i18n/strings';
 import { useAgentHubTheme } from '@/theme';
 
 import { Button } from './Button';
@@ -24,16 +25,18 @@ export function BottomSheet({
   primaryAction,
 }: BottomSheetProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
+  const t = useStrings();
 
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable
-        accessibilityLabel="Close sheet"
-        accessibilityRole="button"
-        onPress={onClose}
-        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.42)' }}
-      >
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable
+          accessibilityLabel={t.closeSheet}
+          accessibilityRole="button"
+          onPress={onClose}
+          style={[StyleSheet.absoluteFill, { backgroundColor: tokens.color.scrim }]}
+        />
+        <View
           style={{
             borderTopLeftRadius: tokens.radius.sheet,
             borderTopRightRadius: tokens.radius.sheet,
@@ -53,7 +56,7 @@ export function BottomSheet({
               backgroundColor: tokens.color.line,
             }}
           />
-          <Text style={{ color: tokens.color.ink, fontSize: tokens.type.lg, fontWeight: '900' }}>{title}</Text>
+          <Text style={{ color: tokens.color.ink, fontSize: tokens.type.lg, fontWeight: tokens.type.weight.semibold }}>{title}</Text>
           {children}
           {primaryAction ? (
             <Button
@@ -62,8 +65,8 @@ export function BottomSheet({
               variant={primaryAction.danger ? 'danger' : 'primary'}
             />
           ) : null}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

@@ -11,11 +11,18 @@ interface AgentHubThemeContextValue {
   tokens: AgentHubThemeTokens;
 }
 
+interface AgentHubThemeProviderProps extends PropsWithChildren {
+  initialMode?: MobileThemeMode;
+}
+
 const AgentHubThemeContext = createContext<AgentHubThemeContextValue | undefined>(undefined);
 
-export function AgentHubThemeProvider({ children }: PropsWithChildren): React.ReactElement {
+export function AgentHubThemeProvider({
+  children,
+  initialMode = 'light',
+}: AgentHubThemeProviderProps): React.ReactElement {
   const systemScheme = useColorScheme();
-  const [mode, setMode] = useState<MobileThemeMode>('system');
+  const [mode, setMode] = useState<MobileThemeMode>(initialMode);
   const tokens = useMemo(
     () => getAgentHubTheme(mode, systemScheme === 'dark'),
     [mode, systemScheme],

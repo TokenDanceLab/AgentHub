@@ -33,29 +33,32 @@ export function ListRow({
       onPress={onPress}
       style={({ pressed }) => [
         {
-          minHeight: 68,
+          minHeight: 64,
           flexDirection: 'row',
           alignItems: 'center',
-          gap: tokens.space.md,
+          gap: tokens.space.sm,
           borderWidth: 1,
           borderColor: selected ? tokens.color.accentSoft : tokens.color.line,
-          borderRadius: tokens.radius.panel,
+          borderRadius: tokens.radius.control,
           backgroundColor: selected || pressed ? tokens.color.tint : tokens.color.surface,
-          padding: tokens.space.md,
+          paddingHorizontal: tokens.space.sm,
+          paddingVertical: tokens.space.sm,
         },
       ]}
     >
       <View
         style={{
-          width: 42,
-          height: 42,
+          width: tokens.touch.minimum,
+          height: tokens.touch.minimum,
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: tokens.radius.control,
-          backgroundColor: tokens.color.accentSoft,
+          borderWidth: 1,
+          borderColor: selected ? tokens.color.focus : tokens.color.line,
+          backgroundColor: selected ? tokens.color.accentSoft : tokens.color.surfaceStrong,
         }}
       >
-        <Text style={{ color: tokens.color.accent, fontSize: tokens.type.base, fontWeight: '800' }}>
+        <Text style={{ color: tokens.color.accent, fontSize: tokens.type.base, fontWeight: tokens.type.weight.semibold }}>
           {initials ?? title.slice(0, 1)}
         </Text>
       </View>
@@ -63,16 +66,20 @@ export function ListRow({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.sm }}>
           <Text
             numberOfLines={1}
-            style={{ flex: 1, color: tokens.color.ink, fontSize: tokens.type.base, fontWeight: '800' }}
+            style={{ flex: 1, color: tokens.color.ink, fontSize: tokens.type.base, fontWeight: tokens.type.weight.medium }}
           >
             {title}
           </Text>
           {meta ? <Text style={{ color: tokens.color.inkSubtle, fontSize: tokens.type.xs }}>{meta}</Text> : null}
         </View>
-        <Text numberOfLines={2} style={{ color: tokens.color.inkMuted, fontSize: tokens.type.sm, lineHeight: 18 }}>
+        <Text numberOfLines={1} style={{ color: tokens.color.inkMuted, fontSize: tokens.type.sm, lineHeight: 18 }}>
           {subtitle}
         </Text>
-        {badge ? <Badge label={badge} tone="accent" /> : null}
+        {badge ? (
+          <View style={{ alignSelf: 'flex-start' }}>
+            <Badge label={badge} tone="accent" />
+          </View>
+        ) : null}
       </View>
       <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={16} />
     </Pressable>

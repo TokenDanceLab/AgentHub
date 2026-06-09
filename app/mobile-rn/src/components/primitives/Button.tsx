@@ -25,7 +25,7 @@ export function Button({
   const { tokens } = useAgentHubTheme();
   const isDisabled = disabled || loading;
   const palette = {
-    primary: { bg: tokens.color.accent, fg: '#ffffff', border: tokens.color.accent },
+    primary: { bg: tokens.color.accent, fg: tokens.color.onAccent, border: tokens.color.accent },
     secondary: { bg: tokens.color.surfaceStrong, fg: tokens.color.ink, border: tokens.color.line },
     danger: { bg: tokens.color.dangerSoft, fg: tokens.color.danger, border: tokens.color.dangerSoft },
     ghost: { bg: 'transparent', fg: tokens.color.inkMuted, border: 'transparent' },
@@ -49,7 +49,7 @@ export function Button({
           borderColor: palette.border,
           borderRadius: tokens.radius.control,
           backgroundColor: pressed && !isDisabled ? tokens.color.tint : palette.bg,
-          paddingHorizontal: tokens.space.lg,
+          paddingHorizontal: tokens.space.md,
           opacity: isDisabled ? 0.58 : 1,
         },
         style,
@@ -61,8 +61,11 @@ export function Button({
         numberOfLines={1}
         style={{
           color: palette.fg,
-          fontSize: tokens.type.base,
-          fontWeight: '700',
+          fontSize: tokens.type.sm,
+          fontWeight: tokens.type.weight.medium,
+          lineHeight: tokens.type.lineHeight.sm,
+          letterSpacing: 0,
+          includeFontPadding: false,
         }}
       >
         {label}

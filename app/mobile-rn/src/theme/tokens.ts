@@ -1,4 +1,10 @@
+import type { ViewStyle } from 'react-native';
+
 export type AgentHubColorScheme = 'light' | 'dark' | 'oled';
+export type AgentHubFontWeight = '400' | '500' | '600';
+
+const systemUiFont =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
 
 export interface AgentHubThemeTokens {
   scheme: AgentHubColorScheme;
@@ -21,6 +27,9 @@ export interface AgentHubThemeTokens {
     warningSoft: string;
     danger: string;
     dangerSoft: string;
+    onAccent: string;
+    onDanger: string;
+    scrim: string;
   };
   radius: {
     control: number;
@@ -34,22 +43,89 @@ export interface AgentHubThemeTokens {
     lg: number;
     xl: number;
     xxl: number;
+    xxxl: number;
+    xxxxl: number;
   };
   type: {
+    family: {
+      ui?: string;
+      mono?: string;
+    };
     xs: number;
     sm: number;
     base: number;
     lg: number;
     xl: number;
+    lineHeight: {
+      xs: number;
+      sm: number;
+      base: number;
+      lg: number;
+      xl: number;
+    };
+    weight: {
+      regular: AgentHubFontWeight;
+      medium: AgentHubFontWeight;
+      semibold: AgentHubFontWeight;
+    };
   };
   touch: {
     minimum: number;
     primary: number;
   };
   shadow: {
-    panel: string;
+    sm: ViewStyle;
+    md: ViewStyle;
+    lg: ViewStyle;
+    panel: ViewStyle;
+    hairline: ViewStyle;
   };
 }
+
+export const agentHubMobileTokenAliases = {
+  '--td-canvas': 'color.canvas',
+  '--td-surface': 'color.surface',
+  '--td-tint': 'color.tint',
+  '--td-panel': 'color.panel',
+  '--td-ink': 'color.ink',
+  '--td-ink-50': 'color.inkMuted',
+  '--td-ink-muted': 'color.inkMuted',
+  '--td-ink-subtle': 'color.inkSubtle',
+  '--td-line': 'color.line',
+  '--td-plum': 'color.accent',
+  '--td-moss': 'color.moss',
+  '--td-danger': 'color.danger',
+  '--td-warning': 'color.warning',
+  '--td-focus': 'color.focus',
+  '--td-scrim': 'color.scrim',
+  '--td-on-accent': 'color.onAccent',
+  '--td-on-danger': 'color.onDanger',
+  '--td-radius-control': 'radius.control',
+  '--td-radius-panel': 'radius.panel',
+  '--td-space-1': 'space.xs',
+  '--td-space-2': 'space.sm',
+  '--td-space-3': 'space.md',
+  '--td-space-4': 'space.lg',
+  '--td-space-5': 'space.xl',
+  '--td-space-6': 'space.xxl',
+  '--td-space-7': 'space.xxxl',
+  '--td-space-8': 'space.xxxxl',
+  '--td-font': 'type.family.ui',
+  '--td-mono': 'type.family.mono',
+  '--td-text-xs': 'type.xs',
+  '--td-text-sm': 'type.sm',
+  '--td-text-base': 'type.base',
+  '--td-text-lg': 'type.lg',
+  '--td-text-xl': 'type.xl',
+  '--td-leading-tight': 'type.lineHeight.xs',
+  '--td-leading-normal': 'type.lineHeight.base',
+  '--td-leading-relaxed': 'type.lineHeight.xl',
+  '--td-shadow-sm': 'shadow.sm',
+  '--td-shadow-md': 'shadow.md',
+  '--td-shadow-lg': 'shadow.lg',
+  '--td-shadow-panel': 'shadow.panel',
+  '--td-shadow-hairline': 'shadow.hairline',
+} as const;
 
 export const agentHubThemes = {
   dark: {
@@ -73,17 +149,35 @@ export const agentHubThemes = {
       warningSoft: 'rgba(212, 170, 76, 0.14)',
       danger: '#ff7e78',
       dangerSoft: 'rgba(255, 126, 120, 0.14)',
+      onAccent: '#ffffff',
+      onDanger: '#ffffff',
+      scrim: 'rgba(0, 0, 0, 0.48)',
     },
-    radius: { control: 8, panel: 12, sheet: 16 },
-    space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 },
-    type: { xs: 12, sm: 13, base: 15, lg: 17, xl: 20 },
+    radius: { control: 8, panel: 10, sheet: 14 },
+    space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 40, xxxxl: 48 },
+    type: {
+      family: { ui: systemUiFont, mono: '"SF Mono", "Cascadia Code", Consolas, monospace' },
+      xs: 12,
+      sm: 13,
+      base: 14,
+      lg: 16,
+      xl: 18,
+      lineHeight: { xs: 16, sm: 18, base: 20, lg: 23, xl: 25 },
+      weight: { regular: '400', medium: '500', semibold: '500' },
+    },
     touch: { minimum: 44, primary: 48 },
-    shadow: { panel: '0 18px 48px rgba(0, 0, 0, 0.24)' },
+    shadow: {
+      sm: { shadowColor: '#000000', shadowOpacity: 0.16, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+      md: { shadowColor: '#000000', shadowOpacity: 0.2, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+      lg: { shadowColor: '#000000', shadowOpacity: 0.24, shadowRadius: 48, shadowOffset: { width: 0, height: 18 }, elevation: 8 },
+      panel: { shadowColor: '#000000', shadowOpacity: 0.24, shadowRadius: 48, shadowOffset: { width: 0, height: 18 }, elevation: 8 },
+      hairline: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.075)' },
+    },
   },
   light: {
     scheme: 'light',
     color: {
-      canvas: '#f5f5f7',
+      canvas: '#f7f8fa',
       surface: 'rgba(255, 255, 255, 0.92)',
       surfaceStrong: '#ffffff',
       panel: 'rgba(255, 255, 255, 0.96)',
@@ -98,15 +192,33 @@ export const agentHubThemes = {
       moss: '#2f855a',
       mossSoft: 'rgba(47, 133, 90, 0.12)',
       warning: '#b7791f',
-      warningSoft: 'rgba(183, 121, 31, 0.12)',
+      warningSoft: 'rgba(183, 121, 31, 0.08)',
       danger: '#d92d30',
-      dangerSoft: 'rgba(217, 45, 48, 0.12)',
+      dangerSoft: 'rgba(217, 45, 48, 0.09)',
+      onAccent: '#ffffff',
+      onDanger: '#ffffff',
+      scrim: 'rgba(15, 23, 42, 0.36)',
     },
-    radius: { control: 8, panel: 12, sheet: 16 },
-    space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 },
-    type: { xs: 12, sm: 13, base: 15, lg: 17, xl: 20 },
+    radius: { control: 8, panel: 10, sheet: 14 },
+    space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 40, xxxxl: 48 },
+    type: {
+      family: { ui: systemUiFont, mono: '"SF Mono", "Cascadia Code", Consolas, monospace' },
+      xs: 12,
+      sm: 13,
+      base: 14,
+      lg: 16,
+      xl: 18,
+      lineHeight: { xs: 16, sm: 18, base: 20, lg: 23, xl: 25 },
+      weight: { regular: '400', medium: '500', semibold: '500' },
+    },
     touch: { minimum: 44, primary: 48 },
-    shadow: { panel: '0 18px 42px rgba(15, 23, 42, 0.1)' },
+    shadow: {
+      sm: { shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+      md: { shadowColor: '#0f172a', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
+      lg: { shadowColor: '#0f172a', shadowOpacity: 0.1, shadowRadius: 42, shadowOffset: { width: 0, height: 18 }, elevation: 6 },
+      panel: { shadowColor: '#0f172a', shadowOpacity: 0.1, shadowRadius: 42, shadowOffset: { width: 0, height: 18 }, elevation: 6 },
+      hairline: { borderWidth: 1, borderColor: 'rgba(15, 23, 42, 0.1)' },
+    },
   },
   oled: {
     scheme: 'oled',
@@ -129,12 +241,30 @@ export const agentHubThemes = {
       warningSoft: 'rgba(212, 170, 76, 0.14)',
       danger: '#ff7e78',
       dangerSoft: 'rgba(255, 126, 120, 0.14)',
+      onAccent: '#ffffff',
+      onDanger: '#ffffff',
+      scrim: 'rgba(0, 0, 0, 0.58)',
     },
-    radius: { control: 8, panel: 12, sheet: 16 },
-    space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 },
-    type: { xs: 12, sm: 13, base: 15, lg: 17, xl: 20 },
+    radius: { control: 8, panel: 10, sheet: 14 },
+    space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 40, xxxxl: 48 },
+    type: {
+      family: { ui: systemUiFont, mono: '"SF Mono", "Cascadia Code", Consolas, monospace' },
+      xs: 12,
+      sm: 13,
+      base: 14,
+      lg: 16,
+      xl: 18,
+      lineHeight: { xs: 16, sm: 18, base: 20, lg: 23, xl: 25 },
+      weight: { regular: '400', medium: '500', semibold: '500' },
+    },
     touch: { minimum: 44, primary: 48 },
-    shadow: { panel: 'none' },
+    shadow: {
+      sm: {},
+      md: {},
+      lg: {},
+      panel: {},
+      hairline: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.065)' },
+    },
   },
 } as const satisfies Record<AgentHubColorScheme, AgentHubThemeTokens>;
 

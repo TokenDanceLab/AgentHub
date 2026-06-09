@@ -22,7 +22,7 @@ export function SearchField({ value, onChangeText, placeholder }: SearchFieldPro
         borderWidth: 1,
         borderColor: tokens.color.line,
         borderRadius: tokens.radius.control,
-        backgroundColor: tokens.color.surface,
+        backgroundColor: tokens.color.surfaceStrong,
         paddingHorizontal: tokens.space.md,
       }}
     >
@@ -36,7 +36,8 @@ export function SearchField({ value, onChangeText, placeholder }: SearchFieldPro
           flex: 1,
           minHeight: tokens.touch.minimum,
           color: tokens.color.ink,
-          fontSize: tokens.type.base,
+          fontSize: tokens.type.sm,
+          fontWeight: tokens.type.weight.medium,
         }}
       />
     </View>

@@ -5,10 +5,11 @@ import { useAgentHubTheme } from '@/theme';
 interface SurfaceProps {
   children: React.ReactNode;
   emphasis?: 'normal' | 'strong' | 'tint' | 'danger' | 'success' | 'warning';
+  elevation?: 'none' | 'sm' | 'md' | 'lg' | 'panel';
   style?: StyleProp<ViewStyle>;
 }
 
-export function Surface({ children, emphasis = 'normal', style }: SurfaceProps): React.ReactElement {
+export function Surface({ children, emphasis = 'normal', elevation = 'none', style }: SurfaceProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
   const backgroundColor = {
     normal: tokens.color.surface,
@@ -18,6 +19,7 @@ export function Surface({ children, emphasis = 'normal', style }: SurfaceProps):
     success: tokens.color.mossSoft,
     warning: tokens.color.warningSoft,
   }[emphasis];
+  const shadow = elevation === 'none' ? undefined : tokens.shadow[elevation];
 
   return (
     <View
@@ -27,8 +29,9 @@ export function Surface({ children, emphasis = 'normal', style }: SurfaceProps):
           borderColor: tokens.color.line,
           borderRadius: tokens.radius.panel,
           backgroundColor,
-          padding: tokens.space.lg,
+          padding: tokens.space.md,
         },
+        shadow,
         style,
       ]}
     >

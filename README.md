@@ -95,7 +95,7 @@ Desktop / Mobile / Web
 |------|------|
 | **Desktop App**（Tauri） | 本地执行工作台，IM 聊天、Diff 审批、多 Agent 管理 |
 | **Web App** | 浏览器工作台，远程查看、审批协作 |
-| **Mobile App**（Tauri Android） | 移动端 IM、审批、预览 |
+| **Mobile App**（Expo/RN candidate, Tauri legacy） | 移动端 IM、审批、预览 |
 | **Edge Server** | 本地执行节点，Agent CLI 进程管理，EventStore |
 | **Hub Server** | 账号、IM 群聊、多端同步、设备路由、审计 |
 | **Agent Runtime** | Claude Code / Codex / OpenCode CLI 适配器 |

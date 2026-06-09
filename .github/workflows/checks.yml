@@ -349,6 +349,31 @@ jobs:
       - name: Test
         run: pnpm test -- --run
 
+  # ── Frontend: Mobile RN ───────────────────────
+  frontend-mobile-rn:
+    name: Frontend (mobile RN)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app/mobile-rn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install
+        working-directory: ./app
+        run: pnpm install --frozen-lockfile
+      - name: Verify Mobile RN
+        run: pnpm verify
+      - name: Expo Doctor
+        run: pnpm run doctor
+
   # ── E2E Smoke ─────────────────────────────────
   e2e-smoke:
     name: E2E Smoke
