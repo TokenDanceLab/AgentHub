@@ -106,6 +106,17 @@ export interface WorkbenchRoutesProps {
   /** Document mutation actions — wired to Hub Documents API. */
   documentsActions?: WorkbenchDocumentsActions | undefined;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+  /** Model catalog items from Edge API. When provided, the Agents page
+   *  Models tab shows real model data instead of mock fixtures. */
+  modelCatalog?: Array<{
+    id: string;
+    label: string;
+    value: string;
+    provider?: string;
+    status: string;
+    description?: string;
+    default?: boolean;
+  }> | undefined;
   /** Settings service for persistent user preferences. When provided,
    *  settings are read from / written to the backend adapter. */
   settingsService?: SettingsService | null | undefined;
@@ -534,6 +545,7 @@ export function WorkbenchRoutes({
   contactsActions,
   localCliDiscovery,
   documentsActions,
+  modelCatalog,
   settingsService,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
@@ -595,6 +607,39 @@ export function WorkbenchRoutes({
       .filter((agent): agent is AgentConfig => Boolean(agent)),
     ...sourceAgentConfigs.map((agent) => agentDrafts[agent.id] ?? agent),
   ], [agentDrafts, draftAgentIds, sourceAgentConfigs]);
+
+  // Map Edge model catalog to AgentsPage ModelInfo[] when available.
+  const resolvedModels = useMemo(() => {
+    if (!modelCatalog || modelCatalog.length === 0) return WORKBENCH_MOCK_AGENT_MODELS;
+    return modelCatalog.map((item) => {
+      const assignedAgents = agentConfigs
+        .filter((agent) => agent.model === item.value || agent.model === item.label)
+        .map((agent) => agent.name)
+        .join(', ');
+      let state: '默认' | '备选' | '实验' = '备选';
+      if (item.default) state = '默认';
+      else if (item.status === 'healthy' || item.status === 'available') state = '默认';
+      else if (item.status === 'experimental' || item.tags?.includes('experimental')) state = '实验';
+      return {
+        name: item.label || item.value,
+        state,
+        description: item.description ?? '',
+        assignedAgents: assignedAgents || '—',
+      };
+    });
+  }, [modelCatalog, agentConfigs]);
+
+  // Extract unique skills and tools from agent configs; fall back to catalog fixtures.
+  const resolvedSkills = useMemo(() => {
+    const fromAgents = Array.from(new Set(agentConfigs.flatMap((a) => a.skills))).filter(Boolean).sort();
+    return fromAgents.length > 0 ? fromAgents : WORKBENCH_MOCK_AGENT_SKILL_OPTIONS;
+  }, [agentConfigs]);
+
+  const resolvedTools = useMemo(() => {
+    const fromAgents = Array.from(new Set(agentConfigs.flatMap((a) => Object.keys(a.tools)))).filter(Boolean).sort();
+    return fromAgents.length > 0 ? fromAgents : WORKBENCH_MOCK_AGENT_TOOL_OPTIONS;
+  }, [agentConfigs]);
+
   const contactsData = contacts ?? {
     members: WORKBENCH_MOCK_CONTACT_MEMBERS,
     externalContacts: WORKBENCH_MOCK_EXTERNAL_CONTACTS,
@@ -1080,10 +1125,10 @@ export function WorkbenchRoutes({
           agentActionError={agentProfilesStatus?.actionError}
           agentsError={agentProfilesStatus?.error}
           agentsLoading={agentProfilesStatus?.loading}
-          allSkills={WORKBENCH_MOCK_AGENT_SKILL_OPTIONS}
-          allTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
+          allSkills={resolvedSkills}
+          allTools={resolvedTools}
           auditEntries={WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
-          confirmCount={agentConfigs.reduce((total, agent) => total + WORKBENCH_MOCK_AGENT_TOOL_OPTIONS.filter((tool) => agent.tools[tool] === '需确认').length, 0)}
+          confirmCount={agentConfigs.reduce((total, agent) => total + resolvedTools.filter((tool) => agent.tools[tool] === '需确认').length, 0)}
           defaultModelLabel={agentConfigs[0]?.model ?? '未配置模型'}
           installedCount={agentConfigs.length}
           marketFeatured={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(0, 3)}
