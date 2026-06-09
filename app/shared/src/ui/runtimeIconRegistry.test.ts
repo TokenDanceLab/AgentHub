@@ -46,5 +46,10 @@ describe('runtimeIconRegistry', () => {
       fallback: 'write',
       value: 'A',
     });
+    expect(resolveRuntimeIconRegistry({ kind: 'tool', name: 'Execution Target' })).toMatchObject({
+      source: 'fallback',
+      fallback: 'target',
+      value: 'E',
+    });
   });
 });
