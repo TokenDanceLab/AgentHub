@@ -1752,6 +1752,32 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByPlaceholderText('发消息给 Builder')).toBeInTheDocument();
   });
 
+  it('pins a transcript card from the message action menu', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    const { container } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    const firstCard = container.querySelector('[data-selectable-card="msg-1"]');
+    expect(firstCard).toBeInTheDocument();
+    fireEvent.contextMenu(firstCard!, { clientX: 120, clientY: 180 });
+
+    const menu = screen.getByRole('menu', { name: '卡片操作菜单' });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /置顶消息/ }));
+
+    expect(screen.getByText('已更新置顶')).toBeInTheDocument();
+  });
+
   it('enters multi-select with the design long-press gesture', () => {
     vi.useFakeTimers();
     try {
@@ -1928,10 +1954,14 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
       target: { value: 'target-local-edge-1' },
     });
+    expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
+    expect(screen.getByText('Target Alpha Desktop')).toBeInTheDocument();
+    expect(screen.getByText('Task draft required')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
       target: { value: 'Start the Web main chain' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+    expect(screen.getByText('Task ready')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '启动 Agent 任务' }));
 
     await waitFor(() => {
       expect(platform.submittedIntents).toEqual([
@@ -1951,6 +1981,43 @@ describe('AgentHubWorkbench', () => {
     });
     expect(screen.getByRole('status')).toHaveTextContent('Data: approved-real');
     expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
+  });
+
+  it('blocks @Agent task start until a Desktop/Edge target is selected', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop' }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          replayLabel: 'Hub replay: 0 runtime events observed',
+          targetState: 'no-target',
+        }}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('@Agent'), {
+      target: { value: 'builder' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: 'Run the remote task' },
+    });
+
+    expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
+    expect(screen.getByText('Target missing')).toBeInTheDocument();
+    expect(screen.getByText('Task draft required')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Select a Desktop/Edge target before starting.');
+    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
+    expect(platform.submittedIntents).toEqual([]);
   });
 
   it('uses Enter to send and Ctrl+Enter for newline by default', async () => {
