@@ -645,10 +645,22 @@ export function AgentHubWorkbench({
         return block.text.slice(0, 28) || block.author.name;
       case 'tool_call':
         return block.toolName;
+      case 'tool_result':
+        return `${block.toolName} result`;
+      case 'file_change':
+        return block.path;
+      case 'permission_request':
+      case 'permission_result':
+      case 'failure':
+      case 'finished':
+        return block.title;
+      case 'preview':
+        return block.url ?? block.previewId;
       case 'diff':
       case 'approval':
       case 'artifact':
       case 'subagent':
+      case 'subtask':
       case 'child_agent':
       case 'run_session':
       case 'run_step_group':

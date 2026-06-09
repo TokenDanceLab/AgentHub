@@ -34,11 +34,12 @@ pub fn run() {
     let edge_path = resolve_edge_path();
     let store_path = std::env::temp_dir().join("agenthub-edge.sqlite");
     let edge = Arc::new(Mutex::new(
-        EdgeManager::new(edge_path.clone(), store_path.clone())
-            .unwrap_or_else(|e| {
-                log::error!("Failed to initialize local Edge auth token: {e}. Local Edge startup is blocked.");
-                EdgeManager::new_unavailable(edge_path, store_path, e)
-            }),
+        EdgeManager::new(edge_path.clone(), store_path.clone()).unwrap_or_else(|e| {
+            log::error!(
+                "Failed to initialize local Edge auth token: {e}. Local Edge startup is blocked."
+            );
+            EdgeManager::new_unavailable(edge_path, store_path, e)
+        }),
     ));
 
     let close_to_tray = Arc::new(AtomicBool::new(true));
@@ -57,6 +58,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_edge_status,
             commands::get_edge_host_readiness,
+            commands::get_local_edge_diagnostics,
             commands::get_edge_auth_token,
             commands::get_packaged_login_readiness,
             commands::start_edge,
