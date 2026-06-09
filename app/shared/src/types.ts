@@ -197,7 +197,11 @@ export interface AgentInfo {
   approvalPolicy?: string;
   permissionMode?: string;
   skills?: string[];
+  mcpServers?: string[];
   toolAllowlist?: string[];
+  memorySources?: string[];
+  memoryRetention?: string;
+  memorySummary?: string;
   targetPreferences?: Record<string, unknown>;
   status: 'available' | 'unavailable' | 'configuring';
   capabilities: AgentCapabilities;
