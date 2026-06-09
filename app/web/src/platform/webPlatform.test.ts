@@ -660,7 +660,7 @@ describe('webPlatform workbench agent mapping', () => {
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest',
-    }, 'target-relay-1'))).rejects.toThrow('Selected Desktop/Edge target is not available for Web Hub dispatch.');
+    }, 'target-relay-1'))).rejects.toThrow('Selected Desktop/Edge target is not dispatchable: target type hub_relay.');
 
     expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
     expect(hubClient.sendMessage).not.toHaveBeenCalled();
@@ -668,6 +668,50 @@ describe('webPlatform workbench agent mapping', () => {
       target_type: 'local_edge',
       pageSize: 50,
     });
+    expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
+  });
+
+  it('rejects selected unhealthy Desktop targets before sending a Hub message', async () => {
+    const hubClient = {
+      addAgentToSession: vi.fn(),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn(),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-stale',
+            name: 'Stale Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'stale',
+            is_online: true,
+          },
+          {
+            id: 'target-mismatch',
+            name: 'Mismatched Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'mismatch',
+            is_online: false,
+          },
+        ],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      createClientMessageId: () => 'client-message-stale-target',
+    });
+
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
+      conversationId: 'hub-session-1',
+      text: '不要盲目启动',
+      mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest',
+    }, 'target-stale'))).rejects.toThrow('Selected Desktop/Edge target is not dispatchable: stale.');
+
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
     expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
   });
 

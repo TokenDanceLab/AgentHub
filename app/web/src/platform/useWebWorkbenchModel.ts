@@ -211,7 +211,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
     target.target_type === 'local_edge' &&
     target.is_online === true &&
-    target.health_state === 'healthy'
+    (target.health_state === 'online' || target.health_state === 'healthy')
   );
   const composerExecutionTargets = hubReady || realMode
     ? onlineLocalEdgeTargets.map((target) => ({
@@ -681,6 +681,8 @@ export type WebExecutionTargetStatusState =
   | 'no-target'
   | 'offline'
   | 'degraded'
+  | 'mismatch'
+  | 'stale'
   | 'wrong-profile'
   | 'ready';
 
@@ -726,9 +728,23 @@ export function resolveWebExecutionTargetStatus(input: {
   }
 
   const selectedTarget = localEdgeTargets.find((target) =>
-    target.is_online === true && target.health_state === 'healthy'
+    target.is_online === true && (target.health_state === 'online' || target.health_state === 'healthy')
   );
   if (!selectedTarget) {
+    const mismatchTarget = localEdgeTargets.find((target) => target.health_state === 'mismatch');
+    if (mismatchTarget) {
+      return targetStatus(
+        'mismatch',
+        `Desktop/Edge target binding mismatch: ${executionTargetLabel(mismatchTarget)}. Web will not dispatch until Hub target and Desktop Edge identity match.`,
+      );
+    }
+    const staleTarget = localEdgeTargets.find((target) => target.health_state === 'stale');
+    if (staleTarget) {
+      return targetStatus(
+        'stale',
+        `Desktop/Edge target health is stale: ${executionTargetLabel(staleTarget)}. Web will wait for a fresh Desktop check-in before dispatch.`,
+      );
+    }
     const degradedTarget = localEdgeTargets.find((target) =>
       target.is_online === true && target.health_state === 'degraded'
     );

@@ -120,7 +120,7 @@ func TestExecutionTargetPingIsOwnerScoped(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
 	require.True(t, target.IsOnline)
 	require.NotNil(t, target.LastSeenAt)
-	require.Equal(t, "healthy", target.HealthState)
+	require.Equal(t, "online", target.HealthState)
 }
 
 func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
@@ -212,6 +212,43 @@ func TestExecutionTargetPingDoesNotUseAuthMethodAsBearerCredential(t *testing.T)
 
 	require.NoError(t, svc.Ping(context.Background(), "target-cloud", "owner-1"))
 	require.Empty(t, gotAuth, "auth_method is a public strategy enum and must not be reused as a bearer credential")
+}
+
+func TestExecutionTargetPingMarksMismatchWhenEdgeReportsDifferentTarget(t *testing.T) {
+	edge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok","target_id":"target-other"}`))
+	}))
+	t.Cleanup(edge.Close)
+
+	edgeURL, err := url.Parse(edge.URL)
+	require.NoError(t, err)
+	port, err := strconv.Atoi(edgeURL.Port())
+	require.NoError(t, err)
+
+	db := newExecutionTargetTestDB(t)
+	require.NoError(t, db.Create(&model.ExecutionTarget{
+		ID:                 "target-cloud",
+		OwnerID:            "owner-1",
+		Name:               "Cloud target",
+		TargetType:         "cloud_edge",
+		Host:               edgeURL.Hostname(),
+		Port:               port,
+		WorkspaceAllowlist: `["/workspace"]`,
+		TrustLevel:         "cloud",
+		HealthState:        "unknown",
+		Capabilities:       "{}",
+		Metadata:           "{}",
+	}).Error)
+	svc := NewExecutionTargetService(db)
+
+	err = svc.Ping(context.Background(), "target-cloud", "owner-1")
+
+	require.ErrorIs(t, err, errcode.TargetNotRoutable)
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-cloud").First(&target).Error)
+	require.False(t, target.IsOnline)
+	require.Equal(t, "mismatch", target.HealthState)
 }
 
 func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
@@ -364,7 +401,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceCreatesOwnerScopedOnlineT
 	require.Equal(t, device.ID, *target.DeviceID)
 	require.Equal(t, "local_edge", target.TargetType)
 	require.Equal(t, "local", target.TrustLevel)
-	require.Equal(t, "healthy", target.HealthState)
+	require.Equal(t, "online", target.HealthState)
 	require.True(t, target.IsOnline)
 	require.NotNil(t, target.LastSeenAt)
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
@@ -413,7 +450,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesWinnerAfterCreat
 	require.Equal(t, "target-race-winner", target.ID)
 	require.Equal(t, "Desktop Local Edge 15151515", target.Name)
 	require.True(t, target.IsOnline)
-	require.Equal(t, "healthy", target.HealthState)
+	require.Equal(t, "online", target.HealthState)
 	require.JSONEq(t, `[]`, target.WorkspaceAllowlist)
 	require.JSONEq(t, `{"device_capabilities":["local_edge","agent.dispatch"]}`, target.Capabilities)
 
@@ -493,7 +530,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesGeneratedNameTar
 	require.NotNil(t, target.DeviceID)
 	require.Equal(t, deviceID, *target.DeviceID)
 	require.True(t, target.IsOnline)
-	require.Equal(t, "healthy", target.HealthState)
+	require.Equal(t, "online", target.HealthState)
 
 	var count int64
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("owner_id = ? AND target_type = ?", "owner-1", "local_edge").Count(&count).Error)
@@ -563,7 +600,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceRefreshesDuplicateOffline
 	})
 	require.NoError(t, err)
 	require.Equal(t, "target-existing", target.ID)
-	require.Equal(t, "healthy", target.HealthState)
+	require.Equal(t, "online", target.HealthState)
 	require.True(t, target.IsOnline)
 	require.NotNil(t, target.LastSeenAt)
 	require.True(t, target.LastSeenAt.After(oldSeenAt))

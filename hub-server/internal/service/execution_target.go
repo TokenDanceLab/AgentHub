@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -36,6 +37,8 @@ type TargetListResult struct {
 	HasMore bool                    `json:"has_more"`
 	Cursor  string                  `json:"next_cursor,omitempty"`
 }
+
+const desktopTargetStaleAfter = 2 * time.Minute
 
 func NewExecutionTargetService(db *gorm.DB) *ExecutionTargetService {
 	return &ExecutionTargetService{db: db}
@@ -178,7 +181,7 @@ func refreshDesktopLocalEdgeTarget(target *model.ExecutionTarget, device *model.
 	target.TargetType = "local_edge"
 	target.WorkspaceAllowlist = "[]"
 	target.TrustLevel = "local"
-	target.HealthState = "healthy"
+	target.HealthState = "online"
 	target.IsOnline = true
 	target.LastSeenAt = &now
 	target.Capabilities = capabilities
@@ -245,6 +248,7 @@ func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*
 	if t.OwnerID != ownerID {
 		return nil, errcode.AuthDeviceMismatch
 	}
+	applyExecutionTargetHealthProjection(t, time.Now())
 	return t, nil
 }
 
@@ -306,6 +310,7 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 	if err := repository.UpdateExecutionTarget(s.db, t); err != nil {
 		return nil, err
 	}
+	applyExecutionTargetHealthProjection(t, time.Now())
 	return t, nil
 }
 
@@ -349,11 +354,56 @@ func (s *ExecutionTargetService) List(ctx context.Context, ownerID, targetType, 
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
+	for i := range targets {
+		applyExecutionTargetHealthProjection(&targets[i], now)
+	}
 	var nextCursor string
 	if hasMore && len(targets) > 0 {
 		nextCursor = targets[len(targets)-1].ID
 	}
 	return &TargetListResult{Items: targets, HasMore: hasMore, Cursor: nextCursor}, nil
+}
+
+func applyExecutionTargetHealthProjection(target *model.ExecutionTarget, now time.Time) {
+	if target == nil {
+		return
+	}
+	target.HealthState = resolveExecutionTargetHealthState(target, now)
+	target.IsOnline = target.HealthState == "online" || target.HealthState == "healthy"
+}
+
+func resolveExecutionTargetHealthState(target *model.ExecutionTarget, now time.Time) string {
+	if target == nil {
+		return "offline"
+	}
+	state := strings.TrimSpace(strings.ToLower(target.HealthState))
+	switch state {
+	case "mismatch", "offline":
+		return state
+	}
+	if target.TargetType != "local_edge" {
+		if target.IsOnline && (state == "healthy" || state == "online") {
+			return "online"
+		}
+		if state == "degraded" || state == "unknown" || state == "stale" {
+			return state
+		}
+		return "offline"
+	}
+	if !target.IsOnline {
+		return "offline"
+	}
+	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
+		return "mismatch"
+	}
+	if target.LastSeenAt == nil || now.Sub(*target.LastSeenAt) > desktopTargetStaleAfter {
+		return "stale"
+	}
+	if state == "degraded" || state == "unknown" {
+		return state
+	}
+	return "online"
 }
 
 func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) error {
@@ -380,7 +430,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 			port = 3210
 		}
 		addr := net.JoinHostPort(t.Host, fmt.Sprintf("%d", port))
-		return pingEdgeServer(ctx, addr, t.AuthCredential, t.ID, id, s.db)
+		return pingEdgeServer(ctx, addr, t.AuthCredential, t.ID, s.db)
 	case "hub_relay":
 		// hub_relay health depends on whether the owner has an active
 		// WebSocket connection that can relay tasks.
@@ -401,7 +451,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 
 // pingEdgeServer performs an actual HTTP GET /v1/health against the Edge Server
 // and updates the target's online status and last_seen_at accordingly.
-func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID, targetOwnerID string, db *gorm.DB) error {
+func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID string, db *gorm.DB) error {
 	scheme := "http"
 	url := scheme + "://" + addr + "/v1/health"
 
@@ -420,17 +470,47 @@ func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID, 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		slog.Debug("execution target ping failed", "target_id", targetOwnerID, "addr", addr, "err", err)
+		slog.Debug("execution target ping failed", "target_id", targetID, "addr", addr, "err", err)
 		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
 		return errcode.TargetNotRoutable.WithMessage("ping failed: " + err.Error())
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+		if observedTargetID := observedTargetIDFromHealthBody(body); observedTargetID != "" && observedTargetID != targetID {
+			_ = repository.UpdateTargetHealthState(db, targetID, "mismatch", false)
+			return errcode.TargetNotRoutable.WithMessage("execution target health mismatch")
+		}
 		_ = repository.UpdateTargetOnlineStatus(db, targetID, true)
 		return nil
 	}
 
 	_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
 	return errcode.TargetNotRoutable.WithMessage(fmt.Sprintf("ping returned HTTP %d", resp.StatusCode))
+}
+
+func observedTargetIDFromHealthBody(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return ""
+	}
+	for _, key := range []string{"target_id", "targetId"} {
+		if value, ok := raw[key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	data, ok := raw["data"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, key := range []string{"target_id", "targetId"} {
+		if value, ok := data[key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

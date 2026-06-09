@@ -518,14 +518,26 @@ async function resolveWebDispatchTarget(
   const onlineLocalEdgeTargets = inventory.items.filter((target) =>
     target.target_type === 'local_edge' &&
     target.is_online === true &&
-    target.health_state !== 'offline' &&
-    target.health_state === 'healthy'
+    (target.health_state === 'online' || target.health_state === 'healthy')
   );
   const target = onlineLocalEdgeTargets.find((item) => item.id === requestedTargetId);
   if (!target) {
-    throw new Error('Selected Desktop/Edge target is not available for Web Hub dispatch.');
+    const requested = inventory.items.find((item) => item.id === requestedTargetId);
+    if (requested) {
+      throw new Error(
+        `Selected Desktop/Edge target is not dispatchable: ${targetDispatchBlockerLabel(requested)}.`,
+      );
+    }
+    throw new Error('Selected Desktop/Edge target is missing from Hub inventory.');
   }
   return target;
+}
+
+function targetDispatchBlockerLabel(target: ExecutionTarget): string {
+  if (target.target_type !== 'local_edge') return `target type ${target.target_type}`;
+  const healthState = target.health_state;
+  if (healthState === 'online' || healthState === 'healthy') return target.is_online ? 'online' : 'offline';
+  return healthState || (target.is_online ? 'unknown' : 'offline');
 }
 
 function buildHubComposerPrompt(intent: ComposerIntent): string {

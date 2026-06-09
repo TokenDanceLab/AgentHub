@@ -50,8 +50,11 @@ var validExecutionTargetTrustLevels = map[string]struct{}{
 var validExecutionTargetHealthStates = map[string]struct{}{
 	"unknown":  {},
 	"healthy":  {},
+	"online":   {},
 	"degraded": {},
 	"offline":  {},
+	"mismatch": {},
+	"stale":    {},
 }
 
 var validExecutionTargetAuthMethods = map[string]struct{}{
