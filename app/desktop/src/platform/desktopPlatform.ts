@@ -166,7 +166,7 @@ function readEdgeHostReadiness(): Promise<DesktopEdgeHostReadiness> {
   return invoke<DesktopEdgeHostReadiness>('get_edge_host_readiness');
 }
 
-function readLocalEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics> {
+export function readLocalEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics> {
   return invoke<DesktopLocalEdgeDiagnostics>('get_local_edge_diagnostics');
 }
 
