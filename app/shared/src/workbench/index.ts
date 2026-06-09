@@ -8,6 +8,27 @@ export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
 export * from './mockData';
 export {
+  AGENT_PROFILE_CATALOG,
+  WORKBENCH_AGENT_MARKET_FIXTURES,
+  WORKBENCH_AGENT_MCP_OPTIONS,
+  WORKBENCH_AGENT_MODELS,
+  WORKBENCH_AGENT_MODEL_HEALTH,
+  WORKBENCH_AGENT_POLICY_RULES,
+  WORKBENCH_AGENT_PROFILE_FIXTURES,
+  WORKBENCH_AGENT_SKILL_OPTIONS,
+  WORKBENCH_AGENT_TOOL_OPTIONS,
+  agentProfileCatalogToConfig,
+  agentProfileCatalogToMarketTemplate,
+} from './agentProfileCatalog';
+export type {
+  AgentApprovalMode,
+  AgentMemorySource,
+  AgentProfileCatalogItem,
+  AgentProfileVisibility,
+  AgentRuntimeId,
+  AgentTargetPreference,
+} from './agentProfileCatalog';
+export {
   DESIGN_FILE_ICON_RADIUS,
   DESIGN_FILE_ICON_SIZE,
   DESIGN_NAV_GLYPH_SIZE,
