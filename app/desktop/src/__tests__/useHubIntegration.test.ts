@@ -280,6 +280,25 @@ describe('useHubIntegration', () => {
     });
   }
 
+  function mockRunCreateResponse(body: Record<string, unknown>) {
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/threads')) {
+        return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/v1/runs')) {
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+  }
+
   // ── agent.dispatch → Edge run ──────────────────────────
 
   it('acks task and starts Edge run on agent.dispatch', async () => {
@@ -306,6 +325,72 @@ describe('useHubIntegration', () => {
     const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.threadId).toBe('sess-1');
     expect(fetchBody.agentId).toBe('claude-code');
+  });
+
+  it('unwraps unified Edge run envelopes before acking Hub tasks', async () => {
+    mockRunCreateResponse({
+      code: 'OK',
+      data: {
+        id: 'run-envelope-1',
+        projectId: 'proj-1',
+        threadId: 'sess-1',
+        status: 'started',
+      },
+    });
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1', 'run-envelope-1');
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy raw Edge run responses compatible', async () => {
+    mockRunCreateResponse({
+      id: 'run-legacy-1',
+      runId: 'run-legacy-1',
+      projectId: 'proj-1',
+      threadId: 'sess-1',
+      status: 'started',
+    });
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1', 'run-legacy-1');
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when a unified Edge run envelope has no id or runId in data', async () => {
+    mockRunCreateResponse({
+      code: 'OK',
+      data: {
+        projectId: 'proj-1',
+        threadId: 'sess-1',
+        status: 'started',
+      },
+    });
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).toHaveBeenCalledWith(
+      'task-1',
+      'Edge run created but no id/runId in response data',
+    );
   });
 
   it('refuses to hand off dispatches that are not targeted to this Desktop local edge', async () => {
@@ -564,6 +649,48 @@ describe('useHubIntegration', () => {
     });
 
     expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
+  });
+
+  it('streams permission request and decision events to Hub', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    const requestPayload = {
+      runId: 'run-1',
+      requestId: 'perm-1',
+      toolName: 'Bash',
+      toolUseId: 'tool-1',
+      command: 'pnpm test',
+    };
+    const decisionPayload = {
+      runId: 'run-1',
+      requestId: 'perm-1',
+      decision: 'allow',
+      reason: 'approved remotely',
+    };
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.permission_requested', requestPayload));
+      fireEdgeEvent(makeEvent('run.agent.permission_decided', decisionPayload));
+    });
+
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.permission_requested',
+      requestPayload,
+      { runId: 'run-1' },
+    );
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.permission_decided',
+      decisionPayload,
+      { runId: 'run-1' },
+    );
   });
 
   it('posts supervisor route decisions from typed Edge events to Hub TeamRun', async () => {
