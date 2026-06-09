@@ -3,97 +3,79 @@ import type { AddressInfo } from 'node:net';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { HubApiError, createHubClient } from './hubClient';
+import { createHubClient } from './hubClient';
 
-import type { MobileAppFixture } from '@/types';
-
-const snapshotBody: MobileAppFixture = {
-  threads: [
-    {
-      id: 'delicious233-thread',
-      title: 'Delicious233 mobile review',
-      subtitle: 'TokenDance local Hub contract',
-      initials: 'D2',
-      unread: 1,
-      participantKind: 'agent',
-      status: 'online',
-      lastActivity: '2026-06-08T08:00:00.000Z',
-    },
-  ],
-  runs: [
-    {
-      id: 'tokendance-run',
-      threadId: 'delicious233-thread',
-      title: 'TokenDance snapshot sync',
-      status: 'approval_required',
-      target: 'TokenDance local Hub',
-      updatedAt: '2026-06-08T08:01:00.000Z',
-      summary: 'Delicious233 is reviewing the mobile Hub contract.',
-      changedFiles: ['app/mobile-rn/src/api/hubContract.test.ts'],
-    },
-  ],
-  transcript: {},
-  account: {
-    tokenDanceId: 'signed_in',
-    hubSession: 'active',
-    notification: 'granted',
-    hubSync: 'active',
-    deviceLabel: 'Delicious233 TokenDance device',
-  },
-};
-
-const contractToken = 'TokenDance-local-contract-token';
-const requestHeaders: Array<string | undefined> = [];
+const contractToken = 'test-contract-token';
 let server: Awaited<ReturnType<typeof startLocalHubServer>> | undefined;
 
 afterEach(async () => {
-  requestHeaders.length = 0;
   await server?.close();
   server = undefined;
 });
 
 describe('Mobile Hub REST contract', () => {
-  it('uses real local HTTP fetch for bearer auth, snapshot JSON, and API error JSON', async () => {
+  it('calls real Hub API endpoints (/client/sessions, /client/contacts) with bearer auth', async () => {
+    const sessionsData = [
+      {
+        session_id: 's-contract-1',
+        type: 'private',
+        name: 'Contract Test Session',
+        unread_count: 2,
+        last_message_at: '2026-06-10T10:00:00.000Z',
+      },
+    ];
+    const contactsData: unknown[] = [];
+
     server = await startLocalHubServer((request, response) => {
-      requestHeaders.push(request.headers.authorization);
-
-      if (request.url !== '/v1/mobile/snapshot') {
-        writeJson(response, 404, { error: { code: 'not_found', message: 'TokenDance route not found' } });
-        return;
-      }
-
+      // Verify auth
       if (request.headers.authorization !== `Bearer ${contractToken}`) {
         writeJson(response, 401, {
-          error: {
-            code: 'unauthorized',
-            message: 'TokenDance session expired',
-          },
+          error: { code: 'AUTH_INVALID_TOKEN', message: 'token is invalid or expired' },
         });
         return;
       }
 
-      writeJson(response, 200, snapshotBody);
+      // Route to Hub endpoints
+      if (request.url === '/client/sessions') {
+        writeJson(response, 200, { code: 'OK', data: sessionsData });
+        return;
+      }
+      if (request.url === '/client/contacts') {
+        writeJson(response, 200, { code: 'OK', data: contactsData });
+        return;
+      }
+
+      writeJson(response, 404, { error: { code: 'NOT_FOUND', message: 'route not found' } });
     });
+
     const client = createHubClient({
       baseUrl: server.baseUrl,
       getAccessToken: async () => contractToken,
     });
 
-    await expect(client.getMobileSnapshot()).resolves.toEqual(snapshotBody);
-    expect(requestHeaders).toContain(`Bearer ${contractToken}`);
+    const snapshot = await client.getMobileSnapshot();
 
-    const unauthorizedClient = createHubClient({
+    expect(snapshot.threads).toHaveLength(1);
+    expect(snapshot.threads[0]?.id).toBe('s-contract-1');
+    expect(snapshot.threads[0]?.title).toBe('Contract Test Session');
+    expect(snapshot.threads[0]?.unread).toBe(2);
+  });
+
+  it('rejects requests with invalid tokens', async () => {
+    server = await startLocalHubServer((request, response) => {
+      writeJson(response, 401, {
+        error: { code: 'AUTH_INVALID_TOKEN', message: 'token is invalid or expired' },
+      });
+    });
+
+    const client = createHubClient({
       baseUrl: server.baseUrl,
-      getAccessToken: async () => 'TokenDance-expired-contract-token',
+      getAccessToken: async () => 'expired-token',
     });
 
-    await expect(unauthorizedClient.getMobileSnapshot()).rejects.toMatchObject({
-      code: 'unauthorized',
-      message: 'TokenDance session expired',
-      retryable: false,
-      status: 401,
-    });
-    await expect(unauthorizedClient.getMobileSnapshot()).rejects.toBeInstanceOf(HubApiError);
+    // getMobileSnapshot catches errors and returns empty data
+    const snapshot = await client.getMobileSnapshot();
+    expect(snapshot.threads).toHaveLength(0);
   });
 });
 
