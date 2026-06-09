@@ -295,6 +295,33 @@ const RUN_STATUS_DOT: Record<string, string> = {
 const EMPTY_TASKS: AgentTeamTask[] = [];
 const EMPTY_EVENTS: AgentTeamEvent[] = [];
 
+function replayEventCountLabel(count: number): string {
+  return count === 1 ? '1 replay event' : `${count} replay events`;
+}
+
+function replayTargetLabel(targetId: string | undefined, target: { name?: string; id: string } | undefined): string {
+  if (!targetId) return 'No target recorded';
+  return target?.name || targetId;
+}
+
+function replayTargetWarning(
+  selectedRun: AgentTeamRun | undefined,
+  target: { id: string; name?: string; target_type: string; is_online: boolean; health_state: string } | undefined,
+): string | undefined {
+  const targetId = selectedRun?.target_id;
+  if (!selectedRun) return undefined;
+  if (!targetId) {
+    return 'Run has no execution target recorded. Web keeps this view Hub-sourced and does not contact the Desktop/Edge runtime directly.';
+  }
+  if (!target || !target.is_online || target.health_state === 'offline') {
+    return `Replay target offline or unavailable: ${replayTargetLabel(targetId, target)}. Web keeps this view Hub-sourced and does not contact the Desktop/Edge runtime directly.`;
+  }
+  if (target.target_type !== 'local_edge') {
+    return `Replay target is ${target.target_type}. Web keeps this view Hub-sourced and does not contact the Desktop/Edge runtime directly.`;
+  }
+  return undefined;
+}
+
 function mapMemberDisplays(
   members: { member_id: string; agent_profile_id?: string; role: string; active_tasks?: number; completed_tasks?: number }[],
   teamDetail?: AgentTeamDetail | null,
@@ -395,15 +422,21 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
     ),
     [agentTeamsQuery.data?.events, localEvents, selectedRun, state],
   );
+  const executionTargetItems = executionTargetsQuery.data?.items ?? [];
   const onlineLocalEdgeTargets = useMemo(
-    () => (executionTargetsQuery.data?.items ?? []).filter((target) =>
+    () => executionTargetItems.filter((target) =>
       target.target_type === 'local_edge' &&
       target.is_online === true &&
       target.health_state !== 'offline'
     ),
-    [executionTargetsQuery.data?.items],
+    [executionTargetItems],
   );
   const selectedRunTarget = onlineLocalEdgeTargets.find((target) => target.id === selectedTargetId);
+  const replayTarget = selectedRun?.target_id
+    ? executionTargetItems.find((target) => target.id === selectedRun.target_id)
+    : undefined;
+  const replayTargetStatus = replayTargetWarning(selectedRun, replayTarget);
+  const replayTargetName = replayTargetLabel(selectedRun?.target_id, replayTarget);
   const runTargetLoading =
     executionTargetsQuery.isLoading ||
     (executionTargetsQuery.isFetching && !executionTargetsQuery.data);
@@ -778,6 +811,22 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                 <p className={styles.detailDesc}>{teamDetail.description}</p>
               )}
 
+              {selectedRun && (
+                <div className={styles.replayContext} aria-label="Selected Hub run replay context">
+                  <span className={styles.replayPill}>
+                    {t('teamRun.realHubReplay', 'Real Hub replay')}
+                  </span>
+                  <span>{t('teamRun.replayRunId', 'Run {{id}}', { id: selectedRun.id })}</span>
+                  <span>{t('teamRun.replayTarget', 'Target {{target}}', { target: replayTargetName })}</span>
+                  <span>{replayEventCountLabel(events.length)}</span>
+                  {replayTargetStatus && (
+                    <span className={styles.replayWarning} role="status">
+                      {replayTargetStatus}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Start run */}
               {selectedTeamId && (
                 <div className={styles.runControls}>
@@ -933,6 +982,10 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                       loading={queryLoading && events.length === 0}
                       error={agentTeamsQuery.error ? String(agentTeamsQuery.error) : null}
                       memberNames={memberNames}
+                      emptyText={t(
+                        'teamRun.emptyHubReplay',
+                        'Hub replay has no recorded events for this selected run.',
+                      )}
                     />
                   )}
                 </>
