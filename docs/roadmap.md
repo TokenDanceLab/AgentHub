@@ -470,10 +470,10 @@ Web / Desktop / Mobile / IM
 
 - [x] Desktop 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
 - [x] Web 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
-- [ ] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
+- [x] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
 - [x] 登录后 Hub WS 连接成功，收到 `auth.ok`
 - [x] Logout 后 session 失效，所有 API 返回 401
-- [ ] Access token 过期前自动 refresh，用户无感知
+- [x] Access token 过期前自动 refresh，用户无感知
 - [x] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新
 - [x] Avatar 上传：`POST /client/attachments` 上传后 `GET /client/auth/me` 返回新 URL
 
@@ -540,7 +540,7 @@ Web / Desktop / Mobile / IM
 
 - [x] 发送文本消息，其余在线成员通过 WS 实时收到
 - [x] 消息列表按 `seq_id` 排序
-- [ ] 重复 `client_msg_id` 不产生重复消息
+- [x] 重复 `client_msg_id` 不产生重复消息
 - [x] 撤回成功后 UI 显示"消息已撤回"
 - [x] 超时撤回返回错误
 - [x] 非发送者撤回返回 403
@@ -675,8 +675,8 @@ Web / Desktop / Mobile / IM
 - [x] Target 展示 online/offline
 - [x] MCP Server 可被 Agent 引用
 - [ ] Tool allowlist 限制可调用工具
-- [ ] Profile 发布后出现在市场
-- [ ] Profile 安装后出现在用户列表
+- [x] Profile 发布后出现在市场
+- [x] Profile 安装后出现在用户列表
 
 ---
 
