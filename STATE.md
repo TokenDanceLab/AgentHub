@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 14:39 +08:00
+最后更新：2026-06-09 14:43 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | `origin/dev/delicious233 = 2aff026d docs(state): record web visual smoke integration` |
-| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke 集成已合入 |
+| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
@@ -31,6 +31,8 @@
 - Desktop sidecar observed fixture smoke：覆盖 fixture/mock sidecar health、SQLite app-data path、stdout/stderr log path、health URL、preflight/readiness、no direct CLI spawn，并保留缺真实 sidecar binary 时 strict gate 失败。
 - CLI JSON readiness checker：覆盖 Codex `exec --json`、Claude Code `stream-json` permission bridge、OpenCode `run --format json` permission risk、命令计划脱敏和 no-spend fixture boundary。
 - Web real-mode visual smoke 集成提交：`e2ee21f0 fix(web): surface real-mode replay evidence`，覆盖 Hub `approval.requested` 标题/描述投影、避免重复 approval evidence label、右侧 inspector 在 runtime evidence 存在时展示 Hub replay evidence 而不是 demo `B0 SQLite` fixture。
+- Desktop sidecar binary smoke 集成提交：`74660003 test(desktop): 增加 sidecar binary smoke`，覆盖 Windows Local Edge sidecar build/placement、strict bundled sidecar readiness、dry package gate 复用 prepare 脚本，以及二进制/打包产物 ignore 边界。
+- Edge SQLite durable hardening 集成提交：`fd5fa202 test(edge): harden sqlite durable store slice`，覆盖 approval requested/decided replay item、file-change/artifact evidence、pins、run replay projection 和删除 snapshot 后的 row-first restore。
 
 当前不声明已经完成：
 
@@ -48,8 +50,8 @@
 | CLI JSON readiness checker | Edge/SDK worker | 已合入 dev：`bf1a7ab5` | 静态/fixture JSON 合同；不运行真实 CLI/model/API |
 | Web real-mode visual smoke | Trump/Web | 已推 dev：`e2ee21f0` + `2aff026d` | review branch `origin/codex/p1-web-real-mode-visual-smoke` commit `855c8cea`；改动只在 `app/shared/**`，不碰 Hub/Edge/Desktop/Mobile |
 | Hub 单任务 approval/artifact | Johnny/backend | 运行中：thread `019eab05-39ef-7b70-bece-4b2a853fe9e8` | 只改 Hub/API；补 `/web/agent-tasks` approval decision 与 artifact metadata/list 最小合同 |
-| Desktop sidecar binary/package smoke | Desktop/Tauri | 已集成 controller：`74660003`，待验证/推 dev | review branch `origin/codex/p1-desktop-sidecar-binary-smoke` commit `f70194c4`；本地 build/placement/smoke gate，不提交二进制、不签名/公证/release upload |
-| Edge SQLite durable hardening | Johnny/Edge | 已集成 controller：cherry-pick 进行中，待验证/推 dev | review branch `origin/codex/p1-edge-sqlite-durable-hardening` commit `28655b25`；fixture-only durable gate，不声明完整 production DB |
+| Desktop sidecar binary/package smoke | Desktop/Tauri | 已集成并验证 controller：`74660003` | review branch `origin/codex/p1-desktop-sidecar-binary-smoke` commit `f70194c4`；本地 build/placement/smoke gate，不提交二进制、不签名/公证/release upload |
+| Edge SQLite durable hardening | Johnny/Edge | 已集成并验证 controller：`fd5fa202` | review branch `origin/codex/p1-edge-sqlite-durable-hardening` commit `28655b25`；fixture-only durable gate，不声明完整 production DB |
 | Hub/Event/Replay 合同审计 | Johnny/backend | 已产出报告 | 指向单任务 approval/artifact Hub 合同缺口；后续进入实现 worker |
 | State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
@@ -64,11 +66,9 @@
 
 ## 下一步优先级
 
-1. **Desktop/Tauri sidecar binary smoke 集成**：review branch `codex/p1-desktop-sidecar-binary-smoke` 已 ready，优先审查并合入 Windows 本地 sidecar placement/readiness 证据。
-2. **Edge SQLite durable hardening 集成**：review branch `codex/p1-edge-sqlite-durable-hardening` 已 ready，审查并合入 approval/artifact/replay/pins 重启恢复 fixture-only gate。
-3. **Hub 单任务 approval/artifact 合同**：worker 已推 review branch，等最终 AH-SYNC 后审查合入，支撑 Web/Mobile/IM 单任务审批与产物列表。
-4. **组合链路 observed E2E**：等 Web + Hub approval/artifact + Desktop sidecar binary smoke 回来后，开单一 product-loop worktree，验证 Web -> Hub -> Desktop -> Edge -> adapter fixture -> replay -> Web。
-5. **受控 approved-real 方案**：先形成审批清单和成本/凭据边界；真实登录、真实 CLI/model/API 消耗、部署和签名必须另获批准。
+1. **Hub 单任务 approval/artifact 合同**：review branch `codex/p1-hub-task-approval-artifacts` 已 ready，下一批审查合入，支撑 Web/Mobile/IM 单任务审批与产物列表。
+2. **组合链路 observed E2E**：等 Hub approval/artifact 合入后，开单一 product-loop worktree，验证 Web -> Hub -> Desktop -> Edge -> adapter fixture -> replay -> Web。
+3. **受控 approved-real 方案**：先形成审批清单和成本/凭据边界；真实登录、真实 CLI/model/API 消耗、部署和签名必须另获批准。
 
 ## 安全规则
 
