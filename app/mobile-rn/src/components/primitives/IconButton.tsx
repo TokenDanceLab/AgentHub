@@ -1,12 +1,15 @@
-import { Pressable, type StyleProp, type ViewStyle } from 'react-native';
+import { type StyleProp, type ViewStyle } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
 import { useAgentHubTheme } from '@/theme';
+
+import { MotionPressable } from './MotionPressable';
 
 const MIN_ICON_BUTTON_SIZE = 44;
 
 interface IconButtonProps {
   accessibilityLabel: string;
+  disabled?: boolean;
   icon: AgentHubIconName;
   onPress?: () => void;
   selected?: boolean;
@@ -15,6 +18,7 @@ interface IconButtonProps {
 
 export function IconButton({
   accessibilityLabel,
+  disabled = false,
   icon,
   onPress,
   selected = false,
@@ -23,13 +27,15 @@ export function IconButton({
   const { tokens } = useAgentHubTheme();
   const controlSize = Math.max(MIN_ICON_BUTTON_SIZE, tokens.touch.primary);
   const label = accessibilityLabel.trim();
+  const isDisabled = disabled || !onPress;
 
   return (
-    <Pressable
+    <MotionPressable
       accessibilityLabel={label}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
-      hitSlop={4}
+      accessibilityState={{ selected, disabled: isDisabled }}
+      disabled={isDisabled}
+      feedback="icon"
       onPress={onPress}
       style={({ pressed }) => [
         {
@@ -40,12 +46,12 @@ export function IconButton({
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: tokens.radius.control,
-          backgroundColor: selected || pressed ? tokens.color.tint : 'transparent',
+          backgroundColor: selected || (pressed && !isDisabled) ? tokens.color.tint : 'transparent',
         },
         style,
       ]}
     >
       <AgentHubIcon color={selected ? tokens.color.accent : tokens.color.inkMuted} name={icon} />
-    </Pressable>
+    </MotionPressable>
   );
 }
