@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useReducer, useRef, useState } from 'react';
+import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   buildComposerIntent,
   canSubmitComposer,
@@ -1238,6 +1238,7 @@ export function AgentHubWorkbench({
               contactsActions={contactsActions}
               documentsActions={documentsActions}
               localCliDiscovery={localCliDiscovery}
+              settingsService={settingsService}
             />
           </section>
         )}
