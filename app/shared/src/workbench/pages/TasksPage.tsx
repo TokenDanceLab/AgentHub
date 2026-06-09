@@ -76,6 +76,8 @@ export interface TasksPageProps {
 
   /** Task groups to render in the table */
   groups: TaskGroup[];
+  /** Status line to show when no tasks are available from the active data source. */
+  emptyStateLabel?: string | undefined;
   /** Agent/user profiles available for assignee and creator avatar resolution */
   profiles?: WorkbenchProfileSource[] | undefined;
   /** Selected task details, rendered as a compact in-page action strip */
@@ -419,6 +421,7 @@ function TaskRow({
 
 function TaskTable({
   groups,
+  emptyStateLabel,
   onTaskClick,
   onAddRow,
   selectedTaskId,
@@ -431,6 +434,7 @@ function TaskTable({
   onCancelEdit,
 }: {
   groups: TaskGroup[];
+  emptyStateLabel?: string | undefined;
   onTaskClick?: ((task: TaskItem) => void) | undefined;
   onAddRow?: (() => void) | undefined;
   selectedTaskId?: string | null | undefined;
@@ -482,6 +486,12 @@ function TaskTable({
         </React.Fragment>
       ))}
 
+      {totalTasks === 0 && emptyStateLabel && (
+        <div className={styles.emptyState} role="status">
+          {emptyStateLabel}
+        </div>
+      )}
+
       {/* Fallback: if no groups, show single group with all tasks */}
       {groups.length === 0 && (
         <>
@@ -510,6 +520,7 @@ export function TasksPage({
   viewMode,
   onViewModeChange,
   groups,
+  emptyStateLabel,
   profiles,
   selectedTask,
   taskActionLabel,
@@ -744,6 +755,7 @@ export function TasksPage({
 
         {/* Task table */}
         <TaskTable
+          emptyStateLabel={emptyStateLabel}
           groups={groups}
           editingDraft={editingDraft}
           editingTaskId={editingTaskId}
