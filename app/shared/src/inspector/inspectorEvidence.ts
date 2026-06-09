@@ -86,10 +86,15 @@ export interface DiffProposalEvidenceModel {
   approvalId: string;
   correlationId: string;
   exportLabel: string;
+  exportMode: 'review-only';
+  safeToExport: boolean;
+  guardReasons: string[];
 }
 
 export interface DiffProposalEvidenceManifest {
   schema: 'agenthub-diff-proposal-evidence-manifest-v1';
+  export_mode: 'review-only';
+  real_apply_supported: false;
   generatedAt: string;
   proposals: Array<{
     file_path: string;
@@ -158,17 +163,37 @@ export function buildInspectorEvidenceModel(evidence: EvidenceRef[]): InspectorE
 
 export function buildDiffProposalEvidenceModel(input: DiffProposalEvidenceInput): DiffProposalEvidenceModel {
   const reviewStatus = normalizeDiffProposalReviewStatus(input.diff.reviewStatus);
+  const canApply = Boolean(input.diff.canApply);
+  const canRevert = Boolean(input.diff.canRevert);
+  const editId = input.diff.editId ?? '';
+  const hash = input.diff.hash ?? '';
+  const artifactId = input.artifactId ?? '';
+  const approvalId = input.approvalId ?? '';
+  const correlationId = input.correlationId ?? '';
+  const guardReasons = diffProposalEvidenceGuardReasons({
+    filePath: input.diff.filePath,
+    reviewStatus,
+    canApply,
+    canRevert,
+    hash,
+    artifactId,
+    approvalId,
+    correlationId,
+  });
   return {
     filePath: input.diff.filePath,
     reviewStatus,
-    canApply: Boolean(input.diff.canApply),
-    canRevert: Boolean(input.diff.canRevert),
-    editId: input.diff.editId ?? '',
-    hash: input.diff.hash ?? '',
-    artifactId: input.artifactId ?? '',
-    approvalId: input.approvalId ?? '',
-    correlationId: input.correlationId ?? '',
+    canApply,
+    canRevert,
+    editId,
+    hash,
+    artifactId,
+    approvalId,
+    correlationId,
     exportLabel: reviewStatus === 'approved' ? 'Export approved evidence' : 'Export evidence',
+    exportMode: 'review-only',
+    safeToExport: guardReasons.length === 0,
+    guardReasons,
   };
 }
 
@@ -176,8 +201,16 @@ export function buildDiffProposalEvidenceManifest(
   proposals: DiffProposalEvidenceModel[],
   generatedAt = new Date().toISOString(),
 ): DiffProposalEvidenceManifest {
+  const unsafe = proposals.flatMap((proposal) =>
+    proposal.guardReasons.map((reason) => `${proposal.filePath || '<unknown>'}:${reason}`),
+  );
+  if (unsafe.length > 0) {
+    throw new Error(`Unsafe diff proposal evidence export: ${unsafe.join(', ')}`);
+  }
   return {
     schema: 'agenthub-diff-proposal-evidence-manifest-v1',
+    export_mode: 'review-only',
+    real_apply_supported: false,
     generatedAt,
     proposals: proposals.map((proposal) => ({
       file_path: proposal.filePath,
@@ -191,6 +224,44 @@ export function buildDiffProposalEvidenceManifest(
       correlation_id: proposal.correlationId,
     })),
   };
+}
+
+function diffProposalEvidenceGuardReasons(input: {
+  filePath: string;
+  reviewStatus: DiffProposalReviewStatus;
+  canApply: boolean;
+  canRevert: boolean;
+  hash: string;
+  artifactId: string;
+  approvalId: string;
+  correlationId: string;
+}): string[] {
+  const reasons: string[] = [];
+  if (!input.filePath.trim()) {
+    reasons.push('missing-file-path');
+  }
+  if (input.reviewStatus === 'review') {
+    reasons.push('unreviewed-diff');
+  }
+  if (input.canApply) {
+    reasons.push('apply-capability-exposed');
+  }
+  if (input.canRevert) {
+    reasons.push('revert-capability-exposed');
+  }
+  if (!input.hash.startsWith('sha256:')) {
+    reasons.push('missing-sha256-hash');
+  }
+  if (!input.artifactId.trim()) {
+    reasons.push('missing-artifact-id');
+  }
+  if (!input.approvalId.trim()) {
+    reasons.push('missing-approval-id');
+  }
+  if (!input.correlationId.trim()) {
+    reasons.push('missing-correlation-id');
+  }
+  return reasons;
 }
 
 export function evidenceStatusLabel(status: EvidenceRefStatus | undefined): string {

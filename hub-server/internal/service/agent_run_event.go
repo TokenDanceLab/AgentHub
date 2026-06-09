@@ -450,8 +450,8 @@ func projectTaskArtifacts(task *model.PendingAgentTask, events []model.AgentRunE
 					EditID:        firstJSONString(payload, "edit_id", "editId"),
 					Hash:          firstJSONString(payload, "hash", "diff_hash", "diffHash", "sha256"),
 					ReviewStatus:  firstJSONString(payload, "review_status", "reviewStatus", "status"),
-					CanApply:      firstJSONBoolPtr(payload, "can_apply", "canApply"),
-					CanRevert:     firstJSONBoolPtr(payload, "can_revert", "canRevert"),
+					CanApply:      safeTaskArtifactCapability(payload, "can_apply", "canApply"),
+					CanRevert:     safeTaskArtifactCapability(payload, "can_revert", "canRevert"),
 					CreatedAt:     event.CreatedAt,
 				})
 			}
@@ -496,6 +496,16 @@ func taskArtifactPaths(payload map[string]any) []string {
 		}
 	}
 	return paths
+}
+
+func safeTaskArtifactCapability(payload map[string]any, keys ...string) *bool {
+	requested := firstJSONBoolPtr(payload, keys...)
+	if requested == nil {
+		return nil
+	}
+	// Hub exposes artifact/file-change projection for review and evidence export only.
+	disabled := false
+	return &disabled
 }
 
 func firstJSONBoolPtr(payload map[string]any, keys ...string) *bool {

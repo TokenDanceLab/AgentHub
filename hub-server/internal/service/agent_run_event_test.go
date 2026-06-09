@@ -665,7 +665,7 @@ func TestListTaskArtifactsProjectsFileChangeAndArtifactCreated(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
 	for _, event := range []model.AgentRunEvent{
-		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.file_change", Payload: `{"path":"src/a.go","action":"modified","toolName":"apply_patch","status":"ok","diff":"@@ -1 +1 @@\n-old\n+new","edit_id":"edit-1","diff_hash":"sha256:diff-1","review_status":"pending","can_apply":false,"can_revert":true}`, CreatedAt: base},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.file_change", Payload: `{"path":"src/a.go","action":"modified","toolName":"apply_patch","status":"ok","diff":"@@ -1 +1 @@\n-old\n+new","edit_id":"edit-1","diff_hash":"sha256:diff-1","review_status":"pending","can_apply":true,"can_revert":true}`, CreatedAt: base},
 		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "artifact.created", Payload: `{"artifact_id":"art-1","path":"reports/summary.md","name":"summary.md","mime_type":"text/markdown","size_bytes":128,"hash":"sha256:artifact-1"}`, CreatedAt: base.Add(time.Second)},
 		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 3, EventType: "run.agent.file_change", Payload: `{"path":"src/b.go","status":{"unknown":true},"can_apply":"invalid"}`, CreatedAt: base.Add(2 * time.Second)},
 	} {
@@ -692,7 +692,7 @@ func TestListTaskArtifactsProjectsFileChangeAndArtifactCreated(t *testing.T) {
 	require.Equal(t, "sha256:diff-1", fileChange["hash"])
 	require.Equal(t, "pending", fileChange["review_status"])
 	require.Equal(t, false, fileChange["can_apply"])
-	require.Equal(t, true, fileChange["can_revert"])
+	require.Equal(t, false, fileChange["can_revert"])
 	require.Equal(t, "art-1", result.Artifacts[1].ArtifactID)
 	require.Equal(t, "sha256:artifact-1", result.Artifacts[1].Hash)
 	require.Equal(t, "reports/summary.md", result.Artifacts[1].Path)

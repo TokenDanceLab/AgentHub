@@ -58,6 +58,9 @@ describe('buildInspectorEvidenceModel', () => {
       approvalId: 'approval-1',
       correlationId: 'corr-1',
       exportLabel: 'Export approved evidence',
+      exportMode: 'review-only',
+      safeToExport: false,
+      guardReasons: ['revert-capability-exposed'],
     });
   });
 
@@ -82,6 +85,8 @@ describe('buildInspectorEvidenceModel', () => {
 
     expect(buildDiffProposalEvidenceManifest([proposal], '2026-06-09T00:00:00.000Z')).toEqual({
       schema: 'agenthub-diff-proposal-evidence-manifest-v1',
+      export_mode: 'review-only',
+      real_apply_supported: false,
       generatedAt: '2026-06-09T00:00:00.000Z',
       proposals: [{
         file_path: 'src/review.ts',
@@ -95,6 +100,33 @@ describe('buildInspectorEvidenceModel', () => {
         correlation_id: 'corr-2',
       }],
     });
+  });
+
+  it('rejects unsafe diff proposal evidence export before any real apply path exists', () => {
+    const proposal = buildDiffProposalEvidenceModel({
+      diff: {
+        filePath: 'src/unsafe.ts',
+        status: 'modified',
+        additions: 1,
+        deletions: 0,
+        hunks: [],
+        hash: 'diff-without-prefix',
+        reviewStatus: 'review',
+        canApply: true,
+      },
+      artifactId: 'artifact-unsafe',
+      approvalId: 'approval-unsafe',
+    });
+
+    expect(proposal.safeToExport).toBe(false);
+    expect(proposal.guardReasons).toEqual([
+      'unreviewed-diff',
+      'apply-capability-exposed',
+      'missing-sha256-hash',
+      'missing-correlation-id',
+    ]);
+    expect(() => buildDiffProposalEvidenceManifest([proposal], '2026-06-09T00:00:00.000Z'))
+      .toThrow('Unsafe diff proposal evidence export');
   });
 
   it('keeps approval refs visible for side-panel evidence grouping', () => {

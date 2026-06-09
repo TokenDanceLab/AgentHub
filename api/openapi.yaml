@@ -5595,10 +5595,10 @@ components:
           description: Optional review state projected from run.agent.file_change for inspector UI.
         can_apply:
           type: boolean
-          description: Whether the projected file-change can be applied by a future client action.
+          description: Review/export-only capability projection. Current Hub responses clamp unguarded runtime apply capability to false and do not expose a real apply action.
         can_revert:
           type: boolean
-          description: Whether the projected file-change can be reverted by a future client action.
+          description: Review/export-only capability projection. Current Hub responses clamp unguarded runtime revert capability to false and do not expose a real revert action.
         artifact_id:
           type: string
         name:
