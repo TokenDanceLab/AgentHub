@@ -347,6 +347,8 @@ function renderToolCallBlock(
             status={block.status}
             path={target}
             description={block.summary}
+            detailRows={toolCallDetailRows(target, block.summary)}
+            evidenceRefs={block.evidenceRefs}
           />
         </div>
       </div>
@@ -363,6 +365,8 @@ function renderToolResultBlock(
         <div className={styles.agentRunDetail}>
           <ToolCardBlock
             description={block.summary}
+            detailRows={toolResultDetailRows(block.summary)}
+            evidenceRefs={block.evidenceRefs}
             status={block.status}
             toolName={`${block.toolName} result`}
           />
@@ -499,6 +503,22 @@ function renderDiffBlock(
       </div>
     </div>
   );
+}
+
+function toolCallDetailRows(
+  target?: string | undefined,
+  summary?: string | undefined,
+): Array<{ label: string; value: string }> {
+  return [
+    ...(target ? [{ label: 'Target', value: target }] : []),
+    ...(summary ? [{ label: 'Summary', value: summary }] : []),
+  ];
+}
+
+function toolResultDetailRows(
+  summary?: string | undefined,
+): Array<{ label: string; value: string }> {
+  return summary ? [{ label: 'Result', value: summary }] : [];
 }
 
 /* ── Approval block ── */
