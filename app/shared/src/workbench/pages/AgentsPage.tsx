@@ -8,6 +8,10 @@ import {
 } from '../designIcons';
 import { resolveWorkbenchProfile } from '../profileRegistry';
 import { RuntimeBrandIcon } from '../RuntimeBrandIcon';
+import {
+  buildAgentCapabilityContractFromConfig,
+  buildAgentCapabilitySummary,
+} from '../agentCapabilities';
 import { agentConfigToAgentSpecFixture } from '../agentProfileCatalog';
 import { formatAgentHubAgentSpecV1 } from '../../agentSpec';
 import { Select } from '../../ui';
@@ -538,7 +542,12 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   onToolPermissionSet,
   onFieldChange,
   recentEvents,
-}) => (
+}) => {
+  const capabilitySummary = buildAgentCapabilitySummary(
+    buildAgentCapabilityContractFromConfig(agent),
+  );
+
+  return (
   <aside className={styles['agent-detail']}>
     <div className={`${styles['detail-head']} ${styles.editable}`}>
       <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
@@ -561,7 +570,20 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
     </div>
 
+    <div className={styles['agent-capability-strip']} aria-label={`${agent.name} capability readiness`}>
+      <CapabilityBadge label="AGENTS.md" value={capabilitySummary.agentsMd} />
+      <CapabilityBadge label="Skills" value={capabilitySummary.skills} />
+      <CapabilityBadge label="MCP" value={capabilitySummary.mcp} />
+      <CapabilityBadge label="Memory" value={capabilitySummary.memory} />
+      <CapabilityBadge label="Tools" value={capabilitySummary.tools} />
+      <CapabilityBadge label="Avatar" value={capabilitySummary.avatar} />
+      <span className={`${styles['capability-readiness']} ${styles[capabilitySummary.readiness]}`}>
+        {capabilitySummary.readiness}
+      </span>
+    </div>
+
     <div className={styles['agent-config-summary']} aria-label={`${agent.name} 配置摘要`}>
+      <ConfigSummaryRow label="AGENTS.md" value={capabilitySummary.agentsMd} />
       <ConfigSummaryRow label="MCP" value={formatList(agent.mcpServers, '未绑定 MCP')} />
       <ConfigSummaryRow label="Memory" value={agent.memorySummary || formatList(agent.memorySources, '未声明 memory')} />
       <ConfigSummaryRow label="Approval" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
@@ -763,7 +785,8 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       </button>
     </div>
   </aside>
-);
+  );
+};
 
 const AgentSpecFixturePanel: React.FC<{ agent: AgentConfig }> = ({ agent }) => {
   const spec = agentConfigToAgentSpecFixture(agent);
@@ -1339,6 +1362,13 @@ const AgentAvatar: React.FC<{
     </span>
   );
 };
+
+const CapabilityBadge: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <span className={styles['capability-badge']} title={`${label}: ${value}`}>
+    <em>{label}</em>
+    <strong>{value}</strong>
+  </span>
+);
 
 const ConfigSummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className={styles['config-summary-row']}>
