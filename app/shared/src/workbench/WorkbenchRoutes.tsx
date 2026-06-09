@@ -128,13 +128,17 @@ function persistDataModeLabel(value: string): void {
 
 function dataModeLabel(): string {
   switch (readWorkbenchDataModeOverride()) {
-    case 'demo':
+    case 'mock':
       return 'Mock';
-    case 'real':
-      return '正常';
+    case 'fixture':
+      return 'Fixture';
+    case 'observed':
+      return 'Observed';
+    case 'approved-real':
+      return 'Approved real';
     case 'auto':
     default:
-      return '自动';
+      return 'Auto';
   }
 }
 
