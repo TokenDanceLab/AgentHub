@@ -46,12 +46,24 @@ export interface AgentConfig {
   name: string;
   role: string;
   engine: string;
+  runtimeId?: string | undefined;
+  provider?: string | undefined;
   model: string;
   mode: string;
   approval: string;
+  approvalMode?: string | undefined;
+  approvalRiskRules?: Array<{ match: string; decision: string }> | undefined;
   scope: string;
   state: AgentState;
   skills: string[];
+  mcpServers?: string[] | undefined;
+  toolAllowlist?: string[] | undefined;
+  memorySources?: string[] | undefined;
+  memoryRetention?: string | undefined;
+  memorySummary?: string | undefined;
+  targetPreferences?: string[] | undefined;
+  avatarRef?: string | undefined;
+  avatarColor?: string | undefined;
   tools: Record<string, ToolPermission>;
 }
 
@@ -60,6 +72,18 @@ export interface MarketTemplate {
   description: string;
   category: string;
   detail: string;
+  runtime?: string | undefined;
+  runtimeId?: string | undefined;
+  provider?: string | undefined;
+  model?: string | undefined;
+  avatarRef?: string | undefined;
+  avatarColor?: string | undefined;
+  skills?: string[] | undefined;
+  mcpServers?: string[] | undefined;
+  toolAllowlist?: string[] | undefined;
+  memorySummary?: string | undefined;
+  approvalSummary?: string | undefined;
+  targetPreferences?: string[] | undefined;
 }
 
 export interface PolicyRule {
@@ -236,14 +260,6 @@ function riskClass(level: RiskLevel): string {
   if (level === '高风险') return 'risk-high';
   if (level === '低风险') return 'risk-low';
   return 'risk-mid';
-}
-
-function marketInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -431,7 +447,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                     {agent.skills.join(' · ') || '未配置 skill'}
                   </small>
                 </div>
-                <em>{agent.model}</em>
+                <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
                 <span className={`${styles.state} ${stateClass(agent.state)}`} />
               </button>
             ))}
@@ -536,9 +552,16 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
     {/* Runtime line */}
     <div className={styles['agent-runtime-line']}>
       <span className={`${styles.state} ${stateClass(agent.state)}`} />
-      <RuntimeBrandIcon kind="runtime" name={agent.engine} size="compact" framed={false} />
+      <RuntimeBrandIcon kind="runtime" name={agent.runtimeId ?? agent.engine} size="compact" framed={false} />
       <strong>{agent.engine}</strong>
-      <em>{agent.model}</em>
+      <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
+    </div>
+
+    <div className={styles['agent-config-summary']} aria-label={`${agent.name} 配置摘要`}>
+      <ConfigSummaryRow label="MCP" value={formatList(agent.mcpServers, '未绑定 MCP')} />
+      <ConfigSummaryRow label="Memory" value={agent.memorySummary || formatList(agent.memorySources, '未声明 memory')} />
+      <ConfigSummaryRow label="Approval" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
+      <ConfigSummaryRow label="Target" value={formatList(agent.targetPreferences, '未声明 target')} />
     </div>
 
     {/* Edit grid */}
@@ -613,6 +636,27 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
       </label>
     </div>
 
+    <section className={styles['agent-skill-editor']}>
+      <div className={styles['section-title-row']}>
+        <h3>MCP / Memory</h3>
+        <span>{agent.memoryRetention || 'policy pending'}</span>
+      </div>
+      <div className={styles['agent-token-grid']}>
+        {(agent.mcpServers ?? []).map((server) => (
+          <span key={`mcp-${server}`} className={styles['agent-token']}>
+            <RuntimeBrandIcon kind="tool" name="MCP Server" size="compact" framed={false} decorative />
+            {server}
+          </span>
+        ))}
+        {(agent.memorySources ?? []).map((source) => (
+          <span key={`memory-${source}`} className={styles['agent-token']}>
+            <RuntimeBrandIcon kind="tool" name="Agent Profile" size="compact" framed={false} decorative />
+            {source}
+          </span>
+        ))}
+      </div>
+    </section>
+
     {/* Skill editor */}
     <section className={styles['agent-skill-editor']}>
       <div className={styles['section-title-row']}>
@@ -626,10 +670,11 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
             className={`${styles['skill-chip']} ${agent.skills.includes(skill) ? styles.active : ''}`}
             type="button"
             onClick={() => onAgentSkillToggle?.(skill)}
-          >
-            {skill}
-          </button>
-        ))}
+            >
+              <RuntimeBrandIcon kind="tool" name={skill} size="compact" framed={false} decorative />
+              {skill}
+            </button>
+          ))}
       </div>
     </section>
 
@@ -798,14 +843,22 @@ const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
               }
             >
               <div className={styles['market-icon']}>
-                {marketInitials(tmpl.name)}
+                <RuntimeBrandIcon kind="runtime" name={tmpl.runtimeId ?? tmpl.runtime ?? tmpl.name} size="compact" framed={false} decorative />
               </div>
               <div>
                 <strong>{tmpl.name}</strong>
                 <span>{tmpl.description}</span>
               </div>
               <em>{tmpl.category}</em>
-              <small>{tmpl.detail}</small>
+              <small>
+                {[
+                  tmpl.runtime,
+                  tmpl.provider,
+                  tmpl.model,
+                  formatList(tmpl.mcpServers, ''),
+                  tmpl.memorySummary,
+                ].filter(Boolean).join(' · ') || tmpl.detail}
+              </small>
               <b>安装</b>
             </button>
           ))}
@@ -824,12 +877,22 @@ const MarketCard: React.FC<{
 }> = ({ template, onInstall, onPreview }) => (
   <article className={`${styles['market-card']} agent-card`} data-card-surface>
     <div className={styles['market-card-head']}>
-      <div className={styles['market-icon']}>{marketInitials(template.name)}</div>
+      <div className={styles['market-icon']}>
+        <RuntimeBrandIcon kind="runtime" name={template.runtimeId ?? template.runtime ?? template.name} size="compact" framed={false} decorative />
+      </div>
       <span>{template.category}</span>
     </div>
     <h3>{template.name}</h3>
     <p>{template.description}</p>
     <small>{template.detail}</small>
+    <div className={styles['market-config-summary']}>
+      <ConfigSummaryRow label="Runtime" value={[template.runtime, template.provider, template.model].filter(Boolean).join(' / ') || 'fixture'} />
+      <ConfigSummaryRow label="Skills" value={formatList(template.skills, '未声明 skill')} />
+      <ConfigSummaryRow label="MCP" value={formatList(template.mcpServers, '未绑定 MCP')} />
+      <ConfigSummaryRow label="Memory" value={template.memorySummary || '未声明 memory'} />
+      <ConfigSummaryRow label="Approval" value={template.approvalSummary || '未声明审批策略'} />
+      <ConfigSummaryRow label="Target" value={formatList(template.targetPreferences, '未声明 target')} />
+    </div>
     <div>
       <button
         type="button"
@@ -1226,14 +1289,26 @@ const AgentAvatar: React.FC<{
         onAgentProfileOpen?.(agent, event.currentTarget);
       }}
       role="button"
-      style={{ background: profile.color }}
+      style={{ background: agent.avatarColor || profile.color }}
       tabIndex={0}
-      title={`${profile.name} ${profile.label}`}
+      title={agent.avatarRef ? `${profile.name} ${agent.avatarRef}` : `${profile.name} ${profile.label}`}
     >
       {profile.initials}
     </span>
   );
 };
+
+const ConfigSummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className={styles['config-summary-row']}>
+    <span>{label}</span>
+    <strong>{value}</strong>
+  </div>
+);
+
+function formatList(items: string[] | undefined, emptyLabel: string): string {
+  if (!items || items.length === 0) return emptyLabel;
+  return items.join(' · ');
+}
 
 function stateClass(state: AgentState): string {
   if (state === 'running') return styles.running ?? '';

@@ -615,6 +615,42 @@
   white-space: nowrap;
 }
 
+.agent-config-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin: 8px 0 2px;
+  border-top: 1px solid var(--bdr);
+  border-bottom: 1px solid var(--bdr);
+}
+
+.config-summary-row {
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--bdr);
+}
+
+.config-summary-row:first-child {
+  border-top: 0;
+}
+
+.config-summary-row span {
+  color: var(--text-3);
+  font: 600 0.6875rem var(--font-sans);
+}
+
+.config-summary-row strong {
+  min-width: 0;
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Edit grid ── */
 
 .agent-edit-grid {
@@ -691,6 +727,9 @@
   color: var(--text-2);
   font: 600 0.75rem var(--font-sans);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   transition:
     background var(--dur-normal) var(--ease),
     border-color var(--dur-normal) var(--ease),
@@ -706,6 +745,25 @@
   border-color: transparent;
   background: var(--primary-light);
   color: var(--primary);
+}
+
+.agent-token-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.agent-token {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-full);
+  background: var(--surface-low);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 0.6875rem var(--font-sans);
 }
 
 /* ── Tool scope / permissions ── */
@@ -1031,6 +1089,20 @@
   min-height: 34px;
   color: var(--text-3);
   font: 400 0.6875rem/1.45 var(--font-sans);
+}
+
+.market-config-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 7px 0;
+  border-top: 1px solid var(--bdr);
+  border-bottom: 1px solid var(--bdr);
+}
+
+.market-config-summary .config-summary-row {
+  min-height: 24px;
+  grid-template-columns: 58px minmax(0, 1fr);
 }
 
 .market-card div:last-child {
