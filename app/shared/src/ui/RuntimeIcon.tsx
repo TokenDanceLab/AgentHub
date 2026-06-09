@@ -1,12 +1,6 @@
 import React from 'react';
-import {
-  ClaudeCode,
-  Codex,
-  GeminiCLI,
-  ModelIcon,
-  OpenCode,
-  ProviderIcon,
-} from '@lobehub/icons';
+import { ClaudeCode, Codex, GeminiCLI, ModelIcon, OpenCode, ProviderIcon } from '@lobehub/icons';
+import { resolveRuntimeIconRegistry } from './runtimeIconRegistry';
 
 export type RuntimeIconKind = 'model' | 'provider' | 'runtime' | 'tool';
 
@@ -49,105 +43,12 @@ export interface RuntimeIconProps {
   decorative?: boolean | undefined;
 }
 
-const LOBE_RUNTIME_KEYS = new Set(['claude-code', 'codex', 'gemini-cli', 'opencode']);
-const LOBE_PROVIDER_KEYS = new Set([
-  'alibaba',
-  'alibabacloud',
-  'anthropic',
-  'azure',
-  'aws',
-  'bedrock',
-  'bytedance',
-  'claude',
-  'cohere',
-  'deepseek',
-  'doubao',
-  'gemini',
-  'google',
-  'meta',
-  'mistral',
-  'moonshot',
-  'openai',
-  'opencode',
-  'perplexity',
-  'qwen',
-  'volcengine',
-  'zhipu',
-]);
-
-const MODEL_PATTERNS = [
-  /^claude[-\s]/,
-  /^deepseek[-\s]/,
-  /^doubao[-\s]/,
-  /^gemini[-\s]/,
-  /^glm[-\s]/,
-  /^gpt[-\s]/,
-  /^kimi[-\s]/,
-  /^o[134][-\s]/,
-  /^qwen[-\s]/,
-];
-
 export function resolveRuntimeIcon({
   kind,
   name,
   provider,
 }: Pick<RuntimeIconProps, 'kind' | 'name' | 'provider'>): RuntimeIconResolution {
-  const label = cleanRuntimeIconLabel(name || provider || kind);
-  const normalizedModel = normalizeRuntimeIconModelKey(name);
-  const normalizedProvider = normalizeRuntimeIconProviderKey(provider || name);
-  const runtimeKey = normalizeRuntimeIconRuntimeKey(name);
-
-  if (kind === 'runtime' && LOBE_RUNTIME_KEYS.has(runtimeKey)) {
-    return {
-      kind,
-      label,
-      source: 'lobehub',
-      value: runtimeKey,
-      fallback: 'runtime',
-      lobeType: 'runtime',
-    };
-  }
-
-  if (kind === 'provider' && normalizedProvider && LOBE_PROVIDER_KEYS.has(normalizedProvider)) {
-    return {
-      kind,
-      label,
-      source: 'lobehub',
-      value: normalizedProvider,
-      fallback: 'provider',
-      lobeType: 'provider',
-    };
-  }
-
-  if (kind === 'model' && normalizedModel && isLikelyLobeModel(normalizedModel)) {
-    return {
-      kind,
-      label,
-      source: 'lobehub',
-      value: normalizedModel,
-      fallback: 'model',
-      lobeType: 'model',
-    };
-  }
-
-  if (kind === 'model' && normalizedProvider && LOBE_PROVIDER_KEYS.has(normalizedProvider)) {
-    return {
-      kind,
-      label,
-      source: 'lobehub',
-      value: normalizedProvider,
-      fallback: 'model',
-      lobeType: 'provider',
-    };
-  }
-
-  return {
-    kind,
-    label,
-    source: 'fallback',
-    value: runtimeIconFallbackValue(kind, label),
-    fallback: runtimeIconFallbackFor(kind, label),
-  };
+  return resolveRuntimeIconRegistry({ kind, name, provider });
 }
 
 export function RuntimeIcon({
@@ -166,7 +67,9 @@ export function RuntimeIcon({
 
   return (
     <span
-      {...(decorative ? { 'aria-hidden': true } : { 'aria-label': label, role: 'img', title: label })}
+      {...(decorative
+        ? { 'aria-hidden': true }
+        : { 'aria-label': label, role: 'img', title: label })}
       className={className}
       data-runtime-brand-fallback={resolution.fallback}
       data-runtime-brand-kind={resolution.kind}
@@ -186,7 +89,8 @@ export function RuntimeIcon({
 function renderRuntimeIcon(resolution: RuntimeIconResolution, iconSize: number): React.ReactNode {
   if (resolution.source === 'lobehub') {
     if (resolution.lobeType === 'runtime') return renderLobeRuntimeIcon(resolution.value, iconSize);
-    if (resolution.lobeType === 'provider') return <ProviderIcon provider={resolution.value} size={iconSize} type="color" />;
+    if (resolution.lobeType === 'provider')
+      return <ProviderIcon provider={resolution.value} size={iconSize} type="color" />;
     return <ModelIcon model={resolution.value} size={iconSize} />;
   }
 
@@ -229,101 +133,6 @@ function runtimeIconFrameStyle(size: RuntimeIconSize, framed: boolean): React.CS
     overflow: 'hidden',
     width: boxSize,
   };
-}
-
-function normalizeRuntimeIconKey(value: string | undefined): string {
-  return cleanRuntimeIconLabel(value)
-    .toLowerCase()
-    .replace(/[._/]+/g, '-')
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function normalizeRuntimeIconModelKey(value: string | undefined): string {
-  return cleanRuntimeIconLabel(value)
-    .toLowerCase()
-    .replace(/[_/]+/g, '-')
-    .replace(/[^a-z0-9.-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function normalizeRuntimeIconRuntimeKey(value: string | undefined): string {
-  const key = normalizeRuntimeIconKey(value);
-  if (key === 'claude' || key === 'claudecode') return 'claude-code';
-  if (key === 'codex-cli' || key === 'openai-codex') return 'codex';
-  if (key === 'gemini' || key === 'geminicli' || key === 'google-gemini-cli') return 'gemini-cli';
-  if (key === 'open-code') return 'opencode';
-  return key;
-}
-
-function normalizeRuntimeIconProviderKey(value: string | undefined): string {
-  const key = normalizeRuntimeIconKey(value);
-  if (!key) return '';
-  if (key.includes('alibaba-cloud')) return 'alibabacloud';
-  if (key.includes('alibaba') || key.includes('qwen')) return 'qwen';
-  if (key.includes('anthropic')) return 'anthropic';
-  if (key.includes('claude')) return 'claude';
-  if (key.includes('azure') || key.includes('microsoft')) return 'azure';
-  if (key.includes('bedrock')) return 'bedrock';
-  if (key.includes('aws')) return 'aws';
-  if (key.includes('bytedance') || key.includes('byte-dance') || key.includes('zijie')) return 'bytedance';
-  if (key.includes('doubao')) return 'doubao';
-  if (key.includes('volcengine')) return 'volcengine';
-  if (key.includes('cohere')) return 'cohere';
-  if (key.includes('deepseek')) return 'deepseek';
-  if (key.includes('gemini')) return 'gemini';
-  if (key.includes('google')) return 'google';
-  if (key.includes('llama') || key.includes('meta')) return 'meta';
-  if (key.includes('glm') || key.includes('zhipu')) return 'zhipu';
-  if (key.includes('kimi') || key.includes('moonshot')) return 'moonshot';
-  if (key.includes('mistral')) return 'mistral';
-  if (key.includes('openai') || key.includes('gpt') || key.includes('codex')) return 'openai';
-  if (key.includes('perplexity') || key.includes('sonar')) return 'perplexity';
-  return key;
-}
-
-function isLikelyLobeModel(value: string): boolean {
-  if (!value || value === 'auto') return false;
-  return MODEL_PATTERNS.some((pattern) => pattern.test(value));
-}
-
-function runtimeIconFallbackFor(kind: RuntimeIconKind, label: string): RuntimeIconFallback {
-  const key = normalizeRuntimeIconKey(label);
-  if (key.includes('tokendance') || key.includes('agenthub') || key.includes('cc-switch')) return 'agenthub';
-  if (key.includes('custom')) return 'custom';
-  if (kind === 'tool') {
-    if (key.includes('read')) return 'read';
-    if (key.includes('write') || key.includes('edit') || key.includes('patch')) return 'write';
-    if (key.includes('shell') || key.includes('bash') || key.includes('terminal')) return 'shell';
-    if (key.includes('grep') || key.includes('glob') || key.includes('search') || key.includes('rg')) return 'search';
-    if (key.includes('browser') || key.includes('web') || key.includes('screenshot')) return 'browser';
-    if (key.includes('diff') || key.includes('git')) return 'diff';
-    if (key.includes('task') || key.includes('subagent')) return 'task';
-    return 'tool';
-  }
-  if (kind === 'provider') return 'provider';
-  if (kind === 'model') return 'model';
-  if (key.includes('browser')) return 'browser';
-  return 'runtime';
-}
-
-function runtimeIconFallbackValue(kind: RuntimeIconKind, label: string): string {
-  const ascii = label.match(/[A-Za-z0-9]+/g);
-  if (ascii?.length) {
-    return ascii
-      .slice(0, kind === 'tool' ? 1 : 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase();
-  }
-  const chars = Array.from(label);
-  return chars.slice(0, 2).join('').toUpperCase() || kind.slice(0, 1).toUpperCase();
-}
-
-function cleanRuntimeIconLabel(value: string | undefined): string {
-  return (value ?? '').trim() || 'Unknown';
 }
 
 function runtimeIconFallbackSvg(name: RuntimeIconFallback, iconSize: number): React.ReactNode {
