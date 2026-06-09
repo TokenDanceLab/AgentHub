@@ -19,7 +19,7 @@ import type {
 } from '@shared/types';
 import { parseError } from '@shared/errors';
 import type { AppError } from '@shared/errors';
-import { edgeAuthHeaders } from './edgeAuth';
+import { edgeAuthHeaders, refreshEdgeAuthToken } from './edgeAuth';
 import {
   HealthResponseSchema,
   RunnerSchema,
@@ -87,6 +87,29 @@ function edgeRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): Req
 }
 
 /**
+ * Auth-aware fetch wrapper. On 401, refreshes the Edge auth token from the
+ * Vite dev middleware and retries the request once. This handles the case
+ * where Desktop restarts Edge (generating a new token) while the Vite dev
+ * server is still running with a stale build-time token.
+ */
+async function edgeFetch(url: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(url, init);
+  if (res.status !== 401) return res;
+  // Attempt token refresh and retry once.
+  const newToken = await refreshEdgeAuthToken();
+  if (!newToken) return res; // No token available — return the 401 as-is.
+  // Rebuild the request with the fresh token.
+  const retryInit = init ? { ...init } : {};
+  const retryHeaders = edgeAuthHeaders(
+    init?.headers instanceof Headers
+      ? Object.fromEntries((init.headers as Headers).entries())
+      : (init?.headers as Record<string, string> | undefined),
+  );
+  if (retryHeaders) retryInit.headers = retryHeaders;
+  return fetch(url, retryInit);
+}
+
+/**
  * Extracts the .data field from a unified {@code {"code":"OK","data":...}} envelope.
  * Returns the raw input unchanged when no envelope is present, preserving backward
  * compatibility with Edge Servers that have not yet adopted the envelope format.
@@ -111,13 +134,13 @@ export async function fetchHealth(): Promise<HealthResponse> {
 }
 
 export async function fetchRunners(): Promise<ListResponse<Runner>> {
-  const res = await fetch(`${BASE}/v1/runners`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/runners`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<Runner>>(listResponseSchema(RunnerSchema), unwrapEdgeResponse(await res.json()), 'runners');
 }
 
 export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
-  const res = await fetch(`${BASE}/v1/agents`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/agents`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   const raw = unwrapEdgeResponse(await res.json());
   const normalized = normalizeAgentList(raw);
@@ -125,7 +148,7 @@ export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
 }
 
 export async function fetchModelCatalog(): Promise<ModelCatalogResponse> {
-  const res = await fetch(`${BASE}/v1/model-catalog`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/model-catalog`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ModelCatalogResponse>(ModelCatalogResponseSchema, unwrapEdgeResponse(await res.json()), 'modelCatalog');
 }
@@ -161,7 +184,7 @@ function normalizeAgentCapabilities(raw: unknown): AgentInfo['capabilities'] {
 
 export async function fetchThreads(projectId?: string): Promise<ListResponse<ThreadInfo>> {
   const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-  const res = await fetch(`${BASE}/v1/threads${params}`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/threads${params}`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<ThreadInfo>>(listResponseSchema(ThreadInfoSchema), unwrapEdgeResponse(await res.json()), 'threads');
 }
@@ -176,7 +199,7 @@ export async function createThread(input?: string | CreateThreadRequest, threadI
   const body: CreateThreadRequest = typeof input === 'object'
     ? input
     : { title: input ?? '', threadId: threadId ?? '' };
-  const res = await fetch(`${BASE}/v1/threads`, {
+  const res = await edgeFetch(`${BASE}/v1/threads`, {
     method: 'POST',
     ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({
@@ -190,7 +213,7 @@ export async function createThread(input?: string | CreateThreadRequest, threadI
 }
 
 export async function fetchThreadItems(threadId: string): Promise<ListResponse<ThreadItemInfo>> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/items`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/items`, {
     ...edgeRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
@@ -198,7 +221,7 @@ export async function fetchThreadItems(threadId: string): Promise<ListResponse<T
 }
 
 export async function fetchThreadPins(threadId: string): Promise<ListResponse<ThreadPinInfo>> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
     ...edgeRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
@@ -206,7 +229,7 @@ export async function fetchThreadPins(threadId: string): Promise<ListResponse<Th
 }
 
 export async function pinThreadItem(threadId: string, itemId: string, pinnedBy?: string): Promise<ThreadPinInfo> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
     method: 'POST',
     ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({ itemId, pinnedBy }),
@@ -216,7 +239,7 @@ export async function pinThreadItem(threadId: string, itemId: string, pinnedBy?:
 }
 
 export async function deleteThreadPin(threadId: string, itemId: string): Promise<void> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins?itemId=${encodeURIComponent(itemId)}`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins?itemId=${encodeURIComponent(itemId)}`, {
     method: 'DELETE',
     ...edgeRequestInit(),
   });
@@ -228,7 +251,7 @@ export async function fetchRuns(projectId?: string, threadId?: string): Promise<
   if (projectId) params.set('projectId', projectId);
   if (threadId) params.set('threadId', threadId);
   const qs = params.toString();
-  const res = await fetch(`${BASE}/v1/runs${qs ? `?${qs}` : ''}`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/runs${qs ? `?${qs}` : ''}`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<RunInfo>>(listResponseSchema(RunInfoSchema), unwrapEdgeResponse(await res.json()), 'runs');
 }
@@ -238,13 +261,13 @@ export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
     method: 'POST',
   };
   if (req) init.body = JSON.stringify(req);
-  const res = await fetch(`${BASE}/v1/runs`, edgeRequestInit(init, req ? { 'Content-Type': 'application/json' } : undefined));
+  const res = await edgeFetch(`${BASE}/v1/runs`, edgeRequestInit(init, req ? { 'Content-Type': 'application/json' } : undefined));
   if (!res.ok) throw await parseError(res);
   return safeParse<RunInfo>(RunInfoSchema, unwrapEdgeResponse(await res.json()), 'startRun');
 }
 
 export async function cancelRun(runId: string): Promise<RunInfo> {
-  const res = await fetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
+  const res = await edgeFetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
     method: 'POST',
     ...edgeRequestInit(),
   });
@@ -253,7 +276,7 @@ export async function cancelRun(runId: string): Promise<RunInfo> {
 }
 
 export async function fetchRunDiff(runId: string): Promise<RunDiff> {
-  const res = await fetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}/diff`, {
+  const res = await edgeFetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}/diff`, {
     ...edgeRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
@@ -261,19 +284,19 @@ export async function fetchRunDiff(runId: string): Promise<RunDiff> {
 }
 
 export async function fetchArtifacts(): Promise<ListResponse<Artifact>> {
-  const res = await fetch(`${BASE}/v1/artifacts`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/artifacts`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<Artifact>>(listResponseSchema(ArtifactSchema), unwrapEdgeResponse(await res.json()), 'artifacts');
 }
 
 export async function fetchPreviews(): Promise<ListResponse<Preview>> {
-  const res = await fetch(`${BASE}/v1/previews`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/previews`, edgeRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<Preview>>(listResponseSchema(PreviewSchema), unwrapEdgeResponse(await res.json()), 'previews');
 }
 
 export async function renameThread(threadId: string, title: string): Promise<ThreadInfo> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'PATCH',
     ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({ title }),
@@ -283,7 +306,7 @@ export async function renameThread(threadId: string, title: string): Promise<Thr
 }
 
 export async function updateThreadStatus(threadId: string, status: 'active' | 'archived'): Promise<ThreadInfo> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'PATCH',
     ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({ status }),
@@ -293,7 +316,7 @@ export async function updateThreadStatus(threadId: string, status: 'active' | 'a
 }
 
 export async function archiveThread(threadId: string): Promise<ThreadInfo> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
     method: 'POST',
     ...edgeRequestInit(),
   });
@@ -302,7 +325,7 @@ export async function archiveThread(threadId: string): Promise<ThreadInfo> {
 }
 
 export async function deleteThread(threadId: string): Promise<'deleted' | 'archived'> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'DELETE',
     ...edgeRequestInit(),
   });
@@ -330,7 +353,7 @@ export interface PermissionDecideRequest {
 }
 
 export async function decidePermission(req: PermissionDecideRequest): Promise<void> {
-  const res = await fetch(`${BASE}/v1/permissions/decide`, {
+  const res = await edgeFetch(`${BASE}/v1/permissions/decide`, {
     method: 'POST',
     ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(req),

@@ -33,6 +33,29 @@ export function getEdgeAuthToken(): string {
   }
 }
 
+/**
+ * Refresh the Edge auth token from the Vite dev server middleware (`/__edge_token`).
+ * This is only useful in dev mode — in production Tauri the token is always
+ * available via the `invoke('get_edge_auth_token')` bridge.
+ *
+ * Returns the new token, or empty string if unavailable.
+ */
+export async function refreshEdgeAuthToken(): Promise<string> {
+  // Only attempt in dev mode with a Vite dev server running.
+  if (!import.meta.env.DEV) return getEdgeAuthToken();
+  try {
+    const res = await fetch('/__edge_token');
+    if (!res.ok) return getEdgeAuthToken();
+    const token = (await res.text()).trim();
+    if (token) {
+      setEdgeAuthToken(token);
+    }
+    return token;
+  } catch {
+    return getEdgeAuthToken();
+  }
+}
+
 export function edgeAuthHeaders(base?: HeadersInit): HeadersInit | undefined {
   const token = getEdgeAuthToken();
   if (!token) return base;
