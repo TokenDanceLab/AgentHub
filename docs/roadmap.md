@@ -1,145 +1,106 @@
-# AgentHub 48h Remote-Control Roadmap
+# AgentHub 产品路线图
 
-> Last updated: 2026-06-09 07:50 +08:00
-> Stable baseline: `origin/dev/delicious233` / `v0.3.0-rc.5` at `19079563`
-> Active integration candidate: `origin/codex/p1-critical-evidence-integration` at `42d2c768`
-> Current delta: integration is `ahead 78 / behind 0` from stable baseline
-> Next tag candidate after accepted merge only: `v0.3.0-rc.6`
+本文只写未来路线、优先级、模块拆分和产品边界。当前分支状态、
+提交 SHA、工作区治理、具体派工任务写在仓库根目录 `STATE.md`。
 
-This file is the sprint control board. Long history is archived in
-`docs/archive/roadmap-pre-refresh-20260608-1008.md` and
-`docs/archive/roadmap-full-history-20260605.md`. Detailed proof remains in
-`docs/audit/`.
+## 产品北极星
 
-## Mission
-
-Ship a usable remote-control loop:
+AgentHub 要成为跨平台 AI 编码 Agent 的远程控制工作台：
 
 ```text
-Web -> Hub -> registered Desktop target -> Desktop Local Edge sidecar
-    -> CLI/SDK adapter -> Hub events/replay -> Web rendering
+Web / Mobile / IM
+  -> Hub 身份、路由、回放、权限
+  -> 已注册 Desktop 目标
+  -> 本地 Edge sidecar
+  -> CLI / Agent SDK / 自定义 Runtime
+  -> 类型化事件、产物、审批、执行记录
+  -> Web / Mobile / IM 渲染和控制
 ```
 
-Mobile is owned by thread `019ea616-0dbf-7263-a785-87fdb2e9d8a4`; coordinate
-only protocol drift. Web must stay Hub-only. Desktop must execute through the
-Local Edge sidecar. Real TokenDanceID login, real CLI/model spend, public
-deploy, signing, notarization, updater metadata, and release upload remain
-explicit approval gates.
+用户体验目标不是“选择运行时下拉框”，而是“在联系人、群聊或工作台
+线程里和 Agent 队友协作”。目标健康、运行时、权限、执行计划、差异、
+预览和产物都应该出现在同一条任务流里。
 
-## Baseline And Branch Control
+## P0：可用远程控制主链
 
-| Item | Current truth | Action |
+目标：用户可以通过 Web 控制一台 Desktop 目标，由本地 Edge 调用
+CLI/SDK Runtime，并把结果回放到 Web。
+
+| 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| Stable dev | `origin/dev/delicious233 = 19079563`, tagged `v0.3.0-rc.5` | Keep stable. Do not move tag. |
-| Main worktree | `D:\Code\TokenDance\AgentHub` is stale, behind remote, and dirty | Quarantine. Do not develop or merge there. |
-| Integration candidate | `origin/codex/p1-critical-evidence-integration = cc13a48e` | Review, gate, then merge to dev if accepted. |
-| Next release marker | `v0.3.0-rc.6` | Create only after explicit release approval. |
-| Git maintenance | Auto-gc reports bad tree `fff550960821b6454a476d755465c71d9deaa258` | No destructive repair without approval. |
+| IM / @Agent 主链 | Agent/联系人式入口、目标选择、任务输入、启动运行、路由状态、回放面板 | 用户能从一个 Web 页面启动任务，不需要理解后端运行时术语。 |
+| Target Health | Hub、Desktop、Web 统一展示目标、运行时、Profile、Workspace 健康 | Web/Desktop 能清楚展示 ready/offline/degraded/missing/signed-out，并给出下一步。 |
+| Transcript Blocks | 路由、子任务、权限请求、工具调用、文件变更、产物、预览、失败、完成等类型化时间线 | 用户看到的是结构化工作记录，不是原始 JSON 或控制台噪声。 |
+| Approval Loop | Edge 发起权限请求，Web 通过 Hub approve/deny，Edge resume/abort，回放记录决策 | 远程执行危险动作或用户可见动作前可以被控制。 |
+| Desktop Local Edge | Desktop 登录、注册目标、启动/诊断 Local Edge、保留日志和 app data、Windows 打包 | Desktop 可以作为本地执行锚点使用，不依赖用户手动开终端。 |
+| Mock / Real 分离 | mock、fixture、observed、approved-real、production 模式在 UI 和 gate 中显式标记 | real mode 不能静默降级到 mock。 |
+| Product-loop E2E | 本地可复现 E2E 覆盖 Web -> Hub -> Desktop -> Edge -> adapter -> replay -> Web | 发布前有一个聚焦 smoke gate 证明核心产品链路。 |
 
-## What Is Already In The Candidate
+## P1：真实开发可用性
 
-The integration candidate bundles the reviewed P1 remote-control evidence line:
+目标：让远程控制链路足够支撑日常 dogfood，而不是只跑通演示。
 
-| Area | Evidence now present | Still not claimed |
+| 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| Hub dispatch proof | `agent.dispatch` carries `target_id` and `edge_device_id`; Desktop rejects mismatched proof before handoff | Real deployed multi-device dispatch |
-| Desktop Local Edge readiness | UI distinguishes signed-out/loading/error/offline/missing/degraded/ready using exact `deviceId` and target health | Signed installer or macOS package |
-| Edge CLI/SDK contract | Provider-neutral JSON fixture mapping for Claude/OpenAI/OpenCode/custom Agent shapes, recursive redaction, safe trace refs | Real SDK/model invocation |
-| Web event rendering | TeamRun console renders runtime summaries, target IDs, Edge run IDs, tool results, file changes, and failures | Live selected-run WebSocket proof |
-| Local stack gates | Fixture/readiness/approved-real runner plus live-chain topology verifier | Real login or real CLI by default |
-| Real evidence boundary | Manifest-only observed evidence now reports `observed_manifest_accepted=true` and keeps `real_tested=false` | Artifact/log/hash-dereferenced real verifier |
-| Login harness | Approval-gated real login E2E harness with secret redaction and safe artifact roots | Disposable TokenDanceID account proof |
-| Tauri packaging | Unsigned Windows package evidence plus sidecar runtime evidence gate for app-data SQLite, logs, sidecar name, and macOS policy | Signing/notary/updater/release upload |
-| Web Projects state | Real/signed-out mode requires Hub sign-in instead of silently falling back to mock data | Full Projects CRUD UX polish |
-| Edge durable store | SQLite row-first store alpha persists Store contract rows before legacy snapshot fallback | Production durability rollout policy |
-| Runtime icons | LobeHub-backed runtime/provider icons plus custom fallback coverage | Broader UI visual QA |
+| Artifact / Diff / Preview | Transcript 内一等公民的 artifact、diff、preview、file-change 卡片 | 用户可以在任务上下文里检查输出、拟议修改、预览和生成资产。 |
+| Edge SQLite 持久化 | Edge Store 从 alpha 进入有迁移保护的 durable 模式 | runs、items、pins、approvals、artifacts、replay state 重启后仍可靠。 |
+| Agent SDK / 自定义 Runtime | OpenAI Agents SDK、Claude Agent SDK、OpenCode、CLI Adapter、自定义 Agent 纳入统一 Runtime Registry | 新运行时可注册 metadata、capabilities、icon、approval policy、adapter strategy，不把 provider 规则写死在产品层。 |
+| Hub Replay / Event Contract | 稳定 run、route、subtask、approval、artifact、preview、file、failure 事件分类 | Web/Mobile/IM 使用同一事件契约渲染。 |
+| Web Real-mode Workbench | Projects、Agents、Targets、Runs、Transcripts、Approvals、Artifacts 全部接 Hub | Web 不再主要依赖 mock 工作台。 |
+| Desktop Workspace Control | Workspace picker、trusted boundary、recent projects、sidecar logs、runtime diagnostics、package readiness | Desktop 用户能理解并恢复本地运行状态。 |
+| Runtime / Model Icons | 基于 LobeHub 的 provider/model/runtime/tool logo 和稳健 fallback | 模型和运行时界面更专业、更易扫描。 |
 
-## 48h Priority Order
+## P2：发布和多平台扩展
 
-| Priority | Workstream | Owner mode | Definition of done |
-|---|---|---|---|
-| P0 | Merge-gate `p1-critical-evidence-integration` | Controller + reviewer | Read-only review returns no blocker; focused gates pass; branch merges to `dev/delicious233`; no rc.6 tag without approval. |
-| P0 | Local product-loop evidence | Worker + controller | One reproducible local run proves Hub/Web/Desktop/Local Edge/adapter fixture flow and produces sanitized evidence. |
-| P0 | Desktop usable package | Worker | Windows unsigned installer/portable package can launch Desktop, show Hub sign-in state, start/diagnose Local Edge, and preserve logs. |
-| P0 | Web real-mode remote UX | Worker | Web can select a Hub target, dispatch a task, and render replay/error states without mock fallback or direct Local Edge calls. |
-| P0 | Real evidence verifier | Worker + reviewer | `real_tested=true` requires dereferencing artifact/log/hash and matching correlation/event ids; manifest text alone cannot promote. |
-| P1 | Edge durable store alpha | integrated | SQLite row-first store covers store contract key paths without regressing FileStore or migration guard. |
-| P1 | SDK/custom Agent product path | Researcher + worker | OpenAI/Claude/OpenCode/custom Agent registration fields and adapter contract are documented and mapped to concrete implementation slices. |
-| P1 | Runtime/tool icons | integrated | LobeHub icons cover major model/runtime/tool brands with fallback and tests. |
-| P1 | Release/deploy gates | Worker + controller | Web build/deploy, Tauri signing/notary/updater, and real CLI spend gates are documented as approval-controlled operations. |
+目标：让 Web、Desktop、Mobile、IM 进入可控 beta。
 
-## Parallel Topology
-
-Current active delegation wave:
-
-| Agent | Lane | Write scope |
+| 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| Local product-loop evidence worker | Reproducible local fixture/approved-real harness | `scripts/**`, `tests/scripts/**`, local-stack/product-loop audit docs only. |
-| Web remote UX worker | Web target selection, dispatch, run replay, real/mock states | `app/web/src/**`, narrow shared workbench files/tests only. |
-| Desktop Profile/Target worker | Desktop AgentProfile/ExecutionTarget/readiness wiring | `app/desktop/src/**`, `app/desktop/src-tauri/src/**` only. |
-| Real evidence verifier worker | Artifact/log/hash dereference for real evidence | `scripts/**`, `tests/scripts/**`, real-evidence audit docs only. |
-| Worktree cleanup auditor | Cleanup topology | Read-only. |
-| Deploy/release gap auditor | Web/Desktop release readiness | Read-only. |
+| Web 部署 | 生产环境变量、OIDC callback、静态构建、Hub API 路由、部署 gate | Web 可以在审批后部署，并有回滚路径。 |
+| Windows 安装器 | 先有 unsigned beta package，再进入签名、updater metadata、release upload | Windows 用户可以正常安装和启动 Desktop。 |
+| macOS 打包 | sidecar 命名、entitlements、app data 路径、notarization、签名、smoke plan | macOS 不是默认假设兼容，而是有单独验证路径。 |
+| TokenDanceID 登录 | Web/Desktop 真实 OIDC 登录、登出、session refresh | 使用 disposable 账号完成真实登录证明，不泄露 secret。 |
+| Mobile 协议对齐 | Mobile 消费同一套 Hub target、run、approval、replay 合同 | Mobile 能远程监控和控制，不分叉产品语义。 |
+| Feishu / IM 入口 | Feishu/Lark bot 或工作台卡片可以启动/跟随 Hub 任务 | IM 是协作入口，不是第二套登录或 runtime 系统。 |
+| Release Governance | 版本号、tag、changelog、artifact、gate、rollback policy | `dev`、`master`、rc tag 都有稳定且可审计的含义。 |
 
-Controller owns this roadmap, integration branches, tags, final gates, cleanup,
-and conflict resolution. Workers must not push, merge, tag, edit this roadmap,
-or touch the dirty main worktree.
+## P3：平台化和生态
 
-## Verification Gates
+目标：让 AgentHub 从单机远控产品扩展为可治理、可扩展的平台。
 
-Run from `D:\Code\TokenDance\AgentHub\.worktrees\p1-critical-evidence-integration`.
+| 模块 | 路线项 | 完成标准 |
+|---|---|---|
+| Multi-agent Orchestration | TeamRun plan、worker split、parallel steps、review loops、trace visualization | 用户能观察和控制多 Agent 协作，而不只是看单次运行日志。 |
+| Runtime Marketplace | 发布、安装、共享 AgentProfile、Runtime Adapter、Tools、Prompts、Skills | 团队能复用并治理 Agent 能力。 |
+| MCP / Tool Registry | 工具 schema、权限、icon、审计行为统一注册 | 工具调用类型化、可审查、可跨 runtime 复用。 |
+| Sandbox / Policy | Workspace trust、文件系统边界、approval policy、网络/runtime 约束 | 本地执行能力强但可控。 |
+| Observability | correlation id、event search、run diagnostics、logs、metrics、health dashboards | Web、Hub、Desktop、Edge、Runtime 的失败能串起来排查。 |
+| Enterprise / Multi-tenant | org、role、audit、quota、workspace ownership、deployment boundary | AgentHub 能从单用户本地 setup 扩到团队和组织。 |
 
-Minimum merge-gate:
+## 负责人模型
 
-```powershell
-git diff --check origin/dev/delicious233...HEAD
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-live-chain-topology.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-local-stack-e2e-readiness.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-edge-cli-dispatch-evidence.ps1 -RepoRoot .
-corepack.cmd pnpm --dir app\web typecheck
-corepack.cmd pnpm --dir app\web exec vitest run src\views\TeamRunConsole.test.tsx --reporter=dot
-cd app\desktop
-corepack.cmd pnpm typecheck
-corepack.cmd pnpm exec vitest run src\__tests__\useHubIntegration.test.ts --reporter=dot
-```
-
-Expanded gates before `v0.3.0-rc.6` approval:
-
-```powershell
-cd hub-server
-go test ./internal/handler ./internal/service ./internal/repository -short -count=1
-cd ..\edge-server
-go test ./internal/store -short -count=1
-go test ./internal/adapters ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
-cd ..\app\shared
-corepack.cmd pnpm exec vitest run src\ui\RuntimeIcon.test.tsx src\workbench\RuntimeBrandIcon.test.tsx --reporter=dot
-cd ..\desktop
-corepack.cmd pnpm exec vitest run src\utils\workspaceStore.test.ts src\components\settings\sections\WorktreeSection.test.tsx --reporter=dot
-cd ..\..
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-login-e2e-readiness.ps1 -RepoRoot .
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-tauri-package-readiness.ps1 -RepoRoot .
-```
-
-Approved-real gates are separate. They require disposable login credentials,
-explicit real CLI/model approval, sanitized artifact roots, and post-run evidence
-review before any `real_tested=true` claim.
-
-## Open Decisions
-
-| Decision | Default until approved |
+| 负责人 | 产品区域 |
 |---|---|
-| Merge `cc13a48e` into `dev/delicious233` | Wait for reviewer and gate evidence. |
-| Merge `42d2c768` into `dev/delicious233` | Candidate is ready for next review/gate pass; controller owns final merge instruction. |
-| Push `v0.3.0-rc.6` | Blocked. Needs explicit release approval. |
-| Real TokenDanceID login test | Blocked. Needs disposable account/env approval. |
-| Real OpenAI/Claude/OpenCode invocation | Blocked. Needs spend/API approval and redacted evidence path. |
-| Tauri signing/notary/updater/release upload | Blocked. Needs signing identity and release approval. |
-| Worktree cleanup | Blocked until cleanup audit is refreshed; do not delete unique dirty work. |
+| Controller Codex | 总路线图、分支集成、Desktop/Tauri/Local Edge 路径、发布 gate、最终验证 |
+| Trump | Web 和 shared 前端产品体验 |
+| Johnny | Hub、Edge、事件合同、后端路由、持久化 |
+| Mobile 负责人 | Mobile app 和移动端专属体验，通过共享 Hub 合同对齐 |
+| Evidence/docs 负责人 | 比赛材料、截图、demo、外部报告、提交包 |
 
-## Next Controller Actions
+## 依赖顺序
 
-1. Collect current worker outputs and integrate only disjoint, verified slices.
-2. Run minimum merge-gate again after each integration batch.
-3. Prepare merge instruction for `dev/delicious233` when review remains clear.
-4. After dev merge, request explicit approval before creating `v0.3.0-rc.6`.
-5. Run local fixture product-loop evidence before any real login or model spend.
+1. 冻结干净 baseline 和分支拓扑。
+2. 稳定 Hub/Edge event contract 和 approval contract。
+3. Web 按合同实现一屏主链。
+4. Desktop Local Edge 启动、诊断和打包硬化。
+5. 对组合后的栈运行 product-loop E2E。
+6. 扩展持久化、SDK/custom runtime、artifact、部署、Mobile/IM 集成。
+
+## 非协商边界
+
+- Web 只和 Hub 通信，不直接连接 Local Edge 或 raw runtime。
+- Desktop renderer 不获得 raw process execution 权限。
+- Local Edge 负责本地执行、adapter 调用、runtime policy、日志和证据。
+- Mock 和 fixture 模式必须显式；real mode 不能静默降级。
+- 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
+- Roadmap 只写未来路线；当前事实写在 `STATE.md`。
