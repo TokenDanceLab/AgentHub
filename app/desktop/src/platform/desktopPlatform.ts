@@ -27,6 +27,7 @@ export function resolveDesktopPreviewTranscript(conversationId: string): Transcr
 export interface DesktopPlatformOptions {
   activeProjectId?: string;
   getEdgeHostReadiness?: () => Promise<DesktopEdgeHostReadiness>;
+  getLocalEdgeDiagnostics?: () => Promise<DesktopLocalEdgeDiagnostics>;
   activeThreadId?: string;
   openPreview?: (evidence: EvidenceRef) => Promise<void>;
   pickLocalAttachments?: NonNullable<AgentHubPlatform['attachments']>['pickFiles'];
@@ -59,9 +60,44 @@ export interface DesktopEdgeHostReadiness {
   direct_cli_spawn: false;
 }
 
+export interface DesktopLocalEdgeDiagnostics {
+  readiness: DesktopEdgeHostReadiness;
+  status: {
+    running: boolean;
+    pid: number | null;
+    port: number;
+    health_url: string;
+    last_error: string | null;
+    log_paths: DesktopEdgeHostReadiness['log_paths'];
+  };
+  packaged_login: {
+    loopback: {
+      available: boolean;
+      bind_host: string;
+      port: number | null;
+      redirect_uri: string | null;
+      error: string | null;
+    };
+    credential_store: {
+      available: boolean;
+      service: string;
+      error: string | null;
+    };
+    real_e2e: {
+      status: string;
+      reason: string;
+    };
+  };
+  log_tail: {
+    stdout: string[];
+    stderr: string[];
+  };
+}
+
 export interface DesktopHostPort {
   executionTargetPreference(): DesktopTargetPreference;
   edgeHostReadiness(): Promise<DesktopEdgeHostReadiness>;
+  localEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics>;
 }
 
 export interface DesktopPlatform extends AgentHubPlatform {
@@ -78,6 +114,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
     },
     host: {
       edgeHostReadiness: options.getEdgeHostReadiness ?? readEdgeHostReadiness,
+      localEdgeDiagnostics: options.getLocalEdgeDiagnostics ?? readLocalEdgeDiagnostics,
       executionTargetPreference: resolveDesktopTargetPreference,
     },
     conversations: {
@@ -120,6 +157,10 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
 
 function readEdgeHostReadiness(): Promise<DesktopEdgeHostReadiness> {
   return invoke<DesktopEdgeHostReadiness>('get_edge_host_readiness');
+}
+
+function readLocalEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics> {
+  return invoke<DesktopLocalEdgeDiagnostics>('get_local_edge_diagnostics');
 }
 
 function edgeSelectedAgent(intent: ComposerIntent): Pick<StartRunRequest, 'agentId' | 'model'> {
