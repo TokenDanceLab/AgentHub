@@ -146,6 +146,12 @@ func TestAttachmentErrors(t *testing.T) {
 	if AttachHashMismatch.HTTPStatus != http.StatusBadRequest {
 		t.Errorf("AttachHashMismatch.HTTPStatus = %d", AttachHashMismatch.HTTPStatus)
 	}
+	if AttachTypeNotAllowed.Code != "ATTACH_TYPE_NOT_ALLOWED" {
+		t.Errorf("AttachTypeNotAllowed.Code = %q", AttachTypeNotAllowed.Code)
+	}
+	if AttachTypeNotAllowed.HTTPStatus != http.StatusUnsupportedMediaType {
+		t.Errorf("AttachTypeNotAllowed.HTTPStatus = %d", AttachTypeNotAllowed.HTTPStatus)
+	}
 }
 
 func TestWSErrors(t *testing.T) {
@@ -180,7 +186,7 @@ func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 		GroupNotOwner, GroupOwnerCannotLeave, GroupAlreadyMember,
 		UserNotFound, UserUsernameTaken, UserInvalidParam,
 		FriendAlready, FriendBlocked, FriendRequestNotFound, FriendRemarkNoRow, FriendNotFriend,
-		AttachNotFound, AttachTooLarge, AttachHashMismatch,
+		AttachNotFound, AttachTooLarge, AttachHashMismatch, AttachTypeNotAllowed,
 		NotifNotFound,
 		WsAuthTimeout, WsAuthFailed,
 		OIDCInvalidState, OIDCCodeExchangeFailed, OIDCIDTokenInvalid, OIDCSubNotFound,

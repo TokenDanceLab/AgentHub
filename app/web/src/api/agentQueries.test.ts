@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccessToken } from '@/hooks/useAuth';
-import { fetchAgentList, mapHubAgentProfileToAgentInfo } from './agentQueries';
+import {
+  agentConfigToCreateAgentProfileRequest,
+  agentConfigToUpdateAgentProfileRequest,
+  fetchAgentList,
+  mapHubAgentProfileToAgentInfo,
+} from './agentQueries';
 
 vi.mock('@/hooks/useAuth', () => ({
   getAccessToken: vi.fn(),
@@ -22,9 +27,12 @@ describe('web agent profile queries', () => {
       provider: 'openai',
       model: 'gpt-5.5',
       reasoning_effort: 'high',
+      approval_policy: 'on-request',
       permission_mode: 'plan',
+      skills: '["Code Review","Security"]',
       mcp_servers: '[{"name":"github"}]',
       tool_allowlist: '["Read","Grep"]',
+      memory_policy: '{"sources":["agents-md","project-memory"],"retention":"project-policy","summary":"Reads AGENTS.md and project memory"}',
       target_preferences: '{"work_dir":"D:\\\\Code\\\\TokenDance\\\\AgentHub"}',
       version: 3,
     });
@@ -37,8 +45,14 @@ describe('web agent profile queries', () => {
       provider: 'openai',
       model: 'gpt-5.5',
       reasoningEffort: 'high',
+      approvalPolicy: 'on-request',
       permissionMode: 'plan',
+      skills: ['Code Review', 'Security'],
+      mcpServers: ['github'],
       toolAllowlist: ['Read', 'Grep'],
+      memorySources: ['agents-md', 'project-memory'],
+      memoryRetention: 'project-policy',
+      memorySummary: 'Reads AGENTS.md and project memory',
       targetPreferences: { work_dir: 'D:\\Code\\TokenDance\\AgentHub' },
       description: 'Reviews risky patches - Runtime: codex - Model: openai/gpt-5.5',
       version: '3',
@@ -105,5 +119,90 @@ describe('web agent profile queries', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(res.items).toHaveLength(0);
     expect(res.page.hasMore).toBe(false);
+  });
+
+  it('maps editable Agent config into the current Hub JSON-string request contract', () => {
+    const req = agentConfigToCreateAgentProfileRequest({
+      id: 'draft-agent-1',
+      name: ' Builder ',
+      role: 'Code owner',
+      engine: 'claude code',
+      model: 'openai / gpt-5.5',
+      mode: 'Reasoning high',
+      approval: 'Hub 默认策略',
+      scope: 'trusted',
+      state: 'ready',
+      skills: ['Review', 'Review', ' Security '],
+      mcpServers: ['filesystem', 'github'],
+      approvalMode: 'workspace-write',
+      approvalRiskRules: [{ match: 'write workspace files', decision: 'require-approval' }],
+      targetPreference: 'local-edge',
+      targetPreferences: ['local-edge', 'remote-edge'],
+      tools: {
+        Read: '允许',
+        Write: '需确认',
+        Bash: '禁止',
+      },
+    });
+
+    expect(req).toMatchObject({
+      name: 'Builder',
+      description: 'Code owner',
+      runtime_id: 'claude-code',
+      provider: 'openai',
+      model: 'gpt-5.5',
+      reasoning_effort: 'high',
+      permission_mode: 'trusted',
+      skills: '["Review","Security"]',
+      mcp_servers: '["filesystem","github"]',
+      tool_allowlist: '["Read"]',
+      approval_policy: '{"mode":"workspace-write","risk_rules":[{"match":"write workspace files","decision":"require-approval"}]}',
+      target_preferences: '{"preferences":["local-edge","remote-edge"],"primary":"local-edge","label":"local-edge"}',
+    });
+  });
+
+  it('does not write display fallback labels back to Hub on update', () => {
+    const req = agentConfigToUpdateAgentProfileRequest({
+      id: 'agent-profile-1',
+      name: 'Hub Agent',
+      role: 'Hub owner scope',
+      engine: 'Hub AgentProfile',
+      model: '未配置模型',
+      mode: 'Hub 默认策略',
+      approval: 'Hub 默认策略',
+      scope: 'Hub owner scope',
+      state: 'ready',
+      skills: [],
+      tools: {},
+    });
+
+    expect(req).toMatchObject({
+      name: 'Hub Agent',
+    });
+    expect(req).not.toHaveProperty('description');
+    expect(req).not.toHaveProperty('runtime_id');
+    expect(req).not.toHaveProperty('permission_mode');
+    expect(req).not.toHaveProperty('model');
+    expect(req).not.toHaveProperty('provider');
+    expect(req).not.toHaveProperty('approval_policy');
+    expect(req).not.toHaveProperty('target_preferences');
+  });
+
+  it('strips Hub runtime display hints before persisting descriptions', () => {
+    const req = agentConfigToUpdateAgentProfileRequest({
+      id: 'agent-profile-2',
+      name: 'Reviewer',
+      role: 'Reviews risky patches - Runtime: codex - Model: openai/gpt-5.5',
+      engine: 'codex',
+      model: 'openai / gpt-5.5',
+      mode: 'Reasoning high',
+      approval: 'Hub 默认策略',
+      scope: 'default',
+      state: 'ready',
+      skills: [],
+      tools: {},
+    });
+
+    expect(req.description).toBe('Reviews risky patches');
   });
 });

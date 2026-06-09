@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -15,12 +16,21 @@ import (
 // DeviceService encapsulates device business logic, keeping DB access
 // out of the HTTP handler layer.
 type DeviceService struct {
-	db *gorm.DB
+	db                     *gorm.DB
+	desktopTargetRegistrar desktopTargetRegistrar
+}
+
+type desktopTargetRegistrar interface {
+	UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *model.Device) (*model.ExecutionTarget, error)
 }
 
 // NewDeviceService creates a new DeviceService backed by the given database.
 func NewDeviceService(db *gorm.DB) *DeviceService {
 	return &DeviceService{db: db}
+}
+
+func (s *DeviceService) SetDesktopTargetRegistrar(registrar desktopTargetRegistrar) {
+	s.desktopTargetRegistrar = registrar
 }
 
 // Register creates or updates a device record for the given user and returns it.
@@ -45,6 +55,12 @@ func (s *DeviceService) Register(deviceID, userID, deviceType, appVersion string
 		return nil, err
 	}
 
+	if device.DeviceType == "desktop" && s.desktopTargetRegistrar != nil {
+		if _, err := s.desktopTargetRegistrar.UpsertLocalEdgeForDesktopDevice(context.Background(), device); err != nil {
+			return nil, err
+		}
+	}
+
 	return device, nil
 }
 
@@ -56,9 +72,7 @@ func (s *DeviceService) Get(deviceID string) (*model.Device, error) {
 // List returns all devices belonging to the given user, ordered by most
 // recently active first.
 func (s *DeviceService) List(userID string) ([]model.Device, error) {
-	var devices []model.Device
-	err := s.db.Where("user_id = ?", userID).Order("last_active_at DESC").Find(&devices).Error
-	return devices, err
+	return repository.ListDevicesByUser(s.db, userID)
 }
 
 // ListDevices is an alias for List to match the handler interface.
@@ -79,12 +93,10 @@ func (s *DeviceService) Update(deviceID, appVersion string, capabilities []strin
 		capsBytes, _ := json.Marshal(capabilities)
 		updates["capabilities"] = string(capsBytes)
 	}
-	return s.db.Model(&model.Device{}).
-		Where("id = ?", deviceID).
-		Updates(updates).Error
+	return repository.UpdateDevice(s.db, deviceID, updates)
 }
 
 // Unregister removes a device record by ID.
 func (s *DeviceService) Unregister(deviceID string) error {
-	return s.db.Where("id = ?", deviceID).Delete(&model.Device{}).Error
+	return repository.DeleteDevice(s.db, deviceID)
 }

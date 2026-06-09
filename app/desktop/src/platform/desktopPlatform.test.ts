@@ -2,20 +2,323 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
-  it('falls back to the shared demo runtime when no active Edge thread is selected', async () => {
+  it('fails closed instead of using the demo runtime when no active Edge thread is selected', async () => {
     const submitRun = vi.fn();
     const platform = createDesktopPlatform({ submitRun });
 
-    const result = await platform.runs.submitComposerIntent({
+    await expect(platform.runs.submitComposerIntent({
       conversationId: 'builder',
       text: 'demo send smoke',
       mode: 'ask',
       mentions: [],
       attachments: [],
       approvalMode: 'suggest',
+    })).rejects.toThrow('Local Edge thread is required');
+
+    expect(submitRun).not.toHaveBeenCalled();
+  });
+
+  it('routes selected runtime adapter id through the Local Edge run request', async () => {
+    const submitRun = vi.fn().mockResolvedValue({
+      runId: 'run-edge-1',
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+      status: 'queued',
+    });
+    const platform = createDesktopPlatform({
+      activeProjectId: 'project-edge',
+      activeThreadId: 'thread-edge',
+      submitRun,
     });
 
-    expect(result.intentId).toMatch(/^demo-agent-/);
-    expect(submitRun).not.toHaveBeenCalled();
+    await platform.runs.submitComposerIntent({
+      conversationId: 'thread-edge',
+      text: 'review the mapper',
+      mode: 'code',
+      mentions: [{
+        id: 'codex-local',
+        label: 'Codex Local',
+        model: 'gpt-5.1-codex',
+        provider: 'tokendance-gateway',
+        runtimeId: 'codex',
+      }],
+      attachments: [],
+      approvalMode: 'workspace-write',
+      workDir: 'D:/Code/TokenDance/AgentHub',
+    });
+
+    expect(submitRun).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: 'codex',
+      model: 'gpt-5.1-codex',
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+      permissionMode: 'acceptEdits',
+      workDir: 'D:/Code/TokenDance/AgentHub',
+    }));
+    expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('provider');
+  });
+
+  it('keeps Desktop run submission owned by the Local Edge target preference', async () => {
+    const submitRun = vi.fn().mockResolvedValue({
+      runId: 'run-edge-1',
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+      status: 'queued',
+    });
+    const platform = createDesktopPlatform({
+      activeProjectId: 'project-edge',
+      activeThreadId: 'thread-edge',
+      submitRun,
+    });
+
+    await platform.runs.submitComposerIntent({
+      conversationId: 'thread-edge',
+      text: 'use the desktop target owner',
+      mode: 'code',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    });
+
+    expect(submitRun).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'project-edge',
+      threadId: 'thread-edge',
+    }));
+    expect(platform.host?.executionTargetPreference?.()).toEqual(expect.objectContaining({
+      owner: 'desktop',
+      targetId: 'local-edge',
+      route: 'local-edge-api',
+    }));
+    expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('command');
+    expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('cliPath');
+  });
+
+  it('exposes Tauri host readiness without granting UI process spawn inputs', async () => {
+    const platform = createDesktopPlatform({
+      getEdgeHostReadiness: vi.fn().mockResolvedValue({
+        running: false,
+        pid: null,
+        port: 3210,
+        sidecar_name: 'agenthub-edge',
+        target_id: 'local-edge',
+        route: 'local-edge-api',
+        bind_addr: '127.0.0.1:3210',
+        health_url: 'http://127.0.0.1:3210/v1/health',
+        store_backend: 'sqlite',
+        store_db_policy: '<app-data>/agenthub-edge.sqlite',
+        store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+        expected_store_migration_version: 4,
+        log_paths: {
+          directory: '<app-data>/edge-logs',
+          stdout: '<app-data>/edge-logs/local-edge.stdout.log',
+          stderr: '<app-data>/edge-logs/local-edge.stderr.log',
+        },
+        sidecar_args: [
+          '--store-backend',
+          'sqlite',
+          '--store-db',
+          '<app-data>/agenthub-edge.sqlite',
+          '--addr',
+          '127.0.0.1:3210',
+          '--runner-profile',
+          'claude-code',
+        ],
+        preflight: {
+          sidecar_available: false,
+          fallback_executable_available: false,
+          auth_token_ready: true,
+          status: 'blocked',
+          blocker: 'Local Edge sidecar is not bundled and fallback executable is missing',
+        },
+        direct_cli_spawn: false,
+      }),
+    });
+
+    const readiness = await platform.host.edgeHostReadiness();
+
+    expect(readiness).toEqual(expect.objectContaining({
+      sidecar_name: 'agenthub-edge',
+      target_id: 'local-edge',
+      route: 'local-edge-api',
+      health_url: 'http://127.0.0.1:3210/v1/health',
+      store_backend: 'sqlite',
+      store_db_policy: '<app-data>/agenthub-edge.sqlite',
+      store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+      expected_store_migration_version: 4,
+      direct_cli_spawn: false,
+    }));
+    expect(readiness.log_paths).toEqual(expect.objectContaining({
+      stdout: '<app-data>/edge-logs/local-edge.stdout.log',
+      stderr: '<app-data>/edge-logs/local-edge.stderr.log',
+    }));
+    expect(readiness.preflight).toEqual(expect.objectContaining({
+      sidecar_available: false,
+      fallback_executable_available: false,
+      auth_token_ready: true,
+      status: 'blocked',
+    }));
+    expect(readiness.sidecar_args).toEqual(expect.arrayContaining([
+      '--store-backend',
+      'sqlite',
+      '--store-db',
+      '<app-data>/agenthub-edge.sqlite',
+      '--addr',
+      '127.0.0.1:3210',
+    ]));
+    expect(readiness.sidecar_args).not.toContain('--store-file');
+    expect(readiness.sidecar_args).not.toEqual(expect.arrayContaining([
+      'codex',
+      'codex.exe',
+      'claude',
+      'claude.exe',
+      'opencode',
+      'opencode.exe',
+    ]));
+    expect(readiness).not.toHaveProperty('command');
+    expect(readiness).not.toHaveProperty('cliPath');
+  });
+
+  it('exposes local edge diagnostics as read-only host data', async () => {
+    const platform = createDesktopPlatform({
+      getLocalEdgeDiagnostics: vi.fn().mockResolvedValue({
+        readiness: {
+          running: true,
+          pid: 1234,
+          port: 3210,
+          sidecar_name: 'agenthub-edge',
+          target_id: 'local-edge',
+          route: 'local-edge-api',
+          bind_addr: '127.0.0.1:3210',
+          health_url: 'http://127.0.0.1:3210/v1/health',
+          store_backend: 'sqlite',
+          store_db_policy: '<app-data>/agenthub-edge.sqlite',
+          store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+          expected_store_migration_version: 4,
+          log_paths: {
+            directory: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs',
+            stdout: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stdout.log',
+            stderr: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stderr.log',
+          },
+          sidecar_args: [
+            '--store-backend',
+            'sqlite',
+            '--store-db',
+            '<app-data>/agenthub-edge.sqlite',
+            '--addr',
+            '127.0.0.1:3210',
+            '--runner-profile',
+            'claude-code',
+          ],
+          preflight: {
+            sidecar_available: true,
+            fallback_executable_available: false,
+            auth_token_ready: true,
+            status: 'ready',
+            blocker: null,
+          },
+          direct_cli_spawn: false,
+        },
+        status: {
+          running: true,
+          pid: 1234,
+          port: 3210,
+          health_url: 'http://127.0.0.1:3210/v1/health',
+          last_error: null,
+          log_paths: {
+            directory: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs',
+            stdout: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stdout.log',
+            stderr: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stderr.log',
+          },
+        },
+        packaged_login: {
+          loopback: {
+            available: true,
+            bind_host: '127.0.0.1',
+            port: 49888,
+            redirect_uri: 'http://127.0.0.1:49888/callback',
+            error: null,
+          },
+          credential_store: {
+            available: true,
+            service: 'com.agenthub.desktop',
+            error: null,
+          },
+          real_e2e: {
+            status: 'proposal_only',
+            reason: 'Real packaged login E2E requires an explicit TokenDance ID/browser gate.',
+          },
+        },
+        log_tail: {
+          stdout: ['edge ready'],
+          stderr: [],
+        },
+      }),
+    });
+
+    const diagnostics = await platform.host.localEdgeDiagnostics();
+
+    expect(diagnostics).toEqual(expect.objectContaining({
+      status: expect.objectContaining({
+        running: true,
+        health_url: 'http://127.0.0.1:3210/v1/health',
+      }),
+      log_tail: {
+        stdout: ['edge ready'],
+        stderr: [],
+      },
+    }));
+    expect(diagnostics.readiness).toEqual(expect.objectContaining({
+      direct_cli_spawn: false,
+      store_backend: 'sqlite',
+      store_db_policy: '<app-data>/agenthub-edge.sqlite',
+      store_readiness_manifest_schema: 'agenthub-edge-sqlite-readiness-v1',
+      expected_store_migration_version: 4,
+    }));
+    expect(diagnostics).not.toHaveProperty('command');
+    expect(diagnostics).not.toHaveProperty('cliPath');
+  });
+
+  it('exposes no-spend local CLI discovery through the Desktop host port', async () => {
+    const platform = createDesktopPlatform({
+      getLocalCliDiscovery: vi.fn().mockResolvedValue({
+        mode: 'no-spend-discovery',
+        readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+        readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+        generatedAt: null,
+        items: [
+          {
+            id: 'codex',
+            name: 'Codex CLI',
+            installed: true,
+            version: 'codex 0.1.0',
+            path: 'C:/Tools/codex.cmd',
+            noSpend: true,
+          },
+          {
+            id: 'claude-code',
+            name: 'Claude Code',
+            installed: false,
+            version: null,
+            path: 'claude',
+            noSpend: true,
+          },
+        ],
+      }),
+    });
+
+    const discovery = await platform.host.localCliDiscovery();
+
+    expect(discovery).toEqual(expect.objectContaining({
+      mode: 'no-spend-discovery',
+      readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+      readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+    }));
+    expect(discovery.items[0]).toEqual(expect.objectContaining({
+      id: 'codex',
+      installed: true,
+      noSpend: true,
+    }));
+    expect(discovery).not.toHaveProperty('prompt');
+    expect(discovery).not.toHaveProperty('model');
   });
 });

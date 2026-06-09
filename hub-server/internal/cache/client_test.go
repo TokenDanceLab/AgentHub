@@ -538,6 +538,65 @@ func TestPendingTargetTasksAreIsolatedByDeviceAndTarget(t *testing.T) {
 	require.Equal(t, []string{`{"task_id":"a2"}`}, devBTasks)
 }
 
+func TestPendingTargetTasksReplayFIFOAcrossTargetsForDevice(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	first := `{"task_id":"a1"}`
+	second := `{"task_id":"b1"}`
+	third := `{"task_id":"a2"}`
+	otherDevice := `{"task_id":"other-device"}`
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-a", first))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-b", "dev-a", second))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-a", third))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-b", otherDevice))
+
+	listed, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.Equal(t, []PendingTargetTask{
+		{TargetID: "target-a", Payload: first},
+		{TargetID: "target-b", Payload: second},
+		{TargetID: "target-a", Payload: third},
+	}, listed)
+
+	popped, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.Equal(t, []string{first, second, third}, popped)
+
+	devBTasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []string{otherDevice}, devBTasks)
+}
+
+func TestPendingTargetTasksListDoesNotAckUntilExplicitRemove(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-a", `{"task_id":"a1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-b", "dev-a", `{"task_id":"b1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-b", `{"task_id":"a2"}`))
+
+	devATasks, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []PendingTargetTask{
+		{TargetID: "target-a", Payload: `{"task_id":"a1"}`},
+		{TargetID: "target-b", Payload: `{"task_id":"b1"}`},
+	}, devATasks)
+
+	devASecondList, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.ElementsMatch(t, devATasks, devASecondList)
+
+	require.NoError(t, c.AckPendingTargetTask(ctx, "user-target", "target-a", "dev-a", `{"task_id":"a1"}`))
+	devAAfterAck, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.Equal(t, []PendingTargetTask{{TargetID: "target-b", Payload: `{"task_id":"b1"}`}}, devAAfterAck)
+
+	devBTasks, err := c.ListPendingTargetTasksForDevice(ctx, "user-target", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []PendingTargetTask{{TargetID: "target-a", Payload: `{"task_id":"a2"}`}}, devBTasks)
+}
+
 func TestPendingTargetTasksExpireWithIndex(t *testing.T) {
 	c, mr := testClient(t)
 	ctx := context.Background()
@@ -582,6 +641,36 @@ func TestPendingAgentControlsAreIsolatedByDevice(t *testing.T) {
 	require.JSONEq(t, `{"kind":"permission.decide","approval_id":"approval-b"}`, devBControls[0])
 }
 
+func TestPendingAgentControlsListDoesNotAckUntilExplicitRemove(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+	devAControl := `{"kind":"permission.decide","approval_id":"approval-a"}`
+	devBControl := `{"kind":"permission.decide","approval_id":"approval-b"}`
+
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", devAControl))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-b", devBControl))
+
+	devAControls, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, devAControls, 1)
+	require.JSONEq(t, devAControl, devAControls[0])
+
+	devASecondList, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, devASecondList, 1)
+	require.JSONEq(t, devAControl, devASecondList[0])
+
+	require.NoError(t, c.AckPendingAgentControl(ctx, "user-control", "dev-a", devAControl))
+	devAAfterAck, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Empty(t, devAAfterAck)
+
+	devBControls, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-b")
+	require.NoError(t, err)
+	require.Len(t, devBControls, 1)
+	require.JSONEq(t, devBControl, devBControls[0])
+}
+
 func TestPendingAgentControlsDeduplicateExactPayloadForDevice(t *testing.T) {
 	c, _ := testClient(t)
 	ctx := context.Background()
@@ -594,6 +683,30 @@ func TestPendingAgentControlsDeduplicateExactPayloadForDevice(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, controls, 1)
 	require.JSONEq(t, control, controls[0])
+}
+
+func TestPendingAgentControlsReplayFIFOForDevice(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+	first := `{"kind":"permission.decide","approval_id":"approval-a"}`
+	second := `{"kind":"permission.decide","approval_id":"approval-b"}`
+	otherDevice := `{"kind":"permission.decide","approval_id":"approval-other"}`
+
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", first))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", second))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-b", otherDevice))
+
+	listed, err := c.ListPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Equal(t, []string{first, second}, listed)
+
+	popped, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Equal(t, []string{first, second}, popped)
+
+	devBControls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []string{otherDevice}, devBControls)
 }
 
 func TestPendingAgentControlsAreCappedAndExpire(t *testing.T) {
@@ -615,7 +728,7 @@ func TestPendingAgentControlsAreCappedAndExpire(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, controls, config.PendingAgentControlQueueMaxLen)
 	for i, control := range controls {
-		expectedID := totalControls - 1 - i
+		expectedID := i + 2
 		require.JSONEq(t, fmt.Sprintf(`{"kind":"permission.decide","approval_id":"approval-%03d"}`, expectedID), control)
 	}
 }

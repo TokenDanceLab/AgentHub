@@ -66,6 +66,8 @@ import AboutSection from './settings/sections/AboutSection';
 import { useHubStore } from '@/stores/hubStore';
 import { getEdgeBaseUrl } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
+import { findRegisteredLocalEdgeTarget, useHubExecutionTargets, useSyncLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
+import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
@@ -77,6 +79,16 @@ import {
   buildDefaultAgentOptions,
   resolveAvailableDefaultAgentId,
 } from '@/utils/defaultAgent';
+import { mapLocalEdgeExecutionTarget } from '@/platform/edgeCapabilityMapper';
+import {
+  readLocalCliDiscovery,
+  readLocalEdgeDiagnostics,
+  type DesktopLocalEdgeDiagnostics,
+} from '@/platform/desktopPlatform';
+import {
+  buildLocalCliDiscoveryFromAgents,
+  type LocalCliDiscoveryManifest,
+} from './settings/cliDiscovery';
 import styles from './SettingsPage.module.css';
 import {
   useStoredBooleanState,
@@ -153,6 +165,7 @@ export default function SettingsPage({
   const hubAuth = useAuth();
   const { online: edgeOnline, health, refetch: refetchHealth } = useHealth();
   const { data: agentData, refetch: refetchAgents } = useAgentList(edgeOnline);
+  const { data: modelCatalog } = useModelCatalog(edgeOnline);
   const {
     data: runData,
     isError: runsError,
@@ -173,6 +186,8 @@ export default function SettingsPage({
   const [paletteQuery, setPaletteQuery] = useState('');
   const [paletteIndex, setPaletteIndex] = useState(0);
   const paletteInputRef = useRef<HTMLInputElement>(null);
+  const [hostCliDiscovery, setHostCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
+  const [localEdgeDiagnostics, setLocalEdgeDiagnostics] = useState<DesktopLocalEdgeDiagnostics | null>(null);
 
   // Keyboard shortcuts
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
@@ -280,6 +295,46 @@ export default function SettingsPage({
     : t('settings.edgeOffline');
   const edgeAddress = getEdgeBaseUrl();
   const healthStatus = edgeOnline ? (health?.status ?? 'unknown') : 'offline';
+  const localEdgeTarget = useMemo(
+    () => mapLocalEdgeExecutionTarget({
+      edgeOnline,
+      healthStatus,
+      runners: runnerItems,
+      agents,
+      modelCatalog,
+    }),
+    [agents, edgeOnline, healthStatus, modelCatalog, runnerItems],
+  );
+  const cliDiscovery = useMemo(
+    () => buildLocalCliDiscoveryFromAgents(agents, hostCliDiscovery),
+    [agents, hostCliDiscovery],
+  );
+  useEffect(() => {
+    let cancelled = false;
+    readLocalCliDiscovery()
+      .then((discovery) => {
+        if (!cancelled) setHostCliDiscovery(discovery);
+      })
+      .catch(() => {
+        if (!cancelled) setHostCliDiscovery(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    readLocalEdgeDiagnostics()
+      .then((diagnostics) => {
+        if (!cancelled) setLocalEdgeDiagnostics(diagnostics);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalEdgeDiagnostics(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const handleRefreshConnections = useCallback(() => {
     refetchHealth();
     refetchAgents();
@@ -297,6 +352,20 @@ export default function SettingsPage({
         ? t('settings.hubLocalLogin')
         : t('settings.notConfigured');
   const deviceId = readBrowserStorage('local', DEVICE_ID_KEY);
+  const hubExecutionTargets = useHubExecutionTargets({ enabled: hubSessionActive });
+  const registeredLocalEdgeTarget = useMemo(
+    () => findRegisteredLocalEdgeTarget(hubExecutionTargets.data?.items ?? [], deviceId),
+    [deviceId, hubExecutionTargets.data?.items],
+  );
+  const syncLocalEdgeTarget = useSyncLocalEdgeExecutionTarget();
+  const handleSyncLocalEdgeTarget = useCallback(() => {
+    if (!deviceId) return;
+    void syncLocalEdgeTarget.mutateAsync({
+      deviceId,
+      localEdgeTarget,
+      ...(registeredLocalEdgeTarget ? { registeredTargetId: registeredLocalEdgeTarget.id } : {}),
+    });
+  }, [deviceId, localEdgeTarget, registeredLocalEdgeTarget, syncLocalEdgeTarget]);
   const handleSignOut = () => {
     void hubAuth.logout();
   };
@@ -523,8 +592,18 @@ export default function SettingsPage({
               runnerSummary={runnerSummary}
               runnerItems={runnerItems}
               availableRunners={availableRunners}
+              localEdgeTarget={localEdgeTarget}
               desktopDeviceStatus={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
               deviceId={deviceId}
+              registeredLocalEdgeTarget={registeredLocalEdgeTarget}
+              hubTargetsLoading={hubExecutionTargets.isLoading}
+              hubTargetsError={hubExecutionTargets.isError}
+              hubTargetsPaginationLimited={hubExecutionTargets.data?.page.hasMore === true}
+              localEdgeTargetSyncStatus={syncLocalEdgeTarget.isPending ? 'syncing' : syncLocalEdgeTarget.isError ? 'error' : 'idle'}
+              localEdgeTargetSyncError={syncLocalEdgeTarget.error instanceof Error ? syncLocalEdgeTarget.error.message : null}
+              onSyncLocalEdgeTarget={handleSyncLocalEdgeTarget}
+              cliDiscovery={cliDiscovery}
+              localEdgeDiagnostics={localEdgeDiagnostics}
             />
           )}
 

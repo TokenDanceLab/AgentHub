@@ -39,9 +39,23 @@ export interface WorkbenchAgent {
   id: string;
   name: string;
   description?: string | undefined;
+  icon?: string | undefined;
   status?: 'available' | 'unavailable' | 'configuring' | undefined;
   model?: string | undefined;
   runtimeId?: string | undefined;
+  provider?: string | undefined;
+  avatarRef?: string | undefined;
+  avatarColor?: string | undefined;
+  approvalPolicy?: string | undefined;
+  permissionMode?: string | undefined;
+  reasoningEffort?: string | undefined;
+  skills?: string[] | undefined;
+  mcpServers?: string[] | undefined;
+  toolAllowlist?: string[] | undefined;
+  memorySources?: string[] | undefined;
+  memoryRetention?: string | undefined;
+  memorySummary?: string | undefined;
+  targetPreferences?: string[] | Record<string, unknown> | undefined;
 }
 
 export interface ConversationPort {
@@ -61,11 +75,35 @@ export interface PreviewPort {
   openEvidence(evidence: EvidenceRef): Promise<void>;
 }
 
+export type LocalCliRuntimeId = 'codex' | 'claude-code' | 'opencode';
+
+export interface LocalCliDiscoveryItem {
+  id: LocalCliRuntimeId;
+  name: string;
+  installed: boolean;
+  version: string | null;
+  path: string;
+  noSpend: boolean;
+}
+
+export interface LocalCliDiscoveryManifest {
+  mode: 'no-spend-discovery';
+  readinessManifest: string;
+  readinessScript: string;
+  generatedAt?: string | null;
+  items: LocalCliDiscoveryItem[];
+}
+
+export interface HostDiagnosticsPort {
+  localCliDiscovery?(): Promise<LocalCliDiscoveryManifest>;
+}
+
 export interface AgentHubPlatform {
   surface: AgentHubSurface;
   capabilities: SurfaceCapabilities;
   conversations: ConversationPort;
   attachments?: AttachmentPort;
+  host?: HostDiagnosticsPort;
   preview?: PreviewPort;
   runs: RunPort;
 }

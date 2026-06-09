@@ -1,7 +1,7 @@
 {
   "name": "agenthub-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0-rc.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,8 @@
     "test:ci": "vitest run --config vitest.desktop-ts-ci.config.ts && vitest run --config vitest.desktop-tsx-ci.config.ts && vitest run --config vitest.edge-integration-ci.config.ts && vitest run --config vitest.shared-ci.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --config playwright.config.ts",
+    "test:e2e:smoke": "playwright test --config playwright.config.ts --project=chromium smoke.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "analyze": "pnpm build && npx vite-bundle-visualizer",
     "lint": "eslint src",

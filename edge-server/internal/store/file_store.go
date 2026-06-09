@@ -16,15 +16,23 @@ var _ Repository = (*FileStore)(nil)
 var _ RunLifecycleStore = (*FileStore)(nil)
 
 type fileSnapshot struct {
-	Projects map[string]Project `json:"projects"`
-	Threads  map[string]Thread  `json:"threads"`
-	Runs     map[string]Run     `json:"runs"`
-	Items    map[string]Item    `json:"items"`
+	Projects  map[string]Project     `json:"projects"`
+	Threads   map[string]Thread      `json:"threads"`
+	Runs      map[string]Run         `json:"runs"`
+	Items     map[string]Item        `json:"items"`
+	Pins      map[string]ThreadPin   `json:"pins"`
+	Diffs     map[string]RunDiffFile `json:"diffs"`
+	Artifacts map[string]Artifact    `json:"artifacts"`
+	Previews  map[string]Preview     `json:"previews"`
 
-	ProjectOrder []string `json:"projectOrder"`
-	ThreadOrder  []string `json:"threadOrder"`
-	RunOrder     []string `json:"runOrder"`
-	ItemOrder    []string `json:"itemOrder"`
+	ProjectOrder  []string `json:"projectOrder"`
+	ThreadOrder   []string `json:"threadOrder"`
+	RunOrder      []string `json:"runOrder"`
+	ItemOrder     []string `json:"itemOrder"`
+	PinOrder      []string `json:"pinOrder"`
+	DiffOrder     []string `json:"diffOrder"`
+	ArtifactOrder []string `json:"artifactOrder"`
+	PreviewOrder  []string `json:"previewOrder"`
 }
 
 // FileStore wraps the in-memory store with a JSON snapshot saved asynchronously after writes.
@@ -253,6 +261,74 @@ func (f *FileStore) GetItem(id string) (Item, bool) {
 
 func (f *FileStore) ListThreadItems(threadID string) []Item {
 	return f.store.ListThreadItems(threadID)
+}
+
+func (f *FileStore) PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, error) {
+	pin, err := f.store.PinThreadItem(threadID, itemID, pinnedBy)
+	if err != nil {
+		return ThreadPin{}, err
+	}
+	f.schedulePersist()
+	return pin, nil
+}
+
+func (f *FileStore) DeleteThreadPin(threadID, itemID string) bool {
+	ok := f.store.DeleteThreadPin(threadID, itemID)
+	if ok {
+		f.schedulePersist()
+	}
+	return ok
+}
+
+func (f *FileStore) ListThreadPins(threadID string) []ThreadPin {
+	return f.store.ListThreadPins(threadID)
+}
+
+func (f *FileStore) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
+	diffFile, err := f.store.UpsertRunDiffFile(file)
+	if err != nil {
+		return RunDiffFile{}, err
+	}
+	f.schedulePersist()
+	return diffFile, nil
+}
+
+func (f *FileStore) ListRunDiffFiles(runID string) []RunDiffFile {
+	return f.store.ListRunDiffFiles(runID)
+}
+
+func (f *FileStore) UpsertArtifact(artifact Artifact) (Artifact, error) {
+	created, err := f.store.UpsertArtifact(artifact)
+	if err != nil {
+		return Artifact{}, err
+	}
+	f.schedulePersist()
+	return created, nil
+}
+
+func (f *FileStore) ListArtifacts(runID string) []Artifact {
+	return f.store.ListArtifacts(runID)
+}
+
+func (f *FileStore) GetArtifact(id string) (Artifact, bool) {
+	return f.store.GetArtifact(id)
+}
+
+func (f *FileStore) UpsertPreview(preview Preview) (Preview, error) {
+	created, err := f.store.UpsertPreview(preview)
+	if err != nil {
+		return Preview{}, err
+	}
+	f.schedulePersist()
+	return created, nil
+}
+
+func (f *FileStore) ListPreviews(runID string) []Preview {
+	return f.store.ListPreviews(runID)
+}
+
+func (f *FileStore) GetPreview(id string) (Preview, bool) {
+	return f.store.GetPreview(id)
 }
 
 func ensureFileSnapshotDirectory(path string) error {

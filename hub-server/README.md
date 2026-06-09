@@ -271,12 +271,13 @@ go test ./... -short -count=1
 | `AGENTHUB_JWT_SECRET` | Hub JWT 密钥 | 必须由环境注入 |
 | `AGENTHUB_JWT_ACCESS_TTL` | Hub access token 有效期 | 15m |
 | `AGENTHUB_UPLOAD_MAX_SIZE` | 上传大小限制 | 10485760 |
+| `AGENTHUB_CORS_ORIGINS` | CORS origin allowlist，逗号分隔；非生产未配置时默认包含本地 Web Vite `http://localhost:5174` 和 `http://127.0.0.1:5174`，生产环境必须只配置正式前端域名 | 非生产内置默认；生产 `https://hub.vectorcontrol.tech` |
 | `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | TokenDance ID issuer | `https://id.vectorcontrol.tech` |
 | `AGENTHUB_TOKENDANCE_ID_JWKS_URI` | TokenDance ID JWKS | `https://id.vectorcontrol.tech/oidc/jwks` |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；启用 TokenDance bearer 兼容路径时用于强制 `aud` 校验 | 待配置 |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | Hub confidential-client secret；不得提交 | 待配置 |
 | `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | OIDC callback URL | `http://localhost:8080/client/auth/oidc/callback` |
-| `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 允许本轮 PKCE 使用的 Web/native callback 列表，逗号分隔；Desktop loopback 使用注册的无端口 `http://127.0.0.1/callback` | `http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback` |
+| `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 允许本轮 PKCE 使用的 Web/native callback 列表，逗号分隔；Desktop loopback 使用注册的无端口 `http://127.0.0.1/callback`，本地 Web dev 同时注册 `localhost:5174` 和 `127.0.0.1:5174` callback | `http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback,http://127.0.0.1:5174/auth/tokendance/callback` |
 
 `AGENTHUB_TOKENDANCE_*` 旧变量名仍可被加载器识别，用于兼容早期本地脚本；新配置和部署文档统一使用 `AGENTHUB_TOKENDANCE_ID_*`。
 

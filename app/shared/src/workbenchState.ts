@@ -405,6 +405,24 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
         })),
       };
     }
+    case 'preview.stopped': {
+      const previewId = text(payload.previewId);
+      const runId = text(payload.runId) ?? text(envelope.scope?.runId);
+      if (!previewId || !runId) return withSeq(state, nextSeq);
+      const run = state.runs.find((candidate) => candidate.runId === runId);
+
+      return {
+        ...state,
+        lastSeq: nextSeq,
+        previews: upsertBy(state.previews, previewId, (current) => ({
+          id: previewId,
+          runId,
+          threadId: text(payload.threadId) ?? current?.threadId ?? run?.threadId ?? '',
+          status: 'stopped',
+          createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
+        })),
+      };
+    }
     case 'error':
       return {
         ...state,

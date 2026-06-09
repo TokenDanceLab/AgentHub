@@ -3,6 +3,8 @@ package jwtutil
 import (
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestGenerateAccessToken_RoundTrip(t *testing.T) {
@@ -162,4 +164,59 @@ func TestGenerateAccessToken_IncludesRegisteredClaims(t *testing.T) {
 	if claims.IssuedAt.Time.After(time.Now()) {
 		t.Error("expected IssuedAt to be in the past or present")
 	}
+}
+
+func TestGenerateEdgeToken_IncludesEdgeScopedClaims(t *testing.T) {
+	secret := "hub-secret-at-least-32-bytes-long!!"
+	tokenString, err := GenerateEdgeToken("user-1", "edge-device-1", secret, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("GenerateEdgeToken failed: %v", err)
+	}
+	if tokenString == "" {
+		t.Fatal("expected non-empty token")
+	}
+
+	var claims struct {
+		UserID     string `json:"user_id"`
+		DeviceID   string `json:"device_id"`
+		DeviceType string `json:"device_type"`
+		Purpose    string `json:"purpose"`
+		jwt.RegisteredClaims
+	}
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	}, jwt.WithValidMethods([]string{"HS256"}))
+	if err != nil {
+		t.Fatalf("parse edge token: %v", err)
+	}
+	if !token.Valid {
+		t.Fatal("edge token is invalid")
+	}
+	if claims.Issuer != "agenthub-hub" {
+		t.Fatalf("issuer = %q, want agenthub-hub", claims.Issuer)
+	}
+	if !claimStringsContain(claims.Audience, "agenthub-edge") {
+		t.Fatalf("audience = %v, want agenthub-edge", claims.Audience)
+	}
+	if claims.Subject != "user-1" || claims.UserID != "user-1" {
+		t.Fatalf("subject/user_id = %q/%q, want user-1", claims.Subject, claims.UserID)
+	}
+	if claims.DeviceID != "edge-device-1" {
+		t.Fatalf("device_id = %q, want edge-device-1", claims.DeviceID)
+	}
+	if claims.DeviceType != "edge" {
+		t.Fatalf("device_type = %q, want edge", claims.DeviceType)
+	}
+	if claims.Purpose != "edge-api" {
+		t.Fatalf("purpose = %q, want edge-api", claims.Purpose)
+	}
+}
+
+func claimStringsContain(values jwt.ClaimStrings, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

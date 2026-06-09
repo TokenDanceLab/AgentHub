@@ -1,10 +1,25 @@
 export {
+  TEAMRUN_DEMO_CONVERSATION_ID,
+  teamRunDemoScenario,
+  teamRunDemoTranscript,
+} from './teamrunDemo';
+export type {
+  TeamRunDemoEvent,
+  TeamRunDemoRuntimeProfile,
+  TeamRunDemoScenario,
+  TeamRunDemoTask,
+} from './teamrunDemo';
+
+export {
   WORKBENCH_DATA_MODE_STORAGE_KEY,
   getWorkbenchDataModeOverrideSnapshot,
+  isWorkbenchFixtureDataMode,
+  isWorkbenchRealDataMode,
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
+  workbenchDataModeLabel,
   writeWorkbenchDataModeOverride,
 } from './dataMode';
 export type {
@@ -18,6 +33,8 @@ export {
   demoWorkbenchAgents,
   demoWorkbenchPins,
   demoWorkbenchTranscripts,
+  projectGroupMessageLoopHubMessages,
+  projectGroupMessageLoopTranscript,
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
 } from './workbenchDemo';

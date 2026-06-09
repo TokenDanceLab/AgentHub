@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "pnpm --filter agenthub-desktop dev",
     "dev:web": "pnpm --filter agenthub-web dev",
+    "dev:mobile-rn": "pnpm --filter agenthub-mobile-rn dev",
     "build": "pnpm -r build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -16,6 +17,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "test:e2e:web": "pnpm --filter agenthub-web test:e2e",
+    "test:e2e:desktop": "pnpm --filter agenthub-desktop test:e2e",
+    "test:smoke:matrix": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/verify-e2e-smoke-matrix.ps1 -RepoRoot ..",
     "lint:css": "stylelint \"**/*.css\" --ignore-path .stylelintignore"
   },
   "pnpm": {

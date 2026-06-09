@@ -8,6 +8,41 @@ export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
 export * from './mockData';
 export {
+  buildAgentCapabilityContractFromConfig,
+  buildAgentCapabilitySummary,
+  validateAgentCapabilityContract,
+} from './agentCapabilities';
+export type {
+  AgentCapabilityContract,
+  AgentCapabilityRef,
+  AgentCapabilityStatus,
+  AgentCapabilitySummary,
+  AgentMemoryPolicy,
+  AgentMemoryRetention,
+} from './agentCapabilities';
+export {
+  AGENT_PROFILE_CATALOG,
+  WORKBENCH_AGENT_MARKET_FIXTURES,
+  WORKBENCH_AGENT_MCP_OPTIONS,
+  WORKBENCH_AGENT_MODELS,
+  WORKBENCH_AGENT_MODEL_HEALTH,
+  WORKBENCH_AGENT_POLICY_RULES,
+  WORKBENCH_AGENT_PROFILE_FIXTURES,
+  WORKBENCH_AGENT_SKILL_OPTIONS,
+  WORKBENCH_AGENT_TOOL_OPTIONS,
+  agentConfigToAgentSpecFixture,
+  agentProfileCatalogToConfig,
+  agentProfileCatalogToMarketTemplate,
+} from './agentProfileCatalog';
+export type {
+  AgentApprovalMode,
+  AgentMemorySource,
+  AgentProfileCatalogItem,
+  AgentProfileVisibility,
+  AgentRuntimeId,
+  AgentTargetPreference,
+} from './agentProfileCatalog';
+export {
   DESIGN_FILE_ICON_RADIUS,
   DESIGN_FILE_ICON_SIZE,
   DESIGN_NAV_GLYPH_SIZE,
@@ -20,20 +55,35 @@ export {
   getDesignFileIconType,
   profileActionIconName,
 } from './designIcons';
+export {
+  RuntimeBrandIcon,
+  resolveRuntimeBrandIcon,
+} from './RuntimeBrandIcon';
 
 /* ── Types ── */
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
 export type { ConversationSidebarProps } from './ConversationSidebar';
 export type { GlobalRailProps, GlobalRailPage } from './GlobalRail';
-export type { RightInspectorProps } from './RightInspector';
+export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './RightInspector';
 export type { TranscriptViewProps } from './TranscriptView';
 export type { UnifiedComposerProps } from './UnifiedComposer';
-export type { WorkbenchRoutesProps } from './WorkbenchRoutes';
+export type {
+  WorkbenchAgentProfilesStatus,
+  WorkbenchContactsData,
+  WorkbenchRoutesProps,
+} from './WorkbenchRoutes';
 export type { WorkspaceHeaderProps } from './WorkspaceHeader';
 export type {
   DesignFileIconType,
   DesignNavIconName,
 } from './designIcons';
+export type {
+  RuntimeBrandIconKind,
+  RuntimeBrandIconProps,
+  RuntimeBrandIconResolution,
+  RuntimeBrandIconSize,
+  RuntimeBrandIconSource,
+} from './RuntimeBrandIcon';
 
 /* ═══ Pages ═══ */
 export {
@@ -47,6 +97,7 @@ export {
 } from './pages';
 export type {
   AgentsPageProps,
+  AgentConfig,
   AgentsPaneId,
   AgentState,
   ToolPermission,
@@ -63,6 +114,7 @@ export type {
   DocsPane,
   DocsPageNavItem,
   ProjectsPageProps,
+  ProjectDraft,
   ProjectInfo,
   ProjectRun,
   ProjectArtifact,

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -362,10 +363,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	// Resolve adapter for this run: explicit agentID first, then default
 	adapter := e.adapter
-	if e.adapterReg != nil {
-		if resolved, err := e.adapterReg.Resolve(runCtx.AgentID); err == nil {
-			adapter = resolved
+	if e.adapterReg != nil && (runCtx.AgentID != "" || adapter != nil) {
+		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
+		if err != nil {
+			e.publishFailed(run, err)
+			return
 		}
+		adapter = resolved
 	}
 
 	// Resolve adapter label for Prometheus metrics
@@ -407,38 +411,11 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	var cmdPath string
 	var args, env []string
 	var workDir string
+	adapterCtx := adapters.RunProcessContext(runCtx)
 
 	if adapter != nil {
 		// Adapter mode: BuildCommand provides full command configuration
-		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
-			Run:                    runCtx.Run,
-			Prompt:                 runCtx.Prompt,
-			AgentID:                runCtx.AgentID,
-			Model:                  runCtx.Model,
-			WorkDir:                runCtx.WorkDir,
-			SessionID:              runCtx.SessionID,
-			ContinueLast:           runCtx.ContinueLast,
-			ForkSession:            runCtx.ForkSession,
-			ReasoningEffort:        runCtx.ReasoningEffort,
-			ThinkingMode:           runCtx.ThinkingMode,
-			MaxThinkingTokens:      runCtx.MaxThinkingTokens,
-			PermissionMode:         runCtx.PermissionMode,
-			IncludePartial:         runCtx.IncludePartial,
-			StructuredOutputSchema: runCtx.StructuredOutputSchema,
-			SystemPrompt:           runCtx.SystemPrompt,
-			AppendSystemPrompt:     runCtx.AppendSystemPrompt,
-			SkillsPrompt:           runCtx.SkillsPrompt,
-			AgentDefinitions:       runCtx.AgentDefinitions,
-			MCPConfig:              runCtx.MCPConfig,
-			AllowedTools:           runCtx.AllowedTools,
-			HubTaskID:              runCtx.HubTaskID,
-			ConfigOverrides:        runCtx.ConfigOverrides,
-			Ephemeral:              runCtx.Ephemeral,
-			AgentName:              runCtx.AgentName,
-			Budget:                 runCtx.Budget,
-			Messages:               runCtx.Messages,
-			PinnedMessages:         runCtx.PinnedMessages,
-		})
+		cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
 	} else {
 		// Profile mode: use configured command template
 		var err error
@@ -449,6 +426,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 		cmdPath = e.profile.Command
 		workDir = e.profile.WorkDir
+	}
+	if adapter != nil {
+		plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
+		e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
 	}
 
 	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
@@ -480,8 +461,20 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.stdins[run.ID] = stdin
 		e.mu.Unlock()
 	}
-		setResourceLimits(cmd)
-	slog.Debug("executor.subprocess.starting", "runId", run.ID, "command", cmdPath, "args", args)
+	setResourceLimits(cmd)
+	argSummary := summarizeProcessArgsForLog(args)
+	slog.Debug("executor.subprocess.starting",
+		"runId", run.ID,
+		"commandName", processCommandNameForLog(cmdPath),
+		"commandRedacted", true,
+		"argCount", len(args),
+		"argFlags", argSummary.ArgFlags,
+		"configKeys", argSummary.ConfigKeys,
+		"positionalArgCount", argSummary.PositionalArgCount,
+		"unknownFlagCount", argSummary.UnknownFlagCount,
+		"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
+		"argsRedacted", true,
+	)
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {
 			if cmd.Process != nil {
@@ -554,7 +547,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Inject context budget for token tracking in stream parsers.
 	parserCtx := ctx
 	if runCtx.Budget != nil {
-		parserCtx = context.WithValue(ctx, adapters.CtxBudgetKey, runCtx.Budget)
+		parserCtx = context.WithValue(parserCtx, adapters.CtxBudgetKey, runCtx.Budget)
+	}
+	if runCtx.WorkDir != "" {
+		parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
 	}
 
 	var parseErr error
@@ -567,9 +563,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
 	}
 
+	// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
+	// descriptors; otherwise structured parsers can race with Wait and see
+	// transient "file already closed" read errors.
+	wg.Wait()
 	waitErr := cmd.Wait()
 	slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(waitErr))
-	wg.Wait()
 
 	// Context budget compaction check: after the stream completes, evaluate
 	// whether the context budget exceeded the auto-compaction threshold.
@@ -675,6 +674,196 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 			return
 		}
 	}
+}
+
+type processArgLogSummary struct {
+	ArgFlags               []string
+	ConfigKeys             []string
+	PositionalArgCount     int
+	UnknownFlagCount       int
+	RedactedConfigKeyCount int
+}
+
+func summarizeProcessArgsForLog(args []string) processArgLogSummary {
+	var summary processArgLogSummary
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "" {
+			continue
+		}
+		if arg == "--" {
+			summary.PositionalArgCount += len(args) - i - 1
+			break
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			summary.PositionalArgCount++
+			continue
+		}
+
+		flag, value, hasInlineValue := strings.Cut(arg, "=")
+		if !isSafeProcessArgFlag(flag) {
+			summary.UnknownFlagCount++
+			continue
+		}
+		summary.ArgFlags = appendUniqueString(summary.ArgFlags, flag)
+		if flag == "-c" {
+			if hasInlineValue {
+				summary.ConfigKeys, summary.RedactedConfigKeyCount = appendConfigKeyName(summary.ConfigKeys, summary.RedactedConfigKeyCount, value)
+			} else if i+1 < len(args) {
+				summary.ConfigKeys, summary.RedactedConfigKeyCount = appendConfigKeyName(summary.ConfigKeys, summary.RedactedConfigKeyCount, args[i+1])
+				i++
+			}
+			continue
+		}
+		if shouldConsumeNextProcessArgValue(flag, args, i) {
+			i++
+		}
+	}
+	return summary
+}
+
+func appendConfigKeyName(configKeys []string, redactedCount int, value string) ([]string, int) {
+	key, _, _ := strings.Cut(value, "=")
+	if key == "" || key == value || !isSafeProcessConfigKey(key) {
+		return configKeys, redactedCount + 1
+	}
+	return appendUniqueString(configKeys, key), redactedCount
+}
+
+func processCommandNameForLog(cmdPath string) string {
+	name := filepath.Base(cmdPath)
+	if name == "." || name == string(filepath.Separator) {
+		return ""
+	}
+	return name
+}
+
+func isSafeProcessArgFlag(flag string) bool {
+	switch flag {
+	case "-c",
+		"-i",
+		"-m",
+		"-p",
+		"-test.run",
+		"--add-dir",
+		"--agent",
+		"--agents",
+		"--allowedTools",
+		"--append-system-prompt",
+		"--cd",
+		"--command",
+		"--continue",
+		"--dangerously-skip-permissions",
+		"--dir",
+		"--effort",
+		"--ephemeral",
+		"--fast",
+		"--file",
+		"--fork",
+		"--fork-session",
+		"--format",
+		"--image",
+		"--include-partial-messages",
+		"--json",
+		"--json-schema",
+		"--max-budget-usd",
+		"--max-turns",
+		"--mcp-config",
+		"--model",
+		"--output-format",
+		"--permission-mode",
+		"--resume",
+		"--sandbox",
+		"--session",
+		"--session-id",
+		"--skip-git-repo-check",
+		"--system-prompt",
+		"--thinking",
+		"--title",
+		"--variant",
+		"--verbose":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSafeProcessConfigKey(key string) bool {
+	for i, r := range key {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+			if i == 0 {
+				return false
+			}
+		case r == '_' || r == '-' || r == '.':
+			if i == 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return key != ""
+}
+
+func processArgFlagTakesValue(flag string) bool {
+	switch flag {
+	case "-p",
+		"-m",
+		"-i",
+		"--add-dir",
+		"--agent",
+		"--agents",
+		"--allowedTools",
+		"--append-system-prompt",
+		"--cd",
+		"--command",
+		"--dir",
+		"--effort",
+		"--file",
+		"--format",
+		"--image",
+		"--json-schema",
+		"--max-budget-usd",
+		"--mcp-config",
+		"--model",
+		"--output-format",
+		"--permission-mode",
+		"--resume",
+		"--sandbox",
+		"--session",
+		"--session-id",
+		"--thinking",
+		"--system-prompt",
+		"--title",
+		"--variant":
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldConsumeNextProcessArgValue(flag string, args []string, index int) bool {
+	if !processArgFlagTakesValue(flag) || index+1 >= len(args) {
+		return false
+	}
+	next := args[index+1]
+	if next == "" || next == "--" || !strings.HasPrefix(next, "-") || next == "-" {
+		return true
+	}
+	nextFlag, _, _ := strings.Cut(next, "=")
+	return !isSafeProcessArgFlag(nextFlag)
+}
+
+func appendUniqueString(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 // envForRun builds the environment for a child process.
@@ -916,6 +1105,9 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		scope,
 	)
 	emitter = newHubCallbackEmitter(e, run.ID, emitter)
+	if evidenceEmitter := newRuntimeEvidenceEmitter(e.store, run, emitter); evidenceEmitter != nil {
+		emitter = evidenceEmitter
+	}
 	transcriptEmitter := newThreadTranscriptEmitter(e.store, run, emitter)
 	if transcriptEmitter != nil {
 		emitter = transcriptEmitter

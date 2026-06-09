@@ -13,7 +13,8 @@
 --   client_id:     agenthub-desktop
 --   client_secret: agenthub-dev-secret-change-me
 --   redirect_uris: http://127.0.0.1/callback
---                  http://localhost:5173/auth/tokendance/callback
+--                  http://localhost:5174/auth/tokendance/callback
+--                  http://127.0.0.1:5174/auth/tokendance/callback
 --   grant_types:   authorization_code, refresh_token
 --   scopes:        openid, profile, email
 --
@@ -35,7 +36,7 @@ VALUES (
     'agenthub-desktop',
     '$2a$10$CFRzH1R6MEUVU88nLzRSo.1qX7DtG6sPTqOrZ5HNfp1awu0ei0XpS',  -- bcrypt("agenthub-dev-secret-change-me")
     'AgentHub Desktop',
-    '["http://127.0.0.1/callback","http://localhost:5173/auth/tokendance/callback"]',
+    '["http://127.0.0.1/callback","http://localhost:5174/auth/tokendance/callback","http://127.0.0.1:5174/auth/tokendance/callback"]',
     '["authorization_code","refresh_token"]',
     '["openid","profile","email"]',
     '00000000-0000-0000-0000-000000000001',

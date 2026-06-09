@@ -19,6 +19,7 @@
     "./platform": "./src/platform/index.ts",
     "./transcript": "./src/transcript/index.ts",
     "./workbench": "./src/workbench/index.ts",
+    "./agentSpec": "./src/agentSpec.ts",
     "./surfaceMetadata": "./src/surfaceMetadata.ts",
     "./workbenchState": "./src/workbenchState.ts",
     "./tree": "./src/tree.ts",

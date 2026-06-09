@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"gorm.io/gorm"
@@ -64,10 +63,7 @@ func (s *ContactService) SearchUser(ctx context.Context, currentUserID, targetID
 
 	target, err := repository.GetUserByID(s.db, targetID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.UserNotFound
-		}
-		return nil, err
+		return nil, repository.WrapNotFound(err, errcode.UserNotFound)
 	}
 
 	rel := "stranger"
@@ -109,10 +105,7 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 
 	_, err := repository.GetUserByID(s.db, friendID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errcode.UserNotFound
-		}
-		return err
+		return repository.WrapNotFound(err, errcode.UserNotFound)
 	}
 
 	existing, err := repository.FindFriendshipBetween(s.db, userID, friendID)
@@ -143,11 +136,12 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 		return err
 	}
 
+	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
-			"sender_id":   userID,
-			"receiver_id": friendID,
-			"message":     message,
+			"request_id":   f.ID,
+			"from_user_id": userID,
+			"message":      message,
 		}})
 	}
 
@@ -220,6 +214,13 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 	}
 
 	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	if s.bus != nil {
+		s.bus.Publish(ctx, Event{Type: "friend.accepted", Payload: map[string]interface{}{
+			"friendship_id": r.ID,
+			"user_id":       r.UserID,
+			"accepter_id":   userID,
+		}})
+	}
 	return nil
 }
 
@@ -231,7 +232,7 @@ func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, reques
 	if r.FriendID != userID || r.Status != model.StatusPending {
 		return errcode.FriendRequestNotFound
 	}
-	if err := s.db.Delete(r).Error; err != nil {
+	if err := repository.DeleteFriendship(s.db, r); err != nil {
 		return err
 	}
 	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
@@ -318,7 +319,7 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 	if err != nil || f.Status != model.StatusBlocked {
 		return errcode.FriendRequestNotFound
 	}
-	if err := s.db.Delete(f).Error; err != nil {
+	if err := repository.DeleteFriendship(s.db, f); err != nil {
 		return err
 	}
 	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
@@ -327,10 +328,7 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 
 func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error {
 	if err := repository.UpdateFriendshipRemark(s.db, currentUserID, friendUserID, remark); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errcode.FriendRemarkNoRow
-		}
-		return err
+		return repository.WrapNotFound(err, errcode.FriendRemarkNoRow)
 	}
 	return nil
 }

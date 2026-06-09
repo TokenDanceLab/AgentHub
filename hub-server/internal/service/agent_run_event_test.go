@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE sessions (
 			id TEXT PRIMARY KEY,
 			type TEXT NOT NULL,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved BOOLEAN NOT NULL DEFAULT FALSE,
@@ -46,6 +48,7 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			agent_instance_id TEXT NOT NULL,
 			triggered_by_user_id TEXT NOT NULL,
 			trigger_message_id TEXT NOT NULL,
+			target_id TEXT,
 			status TEXT NOT NULL,
 			edge_run_id TEXT,
 			edge_device_id TEXT,
@@ -66,6 +69,8 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL,
 			reply_to_message_id TEXT,
 			recalled BOOLEAN NOT NULL DEFAULT FALSE,
+			edited BOOLEAN NOT NULL DEFAULT FALSE,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,
@@ -79,6 +84,17 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			event_type TEXT NOT NULL,
 			payload TEXT NOT NULL,
 			created_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT NOT NULL,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT,
+			target_id TEXT,
+			status TEXT NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
 		)`,
 	}
 	for _, stmt := range ddl {
@@ -95,11 +111,45 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 		"agent-1", "codex", "sess-1", "user-1", "Codex", now,
 	).Error)
 	require.NoError(t, db.Exec(
-		`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_run_id, edge_device_id, created_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		"task-1", "agent-1", "user-1", "msg-1", model.TaskStatusRunning, "run-1", "dev-1", now, now.Add(time.Hour),
+		`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_run_id, edge_device_id, created_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-1", "agent-1", "user-1", "msg-1", "target-1", model.TaskStatusRunning, "run-1", "dev-1", now, now.Add(time.Hour),
 	).Error)
 
 	return db
+}
+
+type mockTeamRouteHandler struct {
+	calls []mockRouteCall
+	err   error
+}
+
+type mockRouteCall struct {
+	userID   string
+	teamID   string
+	runID    string
+	decision model.CoordinatorRouteDecision
+}
+
+func (m *mockTeamRouteHandler) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
+	m.calls = append(m.calls, mockRouteCall{
+		userID:   userID,
+		teamID:   teamID,
+		runID:    runID,
+		decision: decision,
+	})
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &model.AgentTeamAssignment{ID: "assignment-1", TeamRunID: runID}, nil
+}
+
+func seedAgentRunEventTeamRun(t *testing.T, db *gorm.DB, status string) {
+	t.Helper()
+	now := time.Now()
+	require.NoError(t, db.Exec(
+		`INSERT INTO agent_team_runs (id, team_id, session_id, trigger_user_id, trigger_message, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"team-run-1", "team-1", "sess-1", "owner-1", "start team run", status, now, now,
+	).Error)
 }
 
 func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
@@ -139,6 +189,101 @@ func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("agent.stream event was not published")
 	}
+}
+
+func TestHandleTaskStreamAutoParsesRunningTeamRunRouteDecision(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
+	handler := &mockTeamRouteHandler{}
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc.SetTeamRouteHandler(handler)
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route","reasoning":"needs backend"}`),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, handler.calls, 1)
+	call := handler.calls[0]
+	require.Equal(t, "owner-1", call.userID)
+	require.Equal(t, "team-1", call.teamID)
+	require.Equal(t, "team-run-1", call.runID)
+	require.Equal(t, "delegate", call.decision.Action)
+	require.Equal(t, "member-2", call.decision.NextWorker)
+	require.Equal(t, "Implement the route", call.decision.Instructions)
+}
+
+func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  string
+		payload json.RawMessage
+		wantErr error
+	}{
+		{
+			name:    "invalid json",
+			status:  model.TeamRunStatusRunning,
+			payload: json.RawMessage(`{"action":`),
+			wantErr: errcode.ErrBadRequest,
+		},
+		{
+			name:    "non decision",
+			status:  model.TeamRunStatusRunning,
+			payload: json.RawMessage(`{"type":"run.output.batch","content":"hello"}`),
+		},
+		{
+			name:    "invalid action",
+			status:  model.TeamRunStatusRunning,
+			payload: json.RawMessage(`{"action":"handoff","next_worker":"member-2","instructions":"Implement"}`),
+		},
+		{
+			name:    "non running team run",
+			status:  model.TeamRunStatusCompleted,
+			payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement"}`),
+		},
+		{
+			name:    "no team run",
+			payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement"}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newAgentRunEventTestDB(t)
+			if tt.status != "" {
+				seedAgentRunEventTeamRun(t, db, tt.status)
+			}
+			handler := &mockTeamRouteHandler{}
+			svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+			svc.SetTeamRouteHandler(handler)
+
+			err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+				Payload: tt.payload,
+			})
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Empty(t, handler.calls)
+		})
+	}
+}
+
+func TestHandleTaskStreamRouteDecisionHandlerErrorDoesNotFailStream(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	seedAgentRunEventTeamRun(t, db, model.TeamRunStatusRunning)
+	handler := &mockTeamRouteHandler{err: errors.New("route handler unavailable")}
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc.SetTeamRouteHandler(handler)
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route"}`),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, handler.calls, 1)
 }
 
 func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {
@@ -396,4 +541,209 @@ func TestGetTaskRunEventSummaryAggregatesRuntimeHistory(t *testing.T) {
 	require.Equal(t, int64(6000), summary.ElapsedMs)
 	require.Equal(t, 1, summary.EventTypeCounts[model.RunEventTypeOutputBatch])
 	require.Equal(t, 1, summary.EventTypeCounts["run.agent.result"])
+}
+
+func TestListTaskApprovalsProjectsPendingAndDecidedRuntimeEvents(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
+	for _, event := range []model.AgentRunEvent{
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-1","toolName":"shell","status":"pending"}`, CreatedAt: base},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-2","toolUseId":"tool-2","toolName":"edit"}`, CreatedAt: base.Add(time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 3, EventType: "run.agent.permission_decided", Payload: `{"requestId":"req-2","decision":"allow","reason":"safe"}`, CreatedAt: base.Add(2 * time.Second)},
+	} {
+		require.NoError(t, db.Create(&event).Error)
+	}
+
+	svc := &AgentService{db: db}
+	result, err := svc.ListTaskApprovals(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Equal(t, "task-1", result.TaskID)
+	require.Equal(t, "run-1", result.EdgeRunID)
+	require.Equal(t, "sess-1", result.SessionID)
+	require.Equal(t, int64(3), result.LastEventSeq)
+	require.Len(t, result.Approvals, 2)
+	require.Len(t, result.Pending, 1)
+	require.Len(t, result.Decided, 1)
+	require.Equal(t, "req-1", result.Pending[0].ApprovalID)
+	require.Equal(t, "target-1", result.Pending[0].TargetID)
+	require.Equal(t, "dev-1", result.Pending[0].EdgeDeviceID)
+	require.Equal(t, int64(1), result.Pending[0].EventSeq)
+	require.Equal(t, "req-2", result.Decided[0].ApprovalID)
+	require.Equal(t, "allow", result.Decided[0].Status)
+	require.Equal(t, "safe", result.Decided[0].Reason)
+	require.NotNil(t, result.Decided[0].DecidedAt)
+
+	_, err = svc.ListTaskApprovals(context.Background(), "other-user", "task-1")
+	require.ErrorIs(t, err, errcode.AgentTaskNotFound)
+}
+
+func TestDecideTaskApprovalRoundTripsExactTargetDeviceAndCorrelation(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
+	require.NoError(t, db.Create(&model.AgentRunEvent{
+		TaskID:          "task-1",
+		EdgeRunID:       "edge-run-1",
+		SessionID:       "sess-1",
+		AgentInstanceID: "agent-1",
+		EventSeq:        1,
+		EventType:       "run.agent.permission_requested",
+		Payload:         `{"requestId":"req-1","toolName":"shell","status":"pending","correlation_id":"corr-web-hub-edge-1"}`,
+		CreatedAt:       base,
+	}).Error)
+
+	controlCache := &mockAgentRunControlCache{}
+	svc := &AgentService{db: db, cacheClient: controlCache}
+	listed, err := svc.ListTaskApprovals(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Len(t, listed.Pending, 1)
+	require.Equal(t, "target-1", listed.Pending[0].TargetID)
+	require.Equal(t, "dev-1", listed.Pending[0].EdgeDeviceID)
+	require.Equal(t, "corr-web-hub-edge-1", listed.Pending[0].CorrelationID)
+
+	approval, err := svc.DecideTaskApproval(context.Background(), "user-1", "task-1", "req-1", model.TeamApprovalDecision{
+		Decision: "allow",
+		Reason:   "known safe",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "allow", approval.Status)
+	require.Equal(t, "user-1", approval.DecidedBy)
+	require.Equal(t, "target-1", approval.TargetID)
+	require.Equal(t, "dev-1", approval.EdgeDeviceID)
+	require.Equal(t, "corr-web-hub-edge-1", approval.CorrelationID)
+	require.NotNil(t, approval.EdgeControl)
+	require.Equal(t, "edge-run-1", approval.EdgeControl.RunID)
+	require.Equal(t, "req-1", approval.EdgeControl.RequestID)
+
+	require.Len(t, controlCache.controls, 1)
+	require.Equal(t, "user-1", controlCache.controls[0].userID)
+	require.Equal(t, "dev-1", controlCache.controls[0].deviceID)
+	require.JSONEq(t, `{"kind":"permission.decide","agent_task_id":"task-1","target_id":"target-1","edge_device_id":"dev-1","correlation_id":"corr-web-hub-edge-1","approval_id":"req-1","edge_control":{"runId":"edge-run-1","requestId":"req-1","decision":"allow","reason":"known safe"}}`, controlCache.controls[0].payload)
+
+	result, err := svc.ListTaskApprovals(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Len(t, result.Decided, 1)
+	require.Equal(t, "allow", result.Decided[0].Status)
+	require.Equal(t, "user-1", result.Decided[0].DecidedBy)
+	require.Equal(t, "target-1", result.Decided[0].TargetID)
+	require.Equal(t, "dev-1", result.Decided[0].EdgeDeviceID)
+	require.Equal(t, "corr-web-hub-edge-1", result.Decided[0].CorrelationID)
+}
+
+func TestDecideTaskApprovalRejectsInvalidState(t *testing.T) {
+	tests := []struct {
+		name       string
+		event      *model.AgentRunEvent
+		approvalID string
+		decision   string
+		clearRunID bool
+		wantErr    error
+	}{
+		{name: "missing approval", approvalID: "missing", decision: "allow", wantErr: errcode.AgentTaskNotFound},
+		{name: "invalid decision", approvalID: "req-1", decision: "maybe", wantErr: errcode.ErrBadRequest},
+		{name: "missing edge run", event: &model.AgentRunEvent{TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-1"}`}, approvalID: "req-1", decision: "allow", clearRunID: true, wantErr: errcode.ErrBadRequest},
+		{name: "missing target", event: &model.AgentRunEvent{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-1"}`}, approvalID: "req-1", decision: "allow", wantErr: errcode.ErrBadRequest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newAgentRunEventTestDB(t)
+			if tt.clearRunID {
+				require.NoError(t, db.Exec(`UPDATE pending_agent_tasks SET edge_run_id = ? WHERE id = ?`, "", "task-1").Error)
+			}
+			if tt.name == "missing target" {
+				require.NoError(t, db.Exec(`UPDATE pending_agent_tasks SET target_id = ? WHERE id = ?`, "", "task-1").Error)
+			}
+			if tt.event != nil {
+				require.NoError(t, db.Create(tt.event).Error)
+			}
+			svc := &AgentService{db: db, cacheClient: &mockAgentRunControlCache{}}
+			_, err := svc.DecideTaskApproval(context.Background(), "user-1", "task-1", tt.approvalID, model.TeamApprovalDecision{Decision: tt.decision})
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestListTaskArtifactsProjectsFileChangeAndArtifactCreated(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
+	for _, event := range []model.AgentRunEvent{
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.file_change", Payload: `{"path":"src/a.go","action":"modified","toolName":"apply_patch","status":"ok","diff":"@@ -1 +1 @@\n-old\n+new","edit_id":"edit-1","diff_hash":"sha256:diff-1","review_status":"pending","can_apply":true,"can_revert":true}`, CreatedAt: base},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "artifact.created", Payload: `{"artifact_id":"art-1","path":"reports/summary.md","name":"summary.md","mime_type":"text/markdown","size_bytes":128,"hash":"sha256:artifact-1"}`, CreatedAt: base.Add(time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 3, EventType: "run.agent.file_change", Payload: `{"path":"src/b.go","status":{"unknown":true},"can_apply":"invalid"}`, CreatedAt: base.Add(2 * time.Second)},
+	} {
+		require.NoError(t, db.Create(&event).Error)
+	}
+
+	svc := &AgentService{db: db}
+	result, err := svc.ListTaskArtifacts(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Equal(t, "task-1", result.TaskID)
+	require.Equal(t, "run-1", result.EdgeRunID)
+	require.Equal(t, "sess-1", result.SessionID)
+	require.Equal(t, int64(3), result.LastEventSeq)
+	require.Len(t, result.Artifacts, 3)
+	require.Equal(t, "src/a.go", result.Artifacts[0].Path)
+	require.Equal(t, "modified", result.Artifacts[0].Action)
+	require.Equal(t, int64(1), result.Artifacts[0].EventSeq)
+	fileChange := map[string]any{}
+	fileChangeJSON, err := json.Marshal(result.Artifacts[0])
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(fileChangeJSON, &fileChange))
+	require.Equal(t, "@@ -1 +1 @@\n-old\n+new", fileChange["diff"])
+	require.Equal(t, "edit-1", fileChange["edit_id"])
+	require.Equal(t, "sha256:diff-1", fileChange["hash"])
+	require.Equal(t, "pending", fileChange["review_status"])
+	require.Equal(t, false, fileChange["can_apply"])
+	require.Equal(t, false, fileChange["can_revert"])
+	require.Equal(t, "art-1", result.Artifacts[1].ArtifactID)
+	require.Equal(t, "sha256:artifact-1", result.Artifacts[1].Hash)
+	require.Equal(t, "reports/summary.md", result.Artifacts[1].Path)
+	require.Equal(t, int64(128), result.Artifacts[1].SizeBytes)
+	artifactCreated := map[string]any{}
+	artifactCreatedJSON, err := json.Marshal(result.Artifacts[1])
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(artifactCreatedJSON, &artifactCreated))
+	require.NotContains(t, artifactCreated, "diff")
+	malformedFileChange := map[string]any{}
+	malformedFileChangeJSON, err := json.Marshal(result.Artifacts[2])
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(malformedFileChangeJSON, &malformedFileChange))
+	require.NotContains(t, malformedFileChange, "can_apply")
+
+	_, err = svc.ListTaskArtifacts(context.Background(), "other-user", "task-1")
+	require.ErrorIs(t, err, errcode.AgentTaskNotFound)
+}
+
+type mockAgentRunControlCache struct {
+	controls []mockAgentRunControlCall
+}
+
+type mockAgentRunControlCall struct {
+	userID   string
+	deviceID string
+	payload  string
+}
+
+func (m *mockAgentRunControlCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
+	return "", errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
+	return "", errors.New("offline")
+}
+
+func (m *mockAgentRunControlCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	return errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	return errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	return 0, errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	m.controls = append(m.controls, mockAgentRunControlCall{userID: userID, deviceID: deviceID, payload: controlJSON})
+	return nil
 }

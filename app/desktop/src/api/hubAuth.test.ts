@@ -230,3 +230,79 @@ describe('Hub OIDC API contract (mocked)', () => {
     expect(data.error.code).toBe('oidc_invalid_state');
   });
 });
+
+describe('Desktop browser-dev OIDC fixture boundary', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    localStorageMock.clear();
+    sessionStorageMock.clear();
+    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    window.history.pushState({}, '', '/');
+  });
+
+  it('exchanges fake callback through Hub and keeps token material out of localStorage', async () => {
+    window.history.pushState({}, '', '/auth/tokendance/callback?code=desktop-code&state=state-desktop-fixture');
+    sessionStorage.setItem(
+      'agenthub_oidc_pkce_pending',
+      JSON.stringify({
+        state: 'state-desktop-fixture',
+        codeVerifier: 'desktop-verifier-fixture',
+        deviceId: '00000000-0000-0000-0000-00000000a301',
+        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        createdAt: Date.now(),
+      }),
+    );
+
+    const requestedUrls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requestedUrls.push(url);
+
+      if (url.endsWith('/client/auth/oidc/callback')) {
+        const body = JSON.parse(String(init?.body));
+        expect(body).toMatchObject({
+          code: 'desktop-code',
+          state: 'state-desktop-fixture',
+          code_verifier: 'desktop-verifier-fixture',
+          device_type: 'desktop',
+          device_id: '00000000-0000-0000-0000-00000000a301',
+          redirect_uri: `${window.location.origin}/auth/tokendance/callback`,
+        });
+        return new Response(
+          JSON.stringify({
+            access_token: 'desktop-fixture-access-token',
+            refresh_token: 'desktop-fixture-refresh-token',
+            expires_in: 900,
+            user: {
+              id: '00000000-0000-0000-0000-00000000b301',
+              username: 'fixture-desktop-user',
+              nickname: 'Fixture Desktop User',
+              avatar_url: '',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { createHubAuth } = await import('./hubAuth');
+    const auth = createHubAuth();
+
+    await expect(auth.tryAutoLogin()).resolves.toBe(true);
+    expect(auth.getState()).toMatchObject({
+      isAuthenticated: true,
+      token: 'desktop-fixture-access-token',
+      refreshToken: 'desktop-fixture-refresh-token',
+      tokenSource: 'tokendance',
+    });
+    expect(sessionStorage.getItem('agenthub_hub_token')).toBe('desktop-fixture-access-token');
+    expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+    expect(localStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
+    expect(localStorage.getItem('agenthub_token_source')).toBe('tokendance');
+    expect(requestedUrls).toHaveLength(1);
+    expect(requestedUrls.join('\n')).not.toMatch(/127\.0\.0\.1:3210|localhost:3210|\/v1\/runs|\/v1\/events|spawn|Command/);
+  });
+});

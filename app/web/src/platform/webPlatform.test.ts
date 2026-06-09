@@ -29,6 +29,10 @@ function hubMessages(queryClient: QueryClient, sessionId = 'hub-session-1'): Mes
   return queryClient.getQueryData<MessageResponse[]>(['web-v4', 'hub-messages', sessionId]) ?? [];
 }
 
+function withExecutionTarget<T extends object>(intent: T, executionTargetId: string): T & { executionTargetId: string } {
+  return { ...intent, executionTargetId };
+}
+
 describe('webPlatform workbench agent mapping', () => {
   it('maps Hub AgentInfo into shared workbench agents', () => {
     const agent: AgentInfo = {
@@ -37,7 +41,18 @@ describe('webPlatform workbench agent mapping', () => {
       description: 'Runtime: claude-code - Model: glm-5.1',
       profileId: 'agent-profile-1',
       runtimeId: 'claude-code',
+      provider: 'zhipu',
       model: 'glm-5.1',
+      approvalPolicy: 'on-request',
+      permissionMode: 'workspace-write',
+      reasoningEffort: 'high',
+      skills: ['Code', 'Review'],
+      toolAllowlist: ['Read File'],
+      targetPreferences: {
+        target_id: 'target-local-edge-1',
+        target_type: 'local_edge',
+        work_dir: 'D:\\Code\\TokenDance\\AgentHub',
+      },
       status: 'available',
       capabilities: {
         streaming: true,
@@ -55,15 +70,32 @@ describe('webPlatform workbench agent mapping', () => {
       id: 'agent-profile-1',
       name: 'Hub Builder',
       description: 'Runtime: claude-code - Model: glm-5.1',
+      icon: 'claude-code',
       runtimeId: 'claude-code',
+      provider: 'zhipu',
       model: 'glm-5.1',
+      approvalPolicy: 'on-request',
+      permissionMode: 'workspace-write',
+      reasoningEffort: 'high',
+      skills: ['Code', 'Review'],
+      toolAllowlist: ['Read File'],
+      targetPreferences: {
+        target_id: 'target-local-edge-1',
+        target_type: 'local_edge',
+        work_dir: 'D:\\Code\\TokenDance\\AgentHub',
+      },
       status: 'available',
     });
   });
 
-  it('keeps preview fallback agents until Hub profiles are available', () => {
+  it('keeps preview fallback agents until Hub profiles are available in demo-capable modes', () => {
     expect(resolveWebWorkbenchAgents(undefined)).toBe(webAgents);
     expect(resolveWebWorkbenchAgents([])).toBe(webAgents);
+  });
+
+  it('does not fall back to demo agents in real mode', () => {
+    expect(resolveWebWorkbenchAgents(undefined, 'approved-real')).toEqual([]);
+    expect(resolveWebWorkbenchAgents([], 'approved-real')).toEqual([]);
   });
 
   it('maps Hub sessions into shared workbench conversations', () => {
@@ -82,7 +114,7 @@ describe('webPlatform workbench agent mapping', () => {
     });
 
     expect(resolveWebWorkbenchConversations(undefined, false)).toBe(webConversations);
-    expect(resolveWebWorkbenchConversations(undefined, false, 'real')).toEqual([webHubEmptyConversation]);
+    expect(resolveWebWorkbenchConversations(undefined, false, 'approved-real')).toEqual([webHubEmptyConversation]);
     expect(resolveWebWorkbenchConversations([], true)).toEqual([webHubEmptyConversation]);
   });
 
@@ -147,6 +179,41 @@ describe('webPlatform workbench agent mapping', () => {
     ]));
   });
 
+  it('opens the auth guard instead of silently using demo fallback when the Web root mounts auth', async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
+    const ensureAuth = vi.fn(() => false);
+    const hubClient = {
+      addAgentToSession: vi.fn(),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn(),
+    };
+    const platform = createWebPlatform({
+      demoRuntimeStore,
+      ensureAuth,
+      hubClient,
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'builder',
+      text: '需要登录后才能进入真实 Hub 路径',
+      mode: 'ask',
+      mentions: [],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Hub authentication is required');
+
+    expect(ensureAuth).toHaveBeenCalledTimes(1);
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+    expect(demoRuntimeStore.resolveTranscript('builder')).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        author: expect.objectContaining({ role: 'human' }),
+        text: '需要登录后才能进入真实 Hub 路径',
+      }),
+    ]));
+  });
+
   it('submits Hub session messages and triggers the mentioned runtime agent', async () => {
     const queryClient = new QueryClient();
     const hubClient = {
@@ -169,6 +236,25 @@ describe('webPlatform workbench agent mapping', () => {
         trigger_message_id: 'hub-message-1',
         status: 'queued',
       }),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-offline',
+            name: 'Offline Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'offline',
+            is_online: false,
+          },
+          {
+            id: 'target-local-edge-1',
+            name: 'Online Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
     };
     const platform = createWebPlatform({
       hubClient,
@@ -177,7 +263,7 @@ describe('webPlatform workbench agent mapping', () => {
       now: () => '2026-06-07T00:00:00Z',
     });
 
-    await expect(platform.runs.submitComposerIntent({
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
       conversationId: 'hub-session-1',
       text: '继续 v4 clean rebuild',
       mode: 'code',
@@ -195,7 +281,7 @@ describe('webPlatform workbench agent mapping', () => {
       }],
       approvalMode: 'workspace-write',
       workDir: 'D:\\Code\\TokenDance\\AgentHub',
-    })).resolves.toEqual({ intentId: 'task-1' });
+    }, 'target-local-edge-1'))).resolves.toEqual({ intentId: 'task-1' });
 
     expect(hubClient.sendMessage).toHaveBeenCalledWith('hub-session-1', {
       client_msg_id: 'client-message-1',
@@ -208,8 +294,13 @@ describe('webPlatform workbench agent mapping', () => {
       agent_type: 'claude-code',
       display_name: 'Hub Builder',
     });
+    expect(hubClient.listExecutionTargets).toHaveBeenCalledWith({
+      target_type: 'local_edge',
+      pageSize: 50,
+    });
     expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-1', {
       agent_instance_id: 'agent-instance-1',
+      target_id: 'target-local-edge-1',
       model_params: expect.any(String),
     });
     const triggerOptions = hubClient.triggerAgentTask.mock.calls[0]?.[1];
@@ -229,6 +320,70 @@ describe('webPlatform workbench agent mapping', () => {
         content: expect.stringContaining('继续 v4 clean rebuild'),
       }),
     ]);
+    expect(queryClient.getQueryData(['web-v4', 'active-agent-task', 'hub-session-1'])).toEqual({
+      taskId: 'task-1',
+      sessionId: 'hub-session-1',
+      agentInstanceId: 'agent-instance-1',
+      triggerMessageId: 'hub-message-1',
+      targetId: 'target-local-edge-1',
+      status: 'queued',
+    });
+    expect(localStorage.getItem('agenthub.web.activeAgentTask.hub-session-1')).toBe(JSON.stringify({
+      taskId: 'task-1',
+      sessionId: 'hub-session-1',
+      agentInstanceId: 'agent-instance-1',
+      triggerMessageId: 'hub-message-1',
+      targetId: 'target-local-edge-1',
+      status: 'queued',
+    }));
+  });
+
+  it('does not silently choose the first online local_edge target for Web composer dispatch', async () => {
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-no-explicit-target',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn().mockResolvedValue({
+        message_id: 'hub-message-no-explicit-target',
+        seq_id: 51,
+        created_at: '2026-06-07T00:00:08Z',
+      }),
+      triggerAgentTask: vi.fn(),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-local-edge-first',
+            name: 'First Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      createClientMessageId: () => 'client-message-no-explicit-target',
+    });
+
+    await expect(platform.runs.submitComposerIntent({
+      conversationId: 'hub-session-1',
+      text: '不要自动选择第一个 Desktop Edge',
+      mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest',
+    })).rejects.toThrow('Select a Desktop/Edge target before Web can dispatch real Hub work.');
+
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+    expect(hubClient.listExecutionTargets).not.toHaveBeenCalled();
+    expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
   });
 
   it('reuses the cached exact Hub agent instance for repeated profile mentions', async () => {
@@ -259,6 +414,18 @@ describe('webPlatform workbench agent mapping', () => {
         trigger_message_id: 'hub-message-cached-1',
         status: 'queued',
       }),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-local-edge-cached',
+            name: 'Online Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
     };
     const platform = createWebPlatform({
       hubClient,
@@ -273,6 +440,7 @@ describe('webPlatform workbench agent mapping', () => {
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest' as const,
+      executionTargetId: 'target-local-edge-cached',
     };
 
     await platform.runs.submitComposerIntent({ ...baseIntent, text: '第一次触发' });
@@ -281,10 +449,12 @@ describe('webPlatform workbench agent mapping', () => {
     expect(hubClient.addAgentToSession).toHaveBeenCalledTimes(1);
     expect(hubClient.triggerAgentTask).toHaveBeenNthCalledWith(1, 'hub-message-cached-1', {
       agent_instance_id: 'agent-instance-cached',
+      target_id: 'target-local-edge-cached',
       model_params: expect.any(String),
     });
     expect(hubClient.triggerAgentTask).toHaveBeenNthCalledWith(2, 'hub-message-cached-2', {
       agent_instance_id: 'agent-instance-cached',
+      target_id: 'target-local-edge-cached',
       model_params: expect.any(String),
     });
   });
@@ -417,6 +587,18 @@ describe('webPlatform workbench agent mapping', () => {
         created_at: '2026-06-07T00:00:04Z',
       }),
       triggerAgentTask: vi.fn().mockRejectedValue(new Error('task dispatch failed')),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-local-edge-dispatch-failed',
+            name: 'Online Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
     };
     const platform = createWebPlatform({
       hubClient,
@@ -425,14 +607,14 @@ describe('webPlatform workbench agent mapping', () => {
       now: () => '2026-06-07T00:00:03Z',
     });
 
-    await expect(platform.runs.submitComposerIntent({
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
       conversationId: 'hub-session-1',
       text: '消息已发送但任务失败',
       mode: 'code',
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest',
-    })).rejects.toThrow('task dispatch failed');
+    }, 'target-local-edge-dispatch-failed'))).rejects.toThrow('task dispatch failed');
 
     expect(hubMessages(queryClient)).toEqual([
       expect.objectContaining({
@@ -444,8 +626,104 @@ describe('webPlatform workbench agent mapping', () => {
     ]);
     expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-dispatch-failed', {
       agent_instance_id: 'agent-instance-dispatch-failed',
+      target_id: 'target-local-edge-dispatch-failed',
       model_params: expect.any(String),
     });
+  });
+
+  it('rejects real Hub agent task dispatch when no online local_edge target is available', async () => {
+    const hubClient = {
+      addAgentToSession: vi.fn().mockResolvedValue({
+        id: 'agent-instance-no-target',
+        agent_type: 'claude-code',
+        session_id: 'hub-session-1',
+        inviter_user_id: 'user-1',
+        display_name: 'Hub Builder',
+      }),
+      sendMessage: vi.fn().mockResolvedValue({
+        message_id: 'hub-message-no-target',
+        seq_id: 50,
+        created_at: '2026-06-07T00:00:07Z',
+      }),
+      triggerAgentTask: vi.fn(),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-relay-1',
+            name: 'Hub Relay',
+            target_type: 'hub_relay',
+            health_state: 'healthy',
+            is_online: true,
+          },
+        ],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      createClientMessageId: () => 'client-message-no-target',
+    });
+
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
+      conversationId: 'hub-session-1',
+      text: '需要本机 Edge 目标',
+      mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest',
+    }, 'target-relay-1'))).rejects.toThrow('Selected Desktop/Edge target is not dispatchable: target type hub_relay.');
+
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+    expect(hubClient.listExecutionTargets).toHaveBeenCalledWith({
+      target_type: 'local_edge',
+      pageSize: 50,
+    });
+    expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
+  });
+
+  it('rejects selected unhealthy Desktop targets before sending a Hub message', async () => {
+    const hubClient = {
+      addAgentToSession: vi.fn(),
+      sendMessage: vi.fn(),
+      triggerAgentTask: vi.fn(),
+      listExecutionTargets: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'target-stale',
+            name: 'Stale Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'stale',
+            is_online: true,
+          },
+          {
+            id: 'target-mismatch',
+            name: 'Mismatched Desktop Edge',
+            target_type: 'local_edge',
+            health_state: 'mismatch',
+            is_online: false,
+          },
+        ],
+        page: { hasMore: false },
+      }),
+    };
+    const platform = createWebPlatform({
+      hubClient,
+      createClientMessageId: () => 'client-message-stale-target',
+    });
+
+    await expect(platform.runs.submitComposerIntent(withExecutionTarget({
+      conversationId: 'hub-session-1',
+      text: '不要盲目启动',
+      mode: 'code',
+      mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
+      attachments: [],
+      approvalMode: 'suggest',
+    }, 'target-stale'))).rejects.toThrow('Selected Desktop/Edge target is not dispatchable: stale.');
+
+    expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
+    expect(hubClient.sendMessage).not.toHaveBeenCalled();
+    expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();
   });
 
   it('rejects runtime-less agent mentions before sending a Hub message', async () => {

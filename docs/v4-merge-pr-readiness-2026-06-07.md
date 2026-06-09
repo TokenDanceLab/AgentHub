@@ -79,9 +79,7 @@ c1f79944 feat(ui): align desktop and web v4 workbench
 - `edge-server/internal/store/file_store.go`
 - `edge-server/internal/store/store.go`
 - `BACKEND-MERGE-PLAN.md`
-- `app/mobile/README.md`
-- `app/mobile/scripts/visual-qa.mjs`
-- `app/mobile/vite.config.ts`
+- Mobile is now owned by the Expo/RN lane under `app/mobile-rn/`; old Mobile Tauri files are not part of the Desktop/Web v4 merge readiness surface.
 
 ## PR 前置条件
 

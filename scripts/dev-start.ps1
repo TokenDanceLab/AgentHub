@@ -10,7 +10,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Resolve repo root (parent of the scripts/ directory)
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 # Track started process IDs for cleanup
 $Pids = [System.Collections.ArrayList]::new()
@@ -124,20 +124,20 @@ try {
 }
 finally {
     Write-Host "`nShutting down..." -ForegroundColor Yellow
-    foreach ($pid in $Pids) {
+    foreach ($processId in $Pids) {
         # Try graceful first, then force if still running
-        $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+        $proc = Get-Process -Id $processId -ErrorAction SilentlyContinue
         if ($proc -and !$proc.HasExited) {
-            Write-Host "  Stopping PID $pid ($($proc.ProcessName))..." -ForegroundColor DarkGray
-            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            Write-Host "  Stopping PID $processId ($($proc.ProcessName))..." -ForegroundColor DarkGray
+            Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
         }
     }
     # Backup: kill any remaining with taskkill /T for process tree
     $remaining = $Pids | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue } | Where-Object { $_ -and !$_.HasExited }
     if ($remaining) {
         Start-Sleep 1
-        foreach ($pid in $Pids) {
-            taskkill /F /T /PID $pid 2>$null
+        foreach ($processId in $Pids) {
+            taskkill /F /T /PID $processId 2>$null
         }
     }
     Write-Host "All services stopped." -ForegroundColor Green

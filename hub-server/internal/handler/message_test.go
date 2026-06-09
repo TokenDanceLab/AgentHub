@@ -13,16 +13,20 @@ import (
 )
 
 type mockMessageService struct {
-	sendMsgFn     func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
-	getMsgsFn     func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
-	getMsgsIncrFn func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
-	recallFn      func(ctx context.Context, msgID, userID string) error
-	pinFn         func(ctx context.Context, userID, sessionID, msgID string) error
-	unpinFn       func(ctx context.Context, userID, sessionID, msgID string) error
-	listPinsFn    func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
-	forwardFn     func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
-	markReadFn    func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
-	searchFn      func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
+	sendMsgFn        func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
+	getMsgsFn        func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
+	getMsgsIncrFn    func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
+	recallFn         func(ctx context.Context, msgID, userID string) error
+	pinFn            func(ctx context.Context, userID, sessionID, msgID string) error
+	unpinFn          func(ctx context.Context, userID, sessionID, msgID string) error
+	listPinsFn       func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
+	forwardFn        func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
+	markReadFn       func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
+	searchFn         func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
+	editFn           func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error)
+	addReactionFn    func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	removeReactionFn func(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error)
+	listReactionsFn  func(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error)
 }
 
 func (m *mockMessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {
@@ -54,6 +58,18 @@ func (m *mockMessageService) MarkRead(ctx context.Context, userID, sessionID str
 }
 func (m *mockMessageService) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
 	return m.searchFn(ctx, userID, q, sessionID, contentType, from, to)
+}
+func (m *mockMessageService) EditMessage(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+	return m.editFn(ctx, msgID, userID, req)
+}
+func (m *mockMessageService) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return m.addReactionFn(ctx, userID, sessionID, msgID, reaction)
+}
+func (m *mockMessageService) RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*service.MessageReactionResponse, error) {
+	return m.removeReactionFn(ctx, userID, sessionID, msgID, reaction)
+}
+func (m *mockMessageService) ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]service.MessageReactionResponse, error) {
+	return m.listReactionsFn(ctx, userID, sessionID, msgID)
 }
 
 // ── SendMessage ─────────────────────────────────────────────────────
@@ -220,6 +236,87 @@ func TestMessageHandler_RecallMessage_NotFound(t *testing.T) {
 
 	if w.Code != 404 {
 		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+// ── EditMessage ─────────────────────────────────────────────────────
+
+func TestMessageHandler_EditMessage_Success(t *testing.T) {
+	svc := &mockMessageService{
+		editFn: func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+			if msgID != "m1" || userID != "u1" {
+				t.Fatalf("unexpected ids: msgID=%s userID=%s", msgID, userID)
+			}
+			if req.ContentType != "text" || req.Content != "edited text" {
+				t.Fatalf("unexpected edit request: %+v", req)
+			}
+			return &service.EditMessageResponse{MessageID: "m1", EditedAt: "2026-01-01T12:00:00Z"}, nil
+		},
+	}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("PUT", "/client/messages/m1", map[string]string{
+		"content_type": "text",
+		"content":      "edited text",
+	}, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "m1"}}
+	h.EditMessage(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMessageHandler_EditMessage_NotFound(t *testing.T) {
+	svc := &mockMessageService{
+		editFn: func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+			return nil, errcode.MsgNotFound
+		},
+	}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("PUT", "/client/messages/missing", map[string]string{
+		"content_type": "text",
+		"content":      "edited",
+	}, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "missing"}}
+	h.EditMessage(c)
+
+	if w.Code != 404 {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestMessageHandler_EditMessage_Timeout(t *testing.T) {
+	svc := &mockMessageService{
+		editFn: func(ctx context.Context, msgID, userID string, req service.EditMessageRequest) (*service.EditMessageResponse, error) {
+			return nil, errcode.MsgEditTimeout
+		},
+	}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("PUT", "/client/messages/m1", map[string]string{
+		"content_type": "text",
+		"content":      "too late",
+	}, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "m1"}}
+	h.EditMessage(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestMessageHandler_EditMessage_BadRequest(t *testing.T) {
+	svc := &mockMessageService{}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("PUT", "/client/messages/m1", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "m1"}}
+	h.EditMessage(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }
 

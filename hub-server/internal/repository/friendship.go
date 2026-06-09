@@ -60,6 +60,10 @@ func DeleteFriendshipPair(db *gorm.DB, userID1, userID2 string) error {
 	})
 }
 
+func DeleteFriendship(db *gorm.DB, friendship *model.Friendship) error {
+	return db.Delete(friendship).Error
+}
+
 func UpsertFriendship(db *gorm.DB, f *model.Friendship) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}, {Name: "friend_id"}},

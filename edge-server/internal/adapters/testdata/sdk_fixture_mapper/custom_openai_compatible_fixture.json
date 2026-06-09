@@ -1,0 +1,109 @@
+{
+  "provider": "custom-openai-compatible-fixture",
+  "events": [
+    {
+      "id": "custom_capability_1",
+      "type": "capability_health",
+      "runtimeId": "custom-openai-compatible",
+      "adapterId": "custom-openai-compatible",
+      "adapterMode": "fixture",
+      "fixtureTransport": "fixture-file",
+      "workspacePathPolicy": "workspace-relative-or-basename",
+      "rawSdkObjectPolicy": "never-expose-above-edge-adapter",
+      "capabilities": {
+        "streaming": true,
+        "toolCalls": true,
+        "fileChanges": true,
+        "permissionHooks": true,
+        "mcpIntegration": true,
+        "fixtureOnly": true,
+        "noSpendDefault": true,
+        "transports": ["fixture-file"]
+      },
+      "health": {
+        "state": "fixture-ready",
+        "reason": "custom OpenAI-compatible fixture uses no SDK package or model call",
+        "checks": {
+          "transport": "fixture-only",
+          "spend": "blocked"
+        },
+        "metadata": {
+          "workspace_path": "D:\\Code\\TokenDance\\AgentHub\\private",
+          "api_key": "sk-custom-not-real"
+        }
+      }
+    },
+    {
+      "id": "custom_tool_1",
+      "type": "tool_call",
+      "sessionId": "custom_session_1",
+      "callId": "custom_call_patch",
+      "toolName": "workspace.patch",
+      "input": {
+        "path": "edge-server/internal/adapters/runtime_manifest.go",
+        "authorization": "Bearer custom-secret-token"
+      },
+      "traceRefs": ["trace:custom:tool-call"]
+    },
+    {
+      "id": "custom_tool_result_1",
+      "type": "tool_result",
+      "sessionId": "custom_session_1",
+      "callId": "custom_call_patch",
+      "toolName": "workspace.patch",
+      "output": "patched runtime manifest fixture evidence"
+    },
+    {
+      "id": "custom_permission_1",
+      "type": "permission_requested",
+      "requestId": "perm_custom_shell",
+      "callId": "custom_call_test",
+      "toolName": "shell.test",
+      "riskLevel": "medium",
+      "reason": "custom runtime requested test execution approval",
+      "input": {
+        "command": "go test ./internal/adapters -run TestSDKFixtureMapper -count=1",
+        "cwd": "D:\\Code\\TokenDance\\AgentHub"
+      }
+    },
+    {
+      "id": "custom_route_1",
+      "type": "route_decision",
+      "action": "delegate",
+      "nextWorker": "fixture-evidence-worker",
+      "targetAgent": "fixture-evidence-worker",
+      "instructions": "Collect custom runtime fixture proof.",
+      "reason": "custom OpenAI-compatible runtime asked AgentHub to route evidence work"
+    },
+    {
+      "id": "custom_file_1",
+      "type": "file_change",
+      "callId": "custom_call_patch",
+      "toolName": "workspace.patch",
+      "path": "edge-server/internal/adapters/testdata/sdk_fixture_mapper/custom_openai_compatible_fixture.json",
+      "kind": "created",
+      "diff": "@@ custom fixture diff @@"
+    },
+    {
+      "id": "custom_artifact_1",
+      "type": "artifact.created",
+      "artifactId": "artifact_custom_fixture",
+      "path": "C:\\Users\\Ding\\private\\custom-fixture-evidence.json",
+      "kind": "json",
+      "sizeBytes": 512,
+      "summary": "Custom OpenAI-compatible fixture evidence",
+      "metadata": {
+        "token": "custom-token-secret",
+        "provider": "custom-openai-compatible"
+      }
+    },
+    {
+      "id": "custom_result_1",
+      "type": "result",
+      "sessionId": "custom_session_1",
+      "success": true,
+      "summary": "Custom OpenAI-compatible fixture completed.",
+      "evidenceRefs": ["artifact:artifact_custom_fixture"]
+    }
+  ]
+}

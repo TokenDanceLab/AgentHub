@@ -178,6 +178,11 @@ export interface FileDiff {
   additions: number;
   deletions: number;
   hunks: DiffHunk[];
+  editId?: string | undefined;
+  hash?: string | undefined;
+  reviewStatus?: string | undefined;
+  canApply?: boolean | undefined;
+  canRevert?: boolean | undefined;
 }
 
 export interface DiffHunk {

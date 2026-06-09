@@ -1,4 +1,9 @@
-export type WorkbenchDataMode = 'auto' | 'demo' | 'real';
+export type WorkbenchDataMode =
+  | 'auto'
+  | 'mock'
+  | 'fixture'
+  | 'observed'
+  | 'approved-real';
 
 export const WORKBENCH_DATA_MODE_STORAGE_KEY = 'agenthub.workbench.dataMode';
 const WORKBENCH_DATA_MODE_EVENT = 'agenthub:workbench-data-mode';
@@ -8,14 +13,50 @@ export function normalizeWorkbenchDataMode(value: string | undefined): Workbench
     case 'auto':
     case '自动':
       return 'auto';
-    case 'demo':
     case 'mock':
     case '模拟':
-      return 'demo';
+      return 'mock';
+    case 'demo':
+    case 'fixture':
+    case 'fixtures':
+      return 'fixture';
+    case 'observed':
+    case 'observe':
+    case 'replay':
+      return 'observed';
     case 'real':
     case 'normal':
+    case 'approved-real':
+    case 'approved_real':
+    case 'approved real':
     case '正常':
-      return 'real';
+      return 'approved-real';
+    default:
+      return 'auto';
+  }
+}
+
+export function isWorkbenchFixtureDataMode(mode: WorkbenchDataMode): boolean {
+  const normalized = normalizeWorkbenchDataMode(mode);
+  return normalized === 'mock' || normalized === 'fixture';
+}
+
+export function isWorkbenchRealDataMode(mode: WorkbenchDataMode): boolean {
+  const normalized = normalizeWorkbenchDataMode(mode);
+  return normalized === 'observed' || normalized === 'approved-real';
+}
+
+export function workbenchDataModeLabel(mode: WorkbenchDataMode): string {
+  switch (normalizeWorkbenchDataMode(mode)) {
+    case 'mock':
+      return 'mock';
+    case 'fixture':
+      return 'fixture';
+    case 'observed':
+      return 'observed';
+    case 'approved-real':
+      return 'approved-real';
+    case 'auto':
     default:
       return 'auto';
   }
@@ -35,7 +76,7 @@ export function readWorkbenchDataModeOverride(): WorkbenchDataMode | undefined {
 export function writeWorkbenchDataModeOverride(mode: WorkbenchDataMode): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, mode);
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, normalizeWorkbenchDataMode(mode));
     window.dispatchEvent(new Event(WORKBENCH_DATA_MODE_EVENT));
   } catch {
     // Storage can be unavailable in hardened browser contexts.

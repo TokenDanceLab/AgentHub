@@ -24,6 +24,7 @@ type dispatchPayload struct {
 	AgentType        string `json:"agent_type"`
 	CustomAgentID    string `json:"custom_agent_id,omitempty"`
 	TargetID         string `json:"target_id,omitempty"`
+	EdgeDeviceID     string `json:"edge_device_id,omitempty"`
 	SessionID        string `json:"session_id"`
 	TriggerMessageID string `json:"trigger_message_id"`
 	TriggerUserID    string `json:"trigger_user_id"`
@@ -225,30 +226,32 @@ func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targe
 	if target.OwnerID != userID {
 		return nil, errcode.TargetNotFound
 	}
-	switch target.TargetType {
-	case "local_edge", "hub_relay", "remote_ssh", "tailscale", "cloud_edge":
-		if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
-			return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
-		}
-		deviceID := strings.TrimSpace(*target.DeviceID)
-		device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
-			}
-			return nil, err
-		}
-		if device.UserID != userID || device.DeviceType != "desktop" {
-			return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
-		}
-		return &dispatchTargetSnapshot{
-			ID:         target.ID,
-			TargetType: target.TargetType,
-			DeviceID:   deviceID,
-		}, nil
-	default:
+	if target.TargetType != "local_edge" {
 		return nil, errcode.TargetNotRoutable.WithMessage("execution target type is not dispatchable yet")
 	}
+	healthState := resolveExecutionTargetHealthState(target, time.Now())
+	if healthState != "online" && healthState != "healthy" {
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target health is " + healthState)
+	}
+	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
+	}
+	deviceID := strings.TrimSpace(*target.DeviceID)
+	device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+		}
+		return nil, err
+	}
+	if device.UserID != userID || device.DeviceType != "desktop" {
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+	}
+	return &dispatchTargetSnapshot{
+		ID:         target.ID,
+		TargetType: target.TargetType,
+		DeviceID:   deviceID,
+	}, nil
 }
 
 func promptFromMessage(msg *model.Message) string {
@@ -273,6 +276,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		AgentInstanceID:  ai.ID,
 		AgentType:        normalizeRuntimeAgentType(ai.AgentType),
 		TargetID:         task.TargetID,
+		EdgeDeviceID:     task.EdgeDeviceID,
 		SessionID:        ai.SessionID,
 		TriggerMessageID: task.TriggerMessageID,
 		TriggerUserID:    task.TriggeredByUserID,
@@ -344,7 +348,13 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			slog.Error("failed to mark agent task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
 			return
 		}
-		s.mgr.PushToConn(connID, frame)
+		result := s.mgr.PushToConn(connID, frame)
+		if !result.Queued {
+			slog.Warn("agent task websocket dispatch not queued; preserving pending task", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+			if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
+				slog.Error("failed to preserve agent task after websocket dispatch failure", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
+			}
+		}
 		return
 	}
 
@@ -499,7 +509,11 @@ func (s *AgentService) dispatchTargetBoundTask(ctx context.Context, cacheClient 
 		slog.Error("failed to mark target-bound agent task dispatched", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
 		return
 	}
-	s.mgr.PushToConn(connID, frame)
+	result := s.mgr.PushToConn(connID, frame)
+	if !result.Queued {
+		slog.Warn("target-bound agent task websocket dispatch not queued; preserving pending task", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+		queueTargetTask("websocket delivery not queued", result.Err)
+	}
 }
 
 // CancelTask cancels a pending task by its ID.

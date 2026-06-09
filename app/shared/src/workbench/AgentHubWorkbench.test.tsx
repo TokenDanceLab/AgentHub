@@ -1,12 +1,22 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '../demo';
+import { WORKBENCH_DATA_MODE_STORAGE_KEY, projectGroupMessageLoopTranscript } from '../demo';
 import { createMockPlatform } from '../platform/createMockPlatform';
 import type { WorkbenchAgent } from '../platform/types';
 import type { TranscriptBlock } from '../transcript/types';
 import { AgentHubWorkbench } from './AgentHubWorkbench';
 import { DESIGN_NAV_GLYPH_SIZE, DESIGN_NAV_GLYPH_STROKE_WIDTH } from './designIcons';
+
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: () => null,
+  Codex: () => null,
+  GeminiCLI: () => null,
+  ModelIcon: () => null,
+  OpenCode: () => null,
+  ProviderIcon: () => null,
+}));
+vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 describe('AgentHubWorkbench', () => {
   afterEach(() => {
@@ -50,6 +60,22 @@ describe('AgentHubWorkbench', () => {
         { id: 'run-v4', kind: 'run', label: 'Run v4', status: 'running' },
         { id: 'ev-tool', kind: 'tool', label: 'Read desktop/index.html', status: 'completed' },
       ],
+    },
+    {
+      id: 'run-session-1',
+      kind: 'run_session',
+      author: { id: 'hub', name: 'Hub replay', role: 'system' },
+      title: 'Hub replay for desktop run',
+      status: 'running',
+      meta: 'same Hub task projected from Edge run',
+      runId: 'run-v4',
+      taskId: 'task-v4',
+      edgeRunId: 'edge-run-v4',
+      adapterId: 'codex',
+      deviceId: 'desktop-device-1',
+      sourceLabel: 'Hub replay',
+      modeLabel: 'Replay',
+      targetLabel: 'Edge run evidence',
     },
     {
       id: 'thinking-1',
@@ -182,6 +208,167 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByTestId('composer-attachment-input')).not.toBeInTheDocument();
     expect(screen.getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
     expect(screen.getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
+    expect(screen.getByText('Hub replay for desktop run')).toBeInTheDocument();
+    expect(screen.getByText('Source: Hub replay')).toBeInTheDocument();
+    expect(screen.getByText('Mode: Replay')).toBeInTheDocument();
+    expect(screen.getByText('Target: Edge run evidence')).toBeInTheDocument();
+    expect(screen.getByText('Hub task: task-v4')).toBeInTheDocument();
+    expect(screen.getByText('Edge run: edge-run-v4')).toBeInTheDocument();
+    expect(screen.getByText('Adapter: codex')).toBeInTheDocument();
+    expect(screen.getByText('Device: desktop-device-1')).toBeInTheDocument();
+  });
+
+  it('renders read-only runtime evidence snapshots in the right inspector', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+        runtimeEvidence={{
+          runId: 'run-edge-1',
+          diffs: [{
+            filePath: 'src/runtime.ts',
+            status: 'modified',
+            additions: 1,
+            deletions: 1,
+            editId: 'edit-runtime-1',
+            reviewStatus: 'needs_review',
+            canApply: false,
+            canRevert: true,
+            hunks: [{
+              header: '@@ -1 +1 @@',
+              lines: [
+                { type: 'deleted', content: 'old runtime' },
+                { type: 'added', content: 'new runtime' },
+              ],
+            }],
+          }],
+          artifacts: [{
+            id: 'artifact-1',
+            runId: 'run-edge-1',
+            threadId: 'thread-1',
+            kind: 'patch',
+            path: 'reports/runtime.patch',
+            sizeBytes: 2048,
+            createdAt: '2026-06-08T08:10:00.000Z',
+          }],
+          previews: [{
+            id: 'preview-1',
+            runId: 'run-edge-1',
+            threadId: 'thread-1',
+            url: 'http://127.0.0.1:4173/preview',
+            status: 'ready',
+            createdAt: '2026-06-08T08:12:00.000Z',
+          }],
+          sources: { diff: 'edge', artifacts: 'edge', previews: 'edge' },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('运行证据')).toBeInTheDocument();
+    expect(screen.getByText('Hub replay artifact index: 1')).toBeInTheDocument();
+    expect(screen.getByText('Hub replay / run-edge-1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开 reports/runtime.patch 只读预览' })).toBeInTheDocument();
+    expect(screen.queryByText('B0 SQLite 迁移')).not.toBeInTheDocument();
+    expect(screen.queryByText('sqlite-migration-plan.md')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
+
+    expect(screen.getByText('运行证据')).toBeInTheDocument();
+    expect(screen.getByText('Run run-edge-1')).toBeInTheDocument();
+    expect(screen.getAllByText('Edge / 1')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: '打开 diff src/runtime.ts' })).toBeInTheDocument();
+    expect(screen.getByText('edit edit-runtime-1')).toBeInTheDocument();
+    expect(screen.getByText('review needs_review')).toBeInTheDocument();
+    expect(screen.getByText('apply unavailable')).toBeInTheDocument();
+    expect(screen.getByText('revert available')).toBeInTheDocument();
+    expect(screen.getByLabelText('产物 metadata reports/runtime.patch')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Artifact workspace reports/runtime.patch' })).toBeInTheDocument();
+    expect(screen.getByText('Topic: thread-1')).toBeInTheDocument();
+    expect(screen.getByText('Version: run-edge-1')).toBeInTheDocument();
+    expect(screen.getByText('Preview: ready')).toBeInTheDocument();
+    expect(screen.getByText('Download: metadata only')).toBeInTheDocument();
+    expect(screen.getByText('Export: evidence bundle ready')).toBeInTheDocument();
+    expect(screen.getByText('Evidence: Edge')).toBeInTheDocument();
+    expect(screen.getByText('Diff projection: 1 file')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '查看产物 reports/runtime.patch' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开预览 preview-1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /discard/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /revert/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '打开 diff src/runtime.ts' }));
+    const diffPreview = screen.getByLabelText('src/runtime.ts 只读预览');
+    expect(diffPreview).toBeInTheDocument();
+    fireEvent.click(within(diffPreview).getByRole('tab', { name: 'Diff' }));
+    expect(within(diffPreview).getByText((_, node) => node?.textContent === '+new runtime')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '返回概览' }));
+    fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
+    fireEvent.click(screen.getByRole('button', { name: '打开预览 preview-1' }));
+    expect(screen.getByRole('tab', { name: /浏览器/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('http://127.0.0.1:4173/preview')).toBeInTheDocument();
+  });
+
+  it('renders runtime evidence loading, error, and empty states', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: false },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    const { rerender } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        runtimeEvidence={{
+          runId: 'run-edge-2',
+          diffs: [],
+          artifacts: [],
+          previews: [],
+          loading: { diff: true, artifacts: true, previews: true },
+          errors: { diff: true, artifacts: false, previews: true },
+          sources: { diff: 'none', artifacts: 'none', previews: 'none' },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
+
+    expect(screen.getByText('正在读取 diff snapshot')).toBeInTheDocument();
+    expect(screen.getByText('正在读取 artifact index')).toBeInTheDocument();
+    expect(screen.getByText('正在读取 preview index')).toBeInTheDocument();
+    expect(screen.getByText('Diff snapshot 读取失败')).toBeInTheDocument();
+    expect(screen.getByText('Preview index 读取失败')).toBeInTheDocument();
+
+    rerender(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        runtimeEvidence={{
+          runId: 'run-edge-empty',
+          diffs: [],
+          artifacts: [],
+          previews: [],
+          sources: { diff: 'none', artifacts: 'none', previews: 'none' },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('暂无运行证据')).toBeInTheDocument();
+    expect(screen.getByText(/Edge 已返回空 diff、artifact 和 preview snapshot。/)).toBeInTheDocument();
+    expect(screen.getByText(/Diff snapshot: None/)).toBeInTheDocument();
   });
 
   it('hides repeated avatars for rapid consecutive user messages', () => {
@@ -667,7 +854,7 @@ describe('AgentHubWorkbench', () => {
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'agents');
     expect(screen.getAllByText('Builder').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('DeepSeek-V4-Pro').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('glm-5.1').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '项目' }));
@@ -694,6 +881,565 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(projectScope.getByRole('button', { name: '设置' }));
     expect(screen.getByRole('heading', { name: '项目设置' })).toBeInTheDocument();
     expect(screen.getAllByText('成员策略').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the Projects editor visible when Hub project submit fails', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleProjectCreate = vi.fn().mockRejectedValue(new Error('Hub Projects create failed'));
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[{
+          id: 'hub-project-1',
+          name: 'Hub 项目',
+          description: 'Hub workspace',
+          status: 'Hub',
+          meta: '0 runs',
+          members: [],
+          announcement: 'Hub workspace',
+          runs: [],
+          artifacts: [],
+          feed: [],
+        }]}
+        onProjectCreate={handleProjectCreate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    fireEvent.click(screen.getByRole('button', { name: '新建项目' }));
+    fireEvent.change(projectScope.getByLabelText('项目名称'), { target: { value: '失败项目' } });
+    fireEvent.click(projectScope.getByRole('button', { name: '创建项目' }));
+
+    await waitFor(() => {
+      expect(handleProjectCreate).toHaveBeenCalledWith({
+        name: '失败项目',
+        description: '',
+      });
+    });
+    expect(await projectScope.findByRole('alert')).toHaveTextContent('Hub Projects create failed');
+    expect(projectScope.getByRole('button', { name: '创建项目' })).toBeInTheDocument();
+    expect(projectScope.getByLabelText('项目名称')).toHaveValue('失败项目');
+  });
+
+  it('shows a clear Hub Projects empty-state create gate', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleProjectCreate = vi.fn().mockResolvedValue({
+      id: 'hub-project-new',
+      name: '新 Hub 项目',
+      description: 'Hub workspace',
+      status: 'Hub',
+      meta: '0 runs',
+      members: [],
+      announcement: 'Hub workspace',
+      runs: [],
+      artifacts: [],
+      feed: [],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[]}
+        onProjectCreate={handleProjectCreate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectMain = screen.getByRole('heading', { name: '暂无项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    fireEvent.click(projectScope.getByRole('button', { name: '创建第一个项目' }));
+    fireEvent.change(projectScope.getByLabelText('项目名称'), { target: { value: '新 Hub 项目' } });
+    fireEvent.change(projectScope.getByLabelText('项目描述'), { target: { value: 'Hub workspace' } });
+    fireEvent.click(projectScope.getByRole('button', { name: '创建项目' }));
+
+    await waitFor(() => {
+      expect(handleProjectCreate).toHaveBeenCalledWith({
+        name: '新 Hub 项目',
+        description: 'Hub workspace',
+      });
+    });
+  });
+
+  it('hides Hub Projects create affordances when project creation is unavailable', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+
+    expect(screen.getByRole('heading', { name: '暂无项目' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '新建项目' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '创建第一个项目' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '创建项目' })).not.toBeInTheDocument();
+  });
+
+  it('hides Hub Projects update affordances when project updates are unavailable', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[{
+          id: 'hub-project-1',
+          name: 'Hub 项目',
+          description: 'Hub workspace',
+          status: 'Hub',
+          meta: '0 runs',
+          members: [],
+          announcement: 'Hub workspace',
+          runs: [],
+          artifacts: [],
+          feed: [],
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+
+    const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    expect(projectScope.queryByRole('button', { name: '编辑项目' })).not.toBeInTheDocument();
+    expect(projectScope.queryByRole('button', { name: '保存项目' })).not.toBeInTheDocument();
+  });
+
+  it('reports selected Hub project ids to the Web adapter', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleActiveProjectChange = vi.fn();
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[
+          {
+            id: 'hub-project-1',
+            name: 'Hub 项目一',
+            description: 'First Hub workspace',
+            status: 'Hub',
+            meta: '0 runs',
+            members: [],
+            announcement: 'First Hub workspace',
+            runs: [],
+            artifacts: [],
+            feed: [],
+          },
+          {
+            id: 'hub-project-2',
+            name: 'Hub 项目二',
+            description: 'Second Hub workspace',
+            status: 'Hub',
+            meta: '0 runs',
+            members: [],
+            announcement: 'Second Hub workspace',
+            runs: [],
+            artifacts: [],
+            feed: [],
+          },
+        ]}
+        activeProjectId="hub-project-1"
+        onActiveProjectChange={handleActiveProjectChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    fireEvent.click(screen.getByText('Hub 项目二'));
+
+    expect(handleActiveProjectChange).toHaveBeenCalledWith('hub-project-2');
+  });
+
+  it('submits Hub project updates without exposing delete actions', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleProjectUpdate = vi.fn().mockResolvedValue({
+      id: 'hub-project-1',
+      name: 'Hub 项目更新',
+      description: 'Updated workspace',
+      status: 'Hub',
+      meta: '0 runs',
+      members: [],
+      announcement: 'Updated workspace',
+      runs: [],
+      artifacts: [],
+      feed: [],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[{
+          id: 'hub-project-1',
+          name: 'Hub 项目',
+          description: 'Hub workspace',
+          status: 'Hub',
+          meta: '0 runs',
+          members: [],
+          announcement: 'Hub workspace',
+          runs: [],
+          artifacts: [],
+          feed: [],
+        }]}
+        onProjectUpdate={handleProjectUpdate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    fireEvent.click(projectScope.getByRole('button', { name: '编辑项目' }));
+    fireEvent.change(projectScope.getByLabelText('项目名称'), { target: { value: 'Hub 项目更新' } });
+    fireEvent.change(projectScope.getByLabelText('项目描述'), { target: { value: 'Updated workspace' } });
+    fireEvent.click(projectScope.getByRole('button', { name: '保存项目' }));
+
+    await waitFor(() => {
+      expect(handleProjectUpdate).toHaveBeenCalledWith('hub-project-1', {
+        name: 'Hub 项目更新',
+        description: 'Updated workspace',
+      });
+    });
+    expect(projectScope.queryByRole('button', { name: /删除|delete/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the Projects editor visible when Hub project submit fails', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleProjectCreate = vi.fn().mockRejectedValue(new Error('Hub Projects create failed'));
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[{
+          id: 'hub-project-1',
+          name: 'Hub 项目',
+          description: 'Hub workspace',
+          status: 'Hub',
+          meta: '0 runs',
+          members: [],
+          announcement: 'Hub workspace',
+          runs: [],
+          artifacts: [],
+          feed: [],
+        }]}
+        onProjectCreate={handleProjectCreate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
+    expect(projectMain).not.toBeNull();
+    const projectScope = within(projectMain as HTMLElement);
+
+    fireEvent.click(screen.getByRole('button', { name: '新建项目' }));
+    fireEvent.change(projectScope.getByLabelText('项目名称'), { target: { value: '失败项目' } });
+    fireEvent.click(projectScope.getByRole('button', { name: '创建项目' }));
+
+    await waitFor(() => {
+      expect(handleProjectCreate).toHaveBeenCalledWith({
+        name: '失败项目',
+        description: '',
+      });
+    });
+    expect(await projectScope.findByRole('alert')).toHaveTextContent('Hub Projects create failed');
+    expect(projectScope.getByRole('button', { name: '创建项目' })).toBeInTheDocument();
+    expect(projectScope.getByLabelText('项目名称')).toHaveValue('失败项目');
+  });
+
+  it('renders supplied Hub AgentProfiles on the Agents rail page instead of mock agents', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={[{
+          id: 'hub-agent-architect',
+          name: 'Hub Architect',
+          description: 'Architecture owner',
+          status: 'available',
+          runtimeId: 'codex',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          approvalPolicy: 'on-request',
+          permissionMode: 'workspace-write',
+          reasoningEffort: 'high',
+          skills: ['Architecture', 'Review'],
+          toolAllowlist: ['Read File'],
+        }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    expect(within(page).getAllByText('Hub Architect').length).toBeGreaterThan(0);
+    expect(within(page).getAllByText('openai / gpt-5.5').length).toBeGreaterThan(0);
+    expect(within(page).getByText('Architecture · Review')).toBeInTheDocument();
+    expect(within(page).getAllByText('AGENTS.md missing').length).toBeGreaterThan(0);
+    expect(within(page).getByText('partial')).toBeInTheDocument();
+    expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
+    expect(within(page).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
+  });
+
+  it('keeps real Hub empty agents interactive without falling back to mock agents', async () => {
+    const onAgentCreate = vi.fn().mockResolvedValue(undefined);
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={[]}
+        agentProfilesStatus={{ loading: false }}
+        onAgentCreate={onAgentCreate}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    const emptyState = within(page).getByRole('status');
+    expect(within(emptyState).getByText('暂无 Agent Profile')).toBeInTheDocument();
+    expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
+
+    fireEvent.click(within(emptyState).getByRole('button', { name: '添加 Agent' }));
+    expect(within(page).getByDisplayValue('新 Agent 1')).toBeInTheDocument();
+
+    fireEvent.click(within(page).getByRole('button', { name: '保存配置' }));
+    await waitFor(() => expect(onAgentCreate).toHaveBeenCalledTimes(1));
+    expect(onAgentCreate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'draft-agent-1',
+      name: '新 Agent 1',
+      engine: 'codex',
+      scope: 'default',
+    });
+  });
+
+  it('installs a marketplace fixture into the runnable Agents page', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agent 市场' }));
+
+    fireEvent.click(screen.getAllByRole('button', { name: '安装' })[0]!);
+
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    expect(within(page).getAllByText('Target: local_edge · fixture-local-edge').length).toBeGreaterThan(0);
+    expect(within(page).getByDisplayValue('local_edge · fixture-local-edge')).toBeInTheDocument();
+    expect(within(page).getByDisplayValue('ask-before-write')).toBeInTheDocument();
+    expect(within(page).getByText('Memory disabled')).toBeInTheDocument();
+  });
+
+  it('does not render mock Agents, Projects, or Tasks when approved-real data is missing', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agentProfilesStatus={{ loading: false, error: 'Hub AgentProfiles unavailable' }}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projectsStatus={{ loading: false, error: 'Hub Projects unavailable' }}
+        workbenchStatus={{ dataMode: 'approved-real' }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    const agentsPage = screen.getByRole('region', { name: 'Workbench page' });
+    expect(within(agentsPage).getByRole('alert')).toHaveTextContent('Hub AgentProfiles unavailable');
+    expect(within(agentsPage).getByRole('status')).toHaveTextContent('暂无 Agent Profile');
+    expect(within(agentsPage).queryByText('Browser QA')).not.toBeInTheDocument();
+    expect(within(agentsPage).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    const projectsPage = screen.getByRole('region', { name: 'Workbench page' });
+    expect(within(projectsPage).getByRole('alert')).toHaveTextContent('Hub Projects unavailable');
+    expect(within(projectsPage).getByRole('heading', { name: '暂无项目' })).toBeInTheDocument();
+    expect(within(projectsPage).queryByRole('heading', { name: 'AI 游戏项目' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '任务' }));
+    const tasksPage = screen.getByRole('region', { name: 'Workbench page' });
+    expect(within(tasksPage).getByRole('status')).toHaveTextContent('Real Hub tasks are not loaded.');
+    expect(within(tasksPage).queryByRole('button', { name: /B0 SQLite 迁移方案/ })).not.toBeInTheDocument();
+    expect(within(tasksPage).queryByRole('button', { name: /Agent 市场卡片完善/ })).not.toBeInTheDocument();
+  });
+
+  it('saves and deletes supplied Hub AgentProfiles through shared callbacks', async () => {
+    const onAgentUpdate = vi.fn().mockResolvedValue(undefined);
+    const onAgentDelete = vi.fn().mockResolvedValue(undefined);
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={[{
+          id: 'hub-agent-architect',
+          name: 'Hub Architect',
+          description: 'Architecture owner',
+          status: 'available',
+          runtimeId: 'codex',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          permissionMode: 'default',
+        }]}
+        onAgentUpdate={onAgentUpdate}
+        onAgentDelete={onAgentDelete}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+
+    fireEvent.change(within(page).getByLabelText('名称'), {
+      target: { value: 'Hub Architect Prime' },
+    });
+    fireEvent.click(within(page).getByRole('button', { name: '保存配置' }));
+    await waitFor(() => expect(onAgentUpdate).toHaveBeenCalledTimes(1));
+    expect(onAgentUpdate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'hub-agent-architect',
+      name: 'Hub Architect Prime',
+    });
+
+    fireEvent.click(within(page).getByRole('button', { name: '删除' }));
+    await waitFor(() => expect(onAgentDelete).toHaveBeenCalledWith('hub-agent-architect'));
+  });
+
+  it('renders supplied Hub contacts on the Contacts rail page', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        contacts={{
+          members: [{
+            id: 'hub-user-1',
+            name: 'Hub 联系人',
+            initials: 'HU',
+            org: 'TokenDance',
+            status: '在线',
+            tag: 'Hub',
+          }],
+          recentShortcuts: ['Hub 联系人'],
+          orgName: 'TokenDance',
+          orgInitials: 'TD',
+        }}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '联系人' }));
+
+    const contactsPage = screen.getByRole('heading', { name: '组织内联系人' }).closest('main')!;
+    expect(within(contactsPage).getByText('Hub 联系人')).toBeInTheDocument();
+    expect(within(contactsPage).queryByText('Delicious233')).not.toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: '新的联系人' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '新的联系人' }));
+    const pendingPage = screen.getByRole('heading', { name: '新的联系人' }).closest('main')!;
+    expect(within(pendingPage).queryByText('Nora Wang')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '服务台' }));
+    const servicePage = screen.getByRole('heading', { name: '服务台' }).closest('main')!;
+    expect(within(servicePage).queryByText('账号与权限')).not.toBeInTheDocument();
   });
 
   it('keeps the Tasks rail page interactive without leaving the v4 table shell', () => {
@@ -823,24 +1569,26 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '本地开发' }));
 
     expect(screen.getByText('数据模式')).toBeInTheDocument();
-    expect(screen.getByText('自动优先真实数据；Mock 固定设计 fixture；正常只走真实数据。')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '自动' }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Auto 可开发回退；Mock/Fixture 固定本地数据；Observed/Approved real 不回退。')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Auto' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: 'Mock' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: '正常' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Fixture' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Observed' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Approved real' }).length).toBeGreaterThan(0);
     expect(screen.getByRole('region', { name: '数据模式状态' })).toBeInTheDocument();
     expect(screen.getByText('Auto fallback')).toBeInTheDocument();
-    expect(screen.getByText('优先真实数据，开发预览自动回退 Mock')).toBeInTheDocument();
+    expect(screen.getByText('Prefer real data, allow development fallback')).toBeInTheDocument();
     expect(screen.queryByText('Normal 只走真实数据')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Mock' })[0]);
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('demo');
-    expect(screen.getByText('Mock fixture')).toBeInTheDocument();
-    expect(screen.getByText('固定使用 agenthub-design 的演示数据')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Fixture' })[0]);
+    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('fixture');
+    expect(screen.getByText('Fixture data')).toBeInTheDocument();
+    expect(screen.getByText('Pinned shared workbench fixture')).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: '正常' })[0]);
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('real');
-    expect(screen.getByText('Normal data')).toBeInTheDocument();
-    expect(screen.getByText('只使用真实 Hub / Edge 数据')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Approved real' })[0]);
+    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('approved-real');
+    expect(screen.getAllByText('Approved real').length).toBeGreaterThan(0);
+    expect(screen.getByText('Approved real Hub / Edge data only')).toBeInTheDocument();
   });
 
   it('opens the account profile popover from the global rail', () => {
@@ -991,6 +1739,37 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('协作进度 78% · Builder 完成 · Reviewer 复核中。')).toBeInTheDocument();
   });
 
+  it('renders the Agent-to-Agent project group message loop fixture', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [
+        { id: 'agent-collab', title: 'Agent 协作群', kind: 'group', subtitle: 'Orchestrator 已汇总各 Agent 进度' },
+      ],
+    });
+
+    render(
+      <AgentHubWorkbench
+        activeConversationId="agent-collab"
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={projectGroupMessageLoopTranscript}
+      />,
+    );
+
+    expect(screen.getByText('Builder，先把项目群消息闭环的 shared fixture contract 梳理出来。')).toBeInTheDocument();
+    expect(screen.getByText('Agent -> Agent')).toBeInTheDocument();
+    expect(screen.getByText('IM agent_dm · Builder -> Reviewer · task task-a2a-review')).toBeInTheDocument();
+    expect(screen.getByText('@Reviewer 检查 Agent-to-Agent / 项目群 / @Agent 消息线，不启动真实长连接。')).toBeInTheDocument();
+    expect(screen.getAllByText('Group @Agent').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('@Agent queued')).toHaveLength(2);
+    expect(screen.getByText('@Agent assigned')).toBeInTheDocument();
+    expect(screen.getByText('Route Decision')).toBeInTheDocument();
+    expect(screen.getByText('dispatch')).toBeInTheDocument();
+    expect(screen.getByText('Project group @Agent mention routes task-a2a-review to Reviewer; fixture-only, no live push.')).toBeInTheDocument();
+    expect(screen.getAllByText('Reviewer').length).toBeGreaterThan(0);
+  });
+
   it('opens the design card context menu and multi-select toolbar from transcript cards', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
@@ -1024,7 +1803,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(within(menu).getByRole('menuitem', { name: /多选/ }));
 
     const toolbar = screen.getByRole('toolbar', { name: '多选操作' });
-    expect(toolbar).toHaveTextContent('1 已选择 / 11');
+    expect(toolbar).toHaveTextContent('1 已选择 / 12');
     expect(within(toolbar).getByRole('button', { name: '全选' })).toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: '清空' })).toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: '复制' })).toBeInTheDocument();
@@ -1035,11 +1814,37 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
 
     fireEvent.click(within(toolbar).getByRole('button', { name: '清空' }));
-    expect(toolbar).toHaveTextContent('0 框选模式 / 11');
+    expect(toolbar).toHaveTextContent('0 框选模式 / 12');
 
     fireEvent.click(within(toolbar).getByRole('button', { name: '退出' }));
     expect(screen.queryByRole('toolbar', { name: '多选操作' })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('发消息给 Builder')).toBeInTheDocument();
+  });
+
+  it('pins a transcript card from the message action menu', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    const { container } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />,
+    );
+
+    const firstCard = container.querySelector('[data-selectable-card="msg-1"]');
+    expect(firstCard).toBeInTheDocument();
+    fireEvent.contextMenu(firstCard!, { clientX: 120, clientY: 180 });
+
+    const menu = screen.getByRole('menu', { name: '卡片操作菜单' });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /置顶消息/ }));
+
+    expect(screen.getByText('已更新置顶')).toBeInTheDocument();
   });
 
   it('enters multi-select with the design long-press gesture', () => {
@@ -1068,7 +1873,7 @@ describe('AgentHubWorkbench', () => {
       fireEvent.pointerUp(firstCard, { button: 0, clientX: 120, clientY: 180 });
 
       const toolbar = screen.getByRole('toolbar', { name: '多选操作' });
-      expect(toolbar).toHaveTextContent('1 已选择 / 11');
+      expect(toolbar).toHaveTextContent('1 已选择 / 12');
       expect(firstCard).toHaveAttribute('aria-selected', 'true');
       expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
 
@@ -1119,7 +1924,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.keyDown(secondCard, { key: ' ' });
 
     const toolbar = screen.getByRole('toolbar', { name: '多选操作' });
-    expect(toolbar).toHaveTextContent('2 已选择 / 11');
+    expect(toolbar).toHaveTextContent('2 已选择 / 12');
     expect(secondCard).toHaveAttribute('aria-selected', 'true');
   });
 
@@ -1187,6 +1992,194 @@ describe('AgentHubWorkbench', () => {
         }),
       ]);
     });
+  });
+
+  it('submits @Agent main-chain intents with an explicit execution target', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop' }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          replayLabel: 'Hub replay: 0 runtime events observed',
+          targetState: 'ready',
+          targetLabel: 'Alpha Desktop',
+        }}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('@Agent'), {
+      target: { value: 'builder' },
+    });
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-1' },
+    });
+    expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
+    expect(screen.getByText('Target Alpha Desktop')).toBeInTheDocument();
+    expect(screen.getByText('Task draft required')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: 'Start the Web main chain' },
+    });
+    expect(screen.getByText('Task ready')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '启动 Agent 任务' }));
+
+    await waitFor(() => {
+      expect(platform.submittedIntents).toEqual([
+        expect.objectContaining({
+          conversationId: 'team',
+          executionTargetId: 'target-local-edge-1',
+          mentions: [
+            expect.objectContaining({
+              id: 'builder',
+              label: 'Builder',
+              runtimeId: 'claude-code',
+            }),
+          ],
+          text: 'Start the Web main chain',
+        }),
+      ]);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Data: approved-real');
+    expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
+  });
+
+  it('summarizes the Web to Edge demo main chain in one visible strip', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop' }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          replayLabel: 'Hub replay: task task-v4',
+          targetState: 'ready',
+          targetLabel: 'Alpha Desktop',
+        }}
+        runtimeEvidence={{
+          runId: 'run-edge-1',
+          diffs: [],
+          artifacts: [{
+            id: 'artifact-1',
+            runId: 'run-edge-1',
+            threadId: 'thread-1',
+            kind: 'patch',
+            path: 'reports/runtime.patch',
+            sizeBytes: 2048,
+            createdAt: '2026-06-08T08:10:00.000Z',
+          }],
+          previews: [],
+          sources: { diff: 'edge', artifacts: 'edge', previews: 'none' },
+        }}
+        transcript={transcript}
+      />,
+    );
+
+    const strip = screen.getByRole('region', { name: 'Demo main chain status' });
+    expect(within(strip).getByText('Web')).toBeInTheDocument();
+    expect(within(strip).getByText('Hub task')).toBeInTheDocument();
+    expect(within(strip).getByText('task-v4')).toBeInTheDocument();
+    expect(within(strip).getByText('Supervisor')).toBeInTheDocument();
+    expect(within(strip).getByText('Hub replay')).toBeInTheDocument();
+    expect(within(strip).getByText('Worker')).toBeInTheDocument();
+    expect(within(strip).getAllByText('Reviewer').length).toBeGreaterThan(0);
+    expect(within(strip).getByText('Route + event')).toBeInTheDocument();
+    expect(within(strip).getByText('1 route / 2 event')).toBeInTheDocument();
+    expect(within(strip).getByText('Exact target')).toBeInTheDocument();
+    expect(within(strip).getByText('Alpha Desktop')).toBeInTheDocument();
+    expect(within(strip).getByText('Active run')).toBeInTheDocument();
+    expect(within(strip).getByText('edge-run-v4')).toBeInTheDocument();
+    expect(within(strip).getByText('Replay')).toBeInTheDocument();
+    expect(within(strip).getByText('12 transcript blocks')).toBeInTheDocument();
+    expect(within(strip).getByText('Approval/artifact')).toBeInTheDocument();
+    expect(within(strip).getByText('0 approval / 1 artifact / 0 diff / 0 preview')).toBeInTheDocument();
+
+    fireEvent.click(within(strip).getByRole('button', { name: '导出证据 JSON' }));
+    expect(screen.getByText('已复制主链证据 JSON')).toBeInTheDocument();
+  });
+
+  it('blocks @Agent task start until a Desktop/Edge target is selected', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop' }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          replayLabel: 'Hub replay: 0 runtime events observed',
+          targetState: 'no-target',
+        }}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('@Agent'), {
+      target: { value: 'builder' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: 'Run the remote task' },
+    });
+
+    expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
+    expect(screen.getByText('Target missing')).toBeInTheDocument();
+    expect(screen.getByText('Task draft required')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Select a Desktop/Edge target before starting.');
+    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
+    expect(platform.submittedIntents).toEqual([]);
+  });
+
+  it('shows blocked target and disabled export states when the main chain has no evidence', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          targetState: 'no-target',
+        }}
+        transcript={[]}
+      />,
+    );
+
+    const strip = screen.getByRole('region', { name: 'Demo main chain status' });
+    expect(within(strip).getByText('等待 task/replay')).toBeInTheDocument();
+    expect(within(strip).getByText('等待 worker route')).toBeInTheDocument();
+    expect(within(strip).getByText('0 route / 0 event')).toBeInTheDocument();
+    expect(within(strip).getByText('没有在线 Desktop/Edge target')).toBeInTheDocument();
+    expect(within(strip).getByText('等待 Edge evidence')).toBeInTheDocument();
+    expect(within(strip).getByText('暂无 transcript')).toBeInTheDocument();
+    expect(within(strip).getByText('无 approval/artifact evidence')).toBeInTheDocument();
+    expect(within(strip).getByRole('button', { name: '等待证据' })).toBeDisabled();
   });
 
   it('uses Enter to send and Ctrl+Enter for newline by default', async () => {

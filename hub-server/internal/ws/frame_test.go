@@ -88,10 +88,12 @@ func TestAllFrameTypes(t *testing.T) {
 		TypeAuth, TypeTyping,
 		TypeAuthOK, TypeAuthFail,
 		TypeMessageNew, TypeMessageRecall, TypeMessagePin, TypeMessageUnpin,
+		TypeMessageReactionAdded, TypeMessageReactionRemoved,
 		TypeMessageRead, TypeSessionCreated, TypeSessionDissolved,
 		TypeSessionMemberJoined, TypeSessionMemberLeft, TypeSessionInfoUpdated,
 		TypeDeviceOnline, TypeDeviceOffline, TypeDeviceKicked,
 		TypeAgentDispatch, TypeAgentStream, TypeAgentDone, TypeAgentFailed, TypeAgentCancel, TypeAgentControl,
+		TypeTeamRunStarted, TypeTeamEvent, TypeTeamAssignmentDone, TypeTeamAssignmentFailed,
 		TypeNotificationNew, TypeFriendRequest, TypeFriendAccepted,
 	}
 	for _, typ := range types {
@@ -108,6 +110,27 @@ func TestAllFrameTypes(t *testing.T) {
 		}
 		if parsed.Type != typ {
 			t.Errorf("round-trip type mismatch: got %q, want %q", parsed.Type, typ)
+		}
+	}
+}
+
+func TestAgentTeamFrameTypes(t *testing.T) {
+	tests := map[string]string{
+		"run started":       TypeTeamRunStarted,
+		"team event":        TypeTeamEvent,
+		"assignment done":   TypeTeamAssignmentDone,
+		"assignment failed": TypeTeamAssignmentFailed,
+	}
+	want := map[string]string{
+		"run started":       "team.run.started",
+		"team event":        "team.event",
+		"assignment done":   "team.assignment.done",
+		"assignment failed": "team.assignment.failed",
+	}
+
+	for name, got := range tests {
+		if got != want[name] {
+			t.Fatalf("%s = %q, want %q", name, got, want[name])
 		}
 	}
 }

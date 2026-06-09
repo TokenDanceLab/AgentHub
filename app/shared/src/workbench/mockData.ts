@@ -14,6 +14,16 @@ import type {
   ModelInfo,
   PolicyRule,
 } from './pages/AgentsPage';
+import {
+  WORKBENCH_AGENT_MARKET_FIXTURES,
+  WORKBENCH_AGENT_MCP_OPTIONS as AGENT_MCP_OPTIONS,
+  WORKBENCH_AGENT_MODELS as AGENT_MODELS,
+  WORKBENCH_AGENT_MODEL_HEALTH as AGENT_MODEL_HEALTH,
+  WORKBENCH_AGENT_POLICY_RULES as AGENT_POLICY_RULES,
+  WORKBENCH_AGENT_PROFILE_FIXTURES,
+  WORKBENCH_AGENT_SKILL_OPTIONS as AGENT_SKILL_OPTIONS,
+  WORKBENCH_AGENT_TOOL_OPTIONS as AGENT_TOOL_OPTIONS,
+} from './agentProfileCatalog';
 
 export const WORKBENCH_MOCK_CONTACT_MEMBERS: ContactMember[] = [
   { id: 'delicious', name: 'Delicious233', initials: 'D', tag: '当前用户', org: 'TokenDance', status: '在线' },
@@ -150,93 +160,14 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
   },
 ];
 
-export const WORKBENCH_MOCK_AGENT_CONFIGS: AgentConfig[] = [
-  {
-    id: 'builder-agent',
-    name: 'Builder',
-    role: '代码实现',
-    engine: 'Claude Code',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Plan → Code',
-    approval: '写文件前确认',
-    scope: '当前项目',
-    state: 'running',
-    skills: ['Read File', 'Write File', 'Shell', 'Git Diff'],
-    tools: { 'Read File': '允许', 'Write File': '允许', Shell: '允许', 'Git Diff': '需确认', 'Browser Screenshot': '需确认' },
-  },
-  {
-    id: 'reviewer-agent',
-    name: 'Reviewer',
-    role: '审查与验收',
-    engine: 'Claude Code',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Review',
-    approval: '只读默认允许',
-    scope: '当前项目',
-    state: 'ready',
-    skills: ['Read File', 'Git Diff', 'Browser Screenshot'],
-    tools: { 'Read File': '允许', 'Write File': '禁止', Shell: '需确认', 'Git Diff': '允许', 'Browser Screenshot': '允许' },
-  },
-  {
-    id: 'researcher-agent',
-    name: 'Researcher',
-    role: '资料研究',
-    engine: 'DeepSeek',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Research',
-    approval: '外部访问前确认',
-    scope: '文档库',
-    state: 'idle',
-    skills: ['Web 摘要', '文档库', '引用整理'],
-    tools: { 'Read File': '允许', 'Write File': '需确认', Shell: '禁止', 'Git Diff': '需确认', 'Browser Screenshot': '需确认' },
-  },
-  {
-    id: 'deployer-agent',
-    name: 'Deployer',
-    role: '预览与发布',
-    engine: 'Claude Code',
-    model: 'DeepSeek-V4-Pro',
-    mode: 'Deploy',
-    approval: '生产部署前确认',
-    scope: '当前项目',
-    state: 'waiting',
-    skills: ['Shell', '构建', '预览', '产物归档'],
-    tools: { 'Read File': '允许', 'Write File': '允许', Shell: '需确认', 'Git Diff': '允许', 'Browser Screenshot': '允许' },
-  },
-];
-
-export const WORKBENCH_MOCK_AGENT_SKILL_OPTIONS = ['Read File', 'Write File', 'Shell', 'Git Diff', 'Browser Screenshot', 'Web 摘要', '文档库', '引用整理', '构建', '预览', '产物归档'];
-
-export const WORKBENCH_MOCK_AGENT_TOOL_OPTIONS = ['Read File', 'Write File', 'Shell', 'Git Diff', 'Browser Screenshot'];
-
-export const WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES: MarketTemplate[] = [
-  { name: 'Spec Writer', description: '把聊天结论整理成需求和验收标准', category: '文档', detail: '适合需求澄清、PRD、验收标准' },
-  { name: 'Data Analyst', description: '读取表格和日志，生成趋势洞察', category: '数据', detail: '适合运营报表、成本归因、日志分析' },
-  { name: 'Browser QA', description: '用浏览器截图检查页面和交互', category: '测试', detail: '适合本地预览、视觉回归、可用性检查' },
-  { name: 'Release Captain', description: '发布检查、版本说明、回滚清单', category: '发布', detail: '适合上线前检查、公告和回滚方案' },
-  { name: 'Security Reviewer', description: '审查权限边界、密钥暴露和风险项', category: '安全', detail: '适合发布门禁、代码审计、风险登记' },
-  { name: 'Docs Librarian', description: '整理云文档、Handoff 和归档索引', category: '文档', detail: '适合知识库、项目文档和长期归档' },
-];
-
-export const WORKBENCH_MOCK_AGENT_POLICY_RULES: PolicyRule[] = [
-  { name: '写入工作区文件', riskLevel: '中风险', action: '需要确认', description: 'Write File / apply_patch / 格式化输出' },
-  { name: '执行 Shell 命令', riskLevel: '中风险', action: '需要确认', description: '构建、预览、轻量诊断允许进入确认队列' },
-  { name: '访问浏览器截图', riskLevel: '低风险', action: '默认允许', description: '仅用于本地 demo 视觉检查和 DOM 验证' },
-  { name: '生产部署动作', riskLevel: '高风险', action: '禁止', description: '当前 demo 不连接真实部署面' },
-];
-
-export const WORKBENCH_MOCK_AGENT_MODELS: ModelInfo[] = [
-  { name: 'DeepSeek-V4-Pro', state: '默认', description: '长上下文推理与代码实现', assignedAgents: 'Builder, Reviewer, Deployer' },
-  { name: 'kimi-k2.6', state: '备选', description: '前端视觉和多模态审查', assignedAgents: 'Browser QA' },
-  { name: 'glm-5.1', state: '备选', description: '中文文档和知识整理', assignedAgents: 'Docs Librarian' },
-  { name: 'gpt-5-codex', state: '实验', description: '复杂代码任务和工具编排', assignedAgents: 'Researcher' },
-];
-
-export const WORKBENCH_MOCK_AGENT_MODEL_HEALTH: ModelHealth[] = [
-  { name: 'DeepSeek-V4-Pro', status: '可用', meta: '延迟 680ms' },
-  { name: 'kimi-k2.6', status: '可用', meta: '视觉评审优先' },
-  { name: 'gpt-5-codex', status: '实验', meta: '需要手动选择' },
-];
+export const WORKBENCH_MOCK_AGENT_CONFIGS: AgentConfig[] = WORKBENCH_AGENT_PROFILE_FIXTURES;
+export const WORKBENCH_MOCK_AGENT_SKILL_OPTIONS = AGENT_SKILL_OPTIONS;
+export const WORKBENCH_MOCK_AGENT_TOOL_OPTIONS = AGENT_TOOL_OPTIONS;
+export const WORKBENCH_MOCK_AGENT_MCP_OPTIONS = AGENT_MCP_OPTIONS;
+export const WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES: MarketTemplate[] = WORKBENCH_AGENT_MARKET_FIXTURES;
+export const WORKBENCH_MOCK_AGENT_POLICY_RULES: PolicyRule[] = AGENT_POLICY_RULES;
+export const WORKBENCH_MOCK_AGENT_MODELS: ModelInfo[] = AGENT_MODELS;
+export const WORKBENCH_MOCK_AGENT_MODEL_HEALTH: ModelHealth[] = AGENT_MODEL_HEALTH;
 
 export const WORKBENCH_MOCK_AGENT_AUDIT_ROWS: AuditEntry[] = [
   { time: '14:59', agent: 'Builder', tool: 'Write File', result: '需确认', target: 'migrations/0007_chat_threads.sql' },

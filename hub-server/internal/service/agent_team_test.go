@@ -396,6 +396,7 @@ func newMockAgentTeamDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 // mockAgentTeamAgentSvc implements agentTeamAgentSvc for tests.
 type mockAgentTeamAgentSvc struct {
 	triggerMessageID string
+	targetID         string
 	modelParams      string
 	returnTaskID     string
 }
@@ -406,6 +407,7 @@ func (m *mockAgentTeamAgentSvc) AddAgentToSession(ctx context.Context, userID, s
 
 func (m *mockAgentTeamAgentSvc) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	m.triggerMessageID = triggerMessageID
+	m.targetID = targetID
 	m.modelParams = modelParams
 	taskID := m.returnTaskID
 	if taskID == "" {
@@ -442,7 +444,7 @@ func TestAgentTeamService_StartTeamRun_TeamNotFound(t *testing.T) {
 	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	_, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello")
+	_, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello", "")
 	require.Error(t, err)
 	assert.Equal(t, errcode.AgentNotFound, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -462,7 +464,7 @@ func TestAgentTeamService_StartTeamRun_EmptyMembers(t *testing.T) {
 	mock.ExpectQuery(`SELECT * FROM "agent_team_members"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "agent_profile_id", "role", "position", "created_at"}))
 
-	_, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello")
+	_, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello", "")
 	require.Error(t, err)
 	assert.Equal(t, errcode.ErrBadRequest, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -472,6 +474,13 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
 	agentSvc := &mockAgentTeamAgentSvc{}
 	svc := NewAgentTeamService(db, agentSvc, nil)
+	bus := NewBus()
+	t.Cleanup(bus.Close)
+	events := make(chan Event, 1)
+	bus.Subscribe("team.run.started", func(ctx context.Context, event Event) {
+		events <- event
+	})
+	svc.SetBus(bus)
 
 	now := time.Now()
 	agentProfileID := "agent-1"
@@ -528,7 +537,7 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	// Transaction: Commit
 	mock.ExpectCommit()
 
-	run, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello")
+	run, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello", "")
 	require.NoError(t, err)
 	assert.NotNil(t, run)
 	assert.Equal(t, "team-1", run.TeamID)
@@ -536,7 +545,130 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	assert.NotEmpty(t, agentSvc.triggerMessageID)
 	assert.Contains(t, agentSvc.modelParams, "structured_output_schema")
 	assert.Contains(t, agentSvc.modelParams, "AgentHub TeamRun supervisor mode")
+	event := readAgentTeamEvent(t, events)
+	assert.Equal(t, "team.run.started", event.Type)
+	payload, ok := event.Payload.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "team-1", payload["team_id"])
+	assert.Equal(t, run.ID, payload["run_id"])
+	assert.Equal(t, run.SessionID, payload["session_id"])
+	assert.Equal(t, "user-1", payload["user_id"])
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_StartTeamRunPassesTargetIDToSupervisor(t *testing.T) {
+	db, mock := newMockAgentTeamDB(t)
+	agentSvc := &mockAgentTeamAgentSvc{}
+	svc := NewAgentTeamService(db, agentSvc, nil)
+
+	now := time.Now()
+	agentProfileID := "agent-1"
+
+	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
+		AddRow("team-1", "user-1", "My Team", "desc", "", now, now)
+	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
+		WillReturnRows(teamRows)
+
+	memberRows := sqlmock.NewRows([]string{"id", "team_id", "agent_profile_id", "role", "position", "created_at"}).
+		AddRow("member-1", "team-1", agentProfileID, "supervisor", 0, now)
+	mock.ExpectQuery(`SELECT * FROM "agent_team_members"`).
+		WillReturnRows(memberRows)
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`INSERT INTO "sessions"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`INSERT INTO "session_members"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	agentRows := sqlmock.NewRows([]string{"id", "owner_user_id", "name", "avatar_url", "agent_type", "system_prompt", "capability_tags", "tool_whitelist", "model_params", "deleted_at", "created_at", "updated_at"}).
+		AddRow("agent-1", "user-1", "My Agent", "", "codex", "prompt", "[]", "[]", "{}", nil, now, now)
+	mock.ExpectQuery(`SELECT * FROM "custom_agents" WHERE id IN`).
+		WillReturnRows(agentRows)
+	mock.ExpectExec(`INSERT INTO "agent_instances"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`INSERT INTO "session_members"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery(`UPDATE sessions SET next_seq`).
+		WillReturnRows(sqlmock.NewRows([]string{"next_seq"}).AddRow(1))
+	mock.ExpectExec(`INSERT INTO "messages"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`INSERT INTO "agent_team_runs"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	run, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello", "target-local-edge-1")
+	require.NoError(t, err)
+	require.NotNil(t, run.TargetID)
+	assert.Equal(t, "target-local-edge-1", *run.TargetID)
+	assert.Equal(t, "target-local-edge-1", agentSvc.targetID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	bus := NewBus()
+	t.Cleanup(bus.Close)
+	events := make(chan Event, 1)
+	bus.Subscribe("team.assignment.completed", func(ctx context.Context, event Event) {
+		events <- event
+	})
+	svc.SetBus(bus)
+
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "Ship it",
+		Status:       model.AssignmentStatusRunning,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+
+	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", assignment.ID, "done text"))
+
+	event := readAgentTeamEvent(t, events)
+	assert.Equal(t, "team.assignment.completed", event.Type)
+	payload, ok := event.Payload.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, run.ID, payload["team_run_id"])
+	assert.Equal(t, assignment.ID, payload["assignment_id"])
+	assert.Equal(t, run.SessionID, payload["session_id"])
+	assert.Equal(t, "done text", payload["result"])
+}
+
+func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	bus := NewBus()
+	t.Cleanup(bus.Close)
+	events := make(chan Event, 1)
+	bus.Subscribe("team.assignment.failed", func(ctx context.Context, event Event) {
+		events <- event
+	})
+	svc.SetBus(bus)
+
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "Ship it",
+		Status:       model.AssignmentStatusRunning,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+
+	require.NoError(t, svc.FailAssignment(context.Background(), "user-1", assignment.ID, "blocked"))
+
+	event := readAgentTeamEvent(t, events)
+	assert.Equal(t, "team.assignment.failed", event.Type)
+	payload, ok := event.Payload.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, run.ID, payload["team_run_id"])
+	assert.Equal(t, assignment.ID, payload["assignment_id"])
+	assert.Equal(t, run.SessionID, payload["session_id"])
+	assert.Equal(t, "blocked", payload["reason"])
 }
 
 func TestAgentTeamService_GetTeamRunStateReplaysEvents(t *testing.T) {
@@ -621,11 +753,15 @@ func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 
 	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
-		Action:       "delegate",
-		NextWorker:   executor.ID,
-		Instructions: "Implement the replay UI",
-		Reasoning:    "executor owns UI work",
-		Context:      "state endpoint is ready",
+		Action:        "delegate",
+		NextWorker:    executor.ID,
+		Instructions:  "Implement the replay UI",
+		Reasoning:     "executor owns UI work",
+		Reason:        "worker owns fixture implementation",
+		Context:       "state endpoint is ready",
+		AgentID:       executor.ID,
+		ParentTaskID:  "parent-task-1",
+		CorrelationID: "corr-route-1",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, assignment)
@@ -641,17 +777,34 @@ func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *
 	assert.Equal(t, model.TeamEventRouteDecided, events[0].Type)
 	assert.Equal(t, model.TeamEventAssignmentCreated, events[1].Type)
 	assert.Equal(t, model.TeamEventTaskCreated, events[2].Type)
+	var accepted model.CoordinatorRouteDecision
+	require.NoError(t, json.Unmarshal([]byte(events[0].Payload), &accepted))
+	require.NotEmpty(t, accepted.SubtaskID)
+	assert.True(t, accepted.Accepted)
+	assert.Equal(t, executor.ID, accepted.AgentID)
+	assert.Equal(t, "parent-task-1", accepted.ParentTaskID)
+	assert.Equal(t, "worker owns fixture implementation", accepted.Reason)
+	assert.Equal(t, "corr-route-1", accepted.CorrelationID)
 
 	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
 	require.NoError(t, err)
 	require.Len(t, state.RouteLog, 1)
 	assert.Equal(t, "delegate", state.RouteLog[0].Action)
+	assert.Equal(t, "corr-route-1", state.RouteLog[0].CorrelationID)
+	require.Len(t, state.RouteAuditLog, 1)
+	assert.Equal(t, "accepted", state.RouteAuditLog[0].Status)
+	assert.Equal(t, "corr-route-1", state.RouteAuditLog[0].CorrelationID)
+	assert.Equal(t, accepted.SubtaskID, state.RouteAuditLog[0].SubtaskID)
+	assert.Equal(t, "parent-task-1", state.RouteAuditLog[0].ParentTaskID)
+	assert.Equal(t, executor.ID, state.RouteAuditLog[0].AgentID)
+	assert.Equal(t, "worker owns fixture implementation", state.RouteAuditLog[0].Reason)
 	require.Len(t, state.Assignments, 1)
 	assert.Equal(t, assignment.ID, state.Assignments[0].AssignmentID)
 	assert.Equal(t, 1, state.Members[1].ActiveTasks)
 	require.Len(t, state.Tasks, 1)
 	assert.Equal(t, assignment.ID, state.Tasks[0].AssignmentID)
 	assert.Equal(t, executor.ID, state.Tasks[0].AssigneeMemberID)
+	assert.Equal(t, "parent-task-1", state.Tasks[0].ParentTaskID)
 	assert.Equal(t, "Implement the replay UI", state.Tasks[0].Objective)
 	assert.Equal(t, model.TeamTaskStatusPending, state.Tasks[0].Status)
 }
@@ -675,6 +828,13 @@ func TestAgentTeamService_HandleRouteDecisionRejectsMissingWorkerWithAuditEvent(
 	require.Len(t, events, 1)
 	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
 	assert.Contains(t, events[0].Payload, "next_worker")
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.RouteAuditLog, 1)
+	assert.Equal(t, "rejected", state.RouteAuditLog[0].Status)
+	assert.Equal(t, "missing-member", state.RouteAuditLog[0].AgentID)
+	assert.Equal(t, "next_worker is not a team member", state.RouteAuditLog[0].Reason)
 }
 
 func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *testing.T) {
@@ -1089,6 +1249,37 @@ func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *t
 	assert.Equal(t, "edge-run-1", state.RunEvents[0].EdgeRunID)
 	assert.Equal(t, model.RunEventTypeOutputBatch, state.RunEvents[0].EventType)
 	assert.JSONEq(t, `{"content":"runtime output"}`, state.RunEvents[0].Payload)
+}
+
+func TestAgentTeamService_DispatchAssignmentPassesTeamRunTargetID(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	agentSvc := &mockAgentTeamAgentSvc{returnTaskID: "task-dispatch-1"}
+	svc := NewAgentTeamService(db, agentSvc, nil)
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+	targetID := "target-local-edge-1"
+	run.TargetID = &targetID
+	require.NoError(t, db.Model(&model.AgentTeamRun{}).Where("id = ?", run.ID).Update("target_id", targetID).Error)
+	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
+
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "Implement replay",
+		Context:      "include events",
+		Status:       model.AssignmentStatusPending,
+		Depth:        1,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+
+	require.NoError(t, svc.DispatchAssignment(context.Background(), "user-1", assignment.ID))
+
+	assert.Equal(t, "target-local-edge-1", agentSvc.targetID)
+	var reloadedAssignment model.AgentTeamAssignment
+	require.NoError(t, db.Where("id = ?", assignment.ID).First(&reloadedAssignment).Error)
+	require.NotNil(t, reloadedAssignment.RunID)
+	assert.Equal(t, "task-dispatch-1", *reloadedAssignment.RunID)
 }
 
 func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testing.T) {
@@ -1791,6 +1982,17 @@ func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	assert.Equal(t, errcode.AgentNotFound, err)
 }
 
+func readAgentTeamEvent(t *testing.T, events <-chan Event) Event {
+	t.Helper()
+	select {
+	case event := <-events:
+		return event
+	case <-time.After(time.Second):
+		t.Fatal("agent team event was not published")
+	}
+	return Event{}
+}
+
 func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -1822,6 +2024,7 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			session_id TEXT,
 			trigger_user_id TEXT NOT NULL,
 			trigger_message TEXT DEFAULT '',
+			target_id TEXT,
 			status TEXT NOT NULL DEFAULT 'queued',
 			created_at DATETIME,
 			updated_at DATETIME
@@ -1888,6 +2091,7 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			type TEXT NOT NULL,
 			name TEXT DEFAULT '',
 			owner_user_id TEXT,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1956,6 +2160,8 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL,
 			reply_to_message_id TEXT,
 			recalled BOOLEAN NOT NULL DEFAULT FALSE,
+			edited BOOLEAN NOT NULL DEFAULT FALSE,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,

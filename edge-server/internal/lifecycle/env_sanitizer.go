@@ -85,6 +85,8 @@ func IsSensitiveEnvKey(key string) bool {
 		"OPENAI_API_KEY",
 		"ANTHROPIC_API_KEY",
 		"CLAUDE_API_KEY",
+		"GIT_CONFIG_GLOBAL",
+		"GIT_CONFIG_SYSTEM",
 	} {
 		if upper == name {
 			return true
@@ -116,7 +118,7 @@ func isWhitelistedEnvKey(key string) bool {
 		"HOME", "USER", "LOGNAME",
 		// Executable search
 		"PATH",
-			"TMPDIR", "TEMPDIR",
+		"TMPDIR", "TEMPDIR",
 		// Locale
 		"LANG",
 		// Shell and terminal
@@ -170,7 +172,6 @@ func isWhitelistedEnvKey(key string) bool {
 		// Git identity (read-only overrides, no tokens)
 		"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL",
 		"GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
-		"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM",
 	}
 
 	for _, w := range commonWhitelist {
@@ -231,10 +232,10 @@ func sanitizeParentEnv(extraEnv []string) []string {
 		if !found {
 			continue
 		}
-		if isWhitelistedEnvKey(key) {
-			env = append(env, kv)
-		} else if IsSensitiveEnvKey(key) {
+		if IsSensitiveEnvKey(key) {
 			slog.Debug("sensitive env var filtered from agent process", "key", key)
+		} else if isWhitelistedEnvKey(key) {
+			env = append(env, kv)
 		}
 	}
 	env = append(env, extraEnv...)

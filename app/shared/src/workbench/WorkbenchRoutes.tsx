@@ -10,15 +10,20 @@ import {
   readComposerSubmitBehavior,
   writeComposerSubmitBehavior,
 } from './workbenchPreferences';
-import type { WorkbenchAgent } from '../platform';
+import type { LocalCliDiscoveryManifest, WorkbenchAgent } from '../platform';
 import type {
   ContactsPane,
+  ContactGroup,
+  ContactMember,
   DocRow,
   DocsPane,
   ProjectArtifact,
+  ProjectDraft,
   ProjectFilter,
+  ProjectInfo,
   ProjectTab,
   SettingsPaneId,
+  ServiceDesk,
   TaskGroup,
   TaskItem,
   TaskStatus,
@@ -33,7 +38,7 @@ import {
   SettingsPage,
   TasksPage,
 } from './pages';
-import type { AgentConfig, AgentsPaneId } from './pages/AgentsPage';
+import type { AgentConfig, AgentsPaneId, ToolPermission } from './pages/AgentsPage';
 import type { TaskEditDraft } from './pages/TasksPage';
 import type { GlobalRailPage } from './GlobalRail';
 import {
@@ -72,9 +77,53 @@ const TASK_STATUS_SEQUENCE: TaskStatus[] = ['未开始', '进行中', '待评审
 
 export interface WorkbenchRoutesProps {
   activePage: WorkbenchPage;
-  agents: WorkbenchAgent[];
+  agents?: WorkbenchAgent[] | undefined;
+  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
+  dataMode?: string | undefined;
+  contacts?: WorkbenchContactsData | undefined;
   focusedAgentId?: string | undefined;
+  projects?: ProjectInfo[] | undefined;
+  activeProjectId?: string | undefined;
+  projectsStatus?: WorkbenchProjectsStatus | undefined;
+  onActiveProjectChange?: ((projectId: string) => void) | undefined;
+  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onProjectUpdate?: ((
+    projectId: string,
+    draft: ProjectDraft,
+  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
+  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
+  onAgentsRetry?: (() => void) | undefined;
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
+  localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+}
+
+export interface WorkbenchAgentProfilesStatus {
+  loading?: boolean | undefined;
+  error?: string | undefined;
+  actionError?: string | undefined;
+  savingAgentId?: string | undefined;
+  deletingAgentId?: string | undefined;
+}
+
+export interface WorkbenchProjectsStatus {
+  loading?: boolean | undefined;
+  error?: string | undefined;
+  actionError?: string | undefined;
+  saving?: boolean | undefined;
+}
+
+export interface WorkbenchContactsData {
+  members: ContactMember[];
+  externalContacts?: ContactMember[] | undefined;
+  pendingContacts?: ContactMember[] | undefined;
+  starredContacts?: ContactMember[] | undefined;
+  groups?: ContactGroup[] | undefined;
+  serviceDesks?: ServiceDesk[] | undefined;
+  recentShortcuts?: string[] | undefined;
+  orgName?: string | undefined;
+  orgInitials?: string | undefined;
 }
 
 function persistDataModeLabel(value: string): void {
@@ -83,14 +132,23 @@ function persistDataModeLabel(value: string): void {
 
 function dataModeLabel(): string {
   switch (readWorkbenchDataModeOverride()) {
-    case 'demo':
+    case 'mock':
       return 'Mock';
-    case 'real':
-      return '正常';
+    case 'fixture':
+      return 'Fixture';
+    case 'observed':
+      return 'Observed';
+    case 'approved-real':
+      return 'Approved real';
     case 'auto':
     default:
-      return '自动';
+      return 'Auto';
   }
+}
+
+function isRouteRealDataMode(value: string | undefined): boolean {
+  const key = value?.trim().toLowerCase();
+  return key === 'observed' || key === 'approved-real' || key === 'approved real' || key === 'real';
 }
 
 function createDocPreview(doc: DocRow): WorkbenchDocumentPreview {
@@ -321,11 +379,125 @@ function createLocalTask(index: number): TaskItem {
   };
 }
 
+function createMarketInstalledAgent(
+  name: string,
+  description: string,
+  category: string,
+  index: number,
+): AgentConfig {
+  const normalizedName = name.trim() || `市场 Agent ${index}`;
+  const runtime = normalizedName.toLowerCase().includes('browser') ? 'claude-code' : 'codex';
+  const model = runtime === 'claude-code' ? 'anthropic / sonnet' : 'openai / gpt-5-codex';
+  return {
+    id: `installed-market-${index}`,
+    name: normalizedName,
+    role: description.trim() || 'Agent 市场安装模板',
+    icon: runtime,
+    engine: runtime,
+    model,
+    mode: category === '测试' ? 'Review' : 'Reasoning medium',
+    approval: category === '安全' ? 'on-request' : 'ask-before-write',
+    scope: category === '测试' ? 'read-only' : 'workspace-write',
+    targetPreference: 'local_edge · fixture-local-edge',
+    state: 'ready',
+    skills: [category, 'Agent Market', 'Install Fixture'].filter(Boolean),
+    tools: {
+      'Read File': '允许',
+      'Git Diff': '允许',
+      'Write File': category === '文档' ? '需确认' : '禁止',
+      Shell: '需确认',
+      'Browser Screenshot': category === '测试' ? '允许' : '需确认',
+    },
+  };
+}
+
+function workbenchAgentStateToAgentState(status: WorkbenchAgent['status']): AgentConfig['state'] {
+  switch (status) {
+    case 'available':
+      return 'ready';
+    case 'configuring':
+      return 'waiting';
+    case 'unavailable':
+    default:
+      return 'idle';
+  }
+}
+
+function toolPermissionFromAgent(agent: WorkbenchAgent): Record<string, ToolPermission> {
+  const allowedTools = new Set(agent.toolAllowlist ?? []);
+  if (allowedTools.size === 0) return {};
+  return Object.fromEntries(
+    WORKBENCH_MOCK_AGENT_TOOL_OPTIONS.map((tool) => [
+      tool,
+      allowedTools.has(tool) ? '允许' : '需确认',
+    ]),
+  ) as Record<string, ToolPermission>;
+}
+
+function formatAgentTargetPreference(value: string[] | Record<string, unknown> | undefined): string | undefined {
+  if (!value) return undefined;
+  if (Array.isArray(value)) return value.find((item) => item.trim())?.trim();
+  const targetId = typeof value.target_id === 'string' ? value.target_id.trim() : '';
+  const targetType = typeof value.target_type === 'string' ? value.target_type.trim() : '';
+  const workDir = typeof value.work_dir === 'string' ? value.work_dir.trim() : '';
+  const primary = targetId || targetType || workDir;
+  if (!primary) return undefined;
+  if (targetId && targetType) return `${targetType} · ${targetId}`;
+  return primary;
+}
+
+function workbenchAgentToAgentConfig(agent: WorkbenchAgent): AgentConfig {
+  const runtimeLabel = agent.runtimeId?.trim() || 'Hub AgentProfile';
+  const providerLabel = agent.provider?.trim();
+  const modelLabel = [providerLabel, agent.model?.trim()].filter(Boolean).join(' / ') || '未配置模型';
+  const targetPreference = formatAgentTargetPreference(agent.targetPreferences);
+  return {
+    id: agent.id,
+    name: agent.name,
+    role: agent.description?.trim() || 'Hub AgentProfile',
+    ...(agent.icon ? { icon: agent.icon } : {}),
+    engine: runtimeLabel,
+    runtimeId: agent.runtimeId,
+    provider: agent.provider,
+    model: modelLabel,
+    mode: agent.reasoningEffort ? `Reasoning ${agent.reasoningEffort}` : 'Hub read-through',
+    approval: agent.approvalPolicy?.trim() || agent.permissionMode?.trim() || 'Hub 默认策略',
+    approvalMode: agent.permissionMode,
+    scope: agent.permissionMode?.trim() || 'Hub owner scope',
+    ...(targetPreference ? { targetPreference } : {}),
+    state: workbenchAgentStateToAgentState(agent.status),
+    skills: agent.skills ?? [],
+    mcpServers: agent.mcpServers ?? [],
+    toolAllowlist: agent.toolAllowlist ?? [],
+    memorySources: agent.memorySources ?? [],
+    memoryRetention: agent.memoryRetention,
+    memorySummary: agent.memorySummary,
+    targetPreferences: Array.isArray(agent.targetPreferences) ? agent.targetPreferences : [],
+    avatarRef: agent.avatarRef,
+    avatarColor: agent.avatarColor,
+    tools: toolPermissionFromAgent(agent),
+  };
+}
+
 export function WorkbenchRoutes({
   activePage,
   agents,
+  agentProfilesStatus,
+  dataMode,
+  contacts,
   focusedAgentId,
+  projects,
+  activeProjectId,
+  projectsStatus,
+  onActiveProjectChange,
+  onProjectCreate,
+  onProjectUpdate,
+  onAgentCreate,
+  onAgentUpdate,
+  onAgentDelete,
+  onAgentsRetry,
   onAgentProfileOpen,
+  localCliDiscovery,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
@@ -344,7 +516,13 @@ export function WorkbenchRoutes({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
-  const [projectId, setProjectId] = useState(WORKBENCH_MOCK_PROJECTS[0]?.id ?? null);
+  const realDataMode = isRouteRealDataMode(dataMode);
+  const sourceProjects = projects ?? (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS);
+  const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
+  const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
+    ? activeProjectId
+    : null;
+  const projectId = controlledProjectId ?? localProjectId;
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [projectTab, setProjectTab] = useState<ProjectTab>('overview');
   const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
@@ -352,18 +530,230 @@ export function WorkbenchRoutes({
   const [settingsPane, setSettingsPane] = useState<SettingsPaneId>('appearance');
   const [settings, setSettings] = useState(createSettingsDefaults);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(focusedAgentId);
+  const [agentDrafts, setAgentDrafts] = useState<Record<string, AgentConfig>>({});
+  const [draftAgentIds, setDraftAgentIds] = useState<string[]>([]);
+  const [dirtyAgentIds, setDirtyAgentIds] = useState<string[]>([]);
+  const [agentDraftCounter, setAgentDraftCounter] = useState(1);
 
-  void agents;
-  const agentConfigs = WORKBENCH_MOCK_AGENT_CONFIGS;
+  const sourceAgentConfigs = useMemo(
+    () => (agents === undefined
+      ? realDataMode ? [] : WORKBENCH_MOCK_AGENT_CONFIGS
+      : agents.map(workbenchAgentToAgentConfig)),
+    [agents, realDataMode],
+  );
+  const agentConfigs = useMemo(() => [
+    ...draftAgentIds
+      .map((id) => agentDrafts[id])
+      .filter((agent): agent is AgentConfig => Boolean(agent)),
+    ...sourceAgentConfigs.map((agent) => agentDrafts[agent.id] ?? agent),
+  ], [agentDrafts, draftAgentIds, sourceAgentConfigs]);
+  const contactsData = contacts ?? {
+    members: WORKBENCH_MOCK_CONTACT_MEMBERS,
+    externalContacts: WORKBENCH_MOCK_EXTERNAL_CONTACTS,
+    pendingContacts: WORKBENCH_MOCK_PENDING_CONTACTS,
+    starredContacts: WORKBENCH_MOCK_CONTACT_MEMBERS.slice(0, 2),
+    groups: WORKBENCH_MOCK_CONTACT_GROUPS,
+    serviceDesks: WORKBENCH_MOCK_SERVICE_DESKS,
+    recentShortcuts: WORKBENCH_MOCK_CONTACT_SHORTCUTS,
+    orgName: 'TokenDance',
+    orgInitials: 'TD',
+  };
   const profileSources = useMemo(() => [
     ...agentConfigs.map((agent) => ({ ...agent, kind: 'agent' as const })),
-    ...WORKBENCH_MOCK_CONTACT_MEMBERS.map((member) => ({ ...member, kind: 'user' as const })),
-  ], [agentConfigs]);
+    ...contactsData.members.map((member) => ({ ...member, kind: 'user' as const })),
+  ], [agentConfigs, contactsData.members]);
   const effectiveSelectedAgentId = selectedAgentId ?? agentConfigs[0]?.id ?? '';
+  const selectedAgentIsDraft = effectiveSelectedAgentId ? draftAgentIds.includes(effectiveSelectedAgentId) : false;
+  const selectedAgentIsDirty = effectiveSelectedAgentId ? dirtyAgentIds.includes(effectiveSelectedAgentId) : false;
+  const selectedAgentSaving = effectiveSelectedAgentId && agentProfilesStatus?.savingAgentId === effectiveSelectedAgentId;
+  const selectedAgentDeleting = effectiveSelectedAgentId && agentProfilesStatus?.deletingAgentId === effectiveSelectedAgentId;
 
   React.useEffect(() => {
     if (focusedAgentId) setSelectedAgentId(focusedAgentId);
   }, [focusedAgentId]);
+
+  React.useEffect(() => {
+    if (sourceProjects.length === 0) {
+      setLocalProjectId(null);
+      return;
+    }
+    if (!projectId || !sourceProjects.some((project) => project.id === projectId)) {
+      setLocalProjectId(sourceProjects[0]?.id ?? null);
+    }
+  }, [projectId, sourceProjects]);
+
+  function selectProject(nextProjectId: string): void {
+    setLocalProjectId(nextProjectId);
+    onActiveProjectChange?.(nextProjectId);
+  }
+
+  React.useEffect(() => {
+    const sourceIds = new Set(sourceAgentConfigs.map((agent) => agent.id));
+    setAgentDrafts((current) => Object.fromEntries(
+      Object.entries(current).filter(([id]) => draftAgentIds.includes(id) || sourceIds.has(id)),
+    ));
+    setDirtyAgentIds((current) => current.filter((id) => draftAgentIds.includes(id) || sourceIds.has(id)));
+  }, [draftAgentIds, sourceAgentConfigs]);
+
+  React.useEffect(() => {
+    if (!effectiveSelectedAgentId && agentConfigs[0]?.id) {
+      setSelectedAgentId(agentConfigs[0].id);
+      return;
+    }
+    if (effectiveSelectedAgentId && !agentConfigs.some((agent) => agent.id === effectiveSelectedAgentId)) {
+      setSelectedAgentId(agentConfigs[0]?.id);
+    }
+  }, [agentConfigs, effectiveSelectedAgentId]);
+
+  function setAgentDirty(agentId: string): void {
+    setDirtyAgentIds((current) => current.includes(agentId) ? current : [...current, agentId]);
+  }
+
+  function clearAgentDirty(agentId: string): void {
+    setDirtyAgentIds((current) => current.filter((id) => id !== agentId));
+  }
+
+  function patchSelectedAgent(patch: Partial<AgentConfig>): void {
+    if (!effectiveSelectedAgentId) return;
+    const current = agentConfigs.find((agent) => agent.id === effectiveSelectedAgentId);
+    if (!current) return;
+    setAgentDrafts((drafts) => ({
+      ...drafts,
+      [effectiveSelectedAgentId]: { ...current, ...drafts[effectiveSelectedAgentId], ...patch },
+    }));
+    setAgentDirty(effectiveSelectedAgentId);
+  }
+
+  function createAgentDraft(index: number): AgentConfig {
+    return {
+      id: `draft-agent-${index}`,
+      name: `新 Agent ${index}`,
+      role: '',
+      engine: 'codex',
+      runtimeId: 'codex',
+      provider: 'OpenAI Compatible API',
+      model: 'codex / gpt-5-codex',
+      mode: 'Reasoning medium',
+      approval: 'Hub 默认策略',
+      approvalMode: 'approval-required',
+      scope: 'default',
+      targetPreference: '',
+      state: 'waiting',
+      skills: [],
+      mcpServers: [],
+      toolAllowlist: [],
+      memorySources: ['agents-md', 'thread-context'],
+      memoryRetention: 'thread-only',
+      memorySummary: '读取 AGENTS.md 和当前 Thread 上下文',
+      targetPreferences: ['local-edge'],
+      avatarRef: 'agenthub:avatar/draft',
+      tools: {},
+    };
+  }
+
+  function selectAdjacentAgent(deletedId: string): void {
+    const remaining = agentConfigs.filter((agent) => agent.id !== deletedId);
+    setSelectedAgentId(remaining[0]?.id);
+  }
+
+  function handleAgentAdd(): void {
+    const nextIndex = agentDraftCounter;
+    const draft = createAgentDraft(nextIndex);
+    setAgentDraftCounter((current) => current + 1);
+    setDraftAgentIds((current) => [draft.id, ...current]);
+    setAgentDrafts((current) => ({ ...current, [draft.id]: draft }));
+    setAgentDirty(draft.id);
+    setSelectedAgentId(draft.id);
+  }
+
+  function handleMarketInstall(name: string, description: string, category: string): void {
+    const nextIndex = agentDraftCounter;
+    const installed = createMarketInstalledAgent(name, description, category, nextIndex);
+    setAgentDraftCounter((current) => current + 1);
+    setDraftAgentIds((current) => [installed.id, ...current]);
+    setAgentDrafts((current) => ({ ...current, [installed.id]: installed }));
+    setSelectedAgentId(installed.id);
+    setAgentsPane('installed');
+    clearAgentDirty(installed.id);
+  }
+
+  async function handleAgentSave(): Promise<void> {
+    if (!effectiveSelectedAgentId) return;
+    const agent = agentConfigs.find((item) => item.id === effectiveSelectedAgentId);
+    if (!agent) return;
+    if (selectedAgentIsDraft) {
+      try {
+        await onAgentCreate?.(agent);
+      } catch {
+        return;
+      }
+      setDraftAgentIds((current) => current.filter((id) => id !== agent.id));
+      setAgentDrafts((current) => {
+        const { [agent.id]: _removed, ...rest } = current;
+        return rest;
+      });
+      clearAgentDirty(agent.id);
+      return;
+    }
+    try {
+      await onAgentUpdate?.(agent);
+    } catch {
+      return;
+    }
+    clearAgentDirty(agent.id);
+  }
+
+  async function handleAgentDelete(): Promise<void> {
+    if (!effectiveSelectedAgentId) return;
+    const agentId = effectiveSelectedAgentId;
+    if (draftAgentIds.includes(agentId)) {
+      setDraftAgentIds((current) => current.filter((id) => id !== agentId));
+      setAgentDrafts((current) => {
+        const { [agentId]: _removed, ...rest } = current;
+        return rest;
+      });
+      clearAgentDirty(agentId);
+      selectAdjacentAgent(agentId);
+      return;
+    }
+    try {
+      await onAgentDelete?.(agentId);
+    } catch {
+      return;
+    }
+    selectAdjacentAgent(agentId);
+  }
+
+  function handleAgentSkillToggle(skill: string): void {
+    const current = agentConfigs.find((agent) => agent.id === effectiveSelectedAgentId);
+    if (!current) return;
+    const skills = current.skills.includes(skill)
+      ? current.skills.filter((item) => item !== skill)
+      : [...current.skills, skill];
+    patchSelectedAgent({ skills });
+  }
+
+  function handleToolPermissionSet(tool: string, value: ToolPermission): void {
+    const current = agentConfigs.find((agent) => agent.id === effectiveSelectedAgentId);
+    patchSelectedAgent({ tools: { ...(current?.tools ?? {}), [tool]: value } });
+  }
+
+  function handleAgentFieldChange(field: string, value: string): void {
+    if (field === 'state') {
+      patchSelectedAgent({ state: value as AgentConfig['state'] });
+      return;
+    }
+    patchSelectedAgent({ [field]: value } as Partial<AgentConfig>);
+  }
+
+  function agentSaveStateLabel(): string {
+    if (selectedAgentDeleting) return '删除中';
+    if (selectedAgentSaving) return selectedAgentIsDraft ? '创建中' : '保存中';
+    if (agentProfilesStatus?.actionError) return '保存失败';
+    if (selectedAgentIsDraft) return '草稿';
+    if (selectedAgentIsDirty) return '未保存';
+    return '已同步';
+  }
 
   function handleSettingChange(key: string, value: string | boolean): void {
     if (key === 'dataMode' && typeof value === 'string') {
@@ -390,16 +780,17 @@ export function WorkbenchRoutes({
     });
   }
 
+  const sourceTaskGroups = realDataMode ? [] : taskGroups;
   const visibleTaskGroups = useMemo(() => buildTaskGroups(
-    taskGroups,
+    sourceTaskGroups,
     tasksPane,
     taskFilterActive,
     taskSortMode,
     taskGroupMode,
     taskViewMode,
-  ), [taskFilterActive, taskGroupMode, taskGroups, taskSortMode, taskViewMode, tasksPane]);
+  ), [sourceTaskGroups, taskFilterActive, taskGroupMode, taskSortMode, taskViewMode, tasksPane]);
   const visibleTasks = flattenTaskGroups(visibleTaskGroups);
-  const allTasks = flattenTaskGroups(taskGroups);
+  const allTasks = flattenTaskGroups(sourceTaskGroups);
   const selectedTask = allTasks.find((task) => task.id === selectedTaskId) ?? null;
 
   function handleTaskPaneChange(pane: TasksPane): void {
@@ -583,16 +974,16 @@ export function WorkbenchRoutes({
       return (
         <ContactsPage
           activePane={contactsPane}
-          externalContacts={WORKBENCH_MOCK_EXTERNAL_CONTACTS}
-          groups={WORKBENCH_MOCK_CONTACT_GROUPS}
-          members={WORKBENCH_MOCK_CONTACT_MEMBERS}
+          externalContacts={contactsData.externalContacts ?? []}
+          groups={contactsData.groups ?? []}
+          members={contactsData.members}
           onPaneChange={setContactsPane}
-          orgInitials="TD"
-          orgName="TokenDance"
-          pendingContacts={WORKBENCH_MOCK_PENDING_CONTACTS}
-          recentShortcuts={WORKBENCH_MOCK_CONTACT_SHORTCUTS}
-          serviceDesks={WORKBENCH_MOCK_SERVICE_DESKS}
-          starredContacts={WORKBENCH_MOCK_CONTACT_MEMBERS.slice(0, 2)}
+          orgInitials={contactsData.orgInitials ?? 'TD'}
+          orgName={contactsData.orgName ?? 'TokenDance'}
+          pendingContacts={contactsData.pendingContacts ?? []}
+          recentShortcuts={contactsData.recentShortcuts ?? []}
+          serviceDesks={contactsData.serviceDesks ?? []}
+          starredContacts={contactsData.starredContacts ?? []}
         />
       );
     case 'docs':
@@ -615,11 +1006,14 @@ export function WorkbenchRoutes({
         <AgentsPage
           activePane={agentsPane}
           agents={agentConfigs}
+          agentActionError={agentProfilesStatus?.actionError}
+          agentsError={agentProfilesStatus?.error}
+          agentsLoading={agentProfilesStatus?.loading}
           allSkills={WORKBENCH_MOCK_AGENT_SKILL_OPTIONS}
           allTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
           auditEntries={WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
           confirmCount={agentConfigs.reduce((total, agent) => total + WORKBENCH_MOCK_AGENT_TOOL_OPTIONS.filter((tool) => agent.tools[tool] === '需确认').length, 0)}
-          defaultModelLabel="DeepSeek-V4-Pro"
+          defaultModelLabel={agentConfigs[0]?.model ?? '未配置模型'}
           installedCount={agentConfigs.length}
           marketFeatured={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(0, 3)}
           marketTemplates={WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES.slice(3)}
@@ -635,11 +1029,23 @@ export function WorkbenchRoutes({
           }))}
           models={WORKBENCH_MOCK_AGENT_MODELS}
           onPaneChange={setAgentsPane}
+          onAgentAdd={handleAgentAdd}
+          onAgentDelete={handleAgentDelete}
+          onAgentFieldChange={handleAgentFieldChange}
           onAgentProfileOpen={onAgentProfileOpen}
+          onAgentSave={handleAgentSave}
           onAgentSelect={setSelectedAgentId}
+          onAgentSkillToggle={handleAgentSkillToggle}
+          onMarketInstall={handleMarketInstall}
+          onAgentsRetry={onAgentsRetry}
+          onToolPermissionSet={handleToolPermissionSet}
           policyRules={WORKBENCH_MOCK_AGENT_POLICY_RULES}
-          recentShortcuts={['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由']}
+          recentShortcuts={agents === undefined ? ['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由'] : agentConfigs.slice(0, 3).map((agent) => `${agent.name} 已同步`)}
           runnableCount={agentConfigs.filter((agent) => agent.state === 'running' || agent.state === 'ready').length}
+          saveStateLabel={agentSaveStateLabel()}
+          isDirty={selectedAgentIsDirty}
+          savingAgentId={agentProfilesStatus?.savingAgentId}
+          deletingAgentId={agentProfilesStatus?.deletingAgentId}
           toolMatrixAgents={agentConfigs.map((agent) => ({
             id: agent.id,
             name: agent.name,
@@ -660,6 +1066,7 @@ export function WorkbenchRoutes({
           dueTodayCount={visibleTasks.filter((task) => task.dueDate.includes('今天')).length}
           fieldConfigActive={!taskShowCreator}
           fieldConfigLabel={taskShowCreator ? '字段配置' : '字段配置 5/6'}
+          emptyStateLabel={realDataMode ? 'Real Hub tasks are not loaded.' : undefined}
           groupActive={taskGroupMode !== 'custom' || taskViewMode !== 'list'}
           groupLabel={
             taskViewMode === 'board'
@@ -678,17 +1085,17 @@ export function WorkbenchRoutes({
           editingTaskId={editingTaskId}
           navMenuOpen={taskNavMenuOpen}
           incompleteCount={visibleTasks.filter((task) => task.status !== '已完成').length}
-          onAddTaskRow={handleCreateTask}
+          onAddTaskRow={realDataMode ? undefined : handleCreateTask}
           onAssignSelectedTaskToMe={handleAssignSelectedTaskToMe}
           onCycleSelectedTaskStatus={handleCycleSelectedTaskStatus}
-          onCreateTask={handleCreateTask}
+          onCreateTask={realDataMode ? undefined : handleCreateTask}
           onCancelTaskEdit={handleCancelTaskEdit}
           onDeleteSelectedTask={handleDeleteSelectedTask}
           onEditDraftChange={handleEditTaskDraftChange}
           onEditSelectedTask={handleEditSelectedTask}
           onFilterBySelectedTaskAssignee={handleFilterBySelectedTaskAssignee}
           onGroupBySelectedTaskProject={handleGroupBySelectedTaskProject}
-          onNewGroup={handleNewTaskGroup}
+          onNewGroup={realDataMode ? undefined : handleNewTaskGroup}
           onNavMore={() => {
             setTaskNavMenuOpen((current) => !current);
             setTaskActionLabel('任务更多操作');
@@ -734,13 +1141,19 @@ export function WorkbenchRoutes({
           onFilterChange={setProjectFilter}
           profiles={profileSources}
           onArtifactClick={(id, artifact) => {
-            setProjectId(id);
+            selectProject(id);
             setProjectPreview(createProjectArtifactPreview(id, artifact));
           }}
           onClosePreview={() => setProjectPreview(null)}
-          onProjectSelect={setProjectId}
+          onProjectCreate={onProjectCreate}
+          onProjectSelect={selectProject}
+          onProjectUpdate={onProjectUpdate}
           onTabChange={setProjectTab}
-          projects={WORKBENCH_MOCK_PROJECTS}
+          projectActionError={projectsStatus?.actionError}
+          projectSaving={projectsStatus?.saving}
+          projects={sourceProjects}
+          projectsError={projectsStatus?.error}
+          projectsLoading={projectsStatus?.loading}
         />
       );
     case 'settings':
@@ -749,6 +1162,7 @@ export function WorkbenchRoutes({
           {...settings}
           activePane={settingsPane}
           onChangeSetting={handleSettingChange}
+          localCliDiscovery={localCliDiscovery}
           onSelectPane={setSettingsPane}
           spaceMeta="桌面设计 demo"
           spaceTitle="AgentHub Desktop"
