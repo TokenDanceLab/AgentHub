@@ -7,7 +7,7 @@
   "theme_color": "#0071BC",
   "description": "AgentHub — Multi-agent collaboration hub on web",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/agenthub-icon-rounded-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/agenthub-icon-rounded-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
