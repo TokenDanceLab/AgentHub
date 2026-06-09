@@ -32,17 +32,76 @@ test.describe('Web Hub task approval/artifact contract', () => {
       }
 
       if (url.pathname === '/client/sessions/session-web-contract/messages') {
-        return route.fulfill(json(hubEnvelope([{
-          id: 'message-contract-1',
-          session_id: 'session-web-contract',
-          seq_id: 1,
-          client_msg_id: 'client-message-contract-1',
-          sender_type: 'user',
-          sender_id: 'user-web-contract',
-          content_type: 'text',
-          content: 'Review the Hub-only task contract.',
-          created_at: '2026-06-09T01:00:00Z',
-        }])));
+        return route.fulfill(json(hubEnvelope([
+          {
+            id: 'message-contract-queued',
+            session_id: 'session-web-contract',
+            seq_id: 1,
+            client_msg_id: 'client-message-contract-queued',
+            sender_type: 'user',
+            sender_id: 'user-web-contract',
+            content_type: 'text',
+            content: {
+              text: '@Reviewer Review the Hub-only task contract.',
+              im_kind: 'project_group',
+              mentions: [{ id: 'agent-reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+              agent_task: { task_id: 'task-web-contract', status: 'queued' },
+            },
+            created_at: '2026-06-09T01:00:00Z',
+          },
+          {
+            id: 'message-contract-assigned',
+            session_id: 'session-web-contract',
+            seq_id: 2,
+            client_msg_id: 'client-message-contract-assigned',
+            sender_type: 'system',
+            sender_id: 'hub-orchestrator',
+            content_type: 'text',
+            content: {
+              text: 'Reviewer accepted task-web-contract.',
+              im_kind: 'project_group',
+              mentions: [{ id: 'agent-reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+              agent_task: { task_id: 'task-web-contract', status: 'assigned' },
+            },
+            created_at: '2026-06-09T01:00:01Z',
+          },
+          {
+            id: 'message-contract-working',
+            session_id: 'session-web-contract',
+            seq_id: 3,
+            client_msg_id: 'client-message-contract-working',
+            sender_type: 'agent',
+            sender_id: 'agent-reviewer',
+            sender: { nickname: 'Reviewer' },
+            content_type: 'text',
+            content: {
+              text: 'Reviewer is checking the Hub task contract.',
+              im_kind: 'project_group',
+              from_agent: { id: 'agent-reviewer', label: 'Reviewer' },
+              mentions: [{ id: 'agent-reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+              agent_task: { task_id: 'task-web-contract', status: 'working' },
+            },
+            created_at: '2026-06-09T01:00:02Z',
+          },
+          {
+            id: 'message-contract-done',
+            session_id: 'session-web-contract',
+            seq_id: 4,
+            client_msg_id: 'client-message-contract-done',
+            sender_type: 'agent',
+            sender_id: 'agent-reviewer',
+            sender: { nickname: 'Reviewer' },
+            content_type: 'text',
+            content: {
+              text: 'Reviewer finished the Hub task contract check.',
+              im_kind: 'project_group',
+              from_agent: { id: 'agent-reviewer', label: 'Reviewer' },
+              mentions: [{ id: 'agent-reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+              agent_task: { task_id: 'task-web-contract', status: 'done' },
+            },
+            created_at: '2026-06-09T01:00:03Z',
+          },
+        ])));
       }
 
       if (url.pathname === '/client/sessions/session-web-contract/pins') {
@@ -172,6 +231,10 @@ test.describe('Web Hub task approval/artifact contract', () => {
 
     await page.goto('/');
 
+    await expect(page.getByText('@Agent queued')).toBeVisible();
+    await expect(page.getByText('@Agent assigned')).toBeVisible();
+    await expect(page.getByText('@Agent working')).toBeVisible();
+    await expect(page.getByText('@Agent done')).toBeVisible();
     await expect(page.getByText('Stubbed Hub approval endpoint')).toBeVisible();
     await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();
     await expect.poll(() => requested.has('GET /web/agent-tasks/task-web-contract/approvals')).toBe(true);
