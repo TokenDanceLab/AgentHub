@@ -28,6 +28,8 @@ const forbiddenPrivateTerms = [
   String.fromCodePoint(0x771f, 0x5b9e, 0x59d3, 0x540d),
   ['real', ' name'].join(''),
 ];
+const pemBoundaryPrefix = ['-----', 'BEGIN'].join('');
+const privateKeyBlockTerm = ['PRIVATE', 'KEY'].join(' ');
 const forbiddenSecretPatterns = [
   { label: 'authorization_bearer', pattern: /Authorization:\s*Bearer\s+[A-Za-z0-9._~+/=-]+/i },
   { label: 'access_token', pattern: /\baccess_token\s*[=:]\s*['"]?[A-Za-z0-9._~+/=-]{8,}/i },
@@ -37,7 +39,7 @@ const forbiddenSecretPatterns = [
   { label: 'password', pattern: /\bpassword\s*[=:]\s*['"]?[^'"\s,}]{8,}/i },
   { label: 'client_secret', pattern: /\bclient_secret\s*[=:]\s*['"]?[A-Za-z0-9._~+/=-]{8,}/i },
   { label: 'jwt', pattern: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/ },
-  { label: 'private_key', pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
+  { label: 'private_key', pattern: new RegExp(`${pemBoundaryPrefix} [A-Z ]*${privateKeyBlockTerm}-----`) },
 ];
 
 describe('AgentHub mobile privacy sanitization', () => {
