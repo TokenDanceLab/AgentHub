@@ -81,7 +81,7 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
     case 'run.failed':
       return runFailedBlock(event);
     case 'run.cancelled':
-      return runTextBlock(event, 'cancelled', 'failed');
+      return runCancelledBlock(event);
     default:
       return null;
   }
@@ -128,6 +128,24 @@ function runFailedBlock(event: EventEnvelope): TranscriptBlock | null {
     ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'failed')),
     kind: 'failure',
     title: `Run ${runId} failed`,
+    runId,
+    ...(reason ? { reason } : {}),
+  };
+}
+
+function runCancelledBlock(event: EventEnvelope): TranscriptBlock | null {
+  const runId = eventRunId(event);
+  if (!runId) return null;
+  const reason =
+    stringField(event.payload.reason) ??
+    stringField(event.payload.error) ??
+    stringField(event.payload.message) ??
+    errorPayloadMessage(event.payload.error);
+
+  return {
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'failed')),
+    kind: 'failure',
+    title: `Run ${runId} cancelled`,
     runId,
     ...(reason ? { reason } : {}),
   };
