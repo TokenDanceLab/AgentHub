@@ -48,6 +48,11 @@ describe('webPlatform workbench agent mapping', () => {
       reasoningEffort: 'high',
       skills: ['Code', 'Review'],
       toolAllowlist: ['Read File'],
+      targetPreferences: {
+        target_id: 'target-local-edge-1',
+        target_type: 'local_edge',
+        work_dir: 'D:\\Code\\TokenDance\\AgentHub',
+      },
       status: 'available',
       capabilities: {
         streaming: true,
@@ -65,6 +70,7 @@ describe('webPlatform workbench agent mapping', () => {
       id: 'agent-profile-1',
       name: 'Hub Builder',
       description: 'Runtime: claude-code - Model: glm-5.1',
+      icon: 'claude-code',
       runtimeId: 'claude-code',
       provider: 'zhipu',
       model: 'glm-5.1',
@@ -73,6 +79,11 @@ describe('webPlatform workbench agent mapping', () => {
       reasoningEffort: 'high',
       skills: ['Code', 'Review'],
       toolAllowlist: ['Read File'],
+      targetPreferences: {
+        target_id: 'target-local-edge-1',
+        target_type: 'local_edge',
+        work_dir: 'D:\\Code\\TokenDance\\AgentHub',
+      },
       status: 'available',
     });
   });

@@ -39,6 +39,7 @@ export interface WorkbenchAgent {
   id: string;
   name: string;
   description?: string | undefined;
+  icon?: string | undefined;
   status?: 'available' | 'unavailable' | 'configuring' | undefined;
   model?: string | undefined;
   runtimeId?: string | undefined;
@@ -54,7 +55,7 @@ export interface WorkbenchAgent {
   memorySources?: string[] | undefined;
   memoryRetention?: string | undefined;
   memorySummary?: string | undefined;
-  targetPreferences?: string[] | undefined;
+  targetPreferences?: string[] | Record<string, unknown> | undefined;
 }
 
 export interface ConversationPort {
