@@ -471,6 +471,15 @@ func TestOpenAPITaskApprovalArtifactRoutesDocumentEnvelope(t *testing.T) {
 	if artifactsRef.Value != "#/components/schemas/AgentTaskArtifactList" {
 		t.Fatalf("task artifacts data ref = %q", artifactsRef.Value)
 	}
+
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+	artifactSchema := yamlMapField(t, schemas, "AgentTaskArtifact", "schemas.AgentTaskArtifact")
+	artifactProperties := yamlMapField(t, artifactSchema, "properties", "schemas.AgentTaskArtifact.properties")
+	for _, property := range []string{"diff", "edit_id", "review_status", "can_apply", "can_revert"} {
+		if yamlOptionalMapField(artifactProperties, property) == nil {
+			t.Fatalf("AgentTaskArtifact schema missing %s", property)
+		}
+	}
 }
 
 func TestOpenAPIRouteMiddlewareMetadataMatchesRouter(t *testing.T) {
