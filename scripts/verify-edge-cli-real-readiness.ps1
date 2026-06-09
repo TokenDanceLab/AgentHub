@@ -27,7 +27,9 @@ param(
     [string]$EvidenceMode = "",
     [string]$OperatorApprovalId = "",
     [string]$RealExecutionEvidenceManifest = "",
+    [string]$OutputManifestPath = "",
     [switch]$RequireApprovalInputs,
+    [switch]$DiscoverCommands,
     [switch]$ApproveNoRealExecution,
     [switch]$ApproveRedactionPolicy,
     [switch]$ApproveArtifactRetention,
@@ -43,6 +45,38 @@ $Warnings = 0
 $Blocks = 0
 
 $SupportedRuntimeIds = @("codex", "claude-code", "opencode")
+$RuntimeReadinessDescriptors = @(
+    [ordered]@{
+        RuntimeId = "codex"
+        CommandName = "codex"
+        VersionArgs = @("--version")
+        HelpArgs = @("--help")
+        JsonMode = "codex exec --json"
+        PermissionBoundary = "operator-approved mode only; never infer approval from CLI defaults"
+        DryPlan = "discover command, inspect --version/--help, record future codex exec --json command shape without prompt"
+        EnvNames = @("AGENTHUB_CODEX_PATH", "OPENAI_API_KEY")
+    },
+    [ordered]@{
+        RuntimeId = "claude-code"
+        CommandName = "claude"
+        VersionArgs = @("--version")
+        HelpArgs = @("--help")
+        JsonMode = "claude --output-format stream-json"
+        PermissionBoundary = "operator-approved permission mode only; approval bridge must be reviewed before real prompt"
+        DryPlan = "discover command, inspect --version/--help, record future claude stream-json command shape without prompt"
+        EnvNames = @("AGENTHUB_CLAUDE_CODE_PATH", "ANTHROPIC_API_KEY")
+    },
+    [ordered]@{
+        RuntimeId = "opencode"
+        CommandName = "opencode"
+        VersionArgs = @("--version")
+        HelpArgs = @("--help")
+        JsonMode = "opencode JSON event stream"
+        PermissionBoundary = "default must not enable dangerously-skip-permissions; bypass requires explicit approval"
+        DryPlan = "discover command, inspect --version/--help, record future opencode JSON command shape without prompt"
+        EnvNames = @("AGENTHUB_OPENCODE_PATH")
+    }
+)
 $EffectiveAdapterId = if (-not [string]::IsNullOrWhiteSpace($AdapterId)) { $AdapterId } else { $RuntimeId }
 $EffectiveRedactionPolicy = if (-not [string]::IsNullOrWhiteSpace($RedactionPolicy)) { $RedactionPolicy } else { $RedactionPlan }
 $TempBase = if (-not [string]::IsNullOrWhiteSpace($env:TEMP)) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
@@ -150,6 +184,124 @@ function Assert-NoSecretLikeInput([string]$Name, [string]$Value) {
     }
 }
 
+function ConvertTo-SafeProbeText([object[]]$Output) {
+    $text = (($Output | ForEach-Object { [string]$_ }) -join "`n").Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return ""
+    }
+    $text = $text -replace $SecretLikePattern, "[redacted]"
+    $text = $text -replace [regex]::Escape($RepoRoot), "[repo-root]"
+    $text = $text -replace [regex]::Escape($env:USERPROFILE), "[user-profile]"
+    if ($text.Length -gt 300) {
+        return $text.Substring(0, 300) + "...[truncated]"
+    }
+    return $text
+}
+
+function Invoke-NoSpendCliProbe {
+    param(
+        [string]$CommandPath,
+        [string[]]$Arguments
+    )
+
+    try {
+        $output = & $CommandPath @Arguments 2>&1
+        return [ordered]@{
+            attempted = $true
+            exit_code = $LASTEXITCODE
+            output_preview = ConvertTo-SafeProbeText @($output)
+        }
+    } catch {
+        return [ordered]@{
+            attempted = $true
+            exit_code = $null
+            output_preview = "probe failed: " + (ConvertTo-SafeProbeText @($_.Exception.Message))
+        }
+    }
+}
+
+function New-RuntimeReadinessManifest {
+    $runtimes = @()
+    foreach ($descriptor in $RuntimeReadinessDescriptors) {
+        $command = Get-Command $descriptor.CommandName -ErrorAction SilentlyContinue | Select-Object -First 1
+        $installed = $null -ne $command
+        $versionProbe = [ordered]@{ attempted = $false; exit_code = $null; output_preview = "" }
+        $helpProbe = [ordered]@{ attempted = $false; exit_code = $null; output_preview = "" }
+        if ($DiscoverCommands -and $installed) {
+            $versionProbe = Invoke-NoSpendCliProbe -CommandPath $command.Source -Arguments $descriptor.VersionArgs
+            $helpProbe = Invoke-NoSpendCliProbe -CommandPath $command.Source -Arguments $descriptor.HelpArgs
+        }
+
+        $runtimes += [ordered]@{
+            runtime_id = $descriptor.RuntimeId
+            command_discovery = [ordered]@{
+                command_name = $descriptor.CommandName
+                installed = $installed
+                resolved_path_kind = if ($installed) { "basename-only-redacted" } else { "missing" }
+                resolved_path = if ($installed) { Split-Path -Leaf $command.Source } else { "" }
+                version_probe = $versionProbe
+                help_probe = $helpProbe
+            }
+            json_mode = [ordered]@{
+                expected_flag_or_mode = $descriptor.JsonMode
+                dry_plan_only = $true
+            }
+            permission_boundary = [ordered]@{
+                expected_mode = $descriptor.PermissionBoundary
+                approval_required = $true
+            }
+            budget = [ordered]@{
+                max_requests_before_real_approval = 0
+                max_usd_before_real_approval = 0
+                stop_policy = "no prompt/model/API execution in readiness; approved-real run must provide explicit budget"
+            }
+            timeouts = [ordered]@{
+                discovery_probe = "version/help only; no prompt stdin"
+                kill_policy = "future real run must provide hard timeout and process-tree kill policy"
+            }
+            artifacts = [ordered]@{
+                root_policy = ".tmp/edge-cli-real-readiness or temp AgentHub edge-cli-real-readiness only"
+                manifest_required = $true
+            }
+            redaction_manifest = [ordered]@{
+                policy = "env names only; stdout/stderr/artifacts redacted before publication"
+                secret_values_allowed = $false
+            }
+            dry_plan = $descriptor.DryPlan
+            env_names = $descriptor.EnvNames
+        }
+    }
+
+    return [ordered]@{
+        schema = "agenthub-edge-cli-approved-real-readiness-v1"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        mode = $Mode
+        real_tested = $false
+        model_api_consumed = $false
+        prompt_executed = $false
+        discovery_commands_attempted = [bool]$DiscoverCommands
+        no_spend_boundary = "command discovery, --version, and --help only; no prompt/model/API call"
+        runtimes = $runtimes
+    }
+}
+
+function Write-ReadinessManifest {
+    param([object]$Manifest)
+
+    if ([string]::IsNullOrWhiteSpace($OutputManifestPath)) {
+        return
+    }
+
+    $resolved = if ([System.IO.Path]::IsPathRooted($OutputManifestPath)) { $OutputManifestPath } else { Join-Path $RepoRoot $OutputManifestPath }
+    $resolved = [System.IO.Path]::GetFullPath($resolved)
+    $parent = Split-Path -Parent $resolved
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    $Manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $resolved -Encoding UTF8
+    Pass "wrote per-runtime readiness manifest to $resolved"
+}
+
 function Add-PrerequisiteResult {
     param(
         [bool]$Condition,
@@ -175,6 +327,9 @@ function Add-PrerequisiteResult {
 Write-Host "AgentHub P0 Edge CLI real-readiness proposal gate" -ForegroundColor Magenta
 Write-Host "Mode: $Mode" -ForegroundColor Magenta
 Write-Host "No Codex, Claude Code, or OpenCode command was executed." -ForegroundColor Magenta
+if ($DiscoverCommands) {
+    Write-Host "No prompt, model, or API command was executed; discovery is limited to Get-Command, --version, and --help." -ForegroundColor Magenta
+}
 Write-Host "No network, secret, model, or API budget was consumed." -ForegroundColor Magenta
 
 Step "supported adapter/runtime ids"
@@ -218,6 +373,14 @@ $forbiddenPrimitivePattern = @(
 ) -join "|"
 Assert-NotContains "scripts\verify-edge-cli-real-readiness.ps1" $forbiddenPrimitivePattern "this readiness script has no process/network execution primitive"
 Assert-NotContains "scripts\verify-edge-cli-real-readiness.ps1" '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode)\b' "this readiness script has no direct real CLI command pattern"
+
+Step "per-runtime readiness manifest"
+$readinessManifest = New-RuntimeReadinessManifest
+foreach ($runtime in $readinessManifest.runtimes) {
+    $status = if ($runtime.command_discovery.installed) { "installed" } else { "missing" }
+    Pass "$($runtime.runtime_id) readiness manifest prepared ($status)"
+}
+Write-ReadinessManifest $readinessManifest
 
 Step "real run approval prerequisites"
 $failMissingApprovalInputs = [bool]$RequireApprovalInputs
