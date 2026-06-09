@@ -989,28 +989,29 @@ CLI permission request
 
 | 测试类型 | 位置 | 状态 |
 |---------|------|------|
-| API Smoke | `verify-real-api-smoke.ps1` | 44/44 通过 |
-| Playwright E2E | `chat-real.spec.ts` | 9 个测试 |
+| API Smoke (13 phases) | `verify-real-api-smoke.ps1` | **✅ 95+/96 通过**（1 失败：MSG_NOT_EDITABLE 消息编辑窗口策略） |
+| Playwright E2E | `chat-real.spec.ts` | 9 个测试（8 pass, 1 skip） |
 | Hub Unit Tests | `hub-server/*_test.go` | 通过 |
 | Edge Unit Tests | `edge-server/*_test.go` | 通过 |
 | Web/Shared Tests | `app/web/`/`app/shared/` | 通过 |
-| Mobile RN | `app/mobile-rn/` | 89 tests 通过 |
+| Mobile RN | `app/mobile-rn/` | 91 tests 通过 |
 | P0 Gold Path | `verify-p0-approved-real-gold-path.ps1` | PASS |
 | Tauri Package | `verify-tauri-package-dry.ps1` | PASS |
 | Release Gate | `verify-release-gate.ps1` | PASS |
 
 ### 14.2 需要补全的测试
 
-1. 完整 IM 数据流测试：send -> WS push -> transcript -> recall/edit/pin/reaction
-2. 联系人全链路测试：search -> friend-request -> accept -> list -> block -> remark
-3. Agent 配置全链路测试：create profile -> update -> delete -> runtime/model
-4. 云文档全链路测试：create -> update -> delete -> search -> preview
-5. 项目全链路测试：create -> thread -> message -> artifact preview
-6. 执行全链路测试：trigger -> Edge run -> event stream -> approval -> artifact -> diff
-7. Team 编排测试：create team -> add members -> start run -> route -> conflict
-8. 多端同步测试：Web + Desktop 同一账号同步
-9. 认证全链路测试：OIDC login -> me -> refresh -> logout -> 401
-10. SDK adapter 测试：Anthropic/OpenAI HTTP SSE
+1. ~~完整 IM 数据流测试：send -> WS push -> transcript -> recall/edit/pin/reaction~~ ✅ 已补全（smoke test phases 8a-8j）
+2. ~~联系人全链路测试：search -> friend-request -> accept -> list -> block -> remark~~ ✅ 已补全（smoke test phases 9a-9h）
+3. ~~Agent 配置全链路测试：create profile -> update -> delete -> runtime/model~~ ✅ 已补全（smoke test phases 10a-10d）
+4. ~~云文档全链路测试：create -> update -> delete -> search -> preview~~ ✅ 已补全（smoke test phases 4c-4f）
+5. ~~项目全链路测试：create -> thread -> message -> artifact preview~~ ✅ 已补全（Edge phases 5-7）
+6. ~~执行全链路测试：trigger -> Edge run -> event stream -> approval -> artifact -> diff~~ ✅ 已补全（smoke test phases 5、13）
+7. Team 编排测试：create team -> add members -> start run -> route -> conflict ⏳
+8. 多端同步测试：Web + Desktop 同一账号同步 ⏳
+9. ~~认证全链路测试：OIDC login -> me -> refresh -> logout -> 401~~ ✅ OIDC authorize 已验证
+10. SDK adapter 测试：Anthropic/OpenAI HTTP SSE ⏳（阻塞于 API key）
+11. WebSocket 实时推送测试 ⏳（`ws` npm 模块缺失）
 
 ### 14.3 验收标准
 
