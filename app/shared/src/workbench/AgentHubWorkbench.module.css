@@ -290,6 +290,7 @@
 }
 
 .conversationAvatar {
+  position: relative;
   width: 30px;
   height: 30px;
   border-radius: var(--r-sm);
@@ -301,6 +302,43 @@
   flex-shrink: 0;
   user-select: none;
   overflow: hidden;
+}
+
+.conversationAvatarClickable {
+  cursor: pointer;
+  transition: transform var(--dur-pop) var(--ease-press), box-shadow var(--dur-normal) var(--ease);
+}
+
+.conversationAvatarClickable:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px var(--border);
+}
+
+.conversationAvatarClickable:active {
+  transform: scale(0.96);
+}
+
+.conversationAvatarBadge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface-highest);
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--surface-1);
+}
+
+.conversationKindIcon {
+  display: inline;
+  vertical-align: -1px;
+  margin-right: 3px;
+  opacity: 0.5;
+  flex-shrink: 0;
 }
 
 .avatarImg {
