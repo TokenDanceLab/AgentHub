@@ -71,6 +71,7 @@ export function buildInspectorEvidenceModel(evidence: EvidenceRef[]): InspectorE
     counts: {
       artifact: 0,
       file: 0,
+      preview: 0,
       run: 0,
       tool: 0,
     },

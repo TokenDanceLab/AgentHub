@@ -6,7 +6,7 @@ export interface TranscriptAuthor {
   role: TranscriptAuthorRole;
 }
 
-export type EvidenceRefKind = 'tool' | 'file' | 'artifact' | 'run';
+export type EvidenceRefKind = 'tool' | 'file' | 'artifact' | 'preview' | 'run';
 export type EvidenceRefStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export interface EvidenceRef {
@@ -43,12 +43,31 @@ export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
   summary?: string;
 }
 
+export interface ToolResultTranscriptBlock extends TranscriptBlockBase {
+  kind: 'tool_result';
+  toolName: string;
+  status: EvidenceRefStatus;
+  summary?: string;
+}
+
 export interface ArtifactTranscriptBlock extends TranscriptBlockBase {
   kind: 'artifact';
   title: string;
+  artifactId?: string;
+  artifactKind?: string;
+  path?: string;
+  uri?: string;
+  mimeType?: string;
   action?: 'created' | 'modified' | 'deleted';
   additions?: number;
   deletions?: number;
+}
+
+export interface PreviewTranscriptBlock extends TranscriptBlockBase {
+  kind: 'preview';
+  previewId: string;
+  status: EvidenceRefStatus;
+  url?: string;
 }
 
 export interface DiffTranscriptLine {
@@ -73,6 +92,36 @@ export interface ApprovalTranscriptBlock extends TranscriptBlockBase {
   toolName?: string;
   risk?: 'low' | 'medium' | 'high' | 'critical';
   reason?: string;
+}
+
+export interface PermissionRequestTranscriptBlock extends TranscriptBlockBase {
+  kind: 'permission_request';
+  requestId: string;
+  title: string;
+  status: 'pending';
+  toolName?: string;
+  risk?: 'low' | 'medium' | 'high' | 'critical';
+  reason?: string;
+}
+
+export interface PermissionResultTranscriptBlock extends TranscriptBlockBase {
+  kind: 'permission_result';
+  requestId: string;
+  title: string;
+  status: EvidenceRefStatus;
+  decision: string;
+  toolName?: string;
+  reason?: string;
+}
+
+export interface FileChangeTranscriptBlock extends TranscriptBlockBase {
+  kind: 'file_change';
+  path: string;
+  action: 'created' | 'modified' | 'deleted';
+  additions?: number;
+  deletions?: number;
+  patch?: string;
+  lines?: DiffTranscriptLine[];
 }
 
 export interface RunSessionTranscriptBlock extends TranscriptBlockBase {
@@ -127,6 +176,15 @@ export interface SubagentTranscriptBlock extends TranscriptBlockBase {
   runId?: string;
 }
 
+export interface SubtaskTranscriptBlock extends TranscriptBlockBase {
+  kind: 'subtask';
+  title: string;
+  worker?: string;
+  status: EvidenceRefStatus;
+  summary?: string;
+  runId?: string;
+}
+
 export interface ChildAgentTranscriptBlock extends TranscriptBlockBase {
   kind: 'child_agent';
   title: string;
@@ -163,18 +221,40 @@ export interface ResultTranscriptBlock extends TranscriptBlockBase {
   summary?: string;
 }
 
+export interface FailureTranscriptBlock extends TranscriptBlockBase {
+  kind: 'failure';
+  title: string;
+  reason?: string;
+  runId?: string;
+}
+
+export interface FinishedTranscriptBlock extends TranscriptBlockBase {
+  kind: 'finished';
+  title: string;
+  runId?: string;
+  duration?: string;
+}
+
 export type TranscriptBlock =
   | TextTranscriptBlock
   | ToolCallTranscriptBlock
+  | ToolResultTranscriptBlock
   | ArtifactTranscriptBlock
+  | PreviewTranscriptBlock
   | DiffTranscriptBlock
   | ApprovalTranscriptBlock
+  | PermissionRequestTranscriptBlock
+  | PermissionResultTranscriptBlock
+  | FileChangeTranscriptBlock
   | RunSessionTranscriptBlock
   | AgentTimelineTranscriptBlock
   | RunStepGroupTranscriptBlock
   | ThinkingTranscriptBlock
   | SubagentTranscriptBlock
+  | SubtaskTranscriptBlock
   | ChildAgentTranscriptBlock
   | RouteDecisionTranscriptBlock
   | ContextUsageTranscriptBlock
-  | ResultTranscriptBlock;
+  | ResultTranscriptBlock
+  | FailureTranscriptBlock
+  | FinishedTranscriptBlock;
