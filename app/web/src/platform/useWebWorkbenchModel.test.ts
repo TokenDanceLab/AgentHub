@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   appendHubRuntimeEvent,
   decideWebApprovalWithHubClient,
+  mergeHubTaskContractEvents,
   mergeHubRuntimeEvents,
   projectDraftToHubRequest,
   mergeWorkspaceProjectDetail,
@@ -341,8 +342,90 @@ describe('useWebWorkbenchModel helpers', () => {
     });
   });
 
-  it('submits approval decisions through the Hub TeamRun client only', async () => {
+  it('projects Hub single-task approvals and artifacts into visible transcript blocks', () => {
+    const projected = mergeHubTaskContractEvents([], {
+      task_id: 'task-1',
+      edge_run_id: 'edge-run-1',
+      session_id: 'hub-session-1',
+      approvals: [{
+        approval_id: 'approval-1',
+        task_id: 'task-1',
+        edge_run_id: 'edge-run-1',
+        session_id: 'hub-session-1',
+        source_event_id: 'evt-approval-1',
+        event_seq: 5,
+        request_id: 'perm-1',
+        tool_name: 'Write',
+        status: 'pending',
+        reason: 'Modify workspace file',
+        created_at: '2026-06-09T05:00:02Z',
+      }],
+      pending: [],
+      decided: [],
+      last_event_seq: 5,
+    }, {
+      task_id: 'task-1',
+      edge_run_id: 'edge-run-1',
+      session_id: 'hub-session-1',
+      artifacts: [{
+        task_id: 'task-1',
+        edge_run_id: 'edge-run-1',
+        session_id: 'hub-session-1',
+        source_event_id: 'evt-artifact-1',
+        event_seq: 6,
+        artifact_id: 'artifact-1',
+        path: 'reports/demo-evidence.md',
+        action: 'created',
+        tool_name: 'Write',
+        mime_type: 'text/markdown',
+        size_bytes: 128,
+        created_at: '2026-06-09T05:00:03Z',
+      }],
+      last_event_seq: 6,
+    });
+    const transcript = resolveWebWorkbenchTranscript(true, 'hub-session-1', [], projected);
+
+    expect(transcript).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'edge-event-hub-runtime-evt-approval-1',
+        kind: 'permission_request',
+        requestId: 'perm-1',
+        toolName: 'Write',
+        agentTaskId: 'task-1',
+        reason: 'Modify workspace file',
+      }),
+      expect.objectContaining({
+        id: 'edge-event-hub-runtime-evt-artifact-1',
+        kind: 'artifact',
+        artifactId: 'artifact-1',
+        title: 'reports/demo-evidence.md',
+        path: 'reports/demo-evidence.md',
+        mimeType: 'text/markdown',
+      }),
+    ]));
+  });
+
+  it('submits single-task approval decisions through the Hub task contract when agentTaskId is present', async () => {
     const hubClient = {
+      decideTaskApproval: vi.fn().mockResolvedValue(undefined),
+      decideTeamApproval: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await decideWebApprovalWithHubClient(hubClient, {
+      approvalId: 'approval-1',
+      decision: 'allow',
+      agentTaskId: 'agent-task-1',
+    });
+
+    expect(hubClient.decideTaskApproval).toHaveBeenCalledWith('agent-task-1', 'approval-1', {
+      decision: 'allow',
+    });
+    expect(hubClient.decideTeamApproval).not.toHaveBeenCalled();
+  });
+
+  it('keeps TeamRun approval decisions on the Hub TeamRun client', async () => {
+    const hubClient = {
+      decideTaskApproval: vi.fn().mockResolvedValue(undefined),
       decideTeamApproval: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -357,6 +440,7 @@ describe('useWebWorkbenchModel helpers', () => {
     expect(hubClient.decideTeamApproval).toHaveBeenCalledWith('team-1', 'team-run-1', 'approval-1', {
       decision: 'allow',
     });
+    expect(hubClient.decideTaskApproval).not.toHaveBeenCalled();
   });
 
   it('uses preview and Hub empty transcripts for unauthenticated and empty Hub states', () => {
