@@ -5,6 +5,7 @@ import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
 import { ScreenHeader } from '@/components/layout';
 import { Badge, SearchField, SegmentedControl, Surface } from '@/components/primitives';
 import { useStrings } from '@/i18n/strings';
+import { useNativeCapabilities } from '@/integrations/useNativeCapabilities';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileTab } from '@/types';
 
@@ -68,9 +69,10 @@ export function WorkbenchSurfaceScreen({
 }: WorkbenchSurfaceScreenProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
   const t = useStrings();
+  const nativeCapabilities = useNativeCapabilities();
   const [paneBySurface, setPaneBySurface] = useState<Record<WorkbenchSurface, SurfacePane>>(initialPaneBySurface);
   const [query, setQuery] = useState('');
-  const config = getSurfaceConfig(surface, pendingReviews, onOpenAccount, t);
+  const config = getSurfaceConfig(surface, pendingReviews, onOpenAccount, nativeCapabilities, t);
   const activePane = paneBySurface[surface] ?? config.panes[0]?.value ?? 'default';
   const sections = filterSections(config.sections[activePane] ?? [], query);
   const showSearch = Boolean(config.searchPlaceholder);
@@ -157,6 +159,7 @@ function getSurfaceConfig(
   surface: WorkbenchSurface,
   pendingReviews: number,
   onOpenAccount: () => void,
+  nativeCapabilities: ReturnType<typeof useNativeCapabilities>,
   t: ReturnType<typeof useStrings>,
 ): SurfaceConfig {
   const configs: Record<WorkbenchSurface, SurfaceConfig> = {
@@ -476,11 +479,39 @@ function getSurfaceConfig(
             title: t.nativeDeviceCapabilities,
             description: t.nativeDeviceCapabilitiesDescription,
             rows: [
-              row('camera', t.cameraEvidenceCapture, t.cameraEvidenceCaptureDescription, t.needsAction, 'account', onOpenAccount),
-              row('image', t.photoEvidencePicker, t.photoEvidencePickerDescription, t.needsAction, 'account', onOpenAccount),
-              row('file', t.documentEvidencePicker, t.documentEvidencePickerDescription, t.needsAction),
-              row('hardDrive', t.storageBudget, t.storageBudgetDescription, t.needsAction),
-              row('trash', t.evidenceCache, t.evidenceCacheDescription, t.cacheCleanup),
+              row(
+                'camera',
+                t.cameraEvidenceCapture,
+                t.cameraEvidenceCaptureDescription,
+                formatNativePermissionMeta(nativeCapabilities.status.camera, t),
+                undefined,
+                nativeCapabilities.capturePhoto,
+              ),
+              row(
+                'image',
+                t.photoEvidencePicker,
+                t.photoEvidencePickerDescription,
+                formatNativePermissionMeta(nativeCapabilities.status.photos, t),
+                undefined,
+                nativeCapabilities.pickMedia,
+              ),
+              row(
+                'file',
+                t.documentEvidencePicker,
+                t.documentEvidencePickerDescription,
+                formatNativeLastActionMeta(nativeCapabilities.status, 'documents', t),
+                undefined,
+                nativeCapabilities.pickDocument,
+              ),
+              row('hardDrive', t.storageBudget, t.storageBudgetDescription, nativeCapabilities.status.storageLabel),
+              row(
+                'trash',
+                t.evidenceCache,
+                t.evidenceCacheDescription,
+                formatNativeLastActionMeta(nativeCapabilities.status, 'clearCache', t),
+                undefined,
+                nativeCapabilities.clearCache,
+              ),
             ],
           },
         ],
@@ -503,7 +534,13 @@ function getSurfaceConfig(
               row('status', t.nativeBuildReadiness, t.nativeBuildReadinessDescription, t.needsAction),
               row('cloud', t.mockHubTarget, t.mockHubTargetDescription, t.done),
               row('shield', t.secureStoreReadiness, t.secureStoreReadinessDescription, t.needsAction, 'account', onOpenAccount),
-              row('camera', t.nativeMediaReadiness, t.nativeMediaReadinessDescription, t.needsAction, 'account', onOpenAccount),
+              row(
+                'camera',
+                t.nativeMediaReadiness,
+                t.nativeMediaReadinessDescription,
+                nativeCapabilities.status.ready ? t.done : t.unavailable,
+                'settings',
+              ),
             ],
           },
         ],
@@ -556,6 +593,43 @@ function getSurfaceConfig(
   };
 
   return configs[surface];
+}
+
+function formatNativePermissionMeta(
+  state: ReturnType<typeof useNativeCapabilities>['status']['camera'],
+  t: ReturnType<typeof useStrings>,
+): string {
+  if (state === 'granted') {
+    return t.done;
+  }
+  if (state === 'blocked') {
+    return t.blocked;
+  }
+  if (state === 'prompt') {
+    return t.needsAction;
+  }
+
+  return t.unavailable;
+}
+
+function formatNativeLastActionMeta(
+  status: ReturnType<typeof useNativeCapabilities>['status'],
+  action: NonNullable<ReturnType<typeof useNativeCapabilities>['status']['lastAction']>['action'],
+  t: ReturnType<typeof useStrings>,
+): string {
+  if (status.lastAction?.action !== action) {
+    return status.ready ? t.ready : t.unavailable;
+  }
+
+  if (!status.lastAction.success) {
+    return t.needsAction;
+  }
+
+  if (status.lastAction.count !== undefined) {
+    return `${status.lastAction.count} ${t.taskEvidence}`;
+  }
+
+  return t.done;
 }
 
 function row(
