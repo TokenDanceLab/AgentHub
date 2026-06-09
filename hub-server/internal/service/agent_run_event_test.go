@@ -645,8 +645,9 @@ func TestListTaskArtifactsProjectsFileChangeAndArtifactCreated(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
 	for _, event := range []model.AgentRunEvent{
-		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.file_change", Payload: `{"path":"src/a.go","action":"modified","toolName":"apply_patch","status":"ok"}`, CreatedAt: base},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.file_change", Payload: `{"path":"src/a.go","action":"modified","toolName":"apply_patch","status":"ok","diff":"@@ -1 +1 @@\n-old\n+new","edit_id":"edit-1","review_status":"pending","can_apply":false,"can_revert":true}`, CreatedAt: base},
 		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "artifact.created", Payload: `{"artifact_id":"art-1","path":"reports/summary.md","name":"summary.md","mime_type":"text/markdown","size_bytes":128}`, CreatedAt: base.Add(time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 3, EventType: "run.agent.file_change", Payload: `{"path":"src/b.go","status":{"unknown":true},"can_apply":"invalid"}`, CreatedAt: base.Add(2 * time.Second)},
 	} {
 		require.NoError(t, db.Create(&event).Error)
 	}
@@ -657,14 +658,33 @@ func TestListTaskArtifactsProjectsFileChangeAndArtifactCreated(t *testing.T) {
 	require.Equal(t, "task-1", result.TaskID)
 	require.Equal(t, "run-1", result.EdgeRunID)
 	require.Equal(t, "sess-1", result.SessionID)
-	require.Equal(t, int64(2), result.LastEventSeq)
-	require.Len(t, result.Artifacts, 2)
+	require.Equal(t, int64(3), result.LastEventSeq)
+	require.Len(t, result.Artifacts, 3)
 	require.Equal(t, "src/a.go", result.Artifacts[0].Path)
 	require.Equal(t, "modified", result.Artifacts[0].Action)
 	require.Equal(t, int64(1), result.Artifacts[0].EventSeq)
+	fileChange := map[string]any{}
+	fileChangeJSON, err := json.Marshal(result.Artifacts[0])
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(fileChangeJSON, &fileChange))
+	require.Equal(t, "@@ -1 +1 @@\n-old\n+new", fileChange["diff"])
+	require.Equal(t, "edit-1", fileChange["edit_id"])
+	require.Equal(t, "pending", fileChange["review_status"])
+	require.Equal(t, false, fileChange["can_apply"])
+	require.Equal(t, true, fileChange["can_revert"])
 	require.Equal(t, "art-1", result.Artifacts[1].ArtifactID)
 	require.Equal(t, "reports/summary.md", result.Artifacts[1].Path)
 	require.Equal(t, int64(128), result.Artifacts[1].SizeBytes)
+	artifactCreated := map[string]any{}
+	artifactCreatedJSON, err := json.Marshal(result.Artifacts[1])
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(artifactCreatedJSON, &artifactCreated))
+	require.NotContains(t, artifactCreated, "diff")
+	malformedFileChange := map[string]any{}
+	malformedFileChangeJSON, err := json.Marshal(result.Artifacts[2])
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(malformedFileChangeJSON, &malformedFileChange))
+	require.NotContains(t, malformedFileChange, "can_apply")
 
 	_, err = svc.ListTaskArtifacts(context.Background(), "other-user", "task-1")
 	require.ErrorIs(t, err, errcode.AgentTaskNotFound)

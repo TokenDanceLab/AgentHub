@@ -425,6 +425,11 @@ func projectTaskArtifacts(task *model.PendingAgentTask, events []model.AgentRunE
 					Action:        firstJSONString(payload, "action", "kind"),
 					ToolName:      firstJSONString(payload, "toolName", "tool_name"),
 					Status:        firstJSONString(payload, "status"),
+					Diff:          firstJSONString(payload, "diff", "unified_diff", "unifiedDiff", "patch"),
+					EditID:        firstJSONString(payload, "edit_id", "editId"),
+					ReviewStatus:  firstJSONString(payload, "review_status", "reviewStatus", "status"),
+					CanApply:      firstJSONBoolPtr(payload, "can_apply", "canApply"),
+					CanRevert:     firstJSONBoolPtr(payload, "can_revert", "canRevert"),
 					CreatedAt:     event.CreatedAt,
 				})
 			}
@@ -468,6 +473,19 @@ func taskArtifactPaths(payload map[string]any) []string {
 		}
 	}
 	return paths
+}
+
+func firstJSONBoolPtr(payload map[string]any, keys ...string) *bool {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok {
+			continue
+		}
+		if typed, ok := value.(bool); ok {
+			return &typed
+		}
+	}
+	return nil
 }
 
 func outputBytesFromPayload(payload map[string]any) int {
