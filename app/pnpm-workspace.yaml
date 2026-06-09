@@ -3,6 +3,7 @@ packages:
   - "desktop"
   - "web"
   - "mobile"
+  - "mobile-rn"
 allowBuilds:
   esbuild: true
 onlyBuiltDependencies:

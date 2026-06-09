@@ -1,0 +1,66 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const boundaryScript = path.join(projectRoot, 'scripts', 'verify-boundaries.mjs');
+
+describe('Mobile RN import boundary verifier', () => {
+  it('rejects shared workbench imports and browser storage in runtime source', async () => {
+    const fixtureRoot = await mkdtemp(path.join(tmpdir(), 'agenthub-mobile-boundary-'));
+
+    try {
+      await mkdir(path.join(fixtureRoot, 'src'), { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, 'src', 'bad-runtime.ts'),
+        [
+          ['im', "port { AgentHubWorkbench } from '@agenthub/shared/workbench';"].join(''),
+          'export function readUnsafeStorage() {',
+          `  return ${['local', 'Storage'].join('')}.getItem("hub");`,
+          '}',
+          'void AgentHubWorkbench;',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const result = await runBoundaryVerifier(fixtureRoot);
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('@agenthub/shared/workbench');
+      expect(result.stderr).toContain('localStorage');
+    } finally {
+      await rm(fixtureRoot, { force: true, recursive: true });
+    }
+  });
+});
+
+function runBoundaryVerifier(fixtureRoot: string): Promise<{ exitCode: number | null; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      process.execPath,
+      [boundaryScript],
+      {
+        env: {
+          ...process.env,
+          AGENTHUB_MOBILE_BOUNDARY_PROJECT_ROOT: fixtureRoot,
+        },
+      },
+      (error, _stdout, stderr) => {
+        if (error && typeof error !== 'object') {
+          reject(error);
+          return;
+        }
+
+        const exitCode =
+          error && 'code' in error && typeof error.code === 'number'
+            ? error.code
+            : 0;
+        resolve({ exitCode, stderr });
+      },
+    );
+  });
+}
