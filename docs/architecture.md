@@ -319,6 +319,113 @@ Web shared workbench
 - Desktop 文件操作必须经过 allowlist 和 typed Host API。
 - Hub 权限由 Hub-local membership/resource/action 决定，TokenDance ID 只证明身份。
 
+## 9.1 Runtime Adapters（2026-06-10 新增）
+
+Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内部 `RunEvent` 流。
+
+### CLI Adapters
+
+| Adapter | 文件 | 功能 |
+|---------|------|------|
+| Claude Code | `edge-server/internal/adapters/claude_code.go` | 真实 CLI 执行验证通过，`claude --output-format stream-json` |
+| Codex | `edge-server/internal/adapters/codex.go` | PreflightAdapter 预检 `OPENAI_API_KEY`，env var 透传 |
+| OpenCode | `edge-server/internal/adapters/opencode.go` | `--session` 仅在 resume 时传递 |
+
+### SDK HTTP Adapters（新增）
+
+| Adapter | 文件 | 调用方式 |
+|---------|------|---------|
+| `AnthropicSDKAdapter` | `edge-server/internal/adapters/anthropic_sdk.go` | HTTP direct call Anthropic Messages API + SSE streaming |
+| `OpenAISDKAdapter` | `edge-server/internal/adapters/openai_sdk.go` | HTTP direct call OpenAI Chat Completions API + SSE streaming |
+
+特征：
+
+- 注册标志：`--anthropic-sdk-path` / `--openai-sdk-path`
+- API key 通过环境变量 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` 注入
+- 无外部 SDK 依赖，纯 `net/http`
+- Key 缺失时 `Available=false`，不阻塞 Edge 启动
+
+### PreflightAdapter 接口
+
+```go
+// PreflightAdapter 在真实执行前检查必要条件，快速失败
+type PreflightAdapter interface {
+    Preflight(ctx context.Context) error
+}
+```
+
+Codex adapter 实现了此接口：预检 `OPENAI_API_KEY` 是否存在，缺失时返回描述性错误而非进程启动后失败。
+
+## 9.2 数据流模式（2026-06-10 新增）
+
+本轮数据流打通建立了以下关键模式。
+
+### Auth Token 管道模式
+
+```
+Desktop Tauri keyring/session
+  -> getAccessToken() callback
+  -> { getToken: getAccessToken }
+  -> hubQueries / sessionQueries / documentQueries / projectQueries
+  -> Hub REST API Authorization: Bearer <token>
+```
+
+所有 Desktop 的 Hub API 查询（`hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`、`projectQueries.ts`）统一通过 `getToken` 回调注入 auth token，不硬编码 token 值。
+
+### WebSocket 实时缓存失效模式
+
+```
+Hub WS event (message.new / session.updated / ...)
+  -> useHubWebSocket event handler
+  -> React Query queryClient.invalidateQueries([queryKey])
+  -> UI 自动重新获取最新数据
+```
+
+Desktop `useHubWebSocket.ts` 接入 workbench model 后，Hub 的实时事件直接驱动 React Query 缓存失效，无需手动刷新。这一模式覆盖消息、会话、联系人和 Agent 相关的所有实时更新。
+
+### Chat Actions 模式
+
+Web 和 Desktop 的 workbench model 分别暴露 chat actions，统一命名但各自实现：
+
+| Action | Web `useWebWorkbenchModel` | Desktop `useDesktopWorkbenchModel` |
+|--------|---------------------------|-----------------------------------|
+| send | Hub REST sendMessage | Hub REST sendMessage |
+| recall | Hub REST recallMessage | Hub REST recallMessage |
+| edit | Hub REST editMessage | Hub REST editMessage |
+| pin | Hub REST pinMessage | Hub REST pinMessage |
+| unpin | Hub REST unpinMessage | Hub REST unpinMessage |
+| markRead | Hub REST markRead | Hub REST markRead |
+| addReaction | Hub REST addReaction | -- |
+| removeReaction | Hub REST removeReaction | -- |
+| forward | Hub REST forwardMessage | -- |
+| searchMessages | Hub REST searchMessages | -- |
+
+自动已读回执：进入会话后自动标记最后一条消息为已读。
+
+### Settings 三层回退模式
+
+Desktop 设置读取按以下优先级回退：
+
+```
+Edge settings API (本地实时配置)
+  -> Hub settings API (跨设备同步)
+    -> localStorage (离线兜底)
+```
+
+实现位置：Desktop platform adapter 的 settings 读取逻辑。Hub 设置优先于本地默认，Edge 设置优先于 Hub（本地执行相关配置优先本地）。
+
+### Agent Profile 合并策略
+
+Desktop 的 Agent 列表按以下优先级合并：
+
+```
+Edge local profiles (本地已安装的 Agent)
+  > Hub agent profiles (云端共享的 Agent)
+    > raw adapter list (运行时自动发现的 Agent)
+```
+
+实现位置：`useHubAgentProfiles` 等 hooks + Desktop workbench model。Edge 本地 profile 优先保证离线可用；Hub profile 提供跨设备共享；raw adapter 是底层 runtime 的可用列表。
+
 ## 10. 数据线
 
 **控制线**

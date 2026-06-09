@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
 最后更新：2026-06-10 20:00 +08:00
-当前 dev HEAD：`0e901fce` (`dev/release-0.3.0-rc7`)
+当前 dev HEAD：`e9e23fe9` (`dev/delicious233`)
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
