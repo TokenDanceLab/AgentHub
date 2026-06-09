@@ -45,6 +45,7 @@
 |---|---|---|---|
 | Edge SQLite durable observed smoke | Johnny/backend | 已合入 dev：`63fb6273` | fixture-only alpha durability gate；不代表完整 relational CRUD |
 | Desktop sidecar observed smoke | Trump/Desktop | 已合入 dev：`79e1e453` | fixture/mock sidecar 证据；真实打包仍需要 sidecar binary |
+| Desktop sidecar binary/package smoke | Desktop sidecar worker | review branch：`codex/p1-desktop-sidecar-binary-smoke` | 本地 build/placement/smoke gate；二进制、签名、公证、release upload 不提交不执行 |
 | CLI JSON readiness checker | Edge/SDK worker | 已合入 dev：`bf1a7ab5` | 静态/fixture JSON 合同；不运行真实 CLI/model/API |
 | Web real-mode visual smoke | Trump/Web | 已推 dev：`e2ee21f0` + `2aff026d` | review branch `origin/codex/p1-web-real-mode-visual-smoke` commit `855c8cea`；改动只在 `app/shared/**`，不碰 Hub/Edge/Desktop/Mobile |
 | Hub 单任务 approval/artifact | Johnny/backend | 运行中：thread `019eab05-39ef-7b70-bece-4b2a853fe9e8` | 只改 Hub/API；补 `/web/agent-tasks` approval decision 与 artifact metadata/list 最小合同 |
