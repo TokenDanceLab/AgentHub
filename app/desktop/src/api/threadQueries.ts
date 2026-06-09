@@ -10,9 +10,10 @@ import {
   deleteThread,
   archiveThread,
   updateThreadStatus,
+  fetchCurrentUser,
   type CreateThreadRequest,
 } from './edgeClient';
-import type { ListResponse, ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
+import type { ListResponse, ThreadInfo, ThreadItemInfo, ThreadPinInfo, UserProfileInfo } from '@shared/types';
 
 export function useThreads(projectId?: string, options: { enabled?: boolean } = {}) {
   const enabled = options.enabled ?? true;
@@ -192,5 +193,15 @@ export function useThreadPins(threadId: string | null) {
     enabled: !!threadId && threadId !== 'thread_local',
     staleTime: 5_000,
     refetchInterval: 10_000,
+  });
+}
+
+export function useCurrentUser(enabled = true) {
+  return useQuery<UserProfileInfo>({
+    queryKey: ['currentUser'],
+    queryFn: () => fetchCurrentUser(),
+    enabled,
+    staleTime: 60_000,
+    retry: 1,
   });
 }

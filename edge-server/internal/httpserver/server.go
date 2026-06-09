@@ -320,7 +320,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// with empty projectId/threadId works out of the box.
 	if cfg.Store != nil {
 		_, _ = cfg.Store.CreateProject("proj_local", "Local Project")
-		_, _ = cfg.Store.CreateThread("thread_local", "proj_local", "Local Thread")
+		_, _ = cfg.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct")
 	}
 	return h, nil
 }
