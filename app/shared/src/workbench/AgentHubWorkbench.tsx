@@ -142,6 +142,8 @@ export interface AgentHubWorkbenchProps {
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
+  /** 用户想与某个联系人/Agent 开始私聊，但当前没有已有会话时触发。上层负责创建会话并切换。 */
+  onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   showComposerAgentPicker?: boolean | undefined;
   showComposerStatus?: boolean | undefined;
@@ -172,6 +174,7 @@ export function AgentHubWorkbench({
   onProjectCreate,
   onProjectUpdate,
   onApprovalDecision,
+  onNavigateToConversation,
   runtimeEvidence,
   showComposerAgentPicker = true,
   showComposerStatus = true,
@@ -678,11 +681,14 @@ export function AgentHubWorkbench({
       item.title.toLowerCase() === activeAgentProfile.name.toLowerCase()
       || item.id.toLowerCase() === activeAgentProfile.id.toLowerCase()
     ));
-    if (!conversation) {
+    if (conversation) {
+      selectConversation(conversation.id);
+    } else if (onNavigateToConversation) {
+      onNavigateToConversation({ name: activeAgentProfile.name, id: activeAgentProfile.id, kind: 'dm' });
+    } else {
       showWorkbenchToast(`还没有 ${activeAgentProfile.name} 的私聊会话`);
       return;
     }
-    selectConversation(conversation.id);
     setActivePage('chat');
     setActiveAgentProfile(null);
     setActiveHumanProfile(null);
@@ -695,11 +701,14 @@ export function AgentHubWorkbench({
       item.title.toLowerCase() === activeHumanProfile.name.toLowerCase()
       || item.id.toLowerCase() === activeHumanProfile.id.toLowerCase()
     ));
-    if (!conversation) {
+    if (conversation) {
+      selectConversation(conversation.id);
+    } else if (onNavigateToConversation) {
+      onNavigateToConversation({ name: activeHumanProfile.name, id: activeHumanProfile.id, kind: 'dm' });
+    } else {
       showWorkbenchToast(`还没有 ${activeHumanProfile.name} 的私聊会话`);
       return;
     }
-    selectConversation(conversation.id);
     setActivePage('chat');
     setActiveHumanProfile(null);
     window.setTimeout(() => composerInputRef.current?.focus(), 0);
@@ -1165,6 +1174,7 @@ export function AgentHubWorkbench({
               onAgentDelete={onAgentDelete}
               onAgentsRetry={onAgentsRetry}
               onAgentProfileOpen={openAgentProfileFromConfig}
+              onStartConversation={onNavigateToConversation}
               localCliDiscovery={localCliDiscovery}
             />
           </section>
