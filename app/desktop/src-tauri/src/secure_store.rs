@@ -1,4 +1,5 @@
 use keyring_core::Entry;
+use serde::Serialize;
 use std::sync::OnceLock;
 
 const SERVICE: &str = "com.agenthub.desktop";
@@ -6,6 +7,13 @@ const HUB_REFRESH_TOKEN_USER: &str = "hub-refresh-token";
 const HUB_ACCESS_TOKEN_USER: &str = "hub-access-token";
 
 static STORE_INIT: OnceLock<Result<(), String>> = OnceLock::new();
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CredentialStoreReadiness {
+    pub available: bool,
+    pub service: String,
+    pub error: Option<String>,
+}
 
 fn ensure_store() -> Result<(), String> {
     STORE_INIT
@@ -33,6 +41,31 @@ fn ensure_store() -> Result<(), String> {
             }
         })
         .clone()
+}
+
+fn credential_store_readiness_from_result(result: Result<(), String>) -> CredentialStoreReadiness {
+    match result {
+        Ok(()) => CredentialStoreReadiness {
+            available: true,
+            service: SERVICE.to_string(),
+            error: None,
+        },
+        Err(error) => CredentialStoreReadiness {
+            available: false,
+            service: SERVICE.to_string(),
+            error: Some(error),
+        },
+    }
+}
+
+pub fn check_credential_store_readiness() -> CredentialStoreReadiness {
+    let result = ensure_store().and_then(|_| {
+        Entry::new(SERVICE, HUB_REFRESH_TOKEN_USER)
+            .map(|_| ())
+            .map_err(|err| format!("credential entry unavailable: {err}"))
+    });
+
+    credential_store_readiness_from_result(result)
 }
 
 fn refresh_token_entry() -> Result<Entry, String> {
@@ -100,5 +133,32 @@ pub async fn clear_hub_access_token() -> Result<(), String> {
     match access_token_entry()?.delete_credential() {
         Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
         Err(err) => Err(format!("credential store delete failed: {err}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn credential_readiness_reports_service_without_token_usernames() {
+        let readiness = credential_store_readiness_from_result(Ok(()));
+
+        assert!(readiness.available);
+        assert_eq!(readiness.service, "com.agenthub.desktop");
+        assert!(readiness.error.is_none());
+    }
+
+    #[test]
+    fn credential_readiness_keeps_unavailable_reason_nonfatal() {
+        let readiness =
+            credential_store_readiness_from_result(Err("credential store unavailable".to_string()));
+
+        assert!(!readiness.available);
+        assert_eq!(readiness.service, "com.agenthub.desktop");
+        assert_eq!(
+            readiness.error.as_deref(),
+            Some("credential store unavailable")
+        );
     }
 }

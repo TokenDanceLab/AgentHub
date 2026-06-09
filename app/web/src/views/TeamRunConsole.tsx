@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Users,
@@ -19,6 +19,7 @@ import type {
   AgentTeamTask,
   TeamRunState,
 } from '@/api/hubClient';
+import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useHubStore } from '@/stores/hubStore';
 import { getAccessToken } from '@/hooks/useAuth';
 import { TeamMemberList } from '@/components/IM/TeamMemberList';
@@ -43,6 +44,247 @@ function formatStatus(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || 'Unknown error');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parsePayloadRecord(payload: unknown): Record<string, unknown> | null {
+  if (isRecord(payload)) return payload;
+  if (typeof payload !== 'string') return null;
+  const trimmed = payload.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function booleanField(...values: unknown[]): boolean {
+  return values.some((value) => value === true);
+}
+
+function truncate(value: string, max = 140): string {
+  return value.length > max ? `${value.slice(0, max)}...` : value;
+}
+
+function summarizeRuntimePayload(eventType: string, payload: unknown): string {
+  const record = parsePayloadRecord(payload);
+  const rawText = typeof payload === 'string' && !record ? truncate(payload) : undefined;
+  if (!record) return rawText ?? eventType;
+
+  const toolName = firstString(record.toolName, record.tool_name, record.name);
+  const callId = firstString(record.callId, record.call_id, record.toolUseId, record.tool_use_id);
+  const status = firstString(record.status, record.state);
+  const output = firstString(record.summary, record.output, record.content, record.text, record.result);
+  const error = firstString(record.error, record.error_message, record.message);
+  const action = firstString(record.action, record.decision);
+  const nextWorker = firstString(record.next_worker, record.nextWorker, record.worker, record.agentId, record.agent_id);
+  const instructions = firstString(record.instructions, record.summary, record.reasoning, record.reason, record.feedback);
+  const taskId = firstString(record.taskId, record.task_id);
+  const toolErrored = booleanField(record.isError, record.is_error);
+
+  switch (eventType) {
+    case 'run.agent.tool_call':
+      return [
+        `Tool ${toolName ?? 'unknown'} requested`,
+        status,
+        callId ? `call ${callId}` : undefined,
+      ].filter(Boolean).join(' ');
+    case 'run.agent.tool_result':
+      return `Tool ${toolName ?? 'unknown'} result${toolErrored || error ? ` failed${error ? `: ${truncate(error)}` : output ? `: ${truncate(output)}` : ''}` : output ? `: ${truncate(output)}` : ''}`;
+    case 'run.agent.route_decision':
+      return [
+        `Route ${action ?? 'decision'}${nextWorker ? ` -> ${nextWorker}` : ''}`,
+        instructions ? truncate(instructions) : undefined,
+      ].filter(Boolean).join(': ');
+    case 'run.agent.permission_requested':
+      return [
+        `Approval requested${toolName ? ` for ${toolName}` : ''}`,
+        firstString(record.reason, record.prompt, record.description),
+      ].filter(Boolean).join(': ');
+    case 'run.agent.task_dispatch_failed':
+      return `Dispatch failed${taskId ? ` for ${taskId}` : ''}${error ? `: ${truncate(error)}` : ''}`;
+    case 'run.agent.sub_agent_status':
+      return [
+        `Sub-agent ${nextWorker ?? 'unknown'}`,
+        status,
+        taskId ? `task ${taskId}` : undefined,
+      ].filter(Boolean).join(' ');
+    case 'run.agent.result':
+      return `${record.success === false || error ? 'Result failed' : 'Result succeeded'}${error ? `: ${truncate(error)}` : output ? `: ${truncate(output)}` : ''}`;
+    case 'run.agent.text_delta':
+    case 'run.agent.text_block':
+    case 'run.agent.message':
+      return output ? truncate(output) : eventType;
+    case 'artifact.created': {
+      const title = firstString(record.title, record.path, record.uri, record.artifactId, record.artifact_id);
+      return `Artifact created${title ? `: ${truncate(title)}` : ''}`;
+    }
+    case 'run.agent.file_change': {
+      const path = firstString(record.path, record.file_path, record.filePath);
+      const fileAction = firstString(record.kind, record.action, record.operation, record.status);
+      return `File change${fileAction ? ` ${fileAction}` : ''}${path ? `: ${path}` : ''}`;
+    }
+    default: {
+      const summary = firstString(
+        record.summary,
+        record.message,
+        record.reason,
+        record.objective,
+        record.instructions,
+        record.content,
+        record.output,
+        record.error,
+      );
+      return summary ? truncate(summary) : eventType;
+    }
+  }
+}
+
+type RuntimeEventContext = {
+  taskId?: string | undefined;
+  edgeRunId?: string | undefined;
+  targetId?: string | undefined;
+};
+
+function runtimeContextSummary(context: RuntimeEventContext): string[] {
+  return [
+    context.taskId ? `Hub task ${context.taskId}` : undefined,
+    context.edgeRunId ? `Edge run ${context.edgeRunId}` : undefined,
+    context.targetId ? `Target ${context.targetId}` : undefined,
+  ].filter((part): part is string => Boolean(part));
+}
+
+function runtimeSummaryPayload(
+  eventType: string,
+  payload: unknown,
+  context: RuntimeEventContext,
+): Record<string, unknown> {
+  return {
+    summary: [
+      summarizeRuntimePayload(eventType, payload),
+      ...runtimeContextSummary(context),
+    ].join(' | '),
+  };
+}
+
+function normalizeTeamRunEvent(
+  event: AgentTeamEvent,
+  selectedRun?: AgentTeamRun | undefined,
+): AgentTeamEvent {
+  const payloadRecord = parsePayloadRecord(event.payload);
+  const runtimeType = firstString(payloadRecord?.event_type);
+  if (event.type === 'agent.stream' || runtimeType) {
+    const eventType = runtimeType ?? event.type;
+    const runtimePayload = payloadRecord?.payload ?? event.payload;
+    const nestedPayload = parsePayloadRecord(runtimePayload);
+    const taskId = firstString(payloadRecord?.task_id, payloadRecord?.agent_task_id, nestedPayload?.task_id, nestedPayload?.taskId);
+    const edgeRunId = firstString(payloadRecord?.edge_run_id, payloadRecord?.run_id, nestedPayload?.edge_run_id, nestedPayload?.runId);
+    const targetId = firstString(payloadRecord?.target_id, nestedPayload?.target_id, nestedPayload?.targetId, selectedRun?.target_id);
+    return {
+      ...event,
+      type: eventType,
+      seq: numberField(payloadRecord?.event_seq) ?? event.seq,
+      payload: runtimeSummaryPayload(eventType, runtimePayload, { taskId, edgeRunId, targetId }),
+    };
+  }
+
+  if (event.type.startsWith('run.agent.') || event.type === 'artifact.created') {
+    const targetId = firstString(payloadRecord?.target_id, payloadRecord?.targetId, selectedRun?.target_id);
+    const edgeRunId = firstString(payloadRecord?.edge_run_id, payloadRecord?.runId);
+    const taskId = firstString(payloadRecord?.task_id, payloadRecord?.taskId, payloadRecord?.agent_task_id);
+    return {
+      ...event,
+      payload: runtimeSummaryPayload(event.type, event.payload, { taskId, edgeRunId, targetId }),
+    };
+  }
+
+  return event;
+}
+
+function stateEventToTeamEvent(
+  event: NonNullable<TeamRunState['run_events']>[number],
+  selectedRun?: AgentTeamRun | undefined,
+): AgentTeamEvent {
+  const payloadRecord = parsePayloadRecord(event.payload);
+  const taskId = firstString(event.agent_task_id, payloadRecord?.task_id, payloadRecord?.taskId);
+  const edgeRunId = firstString(event.edge_run_id, payloadRecord?.edge_run_id, payloadRecord?.runId);
+  const targetId = firstString(payloadRecord?.target_id, payloadRecord?.targetId, selectedRun?.target_id);
+  return {
+    id: `run-event-${taskId ?? 'task'}-${edgeRunId ?? 'edge'}-${event.event_seq}`,
+    team_run_id: selectedRun?.id ?? '',
+    seq: event.event_seq,
+    type: event.event_type,
+    payload: runtimeSummaryPayload(event.event_type, event.payload, { taskId, edgeRunId, targetId }),
+    ...(event.created_at ? { created_at: event.created_at } : {}),
+  };
+}
+
+function mergeRunEvents(
+  events: AgentTeamEvent[],
+  state?: TeamRunState | undefined,
+  selectedRun?: AgentTeamRun | undefined,
+): AgentTeamEvent[] {
+  type EventCandidate = {
+    event: AgentTeamEvent;
+    sourceOrder: number;
+    sourceSeq: number;
+    inputOrder: number;
+  };
+  const merged: EventCandidate[] = [];
+  const seen = new Set<string>();
+  const add = (event: AgentTeamEvent, sourceOrder: number, inputOrder: number) => {
+    const key = `${event.type}:${event.seq}:${event.id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push({
+      event,
+      sourceOrder,
+      sourceSeq: event.seq,
+      inputOrder,
+    });
+  };
+
+  events.map((event) => normalizeTeamRunEvent(event, selectedRun)).forEach((event, index) => add(event, 0, index));
+  (state?.run_events ?? [])
+    .map((event) => stateEventToTeamEvent(event, selectedRun))
+    .forEach((event, index) => add(event, 1, events.length + index));
+
+  return merged
+    .sort((a, b) => {
+      const aTime = Date.parse(a.event.created_at ?? '');
+      const bTime = Date.parse(b.event.created_at ?? '');
+      const hasATime = Number.isFinite(aTime);
+      const hasBTime = Number.isFinite(bTime);
+      if (hasATime && hasBTime && aTime !== bTime) return aTime - bTime;
+      if (hasATime !== hasBTime) return hasATime ? -1 : 1;
+      if (a.sourceOrder !== b.sourceOrder) return a.sourceOrder - b.sourceOrder;
+      if (a.sourceSeq !== b.sourceSeq) return a.sourceSeq - b.sourceSeq;
+      return a.inputOrder - b.inputOrder;
+    })
+    .map(({ event }, index) => ({
+      ...event,
+      seq: index + 1,
+    }));
+}
+
 const RUN_STATUS_DOT: Record<string, string> = {
   queued: '#9ca3af',
   running: '#f59e0b',
@@ -50,6 +292,35 @@ const RUN_STATUS_DOT: Record<string, string> = {
   failed: '#ef4444',
   cancelled: '#6b7280',
 };
+const EMPTY_TASKS: AgentTeamTask[] = [];
+const EMPTY_EVENTS: AgentTeamEvent[] = [];
+
+function replayEventCountLabel(count: number): string {
+  return count === 1 ? '1 replay event' : `${count} replay events`;
+}
+
+function replayTargetLabel(targetId: string | undefined, target: { name?: string; id: string } | undefined): string {
+  if (!targetId) return 'No target recorded';
+  return target?.name || targetId;
+}
+
+function replayTargetWarning(
+  selectedRun: AgentTeamRun | undefined,
+  target: { id: string; name?: string; target_type: string; is_online: boolean; health_state: string } | undefined,
+): string | undefined {
+  const targetId = selectedRun?.target_id;
+  if (!selectedRun) return undefined;
+  if (!targetId) {
+    return 'Run has no execution target recorded. Web keeps this view Hub-sourced and does not contact the Desktop/Edge runtime directly.';
+  }
+  if (!target || !target.is_online || target.health_state === 'offline') {
+    return `Replay target offline or unavailable: ${replayTargetLabel(targetId, target)}. Web keeps this view Hub-sourced and does not contact the Desktop/Edge runtime directly.`;
+  }
+  if (target.target_type !== 'local_edge') {
+    return `Replay target is ${target.target_type}. Web keeps this view Hub-sourced and does not contact the Desktop/Edge runtime directly.`;
+  }
+  return undefined;
+}
 
 function mapMemberDisplays(
   members: { member_id: string; agent_profile_id?: string; role: string; active_tasks?: number; completed_tasks?: number }[],
@@ -117,6 +388,9 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const [decidingIds, setDecidingIds] = useState<Set<string>>(new Set());
   const [insetTeam, setInsetTeam] = useState<AgentTeamDetail | null>(null);
   const [insetRun, setInsetRun] = useState<AgentTeamRun | null>(null);
+  const [selectedTargetId, setSelectedTargetId] = useState('');
+  const [startRunError, setStartRunError] = useState('');
+  const [runReplayError, setRunReplayError] = useState('');
 
   // Queries
   const agentTeamsQuery = useHubAgentTeams({
@@ -124,6 +398,10 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
     getToken: tokenGetter,
     selectedTeamId: selectedTeamId ?? undefined,
     selectedRunId: selectedRunId ?? undefined,
+  });
+  const executionTargetsQuery = useHubExecutionTargets({
+    enabled: hubAuthenticated,
+    getToken: tokenGetter,
   });
 
   const teams = agentTeamsQuery.data?.teams ?? [];
@@ -135,8 +413,54 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   const runs = selectedBundle?.runs ?? [];
 
   const state = localState ?? agentTeamsQuery.data?.state;
-  const tasks = localTasks.length > 0 ? localTasks : (agentTeamsQuery.data?.tasks ?? []);
-  const events = localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? []);
+  const tasks = localTasks.length > 0 ? localTasks : (agentTeamsQuery.data?.tasks ?? EMPTY_TASKS);
+  const events = useMemo(
+    () => mergeRunEvents(
+      localEvents.length > 0 ? localEvents : (agentTeamsQuery.data?.events ?? EMPTY_EVENTS),
+      state,
+      selectedRun,
+    ),
+    [agentTeamsQuery.data?.events, localEvents, selectedRun, state],
+  );
+  const executionTargetItems = executionTargetsQuery.data?.items ?? [];
+  const onlineLocalEdgeTargets = useMemo(
+    () => executionTargetItems.filter((target) =>
+      target.target_type === 'local_edge' &&
+      target.is_online === true &&
+      target.health_state !== 'offline'
+    ),
+    [executionTargetItems],
+  );
+  const selectedRunTarget = onlineLocalEdgeTargets.find((target) => target.id === selectedTargetId);
+  const replayTarget = selectedRun?.target_id
+    ? executionTargetItems.find((target) => target.id === selectedRun.target_id)
+    : undefined;
+  const replayTargetStatus = replayTargetWarning(selectedRun, replayTarget);
+  const replayTargetName = replayTargetLabel(selectedRun?.target_id, replayTarget);
+  const runTargetLoading =
+    executionTargetsQuery.isLoading ||
+    (executionTargetsQuery.isFetching && !executionTargetsQuery.data);
+  const runTargetError = executionTargetsQuery.error instanceof Error
+    ? executionTargetsQuery.error.message
+    : executionTargetsQuery.error
+      ? String(executionTargetsQuery.error)
+      : '';
+  const runTargetStatus = runTargetLoading
+    ? t('teamRun.targetLoading', 'Loading Hub execution targets...')
+    : runTargetError
+      ? t('teamRun.targetError', 'Hub execution targets unavailable: {{message}}', { message: runTargetError })
+      : selectedRunTarget
+        ? t('teamRun.targetSelected', 'Target: {{name}}', { name: selectedRunTarget.name || selectedRunTarget.id })
+        : onlineLocalEdgeTargets.length > 0
+          ? t('teamRun.targetRequired', 'Select a Desktop/Edge target before starting.')
+          : t('teamRun.targetMissing', 'No online local_edge execution target is available.');
+
+  useEffect(() => {
+    if (!selectedTargetId) return;
+    if (!onlineLocalEdgeTargets.some((target) => target.id === selectedTargetId)) {
+      setSelectedTargetId('');
+    }
+  }, [onlineLocalEdgeTargets, selectedTargetId]);
 
   // Mutations
   const createTeamMut = useCreateAgentTeam({ getToken: tokenGetter });
@@ -182,6 +506,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
       setLocalEvents([]);
       setInsetTeam(null);
       setInsetRun(null);
+      setRunReplayError('');
     },
     [],
   );
@@ -194,6 +519,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
       setLocalTasks([]);
       setLocalEvents([]);
       setStateLoading(true);
+      setRunReplayError('');
       try {
         const token = tokenGetter();
         if (!token) return;
@@ -210,8 +536,8 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
         setInsetTeam(teamDetailData);
         const runData = await client.getTeamRun(teamId, runId);
         setInsetRun(runData);
-      } catch {
-        // keep stale data
+      } catch (error) {
+        setRunReplayError(formatErrorMessage(error));
       } finally {
         setStateLoading(false);
       }
@@ -233,19 +559,20 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
   }, [createTeamMut, newTeamDesc, newTeamName]);
 
   const handleStartRun = useCallback(async () => {
-    if (!selectedTeamId || !triggerMessage.trim()) return;
+    if (!selectedTeamId || !triggerMessage.trim() || !selectedRunTarget) return;
+    setStartRunError('');
     try {
       const run = await startRunMut.mutateAsync({
         teamId: selectedTeamId,
-        run: { trigger_message: triggerMessage.trim() },
+        run: { trigger_message: triggerMessage.trim(), target_id: selectedRunTarget.id },
       });
       setTriggerMessage('');
       setShowStartRun(false);
       setTimeout(() => handleSelectRun(selectedTeamId, run.id), 1500);
-    } catch {
-      // mutation handles error
+    } catch (error) {
+      setStartRunError(formatErrorMessage(error));
     }
-  }, [handleSelectRun, selectedTeamId, startRunMut, triggerMessage]);
+  }, [handleSelectRun, selectedRunTarget, selectedTeamId, startRunMut, triggerMessage]);
 
   const handleApprove = useCallback(
     async (approvalId: string) => {
@@ -399,16 +726,21 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
               const runCount = bundle?.runs.length ?? 0;
               const active = selectedTeamId === team.id;
               return (
-                <button
+                <div
                   key={team.id}
-                  type="button"
                   className={`${styles.teamItem} ${active ? styles.teamItemActive : ''}`}
-                  onClick={() => handleSelectTeam(team.id)}
                 >
-                  <div className={styles.teamItemHeader}>
-                    <span className={styles.teamName}>{team.name}</span>
-                    <span className={styles.teamRunCount}>{runCount}</span>
-                  </div>
+                  <button
+                    type="button"
+                    className={styles.teamSelectButton}
+                    aria-label={t('teamRun.selectTeamNamed', 'Select team {{name}}', { name: team.name })}
+                    onClick={() => handleSelectTeam(team.id)}
+                  >
+                    <span className={styles.teamItemHeader}>
+                      <span className={styles.teamName}>{team.name}</span>
+                      <span className={styles.teamRunCount}>{runCount}</span>
+                    </span>
+                  </button>
                   {team.description && (
                     <div className={styles.teamDesc}>{team.description}</div>
                   )}
@@ -443,7 +775,7 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                       })}
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -479,6 +811,22 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                 <p className={styles.detailDesc}>{teamDetail.description}</p>
               )}
 
+              {selectedRun && (
+                <div className={styles.replayContext} aria-label="Selected Hub run replay context">
+                  <span className={styles.replayPill}>
+                    {t('teamRun.realHubReplay', 'Real Hub replay')}
+                  </span>
+                  <span>{t('teamRun.replayRunId', 'Run {{id}}', { id: selectedRun.id })}</span>
+                  <span>{t('teamRun.replayTarget', 'Target {{target}}', { target: replayTargetName })}</span>
+                  <span>{replayEventCountLabel(events.length)}</span>
+                  {replayTargetStatus && (
+                    <span className={styles.replayWarning} role="status">
+                      {replayTargetStatus}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Start run */}
               {selectedTeamId && (
                 <div className={styles.runControls}>
@@ -499,7 +847,32 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                         onChange={(e) => setTriggerMessage(e.target.value)}
                         rows={2}
                       />
+                      <label className={styles.targetPicker}>
+                        <span>{t('teamRun.targetPickerLabel', 'Desktop/Edge target')}</span>
+                        <select
+                          className={styles.select}
+                          aria-label={t('teamRun.targetPickerLabel', 'Desktop/Edge target')}
+                          value={selectedTargetId}
+                          onChange={(event) => {
+                            setSelectedTargetId(event.target.value);
+                            setStartRunError('');
+                          }}
+                          disabled={runTargetLoading || Boolean(runTargetError) || onlineLocalEdgeTargets.length === 0}
+                        >
+                          <option value="">
+                            {onlineLocalEdgeTargets.length > 0
+                              ? t('teamRun.targetPickerPlaceholder', 'Select a Hub-registered Desktop/Edge target')
+                              : t('teamRun.targetPickerEmpty', 'No online Desktop/Edge targets')}
+                          </option>
+                          {onlineLocalEdgeTargets.map((target) => (
+                            <option key={target.id} value={target.id}>
+                              {target.name || target.id}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       <div className={styles.startRunActions}>
+                        <span className={styles.targetHint}>{runTargetStatus}</span>
                         <button
                           type="button"
                           className={styles.secondaryBtn}
@@ -511,13 +884,18 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                           type="button"
                           className={styles.primaryBtn}
                           onClick={handleStartRun}
-                          disabled={!triggerMessage.trim() || startRunMut.isPending}
+                          disabled={!triggerMessage.trim() || !selectedRunTarget || runTargetLoading || startRunMut.isPending}
                         >
                           {startRunMut.isPending
                             ? t('teamRun.starting', 'Starting...')
                             : t('teamRun.go', 'Go')}
                         </button>
                       </div>
+                      {startRunError && (
+                        <div className={styles.inlineError} role="status">
+                          {t('teamRun.startRunError', 'Hub dispatch failed: {{message}}', { message: startRunError })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -562,6 +940,10 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                 <div className={styles.listHint}>
                   {t('teamRun.selectRun', 'Select a run from the sidebar to view details.')}
                 </div>
+              ) : runReplayError ? (
+                <div className={styles.listError} role="status">
+                  {t('teamRun.runReplayError', 'Unable to load Hub run replay: {{message}}', { message: runReplayError })}
+                </div>
               ) : (
                 <>
                   {activeTab === 'members' && (
@@ -600,6 +982,10 @@ export default function TeamRunConsole(_props: TeamRunConsoleProps = {}) {
                       loading={queryLoading && events.length === 0}
                       error={agentTeamsQuery.error ? String(agentTeamsQuery.error) : null}
                       memberNames={memberNames}
+                      emptyText={t(
+                        'teamRun.emptyHubReplay',
+                        'Hub replay has no recorded events for this selected run.',
+                      )}
                     />
                   )}
                 </>

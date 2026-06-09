@@ -1,8 +1,14 @@
 import { useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauriRuntime } from '@/utils/appUtils';
 import { useToastStore } from '@/stores/toastStore';
+import type { DesktopLocalEdgeDiagnostics } from '@/platform/desktopPlatform';
+import {
+  formatDesktopEdgeDispatchDiagnostics,
+  type DesktopEdgeDispatchReadiness,
+} from '@/platform/edgeCapabilityMapper';
 
 export type EditCommand = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll';
 export type WindowCommand = 'minimize' | 'toggleMaximize' | 'close';
@@ -15,6 +21,7 @@ export interface UseDesktopCommandsDeps {
   selectedAgent?: { name: string; id: string } | null;
   selectedThread?: { threadId: string; title?: string } | null;
   displayedRun?: { runId: string; status: string } | null;
+  dispatchReadiness?: DesktopEdgeDispatchReadiness | null;
 }
 
 export interface UseDesktopCommandsReturn {
@@ -34,6 +41,7 @@ export function useDesktopCommands(deps: UseDesktopCommandsDeps): UseDesktopComm
     selectedAgent,
     selectedThread,
     displayedRun,
+    dispatchReadiness,
   } = deps;
   const desktopWindowAvailable = isTauriRuntime();
 
@@ -139,6 +147,7 @@ export function useDesktopCommands(deps: UseDesktopCommandsDeps): UseDesktopComm
       selectedAgent ? `Agent: ${selectedAgent.name} (${selectedAgent.id})` : null,
       selectedThread ? `Thread: ${selectedThread.threadId}` : null,
       displayedRun ? `Run: ${displayedRun.runId} (${displayedRun.status})` : null,
+      await readLocalEdgeDiagnosticText(dispatchReadiness),
     ].filter(Boolean).join('\n');
     try {
       await navigator.clipboard.writeText(diagnostic);
@@ -146,7 +155,78 @@ export function useDesktopCommands(deps: UseDesktopCommandsDeps): UseDesktopComm
     } catch {
       addToast({ type: 'error', message: t('toast.error') });
     }
-  }, [addToast, displayedRun, healthVersion, isConnected, online, selectedAgent, selectedThread, t, wsLatency]);
+  }, [addToast, dispatchReadiness, displayedRun, healthVersion, isConnected, online, selectedAgent, selectedThread, t, wsLatency]);
 
   return { handleWindowCommand, handleEditCommand, handleCopyDiagnostics };
+}
+
+async function readLocalEdgeDiagnosticText(dispatchReadiness?: DesktopEdgeDispatchReadiness | null): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  try {
+    const diagnostics = await invoke<DesktopLocalEdgeDiagnostics>('get_local_edge_diagnostics');
+    return formatLocalEdgeDiagnosticText(diagnostics, dispatchReadiness);
+  } catch (error) {
+    return `Local Edge host\n  diagnostics: unavailable (${error instanceof Error ? error.message : String(error)})`;
+  }
+}
+
+export function formatLocalEdgeDiagnosticText(
+  diagnostics: DesktopLocalEdgeDiagnostics,
+  dispatchReadiness?: DesktopEdgeDispatchReadiness | null,
+): string {
+  const readiness = diagnostics.readiness;
+  return [
+    'Local Edge host',
+    `  running: ${diagnostics.status.running}`,
+    `  pid: ${diagnostics.status.pid ?? 'n/a'}`,
+    `  health: ${diagnostics.status.health_url}`,
+    `  preflight: ${readiness.preflight.status}`,
+    readiness.preflight.blocker ? `  blocker: ${readiness.preflight.blocker}` : null,
+    `  sidecar: ${readiness.preflight.sidecar_available ? 'available' : 'missing'}`,
+    `  fallback executable: ${readiness.preflight.fallback_executable_available ? 'available' : 'missing'}`,
+    `  auth token: ${readiness.preflight.auth_token_ready ? 'ready' : 'blocked'}`,
+    `  store backend: ${readiness.store_backend}`,
+    `  store: ${readiness.store_db_policy}`,
+    `  store readiness manifest: ${readiness.store_readiness_manifest_schema}`,
+    `  expected store migration: ${readiness.expected_store_migration_version}`,
+    `  logs: ${readiness.log_paths.directory}`,
+    `  stdout: ${readiness.log_paths.stdout}`,
+    `  stderr: ${readiness.log_paths.stderr}`,
+    formatDesktopEdgeDispatchDiagnostics(dispatchReadiness),
+    formatLocalCliDiscoveryDiagnostics(diagnostics.local_cli_discovery),
+    `  login loopback: ${diagnostics.packaged_login.loopback.available ? 'ready' : 'blocked'}`,
+    `  credential store: ${diagnostics.packaged_login.credential_store.available ? 'ready' : 'blocked'}`,
+    `  real login e2e: ${diagnostics.packaged_login.real_e2e.status}`,
+    diagnostics.log_tail.stderr.length > 0
+      ? `  stderr tail: ${diagnostics.log_tail.stderr.slice(-3).join(' | ')}`
+      : null,
+  ].filter(Boolean).join('\n');
+}
+
+function formatLocalCliDiscoveryDiagnostics(
+  discovery: DesktopLocalEdgeDiagnostics['local_cli_discovery'],
+): string | null {
+  if (!discovery) return null;
+
+  const lines = [
+    'Local CLI discovery',
+    `  mode: ${discovery.mode}`,
+    `  readiness manifest: ${discovery.readinessManifest}`,
+    `  readiness script: ${discovery.readinessScript}`,
+    ...discovery.items.map((item) => [
+      `  ${item.id}: ${item.installed ? 'installed' : 'missing'}`,
+      `version=${item.version || 'unknown'}`,
+      `path=${formatDiagnosticCliPath(item.path)}`,
+      `boundary=${item.noSpend ? 'no-spend' : 'requires-approval'}`,
+    ].join(' ')),
+  ];
+
+  return lines.join('\n');
+}
+
+function formatDiagnosticCliPath(path: string): string {
+  const normalized = path.trim();
+  if (!normalized) return 'unknown';
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] ?? normalized : normalized;
 }

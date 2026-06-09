@@ -76,8 +76,8 @@ For security-sensitive changes, run:
 | Directory | Purpose |
 |-----------|---------|
 | `app/desktop/` | Tauri desktop app (port 5173) |
-| `app/mobile/` | Tauri mobile app (port 5174) |
-| `app/web/` | Web workbench (port 5175 reserved) |
+| `app/mobile-rn/` | Expo + React Native mobile app (Expo Web preview port 5177) |
+| `app/web/` | Web workbench (port 5174) |
 | `app/shared/` | Shared UI, types, API client (`@agenthub/shared`) |
 | `hub-server/` | Hub: accounts, IM, sync, relay (port 8090) |
 | `edge-server/` | Edge: execution node, runtime adapters (port 3210) |
@@ -85,7 +85,7 @@ For security-sensitive changes, run:
 | `docs/` | Guides, architecture, governance, handoff, operations, roadmaps, reference, archive |
 | `scripts/` | Setup, dev start/stop, verification scripts |
 
-Desktop and Mobile are independent Tauri projects. Do not modify each other's `tauri.conf.json`, `Cargo.toml`, or `lib.rs`.
+Desktop is the Tauri project. Mobile is the Expo + React Native lane under `app/mobile-rn/`; do not restore the removed legacy Tauri Mobile project.
 
 ## Security
 

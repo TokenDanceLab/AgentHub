@@ -2,6 +2,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import {
   createWorkbenchDemoStore,
   demoWorkbenchAgents,
+  isWorkbenchFixtureDataMode,
+  isWorkbenchRealDataMode,
   normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
@@ -16,6 +18,7 @@ import { queryClient as defaultQueryClient } from '@/api/queryClient';
 import {
   createHubClient,
   type AgentInstance,
+  type ExecutionTarget,
   type HubClient,
   type MessageResponse,
   type PendingAgentTask,
@@ -25,12 +28,29 @@ import { getAccessToken } from '@/hooks/useAuth';
 import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
 
-type WebRunHubClient = Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'>;
+type WebRunHubClient =
+  Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'> &
+  Partial<Pick<HubClient, 'listExecutionTargets'>>;
+
+interface WebComposerIntent extends ComposerIntent {
+  executionTargetId?: string;
+}
 
 interface SessionAgentInstanceBinding {
   profileId: string;
   runtimeId: string;
   agentInstance: AgentInstance;
+}
+
+export interface WebActiveAgentTask {
+  taskId: string;
+  sessionId?: string;
+  agentInstanceId?: string;
+  triggerMessageId?: string;
+  targetId?: string;
+  edgeRunId?: string;
+  edgeDeviceId?: string;
+  status: string;
 }
 
 export interface WebPlatformOptions {
@@ -39,6 +59,7 @@ export interface WebPlatformOptions {
   createClientMessageId?: () => string;
   demoRuntimeStore?: WorkbenchDemoRuntimeStore;
   now?: () => string;
+  ensureAuth?: () => boolean;
 }
 
 const defaultHubClient = createHubClient({ getToken: getAccessToken });
@@ -69,14 +90,26 @@ export function agentInfoToWorkbenchAgent(agent: AgentInfo): WorkbenchAgent {
     id: agent.profileId ?? agent.id,
     name: agent.name,
     ...(agent.description ? { description: agent.description } : {}),
+    ...(agent.runtimeId ? { icon: agent.runtimeId } : {}),
     status: agent.status,
     ...(agent.model ? { model: agent.model } : {}),
     ...(agent.runtimeId ? { runtimeId: agent.runtimeId } : {}),
+    ...(agent.provider ? { provider: agent.provider } : {}),
+    ...(agent.approvalPolicy ? { approvalPolicy: agent.approvalPolicy } : {}),
+    ...(agent.permissionMode ? { permissionMode: agent.permissionMode } : {}),
+    ...(agent.reasoningEffort ? { reasoningEffort: agent.reasoningEffort } : {}),
+    ...(agent.skills ? { skills: agent.skills } : {}),
+    ...(agent.toolAllowlist ? { toolAllowlist: agent.toolAllowlist } : {}),
+    ...(agent.targetPreferences ? { targetPreferences: agent.targetPreferences } : {}),
   };
 }
 
-export function resolveWebWorkbenchAgents(hubAgents: AgentInfo[] | undefined): WorkbenchAgent[] {
+export function resolveWebWorkbenchAgents(
+  hubAgents: AgentInfo[] | undefined,
+  dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
+): WorkbenchAgent[] {
   const mapped = hubAgents?.map(agentInfoToWorkbenchAgent) ?? [];
+  if (isWorkbenchRealDataMode(dataMode)) return mapped;
   return mapped.length > 0 ? mapped : webAgents;
 }
 
@@ -125,7 +158,7 @@ export function resolveWebWorkbenchConversations(
   hubAuthenticated: boolean,
   dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
 ): WorkbenchConversation[] {
-  if (!hubAuthenticated) return dataMode === 'real' ? [webHubEmptyConversation] : webConversations;
+  if (!hubAuthenticated) return isWorkbenchRealDataMode(dataMode) ? [webHubEmptyConversation] : webConversations;
 
   const mapped = sessions
     ?.map(hubSessionToWorkbenchConversation)
@@ -150,6 +183,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
   const createClientMessageId = options.createClientMessageId ?? newClientMessageId;
   const demoRuntimeStore = options.demoRuntimeStore ?? workbenchDemoRuntimeStore;
   const now = options.now ?? (() => new Date().toISOString());
+  const ensureAuth = options.ensureAuth;
 
   return {
     surface: 'web',
@@ -170,8 +204,18 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
-        if (dataMode === 'demo' || (dataMode === 'auto' && !hasInjectedHubClient && !getAccessToken())) {
+        const hasHubToken = Boolean(getAccessToken());
+        const shouldUseDemoFallback = isWorkbenchFixtureDataMode(dataMode) || (
+          dataMode === 'auto' &&
+          !hasInjectedHubClient &&
+          !hasHubToken &&
+          !ensureAuth
+        );
+        if (shouldUseDemoFallback) {
           return demoRuntimeStore.submitComposerIntent(intent);
+        }
+        if (!hasHubToken && ensureAuth && !ensureAuth()) {
+          throw new Error('Hub authentication is required before Web can submit real Hub work.');
         }
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
       },
@@ -194,6 +238,9 @@ export async function submitWebComposerIntent(
   if (mention && !mention.runtimeId) {
     throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
   }
+  const dispatchTarget = mention
+    ? await resolveWebDispatchTarget(hubClient, (intent as WebComposerIntent).executionTargetId)
+    : undefined;
   const agentInstance = mention
     ? await ensureMentionedAgentInstance(hubClient, intent.conversationId, mention, options.queryClient)
     : undefined;
@@ -215,7 +262,20 @@ export async function submitWebComposerIntent(
     return { intentId: message.message_id };
   }
 
-  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, intent);
+  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, dispatchTarget, intent);
+  if (task.id) {
+    const targetId = task.target_id ?? dispatchTarget?.id;
+    recordWebAgentTaskIndex(options.queryClient, {
+      taskId: task.id,
+      sessionId: intent.conversationId,
+      agentInstanceId: task.agent_instance_id,
+      triggerMessageId: task.trigger_message_id || message.message_id,
+      ...(targetId ? { targetId } : {}),
+      ...(task.edge_run_id ? { edgeRunId: task.edge_run_id } : {}),
+      ...(task.edge_device_id ? { edgeDeviceId: task.edge_device_id } : {}),
+      status: task.status || 'queued',
+    });
+  }
   return { intentId: task.id || message.message_id };
 }
 
@@ -298,6 +358,78 @@ function hubMessagesQueryKey(sessionId: string): [string, string, string] {
   return ['web-v4', 'hub-messages', sessionId];
 }
 
+export function webActiveAgentTaskQueryKey(sessionId: string): [string, string, string] {
+  return ['web-v4', 'active-agent-task', sessionId];
+}
+
+export function webAgentTaskIndexQueryKey(taskId: string): [string, string, string] {
+  return ['web-v4', 'agent-task-index', taskId];
+}
+
+export function recordWebAgentTaskIndex(
+  queryClient: QueryClient | undefined,
+  task: WebActiveAgentTask,
+): void {
+  queryClient?.setQueryData(webAgentTaskIndexQueryKey(task.taskId), task);
+  if (!task.sessionId) return;
+  queryClient?.setQueryData(webActiveAgentTaskQueryKey(task.sessionId), task);
+  writeStoredWebActiveAgentTask(task.sessionId, task);
+}
+
+export function readStoredWebActiveAgentTask(sessionId: string): WebActiveAgentTask | null {
+  if (typeof localStorage === 'undefined') return null;
+  const raw = localStorage.getItem(webActiveAgentTaskStorageKey(sessionId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    const taskId = stringField(record.taskId);
+    const status = stringField(record.status);
+    if (!taskId || !status) return null;
+    const storedSessionId = stringField(record.sessionId) ?? sessionId;
+    const agentInstanceId = stringField(record.agentInstanceId);
+    const triggerMessageId = stringField(record.triggerMessageId);
+    const targetId = stringField(record.targetId);
+    const edgeRunId = stringField(record.edgeRunId);
+    const edgeDeviceId = stringField(record.edgeDeviceId);
+    return compactActiveAgentTask({
+      taskId,
+      sessionId: storedSessionId,
+      ...(agentInstanceId ? { agentInstanceId } : {}),
+      ...(triggerMessageId ? { triggerMessageId } : {}),
+      ...(targetId ? { targetId } : {}),
+      ...(edgeRunId ? { edgeRunId } : {}),
+      ...(edgeDeviceId ? { edgeDeviceId } : {}),
+      status,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredWebActiveAgentTask(sessionId: string, task: WebActiveAgentTask): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(webActiveAgentTaskStorageKey(sessionId), JSON.stringify(compactActiveAgentTask(task)));
+}
+
+function webActiveAgentTaskStorageKey(sessionId: string): string {
+  return `agenthub.web.activeAgentTask.${sessionId}`;
+}
+
+function compactActiveAgentTask(task: WebActiveAgentTask): WebActiveAgentTask {
+  return {
+    taskId: task.taskId,
+    ...(task.sessionId ? { sessionId: task.sessionId } : {}),
+    ...(task.agentInstanceId ? { agentInstanceId: task.agentInstanceId } : {}),
+    ...(task.triggerMessageId ? { triggerMessageId: task.triggerMessageId } : {}),
+    ...(task.targetId ? { targetId: task.targetId } : {}),
+    ...(task.edgeRunId ? { edgeRunId: task.edgeRunId } : {}),
+    ...(task.edgeDeviceId ? { edgeDeviceId: task.edgeDeviceId } : {}),
+    status: task.status,
+  };
+}
+
 function sessionAgentBindingsQueryKey(sessionId: string): [string, string, string] {
   return ['web-v4', 'session-agent-instances', sessionId];
 }
@@ -354,15 +486,60 @@ async function triggerMentionedAgent(
   hubClient: WebRunHubClient,
   triggerMessageId: string,
   agentInstanceId: string | undefined,
+  target: Pick<ExecutionTarget, 'id'> | undefined,
   intent: ComposerIntent,
 ): Promise<PendingAgentTask> {
   if (!agentInstanceId) {
     throw new Error('Hub did not return an exact agent instance id for dispatch.');
   }
+  if (!target?.id) {
+    throw new Error('Selected Desktop/Edge target is not available for Web Hub dispatch.');
+  }
   return hubClient.triggerAgentTask(triggerMessageId, {
     agent_instance_id: agentInstanceId,
+    target_id: target.id,
     model_params: JSON.stringify(buildHubAgentTaskModelParams(intent)),
   });
+}
+
+async function resolveWebDispatchTarget(
+  hubClient: WebRunHubClient,
+  executionTargetId: string | undefined,
+): Promise<Pick<ExecutionTarget, 'id'>> {
+  const requestedTargetId = executionTargetId?.trim();
+  if (!requestedTargetId) {
+    throw new Error('Select a Desktop/Edge target before Web can dispatch real Hub work.');
+  }
+  if (!hubClient.listExecutionTargets) {
+    throw new Error('Hub execution target inventory is required for Web Hub dispatch.');
+  }
+  const inventory = await hubClient.listExecutionTargets({
+    target_type: 'local_edge',
+    pageSize: 50,
+  });
+  const onlineLocalEdgeTargets = inventory.items.filter((target) =>
+    target.target_type === 'local_edge' &&
+    target.is_online === true &&
+    (target.health_state === 'online' || target.health_state === 'healthy')
+  );
+  const target = onlineLocalEdgeTargets.find((item) => item.id === requestedTargetId);
+  if (!target) {
+    const requested = inventory.items.find((item) => item.id === requestedTargetId);
+    if (requested) {
+      throw new Error(
+        `Selected Desktop/Edge target is not dispatchable: ${targetDispatchBlockerLabel(requested)}.`,
+      );
+    }
+    throw new Error('Selected Desktop/Edge target is missing from Hub inventory.');
+  }
+  return target;
+}
+
+function targetDispatchBlockerLabel(target: ExecutionTarget): string {
+  if (target.target_type !== 'local_edge') return `target type ${target.target_type}`;
+  const healthState = target.health_state;
+  if (healthState === 'online' || healthState === 'healthy') return target.is_online ? 'online' : 'offline';
+  return healthState || (target.is_online ? 'unknown' : 'offline');
 }
 
 function buildHubComposerPrompt(intent: ComposerIntent): string {
@@ -402,6 +579,10 @@ function buildHubAgentTaskModelParams(intent: ComposerIntent): Record<string, un
       ...(attachment.truncated != null ? { truncated: attachment.truncated } : {}),
     })),
   };
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function newClientMessageId(): string {

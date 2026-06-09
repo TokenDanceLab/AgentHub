@@ -83,7 +83,8 @@
 }
 
 .input,
-.textarea {
+.textarea,
+.select {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
@@ -96,7 +97,8 @@
 }
 
 .input:focus,
-.textarea:focus {
+.textarea:focus,
+.select:focus {
   outline: none;
   border-color: var(--color-primary, #0071BC);
 }
@@ -162,19 +164,39 @@
   flex-direction: column;
   gap: 2px;
   padding: 10px 16px;
-  border: none;
   background: transparent;
   color: var(--color-text, #e5e7eb);
-  cursor: pointer;
   text-align: left;
   border-bottom: 1px solid transparent;
   transition: background 0.15s;
 }
 
-.teamItem:hover { background: var(--color-surface-variant, rgba(255, 255, 255, 0.03)); }
 .teamItemActive {
   background: var(--color-surface-variant, rgba(255, 255, 255, 0.04));
   border-bottom-color: var(--color-primary, #0071BC);
+}
+
+.teamSelectButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.teamSelectButton:hover .teamName,
+.teamSelectButton:focus-visible .teamName {
+  color: var(--color-primary, #0071BC);
+}
+
+.teamSelectButton:focus-visible {
+  outline: 2px solid var(--color-primary, #0071BC);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 .teamItemHeader {
@@ -324,6 +346,34 @@
   color: var(--color-text-secondary, #9ca3af);
 }
 
+.replayContext {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.replayContext > span {
+  max-width: 100%;
+}
+
+.replayPill {
+  padding: 2px 7px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  background: var(--color-surface-variant, rgba(255, 255, 255, 0.05));
+  color: var(--color-text, #e5e7eb);
+  font-weight: 600;
+}
+
+.replayWarning {
+  color: var(--color-warning, #f59e0b);
+}
+
 .runControls {
   margin-top: 10px;
 }
@@ -334,9 +384,45 @@
   gap: 8px;
 }
 
+.targetPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 11px;
+}
+
+.select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .startRunActions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.targetHint {
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 11px;
+}
+
+.inlineError,
+.listError {
+  color: var(--color-danger, #ef4444);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.listError {
+  padding: 24px;
+  text-align: center;
 }
 
 /* ── Tabs ── */

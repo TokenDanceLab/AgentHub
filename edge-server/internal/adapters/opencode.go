@@ -18,7 +18,7 @@ import (
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
 type OpenCodeAdapter struct {
 	binaryPath string
-	available  bool   // #177: true if the CLI binary exists and is executable
+	available  bool                     // #177: true if the CLI binary exists and is executable
 	budget     *runnerctx.ContextBudget // extracted from ctx in ParseStream; nil = no tracking
 }
 
@@ -196,9 +196,19 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 
 	switch evt.Type {
 	case "step_start":
-		emitter.Emit(BusEventSessionInit, scope, map[string]any{
+		payload := map[string]any{
 			"sessionId": evt.SessionID,
-		})
+		}
+		if evt.Model != "" {
+			payload["model"] = evt.Model
+		}
+		if evt.Provider != "" {
+			payload["provider"] = evt.Provider
+		}
+		if len(evt.Tools) > 0 {
+			payload["tools"] = evt.Tools
+		}
+		emitter.Emit(BusEventSessionInit, scope, payload)
 		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
 			"state": "busy",
 		})
@@ -246,6 +256,18 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 				"content": evt.Part.Text,
 			})
 		}
+	case "permission.asked":
+		emitter.Emit(BusEventPermissionRequested, scope, map[string]any{
+			"adapterId":      "opencode",
+			"requestId":      evt.RequestID,
+			"callId":         evt.CallID,
+			"toolName":       evt.ToolName,
+			"riskLevel":      evt.RiskLevel,
+			"reason":         evt.Reason,
+			"input":          evt.Input,
+			"decisionBridge": "blocked",
+			"nonInteractive": true,
+		})
 	case "step_finish":
 		result := map[string]any{"success": true}
 		if evt.Part != nil {
@@ -305,14 +327,20 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 // --- OpenCode JSON event schemas ---
 
 type opencodeEvent struct {
-	Type         string        `json:"type"`
-	Timestamp    float64       `json:"timestamp,omitempty"`
-	SessionID    string        `json:"sessionID,omitempty"`
-	Part         *opencodePart `json:"part,omitempty"`
-	Error        any           `json:"error,omitempty"` // string or object { name, data: { message } }
-	Model        string        `json:"model,omitempty"`
-	Provider     string        `json:"provider,omitempty"`
-	Tools        []string      `json:"tools,omitempty"`
+	Type      string        `json:"type"`
+	Timestamp float64       `json:"timestamp,omitempty"`
+	SessionID string        `json:"sessionID,omitempty"`
+	Part      *opencodePart `json:"part,omitempty"`
+	Error     any           `json:"error,omitempty"` // string or object { name, data: { message } }
+	Model     string        `json:"model,omitempty"`
+	Provider  string        `json:"provider,omitempty"`
+	Tools     []string      `json:"tools,omitempty"`
+	RequestID string        `json:"requestID,omitempty"`
+	CallID    string        `json:"callID,omitempty"`
+	ToolName  string        `json:"toolName,omitempty"`
+	RiskLevel string        `json:"riskLevel,omitempty"`
+	Reason    string        `json:"reason,omitempty"`
+	Input     any           `json:"input,omitempty"`
 }
 
 type opencodePart struct {

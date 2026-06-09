@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TranscriptBlock, TranscriptAuthor } from '../transcript';
+import type { ApprovalDecisionAction, TranscriptBlock, TranscriptAuthor } from '../transcript';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { FileItem } from './inspector';
 import {
@@ -17,6 +17,7 @@ import {
   DateDivider,
   PinnedAnnouncement,
   AgentTimeline,
+  RunSessionCard,
   RunStepGroup,
   ApprovalCardBlock,
 } from './blocks';
@@ -55,6 +56,7 @@ export interface TranscriptViewProps {
   onBlockPointerUp?: ((block: TranscriptBlock, event: TranscriptPointerEvent) => void) | undefined;
   onBlockSelect?: ((blockId: string, event?: { shiftKey?: boolean }) => void) | undefined;
   onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined;
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined;
   onReviewFile?: ((file: FileItem) => void) | undefined;
   /** Optional pinned announcement to show at the top of the transcript. */
   pinnedAnnouncement?: {
@@ -76,6 +78,7 @@ export function TranscriptView({
   onBlockPointerUp,
   onBlockSelect,
   onAgentProfileOpen,
+  onApprovalDecision,
   onReviewFile,
   selectedBlockIds = [],
   selectionMode = false,
@@ -87,7 +90,7 @@ export function TranscriptView({
   const actionedIds = new Set(actionedBlockIds);
   const selectedIds = new Set(selectedBlockIds);
   const softHiddenIds = new Set(softHiddenBlockIds);
-  const visibleTranscript = transcript.filter((block) => block.kind !== 'run_session');
+  const visibleTranscript = transcript;
   const diffControls = React.useMemo<InlineDiffControls>(() => ({
     expandedDiffIds,
     onToggleDiff: (diffId: string) => {
@@ -173,7 +176,14 @@ export function TranscriptView({
                 onPointerUp={(event) => onBlockPointerUp?.(block, event)}
                 tabIndex={0}
               >
-                {renderTranscriptBlock(block, onAgentProfileOpen, onReviewFile, hideGroupedUserAvatar, diffControls)}
+                {renderTranscriptBlock(
+                  block,
+                  onAgentProfileOpen,
+                  onReviewFile,
+                  hideGroupedUserAvatar,
+                  diffControls,
+                  onApprovalDecision,
+                )}
               </li>
             </React.Fragment>
           );
@@ -191,26 +201,41 @@ function renderTranscriptBlock(
   onReviewFile?: ((file: FileItem) => void) | undefined,
   hideUserAvatar = false,
   diffControls?: InlineDiffControls | undefined,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
   switch (block.kind) {
     case 'text':
       return renderTextBlock(block, onAgentProfileOpen, hideUserAvatar);
     case 'tool_call':
       return renderToolCallBlock(block);
+    case 'tool_result':
+      return renderToolResultBlock(block);
     case 'artifact':
       return renderArtifactBlock(block, onReviewFile, diffControls);
+    case 'preview':
+      return renderPreviewBlock(block);
+    case 'file_change':
+      return renderFileChangeBlock(block, onReviewFile, diffControls);
     case 'diff':
       return renderDiffBlock(block);
     case 'approval':
       return renderApprovalBlock(block);
+    case 'permission_request':
+      return renderPermissionRequestBlock(block, onApprovalDecision);
+    case 'permission_result':
+      return renderPermissionResultBlock(block);
     case 'agent_timeline':
       return renderAgentTimelineBlock(block);
+    case 'run_session':
+      return renderRunSessionBlock(block);
     case 'run_step_group':
-      return renderRunStepGroupBlock(block, onReviewFile, diffControls);
+      return renderRunStepGroupBlock(block, onReviewFile, diffControls, onApprovalDecision);
     case 'thinking':
       return renderThinkingBlock(block);
     case 'subagent':
       return renderSubagentBlock(block);
+    case 'subtask':
+      return renderSubtaskBlock(block);
     case 'child_agent':
       return renderChildAgentBlock(block);
     case 'route_decision':
@@ -219,8 +244,12 @@ function renderTranscriptBlock(
       return renderContextUsageBlock(block);
     case 'result':
       return renderResultBlock(block);
+    case 'failure':
+      return renderFailureBlock(block);
+    case 'finished':
+      return renderFinishedBlock(block);
     default:
-      return <p className={styles.blockText}>{JSON.stringify(block)}</p>;
+      return assertNever(block);
   }
 }
 
@@ -318,6 +347,28 @@ function renderToolCallBlock(
             status={block.status}
             path={target}
             description={block.summary}
+            detailRows={toolCallDetailRows(target, block.summary)}
+            evidenceRefs={block.evidenceRefs}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderToolResultBlock(
+  block: Extract<TranscriptBlock, { kind: 'tool_result' }>,
+): React.ReactElement {
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <div className={styles.agentRunDetail}>
+          <ToolCardBlock
+            description={block.summary}
+            detailRows={toolResultDetailRows(block.summary)}
+            evidenceRefs={block.evidenceRefs}
+            status={block.status}
+            toolName={`${block.toolName} result`}
           />
         </div>
       </div>
@@ -334,7 +385,7 @@ function renderArtifactBlock(
   pairedDiff?: Extract<TranscriptBlock, { kind: 'diff' }> | undefined,
 ): React.ReactElement {
   const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
-  const path = fileRef?.path ?? fileRef?.label;
+  const path = block.path ?? fileRef?.path ?? fileRef?.label;
 
   if (path) {
     return (
@@ -365,8 +416,67 @@ function renderArtifactBlock(
   }
 
   return (
-    <div className={styles.blockTitle}>
-      {block.title}
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <div className={styles.blockTitle}>{block.title}</div>
+        {(block.artifactKind || block.uri || block.mimeType) && (
+          <div className={styles.inlineMutedLoose}>
+            {[block.artifactKind, block.mimeType, block.uri].filter(Boolean).join(' / ')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function renderPreviewBlock(
+  block: Extract<TranscriptBlock, { kind: 'preview' }>,
+): React.ReactElement {
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <div className={styles.blockTitle}>Preview {block.previewId}</div>
+        <div className={styles.inlineMutedLoose}>
+          {[block.status, block.url].filter(Boolean).join(' / ')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderFileChangeBlock(
+  block: Extract<TranscriptBlock, { kind: 'file_change' }>,
+  onReviewFile?: ((file: FileItem) => void) | undefined,
+  diffControls?: InlineDiffControls | undefined,
+): React.ReactElement {
+  const diffExpanded = diffControls?.expandedDiffIds.has(block.id) ?? false;
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <FileChangeCard
+          action={block.action}
+          {...(block.additions != null ? { additions: block.additions } : {})}
+          {...(block.deletions != null ? { deletions: block.deletions } : {})}
+          {...(block.editId ? { editId: block.editId } : {})}
+          {...(block.reviewStatus ? { reviewStatus: block.reviewStatus } : {})}
+          {...(block.canApply != null ? { canApply: block.canApply } : {})}
+          {...(block.canRevert != null ? { canRevert: block.canRevert } : {})}
+          {...(block.lines?.length && diffControls ? {
+            diffExpanded,
+            onToggleDiff: () => diffControls.onToggleDiff(block.id),
+          } : {})}
+          onReview={onReviewFile ? () => onReviewFile(fileItemFromPath(block.path)) : undefined}
+          path={block.path}
+        />
+        {block.lines?.length && diffExpanded && (
+          <DiffCard
+            additions={block.additions ?? 0}
+            deletions={block.deletions ?? 0}
+            filename={block.path}
+            lines={block.lines}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -395,6 +505,22 @@ function renderDiffBlock(
   );
 }
 
+function toolCallDetailRows(
+  target?: string | undefined,
+  summary?: string | undefined,
+): Array<{ label: string; value: string }> {
+  return [
+    ...(target ? [{ label: 'Target', value: target }] : []),
+    ...(summary ? [{ label: 'Summary', value: summary }] : []),
+  ];
+}
+
+function toolResultDetailRows(
+  summary?: string | undefined,
+): Array<{ label: string; value: string }> {
+  return summary ? [{ label: 'Result', value: summary }] : [];
+}
+
 /* ── Approval block ── */
 
 function renderApprovalBlock(
@@ -405,6 +531,43 @@ function renderApprovalBlock(
       id={block.id}
       reason={block.reason}
       risk={block.risk}
+      status={block.status}
+      title={block.title}
+      toolName={block.toolName}
+    />
+  );
+}
+
+function renderPermissionRequestBlock(
+  block: Extract<TranscriptBlock, { kind: 'permission_request' }>,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
+): React.ReactElement {
+  return (
+    <ApprovalCardBlock
+      id={block.requestId}
+      agentTaskId={block.agentTaskId}
+      correlationId={block.correlationId}
+      edgeDeviceId={block.edgeDeviceId}
+      onDecision={onApprovalDecision}
+      reason={block.reason}
+      risk={block.risk}
+      status={block.status}
+      teamId={block.teamId}
+      teamRunId={block.teamRunId}
+      targetId={block.targetId}
+      title={block.title}
+      toolName={block.toolName}
+    />
+  );
+}
+
+function renderPermissionResultBlock(
+  block: Extract<TranscriptBlock, { kind: 'permission_result' }>,
+): React.ReactElement {
+  return (
+    <ApprovalCardBlock
+      id={block.requestId}
+      reason={block.reason ?? block.decision}
       status={block.status}
       title={block.title}
       toolName={block.toolName}
@@ -424,10 +587,37 @@ function renderAgentTimelineBlock(
   );
 }
 
+function renderRunSessionBlock(
+  block: Extract<TranscriptBlock, { kind: 'run_session' }>,
+): React.ReactElement {
+  return (
+    <div className={styles.agentBlockRow}>
+      <div className={styles.agentRunShell}>
+        <RunSessionCard
+          adapterId={block.adapterId}
+          agentLabel={block.agentLabel}
+          deviceId={block.deviceId}
+          edgeRunId={block.edgeRunId}
+          meta={block.meta}
+          modeLabel={block.modeLabel}
+          runtimeLabel={block.runtimeLabel}
+          runId={block.runId}
+          sourceLabel={block.sourceLabel}
+          status={block.status}
+          targetLabel={block.targetLabel}
+          taskId={block.taskId}
+          title={block.title}
+        />
+      </div>
+    </div>
+  );
+}
+
 function renderRunStepGroupBlock(
   block: Extract<TranscriptBlock, { kind: 'run_step_group' }>,
   onReviewFile?: ((file: FileItem) => void) | undefined,
   diffControls?: InlineDiffControls | undefined,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
   const renderedChildren: React.ReactNode[] = [];
   const consumedDiffIds = new Set<string>();
@@ -439,13 +629,13 @@ function renderRunStepGroupBlock(
       if (pairedDiff) consumedDiffIds.add(pairedDiff.id);
       renderedChildren.push(
         <React.Fragment key={child.id}>
-          {renderRunStepChild(child, onReviewFile, diffControls, pairedDiff)}
+          {renderRunStepChild(child, onReviewFile, diffControls, pairedDiff, onApprovalDecision)}
         </React.Fragment>,
       );
       continue;
     }
     renderedChildren.push(
-      <React.Fragment key={child.id}>{renderRunStepChild(child, onReviewFile, diffControls)}</React.Fragment>,
+      <React.Fragment key={child.id}>{renderRunStepChild(child, onReviewFile, diffControls, undefined, onApprovalDecision)}</React.Fragment>,
     );
   }
 
@@ -480,7 +670,7 @@ function findPairedDiffBlock(
 
 function artifactFilePath(block: Extract<TranscriptBlock, { kind: 'artifact' }>): string | undefined {
   const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
-  return fileRef?.path ?? fileRef?.label ?? block.title;
+  return block.path ?? fileRef?.path ?? fileRef?.label ?? block.title;
 }
 
 function renderRunStepChild(
@@ -488,6 +678,7 @@ function renderRunStepChild(
   onReviewFile?: ((file: FileItem) => void) | undefined,
   diffControls?: InlineDiffControls | undefined,
   pairedDiff?: Extract<TranscriptBlock, { kind: 'diff' }> | undefined,
+  onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
   switch (block.kind) {
     case 'tool_call': {
@@ -502,9 +693,17 @@ function renderRunStepChild(
         />
       );
     }
+    case 'tool_result':
+      return (
+        <ToolCardBlock
+          description={block.summary}
+          status={block.status}
+          toolName={`${block.toolName} result`}
+        />
+      );
     case 'artifact': {
       const fileRef = block.evidenceRefs?.find((ref) => ref.kind === 'file');
-      const path = fileRef?.path ?? fileRef?.label ?? block.title;
+      const path = block.path ?? fileRef?.path ?? fileRef?.label ?? block.title;
       return (
         <>
           <FileChangeCard
@@ -529,6 +728,30 @@ function renderRunStepChild(
         </>
       );
     }
+    case 'file_change':
+      return (
+        <>
+          <FileChangeCard
+            action={block.action}
+            {...(block.additions != null ? { additions: block.additions } : {})}
+            {...(block.deletions != null ? { deletions: block.deletions } : {})}
+            {...(block.editId ? { editId: block.editId } : {})}
+            {...(block.reviewStatus ? { reviewStatus: block.reviewStatus } : {})}
+            {...(block.canApply != null ? { canApply: block.canApply } : {})}
+            {...(block.canRevert != null ? { canRevert: block.canRevert } : {})}
+            onReview={onReviewFile ? () => onReviewFile(fileItemFromPath(block.path)) : undefined}
+            path={block.path}
+          />
+          {block.lines?.length ? (
+            <DiffCard
+              additions={block.additions ?? 0}
+              deletions={block.deletions ?? 0}
+              filename={block.path}
+              lines={block.lines}
+            />
+          ) : null}
+        </>
+      );
     case 'diff':
       return (
         <DiffCard
@@ -541,8 +764,12 @@ function renderRunStepChild(
     case 'thinking':
       return renderNestedThinkingDetail(block);
     default:
-      return renderTranscriptBlock(block, undefined, onReviewFile, false, diffControls);
+      return renderTranscriptBlock(block, undefined, onReviewFile, false, diffControls, onApprovalDecision);
   }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported transcript block: ${JSON.stringify(value)}`);
 }
 
 /* ── V4 detail blocks ── */
@@ -583,6 +810,20 @@ function renderSubagentBlock(
       summary={block.summary}
       title={block.title}
       worker={block.worker}
+    />
+  );
+}
+
+function renderSubtaskBlock(
+  block: Extract<TranscriptBlock, { kind: 'subtask' }>,
+): React.ReactElement {
+  return (
+    <SubagentBlock
+      runId={block.runId}
+      status={block.status}
+      summary={block.summary}
+      title={block.title}
+      worker={block.worker ?? 'Agent'}
     />
   );
 }
@@ -645,6 +886,29 @@ function renderResultBlock(
       success={block.success}
       summary={block.summary}
       turns={block.turns}
+    />
+  );
+}
+
+function renderFailureBlock(
+  block: Extract<TranscriptBlock, { kind: 'failure' }>,
+): React.ReactElement {
+  return (
+    <ResultBlock
+      success={false}
+      summary={block.reason ?? block.title}
+    />
+  );
+}
+
+function renderFinishedBlock(
+  block: Extract<TranscriptBlock, { kind: 'finished' }>,
+): React.ReactElement {
+  return (
+    <ResultBlock
+      duration={block.duration}
+      success={true}
+      summary={block.title}
     />
   );
 }

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   DesignFileIcon,
   DesignNavIcon,
@@ -62,6 +62,11 @@ export interface ProjectInfo {
   feed: ProjectFeedItem[];
 }
 
+export interface ProjectDraft {
+  name: string;
+  description: string;
+}
+
 export type ProjectFilter = 'all' | 'running' | 'completed' | 'archived';
 
 export type ProjectTab = 'overview' | 'runs' | 'artifacts' | 'archive' | 'settings';
@@ -69,6 +74,14 @@ export type ProjectTab = 'overview' | 'runs' | 'artifacts' | 'archive' | 'settin
 export interface ProjectsPageProps {
   /** Full list of projects (shown in left nav) */
   projects: ProjectInfo[];
+  /** True while the owning app is loading project data. */
+  projectsLoading?: boolean | undefined;
+  /** Error message from the owning app when project data fails to load. */
+  projectsError?: string | undefined;
+  /** True while a project create/update action is in flight. */
+  projectSaving?: boolean | undefined;
+  /** Error message from the owning app when create/update fails. */
+  projectActionError?: string | undefined;
   /** Currently selected project id */
   activeProjectId: string | null;
   /** Called when user clicks a project in the nav */
@@ -91,6 +104,13 @@ export interface ProjectsPageProps {
 
   /** Called when "新建项目" is clicked */
   onNewProject?: (() => void) | undefined;
+  /** Called when a project should be created. */
+  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  /** Called when a project should be updated. */
+  onProjectUpdate?: ((
+    projectId: string,
+    draft: ProjectDraft,
+  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
   /** Agent/user profiles available for avatar resolution */
   profiles?: WorkbenchProfileSource[] | undefined;
   /** Currently selected project artifact preview */
@@ -854,10 +874,77 @@ function ProjectDetail({
   );
 }
 
+function projectSubmitErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return 'Hub Projects 保存失败';
+}
+
+function ProjectEditor({
+  mode,
+  draft,
+  saving,
+  error,
+  onDraftChange,
+  onCancel,
+  onSubmit,
+}: {
+  mode: 'create' | 'update';
+  draft: ProjectDraft;
+  saving?: boolean | undefined;
+  error?: string | undefined;
+  onDraftChange: (draft: ProjectDraft) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}): React.ReactElement {
+  const submitLabel = mode === 'create' ? '创建项目' : '保存项目';
+  return (
+    <form
+      className={styles.projectEditor}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <div className={styles.editorGrid}>
+        <label className={styles.editorField}>
+          <span>项目名称</span>
+          <input
+            value={draft.name}
+            onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
+            disabled={saving}
+          />
+        </label>
+        <label className={styles.editorField}>
+          <span>项目描述</span>
+          <input
+            value={draft.description}
+            onChange={(event) => onDraftChange({ ...draft, description: event.target.value })}
+            disabled={saving}
+          />
+        </label>
+      </div>
+      {error ? <div className={styles.editorError} role="alert">{error}</div> : null}
+      <div className={styles.editorActions}>
+        <button type="button" className={styles.editorCancelBtn} onClick={onCancel} disabled={saving}>
+          取消
+        </button>
+        <button type="submit" className={styles.newProjectBtn} disabled={saving || !draft.name.trim()}>
+          {saving ? '保存中' : submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ── Main component ──
 
 export function ProjectsPage({
   projects,
+  projectsLoading,
+  projectsError,
+  projectSaving,
+  projectActionError,
   activeProjectId,
   onProjectSelect,
   searchQuery = '',
@@ -871,10 +958,84 @@ export function ProjectsPage({
   activePreview,
   onClosePreview,
   onEditAnnouncement,
+  onProjectCreate,
+  onProjectUpdate,
   onRunClick,
   onArtifactClick,
 }: ProjectsPageProps): React.ReactElement {
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null;
+  const [editorMode, setEditorMode] = useState<'create' | 'update' | null>(null);
+  const [draft, setDraft] = useState<ProjectDraft>({ name: '', description: '' });
+  const [localActionError, setLocalActionError] = useState<string | undefined>();
+  const canCreateProject = Boolean(onProjectCreate);
+  const canUpdateProject = Boolean(onProjectUpdate);
+
+  useEffect(() => {
+    if (editorMode !== 'update' || !activeProject) return;
+    setDraft({
+      name: activeProject.name,
+      description: activeProject.description,
+    });
+  }, [activeProject, editorMode]);
+
+  function startProjectCreate(): void {
+    if (!onProjectCreate) return;
+    onNewProject?.();
+    setDraft({ name: '', description: '' });
+    setLocalActionError(undefined);
+    setEditorMode('create');
+  }
+
+  function startProjectUpdate(project: ProjectInfo): void {
+    if (!onProjectUpdate) return;
+    setDraft({
+      name: project.name,
+      description: project.description,
+    });
+    setLocalActionError(undefined);
+    setEditorMode('update');
+  }
+
+  function cancelProjectEdit(): void {
+    setLocalActionError(undefined);
+    setEditorMode(null);
+  }
+
+  function updateProjectDraft(nextDraft: ProjectDraft): void {
+    setDraft(nextDraft);
+    setLocalActionError(undefined);
+  }
+
+  async function submitProjectEdit(): Promise<void> {
+    const nextDraft = {
+      name: draft.name.trim(),
+      description: draft.description.trim(),
+    };
+    if (!nextDraft.name) return;
+
+    setLocalActionError(undefined);
+
+    try {
+      if (editorMode === 'create') {
+        if (!onProjectCreate) return;
+        const created = await onProjectCreate(nextDraft);
+        if (created?.id) onProjectSelect(created.id);
+        setEditorMode(null);
+        return;
+      }
+
+      if (editorMode === 'update' && activeProject) {
+        if (!onProjectUpdate) return;
+        const updated = await onProjectUpdate(activeProject.id, nextDraft);
+        if (updated?.id) onProjectSelect(updated.id);
+        setEditorMode(null);
+      }
+    } catch (error) {
+      setLocalActionError(projectSubmitErrorMessage(error));
+    }
+  }
+
+  const visibleProjectActionError = projectActionError ?? localActionError;
 
   return (
     <section className={`${styles.page} workbench projects-page`}>
@@ -882,13 +1043,15 @@ export function ProjectsPage({
       <aside className={`${styles.nav} workbench-nav project-nav`}>
         <div className={styles.navHeader}>
           <div className={`${styles.navTitle} workbench-title`}>项目</div>
-          <button
-            type="button"
-            className={`${styles.newProjectBtn} ${styles.navNewProjectBtn} outline-action`}
-            onClick={onNewProject}
-          >
-            新建项目
-          </button>
+          {canCreateProject ? (
+            <button
+              type="button"
+              className={`${styles.newProjectBtn} ${styles.navNewProjectBtn} outline-action`}
+              onClick={startProjectCreate}
+            >
+              新建项目
+            </button>
+          ) : null}
         </div>
         <input
           className={`${styles.search} workbench-search`}
@@ -897,6 +1060,12 @@ export function ProjectsPage({
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
         <div className={styles.navCaption}>项目空间</div>
+        {projectsLoading ? (
+          <div className={styles.navCaption} role="status">项目加载中</div>
+        ) : null}
+        {projectsError ? (
+          <div className={styles.navCaption} role="alert">{projectsError}</div>
+        ) : null}
         {projects.map((project) => (
           <ProjectNavRow
             key={project.id}
@@ -921,11 +1090,33 @@ export function ProjectsPage({
                 </p>
               </div>
               <div className={styles.headActions}>
+                {canUpdateProject ? (
+                  <button
+                    type="button"
+                    className={styles.newProjectBtn}
+                    onClick={() => startProjectUpdate(activeProject)}
+                  >
+                    编辑项目
+                  </button>
+                ) : null}
                 <span className={styles.statusBadge}>
                   {activeProject.status}
                 </span>
               </div>
             </div>
+            {editorMode ? (
+              <ProjectEditor
+                mode={editorMode}
+                draft={draft}
+                saving={projectSaving}
+                error={visibleProjectActionError}
+                onDraftChange={updateProjectDraft}
+                onCancel={cancelProjectEdit}
+                onSubmit={() => {
+                  void submitProjectEdit();
+                }}
+              />
+            ) : null}
             <ProjectTabs activeTab={activeTab} onTabChange={onTabChange} />
             <ProjectDetail
               project={activeProject}
@@ -942,11 +1133,33 @@ export function ProjectsPage({
           <div className={`${styles.detailHead} workbench-head`}>
             <div>
               <h1>暂无项目</h1>
-              <p>创建第一个项目以开始协作。</p>
+              <p>{projectsError || '创建第一个项目以开始协作。'}</p>
             </div>
             <div className={styles.headActions}>
+              {canCreateProject ? (
+                <button
+                  type="button"
+                  className={styles.newProjectBtn}
+                  onClick={startProjectCreate}
+                >
+                  创建第一个项目
+                </button>
+              ) : null}
               <span className={styles.statusBadge}>空项目</span>
             </div>
+            {editorMode ? (
+              <ProjectEditor
+                mode={editorMode}
+                draft={draft}
+                saving={projectSaving}
+                error={visibleProjectActionError}
+                onDraftChange={updateProjectDraft}
+                onCancel={cancelProjectEdit}
+                onSubmit={() => {
+                  void submitProjectEdit();
+                }}
+              />
+            ) : null}
           </div>
         )}
       </main>

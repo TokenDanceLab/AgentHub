@@ -70,6 +70,10 @@ func (s *AgentControlService) DeliverToDesktopDevice(ctx context.Context, userID
 	if conn == nil || conn.UserID != userID || conn.DeviceType != "desktop" || conn.DeviceID != deviceID {
 		return queueControl("connection mismatch", nil)
 	}
-	s.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, json.RawMessage(payloadJSON)))
+	result := s.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, json.RawMessage(payloadJSON)))
+	if !result.Queued {
+		slog.Warn("agent control delivery not queued; preserving pending control", "user_id", userID, "device_id", deviceID, "conn_id", connID, "kind", payload.Kind, "delivery_status", result.Status, "error", result.Err)
+		return queueControl("delivery not queued", result.Err)
+	}
 	return nil
 }

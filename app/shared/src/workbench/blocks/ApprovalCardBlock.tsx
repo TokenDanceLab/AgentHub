@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ApprovalDecisionAction } from '../../transcript';
 import styles from './ApprovalCardBlock.module.css';
 
 type ApprovalStatus = 'pending' | 'running' | 'completed' | 'failed';
@@ -7,10 +8,20 @@ type ApprovalRisk = 'low' | 'medium' | 'high' | 'critical';
 interface ApprovalCardBlockProps {
   id: string;
   status: ApprovalStatus;
+  teamId?: string | undefined;
+  teamRunId?: string | undefined;
+  agentTaskId?: string | undefined;
+  targetId?: string | undefined;
+  edgeDeviceId?: string | undefined;
+  correlationId?: string | undefined;
   title?: string | undefined;
   toolName?: string | undefined;
   risk?: ApprovalRisk | undefined;
   reason?: string | undefined;
+  reviewStatus?: 'review' | 'approved' | 'rejected' | string | undefined;
+  evidenceLabel?: string | undefined;
+  onExportEvidence?: (() => void) | undefined;
+  onDecision?: ((action: ApprovalDecisionAction) => void) | undefined;
 }
 
 const riskLabels: Record<ApprovalRisk, string> = {
@@ -37,10 +48,20 @@ const riskClassMap: Record<ApprovalRisk, string> = {
 export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
   id,
   status,
+  teamId,
+  teamRunId,
+  agentTaskId,
+  targetId,
+  edgeDeviceId,
+  correlationId,
   title = '部署/写入审批',
   toolName,
   risk = 'medium',
   reason = '需要用户确认后继续执行。',
+  reviewStatus,
+  evidenceLabel = 'Export evidence',
+  onExportEvidence,
+  onDecision,
 }) => {
   const statusLabel = statusLabels[status] ?? status;
   const isPending = status === 'pending' || status === 'running';
@@ -61,11 +82,51 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
           {' '}
           <code>{id}</code>
         </div>
+        {(reviewStatus || onExportEvidence) && (
+          <div className={styles.evidence}>
+            {reviewStatus && <span className={styles.badge}>diff {reviewStatus}</span>}
+            {onExportEvidence && (
+              <button className={styles.btn} onClick={onExportEvidence} type="button">
+                {evidenceLabel}
+              </button>
+            )}
+          </div>
+        )}
         <div className={styles.actions}>
           {isPending ? (
             <>
-              <button className={`${styles.btn} ${styles.primary}`} type="button">批准</button>
-              <button className={`${styles.btn} ${styles.danger}`} type="button">拒绝</button>
+              <button
+                className={`${styles.btn} ${styles.primary}`}
+                onClick={() => onDecision?.({
+                  approvalId: id,
+                  decision: 'allow',
+                  ...(teamId ? { teamId } : {}),
+                  ...(teamRunId ? { teamRunId } : {}),
+                  ...(agentTaskId ? { agentTaskId } : {}),
+                  ...(targetId ? { targetId } : {}),
+                  ...(edgeDeviceId ? { edgeDeviceId } : {}),
+                  ...(correlationId ? { correlationId } : {}),
+                })}
+                type="button"
+              >
+                批准
+              </button>
+              <button
+                className={`${styles.btn} ${styles.danger}`}
+                onClick={() => onDecision?.({
+                  approvalId: id,
+                  decision: 'deny',
+                  ...(teamId ? { teamId } : {}),
+                  ...(teamRunId ? { teamRunId } : {}),
+                  ...(agentTaskId ? { agentTaskId } : {}),
+                  ...(targetId ? { targetId } : {}),
+                  ...(edgeDeviceId ? { edgeDeviceId } : {}),
+                  ...(correlationId ? { correlationId } : {}),
+                })}
+                type="button"
+              >
+                拒绝
+              </button>
             </>
           ) : (
             <span className={`${styles.badge} ${status === 'completed' ? styles.badgeSuccess : styles.badgeDanger}`}>

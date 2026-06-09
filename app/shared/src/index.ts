@@ -310,6 +310,23 @@ export {
   surfaceMetadataById,
   surfaceStatusById,
 } from './surfaceMetadata';
+
+export {
+  AGENTHUB_AGENT_SPEC_V1,
+  buildAgentHubAgentSpecV1,
+  formatAgentHubAgentSpecV1,
+} from './agentSpec';
+export type {
+  AgentHubAgentSpecApprovalPolicyV1,
+  AgentHubAgentSpecAvatarV1,
+  AgentHubAgentSpecDraftV1,
+  AgentHubAgentSpecFixturePolicyV1,
+  AgentHubAgentSpecMCPServerV1,
+  AgentHubAgentSpecMemoryPolicyV1,
+  AgentHubAgentSpecRuntimeV1,
+  AgentHubAgentSpecTargetPreferenceV1,
+  AgentHubAgentSpecV1,
+} from './agentSpec';
 export type {
   SurfaceCategory,
   SurfaceId,
@@ -424,6 +441,7 @@ export {
   TranscriptView,
   UnifiedComposer,
   WorkspaceHeader,
+  agentConfigToAgentSpecFixture,
 } from './workbench';
 export type {
   AgentHubWorkbenchProps,

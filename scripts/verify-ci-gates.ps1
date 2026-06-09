@@ -32,6 +32,12 @@ function Assert-Contains([string]$Text, [string]$Pattern, [string]$Message) {
     }
 }
 
+function Assert-NotContains([string]$Text, [string]$Pattern, [string]$Message) {
+    if ($Text -match $Pattern) {
+        Fail $Message
+    }
+}
+
 function Assert-StepContinueOnError([string]$JobBlock, [string]$StepName, [bool]$Expected) {
     $step = Get-StepBlock $JobBlock $StepName
     $hasContinue = $step -match "(?m)^\s+continue-on-error:\s+true\s*$"
@@ -48,6 +54,8 @@ if (-not (Test-Path -LiteralPath $WorkflowPath)) {
 $workflow = Get-Content -LiteralPath $WorkflowPath -Raw
 $edge = Get-JobBlock $workflow "go-edge"
 $hub = Get-JobBlock $workflow "go-hub"
+$backendFixture = Get-JobBlock $workflow "backend-e2e-fixture"
+$backendFocused = Get-JobBlock $workflow "backend-focused-subset"
 $desktop = Get-JobBlock $workflow "frontend-desktop"
 $web = Get-JobBlock $workflow "frontend-web"
 $mobile = Get-JobBlock $workflow "frontend-mobile"
@@ -63,6 +71,55 @@ Assert-StepContinueOnError $edge "Security scan (gosec)" $true
 Assert-StepContinueOnError $hub "Security scan (gosec)" $true
 Assert-StepContinueOnError $edge "Vulnerability check (govulncheck)" $false
 Assert-StepContinueOnError $hub "Vulnerability check (govulncheck)" $false
+
+Assert-Contains $backendFixture "working-directory:\s+hub-server" "backend-e2e-fixture must run from hub-server"
+Assert-Contains $backendFixture "TeamRun fixture E2E" "backend-e2e-fixture must name the TeamRun fixture step"
+Assert-Contains $backendFixture ([regex]::Escape("go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1")) "backend-e2e-fixture must run only the TeamRun fixture smoke test"
+Assert-StepContinueOnError $backendFixture "TeamRun fixture E2E" $false
+Assert-Contains $backendFixture "P0 remote-control fixture readiness" "backend-e2e-fixture must run the P0 remote-control fixture readiness step"
+Assert-Contains $backendFixture ([regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-p0-remote-control-fixture.ps1")) "backend-e2e-fixture must run the P0 remote-control fixture readiness gate"
+Assert-StepContinueOnError $backendFixture "P0 remote-control fixture readiness" $false
+
+Assert-Contains $backendFocused "Backend focused subset" "backend-focused-subset must use a clear job name"
+Assert-Contains $backendFocused "Hub focused backend packages" "backend-focused-subset must run the Hub focused backend package step"
+Assert-Contains $backendFocused "Edge focused backend packages" "backend-focused-subset must run the Edge focused backend package step"
+Assert-Contains $backendFocused ([regex]::Escape("cd hub-server && go test ./internal/repository ./internal/service ./internal/app ./internal/handler ./internal/router -short -count=1")) "backend-focused-subset must run the approved Hub focused backend packages"
+Assert-Contains $backendFocused ([regex]::Escape("cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1")) "backend-focused-subset must run the approved Edge focused backend packages"
+Assert-StepContinueOnError $backendFocused "Hub focused backend packages" $false
+Assert-StepContinueOnError $backendFocused "Edge focused backend packages" $false
+
+$backendForbiddenPatterns = @(
+    "-RealCli",
+    "real[-_]?cli",
+    "self-hosted",
+    "services:",
+    "integration-smoke.ps1",
+    "edge-runtime-smoke.ps1",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "CODEX_",
+    "CLAUDE_",
+    "\bcodex\b",
+    "\bclaude\b",
+    "\bopencode\b",
+    "postgres",
+    "redis",
+    "dev-up",
+    "docker",
+    "codesign",
+    "signtool",
+    "notarization",
+    "notarytool",
+    "cosign",
+    "http://",
+    "https://",
+    "go test ./tests -count=1"
+)
+
+foreach ($forbidden in $backendForbiddenPatterns) {
+    Assert-NotContains $backendFixture $forbidden "backend-e2e-fixture must not invoke '$forbidden'"
+    Assert-NotContains $backendFocused $forbidden "backend-focused-subset must not invoke '$forbidden'"
+}
 
 foreach ($job in @(
     @{ Name = "frontend-desktop"; Body = $desktop; Lockfile = "app/pnpm-lock.yaml" },

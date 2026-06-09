@@ -4,8 +4,11 @@ import {
   createWorkbenchDemoRuntimeStore,
   createWorkbenchDemoStore,
   demoWorkbenchPins,
+  projectGroupMessageLoopHubMessages,
+  projectGroupMessageLoopTranscript,
   resolveDemoWorkbenchTranscript,
 } from './workbenchDemo';
+import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoScenario } from './teamrunDemo';
 
 describe('workbench v4 demo data source', () => {
   it('derives the Builder pinned announcement from the design demo summary', () => {
@@ -38,6 +41,90 @@ describe('workbench v4 demo data source', () => {
     }));
   });
 
+  it('exposes the project group Agent-to-Agent message loop fixture', () => {
+    const store = createWorkbenchDemoStore();
+    const group = store.conversations.find((conversation) => conversation.id === 'agent-collab');
+
+    expect(group).toEqual(expect.objectContaining({
+      kind: 'group',
+      title: 'Agent 协作群',
+    }));
+    expect(projectGroupMessageLoopHubMessages).toHaveLength(8);
+    expect(projectGroupMessageLoopTranscript).toEqual([
+      expect.objectContaining({
+        id: 'hub-message-a2a-dm-builder',
+        displayTitle: 'Agent DM',
+        badgeLabel: '@Agent queued',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-a2a-agent-to-agent',
+        displayTitle: 'Agent -> Agent',
+        displayDetail: 'IM agent_dm · Builder -> Reviewer · task task-a2a-review',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-mention-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent queued',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-queued-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent queued',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-route-decision',
+        kind: 'route_decision',
+        action: 'dispatch',
+        targetAgent: 'Reviewer',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-assigned-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent assigned',
+        badgeVariant: 'thinking',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-working-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent working',
+        badgeVariant: 'thinking',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-done-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent done',
+        badgeVariant: 'success',
+      }),
+    ]);
+    expect(resolveDemoWorkbenchTranscript('agent-collab')).toEqual(projectGroupMessageLoopTranscript);
+  });
+
+  it('exposes the ByteDance TeamRun fixture without live-runtime claims', () => {
+    const store = createWorkbenchDemoStore();
+    const teamRun = store.conversations.find((conversation) => conversation.id === TEAMRUN_DEMO_CONVERSATION_ID);
+    const transcript = resolveDemoWorkbenchTranscript(TEAMRUN_DEMO_CONVERSATION_ID);
+
+    expect(teamRun).toEqual(expect.objectContaining({
+      title: 'ByteDance TeamRun',
+      model: 'fixture-only',
+    }));
+    expect(teamRunDemoScenario.fixtureOnly).toBe(true);
+    expect(teamRunDemoScenario.claims.realRuntimeExecuted).toBe(false);
+    expect(teamRunDemoScenario.claims.liveHubRuntimeVerified).toBe(false);
+    expect(teamRunDemoScenario.runtimeProfiles).toHaveLength(2);
+    expect(teamRunDemoScenario.events.map((event) => event.type)).toEqual(expect.arrayContaining([
+      'agent.dispatch',
+      'run.agent.route_decision',
+      'team.route.decided',
+      'run.agent.result',
+    ]));
+    expect(transcript).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'teamrun-route-list', kind: 'agent_timeline' }),
+      expect.objectContaining({ id: 'teamrun-task-step', kind: 'run_step_group' }),
+      expect.objectContaining({ id: 'teamrun-delegate', kind: 'route_decision' }),
+    ]));
+  });
+
   it('mutates demo transcripts through the runtime store submit path', async () => {
     const runtime = createWorkbenchDemoRuntimeStore();
     const before = runtime.resolveTranscript('builder').length;
@@ -56,13 +143,15 @@ describe('workbench v4 demo data source', () => {
     });
 
     const transcript = runtime.resolveTranscript('builder');
+    const userBlock = transcript[transcript.length - 2];
+    const agentBlock = transcript[transcript.length - 1];
     expect(result.intentId).toMatch(/^demo-agent-/);
     expect(transcript).toHaveLength(before + 2);
-    expect(transcript.at(-2)).toEqual(expect.objectContaining({
+    expect(userBlock).toEqual(expect.objectContaining({
       kind: 'text',
       text: '继续完善 mock 系统',
     }));
-    expect(transcript.at(-1)).toEqual(expect.objectContaining({
+    expect(agentBlock).toEqual(expect.objectContaining({
       kind: 'text',
       text: expect.stringContaining('已收到 mock 输入'),
     }));

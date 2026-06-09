@@ -22,17 +22,19 @@ const (
 )
 
 type Message struct {
-	ID           string    `gorm:"primaryKey;type:uuid" json:"id"`
-	SessionID    string    `gorm:"type:uuid;not null" json:"session_id"`
-	SeqID        int64     `gorm:"not null" json:"seq_id"`
-	ClientMsgID  string    `gorm:"type:uuid;not null" json:"client_msg_id"`
-	SenderType   string    `gorm:"type:varchar(16);not null" json:"sender_type"`
-	SenderID     string    `gorm:"type:uuid;not null" json:"sender_id"`
-	ContentType  string    `gorm:"type:varchar(32);not null" json:"content_type"`
-	Content      string    `gorm:"type:jsonb;not null" json:"content"`
-	ReplyToMsgID *string   `gorm:"type:uuid;column:reply_to_message_id" json:"reply_to_message_id,omitempty"`
-	Recalled     bool      `gorm:"not null;default:false" json:"recalled"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID           string     `gorm:"primaryKey;type:uuid" json:"id"`
+	SessionID    string     `gorm:"type:uuid;not null" json:"session_id"`
+	SeqID        int64      `gorm:"not null" json:"seq_id"`
+	ClientMsgID  string     `gorm:"type:uuid;not null" json:"client_msg_id"`
+	SenderType   string     `gorm:"type:varchar(16);not null" json:"sender_type"`
+	SenderID     string     `gorm:"type:uuid;not null" json:"sender_id"`
+	ContentType  string     `gorm:"type:varchar(32);not null" json:"content_type"`
+	Content      string     `gorm:"type:jsonb;not null" json:"content"`
+	ReplyToMsgID *string    `gorm:"type:uuid;column:reply_to_message_id" json:"reply_to_message_id,omitempty"`
+	Recalled     bool       `gorm:"not null;default:false" json:"recalled"`
+	Edited       bool       `gorm:"not null;default:false" json:"edited"`
+	EditedAt     *time.Time `gorm:"column:edited_at" json:"edited_at,omitempty"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (m *Message) BeforeCreate(tx *gorm.DB) error {

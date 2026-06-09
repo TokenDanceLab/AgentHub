@@ -59,17 +59,7 @@ async fn check_http_health(port: u16) -> EdgeHealthPayload {
     match client.get(&url).send().await {
         Ok(resp) if resp.status().is_success() => {
             if let Ok(body) = resp.json::<serde_json::Value>().await {
-                EdgeHealthPayload {
-                    online: true,
-                    version: body
-                        .get("version")
-                        .and_then(|v| v.as_str())
-                        .map(String::from),
-                    edge_id: body
-                        .get("edgeId")
-                        .and_then(|v| v.as_str())
-                        .map(String::from),
-                }
+                parse_edge_health_payload(body)
             } else {
                 EdgeHealthPayload {
                     online: true,
@@ -83,5 +73,60 @@ async fn check_http_health(port: u16) -> EdgeHealthPayload {
             version: None,
             edge_id: None,
         },
+    }
+}
+
+fn parse_edge_health_payload(body: serde_json::Value) -> EdgeHealthPayload {
+    let data = body
+        .get("data")
+        .filter(|_| body.get("code").and_then(|v| v.as_str()) == Some("OK"))
+        .unwrap_or(&body);
+
+    EdgeHealthPayload {
+        online: true,
+        version: data
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        edge_id: data
+            .get("edgeId")
+            .or_else(|| data.get("edge_id"))
+            .and_then(|v| v.as_str())
+            .map(String::from),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_health_payload_accepts_legacy_raw_health() {
+        let payload = parse_edge_health_payload(json!({
+            "status": "ok",
+            "version": "v1",
+            "edgeId": "local"
+        }));
+
+        assert!(payload.online);
+        assert_eq!(payload.version.as_deref(), Some("v1"));
+        assert_eq!(payload.edge_id.as_deref(), Some("local"));
+    }
+
+    #[test]
+    fn parse_health_payload_accepts_unified_edge_envelope() {
+        let payload = parse_edge_health_payload(json!({
+            "code": "OK",
+            "data": {
+                "status": "ok",
+                "version": "v1",
+                "edgeId": "local"
+            }
+        }));
+
+        assert!(payload.online);
+        assert_eq!(payload.version.as_deref(), Some("v1"));
+        assert_eq!(payload.edge_id.as_deref(), Some("local"));
     }
 }

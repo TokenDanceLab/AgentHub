@@ -93,6 +93,7 @@ func teamTestDB(t *testing.T) *gorm.DB {
 			tokendance_sub_linked_at DATETIME DEFAULT NULL,
 			announcement TEXT DEFAULT '',
 			owner_user_id TEXT,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved INTEGER NOT NULL DEFAULT 0,
@@ -132,6 +133,8 @@ func teamTestDB(t *testing.T) *gorm.DB {
 			content TEXT NOT NULL DEFAULT '',
 			reply_to_message_id TEXT,
 			recalled INTEGER NOT NULL DEFAULT 0,
+			edited INTEGER NOT NULL DEFAULT 0,
+			edited_at DATETIME,
 			created_at DATETIME
 		)`,
 
@@ -160,6 +163,7 @@ func teamTestDB(t *testing.T) *gorm.DB {
 			session_id TEXT,
 			trigger_user_id TEXT NOT NULL,
 			trigger_message TEXT DEFAULT '',
+			target_id TEXT,
 			status TEXT NOT NULL DEFAULT 'queued',
 			created_at DATETIME,
 			updated_at DATETIME
