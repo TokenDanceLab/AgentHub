@@ -384,7 +384,14 @@ export type UpdateAgentProfileRequest = Partial<CreateAgentProfileRequest>;
 
 export type ExecutionTargetType = 'local_edge' | 'hub_relay' | 'remote_ssh' | 'tailscale' | 'cloud_edge';
 export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay';
-export type ExecutionTargetHealthState = 'unknown' | 'healthy' | 'degraded' | 'offline';
+export type ExecutionTargetHealthState =
+  | 'unknown'
+  | 'healthy'
+  | 'online'
+  | 'degraded'
+  | 'offline'
+  | 'mismatch'
+  | 'stale';
 
 export interface ExecutionTarget {
   id: string;
