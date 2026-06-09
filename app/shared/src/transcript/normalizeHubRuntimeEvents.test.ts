@@ -217,4 +217,173 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
       text: 'Replay payload with opaque ids only.',
     }));
   });
+
+  it('keeps Hub @Agent, runtime, and target identity on the replay session block', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-identity',
+        task_id: 'task-identity',
+        edge_run_id: 'run-identity',
+        edge_device_id: 'device-local-edge-1',
+        adapter_id: 'claude-code',
+        session_id: 'hub-session-identity',
+        agent_instance_id: 'agent-instance-builder',
+        event_seq: 1,
+        event_type: 'run.agent.text_block',
+        payload: {
+          content: 'Identity-bearing runtime event.',
+          display_name: 'Hub Builder',
+          runtime_id: 'claude-code',
+          target_label: 'Online Desktop Edge',
+          evidence_mode: 'real',
+        },
+        created_at: '2026-06-07T04:00:08Z',
+      },
+    ]);
+
+    expect(blocks[0]).toEqual(expect.objectContaining({
+      kind: 'run_session',
+      agentLabel: 'Hub Builder',
+      runtimeLabel: 'claude-code',
+      targetLabel: 'Online Desktop Edge',
+      modeLabel: 'Real',
+    }));
+  });
+
+  it('projects permission, artifact, and terminal Hub replay events into stable transcript blocks', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-permission-requested',
+        task_id: 'task-contract',
+        edge_run_id: 'run-contract',
+        session_id: 'hub-session-contract',
+        event_seq: 1,
+        event_type: 'run.agent.permission_requested',
+        payload: {
+          requestId: 'perm-write',
+          toolName: 'Write',
+          risk: 'high',
+          reason: 'Needs workspace write approval.',
+        },
+        created_at: '2026-06-07T04:00:09Z',
+      },
+      {
+        id: 'evt-permission-decided',
+        task_id: 'task-contract',
+        edge_run_id: 'run-contract',
+        session_id: 'hub-session-contract',
+        event_seq: 2,
+        event_type: 'run.agent.permission_decided',
+        payload: {
+          requestId: 'perm-write',
+          toolName: 'Write',
+          decision: 'allow',
+          reason: 'Approved by Web.',
+        },
+        created_at: '2026-06-07T04:00:10Z',
+      },
+      {
+        id: 'evt-artifact-contract',
+        task_id: 'task-contract',
+        edge_run_id: 'run-contract',
+        session_id: 'hub-session-contract',
+        event_seq: 3,
+        event_type: 'artifact.created',
+        payload: {
+          artifactId: 'artifact-report',
+          path: 'reports/p0-transcript.md',
+          mimeType: 'text/markdown',
+        },
+        created_at: '2026-06-07T04:00:11Z',
+      },
+      {
+        id: 'evt-done-contract',
+        task_id: 'task-contract-done',
+        edge_run_id: 'run-contract-done',
+        session_id: 'hub-session-contract',
+        event_seq: 4,
+        event_type: 'run.agent.result',
+        payload: {
+          runId: 'run-contract-done',
+          success: true,
+          summary: 'Done.',
+        },
+        created_at: '2026-06-07T04:00:12Z',
+      },
+      {
+        id: 'evt-failed-contract',
+        task_id: 'task-contract-failed',
+        edge_run_id: 'run-contract-failed',
+        session_id: 'hub-session-contract',
+        event_seq: 5,
+        event_type: 'run.failed',
+        payload: {
+          runId: 'run-contract-failed',
+          error: 'Runtime failed.',
+        },
+        created_at: '2026-06-07T04:00:13Z',
+      },
+      {
+        id: 'evt-cancel-contract',
+        task_id: 'task-contract-cancel',
+        edge_run_id: 'run-contract-cancel',
+        session_id: 'hub-session-contract',
+        event_seq: 6,
+        event_type: 'run.cancelled',
+        payload: {
+          runId: 'run-contract-cancel',
+          reason: 'Cancelled by user.',
+        },
+        created_at: '2026-06-07T04:00:14Z',
+      },
+    ]);
+
+    expect(blocks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'permission_request',
+        requestId: 'perm-write',
+        status: 'pending',
+        toolName: 'Write',
+        risk: 'high',
+      }),
+      expect.objectContaining({
+        kind: 'permission_result',
+        requestId: 'perm-write',
+        status: 'completed',
+        decision: 'allow',
+        toolName: 'Write',
+      }),
+      expect.objectContaining({
+        kind: 'artifact',
+        artifactId: 'artifact-report',
+        title: 'reports/p0-transcript.md',
+        path: 'reports/p0-transcript.md',
+        mimeType: 'text/markdown',
+        evidenceRefs: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'artifact-artifact-report',
+            kind: 'artifact',
+            path: 'reports/p0-transcript.md',
+            status: 'completed',
+          }),
+        ]),
+      }),
+      expect.objectContaining({
+        kind: 'result',
+        success: true,
+        summary: 'Done.',
+      }),
+      expect.objectContaining({
+        kind: 'failure',
+        runId: 'run-contract-failed',
+        reason: 'Runtime failed.',
+      }),
+      expect.objectContaining({
+        kind: 'failure',
+        runId: 'run-contract-cancel',
+        title: 'Run run-contract-cancel cancelled',
+        reason: 'Cancelled by user.',
+      }),
+    ]));
+  });
 });
