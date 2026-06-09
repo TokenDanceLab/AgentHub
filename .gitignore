@@ -85,6 +85,7 @@ Thumbs.db
 .env.*
 !.env.example
 !.env.production.example
+!.env.hk2.example
 .envrc
 *.pem
 *.key
