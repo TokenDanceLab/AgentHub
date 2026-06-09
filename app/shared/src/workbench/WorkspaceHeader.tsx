@@ -1,24 +1,34 @@
 import React from 'react';
+import {
+  normalizeWorkbenchDataMode,
+  writeWorkbenchDataModeOverride,
+  type WorkbenchDataMode,
+} from '../demo';
 import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
 import styles from './AgentHubWorkbench.module.css';
 
 export interface WorkspaceHeaderProps {
   activeConversation: WorkbenchConversation | undefined;
+  dataMode?: string | undefined;
   inspectorCollapsed: boolean;
   onToggleInspector: () => void;
+  showDataModeControl?: boolean | undefined;
 }
 
 export function WorkspaceHeader({
   activeConversation,
+  dataMode,
   inspectorCollapsed,
   onToggleInspector,
+  showDataModeControl = true,
 }: WorkspaceHeaderProps): React.ReactElement {
   const initial = activeConversation?.avatarLabel ?? (activeConversation?.title ?? 'A').slice(0, 1);
   const hasModel = Boolean(activeConversation?.model);
   const runtimeLabel = activeConversation?.runtimeLabel ?? activeConversation?.subtitle;
   const threadLabel = activeConversation?.threadLabel
     ?? (activeConversation?.kind === 'group' ? '协作群' : '私聊');
+  const dataModeValue = dataModeControlValue(dataMode);
 
   return (
     <header className={styles.workspaceHeader}>
@@ -47,6 +57,19 @@ export function WorkspaceHeader({
           </span>
           {hasModel ? (
             <span className={styles.workspaceModel}>{activeConversation!.model}</span>
+          ) : null}
+          {showDataModeControl ? (
+            <select
+              aria-label="数据模式"
+              className={styles.workspaceDataMode}
+              onChange={(event) => writeWorkbenchDataModeOverride(event.target.value as WorkbenchDataMode)}
+              title="切换 Mock / Real 数据模式"
+              value={dataModeValue}
+            >
+              <option value="auto">Auto / Mock</option>
+              <option value="mock">Mock</option>
+              <option value="approved-real">Real</option>
+            </select>
           ) : null}
         </div>
 
@@ -129,4 +152,11 @@ export function WorkspaceHeader({
       </div>
     </header>
   );
+}
+
+function dataModeControlValue(value: string | undefined): WorkbenchDataMode {
+  const normalized = normalizeWorkbenchDataMode(value);
+  if (normalized === 'fixture') return 'mock';
+  if (normalized === 'observed') return 'approved-real';
+  return normalized;
 }
