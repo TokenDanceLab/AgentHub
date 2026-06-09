@@ -32,7 +32,7 @@ import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
-import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData } from './WorkbenchRoutes';
+import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
@@ -144,6 +144,8 @@ export interface AgentHubWorkbenchProps {
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /** 用户想与某个联系人/Agent 开始私聊，但当前没有已有会话时触发。上层负责创建会话并切换。 */
   onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
+  /** Contact mutation actions passed through to ContactsPage. */
+  contactsActions?: WorkbenchContactsActions | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   showComposerAgentPicker?: boolean | undefined;
   showComposerStatus?: boolean | undefined;
@@ -178,6 +180,7 @@ export function AgentHubWorkbench({
   onProjectUpdate,
   onApprovalDecision,
   onNavigateToConversation,
+  contactsActions,
   runtimeEvidence,
   showComposerAgentPicker = true,
   showComposerStatus = true,
@@ -220,6 +223,12 @@ export function AgentHubWorkbench({
   const [localCliDiscovery, setLocalCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
   const [activeAgentProfile, setActiveAgentProfile] = useState<AgentProfileState | null>(null);
   const [activeHumanProfile, setActiveHumanProfile] = useState<HumanProfileState | null>(null);
+  const [activeGroupProfile, setActiveGroupProfile] = useState<{
+    id: string;
+    name: string;
+    memberNames: string[];
+    anchor: HTMLElement;
+  } | null>(null);
   const [focusedAgentId, setFocusedAgentId] = useState<string | undefined>(undefined);
   const [reviewFileRequest, setReviewFileRequest] = useState<FileItem | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -613,10 +622,12 @@ export function AgentHubWorkbench({
     const profile = agentProfileByName(agentName);
     if (!profile) {
       setActiveAgentProfile(null);
+      setActiveGroupProfile(null);
       setActiveHumanProfile(humanProfileByName(agentName, anchor));
       return;
     }
     setActiveHumanProfile(null);
+    setActiveGroupProfile(null);
     setActiveAgentProfile({ ...profile, anchor });
   }
 
@@ -633,7 +644,31 @@ export function AgentHubWorkbench({
     anchor: HTMLElement,
   ): void {
     setActiveHumanProfile(null);
+    setActiveGroupProfile(null);
     setActiveAgentProfile({ ...agent, anchor });
+  }
+
+  function openConversationAvatar(conversation: WorkbenchConversation, anchor: HTMLElement): void {
+    setActiveAgentProfile(null);
+    setActiveHumanProfile(null);
+    setActiveGroupProfile(null);
+
+    if (conversation.kind === 'group') {
+      setActiveGroupProfile({
+        id: conversation.id,
+        name: conversation.title,
+        memberNames: conversation.members ?? [],
+        anchor,
+      });
+      return;
+    }
+
+    const profile = agentProfileByName(conversation.title);
+    if (profile) {
+      setActiveAgentProfile({ ...profile, anchor });
+    } else {
+      setActiveHumanProfile(humanProfileByName(conversation.title, anchor));
+    }
   }
 
   function agentProfileByName(agentName: string): Omit<AgentProfileState, 'anchor'> | null {
@@ -697,6 +732,7 @@ export function AgentHubWorkbench({
     setActivePage('chat');
     setActiveAgentProfile(null);
     setActiveHumanProfile(null);
+    setActiveGroupProfile(null);
     window.setTimeout(() => composerInputRef.current?.focus(), 0);
   }
 
@@ -716,6 +752,8 @@ export function AgentHubWorkbench({
     }
     setActivePage('chat');
     setActiveHumanProfile(null);
+    setActiveAgentProfile(null);
+    setActiveGroupProfile(null);
     window.setTimeout(() => composerInputRef.current?.focus(), 0);
   }
 
@@ -1070,6 +1108,7 @@ export function AgentHubWorkbench({
           <ConversationSidebar
             activeConversationId={currentConversationId}
             conversations={conversations}
+            onAvatarClick={openConversationAvatar}
             onSelectConversation={selectConversation}
           />
           <div
@@ -1182,6 +1221,7 @@ export function AgentHubWorkbench({
               onAgentsRetry={onAgentsRetry}
               onAgentProfileOpen={openAgentProfileFromConfig}
               onStartConversation={onNavigateToConversation}
+              contactsActions={contactsActions}
               localCliDiscovery={localCliDiscovery}
             />
           </section>
@@ -1278,6 +1318,36 @@ export function AgentHubWorkbench({
           }}
           onClose={() => setActiveHumanProfile(null)}
           subtitle={`${activeHumanProfile.tag} · ${activeHumanProfile.org}`}
+        />
+      )}
+      {activeGroupProfile && (
+        <ProfilePopover
+          actions={[
+            { label: '发送消息' },
+          ]}
+          anchorElement={activeGroupProfile.anchor}
+          avatar={workbenchProfileInitials(activeGroupProfile.name)}
+          avatarColor="var(--primary)"
+          badge="群聊"
+          isOpen
+          meta={[
+            { label: '类型', value: '协作群' },
+            ...(activeGroupProfile.memberNames.length > 0
+              ? [{ label: '成员', value: activeGroupProfile.memberNames.join(' · ') }]
+              : []),
+          ]}
+          name={activeGroupProfile.name}
+          onAction={(action) => {
+            if (action === '发送消息') {
+              selectConversation(activeGroupProfile.id);
+              setActiveGroupProfile(null);
+            }
+          }}
+          onClose={() => setActiveGroupProfile(null)}
+          subtitle={activeGroupProfile.memberNames.length > 0
+            ? `${activeGroupProfile.memberNames.length} 人`
+            : '群聊会话'}
+          variant="group"
         />
       )}
       <Toast message={toastMessage} visible={toastVisible} />
