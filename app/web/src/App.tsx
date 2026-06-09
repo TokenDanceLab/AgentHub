@@ -38,6 +38,7 @@ export default function App() {
 
 function WebWorkbenchRoot() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [agentActionError, setAgentActionError] = useState<string | undefined>();
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
@@ -56,7 +57,7 @@ function WebWorkbenchRoot() {
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
-  const workbench = useWebWorkbenchModel(selectedConversationId);
+  const workbench = useWebWorkbenchModel(selectedConversationId, selectedProjectId);
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
   const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, 'Agent Profile 加载失败')
@@ -124,9 +125,11 @@ function WebWorkbenchRoot() {
         }}
         contacts={workbench.contacts}
         conversations={workbench.conversations}
+        activeProjectId={selectedProjectId}
         projects={workbench.projects}
         projectsStatus={workbench.projectsStatus}
         onActiveConversationChange={setSelectedConversationId}
+        onActiveProjectChange={setSelectedProjectId}
         onAgentCreate={handleAgentCreate}
         onAgentUpdate={handleAgentUpdate}
         onAgentDelete={handleAgentDelete}
