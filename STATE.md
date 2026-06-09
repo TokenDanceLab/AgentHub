@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 稳定 dev | `origin/dev/delicious233 = 15277af8`，已经由集成分支 fast-forward |
-| 当前集成分支 | `origin/codex/p1-critical-evidence-integration = 15277af8` |
+| 稳定 dev | `origin/dev/delicious233 = 39465d73`，已经由集成分支 fast-forward |
+| 当前集成分支 | `origin/codex/p1-critical-evidence-integration = 39465d73` |
 | 集成分支相对 dev | `ahead 0 / behind 0` |
 | master | `origin/master = f3b91ab0`；本轮先 defer，不作为当前阻塞项 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 过时且有 dirty 风险，当前隔离不用 |
@@ -36,7 +36,7 @@
 | 分支 | 负责人 | 用途 | 规则 |
 |---|---|---|---|
 | `codex/p1-critical-evidence-integration` | Controller Codex | 当前集成候选和 gate 分支 | 只推 controller 审核后的提交；worker 不直接改 Roadmap/STATE。 |
-| `dev/delicious233` | Controller Codex | 当前开发 baseline | 已推进到 `15277af8`；下一轮 worker 从这里或同 SHA 集成分支开 worktree。 |
+| `dev/delicious233` | Controller Codex | 当前开发 baseline | 已推进到 `39465d73`；下一轮 worker 从这里或同 SHA 集成分支开 worktree。 |
 | `master` | Controller Codex | 稳定发布分支 | 本轮 defer；后续用受控 promotion，不 force push。 |
 | `v0.3.0-rc.6` | 需要发布审批 | 下一个 rc tag 候选 | 未获明确审批前不创建、不推送。 |
 
@@ -60,7 +60,7 @@ Johnny、Evidence/docs 负责人和 subagent。Mobile 线程现在并入 Trump
 
 任务：
 
-1. 从 `origin/dev/delicious233 = 15277af8` 开下一轮实现 worktree。
+1. 从 `origin/dev/delicious233 = 39465d73` 开下一轮实现 worktree。
 2. 暂停 master promotion；后续需要时再做受控 promotion，不 force push。
 3. 负责 Desktop 启动流、Local Edge sidecar 启动/诊断、日志/app-data 持久、Windows unsigned package smoke。
 4. Trump 和 Johnny slice 可用后启动 QA 分支。
@@ -134,7 +134,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-live-chain-topolo
 ## Controller 下一步
 
 1. 把本状态更新推送到 `dev/delicious233` 和 controller 集成分支。
-2. 从 `origin/dev/delicious233 = 15277af8` 创建下一轮 worktree。
+2. 从 `origin/dev/delicious233 = 39465d73` 创建下一轮 worktree。
 3. 向 Trump/Johnny 发送本文中的分工摘要。
 4. Controller 自己启动 Desktop/Tauri/Local Edge 分支。
 5. 等 Trump/Johnny slice 返回后启动 product-loop QA。
