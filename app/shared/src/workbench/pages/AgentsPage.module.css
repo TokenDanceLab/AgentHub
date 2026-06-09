@@ -615,6 +615,65 @@
   white-space: nowrap;
 }
 
+.agent-capability-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.capability-badge,
+.capability-readiness {
+  min-height: 26px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 0.6875rem/1.25 var(--font-sans);
+}
+
+.capability-badge em {
+  color: var(--text-3);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.capability-badge strong {
+  min-width: 0;
+  color: var(--text-1);
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capability-readiness {
+  text-transform: uppercase;
+}
+
+.capability-readiness.ready {
+  border-color: var(--success);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.capability-readiness.partial {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.capability-readiness.blocked {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 .agent-config-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

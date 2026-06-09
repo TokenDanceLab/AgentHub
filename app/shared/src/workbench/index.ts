@@ -8,6 +8,19 @@ export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
 export * from './mockData';
 export {
+  buildAgentCapabilityContractFromConfig,
+  buildAgentCapabilitySummary,
+  validateAgentCapabilityContract,
+} from './agentCapabilities';
+export type {
+  AgentCapabilityContract,
+  AgentCapabilityRef,
+  AgentCapabilityStatus,
+  AgentCapabilitySummary,
+  AgentMemoryPolicy,
+  AgentMemoryRetention,
+} from './agentCapabilities';
+export {
   AGENT_PROFILE_CATALOG,
   WORKBENCH_AGENT_MARKET_FIXTURES,
   WORKBENCH_AGENT_MCP_OPTIONS,

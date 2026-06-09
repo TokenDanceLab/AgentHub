@@ -6023,6 +6023,13 @@ components:
         tool_allowlist:
           type: string
           description: JSON array encoded by current Hub model.
+        memory_policy:
+          type: string
+          description: >
+            Optional forward-compatible JSON object for AgentHub memory
+            policy projection. It may be absent until the Hub DB migration is
+            assigned; clients must treat absence as partial capability
+            readiness, not as an enabled memory policy.
         approval_policy:
           type: string
           description: JSON object encoded by current Hub model.

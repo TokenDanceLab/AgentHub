@@ -342,6 +342,7 @@ export interface AgentProfile {
   skills?: string;
   mcp_servers?: string;
   tool_allowlist?: string;
+  memory_policy?: string;
   approval_policy?: string;
   permission_mode?: string;
   target_preferences?: string;
@@ -372,6 +373,7 @@ export interface CreateAgentProfileRequest {
   reasoning_effort?: string;
   permission_mode?: string;
   skills?: string;
+  mcp_servers?: string;
   tool_allowlist?: string;
   approval_policy?: string;
   target_preferences?: string;
