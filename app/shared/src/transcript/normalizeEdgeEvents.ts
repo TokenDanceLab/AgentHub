@@ -499,9 +499,15 @@ function permissionRequestedBlock(event: EventEnvelope): TranscriptBlock | null 
     stringField(event.payload.requestId) ??
     stringField(event.payload.approvalId) ??
     event.id;
-  const toolName = stringField(event.payload.toolName) ?? stringField(event.payload.kind) ?? 'permission';
+  const approvalTitle = cleanText(stringField(event.payload.title));
+  const toolName =
+    stringField(event.payload.toolName) ??
+    stringField(event.payload.kind) ??
+    approvalTitle ??
+    'permission';
   const runId = eventRunId(event);
   const reason =
+    cleanText(stringField(event.payload.description)) ??
     cleanText(stringField(event.payload.reason)) ??
     cleanText(stringField(event.payload.summary)) ??
     cleanText(stringField(event.payload.command)) ??
@@ -515,7 +521,7 @@ function permissionRequestedBlock(event: EventEnvelope): TranscriptBlock | null 
     ]),
     kind: 'permission_request',
     requestId,
-    title: `Permission requested: ${toolName}`,
+    title: approvalTitle ?? `Permission requested: ${toolName}`,
     status: 'pending',
     ...approvalHubContext(event),
     toolName,
@@ -703,10 +709,14 @@ function approvalEvidence(
   label: string,
   status: EvidenceRefStatus,
 ): EvidenceRef {
+  const normalizedLabel = label.trim();
+  const evidenceLabel = normalizedLabel.toLowerCase().includes('approval')
+    ? normalizedLabel
+    : `${normalizedLabel} approval`;
   return {
     id: `approval-${id}`,
     kind: 'approval',
-    label: `${label} approval`,
+    label: evidenceLabel,
     status,
   };
 }

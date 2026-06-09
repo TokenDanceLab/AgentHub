@@ -204,6 +204,52 @@ describe('normalizeHubRuntimeEventsToTranscript', () => {
     ]);
   });
 
+  it('preserves Hub approval.requested titles and descriptions in real-mode replay', () => {
+    const blocks = normalizeHubRuntimeEventsToTranscript([
+      {
+        id: 'evt-approval-requested',
+        task_id: 'agent-task-approval',
+        edge_run_id: 'edge-run-approval',
+        session_id: 'hub-session-approval',
+        event_seq: 1,
+        event_type: 'approval.requested',
+        payload: {
+          approvalId: 'approval-visual-smoke',
+          title: 'Review command approval',
+          description: 'Approve workspace write?',
+          status: 'pending',
+          teamId: 'team-1',
+          teamRunId: 'team-run-1',
+          agentTaskId: 'agent-task-approval',
+        },
+        created_at: '2026-06-09T04:00:04Z',
+      },
+    ]);
+
+    expect(blocks).toEqual([
+      expect.objectContaining({ kind: 'run_session' }),
+      expect.objectContaining({
+        kind: 'permission_request',
+        requestId: 'approval-visual-smoke',
+        title: 'Review command approval',
+        reason: 'Approve workspace write?',
+        teamId: 'team-1',
+        teamRunId: 'team-run-1',
+        agentTaskId: 'agent-task-approval',
+        toolName: 'Review command approval',
+        evidenceRefs: [
+          { id: 'run-edge-run-approval', kind: 'run', label: 'Run edge-run-approval', status: 'pending' },
+          {
+            id: 'approval-approval-visual-smoke',
+            kind: 'approval',
+            label: 'Review command approval',
+            status: 'pending',
+          },
+        ],
+      }),
+    ]);
+  });
+
   it('ignores invalid Hub runtime payloads', () => {
     expect(hubRuntimeEventFromPayload({ event_type: '', payload: {} })).toBeNull();
     expect(hubRuntimeEventFromPayload('not an object')).toBeNull();
