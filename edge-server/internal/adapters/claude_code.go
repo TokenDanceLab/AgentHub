@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -17,6 +21,7 @@ import (
 // Protocol: NDJSON over stdout (each line a JSON message), stderr for diagnostics.
 type ClaudeCodeAdapter struct {
 	binaryPath       string
+	argPrefix        []string // prepended before args when .cmd shim bypassed (Windows node path)
 	model            string // default model (fallback when runCtx.Model is empty)
 	permissionMode   string // default permission mode (fallback when runCtx.PermissionMode is empty)
 	maxTurns         int
@@ -28,14 +33,46 @@ type ClaudeCodeAdapter struct {
 // binaryPath is the path to the claude executable.
 // model and permissionMode serve as defaults when the run context does not specify them.
 func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeAdapter {
-	_, err := exec.LookPath(binaryPath)
+	cmdPath, argPrefix, available := resolveClaudeCommand(binaryPath, exec.LookPath, os.Stat, runtime.GOOS)
 	return &ClaudeCodeAdapter{
-		binaryPath:     binaryPath,
-		model:          model,
-		permissionMode: permissionMode,
-		maxTurns:       50,
-		available:      err == nil,
+		binaryPath:       cmdPath,
+		argPrefix:        argPrefix,
+		model:            model,
+		permissionMode:   permissionMode,
+		maxTurns:         50,
+		available:        available,
+		permissionBroker: nil,
 	}
+}
+
+// resolveClaudeCommand handles Windows .cmd shim bypass for the claude CLI.
+// On Windows, npm installs a claude.cmd shim that forwards args via %*,
+// which corrupts multiline prompts when launched via os/exec. This function
+// resolves the underlying Node.js entrypoint and returns it with the node
+// binary path so prompts are passed as real argv values.
+func resolveClaudeCommand(binaryPath string, lookPath func(string) (string, error), stat func(string) (os.FileInfo, error), goos string) (string, []string, bool) {
+	resolved, err := lookPath(binaryPath)
+	if err != nil {
+		return binaryPath, nil, false
+	}
+
+	if goos != "windows" || !strings.EqualFold(filepath.Ext(resolved), ".cmd") {
+		return resolved, nil, true
+	}
+
+	// The npm claude.cmd shim forwards args through %*, which corrupts multiline
+	// prompts when Edge launches it via os/exec. Call the Node entrypoint
+	// directly so prompts are passed as real argv values.
+	script := filepath.Join(filepath.Dir(resolved), "node_modules", "@anthropic-ai", "claude-code", "cli.js")
+	info, err := stat(script)
+	if err != nil || info.IsDir() {
+		return resolved, nil, true
+	}
+	nodePath, err := lookPath("node")
+	if err != nil {
+		return resolved, nil, true
+	}
+	return nodePath, []string{script}, true
 }
 
 func (a *ClaudeCodeAdapter) Metadata() AdapterMetadata {
@@ -69,12 +106,13 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		prompt = "Continue."
 	}
 
-	args := []string{
+	args := append([]string(nil), a.argPrefix...)
+	args = append(args,
 		"-p", prompt,
 		"--output-format", "stream-json",
 		"--verbose",
 		fmt.Sprintf("--max-turns=%d", a.maxTurns),
-	}
+	)
 
 	// Model: runCtx override first, fallback to adapter default
 	if ctx.Model != "" {

@@ -1,6 +1,14 @@
 package store
 
-import "log/slog"
+import (
+	"log/slog"
+	"sync"
+)
+
+// seedMu prevents concurrent SeedIfEmpty calls from racing. The store lock
+// is not sufficient because SeedIfEmpty checks-then-writes across many
+// separate store mutations (projects, threads, runs, items, pins).
+var seedMu sync.Mutex
 
 // SeedIfEmpty populates the store with demo data when it is empty.
 // This allows the Desktop app to show realistic conversations, transcripts,
@@ -9,7 +17,12 @@ import "log/slog"
 //
 // It is safe to call multiple times; if the store already contains any
 // project, the function returns immediately without writing anything.
+// A mutex prevents concurrent callers from both seeing an empty store
+// and starting parallel seeding.
 func SeedIfEmpty(repo Repository) error {
+	seedMu.Lock()
+	defer seedMu.Unlock()
+
 	if len(repo.ListProjects()) > 0 {
 		return nil
 	}
@@ -30,7 +43,7 @@ func SeedIfEmpty(repo Repository) error {
 
 	// 3. Threads + Runs + Items + Evidence
 	for _, t := range seedThreads {
-		if _, err := repo.CreateThread(t.ID, seedProjectID, t.Title, t.Kind); err != nil {
+		if _, err := repo.CreateThread(t.ID, seedProjectID, t.Title, t.Kind, t.AvatarColor, t.AvatarLabel); err != nil {
 			return err
 		}
 

@@ -19,7 +19,7 @@ func TestSQLiteStoreRestoresContractRowsWhenSnapshotIsMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := s.CreateThread("thread_rows", project.ID, "Rows Thread")
+	thread, err := s.CreateThread("thread_rows", project.ID, "Rows Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
