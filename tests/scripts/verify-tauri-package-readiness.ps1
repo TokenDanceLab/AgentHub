@@ -51,11 +51,14 @@ function Invoke-Script {
 
     $scriptPath = Join-Path $RepoRoot "scripts\verify-tauri-package-readiness.ps1"
     Push-Location $WorkingDirectory
+    $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     try {
         $output = & $HostShell.Path -NoProfile -ExecutionPolicy Bypass -File $scriptPath @Arguments 2>&1 | Out-String
         $exitCode = $LASTEXITCODE
     }
     finally {
+        $ErrorActionPreference = $oldErrorActionPreference
         Pop-Location
     }
 
@@ -434,7 +437,7 @@ $workflowText = Read-Text ".github\workflows\release.yml"
 $readinessWorkflowText = Read-Text ".github\workflows\release-readiness.yml"
 $desktopPackage = Get-Content (Join-Path $RepoRoot "app\desktop\package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $desktopVersion = [string]$desktopPackage.version
-Assert-True ($desktopVersion -eq "0.3.0-rc.6") "desktop metadata targets next P1 RC version 0.3.0-rc.6"
+Assert-True ($desktopVersion -eq "0.3.0-rc.7") "desktop metadata targets next P1 RC version 0.3.0-rc.7"
 
 Assert-True ($scriptText -match "package\.json" -and $scriptText -match "Cargo\.toml" -and $scriptText -match "Cargo\.lock" -and $scriptText -match "tauri\.conf\.json") "checker compares desktop package, Cargo, Cargo.lock, and Tauri versions"
 Assert-True ($scriptText -match "Release tag version alignment" -and $scriptText -match "prerelease|pre-release") "checker reports RC/pre-release tag version alignment"
@@ -483,8 +486,9 @@ Assert-True ($readinessWorkflowText -match "app/desktop/src-tauri/Cargo\.lock") 
 Assert-True ($readinessWorkflowText -match "verify-tauri-package-readiness\.ps1") "release readiness workflow runs readiness checker"
 Assert-True ($readinessWorkflowText -match "verify-tauri-installer-smoke\.ps1") "release readiness workflow runs installer smoke preflight"
 Assert-True ($readinessWorkflowText -match "windows-installer-smoke-preflight") "release readiness workflow has a Windows installer smoke preflight job"
-Assert-True ($readinessWorkflowText -match "artifact-manifest\.json" -and $readinessWorkflowText -match "Get-FileHash" -and $readinessWorkflowText -match "Length") "release readiness workflow writes artifact manifest with hashes and sizes"
-Assert-True ($readinessWorkflowText -match "missing latest\.json" -and $readinessWorkflowText -match "missing updater signature") "release readiness workflow fails collection when updater metadata or signature is missing"
+Assert-True ($readinessWorkflowText -match "verify-tauri-package-dry\.ps1" -and $readinessWorkflowText -match "RunWindowsBundle" -and $readinessWorkflowText -match "ArtifactsRoot dist") "release readiness workflow delegates unsigned Windows package proof to the local dry gate"
+Assert-True ($readinessWorkflowText -match "windows-package-dry" -and $readinessWorkflowText -match "actions/upload-artifact@v4") "release readiness workflow uploads unsigned dry artifacts as workflow artifacts only"
+Assert-True ($readinessWorkflowText -notmatch "missing latest\.json|missing updater signature") "release readiness unsigned dry job does not require updater metadata or signature"
 Assert-True ($readinessWorkflowText -match "run_macos_unsigned_dry_policy") "release readiness workflow declares macOS unsigned dry policy input"
 Assert-True ($readinessWorkflowText -match "macos-unsigned-dry-policy" -and $readinessWorkflowText -match "agenthub-edge-aarch64-apple-darwin") "release readiness workflow records future macOS arm64 unsigned dry sidecar boundary"
 Assert-True ($readinessWorkflowText -match "AgentHub\.app" -and $readinessWorkflowText -match "AgentHub_\$\{version\}_aarch64\.dmg" -and $readinessWorkflowText -match "workflow artifacts only") "release readiness workflow records future macOS versioned bundle artifact-only boundary"
@@ -590,21 +594,21 @@ foreach ($hostShell in $scriptHosts) {
         Remove-Item -Recurse -Force $deletedSchemaRoot -ErrorAction SilentlyContinue
     }
 
-    $rcMatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.6" "0.3.0-rc.6"
+    $rcMatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.7" "0.3.0-rc.7"
     try {
         $rcMatch = Invoke-Script $hostShell @("-RepoRoot", $rcMatchRoot) $rcMatchRoot
-        Assert-True ($rcMatch.ExitCode -eq 0) "readiness checker accepts RC tag v0.3.0-rc.6 when desktop metadata matches under $($rcMatch.Host)" $rcMatch.Output
-        Assert-True ($rcMatch.Output -match "v0\.3\.0-rc\.6" -and $rcMatch.Output -match "0\.3\.0-rc\.6") "RC tag match output names v0.3.0-rc.6 and metadata 0.3.0-rc.6 under $($rcMatch.Host)" $rcMatch.Output
+        Assert-True ($rcMatch.ExitCode -eq 0) "readiness checker accepts RC tag v0.3.0-rc.7 when desktop metadata matches under $($rcMatch.Host)" $rcMatch.Output
+        Assert-True ($rcMatch.Output -match "v0\.3\.0-rc\.7" -and $rcMatch.Output -match "0\.3\.0-rc\.7") "RC tag match output names v0.3.0-rc.7 and metadata 0.3.0-rc.7 under $($rcMatch.Host)" $rcMatch.Output
     }
     finally {
         Remove-Item -Recurse -Force $rcMatchRoot -ErrorAction SilentlyContinue
     }
 
-    $rcMismatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.6" "0.3.0-rc.5"
+    $rcMismatchRoot = New-TaggedReleaseFixture "v0.3.0-rc.7" "0.3.0-rc.6"
     try {
         $rcMismatch = Invoke-Script $hostShell @("-RepoRoot", $rcMismatchRoot) $rcMismatchRoot
         Assert-True ($rcMismatch.ExitCode -ne 0) "readiness checker rejects RC tag when desktop metadata has a different version under $($rcMismatch.Host)" $rcMismatch.Output
-        Assert-True ($rcMismatch.Output -match "v0\.3\.0-rc\.6" -and $rcMismatch.Output -match "0\.3\.0-rc\.6" -and $rcMismatch.Output -match "0\.3\.0-rc\.5") "RC tag mismatch failure names tag, expected version, and actual desktop version under $($rcMismatch.Host)" $rcMismatch.Output
+        Assert-True ($rcMismatch.Output -match "v0\.3\.0-rc\.7" -and $rcMismatch.Output -match "0\.3\.0-rc\.7" -and $rcMismatch.Output -match "0\.3\.0-rc\.6") "RC tag mismatch failure names tag, expected version, and actual desktop version under $($rcMismatch.Host)" $rcMismatch.Output
     }
     finally {
         Remove-Item -Recurse -Force $rcMismatchRoot -ErrorAction SilentlyContinue
