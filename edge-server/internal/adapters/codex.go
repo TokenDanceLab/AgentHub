@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -21,17 +22,31 @@ import (
 // Phase 1: codex exec "prompt" -- batch mode, JSONL output (simple, reliable).
 // Phase 2: codex app-server --listen stdio:// -- JSON-RPC full streaming.
 type CodexAdapter struct {
-	binaryPath string
-	argPrefix  []string
-	model      string
-	available  bool                     // #177: true if the CLI binary exists and is executable
-	budget     *runnerctx.ContextBudget // extracted from ctx in ParseStream; nil = no tracking
+	binaryPath  string
+	argPrefix   []string
+	model       string
+	available   bool                     // #177: true if the CLI binary exists and is executable
+	openaiKey   string                   // OPENAI_API_KEY from parent env, passed to child process
+	budget      *runnerctx.ContextBudget // extracted from ctx in ParseStream; nil = no tracking
+	preflightOK bool                     // true if CLI binary + API key are both present
 }
 
 // NewCodexAdapter creates a Codex adapter.
 func NewCodexAdapter(binaryPath, model string) *CodexAdapter {
 	cmdPath, argPrefix, available := resolveCodexCommand(binaryPath, exec.LookPath, os.Stat, runtime.GOOS)
-	return &CodexAdapter{binaryPath: cmdPath, argPrefix: argPrefix, model: model, available: available}
+	// Capture OPENAI_API_KEY from parent environment so we can pass it through
+	// to the Codex child process. The env sanitizer filters sensitive keys from
+	// the sanitized child env, so adapter-level passthrough is required.
+	openaiKey := os.Getenv("OPENAI_API_KEY")
+	preflightOK := available && openaiKey != ""
+	return &CodexAdapter{
+		binaryPath:  cmdPath,
+		argPrefix:   argPrefix,
+		model:       model,
+		available:   available,
+		openaiKey:   openaiKey,
+		preflightOK: preflightOK,
+	}
 }
 
 type fileStatFunc func(string) (os.FileInfo, error)
@@ -158,7 +173,13 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		workDir = "."
 	}
 
-	var env []string // runtime vars set by process executor
+	var env []string
+	// Pass OPENAI_API_KEY through to the Codex child process. The env sanitizer
+	// strips sensitive keys from the sanitized parent env, so we must explicitly
+	// inject it here. Without this, Codex hangs waiting for authentication.
+	if a.openaiKey != "" {
+		env = append(env, "OPENAI_API_KEY="+a.openaiKey)
+	}
 
 	return a.binaryPath, args, env, workDir
 }
@@ -242,6 +263,27 @@ func (a *CodexAdapter) NeedsStdin() bool { return false }
 // Available reports whether the codex CLI binary was found at startup.
 // #177: check binary at startup, report unavailable if missing.
 func (a *CodexAdapter) Available() bool { return a.available }
+
+// PreflightCheck verifies that Codex can actually execute by checking both
+// the binary presence and required configuration (OPENAI_API_KEY). Returns
+// an error describing what is missing if the adapter is not ready.
+func (a *CodexAdapter) PreflightCheck() error {
+	if !a.available {
+		return fmt.Errorf("codex CLI binary not found: %s", a.binaryPath)
+	}
+	if a.openaiKey == "" {
+		return fmt.Errorf("codex requires OPENAI_API_KEY environment variable")
+	}
+	return nil
+}
+
+// PreflightAdapter is an optional interface that adapters can implement to
+// provide a pre-execution readiness check. The process executor calls this
+// before launching the subprocess and fails the run immediately with a
+// descriptive error if the check fails.
+type PreflightAdapter interface {
+	PreflightCheck() error
+}
 
 // --- Event types ---
 
