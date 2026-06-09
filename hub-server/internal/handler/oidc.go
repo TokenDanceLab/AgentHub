@@ -2,7 +2,7 @@ package handler
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -56,12 +56,8 @@ func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
 	result, err := h.service.GenerateAuthorizationURL(c.Request.Context(),
 		req.CodeChallenge, req.CodeChallengeMethod, deviceType, deviceID, strings.TrimSpace(req.RedirectURI))
 	if err != nil {
-		slog.Error("oidc authorize service error", "request_id", middleware.GetRequestID(c), "error", err)
-		if e, ok := err.(*errcode.Error); ok {
-			Fail(c, e)
-			return
-		}
-		Fail(c, errcode.ErrInternal)
+		logOIDCServiceError(c, "oidc authorize service error", err)
+		handleOIDCServiceError(c, err)
 		return
 	}
 	OK(c, result)
@@ -109,10 +105,10 @@ func (h *OIDCHandler) GetOIDCCallback(c *gin.Context) {
 	}
 
 	if lang == "zh" {
-		success := fmt.Sprintf(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 登录成功</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">登录成功 ✓</h2><p>您可以关闭此页面并返回 AgentHub 桌面应用。</p><p style="color:#6B7280;font-size:13px">授权码: <code>%s</code></p><p style="color:#6B7280;font-size:13px">状态码: <code>%s</code></p></body></html>`, code, state)
+		const success = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 登录成功</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">登录成功 ✓</h2><p>登录流程已完成。</p><p>您可以关闭此页面并返回 AgentHub 桌面应用。</p></body></html>`
 		c.String(200, success)
 	} else {
-		success := fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Login Successful</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">Login Successful ✓</h2><p>You can close this page and return to the AgentHub desktop app.</p><p style="color:#6B7280;font-size:13px">Authorization code: <code>%s</code></p><p style="color:#6B7280;font-size:13px">State: <code>%s</code></p></body></html>`, code, state)
+		const success = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Login Successful</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto;text-align:center"><h2 style="color:#2563EB">Login Successful ✓</h2><p>The login flow is complete.</p><p>You can close this page and return to the AgentHub desktop app.</p></body></html>`
 		c.String(200, success)
 	}
 }
@@ -133,15 +129,46 @@ func (h *OIDCHandler) handleCallback(c *gin.Context, code, state, codeVerifier, 
 	result, err := h.service.HandleCallback(c.Request.Context(),
 		code, state, codeVerifier, dt, did, strings.TrimSpace(redirectURI))
 	if err != nil {
-		slog.Error("oidc callback service error", "request_id", middleware.GetRequestID(c), "error", err)
-		if e, ok := err.(*errcode.Error); ok {
-			Fail(c, e)
-			return
-		}
-		Fail(c, errcode.ErrInternal)
+		logOIDCServiceError(c, "oidc callback service error", err)
+		handleOIDCServiceError(c, err)
 		return
 	}
 	OK(c, result)
+}
+
+func logOIDCServiceError(c *gin.Context, message string, err error) {
+	if safeErr := safeOIDCServiceError(err); safeErr != nil {
+		slog.Error(message, "request_id", middleware.GetRequestID(c), "error_code", safeErr.Code)
+		return
+	}
+	slog.Error(message, "request_id", middleware.GetRequestID(c), "error_category", "service_error")
+}
+
+func handleOIDCServiceError(c *gin.Context, err error) {
+	if safeErr := safeOIDCServiceError(err); safeErr != nil {
+		Fail(c, safeErr)
+		return
+	}
+	Fail(c, errcode.ErrInternal)
+}
+
+func safeOIDCServiceError(err error) *errcode.Error {
+	var e *errcode.Error
+	if !errors.As(err, &e) {
+		return nil
+	}
+	switch e.Code {
+	case errcode.OIDCInvalidState.Code:
+		return errcode.OIDCInvalidState
+	case errcode.OIDCCodeExchangeFailed.Code:
+		return errcode.OIDCCodeExchangeFailed
+	case errcode.OIDCIDTokenInvalid.Code:
+		return errcode.OIDCIDTokenInvalid
+	case errcode.OIDCSubNotFound.Code:
+		return errcode.OIDCSubNotFound
+	default:
+		return nil
+	}
 }
 
 func normalizeOIDCDeviceType(value string) (string, bool) {

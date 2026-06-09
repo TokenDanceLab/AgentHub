@@ -1,4 +1,4 @@
-export { collectTranscriptEvidence } from './transcriptEvidence';
+export { collectTranscriptEvidence, rawRunIdFromEvidenceId, resolveCurrentTranscriptRunId } from './transcriptEvidence';
 export { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents';
 export { normalizeHubMessagesToTranscript } from './normalizeHubMessages';
 export { hubRuntimeEventFromPayload, normalizeHubRuntimeEventsToTranscript } from './normalizeHubRuntimeEvents';
@@ -10,6 +10,7 @@ export type {
   ApprovalTranscriptBlock,
   AgentTimelineItem,
   AgentTimelineTranscriptBlock,
+  ApprovalDecisionAction,
   ArtifactTranscriptBlock,
   ChildAgentTranscriptBlock,
   ContextUsageTranscriptBlock,
@@ -17,14 +18,22 @@ export type {
   EvidenceRef,
   EvidenceRefKind,
   EvidenceRefStatus,
+  FailureTranscriptBlock,
+  FileChangeTranscriptBlock,
+  FinishedTranscriptBlock,
+  PermissionRequestTranscriptBlock,
+  PermissionResultTranscriptBlock,
+  PreviewTranscriptBlock,
   ResultTranscriptBlock,
   RouteDecisionTranscriptBlock,
   RunStepGroupTranscriptBlock,
   RunSessionTranscriptBlock,
   SubagentTranscriptBlock,
+  SubtaskTranscriptBlock,
   TextTranscriptBlock,
   ThinkingTranscriptBlock,
   ToolCallTranscriptBlock,
+  ToolResultTranscriptBlock,
   TranscriptAuthor,
   TranscriptAuthorRole,
   TranscriptBlock,

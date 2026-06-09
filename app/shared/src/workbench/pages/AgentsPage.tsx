@@ -7,6 +7,13 @@ import {
   type DesignNavIconName,
 } from '../designIcons';
 import { resolveWorkbenchProfile } from '../profileRegistry';
+import { RuntimeBrandIcon } from '../RuntimeBrandIcon';
+import {
+  buildAgentCapabilityContractFromConfig,
+  buildAgentCapabilitySummary,
+} from '../agentCapabilities';
+import { agentConfigToAgentSpecFixture } from '../agentProfileCatalog';
+import { formatAgentHubAgentSpecV1 } from '../../agentSpec';
 import { Select } from '../../ui';
 import styles from './AgentsPage.module.css';
 
@@ -44,13 +51,27 @@ export interface AgentConfig {
   id: string;
   name: string;
   role: string;
+  icon?: string | undefined;
   engine: string;
+  runtimeId?: string | undefined;
+  provider?: string | undefined;
   model: string;
   mode: string;
   approval: string;
+  approvalMode?: string | undefined;
+  approvalRiskRules?: Array<{ match: string; decision: string }> | undefined;
   scope: string;
+  targetPreference?: string | undefined;
   state: AgentState;
   skills: string[];
+  mcpServers?: string[] | undefined;
+  toolAllowlist?: string[] | undefined;
+  memorySources?: string[] | undefined;
+  memoryRetention?: string | undefined;
+  memorySummary?: string | undefined;
+  targetPreferences?: string[] | undefined;
+  avatarRef?: string | undefined;
+  avatarColor?: string | undefined;
   tools: Record<string, ToolPermission>;
 }
 
@@ -59,6 +80,18 @@ export interface MarketTemplate {
   description: string;
   category: string;
   detail: string;
+  runtime?: string | undefined;
+  runtimeId?: string | undefined;
+  provider?: string | undefined;
+  model?: string | undefined;
+  avatarRef?: string | undefined;
+  avatarColor?: string | undefined;
+  skills?: string[] | undefined;
+  mcpServers?: string[] | undefined;
+  toolAllowlist?: string[] | undefined;
+  memorySummary?: string | undefined;
+  approvalSummary?: string | undefined;
+  targetPreferences?: string[] | undefined;
 }
 
 export interface PolicyRule {
@@ -133,6 +166,14 @@ export interface AgentsPageProps {
 
   /** Installed agents */
   agents: AgentConfig[];
+  /** Real data loading state */
+  agentsLoading?: boolean | undefined;
+  /** Real data load error */
+  agentsError?: string | undefined;
+  /** Last mutation error */
+  agentActionError?: string | undefined;
+  /** Retry loading agents */
+  onAgentsRetry?: (() => void) | undefined;
   /** Currently selected agent id in the installed view */
   selectedAgentId?: string | undefined;
   /** Called when an agent config row is clicked */
@@ -156,6 +197,10 @@ export interface AgentsPageProps {
   onAgentDelete?: (() => void) | undefined;
   /** Add agent callback */
   onAgentAdd?: (() => void) | undefined;
+  /** Save in-flight agent id */
+  savingAgentId?: string | undefined;
+  /** Delete in-flight agent id */
+  deletingAgentId?: string | undefined;
   /** Toggle agent skill */
   onAgentSkillToggle?: ((skill: string) => void) | undefined;
   /** Set tool permission */
@@ -223,14 +268,6 @@ function riskClass(level: RiskLevel): string {
   if (level === '高风险') return 'risk-high';
   if (level === '低风险') return 'risk-low';
   return 'risk-mid';
-}
-
-function marketInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -326,6 +363,10 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     confirmCount,
     defaultModelLabel,
     agents,
+    agentsLoading = false,
+    agentsError,
+    agentActionError,
+    onAgentsRetry,
     selectedAgentId,
     onAgentSelect,
     onAgentProfileOpen,
@@ -337,6 +378,8 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     onAgentDuplicate,
     onAgentDelete,
     onAgentAdd,
+    savingAgentId,
+    deletingAgentId,
     onAgentSkillToggle,
     onToolPermissionSet,
     onAgentFieldChange,
@@ -344,6 +387,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
   } = props;
 
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
+  const selectedAgentBusy = Boolean(selectedAgent && (savingAgentId === selectedAgent.id || deletingAgentId === selectedAgent.id));
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
@@ -351,7 +395,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>Agent管理</h1>
           <p className={styles['head-subcopy']}>
-            编辑 Agent 基础配置、skills 和工具权限。当前为前端 demo 内存状态。
+            查看 Agent 基础配置、skills 和工具权限；写入能力按 Hub / Edge 合同逐步接入。
           </p>
         </div>
         <button
@@ -377,14 +421,28 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         <section className={styles['agent-section']}>
           <div className={styles['section-title-row']}>
             <h2>已安装 Agent</h2>
-            <span>{agents.length} active</span>
+            <span>{agentsLoading ? '同步中' : `${agents.length} active`}</span>
           </div>
+          {agentsError && (
+            <div className={styles['agent-inline-state']} role="alert">
+              <span>{agentsError}</span>
+              <button type="button" onClick={onAgentsRetry}>重试</button>
+            </div>
+          )}
           <div className={styles['agent-config-list']}>
+            {agents.length === 0 && !agentsLoading && (
+              <div className={styles['agent-empty-state']} role="status">
+                <strong>暂无 Agent Profile</strong>
+                <span>当前 Hub 账号还没有已安装 Agent。</span>
+                <button type="button" onClick={onAgentAdd}>添加 Agent</button>
+              </div>
+            )}
             {agents.map((agent) => (
               <button
                 key={agent.id}
                 className={`${styles['agent-config-row']} agent-config-row ${agent.id === selectedAgentId ? styles.selected : ''}`}
                 type="button"
+                disabled={deletingAgentId === agent.id}
                 onClick={() => onAgentSelect?.(agent.id)}
               >
                 <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
@@ -394,10 +452,10 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                     {agent.role} · {agent.engine}
                   </span>
                   <small>
-                    {agent.skills.join(' · ') || '未配置 skill'}
+                    {agent.targetPreference ? `Target: ${agent.targetPreference}` : agent.skills.join(' · ') || '未配置 skill'}
                   </small>
                 </div>
-                <em>{agent.model}</em>
+                <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
                 <span className={`${styles.state} ${stateClass(agent.state)}`} />
               </button>
             ))}
@@ -407,8 +465,12 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         {selectedAgent && (
           <AgentEditPanel
             agent={selectedAgent}
+            actionError={agentActionError}
             saveStateLabel={saveStateLabel}
             isDirty={isDirty}
+            isDeleting={deletingAgentId === selectedAgent.id}
+            isSaving={savingAgentId === selectedAgent.id}
+            isBusy={selectedAgentBusy}
             allSkills={allSkills}
             allTools={allTools}
             onAgentSave={onAgentSave}
@@ -419,7 +481,6 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             onToolPermissionSet={onToolPermissionSet}
             onFieldChange={onAgentFieldChange}
             recentEvents={recentEvents}
-            agentsCount={agents.length}
           />
         )}
       </div>
@@ -445,8 +506,12 @@ const AgentStat: React.FC<{ label: string; value: string | number; meta: string 
 
 interface AgentEditPanelProps {
   agent: AgentConfig;
+  actionError?: string | undefined;
   saveStateLabel: string;
   isDirty: boolean;
+  isSaving: boolean;
+  isDeleting: boolean;
+  isBusy: boolean;
   allSkills: string[];
   allTools: string[];
   onAgentSave?: (() => void) | undefined;
@@ -457,13 +522,16 @@ interface AgentEditPanelProps {
   onToolPermissionSet?: ((tool: string, value: ToolPermission) => void) | undefined;
   onFieldChange?: ((field: string, value: string) => void) | undefined;
   recentEvents: AgentRecentEvent[];
-  agentsCount: number;
 }
 
 const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   agent,
+  actionError,
   saveStateLabel,
   isDirty,
+  isSaving,
+  isDeleting,
+  isBusy,
   allSkills,
   allTools,
   onAgentSave,
@@ -474,14 +542,18 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   onToolPermissionSet,
   onFieldChange,
   recentEvents,
-  agentsCount,
-}) => (
+}) => {
+  const capabilitySummary = buildAgentCapabilitySummary(
+    buildAgentCapabilityContractFromConfig(agent),
+  );
+
+  return (
   <aside className={styles['agent-detail']}>
     <div className={`${styles['detail-head']} ${styles.editable}`}>
       <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
       <div>
         <h2>{agent.name}</h2>
-        <span>{agent.role} Agent</span>
+        <span>{agent.role.trim() || 'Hub AgentProfile'} Agent</span>
       </div>
       <span
         className={`${styles['agent-save-state']} ${isDirty ? styles.dirty : ''}`}
@@ -493,9 +565,32 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
     {/* Runtime line */}
     <div className={styles['agent-runtime-line']}>
       <span className={`${styles.state} ${stateClass(agent.state)}`} />
+      <RuntimeBrandIcon kind="runtime" name={agent.runtimeId ?? agent.engine} size="compact" framed={false} />
       <strong>{agent.engine}</strong>
-      <em>{agent.model}</em>
+      <em>{agent.provider ? `${agent.provider} / ${agent.model}` : agent.model}</em>
     </div>
+
+    <div className={styles['agent-capability-strip']} aria-label={`${agent.name} capability readiness`}>
+      <CapabilityBadge label="AGENTS.md" value={capabilitySummary.agentsMd} />
+      <CapabilityBadge label="Skills" value={capabilitySummary.skills} />
+      <CapabilityBadge label="MCP" value={capabilitySummary.mcp} />
+      <CapabilityBadge label="Memory" value={capabilitySummary.memory} />
+      <CapabilityBadge label="Tools" value={capabilitySummary.tools} />
+      <CapabilityBadge label="Avatar" value={capabilitySummary.avatar} />
+      <span className={`${styles['capability-readiness']} ${styles[capabilitySummary.readiness]}`}>
+        {capabilitySummary.readiness}
+      </span>
+    </div>
+
+    <div className={styles['agent-config-summary']} aria-label={`${agent.name} 配置摘要`}>
+      <ConfigSummaryRow label="AGENTS.md" value={capabilitySummary.agentsMd} />
+      <ConfigSummaryRow label="MCP" value={formatList(agent.mcpServers, '未绑定 MCP')} />
+      <ConfigSummaryRow label="Memory" value={agent.memorySummary || formatList(agent.memorySources, '未声明 memory')} />
+      <ConfigSummaryRow label="Approval" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
+      <ConfigSummaryRow label="Target" value={agent.targetPreference || formatList(agent.targetPreferences, '未声明 target')} />
+    </div>
+
+    <AgentSpecFixturePanel agent={agent} />
 
     {/* Edit grid */}
     <div className={styles['agent-edit-grid']}>
@@ -561,6 +656,13 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
         />
       </label>
       <label>
+        目标偏好
+        <input
+          value={agent.targetPreference ?? ''}
+          onChange={(e) => onFieldChange?.('targetPreference', e.target.value)}
+        />
+      </label>
+      <label>
         上下文范围
         <input
           value={agent.scope}
@@ -568,6 +670,27 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
         />
       </label>
     </div>
+
+    <section className={styles['agent-skill-editor']}>
+      <div className={styles['section-title-row']}>
+        <h3>MCP / Memory</h3>
+        <span>{agent.memoryRetention || 'policy pending'}</span>
+      </div>
+      <div className={styles['agent-token-grid']}>
+        {(agent.mcpServers ?? []).map((server) => (
+          <span key={`mcp-${server}`} className={styles['agent-token']}>
+            <RuntimeBrandIcon kind="tool" name="MCP Server" size="compact" framed={false} decorative />
+            {server}
+          </span>
+        ))}
+        {(agent.memorySources ?? []).map((source) => (
+          <span key={`memory-${source}`} className={styles['agent-token']}>
+            <RuntimeBrandIcon kind="tool" name="Agent Profile" size="compact" framed={false} decorative />
+            {source}
+          </span>
+        ))}
+      </div>
+    </section>
 
     {/* Skill editor */}
     <section className={styles['agent-skill-editor']}>
@@ -582,10 +705,11 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
             className={`${styles['skill-chip']} ${agent.skills.includes(skill) ? styles.active : ''}`}
             type="button"
             onClick={() => onAgentSkillToggle?.(skill)}
-          >
-            {skill}
-          </button>
-        ))}
+            >
+              <RuntimeBrandIcon kind="tool" name={skill} size="compact" framed={false} decorative />
+              {skill}
+            </button>
+          ))}
       </div>
     </section>
 
@@ -627,26 +751,71 @@ const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
         </div>
       ))}
     </section>
+    {actionError && (
+      <div className={`${styles['agent-inline-state']} ${styles.danger}`} role="alert">
+        <span>{actionError}</span>
+      </div>
+    )}
 
     {/* Edit actions */}
-    <div className={styles['agent-edit-actions']}>
-      <button className={`${styles.btn} ${styles['btn-p']}`} type="button" onClick={onAgentSave}>
-        保存配置
+    <div className={styles['agent-edit-actions']} aria-busy={isBusy ? 'true' : undefined}>
+      <button
+        className={`${styles.btn} ${styles['btn-p']}`}
+        type="button"
+        disabled={isBusy}
+        onClick={onAgentSave}
+      >
+        {isSaving ? '保存中' : '保存配置'}
       </button>
-      <button className={`${styles.btn} ${styles['btn-s']}`} type="button" onClick={onAgentDuplicate}>
+      <button
+        className={`${styles.btn} ${styles['btn-s']}`}
+        type="button"
+        disabled={isBusy}
+        onClick={onAgentDuplicate}
+      >
         复制 Agent
       </button>
       <button
         className={`${styles.btn} ${styles['btn-d']}`}
         type="button"
-        disabled={agentsCount <= 1}
+        disabled={isBusy}
         onClick={onAgentDelete}
       >
-        删除
+        {isDeleting ? '删除中' : '删除'}
       </button>
     </div>
   </aside>
-);
+  );
+};
+
+const AgentSpecFixturePanel: React.FC<{ agent: AgentConfig }> = ({ agent }) => {
+  const spec = agentConfigToAgentSpecFixture(agent);
+  const preview = formatAgentHubAgentSpecV1(spec);
+
+  return (
+    <section className={styles['agent-spec-fixture']} aria-label={`${agent.name} AgentSpec fixture`}>
+      <div className={styles['section-title-row']}>
+        <h3>AgentSpec fixture</h3>
+        <span>no-spend</span>
+      </div>
+      <div className={styles['agent-spec-grid']}>
+        <ConfigSummaryRow label="Runtime" value={`${spec.runtime.id} · ${spec.runtime.profile}`} />
+        <ConfigSummaryRow label="Model" value={`${spec.runtime.provider} / ${spec.runtime.model}`} />
+        <ConfigSummaryRow label="Tools" value={formatList(spec.tool_allowlist, '未声明 tool')} />
+        <ConfigSummaryRow label="MCP" value={formatList(spec.mcp_servers.map((server) => server.id), '未绑定 MCP')} />
+        <ConfigSummaryRow label="Memory" value={`${spec.memory_policy.mode} · ${spec.memory_policy.retention}`} />
+        <ConfigSummaryRow label="Approval" value={[
+          spec.approval_policy.mode,
+          formatList(spec.approval_policy.require_approval_for, ''),
+        ].filter(Boolean).join(' · ')} />
+      </div>
+      <pre className={styles['agent-spec-preview']}>{preview}</pre>
+      <p className={styles['agent-spec-note']}>
+        仅编译 fixture JSON，不导入 SDK、不启动 CLI、不调用模型。
+      </p>
+    </section>
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════════════
    2. Agent 市场 (Market)
@@ -739,14 +908,22 @@ const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
               }
             >
               <div className={styles['market-icon']}>
-                {marketInitials(tmpl.name)}
+                <RuntimeBrandIcon kind="runtime" name={tmpl.runtimeId ?? tmpl.runtime ?? tmpl.name} size="compact" framed={false} decorative />
               </div>
               <div>
                 <strong>{tmpl.name}</strong>
                 <span>{tmpl.description}</span>
               </div>
               <em>{tmpl.category}</em>
-              <small>{tmpl.detail}</small>
+              <small>
+                {[
+                  tmpl.runtime,
+                  tmpl.provider,
+                  tmpl.model,
+                  formatList(tmpl.mcpServers, ''),
+                  tmpl.memorySummary,
+                ].filter(Boolean).join(' · ') || tmpl.detail}
+              </small>
               <b>安装</b>
             </button>
           ))}
@@ -765,12 +942,22 @@ const MarketCard: React.FC<{
 }> = ({ template, onInstall, onPreview }) => (
   <article className={`${styles['market-card']} agent-card`} data-card-surface>
     <div className={styles['market-card-head']}>
-      <div className={styles['market-icon']}>{marketInitials(template.name)}</div>
+      <div className={styles['market-icon']}>
+        <RuntimeBrandIcon kind="runtime" name={template.runtimeId ?? template.runtime ?? template.name} size="compact" framed={false} decorative />
+      </div>
       <span>{template.category}</span>
     </div>
     <h3>{template.name}</h3>
     <p>{template.description}</p>
     <small>{template.detail}</small>
+    <div className={styles['market-config-summary']}>
+      <ConfigSummaryRow label="Runtime" value={[template.runtime, template.provider, template.model].filter(Boolean).join(' / ') || 'fixture'} />
+      <ConfigSummaryRow label="Skills" value={formatList(template.skills, '未声明 skill')} />
+      <ConfigSummaryRow label="MCP" value={formatList(template.mcpServers, '未绑定 MCP')} />
+      <ConfigSummaryRow label="Memory" value={template.memorySummary || '未声明 memory'} />
+      <ConfigSummaryRow label="Approval" value={template.approvalSummary || '未声明审批策略'} />
+      <ConfigSummaryRow label="Target" value={formatList(template.targetPreferences, '未声明 target')} />
+    </div>
     <div>
       <button
         type="button"
@@ -920,7 +1107,10 @@ const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
           <div className={styles['tool-matrix-head']}>
             <span>Agent</span>
             {toolMatrixTools.map((tool) => (
-              <span key={tool}>{tool}</span>
+              <span key={tool} className={styles['tool-head-cell']}>
+                <RuntimeBrandIcon kind="tool" name={tool} size="compact" framed={false} />
+                {tool}
+              </span>
             ))}
           </div>
           {/* Rows */}
@@ -1002,15 +1192,13 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
       <div className={styles['model-grid']}>
         {models.map((model) => (
           <article key={model.name} className={`${styles['model-card']} agent-card`} data-card-surface>
-            <div className={styles['market-icon']}>
-              {marketInitials(model.name)}
-            </div>
+            <RuntimeBrandIcon kind="model" name={model.name} size="large" />
             <div>
               <h2>{model.name}</h2>
               <p>{model.description}</p>
               <small>{model.assignedAgents}</small>
             </div>
-            <span>{model.state}</span>
+            <span className={styles['model-state']}>{model.state}</span>
           </article>
         ))}
       </div>
@@ -1040,6 +1228,7 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
                 {route.role} · {route.mode}
               </small>
             </div>
+            <RuntimeBrandIcon kind="model" name={route.model} size="compact" framed={false} />
             <em>{route.model}</em>
           </button>
         ))}
@@ -1053,6 +1242,7 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
         </div>
         {modelHealthRows.map((row) => (
           <div key={row.name} className={styles['model-health-row']}>
+            <RuntimeBrandIcon kind="model" name={row.name} size="compact" framed={false} />
             <strong>{row.name}</strong>
             <span>{row.status}</span>
             <em>{row.meta}</em>
@@ -1164,14 +1354,33 @@ const AgentAvatar: React.FC<{
         onAgentProfileOpen?.(agent, event.currentTarget);
       }}
       role="button"
-      style={{ background: profile.color }}
+      style={{ background: agent.avatarColor || profile.color }}
       tabIndex={0}
-      title={`${profile.name} ${profile.label}`}
+      title={agent.avatarRef ? `${profile.name} ${agent.avatarRef}` : `${profile.name} ${profile.label}`}
     >
       {profile.initials}
     </span>
   );
 };
+
+const CapabilityBadge: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <span className={styles['capability-badge']} title={`${label}: ${value}`}>
+    <em>{label}</em>
+    <strong>{value}</strong>
+  </span>
+);
+
+const ConfigSummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className={styles['config-summary-row']}>
+    <span>{label}</span>
+    <strong>{value}</strong>
+  </div>
+);
+
+function formatList(items: string[] | undefined, emptyLabel: string): string {
+  if (!items || items.length === 0) return emptyLabel;
+  return items.join(' · ');
+}
 
 function stateClass(state: AgentState): string {
   if (state === 'running') return styles.running ?? '';

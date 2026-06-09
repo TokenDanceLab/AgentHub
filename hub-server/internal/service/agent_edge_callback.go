@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -159,8 +162,39 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 
 	s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 	s.bus.Publish(ctx, Event{Type: ws.TypeAgentStream, Payload: runEvent})
+	s.tryAutoParseRouteDecision(ctx, ai.SessionID, runEvent.Payload)
 
 	return nil
+}
+
+func (s *AgentService) tryAutoParseRouteDecision(ctx context.Context, sessionID string, payload string) {
+	if s.teamRouteHandler == nil {
+		return
+	}
+
+	run, err := repository.GetTeamRunBySessionID(s.db, sessionID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn("route decision team run lookup failed", "session_id", sessionID, "error", err)
+		}
+		return
+	}
+	if run.Status != model.TeamRunStatusRunning {
+		return
+	}
+
+	var decision model.CoordinatorRouteDecision
+	if err := json.Unmarshal([]byte(payload), &decision); err != nil {
+		return
+	}
+	decision.Action = strings.ToLower(strings.TrimSpace(decision.Action))
+	if !model.ValidActions()[decision.Action] {
+		return
+	}
+
+	if _, err := s.teamRouteHandler.HandleRouteDecision(ctx, run.TriggerUserID, run.TeamID, run.ID, decision); err != nil {
+		slog.Warn("auto route decision handling failed", "run_id", run.ID, "team_id", run.TeamID, "action", decision.Action, "error", err)
+	}
 }
 
 func (s *AgentService) transitionDispatchedTaskToRunning(taskID string) error {

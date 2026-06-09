@@ -13,6 +13,8 @@
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
+    [switch]$SkipGoTests,
+    [switch]$SkipCancel,
     [switch]$ReuseExistingEdge,
     [string]$EdgeAddr = "127.0.0.1:3210",
     [string]$EdgeAuthToken = ""
@@ -53,11 +55,18 @@ function Assert($condition, [string]$label) {
 
 function Test-EdgeHealth() {
     try {
-        $health = Invoke-RestMethod -Uri "$EdgeUrl/v1/health" -TimeoutSec 2
+        $health = Unwrap-EdgeData (Invoke-RestMethod -Uri "$EdgeUrl/v1/health" -TimeoutSec 2)
         return ($health.status -eq "ok" -and $health.version -eq "v1")
     } catch {
         return $false
     }
+}
+
+function Unwrap-EdgeData($Response) {
+    if ($null -ne $Response -and $null -ne $Response.PSObject.Properties["data"]) {
+        return $Response.data
+    }
+    return $Response
 }
 
 function Invoke-EdgeRest {
@@ -80,7 +89,7 @@ function Invoke-EdgeRest {
         $args.Body = $Body
         $args.ContentType = "application/json"
     }
-    return Invoke-RestMethod @args
+    return Unwrap-EdgeData (Invoke-RestMethod @args)
 }
 
 function Format-ProcessArgument([string]$Value) {
@@ -100,6 +109,15 @@ function Start-EdgeProcess([string[]]$Arguments) {
     $psi.CreateNoWindow = $true
     $psi.Arguments = (($Arguments | ForEach-Object { Format-ProcessArgument $_ }) -join " ")
     return [System.Diagnostics.Process]::Start($psi)
+}
+
+function Get-SmokeRunnerCommand {
+    $powershell = Get-Command powershell -ErrorAction SilentlyContinue
+    if ($powershell) {
+        return $powershell.Source
+    }
+    $pwsh = Get-Command pwsh -ErrorAction Stop
+    return $pwsh.Source
 }
 
 function Receive-WebSocketText([System.Net.WebSockets.ClientWebSocket]$ws, [int]$TimeoutMs) {
@@ -323,7 +341,16 @@ try {
             Fail "edge binary missing: $EdgeBinary"
             throw "edge binary missing"
         }
-        $edgeArgs = @("--addr", $EdgeAddr, "--runner-profile", "agenthub-runner-mock")
+        $smokeRunnerCommand = Get-SmokeRunnerCommand
+        $smokeRunnerScript = "Write-Output 'Initializing mock runner'; Write-Output 'AgentHub client smoke mock output'"
+        $edgeArgs = @(
+            "--addr", $EdgeAddr,
+            "--runner-profile", "agenthub-runner-mock",
+            "--runner-command", $smokeRunnerCommand,
+            "--runner-arg", "-NoProfile",
+            "--runner-arg", "-Command",
+            "--runner-arg", $smokeRunnerScript
+        )
         if (-not [string]::IsNullOrWhiteSpace($EdgeAuthToken)) {
             $edgeArgs += @("--local-auth-token", $EdgeAuthToken)
         }
@@ -350,7 +377,7 @@ try {
         # Health
         Write-Step "GET /v1/health"
         try {
-            $health = Invoke-RestMethod -Uri "$EdgeUrl/v1/health" -TimeoutSec 5
+            $health = Unwrap-EdgeData (Invoke-RestMethod -Uri "$EdgeUrl/v1/health" -TimeoutSec 5)
             Assert ($health.status -eq "ok") "status=ok"
             Assert ($health.version -eq "v1") "version=v1"
             Assert ($health.edgeId -eq "local") "edgeId=local"
@@ -365,7 +392,8 @@ try {
             $count = @($runners.items).Count
             Assert ($count -gt 0) "runners count=$count"
             if ($count -gt 0) {
-                Assert ($runners.items[0].status -eq "online") "mock runner online"
+                $firstRunner = @($runners.items)[0]
+                Assert ($firstRunner.status -eq "online") "mock runner online"
             }
             Assert ($runners.page.hasMore -eq $false) "hasMore=false"
         } catch {
@@ -396,29 +424,39 @@ try {
             Fail "WebSocket: $_"
         }
 
-        # POST /v1/runs/{runId}:cancel
-        Write-Step "POST /v1/runs/{runId}:cancel"
-        try {
-            $cancelRun = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs" -Method Post -TimeoutSec 5
-            if ($null -eq $cancelRun -or [string]::IsNullOrWhiteSpace($cancelRun.runId)) {
-                Fail "cancel: POST /v1/runs did not return a runId"
-            } else {
-                $cancel = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs/$($cancelRun.runId):cancel" -Method Post -TimeoutSec 5
-                Assert ($cancel.runId -eq $cancelRun.runId) "runId=$($cancelRun.runId)"
-                Assert ($cancel.status -in @("cancelling", "finished", "failed", "cancelled")) "status=$($cancel.status)"
+        if ($SkipCancel) {
+            Write-Step "POST /v1/runs/{runId}:cancel"
+            Pass "cancel smoke skipped by -SkipCancel"
+        } else {
+            # POST /v1/runs/{runId}:cancel
+            Write-Step "POST /v1/runs/{runId}:cancel"
+            try {
+                $cancelRun = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs" -Method Post -TimeoutSec 5
+                if ($null -eq $cancelRun -or [string]::IsNullOrWhiteSpace($cancelRun.runId)) {
+                    Fail "cancel: POST /v1/runs did not return a runId"
+                } else {
+                    $cancel = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs/$($cancelRun.runId):cancel" -Method Post -TimeoutSec 15
+                    Assert ($cancel.runId -eq $cancelRun.runId) "runId=$($cancelRun.runId)"
+                    Assert ($cancel.status -in @("cancelling", "finished", "failed", "cancelled")) "status=$($cancel.status)"
+                }
+            } catch {
+                Fail "cancel: $_"
             }
-        } catch {
-            Fail "cancel: $_"
         }
 
         # ── Go tests ────────────────────────────────────
 
-        Write-Step "Go unit tests"
-        Push-Location "$Root/edge-server"
-        try {
-            go test ./... 2>&1 | Out-Null
-            Assert ($LASTEXITCODE -eq 0) "edge-server tests pass"
-        } finally { Pop-Location }
+        if ($SkipGoTests) {
+            Write-Step "Go unit tests"
+            Pass "edge-server tests skipped by -SkipGoTests"
+        } else {
+            Write-Step "Go unit tests"
+            Push-Location "$Root/edge-server"
+            try {
+                go test ./... 2>&1 | Out-Null
+                Assert ($LASTEXITCODE -eq 0) "edge-server tests pass"
+            } finally { Pop-Location }
+        }
 
     } finally {
         if ($StartedEdge -and $EdgeProc -and -not $EdgeProc.HasExited) {

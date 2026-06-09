@@ -45,6 +45,30 @@ describe('webHubRealtime', () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['web-v4', 'hub-messages'] });
   });
 
+  it('updates the Hub task index when agent lifecycle events arrive', () => {
+    const queryClient = new QueryClient();
+
+    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.AGENT_DONE, {
+      task_id: 'task-1',
+      session_id: 'hub-session-1',
+      edge_run_id: 'edge-run-1',
+      result_summary: 'done',
+    });
+
+    expect(queryClient.getQueryData(['web-v4', 'agent-task-index', 'task-1'])).toEqual({
+      taskId: 'task-1',
+      sessionId: 'hub-session-1',
+      edgeRunId: 'edge-run-1',
+      status: 'completed',
+    });
+    expect(queryClient.getQueryData(['web-v4', 'active-agent-task', 'hub-session-1'])).toEqual({
+      taskId: 'task-1',
+      sessionId: 'hub-session-1',
+      edgeRunId: 'edge-run-1',
+      status: 'completed',
+    });
+  });
+
   it('ignores unrelated Hub events', () => {
     const queryClient = new QueryClient();
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
@@ -95,5 +119,31 @@ describe('webHubRealtime', () => {
     }, 'hub-session-1', onRuntimeEvent);
 
     expect(onRuntimeEvent).not.toHaveBeenCalled();
+  });
+
+  it('dispatches terminal Hub agent events into the runtime transcript', () => {
+    const onRuntimeEvent = vi.fn();
+
+    dispatchHubRuntimeEvent(HUB_EVENTS.AGENT_DONE, {
+      task_id: 'task-terminal',
+      edge_run_id: 'run-terminal',
+      session_id: 'hub-session-1',
+      result_summary: 'Tests passed',
+      usage: { input_tokens: 10, output_tokens: 5 },
+      created_at: '2026-06-07T05:00:02Z',
+    }, 'hub-session-1', onRuntimeEvent);
+
+    expect(onRuntimeEvent).toHaveBeenCalledWith({
+      task_id: 'task-terminal',
+      edge_run_id: 'run-terminal',
+      session_id: 'hub-session-1',
+      event_type: 'run.agent.result',
+      payload: {
+        content: 'Tests passed',
+        success: true,
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+      created_at: '2026-06-07T05:00:02Z',
+    });
   });
 });

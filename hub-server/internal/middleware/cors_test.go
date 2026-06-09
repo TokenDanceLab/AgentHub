@@ -6,10 +6,32 @@ import (
 )
 
 func TestCORSRejectsProductionLoopbackOrigin(t *testing.T) {
-	// CORS uses slog.Error + os.Exit(1) for init-time config validation, which exits the
-	// process. This cannot be tested directly via recover(). The underlying
-	// validation function is covered by TestValidateCORSOriginsForEnvironmentRejectsLoopbackInProduction.
-	t.Skip("CORS middleware uses os.Exit(1) on config errors; cannot test via recover()")
+	t.Setenv("AGENTHUB_ENV", "production")
+	t.Setenv("AGENTHUB_CORS_ORIGINS", "http://localhost:5173")
+
+	mw, err := CORS()
+	if err == nil {
+		t.Fatal("expected CORS() to return error for loopback in production")
+	}
+	if mw != nil {
+		t.Fatal("expected nil middleware on error")
+	}
+	if !strings.Contains(err.Error(), "CORS configuration error") {
+		t.Fatalf("error should mention CORS configuration error, got: %v", err)
+	}
+}
+
+func TestCORSReturnsMiddlewareOnValidConfig(t *testing.T) {
+	t.Setenv("AGENTHUB_ENV", "development")
+	t.Setenv("AGENTHUB_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+
+	mw, err := CORS()
+	if err != nil {
+		t.Fatalf("CORS() returned unexpected error: %v", err)
+	}
+	if mw == nil {
+		t.Fatal("expected non-nil middleware")
+	}
 }
 
 func TestValidateCORSOriginsForEnvironmentRejectsLoopbackInProduction(t *testing.T) {

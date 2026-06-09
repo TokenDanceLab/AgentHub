@@ -1,19 +1,100 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+#[cfg(any(test, debug_assertions))]
+use std::time::Duration;
 use tauri::{Manager, Runtime};
-use tauri_plugin_shell::process::{CommandEvent, CommandChild};
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
 const DEFAULT_EDGE_PORT: u16 = 3210;
+const EDGE_SIDECAR_NAME: &str = "agenthub-edge";
+const LOCAL_EDGE_TARGET_ID: &str = "local-edge";
+const LOCAL_EDGE_ROUTE: &str = "local-edge-api";
+const DEFAULT_RUNNER_PROFILE: &str = "claude-code";
+const EDGE_STORE_DB_FILE_NAME: &str = "agenthub-edge.sqlite";
+const EDGE_STORE_BACKEND: &str = "sqlite";
+const EDGE_STORE_READINESS_MANIFEST_SCHEMA: &str = "agenthub-edge-sqlite-readiness-v1";
+const EDGE_STORE_EXPECTED_MIGRATION_VERSION: u16 = 4;
+const READINESS_STORE_DB_PLACEHOLDER: &str = "<app-data>/agenthub-edge.sqlite";
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EdgeStatus {
     pub running: bool,
     pub pid: Option<u32>,
     pub port: u16,
+    pub health_url: String,
+    pub last_error: Option<String>,
+    pub log_paths: EdgeLogPaths,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgeHostReadiness {
+    pub running: bool,
+    pub pid: Option<u32>,
+    pub port: u16,
+    pub sidecar_name: &'static str,
+    pub target_id: &'static str,
+    pub route: &'static str,
+    pub bind_addr: String,
+    pub health_url: String,
+    pub store_backend: &'static str,
+    pub store_db_policy: &'static str,
+    pub store_readiness_manifest_schema: &'static str,
+    pub expected_store_migration_version: u16,
+    pub log_paths: EdgeLogPaths,
+    pub sidecar_args: Vec<String>,
+    pub preflight: EdgePreflight,
+    pub direct_cli_spawn: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgeLogPaths {
+    pub directory: String,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgePreflight {
+    pub sidecar_available: bool,
+    pub fallback_executable_available: bool,
+    pub auth_token_ready: bool,
+    pub status: &'static str,
+    pub blocker: Option<String>,
+}
+
+#[cfg(any(test, debug_assertions))]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgeObservedSidecarSmoke {
+    pub mode: &'static str,
+    pub sidecar_name: &'static str,
+    pub target_binding: EdgeObservedTargetBinding,
+    pub app_data_dir: PathBuf,
+    pub store_db_path: PathBuf,
+    pub log_paths: EdgeLogPaths,
+    pub sidecar_args: Vec<String>,
+    pub health_url: String,
+    pub health_online: bool,
+    pub health_version: Option<String>,
+    pub edge_id: Option<String>,
+    pub preflight: EdgePreflight,
+    pub stdout_tail: Vec<String>,
+    pub stderr_tail: Vec<String>,
+    pub direct_cli_spawn: bool,
+}
+
+#[cfg(any(test, debug_assertions))]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EdgeObservedTargetBinding {
+    pub expected_target_id: String,
+    pub observed_target_id: Option<String>,
+    pub expected_edge_device_id: String,
+    pub observed_edge_device_id: Option<String>,
+    pub status: &'static str,
 }
 
 /// Wrapper for the two child-process types: Tauri sidecar (release) or
@@ -27,6 +108,8 @@ enum EdgeChild {
     },
     Direct {
         child: Child,
+        stdout_task: Option<tokio::task::JoinHandle<()>>,
+        stderr_task: Option<tokio::task::JoinHandle<()>>,
     },
 }
 
@@ -34,7 +117,9 @@ pub struct EdgeManager {
     child: Option<EdgeChild>,
     edge_path: PathBuf,
     store_path: PathBuf,
-    local_auth_token: String,
+    local_auth_token: Option<String>,
+    last_error: Option<String>,
+    log_paths: EdgeLogPaths,
     port: u16,
 }
 
@@ -44,20 +129,27 @@ impl EdgeManager {
             child: None,
             edge_path,
             store_path,
-            local_auth_token: generate_local_auth_token()?,
+            local_auth_token: Some(generate_local_auth_token()?),
+            last_error: None,
+            log_paths: placeholder_edge_log_paths(),
             port: DEFAULT_EDGE_PORT,
         })
     }
 
-    /// Fallback constructor used when cryptographically-random token generation
-    /// fails. Uses an empty token — Edge connections won't authenticate, but
-    /// the app stays running instead of panicking.
-    pub fn new_fallback(edge_path: PathBuf, store_path: PathBuf) -> Self {
+    /// Constructor used when cryptographically-random token generation fails.
+    /// The desktop shell can still report diagnostics, but Local Edge startup
+    /// is blocked until a real auth token can be generated.
+    pub fn new_unavailable(edge_path: PathBuf, store_path: PathBuf, error: String) -> Self {
         Self {
             child: None,
             edge_path,
             store_path,
-            local_auth_token: String::new(),
+            local_auth_token: None,
+            last_error: Some(format!(
+                "Local Edge auth token is unavailable; refusing to start Local Edge: {}",
+                error
+            )),
+            log_paths: placeholder_edge_log_paths(),
             port: DEFAULT_EDGE_PORT,
         }
     }
@@ -70,59 +162,87 @@ impl EdgeManager {
             return Err("Edge Server is already running".into());
         }
 
-        let addr = format!("127.0.0.1:{}", self.port);
+        let auth_token = match self.local_auth_token.as_ref() {
+            Some(token) => token.clone(),
+            None => {
+                let error = self.last_error.clone().unwrap_or_else(|| {
+                    "Local Edge auth token is unavailable; refusing to start Local Edge".to_string()
+                });
+                return Err(error);
+            }
+        };
 
-        // Resolve store path: prefer app data dir over temp
-        let store_path = match app_handle.path().app_data_dir() {
+        let addr = edge_bind_addr(self.port);
+
+        // Resolve packaged store path through app data; tests/dev can still inject fallback path.
+        let (store_path, log_paths) = match app_handle.path().app_data_dir() {
             Ok(dir) => {
                 std::fs::create_dir_all(&dir)
                     .map_err(|e| format!("Failed to create app data dir: {}", e))?;
-                dir.join("agenthub-edge-store.json")
+                let log_paths = edge_log_paths(dir.clone());
+                std::fs::create_dir_all(PathBuf::from(&log_paths.directory))
+                    .map_err(|e| format!("Failed to create Local Edge log dir: {}", e))?;
+                (edge_store_db_path(dir), log_paths)
             }
-            Err(_) => self.store_path.clone(),
+            Err(_) => (self.store_path.clone(), self.log_paths.clone()),
         };
+        self.log_paths = log_paths.clone();
         let store_path_str = store_path
             .to_str()
-            .unwrap_or("agenthub-edge-store.json")
+            .unwrap_or(EDGE_STORE_DB_FILE_NAME)
             .to_string();
 
-        let args = vec![
-            "--store-file".to_string(),
-            store_path_str.clone(),
-            "--addr".to_string(),
-            addr.clone(),
-            "--runner-profile".to_string(),
-            "claude-code".to_string(),
-        ];
+        let args = edge_launch_args(&store_path_str, &addr);
 
         // ── Try sidecar first (release / bundled builds) ─────────────────
-        if let Ok(sidecar_cmd) = app_handle.shell().sidecar("agenthub-edge") {
+        let sidecar_result = app_handle.shell().sidecar(EDGE_SIDECAR_NAME);
+        if sidecar_result.is_err() && !self.edge_path.exists() {
+            let error = format!(
+                "Local Edge sidecar is not bundled and fallback executable is missing: {}",
+                self.edge_path.display()
+            );
+            self.last_error = Some(error.clone());
+            append_edge_log_line(&log_paths.stderr, &error);
+            return Err(error);
+        }
+
+        if let Ok(sidecar_cmd) = sidecar_result {
             let mut cmd = sidecar_cmd.args(&args);
 
             if cfg!(debug_assertions) {
                 cmd = cmd.env("AGENTHUB_DEV", "1");
             } else {
-                cmd = cmd.env("AGENTHUB_EDGE_AUTH_TOKEN", &self.local_auth_token);
+                cmd = cmd.env("AGENTHUB_EDGE_AUTH_TOKEN", &auth_token);
             }
 
             match cmd.spawn() {
                 Ok((mut rx, child)) => {
                     let pid = child.pid();
+                    let stdout_log = log_paths.stdout.clone();
+                    let stderr_log = log_paths.stderr.clone();
 
                     let event_task = tokio::spawn(async move {
                         while let Some(event) = rx.recv().await {
                             match event {
                                 CommandEvent::Stdout(line) => {
                                     if let Ok(s) = String::from_utf8(line) {
-                                        log::info!("[edge] {}", s.trim_end());
+                                        let line = s.trim_end().to_string();
+                                        append_edge_log_line(&stdout_log, &line);
+                                        log::info!("[edge] {}", line);
                                     }
                                 }
                                 CommandEvent::Stderr(line) => {
                                     if let Ok(s) = String::from_utf8(line) {
-                                        log::warn!("[edge] {}", s.trim_end());
+                                        let line = s.trim_end().to_string();
+                                        append_edge_log_line(&stderr_log, &line);
+                                        log::warn!("[edge] {}", line);
                                     }
                                 }
                                 CommandEvent::Error(e) => {
+                                    append_edge_log_line(
+                                        &stderr_log,
+                                        &format!("sidecar error: {}", e),
+                                    );
                                     log::error!("[edge] error: {}", e);
                                 }
                                 CommandEvent::Terminated(payload) => {
@@ -139,6 +259,7 @@ impl EdgeManager {
                     });
 
                     log::info!("Edge Server started via sidecar (pid={})", pid);
+                    self.last_error = None;
                     self.child = Some(EdgeChild::Sidecar {
                         child,
                         pid,
@@ -147,7 +268,10 @@ impl EdgeManager {
                     return Ok(());
                 }
                 Err(e) => {
-                    log::warn!("Sidecar spawn failed, falling back to direct path: {}", e);
+                    let message =
+                        format!("Sidecar spawn failed, falling back to direct path: {}", e);
+                    append_edge_log_line(&log_paths.stderr, &message);
+                    log::warn!("{}", message);
                 }
             }
         } else {
@@ -160,35 +284,61 @@ impl EdgeManager {
         if cfg!(debug_assertions) {
             command.env("AGENTHUB_DEV", "1");
         } else {
-            command.env("AGENTHUB_EDGE_AUTH_TOKEN", &self.local_auth_token);
+            command.env("AGENTHUB_EDGE_AUTH_TOKEN", &auth_token);
         }
 
-        let child = command
+        let mut child = command
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
             .spawn()
-            .map_err(|e| format!("Failed to start Edge Server: {}", e))?;
+            .map_err(|e| {
+                let error = format!("Failed to start Edge Server: {}", e);
+                append_edge_log_line(&log_paths.stderr, &error);
+                self.last_error = Some(error.clone());
+                error
+            })?;
 
         let pid = child.id().unwrap_or(0);
+        let stdout_task = child
+            .stdout
+            .take()
+            .map(|stdout| spawn_pipe_logger(stdout, log_paths.stdout.clone(), log::Level::Info));
+        let stderr_task = child
+            .stderr
+            .take()
+            .map(|stderr| spawn_pipe_logger(stderr, log_paths.stderr.clone(), log::Level::Warn));
         log::info!(
             "Edge Server started via direct path (pid={}, path={:?})",
             pid,
             self.edge_path
         );
-        self.child = Some(EdgeChild::Direct { child });
+        self.last_error = None;
+        self.child = Some(EdgeChild::Direct {
+            child,
+            stdout_task,
+            stderr_task,
+        });
         Ok(())
     }
 
     pub async fn stop(&mut self) -> Result<(), String> {
         match self.child.take() {
-            Some(EdgeChild::Sidecar { child, pid, event_task }) => {
+            Some(EdgeChild::Sidecar {
+                child,
+                pid,
+                event_task,
+            }) => {
                 let _ = child.kill();
                 event_task.abort();
                 log::info!("Edge Server (sidecar, pid={}) stopped", pid);
                 Ok(())
             }
-            Some(EdgeChild::Direct { mut child }) => {
+            Some(EdgeChild::Direct {
+                mut child,
+                stdout_task,
+                stderr_task,
+            }) => {
                 child
                     .kill()
                     .await
@@ -197,6 +347,12 @@ impl EdgeManager {
                     .wait()
                     .await
                     .map_err(|e| format!("Failed to wait for Edge Server exit: {}", e))?;
+                if let Some(task) = stdout_task {
+                    task.abort();
+                }
+                if let Some(task) = stderr_task {
+                    task.abort();
+                }
                 log::info!("Edge Server (direct) stopped");
                 Ok(())
             }
@@ -209,9 +365,12 @@ impl EdgeManager {
             running: self.child.is_some(),
             pid: self.child.as_ref().and_then(|c| match c {
                 EdgeChild::Sidecar { pid, .. } => Some(*pid),
-                EdgeChild::Direct { child } => child.id(),
+                EdgeChild::Direct { child, .. } => child.id(),
             }),
             port: self.port,
+            health_url: edge_health_url(self.port),
+            last_error: self.last_error.clone(),
+            log_paths: self.log_paths.clone(),
         }
     }
 
@@ -219,8 +378,66 @@ impl EdgeManager {
         self.child.is_some()
     }
 
-    pub fn local_auth_token(&self) -> &str {
-        &self.local_auth_token
+    pub fn local_auth_token(&self) -> Result<&str, String> {
+        self.local_auth_token.as_deref().ok_or_else(|| {
+            self.last_error.clone().unwrap_or_else(|| {
+                "Local Edge auth token is unavailable; refusing to start Local Edge".to_string()
+            })
+        })
+    }
+
+    #[cfg(test)]
+    pub fn host_readiness(&self) -> EdgeHostReadiness {
+        self.build_host_readiness(false, self.log_paths.clone())
+    }
+
+    pub fn host_readiness_for_app<R: Runtime>(
+        &self,
+        app_handle: &tauri::AppHandle<R>,
+    ) -> EdgeHostReadiness {
+        let sidecar_available = app_handle.shell().sidecar(EDGE_SIDECAR_NAME).is_ok();
+        let log_paths = app_handle
+            .path()
+            .app_data_dir()
+            .map(edge_log_paths)
+            .unwrap_or_else(|_| self.log_paths.clone());
+        self.build_host_readiness(sidecar_available, log_paths)
+    }
+
+    fn build_host_readiness(
+        &self,
+        sidecar_available: bool,
+        log_paths: EdgeLogPaths,
+    ) -> EdgeHostReadiness {
+        let status = self.status();
+        let auth_token_ready = self.local_auth_token.is_some();
+        let fallback_executable_available = self.edge_path.exists();
+        EdgeHostReadiness {
+            running: status.running,
+            pid: status.pid,
+            port: status.port,
+            sidecar_name: EDGE_SIDECAR_NAME,
+            target_id: LOCAL_EDGE_TARGET_ID,
+            route: LOCAL_EDGE_ROUTE,
+            bind_addr: edge_bind_addr(status.port),
+            health_url: edge_health_url(status.port),
+            store_backend: EDGE_STORE_BACKEND,
+            store_db_policy: READINESS_STORE_DB_PLACEHOLDER,
+            store_readiness_manifest_schema: EDGE_STORE_READINESS_MANIFEST_SCHEMA,
+            expected_store_migration_version: EDGE_STORE_EXPECTED_MIGRATION_VERSION,
+            log_paths,
+            sidecar_args: edge_launch_args(
+                READINESS_STORE_DB_PLACEHOLDER,
+                &edge_bind_addr(status.port),
+            ),
+            preflight: edge_preflight(
+                sidecar_available,
+                fallback_executable_available,
+                auth_token_ready,
+                self.last_error.clone(),
+            ),
+            direct_cli_spawn: false,
+        }
     }
 }
 
@@ -275,6 +492,485 @@ fn edge_binary_candidates() -> Vec<PathBuf> {
     }
 
     candidates
+}
+
+fn edge_launch_args(store_path: &str, addr: &str) -> Vec<String> {
+    vec![
+        "--store-backend".to_string(),
+        "sqlite".to_string(),
+        "--store-db".to_string(),
+        store_path.to_string(),
+        "--addr".to_string(),
+        addr.to_string(),
+        "--runner-profile".to_string(),
+        DEFAULT_RUNNER_PROFILE.to_string(),
+    ]
+}
+
+fn edge_bind_addr(port: u16) -> String {
+    format!("127.0.0.1:{}", port)
+}
+
+fn edge_health_url(port: u16) -> String {
+    format!("http://{}/v1/health", edge_bind_addr(port))
+}
+
+#[cfg(any(test, debug_assertions))]
+async fn observe_fixture_sidecar_smoke(
+    app_data_dir: PathBuf,
+    port: u16,
+    expected_target_id: &str,
+    expected_edge_device_id: &str,
+    observed_target_id: Option<&str>,
+    observed_edge_device_id: Option<&str>,
+) -> Result<EdgeObservedSidecarSmoke, String> {
+    let store_db_path = edge_store_db_path(app_data_dir.clone());
+    let store_db = store_db_path.to_string_lossy().to_string();
+    let addr = edge_bind_addr(port);
+    let health_url = edge_health_url(port);
+    let log_paths = edge_log_paths(app_data_dir.clone());
+
+    let body = reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .map_err(|e| format!("Failed to build Local Edge fixture health client: {}", e))?
+        .get(&health_url)
+        .send()
+        .await
+        .map_err(|e| format!("Local Edge fixture health request failed: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Local Edge fixture health returned an error: {}", e))?
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("Local Edge fixture health JSON was invalid: {}", e))?;
+    let data = body
+        .get("data")
+        .filter(|_| body.get("code").and_then(|v| v.as_str()) == Some("OK"))
+        .unwrap_or(&body);
+
+    Ok(EdgeObservedSidecarSmoke {
+        mode: "fixture",
+        sidecar_name: EDGE_SIDECAR_NAME,
+        target_binding: observed_target_binding(
+            expected_target_id,
+            expected_edge_device_id,
+            observed_target_id,
+            observed_edge_device_id,
+            true,
+        ),
+        app_data_dir,
+        store_db_path,
+        log_paths: log_paths.clone(),
+        sidecar_args: edge_launch_args(&store_db, &addr),
+        health_url,
+        health_online: true,
+        health_version: data
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        edge_id: data
+            .get("edgeId")
+            .or_else(|| data.get("edge_id"))
+            .and_then(|v| v.as_str())
+            .map(String::from),
+        preflight: edge_preflight(true, false, true, None),
+        stdout_tail: read_edge_log_tail(&log_paths.stdout, 20),
+        stderr_tail: read_edge_log_tail(&log_paths.stderr, 20),
+        direct_cli_spawn: false,
+    })
+}
+
+#[cfg(any(test, debug_assertions))]
+fn observed_target_binding(
+    expected_target_id: &str,
+    expected_edge_device_id: &str,
+    observed_target_id: Option<&str>,
+    observed_edge_device_id: Option<&str>,
+    edge_online: bool,
+) -> EdgeObservedTargetBinding {
+    let status = if !edge_online {
+        "offline"
+    } else if observed_target_id == Some(expected_target_id)
+        && observed_edge_device_id == Some(expected_edge_device_id)
+    {
+        "matched"
+    } else {
+        "mismatch"
+    };
+
+    EdgeObservedTargetBinding {
+        expected_target_id: expected_target_id.to_string(),
+        observed_target_id: observed_target_id.map(str::to_string),
+        expected_edge_device_id: expected_edge_device_id.to_string(),
+        observed_edge_device_id: observed_edge_device_id.map(str::to_string),
+        status,
+    }
+}
+
+fn edge_store_db_path(app_data_dir: PathBuf) -> PathBuf {
+    app_data_dir.join(EDGE_STORE_DB_FILE_NAME)
+}
+
+fn edge_log_paths(app_data_dir: PathBuf) -> EdgeLogPaths {
+    let directory = app_data_dir.join("edge-logs");
+    EdgeLogPaths {
+        stdout: directory
+            .join("local-edge.stdout.log")
+            .to_string_lossy()
+            .to_string(),
+        stderr: directory
+            .join("local-edge.stderr.log")
+            .to_string_lossy()
+            .to_string(),
+        directory: directory.to_string_lossy().to_string(),
+    }
+}
+
+fn placeholder_edge_log_paths() -> EdgeLogPaths {
+    EdgeLogPaths {
+        directory: "<app-data>/edge-logs".to_string(),
+        stdout: "<app-data>/edge-logs/local-edge.stdout.log".to_string(),
+        stderr: "<app-data>/edge-logs/local-edge.stderr.log".to_string(),
+    }
+}
+
+fn edge_preflight(
+    sidecar_available: bool,
+    fallback_executable_available: bool,
+    auth_token_ready: bool,
+    last_error: Option<String>,
+) -> EdgePreflight {
+    let blocker = if !auth_token_ready {
+        last_error.or_else(|| {
+            Some("Local Edge auth token is unavailable; refusing to start Local Edge".to_string())
+        })
+    } else if !sidecar_available && !fallback_executable_available {
+        Some("Local Edge sidecar is not bundled and fallback executable is missing".to_string())
+    } else {
+        None
+    };
+
+    EdgePreflight {
+        sidecar_available,
+        fallback_executable_available,
+        auth_token_ready,
+        status: if blocker.is_some() {
+            "blocked"
+        } else {
+            "ready"
+        },
+        blocker,
+    }
+}
+
+fn append_edge_log_line(path: &str, line: &str) {
+    if path.starts_with("<app-data>") {
+        return;
+    }
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        use std::io::Write as _;
+        let _ = writeln!(file, "{}", line);
+    }
+}
+
+fn spawn_pipe_logger<T>(pipe: T, log_path: String, level: log::Level) -> tokio::task::JoinHandle<()>
+where
+    T: tokio::io::AsyncRead + Unpin + Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut lines = BufReader::new(pipe).lines();
+        loop {
+            match lines.next_line().await {
+                Ok(Some(line)) => {
+                    append_edge_log_line(&log_path, &line);
+                    log::log!(level, "[edge] {}", line);
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    append_edge_log_line(
+                        &log_path,
+                        &format!("failed to read Local Edge pipe: {}", error),
+                    );
+                    break;
+                }
+            }
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+
+    #[test]
+    fn edge_launch_args_keep_runtime_behind_local_edge() {
+        let args = edge_launch_args("fixtures/app-data/agenthub-edge.sqlite", "127.0.0.1:3210");
+
+        assert_eq!(
+            args,
+            vec![
+                "--store-backend",
+                "sqlite",
+                "--store-db",
+                "fixtures/app-data/agenthub-edge.sqlite",
+                "--addr",
+                "127.0.0.1:3210",
+                "--runner-profile",
+                "claude-code",
+            ]
+        );
+        assert!(!args.iter().any(|arg| arg == "claude" || arg == "codex"));
+    }
+
+    #[test]
+    fn readiness_snapshot_advertises_local_edge_sidecar_route() {
+        let manager = EdgeManager::new(
+            PathBuf::from("edge-server/agenthub-edge"),
+            PathBuf::from("agenthub-edge.sqlite"),
+        )
+        .expect("test token generation should succeed");
+
+        let readiness = manager.host_readiness();
+
+        assert!(!readiness.running);
+        assert_eq!(readiness.sidecar_name, "agenthub-edge");
+        assert_eq!(readiness.route, "local-edge-api");
+        assert_eq!(readiness.target_id, "local-edge");
+        assert_eq!(readiness.port, 3210);
+        assert_eq!(readiness.bind_addr, "127.0.0.1:3210");
+        assert_eq!(readiness.store_backend, "sqlite");
+        assert_eq!(
+            readiness.store_readiness_manifest_schema,
+            "agenthub-edge-sqlite-readiness-v1"
+        );
+        assert_eq!(readiness.expected_store_migration_version, 4);
+        assert_eq!(
+            readiness.sidecar_args,
+            vec![
+                "--store-backend",
+                "sqlite",
+                "--store-db",
+                "<app-data>/agenthub-edge.sqlite",
+                "--addr",
+                "127.0.0.1:3210",
+                "--runner-profile",
+                "claude-code",
+            ]
+        );
+        assert!(!readiness.direct_cli_spawn);
+        assert!(!readiness
+            .sidecar_args
+            .iter()
+            .any(|arg| arg.contains("AppData") || arg.contains("Users")));
+    }
+
+    #[test]
+    fn readiness_snapshot_reports_local_edge_preflight_blocker() {
+        let manager = EdgeManager::new(
+            PathBuf::from("fixtures/missing-agenthub-edge"),
+            PathBuf::from("agenthub-edge.sqlite"),
+        )
+        .expect("test token generation should succeed");
+
+        let readiness = manager.host_readiness();
+
+        assert_eq!(readiness.health_url, "http://127.0.0.1:3210/v1/health");
+        assert_eq!(readiness.store_backend, "sqlite");
+        assert_eq!(readiness.store_db_policy, "<app-data>/agenthub-edge.sqlite");
+        assert!(!readiness.preflight.sidecar_available);
+        assert!(!readiness.preflight.fallback_executable_available);
+        assert_eq!(readiness.preflight.status, "blocked");
+        assert_eq!(
+            readiness.preflight.blocker,
+            Some(
+                "Local Edge sidecar is not bundled and fallback executable is missing".to_string()
+            )
+        );
+        assert!(!readiness.direct_cli_spawn);
+    }
+
+    #[test]
+    fn token_generation_failure_blocks_local_edge_startup() {
+        let manager = EdgeManager::new_unavailable(
+            PathBuf::from("fixtures/agenthub-edge"),
+            PathBuf::from("agenthub-edge.sqlite"),
+            "entropy unavailable".to_string(),
+        );
+
+        let readiness = manager.host_readiness();
+
+        assert_eq!(readiness.preflight.status, "blocked");
+        assert!(!readiness.preflight.auth_token_ready);
+        assert_eq!(
+            readiness.preflight.blocker,
+            Some(
+                "Local Edge auth token is unavailable; refusing to start Local Edge: entropy unavailable"
+                    .to_string()
+            )
+        );
+        assert!(manager.local_auth_token().is_err());
+        assert_eq!(
+            manager.status().last_error,
+            Some(
+                "Local Edge auth token is unavailable; refusing to start Local Edge: entropy unavailable"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn packaged_store_db_path_lives_under_app_data() {
+        let path = edge_store_db_path(PathBuf::from("fixtures/app-data"));
+
+        assert_eq!(
+            path,
+            PathBuf::from("fixtures/app-data/agenthub-edge.sqlite")
+        );
+    }
+
+    #[test]
+    fn observed_fixture_smoke_reads_health_app_data_logs_and_spawn_boundary() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("fixture health listener");
+        let port = listener.local_addr().expect("fixture addr").port();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("fixture request");
+            let mut request = [0_u8; 1024];
+            let _ = stream.read(&mut request);
+            let body =
+                r#"{"code":"OK","data":{"status":"ok","version":"v1","edgeId":"local-fixture"}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .expect("fixture response");
+        });
+
+        let app_data_dir = std::env::temp_dir().join(format!(
+            "agenthub-observed-sidecar-smoke-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&app_data_dir);
+        let log_paths = edge_log_paths(app_data_dir.clone());
+        append_edge_log_line(&log_paths.stdout, "fixture sidecar ready");
+        append_edge_log_line(&log_paths.stderr, "fixture sidecar stderr captured");
+
+        let evidence = tauri::async_runtime::block_on(observe_fixture_sidecar_smoke(
+            app_data_dir.clone(),
+            port,
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-local-1"),
+            Some("desktop-device-1"),
+        ))
+        .expect("observed fixture smoke evidence");
+        server.join().expect("fixture server joined");
+
+        assert_eq!(evidence.sidecar_name, "agenthub-edge");
+        assert_eq!(evidence.mode, "fixture");
+        assert_eq!(evidence.target_binding.status, "matched");
+        assert_eq!(
+            evidence.target_binding.expected_target_id,
+            "hub-target-local-1"
+        );
+        assert_eq!(
+            evidence.target_binding.observed_target_id.as_deref(),
+            Some("hub-target-local-1")
+        );
+        assert_eq!(
+            evidence.target_binding.expected_edge_device_id,
+            "desktop-device-1"
+        );
+        assert_eq!(
+            evidence.target_binding.observed_edge_device_id.as_deref(),
+            Some("desktop-device-1")
+        );
+        assert_eq!(
+            evidence.health_url,
+            format!("http://127.0.0.1:{port}/v1/health")
+        );
+        assert!(evidence.health_online);
+        assert_eq!(evidence.health_version.as_deref(), Some("v1"));
+        assert_eq!(evidence.edge_id.as_deref(), Some("local-fixture"));
+        assert_eq!(evidence.store_db_path, edge_store_db_path(app_data_dir));
+        assert_eq!(evidence.log_paths.stdout, log_paths.stdout);
+        assert!(evidence
+            .stdout_tail
+            .contains(&"fixture sidecar ready".to_string()));
+        assert!(evidence
+            .stderr_tail
+            .contains(&"fixture sidecar stderr captured".to_string()));
+        assert_eq!(evidence.preflight.status, "ready");
+        assert!(!evidence.direct_cli_spawn);
+        assert!(!evidence.sidecar_args.iter().any(|arg| {
+            matches!(
+                arg.as_str(),
+                "codex" | "codex.exe" | "claude" | "claude.exe" | "opencode" | "opencode.exe"
+            )
+        }));
+
+        let _ = std::fs::remove_dir_all(evidence.app_data_dir);
+    }
+
+    #[test]
+    fn observed_target_binding_distinguishes_match_mismatch_and_offline() {
+        let matched = observed_target_binding(
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-local-1"),
+            Some("desktop-device-1"),
+            true,
+        );
+        assert_eq!(matched.status, "matched");
+
+        let mismatch = observed_target_binding(
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-other"),
+            Some("desktop-device-1"),
+            true,
+        );
+        assert_eq!(mismatch.status, "mismatch");
+
+        let offline = observed_target_binding(
+            "hub-target-local-1",
+            "desktop-device-1",
+            Some("hub-target-local-1"),
+            Some("desktop-device-1"),
+            false,
+        );
+        assert_eq!(offline.status, "offline");
+    }
+}
+
+#[cfg(any(test, debug_assertions))]
+fn read_edge_log_tail(path: &str, max_lines: usize) -> Vec<String> {
+    if max_lines == 0 || path.starts_with("<app-data>") {
+        return Vec::new();
+    }
+
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut tail = std::collections::VecDeque::with_capacity(max_lines);
+    for line in content.lines() {
+        if tail.len() == max_lines {
+            tail.pop_front();
+        }
+        tail.push_back(line.to_string());
+    }
+    tail.into_iter().collect()
 }
 
 pub fn resolve_edge_path() -> PathBuf {

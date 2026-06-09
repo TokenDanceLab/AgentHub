@@ -1,4 +1,5 @@
 import { CheckSquare, FileText, GitFork, Route, Wrench } from 'lucide-react';
+import { RuntimeBrandIcon } from '../workbench/RuntimeBrandIcon';
 import styles from './ToolTimeline.module.css';
 
 // ── Minimal block shapes for the timeline ──────────────────────────
@@ -111,6 +112,8 @@ function summarizeInput(input: Record<string, unknown>): string {
 }
 
 function entryIcon(kind: TimelineEntry['kind']) {
+  if (kind === 'tool') return null;
+
   switch (kind) {
     case 'file':
       return <FileText size={13} />;
@@ -120,7 +123,6 @@ function entryIcon(kind: TimelineEntry['kind']) {
       return <GitFork size={13} />;
     case 'route':
       return <Route size={13} />;
-    case 'tool':
     default:
       return <Wrench size={13} />;
   }
@@ -249,7 +251,9 @@ export function ToolTimeline({
         {entries.slice(0, maxEntries).map((entry) => (
           <li key={entry.key} className={cx(styles.entry, entryClassName)} data-testid="tool-timeline-entry">
             <span className={cx(styles.marker, statusClass(entry.status))} aria-hidden="true">
-              {entryIcon(entry.kind)}
+              {entry.kind === 'tool'
+                ? <RuntimeBrandIcon kind="tool" name={entry.label} size="compact" framed={false} />
+                : entryIcon(entry.kind)}
             </span>
             <span className={styles.entryText}>
               {entry.meta ? <span className={styles.entryMeta}>{entry.meta}</span> : null}

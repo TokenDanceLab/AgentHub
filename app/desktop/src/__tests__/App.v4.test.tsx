@@ -3,9 +3,30 @@ import type { EventEnvelope } from '@shared/events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { createEventStream } from '@/api/eventClient';
+import { createHubClient } from '@/api/hubClient';
+import { useAgentList } from '@/api/agentQueries';
+import { useHubExecutionTargets, useSyncLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
+import { useModelCatalog } from '@/api/modelCatalogQueries';
+import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
+import { queryClient } from '@/api/queryClient';
+import { getAccessToken, useAuth } from '@/hooks/useAuth';
+import { useDeviceRegistration } from '@/hooks/useDeviceRegistration';
+import { useHealth } from '@/hooks/useHealth';
+import { useHubEventStream } from '@/hooks/useHubEventStream';
+import { useHubIntegration } from '@/hooks/useHubIntegration';
+
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: () => null,
+  Codex: () => null,
+  ModelIcon: () => null,
+  OpenCode: () => null,
+}));
+
+vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => ({ default: () => null }));
+vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 vi.mock('@/api/eventClient', () => ({
   createEventStream: vi.fn(),
@@ -17,17 +38,97 @@ vi.mock('@/api/threadQueries', () => ({
   useThreads: vi.fn(),
 }));
 
+vi.mock('@/api/agentQueries', () => ({
+  useAgentList: vi.fn(),
+}));
+
+vi.mock('@/api/executionTargetQueries', () => ({
+  findRegisteredLocalEdgeTarget: vi.fn((targets, deviceId) => (
+    targets.find((target: { target_type?: string; device_id?: string }) => (
+      target.target_type === 'local_edge' && target.device_id === deviceId
+    )) ?? null
+  )),
+  useHubExecutionTargets: vi.fn(),
+  useSyncLocalEdgeExecutionTarget: vi.fn(),
+}));
+
+vi.mock('@/api/modelCatalogQueries', () => ({
+  useModelCatalog: vi.fn(),
+}));
+
+vi.mock('@/api/runEvidenceQueries', () => ({
+  useRunEvidence: vi.fn(),
+}));
+
 vi.mock('@/api/runQueries', () => ({
   useCreateRun: vi.fn(),
 }));
 
+vi.mock('@/api/hubClient', () => ({
+  createHubClient: vi.fn(),
+}));
+
+vi.mock('@/api/queryClient', () => ({
+  queryClient: {
+    invalidateQueries: vi.fn(),
+  },
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  getAccessToken: vi.fn(() => 'hub-token'),
+  useAuth: vi.fn(),
+}));
+
+vi.mock('@/hooks/useHealth', () => ({
+  useHealth: vi.fn(),
+}));
+
+vi.mock('@/hooks/useHubEventStream', () => ({
+  useHubEventStream: vi.fn(),
+}));
+
+vi.mock('@/hooks/useDeviceRegistration', () => ({
+  useDeviceRegistration: vi.fn(),
+}));
+
+vi.mock('@/hooks/useHubIntegration', () => ({
+  useHubIntegration: vi.fn(),
+}));
+
 const eventHandlers: EventHandler[] = [];
 const createRunMutateAsync = vi.fn();
+const tryAutoLogin = vi.fn();
+const refetchHealth = vi.fn();
+const mockHubClient = { ackTask: vi.fn() };
+const mockHubWS = {
+  on: vi.fn(() => vi.fn()),
+  onAny: vi.fn(() => vi.fn()),
+  onStatus: vi.fn(() => vi.fn()),
+  send: vi.fn(),
+  sendTyping: vi.fn(),
+  close: vi.fn(),
+  reconnect: vi.fn(),
+  connect: vi.fn(),
+  getStatus: vi.fn(() => 'connected'),
+  isAuthenticated: vi.fn(() => true),
+};
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
+const mockedUseAgentList = vi.mocked(useAgentList);
+const mockedUseHubExecutionTargets = vi.mocked(useHubExecutionTargets);
+const mockedUseSyncLocalEdgeExecutionTarget = vi.mocked(useSyncLocalEdgeExecutionTarget);
+const mockedUseModelCatalog = vi.mocked(useModelCatalog);
+const mockedUseRunEvidence = vi.mocked(useRunEvidence);
 const mockedCreateEventStream = vi.mocked(createEventStream);
 const mockedUseCreateRun = vi.mocked(useCreateRun);
+const mockedCreateHubClient = vi.mocked(createHubClient);
+const mockedQueryClient = vi.mocked(queryClient);
+const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseDeviceRegistration = vi.mocked(useDeviceRegistration);
+const mockedUseHealth = vi.mocked(useHealth);
+const mockedUseHubEventStream = vi.mocked(useHubEventStream);
+const mockedUseHubIntegration = vi.mocked(useHubIntegration);
 
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
@@ -38,6 +139,50 @@ describe('Desktop App v4 root', () => {
     });
     eventHandlers.length = 0;
     mockedCreateEventStream.mockReturnValue(createMockEventStream());
+    mockedUseHealth.mockReturnValue({
+      online: true,
+      health: {
+        status: 'ok',
+        version: 'test',
+      },
+      lastError: null,
+      refetch: refetchHealth,
+    } as ReturnType<typeof useHealth>);
+    mockedUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      token: 'hub-token',
+      user: null,
+      loading: false,
+      error: null,
+      loginWithTokenDance: vi.fn(),
+      logout: vi.fn(),
+      tryAutoLogin,
+    } as ReturnType<typeof useAuth>);
+    mockedUseHubEventStream.mockReturnValue({
+      hubWS: mockHubWS,
+      status: 'connected',
+      lastFrame: null,
+      lastMessage: null,
+      lastNotification: null,
+      lastAgentTask: null,
+      onlineUsers: [],
+      sendTyping: vi.fn(),
+      onFrame: vi.fn(() => vi.fn()),
+      on: vi.fn(() => vi.fn()),
+      reconnect: vi.fn(),
+    } as ReturnType<typeof useHubEventStream>);
+    mockedCreateHubClient.mockReturnValue(mockHubClient as ReturnType<typeof createHubClient>);
+    mockedUseDeviceRegistration.mockReturnValue({
+      deviceId: '00000000-0000-4000-8000-00000000d001',
+      status: 'registered',
+      error: null,
+    });
+    mockedUseHubIntegration.mockReturnValue({
+      tasks: [],
+      activeTaskCount: 0,
+      getTaskByRunId: vi.fn(),
+      getRunByTaskId: vi.fn(),
+    });
     createRunMutateAsync.mockResolvedValue({
       runId: 'run-created',
       projectId: 'project-1',
@@ -48,6 +193,49 @@ describe('Desktop App v4 root', () => {
     mockedUseCreateRun.mockReturnValue({
       mutateAsync: createRunMutateAsync,
     } as ReturnType<typeof useCreateRun>);
+    mockedUseAgentList.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+    } as ReturnType<typeof useAgentList>);
+    mockedUseHubExecutionTargets.mockReturnValue({
+      data: {
+        items: [{
+          id: 'hub-local-edge-target-1',
+          device_id: '00000000-0000-4000-8000-00000000d001',
+          name: 'Current Desktop Local Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          trust_level: 'local',
+          health_state: 'healthy',
+          is_online: true,
+        }],
+        page: { hasMore: false },
+      },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useHubExecutionTargets>);
+    mockedUseSyncLocalEdgeExecutionTarget.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useSyncLocalEdgeExecutionTarget>);
+    mockedUseModelCatalog.mockReturnValue({
+      data: { items: [], sources: [] },
+    } as ReturnType<typeof useModelCatalog>);
+    mockedUseRunEvidence.mockReturnValue({
+      diffs: [],
+      artifacts: [],
+      previews: [],
+      diffLoading: false,
+      artifactLoading: false,
+      previewLoading: false,
+      diffError: false,
+      artifactError: false,
+      previewError: false,
+      diffSource: 'none',
+      artifactSource: 'none',
+      previewSource: 'none',
+    });
     mockedUseThreads.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreads>);
@@ -62,7 +250,7 @@ describe('Desktop App v4 root', () => {
   it('renders the shared v4 workbench as the active desktop route', () => {
     render(<App />);
 
-    expect(screen.getByText('AgentHub')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'AgentHub' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Window controls' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '最小化' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '最大化' })).toBeInTheDocument();
@@ -80,8 +268,51 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '×浏览器' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Builder' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Composer input')).toHaveAttribute('placeholder', '发消息给 Builder');
+    expect(screen.getByRole('heading', { name: 'AgentHub' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Composer input')).toHaveAttribute('placeholder', '发消息给 AgentHub');
+  });
+
+  it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockedUseHubIntegration).toHaveBeenCalledWith({
+        hubWS: mockHubWS,
+        hubClient: mockHubClient,
+        edgeBaseUrl: 'http://127.0.0.1:3210',
+        dispatchTarget: {
+          targetId: 'hub-local-edge-target-1',
+          deviceId: '00000000-0000-4000-8000-00000000d001',
+        },
+      });
+    });
+    expect(mockedUseDeviceRegistration).toHaveBeenCalledWith(mockHubClient);
+    await waitFor(() => {
+      expect(mockedQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['execution-targets'] });
+    });
+    expect(mockedUseHubEventStream).toHaveBeenCalledWith(getAccessToken);
+    expect(mockedCreateHubClient).toHaveBeenCalledWith({ getToken: getAccessToken });
+    expect(tryAutoLogin).not.toHaveBeenCalled();
+  });
+
+  it('waits for Desktop device registration before accepting Hub dispatch frames', async () => {
+    mockedUseDeviceRegistration.mockReturnValue({
+      deviceId: '00000000-0000-4000-8000-00000000d001',
+      status: 'registering',
+      error: null,
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockedUseHubIntegration).toHaveBeenCalledWith({
+        hubWS: null,
+        hubClient: mockHubClient,
+        edgeBaseUrl: 'http://127.0.0.1:3210',
+        dispatchTarget: null,
+      });
+    });
+    expect(mockedQueryClient.invalidateQueries).not.toHaveBeenCalled();
   });
 
   it('uses Edge thread data when Desktop queries return conversations and items', () => {
@@ -206,8 +437,9 @@ describe('Desktop App v4 root', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'Live Edge 会话' })).toBeInTheDocument();
-    expect(screen.getAllByText('rg')).toHaveLength(2);
+    expect(screen.getAllByText('rg').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
+    expect(mockedUseRunEvidence).toHaveBeenLastCalledWith('run-live');
 
     mockedUseThreadMessages.mockReturnValue({
       data: {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  fetchAgents,
   fetchHealth,
   fetchRunners,
   startRun,
@@ -15,6 +16,8 @@ import {
   fetchArtifacts,
   fetchPreviews,
 } from '../api/edgeClient';
+import { createDesktopPlatform } from '../platform/desktopPlatform';
+import { mapEdgeAgentsToWorkbenchAgents } from '../platform/edgeCapabilityMapper';
 
 describe('edgeClient', () => {
   beforeEach(() => {
@@ -64,6 +67,73 @@ describe('edgeClient', () => {
       const result = await fetchRunners();
       expect(result.items).toHaveLength(1);
       expect(result.page.hasMore).toBe(false);
+    });
+  });
+
+  describe('fetchAgents', () => {
+    it('preserves runtime adapter ids through live fetch, mapper, and Desktop submit', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          items: [{
+            id: 'agent-profile-codex',
+            name: 'Codex Local Profile',
+            runtimeId: 'codex',
+            status: 'available',
+            capabilities: {
+              streaming: true,
+              toolCalls: true,
+              fileChanges: true,
+              thinkingVisible: true,
+              multiTurn: true,
+              mcpIntegration: true,
+              permissionHooks: true,
+              subAgentSpawn: false,
+            },
+          }],
+          page: { hasMore: false },
+        }),
+      } as Response);
+
+      const agents = await fetchAgents();
+      const workbenchAgents = mapEdgeAgentsToWorkbenchAgents(agents.items);
+      const submitRun = vi.fn().mockResolvedValue({
+        runId: 'run-edge-1',
+        projectId: 'project-edge',
+        threadId: 'thread-edge',
+        status: 'queued',
+      });
+      const platform = createDesktopPlatform({
+        activeProjectId: 'project-edge',
+        activeThreadId: 'thread-edge',
+        submitRun,
+      });
+
+      await platform.runs.submitComposerIntent({
+        conversationId: 'thread-edge',
+        text: 'run against local runtime',
+        mode: 'code',
+        mentions: [{
+          id: workbenchAgents[0]?.id ?? '',
+          label: workbenchAgents[0]?.name ?? '',
+          runtimeId: workbenchAgents[0]?.runtimeId,
+        }],
+        attachments: [],
+        approvalMode: 'suggest',
+      });
+
+      expect(agents.items[0]).toMatchObject({
+        id: 'agent-profile-codex',
+        runtimeId: 'codex',
+      });
+      expect(workbenchAgents[0]).toMatchObject({
+        id: 'agent-profile-codex',
+        runtimeId: 'codex',
+      });
+      expect(submitRun).toHaveBeenCalledWith(expect.objectContaining({
+        agentId: 'codex',
+      }));
+      expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('provider');
     });
   });
 
@@ -171,7 +241,7 @@ describe('edgeClient', () => {
       );
     });
 
-    it('preserves model routing metadata in the request body', async () => {
+    it('preserves OpenAPI run routing fields in the request body', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued' }),
@@ -180,7 +250,6 @@ describe('edgeClient', () => {
       await startRun({
         prompt: 'route this',
         model: 'claude-opus-4-7',
-        provider: 'anthropic',
         modelAlias: 'opus',
         modelMappingEnabled: true,
         providerFallbackEnabled: true,
@@ -193,7 +262,6 @@ describe('edgeClient', () => {
           body: JSON.stringify({
             prompt: 'route this',
             model: 'claude-opus-4-7',
-            provider: 'anthropic',
             modelAlias: 'opus',
             modelMappingEnabled: true,
             providerFallbackEnabled: true,

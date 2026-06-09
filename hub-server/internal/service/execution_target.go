@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -35,6 +38,8 @@ type TargetListResult struct {
 	Cursor  string                  `json:"next_cursor,omitempty"`
 }
 
+const desktopTargetStaleAfter = 2 * time.Minute
+
 func NewExecutionTargetService(db *gorm.DB) *ExecutionTargetService {
 	return &ExecutionTargetService{db: db}
 }
@@ -55,6 +60,11 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	if err := req.Validate(); err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
 	}
+	if req.DeviceID != nil {
+		if err := requireDeviceBelongsToOwner(ctx, s.db, ownerID, *req.DeviceID, ""); err != nil {
+			return nil, err
+		}
+	}
 
 	existing, err := repository.FindTargetByOwnerAndName(s.db, ownerID, req.Name)
 	if err == nil && existing != nil {
@@ -72,6 +82,161 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	return req, nil
 }
 
+func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *model.Device) (*model.ExecutionTarget, error) {
+	if device == nil || strings.TrimSpace(device.ID) == "" || strings.TrimSpace(device.UserID) == "" || device.DeviceType != "desktop" {
+		return nil, errcode.ErrBadRequest
+	}
+
+	now := time.Now()
+	capabilities, metadata := desktopDeviceTargetFields(device)
+	name := desktopDeviceTargetName(device.ID)
+
+	var result *model.ExecutionTarget
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := requireDeviceBelongsToOwner(ctx, tx, device.UserID, device.ID, "desktop"); err != nil {
+			return err
+		}
+
+		matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
+		if err != nil {
+			return err
+		}
+
+		target, found, err := desktopLocalEdgeTargetFromMatches(matches, device.ID)
+		if err != nil {
+			return err
+		}
+		if !found {
+			target = model.ExecutionTarget{
+				OwnerID:    device.UserID,
+				TargetType: "local_edge",
+			}
+		}
+
+		refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata, now)
+		if target.ID == "" {
+			created, err := repository.CreateExecutionTargetIfNotExists(tx, &target)
+			if err != nil {
+				return err
+			}
+			if !created {
+				matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
+				if err != nil {
+					return err
+				}
+				target, found, err = desktopLocalEdgeTargetFromMatches(matches, device.ID)
+				if err != nil {
+					return err
+				}
+				if !found {
+					return errcode.UserInvalidParam.WithMessage("local_edge target conflict could not be resolved")
+				}
+				refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata, now)
+				if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
+					return err
+				}
+			}
+		} else if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
+			return err
+		}
+
+		result = &target
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func findDesktopLocalEdgeTargetMatches(tx *gorm.DB, ownerID, deviceID, name string) ([]model.ExecutionTarget, error) {
+	var matches []model.ExecutionTarget
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("owner_id = ? AND target_type = ? AND deleted_at IS NULL AND (device_id = ? OR name = ?)", ownerID, "local_edge", deviceID, name).
+		Order("id ASC").
+		Find(&matches).Error; err != nil {
+		return nil, err
+	}
+	return matches, nil
+}
+
+func desktopLocalEdgeTargetFromMatches(matches []model.ExecutionTarget, deviceID string) (model.ExecutionTarget, bool, error) {
+	if len(matches) > 1 {
+		return model.ExecutionTarget{}, false, errcode.UserInvalidParam.WithMessage("multiple local_edge targets match desktop device registration")
+	}
+	if len(matches) == 0 {
+		return model.ExecutionTarget{}, false, nil
+	}
+
+	target := matches[0]
+	if target.DeviceID != nil && *target.DeviceID != deviceID {
+		return model.ExecutionTarget{}, false, errcode.UserInvalidParam.WithMessage("generated local_edge target name is bound to another desktop device")
+	}
+	return target, true, nil
+}
+
+func refreshDesktopLocalEdgeTarget(target *model.ExecutionTarget, device *model.Device, name, capabilities, metadata string, now time.Time) {
+	target.Name = name
+	target.DeviceID = &device.ID
+	target.TargetType = "local_edge"
+	target.WorkspaceAllowlist = "[]"
+	target.TrustLevel = "local"
+	target.HealthState = "online"
+	target.IsOnline = true
+	target.LastSeenAt = &now
+	target.Capabilities = capabilities
+	target.Metadata = metadata
+}
+
+func desktopDeviceTargetName(deviceID string) string {
+	shortID := strings.TrimSpace(deviceID)
+	if len(shortID) > 8 {
+		shortID = shortID[:8]
+	}
+	if shortID == "" {
+		return "Desktop Local Edge"
+	}
+	return "Desktop Local Edge " + shortID
+}
+
+func desktopDeviceTargetFields(device *model.Device) (string, string) {
+	var deviceCapabilities []string
+	if strings.TrimSpace(device.Capabilities) != "" {
+		_ = json.Unmarshal([]byte(device.Capabilities), &deviceCapabilities)
+	}
+	capabilities, _ := json.Marshal(map[string][]string{
+		"device_capabilities": deviceCapabilities,
+	})
+	metadata, _ := json.Marshal(map[string]string{
+		"source":       "desktop_device_registration",
+		"device_type":  device.DeviceType,
+		"app_version":  device.AppVersion,
+		"health_basis": "desktop_check_in_freshness_not_ws_route",
+	})
+	return string(capabilities), string(metadata)
+}
+
+func requireDeviceBelongsToOwner(ctx context.Context, db *gorm.DB, ownerID, deviceID, deviceType string) error {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil
+	}
+	device, err := repository.GetDeviceByID(db.WithContext(ctx), deviceID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AuthDeviceMismatch
+		}
+		return err
+	}
+	if device.UserID != ownerID {
+		return errcode.AuthDeviceMismatch
+	}
+	if deviceType != "" && device.DeviceType != deviceType {
+		return errcode.AuthDeviceMismatch
+	}
+	return nil
+}
+
 func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error) {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
@@ -83,6 +248,7 @@ func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*
 	if t.OwnerID != ownerID {
 		return nil, errcode.AuthDeviceMismatch
 	}
+	applyExecutionTargetHealthProjection(t, time.Now())
 	return t, nil
 }
 
@@ -126,6 +292,9 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 		t.AuthMethod = req.AuthMethod
 	}
 	if req.DeviceID != nil {
+		if err := requireDeviceBelongsToOwner(ctx, s.db, ownerID, *req.DeviceID, ""); err != nil {
+			return nil, err
+		}
 		t.DeviceID = req.DeviceID
 	}
 	if req.Capabilities != "" {
@@ -141,6 +310,7 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 	if err := repository.UpdateExecutionTarget(s.db, t); err != nil {
 		return nil, err
 	}
+	applyExecutionTargetHealthProjection(t, time.Now())
 	return t, nil
 }
 
@@ -184,11 +354,56 @@ func (s *ExecutionTargetService) List(ctx context.Context, ownerID, targetType, 
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
+	for i := range targets {
+		applyExecutionTargetHealthProjection(&targets[i], now)
+	}
 	var nextCursor string
 	if hasMore && len(targets) > 0 {
 		nextCursor = targets[len(targets)-1].ID
 	}
 	return &TargetListResult{Items: targets, HasMore: hasMore, Cursor: nextCursor}, nil
+}
+
+func applyExecutionTargetHealthProjection(target *model.ExecutionTarget, now time.Time) {
+	if target == nil {
+		return
+	}
+	target.HealthState = resolveExecutionTargetHealthState(target, now)
+	target.IsOnline = target.HealthState == "online" || target.HealthState == "healthy"
+}
+
+func resolveExecutionTargetHealthState(target *model.ExecutionTarget, now time.Time) string {
+	if target == nil {
+		return "offline"
+	}
+	state := strings.TrimSpace(strings.ToLower(target.HealthState))
+	switch state {
+	case "mismatch", "offline":
+		return state
+	}
+	if target.TargetType != "local_edge" {
+		if target.IsOnline && (state == "healthy" || state == "online") {
+			return "online"
+		}
+		if state == "degraded" || state == "unknown" || state == "stale" {
+			return state
+		}
+		return "offline"
+	}
+	if !target.IsOnline {
+		return "offline"
+	}
+	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
+		return "mismatch"
+	}
+	if target.LastSeenAt == nil || now.Sub(*target.LastSeenAt) > desktopTargetStaleAfter {
+		return "stale"
+	}
+	if state == "degraded" || state == "unknown" {
+		return state
+	}
+	return "online"
 }
 
 func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) error {
@@ -215,7 +430,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 			port = 3210
 		}
 		addr := net.JoinHostPort(t.Host, fmt.Sprintf("%d", port))
-		return pingEdgeServer(ctx, addr, t.AuthMethod, t.ID, id, s.db)
+		return pingEdgeServer(ctx, addr, t.AuthCredential, t.ID, s.db)
 	case "hub_relay":
 		// hub_relay health depends on whether the owner has an active
 		// WebSocket connection that can relay tasks.
@@ -236,7 +451,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 
 // pingEdgeServer performs an actual HTTP GET /v1/health against the Edge Server
 // and updates the target's online status and last_seen_at accordingly.
-func pingEdgeServer(ctx context.Context, addr string, authMethod, targetID, targetOwnerID string, db *gorm.DB) error {
+func pingEdgeServer(ctx context.Context, addr string, authCredential, targetID string, db *gorm.DB) error {
 	scheme := "http"
 	url := scheme + "://" + addr + "/v1/health"
 
@@ -247,27 +462,55 @@ func pingEdgeServer(ctx context.Context, addr string, authMethod, targetID, targ
 		return errcode.TargetNotRoutable.WithMessage("failed to build ping request: " + err.Error())
 	}
 
-	// If the target has an auth method configured, attach the token.
-	// In practice, remote SSH Edge uses SSH tunnel auth (no HTTP auth needed),
-	// Tailscale uses mTLS/networking auth (no HTTP auth needed),
-	// Cloud Edge uses Hub JWT (attached by the caller).
-	if authMethod != "" && authMethod != "none" {
-		req.Header.Set("Authorization", "Bearer "+authMethod)
+	// auth_method is a public strategy enum; only a trusted internal credential
+	// value may become an Authorization header.
+	if authCredential != "" {
+		req.Header.Set("Authorization", "Bearer "+authCredential)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		slog.Debug("execution target ping failed", "target_id", targetOwnerID, "addr", addr, "err", err)
+		slog.Debug("execution target ping failed", "target_id", targetID, "addr", addr, "err", err)
 		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
 		return errcode.TargetNotRoutable.WithMessage("ping failed: " + err.Error())
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+		if observedTargetID := observedTargetIDFromHealthBody(body); observedTargetID != "" && observedTargetID != targetID {
+			_ = repository.UpdateTargetHealthState(db, targetID, "mismatch", false)
+			return errcode.TargetNotRoutable.WithMessage("execution target health mismatch")
+		}
 		_ = repository.UpdateTargetOnlineStatus(db, targetID, true)
 		return nil
 	}
 
 	_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
 	return errcode.TargetNotRoutable.WithMessage(fmt.Sprintf("ping returned HTTP %d", resp.StatusCode))
+}
+
+func observedTargetIDFromHealthBody(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return ""
+	}
+	for _, key := range []string{"target_id", "targetId"} {
+		if value, ok := raw[key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	data, ok := raw["data"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, key := range []string{"target_id", "targetId"} {
+		if value, ok := data[key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

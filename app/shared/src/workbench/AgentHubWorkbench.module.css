@@ -361,7 +361,7 @@
 .workspace {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -372,6 +372,170 @@
 .workspace[data-mode='workbench'] {
   grid-template-rows: minmax(0, 1fr);
   background: var(--surface);
+}
+
+.mainchainStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 18px;
+  border-bottom: 1px solid var(--bdr);
+  background: color-mix(in srgb, var(--surface) 86%, var(--app-bg));
+}
+
+.mainchainTrack {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(66px, 1fr));
+  gap: 6px;
+}
+
+.mainchainNode {
+  position: relative;
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-2);
+  overflow: hidden;
+}
+
+.mainchainNode::after {
+  position: absolute;
+  top: 50%;
+  right: -7px;
+  width: 7px;
+  height: 1px;
+  background: var(--bdr-strong);
+  content: '';
+}
+
+.mainchainNode:last-child::after {
+  display: none;
+}
+
+.mainchainNode[data-state='done'] {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--bdr));
+  background: color-mix(in srgb, var(--success-bg) 58%, var(--surface));
+}
+
+.mainchainNode[data-state='active'] {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--bdr));
+  background: color-mix(in srgb, var(--primary-light) 72%, var(--surface));
+  color: var(--text-1);
+}
+
+.mainchainNode[data-state='waiting'] {
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--bdr));
+  background: color-mix(in srgb, var(--warning-bg) 44%, var(--surface));
+}
+
+.mainchainNode[data-state='blocked'] {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--bdr));
+  background: color-mix(in srgb, var(--danger-bg) 48%, var(--surface));
+  color: var(--danger);
+}
+
+.mainchainNode[data-state='empty'] {
+  opacity: 0.78;
+}
+
+.mainchainDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--text-3);
+  flex: 0 0 auto;
+}
+
+.mainchainNode[data-state='done'] .mainchainDot {
+  background: var(--success);
+}
+
+.mainchainNode[data-state='active'] .mainchainDot {
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.mainchainNode[data-state='waiting'] .mainchainDot {
+  background: var(--warning);
+}
+
+.mainchainNode[data-state='blocked'] .mainchainDot {
+  background: var(--danger);
+}
+
+.mainchainCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mainchainCopy strong,
+.mainchainCopy em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mainchainCopy strong {
+  color: var(--text-1);
+  font: 600 0.6875rem/1.2 var(--font-sans);
+}
+
+.mainchainCopy em {
+  color: var(--text-3);
+  font: 400 0.625rem/1.2 var(--font-sans);
+  font-style: normal;
+}
+
+.mainchainExport {
+  flex: 0 0 auto;
+  max-width: 128px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font: 600 0.6875rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease),
+    background var(--dur-normal) var(--ease);
+}
+
+.mainchainExport:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.mainchainExport:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mainchainExport:disabled {
+  color: var(--text-3);
+  background: var(--surface-low);
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .workbenchPageHost {
@@ -687,6 +851,69 @@
   justify-content: center;
 }
 
+.composerMentions {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: min(100%, 820px);
+  margin: 0 auto -2px;
+}
+
+.composerMentionChip {
+  min-width: 0;
+  max-width: 180px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-full);
+  background: var(--primary-light);
+  color: var(--primary);
+  font: 600 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.composerMainchain {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: min(100%, 820px);
+  margin: 0 auto -2px;
+  color: var(--text-3);
+  font: var(--caption);
+}
+
+.composerMainchain span {
+  min-width: 0;
+  max-width: 220px;
+  height: 24px;
+  padding: 4px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composerMainchain span[data-state='selected'] {
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--bdr));
+  color: var(--text-1);
+}
+
+.composerMainchain span[data-state='missing'] {
+  border-color: color-mix(in srgb, var(--warning) 44%, var(--bdr));
+  color: var(--warning);
+}
+
 .composerInput {
   flex: 1 1 auto;
   min-width: 0;
@@ -716,6 +943,91 @@
   outline: none;
   border-radius: 0;
   box-shadow: none;
+}
+
+.composerTargetPicker {
+  order: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  color: var(--text-3);
+  font: var(--caption);
+  white-space: nowrap;
+}
+
+.composerAgentPicker {
+  order: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  color: var(--text-3);
+  font: var(--caption);
+  white-space: nowrap;
+}
+
+.composerAgentSelect {
+  width: 138px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-1);
+  font: var(--caption);
+}
+
+.composerAgentSelect:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.composerAgentSelect:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.composerTargetSelect {
+  width: 160px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-1);
+  font: var(--caption);
+}
+
+.composerTargetSelect:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.composerTargetSelect:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.composerStatus {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 820px);
+  margin: -2px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--text-3);
+  font: var(--caption);
+  pointer-events: auto;
+}
+
+.composerStatus span {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sendButton {
@@ -1479,6 +1791,21 @@
   opacity: 0.62;
 }
 
+.readonlyEvidenceRow {
+  cursor: default;
+}
+
+.readonlyEvidenceRow:hover {
+  background: transparent;
+  color: var(--text-2);
+  transform: none;
+}
+
+.readonlyEvidenceRow .fileMeta {
+  opacity: 1;
+  transform: none;
+}
+
 .fileIcon {
   width: 17px;
   height: 17px;
@@ -1532,6 +1859,108 @@
   transform: translateX(0);
   background: var(--surface-high);
   color: var(--primary);
+}
+
+.readonlyEvidenceRow:hover .fileMeta,
+.readonlyEvidenceRow:focus-visible .fileMeta {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.artifactWorkspace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 2px 25px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-2);
+  font: 500 0.6875rem/1.4 var(--font-sans);
+}
+
+.artifactWorkspace span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* ── Runtime evidence ── */
+.runtimeEvidence {
+  display: grid;
+  gap: 12px;
+}
+
+.runtimeEvidenceHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.runtimeEvidenceHead strong {
+  color: var(--text-1);
+  font: 600 0.8125rem var(--font-sans);
+}
+
+.runtimeEvidenceHead span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtimeEvidenceStateList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.runtimeEvidenceState {
+  min-height: 26px;
+  padding: 5px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+}
+
+.runtimeEvidenceState[data-state='error'] {
+  border-color: var(--diff-removed-border);
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-border);
+}
+
+.runtimeEvidenceSection {
+  display: grid;
+  gap: 7px;
+}
+
+.runtimeEvidenceSectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px;
+  color: var(--text-3);
+  font: 600 0.6875rem var(--font-sans);
+  text-transform: uppercase;
+}
+
+.runtimeEvidenceSectionTitle em {
+  min-width: 0;
+  overflow: hidden;
+  font-style: normal;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Browser preview card ── */
@@ -1654,6 +2083,59 @@
 }
 
 /* ═══ Container queries ═══ */
+@media (max-width: 760px) {
+  .shell,
+  .shell[data-inspector-collapsed='true'],
+  .shell[data-sidebar-collapsed='true'],
+  .shell[data-sidebar-collapsed='true'][data-inspector-collapsed='true'] {
+    grid-template-columns: 52px minmax(0, 1fr);
+    width: 100vw;
+    max-width: 100vw;
+  }
+
+  .shell[data-page='contacts'],
+  .shell[data-page='docs'],
+  .shell[data-page='agents'],
+  .shell[data-page='runs'],
+  .shell[data-page='projects'],
+  .shell[data-page='settings'] {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .sidebarFrame,
+  .inspector {
+    display: none;
+  }
+
+  .workspace {
+    min-width: 0;
+    max-width: calc(100vw - 52px);
+  }
+
+  .workspaceActions .iconButton:not(.inspectorToggleBtn):nth-child(-n + 2) {
+    display: none;
+  }
+
+  .composerRow {
+    flex-wrap: wrap;
+  }
+
+  .composerInput {
+    flex-basis: 100%;
+  }
+
+  .composerTargetPicker,
+  .composerAgentPicker {
+    flex: 1 1 180px;
+    max-width: 100%;
+  }
+
+  .composerTargetSelect,
+  .composerAgentSelect {
+    width: 100%;
+  }
+}
+
 @container (max-width: 580px) {
   .workspaceThread {
     display: none;

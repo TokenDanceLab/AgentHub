@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CORS() gin.HandlerFunc {
+func CORS() (gin.HandlerFunc, error) {
 	raw := os.Getenv("AGENTHUB_CORS_ORIGINS")
 	if raw == "" {
 		raw = defaultCORSOrigins(corsEnvironment())
@@ -21,7 +21,7 @@ func CORS() gin.HandlerFunc {
 	origins := splitAndTrim(raw)
 	if err := validateCORSOriginsForEnvironment(corsEnvironment(), origins); err != nil {
 		slog.Error("invalid CORS configuration", "err", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("CORS configuration error: %w", err)
 	}
 	return cors.New(cors.Config{
 		AllowOrigins:     origins,
@@ -30,15 +30,15 @@ func CORS() gin.HandlerFunc {
 		ExposeHeaders:    []string{"X-Request-ID", "Retry-After", "X-API-Version"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
-	})
+	}), nil
 }
 
 func defaultCORSOrigins(env string) string {
 	if isProductionEnvironment(env) {
 		return "https://hub.vectorcontrol.tech"
 	}
-	// Dev: Hub web (3000), Desktop Vite (5173), TokenDance ID (3000)
-	return "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173"
+	// Dev: TokenDance ID/local web (3000), Desktop Vite (5173), Web Vite (5174)
+	return "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
 }
 
 func corsEnvironment() string {

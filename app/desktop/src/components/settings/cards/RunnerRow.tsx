@@ -1,4 +1,4 @@
-import { Cpu } from 'lucide-react';
+import { RuntimeBrandIcon } from '@shared/workbench';
 import type { RunnerHealthItem } from '@shared/types';
 import styles from '../primitives/primitives.module.css';
 
@@ -6,7 +6,7 @@ export default function RunnerRow({ runner }: { runner: RunnerHealthItem }) {
   return (
     <div className={styles.runnerRow}>
       <div className={styles.connectionIcon}>
-        <Cpu size={17} />
+        <RuntimeBrandIcon kind="runtime" name={runner.id || runner.name} size="compact" framed={false} />
       </div>
       <div className={styles.settingCopy}>
         <strong>{runner.name}</strong>

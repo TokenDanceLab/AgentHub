@@ -154,7 +154,6 @@ export interface StartRunRequest {
   prompt?: string;
   agentId?: string;
   model?: string;
-  provider?: string;
   modelAlias?: string;
   reasoningEffort?: string;
   modelMappingEnabled?: boolean;
@@ -195,8 +194,14 @@ export interface AgentInfo {
   model?: string;
   provider?: string;
   reasoningEffort?: string;
+  approvalPolicy?: string;
   permissionMode?: string;
+  skills?: string[];
+  mcpServers?: string[];
   toolAllowlist?: string[];
+  memorySources?: string[];
+  memoryRetention?: string;
+  memorySummary?: string;
   targetPreferences?: Record<string, unknown>;
   status: 'available' | 'unavailable' | 'configuring';
   capabilities: AgentCapabilities;
@@ -240,7 +245,6 @@ export interface StartRunRequest {
   prompt?: string;
   agentId?: string;
   model?: string;
-  provider?: string;
   modelAlias?: string;
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;

@@ -2,7 +2,7 @@ packages:
   - "shared"
   - "desktop"
   - "web"
-  - "mobile"
+  - "mobile-rn"
 allowBuilds:
   esbuild: true
 onlyBuiltDependencies:

@@ -125,11 +125,15 @@ function loadProfile(agentId: string): AgentProfileData {
   return defaultProfileData();
 }
 
-function saveProfile(agentId: string, data: AgentProfileData): void {
+function saveProfile(agentId: string, data: AgentProfileData): { ok: true } | { ok: false; error: string } {
   try {
     localStorage.setItem(agentProfileKey(agentId), JSON.stringify(data));
-  } catch {
-    /* storage unavailable */
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -186,6 +190,7 @@ export default function LocalAgentProfileCard({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [profile, setProfile] = useState<AgentProfileData>(() => loadProfile(agent.id));
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const tokenEstimate = useMemo(() => estimateTokens(profile.systemPrompt), [profile.systemPrompt]);
 
@@ -196,13 +201,15 @@ export default function LocalAgentProfileCard({
   }, [profile, agent.id]);
 
   const handleSave = useCallback(() => {
-    saveProfile(agent.id, profile);
+    const result = saveProfile(agent.id, profile);
+    setSaveError(result.ok ? null : result.error);
   }, [profile, agent.id]);
 
   const handleReset = useCallback(() => {
     const defaults = defaultProfileData();
     setProfile(defaults);
-    saveProfile(agent.id, defaults);
+    const result = saveProfile(agent.id, defaults);
+    setSaveError(result.ok ? null : result.error);
   }, [agent.id]);
 
   const toggleTool = useCallback((index: number) => {
@@ -280,6 +287,11 @@ export default function LocalAgentProfileCard({
   const autoLabel = t('prompt.routeAuto');
   const modelLabel = activeModel ? labelForOption(modelOptions, activeModel) : autoLabel;
   const providerLabel = activeProvider ? labelForOption(providerOptions, activeProvider) : autoLabel;
+  const storageStatus = saveError
+    ? t('settings.agentProfileStorageError', { error: saveError, defaultValue: `Local save failed: ${saveError}` })
+    : hasChanges
+      ? t('settings.agentProfileStorageUnsaved', { defaultValue: 'Unsaved local changes; Hub Agent Profile is unchanged.' })
+      : t('settings.agentProfileStorage', { defaultValue: 'Saved on this device only; Hub Agent Profile sync is not configured.' });
 
   return (
     <div className={styles.profileCard}>
@@ -589,7 +601,7 @@ export default function LocalAgentProfileCard({
           <div className={styles.profileEditorActions}>
             <div className={styles.profileEditorActionsLeft}>
               <span className={styles.profileEditorSource}>
-                {t('settings.agentProfileStorage', { defaultValue: 'Saved on this device' })}
+                {storageStatus}
               </span>
               <button
                 type="button"

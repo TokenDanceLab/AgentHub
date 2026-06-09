@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -35,6 +38,11 @@ type ObjectStorage interface {
 	// storage is backed by a local directory. Returns an empty string
 	// when the storage is remote (e.g. S3).
 	LocalPath(key string) string
+
+	// PresignURL returns a direct-download URL for the key when supported
+	// by the backing store. The caller provides already-safe response
+	// headers for the object-store GET response.
+	PresignURL(ctx context.Context, key string, contentType string, contentDisposition string, expiresIn time.Duration) (string, error)
 }
 
 // ── LocalStorage ────────────────────────────────────────────────────────────
@@ -55,7 +63,7 @@ func NewLocalStorage(baseDir string) *LocalStorage {
 }
 
 func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
-	absPath := filepath.Join(s.baseDir, key)
+	absPath := s.pathForKey(key)
 	dir := filepath.Dir(absPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return false, err
@@ -86,12 +94,12 @@ func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, cont
 }
 
 func (s *LocalStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	absPath := filepath.Join(s.baseDir, key)
+	absPath := s.pathForKey(key)
 	return os.Open(absPath)
 }
 
 func (s *LocalStorage) Delete(ctx context.Context, key string) error {
-	absPath := filepath.Join(s.baseDir, key)
+	absPath := s.pathForKey(key)
 	if err := os.Remove(absPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -99,7 +107,23 @@ func (s *LocalStorage) Delete(ctx context.Context, key string) error {
 }
 
 func (s *LocalStorage) LocalPath(key string) string {
-	return filepath.Join(s.baseDir, key)
+	return s.pathForKey(key)
+}
+
+func (s *LocalStorage) PresignURL(ctx context.Context, key string, contentType string, contentDisposition string, expiresIn time.Duration) (string, error) {
+	return "", nil
+}
+
+func (s *LocalStorage) pathForKey(key string) string {
+	return filepath.Join(s.baseDir, s.localKey(key))
+}
+
+func (s *LocalStorage) localKey(key string) string {
+	if !strings.EqualFold(filepath.Base(filepath.Clean(s.baseDir)), "uploads") {
+		return key
+	}
+	key = filepath.ToSlash(filepath.Clean(key))
+	return strings.TrimPrefix(key, "uploads/")
 }
 
 // ── S3Storage ───────────────────────────────────────────────────────────────
@@ -109,6 +133,7 @@ type S3Storage struct {
 	putObject    func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error)
 	getObject    func(ctx context.Context, bucket, key string) (io.ReadCloser, error)
 	deleteObject func(ctx context.Context, bucket, key string) error
+	presignURL   func(ctx context.Context, bucket, key, contentType, contentDisposition string, expiresIn time.Duration) (string, error)
 	bucket       string
 }
 
@@ -119,12 +144,14 @@ func NewS3Storage(
 	putObject func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error),
 	getObject func(ctx context.Context, bucket, key string) (io.ReadCloser, error),
 	deleteObject func(ctx context.Context, bucket, key string) error,
+	presignURL func(ctx context.Context, bucket, key, contentType, contentDisposition string, expiresIn time.Duration) (string, error),
 	bucket string,
 ) *S3Storage {
 	return &S3Storage{
 		putObject:    putObject,
 		getObject:    getObject,
 		deleteObject: deleteObject,
+		presignURL:   presignURL,
 		bucket:       bucket,
 	}
 }
@@ -143,6 +170,13 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 
 func (s *S3Storage) LocalPath(key string) string {
 	return "" // remote storage, no local path
+}
+
+func (s *S3Storage) PresignURL(ctx context.Context, key string, contentType string, contentDisposition string, expiresIn time.Duration) (string, error) {
+	if s.presignURL == nil {
+		return "", nil
+	}
+	return s.presignURL(ctx, s.bucket, key, contentType, contentDisposition, expiresIn)
 }
 
 // ── AttachmentService ───────────────────────────────────────────────────────
@@ -172,8 +206,16 @@ func (s *AttachmentService) ProbeAttachment(ctx context.Context, userID, hash st
 }
 
 func (s *AttachmentService) SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error) {
+	return s.SaveAttachmentWithMetadata(ctx, uploaderID, hash, mimeType, originalName, size, "")
+}
+
+func (s *AttachmentService) SaveAttachmentWithMetadata(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64, metadata string) (*model.Attachment, error) {
 	if !IsValidAttachmentHash(hash) {
 		return nil, errcode.ErrBadRequest
+	}
+	normalizedMetadata, err := NormalizeAttachmentMetadataJSON(metadata)
+	if err != nil {
+		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
 	}
 
 	// Hash-based dedup: if the same uploader already uploaded this hash,
@@ -188,11 +230,33 @@ func (s *AttachmentService) SaveAttachment(ctx context.Context, uploaderID, hash
 		MimeType:       mimeType,
 		OriginalName:   originalName,
 		UploaderUserID: uploaderID,
+		Metadata:       normalizedMetadata,
 	}
 	if err := repository.CreateAttachment(s.db, a); err != nil {
 		return nil, err
 	}
 	return a, nil
+}
+
+func NormalizeAttachmentMetadataJSON(metadata string) (string, error) {
+	metadata = strings.TrimSpace(metadata)
+	if metadata == "" {
+		return "{}", nil
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(metadata), &payload); err != nil {
+		return "", fmt.Errorf("metadata must be valid JSON: %w", err)
+	}
+	if payload == nil {
+		return "", fmt.Errorf("metadata must be a JSON object")
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return string(normalized), nil
 }
 
 // StoreBlob writes attachment content to the configured object storage.
@@ -233,6 +297,16 @@ func (s *AttachmentService) BlobLocalPath(hash string) string {
 		return ""
 	}
 	return s.storage.LocalPath(key)
+}
+
+// PresignBlobURL returns a direct-download URL for remote storage when the
+// configured object store supports presigned GET requests.
+func (s *AttachmentService) PresignBlobURL(ctx context.Context, hash string, contentType string, contentDisposition string) (string, error) {
+	key := PathFromHash(hash)
+	if key == "" {
+		return "", nil
+	}
+	return s.storage.PresignURL(ctx, key, contentType, contentDisposition, 15*time.Minute)
 }
 
 func (s *AttachmentService) GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error) {
@@ -287,4 +361,30 @@ func (s *AttachmentService) MaxUploadSize() int64 {
 		return config.DefaultMaxUploadSize
 	}
 	return s.uploadCfg.MaxSize
+}
+
+func (s *AttachmentService) IsAttachmentMimeTypeAllowed(mimeType string) bool {
+	mediaType, _, err := mime.ParseMediaType(mimeType)
+	if err != nil {
+		mediaType = strings.TrimSpace(mimeType)
+	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	if mediaType == "" {
+		return false
+	}
+
+	allowedMimeTypes := s.uploadCfg.AllowedMimeTypes
+	if len(allowedMimeTypes) == 0 {
+		allowedMimeTypes = config.DefaultAllowedUploadMimeTypes
+	}
+	for _, allowed := range allowedMimeTypes {
+		allowedMediaType, _, err := mime.ParseMediaType(allowed)
+		if err != nil {
+			allowedMediaType = strings.TrimSpace(allowed)
+		}
+		if mediaType == strings.ToLower(strings.TrimSpace(allowedMediaType)) {
+			return true
+		}
+	}
+	return false
 }

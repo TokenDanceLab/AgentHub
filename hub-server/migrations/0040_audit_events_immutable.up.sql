@@ -1,6 +1,8 @@
 -- 0040_audit_events_immutable.up.sql
 -- Adds hash-chain support and makes audit_events table append-only.
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 1. Add prev_hash column for hash-chain integrity.
 ALTER TABLE audit_events
     ADD COLUMN IF NOT EXISTS prev_hash VARCHAR(64) NOT NULL DEFAULT '';
@@ -67,6 +69,17 @@ BEGIN
     ) THEN
         CREATE TRIGGER trg_audit_events_no_delete
             BEFORE DELETE ON audit_events
+            FOR EACH STATEMENT
+            EXECUTE FUNCTION audit_events_protect();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'trg_audit_events_no_truncate'
+          AND tgrelid = 'audit_events'::regclass
+    ) THEN
+        CREATE TRIGGER trg_audit_events_no_truncate
+            BEFORE TRUNCATE ON audit_events
             FOR EACH STATEMENT
             EXECUTE FUNCTION audit_events_protect();
     END IF;
