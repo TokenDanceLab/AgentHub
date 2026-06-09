@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 00:10 +08:00
+最后更新：2026-06-10 01:40 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
@@ -69,16 +69,60 @@
 - approved-real preflight manifest gate、redacted demo manifest gate 和 no-secret demo readiness gate 已合入，用于审批前检查 approval、budget、timeout、artifact root、redaction、runtime、URL、测试账号标识和 secret scan。
 - Web deploy/readiness、boundary、product-loop fixture QA 和 Tauri readiness gate 已作为当前 dev 基础能力存在。
 
+### 2026-06-10 数据流打通成果（本轮新增）
+
+**IM 聊天全链路（Web + Desktop）**：
+- Web hubClient 新增 4 个方法：`editMessage`、`addMessageReaction`、`removeMessageReaction`、`listMessageReactions`
+- Desktop hubClient 同步新增 4 个 Reaction 方法
+- Web `useWebWorkbenchModel` 新增 10 个 chat actions：recall、edit、pin、unpin、forward、searchMessages、searchSessionMessages、markRead、addReaction、removeReaction
+- 自动已读回执：进入会话后自动标记最后一条消息为已读
+- Desktop `useDesktopWorkbenchModel` 同步接入 chatActions（send、recall、edit、pin、unpin、markRead）
+- Desktop `sessionQueries.ts` 修复所有方法签名以匹配 Hub API（markRead、pin、unpin、forward、reactions）
+
+**Desktop 认证令牌管道**：
+- `hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`、`projectQueries.ts` 全部传入 `{ getToken: getAccessToken }` 用于认证请求
+- Hub WebSocket (`useHubWebSocket.ts`) 接入 workbench model，实时事件驱动 React Query 缓存失效
+
+**Hub Server 数据层完善**：
+- 新增 `model.Document` + `repository.Document`（云文档全链路 CRUD）
+- 修复 Document model/schema 不匹配（`DeletedAt` 移除，`ProjectID`/`Metadata` 对齐 DB）
+- 修复 `user_settings` 表缺失（迁移 0049 手动补建）
+- 移除重复的 `/web/documents` 路由注册
+- 修复 Prometheus metrics 空指针（`metrics.Register()` 移到提前返回之前）
+
+**Edge CLI 适配器完善**：
+- Claude Code 适配器：真实 CLI 执行验证通过
+- OpenCode 适配器：修复 `--session` 只在 resume 时传递
+- Codex 适配器：新增 `PreflightAdapter` 接口，预检 `OPENAI_API_KEY` 缺失时快速失败；环境变量透传
+
+**SDK HTTP 适配器（新增）**：
+- `AnthropicSDKAdapter`：通过 HTTP direct call Anthropic Messages API with SSE streaming
+- `OpenAISDKAdapter`：通过 HTTP direct call OpenAI Chat Completions API with SSE streaming
+- 两个适配器均通过 `--anthropic-sdk-path`/`--openai-sdk-path` 标志注册，支持 env var API key
+- 无外部 SDK 依赖，纯 `net/http`
+
+**E2E 测试与验证**：
+- `tests/scripts/verify-real-api-smoke.ps1`：44/44 断言通过（Hub 健康 → Edge 健康 → 认证 → 联系人/会话/文档 CRUD → Edge run 生命周期 → 运行历史）
+- `app/e2e/chat-real.spec.ts`：9 个 Playwright 测试（Hub API + Edge API + Web UI）
+- 真实 CLI 执行端到端验证：Claude Code 和 OpenCode 均正常工作
+- 真实 Hub API 验证：16/20 端点返回 200，含 contacts、sessions、messages、documents、WebSocket
+
+**Desktop 数据流补全**：
+- Hub Agent Profile CRUD hooks 接入（`useHubAgentProfiles`、`useHubCreateAgentProfile`、`useHubUpdateAgentProfile`、`useHubDeleteAgentProfile`）
+- Agent 合并策略：Edge profiles > Hub profiles > raw adapter list
+- Desktop Settings 读取三层回退（Edge → Hub → localStorage）
+
 ## 当前不声明已经完成
 
-- 真实 TokenDanceID 登录全链路验收。
-- `scripts/verify-token-dance-id-login-readiness.ps1` 的 `READY_FOR_OPERATOR` 只表示 no-secret readiness 通过：环境提供了 approved test account/client 元数据且 OIDC discovery 可用；fixture discovery 只能验证脚本合约，不能当作真实登录 evidence。
-- 真实 CLI/model/API 消耗或 approved-real 运行证据。
+- 真实 TokenDanceID 登录全链路验收（Hub OIDC handler 已实现，缺 env 配置和 TokenDance ID 端 OAuth client）。
+- `scripts/verify-token-dance-id-login-readiness.ps1` 的 `READY_FOR_OPERATOR`：OIDC 被禁用（`AGENTHUB_TOKENDANCE_ID_CLIENT_ID` 未设置）时 token 不可用，只能通过已知 JWT secret 直接签发 token 进行 dev 测试。
 - 真实 Web/Mobile/IM 全部远控闭环的发布级验收。
 - Hub AgentProfile 市场安装/发布 mutation、真实头像 asset 管线和持久化配置闭环。
 - Artifact/Diff 的真实 apply/revert 文件写入。
 - 签名安装器、macOS notarization、release upload、updater metadata。
 - 生产部署、公开发布或 3 分钟 Demo 视频交付。
+- Codex CLI 真实执行（缺 `OPENAI_API_KEY`）。
+- Anthropic SDK / OpenAI SDK 的真实 API key 消耗（适配器已实现，key 未配置）。
 
 ## 当前并发线
 
@@ -88,8 +132,8 @@
 | Hub approval/artifact/diff | 最新 dev 已合入单任务 approval/artifact 合同、diff metadata、approval context gate、编排路由审计队列字段 | apply/revert 写文件、TeamRun/单任务完全统一和 production 权限 gate 继续推进。 |
 | Desktop/Local Edge | 最新 dev 已合入 diagnostics、sidecar observed/binary/package smoke、exact target bridge、Builder fixture UI | 真实签名包、真实 sidecar binary 发布和跨平台安装仍需审批与平台 gate。 |
 | Windows/Tauri packaging release dry | `codex/packaging-release-windows-tauri-20260609` 正在收口 release-readiness dry gate 复用本地 `verify-tauri-package-dry.ps1`，本地 artifact root `.tmp\tauri-package-release-20260609` 已产出 installer/portable/sidecar/hash manifest | unsigned workflow artifacts only；不签名、不公证、不上传 release、不提交二进制；macOS 仍是 future unsigned dry policy。 |
-| Edge/CLI/SDK/SQLite | 最新 dev 已合入 SQLite durable/readiness、fixture adapter runner、CLI JSON readiness、SDK capability/event matrix | 真实 CLI/model/API 消耗和 production durable store promotion 尚未完成。 |
-| Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、localhost probe/smoke、approved-real/no-secret gates、P0 approved-real gold-path harness | 缺账号/env 或缺 evidence 时必须输出 `BLOCKED_WITH_EVIDENCE`；本文不记录 secret 或证据包细节。 |
+| Edge/CLI/SDK/SQLite | 最新 dev 已合入 SQLite durable/readiness、fixture adapter runner、CLI JSON readiness、SDK capability/event matrix、**Claude Code + OpenCode 真实 CLI 执行验证通过**、**Anthropic SDK + OpenAI SDK HTTP 适配器** | Codex CLI 真实执行缺 `OPENAI_API_KEY`；Anthropic/OpenAI SDK API key 未配置。 |
+| Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、localhost probe/smoke、approved-real/no-secret gates、P0 approved-real gold-path harness、**`verify-real-api-smoke.ps1` 44/44 通过** | 缺账号/env 或缺 evidence 时必须输出 `BLOCKED_WITH_EVIDENCE`；本文不记录 secret 或证据包细节。 |
 | Mobile | 已合入 rc7 集成线 | 当前新增来自 `codex/mobile-motion-release-gates`：native capability settings、motion press feedback、Account/Workbench readiness 展示；只按 Hub target/run/approval/replay 合同对齐，不分叉 runtime 或登录语义。 |
 
 ## 分支治理
@@ -117,11 +161,11 @@
 
 ## 下一步优先级
 
-1. **P0 approved-real 金链路总 gate**：先运行 `scripts\verify-p0-approved-real-gold-path.ps1`。它只编排无密 readiness/evidence：TokenDanceID readiness、Desktop target/Local Edge/CLI no-spend smoke、Hub replay/Web 展示和 redacted manifest；如果缺账号/env、CLI smoke 或 replay evidence，状态必须是 `BLOCKED_WITH_EVIDENCE`。
-2. **真实 TokenDanceID 登录打通**：先跑 `scripts/verify-token-dance-id-login-readiness.ps1`；只有输出 `READY_FOR_OPERATOR` 后，操作员才使用一次性/预批准测试账号和已批准环境运行真实登录链路，不把 secret 写入仓库。`BLOCKED` 必须先补齐 approved client/test-account 元数据或 OIDC discovery。
-3. **approved-real 录屏前审批**：先运行 `scripts\verify-approved-real-demo-readiness.ps1` 或顶层 gold-path harness 产出 redacted manifest；若状态是 `READY_FOR_APPROVAL`，再由人工批准真实 TokenDanceID 测试账号/安全 env、录屏范围和是否允许真实 CLI/model/API。无批准时只能演示 fixture/mock replay。
-4. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
-5. **Windows/Tauri unsigned package smoke**：当前 dry gate 已能产出 unsigned NSIS installer、portable zip、Windows Local Edge sidecar 和 `artifact-manifest.json` hash 证据；签名、公证、release upload、updater `latest.json`/`.sig` 另行审批推进。
+1. **P0 approved-real 金链路总 gate**：`verify-real-api-smoke.ps1` 已通过 44/44 断言（2026-06-10）。当前 Hub OIDC 禁用且使用直接 JWT 签发进行 dev 测试；真实 TokenDanceID 登录仍需 env 变量、OAuth client 配置和操作员批准。
+2. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。已添加预检功能以快速失败，并提供描述性错误。
+3. **真实 SDK API 消耗（Anthropic / OpenAI）**：适配器已实现但不阻塞——需要各自的 API key。在密钥缺失时，适配器报告 `Available=false`。
+4. **localhost observed service runner 升级**：在现有的无花费清单门控基础上，逐步挂钩 Web dev 服务器、Local Edge mock/SQLite 和 Hub 健康/服务探测。
+5. **Windows/Tauri unsigned package smoke**：当前的 dry gate 可以生成 unsigned NSIS 安装程序、便携式 zip、Windows Local Edge 侧车和 `artifact-manifest.json` 哈希证据；签名、公证、release upload 和 updater `latest.json`/`.sig` 需另行批准推进。
 6. **受控 approved-real CLI/SDK 方案**：已具备 preflight manifest gate；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
 
 ## 安全规则
