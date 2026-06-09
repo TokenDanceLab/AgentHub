@@ -31,6 +31,7 @@ export interface HubLifecycleResync {
 export interface StartHubLifecycleOptions
   extends Pick<CreateHubEventStreamOptions, 'baseUrl' | 'createWebSocket'> {
   appState: MobileAppStateLike;
+  token?: string;
   initialSince?: string;
   onEvent?: (event: HubWsEvent) => void;
   onError?: (error: HubEventStreamError) => void;
@@ -58,9 +59,12 @@ export function startHubLifecycleBridge(options: StartHubLifecycleOptions): HubL
     const streamOptions: CreateHubEventStreamOptions = {
       baseUrl: options.baseUrl,
       createWebSocket: options.createWebSocket,
+      ...(options.token ? { token: options.token } : {}),
       ...(eventCursor ? { since: eventCursor } : {}),
       onEvent(event) {
-        eventCursor = event.id;
+        if (typeof event.seq_id === 'number') {
+          eventCursor = String(event.seq_id);
+        }
         options.onEvent?.(event);
       },
       onStatusChange(status) {
