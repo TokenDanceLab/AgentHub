@@ -219,6 +219,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
           deletingAgentId,
         }}
         contacts={workbench.contacts}
+        contactsActions={workbench.contactsActions}
         conversations={workbench.conversations}
         onActiveConversationChange={setSelectedConversationId}
         onAgentCreate={handleAgentCreate}
