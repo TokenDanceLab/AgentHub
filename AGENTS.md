@@ -47,9 +47,9 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 | 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
 | 后端 | Hub Server、TokenDance ID 接入、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` |
 | 客户端（Desktop） | Desktop Tauri、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验、tray | `app/desktop/`、`edge-server/` |
-| 客户端（Mobile） | Mobile Tauri、移动端 UI、OIDC deep-link | `app/mobile/` |
+| 客户端（Mobile） | Expo/React Native 移动端、OIDC deep-link、SecureStore、Notifications | `app/mobile-rn/` |
 
-Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri/`，不共享 Rust crate，不互相修改对方的配置。
+Desktop 是 Tauri 项目；Mobile 主线是 Expo + React Native development build。Mobile 不再维护旧 Tauri 实现，旧 Tauri Mobile package 已从活跃源码树移除。
 
 共享边界：
 
@@ -60,17 +60,17 @@ Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri
 
 ### Desktop / Web / Mobile 端口与资源分配
 
-Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能互相抢占。Mobile 不进入本轮 v4 重构，只保留独立预览端口。
+Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能互相抢占。Mobile RN 使用独立 Expo Web 视觉预览端口。
 
 | 资源 | Desktop/Tauri | Web | Mobile |
 |---|---|---|---|
-| Vite 开发端口 | **5173** (strict) | **5174** (strict) | **5175** (strict，非本轮主线) |
-| 前端源码 | `app/desktop/src/` | `app/web/src/` | `app/mobile/src/` |
-| 平台入口 | `app/desktop/src/App.tsx` + Tauri host adapter | `app/web/src/App.tsx` + Hub/Web adapter | Mobile native adaptation |
-| Tauri 项目 | `app/desktop/src-tauri/` | 无 | `app/mobile/src-tauri/` |
-| Rust crate | `agenthub-desktop` | 无 | `agenthub-mobile` |
-| Tauri identifier | `com.agenthub.desktop` | 无 | `com.agenthub.mobile` |
-| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) | 稳定子集 |
+| Vite/Expo Web 开发端口 | **5173** (strict) | **5174** (strict) | **5177** |
+| 前端源码 | `app/desktop/src/` | `app/web/src/` | `app/mobile-rn/src/` |
+| 平台入口 | `app/desktop/src/App.tsx` + Tauri host adapter | `app/web/src/App.tsx` + Hub/Web adapter | `app/mobile-rn/src/App.tsx` + Expo/RN adapters |
+| Native 项目 | `app/desktop/src-tauri/` | 无 | Expo development build (`app/mobile-rn/app.config.ts`, `eas.json`) |
+| Native package | `agenthub-desktop` | 无 | `agenthub-mobile-rn` |
+| App identifier | `com.agenthub.desktop` | 无 | `tech.vectorcontrol.agenthub.mobile` |
+| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) | RN-safe contracts only |
 | Storybook | 6006 | 共用 shared/desktop story | 无 |
 
 其他固定端口：
@@ -83,11 +83,11 @@ Desktop/Web 是本轮 v4 shared workbench 主线，端口必须固定且不能�
 | OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
 | Web 工作台 | 5174 | `app/web/vite.config.ts` |
 
-Rust/Tauri 隔离规则：
+Native 隔离规则：
 
-- **Desktop Agent 只能修改** `app/desktop/src-tauri/`，**Mobile Agent 只能修改** `app/mobile/src-tauri/`。
-- 任何 Agent 不得修改对方的 `tauri.conf.json`、`Cargo.toml`、`lib.rs`。
-- 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate，两边各自在 `Cargo.toml` 中 `[dependencies]` 引用。
+- **Desktop Agent 只能修改** `app/desktop/src-tauri/` 的 Tauri/Rust 能力；Mobile Agent 不新增或恢复旧 Tauri Mobile native host。
+- 任何 Agent 不得修改对方的 native 配置。Mobile native 配置集中在 `app/mobile-rn/app.config.ts`、`eas.json` 和 Expo plugin 配置。
+- 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate；Mobile RN 默认不消费 Rust crate。
 - Desktop 特有功能（tray、Edge 进程管理、keyring）不往 Web/Mobile 移植；Web 只能通过 Hub/Web adapter 访问远端能力；Mobile 特有功能（deep link、platform secure store）不往 desktop 移植。
 - 共享的前端代码（类型、hooks、i18n、UI 组件）放 `app/shared/`，两个项目通过 `workspace:*` 引用。
 
