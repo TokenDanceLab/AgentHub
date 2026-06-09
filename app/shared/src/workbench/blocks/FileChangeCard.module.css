@@ -68,6 +68,19 @@
   color: var(--text-3);
 }
 
+.readonlyPill {
+  max-width: 148px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  background: var(--surface-low);
+  font: 600 0.625rem var(--font-sans);
+}
+
 .expandBtn,
 .reviewBtn {
   height: 26px;

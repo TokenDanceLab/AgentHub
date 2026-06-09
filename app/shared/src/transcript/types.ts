@@ -138,6 +138,10 @@ export interface FileChangeTranscriptBlock extends TranscriptBlockBase {
   deletions?: number;
   patch?: string;
   lines?: DiffTranscriptLine[];
+  editId?: string;
+  reviewStatus?: string;
+  canApply?: boolean;
+  canRevert?: boolean;
 }
 
 export interface RunSessionTranscriptBlock extends TranscriptBlockBase {

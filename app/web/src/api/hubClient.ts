@@ -271,6 +271,14 @@ export interface AgentTaskArtifact {
   name?: string;
   mime_type?: string;
   size_bytes?: number;
+  diff?: string;
+  patch?: string;
+  edit_id?: string;
+  review_status?: string;
+  can_apply?: boolean;
+  can_revert?: boolean;
+  type?: string;
+  kind?: string;
   created_at?: string;
 }
 
