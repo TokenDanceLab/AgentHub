@@ -91,11 +91,30 @@ function Join-NativeArguments {
     return ($quoted -join " ")
 }
 
+function Resolve-PowerShellExecutable {
+    $currentPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    if (-not [string]::IsNullOrWhiteSpace($currentPath) -and (Test-Path -LiteralPath $currentPath)) {
+        return $currentPath
+    }
+
+    $pwsh = Get-Command "pwsh" -ErrorAction SilentlyContinue
+    if ($pwsh) {
+        return $pwsh.Source
+    }
+
+    $windowsPowerShell = Get-Command "powershell" -ErrorAction SilentlyContinue
+    if ($windowsPowerShell) {
+        return $windowsPowerShell.Source
+    }
+
+    throw "Unable to locate a PowerShell executable for script self-tests."
+}
+
 function Invoke-RepoScript {
     param([string[]]$Arguments)
 
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = "powershell"
+    $psi.FileName = Resolve-PowerShellExecutable
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
