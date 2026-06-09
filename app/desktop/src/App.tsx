@@ -1,5 +1,5 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride, workbenchDemoRuntimeStore, readWorkbenchDataModeOverride, isWorkbenchRealDataMode } from '@shared/demo';
+import { useMemo, useState, useCallback } from 'react';
+import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride, workbenchDemoRuntimeStore } from '@shared/demo';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
@@ -83,17 +83,6 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const workbench = useDesktopWorkbenchModel(selectedConversationId);
   const { online: edgeOnline } = useHealth();
-
-  // Auto-upgrade: when Edge is online but dataMode is stuck on mock/fixture
-  // (e.g. from a previous session's localStorage), switch to approved-real so
-  // the user sees live Edge data instead of stale demo content.
-  useEffect(() => {
-    if (!edgeOnline) return;
-    const currentMode = readWorkbenchDataModeOverride();
-    if (currentMode && !isWorkbenchRealDataMode(currentMode)) {
-      writeWorkbenchDataModeOverride('approved-real');
-    }
-  }, [edgeOnline]);
 
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
   const { data: agentData } = useAgentList(liveEdgeEnabled);
