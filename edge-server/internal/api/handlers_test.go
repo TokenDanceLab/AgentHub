@@ -570,7 +570,7 @@ func TestThreadUpdateArchiveDeleteRoutes(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	h.ensureDefaults()
-	if _, err := h.Store.CreateThread("thread_manage", "proj_local", "Manage Thread", ""); err != nil {
+	if _, err := h.Store.CreateThread("thread_manage", "proj_local", "Manage Thread", "", "", ""); err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
 	if _, err := h.Store.CreateRun("run_manage", "proj_local", "thread_manage"); err != nil {
@@ -745,7 +745,7 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.ensureDefaults()
-	_, err := h.Store.CreateThread("thread_bound", "proj_local", "Bound Thread", "")
+	_, err := h.Store.CreateThread("thread_bound", "proj_local", "Bound Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
@@ -789,7 +789,7 @@ func TestPostRunsPersistsUserPromptAndUsesThreadSession(t *testing.T) {
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.ensureDefaults()
-	if _, err := h.Store.CreateThread("thread_context", "proj_local", "Context Thread", ""); err != nil {
+	if _, err := h.Store.CreateThread("thread_context", "proj_local", "Context Thread", "", "", ""); err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
 
@@ -844,7 +844,7 @@ func TestPostRunsResumesThreadRuntimeSessionAfterAssistantHistory(t *testing.T) 
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	h.ensureDefaults()
-	if _, err := h.Store.CreateThread("thread_resume", "proj_local", "Resume Thread", ""); err != nil {
+	if _, err := h.Store.CreateThread("thread_resume", "proj_local", "Resume Thread", "", "", ""); err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
 	if _, err := h.Store.CreateRun("run_existing", "proj_local", "thread_resume"); err != nil {
@@ -1616,7 +1616,7 @@ func TestThreadPinsRejectInvalidRequests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
 	}
-	_, _ = h.Store.CreateThread("thread_other", "proj_local", "Other", "")
+	_, _ = h.Store.CreateThread("thread_other", "proj_local", "Other", "", "", "")
 	otherItem, err := h.Store.CreateThreadMessage("item_other", "thread_other", "user", "other")
 	if err != nil {
 		t.Fatalf("CreateThreadMessage other returned error: %v", err)
@@ -1653,8 +1653,8 @@ func TestThreadPinsRejectInvalidRequests(t *testing.T) {
 func TestThreadPinsSkipCrossThreadSnapshotPin(t *testing.T) {
 	base := store.New()
 	_, _ = base.CreateProject("proj_local", "Local")
-	_, _ = base.CreateThread("thread_local", "proj_local", "Local", "")
-	_, _ = base.CreateThread("thread_other", "proj_local", "Other", "")
+	_, _ = base.CreateThread("thread_local", "proj_local", "Local", "", "", "")
+	_, _ = base.CreateThread("thread_other", "proj_local", "Other", "", "", "")
 	otherItem, err := base.CreateThreadMessage("item_other", "thread_other", "user", "other")
 	if err != nil {
 		t.Fatalf("CreateThreadMessage other returned error: %v", err)
@@ -1750,7 +1750,7 @@ func TestPostCancelRun(t *testing.T) {
 	h := newTestHandler()
 	// Create project and thread first (required for CreateRun).
 	_, _ = h.Store.CreateProject("proj_local", "Local")
-	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread", "")
+	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread", "", "", "")
 	_, _ = h.Store.CreateRun("run_test123", "proj_local", "thread_local")
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_test123:cancel", nil)
 	rec := httptest.NewRecorder()
@@ -2263,7 +2263,7 @@ func TestMuxCancelRunRoute(t *testing.T) {
 	h := newTestHandler()
 	// Create project, thread, and run so the cancel route can find it.
 	_, _ = h.Store.CreateProject("proj_local", "Local")
-	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread", "")
+	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread", "", "", "")
 	_, _ = h.Store.CreateRun("run_abc", "proj_local", "thread_local")
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
