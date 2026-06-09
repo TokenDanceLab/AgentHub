@@ -3,13 +3,15 @@ import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride, workbe
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
+import type { ApprovalDecisionAction } from '@shared/transcript';
 import type { WorkbenchConversation } from '@shared/platform';
 import { useAgentList } from '@/api/agentQueries';
+import { useDecideTeamApproval } from '@/api/agentTeamQueries';
 import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
-import { useCreateThread, useCurrentUser } from '@/api/threadQueries';
+import { useCreateThread, useCurrentUser, useThreads } from '@/api/threadQueries';
 import { DesktopChrome } from '@/components/DesktopChrome';
 import { DesktopEntryGate } from '@/components/DesktopEntryGate';
 import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
@@ -90,6 +92,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const createRun = useCreateRun();
   const createThread = useCreateThread();
+  const decideTeamApproval = useDecideTeamApproval();
+  const { data: threadsData } = useThreads(undefined, { enabled: liveEdgeEnabled });
   const { data: currentUser } = useCurrentUser(liveEdgeEnabled);
   const { data: documentListData } = useDocumentList(undefined, { enabled: liveEdgeEnabled });
   const createDocumentMutation = useCreateDocument();
@@ -193,6 +197,22 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     }
   }
 
+  const handleActiveProjectChange = useCallback((projectId: string) => {
+    if (workbench.isDemo) return;
+    const thread = threadsData?.items?.find((t) => t.projectId === projectId);
+    if (thread) setSelectedConversationId(thread.threadId);
+  }, [threadsData?.items, workbench.isDemo]);
+
+  const handleApprovalDecision = useCallback(async (action: ApprovalDecisionAction) => {
+    if (!action.teamId || !action.teamRunId) return;
+    await decideTeamApproval.mutateAsync({
+      teamId: action.teamId,
+      runId: action.teamRunId,
+      approvalId: action.approvalId,
+      decision: { decision: action.decision },
+    });
+  }, [decideTeamApproval]);
+
   const handleNavigateToConversation = useCallback((target: { name: string; id: string; kind: 'dm' | 'group' }) => {
     if (workbench.isDemo) {
       const existing = workbench.conversations.find((c) => c.id === target.id || c.title === target.name);
@@ -245,6 +265,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         onNavigateToConversation={handleNavigateToConversation}
         onProjectCreate={workbench.projectsActions?.create}
         onProjectUpdate={workbench.projectsActions?.update}
+        onApprovalDecision={handleApprovalDecision}
+        activeProjectId={workbench.activeProjectId}
+        onActiveProjectChange={handleActiveProjectChange}
           modelCatalog={modelCatalog?.items}
         platform={desktopPlatform}
         projects={workbench.projects}
