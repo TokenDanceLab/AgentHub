@@ -101,6 +101,13 @@ export interface HostDiagnosticsPort {
   localCliDiscovery?(): Promise<LocalCliDiscoveryManifest>;
 }
 
+export interface SettingsPort {
+  /** Read all settings from the backend. Returns empty object if none stored. */
+  readSettings(): Promise<Record<string, string>>;
+  /** Write a partial settings patch to the backend. */
+  writeSettings(values: Record<string, string>): Promise<void>;
+}
+
 export interface AgentHubPlatform {
   surface: AgentHubSurface;
   capabilities: SurfaceCapabilities;
@@ -109,4 +116,5 @@ export interface AgentHubPlatform {
   host?: HostDiagnosticsPort;
   preview?: PreviewPort;
   runs: RunPort;
+  settings?: SettingsPort;
 }
