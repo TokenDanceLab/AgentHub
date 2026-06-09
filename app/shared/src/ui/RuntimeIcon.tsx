@@ -13,13 +13,17 @@ export type RuntimeIconFallback =
   | 'browser'
   | 'custom'
   | 'diff'
+  | 'health'
+  | 'mcp'
   | 'model'
+  | 'profile'
   | 'provider'
   | 'read'
   | 'runtime'
   | 'search'
   | 'shell'
   | 'task'
+  | 'target'
   | 'tool'
   | 'write';
 
@@ -179,11 +183,34 @@ function runtimeIconFallbackSvg(name: RuntimeIconFallback, iconSize: number): Re
           <path d="M9 9V3M15 21v-6" />
         </svg>
       );
+    case 'health':
+      return (
+        <svg {...common}>
+          <path d="M4 13h4l2-6 4 10 2-4h4" />
+          <path d="M12 21a8.5 8.5 0 0 1-8-8.5 5 5 0 0 1 8-3 5 5 0 0 1 8 3 8.5 8.5 0 0 1-8 8.5z" />
+        </svg>
+      );
+    case 'mcp':
+      return (
+        <svg {...common}>
+          <rect x="4" y="5" width="16" height="14" rx="3" />
+          <path d="M8 9v6M12 9v6M16 9v6" />
+          <path d="M8 12h8" />
+        </svg>
+      );
     case 'model':
       return (
         <svg {...common}>
           <rect x="5" y="5" width="14" height="14" rx="2" />
           <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" />
+        </svg>
+      );
+    case 'profile':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="3" />
+          <path d="M6 20v-1a6 6 0 0 1 12 0v1" />
+          <path d="M18 4h2v2M20 4l-3 3" />
         </svg>
       );
     case 'provider':
@@ -226,6 +253,14 @@ function runtimeIconFallbackSvg(name: RuntimeIconFallback, iconSize: number): Re
         <svg {...common}>
           <path d="M5 7h10M5 12h8M5 17h6" />
           <path d="m16 17 2 2 4-5" />
+        </svg>
+      );
+    case 'target':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="7" />
+          <circle cx="12" cy="12" r="2" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
         </svg>
       );
     case 'write':
