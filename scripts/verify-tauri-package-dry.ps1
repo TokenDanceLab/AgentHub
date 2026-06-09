@@ -168,10 +168,9 @@ Assert-True (Test-Path -LiteralPath $sidecarIntermediate) "Windows Local Edge si
 Copy-Item -LiteralPath $sidecarIntermediate -Destination (Join-Path $artifactRoot "agenthub-edge-windows-amd64.exe") -Force
 
 Step "Prepare Tauri external sidecar"
-$tauriSidecarDir = Join-Path $RepoRoot "app\desktop\src-tauri\binaries"
-New-Item -ItemType Directory $tauriSidecarDir -Force | Out-Null
-$tauriSidecar = Join-Path $tauriSidecarDir "agenthub-edge-x86_64-pc-windows-msvc.exe"
-Copy-Item -LiteralPath $sidecarIntermediate -Destination $tauriSidecar -Force
+& (Join-Path $RepoRoot "scripts\prepare-tauri-sidecar-local.ps1") -RepoRoot $RepoRoot -SourceBinary $sidecarIntermediate -NoBuild
+if ($LASTEXITCODE -ne 0) { Fail "prepare Tauri external sidecar failed" }
+$tauriSidecar = Join-Path $RepoRoot "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
 Assert-True (Test-Path -LiteralPath $tauriSidecar) "Tauri external sidecar exists at Windows target triple path"
 $report.stages.sidecar = "passed"
 
