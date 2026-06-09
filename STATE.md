@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web 单任务 approval/artifact contract 消费、Edge fixture adapter runner、Hub file-change diff projection、runtime/provider icon polish、Real/Mock boundary、Desktop exact target observed bridge、Tauri package smoke gate、SDK fixture capability evidence、localhost observed loop gate、localhost services probe plan、Agent Builder fixture evidence UI；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
-| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web task approval/artifact contract consumption、Edge fixture adapter runner contract、Hub task file-change diff metadata、runtime/provider icons polish、real-mode explicit boundary、Desktop exact target sidecar evidence、Tauri package readiness hardening、SDK fixture capability evidence、localhost observed loop runner、localhost services probe plan、Desktop Agent Builder fixture evidence |
+| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web 单任务 approval/artifact contract 消费、Edge fixture adapter runner、Hub file-change diff projection、runtime/provider icon polish、Real/Mock boundary、Desktop exact target observed bridge、Tauri package smoke gate、SDK fixture capability evidence、localhost observed loop gate、localhost services probe plan、Agent Builder fixture evidence UI、Web artifact/diff inspector；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web task approval/artifact contract consumption、Edge fixture adapter runner contract、Hub task file-change diff metadata、runtime/provider icons polish、real-mode explicit boundary、Desktop exact target sidecar evidence、Tauri package readiness hardening、SDK fixture capability evidence、localhost observed loop runner、localhost services probe plan、Desktop Agent Builder fixture evidence、Web artifact/diff inspector |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
@@ -47,6 +47,7 @@
 - localhost observed loop gate 集成提交：`b9e53b25 test(e2e): add localhost observed loop gate`，新增 no-spend localhost observed runner、manifest、safe artifact root、direct Hub-to-Edge rejection、local stack readiness 组合；当前仍 `RealTested=false`。
 - localhost services probe plan 集成提交：`935704b5 test(e2e): add localhost service probe plan`，在 localhost observed runner 中加入 `ProbeServices` health marker、统一 log root、service probe/pid/health manifests；默认不启动服务，`RealTested=false`。
 - Desktop Agent Builder fixture evidence UI 集成提交：`6c855195 feat(desktop): show fixture agent builder evidence`，在 Builder 中展示 fixture-only、runtime/profile、provider/model、tools/MCP、approval policy、workspace trust、Local Edge fixture health 和 no-spend evidence；不运行真实 SDK/CLI/model/API。
+- Web artifact/diff inspector 集成提交：`01ff715d feat(web): surface task diff evidence in inspector`，保留 Hub task artifact 的 diff/patch/edit/review/apply/revert metadata，把 file-change artifact 投影进 `RuntimeEvidenceSnapshot.diffs`，并在 transcript/inspector 展示只读 diff/edit/review 状态；不实现 apply/revert 文件写入。
 
 当前不声明已经完成：
 
@@ -80,6 +81,7 @@
 | localhost observed loop gate | worker/Gauss | 已集成并验证 controller：`b9e53b25` | runner/manifest/readiness-only gate，`RealTested=false` |
 | localhost services probe | worker/Ptolemy | 已集成并验证 controller：`935704b5` | service probe manifests 和 fail-closed readiness，不启动真实服务 |
 | Agent Builder fixture UI | worker/Franklin | 已集成并验证 controller：`6c855195` | Desktop Builder fixture/no-spend evidence，可见但不声明 live SDK execution |
+| Web artifact/diff inspector | worker/Erdos | 已集成并验证 controller：`01ff715d` | Web/shared 只读消费 Hub file-change diff metadata；不实现 apply/revert |
 | State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
 
@@ -93,10 +95,10 @@
 
 ## 下一步优先级
 
-1. **Web artifact/diff inspector consumption**：基于 Hub file-change diff metadata，把单任务 diff/edit/review 状态投影进 Web real-mode transcript 和右侧 inspector。
-2. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
-3. **Agent Builder fixture UI / IM @Agent 操作补强**：把 SDK/custom Agent fixture evidence、runtime icons、target health 和 real/mock boundary 落到用户可见的 Agent/Profile/任务入口。
-4. **受控 approved-real 方案**：已具备 preflight manifest gate；真实登录、真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
+1. **IM/@Agent 主链操作补强**：把 target health、缺 target 禁用、Agent task 启动语义和消息 pin 入口落到共享工作台。
+2. **真实 TokenDanceID 登录打通**：先跑 no-secret readiness gates，再用一次性测试账号和已批准环境运行真实登录链路，不把 secret 写入仓库。
+3. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
+4. **受控 approved-real CLI/SDK 方案**：已具备 preflight manifest gate；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
 
 ## 安全规则
 
