@@ -714,6 +714,42 @@
   cursor: pointer;
 }
 
+.composerMainchain {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: min(100%, 820px);
+  margin: 0 auto -2px;
+  color: var(--text-3);
+  font: var(--caption);
+}
+
+.composerMainchain span {
+  min-width: 0;
+  max-width: 220px;
+  height: 24px;
+  padding: 4px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composerMainchain span[data-state='selected'] {
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--bdr));
+  color: var(--text-1);
+}
+
+.composerMainchain span[data-state='missing'] {
+  border-color: color-mix(in srgb, var(--warning) 44%, var(--bdr));
+  color: var(--warning);
+}
+
 .composerInput {
   flex: 1 1 auto;
   min-width: 0;
