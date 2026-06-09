@@ -4,6 +4,8 @@ import {
   createWorkbenchDemoRuntimeStore,
   createWorkbenchDemoStore,
   demoWorkbenchPins,
+  projectGroupMessageLoopHubMessages,
+  projectGroupMessageLoopTranscript,
   resolveDemoWorkbenchTranscript,
 } from './workbenchDemo';
 import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoScenario } from './teamrunDemo';
@@ -37,6 +39,52 @@ describe('workbench v4 demo data source', () => {
       id: 'reviewer-user-1',
       kind: 'text',
     }));
+  });
+
+  it('exposes the project group Agent-to-Agent message loop fixture', () => {
+    const store = createWorkbenchDemoStore();
+    const group = store.conversations.find((conversation) => conversation.id === 'agent-collab');
+
+    expect(group).toEqual(expect.objectContaining({
+      kind: 'group',
+      title: 'Agent 协作群',
+    }));
+    expect(projectGroupMessageLoopHubMessages).toHaveLength(6);
+    expect(projectGroupMessageLoopTranscript).toEqual([
+      expect.objectContaining({
+        id: 'hub-message-a2a-dm-builder',
+        displayTitle: 'Agent DM',
+        badgeLabel: '@Agent queued',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-a2a-agent-to-agent',
+        displayTitle: 'Agent -> Agent',
+        displayDetail: 'IM agent_dm · Builder -> Reviewer · task task-a2a-review',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-mention-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent queued',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-queued-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent queued',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-route-decision',
+        kind: 'route_decision',
+        action: 'dispatch',
+        targetAgent: 'Reviewer',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-project-group-assigned-reviewer',
+        displayTitle: 'Group @Agent',
+        badgeLabel: '@Agent assigned',
+        badgeVariant: 'thinking',
+      }),
+    ]);
+    expect(resolveDemoWorkbenchTranscript('agent-collab')).toEqual(projectGroupMessageLoopTranscript);
   });
 
   it('exposes the ByteDance TeamRun fixture without live-runtime claims', () => {
@@ -83,13 +131,15 @@ describe('workbench v4 demo data source', () => {
     });
 
     const transcript = runtime.resolveTranscript('builder');
+    const userBlock = transcript[transcript.length - 2];
+    const agentBlock = transcript[transcript.length - 1];
     expect(result.intentId).toMatch(/^demo-agent-/);
     expect(transcript).toHaveLength(before + 2);
-    expect(transcript.at(-2)).toEqual(expect.objectContaining({
+    expect(userBlock).toEqual(expect.objectContaining({
       kind: 'text',
       text: '继续完善 mock 系统',
     }));
-    expect(transcript.at(-1)).toEqual(expect.objectContaining({
+    expect(agentBlock).toEqual(expect.objectContaining({
       kind: 'text',
       text: expect.stringContaining('已收到 mock 输入'),
     }));
