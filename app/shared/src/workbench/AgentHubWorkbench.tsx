@@ -54,7 +54,7 @@ const SIDEBAR_COLLAPSE_SNAP_WIDTH = 96;
 const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
 const SELECTION_HOLD_DELAY_MS = 520;
 const SELECTION_HOLD_CANCEL_DISTANCE = 36;
-const DEFAULT_BROWSER_PREVIEW_URL = 'https://hub.vectorcontrol.tech';
+const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
 type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
 
