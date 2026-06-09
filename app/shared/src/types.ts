@@ -221,7 +221,10 @@ export interface ThreadInfo {
   threadId: string;
   projectId: string;
   title: string;
+  kind?: string;
   status: string;
+  avatarColor?: string;
+  avatarLabel?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -233,6 +236,8 @@ export interface ThreadItemInfo {
   runId?: string;
   type: string;
   role?: string;
+  senderId?: string;
+  senderName?: string;
   status: string;
   content?: string;
   createdAt: string;
@@ -327,6 +332,17 @@ export interface Workspace {
   name: string;
   runId?: string;
   createdAt: string;
+}
+
+// ── User profile ─────────────────────────────────
+
+export interface UserProfileInfo {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  status?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface WorkspaceFile {

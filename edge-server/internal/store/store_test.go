@@ -104,8 +104,8 @@ func TestStoreCreatesThreadMessageItem(t *testing.T) {
 func TestStorePinsThreadItems(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_test", "Test Project")
-	thread, _ := s.CreateThread("thread_test", "proj_test", "Test Thread")
-	otherThread, _ := s.CreateThread("thread_other", "proj_test", "Other Thread")
+	thread, _ := s.CreateThread("thread_test", "proj_test", "Test Thread", "")
+	otherThread, _ := s.CreateThread("thread_other", "proj_test", "Other Thread", "")
 	item, err := s.CreateThreadMessage("item_msg", thread.ID, "", "hello")
 	if err != nil {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
@@ -174,7 +174,7 @@ func TestStoreRejectsRunForMissingThread(t *testing.T) {
 func TestStoreAllowsMultipleRunsForSameThread(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_test", "Test Project")
-	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread")
+	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread", "")
 
 	first, err := s.CreateRun("run_first", "proj_test", "thread_test")
 	if err != nil {
@@ -198,8 +198,8 @@ func TestStoreFiltersListsByProjectAndThread(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_a", "A")
 	_, _ = s.CreateProject("proj_b", "B")
-	threadA, _ := s.CreateThread("thread_a", "proj_a", "A")
-	threadB, _ := s.CreateThread("thread_b", "proj_b", "B")
+	threadA, _ := s.CreateThread("thread_a", "proj_a", "A", "")
+	threadB, _ := s.CreateThread("thread_b", "proj_b", "B", "")
 	runA, _ := s.CreateRun("run_a", "proj_a", threadA.ID)
 	_, _ = s.CreateRun("run_b", "proj_b", threadB.ID)
 	_, _ = s.CreateItem(Item{ID: "item_a", ProjectID: "proj_a", ThreadID: threadA.ID, RunID: runA.ID})
@@ -219,7 +219,7 @@ func TestStoreFiltersListsByProjectAndThread(t *testing.T) {
 func TestStoreUpdatesAndDeletesThreads(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_test", "Test Project")
-	thread, err := s.CreateThread("thread_test", "proj_test", "Test Thread")
+	thread, err := s.CreateThread("thread_test", "proj_test", "Test Thread", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestStoreUpdatesAndDeletesThreads(t *testing.T) {
 func TestStoreUpdatesRunStatusTimestamps(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_test", "Test Project")
-	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread")
+	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread", "")
 	_, _ = s.CreateRun("run_test", "proj_test", "thread_test")
 
 	started, ok := s.SetRunStatus("run_test", "started")
@@ -287,7 +287,7 @@ func TestStoreUpdatesRunStatusTimestamps(t *testing.T) {
 func TestStoreSetRunStatusIfDoesNotOverwriteDisallowedStatus(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_test", "Test Project")
-	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread")
+	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread", "")
 	_, _ = s.CreateRun("run_test", "proj_test", "thread_test")
 	finished, ok := s.SetRunStatus("run_test", "finished")
 	if !ok {

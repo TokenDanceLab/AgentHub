@@ -113,9 +113,11 @@ function threadToConversation(thread: ThreadInfo, pins?: ThreadPinInfo[]): Workb
   const conversation: WorkbenchConversation = {
     id: thread.threadId,
     title: thread.title?.trim() || '未命名会话',
-    kind: 'group',
+    kind: (thread.kind === 'direct' || thread.kind === 'group') ? thread.kind : 'group',
     subtitle: threadSubtitle(thread),
     updatedLabel,
+    avatarColor: thread.avatarColor,
+    avatarLabel: thread.avatarLabel,
   };
   const pin = pins?.[0];
   if (pin?.item?.content) {
