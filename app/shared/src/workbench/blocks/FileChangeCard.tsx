@@ -7,6 +7,10 @@ export interface FileChangeCardProps {
   action: 'created' | 'modified' | 'deleted';
   additions?: number | undefined;
   deletions?: number | undefined;
+  editId?: string | undefined;
+  reviewStatus?: string | undefined;
+  canApply?: boolean | undefined;
+  canRevert?: boolean | undefined;
   /** Optional callback for the "Review" button. When provided the button is rendered. */
   onReview?: (() => void) | undefined;
   diffExpanded?: boolean | undefined;
@@ -18,6 +22,10 @@ export const FileChangeCard: React.FC<FileChangeCardProps> = ({
   action,
   additions,
   deletions,
+  editId,
+  reviewStatus,
+  canApply,
+  canRevert,
   diffExpanded = false,
   onReview,
   onToggleDiff,
@@ -32,6 +40,14 @@ export const FileChangeCard: React.FC<FileChangeCardProps> = ({
       )}
       {deletions !== undefined && (
         <em className={styles.del}>-{deletions}</em>
+      )}
+      {editId && <span className={styles.readonlyPill}>edit {editId}</span>}
+      {reviewStatus && <span className={styles.readonlyPill}>review {reviewStatus}</span>}
+      {canApply !== undefined && (
+        <span className={styles.readonlyPill}>apply {canApply ? 'available' : 'unavailable'}</span>
+      )}
+      {canRevert !== undefined && (
+        <span className={styles.readonlyPill}>revert {canRevert ? 'available' : 'unavailable'}</span>
       )}
       {onToggleDiff && (
         <button

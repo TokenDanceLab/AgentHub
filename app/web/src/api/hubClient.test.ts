@@ -328,6 +328,11 @@ describe('createHubClient', () => {
                 tool_name: 'Write',
                 mime_type: 'text/markdown',
                 size_bytes: 128,
+                diff: '@@ -1 +1 @@\n-old\n+new\n',
+                edit_id: 'edit-1',
+                review_status: 'needs_review',
+                can_apply: false,
+                can_revert: true,
                 created_at: '2026-06-09T01:00:01Z',
               }],
               last_event_seq: 8,
@@ -385,7 +390,15 @@ describe('createHubClient', () => {
       }),
     );
     expect(approvals.approvals[0]).toMatchObject({ approval_id: 'approval-1', status: 'pending' });
-    expect(artifacts.artifacts[0]).toMatchObject({ artifact_id: 'artifact-1', path: 'reports/report.md' });
+    expect(artifacts.artifacts[0]).toMatchObject({
+      artifact_id: 'artifact-1',
+      path: 'reports/report.md',
+      diff: '@@ -1 +1 @@\n-old\n+new\n',
+      edit_id: 'edit-1',
+      review_status: 'needs_review',
+      can_apply: false,
+      can_revert: true,
+    });
     expect(decision).toMatchObject({ approval_id: 'approval-1', status: 'approved' });
   });
 
