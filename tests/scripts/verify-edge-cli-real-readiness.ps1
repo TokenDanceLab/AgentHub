@@ -116,6 +116,9 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($scriptText -match '\$ApproveRedactionPolicy') "script has an explicit redaction approval flag"
     Assert-True ($scriptText -match '\$ApproveArtifactRetention') "script has an explicit artifact retention approval flag"
     Assert-True ($scriptText -match '\$ApproveEnvVarOwnership') "script has an explicit env ownership approval flag"
+    Assert-True ($scriptText -match '\$DiscoverCommands') "script exposes no-spend command discovery"
+    Assert-True ($scriptText -match '\$OutputManifestPath') "script can write a per-runtime readiness manifest"
+    Assert-True ($scriptText -match 'codex.*claude-code.*opencode') "script declares per-runtime manifest coverage"
 
     $defaultRun = Invoke-ReadinessScript @(
         "-NoProfile",
@@ -178,6 +181,39 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($secretInputRun.ExitCode -ne 0) "secret-like approval input fails closed" $secretInputRun.Output
     Assert-True ($secretInputRun.Output -match "secret-like") "secret-like failure is reported generically" $secretInputRun.Output
     Assert-True ($secretInputRun.Output -notmatch [regex]::Escape($secretValue)) "secret-like input value is not printed" $secretInputRun.Output
+
+    $manifestDir = Join-Path ([System.IO.Path]::GetTempPath()) ("agenthub-edge-cli-readiness-test-" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+    $manifestPath = Join-Path $manifestDir "readiness-manifest.json"
+    $manifestRun = Invoke-ReadinessScript @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $scriptPath,
+        "-RepoRoot", $RepoRoot,
+        "-DiscoverCommands",
+        "-OutputManifestPath", $manifestPath
+    )
+    Assert-True ($manifestRun.ExitCode -eq 0) "discovery manifest run passes without model execution" $manifestRun.Output
+    Assert-True ($manifestRun.Output -match "No prompt, model, or API command was executed") "discovery manifest output states no prompt/model/API execution" $manifestRun.Output
+    Assert-True (Test-Path -LiteralPath $manifestPath) "discovery manifest is written"
+    if (Test-Path -LiteralPath $manifestPath) {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        Assert-True ($manifest.schema -eq "agenthub-edge-cli-approved-real-readiness-v1") "manifest schema is explicit"
+        Assert-True ($manifest.real_tested -eq $false -and $manifest.model_api_consumed -eq $false) "manifest does not claim real execution or spend"
+        foreach ($runtimeId in @("codex", "claude-code", "opencode")) {
+            $runtime = @($manifest.runtimes | Where-Object { $_.runtime_id -eq $runtimeId }) | Select-Object -First 1
+            Assert-True ($null -ne $runtime) "manifest includes $runtimeId runtime"
+            if ($null -ne $runtime) {
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$runtime.command_discovery.command_name)) "$runtimeId records command discovery"
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$runtime.json_mode.expected_flag_or_mode)) "$runtimeId records JSON mode expectation"
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$runtime.permission_boundary.expected_mode)) "$runtimeId records permission/approval boundary"
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$runtime.budget.stop_policy)) "$runtimeId records budget stop policy"
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$runtime.timeouts.kill_policy)) "$runtimeId records timeout/kill policy"
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$runtime.artifacts.root_policy)) "$runtimeId records artifact root policy"
+                Assert-True (-not [string]::IsNullOrWhiteSpace([string]$runtime.redaction_manifest.policy)) "$runtimeId records redaction manifest policy"
+            }
+        }
+    }
 
     $approvalRequiredRun = Invoke-ReadinessScript @(
         "-NoProfile",
@@ -336,6 +372,7 @@ if (Test-Path -LiteralPath $docPath) {
     Assert-True ($docText -match "allowed temp") "audit doc records allowed artifact temp roots"
     Assert-True ($docText -match "secret-like") "audit doc records secret-like input rejection"
     Assert-True ($docText -match "No real CLI/model run") "audit doc records no real CLI/model execution"
+    Assert-True ($docText -match "per-runtime readiness manifest") "audit doc records per-runtime readiness manifest"
 }
 
 if ($Failed -gt 0) {

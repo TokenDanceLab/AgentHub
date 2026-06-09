@@ -23,6 +23,7 @@ This slice is a proposal/readiness gate for future approved Edge CLI runs. No re
 | Runtime path/env names | Edge config exposes `AGENTHUB_CODEX_PATH`, `AGENTHUB_CLAUDE_CODE_PATH`, and `AGENTHUB_OPENCODE_PATH`. Future approval must provide env var ownership without values. | Static pass |
 | Secret-like input rejection | The readiness script rejects secret-like parameter content and reports only the field name. | Static pass |
 | Artifact output boundary | Future artifact roots must be under allowed temp directories: `.tmp/edge-cli-real-readiness/` or `$env:TEMP/AgentHub/edge-cli-real-readiness/`. | Static pass |
+| Per-runtime readiness manifest | `verify-edge-cli-real-readiness.ps1 -DiscoverCommands -OutputManifestPath <path>` writes a per-runtime readiness manifest for `codex`, `claude-code`, and `opencode` covering command discovery, version/help probe result, JSON mode, permission boundary, budget, timeout, artifact root, and redaction manifest policy. | No-spend preflight |
 | Real execution | This slice does not run Codex, Claude Code, OpenCode, SDKs, model APIs, or network calls. | Blocked |
 
 ## Approval Prerequisites
@@ -48,6 +49,8 @@ Default `ProposalOnly` mode may pass static checks while still reporting these i
 
 Before any future real run, run this gate with `-RequireApprovalInputs` plus the approval flags. Missing approval flags, unsupported adapter ids, secret-like parameter content, and artifact paths outside the allowed temp roots fail closed.
 
+The per-runtime readiness manifest is an executable checklist, not completion evidence. Command discovery may use `Get-Command`, `--version`, and `--help` only when `-DiscoverCommands` is explicitly set. It must not pass a prompt, read auth material, call a model/API, or promote `real_tested=true`.
+
 Allowed status claims from this script:
 
 - `PROPOSAL_ONLY`: static evidence was checked; real execution is still blocked or not attempted.
@@ -57,7 +60,8 @@ Allowed status claims from this script:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-edge-cli-real-readiness.ps1 -RepoRoot .
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-edge-cli-real-readiness.ps1 -RepoRoot . -DiscoverCommands -OutputManifestPath .tmp\edge-cli-real-readiness\readiness-manifest.json
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-edge-cli-real-readiness.ps1 -RepoRoot .
 ```
 
-Do not add `codex`, `claude`, or `opencode` invocation commands to this gate. Future real execution must be a separate approved slice with redacted evidence handling.
+Do not add prompt-bearing `codex`, `claude`, or `opencode` invocation commands to this gate. Future real execution must be a separate approved slice with redacted evidence handling.

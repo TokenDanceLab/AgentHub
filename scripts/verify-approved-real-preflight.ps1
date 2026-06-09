@@ -114,6 +114,23 @@ function Require-NumberPath {
     return $null
 }
 
+function Require-ArrayPath {
+    param(
+        [object]$Object,
+        [string]$Path,
+        [string]$Label
+    )
+
+    $value = Get-ValueAtPath $Object $Path
+    if ($null -ne $value -and $value -is [array] -and $value.Count -gt 0) {
+        Pass "$Label is declared"
+        return @($value)
+    }
+
+    Fail "$Label missing or not a non-empty array ($Path)"
+    return @()
+}
+
 function Test-ApprovedActionObject {
     param([object]$Value)
 
@@ -194,6 +211,31 @@ function Assert-UriLike {
     }
 }
 
+function Test-RuntimeReadinessEntry {
+    param([object]$Runtime)
+
+    $runtimeId = Require-StringPath $Runtime "runtime_id" "runtime_readiness.runtime_id"
+    if (@("codex", "claude-code", "opencode") -contains $runtimeId) {
+        Pass "runtime_readiness $runtimeId is supported"
+    } elseif (-not [string]::IsNullOrWhiteSpace($runtimeId)) {
+        Fail "runtime_readiness runtime_id must be codex, claude-code, or opencode, got '$runtimeId'"
+    }
+
+    Require-StringPath $Runtime "command_discovery.command_name" "runtime_readiness.$runtimeId command_discovery.command_name" | Out-Null
+    $installed = Get-ValueAtPath $Runtime "command_discovery.installed"
+    if ($installed -is [bool]) {
+        Pass "runtime_readiness.$runtimeId command_discovery.installed is boolean"
+    } else {
+        Fail "runtime_readiness.$runtimeId command_discovery.installed missing or not boolean"
+    }
+    Require-StringPath $Runtime "json_mode.expected_flag_or_mode" "runtime_readiness.$runtimeId json_mode.expected_flag_or_mode" | Out-Null
+    Require-StringPath $Runtime "permission_boundary.expected_mode" "runtime_readiness.$runtimeId permission_boundary.expected_mode" | Out-Null
+    Require-StringPath $Runtime "budget.stop_policy" "runtime_readiness.$runtimeId budget.stop_policy" | Out-Null
+    Require-StringPath $Runtime "timeouts.kill_policy" "runtime_readiness.$runtimeId timeouts.kill_policy" | Out-Null
+    Require-StringPath $Runtime "artifacts.root_policy" "runtime_readiness.$runtimeId artifacts.root_policy" | Out-Null
+    Require-StringPath $Runtime "redaction_manifest.policy" "runtime_readiness.$runtimeId redaction_manifest.policy" | Out-Null
+}
+
 Write-Host "AgentHub approved-real preflight manifest gate" -ForegroundColor Magenta
 Write-Host "Input kind: manifest/preflight only" -ForegroundColor Magenta
 Write-Host "No login, CLI/model/API, deploy, sign, notarization, updater, release upload, network, or production command was executed." -ForegroundColor Magenta
@@ -261,6 +303,23 @@ Require-StringPath $manifest "target_runtime.id" "target runtime id" | Out-Null
 Require-StringPath $manifest "target_runtime.kind" "target runtime kind" | Out-Null
 Require-StringPath $manifest "cli.command_path" "CLI command path" | Out-Null
 Require-StringPath $manifest "cli.command_plan" "future CLI command plan" | Out-Null
+
+$runtimeReadiness = Require-ArrayPath $manifest "runtime_readiness" "runtime_readiness"
+$seenRuntimeIds = @{}
+foreach ($runtime in $runtimeReadiness) {
+    Test-RuntimeReadinessEntry $runtime
+    $runtimeId = [string](Get-ValueAtPath $runtime "runtime_id")
+    if (-not [string]::IsNullOrWhiteSpace($runtimeId)) {
+        $seenRuntimeIds[$runtimeId] = $true
+    }
+}
+foreach ($runtimeId in @("codex", "claude-code", "opencode")) {
+    if ($seenRuntimeIds.ContainsKey($runtimeId)) {
+        Pass "runtime_readiness includes $runtimeId"
+    } else {
+        Fail "runtime_readiness missing $runtimeId"
+    }
+}
 
 $hubUrl = Require-StringPath $manifest "urls.hub" "Hub URL"
 $webUrl = Require-StringPath $manifest "urls.web" "Web URL"
