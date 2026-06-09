@@ -8,7 +8,7 @@ import { useAgentList } from '@/api/agentQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
-import { useCreateThread } from '@/api/threadQueries';
+import { useCreateThread, useCurrentUser } from '@/api/threadQueries';
 import { DesktopChrome } from '@/components/DesktopChrome';
 import { DesktopEntryGate } from '@/components/DesktopEntryGate';
 import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
@@ -107,6 +107,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const createRun = useCreateRun();
   const createThread = useCreateThread();
+  const { data: currentUser } = useCurrentUser(liveEdgeEnabled);
   const activeRunId = useMemo(() => {
     if (!workbench.activeThreadId) return undefined;
     return resolveCurrentTranscriptRunId(workbench.transcript);
@@ -251,6 +252,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         showHeaderDataModeControl={false}
         showMainchainStatus={false}
         transcript={workbench.transcript}
+        userDisplayName={currentUser?.displayName}
+        userAvatarUrl={currentUser?.avatarUrl}
         workbenchStatus={{
           dataMode: workbench.dataMode,
           targetState: workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',

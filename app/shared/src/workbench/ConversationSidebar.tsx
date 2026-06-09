@@ -39,11 +39,15 @@ export function ConversationSidebar({
                   aria-hidden="true"
                   className={styles.conversationAvatar}
                   style={{
-                    background: conversation.avatarColor ?? 'var(--primary)',
+                    background: conversation.avatarUrl ? undefined : (conversation.avatarColor ?? 'var(--primary)'),
                     color: conversation.avatarTextColor,
                   }}
                 >
-                  {initial}
+                  {conversation.avatarUrl ? (
+                    <img alt="" className={styles.avatarImg} src={conversation.avatarUrl} />
+                  ) : (
+                    initial
+                  )}
                 </span>
                 <span className={styles.conversationCopy}>
                   <span className={styles.conversationTitle}>{conversation.title}</span>

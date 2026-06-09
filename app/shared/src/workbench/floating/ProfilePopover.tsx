@@ -34,6 +34,7 @@ interface ProfilePopoverProps {
   subtitle?: string;
   avatar?: string;
   avatarColor?: string;
+  avatarUrl?: string;
   isOpen: boolean;
   onClose: () => void;
   anchorRef?: React.RefObject<HTMLElement | null>;
@@ -59,6 +60,7 @@ export function ProfilePopover({
   subtitle,
   avatar,
   avatarColor,
+  avatarUrl,
   isOpen,
   onClose,
   anchorRef,
@@ -156,6 +158,10 @@ export function ProfilePopover({
   const initials = avatar || name.slice(0, 1).toUpperCase();
   const avatarBg = avatarColor || 'var(--primary)';
 
+  const avatarContent = avatarUrl ? (
+    <img alt="" src={avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+  ) : initials;
+
   /* ── Account variant ── */
   if (variant === 'account') {
     return (
@@ -170,9 +176,9 @@ export function ProfilePopover({
         <div className={styles.accountHead}>
           <div
             className={`${styles.avatar} ${styles.accountAvatar}`}
-            style={{ background: avatarBg }}
+            style={{ background: avatarUrl ? undefined : avatarBg }}
           >
-            {initials}
+            {avatarContent}
           </div>
           <div className={styles.identity}>
             <div className={styles.titleRow}>

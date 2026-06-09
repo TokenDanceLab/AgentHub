@@ -36,6 +36,9 @@ export interface GlobalRailProps {
   onNavigate?: (page: GlobalRailPage) => void;
   onLogout?: (() => void) | undefined;
   onToggleTheme?: (() => void) | undefined;
+  /** User profile data for the current user. */
+  userDisplayName?: string | undefined;
+  userAvatarUrl?: string | undefined;
 }
 
 export function GlobalRail({
@@ -43,12 +46,17 @@ export function GlobalRail({
   onNavigate,
   onLogout,
   onToggleTheme,
+  userDisplayName,
+  userAvatarUrl,
 }: GlobalRailProps): React.ReactElement {
   const [internalPage, setInternalPage] = useState<GlobalRailPage>('chat');
   const avatarRef = useRef<HTMLDivElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+
+  const displayName = userDisplayName ?? 'Delicious233';
+  const displayInitial = displayName.slice(0, 1).toUpperCase();
 
   // Use controlled props when provided, otherwise fall back to internal state.
   const isControlled = activePageProp !== undefined;
@@ -87,7 +95,7 @@ export function GlobalRail({
   return (
     <nav aria-label="Global rail" className={styles.rail}>
       <div
-        aria-label="Delicious233"
+        aria-label={displayName}
         aria-expanded={profileOpen}
         aria-haspopup="dialog"
         className={styles.railAvatar}
@@ -96,9 +104,13 @@ export function GlobalRail({
         ref={avatarRef}
         role="button"
         tabIndex={0}
-        title="Delicious233"
+        title={displayName}
       >
-        D
+        {userAvatarUrl ? (
+          <img alt="" src={userAvatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+        ) : (
+          displayInitial
+        )}
       </div>
 
       {topNavItems.map((item) => (
@@ -149,11 +161,12 @@ export function GlobalRail({
           { label: '复制链接' },
         ]}
         anchorRef={avatarRef}
-        avatar="D"
+        avatar={userAvatarUrl ? '' : displayInitial}
         avatarColor="var(--primary)"
+        avatarUrl={userAvatarUrl}
         badge="当前用户"
         isOpen={profileOpen}
-        name="Delicious233"
+        name={displayName}
         onAccountMenu={handleProfileAction}
         onAction={handleProfileAction}
         onClose={() => setProfileOpen(false)}

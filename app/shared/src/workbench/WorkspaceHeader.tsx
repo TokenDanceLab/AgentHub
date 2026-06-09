@@ -37,11 +37,15 @@ export function WorkspaceHeader({
         className={styles.workspaceAvatar}
         style={{
           background:
-            activeConversation?.avatarColor ?? 'var(--primary)',
+            activeConversation?.avatarUrl ? undefined : (activeConversation?.avatarColor ?? 'var(--primary)'),
           color: activeConversation?.avatarTextColor,
         }}
       >
-        {initial}
+        {activeConversation?.avatarUrl ? (
+          <img alt="" className={styles.workspaceAvatarImg} src={activeConversation.avatarUrl} />
+        ) : (
+          initial
+        )}
       </div>
 
       <div className={styles.workspaceHeaderCopy}>

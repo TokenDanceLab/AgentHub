@@ -32,6 +32,7 @@ export interface WorkbenchConversation {
   avatarLabel?: string | undefined;
   avatarColor?: string | undefined;
   avatarTextColor?: string | undefined;
+  avatarUrl?: string | undefined;
   pinnedAnnouncement?: WorkbenchPinnedAnnouncement | undefined;
 }
 
