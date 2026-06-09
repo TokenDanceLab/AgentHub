@@ -16,14 +16,21 @@ func SeedIfEmpty(repo Repository) error {
 
 	slog.Info("seed: store is empty, seeding demo data")
 
-	// 1. Project
+	// 1. User profiles
+	for _, profile := range seedUserProfiles {
+		if _, err := repo.CreateUserProfile(profile); err != nil {
+			return err
+		}
+	}
+
+	// 2. Project
 	if _, err := repo.CreateProject(seedProjectID, seedProjectName); err != nil {
 		return err
 	}
 
-	// 2. Threads + Runs + Items + Evidence
+	// 3. Threads + Runs + Items + Evidence
 	for _, t := range seedThreads {
-		if _, err := repo.CreateThread(t.ID, seedProjectID, t.Title); err != nil {
+		if _, err := repo.CreateThread(t.ID, seedProjectID, t.Title, t.Kind); err != nil {
 			return err
 		}
 
@@ -84,14 +91,16 @@ func SeedIfEmpty(repo Repository) error {
 		for _, item := range t.Items {
 			runID := item.RunID
 			if _, err := repo.CreateItem(Item{
-				ID:        item.ID,
-				ProjectID: seedProjectID,
-				ThreadID:  t.ID,
-				RunID:     runID,
-				Type:      item.Type,
-				Role:      item.Role,
-				Status:    "created",
-				Content:   item.Content,
+				ID:         item.ID,
+				ProjectID:  seedProjectID,
+				ThreadID:   t.ID,
+				RunID:      runID,
+				Type:       item.Type,
+				Role:       item.Role,
+				SenderID:   item.SenderID,
+				SenderName: item.SenderName,
+				Status:     "created",
+				Content:    item.Content,
 			}); err != nil {
 				return err
 			}

@@ -244,11 +244,11 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 	var patch map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithDetail("invalid json body")))
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("invalid json body")))
 		return
 	}
 	if len(patch) == 0 {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithDetail("empty patch")))
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("empty patch")))
 		return
 	}
 	settings := ensureStore(h).UpsertSettings(patch)

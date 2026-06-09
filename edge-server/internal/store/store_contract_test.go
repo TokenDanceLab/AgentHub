@@ -417,7 +417,7 @@ func runRepositoryLifecycleContract(t *testing.T, handle repositoryContractHandl
 		t.Fatalf("duplicate project = %#v, want original project", duplicate)
 	}
 
-	if _, err := repo.CreateThread("thread_missing_project", "missing", "Missing"); !errors.Is(err, ErrNotFound) {
+	if _, err := repo.CreateThread("thread_missing_project", "missing", "Missing", ""); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("CreateThread missing project error = %v, want ErrNotFound", err)
 	}
 	thread, err := repo.CreateThread("thread_contract", project.ID, "")

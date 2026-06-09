@@ -150,6 +150,9 @@ export interface AgentHubWorkbenchProps {
   showHeaderDataModeControl?: boolean | undefined;
   showMainchainStatus?: boolean | undefined;
   transcript: TranscriptBlock[];
+  /** Current user profile info, shown in GlobalRail avatar and profile popover. */
+  userDisplayName?: string | undefined;
+  userAvatarUrl?: string | undefined;
 }
 
 export function AgentHubWorkbench({
@@ -181,6 +184,8 @@ export function AgentHubWorkbench({
   showHeaderDataModeControl = true,
   showMainchainStatus = true,
   transcript,
+  userDisplayName,
+  userAvatarUrl,
 }: AgentHubWorkbenchProps): React.ReactElement {
   const fallbackConversationId = conversations[0]?.id ?? 'default';
   const [localConversationId, setLocalConversationId] = useState(fallbackConversationId);
@@ -1057,6 +1062,8 @@ export function AgentHubWorkbench({
         onNavigate={navigateRail}
         onLogout={onLogout}
         onToggleTheme={handleToggleTheme}
+        userDisplayName={userDisplayName}
+        userAvatarUrl={userAvatarUrl}
       />
       {isChatPage && (
         <div className={styles.sidebarFrame}>
