@@ -18,6 +18,10 @@ type WorkspaceService interface {
 	Get(ctx context.Context, id, ownerID string) (*model.Workspace, error)
 	Update(ctx context.Context, id, ownerID string, req *service.WorkspaceUpdate) (*model.Workspace, error)
 	List(ctx context.Context, ownerID, q, cursor string, pageSize int) (*service.WorkspaceListResult, error)
+	ListThreads(ctx context.Context, projectID, ownerID string) ([]service.WorkspaceThread, error)
+	CreateThread(ctx context.Context, projectID, ownerID string, req *service.CreateWorkspaceThreadRequest) (*service.WorkspaceThread, error)
+	CreateThreadMessage(ctx context.Context, projectID, threadID, ownerID string, req service.SendWorkspaceThreadMessageRequest) (*service.WorkspaceThreadMessage, error)
+	ListThreadMessages(ctx context.Context, projectID, threadID, ownerID string, limit int) ([]service.WorkspaceThreadMessage, error)
 }
 
 type WorkspaceHandler struct {
@@ -110,4 +114,81 @@ func (h *WorkspaceHandler) UpdateWorkspace(c *gin.Context) {
 		return
 	}
 	OK(c, workspace)
+}
+
+type createProjectThreadReq struct {
+	Name string `json:"name" binding:"required"`
+}
+
+func (h *WorkspaceHandler) ListProjectThreads(c *gin.Context) {
+	threads, err := h.service.ListThreads(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, threads)
+}
+
+func (h *WorkspaceHandler) CreateProjectThread(c *gin.Context) {
+	var req createProjectThreadReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	thread, err := h.service.CreateThread(c.Request.Context(), c.Param("id"), c.GetString("user_id"), &service.CreateWorkspaceThreadRequest{
+		Name: req.Name,
+	})
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, thread)
+}
+
+func (h *WorkspaceHandler) CreateProjectThreadMessage(c *gin.Context) {
+	var req service.SendWorkspaceThreadMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	if req.ClientMsgID != "" {
+		normalized, ok := normalizeUUID(req.ClientMsgID)
+		if !ok {
+			Fail(c, errcode.ErrBadRequest)
+			return
+		}
+		req.ClientMsgID = normalized
+	}
+	message, err := h.service.CreateThreadMessage(c.Request.Context(), c.Param("id"), c.Param("threadId"), c.GetString("user_id"), req)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, message)
+}
+
+func (h *WorkspaceHandler) ListProjectThreadMessages(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	messages, err := h.service.ListThreadMessages(c.Request.Context(), c.Param("id"), c.Param("threadId"), c.GetString("user_id"), limit)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, messages)
 }

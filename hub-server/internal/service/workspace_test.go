@@ -26,6 +26,54 @@ func newWorkspaceTestDB(t *testing.T) *gorm.DB {
 			updated_at DATETIME
 		)
 	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE TABLE sessions (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL,
+			name TEXT,
+			avatar_url TEXT,
+			announcement TEXT,
+			owner_user_id TEXT,
+			workspace_id TEXT,
+			next_seq INTEGER NOT NULL DEFAULT 0,
+			last_message_at DATETIME,
+			dissolved BOOLEAN NOT NULL DEFAULT false,
+			created_at DATETIME
+		)
+	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE TABLE session_members (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			member_type TEXT NOT NULL,
+			member_id TEXT NOT NULL,
+			role TEXT NOT NULL,
+			pinned BOOLEAN NOT NULL DEFAULT false,
+			archived BOOLEAN NOT NULL DEFAULT false,
+			muted BOOLEAN NOT NULL DEFAULT false,
+			last_read_seq INTEGER NOT NULL DEFAULT 0,
+			joined_at DATETIME,
+			left_at DATETIME,
+			updated_at DATETIME
+		)
+	`).Error)
+	require.NoError(t, db.Exec(`
+		CREATE TABLE messages (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			seq_id INTEGER NOT NULL,
+			client_msg_id TEXT NOT NULL,
+			sender_type TEXT NOT NULL,
+			sender_id TEXT NOT NULL,
+			content_type TEXT NOT NULL,
+			content TEXT NOT NULL,
+			reply_to_message_id TEXT,
+			recalled BOOLEAN NOT NULL DEFAULT false,
+			edited BOOLEAN NOT NULL DEFAULT false,
+			edited_at DATETIME,
+			created_at DATETIME
+		)
+	`).Error)
 	return db
 }
 
@@ -142,4 +190,84 @@ func TestWorkspaceListSupportsOwnerScopeSearchAndPagination(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, search.Items, 1)
 	require.Equal(t, "workspace-1", search.Items[0].ID)
+}
+
+func TestWorkspaceProjectThreadsPreserveProjectAndMessageContext(t *testing.T) {
+	db := newWorkspaceTestDB(t)
+	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
+	svc := NewWorkspaceService(db)
+
+	thread, err := svc.CreateThread(context.Background(), "workspace-1", "owner-1", &CreateWorkspaceThreadRequest{
+		Name: "项目群",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "workspace-1", thread.ProjectID)
+	require.Equal(t, model.SessionTypeGroup, thread.Type)
+	require.Equal(t, "项目群", thread.Name)
+	require.Equal(t, model.MemberRoleOwner, thread.Role)
+	require.Equal(t, int64(1), thread.MemberCount)
+
+	threads, err := svc.ListThreads(context.Background(), "workspace-1", "owner-1")
+	require.NoError(t, err)
+	require.Len(t, threads, 1)
+	require.Equal(t, thread.ID, threads[0].ID)
+	require.Equal(t, "workspace-1", threads[0].ProjectID)
+
+	message, err := svc.CreateThreadMessage(context.Background(), "workspace-1", thread.ID, "owner-1", SendWorkspaceThreadMessageRequest{
+		ClientMsgID: "00000000-0000-0000-0000-000000000c01",
+		Content:     "保留项目线程上下文",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "workspace-1", message.ProjectID)
+	require.Equal(t, thread.ID, message.ThreadID)
+	require.Equal(t, int64(1), message.SeqID)
+
+	messages, err := svc.ListThreadMessages(context.Background(), "workspace-1", thread.ID, "owner-1", 50)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.Equal(t, "workspace-1", messages[0].ProjectID)
+	require.Equal(t, thread.ID, messages[0].ThreadID)
+	require.Equal(t, model.ContentTypeText, messages[0].ContentType)
+	require.Equal(t, `{"text":"保留项目线程上下文"}`, messages[0].Content)
+}
+
+func TestWorkspaceProjectThreadMessagePreservesA2AMetadata(t *testing.T) {
+	db := newWorkspaceTestDB(t)
+	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
+	svc := NewWorkspaceService(db)
+
+	thread, err := svc.CreateThread(context.Background(), "workspace-1", "owner-1", &CreateWorkspaceThreadRequest{Name: "项目群"})
+	require.NoError(t, err)
+
+	content := `{"text":"@Reviewer 请审查这个切片","metadata":{"im_kind":"project_group","mentions":[{"type":"agent","id":"agent-reviewer","display_name":"Reviewer"}],"orchestrator_queue":{"status":"queued","route":"review","correlation_id":"corr-1"}}}`
+	message, err := svc.CreateThreadMessage(context.Background(), "workspace-1", thread.ID, "owner-1", SendWorkspaceThreadMessageRequest{
+		ClientMsgID: "00000000-0000-0000-0000-000000000c02",
+		Content:     content,
+	})
+	require.NoError(t, err)
+	require.JSONEq(t, content, message.Content)
+
+	messages, err := svc.ListThreadMessages(context.Background(), "workspace-1", thread.ID, "owner-1", 50)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	require.JSONEq(t, content, messages[0].Content)
+}
+
+func TestWorkspaceProjectThreadsAreOwnerAndProjectScoped(t *testing.T) {
+	db := newWorkspaceTestDB(t)
+	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
+	seedWorkspace(t, db, "workspace-2", "owner-1", "Other")
+	svc := NewWorkspaceService(db)
+
+	thread, err := svc.CreateThread(context.Background(), "workspace-1", "owner-1", &CreateWorkspaceThreadRequest{Name: "项目群"})
+	require.NoError(t, err)
+
+	_, err = svc.ListThreads(context.Background(), "workspace-1", "other-owner")
+	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+
+	_, err = svc.CreateThreadMessage(context.Background(), "workspace-2", thread.ID, "owner-1", SendWorkspaceThreadMessageRequest{
+		ClientMsgID: "00000000-0000-0000-0000-000000000c03",
+		Content:     "wrong project",
+	})
+	require.ErrorIs(t, err, errcode.SessionNotFound)
 }

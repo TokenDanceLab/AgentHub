@@ -1065,6 +1065,7 @@ func newMessageAttachmentTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE sessions (
 			id TEXT PRIMARY KEY,
 			type TEXT NOT NULL,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved BOOLEAN NOT NULL DEFAULT FALSE,
