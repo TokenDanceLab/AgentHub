@@ -175,7 +175,9 @@ Assert-True (Test-Path -LiteralPath $tauriSidecar) "Tauri external sidecar exist
 $report.stages.sidecar = "passed"
 
 if (-not $SkipExecutableCompile) {
-    Invoke-Checked "Build Tauri executable without bundling" (Join-Path $RepoRoot "app\desktop") "corepack.cmd" @("pnpm", "tauri", "build", "--no-bundle")
+    Invoke-Checked "Build Tauri executable without bundling" (Join-Path $RepoRoot "app\desktop") "corepack.cmd" @("pnpm", "tauri", "build", "--no-bundle") @{
+        CI = "true"
+    }
     $desktopExe = Join-Path $RepoRoot "app\desktop\src-tauri\target\release\agenthub-desktop.exe"
     Assert-True (Test-Path -LiteralPath $desktopExe) "Tauri executable compile artifact exists"
     Copy-Item -LiteralPath $desktopExe -Destination (Join-Path $artifactRoot "agenthub-desktop.exe") -Force
@@ -185,7 +187,9 @@ if (-not $SkipExecutableCompile) {
 }
 
 if ($RunWindowsBundle) {
-    Invoke-Checked "Build unsigned Tauri Windows NSIS package" (Join-Path $RepoRoot "app\desktop") "corepack.cmd" @("pnpm", "tauri", "build")
+    Invoke-Checked "Build unsigned Tauri Windows NSIS package" (Join-Path $RepoRoot "app\desktop") "corepack.cmd" @("pnpm", "tauri", "build", "--no-sign") @{
+        CI = "true"
+    }
 
     $nsis = Get-ChildItem (Join-Path $RepoRoot "app\desktop\src-tauri\target\release\bundle\nsis") -Filter "*setup.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
     Assert-True ($null -ne $nsis) "NSIS setup.exe artifact exists"
