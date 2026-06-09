@@ -49,8 +49,10 @@ Any missing approval marker, missing manifest field, wrong-type required field, 
 Passing observed manifests are still manifest-level evidence only. They report
 `observed_manifest_accepted=true` and keep `real_tested=false` because this
 verifier does not dereference the referenced artifact, event log, or hash. A
-future RealTested promotion needs a separate verifier that reads the referenced
-material and checks event ids/correlation ids against it.
+RealTested promotion must pass
+`scripts/verify-approved-real-edge-cli-evidence.ps1`, which reads the referenced
+artifact, event log, or hash manifest and checks event ids/correlation ids
+against it.
 
 Boolean-only synthetic manifests are fixture proof only. Even with an approval marker, they remain `real_tested=false`; concrete observed evidence reference and event correlation fields are required only to accept the manifest for follow-up verification.
 
