@@ -33,6 +33,8 @@ export interface WorkbenchConversation {
   avatarColor?: string | undefined;
   avatarTextColor?: string | undefined;
   avatarUrl?: string | undefined;
+  /** 群聊成员名称列表，用于卡片展示。 */
+  members?: string[] | undefined;
   pinnedAnnouncement?: WorkbenchPinnedAnnouncement | undefined;
 }
 

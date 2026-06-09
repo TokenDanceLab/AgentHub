@@ -60,6 +60,7 @@ const demoConversationsBase: WorkbenchConversation[] = [
     unreadCount: 4,
     model: 'DeepSeek-V4-Pro',
     avatarColor: `linear-gradient(135deg, ${ROLE_ORCHESTRATOR}, ${ROLE_BUILDER})`,
+    members: ['Orchestrator', 'Builder', 'Reviewer', 'Deployer'],
   },
   {
     id: TEAMRUN_DEMO_CONVERSATION_ID,
@@ -71,6 +72,7 @@ const demoConversationsBase: WorkbenchConversation[] = [
     model: 'fixture-only',
     avatarLabel: 'T',
     avatarColor: `linear-gradient(135deg, ${ROLE_ORCHESTRATOR}, ${ROLE_REVIEWER})`,
+    members: ['Builder', 'Reviewer', 'Deployer'],
   },
   {
     id: 'deployer',
@@ -125,6 +127,7 @@ const demoConversationsBase: WorkbenchConversation[] = [
     avatarLabel: 'P',
     avatarColor: 'var(--surface-highest)',
     avatarTextColor: 'var(--text-3)',
+    members: ['Delicious233', 'Builder', 'Reviewer', 'Johnny', 'Trump'],
   },
   {
     id: 'project-docs',
