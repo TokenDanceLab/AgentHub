@@ -299,72 +299,73 @@ test.describe('AgentHub real E2E', () => {
         // User B exists -- run full friend flow
         const tokenB = await mintTestJWT(userBId);
 
-      // Send friend request
-      const frResp = await request.post('http://127.0.0.1:8080/client/contacts/friend-requests', {
-        headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
-        data: { friend_id: userBId, message: 'Playwright E2E friend request' },
-      });
-      // May succeed or already-exist
-      expect([200, 201, 409].map(String)).toContain(String(frResp.status()));
+        // Send friend request
+        const frResp = await request.post('http://127.0.0.1:8080/client/contacts/friend-requests', {
+          headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
+          data: { friend_id: userBId, message: 'Playwright E2E friend request' },
+        });
+        // May succeed or already-exist
+        expect([200, 201, 409].map(String)).toContain(String(frResp.status()));
 
-      // List friend requests as user B and accept if pending
-      const frListResp = await request.get('http://127.0.0.1:8080/client/contacts/friend-requests', {
-        headers: { Authorization: `Bearer ${tokenB}` },
-      });
-      expect(frListResp.status()).toBe(200);
-      const frListBody = await frListResp.json();
-      expect(frListBody.code).toBe('OK');
-      const pendingFR = (frListBody.data as any[]).find(
-        (fr: any) => fr.from_user_id === '3ecadf58-012a-4fc5-9170-61976cdac5a7' && fr.status === 'pending',
-      );
-      if (pendingFR) {
-        const frId = pendingFR.request_id ?? pendingFR.id;
-        const acceptResp = await request.post(`http://127.0.0.1:8080/client/contacts/friend-requests/${frId}/accept`, {
-          headers: { Authorization: `Bearer ${tokenB}`, 'Content-Type': 'application/json' },
+        // List friend requests as user B and accept if pending
+        const frListResp = await request.get('http://127.0.0.1:8080/client/contacts/friend-requests', {
+          headers: { Authorization: `Bearer ${tokenB}` },
+        });
+        expect(frListResp.status()).toBe(200);
+        const frListBody = await frListResp.json();
+        expect(frListBody.code).toBe('OK');
+        const pendingFR = (frListBody.data as any[]).find(
+          (fr: any) => fr.from_user_id === '3ecadf58-012a-4fc5-9170-61976cdac5a7' && fr.status === 'pending',
+        );
+        if (pendingFR) {
+          const frId = pendingFR.request_id ?? pendingFR.id;
+          const acceptResp = await request.post(`http://127.0.0.1:8080/client/contacts/friend-requests/${frId}/accept`, {
+            headers: { Authorization: `Bearer ${tokenB}`, 'Content-Type': 'application/json' },
+            data: {},
+          });
+          expect([200, 201].map(String)).toContain(String(acceptResp.status()));
+        }
+
+        // Verify mutual contacts
+        const contactsA2 = await request.get('http://127.0.0.1:8080/client/contacts', {
+          headers: { Authorization: `Bearer ${tokenA}` },
+        });
+        expect(contactsA2.status()).toBe(200);
+        const contactsA2Body = await contactsA2.json();
+        const foundB = (contactsA2Body.data as any[]).find((c: any) => c.user_id === userBId);
+        expect(foundB).toBeTruthy();
+
+        // Update remark
+        const remarkResp = await request.put(`http://127.0.0.1:8080/client/contacts/${userBId}/remark`, {
+          headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
+          data: { remark: 'Playwright E2E Remark' },
+        });
+        expect([200, 201].map(String)).toContain(String(remarkResp.status()));
+
+        // Block
+        const blockResp = await request.post(`http://127.0.0.1:8080/client/contacts/${userBId}/block`, {
+          headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
           data: {},
         });
-        expect([200, 201].map(String)).toContain(String(acceptResp.status()));
+        expect([200, 201].map(String)).toContain(String(blockResp.status()));
+
+        // Unblock
+        const unblockResp = await request.post(`http://127.0.0.1:8080/client/contacts/${userBId}/unblock`, {
+          headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
+          data: {},
+        });
+        expect([200, 201].map(String)).toContain(String(unblockResp.status()));
+
+        // Create group session
+        const groupResp = await request.post('http://127.0.0.1:8080/client/sessions/group', {
+          headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
+          data: { name: 'Playwright E2E Group', member_ids: [userBId] },
+        });
+        expect([200, 201].map(String)).toContain(String(groupResp.status()));
+        const groupBody = await groupResp.json();
+        expect(groupBody.code).toBe('OK');
+        expect(groupBody.data.session_id).toBeTruthy();
       }
-
-      // Verify mutual contacts
-      const contactsA = await request.get('http://127.0.0.1:8080/client/contacts', {
-        headers: { Authorization: `Bearer ${tokenA}` },
-      });
-      expect(contactsA.status()).toBe(200);
-      const contactsABody = await contactsA.json();
-      const foundB = (contactsABody.data as any[]).find((c: any) => c.user_id === userBId);
-      expect(foundB).toBeTruthy();
-
-      // Update remark
-      const remarkResp = await request.put(`http://127.0.0.1:8080/client/contacts/${userBId}/remark`, {
-        headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
-        data: { remark: 'Playwright E2E Remark' },
-      });
-      expect([200, 201].map(String)).toContain(String(remarkResp.status()));
-
-      // Block
-      const blockResp = await request.post(`http://127.0.0.1:8080/client/contacts/${userBId}/block`, {
-        headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
-        data: {},
-      });
-      expect([200, 201].map(String)).toContain(String(blockResp.status()));
-
-      // Unblock
-      const unblockResp = await request.post(`http://127.0.0.1:8080/client/contacts/${userBId}/unblock`, {
-        headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
-        data: {},
-      });
-      expect([200, 201].map(String)).toContain(String(unblockResp.status()));
-
-      // Create group session
-      const groupResp = await request.post('http://127.0.0.1:8080/client/sessions/group', {
-        headers: { Authorization: `Bearer ${tokenA}`, 'Content-Type': 'application/json' },
-        data: { name: 'Playwright E2E Group', member_ids: [userBId] },
-      });
-      expect([200, 201].map(String)).toContain(String(groupResp.status()));
-      const groupBody = await groupResp.json();
-      expect(groupBody.code).toBe('OK');
-      expect(groupBody.data.session_id).toBeTruthy();
     });
   });
 
