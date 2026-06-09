@@ -100,6 +100,17 @@ func TestRuntimeManifestAdapterFixtureFileContract(t *testing.T) {
 	if got := adapter.Capabilities(); !got.Streaming || !got.ToolCalls || !got.FileChanges || !got.PermissionHooks || !got.MultiTurn {
 		t.Fatalf("capabilities = %#v", got)
 	}
+	health := adapter.CapabilityHealthMetadata()
+	if health["adapterId"] != "custom-fixture" || health["transport"] != "fixture-file" || health["healthState"] != "available" {
+		t.Fatalf("capability health metadata = %#v", health)
+	}
+	if health["fixtureOnly"] != true || health["noSpendDefault"] != true {
+		t.Fatalf("health metadata missing fixture-only/no-spend evidence: %#v", health)
+	}
+	capabilityMetadata, ok := health["capabilities"].(map[string]bool)
+	if !ok || !capabilityMetadata["streaming"] || !capabilityMetadata["toolCalls"] || !capabilityMetadata["permissionHooks"] {
+		t.Fatalf("capability metadata = %#v", health["capabilities"])
+	}
 
 	cmdPath, args, env, workDir := adapter.BuildCommand(RunProcessContext{Prompt: "secret prompt", WorkDir: "C:\\Users\\Ding\\private\\workspace"})
 	currentExecutable, err := os.Executable()
@@ -192,16 +203,49 @@ func TestRuntimeManifestAdapterFixtureSubprocessBuildCommandUsesManifestCommand(
 }
 
 func TestRuntimeManifestRejectsRealSDKTransports(t *testing.T) {
+	for _, transport := range []string{
+		"openai-agents-sdk",
+		"claude-sdk",
+		"http-sse",
+		"stdio",
+		"websocket",
+		"fixture-file;rm",
+	} {
+		t.Run(transport, func(t *testing.T) {
+			dir := t.TempDir()
+			manifestPath := filepath.Join(dir, "runtime.json")
+			manifest := runtimeManifestTestJSON(t, map[string]any{
+				"schema":  RuntimeManifestV1Schema,
+				"id":      "real-sdk",
+				"name":    "Real SDK",
+				"kind":    "sdk",
+				"command": "node",
+				"fixture": map[string]any{
+					"type": transport,
+				},
+			})
+			if err := os.WriteFile(manifestPath, []byte(manifest), 0o600); err != nil {
+				t.Fatalf("write manifest: %v", err)
+			}
+
+			if _, err := LoadRuntimeManifestFile(manifestPath); err == nil || !strings.Contains(err.Error(), "unsafe or live runtime transport") {
+				t.Fatalf("LoadRuntimeManifestFile error = %v, want unsafe transport rejection", err)
+			}
+		})
+	}
+}
+
+func TestRuntimeManifestRejectsUnknownFixtureTransport(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "runtime.json")
 	manifest := runtimeManifestTestJSON(t, map[string]any{
 		"schema":  RuntimeManifestV1Schema,
-		"id":      "real-sdk",
-		"name":    "Real SDK",
-		"kind":    "sdk",
-		"command": "node",
+		"id":      "unknown-transport",
+		"name":    "Unknown Transport",
+		"kind":    "custom",
+		"command": "fixture-runner",
 		"fixture": map[string]any{
-			"type": "openai-agents-sdk",
+			"type": "unknown-fixture-transport",
 		},
 	})
 	if err := os.WriteFile(manifestPath, []byte(manifest), 0o600); err != nil {
@@ -209,7 +253,7 @@ func TestRuntimeManifestRejectsRealSDKTransports(t *testing.T) {
 	}
 
 	if _, err := LoadRuntimeManifestFile(manifestPath); err == nil || !strings.Contains(err.Error(), "fixture-file or fixture-subprocess") {
-		t.Fatalf("LoadRuntimeManifestFile error = %v, want fixture-only transport rejection", err)
+		t.Fatalf("LoadRuntimeManifestFile error = %v, want unknown transport rejection", err)
 	}
 }
 
@@ -228,6 +272,9 @@ func TestRuntimeManifestAdapterUnavailableWhenFixtureFileMissing(t *testing.T) {
 	adapter := NewRuntimeManifestAdapter(manifest)
 	if adapter.Available() {
 		t.Fatal("missing fixture-file adapter should not be available")
+	}
+	if health := adapter.CapabilityHealthMetadata(); health["healthState"] != "unavailable" || health["fixtureOnly"] != true || health["noSpendDefault"] != true {
+		t.Fatalf("missing fixture health metadata = %#v", health)
 	}
 }
 

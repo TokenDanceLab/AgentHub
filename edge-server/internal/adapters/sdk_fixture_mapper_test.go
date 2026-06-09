@@ -20,6 +20,121 @@ func TestSDKFixtureMapperOpenCodeGolden(t *testing.T) {
 	assertSDKFixtureGolden(t, "opencode")
 }
 
+func TestSDKFixtureMapperCustomOpenAICompatibleGolden(t *testing.T) {
+	assertSDKFixtureGolden(t, "custom_openai_compatible")
+}
+
+func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.T) {
+	providers := []struct {
+		name       string
+		provider   string
+		runtimeID  string
+		transport  string
+		capability SDKFixtureCapabilities
+	}{
+		{
+			name:      "openai",
+			provider:  SDKFixtureProviderOpenAI,
+			runtimeID: "openai-agents-sdk-like",
+			transport: "fixture-file",
+			capability: SDKFixtureCapabilities{
+				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, MultiTurn: true,
+				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-file"},
+			},
+		},
+		{
+			name:      "claude",
+			provider:  SDKFixtureProviderClaude,
+			runtimeID: "claude-sdk-like",
+			transport: "fixture-file",
+			capability: SDKFixtureCapabilities{
+				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, MultiTurn: true,
+				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-file"},
+			},
+		},
+		{
+			name:      "opencode",
+			provider:  SDKFixtureProviderOpenCode,
+			runtimeID: "opencode-like",
+			transport: "fixture-subprocess",
+			capability: SDKFixtureCapabilities{
+				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, ThinkingVisible: true,
+				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-subprocess"},
+			},
+		},
+		{
+			name:      "custom",
+			provider:  SDKFixtureProviderCustomOpenAICompatible,
+			runtimeID: "custom-openai-compatible",
+			transport: "fixture-file",
+			capability: SDKFixtureCapabilities{
+				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, MCPIntegration: true,
+				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-file"},
+			},
+		},
+	}
+
+	for _, tt := range providers {
+		t.Run(tt.name, func(t *testing.T) {
+			stream := SDKFixtureStream{
+				Provider: tt.provider,
+				Events: []SDKFixtureEvent{{
+					ID:                  "capability_" + tt.name,
+					Type:                "capability_health",
+					RuntimeID:           tt.runtimeID,
+					AdapterID:           tt.runtimeID,
+					AdapterMode:         "fixture",
+					FixtureTransport:    tt.transport,
+					WorkspacePathPolicy: "workspace-relative-or-basename",
+					RawSDKObjectPolicy:  "never-expose-above-edge-adapter",
+					Capabilities:        &tt.capability,
+					Health: &SDKFixtureHealth{
+						State:  "fixture-ready",
+						Reason: "no SDK package, model call, API call, or CLI process was executed",
+						Checks: map[string]string{
+							"transport": "fixture-only",
+							"spend":     "blocked",
+						},
+						Metadata: map[string]any{
+							"workspace_path":    "D:\\Code\\TokenDance\\AgentHub\\private",
+							"sdk_session_token": "not-real",
+							"api_key":           "sk-not-real",
+						},
+					},
+				}},
+			}
+			mapped := MapSDKFixtureStream(stream, testSDKFixtureScope())
+			if len(mapped) != 1 || mapped[0].Type != BusEventStatusChange {
+				t.Fatalf("mapped capability event = %#v", mapped)
+			}
+			payload := mapped[0].Payload
+			if payload["provider"] != tt.provider || payload["runtimeId"] != tt.runtimeID {
+				t.Fatalf("provider/runtime metadata = %#v", payload)
+			}
+			if payload["fixtureOnly"] != true || payload["noSpendDefault"] != true {
+				t.Fatalf("missing fixture-only no-spend metadata: %#v", payload)
+			}
+			if payload["rawSdkObjectPolicy"] != "never-expose-above-edge-adapter" {
+				t.Fatalf("raw SDK policy = %#v", payload["rawSdkObjectPolicy"])
+			}
+			capability, ok := payload["capabilities"].(map[string]any)
+			if !ok || capability["toolCalls"] != true || capability["fixtureOnly"] != true || capability["noSpendDefault"] != true {
+				t.Fatalf("capabilities payload = %#v", payload["capabilities"])
+			}
+			health, ok := payload["health"].(map[string]any)
+			if !ok || health["state"] != "fixture-ready" {
+				t.Fatalf("health payload = %#v", payload["health"])
+			}
+			replay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
+			for _, leaked := range []string{"sk-not-real", "D:\\Code\\TokenDance", "not-real"} {
+				if strings.Contains(replay, leaked) {
+					t.Fatalf("capability health replay leaked %q:\n%s", leaked, replay)
+				}
+			}
+		})
+	}
+}
+
 func TestSDKFixtureMapperKeepsOutputWorkspaceRelativeAndRedacted(t *testing.T) {
 	stream := SDKFixtureStream{
 		Provider: SDKFixtureProviderClaude,

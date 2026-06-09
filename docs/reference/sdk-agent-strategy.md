@@ -240,9 +240,11 @@ Owner scope: future Edge adapter test slice.
 Current slice:
 
 - `edge-server/internal/adapters/sdk_fixture_mapper.go` defines a fixture-only mapper and does not implement or register an `AgentAdapter`.
-- Claude SDK-like and OpenAI Agents SDK-like JSON fixtures live under `edge-server/internal/adapters/testdata/sdk_fixture_mapper/`.
-- Golden tests project provider-like fixture events into existing AgentHub event types: `run.agent.tool_call`, `run.agent.permission_requested`, `run.agent.route_decision`, `run.agent.file_change`, `artifact.created`, and `run.agent.result`.
+- Claude SDK-like, OpenAI Agents SDK-like, OpenCode-like, and custom OpenAI-compatible JSON fixtures live under `edge-server/internal/adapters/testdata/sdk_fixture_mapper/`.
+- Golden tests project provider-like fixture events into existing AgentHub event types: `run.agent.tool_call`, `run.agent.tool_result`, `run.agent.permission_requested`, `run.agent.route_decision`, `run.agent.file_change`, `artifact.created`, and `run.agent.result`.
+- Capability and health metadata remain provider-neutral: fixture-only, no-spend default, workspace-relative-or-basename path policy, and raw SDK object policy set to never expose above the Edge adapter.
 - Mapper output strips common secret/token fields and normalizes file/artifact paths to workspace-relative or basename-only values before emitting payloads.
+- `edge-server/internal/adapters/runtime_manifest.go` only accepts `fixture-file` and `fixture-subprocess` manifest transports in this slice. Unknown, live SDK, HTTP/SSE/WebSocket/stdio, shell-like, or otherwise unsafe transports are rejected before adapter construction is treated as available.
 
 Deliverables:
 
@@ -258,6 +260,8 @@ Acceptance:
 Non-goals:
 
 - No live SDK runtime.
+- No SDK package installation.
+- No SDK preflight, provider API call, model call, or real CLI process execution.
 - No real MCP server.
 - No model/provider credentials.
 

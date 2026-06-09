@@ -94,6 +94,47 @@ func (a *RuntimeManifestAdapter) Capabilities() AgentCapabilities {
 	return a.manifest.Capabilities
 }
 
+func (a *RuntimeManifestAdapter) CapabilityHealthMetadata() map[string]any {
+	capabilities := a.manifest.Capabilities
+	healthState := "available"
+	if !a.Available() {
+		healthState = "unavailable"
+	}
+	metadata := map[string]any{
+		"adapterId":           a.manifest.ID,
+		"runtimeKind":         a.manifest.Kind,
+		"fixtureOnly":         true,
+		"noSpendDefault":      true,
+		"transport":           a.manifest.Fixture.Type,
+		"healthState":         healthState,
+		"workspacePathPolicy": "runtime-workdir-runtime-managed; fixture payloads basename-redacted",
+		"rawSdkObjectPolicy":  "never-expose-above-edge-adapter",
+		"capabilities": map[string]bool{
+			"streaming":       capabilities.Streaming,
+			"toolCalls":       capabilities.ToolCalls,
+			"fileChanges":     capabilities.FileChanges,
+			"permissionHooks": capabilities.PermissionHooks,
+			"thinkingVisible": capabilities.ThinkingVisible,
+			"multiTurn":       capabilities.MultiTurn,
+			"mcpIntegration":  capabilities.MCPIntegration,
+			"subAgentSpawn":   capabilities.SubAgentSpawn,
+		},
+	}
+	if len(a.manifest.Models) > 0 {
+		models := make([]string, 0, len(a.manifest.Models))
+		for _, model := range a.manifest.Models {
+			if strings.TrimSpace(model.ID) != "" {
+				models = append(models, model.ID)
+			}
+		}
+		metadata["models"] = models
+	}
+	if strings.TrimSpace(a.manifest.Icons.Fallback) != "" {
+		metadata["iconFallback"] = a.manifest.Icons.Fallback
+	}
+	return metadata
+}
+
 func (a *RuntimeManifestAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	workDir := ctx.WorkDir
 	if workDir == "" {
@@ -176,7 +217,11 @@ func (m RuntimeManifestV1) validate() error {
 	if strings.TrimSpace(m.Command) == "" {
 		return fmt.Errorf("command is required")
 	}
-	switch strings.TrimSpace(m.Fixture.Type) {
+	fixtureType := strings.TrimSpace(m.Fixture.Type)
+	if isUnsafeRuntimeManifestTransport(fixtureType) {
+		return fmt.Errorf("unsafe or live runtime transport %q is not allowed in fixture manifests; use fixture-file or fixture-subprocess", fixtureType)
+	}
+	switch fixtureType {
 	case runtimeManifestFixtureFile:
 		if strings.TrimSpace(m.Fixture.Path) == "" {
 			return fmt.Errorf("fixture.path is required for fixture-file")
@@ -230,4 +275,22 @@ func isLikelyRuntimeManifestSecretArg(value string) bool {
 		strings.Contains(normalized, "secret") ||
 		strings.Contains(normalized, "authorization") ||
 		strings.Contains(normalized, "password")
+}
+
+func isUnsafeRuntimeManifestTransport(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" || normalized == runtimeManifestFixtureFile || normalized == runtimeManifestFixtureSubprocess {
+		return false
+	}
+	return strings.Contains(normalized, "sdk") ||
+		strings.Contains(normalized, "http") ||
+		strings.Contains(normalized, "websocket") ||
+		strings.Contains(normalized, "stdio") ||
+		strings.Contains(normalized, "grpc") ||
+		strings.Contains(normalized, "sse") ||
+		strings.Contains(normalized, "live") ||
+		strings.Contains(normalized, "real") ||
+		strings.Contains(normalized, "shell") ||
+		strings.Contains(normalized, " ") ||
+		strings.ContainsAny(normalized, ";|&`$")
 }
