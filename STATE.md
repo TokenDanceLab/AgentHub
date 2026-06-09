@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 14:36 +08:00
+最后更新：2026-06-09 14:39 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -45,12 +45,11 @@
 |---|---|---|---|
 | Edge SQLite durable observed smoke | Johnny/backend | 已合入 dev：`63fb6273` | fixture-only alpha durability gate；不代表完整 relational CRUD |
 | Desktop sidecar observed smoke | Trump/Desktop | 已合入 dev：`79e1e453` | fixture/mock sidecar 证据；真实打包仍需要 sidecar binary |
-| Desktop sidecar binary/package smoke | Desktop sidecar worker | review branch：`codex/p1-desktop-sidecar-binary-smoke` | 本地 build/placement/smoke gate；二进制、签名、公证、release upload 不提交不执行 |
 | CLI JSON readiness checker | Edge/SDK worker | 已合入 dev：`bf1a7ab5` | 静态/fixture JSON 合同；不运行真实 CLI/model/API |
 | Web real-mode visual smoke | Trump/Web | 已推 dev：`e2ee21f0` + `2aff026d` | review branch `origin/codex/p1-web-real-mode-visual-smoke` commit `855c8cea`；改动只在 `app/shared/**`，不碰 Hub/Edge/Desktop/Mobile |
 | Hub 单任务 approval/artifact | Johnny/backend | 运行中：thread `019eab05-39ef-7b70-bece-4b2a853fe9e8` | 只改 Hub/API；补 `/web/agent-tasks` approval decision 与 artifact metadata/list 最小合同 |
-| Desktop sidecar binary/package smoke | Desktop/Tauri | 运行中：thread `019eab05-4365-72a1-962b-278fb3c7888f` | 只改 Desktop/Tauri package/readiness 脚本；验证 Windows sidecar binary placement，不提交二进制 |
-| Edge SQLite durable hardening | Johnny/Edge | 运行中：thread `019eab08-71aa-72e0-9912-f23060e22e09` | 只改 Edge store/durable gate；验证 approval/artifact/replay/pins 重启恢复，不声明完整 production DB |
+| Desktop sidecar binary/package smoke | Desktop/Tauri | 已集成 controller：`74660003`，待验证/推 dev | review branch `origin/codex/p1-desktop-sidecar-binary-smoke` commit `f70194c4`；本地 build/placement/smoke gate，不提交二进制、不签名/公证/release upload |
+| Edge SQLite durable hardening | Johnny/Edge | 已集成 controller：cherry-pick 进行中，待验证/推 dev | review branch `origin/codex/p1-edge-sqlite-durable-hardening` commit `28655b25`；fixture-only durable gate，不声明完整 production DB |
 | Hub/Event/Replay 合同审计 | Johnny/backend | 已产出报告 | 指向单任务 approval/artifact Hub 合同缺口；后续进入实现 worker |
 | State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
