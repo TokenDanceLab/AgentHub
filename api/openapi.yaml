@@ -3296,6 +3296,111 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
 
+  /web/projects/{id}/threads:
+    x-agenthub-device-type: web
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListProjectThreads
+      summary: List Hub project group threads.
+      description: Returns owner-scoped Hub group sessions bound to the project workspace through sessions.workspace_id.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateProjectThread
+      summary: Create a Hub project group thread.
+      description: Creates a group session owned by the current Hub user and binds it to the project workspace.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceThreadRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /web/projects/{id}/threads/{threadId}/messages:
+    x-agenthub-device-type: web
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListProjectThreadMessages
+      summary: List messages in a Hub project group thread.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: threadId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateProjectThreadMessage
+      summary: Send a message in a Hub project group thread.
+      description: Text content may be raw text or a JSON object with text plus optional metadata for project group, @Agent mention and orchestrator queue fixtures. This route only records the message; real runtime dispatch still uses /web/agent-tasks with trigger_message_id.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: threadId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendWorkspaceThreadMessageRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
   # ── Audit Events ──
 
   /web/audit-events:
@@ -5886,6 +5991,89 @@ components:
           type: string
         description:
           type: string
+    WorkspaceThread:
+      type: object
+      required: [id, project_id, type, name, member_count, created_at]
+      description: Web project-facing projection of a Hub group session.
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [group]
+        name:
+          type: string
+        owner_user_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+        member_count:
+          type: integer
+          format: int64
+        last_message_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    CreateWorkspaceThreadRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+    SendWorkspaceThreadMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        client_msg_id:
+          type: string
+          format: uuid
+        content_type:
+          type: string
+          enum: [text, code, diff, image, file, link_card, deploy_card]
+          default: text
+        content:
+          type: string
+          description: Raw text, or JSON text payload with optional metadata for im_kind, mentions and orchestrator_queue.
+    WorkspaceThreadMessage:
+      type: object
+      required: [id, project_id, thread_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        seq_id:
+          type: integer
+          format: int64
+        client_msg_id:
+          type: string
+          format: uuid
+        sender_type:
+          type: string
+          enum: [user, agent]
+        sender_id:
+          type: string
+        content_type:
+          type: string
+        content:
+          type: string
+          description: "Normalized JSON string. Text messages are persisted as text-only JSON or text plus metadata JSON."
+        created_at:
+          type: string
+          format: date-time
     CreateExecutionTargetRequest:
       type: object
       required: [name]
