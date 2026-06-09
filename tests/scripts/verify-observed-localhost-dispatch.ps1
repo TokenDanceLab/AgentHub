@@ -132,7 +132,8 @@ function New-ObservedManifest {
         [ordered]@{ id = "evt-003"; type = "hub.agent.dispatch"; actor = "hub"; source = "hub.dispatch_log"; observed = $true },
         [ordered]@{ id = "evt-004"; type = "desktop.dispatch.accepted"; actor = "desktop"; source = "desktop.bridge_log"; observed = $true },
         [ordered]@{ id = "evt-005"; type = "edge.run.started"; actor = "desktop-local-edge"; source = "edge.run_log"; observed = $true },
-        [ordered]@{ id = "evt-006"; type = "hub.replay.recorded"; actor = "hub"; source = "hub.replay_store"; observed = $true }
+        [ordered]@{ id = "evt-006"; type = "hub.replay.recorded"; actor = "hub"; source = "hub.replay_store"; observed = $true },
+        [ordered]@{ id = "evt-007"; type = "web.replay.rendered"; actor = "web"; source = "web.transcript_render"; observed = $true }
     )
     if ($MissingDispatch) {
         $events = @($events | Where-Object { $_.type -ne "hub.agent.dispatch" })
@@ -200,6 +201,19 @@ function New-ObservedManifest {
             replay_ref = $replayEventRef
             source = "hub.replay_store"
             event_ref = $replayEventRef
+        }
+        web_render = [ordered]@{
+            team_run_id = "teamrun-observed-001"
+            hub_task_id = "task-observed-001"
+            target_id = "target-observed-001"
+            edge_device_id = "desktop-device-001"
+            edge_run_id = "edge-run-observed-001"
+            adapter_id = "fixture-sdk-adapter"
+            replay_ref = $replayEventRef
+            render_source = "hub-replay"
+            observed = $true
+            source = "web.transcript_render"
+            event_ref = "evt-007"
         }
         events = $events
     }
