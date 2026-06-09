@@ -608,6 +608,50 @@ describe('useWebWorkbenchModel helpers', () => {
       error: null,
       targets: [
         {
+          id: 'target-local-edge-mismatch',
+          name: 'Mismatched Desktop Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          health_state: 'mismatch',
+          trust_level: 'local',
+          is_online: false,
+        },
+      ],
+    })).toMatchObject({
+      state: 'mismatch',
+      selectedTarget: undefined,
+      block: { text: expect.stringContaining('binding mismatch') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'approved-real',
+      isFetching: false,
+      error: null,
+      targets: [
+        {
+          id: 'target-local-edge-stale',
+          name: 'Stale Desktop Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          health_state: 'stale',
+          trust_level: 'local',
+          is_online: true,
+        },
+      ],
+    })).toMatchObject({
+      state: 'stale',
+      selectedTarget: undefined,
+      block: { text: expect.stringContaining('health is stale') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'approved-real',
+      isFetching: false,
+      error: null,
+      targets: [
+        {
           id: 'target-local-edge-offline',
           name: 'Offline Desktop Edge',
           target_type: 'local_edge',
@@ -634,7 +678,7 @@ describe('useWebWorkbenchModel helpers', () => {
           name: 'Online Desktop Edge',
           target_type: 'local_edge',
           workspace_allowlist: ['D:\\Code\\TokenDance\\AgentHub'],
-          health_state: 'healthy',
+          health_state: 'online',
           trust_level: 'local',
           is_online: true,
         },
