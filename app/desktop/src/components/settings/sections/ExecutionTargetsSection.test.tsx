@@ -3,6 +3,11 @@ import { vi } from 'vitest';
 import ExecutionTargetsSection from './ExecutionTargetsSection';
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
+import { localCliDiscoveryFixture } from '../cliDiscovery';
+
+vi.mock('@shared/workbench', () => ({
+  RuntimeBrandIcon: ({ name }: { name?: string }) => <span data-testid="runtime-brand-icon">{name}</span>,
+}));
 
 vi.mock('../cards/RunnerRow', () => ({
   default: () => <div data-testid="runner-row" />,
@@ -50,6 +55,15 @@ vi.mock('react-i18next', () => ({
         'settings.localEdgeTargetUpdateAction': 'Sync Local Edge target',
         'settings.localEdgeTargetSyncing': 'Syncing Local Edge target...',
         'settings.localEdgeTargetSyncError': 'Hub target sync failed: {{error}}',
+        'settings.localCliDiscovery': 'Local CLI discovery',
+        'settings.localCliDiscoveryDesc': 'No-spend runtime discovery for Desktop diagnostics. It does not execute runs, prompt-bearing commands, model calls, or secrets.',
+        'settings.localCliReadinessManifest': 'Readiness manifest',
+        'settings.localCliReadinessScript': 'Readiness script',
+        'settings.localCliNoSpend': 'no-spend',
+        'settings.localCliInstalled': 'installed',
+        'settings.localCliMissing': 'missing',
+        'settings.localCliVersion': 'version',
+        'settings.localCliPath': 'path',
       };
       return text[key]
         ?.replace('{{name}}', String(values?.name))
@@ -98,6 +112,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof ExecutionT
       deviceId="desktop-device-0001"
       registeredLocalEdgeTarget={null}
       localEdgeTargetSyncStatus="idle"
+      cliDiscovery={localCliDiscoveryFixture}
       {...overrides}
     />,
   );
@@ -255,5 +270,26 @@ describe('ExecutionTargetsSection', () => {
 
     expect(screen.getByText('Hub target sync failed: HTTP 409')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register Local Edge target' })).toBeEnabled();
+  });
+
+  it('shows no-spend local CLI discovery with versions, paths, and readiness manifest in settings diagnostics', () => {
+    renderSection();
+
+    expect(screen.getByText('Local CLI discovery')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === 'Readiness manifest: docs/audit/p0-edge-cli-real-readiness.md')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === 'Readiness script: scripts/verify-edge-cli-real-readiness.ps1')).toBeInTheDocument();
+
+    expect(screen.getByText('Codex CLI')).toBeInTheDocument();
+    expect(screen.getByText('version: 0.27.0')).toBeInTheDocument();
+    expect(screen.getByText('path: C:/Users/Ding/AppData/Roaming/npm/codex.cmd')).toBeInTheDocument();
+
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByText('version: 2.1.4')).toBeInTheDocument();
+    expect(screen.getByText('OpenCode')).toBeInTheDocument();
+    expect(screen.getByText('version: 0.8.3')).toBeInTheDocument();
+
+    expect(screen.getAllByText('no-spend')).toHaveLength(3);
+    expect(screen.getAllByText('installed')).toHaveLength(3);
+    expect(screen.getByText(/does not execute runs, prompt-bearing commands, model calls, or secrets/i)).toBeInTheDocument();
   });
 });

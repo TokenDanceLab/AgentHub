@@ -7,7 +7,7 @@ import {
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
-import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
+import type { AgentHubPlatform, LocalCliDiscoveryManifest, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { EvidenceRef } from '@shared/transcript';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
@@ -28,6 +28,7 @@ export interface DesktopPlatformOptions {
   activeProjectId?: string;
   getEdgeHostReadiness?: () => Promise<DesktopEdgeHostReadiness>;
   getLocalEdgeDiagnostics?: () => Promise<DesktopLocalEdgeDiagnostics>;
+  getLocalCliDiscovery?: () => Promise<LocalCliDiscoveryManifest>;
   activeThreadId?: string;
   openPreview?: (evidence: EvidenceRef) => Promise<void>;
   pickLocalAttachments?: NonNullable<AgentHubPlatform['attachments']>['pickFiles'];
@@ -73,6 +74,7 @@ export interface DesktopLocalEdgeDiagnostics {
     last_error: string | null;
     log_paths: DesktopEdgeHostReadiness['log_paths'];
   };
+  local_cli_discovery?: LocalCliDiscoveryManifest;
   packaged_login: {
     loopback: {
       available: boolean;
@@ -101,6 +103,7 @@ export interface DesktopHostPort {
   executionTargetPreference(): DesktopTargetPreference;
   edgeHostReadiness(): Promise<DesktopEdgeHostReadiness>;
   localEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics>;
+  localCliDiscovery(): Promise<LocalCliDiscoveryManifest>;
 }
 
 export interface DesktopPlatform extends AgentHubPlatform {
@@ -118,6 +121,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
     host: {
       edgeHostReadiness: options.getEdgeHostReadiness ?? readEdgeHostReadiness,
       localEdgeDiagnostics: options.getLocalEdgeDiagnostics ?? readLocalEdgeDiagnostics,
+      localCliDiscovery: options.getLocalCliDiscovery ?? readLocalCliDiscovery,
       executionTargetPreference: resolveDesktopTargetPreference,
     },
     conversations: {
@@ -164,6 +168,10 @@ function readEdgeHostReadiness(): Promise<DesktopEdgeHostReadiness> {
 
 function readLocalEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics> {
   return invoke<DesktopLocalEdgeDiagnostics>('get_local_edge_diagnostics');
+}
+
+export function readLocalCliDiscovery(): Promise<LocalCliDiscoveryManifest> {
+  return invoke<LocalCliDiscoveryManifest>('get_local_cli_discovery');
 }
 
 function edgeSelectedAgent(intent: ComposerIntent): Pick<StartRunRequest, 'agentId' | 'model'> {

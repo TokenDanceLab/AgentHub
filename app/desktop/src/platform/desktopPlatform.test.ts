@@ -277,4 +277,48 @@ describe('createDesktopPlatform', () => {
     expect(diagnostics).not.toHaveProperty('command');
     expect(diagnostics).not.toHaveProperty('cliPath');
   });
+
+  it('exposes no-spend local CLI discovery through the Desktop host port', async () => {
+    const platform = createDesktopPlatform({
+      getLocalCliDiscovery: vi.fn().mockResolvedValue({
+        mode: 'no-spend-discovery',
+        readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+        readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+        generatedAt: null,
+        items: [
+          {
+            id: 'codex',
+            name: 'Codex CLI',
+            installed: true,
+            version: 'codex 0.1.0',
+            path: 'C:/Tools/codex.cmd',
+            noSpend: true,
+          },
+          {
+            id: 'claude-code',
+            name: 'Claude Code',
+            installed: false,
+            version: null,
+            path: 'claude',
+            noSpend: true,
+          },
+        ],
+      }),
+    });
+
+    const discovery = await platform.host.localCliDiscovery();
+
+    expect(discovery).toEqual(expect.objectContaining({
+      mode: 'no-spend-discovery',
+      readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+      readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+    }));
+    expect(discovery.items[0]).toEqual(expect.objectContaining({
+      id: 'codex',
+      installed: true,
+      noSpend: true,
+    }));
+    expect(discovery).not.toHaveProperty('prompt');
+    expect(discovery).not.toHaveProperty('model');
+  });
 });

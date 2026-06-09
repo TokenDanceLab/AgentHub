@@ -24,6 +24,7 @@ This slice is a proposal/readiness gate for future approved Edge CLI runs. No re
 | Secret-like input rejection | The readiness script rejects secret-like parameter content and reports only the field name. | Static pass |
 | Artifact output boundary | Future artifact roots must be under allowed temp directories: `.tmp/edge-cli-real-readiness/` or `$env:TEMP/AgentHub/edge-cli-real-readiness/`. | Static pass |
 | Per-runtime readiness manifest | `verify-edge-cli-real-readiness.ps1 -DiscoverCommands -OutputManifestPath <path>` writes a per-runtime readiness manifest for `codex`, `claude-code`, and `opencode` covering command discovery, version/help probe result, JSON mode, permission boundary, budget, timeout, artifact root, and redaction manifest policy. | No-spend preflight |
+| Desktop settings diagnostics | Desktop Tauri exposes `get_local_cli_discovery` and `get_local_edge_diagnostics.local_cli_discovery`; the shared settings route reads it only for `platform.surface === "desktop"` and renders it in the Settings diagnostics area, not the Web home route. The probe is limited to command resolution plus a bounded `--version` check with null stdin and no prompt/model/API execution. | No-spend preflight |
 | Real execution | This slice does not run Codex, Claude Code, OpenCode, SDKs, model APIs, or network calls. | Blocked |
 
 ## Approval Prerequisites

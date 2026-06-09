@@ -3,12 +3,13 @@ use crate::oidc_server::{check_loopback_callback_readiness, LoopbackReadiness};
 use crate::secure_store::{check_credential_store_readiness, CredentialStoreReadiness};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 
@@ -256,8 +257,30 @@ pub struct LocalEdgeLogTail {
 pub struct LocalEdgeDiagnostics {
     pub readiness: EdgeHostReadiness,
     pub status: EdgeStatus,
+    pub local_cli_discovery: LocalCliDiscoveryManifest,
     pub packaged_login: PackagedLoginReadiness,
     pub log_tail: LocalEdgeLogTail,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalCliDiscoveryItem {
+    pub id: String,
+    pub name: String,
+    pub installed: bool,
+    pub version: Option<String>,
+    pub path: String,
+    pub no_spend: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalCliDiscoveryManifest {
+    pub mode: String,
+    pub readiness_manifest: String,
+    pub readiness_script: String,
+    pub generated_at: Option<String>,
+    pub items: Vec<LocalCliDiscoveryItem>,
 }
 
 #[tauri::command]
@@ -285,15 +308,128 @@ pub async fn get_local_edge_diagnostics(
     Ok(LocalEdgeDiagnostics {
         readiness,
         status,
+        local_cli_discovery: build_local_cli_discovery(),
         packaged_login,
         log_tail,
     })
 }
 
 #[tauri::command]
+pub async fn get_local_cli_discovery() -> Result<LocalCliDiscoveryManifest, String> {
+    Ok(build_local_cli_discovery())
+}
+
+#[tauri::command]
 pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
     let mgr = state.lock().await;
     mgr.local_auth_token().map(str::to_string)
+}
+
+fn build_local_cli_discovery() -> LocalCliDiscoveryManifest {
+    LocalCliDiscoveryManifest {
+        mode: "no-spend-discovery".to_string(),
+        readiness_manifest: "docs/audit/p0-edge-cli-real-readiness.md".to_string(),
+        readiness_script: "scripts/verify-edge-cli-real-readiness.ps1".to_string(),
+        generated_at: None,
+        items: vec![
+            discover_cli("codex", "Codex CLI", "codex", "AGENTHUB_CODEX_PATH"),
+            discover_cli(
+                "claude-code",
+                "Claude Code",
+                "claude",
+                "AGENTHUB_CLAUDE_CODE_PATH",
+            ),
+            discover_cli(
+                "opencode",
+                "OpenCode",
+                "opencode",
+                "AGENTHUB_OPENCODE_PATH",
+            ),
+        ],
+    }
+}
+
+fn discover_cli(id: &str, name: &str, command: &str, env_var: &str) -> LocalCliDiscoveryItem {
+    let configured = env::var(env_var)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| command.to_string());
+    let resolved_path = resolve_cli_path(&configured);
+    let installed = resolved_path.is_some();
+    let path = resolved_path.unwrap_or(configured);
+    let version = if installed {
+        read_cli_version(&path)
+    } else {
+        None
+    };
+
+    LocalCliDiscoveryItem {
+        id: id.to_string(),
+        name: name.to_string(),
+        installed,
+        version,
+        path,
+        no_spend: true,
+    }
+}
+
+fn resolve_cli_path(command: &str) -> Option<String> {
+    let candidate = Path::new(command);
+    if candidate.is_absolute() || command.contains('/') || command.contains('\\') {
+        if candidate.exists() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+        return None;
+    }
+
+    let lookup = if cfg!(target_os = "windows") {
+        ("where.exe", command)
+    } else {
+        ("which", command)
+    };
+    let output = Command::new(lookup.0).arg(lookup.1).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(str::to_string)
+}
+
+fn read_cli_version(path: &str) -> Option<String> {
+    let mut child = Command::new(path)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                let output = child.wait_with_output().ok()?;
+                let text = if output.stdout.is_empty() {
+                    String::from_utf8_lossy(&output.stderr)
+                } else {
+                    String::from_utf8_lossy(&output.stdout)
+                };
+                return text
+                    .lines()
+                    .map(str::trim)
+                    .find(|line| !line.is_empty())
+                    .map(|line| line.chars().take(120).collect());
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            Err(_) => return None,
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    Some("version probe timed out".to_string())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1151,6 +1287,44 @@ mod tests {
         );
         assert!(!readiness.running);
         assert!(!readiness.direct_cli_spawn);
+    }
+
+    #[test]
+    fn local_cli_discovery_missing_probe_is_no_spend() {
+        let item = discover_cli(
+            "codex",
+            "Codex CLI",
+            "agenthub-definitely-missing-cli-for-test",
+            "AGENTHUB_MISSING_CLI_FOR_TEST",
+        );
+
+        assert_eq!(item.id, "codex");
+        assert_eq!(item.name, "Codex CLI");
+        assert!(!item.installed);
+        assert_eq!(item.version, None);
+        assert_eq!(item.path, "agenthub-definitely-missing-cli-for-test");
+        assert!(item.no_spend);
+    }
+
+    #[test]
+    fn local_cli_discovery_manifest_advertises_readiness_gate() {
+        let manifest = build_local_cli_discovery();
+
+        assert_eq!(manifest.mode, "no-spend-discovery");
+        assert_eq!(
+            manifest.readiness_manifest,
+            "docs/audit/p0-edge-cli-real-readiness.md"
+        );
+        assert_eq!(
+            manifest.readiness_script,
+            "scripts/verify-edge-cli-real-readiness.ps1"
+        );
+        assert_eq!(manifest.items.len(), 3);
+        assert!(manifest.items.iter().all(|item| item.no_spend));
+        assert!(manifest
+            .items
+            .iter()
+            .all(|item| ["codex", "claude-code", "opencode"].contains(&item.id.as_str())));
     }
 
     #[test]

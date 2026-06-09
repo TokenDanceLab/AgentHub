@@ -6,7 +6,12 @@ import {
   composerReducer,
   createInitialComposerState,
 } from '../composer';
-import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '../platform';
+import type {
+  AgentHubPlatform,
+  LocalCliDiscoveryManifest,
+  WorkbenchAgent,
+  WorkbenchConversation,
+} from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
 import type { TranscriptBlock } from '../transcript';
@@ -68,6 +73,18 @@ interface MainchainSummary {
   exportLabel: string;
   exportDetail: string;
 }
+
+const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
+  mode: 'no-spend-discovery',
+  readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
+  readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
+  generatedAt: null,
+  items: [
+    { id: 'codex', name: 'Codex CLI', installed: false, version: null, path: 'codex', noSpend: true },
+    { id: 'claude-code', name: 'Claude Code', installed: false, version: null, path: 'claude', noSpend: true },
+    { id: 'opencode', name: 'OpenCode', installed: false, version: null, path: 'opencode', noSpend: true },
+  ],
+};
 
 interface AgentProfileState {
   id: string;
@@ -184,6 +201,7 @@ export function AgentHubWorkbench({
   const [selectBarRect, setSelectBarRect] = useState<{ left: number; width: number } | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [localCliDiscovery, setLocalCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
   const [activeAgentProfile, setActiveAgentProfile] = useState<AgentProfileState | null>(null);
   const [activeHumanProfile, setActiveHumanProfile] = useState<HumanProfileState | null>(null);
   const [focusedAgentId, setFocusedAgentId] = useState<string | undefined>(undefined);
@@ -252,6 +270,27 @@ export function AgentHubWorkbench({
       setSelectedExecutionTargetId('');
     }
   }, [composerExecutionTargets, selectedExecutionTargetId]);
+
+  useEffect(() => {
+    if (activePage !== 'settings' || platform.surface !== 'desktop' || !platform.host?.localCliDiscovery) {
+      setLocalCliDiscovery(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLocalCliDiscovery(LOCAL_CLI_DISCOVERY_FALLBACK);
+    platform.host.localCliDiscovery()
+      .then((discovery) => {
+        if (!cancelled) setLocalCliDiscovery(discovery);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalCliDiscovery(LOCAL_CLI_DISCOVERY_FALLBACK);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage, platform]);
 
   useEffect(() => {
     if (!inspectorResizing) return;
@@ -1114,6 +1153,7 @@ export function AgentHubWorkbench({
               onAgentDelete={onAgentDelete}
               onAgentsRetry={onAgentsRetry}
               onAgentProfileOpen={openAgentProfileFromConfig}
+              localCliDiscovery={localCliDiscovery}
             />
           </section>
         )}
