@@ -5822,9 +5822,9 @@ components:
           enum: [local, remote, cloud, relay]
         health_state:
           type: string
-          enum: [unknown, healthy, degraded, offline]
+          enum: [unknown, healthy, online, degraded, offline, mismatch, stale]
           readOnly: true
-          description: System-managed health proof state. Clients cannot set this through create/update requests.
+          description: System-managed health proof state. `online` is the current dispatchable state; `healthy` is accepted for compatibility with older clients. `offline`, `mismatch`, and `stale` are not dispatchable. Clients cannot set this through create/update requests.
         auth_method:
           type: string
           enum: [none, ssh_tunnel, tailscale_mtls, hub_jwt]

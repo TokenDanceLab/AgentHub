@@ -229,6 +229,10 @@ func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targe
 	if target.TargetType != "local_edge" {
 		return nil, errcode.TargetNotRoutable.WithMessage("execution target type is not dispatchable yet")
 	}
+	healthState := resolveExecutionTargetHealthState(target, time.Now())
+	if healthState != "online" && healthState != "healthy" {
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target health is " + healthState)
+	}
 	if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
 		return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
 	}
