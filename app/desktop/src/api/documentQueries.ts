@@ -3,12 +3,13 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHubClient, type HubDocument } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
 import type { DocRow } from '@shared/workbench/pages';
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
 let _hubClient: ReturnType<typeof createHubClient> | null = null;
 function getHubClient() {
-  if (!_hubClient) _hubClient = createHubClient();
+  if (!_hubClient) _hubClient = createHubClient({ getToken: getAccessToken });
   return _hubClient;
 }
 
@@ -39,10 +40,11 @@ export function useCreateDocument() {
 // ── Mapping ──────────────────────────────────────────────────────
 
 export function hubDocToDocRow(doc: HubDocument): DocRow {
+  const tag = doc.tag?.trim();
   return {
     id: doc.id,
     title: doc.title?.trim() || '未命名文档',
-    tag: doc.tag?.trim() || undefined,
+    ...(tag ? { tag } : {}),
     location: doc.location?.trim() || '我的文档库',
     owner: doc.owner_id?.trim() || 'Hub',
     time: formatDocTime(doc.updated_at ?? doc.created_at),
