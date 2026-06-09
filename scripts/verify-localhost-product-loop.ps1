@@ -5,7 +5,7 @@ AgentHub localhost product-loop fixture harness.
 This starts localhost-only fixture HTTP services for Web, Hub, Desktop bridge,
 and Local Edge, then proves this sequence:
 
-Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay
+Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay -> Web render
 
 Boundary:
 - no real TokenDanceID or browser secrets
@@ -538,6 +538,26 @@ async function startWeb() {
       return;
     }
 
+    if (req.method === "GET" && route.pathname === `/render/${ids.teamRunId}`) {
+      const replay = await requestJson("GET", `${urls.hub}/api/replay/${ids.teamRunId}`);
+      const renderedTypes = replay.events.map((event) => event.type);
+      assert(renderedTypes.includes("hub.replay.recorded"), "Web render requires Hub replay record");
+      const renderEvent = record("web.replay.rendered", "web", {
+        target_id: ids.targetId,
+        edge_device_id: ids.edgeDeviceId,
+        team_run_id: ids.teamRunId,
+        source: "hub-replay",
+        rendered_event_types: renderedTypes,
+      });
+      writeJson(res, 200, {
+        status: "rendered",
+        teamRunId: ids.teamRunId,
+        renderedEventId: renderEvent.id,
+        renderedEventTypes: renderedTypes,
+      });
+      return;
+    }
+
     writeJson(res, 404, { error: "not found", service: "web" });
   });
 }
@@ -583,9 +603,18 @@ function validateReplay(replay) {
   assert(replay.tasks[0].adapter_id === ids.adapterId, "Hub replay task adapter_id mismatch");
 }
 
+function validateWebRender(rendered) {
+  assert(rendered.status === "rendered", "Web render status mismatch");
+  assert(rendered.teamRunId === ids.teamRunId, "Web render teamRunId mismatch");
+  assert(rendered.renderedEventTypes.includes("hub.replay.recorded"), "Web render did not consume Hub replay");
+  const replayIndex = eventIndex("hub.replay.recorded");
+  const renderIndex = eventIndex("web.replay.rendered");
+  assert(renderIndex > replayIndex, "Web render must happen after Hub replay");
+}
+
 async function main() {
   log("AgentHub localhost product-loop harness");
-  log("Sequence: Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay");
+  log("Sequence: Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay -> Web render");
   log("RealTested=false");
 
   await startHub();
@@ -628,6 +657,8 @@ async function main() {
   await requestJson("POST", `${urls.web}/start`, {});
   const replay = await requestJson("GET", `${urls.hub}/api/replay/${ids.teamRunId}`);
   validateReplay(replay);
+  const rendered = await requestJson("GET", `${urls.web}/render/${ids.teamRunId}`);
+  validateWebRender(rendered);
   await expectRejectedJson("POST", `${urls.hub}/api/events`, {
     type: "adapter.run.completed",
     hubTaskId: ids.hubTaskId,
@@ -641,6 +672,7 @@ async function main() {
   log("PASS: Local Edge runs fixture/SDK adapter without CLI/model spend");
   log("PASS: Hub rejects forged and out-of-order callbacks before replay");
   log("PASS: Hub replay records completed localhost fixture chain");
+  log("PASS: Web renders Hub replay into localhost fixture view");
 
   const manifest = {
     hubTaskId: ids.hubTaskId,
@@ -659,6 +691,7 @@ async function main() {
       { stage: "edge_events_callback", label: "Local Edge starts fixture run", eventRef: "local-edge:edge.run.started:evt-local-005" },
       { stage: "adapter_callback_result", label: "Local Edge runs fixture/SDK adapter without CLI/model spend", eventRef: "fixture-sdk:adapter.run.completed:evt-local-006" },
       { stage: "hub_replay", label: "Hub replay records completed localhost fixture chain", eventRef: "hub:hub.replay.recorded:evt-local-007" },
+      { stage: "web_render", label: "Web renders Hub replay into localhost fixture view", eventRef: "web:web.replay.rendered:evt-local-008" },
     ],
   };
 
@@ -668,7 +701,7 @@ async function main() {
     real_tested: false,
     generated_at: new Date().toISOString(),
     repo_root: repoRoot,
-    sequence: "Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay",
+    sequence: "Web -> Hub -> registered Desktop/Edge -> Local Edge -> fixture/SDK adapter -> Hub replay -> Web render",
     claims: {
       real_tokendance_id_login: false,
       real_cli_or_model_invoked: false,
