@@ -34,6 +34,7 @@ import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
+import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
 import type { AgentConfig, ProjectDraft } from './pages';
 import type { ProjectInfo } from './pages/ProjectsPage';
@@ -53,10 +54,7 @@ const SIDEBAR_COLLAPSE_SNAP_WIDTH = 96;
 const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
 const SELECTION_HOLD_DELAY_MS = 520;
 const SELECTION_HOLD_CANCEL_DISTANCE = 36;
-const DEFAULT_BROWSER_PREVIEW_URL_BY_SURFACE = {
-  desktop: 'http://127.0.0.1:5176/desktop/',
-  web: 'http://127.0.0.1:5176/desktop/',
-} as const;
+const DEFAULT_BROWSER_PREVIEW_URL = 'about:blank';
 
 type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
 
@@ -137,6 +135,7 @@ export interface AgentHubWorkbenchProps {
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
   onAgentsRetry?: (() => void) | undefined;
+  onLogout?: (() => void) | undefined;
   onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
   onProjectUpdate?: ((
     projectId: string,
@@ -144,6 +143,10 @@ export interface AgentHubWorkbenchProps {
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  showComposerAgentPicker?: boolean | undefined;
+  showComposerStatus?: boolean | undefined;
+  showHeaderDataModeControl?: boolean | undefined;
+  showMainchainStatus?: boolean | undefined;
   transcript: TranscriptBlock[];
 }
 
@@ -165,10 +168,15 @@ export function AgentHubWorkbench({
   onAgentUpdate,
   onAgentDelete,
   onAgentsRetry,
+  onLogout,
   onProjectCreate,
   onProjectUpdate,
   onApprovalDecision,
   runtimeEvidence,
+  showComposerAgentPicker = true,
+  showComposerStatus = true,
+  showHeaderDataModeControl = true,
+  showMainchainStatus = true,
   transcript,
 }: AgentHubWorkbenchProps): React.ReactElement {
   const fallbackConversationId = conversations[0]?.id ?? 'default';
@@ -248,6 +256,18 @@ export function AgentHubWorkbench({
   useEffect(() => {
     sidebarWidthRef.current = sidebarWidth;
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (platform.surface !== 'desktop' || activePage !== 'chat') return undefined;
+
+    function handleDesktopToggleSidebar(): void {
+      toggleSidebar();
+    }
+
+    window.addEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
+    return () => window.removeEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
+  }, [activePage, platform.surface, sidebarWidth]);
+
   const activeConversation = conversations.find((conversation) => conversation.id === currentConversationId);
   const isChatPage = activePage === 'chat';
   const mentionableAgents: ComposerMention[] = (agents ?? []).map((agent) => ({
@@ -404,22 +424,6 @@ export function AgentHubWorkbench({
     return () => window.removeEventListener('resize', updateSelectBarRect);
   }, [selectionMode, inspectorCollapsed, inspectorWidth]);
 
-  useEffect(() => {
-    if (!isChatPage || sidebarCollapsed) return;
-    const workspace = workspaceRef.current;
-    if (!workspace || typeof ResizeObserver === 'undefined') return;
-
-    const observer = new ResizeObserver(([entry]) => {
-      const width = entry?.contentRect.width ?? workspace.getBoundingClientRect().width;
-      if (width < WORKSPACE_AUTO_COLLAPSE_WIDTH) {
-        setSidebarCollapsed(true);
-      }
-    });
-
-    observer.observe(workspace);
-    return () => observer.disconnect();
-  }, [isChatPage, sidebarCollapsed]);
-
   async function submitComposer(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!canSubmitComposer(composer)) return;
@@ -499,8 +503,10 @@ export function AgentHubWorkbench({
   }
 
   function navigateRail(page: GlobalRailPage): void {
-    if (page === 'chat' && activePage === 'chat') {
-      toggleSidebar();
+    if (page === 'chat') {
+      setActivePage('chat');
+      setSidebarCollapsed(false);
+      restoreSidebarWidth();
       return;
     }
     setActivePage(page);
@@ -1040,6 +1046,7 @@ export function AgentHubWorkbench({
       <GlobalRail
         activePage={activePage}
         onNavigate={navigateRail}
+        onLogout={onLogout}
         onToggleTheme={handleToggleTheme}
       />
       {isChatPage && (
@@ -1078,6 +1085,7 @@ export function AgentHubWorkbench({
         ref={workspaceRef}
         aria-label="Workspace"
         className={styles.workspace}
+        data-mainchain={showMainchainStatus ? 'true' : 'false'}
         data-mode={isChatPage ? 'chat' : 'workbench'}
         data-surface={platform.surface}
         data-workspace-main
@@ -1086,13 +1094,17 @@ export function AgentHubWorkbench({
           <>
             <WorkspaceHeader
               activeConversation={activeConversation}
+              dataMode={workbenchStatus?.dataMode}
               inspectorCollapsed={inspectorCollapsed}
               onToggleInspector={toggleInspector}
+              showDataModeControl={showHeaderDataModeControl}
             />
-            <MainchainStatusStrip
-              summary={mainchainSummary}
-              onExportEvidence={exportMainchainEvidence}
-            />
+            {showMainchainStatus ? (
+              <MainchainStatusStrip
+                summary={mainchainSummary}
+                onExportEvidence={exportMainchainEvidence}
+              />
+            ) : null}
             <TranscriptView
               actionedBlockIds={actionedBlockIds}
               contextBlockId={contextMenu?.blockId}
@@ -1123,11 +1135,11 @@ export function AgentHubWorkbench({
                 executionTargets={composerExecutionTargets}
                 executionTargetId={selectedExecutionTargetId}
                 inputRef={composerInputRef}
-                mentionableAgents={mentionableAgents}
+                mentionableAgents={showComposerAgentPicker ? mentionableAgents : []}
                 onExecutionTargetChange={setSelectedExecutionTargetId}
                 onPickLocalAttachments={platform.attachments?.pickFiles}
                 onSubmit={submitComposer}
-                status={workbenchStatus}
+                status={showComposerStatus ? workbenchStatus : undefined}
                 submitBehavior={composerSubmitBehavior}
                 targetLabel={activeConversation?.title ?? 'AgentHub'}
               />
@@ -1164,7 +1176,7 @@ export function AgentHubWorkbench({
           browserPreviewEnabled={platform.capabilities.browserPreview}
           canOpenPreview={platform.preview?.canOpenEvidence}
           collapsed={inspectorCollapsed}
-          defaultBrowserUrl={DEFAULT_BROWSER_PREVIEW_URL_BY_SURFACE[platform.surface]}
+          defaultBrowserUrl={DEFAULT_BROWSER_PREVIEW_URL}
           evidence={evidence}
           maxWidth={INSPECTOR_MAX_WIDTH}
           minWidth={INSPECTOR_MIN_WIDTH}
