@@ -10,6 +10,7 @@ export interface InspectorEvidenceModel {
   tools: EvidenceRef[];
   files: EvidenceRef[];
   artifacts: EvidenceRef[];
+  approvals: EvidenceRef[];
 }
 
 export type RuntimeEvidenceSource = 'edge' | 'event' | 'none';
@@ -69,6 +70,7 @@ export function buildInspectorEvidenceModel(evidence: EvidenceRef[]): InspectorE
   const model: InspectorEvidenceModel = {
     total: evidence.length,
     counts: {
+      approval: 0,
       artifact: 0,
       file: 0,
       preview: 0,
@@ -85,6 +87,7 @@ export function buildInspectorEvidenceModel(evidence: EvidenceRef[]): InspectorE
     tools: [],
     files: [],
     artifacts: [],
+    approvals: [],
   };
 
   for (const item of evidence) {
@@ -105,6 +108,9 @@ export function buildInspectorEvidenceModel(evidence: EvidenceRef[]): InspectorE
         break;
       case 'artifact':
         model.artifacts.push(item);
+        break;
+      case 'approval':
+        model.approvals.push(item);
         break;
     }
   }

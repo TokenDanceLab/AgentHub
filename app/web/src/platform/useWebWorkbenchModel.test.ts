@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   appendHubRuntimeEvent,
+  decideWebApprovalWithHubClient,
   mergeHubRuntimeEvents,
   projectDraftToHubRequest,
   mergeWorkspaceProjectDetail,
+  resolveWebRuntimeEvidence,
   resolveWebWorkbenchContacts,
   resolveWebExecutionTargetStatus,
   resolveWebWorkbenchProjects,
@@ -296,6 +298,65 @@ describe('useWebWorkbenchModel helpers', () => {
         ],
       }),
     ]);
+  });
+
+  it('derives side-panel runtime evidence from Hub replay artifact refs', () => {
+    const transcript = resolveWebWorkbenchTranscript(
+      true,
+      'hub-session-1',
+      [],
+      [
+        {
+          id: 'evt-artifact-1',
+          task_id: 'task-1',
+          edge_run_id: 'edge-run-1',
+          session_id: 'hub-session-1',
+          event_seq: 3,
+          event_type: 'artifact.created',
+          payload: {
+            artifactId: 'artifact-1',
+            path: 'reports/demo-evidence.md',
+            kind: 'summary',
+            mimeType: 'text/markdown',
+          },
+          created_at: '2026-06-09T05:00:03Z',
+        },
+      ],
+    );
+
+    expect(resolveWebRuntimeEvidence(transcript)).toEqual({
+      runId: 'edge-run-1',
+      diffs: [],
+      artifacts: [{
+        id: 'artifact-1',
+        runId: 'edge-run-1',
+        threadId: 'hub-session-1',
+        kind: 'summary',
+        path: 'reports/demo-evidence.md',
+        sizeBytes: 0,
+        createdAt: '2026-06-09T05:00:03Z',
+      }],
+      previews: [],
+      sources: { diff: 'none', artifacts: 'event', previews: 'none' },
+    });
+  });
+
+  it('submits approval decisions through the Hub TeamRun client only', async () => {
+    const hubClient = {
+      decideTeamApproval: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await decideWebApprovalWithHubClient(hubClient, {
+      approvalId: 'approval-1',
+      teamId: 'team-1',
+      teamRunId: 'team-run-1',
+      decision: 'allow',
+      agentTaskId: 'agent-task-1',
+    });
+
+    expect(hubClient.decideTeamApproval).toHaveBeenCalledWith('team-1', 'team-run-1', 'approval-1', {
+      decision: 'allow',
+    });
   });
 
   it('uses preview and Hub empty transcripts for unauthenticated and empty Hub states', () => {
