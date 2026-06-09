@@ -1,7 +1,14 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 07:25 +08:00
-当前 dev HEAD：`beeea553` (`dev/delicious233`)
+最后更新：2026-06-10 07:35 +08:00
+当前 dev HEAD：`b7189525` (`dev/delicious233`)
+
+## Roadmap 最终状态
+
+224 个复选框中 215 个已勾选（95%）。剩余 9 项全部为平台发布阻塞项：
+- 消息搜索点击导航（UI）、按需未读清除（UI）、WS 重连事件（ws lib compat）、连接状态指示器（UI）
+- Tool allowlist（可通过 API 配置）、Android APK（缺少构建环境）、macOS（缺少硬件）
+- 安全风险登记册关闭（流程）
 
 ## Release Gate 快照 (Final)
 
