@@ -25,6 +25,9 @@ export interface ApprovalDecisionAction {
   teamId?: string;
   teamRunId?: string;
   agentTaskId?: string;
+  targetId?: string;
+  edgeDeviceId?: string;
+  correlationId?: string;
 }
 
 interface TranscriptBlockBase {
@@ -112,6 +115,9 @@ export interface PermissionRequestTranscriptBlock extends TranscriptBlockBase {
   teamId?: string;
   teamRunId?: string;
   agentTaskId?: string;
+  targetId?: string;
+  edgeDeviceId?: string;
+  correlationId?: string;
   toolName?: string;
   risk?: 'low' | 'medium' | 'high' | 'critical';
   reason?: string;
@@ -126,6 +132,9 @@ export interface PermissionResultTranscriptBlock extends TranscriptBlockBase {
   teamId?: string;
   teamRunId?: string;
   agentTaskId?: string;
+  targetId?: string;
+  edgeDeviceId?: string;
+  correlationId?: string;
   toolName?: string;
   reason?: string;
 }

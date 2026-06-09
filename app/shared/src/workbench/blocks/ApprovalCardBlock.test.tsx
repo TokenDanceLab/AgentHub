@@ -46,6 +46,9 @@ describe('ApprovalCardBlock', () => {
         teamId="team-1"
         teamRunId="team-run-1"
         agentTaskId="agent-task-1"
+        targetId="target-local-edge-1"
+        edgeDeviceId="desktop-device-1"
+        correlationId="corr-web-hub-edge-1"
         toolName="Bash"
         onDecision={onDecision}
       />,
@@ -60,6 +63,9 @@ describe('ApprovalCardBlock', () => {
       teamId: 'team-1',
       teamRunId: 'team-run-1',
       agentTaskId: 'agent-task-1',
+      targetId: 'target-local-edge-1',
+      edgeDeviceId: 'desktop-device-1',
+      correlationId: 'corr-web-hub-edge-1',
     });
     expect(onDecision).toHaveBeenNthCalledWith(2, {
       approvalId: 'approval-web-1',
@@ -67,6 +73,9 @@ describe('ApprovalCardBlock', () => {
       teamId: 'team-1',
       teamRunId: 'team-run-1',
       agentTaskId: 'agent-task-1',
+      targetId: 'target-local-edge-1',
+      edgeDeviceId: 'desktop-device-1',
+      correlationId: 'corr-web-hub-edge-1',
     });
   });
 });

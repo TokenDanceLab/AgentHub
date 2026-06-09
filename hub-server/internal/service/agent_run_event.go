@@ -85,7 +85,7 @@ func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, a
 	if !pendingApprovalStatus(approval.Status) {
 		return nil, errcode.ErrBadRequest
 	}
-	if strings.TrimSpace(approval.RequestID) == "" || strings.TrimSpace(approval.EdgeRunID) == "" || strings.TrimSpace(task.EdgeDeviceID) == "" {
+	if strings.TrimSpace(approval.RequestID) == "" || strings.TrimSpace(approval.EdgeRunID) == "" || strings.TrimSpace(task.EdgeDeviceID) == "" || strings.TrimSpace(task.TargetID) == "" {
 		return nil, errcode.ErrBadRequest
 	}
 
@@ -97,13 +97,16 @@ func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, a
 		Reason:    decision.Reason,
 	}
 	payloadBytes, err := json.Marshal(map[string]any{
-		"requestId":    approval.RequestID,
-		"toolUseId":    approval.ToolUseID,
-		"toolName":     approval.ToolName,
-		"decision":     decision.Decision,
-		"reason":       decision.Reason,
-		"decided_by":   userID,
-		"edge_control": edgeControl,
+		"requestId":      approval.RequestID,
+		"toolUseId":      approval.ToolUseID,
+		"toolName":       approval.ToolName,
+		"decision":       decision.Decision,
+		"reason":         decision.Reason,
+		"decided_by":     userID,
+		"target_id":      strings.TrimSpace(task.TargetID),
+		"edge_device_id": strings.TrimSpace(task.EdgeDeviceID),
+		"correlation_id": approval.CorrelationID,
+		"edge_control":   edgeControl,
 	})
 	if err != nil {
 		return nil, err
@@ -124,12 +127,13 @@ func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, a
 	if controlCache, ok := s.cacheClient.(agentControlCache); ok {
 		controlSvc := &AgentControlService{cacheClient: controlCache, mgr: s.mgr}
 		if err := controlSvc.DeliverToDesktopDevice(ctx, userID, task.EdgeDeviceID, model.AgentControlPayload{
-			Kind:         model.AgentControlKindPermissionDecide,
-			AgentTaskID:  task.ID,
-			TargetID:     strings.TrimSpace(task.TargetID),
-			EdgeDeviceID: strings.TrimSpace(task.EdgeDeviceID),
-			ApprovalID:   firstNonEmptyString(approval.ApprovalID, approvalIDFor(approval.RequestID, approval.ToolUseID)),
-			EdgeControl:  edgeControl,
+			Kind:          model.AgentControlKindPermissionDecide,
+			AgentTaskID:   task.ID,
+			TargetID:      strings.TrimSpace(task.TargetID),
+			EdgeDeviceID:  strings.TrimSpace(task.EdgeDeviceID),
+			CorrelationID: approval.CorrelationID,
+			ApprovalID:    firstNonEmptyString(approval.ApprovalID, approvalIDFor(approval.RequestID, approval.ToolUseID)),
+			EdgeControl:   edgeControl,
 		}); err != nil {
 			return nil, err
 		}
@@ -140,6 +144,8 @@ func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, a
 	decided.Reason = decision.Reason
 	decided.DecidedBy = userID
 	decided.DecidedAt = &now
+	decided.TargetID = strings.TrimSpace(task.TargetID)
+	decided.EdgeDeviceID = strings.TrimSpace(task.EdgeDeviceID)
 	decided.EdgeControl = edgeControl
 	return &decided, nil
 }
@@ -289,6 +295,9 @@ func projectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunE
 			result.Approvals = append(result.Approvals, model.AgentTaskApproval{
 				ApprovalID:    approvalIDFor(requestID, toolUseID),
 				TaskID:        event.TaskID,
+				TargetID:      strings.TrimSpace(task.TargetID),
+				EdgeDeviceID:  strings.TrimSpace(task.EdgeDeviceID),
+				CorrelationID: firstJSONString(payload, "correlation_id", "correlationId"),
 				EdgeRunID:     edgeRunID,
 				SessionID:     event.SessionID,
 				SourceEventID: event.ID,
@@ -327,12 +336,24 @@ func projectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunE
 				if edgeControl != nil {
 					result.Approvals[idx].EdgeControl = edgeControl
 				}
+				if result.Approvals[idx].TargetID == "" {
+					result.Approvals[idx].TargetID = strings.TrimSpace(task.TargetID)
+				}
+				if result.Approvals[idx].EdgeDeviceID == "" {
+					result.Approvals[idx].EdgeDeviceID = strings.TrimSpace(task.EdgeDeviceID)
+				}
+				if result.Approvals[idx].CorrelationID == "" {
+					result.Approvals[idx].CorrelationID = firstJSONString(payload, "correlation_id", "correlationId")
+				}
 				continue
 			}
 			approvalIndex[key] = len(result.Approvals)
 			result.Approvals = append(result.Approvals, model.AgentTaskApproval{
 				ApprovalID:    approvalIDFor(requestID, toolUseID),
 				TaskID:        event.TaskID,
+				TargetID:      strings.TrimSpace(task.TargetID),
+				EdgeDeviceID:  strings.TrimSpace(task.EdgeDeviceID),
+				CorrelationID: firstJSONString(payload, "correlation_id", "correlationId"),
 				EdgeRunID:     edgeRunID,
 				SessionID:     event.SessionID,
 				SourceEventID: event.ID,
