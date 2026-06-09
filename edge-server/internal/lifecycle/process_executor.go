@@ -568,6 +568,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 	if runCtx.WorkDir != "" {
 		parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
+		parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
 	}
 
 	var parseErr error

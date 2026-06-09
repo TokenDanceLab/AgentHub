@@ -52,6 +52,10 @@ type config struct {
 	AgentModel       string         // model override for the default agent
 	RuntimeManifests repeatedString // fixture-only custom runtime manifests
 
+	// SDK adapter configuration (direct HTTP API calls, no CLI subprocess)
+	AnthropicSDKPath string         // enables anthropic-sdk adapter; value is API key or "env" for ANTHROPIC_API_KEY
+	OpenAISDKPath    string         // enables openai-sdk adapter; value is API key or "env" for OPENAI_API_KEY
+
 	// SKILL.md discovery
 	SkillsDirs repeatedString // additional dirs to search for SKILL.md files
 
@@ -241,6 +245,9 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.AgentModel, "agent-model", getEnv("AGENTHUB_AGENT_MODEL", ""), "model override for the default agent (e.g. claude-sonnet-4-6)")
 	cfg.RuntimeManifests = append(cfg.RuntimeManifests, splitPathList(getEnv("AGENTHUB_RUNTIME_MANIFESTS", ""))...)
 	fs.Var(&cfg.RuntimeManifests, "runtime-manifest", "fixture-only custom runtime manifest JSON path; may be repeated; env AGENTHUB_RUNTIME_MANIFESTS uses OS path-list separators")
+
+	fs.StringVar(&cfg.AnthropicSDKPath, "anthropic-sdk-path", getEnv("AGENTHUB_ANTHROPIC_SDK_PATH", ""), "enable anthropic-sdk adapter; API key or env-var for ANTHROPIC_API_KEY")
+	fs.StringVar(&cfg.OpenAISDKPath, "openai-sdk-path", getEnv("AGENTHUB_OPENAI_SDK_PATH", ""), "enable openai-sdk adapter; API key or env-var for OPENAI_API_KEY")
 
 	cfg.SkillsDirs = append(cfg.SkillsDirs, splitPathList(getEnv("AGENTHUB_SKILLS_DIRS", ""))...)
 	fs.Var(&cfg.SkillsDirs, "skills-dir", "directory containing SKILL.md subdirectories; may be repeated; defaults to .agents/skills and .codex/skills")
@@ -437,6 +444,29 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 			slog.Info("registered runtime manifest adapter", "id", a.Metadata().ID, "path", manifestPath, "fixture", manifest.Fixture.Type)
 		}
 	}
+
+	// SDK adapters: direct HTTP API calls, no CLI subprocess needed.
+	// When the flag value is "env" or empty, the API key is read from the
+	// corresponding environment variable (ANTHROPIC_API_KEY / OPENAI_API_KEY).
+	if cfg.AnthropicSDKPath != "" {
+		apiKey := resolveSDKAPIKey(cfg.AnthropicSDKPath, "ANTHROPIC_API_KEY")
+		a := adapters.NewAnthropicSDKAdapter(apiKey, cfg.AgentModel)
+		if err := reg.Register(a); err != nil {
+			slog.Warn("failed to register anthropic-sdk adapter", "err", err)
+		} else {
+			slog.Info("registered adapter", "id", a.Metadata().ID, "available", a.Available())
+		}
+	}
+	if cfg.OpenAISDKPath != "" {
+		apiKey := resolveSDKAPIKey(cfg.OpenAISDKPath, "OPENAI_API_KEY")
+		a := adapters.NewOpenAISDKAdapter(apiKey, cfg.AgentModel)
+		if err := reg.Register(a); err != nil {
+			slog.Warn("failed to register openai-sdk adapter", "err", err)
+		} else {
+			slog.Info("registered adapter", "id", a.Metadata().ID, "available", a.Available())
+		}
+	}
+
 	if cfg.ClaudeCodePath != "" {
 		childAgents := registeredChildAgentIDs(reg)
 		a := adapters.NewOrchestratorAdapter(
@@ -461,7 +491,7 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 
 func registeredChildAgentIDs(reg *adapters.Registry) []string {
 	ids := make([]string, 0, 3)
-	for _, id := range []string{"claude-code", "codex", "opencode"} {
+	for _, id := range []string{"claude-code", "codex", "opencode", "anthropic-sdk", "openai-sdk"} {
 		if _, ok := reg.Get(id); ok {
 			ids = append(ids, id)
 		}
@@ -501,3 +531,13 @@ func newStoreFromConfig(cfg config) (store.Repository, error) {
 		return nil, fmt.Errorf("unknown store backend %q", cfg.StoreBackend)
 	}
 }
+// resolveSDKAPIKey resolves the API key for an SDK adapter. If the value is
+// "env" or empty, it reads from the specified environment variable. Otherwise
+// the value itself is used as the API key.
+func resolveSDKAPIKey(value, envName string) string {
+	if value == "" || strings.EqualFold(value, "env") {
+		return os.Getenv(envName)
+	}
+	return value
+}
+
