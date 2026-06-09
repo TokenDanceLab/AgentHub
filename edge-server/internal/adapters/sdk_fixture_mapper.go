@@ -428,8 +428,14 @@ func normalizeSDKFixtureType(value string) string {
 	normalized = strings.ReplaceAll(normalized, ".", "_")
 	normalized = strings.ReplaceAll(normalized, "-", "_")
 	switch normalized {
+	case "message_output", "output_text", "response_output_text":
+		return "text_block"
+	case "function_tool_call", "tool_call_item":
+		return "tool_call"
 	case "function_call", "tool_invocation", "tool_use":
 		return "tool_call"
+	case "function_tool_output", "tool_output_item":
+		return "tool_result"
 	case "function_result", "tool_output":
 		return "tool_result"
 	case "approval_request", "permission", "can_use_tool":
