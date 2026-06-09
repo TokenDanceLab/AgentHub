@@ -82,7 +82,9 @@ export interface WorkbenchRoutesProps {
   contacts?: WorkbenchContactsData | undefined;
   focusedAgentId?: string | undefined;
   projects?: ProjectInfo[] | undefined;
+  activeProjectId?: string | undefined;
   projectsStatus?: WorkbenchProjectsStatus | undefined;
+  onActiveProjectChange?: ((projectId: string) => void) | undefined;
   onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
   onProjectUpdate?: ((
     projectId: string,
@@ -419,7 +421,9 @@ export function WorkbenchRoutes({
   contacts,
   focusedAgentId,
   projects,
+  activeProjectId,
   projectsStatus,
+  onActiveProjectChange,
   onProjectCreate,
   onProjectUpdate,
   onAgentCreate,
@@ -446,7 +450,11 @@ export function WorkbenchRoutes({
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
   const sourceProjects = projects ?? WORKBENCH_MOCK_PROJECTS;
-  const [projectId, setProjectId] = useState(sourceProjects[0]?.id ?? null);
+  const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
+  const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
+    ? activeProjectId
+    : null;
+  const projectId = controlledProjectId ?? localProjectId;
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [projectTab, setProjectTab] = useState<ProjectTab>('overview');
   const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
@@ -496,13 +504,18 @@ export function WorkbenchRoutes({
 
   React.useEffect(() => {
     if (sourceProjects.length === 0) {
-      setProjectId(null);
+      setLocalProjectId(null);
       return;
     }
     if (!projectId || !sourceProjects.some((project) => project.id === projectId)) {
-      setProjectId(sourceProjects[0]?.id ?? null);
+      setLocalProjectId(sourceProjects[0]?.id ?? null);
     }
   }, [projectId, sourceProjects]);
+
+  function selectProject(nextProjectId: string): void {
+    setLocalProjectId(nextProjectId);
+    onActiveProjectChange?.(nextProjectId);
+  }
 
   React.useEffect(() => {
     const sourceIds = new Set(sourceAgentConfigs.map((agent) => agent.id));
@@ -1033,12 +1046,12 @@ export function WorkbenchRoutes({
           onFilterChange={setProjectFilter}
           profiles={profileSources}
           onArtifactClick={(id, artifact) => {
-            setProjectId(id);
+            selectProject(id);
             setProjectPreview(createProjectArtifactPreview(id, artifact));
           }}
           onClosePreview={() => setProjectPreview(null)}
           onProjectCreate={onProjectCreate}
-          onProjectSelect={setProjectId}
+          onProjectSelect={selectProject}
           onProjectUpdate={onProjectUpdate}
           onTabChange={setProjectTab}
           projectActionError={projectsStatus?.actionError}
