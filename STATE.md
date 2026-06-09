@@ -1,149 +1,70 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 09:05 +08:00
+最后更新：2026-06-09 11:03 +08:00
 
-本文记录当前事实、分支治理和任务分配。长期路线写在
-`docs/roadmap.md`。
+本文只记录当前事实、分支治理和任务调度。长期路线图写在
+`docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
 
 ## 当前 Baseline
 
 | 项目 | 当前事实 |
 |---|---|
-| 稳定 dev | `origin/dev/delicious233 = 39465d73`，已经由集成分支 fast-forward |
-| 当前集成分支 | `origin/codex/p1-critical-evidence-integration = 39465d73` |
-| 集成分支相对 dev | `ahead 0 / behind 0` |
-| master | `origin/master = f3b91ab0`；本轮先 defer，不作为当前阻塞项 |
-| 主工作树 | `D:\Code\TokenDance\AgentHub` 过时且有 dirty 风险，当前隔离不用 |
-| Git 维护风险 | auto-gc 报 `fatal: bad tree object fff550960821b6454a476d755465c71d9deaa258` |
+| 当前 dev | `origin/dev/delicious233 = 249c4a21` |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard 已合入 |
+| RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
+| master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
+| 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
+| Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset |
 
-## 当前集成候选包含内容
+## 已合入能力
 
-当前 dev/集成分支已经包含 P0/P1 远程控制证据线：
+当前 `origin/dev/delicious233` 已经具备以下基础能力：
 
-- Hub 精确 target 和 Edge dispatch proof。
-- Desktop Profile/Target readiness、Local Edge sidecar diagnostics。
-- Edge CLI/SDK fixture contract、脱敏、trace refs、real-tested guard。
-- Web target labels、selected-run replay、明确 real/mock/no-target 状态。
-- Local product-loop、localhost product-loop、approved-real evidence verifier、OIDC readiness、Web deploy readiness、Tauri package readiness gates。
-- Edge SQLite row-first store alpha。
-- LobeHub runtime/provider icons 和 fallback 覆盖。
+- Hub/Edge/Device/Target 合同和精确 target dispatch proof。
+- Desktop Local Edge diagnostics、Hub task bridge、target 注册/同步和 sidecar readiness。
+- Web Agent 主链、target 选择、typed transcript blocks、artifact/replay 渲染基础。
+- Web boundary/deploy readiness、product-loop fixture QA、Tauri package/readiness gate。
+- Edge SQLite store、迁移、row/projection tests，Desktop sidecar 默认使用 app-data SQLite 路径。
+- SDK fixture mapper，用 fixture 覆盖 OpenAI/Claude 形状事件到现有 Edge 事件合同的映射。
+- 基于 `@lobehub/icons` 的 runtime/provider/model/tool icon 组件和 fallback。
 
-当前不声明：公开部署、签名安装器、macOS notarization、真实 TokenDanceID 证明、
-默认真实模型/CLI 消耗。
+当前不声明已经完成：
+
+- 真实 TokenDanceID 登录全链路验收。
+- 真实 CLI/model/API 消耗或 approved-real 运行证据。
+- 签名安装器、macOS notarization、release upload、updater metadata。
+- Web/Mobile/IM 全部真实远控闭环的发布级验收。
+
+## 当前并发线
+
+| 线程 | 负责人 | 状态 | 边界 |
+|---|---|---|---|
+| Edge SQLite durable 复核 | Johnny/backend | 运行中 | 先确认主线 SQLite 是否只需验证/收口；不重复 cherry-pick 旧分支 |
+| Desktop/Tauri 复核 | Trump/Desktop | 运行中 | 只读评估 Desktop Edge mapper、unsigned package smoke、macOS 风险 |
+| SDK/runtime 研究 | SDK researcher | 运行中 | 输出 Claude/OpenAI Agent SDK、自定义 runtime、Lobe icons 具体报告 |
+| State/worktree 审计 | state auditor | 运行中 | 只读整理 worktree/branch，给出清理候选；不删除 |
+| Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
 
 ## 分支治理
 
-| 分支 | 负责人 | 用途 | 规则 |
-|---|---|---|---|
-| `codex/p1-critical-evidence-integration` | Controller Codex | 当前集成候选和 gate 分支 | 只推 controller 审核后的提交；worker 不直接改 Roadmap/STATE。 |
-| `dev/delicious233` | Controller Codex | 当前开发 baseline | 已推进到 `39465d73`；下一轮 worker 从这里或同 SHA 集成分支开 worktree。 |
-| `master` | Controller Codex | 稳定发布分支 | 本轮 defer；后续用受控 promotion，不 force push。 |
-| `v0.3.0-rc.6` | 需要发布审批 | 下一个 rc tag 候选 | 未获明确审批前不创建、不推送。 |
+- 新实现必须从最新 `origin/dev/delicious233` 开隔离 worktree，不在主工作树开发。
+- Worker 不直接推 `dev/delicious233`、`master` 或 tag。
+- Controller 负责最终集成、验证、fast-forward/push。
+- 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
+- `v0.3.0-rc.6` 已存在，保留为稳定 RC 基线；后续 tag 需先通过独立 release gate。
 
-## 任务分配包
+## 下一步优先级
 
-用户是顶层产品负责人。Controller Codex 向用户负责，并协调 Trump、
-Johnny、Evidence/docs 负责人和 subagent。Mobile 线程现在并入 Trump
-统筹，只在需要移动端执行或协议对齐时作为 Trump 下属线程使用。
-
-### Controller Codex
-
-职责：保持 baseline 干净，控制合并顺序，完成最终验证，协调所有实现线。
-
-分支：
-
-| 分支 | 用途 |
-|---|---|
-| `codex/p1-critical-evidence-integration` | 当前 controller 集成分支，已与 dev 对齐。 |
-| `codex/p0-desktop-tauri-edge-build` | Desktop/Tauri/Local Edge 可用构建。 |
-| `codex/p0-product-loop-qa` | Web/backend/Desktop slice 合入后运行完整组合链路回归。 |
-
-任务：
-
-1. 从 `origin/dev/delicious233 = 39465d73` 开下一轮实现 worktree。
-2. 暂停 master promotion；后续需要时再做受控 promotion，不 force push。
-3. 负责 Desktop 启动流、Local Edge sidecar 启动/诊断、日志/app-data 持久、Windows unsigned package smoke。
-4. Trump 和 Johnny slice 可用后启动 QA 分支。
-
-### Trump
-
-职责：Web、Mobile 和 shared 前端产品体验。Trump 需要直接启动 Web
-本地页面调 UI 细节，不能只停留在代码和单元测试。
-
-分支：
-
-| 分支 | 用途 | 写入范围 |
-|---|---|---|
-| `codex/p0-web-agent-main-chain` | IM/@Agent 入口、目标选择、启动运行、target health、mock/real 标签 | `app/web/**`、`app/shared/**` |
-| `codex/p0-web-transcript-artifacts` | typed transcript blocks 和最小 artifact/diff/preview cards | `app/shared/**`、`app/web/**` tests |
-| `codex/mobile-expo-rn-plan` | Mobile 收口分支，当前已保存进度；后续由 Trump 统筹协议对齐 | `app/mobile/**`，仅在必要时改 shared 类型 |
-
-任务：
-
-1. 做一屏 Web 主链：Agent/联系人式入口、target picker、run start、route/run status、replay panel。
-2. 渲染 target health：no target、offline、degraded、ready、wrong profile、signed out。
-3. 明确 mock/fixture/observed/approved-real 模式；real mode 不得静默 fallback 到 mock。
-4. 渲染 typed transcript blocks：route decision、subtask、permission request/result、file change、tool result、artifact、preview、failure、finished。
-5. artifact/diff/preview cards 只基于现有事件合同或 Johnny 提供的新合同实现。
-6. 启动本地 Web dev server，实际点击主链页面、检查布局、空态、错误态、目标健康态、回放态和移动视口，不只跑测试。
-7. 接收已经保存进度的 `codex/mobile-expo-rn-plan` 分支和 Mobile 线程，让 Mobile 使用同一套 Hub target/run/approval/replay 语义；非必要不打断该分支的收尾节奏。
-8. 不改 backend schema、Hub handler、Edge handler。
-
-建议验证：
-
-```powershell
-corepack.cmd pnpm --dir app\web typecheck
-corepack.cmd pnpm --dir app\web exec vitest run --reporter=dot
-corepack.cmd pnpm --dir app\shared exec vitest run src\workbench\AgentHubWorkbench.test.tsx --reporter=dot
-corepack.cmd pnpm --dir app\web dev
-```
-
-### Johnny
-
-职责：Hub、Edge、事件合同、dispatch、permission、持久化运行状态。
-
-分支：
-
-| 分支 | 用途 | 写入范围 |
-|---|---|---|
-| `codex/p0-hub-edge-approval-loop` | Permission request/approve/deny 生命周期和 replay events | `hub-server/**`、`edge-server/**`、`api/**` |
-| `codex/p0-target-health-inventory` | target/runtime health contract 和 Desktop/Hub sync | `hub-server/**`、`edge-server/**`、`api/**`，必要时窄范围 `app/desktop/**` bridge tests |
-| `codex/p1-edge-sqlite-durability` | Edge SQLite 从 alpha 推到 guarded durability candidate | `edge-server/internal/store/**`、Edge tests |
-| `codex/p1-agent-sdk-custom-runtime` | OpenAI/Claude/custom Agent runtime registry 和 adapter path | `edge-server/internal/adapters/**`、`api/**`、聚焦 docs |
-
-任务：
-
-1. 实现 permission request/approve/deny/timeout/cancel/resume/abort events 和 replay。
-2. 确保 Edge 等待 permission decision 时不绕过 policy，也不会无限挂起。
-3. 收紧 target health 字段：target ID、Edge device ID、runtime、workspace、profile、last seen、degraded reasons。
-4. 保持 Web Hub-only；Web 不直接连接 Local Edge。
-5. approval 和 health contract 稳定后再推进 SQLite durability。
-6. 把 OpenAI/Claude/custom agents 映射进现有 adapter contract，不把 provider policy 写死。
-
-建议验证：
-
-```powershell
-cd hub-server
-go test ./... -short -count=1
-cd ..\edge-server
-go test ./... -short -count=1
-cd ..
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-live-chain-topology.ps1 -RepoRoot .
-```
-
-## Controller 下一步
-
-1. 把本状态更新推送到 `dev/delicious233` 和 controller 集成分支。
-2. 从 `origin/dev/delicious233 = 39465d73` 创建下一轮 worktree。
-3. 向 Trump/Johnny 发送本文中的分工摘要。
-4. Controller 自己启动 Desktop/Tauri/Local Edge 分支。
-5. 等 Trump/Johnny slice 返回后启动 product-loop QA。
+1. **真实产品闭环验收**：在 fixture gate 之外，准备受控 observed/approved-real 路径，验证 Web -> Hub -> Desktop -> Edge -> adapter -> replay -> Web。
+2. **Desktop/Tauri 可安装可启动**：先做 Windows unsigned package smoke，再拆 macOS sidecar/app-data/signing/notarization 风险。
+3. **Edge SQLite durable 收口**：基于当前 dev 已有 SQLite store 做迁移/重启/packaged-sidecar 证据，不重复实现旧分支。
+4. **Web real-mode 继续收口**：Projects、Targets、Runs、Approvals、Artifacts 全部保持 Hub-only，不静默 fallback mock。
+5. **SDK/custom runtime**：先做 manifest/registry/fixture contract 和图标专业化；真实 SDK/API 调用放到批准后的独立切片。
 
 ## 安全规则
 
-- 不在 dirty 主工作树开发。
-- 不 force push `dev`、`master` 或 tag。
-- 未获明确发布审批，不创建/推送 `v0.3.0-rc.6`。
+- Web 只连接 Hub，不直接连接 Local Edge 或 raw runtime。
+- Desktop renderer 不获得 raw process execution 权限。
+- Mock、fixture、observed、approved-real、production 必须显式区分。
 - 未获明确审批，不跑真实登录、真实模型消耗、部署、签名、公证、updater、release upload。
-- 未获明确审批，不对 bad-tree 问题做 destructive git maintenance。
-- Mobile 线程 `019ea616-0dbf-7263-a785-87fdb2e9d8a4` 现在归 Trump 统筹；Controller 只在协议漂移或阻塞时介入。
+- Roadmap 只写路线；当前事实写在本文。
