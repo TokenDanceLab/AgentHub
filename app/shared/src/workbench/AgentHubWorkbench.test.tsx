@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '../demo';
+import { WORKBENCH_DATA_MODE_STORAGE_KEY, projectGroupMessageLoopTranscript } from '../demo';
 import { createMockPlatform } from '../platform/createMockPlatform';
 import type { WorkbenchAgent } from '../platform/types';
 import type { TranscriptBlock } from '../transcript/types';
@@ -1699,6 +1699,37 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('limit')).toBeInTheDocument();
     expect(screen.getByText('运行结果')).toBeInTheDocument();
     expect(screen.getByText('协作进度 78% · Builder 完成 · Reviewer 复核中。')).toBeInTheDocument();
+  });
+
+  it('renders the Agent-to-Agent project group message loop fixture', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [
+        { id: 'agent-collab', title: 'Agent 协作群', kind: 'group', subtitle: 'Orchestrator 已汇总各 Agent 进度' },
+      ],
+    });
+
+    render(
+      <AgentHubWorkbench
+        activeConversationId="agent-collab"
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={projectGroupMessageLoopTranscript}
+      />,
+    );
+
+    expect(screen.getByText('Builder，先把项目群消息闭环的 shared fixture contract 梳理出来。')).toBeInTheDocument();
+    expect(screen.getByText('Agent -> Agent')).toBeInTheDocument();
+    expect(screen.getByText('IM agent_dm · Builder -> Reviewer · task task-a2a-review')).toBeInTheDocument();
+    expect(screen.getByText('@Reviewer 检查 Agent-to-Agent / 项目群 / @Agent 消息线，不启动真实长连接。')).toBeInTheDocument();
+    expect(screen.getAllByText('Group @Agent').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('@Agent queued')).toHaveLength(2);
+    expect(screen.getByText('@Agent assigned')).toBeInTheDocument();
+    expect(screen.getByText('Route Decision')).toBeInTheDocument();
+    expect(screen.getByText('dispatch')).toBeInTheDocument();
+    expect(screen.getByText('Project group @Agent mention routes task-a2a-review to Reviewer; fixture-only, no live push.')).toBeInTheDocument();
+    expect(screen.getAllByText('Reviewer').length).toBeGreaterThan(0);
   });
 
   it('opens the design card context menu and multi-select toolbar from transcript cards', () => {

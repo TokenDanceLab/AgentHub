@@ -116,6 +116,20 @@ describe('normalizeHubMessagesToTranscript', () => {
         },
         created_at: '2026-06-09T01:00:02Z',
       },
+      {
+        id: 'group-assigned-reviewer',
+        session_id: 'project-group-session',
+        seq_id: 4,
+        sender_type: 'system',
+        sender_id: 'hub-orchestrator',
+        content: {
+          text: 'Reviewer 已接到 shared transcript contract 复核任务。',
+          im_kind: 'project_group',
+          mentions: [{ id: 'agent-reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+          agent_task: { task_id: 'task-reviewer-1', status: 'assigned' },
+        },
+        created_at: '2026-06-09T01:00:03Z',
+      },
     ]);
 
     expect(blocks).toEqual([
@@ -142,6 +156,15 @@ describe('normalizeHubMessagesToTranscript', () => {
         displayDetail: 'IM project_group · mentions @Reviewer · task task-reviewer-1',
         badgeLabel: '@Agent queued',
         badgeVariant: 'primary',
+      }),
+      expect.objectContaining({
+        id: 'hub-message-group-assigned-reviewer',
+        kind: 'text',
+        text: 'Reviewer 已接到 shared transcript contract 复核任务。',
+        displayTitle: 'Group @Agent',
+        displayDetail: 'IM project_group · mentions @Reviewer · task task-reviewer-1',
+        badgeLabel: '@Agent assigned',
+        badgeVariant: 'thinking',
       }),
     ]);
   });
