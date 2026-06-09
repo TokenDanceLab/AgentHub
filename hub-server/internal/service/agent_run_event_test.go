@@ -540,3 +540,167 @@ func TestGetTaskRunEventSummaryAggregatesRuntimeHistory(t *testing.T) {
 	require.Equal(t, 1, summary.EventTypeCounts[model.RunEventTypeOutputBatch])
 	require.Equal(t, 1, summary.EventTypeCounts["run.agent.result"])
 }
+
+func TestListTaskApprovalsProjectsPendingAndDecidedRuntimeEvents(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
+	for _, event := range []model.AgentRunEvent{
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-1","toolName":"shell","status":"pending"}`, CreatedAt: base},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-2","toolUseId":"tool-2","toolName":"edit"}`, CreatedAt: base.Add(time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 3, EventType: "run.agent.permission_decided", Payload: `{"requestId":"req-2","decision":"allow","reason":"safe"}`, CreatedAt: base.Add(2 * time.Second)},
+	} {
+		require.NoError(t, db.Create(&event).Error)
+	}
+
+	svc := &AgentService{db: db}
+	result, err := svc.ListTaskApprovals(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Equal(t, "task-1", result.TaskID)
+	require.Equal(t, "run-1", result.EdgeRunID)
+	require.Equal(t, "sess-1", result.SessionID)
+	require.Equal(t, int64(3), result.LastEventSeq)
+	require.Len(t, result.Approvals, 2)
+	require.Len(t, result.Pending, 1)
+	require.Len(t, result.Decided, 1)
+	require.Equal(t, "req-1", result.Pending[0].ApprovalID)
+	require.Equal(t, int64(1), result.Pending[0].EventSeq)
+	require.Equal(t, "req-2", result.Decided[0].ApprovalID)
+	require.Equal(t, "allow", result.Decided[0].Status)
+	require.Equal(t, "safe", result.Decided[0].Reason)
+	require.NotNil(t, result.Decided[0].DecidedAt)
+
+	_, err = svc.ListTaskApprovals(context.Background(), "other-user", "task-1")
+	require.ErrorIs(t, err, errcode.AgentTaskNotFound)
+}
+
+func TestDecideTaskApprovalDeliversExactDeviceControl(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
+	require.NoError(t, db.Create(&model.AgentRunEvent{
+		TaskID:          "task-1",
+		EdgeRunID:       "edge-run-1",
+		SessionID:       "sess-1",
+		AgentInstanceID: "agent-1",
+		EventSeq:        1,
+		EventType:       "run.agent.permission_requested",
+		Payload:         `{"requestId":"req-1","toolName":"shell","status":"pending"}`,
+		CreatedAt:       base,
+	}).Error)
+
+	controlCache := &mockAgentRunControlCache{}
+	svc := &AgentService{db: db, cacheClient: controlCache}
+	approval, err := svc.DecideTaskApproval(context.Background(), "user-1", "task-1", "req-1", model.TeamApprovalDecision{
+		Decision: "allow",
+		Reason:   "known safe",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "allow", approval.Status)
+	require.Equal(t, "user-1", approval.DecidedBy)
+	require.NotNil(t, approval.EdgeControl)
+	require.Equal(t, "edge-run-1", approval.EdgeControl.RunID)
+	require.Equal(t, "req-1", approval.EdgeControl.RequestID)
+
+	require.Len(t, controlCache.controls, 1)
+	require.Equal(t, "user-1", controlCache.controls[0].userID)
+	require.Equal(t, "dev-1", controlCache.controls[0].deviceID)
+	require.JSONEq(t, `{"kind":"permission.decide","agent_task_id":"task-1","edge_device_id":"dev-1","approval_id":"req-1","edge_control":{"runId":"edge-run-1","requestId":"req-1","decision":"allow","reason":"known safe"}}`, controlCache.controls[0].payload)
+
+	result, err := svc.ListTaskApprovals(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Len(t, result.Decided, 1)
+	require.Equal(t, "allow", result.Decided[0].Status)
+	require.Equal(t, "user-1", result.Decided[0].DecidedBy)
+}
+
+func TestDecideTaskApprovalRejectsInvalidState(t *testing.T) {
+	tests := []struct {
+		name       string
+		event      *model.AgentRunEvent
+		approvalID string
+		decision   string
+		clearRunID bool
+		wantErr    error
+	}{
+		{name: "missing approval", approvalID: "missing", decision: "allow", wantErr: errcode.AgentTaskNotFound},
+		{name: "invalid decision", approvalID: "req-1", decision: "maybe", wantErr: errcode.ErrBadRequest},
+		{name: "missing edge run", event: &model.AgentRunEvent{TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-1"}`}, approvalID: "req-1", decision: "allow", clearRunID: true, wantErr: errcode.ErrBadRequest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newAgentRunEventTestDB(t)
+			if tt.clearRunID {
+				require.NoError(t, db.Exec(`UPDATE pending_agent_tasks SET edge_run_id = ? WHERE id = ?`, "", "task-1").Error)
+			}
+			if tt.event != nil {
+				require.NoError(t, db.Create(tt.event).Error)
+			}
+			svc := &AgentService{db: db, cacheClient: &mockAgentRunControlCache{}}
+			_, err := svc.DecideTaskApproval(context.Background(), "user-1", "task-1", tt.approvalID, model.TeamApprovalDecision{Decision: tt.decision})
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestListTaskArtifactsProjectsFileChangeAndArtifactCreated(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC)
+	for _, event := range []model.AgentRunEvent{
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: "run.agent.file_change", Payload: `{"path":"src/a.go","action":"modified","toolName":"apply_patch","status":"ok"}`, CreatedAt: base},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "artifact.created", Payload: `{"artifact_id":"art-1","path":"reports/summary.md","name":"summary.md","mime_type":"text/markdown","size_bytes":128}`, CreatedAt: base.Add(time.Second)},
+	} {
+		require.NoError(t, db.Create(&event).Error)
+	}
+
+	svc := &AgentService{db: db}
+	result, err := svc.ListTaskArtifacts(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Equal(t, "task-1", result.TaskID)
+	require.Equal(t, "run-1", result.EdgeRunID)
+	require.Equal(t, "sess-1", result.SessionID)
+	require.Equal(t, int64(2), result.LastEventSeq)
+	require.Len(t, result.Artifacts, 2)
+	require.Equal(t, "src/a.go", result.Artifacts[0].Path)
+	require.Equal(t, "modified", result.Artifacts[0].Action)
+	require.Equal(t, int64(1), result.Artifacts[0].EventSeq)
+	require.Equal(t, "art-1", result.Artifacts[1].ArtifactID)
+	require.Equal(t, "reports/summary.md", result.Artifacts[1].Path)
+	require.Equal(t, int64(128), result.Artifacts[1].SizeBytes)
+
+	_, err = svc.ListTaskArtifacts(context.Background(), "other-user", "task-1")
+	require.ErrorIs(t, err, errcode.AgentTaskNotFound)
+}
+
+type mockAgentRunControlCache struct {
+	controls []mockAgentRunControlCall
+}
+
+type mockAgentRunControlCall struct {
+	userID   string
+	deviceID string
+	payload  string
+}
+
+func (m *mockAgentRunControlCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
+	return "", errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
+	return "", errors.New("offline")
+}
+
+func (m *mockAgentRunControlCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	return errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	return errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	return 0, errors.New("not used")
+}
+
+func (m *mockAgentRunControlCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	m.controls = append(m.controls, mockAgentRunControlCall{userID: userID, deviceID: deviceID, payload: controlJSON})
+	return nil
+}
