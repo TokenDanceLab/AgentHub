@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildInspectorEvidenceModel,
+  buildDiffProposalEvidenceManifest,
+  buildDiffProposalEvidenceModel,
   buildRuntimeEvidenceInspectorModel,
   evidenceStatusLabel,
 } from './inspectorEvidence';
@@ -24,6 +26,75 @@ describe('buildInspectorEvidenceModel', () => {
     expect(model.tools.map((item) => item.id)).toEqual(['tool-rg']);
     expect(model.files.map((item) => item.id)).toEqual(['file-app']);
     expect(model.artifacts.map((item) => item.id)).toEqual(['artifact-smoke']);
+  });
+
+  it('models a diff proposal as review-only evidence with export metadata', () => {
+    const model = buildDiffProposalEvidenceModel({
+      diff: {
+        filePath: 'src/a.go',
+        status: 'modified',
+        additions: 1,
+        deletions: 1,
+        hunks: [],
+        editId: 'edit-1',
+        hash: 'sha256:diff-abc',
+        reviewStatus: 'allow',
+        canApply: false,
+        canRevert: true,
+      },
+      artifactId: 'artifact-1',
+      approvalId: 'approval-1',
+      correlationId: 'corr-1',
+    });
+
+    expect(model).toEqual({
+      filePath: 'src/a.go',
+      reviewStatus: 'approved',
+      canApply: false,
+      canRevert: true,
+      editId: 'edit-1',
+      hash: 'sha256:diff-abc',
+      artifactId: 'artifact-1',
+      approvalId: 'approval-1',
+      correlationId: 'corr-1',
+      exportLabel: 'Export approved evidence',
+    });
+  });
+
+  it('exports diff proposal evidence manifest with approval correlation', () => {
+    const proposal = buildDiffProposalEvidenceModel({
+      diff: {
+        filePath: 'src/review.ts',
+        status: 'modified',
+        additions: 2,
+        deletions: 0,
+        hunks: [],
+        editId: 'edit-2',
+        hash: 'sha256:diff-def',
+        reviewStatus: 'rejected',
+        canApply: false,
+        canRevert: false,
+      },
+      artifactId: 'artifact-2',
+      approvalId: 'approval-2',
+      correlationId: 'corr-2',
+    });
+
+    expect(buildDiffProposalEvidenceManifest([proposal], '2026-06-09T00:00:00.000Z')).toEqual({
+      schema: 'agenthub-diff-proposal-evidence-manifest-v1',
+      generatedAt: '2026-06-09T00:00:00.000Z',
+      proposals: [{
+        file_path: 'src/review.ts',
+        review_status: 'rejected',
+        can_apply: false,
+        can_revert: false,
+        edit_id: 'edit-2',
+        hash: 'sha256:diff-def',
+        artifact_id: 'artifact-2',
+        approval_id: 'approval-2',
+        correlation_id: 'corr-2',
+      }],
+    });
   });
 
   it('keeps approval refs visible for side-panel evidence grouping', () => {

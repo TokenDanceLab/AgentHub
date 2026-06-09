@@ -124,6 +124,7 @@ type AgentTaskArtifact struct {
 	Status        string    `json:"status,omitempty"`
 	Diff          string    `json:"diff,omitempty"`
 	EditID        string    `json:"edit_id,omitempty"`
+	Hash          string    `json:"hash,omitempty"`
 	ReviewStatus  string    `json:"review_status,omitempty"`
 	CanApply      *bool     `json:"can_apply,omitempty"`
 	CanRevert     *bool     `json:"can_revert,omitempty"`

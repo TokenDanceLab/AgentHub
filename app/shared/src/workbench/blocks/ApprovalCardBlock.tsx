@@ -18,6 +18,9 @@ interface ApprovalCardBlockProps {
   toolName?: string | undefined;
   risk?: ApprovalRisk | undefined;
   reason?: string | undefined;
+  reviewStatus?: 'review' | 'approved' | 'rejected' | string | undefined;
+  evidenceLabel?: string | undefined;
+  onExportEvidence?: (() => void) | undefined;
   onDecision?: ((action: ApprovalDecisionAction) => void) | undefined;
 }
 
@@ -55,6 +58,9 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
   toolName,
   risk = 'medium',
   reason = '需要用户确认后继续执行。',
+  reviewStatus,
+  evidenceLabel = 'Export evidence',
+  onExportEvidence,
   onDecision,
 }) => {
   const statusLabel = statusLabels[status] ?? status;
@@ -76,6 +82,16 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
           {' '}
           <code>{id}</code>
         </div>
+        {(reviewStatus || onExportEvidence) && (
+          <div className={styles.evidence}>
+            {reviewStatus && <span className={styles.badge}>diff {reviewStatus}</span>}
+            {onExportEvidence && (
+              <button className={styles.btn} onClick={onExportEvidence} type="button">
+                {evidenceLabel}
+              </button>
+            )}
+          </div>
+        )}
         <div className={styles.actions}>
           {isPending ? (
             <>

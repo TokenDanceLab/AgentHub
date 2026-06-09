@@ -592,9 +592,17 @@ func TestAgentHandler_TaskArtifacts(t *testing.T) {
 			return &model.AgentTaskArtifactList{
 				TaskID: "task-1",
 				Artifacts: []model.AgentTaskArtifact{{
-					TaskID: "task-1",
-					Path:   "src/a.go",
-					Action: "modified",
+					TaskID:        "task-1",
+					Path:          "src/a.go",
+					Action:        "modified",
+					Diff:          "@@ -1 +1 @@\n-old\n+new",
+					EditID:        "edit-1",
+					Hash:          "sha256:diff-1",
+					ReviewStatus:  "approved",
+					CanApply:      boolPtr(false),
+					CanRevert:     boolPtr(true),
+					ArtifactID:    "artifact-1",
+					SourceEventID: "event-1",
 				}},
 			}, nil
 		},
@@ -614,6 +622,12 @@ func TestAgentHandler_TaskArtifacts(t *testing.T) {
 	require.True(t, called)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"path":"src/a.go"`)
+	assert.Contains(t, w.Body.String(), `"edit_id":"edit-1"`)
+	assert.Contains(t, w.Body.String(), `"hash":"sha256:diff-1"`)
+	assert.Contains(t, w.Body.String(), `"review_status":"approved"`)
+	assert.Contains(t, w.Body.String(), `"can_apply":false`)
+	assert.Contains(t, w.Body.String(), `"can_revert":true`)
+	assert.Contains(t, w.Body.String(), `"artifact_id":"artifact-1"`)
 }
 
 func TestAgentHandler_TaskDone(t *testing.T) {
@@ -722,4 +736,8 @@ func TestAgentHandler_TaskFail(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
