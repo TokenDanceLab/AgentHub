@@ -600,7 +600,7 @@ func TestAgentHandler_TaskArtifacts(t *testing.T) {
 					Hash:          "sha256:diff-1",
 					ReviewStatus:  "approved",
 					CanApply:      boolPtr(false),
-					CanRevert:     boolPtr(true),
+					CanRevert:     boolPtr(false),
 					ArtifactID:    "artifact-1",
 					SourceEventID: "event-1",
 				}},
@@ -626,7 +626,7 @@ func TestAgentHandler_TaskArtifacts(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"hash":"sha256:diff-1"`)
 	assert.Contains(t, w.Body.String(), `"review_status":"approved"`)
 	assert.Contains(t, w.Body.String(), `"can_apply":false`)
-	assert.Contains(t, w.Body.String(), `"can_revert":true`)
+	assert.Contains(t, w.Body.String(), `"can_revert":false`)
 	assert.Contains(t, w.Body.String(), `"artifact_id":"artifact-1"`)
 }
 

@@ -13,7 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Passed = 0
 $Failed = 0
-$AllowedReviewStatus = @("review", "approved", "rejected")
+$AllowedReviewStatus = @("approved", "rejected")
 
 function Pass([string]$Text) {
     $script:Passed++
@@ -63,6 +63,18 @@ if ($manifest) {
         Fail "manifest has generatedAt"
     }
 
+    if ($manifest.export_mode -eq "review-only") {
+        Pass "manifest export_mode is review-only"
+    } else {
+        Fail "manifest export_mode is review-only"
+    }
+
+    if ($false -eq $manifest.real_apply_supported) {
+        Pass "manifest real_apply_supported is false"
+    } else {
+        Fail "manifest real_apply_supported is false"
+    }
+
     $proposals = @($manifest.proposals)
     if ($proposals.Count -gt 0) {
         Pass "manifest lists diff proposals"
@@ -98,10 +110,22 @@ if ($manifest) {
             Fail "proposal can_apply is boolean: $filePath"
         }
 
+        if ($false -eq $proposal.can_apply) {
+            Pass "proposal can_apply is false: $filePath"
+        } else {
+            Fail "proposal can_apply is false: $filePath"
+        }
+
         if ($null -ne $proposal.can_revert -and $proposal.can_revert.GetType().Name -eq "Boolean") {
             Pass "proposal can_revert is boolean: $filePath"
         } else {
             Fail "proposal can_revert is boolean: $filePath"
+        }
+
+        if ($false -eq $proposal.can_revert) {
+            Pass "proposal can_revert is false: $filePath"
+        } else {
+            Fail "proposal can_revert is false: $filePath"
         }
     }
 }
