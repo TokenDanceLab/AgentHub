@@ -83,8 +83,8 @@ describe('webPlatform workbench agent mapping', () => {
   });
 
   it('does not fall back to demo agents in real mode', () => {
-    expect(resolveWebWorkbenchAgents(undefined, 'real')).toEqual([]);
-    expect(resolveWebWorkbenchAgents([], 'real')).toEqual([]);
+    expect(resolveWebWorkbenchAgents(undefined, 'approved-real')).toEqual([]);
+    expect(resolveWebWorkbenchAgents([], 'approved-real')).toEqual([]);
   });
 
   it('maps Hub sessions into shared workbench conversations', () => {
@@ -103,7 +103,7 @@ describe('webPlatform workbench agent mapping', () => {
     });
 
     expect(resolveWebWorkbenchConversations(undefined, false)).toBe(webConversations);
-    expect(resolveWebWorkbenchConversations(undefined, false, 'real')).toEqual([webHubEmptyConversation]);
+    expect(resolveWebWorkbenchConversations(undefined, false, 'approved-real')).toEqual([webHubEmptyConversation]);
     expect(resolveWebWorkbenchConversations([], true)).toEqual([webHubEmptyConversation]);
   });
 

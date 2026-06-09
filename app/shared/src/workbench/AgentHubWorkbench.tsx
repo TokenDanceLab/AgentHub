@@ -79,6 +79,12 @@ export interface AgentHubWorkbenchProps {
   conversations: WorkbenchConversation[];
   agents?: WorkbenchAgent[];
   composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
+  workbenchStatus?: {
+    dataMode?: string | undefined;
+    replayLabel?: string | undefined;
+    targetLabel?: string | undefined;
+    targetState?: string | undefined;
+  } | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
   projects?: ProjectInfo[] | undefined;
@@ -108,6 +114,7 @@ export function AgentHubWorkbench({
   conversations,
   agents,
   composerExecutionTargets,
+  workbenchStatus,
   agentProfilesStatus,
   contacts,
   projects,
@@ -1024,6 +1031,7 @@ export function AgentHubWorkbench({
                 onExecutionTargetChange={setSelectedExecutionTargetId}
                 onPickLocalAttachments={platform.attachments?.pickFiles}
                 onSubmit={submitComposer}
+                status={workbenchStatus}
                 submitBehavior={composerSubmitBehavior}
                 targetLabel={activeConversation?.title ?? 'AgentHub'}
               />

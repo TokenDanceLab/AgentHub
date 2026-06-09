@@ -4,6 +4,7 @@ import { AgentHubWorkbench } from '@shared/workbench';
 import type { AgentConfig, ProjectDraft, ProjectInfo } from '@shared/workbench';
 import {
   getWorkbenchDataModeOverrideSnapshot,
+  isWorkbenchRealDataMode,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
 } from '@shared/demo';
@@ -50,13 +51,14 @@ function WebWorkbenchRoot() {
     getWorkbenchDataModeOverrideSnapshot,
   );
   const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
+  const realMode = isWorkbenchRealDataMode(dataMode);
   const agentList = useAgentList(true);
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
   const workbench = useWebWorkbenchModel(selectedConversationId);
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
-  const agentLoadError = dataMode === 'real' && agentList.error
+  const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, 'Agent Profile 加载失败')
     : undefined;
 
@@ -114,7 +116,7 @@ function WebWorkbenchRoot() {
         agents={agents}
         composerExecutionTargets={workbench.composerExecutionTargets}
         agentProfilesStatus={{
-          loading: dataMode === 'real' && agentList.isFetching,
+          loading: realMode && agentList.isFetching,
           error: agentLoadError,
           actionError: agentActionError,
           savingAgentId,
@@ -135,6 +137,7 @@ function WebWorkbenchRoot() {
         onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
         platform={webPlatform}
+        workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
       />
       {showAuthModal && (
