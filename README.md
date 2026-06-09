@@ -1,184 +1,147 @@
-<div align="center">
+# AgentHub
 
-# AgentHub / AI 工作台
+AgentHub 是一个面向 AI Agent 团队协作的开源工作台。它把 Web、Desktop、Mobile、Hub Server、Edge Server 和多种 CLI Runtime 连接到同一条协作链路，让用户在类似 IM 的界面里创建项目、拉起 Agent、审批任务、查看回放和管理本地执行目标。
 
-> 让 Claude Code、Codex、OpenCode 在同一 IM 工作台上协作
+[English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [路线图](docs/roadmap.md) · [API](api/)
 
-[![status](https://img.shields.io/badge/v0.3.0-活跃开发-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
-[![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
-[![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
-[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
+![status](https://img.shields.io/badge/status-active_development-blue?style=flat-square)
+![version](https://img.shields.io/badge/version-0.3.0--rc.7-orange?style=flat-square)
+![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
+![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
+![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
 
-[English](README_EN.md) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
+## 当前状态
 
-</div>
+AgentHub 正在进入 `v0.3.0-rc.7` 候选阶段。当前主线优先级是稳定 `dev/delicious233`，再合入 `master`，然后发布 Windows Desktop 与 Android 预览版本。
 
-<br>
+| 模块 | 状态 | 说明 |
+|---|---|---|
+| Web 工作台 | 可开发验证 | 已接 Hub 项目、任务、审批、Artifact、项目群线程和 Agent 消息合同 |
+| Desktop 工作台 | 可开发验证 | Tauri 2，本地 Edge/CLI readiness 和 Windows 打包门禁正在收口 |
+| Mobile | 已合入 dev | Expo / React Native 路线已进入 `app/mobile-rn`，Android/iOS release gate 仍需设备证据 |
+| Hub Server | 可开发验证 | 项目、AgentProfile、ExecutionTarget、任务、审批和消息合同已持续收口 |
+| Edge Server | 可开发验证 | CLI adapter、SQLite readiness、SDK fixture 和本地执行证据仍在强化 |
+| 真实登录/真实 CLI | 未标记完成 | TokenDanceID 与真实 CLI/model/API 需要单独的 approved-real 证据，不用 fixture 代替 |
 
-<!-- 截图占位：Desktop 主界面 dark theme -->
-<p align="center">
-  <img src="screenshots/web-app.png" alt="AgentHub 工作台" width="80%">
-</p>
+## 快速开始
 
----
+### 环境
 
-## 三种 AI Runtime 统一调度 · IM 原生多 Agent 协作 · 团队审批流 · 中英双语 · Glass 拟态设计
+- Go 1.25+
+- Node.js 20+
+- pnpm / Corepack
+- Windows Desktop 打包需要 Rust、Tauri 依赖和 Windows toolchain
 
-<br>
-
-## 核心卖点
-
-| | |
-|---|---|
-| **三种 Runtime 统一** | 同一界面调度 Claude Code、Codex、OpenCode，不锁定单一模型或工具链 |
-| **IM 原生协作** | 像飞书/微信一样拉群、@Agent、审批——不是又一个 IDE 插件 |
-| **Hub-Edge 分布式** | 本地执行 + 云端同步 + 多端协作，数据不出本地，协作走云端 |
-
-<br>
-
-## 快速开始（5 步）
+### 安装依赖
 
 ```powershell
-# 1. 克隆仓库
 git clone https://github.com/TokenDanceLab/AgentHub.git
 cd AgentHub
-
-# 2. 初始化开发环境
-.\scripts\setup.ps1
-
-# 3. 启动 Edge Server（选择一种 Runtime）
-cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
-
-# 4. 启动 Desktop
-cd ..\app\desktop
-pnpm install
-pnpm dev
-
-# 5. 打开 http://localhost:5173 开始使用
+corepack enable
+corepack pnpm install --dir app --frozen-lockfile
 ```
 
-> 需要先安装 Go 1.25+、Node.js 20+ 和 pnpm。详见 [架构文档](docs/architecture.md)。
+### 启动 Hub Server
 
-<br>
+```powershell
+cd hub-server
+go test ./... -short
+go run ./cmd/agenthub-hub
+```
 
-## 功能对比
+### 启动 Web
 
-| 能力 | AgentHub | Cursor | Windsurf | Claude Code | Codex |
-|------|:---:|:---:|:---:|:---:|:---:|
-| 多 Agent 协作 | **IM 群聊** | 单人 | 单人 | 实验性 | 单人 |
-| 多 Runtime 支持 | **3 种** | 自有 | 自有 | Claude 专用 | OpenAI 专用 |
-| 中英双语 | **完整** | 英文 | 英文 | 英文 | 英文 |
-| 本地执行 | **Tauri 桌面端** | VS Code 插件 | VS Code 插件 | CLI | CLI |
-| 移动端 | **Android 原生** | 无 | 无 | 无 | Web |
-| 团队审批流 | **内置** | 无 | 无 | 权限弹窗 | 无 |
-| 多端同步 | **Hub 云端** | 无 | 无 | 无 | 无 |
-| 设计系统 | **Glass 拟态** | VS Code 主题 | VS Code 主题 | TUI | Web Dashboard |
-| MCP 生态 | 规划中 | 完整 | 完整 | 最完整 | 无 |
-| 定价 | **开源免费** | $20/月 | $20/月 | API 计费 | $20/月 |
+```powershell
+cd app
+corepack pnpm --filter agenthub-web dev
+```
 
-> AgentHub 是 IM 层的创新——不替代任何 Runtime，而是让它们在同一工作台上协作。
+### 启动 Desktop
 
-<br>
+```powershell
+cd app
+corepack pnpm --filter agenthub-desktop dev
+```
+
+Desktop 会通过 Local Edge/sidecar 连接本机执行目标。真实 CLI 调用需要本机已安装并配置对应 CLI，并通过 readiness gate 证明 no-secret / no-spend 边界。
 
 ## 架构
 
 ```text
-Desktop / Mobile / Web
+Web / Desktop / Mobile
         |
-   Edge Server (Go) ── Agent Runtime Adapter ── Claude Code / Codex / OpenCode
+        v
+Hub Server  <---->  TokenDanceID
         |
-   Hub Server (Go) ── PostgreSQL + Redis
+        v
+Local Edge / Remote Edge
+        |
+        v
+Claude Code / Codex / OpenCode / SDK fixtures
 ```
 
-| 组件 | 职责 |
-|------|------|
-| **Desktop App**（Tauri） | 本地执行工作台，IM 聊天、Diff 审批、多 Agent 管理 |
-| **Web App** | 浏览器工作台，远程查看、审批协作 |
-| **Mobile App**（Expo + React Native） | 移动端 IM、审批、预览 |
-| **Edge Server** | 本地执行节点，Agent CLI 进程管理，EventStore |
-| **Hub Server** | 账号、IM 群聊、多端同步、设备路由、审计 |
-| **Agent Runtime** | Claude Code / Codex / OpenCode CLI 适配器 |
+| 目录 | 作用 |
+|---|---|
+| `app/web` | 浏览器工作台 |
+| `app/desktop` | Tauri Desktop 工作台 |
+| `app/mobile-rn` | Expo / React Native Mobile |
+| `app/shared` | 共享 UI、类型、transcript、API client |
+| `hub-server` | Hub API、账号会话、项目、任务、消息、审批 |
+| `edge-server` | 本地执行节点、CLI adapter、SQLite store、事件回放 |
+| `api` | OpenAPI 与事件合同 |
+| `tests/scripts` | release、readiness、approved-real 证据门禁 |
+| `docs` | 路线图、状态、架构和治理文档 |
 
-本地执行不依赖 Hub——Desktop 只连 Local Edge 即可完成项目、线程、Run 全流程。Hub 用于云端 IM、多端同步、远程审批。
+## 能力边界
 
-<br>
+| 能力 | 当前口径 |
+|---|---|
+| Mock / fixture | 用于本地开发、CI 和无密钥证明，不能声明为真实登录或真实模型执行 |
+| Real mode | 需要 TokenDanceID、Hub、Desktop/Edge、CLI adapter 和脱敏证据同时通过 |
+| Windows Release | 允许先走 unsigned / artifact-only readiness，正式签名和 updater 发布需要单独批准 |
+| Android Release | Mobile 已合入 dev，正式 release 需要 dev-build/device/AuthSession/SecureStore/Push/Hub 证据 |
+| macOS Release | 目前只保留 policy gate；签名、公证和上传不在默认 release 流程内 |
 
-## 产品分层
+## 常用验证
 
-| 层 | 描述 | 阶段 |
-|---|------|:---:|
-| **Desktop Command Center** | 本地项目、Thread、Run、Diff、审批、Preview | P0 ✅ |
-| **IM Collaboration** | 单聊、群聊、@Agent、多 Agent 审查、进度卡片 | P1 🔧 |
-| **Hub Network** | 账号、好友、多端同步、Edge 中继、审计 | P2-P4 📋 |
+```powershell
+# Web
+cd app
+corepack pnpm --filter agenthub-web typecheck
+corepack pnpm --filter agenthub-web test
 
-<br>
+# Hub
+cd ..\hub-server
+go test ./... -short
 
-## 技术栈
+# Edge
+cd ..\edge-server
+go test ./... -short
 
-| 层 | 技术 |
-|---|------|
-| 前端 | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens |
-| Desktop | Tauri 2.5 |
-| Mobile | Expo SDK 56 + React Native 0.85 + React 19.2 |
-| Edge Server | Go 1.25 + WebSocket + Agent Runtime adapters |
-| Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis |
-| 实时通信 | WebSocket typed events |
-| 共享组件 | `@shared/ui` — 通用 UI 组件库 |
-
-<br>
-
-## 项目结构
-
-```text
-AgentHub/
-├── app/
-│   ├── desktop/          # Tauri 桌面端
-│   ├── web/              # Web 工作台
-│   ├── mobile-rn/        # Expo + React Native Mobile 端
-│   └── shared/           # 前端共享类型、API client、@shared/ui
-├── edge-server/          # Edge 执行节点
-├── hub-server/           # Hub 中心服务
-├── api/                  # API 契约（OpenAPI + WebSocket events）
-├── docs/                 # 文档
-│   ├── architecture.md   # 产品定位 + 系统架构 + 实现状态
-│   ├── roadmap.md        # 当前主线与任务优先级
-│   ├── desktop-web-v4-clean-rebuild-plan.md
-│   ├── v4-frontend-progress-2026-06-07.md
-│   ├── adr/              # 架构决策记录
-│   ├── designs/          # 组件设计文档
-│   ├── governance/       # 安全台账、分支治理、文档标准
-│   ├── reference/        # 调研与竞品分析
-│   ├── operations/       # 运维文档
-│   └── archive/          # 历史评审与归档
-└── scripts/              # 初始化脚本、git hooks
+# Release readiness
+cd ..
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-release-gate.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-token-dance-id-login-readiness.ps1 -RepoRoot .
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-p0-approved-real-gold-path.ps1 -RepoRoot .
 ```
 
-<br>
+## 发布节奏
 
-## 文档导航
+1. `dev/delicious233` 先达到完整绿色 CI。
+2. 清理或关闭已过时的 PR 与 worktree。
+3. 新建 `dev/delicious233 -> master` promote PR。
+4. 合入 `master` 后打 `v0.3.0-rc.7` tag。
+5. 生成 Windows Desktop 和 Android 预览证据；签名、公证、商店发布另走批准。
 
-| 文档 | 面向 |
-|------|------|
-| [架构文档](docs/architecture.md) | 产品定位、系统架构、实现状态（首选入口） |
-| [路线图](docs/roadmap.md) | 当前主线、阶段任务和验收口径 |
-| [v4 重构计划](docs/desktop-web-v4-clean-rebuild-plan.md) | Desktop/Web shared workbench clean rebuild |
-| [v4 前端进度](docs/v4-frontend-progress-2026-06-07.md) | 5173/5174 shared UI、动效、主题、侧栏和验证证据 |
-| [API 契约](api/) | REST + WebSocket 接口定义 |
-| [安全风险台账](docs/governance/security-risk-register.md) | 安全风险登记与追踪 |
+## 文档
 
-<br>
+- [路线图](docs/roadmap.md)
+- [当前状态](STATE.md)
+- [架构文档](docs/architecture.md)
+- [API 合同](api/)
+- [安全风险台账](docs/governance/security-risk-register.md)
+- [TokenDanceID 登录 readiness](docs/audit/token-dance-id-login-readiness.md)
 
-## 鉴权
+## License
 
-本地执行无需登录。使用云端 IM、多端同步或远程控制时，通过 TokenDance ID 统一登录。
-
-<br>
-
----
-
-<p align="center">
-  <a href="README_EN.md">English</a> &nbsp;·&nbsp;
-  <a href="docs/architecture.md">系统架构</a> &nbsp;·&nbsp;
-  <a href="api/">API 契约</a>
-</p>
+Apache-2.0. See [LICENSE](LICENSE).

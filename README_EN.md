@@ -1,182 +1,147 @@
-<div align="center">
+# AgentHub
 
-# AgentHub / AI Workbench
+AgentHub is an open-source workbench for AI agent collaboration. It connects Web, Desktop, Mobile, Hub Server, Edge Server, and multiple CLI runtimes into one IM-style workflow for projects, agents, approvals, replay, artifacts, and local execution targets.
 
-> Claude Code, Codex, OpenCode — collaborating in one IM workspace
+[中文](README.md) · [Website](https://hub.vectorcontrol.tech) · [Roadmap](docs/roadmap.md) · [API](api/)
 
-[![status](https://img.shields.io/badge/v0.3.0-Active_Development-blue?style=flat-square)](https://github.com/TokenDanceLab/AgentHub)
-[![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)](https://go.dev/)
-[![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
-[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](LICENSE)
+![status](https://img.shields.io/badge/status-active_development-blue?style=flat-square)
+![version](https://img.shields.io/badge/version-0.3.0--rc.7-orange?style=flat-square)
+![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
+![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
+![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
 
-[中文文档](README.md) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
+## Status
 
-</div>
+AgentHub is moving toward the `v0.3.0-rc.7` candidate. The active path is to stabilize `dev/delicious233`, promote it to `master`, then publish Windows Desktop and Android preview evidence.
 
-<br>
+| Area | Status | Notes |
+|---|---|---|
+| Web workbench | Development-ready | Hub projects, tasks, approvals, artifacts, project group threads, and agent message contracts are wired |
+| Desktop workbench | Development-ready | Tauri 2, local Edge/CLI readiness, and Windows packaging gates are being closed |
+| Mobile | Merged to dev | Expo / React Native lives in `app/mobile-rn`; Android/iOS release gates still need device evidence |
+| Hub Server | Development-ready | Projects, AgentProfile, ExecutionTarget, tasks, approvals, and message contracts are active |
+| Edge Server | Development-ready | CLI adapters, SQLite readiness, SDK fixtures, and local evidence gates are being hardened |
+| Real login / real CLI | Not complete | TokenDanceID and real CLI/model/API usage require separate approved-real evidence |
 
-<!-- Screenshot placeholder: Desktop main UI dark theme -->
-<p align="center">
-  <img src="screenshots/web-app.png" alt="AgentHub Desktop main UI" width="80%">
-</p>
+## Quick Start
 
----
+### Requirements
 
-## Unified Runtime Scheduling · IM-native Multi-Agent Collaboration · Team Approval Pipelines · Bilingual zh/en · Glassmorphism Design
+- Go 1.25+
+- Node.js 20+
+- pnpm / Corepack
+- Rust, Tauri prerequisites, and Windows toolchain for Desktop packaging
 
-<br>
-
-## Key Features
-
-| | |
-|---|---|
-| **Unified Runtimes** | Schedule Claude Code, Codex, and OpenCode from the same UI — never locked into one toolchain |
-| **IM-native Collaboration** | Create groups, @mention agents, approve diffs — just like Slack or WeChat, not another IDE plugin |
-| **Hub-Edge Distributed** | Local execution + cloud sync + multi-device — your data stays local, collaboration goes through the cloud |
-
-<br>
-
-## Quick Start (5 steps)
+### Install
 
 ```powershell
-# 1. Clone
 git clone https://github.com/TokenDanceLab/AgentHub.git
 cd AgentHub
-
-# 2. Initialize
-.\scripts\setup.ps1
-
-# 3. Start Edge Server (pick a runtime)
-cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
-
-# 4. Start Desktop
-cd ..\app\desktop
-pnpm install
-pnpm dev
-
-# 5. Open http://localhost:5173
+corepack enable
+corepack pnpm install --dir app --frozen-lockfile
 ```
 
-> Requires Go 1.25+, Node.js 20+, and pnpm. See [Architecture](docs/architecture.md) for details.
+### Run Hub Server
 
-<br>
+```powershell
+cd hub-server
+go test ./... -short
+go run ./cmd/agenthub-hub
+```
 
-## Feature Comparison
+### Run Web
 
-| Capability | AgentHub | Cursor | Windsurf | Claude Code | Codex |
-|------|:---:|:---:|:---:|:---:|:---:|
-| Multi-agent Collaboration | **IM group chat** | Solo | Solo | Experimental | Solo |
-| Multi-runtime Support | **3 runtimes** | Proprietary | Proprietary | Claude only | OpenAI only |
-| Bilingual zh/en | **Full** | EN | EN | EN | EN |
-| Local Execution | **Tauri desktop** | VS Code ext | VS Code ext | CLI | CLI |
-| Mobile | **Android native** | None | None | None | Web |
-| Team Approval Pipeline | **Built-in** | None | None | Permission modal | None |
-| Multi-device Sync | **Hub cloud** | None | None | None | None |
-| Design System | **Glassmorphism** | VS Code theme | VS Code theme | TUI | Web Dashboard |
-| MCP Ecosystem | Planned | Full | Full | Best-in-class | None |
-| Pricing | **Free & OSS** | $20/mo | $20/mo | API metered | $20/mo |
+```powershell
+cd app
+corepack pnpm --filter agenthub-web dev
+```
 
-> AgentHub innovates at the IM layer — it doesn't replace any runtime, it lets them collaborate in one workspace.
+### Run Desktop
 
-<br>
+```powershell
+cd app
+corepack pnpm --filter agenthub-desktop dev
+```
+
+Desktop connects to a local Edge/sidecar for local execution. Real CLI calls require the matching local CLI setup and readiness evidence for no-secret / no-spend boundaries.
 
 ## Architecture
 
 ```text
-Desktop / Mobile / Web
+Web / Desktop / Mobile
         |
-   Edge Server (Go) ── Agent Runtime Adapter ── Claude Code / Codex / OpenCode
+        v
+Hub Server  <---->  TokenDanceID
         |
-   Hub Server (Go) ── PostgreSQL + Redis
+        v
+Local Edge / Remote Edge
+        |
+        v
+Claude Code / Codex / OpenCode / SDK fixtures
 ```
 
-| Component | Responsibility |
-|------|------|
-| **Desktop App** (Tauri) | Local execution workspace, IM chat, diff approval, multi-agent management |
-| **Web App** | Browser workspace for remote viewing, approval, and collaboration |
-| **Mobile App** (Expo + React Native) | Mobile IM, approvals, previews |
-| **Edge Server** | Local execution node, Agent CLI process management, EventStore |
-| **Hub Server** | Accounts, IM groups, multi-device sync, device routing, audit |
-| **Agent Runtime** | Claude Code / Codex / OpenCode CLI adapters |
+| Path | Purpose |
+|---|---|
+| `app/web` | Browser workbench |
+| `app/desktop` | Tauri Desktop workbench |
+| `app/mobile-rn` | Expo / React Native Mobile |
+| `app/shared` | Shared UI, types, transcript logic, API client |
+| `hub-server` | Hub API, sessions, projects, tasks, messages, approvals |
+| `edge-server` | Local execution node, CLI adapters, SQLite store, event replay |
+| `api` | OpenAPI and event contracts |
+| `tests/scripts` | Release, readiness, and approved-real gates |
+| `docs` | Roadmap, state, architecture, and governance docs |
 
-Local execution works without Hub — Desktop only needs Local Edge for the full project→thread→run workflow. Hub provides cloud IM, multi-device sync, and remote approval.
+## Boundaries
 
-<br>
+| Capability | Current contract |
+|---|---|
+| Mock / fixture | Used for local development, CI, and no-secret proof; not real login or real model execution |
+| Real mode | Requires TokenDanceID, Hub, Desktop/Edge, CLI adapter, and redacted evidence together |
+| Windows Release | Unsigned / artifact-only readiness is allowed first; signing and updater publication need approval |
+| Android Release | Mobile is merged to dev; release needs dev-build/device/AuthSession/SecureStore/Push/Hub evidence |
+| macOS Release | Policy gate only for now; signing, notarization, and upload are separate approval slices |
 
-## Product Layers
+## Verification
 
-| Layer | Description | Phase |
-|---|------|:---:|
-| **Desktop Command Center** | Local projects, threads, runs, diffs, approvals, previews | P0 ✅ |
-| **IM Collaboration** | Direct chat, groups, @Agent, multi-agent review, progress cards | P1 🔧 |
-| **Hub Network** | Accounts, friends, multi-device sync, Edge relay, audit | P2-P4 📋 |
+```powershell
+# Web
+cd app
+corepack pnpm --filter agenthub-web typecheck
+corepack pnpm --filter agenthub-web test
 
-<br>
+# Hub
+cd ..\hub-server
+go test ./... -short
 
-## Tech Stack
+# Edge
+cd ..\edge-server
+go test ./... -short
 
-| Layer | Technology |
-|---|------|
-| Frontend | React 19 + TypeScript + Vite + CSS Modules + OKLCH tokens |
-| Desktop | Tauri 2.5 |
-| Mobile | Expo SDK 56 + React Native 0.85 + React 19.2 |
-| Edge Server | Go 1.25 + WebSocket + Agent Runtime adapters |
-| Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis |
-| Realtime | WebSocket typed events |
-| Shared UI | `@shared/ui` — reusable UI component library |
-
-<br>
-
-## Project Structure
-
-```text
-AgentHub/
-├── app/
-│   ├── desktop/          # Tauri desktop app
-│   ├── web/              # Web workspace
-│   ├── mobile-rn/        # Expo + React Native mobile app
-│   └── shared/           # Shared types, API client, @shared/ui
-├── edge-server/          # Edge execution node
-├── hub-server/           # Hub central service
-├── api/                  # API contracts (OpenAPI + WebSocket events)
-├── docs/                 # Documentation
-│   ├── architecture.md   # Product positioning, system architecture, implementation status
-│   ├── adr/              # Architecture decision records
-│   ├── designs/          # Component design docs
-│   ├── handoffs/         # Project status and handoff
-│   ├── governance/       # Security risk register, branch governance, doc standards
-│   ├── reference/        # Research and competitive analysis
-│   ├── operations/       # Operations docs
-│   └── archive/          # Historical reviews and archived documents
-└── scripts/              # Setup scripts, git hooks
+# Release readiness
+cd ..
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-release-gate.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-token-dance-id-login-readiness.ps1 -RepoRoot .
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-p0-approved-real-gold-path.ps1 -RepoRoot .
 ```
 
-<br>
+## Release Flow
+
+1. Stabilize `dev/delicious233` with green CI.
+2. Clean or close outdated PRs and worktrees.
+3. Open a fresh `dev/delicious233 -> master` promotion PR.
+4. Tag `v0.3.0-rc.7` after `master` is updated.
+5. Produce Windows Desktop and Android preview evidence; signing, notarization, and store release require separate approval.
 
 ## Documentation
 
-| Document | Audience |
-|------|------|
-| [Get Started](docs/getting-started/GOAL.md) | New users and FAQ |
-| [Product Requirements](docs/architecture/system-design/product-requirements.md) | Product positioning and phase goals |
-| [System Architecture](docs/architecture/system-design/system-architecture.md) | Technical architecture and core concepts |
-| [API Contract](api/) | REST + WebSocket interface definitions |
-| [Security Risk Register](docs/governance/security-risk-register.md) | Security risk tracking |
+- [Roadmap](docs/roadmap.md)
+- [Current state](STATE.md)
+- [Architecture](docs/architecture.md)
+- [API contract](api/)
+- [Security risk register](docs/governance/security-risk-register.md)
+- [TokenDanceID login readiness](docs/audit/token-dance-id-login-readiness.md)
 
-<br>
+## License
 
-## Auth
-
-Local execution works without login. TokenDance ID unified login is required for cloud IM, multi-device sync, and remote control.
-
-<br>
-
----
-
-<p align="center">
-  <a href="README.md">中文文档</a> &nbsp;·&nbsp;
-  <a href="docs/getting-started/GOAL.md">Get Started</a> &nbsp;·&nbsp;
-  <a href="docs/architecture/system-design/system-architecture.md">Architecture</a> &nbsp;·&nbsp;
-  <a href="api/">API</a>
-</p>
+Apache-2.0. See [LICENSE](LICENSE).
