@@ -14,6 +14,7 @@ import type { RunInfo, StartRunRequest } from '@shared/types';
 import { pickDesktopComposerAttachments } from './desktopAttachments';
 import { canOpenDesktopEvidencePreview, openDesktopEvidencePreview } from './desktopPreview';
 import { resolveDesktopTargetPreference, type DesktopTargetPreference } from './targetPreference';
+import { createDesktopSettingsAdapter } from './desktopSettingsAdapter';
 
 export const DESKTOP_FALLBACK_CONVERSATION_ID = WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID;
 export const desktopConversations: WorkbenchConversation[] = workbenchDemoRuntimeStore.getSnapshot().conversations;
@@ -136,6 +137,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       canOpenEvidence: canOpenDesktopEvidencePreview,
       openEvidence: options.openPreview ?? openDesktopEvidencePreview,
     },
+    settings: createDesktopSettingsAdapter(),
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         if (options.submitRun && (!options.activeProjectId || !options.activeThreadId)) {
