@@ -59,6 +59,7 @@ pub fn run() {
             commands::get_edge_status,
             commands::get_edge_host_readiness,
             commands::get_local_edge_diagnostics,
+            commands::get_local_cli_discovery,
             commands::get_edge_auth_token,
             commands::get_packaged_login_readiness,
             commands::start_edge,
