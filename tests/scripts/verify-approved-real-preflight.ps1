@@ -115,6 +115,8 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($scriptText -notmatch '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode|npm|pnpm|git|gh)\b') "script has no direct CLI/deploy command pattern"
     Assert-True ($scriptText -match 'real_tested=false') "script always declares real_tested=false"
     Assert-True ($scriptText -match 'fixture=not-run' -and $scriptText -match 'observed=not-run' -and $scriptText -match 'approved-real=manifest-validated-only' -and $scriptText -match 'production=blocked') "script distinguishes fixture, observed, approved-real, and production"
+    Assert-True ($scriptText -match 'runtime_readiness') "script validates per-runtime readiness entries"
+    Assert-True ($scriptText -match 'command_discovery' -and $scriptText -match 'json_mode' -and $scriptText -match 'permission_boundary') "script validates runtime command, JSON, and approval boundaries"
 }
 
 $missingManifestRun = Invoke-PreflightScript @(
@@ -138,6 +140,7 @@ Assert-True ($validRun.Output -match "Status: APPROVED_REAL_PREFLIGHT_MANIFEST_O
 Assert-True ($validRun.Output -match "real_tested=false") "valid manifest does not claim real execution" $validRun.Output
 Assert-True ($validRun.Output -match "No login, CLI/model/API, deploy, sign") "valid output states no real action executed" $validRun.Output
 Assert-True ($validRun.Output -match "fixture=not-run" -and $validRun.Output -match "observed=not-run" -and $validRun.Output -match "production=blocked") "valid output distinguishes evidence modes" $validRun.Output
+Assert-True ($validRun.Output -match "runtime_readiness") "valid output reports per-runtime readiness validation" $validRun.Output
 
 $modeRun = Invoke-PreflightScript @(
     "-NoProfile",
