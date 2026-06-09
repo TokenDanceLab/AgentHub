@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
@@ -66,6 +66,8 @@ import {
   WORKBENCH_MOCK_SETTINGS_DEFAULTS,
   WORKBENCH_MOCK_TASK_GROUPS,
 } from './mockData';
+import type { SettingsService } from './settingsService';
+import { createSettingsService } from './settingsService';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -104,6 +106,9 @@ export interface WorkbenchRoutesProps {
   /** Document mutation actions — wired to Hub Documents API. */
   documentsActions?: WorkbenchDocumentsActions | undefined;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
+  /** Settings service for persistent user preferences. When provided,
+   *  settings are read from / written to the backend adapter. */
+  settingsService?: SettingsService | null | undefined;
 }
 
 /** Contact mutation callbacks wired to Hub API. */
@@ -529,6 +534,7 @@ export function WorkbenchRoutes({
   contactsActions,
   localCliDiscovery,
   documentsActions,
+  settingsService,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
@@ -560,6 +566,17 @@ export function WorkbenchRoutes({
   const [projectPreview, setProjectPreview] = useState<WorkbenchDocumentPreview | null>(null);
   const [settingsPane, setSettingsPane] = useState<SettingsPaneId>('appearance');
   const [settings, setSettings] = useState(createSettingsDefaults);
+
+  // When a settingsService is provided, initialize it and subscribe to remote changes.
+  useEffect(() => {
+    if (!settingsService) return;
+    const unsub = settingsService.subscribe(() => {
+      setSettings(settingsService.readAll() as typeof settings);
+    });
+    settingsService.init().catch(() => { /* init failure: keep defaults */ });
+    return unsub;
+  }, [settingsService]);
+
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(focusedAgentId);
   const [agentDrafts, setAgentDrafts] = useState<Record<string, AgentConfig>>({});
   const [draftAgentIds, setDraftAgentIds] = useState<string[]>([]);
@@ -794,20 +811,32 @@ export function WorkbenchRoutes({
       writeComposerSubmitBehavior(composerSubmitBehaviorFromLabel(value));
     }
     setSettings((current) => {
+      let next: typeof current;
       if (key.startsWith('perm_')) {
-        return {
+        next = {
           ...current,
           permissions: { ...current.permissions, [key.slice(5)]: String(value) },
         };
-      }
-      if (key.startsWith('stateStrategy_')) {
+      } else if (key.startsWith('stateStrategy_')) {
         const strategy = key.slice('stateStrategy_'.length) as keyof typeof current.stateStrategies;
-        return {
+        next = {
           ...current,
           stateStrategies: { ...current.stateStrategies, [strategy]: Boolean(value) },
         };
+      } else {
+        next = { ...current, [key]: value };
       }
-      return { ...current, [key]: value };
+      // Persist to settingsService (fire-and-forget)
+      if (settingsService) {
+        if (key.startsWith('perm_')) {
+          settingsService.write('permissions', next.permissions);
+        } else if (key.startsWith('stateStrategy_')) {
+          settingsService.write('stateStrategies', next.stateStrategies);
+        } else {
+          settingsService.write(key, value);
+        }
+      }
+      return next;
     });
   }
 
