@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 18:20 +08:00
+最后更新：2026-06-09 19:30 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
@@ -9,9 +9,9 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | `origin/dev/delicious233` 最新 HEAD 是 `0a36b7df feat(hub): 记录编排路由审计队列字段`。 |
-| RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev。 |
-| master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用。 |
+| 当前 dev | `origin/dev/delicious233` 最新 HEAD 是 `c6dcb674 feat(web): wire agent profile install-to-run fixture`。 |
+| RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
+| master | `origin/master = f3b91ab0`，落后 dev 约 366 个提交；release 前走 PR/merge gate，不直接改写 master。 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 当前存在大量 dirty 文件且落后远端；新开发和文档收敛从最新 `origin/dev/delicious233` 开隔离 worktree。 |
 | 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
@@ -93,7 +93,8 @@
 - Worker 不直接推 `dev/delicious233`、`master` 或 tag。
 - Controller 负责最终集成、验证、fast-forward/push。
 - 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
-- `v0.3.0-rc.6` 已存在，保留为稳定 RC 基线；后续 tag 需先通过独立 release gate。
+- `v0.3.0-rc.6` 已存在且指向 `fa6cd35e`，保留为历史 RC 基线；后续 tag 需先通过独立 release gate。
+- Desktop 下一版候选已按 `0.3.0-rc.7` 准备；只有 release gate 通过并获人工确认后才允许创建 `v0.3.0-rc.7` tag。
 
 ## 下一步优先级
 
