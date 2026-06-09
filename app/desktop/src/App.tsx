@@ -19,19 +19,18 @@ export default function App() {
   const { online: edgeOnline } = useHealth();
 
   function continueDemo(): void {
-    writeWorkbenchDataModeOverride('mock');
-    setEntryMode('demo');
-  }
-
-  function connectEdge(): void {
-    writeWorkbenchDataModeOverride('approved-real');
+    if (edgeOnline) {
+      writeWorkbenchDataModeOverride('approved-real');
+    } else {
+      writeWorkbenchDataModeOverride('mock');
+    }
     setEntryMode('demo');
   }
 
   return (
     <DesktopChrome>
       {entryMode === 'entry' ? (
-        <DesktopEntryGate onContinueDemo={continueDemo} onConnectEdge={connectEdge} edgeOnline={edgeOnline} />
+        <DesktopEntryGate onContinueDemo={continueDemo} edgeOnline={edgeOnline} />
       ) : (
         <DesktopWorkbenchApp />
       )}
