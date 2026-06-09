@@ -84,7 +84,7 @@
 | Hub approval/artifact/diff | 最新 dev 已合入单任务 approval/artifact 合同、diff metadata、approval context gate、编排路由审计队列字段 | apply/revert 写文件、TeamRun/单任务完全统一和 production 权限 gate 继续推进。 |
 | Desktop/Local Edge | 最新 dev 已合入 diagnostics、sidecar observed/binary/package smoke、exact target bridge、Builder fixture UI | 真实签名包、真实 sidecar binary 发布和跨平台安装仍需审批与平台 gate。 |
 | Edge/CLI/SDK/SQLite | 最新 dev 已合入 SQLite durable/readiness、fixture adapter runner、CLI JSON readiness、SDK capability/event matrix | 真实 CLI/model/API 消耗和 production durable store promotion 尚未完成。 |
-| Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、localhost probe/smoke、approved-real/no-secret gates | 脱敏输出可被后续演示或验收流程消费；本文不记录细节。 |
+| Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、localhost probe/smoke、approved-real/no-secret gates、P0 approved-real gold-path harness | 缺账号/env 或缺 evidence 时必须输出 `BLOCKED_WITH_EVIDENCE`；本文不记录 secret 或证据包细节。 |
 | Mobile | 独立收口 | 只按 Hub target/run/approval/replay 合同对齐，不分叉 runtime 或登录语义。 |
 
 ## 分支治理
@@ -94,6 +94,15 @@
 - Controller 负责最终集成、验证、fast-forward/push。
 - 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
 - `v0.3.0-rc.6` 已存在，保留为稳定 RC 基线；后续 tag 需先通过独立 release gate。
+
+## 下一步优先级
+
+1. **P0 approved-real 金链路总 gate**：先运行 `scripts\verify-p0-approved-real-gold-path.ps1`。它只编排无密 readiness/evidence：TokenDanceID readiness、Desktop target/Local Edge/CLI no-spend smoke、Hub replay/Web 展示和 redacted manifest；如果缺账号/env、CLI smoke 或 replay evidence，状态必须是 `BLOCKED_WITH_EVIDENCE`。
+2. **真实 TokenDanceID 登录打通**：先跑 `scripts/verify-token-dance-id-login-readiness.ps1`；只有输出 `READY_FOR_OPERATOR` 后，操作员才使用一次性/预批准测试账号和已批准环境运行真实登录链路，不把 secret 写入仓库。`BLOCKED` 必须先补齐 approved client/test-account 元数据或 OIDC discovery。
+3. **approved-real 录屏前审批**：先运行 `scripts\verify-approved-real-demo-readiness.ps1` 或顶层 gold-path harness 产出 redacted manifest；若状态是 `READY_FOR_APPROVAL`，再由人工批准真实 TokenDanceID 测试账号/安全 env、录屏范围和是否允许真实 CLI/model/API。无批准时只能演示 fixture/mock replay。
+4. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
+5. **Windows/Tauri unsigned package smoke**：验证 sidecar binary、no-bundle build 和 unsigned installer readiness；签名、公证、release upload 另行推进。
+6. **受控 approved-real CLI/SDK 方案**：已具备 preflight manifest gate；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
 
 ## 安全规则
 
