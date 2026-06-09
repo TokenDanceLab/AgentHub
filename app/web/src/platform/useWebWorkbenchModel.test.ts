@@ -35,7 +35,7 @@ describe('useWebWorkbenchModel helpers', () => {
         online: false,
         type: 'external',
       },
-    ], true)).toMatchObject({
+    ], true, 'approved-real')).toMatchObject({
       members: [
         {
           id: 'user-1',
@@ -59,7 +59,7 @@ describe('useWebWorkbenchModel helpers', () => {
   });
 
   it('keeps demo contacts unless Hub or real mode is active', () => {
-    expect(resolveWebWorkbenchContacts(undefined, false)).toBeUndefined();
+    expect(resolveWebWorkbenchContacts(undefined, false, 'fixture')).toBeUndefined();
     expect(resolveWebWorkbenchContacts(undefined, false, 'approved-real')).toMatchObject({
       members: [],
       recentShortcuts: [],
