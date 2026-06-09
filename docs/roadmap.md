@@ -26,6 +26,8 @@ Web / Mobile / IM
 目标：用户可以通过 Web 控制一台 Desktop 目标，由本地 Edge 调用
 CLI/SDK Runtime，并把结果回放到 Web。
 
+状态同步：P0 fixture-only 证据门禁固定链路为 Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI/SDK adapter；真实登录、真实 CLI/model、部署、签名和公证仍需审批。
+
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
 | IM / @Agent 主链 | Agent/联系人式入口、目标选择、任务输入、启动运行、路由状态、回放面板 | 用户能从一个 Web 页面启动任务，不需要理解后端运行时术语。 |
