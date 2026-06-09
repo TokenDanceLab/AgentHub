@@ -216,6 +216,23 @@ Contract fixture mappings:
 | `error` | `run.agent.result` | `success: false`, `terminalReason: error`, redacted `error`, sanitized `reason` |
 | `cancelled` / `cancellation` | `run.agent.result` | Adapter-level cancellation signal only: `success: false`, `cancelled: true`, `terminalReason: cancelled`; lifecycle-owned `run.cancelled` is still emitted by `ProcessExecutor` |
 
+Artifact/demo evidence packages that leave a local run directory must include a
+redacted manifest before they are treated as product-loop evidence. The manifest
+is offline metadata only; it does not run CLI/model/API calls and is not a
+competition submission bundle.
+
+Required manifest fields:
+
+| Field | Requirement |
+| --- | --- |
+| `schema` | `agenthub-redacted-evidence-manifest-v1` |
+| `evidence_boundary.label` | one of `fixture`, `observed`, `RealTested`, `approved-real` |
+| `evidence_boundary.*` | boolean flags for the four boundaries so fixture, observed replay, real-tested evidence, and approved-real packaging cannot be conflated |
+| `path_boundary` | package-root statement plus package-relative file paths only; no absolute source path disclosure |
+| `redaction.status` | `passed` after scanning text evidence for token/password/client secret/cookie/authorization value patterns |
+| `files[].path` | package-relative path under the evidence package root |
+| `files[].sha256` | SHA-256 hash for every packaged artifact, evidence JSON, screenshot, and video; the manifest itself is parsed and scanned by the checker rather than self-hashed |
+
 48h 低风险离线矩阵的 fixture evidence 位于
 `edge-server/internal/adapters/sdk_fixture_mapper_test.go`。当前矩阵验证 Claude
 Agent SDK-like 与 OpenAI Agents SDK-like 静态 JSON 样例可映射到
