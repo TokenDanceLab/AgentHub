@@ -21,7 +21,7 @@ func TestSQLiteDurableHardeningRestoresApprovalArtifactReplayAndPins(t *testing.
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := s.CreateThread("thread_durable_hardening", project.ID, "Durable Hardening Thread")
+	thread, err := s.CreateThread("thread_durable_hardening", project.ID, "Durable Hardening Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}

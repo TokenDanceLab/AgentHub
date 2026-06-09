@@ -28,7 +28,7 @@ func TestSQLiteStoreReadinessRestoresAfterEachDurableWrite(t *testing.T) {
 	})
 
 	s = reopenSQLiteReadinessStore(t, path)
-	thread, err := s.CreateThread("thread_readiness", project.ID, "Readiness Thread")
+	thread, err := s.CreateThread("thread_readiness", project.ID, "Readiness Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}

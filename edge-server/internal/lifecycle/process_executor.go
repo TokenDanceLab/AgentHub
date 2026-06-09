@@ -327,15 +327,17 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	proc := e.processes[runID]
 	e.mu.Unlock()
 	if proc != nil {
-		// Wait shutdownGracePeriod for child process to naturally exit
-		time.Sleep(e.shutdownGracePeriod)
-		// Send SIGTERM (os.Interrupt)
-		_ = proc.Signal(os.Interrupt)
-		// Wait shutdownForceTimeout before escalating
-		time.Sleep(e.shutdownForceTimeout)
-		// Escalate to Kill
-		_ = proc.Kill()
-		_, _ = proc.Wait()
+		// Graceful shutdown: run in a goroutine so Cancel() returns
+		// immediately and does not block the HTTP response. The process
+		// gets shutdownGracePeriod to respond to the stdin interrupt,
+		// then SIGTERM, then shutdownForceTimeout before Kill.
+		go func() {
+			time.Sleep(e.shutdownGracePeriod)
+			_ = proc.Signal(os.Interrupt)
+			time.Sleep(e.shutdownForceTimeout)
+			_ = proc.Kill()
+			_, _ = proc.Wait()
+		}()
 	}
 
 	cancel()
