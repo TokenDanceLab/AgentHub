@@ -1,3 +1,2 @@
-// Thin re-export shim. Commands live in host/fs.rs and host/edge.rs.
-pub use crate::host::edge::*;
-pub use crate::host::fs::*;
+pub use crate::host::fs::{seed_workspace_file_access_from_store, WorkspaceFileAccessState};
+pub use crate::host::window::{build_tray, spawn_health_check};
