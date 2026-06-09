@@ -79,6 +79,7 @@ export interface WorkbenchRoutesProps {
   activePage: WorkbenchPage;
   agents?: WorkbenchAgent[] | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
+  dataMode?: string | undefined;
   contacts?: WorkbenchContactsData | undefined;
   focusedAgentId?: string | undefined;
   projects?: ProjectInfo[] | undefined;
@@ -142,6 +143,11 @@ function dataModeLabel(): string {
     default:
       return 'Auto';
   }
+}
+
+function isRouteRealDataMode(value: string | undefined): boolean {
+  const key = value?.trim().toLowerCase();
+  return key === 'observed' || key === 'approved-real' || key === 'approved real' || key === 'real';
 }
 
 function createDocPreview(doc: DocRow): WorkbenchDocumentPreview {
@@ -418,6 +424,7 @@ export function WorkbenchRoutes({
   activePage,
   agents,
   agentProfilesStatus,
+  dataMode,
   contacts,
   focusedAgentId,
   projects,
@@ -449,7 +456,8 @@ export function WorkbenchRoutes({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
-  const sourceProjects = projects ?? WORKBENCH_MOCK_PROJECTS;
+  const realDataMode = isRouteRealDataMode(dataMode);
+  const sourceProjects = projects ?? (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS);
   const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
   const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
     ? activeProjectId
@@ -468,8 +476,10 @@ export function WorkbenchRoutes({
   const [agentDraftCounter, setAgentDraftCounter] = useState(1);
 
   const sourceAgentConfigs = useMemo(
-    () => (agents === undefined ? WORKBENCH_MOCK_AGENT_CONFIGS : agents.map(workbenchAgentToAgentConfig)),
-    [agents],
+    () => (agents === undefined
+      ? realDataMode ? [] : WORKBENCH_MOCK_AGENT_CONFIGS
+      : agents.map(workbenchAgentToAgentConfig)),
+    [agents, realDataMode],
   );
   const agentConfigs = useMemo(() => [
     ...draftAgentIds
@@ -688,16 +698,17 @@ export function WorkbenchRoutes({
     });
   }
 
+  const sourceTaskGroups = realDataMode ? [] : taskGroups;
   const visibleTaskGroups = useMemo(() => buildTaskGroups(
-    taskGroups,
+    sourceTaskGroups,
     tasksPane,
     taskFilterActive,
     taskSortMode,
     taskGroupMode,
     taskViewMode,
-  ), [taskFilterActive, taskGroupMode, taskGroups, taskSortMode, taskViewMode, tasksPane]);
+  ), [sourceTaskGroups, taskFilterActive, taskGroupMode, taskSortMode, taskViewMode, tasksPane]);
   const visibleTasks = flattenTaskGroups(visibleTaskGroups);
-  const allTasks = flattenTaskGroups(taskGroups);
+  const allTasks = flattenTaskGroups(sourceTaskGroups);
   const selectedTask = allTasks.find((task) => task.id === selectedTaskId) ?? null;
 
   function handleTaskPaneChange(pane: TasksPane): void {
@@ -972,6 +983,7 @@ export function WorkbenchRoutes({
           dueTodayCount={visibleTasks.filter((task) => task.dueDate.includes('今天')).length}
           fieldConfigActive={!taskShowCreator}
           fieldConfigLabel={taskShowCreator ? '字段配置' : '字段配置 5/6'}
+          emptyStateLabel={realDataMode ? 'Real Hub tasks are not loaded.' : undefined}
           groupActive={taskGroupMode !== 'custom' || taskViewMode !== 'list'}
           groupLabel={
             taskViewMode === 'board'
@@ -990,17 +1002,17 @@ export function WorkbenchRoutes({
           editingTaskId={editingTaskId}
           navMenuOpen={taskNavMenuOpen}
           incompleteCount={visibleTasks.filter((task) => task.status !== '已完成').length}
-          onAddTaskRow={handleCreateTask}
+          onAddTaskRow={realDataMode ? undefined : handleCreateTask}
           onAssignSelectedTaskToMe={handleAssignSelectedTaskToMe}
           onCycleSelectedTaskStatus={handleCycleSelectedTaskStatus}
-          onCreateTask={handleCreateTask}
+          onCreateTask={realDataMode ? undefined : handleCreateTask}
           onCancelTaskEdit={handleCancelTaskEdit}
           onDeleteSelectedTask={handleDeleteSelectedTask}
           onEditDraftChange={handleEditTaskDraftChange}
           onEditSelectedTask={handleEditSelectedTask}
           onFilterBySelectedTaskAssignee={handleFilterBySelectedTaskAssignee}
           onGroupBySelectedTaskProject={handleGroupBySelectedTaskProject}
-          onNewGroup={handleNewTaskGroup}
+          onNewGroup={realDataMode ? undefined : handleNewTaskGroup}
           onNavMore={() => {
             setTaskNavMenuOpen((current) => !current);
             setTaskActionLabel('任务更多操作');
