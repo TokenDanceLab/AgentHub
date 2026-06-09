@@ -81,6 +81,7 @@ export interface WorkbenchRoutesProps {
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   dataMode?: string | undefined;
   contacts?: WorkbenchContactsData | undefined;
+  documents?: DocRow[] | undefined;
   focusedAgentId?: string | undefined;
   projects?: ProjectInfo[] | undefined;
   activeProjectId?: string | undefined;
@@ -100,6 +101,8 @@ export interface WorkbenchRoutesProps {
   onStartConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
   /** Contact mutation actions — passed through to ContactsPage. */
   contactsActions?: WorkbenchContactsActions | undefined;
+  /** Document mutation actions — wired to Hub Documents API. */
+  documentsActions?: WorkbenchDocumentsActions | undefined;
   localCliDiscovery?: LocalCliDiscoveryManifest | null | undefined;
 }
 
@@ -114,6 +117,13 @@ export interface WorkbenchContactsActions {
   onUnblockContact?: ((userId: string) => Promise<unknown> | void) | undefined;
   onUpdateRemark?: ((userId: string, remark: string) => Promise<unknown> | void) | undefined;
   onCreateGroup?: ((name: string, memberIds: string[]) => Promise<unknown> | void) | undefined;
+}
+
+/** Document mutation callbacks wired to Hub Documents API. */
+export interface WorkbenchDocumentsActions {
+  onCreateDoc?: (() => Promise<unknown> | void) | undefined;
+  onUpdateDoc?: ((documentId: string, data: Record<string, unknown>) => Promise<unknown> | void) | undefined;
+  onDeleteDoc?: ((documentId: string) => Promise<unknown> | void) | undefined;
 }
 
 export interface WorkbenchAgentProfilesStatus {
@@ -502,6 +512,7 @@ export function WorkbenchRoutes({
   agentProfilesStatus,
   dataMode,
   contacts,
+  documents,
   focusedAgentId,
   projects,
   activeProjectId,
@@ -515,7 +526,9 @@ export function WorkbenchRoutes({
   onAgentsRetry,
   onAgentProfileOpen,
   onStartConversation,
+  contactsActions,
   localCliDiscovery,
+  documentsActions,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
@@ -1026,7 +1039,8 @@ export function WorkbenchRoutes({
           activePreview={docsPreview}
           onClosePreview={() => setDocsPreview(null)}
           onDocClick={(doc) => setDocsPreview(createDocPreview(doc))}
-          rows={WORKBENCH_MOCK_DOC_ROWS}
+          rows={documents ?? WORKBENCH_MOCK_DOC_ROWS}
+          onCreateDoc={documentsActions?.onCreateDoc}
         />
       );
     case 'agents':
