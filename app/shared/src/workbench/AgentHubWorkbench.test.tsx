@@ -2014,6 +2014,67 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
   });
 
+  it('summarizes the Web to Edge demo main chain in one visible strip', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop' }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          replayLabel: 'Hub replay: task task-v4',
+          targetState: 'ready',
+          targetLabel: 'Alpha Desktop',
+        }}
+        runtimeEvidence={{
+          runId: 'run-edge-1',
+          diffs: [],
+          artifacts: [{
+            id: 'artifact-1',
+            runId: 'run-edge-1',
+            threadId: 'thread-1',
+            kind: 'patch',
+            path: 'reports/runtime.patch',
+            sizeBytes: 2048,
+            createdAt: '2026-06-08T08:10:00.000Z',
+          }],
+          previews: [],
+          sources: { diff: 'edge', artifacts: 'edge', previews: 'none' },
+        }}
+        transcript={transcript}
+      />,
+    );
+
+    const strip = screen.getByRole('region', { name: 'Demo main chain status' });
+    expect(within(strip).getByText('Web')).toBeInTheDocument();
+    expect(within(strip).getByText('Hub task')).toBeInTheDocument();
+    expect(within(strip).getByText('task-v4')).toBeInTheDocument();
+    expect(within(strip).getByText('Supervisor')).toBeInTheDocument();
+    expect(within(strip).getByText('Hub replay')).toBeInTheDocument();
+    expect(within(strip).getByText('Worker')).toBeInTheDocument();
+    expect(within(strip).getAllByText('Reviewer').length).toBeGreaterThan(0);
+    expect(within(strip).getByText('Route + event')).toBeInTheDocument();
+    expect(within(strip).getByText('1 route / 2 event')).toBeInTheDocument();
+    expect(within(strip).getByText('Exact target')).toBeInTheDocument();
+    expect(within(strip).getByText('Alpha Desktop')).toBeInTheDocument();
+    expect(within(strip).getByText('Active run')).toBeInTheDocument();
+    expect(within(strip).getByText('edge-run-v4')).toBeInTheDocument();
+    expect(within(strip).getByText('Replay')).toBeInTheDocument();
+    expect(within(strip).getByText('12 transcript blocks')).toBeInTheDocument();
+    expect(within(strip).getByText('Approval/artifact')).toBeInTheDocument();
+    expect(within(strip).getByText('0 approval / 1 artifact / 0 diff / 0 preview')).toBeInTheDocument();
+
+    fireEvent.click(within(strip).getByRole('button', { name: '导出证据 JSON' }));
+    expect(screen.getByText('已复制主链证据 JSON')).toBeInTheDocument();
+  });
+
   it('blocks @Agent task start until a Desktop/Edge target is selected', () => {
     const platform = createMockPlatform({
       surface: 'web',
@@ -2049,6 +2110,38 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Select a Desktop/Edge target before starting.');
     expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
     expect(platform.submittedIntents).toEqual([]);
+  });
+
+  it('shows blocked target and disabled export states when the main chain has no evidence', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          targetState: 'no-target',
+        }}
+        transcript={[]}
+      />,
+    );
+
+    const strip = screen.getByRole('region', { name: 'Demo main chain status' });
+    expect(within(strip).getByText('等待 task/replay')).toBeInTheDocument();
+    expect(within(strip).getByText('等待 worker route')).toBeInTheDocument();
+    expect(within(strip).getByText('0 route / 0 event')).toBeInTheDocument();
+    expect(within(strip).getByText('没有在线 Desktop/Edge target')).toBeInTheDocument();
+    expect(within(strip).getByText('等待 Edge evidence')).toBeInTheDocument();
+    expect(within(strip).getByText('暂无 transcript')).toBeInTheDocument();
+    expect(within(strip).getByText('无 approval/artifact evidence')).toBeInTheDocument();
+    expect(within(strip).getByRole('button', { name: '等待证据' })).toBeDisabled();
   });
 
   it('uses Enter to send and Ctrl+Enter for newline by default', async () => {

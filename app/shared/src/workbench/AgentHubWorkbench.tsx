@@ -23,6 +23,7 @@ import {
 import { GlobalRail, type GlobalRailPage } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
+import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
@@ -51,6 +52,22 @@ const DEFAULT_BROWSER_PREVIEW_URL_BY_SURFACE = {
   desktop: 'http://127.0.0.1:5176/desktop/',
   web: 'http://127.0.0.1:5176/desktop/',
 } as const;
+
+type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
+
+interface MainchainNode {
+  id: string;
+  label: string;
+  detail: string;
+  state: MainchainStatusKind;
+}
+
+interface MainchainSummary {
+  nodes: MainchainNode[];
+  exportEnabled: boolean;
+  exportLabel: string;
+  exportDetail: string;
+}
 
 interface AgentProfileState {
   id: string;
@@ -191,6 +208,16 @@ export function AgentHubWorkbench({
   );
   const composerSubmitBehavior = useComposerSubmitBehavior();
   const evidence = collectTranscriptEvidence(transcript);
+  const mainchainSummary = buildMainchainSummary({
+    composerTargetLabel: composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label,
+    evidence,
+    platformSurface: platform.surface,
+    runtimeEvidence,
+    selectedExecutionTargetId,
+    targetRequired: Boolean(composerExecutionTargets),
+    transcript,
+    workbenchStatus,
+  });
 
   useEffect(() => {
     selectionModeRef.current = selectionMode;
@@ -887,6 +914,22 @@ export function AgentHubWorkbench({
     showWorkbenchToast(multiActionLabel(action, count));
   }
 
+  function exportMainchainEvidence(): void {
+    if (!mainchainSummary.exportEnabled) {
+      showWorkbenchToast('暂无可导出的主链证据');
+      return;
+    }
+    copyText(JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      surface: platform.surface,
+      status: workbenchStatus,
+      nodes: mainchainSummary.nodes,
+      evidence,
+      runtimeEvidence,
+    }, null, 2));
+    showWorkbenchToast('已复制主链证据 JSON');
+  }
+
   function contextMenuGroups(blockId: string): Array<Array<ContextMenuItem>> {
     return [
       [
@@ -1006,6 +1049,10 @@ export function AgentHubWorkbench({
               activeConversation={activeConversation}
               inspectorCollapsed={inspectorCollapsed}
               onToggleInspector={toggleInspector}
+            />
+            <MainchainStatusStrip
+              summary={mainchainSummary}
+              onExportEvidence={exportMainchainEvidence}
             />
             <TranscriptView
               actionedBlockIds={actionedBlockIds}
@@ -1167,6 +1214,197 @@ export function AgentHubWorkbench({
       <Toast message={toastMessage} visible={toastVisible} />
     </div>
   );
+}
+
+function MainchainStatusStrip({
+  onExportEvidence,
+  summary,
+}: {
+  onExportEvidence: () => void;
+  summary: MainchainSummary;
+}): React.ReactElement {
+  return (
+    <section className={styles.mainchainStrip} aria-label="Demo main chain status">
+      <div className={styles.mainchainTrack} role="list">
+        {summary.nodes.map((node) => (
+          <div className={styles.mainchainNode} data-state={node.state} key={node.id} role="listitem">
+            <span className={styles.mainchainDot} aria-hidden="true" />
+            <span className={styles.mainchainCopy}>
+              <strong>{node.label}</strong>
+              <em>{node.detail}</em>
+            </span>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className={styles.mainchainExport}
+        disabled={!summary.exportEnabled}
+        onClick={onExportEvidence}
+        title={summary.exportDetail}
+      >
+        {summary.exportLabel}
+      </button>
+    </section>
+  );
+}
+
+function buildMainchainSummary({
+  composerTargetLabel,
+  evidence,
+  platformSurface,
+  runtimeEvidence,
+  selectedExecutionTargetId,
+  targetRequired,
+  transcript,
+  workbenchStatus,
+}: {
+  composerTargetLabel?: string | undefined;
+  evidence: EvidenceRef[];
+  platformSurface: AgentHubPlatform['surface'];
+  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  selectedExecutionTargetId: string;
+  targetRequired: boolean;
+  transcript: TranscriptBlock[];
+  workbenchStatus?: AgentHubWorkbenchProps['workbenchStatus'];
+}): MainchainSummary {
+  const runSession = transcript.find((block) => block.kind === 'run_session');
+  const taskId = runSession?.kind === 'run_session' ? runSession.taskId : undefined;
+  const edgeRunId = runSession?.kind === 'run_session' ? runSession.edgeRunId : undefined;
+  const runId = runtimeEvidence?.runId ?? (runSession?.kind === 'run_session' ? runSession.runId : undefined);
+  const artifactCount = runtimeEvidence
+    ? runtimeEvidence.artifacts.length
+    : evidence.filter((item) => item.kind === 'artifact').length;
+  const approvalCount = evidence.filter((item) => item.kind === 'approval').length
+    + transcript.filter((block) => block.kind === 'approval' || block.kind === 'permission_request').length;
+  const diffCount = runtimeEvidence?.diffs.length ?? evidence.filter((item) => item.kind === 'file').length;
+  const previewCount = runtimeEvidence?.previews.length ?? evidence.filter((item) => item.kind === 'preview').length;
+  const routeBlocks = transcript.filter((block) => block.kind === 'route_decision');
+  const workerBlocks = transcript.filter((block) => (
+    block.kind === 'subagent' || block.kind === 'subtask' || block.kind === 'child_agent'
+  ));
+  const eventBlocks = transcript.filter((block) => (
+    block.kind === 'agent_timeline' || block.kind === 'tool_call' || block.kind === 'run_step_group'
+  ));
+  const supervisorLabel = runSession?.kind === 'run_session'
+    ? runSession.agentLabel ?? runSession.author.name
+    : routeBlocks[0]?.author.name ?? 'Supervisor';
+  const workerLabel = workerBlocks.map((block) => {
+    if (block.kind === 'subagent' || block.kind === 'subtask') return block.worker;
+    return block.agent;
+  }).find(Boolean) ?? routeBlocks.find((block) => block.kind === 'route_decision')?.targetAgent;
+  const evidencePathDetail = `${approvalCount} approval / ${artifactCount} artifact`;
+  const hasRuntimeEvidence = Boolean(runtimeEvidence && (
+    runtimeEvidence.diffs.length > 0
+    || runtimeEvidence.artifacts.length > 0
+    || runtimeEvidence.previews.length > 0
+    || runtimeEvidence.runId
+    || runtimeEvidence.loading?.diff
+    || runtimeEvidence.loading?.artifacts
+    || runtimeEvidence.loading?.previews
+    || runtimeEvidence.errors?.diff
+    || runtimeEvidence.errors?.artifacts
+    || runtimeEvidence.errors?.previews
+  ));
+  const hasExportEvidence = evidence.length > 0 || hasRuntimeEvidence || Boolean(runSession);
+  const targetLabel = composerTargetLabel
+    ?? workbenchStatus?.targetLabel
+    ?? (runSession?.kind === 'run_session' ? runSession.targetLabel : undefined);
+  const targetBlocked = targetRequired
+    && !selectedExecutionTargetId
+    && (workbenchStatus?.targetState === 'no-target' || !targetLabel);
+  const targetState = targetBlocked
+    ? 'blocked'
+    : targetLabel
+      ? 'done'
+      : targetRequired
+        ? 'waiting'
+        : 'empty';
+
+  const nodes: MainchainNode[] = [
+    {
+      id: 'web',
+      label: platformSurface === 'web' ? 'Web' : 'Shared UI',
+      detail: platformSurface === 'web' ? 'Shared/Web workbench' : 'Desktop shared workbench',
+      state: 'done',
+    },
+    {
+      id: 'hub-task',
+      label: 'Hub task',
+      detail: taskId ? taskId : workbenchStatus?.replayLabel ?? '等待 task/replay',
+      state: taskId ? 'done' : workbenchStatus?.replayLabel ? 'active' : 'waiting',
+    },
+    {
+      id: 'supervisor',
+      label: 'Supervisor',
+      detail: supervisorLabel,
+      state: supervisorLabel === 'Supervisor' ? 'waiting' : 'done',
+    },
+    {
+      id: 'worker',
+      label: 'Worker',
+      detail: workerLabel ?? '等待 worker route',
+      state: workerLabel ? 'active' : 'waiting',
+    },
+    {
+      id: 'route-event',
+      label: 'Route + event',
+      detail: `${routeBlocks.length} route / ${eventBlocks.length} event`,
+      state: routeBlocks.length + eventBlocks.length > 0 ? 'done' : 'empty',
+    },
+    {
+      id: 'target',
+      label: 'Exact target',
+      detail: targetLabel ?? (targetBlocked ? '没有在线 Desktop/Edge target' : '待选择 Desktop/Edge target'),
+      state: targetState,
+    },
+    {
+      id: 'edge',
+      label: 'Active run',
+      detail: edgeRunId ?? runId ?? runtimeEvidenceSourceSummary(runtimeEvidence),
+      state: runId || edgeRunId ? 'active' : hasRuntimeEvidence ? 'done' : 'waiting',
+    },
+    {
+      id: 'replay',
+      label: 'Replay',
+      detail: transcript.length > 0 ? `${transcript.length} transcript blocks` : '暂无 transcript',
+      state: transcript.length > 0 ? 'done' : 'empty',
+    },
+    {
+      id: 'evidence-path',
+      label: 'Approval/artifact',
+      detail: artifactCount + approvalCount + diffCount + previewCount > 0
+        ? `${evidencePathDetail} / ${diffCount} diff / ${previewCount} preview`
+        : '无 approval/artifact evidence',
+      state: approvalCount > 0 ? 'active' : artifactCount + diffCount + previewCount > 0 ? 'done' : 'empty',
+    },
+  ];
+
+  return {
+    nodes,
+    exportEnabled: hasExportEvidence,
+    exportLabel: hasExportEvidence ? '导出证据 JSON' : '等待证据',
+    exportDetail: hasExportEvidence
+      ? '复制 Web -> Hub task -> target -> Edge -> replay/artifact/approval evidence JSON'
+      : '暂无 transcript、runtime evidence 或 run session 可导出',
+  };
+}
+
+function runtimeEvidenceSourceSummary(runtimeEvidence: RuntimeEvidenceSnapshot | undefined): string {
+  if (!runtimeEvidence) return '等待 Edge evidence';
+  const loading = [
+    runtimeEvidence.loading?.diff ? 'diff loading' : undefined,
+    runtimeEvidence.loading?.artifacts ? 'artifact loading' : undefined,
+    runtimeEvidence.loading?.previews ? 'preview loading' : undefined,
+  ].filter(Boolean);
+  if (loading.length > 0) return loading.join(' / ');
+  const errors = [
+    runtimeEvidence.errors?.diff ? 'diff error' : undefined,
+    runtimeEvidence.errors?.artifacts ? 'artifact error' : undefined,
+    runtimeEvidence.errors?.previews ? 'preview error' : undefined,
+  ].filter(Boolean);
+  if (errors.length > 0) return errors.join(' / ');
+  return 'Edge evidence empty';
 }
 
 function configuredAgentProfiles(): Array<Omit<AgentProfileState, 'anchor'>> {
