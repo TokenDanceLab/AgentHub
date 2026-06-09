@@ -422,6 +422,7 @@ async function resolveWebDispatchTarget(
   const onlineLocalEdgeTargets = inventory.items.filter((target) =>
     target.target_type === 'local_edge' &&
     target.is_online === true &&
+    target.health_state !== 'offline' &&
     target.health_state === 'healthy'
   );
   const target = onlineLocalEdgeTargets.find((item) => item.id === requestedTargetId);
