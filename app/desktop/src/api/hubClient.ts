@@ -539,6 +539,22 @@ export interface ExecutionTargetListResponse {
   };
 }
 
+export interface CreateExecutionTargetRequest {
+  name: string;
+  target_type?: ExecutionTargetType;
+  host?: string;
+  port?: number | string;
+  workspace_root?: string;
+  workspace_allowlist?: string[] | string;
+  trust_level?: ExecutionTargetTrustLevel;
+  device_id?: string;
+  capabilities?: Record<string, unknown> | string;
+  metadata?: Record<string, unknown> | string;
+  auth_method?: 'none' | 'ssh_tunnel' | 'tailscale_mtls' | 'hub_jwt';
+}
+
+export type UpdateExecutionTargetRequest = Partial<CreateExecutionTargetRequest>;
+
 // 鈹€鈹€ Auth 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface OIDCAuthorizeRequest {
@@ -1127,6 +1143,18 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageSize?: number;
     }) =>
       request<ExecutionTargetListResponse>(`/web/execution-targets${qs(params ?? {})}`),
+
+    createExecutionTarget: (data: CreateExecutionTargetRequest) =>
+      request<ExecutionTarget>('/web/execution-targets', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateExecutionTarget: (id: string, data: UpdateExecutionTargetRequest) =>
+      request<ExecutionTarget>(`/web/execution-targets/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
 
     pingExecutionTarget: (id: string) =>
       request<EmptyHubResponse>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
