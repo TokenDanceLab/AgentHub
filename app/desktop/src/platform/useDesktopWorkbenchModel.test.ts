@@ -2,12 +2,42 @@ import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, demoWorkbenchTranscripts } from '@shared/demo';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
+import { useHubSessions, useHubMessages } from '@/api/sessionQueries';
 import { useDesktopWorkbenchModel } from './useDesktopWorkbenchModel';
 
 vi.mock('@/api/threadQueries', () => ({
   useThreadPins: vi.fn(),
   useThreadMessages: vi.fn(),
   useThreads: vi.fn(),
+}));
+
+vi.mock('@/api/sessionQueries', () => ({
+  useHubSessions: vi.fn(),
+  useHubMessages: vi.fn(),
+}));
+
+vi.mock('@/api/hubQueries', () => ({
+  useHubContacts: vi.fn(() => ({ data: undefined })),
+  useHubSearchUser: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubSendFriendRequest: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubAcceptFriendRequest: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubRejectFriendRequest: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubRemoveContact: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubBlockContact: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubUnblockContact: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubUpdateContactRemark: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubCreateContactGroup: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubWorkspaceProjects: vi.fn(() => ({ data: undefined, isFetching: false })),
+  useCreateHubWorkspaceProject: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useUpdateHubWorkspaceProject: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+}));
+
+vi.mock('@/stores/hubStore', () => ({
+  useHubStore: vi.fn(() => false),
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  getAccessToken: vi.fn(() => null),
 }));
 
 vi.mock('./useDesktopEdgeEvents', () => ({
@@ -17,6 +47,8 @@ vi.mock('./useDesktopEdgeEvents', () => ({
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
+const mockedUseHubSessions = vi.mocked(useHubSessions);
+const mockedUseHubMessages = vi.mocked(useHubMessages);
 
 describe('useDesktopWorkbenchModel', () => {
   beforeEach(() => {
@@ -35,6 +67,12 @@ describe('useDesktopWorkbenchModel', () => {
     mockedUseThreadPins.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreadPins>);
+    mockedUseHubSessions.mockReturnValue({
+      data: undefined,
+    } as unknown as ReturnType<typeof useHubSessions>);
+    mockedUseHubMessages.mockReturnValue({
+      data: undefined,
+    } as unknown as ReturnType<typeof useHubMessages>);
   });
 
   it('uses the Desktop demo conversation while live threads are loading', () => {
