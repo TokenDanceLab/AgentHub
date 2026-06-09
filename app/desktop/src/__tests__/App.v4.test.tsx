@@ -5,6 +5,7 @@ import App from '@/App';
 import { createEventStream } from '@/api/eventClient';
 import { createHubClient } from '@/api/hubClient';
 import { useAgentList } from '@/api/agentQueries';
+import { useHubExecutionTargets, useSyncLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
@@ -39,6 +40,16 @@ vi.mock('@/api/threadQueries', () => ({
 
 vi.mock('@/api/agentQueries', () => ({
   useAgentList: vi.fn(),
+}));
+
+vi.mock('@/api/executionTargetQueries', () => ({
+  findRegisteredLocalEdgeTarget: vi.fn((targets, deviceId) => (
+    targets.find((target: { target_type?: string; device_id?: string }) => (
+      target.target_type === 'local_edge' && target.device_id === deviceId
+    )) ?? null
+  )),
+  useHubExecutionTargets: vi.fn(),
+  useSyncLocalEdgeExecutionTarget: vi.fn(),
 }));
 
 vi.mock('@/api/modelCatalogQueries', () => ({
@@ -105,6 +116,8 @@ const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
 const mockedUseAgentList = vi.mocked(useAgentList);
+const mockedUseHubExecutionTargets = vi.mocked(useHubExecutionTargets);
+const mockedUseSyncLocalEdgeExecutionTarget = vi.mocked(useSyncLocalEdgeExecutionTarget);
 const mockedUseModelCatalog = vi.mocked(useModelCatalog);
 const mockedUseRunEvidence = vi.mocked(useRunEvidence);
 const mockedCreateEventStream = vi.mocked(createEventStream);
@@ -183,6 +196,29 @@ describe('Desktop App v4 root', () => {
     mockedUseAgentList.mockReturnValue({
       data: { items: [], page: { hasMore: false } },
     } as ReturnType<typeof useAgentList>);
+    mockedUseHubExecutionTargets.mockReturnValue({
+      data: {
+        items: [{
+          id: 'hub-local-edge-target-1',
+          device_id: '00000000-0000-4000-8000-00000000d001',
+          name: 'Current Desktop Local Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          trust_level: 'local',
+          health_state: 'healthy',
+          is_online: true,
+        }],
+        page: { hasMore: false },
+      },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useHubExecutionTargets>);
+    mockedUseSyncLocalEdgeExecutionTarget.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useSyncLocalEdgeExecutionTarget>);
     mockedUseModelCatalog.mockReturnValue({
       data: { items: [], sources: [] },
     } as ReturnType<typeof useModelCatalog>);
@@ -244,6 +280,10 @@ describe('Desktop App v4 root', () => {
         hubWS: mockHubWS,
         hubClient: mockHubClient,
         edgeBaseUrl: 'http://127.0.0.1:3210',
+        dispatchTarget: {
+          targetId: 'hub-local-edge-target-1',
+          deviceId: '00000000-0000-4000-8000-00000000d001',
+        },
       });
     });
     expect(mockedUseDeviceRegistration).toHaveBeenCalledWith(mockHubClient);
@@ -269,6 +309,7 @@ describe('Desktop App v4 root', () => {
         hubWS: null,
         hubClient: mockHubClient,
         edgeBaseUrl: 'http://127.0.0.1:3210',
+        dispatchTarget: null,
       });
     });
     expect(mockedQueryClient.invalidateQueries).not.toHaveBeenCalled();
