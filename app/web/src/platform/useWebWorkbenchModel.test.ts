@@ -54,7 +54,7 @@ describe('useWebWorkbenchModel helpers', () => {
 
   it('keeps demo contacts unless Hub or real mode is active', () => {
     expect(resolveWebWorkbenchContacts(undefined, false)).toBeUndefined();
-    expect(resolveWebWorkbenchContacts(undefined, false, 'real')).toMatchObject({
+    expect(resolveWebWorkbenchContacts(undefined, false, 'approved-real')).toMatchObject({
       members: [],
       recentShortcuts: [],
     });
@@ -67,7 +67,7 @@ describe('useWebWorkbenchModel helpers', () => {
       nickname: 'Old Contact',
       online: true,
       type: 'internal',
-    }], false, 'real')).toMatchObject({
+    }], false, 'approved-real')).toMatchObject({
       members: [],
       recentShortcuts: [],
     });
@@ -97,8 +97,8 @@ describe('useWebWorkbenchModel helpers', () => {
 
   it('keeps demo projects only in demo mode without Hub readiness', () => {
     expect(resolveWebWorkbenchProjects(undefined, false)).toEqual([]);
-    expect(resolveWebWorkbenchProjects(undefined, false, 'demo')).toBeUndefined();
-    expect(resolveWebWorkbenchProjects(undefined, false, 'real')).toEqual([]);
+    expect(resolveWebWorkbenchProjects(undefined, false, 'fixture')).toBeUndefined();
+    expect(resolveWebWorkbenchProjects(undefined, false, 'approved-real')).toEqual([]);
     expect(resolveWebWorkbenchProjects([{
       id: 'project-1',
       name: 'AgentHub Demo',
@@ -161,7 +161,7 @@ describe('useWebWorkbenchModel helpers', () => {
       undefined,
       undefined,
       false,
-      'real',
+      'approved-real',
     )).toEqual({
       loading: false,
       error: 'Sign in to Hub to load workspace projects.',
@@ -253,7 +253,7 @@ describe('useWebWorkbenchModel helpers', () => {
       id: 'web-hub-empty',
       text: 'Hub session 已连接，暂无可显示会话。',
     }));
-    expect(resolveWebWorkbenchTranscript(false, null, undefined, [], 'real')[0]).toEqual(expect.objectContaining({
+    expect(resolveWebWorkbenchTranscript(false, null, undefined, [], 'approved-real')[0]).toEqual(expect.objectContaining({
       id: 'web-hub-empty',
       text: 'Hub session 已连接，暂无可显示会话。',
     }));
@@ -262,7 +262,7 @@ describe('useWebWorkbenchModel helpers', () => {
   it('surfaces explicit real-mode execution target states without mock fallback', () => {
     expect(resolveWebExecutionTargetStatus({
       hubReady: false,
-      dataMode: 'real',
+      dataMode: 'approved-real',
       isFetching: false,
       error: null,
       targets: undefined,
@@ -273,7 +273,7 @@ describe('useWebWorkbenchModel helpers', () => {
 
     expect(resolveWebExecutionTargetStatus({
       hubReady: true,
-      dataMode: 'real',
+      dataMode: 'approved-real',
       isFetching: true,
       error: null,
       targets: undefined,
@@ -284,7 +284,7 @@ describe('useWebWorkbenchModel helpers', () => {
 
     expect(resolveWebExecutionTargetStatus({
       hubReady: true,
-      dataMode: 'real',
+      dataMode: 'approved-real',
       isFetching: false,
       error: new Error('Hub target inventory failed'),
       targets: undefined,
@@ -295,7 +295,19 @@ describe('useWebWorkbenchModel helpers', () => {
 
     expect(resolveWebExecutionTargetStatus({
       hubReady: true,
-      dataMode: 'real',
+      dataMode: 'approved-real',
+      isFetching: false,
+      error: null,
+      targets: [],
+    })).toMatchObject({
+      state: 'no-target',
+      selectedTarget: undefined,
+      block: { text: expect.stringContaining('No online local_edge execution target') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'approved-real',
       isFetching: false,
       error: null,
       targets: [
@@ -310,14 +322,58 @@ describe('useWebWorkbenchModel helpers', () => {
         },
       ],
     })).toMatchObject({
-      state: 'empty',
+      state: 'wrong-profile',
       selectedTarget: undefined,
-      block: { text: expect.stringContaining('No online local_edge execution target') },
+      block: { text: expect.stringContaining('none are local_edge') },
     });
 
     expect(resolveWebExecutionTargetStatus({
       hubReady: true,
-      dataMode: 'real',
+      dataMode: 'approved-real',
+      isFetching: false,
+      error: null,
+      targets: [
+        {
+          id: 'target-local-edge-degraded',
+          name: 'Degraded Desktop Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          health_state: 'degraded',
+          trust_level: 'local',
+          is_online: true,
+        },
+      ],
+    })).toMatchObject({
+      state: 'degraded',
+      selectedTarget: undefined,
+      block: { text: expect.stringContaining('Degraded Desktop Edge') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'approved-real',
+      isFetching: false,
+      error: null,
+      targets: [
+        {
+          id: 'target-local-edge-offline',
+          name: 'Offline Desktop Edge',
+          target_type: 'local_edge',
+          workspace_allowlist: [],
+          health_state: 'offline',
+          trust_level: 'local',
+          is_online: false,
+        },
+      ],
+    })).toMatchObject({
+      state: 'offline',
+      selectedTarget: undefined,
+      block: { text: expect.stringContaining('offline') },
+    });
+
+    expect(resolveWebExecutionTargetStatus({
+      hubReady: true,
+      dataMode: 'approved-real',
       isFetching: false,
       error: null,
       targets: [

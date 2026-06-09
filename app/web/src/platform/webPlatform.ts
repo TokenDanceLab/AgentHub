@@ -2,6 +2,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import {
   createWorkbenchDemoStore,
   demoWorkbenchAgents,
+  isWorkbenchFixtureDataMode,
+  isWorkbenchRealDataMode,
   normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
@@ -94,7 +96,7 @@ export function resolveWebWorkbenchAgents(
   dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
 ): WorkbenchAgent[] {
   const mapped = hubAgents?.map(agentInfoToWorkbenchAgent) ?? [];
-  if (dataMode === 'real') return mapped;
+  if (isWorkbenchRealDataMode(dataMode)) return mapped;
   return mapped.length > 0 ? mapped : webAgents;
 }
 
@@ -143,7 +145,7 @@ export function resolveWebWorkbenchConversations(
   hubAuthenticated: boolean,
   dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
 ): WorkbenchConversation[] {
-  if (!hubAuthenticated) return dataMode === 'real' ? [webHubEmptyConversation] : webConversations;
+  if (!hubAuthenticated) return isWorkbenchRealDataMode(dataMode) ? [webHubEmptyConversation] : webConversations;
 
   const mapped = sessions
     ?.map(hubSessionToWorkbenchConversation)
@@ -190,7 +192,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         const dataMode = normalizeWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
         const hasHubToken = Boolean(getAccessToken());
-        const shouldUseDemoFallback = dataMode === 'demo' || (
+        const shouldUseDemoFallback = isWorkbenchFixtureDataMode(dataMode) || (
           dataMode === 'auto' &&
           !hasInjectedHubClient &&
           !hasHubToken &&
@@ -420,7 +422,7 @@ async function resolveWebDispatchTarget(
   const onlineLocalEdgeTargets = inventory.items.filter((target) =>
     target.target_type === 'local_edge' &&
     target.is_online === true &&
-    target.health_state !== 'offline'
+    target.health_state === 'healthy'
   );
   const target = onlineLocalEdgeTargets.find((item) => item.id === requestedTargetId);
   if (!target) {

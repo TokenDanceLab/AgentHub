@@ -1427,24 +1427,26 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '本地开发' }));
 
     expect(screen.getByText('数据模式')).toBeInTheDocument();
-    expect(screen.getByText('自动优先真实数据；Mock 固定设计 fixture；正常只走真实数据。')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '自动' }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Auto 可开发回退；Mock/Fixture 固定本地数据；Observed/Approved real 不回退。')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Auto' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: 'Mock' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: '正常' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Fixture' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Observed' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Approved real' }).length).toBeGreaterThan(0);
     expect(screen.getByRole('region', { name: '数据模式状态' })).toBeInTheDocument();
     expect(screen.getByText('Auto fallback')).toBeInTheDocument();
-    expect(screen.getByText('优先真实数据，开发预览自动回退 Mock')).toBeInTheDocument();
+    expect(screen.getByText('Prefer real data, allow development fallback')).toBeInTheDocument();
     expect(screen.queryByText('Normal 只走真实数据')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Mock' })[0]);
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('demo');
-    expect(screen.getByText('Mock fixture')).toBeInTheDocument();
-    expect(screen.getByText('固定使用 agenthub-design 的演示数据')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Fixture' })[0]);
+    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('fixture');
+    expect(screen.getByText('Fixture data')).toBeInTheDocument();
+    expect(screen.getByText('Pinned shared workbench fixture')).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: '正常' })[0]);
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('real');
-    expect(screen.getByText('Normal data')).toBeInTheDocument();
-    expect(screen.getByText('只使用真实 Hub / Edge 数据')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Approved real' })[0]);
+    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('approved-real');
+    expect(screen.getAllByText('Approved real').length).toBeGreaterThan(0);
+    expect(screen.getByText('Approved real Hub / Edge data only')).toBeInTheDocument();
   });
 
   it('opens the account profile popover from the global rail', () => {
@@ -1791,6 +1793,60 @@ describe('AgentHubWorkbench', () => {
         }),
       ]);
     });
+  });
+
+  it('submits @Agent main-chain intents with an explicit execution target', async () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop' }]}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        workbenchStatus={{
+          dataMode: 'approved-real',
+          replayLabel: 'Hub replay: 0 runtime events observed',
+          targetState: 'ready',
+          targetLabel: 'Alpha Desktop',
+        }}
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('@Agent'), {
+      target: { value: 'builder' },
+    });
+    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+      target: { value: 'target-local-edge-1' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: 'Start the Web main chain' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+    await waitFor(() => {
+      expect(platform.submittedIntents).toEqual([
+        expect.objectContaining({
+          conversationId: 'team',
+          executionTargetId: 'target-local-edge-1',
+          mentions: [
+            expect.objectContaining({
+              id: 'builder',
+              label: 'Builder',
+              runtimeId: 'claude-code',
+            }),
+          ],
+          text: 'Start the Web main chain',
+        }),
+      ]);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Data: approved-real');
+    expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
   });
 
   it('uses Enter to send and Ctrl+Enter for newline by default', async () => {
