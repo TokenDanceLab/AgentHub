@@ -116,6 +116,7 @@ export interface WorkbenchRoutesProps {
     status: string;
     description?: string;
     default?: boolean;
+    tags?: string[];
   }> | undefined;
   /** Settings service for persistent user preferences. When provided,
    *  settings are read from / written to the backend adapter. */
@@ -1143,7 +1144,7 @@ export function WorkbenchRoutes({
             mode: agent.mode,
             model: agent.model,
           }))}
-          models={WORKBENCH_MOCK_AGENT_MODELS}
+          models={resolvedModels}
           onPaneChange={setAgentsPane}
           onAgentAdd={handleAgentAdd}
           onAgentDelete={handleAgentDelete}

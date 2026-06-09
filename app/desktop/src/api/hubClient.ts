@@ -496,23 +496,6 @@ export interface CustomAgent {
 
 // ── Hub documents ─────────────────────────────────
 
-export interface HubDocument {
-  id: string;
-  owner_id: string;
-  project_id?: string | undefined;
-  title: string;
-  type: string;
-  source: string;
-  source_ref?: string | undefined;
-  tag?: string | undefined;
-  location: string;
-  status: string;
-  content?: string | undefined;
-  metadata: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface HubDocumentListItem {
   id: string;
   owner_id: string;
@@ -1464,23 +1447,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages`,
         { method: 'POST', body: JSON.stringify(data) },
       ),
-
-    // ── Documents (cloud docs + artifact projection) ────────────────
-
-    listDocuments: (params?: { status?: string; source?: string; project_id?: string; search?: string; limit?: number }) =>
-      request<{ items: HubDocument[] }>(`/web/documents${qs(params ?? {})}`),
-
-    getDocument: (docId: string) =>
-      request<HubDocument>(`/web/documents/${encodeURIComponent(docId)}`),
-
-    createDocument: (data: { title: string; type?: string; tag?: string; location?: string; content?: string }) =>
-      request<HubDocument>('/web/documents', { method: 'POST', body: JSON.stringify(data) }),
-
-    updateDocument: (docId: string, data: { title?: string; type?: string; tag?: string; content?: string }) =>
-      request<HubDocument>(`/web/documents/${encodeURIComponent(docId)}`, { method: 'PATCH', body: JSON.stringify(data) }),
-
-    deleteDocument: (docId: string) =>
-      request<void>(`/web/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' }),
 
     // ── Settings (user preferences) ────────────────────
 
