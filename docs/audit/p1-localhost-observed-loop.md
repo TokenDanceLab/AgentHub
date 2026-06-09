@@ -59,6 +59,13 @@ services or `-StartServices -StartServicePlanPath <plan.json>` to delegate
 bounded startup to the existing local-stack readiness verifier. The default
 mode does neither.
 
+`ReadinessOnly` also accepts `-ProbeServices` as a no-spend localhost health
+probe. It checks the Web dev server, Hub health, Desktop/Tauri bridge, and
+Local Edge health URLs with explicit identity markers, then still reports
+`real_tested=false`. `-StartServices` is never implicit; it only runs when a
+caller supplies `-StartServicePlanPath`, and this runner does not treat that as
+real CLI/model/API proof.
+
 Focused verification:
 
 ```powershell
@@ -92,12 +99,22 @@ The runner records:
 
 - `localhost-observed-loop-readiness.json` or `observed-dispatch-manifest.json`
 - `observed-dispatch-report.json` when observed manifest validation runs
+- `service-probe-manifest.json` as the unified service probe manifest
+- `service-pids.json` as the pid manifest for harness-started service metadata
+- `service-health.json` as the health manifest for Web, Hub, Desktop bridge,
+  and Local Edge probes
 - `logs\startup.log`
 - `logs\cleanup.log`
 
 Artifact roots are accepted only under `.tmp\localhost-observed-loop`,
 `tmp\localhost-observed-loop`, or `$env:TEMP\AgentHub\localhost-observed-loop`.
 `-CleanArtifactRoot` is allowed only after that root check passes.
+
+Cleanup policy: keep the artifact root until evidence review is complete, then
+remove that safe root with `Remove-Item`. If `-StartServices` is used, process
+cleanup is delegated to `verify-localhost-real-services.ps1`; default
+readiness and `-ProbeServices` do not start processes and therefore write an
+empty pid manifest.
 
 ## Approved-Real Checklist
 
