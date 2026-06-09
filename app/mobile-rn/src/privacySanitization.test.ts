@@ -11,8 +11,7 @@ const explicitScanFiles = [
   path.join(projectRoot, 'app.config.ts'),
   path.join(projectRoot, 'eas.json'),
   path.join(projectRoot, 'README.md'),
-  path.join(projectRoot, '..', 'mobile', 'docs', 'mobile-expo-rn-migration-plan.md'),
-  path.join(projectRoot, '..', 'mobile', 'docs', 'mobile-v4-plan.md'),
+  path.join(projectRoot, 'docs', 'handoff.md'),
 ];
 const scanRoots = [
   sourceRoot,
