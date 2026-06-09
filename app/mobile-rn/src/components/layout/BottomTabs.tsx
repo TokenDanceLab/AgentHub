@@ -1,6 +1,7 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
+import { MotionPressable } from '@/components/primitives';
 import { useStrings } from '@/i18n/strings';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileTab } from '@/types';
@@ -61,7 +62,7 @@ export function BottomTabs({
         const badgeCount = getTabBadgeCount(tab.value, { pendingReviews, unreadThreads });
 
         return (
-          <Pressable
+          <MotionPressable
             accessibilityLabel={buildTabAccessibilityLabel({
               badgeCount,
               label: tab.label,
@@ -70,6 +71,7 @@ export function BottomTabs({
             })}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            feedback="icon"
             hitSlop={{ top: 6, right: 3, bottom: 6, left: 3 }}
             key={tab.value}
             onPress={() => onChange(tab.value)}
@@ -87,7 +89,6 @@ export function BottomTabs({
                 : pressed
                   ? tokens.color.tint
                   : 'transparent',
-              opacity: pressed ? 0.88 : 1,
               paddingHorizontal: 2,
             })}
           >
@@ -128,7 +129,7 @@ export function BottomTabs({
             >
               {tab.label}
             </Text>
-          </Pressable>
+          </MotionPressable>
         );
       })}
     </View>
