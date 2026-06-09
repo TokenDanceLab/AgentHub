@@ -1240,6 +1240,8 @@ describe('AgentHubWorkbench', () => {
     expect(within(page).getAllByText('Hub Architect').length).toBeGreaterThan(0);
     expect(within(page).getAllByText('openai / gpt-5.5').length).toBeGreaterThan(0);
     expect(within(page).getByText('Architecture · Review')).toBeInTheDocument();
+    expect(within(page).getAllByText('AGENTS.md missing').length).toBeGreaterThan(0);
+    expect(within(page).getByText('partial')).toBeInTheDocument();
     expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
     expect(within(page).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
   });
@@ -1307,6 +1309,7 @@ describe('AgentHubWorkbench', () => {
     expect(within(page).getAllByText('Target: local_edge · fixture-local-edge').length).toBeGreaterThan(0);
     expect(within(page).getByDisplayValue('local_edge · fixture-local-edge')).toBeInTheDocument();
     expect(within(page).getByDisplayValue('ask-before-write')).toBeInTheDocument();
+    expect(within(page).getByText('Memory disabled')).toBeInTheDocument();
   });
 
   it('does not render mock Agents, Projects, or Tasks when approved-real data is missing', () => {
