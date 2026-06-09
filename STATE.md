@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 14:48 +08:00
+最后更新：2026-06-09 15:07 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
-| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同 |
+| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
@@ -34,6 +34,7 @@
 - Desktop sidecar binary smoke 集成提交：`74660003 test(desktop): 增加 sidecar binary smoke`，覆盖 Windows Local Edge sidecar build/placement、strict bundled sidecar readiness、dry package gate 复用 prepare 脚本，以及二进制/打包产物 ignore 边界。
 - Edge SQLite durable hardening 集成提交：`fd5fa202 test(edge): harden sqlite durable store slice`，覆盖 approval requested/decided replay item、file-change/artifact evidence、pins、run replay projection 和删除 snapshot 后的 row-first restore。
 - Hub 单任务 approval/artifact 合同集成提交：`6b5a3e4e feat(hub): 支持单任务审批和产物投影`，覆盖 `/web/agent-tasks/{id}/approvals`、`POST /web/agent-tasks/{id}/approvals/{approvalId}/decide`、`/web/agent-tasks/{id}/artifacts`、owner scope、exact target/device control、correlation fields 和 200 OK envelope OpenAPI。
+- Product-loop observed fixture E2E gate 集成提交：`8dc7dcac test(product-loop): add observed fixture e2e gate`，覆盖 Web -> Hub -> Desktop/Tauri sidecar readiness -> Local Edge -> adapter fixture -> Hub replay -> Web transcript/approval/artifact render 的可复跑 gate，明确 `real_tested=false`。
 
 当前不声明已经完成：
 
@@ -67,9 +68,9 @@
 
 ## 下一步优先级
 
-1. **组合链路 observed E2E**：开单一 product-loop worktree，验证 Web -> Hub -> Desktop -> Edge -> adapter fixture -> replay -> Web。
-2. **Web/Mobile/IM 调用面同步**：基于 Hub 单任务 approval/artifact 合同，把 Web/Mobile/IM 的审批和产物入口统一到 Hub contract，不直连 Local Edge。
-3. **受控 approved-real 方案**：先形成审批清单和成本/凭据边界；真实登录、真实 CLI/model/API 消耗、部署和签名必须另获批准。
+1. **Web/Mobile/IM 调用面同步**：基于 Hub 单任务 approval/artifact 合同，把 Web/Mobile/IM 的审批和产物入口统一到 Hub contract，不直连 Local Edge。
+2. **受控 approved-real 方案**：先形成审批清单和成本/凭据边界；真实登录、真实 CLI/model/API 消耗、部署和签名必须另获批准。
+3. **真实本地服务 observed loop**：在不消耗真实模型、不部署的前提下，逐步把 Web、Hub、Desktop sidecar、Local Edge 从 fixture gate 推进到 localhost observed gate。
 
 ## 安全规则
 
