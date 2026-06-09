@@ -24,6 +24,9 @@ interface ExecutionTargetsSectionProps {
   hubTargetsLoading?: boolean;
   hubTargetsError?: boolean;
   hubTargetsPaginationLimited?: boolean;
+  localEdgeTargetSyncStatus?: 'idle' | 'syncing' | 'error';
+  localEdgeTargetSyncError?: string | null;
+  onSyncLocalEdgeTarget?: () => void;
 }
 
 export default function ExecutionTargetsSection({
@@ -31,6 +34,9 @@ export default function ExecutionTargetsSection({
   availableRunners, localEdgeTarget, desktopDeviceStatus, deviceId,
   registeredLocalEdgeTarget = null, hubTargetsLoading = false, hubTargetsError = false,
   hubTargetsPaginationLimited = false,
+  localEdgeTargetSyncStatus = 'idle',
+  localEdgeTargetSyncError = null,
+  onSyncLocalEdgeTarget,
 }: ExecutionTargetsSectionProps) {
   const { t } = useTranslation();
   const localEdgeMetric = edgeOnline
@@ -65,9 +71,40 @@ export default function ExecutionTargetsSection({
     if (hubTargetsPaginationLimited) return t('settings.localEdgeTargetReadinessPaginationLimited');
     return t('settings.localEdgeTargetReadinessMissing');
   })();
+  const canSyncLocalEdgeTarget = Boolean(
+    onSyncLocalEdgeTarget
+      && hubSessionActive
+      && deviceId
+      && edgeOnline
+      && !hubTargetsLoading
+      && !hubTargetsError
+      && !hubTargetsPaginationLimited,
+  );
+  const syncingLocalEdgeTarget = localEdgeTargetSyncStatus === 'syncing';
+  const syncActionLabel = syncingLocalEdgeTarget
+    ? t('settings.localEdgeTargetSyncing')
+    : registeredLocalEdgeTarget
+      ? t('settings.localEdgeTargetUpdateAction')
+      : t('settings.localEdgeTargetRegisterAction');
+  const syncErrorBody = localEdgeTargetSyncStatus === 'error' && localEdgeTargetSyncError
+    ? t('settings.localEdgeTargetSyncError', { error: localEdgeTargetSyncError })
+    : null;
 
   return (
-    <Panel title={t('settings.executionTargets')} description={t('settings.executionTargetsDesc')}>
+    <Panel
+      title={t('settings.executionTargets')}
+      description={t('settings.executionTargetsDesc')}
+      actions={onSyncLocalEdgeTarget ? (
+        <button
+          type="button"
+          className={styles.secondaryBtn}
+          onClick={onSyncLocalEdgeTarget}
+          disabled={!canSyncLocalEdgeTarget || syncingLocalEdgeTarget}
+        >
+          {syncActionLabel}
+        </button>
+      ) : null}
+    >
       <div className={styles.targetGrid}>
         <ExecutionTargetCard
           icon={<Monitor size={18} />}
@@ -109,6 +146,9 @@ export default function ExecutionTargetsSection({
         />
       </div>
       <Callout title={t('settings.localEdgeTargetReadiness')} body={readinessBody} />
+      {syncErrorBody ? (
+        <Callout title={t('settings.localEdgeTargetReadiness')} body={syncErrorBody} />
+      ) : null}
       {runnerItems.length > 0 ? (
         <div className={styles.runnerList}>
           {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}

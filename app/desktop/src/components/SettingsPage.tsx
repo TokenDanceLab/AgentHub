@@ -66,7 +66,7 @@ import AboutSection from './settings/sections/AboutSection';
 import { useHubStore } from '@/stores/hubStore';
 import { getEdgeBaseUrl } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
-import { findRegisteredLocalEdgeTarget, useHubExecutionTargets } from '@/api/executionTargetQueries';
+import { findRegisteredLocalEdgeTarget, useHubExecutionTargets, useSyncLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
@@ -316,6 +316,15 @@ export default function SettingsPage({
     () => findRegisteredLocalEdgeTarget(hubExecutionTargets.data?.items ?? [], deviceId),
     [deviceId, hubExecutionTargets.data?.items],
   );
+  const syncLocalEdgeTarget = useSyncLocalEdgeExecutionTarget();
+  const handleSyncLocalEdgeTarget = useCallback(() => {
+    if (!deviceId) return;
+    void syncLocalEdgeTarget.mutateAsync({
+      deviceId,
+      localEdgeTarget,
+      ...(registeredLocalEdgeTarget ? { registeredTargetId: registeredLocalEdgeTarget.id } : {}),
+    });
+  }, [deviceId, localEdgeTarget, registeredLocalEdgeTarget, syncLocalEdgeTarget]);
   const handleSignOut = () => {
     void hubAuth.logout();
   };
@@ -549,6 +558,9 @@ export default function SettingsPage({
               hubTargetsLoading={hubExecutionTargets.isLoading}
               hubTargetsError={hubExecutionTargets.isError}
               hubTargetsPaginationLimited={hubExecutionTargets.data?.page.hasMore === true}
+              localEdgeTargetSyncStatus={syncLocalEdgeTarget.isPending ? 'syncing' : syncLocalEdgeTarget.isError ? 'error' : 'idle'}
+              localEdgeTargetSyncError={syncLocalEdgeTarget.error instanceof Error ? syncLocalEdgeTarget.error.message : null}
+              onSyncLocalEdgeTarget={handleSyncLocalEdgeTarget}
             />
           )}
 
