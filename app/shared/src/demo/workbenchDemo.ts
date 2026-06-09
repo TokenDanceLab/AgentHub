@@ -579,6 +579,38 @@ export const projectGroupMessageLoopHubMessages: HubMessageTranscriptInput[] = [
     },
     created_at: '2026-06-09T09:19:40+08:00',
   },
+  {
+    id: 'project-group-working-reviewer',
+    session_id: 'project-group-session',
+    seq_id: 7,
+    sender_type: 'agent',
+    sender_id: 'reviewer',
+    sender: { nickname: 'Reviewer' },
+    content: {
+      text: 'Reviewer 正在复核 shared transcript rendering 和 Hub contract 可见性。',
+      im_kind: 'project_group',
+      from_agent: { id: 'reviewer', label: 'Reviewer', runtime_id: 'codex' },
+      mentions: [{ id: 'reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+      agent_task: { task_id: 'task-a2a-review', status: 'working', queue_id: 'project-group-fixture' },
+    },
+    created_at: '2026-06-09T09:19:50+08:00',
+  },
+  {
+    id: 'project-group-done-reviewer',
+    session_id: 'project-group-session',
+    seq_id: 8,
+    sender_type: 'agent',
+    sender_id: 'reviewer',
+    sender: { nickname: 'Reviewer' },
+    content: {
+      text: 'Reviewer 已完成 task-a2a-review，消息同步链进入 done。',
+      im_kind: 'project_group',
+      from_agent: { id: 'reviewer', label: 'Reviewer', runtime_id: 'codex' },
+      mentions: [{ id: 'reviewer', label: 'Reviewer', runtime_id: 'codex' }],
+      agent_task: { task_id: 'task-a2a-review', status: 'done', queue_id: 'project-group-fixture' },
+    },
+    created_at: '2026-06-09T09:20:00+08:00',
+  },
 ];
 
 export const projectGroupMessageLoopTranscript: TranscriptBlock[] =

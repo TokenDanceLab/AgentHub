@@ -9,7 +9,7 @@ export interface HubMessageAgentRef {
 export interface HubMessageAgentTaskRef {
   id?: string;
   task_id?: string;
-  status?: 'queued' | 'assigned' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled';
+  status?: 'queued' | 'assigned' | 'working' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled';
   queue_id?: string;
 }
 
@@ -275,6 +275,7 @@ function taskStatusField(value: unknown): HubMessageAgentTaskRef['status'] | und
   switch (status) {
     case 'queued':
     case 'assigned':
+    case 'working':
     case 'dispatched':
     case 'running':
     case 'done':
@@ -298,6 +299,7 @@ function taskStatusBadgeVariant(
     case 'running':
     case 'dispatched':
     case 'assigned':
+    case 'working':
       return 'thinking';
     case 'queued':
     default:
