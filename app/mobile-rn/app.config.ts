@@ -45,6 +45,15 @@ const config = {
   plugins: [
     'expo-localization',
     [
+      'expo-image-picker',
+      {
+        cameraPermission: '允许 AgentHub 拍摄任务审查证据照片 / Allow AgentHub to capture evidence photos for task reviews.',
+        photosPermission: '允许 AgentHub 选择照片或视频作为任务证据 / Allow AgentHub to attach selected photos or videos as task evidence.',
+        microphonePermission: false,
+      },
+    ],
+    'expo-document-picker',
+    [
       'expo-notifications',
       {
         color: '#0a84ff',
@@ -54,7 +63,7 @@ const config = {
     [
       'expo-secure-store',
       {
-        faceIDPermission: 'Allow AgentHub to unlock the local Hub session with device biometrics.',
+        faceIDPermission: '允许 AgentHub 使用设备生物识别解锁本地 Hub 会话 / Allow AgentHub to unlock the local Hub session with device biometrics.',
       },
     ],
   ],

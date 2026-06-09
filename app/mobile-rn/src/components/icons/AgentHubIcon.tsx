@@ -3,6 +3,7 @@ import {
   AtSign,
   Bell,
   Bot,
+  Camera,
   CircleDot,
   CheckCircle2,
   ChevronLeft,
@@ -15,6 +16,7 @@ import {
   FileText,
   GitPullRequest,
   Grid2X2,
+  HardDrive,
   Hash,
   Image,
   Menu,
@@ -34,6 +36,7 @@ import {
   Smile,
   Star,
   Sun,
+  Trash2,
   UserCircle,
   UserPlus,
   Users,
@@ -53,6 +56,7 @@ export type AgentHubIconName =
   | 'bell'
   | 'browser'
   | 'call'
+  | 'camera'
   | 'chat'
   | 'check'
   | 'chevronRight'
@@ -63,6 +67,7 @@ export type AgentHubIconName =
   | 'expand'
   | 'file'
   | 'grid'
+  | 'hardDrive'
   | 'hash'
   | 'image'
   | 'info'
@@ -85,6 +90,7 @@ export type AgentHubIconName =
   | 'status'
   | 'sun'
   | 'team'
+  | 'trash'
   | 'video'
   | 'x';
 
@@ -98,6 +104,7 @@ const iconMap: Record<AgentHubIconName, LucideIcon> = {
   bell: Bell,
   browser: Cloud,
   call: Phone,
+  camera: Camera,
   chat: MessageCircle,
   check: CheckCircle2,
   chevronRight: ChevronRight,
@@ -108,6 +115,7 @@ const iconMap: Record<AgentHubIconName, LucideIcon> = {
   expand: Maximize2,
   file: FileText,
   grid: Grid2X2,
+  hardDrive: HardDrive,
   hash: Hash,
   image: Image,
   info: Info,
@@ -130,6 +138,7 @@ const iconMap: Record<AgentHubIconName, LucideIcon> = {
   status: CircleDot,
   sun: Sun,
   team: Users,
+  trash: Trash2,
   video: Video,
   x: X,
 };

@@ -427,6 +427,7 @@ function getSurfaceConfig(
         { label: t.workspaceSettings, value: 'workspace' },
         { label: t.appearanceSettings, value: 'appearance' },
         { label: t.notifications, value: 'notifications' },
+        { label: t.nativeDeviceCapabilities, value: 'device' },
         { label: t.agentDefaults, value: 'agent-defaults' },
         { label: t.localRuntimeState, value: 'runtime' },
         { label: t.identityAndSession, value: 'identity' },
@@ -470,6 +471,19 @@ function getSurfaceConfig(
             ],
           },
         ],
+        device: [
+          {
+            title: t.nativeDeviceCapabilities,
+            description: t.nativeDeviceCapabilitiesDescription,
+            rows: [
+              row('camera', t.cameraEvidenceCapture, t.cameraEvidenceCaptureDescription, t.needsAction, 'account', onOpenAccount),
+              row('image', t.photoEvidencePicker, t.photoEvidencePickerDescription, t.needsAction, 'account', onOpenAccount),
+              row('file', t.documentEvidencePicker, t.documentEvidencePickerDescription, t.needsAction),
+              row('hardDrive', t.storageBudget, t.storageBudgetDescription, t.needsAction),
+              row('trash', t.evidenceCache, t.evidenceCacheDescription, t.cacheCleanup),
+            ],
+          },
+        ],
         'agent-defaults': [
           {
             title: t.agentDefaults,
@@ -489,6 +503,7 @@ function getSurfaceConfig(
               row('status', t.nativeBuildReadiness, t.nativeBuildReadinessDescription, t.needsAction),
               row('cloud', t.mockHubTarget, t.mockHubTargetDescription, t.done),
               row('shield', t.secureStoreReadiness, t.secureStoreReadinessDescription, t.needsAction, 'account', onOpenAccount),
+              row('camera', t.nativeMediaReadiness, t.nativeMediaReadinessDescription, t.needsAction, 'account', onOpenAccount),
             ],
           },
         ],

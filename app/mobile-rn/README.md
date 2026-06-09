@@ -74,7 +74,7 @@ Release gates covered by local commands:
 | zh/en and i18n structure | `corepack pnpm verify` | i18n tests keep zh/en dictionaries aligned and locale fallback covered. |
 | Reduced motion interactions | `corepack pnpm visual:qa` | Reduced-motion scenes report `prefers-reduced-motion: reduce` and no active CSS transition/animation samples. |
 | Privacy scan | `corepack pnpm verify` and `corepack pnpm visual:qa` | Source/docs/config/script tests plus rendered text checks reject private names, secret patterns, localhost/debug transport strings, and raw API paths. |
-| Native readiness shape | `corepack pnpm native:check` | Expo config and EAS development profiles are no-secret and target the expected mock Hub URLs. |
+| Native readiness shape | `corepack pnpm native:check` | Expo config and EAS development profiles are no-secret, include identity/session/notification/media/storage plugins, and target the expected mock Hub URLs. |
 
 Native development builds:
 
@@ -86,7 +86,7 @@ npx eas-cli@20.1.0 build --profile development --platform android
 npx eas-cli@20.1.0 build --profile development --platform ios
 ```
 
-`native:check` verifies the no-secret development-build shape before any device install: Expo scheme, bundle IDs, localization/notification/SecureStore plugins, EAS development profiles, and target-specific mock Hub base URLs. By default it checks Android emulator and iOS simulator defaults. For a physical device, run it with a LAN Hub URL:
+`native:check` verifies the no-secret development-build shape before any device install: Expo scheme, bundle IDs, localization, notification, SecureStore, image picker, document picker, file-system dependencies, EAS development profiles, and target-specific mock Hub base URLs. By default it checks Android emulator and iOS simulator defaults. For a physical device, run it with a LAN Hub URL:
 
 ```powershell
 $env:AGENTHUB_MOBILE_NATIVE_TARGET = "physical"
@@ -94,7 +94,7 @@ $env:EXPO_PUBLIC_AGENTHUB_HUB_URL = "http://<host-lan-ip>:8088"
 corepack pnpm native:check
 ```
 
-iOS requires macOS/Xcode or EAS Build. Android requires Android Studio/SDK and a device or emulator. `eas.json` defines development, preview, and production profiles but intentionally does not include account-specific project IDs, credentials, or secrets. Do not use Expo Go for capability validation because OIDC deep links, SecureStore, notifications, and native config must be validated in a development build.
+iOS requires macOS/Xcode or EAS Build. Android requires Android Studio/SDK and a device or emulator. `eas.json` defines development, preview, and production profiles but intentionally does not include account-specific project IDs, credentials, or secrets. Do not use Expo Go for capability validation because OIDC deep links, SecureStore, notifications, camera/photo/file access, storage cleanup, and native config must be validated in a development build.
 
 Android development-build proof is separate from the 5177 web preview. Before claiming Android proof, run `corepack pnpm android` against an emulator/device or `npx eas-cli@20.1.0 build --profile development --platform android`, install the generated development build, open it, and verify the expected Hub snapshot/deep-link/session behavior on device. `native:check` is config readiness only.
 
@@ -106,11 +106,12 @@ Native proof status:
 | TokenDance ID OIDC | AuthSession helpers, default `expo-auth-session` redirect URI bridge, default `expo-web-browser` auth-session launcher, and `agenthub://auth/callback` parsing are covered by pure tests. | Complete mocked or local TokenDance ID + Hub session exchange in a development build. |
 | SecureStore | SecureStore adapter, default `expo-secure-store` adapter loader, and Hub session storage contracts are covered by tests/typecheck. | Prove persistence and logout clearing on device. |
 | Notifications | Notification intent parsing, response routing, default `expo-notifications` response bridge, and Android review channel configuration are covered by tests/typecheck and preview fixtures. | Prove native delivery/response opens the target thread or run on device. |
+| Media/files/storage | `expo-image-picker`, `expo-document-picker`, and `expo-file-system` are declared in config/dependencies; typed adapters cover camera/photo permission normalization, evidence media/document mapping, storage budget, and evidence cache cleanup. Settings and Account expose device capability rows. | Prove camera capture, photo/video picker, document picker, and evidence cache cleanup in a development build. |
 | Hub REST/WS | Typed client, event stream, lifecycle bridge, mock Hub, and local HTTP contract are covered by tests and `mock:hub:check`. | Prove against a live or local deployed Hub from a development build. |
 
 ## Current Slice Status
 
-This package is the active Mobile implementation, but it is not yet an Android/iOS release candidate. Current code proves the RN runtime shape, design token contract, stateful workflow surfaces, pure tests, local Hub contract path, native config parsing, and Expo Web visual preview path. It does not yet prove real TokenDance ID OIDC exchange, SecureStore persistence on device, Hub REST/WS against a live deployed Hub, push notification delivery, or Android/iOS development build installation.
+This package is the active Mobile implementation, but it is not yet an Android/iOS release candidate. Current code proves the RN runtime shape, design token contract, stateful workflow surfaces, pure tests, local Hub contract path, native config parsing, Expo Web visual preview path, and typed native media/storage capability boundaries. It does not yet prove real TokenDance ID OIDC exchange, SecureStore persistence on device, Hub REST/WS against a live deployed Hub, camera/photo/document picker behavior on device, evidence cache cleanup on device, push notification delivery, or Android/iOS development build installation.
 
 Current verified slice:
 
@@ -119,12 +120,12 @@ Current verified slice:
 - RN primitives and layout shell: Button, IconButton, Surface, Badge, StatusPill, ListRow, SearchField, SegmentedControl, BottomSheet, EmptyState, ErrorNotice, AppShell, BottomTabs, ScreenHeader, InspectorSheet.
 - Stateful Chat, Thread detail, Tasks, Projects, Agent Profiles, More overflow, Settings, and Account surfaces with local mock Hub preview data and realistic AgentHub fixture fallback.
 - Chat now keeps the first-screen composer to AgentHub shared-workbench essentials: text input, send, delivery recovery, and review-context chips. Approval, diff, run-session, and tool-call transcript blocks render as structured evidence cards instead of generic chat bubbles.
-- Typed mock/REST Hub facade with API error redaction, local HTTP Hub contract test, local mock Hub snapshot/update script, injectable Hub update stream, event URL mapping, AppState-driven Hub lifecycle bridge, Hub session reducer/storage abstraction, SecureStore adapter plus default Expo SecureStore loader, TokenDance ID AuthSession helpers plus default Expo AuthSession/WebBrowser bridge, `agenthub://auth/callback` parser plus default Expo Linking bridge, AgentHub thread/run/approval deep-link bridge, and notification response bridge plus default Expo Notifications bridge.
+- Typed mock/REST Hub facade with API error redaction, local HTTP Hub contract test, local mock Hub snapshot/update script, injectable Hub update stream, event URL mapping, AppState-driven Hub lifecycle bridge, Hub session reducer/storage abstraction, SecureStore adapter plus default Expo SecureStore loader, TokenDance ID AuthSession helpers plus default Expo AuthSession/WebBrowser bridge, `agenthub://auth/callback` parser plus default Expo Linking bridge, AgentHub thread/run/approval deep-link bridge, notification response bridge plus default Expo Notifications bridge, and native camera/photo/document/storage capability adapters.
 - Expo Web preview on fixed port 5177 plus screenshot-based visual QA for `390x844` phone, compact `390x560` phone, `768x1024` tablet, and `1024x768` tablet budgets, including zh/en light scenes, More/Settings/Agent/Profile/Projects semantics, an OLED account scene, reduced-motion composer interactions, tablet Chat two-column split-pane, `>=1024px` three-column inspector pane with Overview/Files/Browser tabs, and empty/offline/notification/deep-link/send-error/send-pending/approval-confirmation/approval-error/resolved-approval/diff-preview/file-preview/browser-preview states.
 - Five primary mobile tabs mirror AgentHub workbench semantics on phone: Chat, Docs, Tasks, Projects, More. Tasks keeps review pressure visible without turning Chat into a run dashboard. Contacts, Agent/Profile, Settings, and Account are folded into More or the avatar entry; Thread detail and Account hide global tabs. On tablet split views, the same tabs stay inside the left list pane so transcript and inspector panes remain full-height details. Chat shows task pressure as a compact digest instead of mixing task rows into the conversation list. More is phone overflow, not a second navigation model.
 - The 5177 preview now treats Feishu/Lark screenshots as density and interaction references only: continuous IM rows, lightweight badges, avatar/status semantics, a compact composer, and an account rail are implemented with AgentHub/TokenDance mock data and Desktop-aligned vocabulary. The mock Hub and fallback fixtures intentionally avoid private identity placeholders and generic social-account entries such as wallet/favorites.
 - Privacy, boundary, and i18n gates: source/docs/config/script tests reject private identity placeholders and inline secret patterns, boundary tests prove forbidden shared/runtime imports fail, zh/en keys stay aligned, and zh system locale fallback is covered.
-- Native build config: Expo config parses with AgentHub product icon/splash/favicon/notification assets, localization, notifications, and secure-store plugins; `eas.json` provides no-secret development build profiles; `verify:brand` guards AgentHub product asset naming; `native:check` validates emulator/simulator defaults and physical-device LAN URL requirements without claiming device proof.
+- Native build config: Expo config parses with AgentHub product icon/splash/favicon/notification assets, localization, notifications, secure-store, image-picker, document-picker, and file-system dependencies; `eas.json` provides no-secret development build profiles; `verify:brand` guards AgentHub product asset naming; `native:check` validates emulator/simulator defaults and physical-device LAN URL requirements without claiming device proof.
 
 Verification evidence from this slice:
 

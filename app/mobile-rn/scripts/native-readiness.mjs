@@ -44,8 +44,17 @@ check('Resolved notification icon uses AgentHub product asset', getNotificationP
 check('Native config does not reference legacy TokenDance asset filenames', !legacyTokenDanceAssetPattern.test(appConfigSource));
 check('Native config does not use TokenDance org icon assets for AgentHub', !/assets\/tokendance-/i.test(appConfigSource));
 check('Resolved Expo config includes localization plugin', plugins.includes('expo-localization'));
+check('Resolved Expo config includes image picker plugin', plugins.includes('expo-image-picker'));
+check('Resolved Expo config includes document picker plugin', plugins.includes('expo-document-picker'));
 check('Resolved Expo config includes notifications plugin', plugins.includes('expo-notifications'));
 check('Resolved Expo config includes SecureStore plugin', plugins.includes('expo-secure-store'));
+check('package declares expo-image-picker dependency', Boolean(packageJson.dependencies?.['expo-image-picker']));
+check('package declares expo-document-picker dependency', Boolean(packageJson.dependencies?.['expo-document-picker']));
+check('package declares expo-file-system dependency', Boolean(packageJson.dependencies?.['expo-file-system']));
+check('Image picker camera permission is AgentHub scoped and bilingual', appConfigSource.includes('拍摄任务审查证据照片') && appConfigSource.includes('capture evidence photos'));
+check('Image picker photos permission is AgentHub scoped and bilingual', appConfigSource.includes('选择照片或视频作为任务证据') && appConfigSource.includes('photos or videos as task evidence'));
+check('Image picker microphone permission stays disabled', appConfigSource.includes('microphonePermission: false'));
+check('SecureStore biometric permission is AgentHub scoped and bilingual', appConfigSource.includes('设备生物识别解锁本地 Hub 会话') && appConfigSource.includes('device biometrics'));
 check('Expo config reads Hub URL from EXPO_PUBLIC_AGENTHUB_HUB_URL', appConfigSource.includes('EXPO_PUBLIC_AGENTHUB_HUB_URL'));
 check('Expo config reads TokenDance ID issuer from EXPO_PUBLIC_TOKENDANCE_ID_ISSUER', appConfigSource.includes('EXPO_PUBLIC_TOKENDANCE_ID_ISSUER'));
 check('Resolved Expo config exposes Hub base URL', /^https?:\/\//.test(hubBaseUrl));
@@ -98,6 +107,7 @@ const summary = {
     'Install iOS development build through simulator or EAS Build.',
     'Complete TokenDance ID AuthSession round trip in a development build.',
     'Verify SecureStore persistence and logout clearing on device.',
+    'Verify camera, photo library, document picker, and evidence cache cleanup on device.',
     'Verify notification delivery and tap routing on device.',
     'Verify Hub REST and update stream against mock/local/live Hub from a development build.',
   ],

@@ -47,6 +47,7 @@ Last updated: 2026-06-09
 - TokenDance ID AuthSession planning/wiring module tests.
 - SecureStore adapter/session state tests.
 - Notification bridge and notification intent tests.
+- Native camera/photo/document/storage capability adapter tests.
 - Desktop-aligned mobile token aliases and theme tests.
 - Visual QA script with multiple mobile scenarios.
 - Visual QA includes phone and tablet split-pane composer interaction scenes with reduced motion enabled.
@@ -92,6 +93,7 @@ Do not tag or publish Android/iOS Mobile releases until these are proven in deve
 - TokenDance ID AuthSession + PKCE round trip works with the `agenthub://` scheme.
 - SecureStore persists Hub session and logout clears it.
 - Notifications deliver and tap through to the correct task/chat intent.
+- Camera capture, photo/video picker, document picker, and evidence cache cleanup work in a development build.
 - Native app reads Hub snapshot and update stream from mock/local/live Hub without showing raw transport state.
 - Visual QA confirms Desktop-aligned light UI, Feishu-like mobile ergonomics, zh/en parity, and no private mock data.
 - Visual QA confirms reduced-motion interaction scenes and tablet split-pane panes remain stable.
@@ -105,5 +107,5 @@ Do not tag or publish Android/iOS Mobile releases until these are proven in deve
 - Desktop/Web parity is not complete outside Chat/Tasks. Contacts, Docs, Agents, Projects, and Settings need more page-specific mobile screens that preserve Desktop page semantics instead of only listing rows.
 - Keep the explicit route mapping documented: Desktop route `runs` is the mobile primary tab `tasks`; legacy run/approval/activity deep links and notifications route into Tasks context instead of separate primary screens.
 - Settings must add Desktop panes such as appearance, notifications, agent/defaults, local/runtime state while keeping mobile-only identity/session controls in account/profile surfaces.
-- Native device proof is still missing.
+- Native device proof is still missing for install/open, media permissions, camera/photo/document picker behavior, storage cleanup, SecureStore persistence, notifications, and Hub update stream.
 - Push/PR should keep this branch isolated from backend/desktop feature work.
