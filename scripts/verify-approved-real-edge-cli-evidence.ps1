@@ -115,6 +115,30 @@ function Test-RequiredBoolTrue {
     return $true
 }
 
+function Test-RequiredBoolValue {
+    param(
+        [object]$Object,
+        [string]$Name,
+        [string]$Label,
+        [bool]$Expected
+    )
+
+    $value = Get-RequiredPropertyValue $Object $Name $Label
+    if ($null -eq $value) {
+        return $false
+    }
+    if ($value -isnot [bool]) {
+        Block "$Label $Name must be boolean $Expected"
+        return $false
+    }
+    if ($value -ne $Expected) {
+        Block "$Label $Name must be $Expected"
+        return $false
+    }
+    Pass "$Label $Name=$($Expected.ToString().ToLowerInvariant())"
+    return $true
+}
+
 function Get-RequiredString {
     param(
         [object]$Object,
@@ -326,6 +350,24 @@ function Test-ManifestShape {
     $ok = $true
     foreach ($field in @("requestMapped", "invocationPlanObserved", "eventReplayObserved", "realCliObserved", "redacted", "noSecrets")) {
         if (-not (Test-RequiredBoolTrue $Manifest $field "observed manifest")) {
+            $ok = $false
+        }
+    }
+    if (-not (Test-RequiredBoolValue $Manifest "mockAdapterUsed" "observed manifest" $false)) {
+        $ok = $false
+    }
+    if (-not (Test-RequiredBoolValue $Manifest "realCliTested" "observed manifest" $true)) {
+        $ok = $false
+    }
+    if (-not (Test-RequiredBoolValue $Manifest "realModelTested" "observed manifest" $false)) {
+        $ok = $false
+    }
+    if (-not (Test-RequiredBoolValue $Manifest "tokenDanceIdLogin" "observed manifest" $false)) {
+        $ok = $false
+    }
+
+    foreach ($field in @("realCliTestedReason", "realModelTestedReason", "tokenDanceIdLoginReason", "failureReason", "recordingEvidencePath")) {
+        if ($null -eq (Get-RequiredString $Manifest $field "observed manifest")) {
             $ok = $false
         }
     }
@@ -549,6 +591,7 @@ function Test-EventLogAgainstManifest {
 
 Write-Host "AgentHub approved-real Edge CLI evidence verifier" -ForegroundColor Magenta
 Write-Host "No real CLI/model/login/network command was executed by this verifier." -ForegroundColor Magenta
+Write-Host "This verifier distinguishes MockAdapterUsed, RealCliTested, RealModelTested, and TokenDanceIDLogin." -ForegroundColor Magenta
 
 $approved = Test-ApprovalMarker
 $manifestPath = if ([string]::IsNullOrWhiteSpace($ObservedManifest)) { "" } elseif ([System.IO.Path]::IsPathRooted($ObservedManifest)) { $ObservedManifest } else { Join-Path $RepoRoot $ObservedManifest }
@@ -582,6 +625,10 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 if ($verified) {
     Write-Host "real_tested=true" -ForegroundColor Green
+    Write-Host "MockAdapterUsed=false" -ForegroundColor Green
+    Write-Host "RealCliTested=true" -ForegroundColor Green
+    Write-Host "RealModelTested=false" -ForegroundColor Green
+    Write-Host "TokenDanceIDLogin=false" -ForegroundColor Green
     Write-Host "approved_real_evidence_verified=true" -ForegroundColor Green
     Write-Host "hash_verified=$($HashVerified.ToString().ToLowerInvariant())" -ForegroundColor Green
     Write-Host "Status: APPROVED_REAL_EVIDENCE_VERIFIED" -ForegroundColor Green
@@ -589,6 +636,10 @@ if ($verified) {
 }
 
 Write-Host "real_tested=false" -ForegroundColor Yellow
+Write-Host "MockAdapterUsed=unknown" -ForegroundColor Yellow
+Write-Host "RealCliTested=false" -ForegroundColor Yellow
+Write-Host "RealModelTested=false" -ForegroundColor Yellow
+Write-Host "TokenDanceIDLogin=false" -ForegroundColor Yellow
 Write-Host "approved_real_evidence_verified=false" -ForegroundColor Yellow
 Write-Host "hash_verified=$($HashVerified.ToString().ToLowerInvariant())" -ForegroundColor Yellow
 Write-Host "Status: APPROVED_REAL_EVIDENCE_BLOCKED" -ForegroundColor Red

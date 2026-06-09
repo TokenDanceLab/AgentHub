@@ -113,7 +113,7 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($scriptText -match '\$ManifestPath') "script requires explicit ManifestPath parameter"
     Assert-True ($scriptText -notmatch 'Start-Process|Invoke-Expression|Invoke-Command|Invoke-WebRequest|Invoke-RestMethod|System\.Diagnostics\.Process|ProcessStartInfo') "script has no process or network execution primitive"
     Assert-True ($scriptText -notmatch '(?m)^\s*(?:&\s*)?(?:codex|claude|opencode|npm|pnpm|git|gh)\b') "script has no direct CLI/deploy command pattern"
-    Assert-True ($scriptText -match 'real_tested=false') "script always declares real_tested=false"
+    Assert-True ($scriptText -match 'RealCliTested=false' -and $scriptText -match 'RealModelTested=false' -and $scriptText -match 'TokenDanceIDLogin=false') "script always declares split readiness claims false"
     Assert-True ($scriptText -match 'fixture=not-run' -and $scriptText -match 'observed=not-run' -and $scriptText -match 'approved-real=manifest-validated-only' -and $scriptText -match 'production=blocked') "script distinguishes fixture, observed, approved-real, and production"
     Assert-True ($scriptText -match 'runtime_readiness') "script validates per-runtime readiness entries"
     Assert-True ($scriptText -match 'command_discovery' -and $scriptText -match 'json_mode' -and $scriptText -match 'permission_boundary') "script validates runtime command, JSON, and approval boundaries"
@@ -137,7 +137,7 @@ $validRun = Invoke-PreflightScript @(
 )
 Assert-True ($validRun.ExitCode -eq 0) "valid manifest passes" $validRun.Output
 Assert-True ($validRun.Output -match "Status: APPROVED_REAL_PREFLIGHT_MANIFEST_OK") "valid manifest reports OK status" $validRun.Output
-Assert-True ($validRun.Output -match "real_tested=false") "valid manifest does not claim real execution" $validRun.Output
+Assert-True ($validRun.Output -match "RealCliTested=false" -and $validRun.Output -match "RealModelTested=false" -and $validRun.Output -match "TokenDanceIDLogin=false") "valid manifest does not claim real execution" $validRun.Output
 Assert-True ($validRun.Output -match "No login, CLI/model/API, deploy, sign") "valid output states no real action executed" $validRun.Output
 Assert-True ($validRun.Output -match "fixture=not-run" -and $validRun.Output -match "observed=not-run" -and $validRun.Output -match "production=blocked") "valid output distinguishes evidence modes" $validRun.Output
 Assert-True ($validRun.Output -match "runtime_readiness") "valid output reports per-runtime readiness validation" $validRun.Output
