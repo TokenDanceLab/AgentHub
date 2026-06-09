@@ -86,6 +86,9 @@ type AgentTaskApprovalList struct {
 type AgentTaskApproval struct {
 	ApprovalID    string                   `json:"approval_id"`
 	TaskID        string                   `json:"task_id"`
+	TargetID      string                   `json:"target_id,omitempty"`
+	EdgeDeviceID  string                   `json:"edge_device_id,omitempty"`
+	CorrelationID string                   `json:"correlation_id,omitempty"`
 	EdgeRunID     string                   `json:"edge_run_id,omitempty"`
 	SessionID     string                   `json:"session_id,omitempty"`
 	SourceEventID string                   `json:"source_event_id,omitempty"`
