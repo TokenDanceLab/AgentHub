@@ -753,11 +753,15 @@ func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 
 	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
-		Action:       "delegate",
-		NextWorker:   executor.ID,
-		Instructions: "Implement the replay UI",
-		Reasoning:    "executor owns UI work",
-		Context:      "state endpoint is ready",
+		Action:        "delegate",
+		NextWorker:    executor.ID,
+		Instructions:  "Implement the replay UI",
+		Reasoning:     "executor owns UI work",
+		Reason:        "worker owns fixture implementation",
+		Context:       "state endpoint is ready",
+		AgentID:       executor.ID,
+		ParentTaskID:  "parent-task-1",
+		CorrelationID: "corr-route-1",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, assignment)
@@ -773,17 +777,34 @@ func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *
 	assert.Equal(t, model.TeamEventRouteDecided, events[0].Type)
 	assert.Equal(t, model.TeamEventAssignmentCreated, events[1].Type)
 	assert.Equal(t, model.TeamEventTaskCreated, events[2].Type)
+	var accepted model.CoordinatorRouteDecision
+	require.NoError(t, json.Unmarshal([]byte(events[0].Payload), &accepted))
+	require.NotEmpty(t, accepted.SubtaskID)
+	assert.True(t, accepted.Accepted)
+	assert.Equal(t, executor.ID, accepted.AgentID)
+	assert.Equal(t, "parent-task-1", accepted.ParentTaskID)
+	assert.Equal(t, "worker owns fixture implementation", accepted.Reason)
+	assert.Equal(t, "corr-route-1", accepted.CorrelationID)
 
 	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
 	require.NoError(t, err)
 	require.Len(t, state.RouteLog, 1)
 	assert.Equal(t, "delegate", state.RouteLog[0].Action)
+	assert.Equal(t, "corr-route-1", state.RouteLog[0].CorrelationID)
+	require.Len(t, state.RouteAuditLog, 1)
+	assert.Equal(t, "accepted", state.RouteAuditLog[0].Status)
+	assert.Equal(t, "corr-route-1", state.RouteAuditLog[0].CorrelationID)
+	assert.Equal(t, accepted.SubtaskID, state.RouteAuditLog[0].SubtaskID)
+	assert.Equal(t, "parent-task-1", state.RouteAuditLog[0].ParentTaskID)
+	assert.Equal(t, executor.ID, state.RouteAuditLog[0].AgentID)
+	assert.Equal(t, "worker owns fixture implementation", state.RouteAuditLog[0].Reason)
 	require.Len(t, state.Assignments, 1)
 	assert.Equal(t, assignment.ID, state.Assignments[0].AssignmentID)
 	assert.Equal(t, 1, state.Members[1].ActiveTasks)
 	require.Len(t, state.Tasks, 1)
 	assert.Equal(t, assignment.ID, state.Tasks[0].AssignmentID)
 	assert.Equal(t, executor.ID, state.Tasks[0].AssigneeMemberID)
+	assert.Equal(t, "parent-task-1", state.Tasks[0].ParentTaskID)
 	assert.Equal(t, "Implement the replay UI", state.Tasks[0].Objective)
 	assert.Equal(t, model.TeamTaskStatusPending, state.Tasks[0].Status)
 }
@@ -807,6 +828,13 @@ func TestAgentTeamService_HandleRouteDecisionRejectsMissingWorkerWithAuditEvent(
 	require.Len(t, events, 1)
 	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
 	assert.Contains(t, events[0].Payload, "next_worker")
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.RouteAuditLog, 1)
+	assert.Equal(t, "rejected", state.RouteAuditLog[0].Status)
+	assert.Equal(t, "missing-member", state.RouteAuditLog[0].AgentID)
+	assert.Equal(t, "next_worker is not a team member", state.RouteAuditLog[0].Reason)
 }
 
 func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *testing.T) {

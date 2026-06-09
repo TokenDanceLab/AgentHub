@@ -229,6 +229,12 @@ type CoordinatorRouteDecision struct {
 	Summary       string `json:"summary,omitempty"`
 	BlockedReason string `json:"blocked_reason,omitempty"`
 
+	Accepted     bool   `json:"accepted,omitempty"`       // true when Hub accepts and queues a subtask
+	SubtaskID    string `json:"subtask_id,omitempty"`     // AgentTeamTask.ID queued by Hub
+	ParentTaskID string `json:"parent_task_id,omitempty"` // optional parent AgentTeamTask.ID
+	AgentID      string `json:"agent_id,omitempty"`       // target AgentTeamMember.ID / agent id
+	Reason       string `json:"reason,omitempty"`         // accepted/rejected audit reason
+
 	CorrelationID string `json:"correlation_id,omitempty"` // links route to previous assignment
 }
 
@@ -335,8 +341,23 @@ type TeamRunState struct {
 	Conflicts      []TeamConflictState        `json:"conflicts"`
 	RunEvents      []TeamRunEventState        `json:"run_events"`
 	RouteLog       []CoordinatorRouteDecision `json:"route_log"`
+	RouteAuditLog  []TeamRouteAuditState      `json:"route_audit_log"`
 	Budget         *TeamBudget                `json:"budget,omitempty"`
 	TerminalReason string                     `json:"terminal_reason,omitempty"`
+}
+
+// TeamRouteAuditState is a replay-friendly route decision audit entry. It keeps
+// accepted and rejected route decisions queryable without reinterpreting raw
+// event payloads.
+type TeamRouteAuditState struct {
+	Status        string    `json:"status"` // accepted | rejected
+	Action        string    `json:"action,omitempty"`
+	SubtaskID     string    `json:"subtask_id,omitempty"`
+	ParentTaskID  string    `json:"parent_task_id,omitempty"`
+	AgentID       string    `json:"agent_id,omitempty"`
+	Reason        string    `json:"reason,omitempty"`
+	CorrelationID string    `json:"correlation_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at,omitempty"`
 }
 
 // TeamMemberState is a member's status within a team run.
