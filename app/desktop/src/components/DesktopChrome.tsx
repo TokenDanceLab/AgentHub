@@ -1,15 +1,35 @@
 import type { ReactNode } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import logoUrl from '@/assets/agenthub-icon-rounded.svg';
+import { DesignNavIcon } from '@shared/workbench/designIcons';
+import {
+  DESKTOP_NAVIGATE_BACK_EVENT,
+  DESKTOP_NAVIGATE_FORWARD_EVENT,
+  DESKTOP_TOGGLE_SIDEBAR_EVENT,
+} from '@shared/workbench/desktopChromeEvents';
 import styles from './DesktopChrome.module.css';
 
 type WindowCommand = 'minimize' | 'toggleMaximize' | 'close';
 
 export interface DesktopChromeProps {
   children: ReactNode;
+  showNavigationControls?: boolean | undefined;
 }
 
-export function DesktopChrome({ children }: DesktopChromeProps) {
+export function DesktopChrome({ children, showNavigationControls = true }: DesktopChromeProps) {
+  function dispatchDesktopEvent(eventName: string): void {
+    window.dispatchEvent(new Event(eventName));
+  }
+
+  function runNavigationCommand(direction: 'back' | 'forward'): void {
+    if (direction === 'back') {
+      dispatchDesktopEvent(DESKTOP_NAVIGATE_BACK_EVENT);
+      window.history.back();
+      return;
+    }
+    dispatchDesktopEvent(DESKTOP_NAVIGATE_FORWARD_EVENT);
+    window.history.forward();
+  }
+
   async function runWindowCommand(command: WindowCommand): Promise<void> {
     if (!isTauriRuntime()) return;
 
@@ -28,11 +48,41 @@ export function DesktopChrome({ children }: DesktopChromeProps) {
   return (
     <div className={styles.host}>
       <div className={`${styles.chrome} window-chrome`} data-desktop-window-chrome>
+        {showNavigationControls ? (
+          <div aria-label="Desktop navigation controls" className={styles.toolbar} role="group">
+            <button
+              aria-label="切换左侧栏"
+              className={`${styles.chromeButton} ${styles.sidebarButton}`}
+              onClick={() => dispatchDesktopEvent(DESKTOP_TOGGLE_SIDEBAR_EVENT)}
+              title="收起 / 展开左侧栏"
+              type="button"
+            >
+              <DesignNavIcon name="sidebarLeft" size={15} strokeWidth={1.85} />
+            </button>
+            <div className={styles.historyGroup}>
+              <button
+                aria-label="后退"
+                className={styles.chromeButton}
+                onClick={() => runNavigationCommand('back')}
+                title="上一页"
+                type="button"
+              >
+                <DesignNavIcon name="back" size={15} strokeWidth={1.85} />
+              </button>
+              <button
+                aria-label="前进"
+                className={styles.chromeButton}
+                onClick={() => runNavigationCommand('forward')}
+                title="下一页"
+                type="button"
+              >
+                <DesignNavIcon name="forward" size={15} strokeWidth={1.85} />
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className={styles.drag}>
-          <span className={styles.brandMark}>
-            <img alt="AgentHub" src={logoUrl} />
-          </span>
-          <span className={styles.title}>AgentHub</span>
+          <span className={styles.dragHandle} aria-hidden="true" />
         </div>
         <div aria-label="Window controls" className={styles.controls} role="group">
           <button

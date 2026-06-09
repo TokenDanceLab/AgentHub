@@ -374,6 +374,10 @@
   background: var(--surface);
 }
 
+.workspace[data-mode='chat'][data-mainchain='false'] {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .mainchainStrip {
   display: flex;
   align-items: center;
@@ -638,6 +642,25 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.workspaceDataMode {
+  flex: 0 0 auto;
+  max-width: 148px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--bdr));
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  color: var(--primary);
+  font: 600 0.6875rem/1 var(--font-sans);
+  white-space: nowrap;
+  outline: none;
+}
+
+.workspaceDataMode:focus-visible {
+  border-color: var(--bdr-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .workspaceThread {
@@ -1036,7 +1059,7 @@
   height: 36px;
   border-radius: 50%;
   background: var(--primary);
-  color: ButtonText;
+  color: #fff;
   border: 0;
   font-size: 13.3333px;
   line-height: normal;
@@ -1059,7 +1082,7 @@
 
 .sendButton:disabled {
   background: var(--primary);
-  color: ButtonText;
+  color: #fff;
   cursor: pointer;
   transform: none;
 }
