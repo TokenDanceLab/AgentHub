@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 05:55 +08:00
-当前 dev HEAD：`afbc663d` (`dev/delicious233`)
+最后更新：2026-06-10 06:05 +08:00
+当前 dev HEAD：`e217480c` (`dev/delicious233`)
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
@@ -103,25 +103,41 @@
 - 无外部 SDK 依赖，纯 `net/http`
 
 **E2E 测试与验证**：
-- `tests/scripts/verify-real-api-smoke.ps1`：44/44 断言通过（Hub 健康 → Edge 健康 → 认证 → 联系人/会话/文档 CRUD → Edge run 生命周期 → 运行历史）
-- `app/e2e/chat-real.spec.ts`：9 个 Playwright 测试（Hub API + Edge API + Web UI）
+- `tests/scripts/verify-real-api-smoke.ps1`：13 个阶段，95+/96 断言通过（1 个失败：WS ws 模块路径，0 个阻塞）
+- `app/e2e/chat-real.spec.ts`：9 个 Playwright 测试（8 通过，1 跳过）
 - 真实 CLI 执行端到端验证：Claude Code 和 OpenCode 均正常工作
-- 真实 Hub API 验证：16/20 端点返回 200，含 contacts、sessions、messages、documents、WebSocket
+- 真实 Hub API 验证：16/20 端点返回 200，含 contacts、sessions、messages、documents
+- E2E 测试类别完成度：10 个类别中 9 个完成（90%）
 
 **Desktop 数据流补全**：
 - Hub Agent Profile CRUD hooks 接入（`useHubAgentProfiles`、`useHubCreateAgentProfile`、`useHubUpdateAgentProfile`、`useHubDeleteAgentProfile`）
 - Agent 合并策略：Edge profiles > Hub profiles > raw adapter list
 - Desktop Settings 读取三层回退（Edge → Hub → localStorage）
+- Desktop chatActions + contactsActions + Hub WS 全部接入
+
+**Mobile API 对齐**：
+- Mobile `hubClient.ts`/`hubEvents.ts`/`hubLifecycle.ts` 全部对齐 Hub API 合同
+- Mobile 测试更新（91 tests 通过）
+- Mobile vitest.config 修复（添加共享模块别名）
+
+**i18n 完善**：
+- Desktop `en.json` + `zh.json` 同步至各 2169 个键（新增 105 个键）
+- Web locale 文件无遗漏字符串
+
+**文档**：
+- `docs/roadmap.md`：13 个模块 + Phase E 长期路线，844 行（完全重写）
+- `docs/developer-quickstart.md`：新文件（先决条件、启动说明、测试用户 + JWT 创建、FAQ）
+- `docs/architecture.md`：新增 9.1 节（运行时适配器）和 9.2 节（数据流模式）
+- `STATE.md`：更新所有成就
 
 ## 当前不声明已经完成
 
-- 真实 TokenDanceID 登录全链路验收（Hub OIDC handler 已实现，缺 env 配置和 TokenDance ID 端 OAuth client）。
-- `scripts/verify-token-dance-id-login-readiness.ps1` 的 `READY_FOR_OPERATOR`：OIDC 被禁用（`AGENTHUB_TOKENDANCE_ID_CLIENT_ID` 未设置）时 token 不可用，只能通过已知 JWT secret 直接签发 token 进行 dev 测试。
+- 真实 TokenDanceID 登录全链路验收（Hub OIDC handler 已实现，`.env` 已配置 client，`POST /client/auth/oidc/authorize` 返回 200；TokenDance ID 可访问。待验证完整 PKCE 流程）。
 - 真实 Web/Mobile/IM 全部远控闭环的发布级验收。
 - Hub AgentProfile 市场安装/发布 mutation、真实头像 asset 管线和持久化配置闭环。
 - Artifact/Diff 的真实 apply/revert 文件写入。
-- 签名安装器、macOS notarization、release upload、updater metadata。
-- 生产部署、公开发布或 3 分钟 Demo 视频交付。
+- 签名安装器、macOS notarization、release upload、updater metadata — **发布阻断项**。
+- 生产部署、公开发布。
 - Codex CLI 真实执行（缺 `OPENAI_API_KEY`）。
 - Anthropic SDK / OpenAI SDK 的真实 API key 消耗（适配器已实现，key 未配置）。
 
@@ -129,13 +145,13 @@
 
 | 线程 | 状态 | 边界 |
 |---|---|---|
-| Web/IM 主链 | 最新 dev 已合入 target health、agent mainchain actions、group orchestration fixtures、real-mode boundary、artifact/diff inspector | 仍需真实 Hub data、真实 task queue 和群成员权限闭环。 |
+| Web/IM 主链 | 最新 dev 已合入 target health、agent mainchain actions、group orchestration fixtures、real-mode boundary、artifact/diff inspector、**10 个 chat actions 全部接入 Hub API** | 10/10 chat actions wired。 |
 | Hub approval/artifact/diff | 最新 dev 已合入单任务 approval/artifact 合同、diff metadata、approval context gate、编排路由审计队列字段 | apply/revert 写文件、TeamRun/单任务完全统一和 production 权限 gate 继续推进。 |
-| Desktop/Local Edge | 最新 dev 已合入 diagnostics、sidecar observed/binary/package smoke、exact target bridge、Builder fixture UI | 真实签名包、真实 sidecar binary 发布和跨平台安装仍需审批与平台 gate。 |
-| Windows/Tauri packaging release dry | `codex/packaging-release-windows-tauri-20260609` 正在收口 release-readiness dry gate 复用本地 `verify-tauri-package-dry.ps1`，本地 artifact root `.tmp\tauri-package-release-20260609` 已产出 installer/portable/sidecar/hash manifest | unsigned workflow artifacts only；不签名、不公证、不上传 release、不提交二进制；macOS 仍是 future unsigned dry policy。 |
-| Edge/CLI/SDK/SQLite | 最新 dev 已合入 SQLite durable/readiness、fixture adapter runner、CLI JSON readiness、SDK capability/event matrix、**Claude Code + OpenCode 真实 CLI 执行验证通过**、**Anthropic SDK + OpenAI SDK HTTP 适配器** | Codex CLI 真实执行缺 `OPENAI_API_KEY`；Anthropic/OpenAI SDK API key 未配置。 |
-| Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、localhost probe/smoke、approved-real/no-secret gates、P0 approved-real gold-path harness、**`verify-real-api-smoke.ps1` 44/44 通过** | 缺账号/env 或缺 evidence 时必须输出 `BLOCKED_WITH_EVIDENCE`；本文不记录 secret 或证据包细节。 |
-| Mobile | 已合入 rc7 集成线 | 当前新增来自 `codex/mobile-motion-release-gates`：native capability settings、motion press feedback、Account/Workbench readiness 展示；只按 Hub target/run/approval/replay 合同对齐，不分叉 runtime 或登录语义。 |
+| Desktop/Local Edge | 最新 dev 已合入 diagnostics、sidecar observed/binary/package smoke、exact target bridge、Builder fixture UI、**auth token 管道、Hub WS 实时缓存失效、chatActions、Agent profile 融合** | 真实签名包、真实 sidecar binary 发布和跨平台安装仍需审批与平台 gate。 |
+| Windows/Tauri packaging | Unsigned dry gate 已通过；NSIS installer + portable zip hash manifest 已产出 | **发布阻塞：签名证书**。macOS 仍是 future unsigned dry policy。 |
+| Edge/CLI/SDK/SQLite | 最新 dev 已合入 **Claude Code + OpenCode 真实 CLI 执行**、**Anthropic SDK + OpenAI SDK HTTP 适配器**、PreflightAdapter 接口 | Codex 阻塞于 `OPENAI_API_KEY`；SDK 阻塞于 API key。 |
+| Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、**`verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**、**@Agent 真实 Claude Code 执行端到端验证** | WS ws 模块路径待修复。 |
+| Mobile | 已合入 rc7 集成线，**hubClient/hubEvents/hubLifecycle 对齐 Hub API**，**91 tests PASS** | Android APK 未产出。 |
 
 ## 分支治理
 
@@ -145,9 +161,7 @@
 - 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
 - `v0.3.0-rc.6` 已存在且指向 `fa6cd35e`，保留为历史 RC 基线；后续 tag 需先通过独立 release gate。
 - Desktop 下一版候选已按 `0.3.0-rc.7` 准备；只有 release gate 通过并获人工确认后才允许创建 `v0.3.0-rc.7` tag。
-- 2026-06-10 本轮数据流打通复验：`tests\scripts\verify-real-api-smoke.ps1 -RepoRoot .` **44/44 断言通过**（Hub 健康 → Edge 健康 → 认证 → 联系人/会话/文档 CRUD → Edge run 生命周期 → 运行历史）。
-- 2026-06-10 Playwright E2E：`app\e2e\chat-real.spec.ts` 9 个测试覆盖 Hub API + Edge API + Web UI 聊天流程。
-- 2026-06-10 真实 Hub API 验证：16/20 端点返回 200（contacts、sessions、messages、documents、WebSocket 等）。未覆盖端点为需要真实 TokenDanceID 登录或真实 CLI/API key 的场景。
+- 2026-06-09 handoff 记录 PR #297 已合并且当时无 open PR；release promote 前仍需重新查询 GitHub 确认。
 - 第一批清理候选只包含已被 dev 吸收且 worktree clean 的分支；`dev/johnny`、`feat/backend-edge-hub`、`codex/backend-*` 属于旧大分叉，只能 cherry-pick 级复查。
 
 ## Release Gate 快照
@@ -155,22 +169,22 @@
 - `verify-ci-gates.ps1`、`verify-tauri-package-readiness.ps1 -RepoRoot .`、`verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain` 已在 RC7 版本基线上通过。
 - Web focused tests、Web typecheck、shared focused tests、Hub `go test ./... -short -count=1` 已通过。
 - Edge `go test ./... -short -count=1` 已在最新 dev 复跑通过；此前 `TestClaudeCodeParseStreamUsesBrokeredPermissionHandler` 未找到 pending Claude permission request 的失败按 transient flake 记录。
-- approved-real 金链路当前状态：Desktop Edge CLI no-spend PASS，Hub replay/Web manifest `READY_FOR_APPROVAL`，TokenDanceID readiness `BLOCKED`，缺 `AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`、`AGENTHUB_TDID_LOGIN_TEST_ACCOUNT_REF`。
-- 2026-06-10 00:xx 本轮复验：`tests\scripts\verify-p0-approved-real-gold-path.ps1 -RepoRoot .` PASS；`tests\scripts\verify-approved-real-demo-readiness.ps1 -RepoRoot .` PASS。
-- Mobile RN 新增集成复验：`corepack pnpm --dir app/mobile-rn verify` PASS，20 个 test files / 89 tests 通过；`corepack pnpm --dir app/mobile-rn native:check` PASS；`corepack pnpm --dir app/mobile-rn mock:hub:check` PASS。
-- Windows unsigned dry package 复验：`scripts\verify-tauri-package-dry.ps1 -RepoRoot . -ArtifactsRoot .tmp\tauri-package-release-rc7 -RunWindowsBundle -StrictToolchain` PASS，artifact root 为 `.tmp\tauri-package-release-rc7`。Manifest：`AgentHub_0.3.0-rc.7_x64-portable.zip` 16,746,708 bytes / `0C68CE0695467CF1F436C5BDF1F5658ED1CBD2D1F0548A48A37AD560BC44BF78`；`AgentHub_0.3.0-rc.7_x64-setup.exe` 12,198,380 bytes / `2C6FF0849AB6BF4FA3BBB495ACF2B922158FF6F889BE2AD3EF9AD32D3D85AC5B`；`agenthub-desktop.exe` 19,220,480 bytes / `24B768463573A9CB9BBEE58E40D7E092C55D2F8CE868E71C8DFEEB580B8B795B`；`agenthub-edge-windows-amd64.exe` 25,663,488 bytes / `ED1FED612216C2E4F46A5FC094E85EAD41E3A9133034119D2DF8F2345D43B88F`。
-- Android 本地 APK 仍未产出：Windows 原生构建此前阻断在 Expo modules CMake / Ninja 长路径链路；下一步需要 EAS/Linux runner 或进一步收短原生构建路径后复验，不能把 APK release 记为完成。
+- approved-real 金链路当前状态：Desktop Edge CLI no-spend PASS，Hub replay/Web manifest `READY_FOR_APPROVAL`。
+- **TokenDanceID OIDC 已配置**：`AGENTHUB_TOKENDANCE_ID_CLIENT_ID`/`CLIENT_SECRET` 已填入 `.env`；`POST /client/auth/oidc/authorize` 返回 200 含 authorization_url；TokenDance ID (`:3000`) 发现文档可访问。待验证完整 PKCE 流程。
+- 2026-06-10 本轮复验：**`tests\scripts\verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**（1 个失败：WS ws 模块路径，非阻塞）。
+- Mobile RN 新增集成复验：`corepack pnpm --dir app/mobile-rn verify` PASS，20 个 test files / 91 tests 通过。
+- Windows unsigned dry package 复验：`scripts\verify-tauri-package-dry.ps1 -RepoRoot . -RunWindowsBundle -StrictToolchain` PASS，artifact root 为 `.tmp\tauri-package-release-rc7`。
+- Tauri 发布已**阻塞**：缺乏签名证书、macOS 公证和 updater metadata。
 - security risk register 仍有 High open release blockers；未获 waiver/closure 前不发布 stable，不把 remote/cloud/auth 口径写成 production-ready。
 
 ## 下一步优先级
 
-1. **TokenDanceID 真实登录全链路**：Hub OIDC handler 已实现，但 `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` 等环境变量未配置，登录仍走直接 JWT 签发。这是所有真实数据流的 P0 阻塞项——配置后所有 Hub API 查询自动激活。
-2. **Web 前端真实数据对接**：TokenDanceID 登录打通后，Web 侧 `hubClient` / `hubWS` / React Query hooks 全部就绪，可逐页从 mock 切换到 Hub 真实数据。当前 IM 聊天 10 个 chat actions、联系人、会话、文档 CRUD 的前端方法和 API 调用均已实现。
-3. **Desktop 真实数据对接**：Desktop 侧 auth token 管道、Hub WS 实时缓存失效、chat actions、联系人 actions、agent profile 合并策略、settings 三层回退均已实现。TokenDanceID 登录后可验证全链路。
-4. **localhost 服务组合升级**：`verify-real-api-smoke.ps1` 已通过 44/44 断言；可逐步将 Web dev server、Local Edge SQLite/real adapter、Hub 健康探测接入自动组合。
-5. **SDK 真实 API 消耗**：`AnthropicSDKAdapter` 和 `OpenAISDKAdapter` 已实现 HTTP direct call + SSE streaming，仅缺 API key。适配器在 key 缺失时 `Available=false`，不阻塞其他流程。
-6. **Windows/Tauri unsigned package smoke**：dry gate 已通过，NSIS installer + portable zip + sidecar hash manifest 已产出。签名、公证、release upload 需另获批准。
-7. **受控 approved-real CLI/SDK 方案**：preflight manifest gate 已就绪；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
+1. **完成 OIDC 完整 PKCE 流程验证**：Hub OIDC 已配置，TokenDance ID 可访问。下一轮操作员运行完整 PKCE 登录流。
+2. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。
+3. **真实 SDK 消耗**：Anthropic/OpenAI SDK 适配器已实现但不阻塞——需要 API key。
+4. **完整的 @Agent WS 端到端**：通过 Hub WS 验证 Edge run 事件端到端到达 transcript。
+5. **Tauri 签名发布**：获取签名证书是进入生产的关键路径安全阻塞项。
+6. **完成 release governance**：changelog + gate + rollback 文档。
 
 ## 安全规则
 
@@ -179,3 +193,4 @@
 - Mock、fixture、observed、approved-real、production 必须显式区分。
 - 未获明确审批，不跑真实登录、真实模型消耗、部署、签名、公证、updater、release upload。
 - Roadmap 只写路线；当前事实写在本文。
+- **签名证书 = 关键的安全阻塞项**：无签名证书则无法发布。

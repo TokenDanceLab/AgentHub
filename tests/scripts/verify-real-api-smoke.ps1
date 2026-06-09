@@ -477,9 +477,12 @@ Assert-True ($sessionId -ne "") "Got a session for IM testing"
 if ($sessionId) {
     # 8b: Send message from user A
     Write-Host "  8b. Send message (user A)" -ForegroundColor DarkYellow
+    # Generate a random UUID-like client_msg_id (test_user_uuid:uuid segment aligned with DB UUID type)
+    $randSuffix = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 12 | ForEach-Object { [char]$_ })
     $msgABody = @{
-        content_type = "text"
-        content      = "Hello from E2E smoke test user A!"
+        client_msg_id = "e2ea0001-$randSuffix"
+        content_type  = "text"
+        content       = "Hello from E2E smoke test user A!"
     }
     $sendMsgA = Invoke-PostJson "$HubUrl/client/sessions/$sessionId/messages" $msgABody $tokenA
     $msgAId = $null
