@@ -18,20 +18,20 @@ type SQLiteReadinessReport struct {
 }
 
 type SQLiteReadinessManifest struct {
-	Schema                   string
-	Status                   string
-	Path                     string
-	IntegrityCheck           string
-	LatestMigrationVersion   int
-	ExpectedMigrationVersion int
-	MigrationStatus          string
-	AppliedMigrations        []SQLiteMigrationInfo
-	MissingMigrationVersions []int
-	UnknownMigrationVersions []int
-	RequiredRowKinds         []string
-	RequiredProjectionTables []string
-	RowCounts                map[string]int
-	ProjectionCounts         map[string]int
+	Schema                   string                `json:"schema"`
+	Status                   string                `json:"status"`
+	Path                     string                `json:"path"`
+	IntegrityCheck           string                `json:"integrity_check"`
+	LatestMigrationVersion   int                   `json:"latest_migration_version"`
+	ExpectedMigrationVersion int                   `json:"expected_migration_version"`
+	MigrationStatus          string                `json:"migration_status"`
+	AppliedMigrations        []SQLiteMigrationInfo `json:"applied_migrations"`
+	MissingMigrationVersions []int                 `json:"missing_migration_versions"`
+	UnknownMigrationVersions []int                 `json:"unknown_migration_versions"`
+	RequiredRowKinds         []string              `json:"required_row_kinds"`
+	RequiredProjectionTables []string              `json:"required_projection_tables"`
+	RowCounts                map[string]int        `json:"row_counts"`
+	ProjectionCounts         map[string]int        `json:"projection_counts"`
 }
 
 func SQLiteReadiness(path string) (SQLiteReadinessReport, error) {
