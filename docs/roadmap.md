@@ -952,9 +952,9 @@ CLI permission request
 
 #### 验收标准
 
-- [ ] 登录后看到与 Web 相同会话列表
-- [ ] 可 approve/deny 审批
-- [ ] WS 事件实时到达
+- [x] 登录后看到与 Web 相同会话列表
+- [x] 可 approve/deny 审批
+- [x] WS 事件实时到达
 - [ ] Android APK 构建产出
 
 ### 13.2 Desktop Tauri
@@ -968,18 +968,18 @@ CLI permission request
 
 #### 验收标准
 
-- [ ] Desktop 通过 Local Edge 执行 run
-- [ ] Edge 健康状态在 UI 显示
-- [ ] Windows unsigned package hash 一致
-- [ ] sidecar 正确放置
+- [x] Desktop 通过 Local Edge 执行 run
+- [x] Edge 健康状态在 UI 显示
+- [x] Windows unsigned package hash 一致
+- [x] sidecar 正确放置
 - [ ] macOS unsigned path 拆清
 
 ### 13.3 i18n
 
 #### 验收标准
 
-- [ ] 所有页面 zh/en 完整无遗漏字符串
-- [ ] 术语翻译统一
+- [x] 所有页面 zh/en 完整无遗漏字符串
+- [x] 术语翻译统一
 
 ---
 
@@ -1020,7 +1020,7 @@ CLI permission request
 - [ ] 无 open Critical blockers
 - [ ] 所有 High 风险有 accepted 或 fixed
 - [ ] Windows package hash 一致
-- [ ] sidecar 正确放置
+- [x] sidecar 正确放置
 - [ ] Mobile tests pass
 - [ ] Hub + Edge + Web + Desktop smoke 通过
 
