@@ -176,6 +176,10 @@ jobs:
       - name: TeamRun fixture E2E
         run: go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1
 
+      - name: P0 remote-control fixture readiness
+        working-directory: .
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-p0-remote-control-fixture.ps1
+
   # -- Backend: focused subset, no real CLI/model/services
   backend-focused-subset:
     name: Backend focused subset
