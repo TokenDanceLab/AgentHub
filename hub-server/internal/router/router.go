@@ -276,6 +276,10 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.POST("/projects", workspaceHandler.CreateWorkspace)
 			web.GET("/projects/:id", workspaceHandler.GetWorkspace)
 			web.PATCH("/projects/:id", workspaceHandler.UpdateWorkspace)
+			web.GET("/projects/:id/threads", workspaceHandler.ListProjectThreads)
+			web.POST("/projects/:id/threads", workspaceHandler.CreateProjectThread)
+			web.GET("/projects/:id/threads/:threadId/messages", workspaceHandler.ListProjectThreadMessages)
+			web.POST("/projects/:id/threads/:threadId/messages", workspaceHandler.CreateProjectThreadMessage)
 		}
 
 		// Audit Events (Phase 6)

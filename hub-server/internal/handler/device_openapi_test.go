@@ -365,6 +365,8 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/web/execution-targets/{id}/ping":                                    {"post"},
 		"/web/projects":                                                       {"get", "post"},
 		"/web/projects/{id}":                                                  {"get", "patch"},
+		"/web/projects/{id}/threads":                                          {"get", "post"},
+		"/web/projects/{id}/threads/{threadId}/messages":                      {"get", "post"},
 		"/web/audit-events":                                                   {"get"},
 		"/web/relay/commands":                                                 {"post"},
 		"/web/relay/commands/{id}":                                            {"get"},
@@ -440,6 +442,46 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 	for path, methods := range legacyImplementedOperations {
 		for _, method := range methods {
 			assertOperationIsNotImplemented(t, paths, path, method)
+		}
+	}
+}
+
+func TestOpenAPIProjectThreadMessageContractDocumentsA2AMetadata(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	threadMessages := yamlMapField(t, paths, "/web/projects/{id}/threads/{threadId}/messages", "paths.projectThreadMessages")
+	post := yamlMapField(t, threadMessages, "post", "paths.projectThreadMessages.post")
+	description := yamlScalarField(t, post, "description", "project thread message description")
+	for _, want := range []string{"metadata", "@Agent mention", "orchestrator queue", "trigger_message_id"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("project thread message description missing %q: %s", want, description)
+		}
+	}
+	requestSchema := requestBodySchema(t, post, "project thread message")
+	if got := yamlScalarField(t, requestSchema, "$ref", "project thread message request ref"); got != "#/components/schemas/SendWorkspaceThreadMessageRequest" {
+		t.Fatalf("project thread message request ref = %v, want SendWorkspaceThreadMessageRequest", got)
+	}
+
+	request := yamlMapField(t, schemas, "SendWorkspaceThreadMessageRequest", "schemas.SendWorkspaceThreadMessageRequest")
+	required := yamlStringSlice(t, yamlField(t, request, "required", "SendWorkspaceThreadMessageRequest.required"), "SendWorkspaceThreadMessageRequest.required")
+	if !containsString(required, "content") {
+		t.Fatalf("SendWorkspaceThreadMessageRequest.required = %v, want content", required)
+	}
+	content := yamlMapField(t, yamlMapField(t, request, "properties", "SendWorkspaceThreadMessageRequest.properties"), "content", "SendWorkspaceThreadMessageRequest.properties.content")
+	contentDescription := yamlScalarField(t, content, "description", "SendWorkspaceThreadMessageRequest.content.description")
+	for _, want := range []string{"im_kind", "mentions", "orchestrator_queue"} {
+		if !strings.Contains(contentDescription, want) {
+			t.Fatalf("content description missing %q: %s", want, contentDescription)
+		}
+	}
+
+	response := yamlMapField(t, schemas, "WorkspaceThreadMessage", "schemas.WorkspaceThreadMessage")
+	responseRequired := yamlStringSlice(t, yamlField(t, response, "required", "WorkspaceThreadMessage.required"), "WorkspaceThreadMessage.required")
+	for _, want := range []string{"project_id", "thread_id", "content"} {
+		if !containsString(responseRequired, want) {
+			t.Fatalf("WorkspaceThreadMessage.required = %v, want %s", responseRequired, want)
 		}
 	}
 }
@@ -540,6 +582,8 @@ func TestOpenAPIRouteMiddlewareMetadataMatchesRouter(t *testing.T) {
 		"/web/execution-targets/{id}/ping":                    "web",
 		"/web/projects":                                       "web",
 		"/web/projects/{id}":                                  "web",
+		"/web/projects/{id}/threads":                          "web",
+		"/web/projects/{id}/threads/{threadId}/messages":      "web",
 		"/web/audit-events":                                   "web",
 		"/web/relay/commands":                                 "web",
 		"/web/relay/commands/{id}":                            "web",

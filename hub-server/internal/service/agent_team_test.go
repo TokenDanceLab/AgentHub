@@ -2091,6 +2091,7 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			type TEXT NOT NULL,
 			name TEXT DEFAULT '',
 			owner_user_id TEXT,
+			workspace_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
 			last_message_at DATETIME,
 			dissolved BOOLEAN NOT NULL DEFAULT FALSE,
