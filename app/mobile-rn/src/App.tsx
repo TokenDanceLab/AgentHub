@@ -293,15 +293,17 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
       />
     ),
   } satisfies Record<MobileTab, React.ReactNode>;
+  const useInlineTabRail = useSplitPane && (activeTab === 'chat' || activeTab === 'thread');
 
   return (
     <>
       <StatusBar style={tokens.scheme === 'light' ? 'dark' : 'light'} />
       <AppShell
         activeTab={useSplitPane && activeTab === 'thread' ? 'chat' : activeTab}
-        hideTabs={(useSplitPane && (activeTab === 'chat' || activeTab === 'thread')) || (!useSplitPane && (activeTab === 'thread' || activeTab === 'account'))}
+        hideTabs={!useSplitPane && (activeTab === 'thread' || activeTab === 'account')}
         onChangeTab={setActiveTab}
         pendingReviews={counters.pendingReviews}
+        tabRailPlacement={useInlineTabRail ? 'inlinePane' : 'bottom'}
         unreadThreads={counters.unreadThreads}
       >
         {content[activeTab]}

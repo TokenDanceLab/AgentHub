@@ -541,6 +541,30 @@ const scenes = [
     actions: [],
   },
   {
+    name: 'phone-composer-actions-reduced-motion-en-light-390x844',
+    locale: 'en-US',
+    reducedMotion: true,
+    forbidCssMotion: true,
+    viewport: { width: 390, height: 844 },
+    path: '/',
+    search: '?tab=chat',
+    readyTextPatterns: ['AgentHub Mobile Workbench'],
+    expectedTexts: [
+      'Composer actions',
+      'Evidence',
+      'Review mode',
+      'Agent picker',
+      'Format',
+      'Attach changed files, screenshots, or browser preview evidence to the message.',
+    ],
+    forbiddenTexts: ['Emoji', 'Voice input', 'Attach image', 'Text format'],
+    expectTabsHidden: true,
+    actions: [
+      { text: 'AgentHub Mobile Workbench' },
+      { role: 'button', namePattern: '^More actions$' },
+    ],
+  },
+  {
     name: 'phone-keyboard-send-pending-en-light-390x560',
     locale: 'en-US',
     viewport: { width: 390, height: 560 },
@@ -552,6 +576,34 @@ const scenes = [
     expectTabsHidden: true,
     expectedLightSurfaceMinLuminance: minimumLightSurfaceLuminance,
     actions: [],
+  },
+  {
+    name: 'tablet-composer-actions-split-reduced-motion-en-light-1024x768',
+    locale: 'en-US',
+    reducedMotion: true,
+    forbidCssMotion: true,
+    viewport: { width: 1024, height: 768 },
+    path: '/',
+    search: '?tab=chat&thread=mobile-design&run=run-mobile-design',
+    readyTextPatterns: ['AgentHub Mobile Workbench', 'Run inspector'],
+    expectedTexts: [
+      'AgentHub Mobile Workbench',
+      'Run inspector',
+      'Composer actions',
+      'Evidence',
+      'Review mode',
+      'Agent picker',
+      'Format',
+    ],
+    forbiddenTexts: ['Back to messages', 'Emoji', 'Voice input', 'Attach image', 'Text format'],
+    expectedPaneTestIds: [
+      'tablet-thread-list-pane',
+      'tablet-thread-transcript-pane',
+      'tablet-thread-inspector-pane',
+    ],
+    expectedTabCount: 5,
+    expectedBottomTabLabels: ['Chats', 'Docs', 'Tasks', 'Projects', 'More'],
+    actions: [{ role: 'button', namePattern: '^More actions$' }],
   },
   {
     name: 'phone-keyboard-send-error-zh-light-390x560',
@@ -886,6 +938,22 @@ async function probePage(page) {
     };
 
     const normalizeText = (text) => text.replace(/\s+/g, ' ').trim();
+    const maxDurationMs = (value) => Math.max(
+      0,
+      ...value.split(',').map((part) => {
+        const duration = part.trim();
+        if (!duration) {
+          return 0;
+        }
+        if (duration.endsWith('ms')) {
+          return Number.parseFloat(duration);
+        }
+        if (duration.endsWith('s')) {
+          return Number.parseFloat(duration) * 1000;
+        }
+        return 0;
+      }).filter(Number.isFinite),
+    );
     const parseCssRgb = (color) => {
       const match = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)$/);
       if (!match) {
@@ -917,6 +985,7 @@ async function probePage(page) {
     const visibleTextBlocks = [];
     const smallTextBlocks = [];
     const backgroundSamples = [];
+    const motionStyleSamples = [];
     const accessibleTexts = [];
     const visibleElements = Array.from(document.body.querySelectorAll('*')).filter(isVisibleElement);
     for (const element of visibleElements) {
@@ -930,6 +999,17 @@ async function probePage(page) {
       }
       if (!rgb) {
         continue;
+      }
+
+      const transitionMs = maxDurationMs(style.transitionDuration);
+      const animationMs = maxDurationMs(style.animationDuration);
+      if ((transitionMs > 0 || animationMs > 0) && motionStyleSamples.length < 8) {
+        motionStyleSamples.push({
+          tag: element.tagName.toLowerCase(),
+          testId: element.getAttribute('data-testid') ?? null,
+          transitionDuration: style.transitionDuration,
+          animationDuration: style.animationDuration,
+        });
       }
 
       const rect = element.getBoundingClientRect();
@@ -1040,6 +1120,8 @@ async function probePage(page) {
       visibleTextBlocks,
       accessibleTexts,
       searchableText,
+      reduceMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      motionStyleSamples,
       significantBackgroundSamples,
       darkestSignificantBackground: significantBackgroundSamples[0] ?? null,
     };
@@ -1072,7 +1154,10 @@ async function run() {
 
   try {
     for (const scene of scenes) {
-      const context = await browser.newContext({ locale: scene.locale ?? 'en-US' });
+      const context = await browser.newContext({
+        locale: scene.locale ?? 'en-US',
+        reducedMotion: scene.reducedMotion ? 'reduce' : 'no-preference',
+      });
       const page = await openScene(context, scene, (scenePage) => {
         scenePage.on('console', (message) => {
         if (message.type() === 'error') {
@@ -1105,6 +1190,12 @@ async function run() {
     }
     if (result.locale && result.probe.locale !== result.locale) {
       failures.push(`${result.name}: expected locale ${result.locale}, got ${result.probe.locale}`);
+    }
+    if (result.reducedMotion && !result.probe.reduceMotion) {
+      failures.push(`${result.name}: expected prefers-reduced-motion: reduce`);
+    }
+    if (result.forbidCssMotion && result.probe.motionStyleSamples.length > 0) {
+      failures.push(`${result.name}: CSS transition/animation remains active under reduced motion: ${JSON.stringify(result.probe.motionStyleSamples)}`);
     }
     if (result.expectTabsHidden && result.probe.bottomTabCount !== 0) {
       failures.push(`${result.name}: bottom tabs should be hidden, found ${result.probe.bottomTabCount}`);
@@ -1233,6 +1324,8 @@ async function run() {
       bottomTabCount: result.probe.bottomTabCount,
       bottomTabRects: result.probe.bottomTabRects,
       paneRects: result.probe.paneRects,
+      reduceMotion: result.probe.reduceMotion,
+      motionStyleSamples: result.probe.motionStyleSamples,
       smallTextBlocks: result.probe.smallTextBlocks,
       horizontalOverflow: result.probe.horizontalOverflow,
       darkestSignificantBackground: result.probe.darkestSignificantBackground,

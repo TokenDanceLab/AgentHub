@@ -5,6 +5,13 @@ import { useStrings } from '@/i18n/strings';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileTab } from '@/types';
 
+import {
+  buildTabAccessibilityLabel,
+  formatTabBadgeCount,
+  getTabBadgeCount,
+  isTabSelected,
+} from './navigationLayout';
+
 interface TabItem {
   activeValues?: MobileTab[];
   icon: AgentHubIconName;
@@ -50,35 +57,48 @@ export function BottomTabs({
       }}
     >
       {tabs.map((tab) => {
-        const selected = tab.value === activeTab || tab.activeValues?.includes(activeTab) === true;
-        const badgeCount =
-          tab.value === 'chat' ? unreadThreads : tab.value === 'tasks' ? pendingReviews : 0;
+        const selected = isTabSelected(activeTab, tab.value, tab.activeValues);
+        const badgeCount = getTabBadgeCount(tab.value, { pendingReviews, unreadThreads });
 
         return (
           <Pressable
+            accessibilityLabel={buildTabAccessibilityLabel({
+              badgeCount,
+              label: tab.label,
+              selected,
+              value: tab.value,
+            })}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            accessibilityLabel={tab.label}
-            hitSlop={4}
+            hitSlop={{ top: 6, right: 3, bottom: 6, left: 3 }}
             key={tab.value}
             onPress={() => onChange(tab.value)}
             style={({ pressed }) => ({
-              minHeight: 54,
+              minHeight: 56,
               flex: 1,
               alignItems: 'center',
               justifyContent: 'center',
               gap: 2,
               borderRadius: tokens.radius.control,
-              backgroundColor: pressed ? tokens.color.tint : 'transparent',
-              opacity: pressed ? 0.82 : 1,
+              borderWidth: 1,
+              borderColor: selected ? tokens.color.focus : 'transparent',
+              backgroundColor: selected
+                ? tokens.color.surfaceStrong
+                : pressed
+                  ? tokens.color.tint
+                  : 'transparent',
+              opacity: pressed ? 0.88 : 1,
+              paddingHorizontal: 2,
             })}
           >
             <View
               style={{
-                width: 34,
-                height: 24,
+                width: 42,
+                height: 26,
                 alignItems: 'center',
                 justifyContent: 'center',
+                borderRadius: 13,
+                backgroundColor: selected ? tokens.color.accentSoft : 'transparent',
               }}
             >
               <AgentHubIcon
@@ -90,6 +110,14 @@ export function BottomTabs({
                 <TabUnreadBadge count={badgeCount} />
               ) : null}
             </View>
+            <View
+              style={{
+                width: selected ? 18 : 4,
+                height: 2,
+                borderRadius: 1,
+                backgroundColor: selected ? tokens.color.accent : 'transparent',
+              }}
+            />
             <Text
               numberOfLines={1}
               style={{
@@ -109,10 +137,12 @@ export function BottomTabs({
 
 function TabUnreadBadge({ count }: { count: number }): React.ReactElement {
   const { tokens } = useAgentHubTheme();
-  const label = count > 99 ? '99+' : String(count);
+  const label = formatTabBadgeCount(count);
 
   return (
     <View
+      accessibilityElementsHidden
+      importantForAccessibility="no"
       style={{
         position: 'absolute',
         top: -4,

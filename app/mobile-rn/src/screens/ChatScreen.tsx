@@ -8,6 +8,8 @@ import { useStrings } from '@/i18n/strings';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileAppFixture, MobileRun, MobileThread } from '@/types';
 
+type ChatDisplayName = 'Delicious233' | 'TokenDance' | 'AgentHub';
+
 interface ChatScreenProps {
   fixture: MobileAppFixture;
   selectedThreadId: string;
@@ -15,32 +17,68 @@ interface ChatScreenProps {
   onBack: () => void;
   onOpenRuns: () => void;
 }
+
+function formatChatCopy(value: string): string {
+  return value
+    .replace(/\bweb\s*socket\b/gi, 'live sync')
+    .replace(/\bwebsocket\b/gi, 'live sync')
+    .replace(/\breconnecting\b/gi, 'recovering sync')
+    .replace(/\breconnect(ed|s)?\b/gi, 'recover$1')
+    .replace(/\bsocket\b/gi, 'sync channel');
+}
+
+function formatChatDisplayName(name: string | undefined, role?: string): ChatDisplayName {
+  const normalized = name?.trim().toLowerCase() ?? '';
+
+  if (normalized.includes('delicious') || role === 'human') {
+    return 'Delicious233';
+  }
+  if (normalized.includes('tokendance')) {
+    return 'TokenDance';
+  }
+
+  return 'AgentHub';
+}
+
+function getDisplayInitials(name: ChatDisplayName): string {
+  if (name === 'Delicious233') {
+    return 'D';
+  }
+  if (name === 'TokenDance') {
+    return 'TD';
+  }
+
+  return 'AH';
+}
+
 function getBlockTitle(block: TranscriptBlock): string {
   switch (block.kind) {
     case 'text':
-      return block.displayTitle ?? block.author.name;
+      return formatChatCopy(
+        block.displayTitle ?? formatChatDisplayName(block.author.name, block.author.role)
+      );
     case 'approval':
     case 'artifact':
     case 'diff':
     case 'run_session':
-      return block.title;
+      return formatChatCopy(block.title);
     case 'tool_call':
-      return block.toolName;
+      return formatChatCopy(block.toolName);
     case 'run_step_group':
-      return block.title;
+      return formatChatCopy(block.title);
     case 'thinking':
       return 'Thinking';
     case 'subagent':
     case 'child_agent':
-      return block.title;
+      return formatChatCopy(block.title);
     case 'route_decision':
-      return block.action;
+      return formatChatCopy(block.action);
     case 'context_usage':
-      return block.modelLabel ?? 'Context usage';
+      return block.modelLabel ? formatChatCopy(block.modelLabel) : 'Context usage';
     case 'result':
       return block.success ? 'Result completed' : 'Result failed';
     case 'agent_timeline':
-      return block.title ?? 'Agent timeline';
+      return block.title ? formatChatCopy(block.title) : 'Agent timeline';
     default:
       return 'Transcript block';
   }
@@ -50,7 +88,9 @@ function formatApprovalDetail(
   block: Extract<TranscriptBlock, { kind: 'approval' }>,
   t: ReturnType<typeof useStrings>
 ): string {
-  return [formatEvidenceStatusLabel(block.status, t), block.reason].filter(Boolean).join('\n');
+  return [formatEvidenceStatusLabel(block.status, t), block.reason ? formatChatCopy(block.reason) : undefined]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function formatDiffDetail(block: Extract<TranscriptBlock, { kind: 'diff' }>): string {
@@ -69,7 +109,7 @@ function formatRunSessionDetail(
   block: Extract<TranscriptBlock, { kind: 'run_session' }>,
   t: ReturnType<typeof useStrings>
 ): string {
-  return [block.status ? formatEvidenceStatusLabel(block.status, t) : undefined, block.meta]
+  return [block.status ? formatEvidenceStatusLabel(block.status, t) : undefined, block.meta ? formatChatCopy(block.meta) : undefined]
     .filter(Boolean)
     .join('\n');
 }
@@ -77,13 +117,13 @@ function formatRunSessionDetail(
 function getBlockDetail(block: TranscriptBlock, t: ReturnType<typeof useStrings>): string {
   switch (block.kind) {
     case 'text':
-      return block.text;
+      return formatChatCopy(block.text);
     case 'approval':
       return formatApprovalDetail(block, t);
     case 'diff':
       return formatDiffDetail(block);
     case 'tool_call':
-      return block.summary ?? formatEvidenceStatusLabel(block.status, t);
+      return block.summary ? formatChatCopy(block.summary) : formatEvidenceStatusLabel(block.status, t);
     case 'run_session':
       return formatRunSessionDetail(block, t);
     default:
@@ -430,15 +470,19 @@ function PinnedCard({
           }}
         >
           <Pressable
+            accessibilityLabel={formatChatCopy(activeRun?.title ?? thread?.subtitle ?? t.pinnedWorkflow)}
             accessibilityRole="button"
             onPress={onOpenRuns}
-            style={{
+            style={({ pressed }) => ({
               flex: 1,
               minHeight: 44,
               flexDirection: 'row',
               alignItems: 'center',
               gap: tokens.space.sm,
-            }}
+              borderRadius: 8,
+              backgroundColor: pressed ? tokens.color.tint : 'transparent',
+              paddingRight: tokens.space.xs,
+            })}
           >
             <View
               style={{
@@ -457,17 +501,18 @@ function PinnedCard({
                 numberOfLines={1}
                 style={{ color: tokens.color.ink, ...tokens.type.role.meta, fontWeight: tokens.type.weight.medium }}
               >
-                {activeRun?.title ?? thread?.subtitle ?? t.pinnedWorkflow}
+                {formatChatCopy(activeRun?.title ?? thread?.subtitle ?? t.pinnedWorkflow)}
               </Text>
               <Text
                 numberOfLines={1}
                 style={{ color: tokens.color.inkMuted, ...tokens.type.role.caption }}
               >
                 {activeRun
-                  ? `${t.pinnedBy} Delicious233 · ${activeRun.updatedAt}`
+                  ? `${t.pinnedBy} Delicious233 · ${formatChatCopy(activeRun.updatedAt)}`
                   : `${t.pinnedBy} AgentHub`}
               </Text>
             </View>
+            <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={15} />
           </Pressable>
           {activeRun ? (
             <Pressable
@@ -481,7 +526,9 @@ function PinnedCard({
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: 22,
-                backgroundColor: pressed ? tokens.color.tint : 'transparent',
+                borderWidth: pressed ? 1 : 0,
+                borderColor: tokens.color.accentSoft,
+                backgroundColor: pressed ? tokens.color.accentSoft : 'transparent',
               })}
             >
               <AgentHubIcon color={tokens.color.accent} name="file" size={18} />
@@ -537,14 +584,14 @@ function RunEvidenceSheet({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.sm }}>
               <StatusPill status={runStatusToPill(run.status)} />
               <Text style={{ color: tokens.color.inkSubtle, fontSize: tokens.type.xs, lineHeight: tokens.type.lineHeight.xs }}>
-                {run.updatedAt}
+                {formatChatCopy(run.updatedAt)}
               </Text>
             </View>
             <Text style={{ color: tokens.color.ink, fontSize: tokens.type.base, fontWeight: tokens.type.weight.medium, lineHeight: tokens.type.lineHeight.base }}>
-              {run.title}
+              {formatChatCopy(run.title)}
             </Text>
             <Text style={{ color: tokens.color.inkMuted, fontSize: tokens.type.sm, lineHeight: tokens.type.lineHeight.sm }}>
-              {run.summary}
+              {formatChatCopy(run.summary)}
             </Text>
           </View>
           <View style={{ gap: tokens.space.xs }}>
@@ -580,7 +627,7 @@ function RunEvidenceSheet({
               {t.browserPreview}
             </Text>
             <Text style={{ color: tokens.color.inkMuted, fontSize: tokens.type.sm, lineHeight: tokens.type.lineHeight.sm }}>
-              {preview?.description ?? t.browserPreviewDescription}
+              {formatChatCopy(preview?.description ?? t.browserPreviewDescription)}
             </Text>
             <Badge label={formatBrowserPreviewStatus(preview?.status, t)} tone={browserPreviewTone(preview?.status)} />
           </View>
@@ -650,13 +697,10 @@ function MessageBlock({
     block.kind === 'approval' ||
     block.kind === 'run_session' ||
     block.kind === 'tool_call';
-  const isHuman = block.author.role === 'human';
+  const displayName = formatChatDisplayName(block.author.name, block.author.role);
+  const isHuman = block.author.role === 'human' || displayName === 'Delicious233';
   const isText = block.kind === 'text';
-  const avatar = block.author.name === 'Delicious233'
-    ? 'D'
-    : block.author.name === 'AgentHub'
-      ? 'AH'
-      : block.author.name.slice(0, 1).toUpperCase();
+  const avatar = getDisplayInitials(displayName);
   const reviewIcon =
     block.kind === 'diff'
       ? 'diff'
@@ -693,7 +737,7 @@ function MessageBlock({
           opacity: showAvatar ? 1 : 0,
         }}
       >
-        {!isHuman && block.author.name === 'AgentHub' ? (
+        {!isHuman && displayName === 'AgentHub' ? (
           <AgentHubIcon color={isReview ? tokens.color.warning : tokens.color.accent} name={isReview ? reviewIcon : 'agent'} size={18} />
         ) : (
           <Text
@@ -707,13 +751,19 @@ function MessageBlock({
           </Text>
         )}
       </View>
-      <View
-        style={{
+      <Pressable
+        accessibilityLabel={isReview ? getBlockTitle(block) : undefined}
+        accessibilityRole={isReview ? 'button' : undefined}
+        disabled={!isReview}
+        onPress={isReview ? () => undefined : undefined}
+        style={({ pressed }) => ({
           maxWidth: isReview ? '84%' : '78%',
           borderRadius: isReview ? 10 : 10,
           borderWidth: isReview ? 0.5 : 0,
-          borderColor: tokens.color.line,
-          backgroundColor: isHuman
+          borderColor: pressed && isReview ? tokens.color.accentSoft : tokens.color.line,
+          backgroundColor: pressed && isReview
+            ? tokens.color.tint
+            : isHuman
             ? tokens.color.accentSoft
             : isReview
               ? tokens.color.surfaceStrong
@@ -721,7 +771,8 @@ function MessageBlock({
           paddingHorizontal: isReview ? 11 : 10,
           paddingVertical: isReview ? 8 : 7,
           gap: isReview ? tokens.space.xs : 2,
-        }}
+          opacity: pressed && isReview ? 0.92 : 1,
+        })}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.xs }}>
           {isReview ? (
@@ -740,7 +791,12 @@ function MessageBlock({
             {getBlockTitle(block)}
           </Text>
           {block.createdAt ? (
-            <Text style={{ color: tokens.color.inkSubtle, fontSize: 11 }}>{block.createdAt}</Text>
+            <Text style={{ color: tokens.color.inkSubtle, fontSize: 11 }}>
+              {formatChatCopy(block.createdAt)}
+            </Text>
+          ) : null}
+          {isReview ? (
+            <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={14} />
           ) : null}
         </View>
         {isReview ? (
@@ -758,7 +814,7 @@ function MessageBlock({
             {getBlockDetail(block, t)}
           </Text>
         ) : null}
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -773,11 +829,11 @@ function EvidenceBlockContent({ block }: { block: TranscriptBlock }): React.Reac
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space.xs }}>
           <Badge label={formatEvidenceStatusLabel(block.status, t)} size="micro" tone={getEvidenceStatusTone(block.status)} />
           {block.risk ? <Badge label={formatApprovalRiskLabel(block.risk, t)} size="micro" tone={getApprovalTone(block.risk)} /> : null}
-          {block.toolName ? <Badge label={block.toolName} size="micro" /> : null}
+          {block.toolName ? <Badge label={formatChatCopy(block.toolName)} size="micro" /> : null}
         </View>
         {block.reason ? (
           <Text style={{ color: tokens.color.ink, fontSize: tokens.type.sm, lineHeight: tokens.type.lineHeight.sm }}>
-            {block.reason}
+            {formatChatCopy(block.reason)}
           </Text>
         ) : null}
       </View>
@@ -819,7 +875,7 @@ function EvidenceBlockContent({ block }: { block: TranscriptBlock }): React.Reac
         </View>
         {block.summary ? (
           <Text style={{ color: tokens.color.ink, fontSize: tokens.type.sm, lineHeight: tokens.type.lineHeight.sm }}>
-            {block.summary}
+            {formatChatCopy(block.summary)}
           </Text>
         ) : null}
       </View>
@@ -835,7 +891,7 @@ function EvidenceBlockContent({ block }: { block: TranscriptBlock }): React.Reac
         </View>
         {block.meta ? (
           <Text style={{ color: tokens.color.ink, fontSize: tokens.type.sm, lineHeight: tokens.type.lineHeight.sm }}>
-            {block.meta}
+            {formatChatCopy(block.meta)}
           </Text>
         ) : null}
       </View>
@@ -859,108 +915,171 @@ function Composer({
   const { tokens } = useAgentHubTheme();
   const t = useStrings();
   const [draft, setDraft] = useState('');
+  const [actionsVisible, setActionsVisible] = useState(false);
   const canSend = draft.trim().length > 0;
+  const deliveryTone = deliveryState === 'failed' ? 'danger' : 'accent';
+  const actions = [
+    { icon: 'file' as const, title: t.evidenceAttachment, subtitle: t.composerEvidenceDescription },
+    { icon: 'approval' as const, title: t.composerReviewMode, subtitle: t.composerReviewDescription },
+    { icon: 'agent' as const, title: t.agentPicker, subtitle: t.composerAgentDescription },
+    { icon: 'settings' as const, title: t.composerFormat, subtitle: t.composerFormatDescription },
+  ];
 
   return (
-    <View
-      style={{
-        borderTopWidth: 0.5,
-        borderTopColor: tokens.color.line,
-        backgroundColor: tokens.color.panel,
-        paddingHorizontal: tokens.space.sm,
-        paddingTop: 7,
-        paddingBottom: 8,
-      }}
-    >
+    <>
       <View
         style={{
-          minHeight: 48,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens.space.xs,
+          borderTopWidth: 0.5,
+          borderTopColor: tokens.color.line,
+          backgroundColor: tokens.color.panel,
+          paddingHorizontal: tokens.space.sm,
+          paddingTop: 7,
+          paddingBottom: 8,
         }}
       >
-        <Pressable
-          accessibilityLabel={t.moreActions}
-          accessibilityRole="button"
-          style={({ pressed }) => ({
-            width: 44,
-            height: 44,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 22,
-            backgroundColor: pressed ? tokens.color.tint : 'transparent',
-          })}
-        >
-          <AgentHubIcon color={tokens.color.inkMuted} name="plusCircle" size={22} />
-        </Pressable>
         <View
           style={{
-            minHeight: 44,
-            flex: 1,
-            justifyContent: 'center',
-            borderRadius: 18,
-            backgroundColor: tokens.color.surfaceStrong,
-            paddingHorizontal: 13,
-          }}
-        >
-        <TextInput
-          multiline
-          placeholder={sendTo}
-          placeholderTextColor={tokens.color.inkSubtle}
-          value={draft}
-          onChangeText={setDraft}
-          style={{
-            maxHeight: 108,
-            color: tokens.color.ink,
-            ...tokens.type.role.composer,
-            minHeight: 40,
-            textAlignVertical: 'center',
-          }}
-        />
-        </View>
-        <Pressable
-          accessibilityLabel={t.sendMessage}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canSend }}
-          disabled={!canSend}
-          onPress={() => setDraft('')}
-          style={{
-            width: 44,
-            height: 44,
+            minHeight: 48,
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 22,
-            backgroundColor: canSend ? tokens.color.accent : 'transparent',
-            opacity: canSend ? 1 : 0.45,
+            gap: tokens.space.xs,
           }}
         >
-          <AgentHubIcon color={canSend ? tokens.color.onAccent : tokens.color.inkMuted} name="send" size={22} />
-        </Pressable>
-      </View>
-      {deliveryState !== 'idle' ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.xs, paddingHorizontal: tokens.space.md, paddingTop: 4 }}>
+          <Pressable
+            accessibilityLabel={t.moreActions}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: actionsVisible }}
+            onPress={() => setActionsVisible((visible) => !visible)}
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 22,
+              borderWidth: actionsVisible ? 1 : 0,
+              borderColor: tokens.color.accentSoft,
+              backgroundColor: pressed || actionsVisible ? tokens.color.accentSoft : 'transparent',
+              opacity: pressed ? 0.9 : 1,
+            })}
+          >
+            <AgentHubIcon color={actionsVisible ? tokens.color.accent : tokens.color.inkMuted} name="plusCircle" size={22} />
+          </Pressable>
           <View
             style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: deliveryState === 'sending' ? tokens.color.accent : tokens.color.danger,
-            }}
-          />
-          <Text
-            numberOfLines={1}
-            style={{
+              minHeight: 44,
               flex: 1,
-              color: deliveryState === 'sending' ? tokens.color.inkMuted : tokens.color.danger,
-              ...tokens.type.role.caption,
-              fontWeight: tokens.type.weight.medium,
+              justifyContent: 'center',
+              borderRadius: 18,
+              backgroundColor: tokens.color.surfaceStrong,
+              paddingHorizontal: 13,
             }}
           >
-            {deliveryState === 'sending' ? t.sendPendingMessage : t.sendFailedMessage}
-          </Text>
+          <TextInput
+            multiline
+            placeholder={sendTo}
+            placeholderTextColor={tokens.color.inkSubtle}
+            value={draft}
+            onChangeText={setDraft}
+            style={{
+              maxHeight: 108,
+              color: tokens.color.ink,
+              ...tokens.type.role.composer,
+              minHeight: 40,
+              textAlignVertical: 'center',
+            }}
+          />
+          </View>
+          <Pressable
+            accessibilityLabel={t.sendMessage}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSend }}
+            disabled={!canSend}
+            onPress={() => setDraft('')}
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 22,
+              backgroundColor: canSend ? tokens.color.accent : 'transparent',
+              opacity: canSend ? (pressed ? 0.86 : 1) : 0.45,
+            })}
+          >
+            <AgentHubIcon color={canSend ? tokens.color.onAccent : tokens.color.inkMuted} name="send" size={22} />
+          </Pressable>
         </View>
-      ) : null}
-    </View>
+        {deliveryState !== 'idle' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.xs, paddingHorizontal: tokens.space.md, paddingTop: 4 }}>
+            <Badge
+              label={deliveryState === 'sending' ? t.runningStatus : t.failed}
+              size="micro"
+              tone={deliveryTone}
+            />
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                color: deliveryState === 'sending' ? tokens.color.inkMuted : tokens.color.danger,
+                ...tokens.type.role.caption,
+                fontWeight: tokens.type.weight.medium,
+              }}
+            >
+              {deliveryState === 'sending' ? t.sendPendingMessage : t.sendFailedMessage}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <BottomSheet
+        title={t.composerActionsTitle}
+        visible={actionsVisible}
+        onClose={() => setActionsVisible(false)}
+        primaryAction={{ label: t.close, onPress: () => setActionsVisible(false) }}
+      >
+        <View style={{ gap: tokens.space.xs }}>
+          {actions.map((action) => (
+            <Pressable
+              accessibilityRole="button"
+              key={action.title}
+              onPress={() => setActionsVisible(false)}
+              style={({ pressed }) => ({
+                minHeight: 58,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: tokens.space.sm,
+                borderWidth: 1,
+                borderColor: pressed ? tokens.color.accentSoft : tokens.color.line,
+                borderRadius: tokens.radius.panel,
+                backgroundColor: pressed ? tokens.color.tint : tokens.color.surfaceStrong,
+                paddingHorizontal: tokens.space.md,
+                paddingVertical: tokens.space.sm,
+                opacity: pressed ? 0.94 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 16,
+                  backgroundColor: tokens.color.accentSoft,
+                }}
+              >
+                <AgentHubIcon color={tokens.color.accent} name={action.icon} size={18} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ color: tokens.color.ink, ...tokens.type.role.rowTitle }}>
+                  {action.title}
+                </Text>
+                <Text numberOfLines={2} style={{ color: tokens.color.inkMuted, ...tokens.type.role.meta }}>
+                  {action.subtitle}
+                </Text>
+              </View>
+              <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={16} />
+            </Pressable>
+          ))}
+        </View>
+      </BottomSheet>
+    </>
   );
 }
