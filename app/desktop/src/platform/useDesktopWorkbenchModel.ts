@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from 'react';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   getWorkbenchDataModeOverrideSnapshot,
+  isWorkbenchFixtureDataMode,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
   workbenchDemoRuntimeStore,
@@ -30,7 +31,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     getWorkbenchDataModeOverrideSnapshot,
   );
   const dataMode = getWorkbenchDataMode(dataModeOverride);
-  const useDemo = dataMode === 'demo' || (dataMode === 'auto' && isBrowserPreview());
+  const useDemo = isWorkbenchFixtureDataMode(dataMode) || (dataMode === 'auto' && isBrowserPreview());
   const demoSnapshot = useSyncExternalStore(
     workbenchDemoRuntimeStore.subscribe,
     workbenchDemoRuntimeStore.getSnapshot,
