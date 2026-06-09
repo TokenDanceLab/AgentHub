@@ -33,8 +33,8 @@ Desktop target，由 Desktop 启动 Local Edge，再由 Edge 调用 CLI/SDK adap
 fixture、observed 或 no-spend readiness 证据。
 
 P0 远控认证与拓扑前置链路：`Web -> Hub -> 已注册 Desktop/Edge -> Local Edge -> CLI/SDK adapter`。
-真实 TokenDanceID/OIDC 登录和真实 CLI/model 执行仍是显式审批门。
-真实 TokenDanceID 登录需要先具备：已批准的 OAuth client、一次性或预批准测试账号、明确的 Hub/Web/Desktop
+真实 TokenDanceID/OIDC 登录和真实 CLI/model 执行仍是显式审批门（approval gate）。
+真实 TokenDanceID 登录需要先具备：已批准的 OAuth client、一次性或预批准测试账号（test account）、明确的 Hub/Web/Desktop
 测试环境、浏览器证据边界，以及 callback、session、target inventory、`/client/auth/me` 的脱敏证明；
 token、密码、client secret、cookie、authorization 值不得进入文档、日志、截图、commit 或报告。
 
