@@ -27,7 +27,21 @@
   },
   "cli": {
     "command_path": "operator-owned-codex-path",
-    "command_plan": "codex exec --json with approved fixture prompt; do not execute in this gate"
+    "command_plan": "codex exec --json with approved fixture prompt; do not execute in this gate",
+    "no_secret_runner": "operator-owned runner command; env values stay in secret store"
+  },
+  "readiness_claims": {
+    "mock_adapter_used": false,
+    "real_cli_tested": false,
+    "real_model_tested": false,
+    "tokendance_id_login": false,
+    "real_cli_tested_reason": "preflight manifest only; no CLI process executed by this gate",
+    "real_model_tested_reason": "preflight manifest only; no model API call executed by this gate",
+    "tokendance_id_login_reason": "preflight manifest only; TokenDanceID login is not attempted by this gate"
+  },
+  "recording_evidence": {
+    "path": ".tmp/approved-real-preflight/AH-APPROVED-REAL-PREFLIGHT-20260609-001/redacted-recording-placeholder.json",
+    "status": "not-run in manifest fixture"
   },
   "runtime_readiness": [
     {

@@ -59,11 +59,43 @@ func TestCLIJSONReadinessCommandPlansRedactPromptEnvAndPaths(t *testing.T) {
 	if plan.Observed || plan.RealTested {
 		t.Fatalf("fixture command plan must not claim observed/real tested: %#v", plan)
 	}
+	if plan.MockAdapterUsed || plan.RealCliTested || plan.RealModelTested || plan.TokenDanceIDLogin {
+		t.Fatalf("fixture command plan must split approved-real readiness claims as false: %#v", plan)
+	}
+	if plan.RealCliTestedReason == "" || plan.RealModelTestedReason == "" || plan.TokenDanceIDLoginReason == "" {
+		t.Fatalf("fixture command plan must carry explicit blocked reasons: %#v", plan)
+	}
 	if !containsString(plan.ArgFlags, "--json") || !containsString(plan.ConfigKeys, "model") {
 		t.Fatalf("plan lost safe command-shape evidence: %#v", plan)
 	}
 	if !containsString(plan.EnvNames, "OPENAI_API_KEY") || strings.Contains(payloadJSON, "=") {
 		t.Fatalf("plan should retain env names only, without values: %#v\n%s", plan.EnvNames, payloadJSON)
+	}
+}
+
+func TestCLIJSONReadinessPayloadSplitsRealCliModelAndLoginClaims(t *testing.T) {
+	plan := BuildCLIInvocationPlanFromCommand(
+		NewOpenCodeAdapter("opencode"),
+		RunProcessContext{Prompt: "fixture prompt", AgentID: "opencode", WorkDir: `C:\Users\Ding\private\agenthub`},
+		`C:\tools\opencode.exe`,
+		[]string{"run", "--json"},
+		[]string{"TOKEN_DANCE_API_KEY=secret-value"},
+		`C:\Users\Ding\private\agenthub`,
+	)
+	payload := plan.Payload()
+
+	for _, field := range []string{"mockAdapterUsed", "realCliTested", "realModelTested", "tokenDanceIdLogin"} {
+		if value, ok := payload[field].(bool); !ok || value {
+			t.Fatalf("%s = %#v, want boolean false in no-secret fixture plan: %#v", field, payload[field], payload)
+		}
+	}
+	for _, field := range []string{"realCliTestedReason", "realModelTestedReason", "tokenDanceIdLoginReason"} {
+		if value, ok := payload[field].(string); !ok || strings.TrimSpace(value) == "" {
+			t.Fatalf("%s = %#v, want non-empty blocked reason: %#v", field, payload[field], payload)
+		}
+	}
+	if payload["realTested"] != false {
+		t.Fatalf("legacy realTested compatibility field = %#v, want false", payload["realTested"])
 	}
 }
 
@@ -126,13 +158,7 @@ func TestClaudeStreamJSONReadinessFixtureMapsPermissionDecisionAndStatus(t *test
 		done <- adapter.ParseStream(context.Background(), strings.NewReader(stream), &stdin, emitter, run)
 	}()
 
-	select {
-	case err := <-done:
-		t.Fatalf("Claude fixture returned before permission decision: %v", err)
-	case <-time.After(50 * time.Millisecond):
-	}
-
-	pending, ok := broker.Decide(run.ID, "req_permission_1", PermissionDecision{
+	pending, ok := waitForBrokeredPermissionDecision(t, broker, run.ID, "req_permission_1", PermissionDecision{
 		Behavior:      "deny",
 		Message:       "fixture denied",
 		DecisionClass: "user_rejected",
@@ -262,6 +288,21 @@ func marshalReadinessPayload(t *testing.T, value any) string {
 		t.Fatalf("marshal payload: %v", err)
 	}
 	return string(data)
+}
+
+func waitForBrokeredPermissionDecision(t *testing.T, broker *PermissionDecisionBroker, runID, requestID string, decision PermissionDecision) (PendingPermissionRequest, bool) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		pending, ok := broker.Decide(runID, requestID, decision)
+		if ok {
+			return pending, true
+		}
+		select {
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	return PendingPermissionRequest{}, false
 }
 
 func containsString(values []string, needle string) bool {
