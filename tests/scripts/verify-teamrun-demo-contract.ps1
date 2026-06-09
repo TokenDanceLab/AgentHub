@@ -97,11 +97,13 @@ $scenarioPath = Resolve-RepoPath "docs\competition\teamrun-demo-scenario.json"
 $exporterPath = Resolve-RepoPath "scripts\export-teamrun-demo-fixture-evidence.ps1"
 $packagePath = Resolve-RepoPath "scripts\package-teamrun-demo-evidence.ps1"
 $readinessPath = Resolve-RepoPath "scripts\verify-teamrun-demo-readiness.ps1"
+$redactedManifestVerifierPath = Resolve-RepoPath "scripts\evidence\verify-redacted-manifest.ps1"
 
 Assert-True (Test-Path -LiteralPath $scenarioPath) "TeamRun demo scenario manifest exists"
 Assert-True (Test-Path -LiteralPath $exporterPath) "TeamRun fixture evidence exporter exists"
 Assert-True (Test-Path -LiteralPath $packagePath) "TeamRun evidence package script exists"
 Assert-True (Test-Path -LiteralPath $readinessPath) "TeamRun readiness checker exists"
+Assert-True (Test-Path -LiteralPath $redactedManifestVerifierPath) "redacted evidence manifest checker exists"
 
 if (Test-Path -LiteralPath $scenarioPath) {
     $scenario = Get-Content -Raw -LiteralPath $scenarioPath | ConvertFrom-Json
@@ -213,11 +215,57 @@ if ((Test-Path -LiteralPath $scenarioPath) -and (Test-Path -LiteralPath $exporte
         )
         Assert-True ($packageRun.ExitCode -eq 0) "package script writes fixture rehearsal package" $packageRun.Output
         $packageManifest = Join-Path $packageRoot "teamrun-demo-contract-test-package\manifest.md"
+        $redactedManifest = Join-Path $packageRoot "teamrun-demo-contract-test-package\redacted-manifest.json"
         Assert-True (Test-Path -LiteralPath $packageManifest) "package script writes fixture rehearsal manifest"
+        Assert-True (Test-Path -LiteralPath $redactedManifest) "package script writes redacted manifest"
         if (Test-Path -LiteralPath $packageManifest) {
             $packageManifestText = Get-Content -Raw -LiteralPath $packageManifest
             Assert-True ($packageManifestText -match "Package mode: FixtureRehearsal") "package manifest labels fixture rehearsal mode"
+            Assert-True ($packageManifestText -match "boundary_label: fixture") "package manifest labels fixture boundary"
+            Assert-True ($packageManifestText -match "sha256=") "package manifest includes artifact hashes"
             Assert-True ($packageManifestText -match "submission_ready: False") "package manifest keeps submission_ready false"
+        }
+        if (Test-Path -LiteralPath $redactedManifest) {
+            $redacted = Get-Content -Raw -LiteralPath $redactedManifest | ConvertFrom-Json
+            Assert-True ($redacted.schema -eq "agenthub-redacted-evidence-manifest-v1") "redacted manifest declares schema"
+            Assert-True ($redacted.evidence_boundary.label -eq "fixture") "redacted manifest labels fixture boundary"
+            Assert-True ($redacted.evidence_boundary.fixture -eq $true) "redacted manifest fixture flag is true"
+            Assert-True ($redacted.evidence_boundary.observed -eq $false) "redacted manifest observed flag is false"
+            Assert-True ($redacted.evidence_boundary.real_tested -eq $false) "redacted manifest RealTested flag is false"
+            Assert-True ($redacted.evidence_boundary.approved_real -eq $false) "redacted manifest approved-real flag is false"
+            Assert-True (@($redacted.files).Count -ge 1) "redacted manifest includes hashes for evidence assets"
+            Assert-True (@($redacted.files | Where-Object { $_.path -match '(^|/|\\)\.\.($|/|\\)' -or [System.IO.Path]::IsPathRooted([string]$_.path) }).Count -eq 0) "redacted manifest uses package-relative paths only"
+        }
+        if (Test-Path -LiteralPath $redactedManifestVerifierPath) {
+            $verifyRedactedRun = Invoke-RepoScript @(
+                $redactedManifestVerifierPath,
+                "-ManifestPath", $redactedManifest
+            )
+            Assert-True ($verifyRedactedRun.ExitCode -eq 0) "redacted manifest checker accepts generated package" $verifyRedactedRun.Output
+
+            $badPackageRoot = Join-Path $tmpRoot "bad-redacted-package"
+            New-Item -ItemType Directory -Force -Path $badPackageRoot | Out-Null
+            Copy-Item -LiteralPath $redactedManifest -Destination (Join-Path $badPackageRoot "redacted-manifest.json") -Force
+            $leakPath = Join-Path $badPackageRoot "leak.txt"
+            Set-Content -LiteralPath $leakPath -Value "Authorization: Bearer should-not-ship" -Encoding ASCII
+            $badRedacted = Get-Content -Raw -LiteralPath (Join-Path $badPackageRoot "redacted-manifest.json") | ConvertFrom-Json
+            $badRedacted.files = @(
+                [ordered]@{
+                    path = "leak.txt"
+                    role = "leak"
+                    sha256 = (Get-FileHash -LiteralPath $leakPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    bytes = (Get-Item -LiteralPath $leakPath).Length
+                    redacted = $true
+                }
+            )
+            $badRedacted | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $badPackageRoot "redacted-manifest.json") -Encoding UTF8
+            $badRedactedRun = Invoke-RepoScript @(
+                $redactedManifestVerifierPath,
+                "-PackagePath", $badPackageRoot
+            )
+            Assert-True ($badRedactedRun.ExitCode -ne 0) "redacted manifest checker rejects authorization leakage" $badRedactedRun.Output
+            Assert-True ($badRedactedRun.Output -match "text file has no sensitive values") "redacted checker reports sensitive text without printing the value" $badRedactedRun.Output
+            Assert-True ($badRedactedRun.Output -notmatch "should-not-ship") "redacted checker does not print leaked secret material" $badRedactedRun.Output
         }
 
         $packageSubmissionRun = Invoke-RepoScript @(
