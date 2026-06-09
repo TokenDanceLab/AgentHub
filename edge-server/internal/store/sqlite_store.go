@@ -24,14 +24,16 @@ const sqliteSnapshotKey = "default"
 const sqliteProjectionOwnerID = "agenthub_store_snapshot"
 
 const (
-	sqliteRowKindProject  = "project"
-	sqliteRowKindThread   = "thread"
-	sqliteRowKindRun      = "run"
-	sqliteRowKindItem     = "item"
-	sqliteRowKindPin      = "pin"
-	sqliteRowKindDiff     = "diff"
-	sqliteRowKindArtifact = "artifact"
-	sqliteRowKindPreview  = "preview"
+	sqliteRowKindProject      = "project"
+	sqliteRowKindThread       = "thread"
+	sqliteRowKindRun          = "run"
+	sqliteRowKindItem         = "item"
+	sqliteRowKindPin          = "pin"
+	sqliteRowKindDiff         = "diff"
+	sqliteRowKindArtifact     = "artifact"
+	sqliteRowKindPreview      = "preview"
+	sqliteRowKindUserProfile  = "user_profile"
+	sqliteRowKindAgentProfile = "agent_profile"
 )
 
 type SQLiteStore struct {
@@ -282,6 +284,16 @@ func applySQLiteRow(snapshot *fileSnapshot, kind, id, payload string) error {
 		}
 		snapshot.Previews[id] = value
 		snapshot.PreviewOrder = append(snapshot.PreviewOrder, id)
+		case sqliteRowKindAgentProfile:
+			var value AgentProfile
+			if err := decodeSQLiteRowPayload(payload, &value); err != nil {
+				return fmt.Errorf("decode sqlite agent_profile row %s: %w", id, err)
+			}
+			if snapshot.AgentProfiles == nil {
+				snapshot.AgentProfiles = map[string]AgentProfile{}
+			}
+			snapshot.AgentProfiles[id] = value
+			snapshot.AgentProfileOrder = append(snapshot.AgentProfileOrder, id)
 	default:
 		return fmt.Errorf("unknown sqlite store row kind %s", kind)
 	}
@@ -326,6 +338,9 @@ func replaceSQLiteRows(tx *sql.Tx, snapshot fileSnapshot) error {
 		return err
 	}
 	if err := insertSQLiteRows(tx, sqliteRowKindPreview, snapshot.PreviewOrder, snapshot.Previews, now); err != nil {
+		return err
+	}
+	if err := insertSQLiteRows(tx, sqliteRowKindAgentProfile, snapshot.AgentProfileOrder, snapshot.AgentProfiles, now); err != nil {
 		return err
 	}
 	return nil
@@ -603,8 +618,8 @@ func (s *SQLiteStore) ListProjects() []Project {
 	return s.store.ListProjects()
 }
 
-func (s *SQLiteStore) CreateThread(id, projectID, title string) (Thread, error) {
-	thread, err := s.store.CreateThread(id, projectID, title)
+func (s *SQLiteStore) CreateThread(id, projectID, title, kind string) (Thread, error) {
+	thread, err := s.store.CreateThread(id, projectID, title, kind)
 	return persistAfterSQLiteWrite(s, thread, err)
 }
 
@@ -757,6 +772,19 @@ func (s *SQLiteStore) GetPreview(id string) (Preview, bool) {
 	return s.store.GetPreview(id)
 }
 
+func (s *SQLiteStore) CreateUserProfile(profile UserProfile) (UserProfile, error) {
+	created, err := s.store.CreateUserProfile(profile)
+	return persistAfterSQLiteWrite(s, created, err)
+}
+
+func (s *SQLiteStore) GetUserProfile(id string) (UserProfile, bool) {
+	return s.store.GetUserProfile(id)
+}
+
+func (s *SQLiteStore) ListUserProfiles() []UserProfile {
+	return s.store.ListUserProfiles()
+}
+
 func ensureSQLiteDirectory(path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -770,4 +798,53 @@ func ensureSQLiteDirectory(path string) error {
 		return fmt.Errorf("create sqlite store directory: %s is not a directory", dir)
 	}
 	return nil
+}
+
+// ── AgentProfile delegating methods ──
+
+func (s *SQLiteStore) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
+	created, err := s.store.CreateAgentProfile(profile)
+	return persistAfterSQLiteWrite(s, created, err)
+}
+
+func (s *SQLiteStore) GetAgentProfile(id string) (AgentProfile, bool) {
+	return s.store.GetAgentProfile(id)
+}
+
+func (s *SQLiteStore) ListAgentProfiles(adapterID string) []AgentProfile {
+	return s.store.ListAgentProfiles(adapterID)
+}
+
+func (s *SQLiteStore) UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error) {
+	profile, err := s.store.UpdateAgentProfile(id, patch)
+	if err != nil {
+		return AgentProfile{}, err
+	}
+	if err := s.syncPersist(); err != nil {
+		return AgentProfile{}, err
+	}
+	return profile, nil
+}
+
+func (s *SQLiteStore) DeleteAgentProfile(id string) error {
+	if err := s.store.DeleteAgentProfile(id); err != nil {
+		return err
+	}
+	return s.syncPersist()
+}
+
+func (s *SQLiteStore) GetCurrentUser() (UserProfile, bool) {
+	return s.store.GetCurrentUser()
+}
+
+// ── UserSettings delegating methods ──
+
+func (s *SQLiteStore) GetSettings() UserSettings {
+	return s.store.GetSettings()
+}
+
+func (s *SQLiteStore) UpsertSettings(patch map[string]string) UserSettings {
+	result := s.store.UpsertSettings(patch)
+	_ = s.syncPersist()
+	return result
 }

@@ -23,12 +23,15 @@ type Project struct {
 }
 
 type Thread struct {
-	ID        string `json:"threadId"`
-	ProjectID string `json:"projectId"`
-	Title     string `json:"title"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID          string `json:"threadId"`
+	ProjectID   string `json:"projectId"`
+	Title       string `json:"title"`
+	Kind        string `json:"kind,omitempty"`
+	Status      string `json:"status"`
+	AvatarColor string `json:"avatarColor,omitempty"`
+	AvatarLabel string `json:"avatarLabel,omitempty"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
 }
 
 type Run struct {
@@ -79,16 +82,18 @@ type Preview struct {
 }
 
 type Item struct {
-	ID        string `json:"itemId"`
-	ProjectID string `json:"projectId"`
-	ThreadID  string `json:"threadId"`
-	RunID     string `json:"runId,omitempty"`
-	Type      string `json:"type"`
-	Role      string `json:"role,omitempty"`
-	Status    string `json:"status"`
-	Content   string `json:"content,omitempty"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID         string `json:"itemId"`
+	ProjectID  string `json:"projectId"`
+	ThreadID   string `json:"threadId"`
+	RunID      string `json:"runId,omitempty"`
+	Type       string `json:"type"`
+	Role       string `json:"role,omitempty"`
+	SenderID   string `json:"senderId,omitempty"`
+	SenderName string `json:"senderName,omitempty"`
+	Status     string `json:"status"`
+	Content    string `json:"content,omitempty"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
 }
 
 type ThreadPin struct {
@@ -98,6 +103,40 @@ type ThreadPin struct {
 	PinnedAt  string `json:"pinnedAt"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
+}
+
+type UserProfile struct {
+	ID          string `json:"userId"`
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl,omitempty"`
+	Status      string `json:"status,omitempty"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+type AgentProfile struct {
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description,omitempty"`
+	AdapterID         string   `json:"adapterId"`
+	Model             string   `json:"model,omitempty"`
+	Provider          string   `json:"provider,omitempty"`
+	ReasoningEffort   string   `json:"reasoningEffort,omitempty"`
+	ThinkingMode      string   `json:"thinkingMode,omitempty"`
+	MaxThinkingTokens int      `json:"maxThinkingTokens,omitempty"`
+	PermissionMode    string   `json:"permissionMode,omitempty"`
+	SystemPrompt      string   `json:"systemPrompt,omitempty"`
+	AllowedTools      []string `json:"allowedTools,omitempty"`
+	MCPConfig         string   `json:"mcpConfig,omitempty"`
+	Skills            []string `json:"skills,omitempty"`
+	AvatarRef         string   `json:"avatarRef,omitempty"`
+	CreatedAt         string   `json:"createdAt"`
+	UpdatedAt         string   `json:"updatedAt"`
+}
+
+type UserSettings struct {
+	Values    map[string]string `json:"values"`
+	UpdatedAt string            `json:"updatedAt"`
 }
 
 type RunCleanupOptions struct {
@@ -126,11 +165,17 @@ type Reader interface {
 	ListArtifacts(runID string) []Artifact
 	GetPreview(id string) (Preview, bool)
 	ListPreviews(runID string) []Preview
+	GetUserProfile(id string) (UserProfile, bool)
+	ListUserProfiles() []UserProfile
+	GetCurrentUser() (UserProfile, bool)
+	GetAgentProfile(id string) (AgentProfile, bool)
+	ListAgentProfiles(adapterID string) []AgentProfile
+	GetSettings() UserSettings
 }
 
 type Writer interface {
 	CreateProject(id, name string) (Project, error)
-	CreateThread(id, projectID, title string) (Thread, error)
+	CreateThread(id, projectID, title, kind string) (Thread, error)
 	UpdateThread(id string, title *string, status *string) (Thread, bool)
 	DeleteThread(id string) bool
 	CreateRun(id, projectID, threadID string) (Run, error)
@@ -143,6 +188,11 @@ type Writer interface {
 	UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error)
 	UpsertArtifact(artifact Artifact) (Artifact, error)
 	UpsertPreview(preview Preview) (Preview, error)
+	CreateUserProfile(profile UserProfile) (UserProfile, error)
+	CreateAgentProfile(profile AgentProfile) (AgentProfile, error)
+	UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error)
+	DeleteAgentProfile(id string) error
+	UpsertSettings(patch map[string]string) UserSettings
 }
 
 type Repository interface {
@@ -163,35 +213,44 @@ type RunCleaner interface {
 type Store struct {
 	mu sync.RWMutex
 
-	projects  map[string]Project
-	threads   map[string]Thread
-	runs      map[string]Run
-	items     map[string]Item
-	pins      map[string]ThreadPin
-	diffs     map[string]RunDiffFile
-	artifacts map[string]Artifact
-	previews  map[string]Preview
+	projects       map[string]Project
+	threads        map[string]Thread
+	runs           map[string]Run
+	items          map[string]Item
+	pins           map[string]ThreadPin
+	diffs          map[string]RunDiffFile
+	artifacts      map[string]Artifact
+	previews       map[string]Preview
+	userProfiles   map[string]UserProfile
+	agentProfiles  map[string]AgentProfile
+	settings       map[string]string
+	settingsMtime  string
 
-	projectOrder  []string
-	threadOrder   []string
-	runOrder      []string
-	itemOrder     []string
-	pinOrder      []string
-	diffOrder     []string
-	artifactOrder []string
-	previewOrder  []string
+	projectOrder      []string
+	threadOrder       []string
+	runOrder          []string
+	itemOrder         []string
+	pinOrder          []string
+	diffOrder         []string
+	artifactOrder     []string
+	previewOrder      []string
+	userProfileOrder  []string
+	agentProfileOrder []string
 }
 
 func New() *Store {
 	return &Store{
-		projects:  make(map[string]Project),
-		threads:   make(map[string]Thread),
-		runs:      make(map[string]Run),
-		items:     make(map[string]Item),
-		pins:      make(map[string]ThreadPin),
-		diffs:     make(map[string]RunDiffFile),
-		artifacts: make(map[string]Artifact),
-		previews:  make(map[string]Preview),
+		projects:      make(map[string]Project),
+		threads:       make(map[string]Thread),
+		runs:          make(map[string]Run),
+		items:         make(map[string]Item),
+		pins:          make(map[string]ThreadPin),
+		diffs:         make(map[string]RunDiffFile),
+		artifacts:     make(map[string]Artifact),
+		previews:      make(map[string]Preview),
+		userProfiles:  make(map[string]UserProfile),
+		agentProfiles: make(map[string]AgentProfile),
+		settings:      make(map[string]string),
 	}
 }
 
@@ -200,22 +259,28 @@ func (s *Store) snapshot() fileSnapshot {
 	defer s.mu.RUnlock()
 
 	return fileSnapshot{
-		Projects:      copyMap(s.projects),
-		Threads:       copyMap(s.threads),
-		Runs:          copyMap(s.runs),
-		Items:         copyMap(s.items),
-		Pins:          copyMap(s.pins),
-		Diffs:         copyMap(s.diffs),
-		Artifacts:     cloneArtifactMap(s.artifacts),
-		Previews:      copyMap(s.previews),
-		ProjectOrder:  append([]string(nil), s.projectOrder...),
-		ThreadOrder:   append([]string(nil), s.threadOrder...),
-		RunOrder:      append([]string(nil), s.runOrder...),
-		ItemOrder:     append([]string(nil), s.itemOrder...),
-		PinOrder:      append([]string(nil), s.pinOrder...),
-		DiffOrder:     append([]string(nil), s.diffOrder...),
-		ArtifactOrder: append([]string(nil), s.artifactOrder...),
-		PreviewOrder:  append([]string(nil), s.previewOrder...),
+		Projects:          copyMap(s.projects),
+		Threads:           copyMap(s.threads),
+		Runs:              copyMap(s.runs),
+		Items:             copyMap(s.items),
+		Pins:              copyMap(s.pins),
+		Diffs:             copyMap(s.diffs),
+		Artifacts:         cloneArtifactMap(s.artifacts),
+		Previews:          copyMap(s.previews),
+		UserProfiles:      copyMap(s.userProfiles),
+		AgentProfiles:     copyMap(s.agentProfiles),
+		ProjectOrder:      append([]string(nil), s.projectOrder...),
+		ThreadOrder:       append([]string(nil), s.threadOrder...),
+		RunOrder:          append([]string(nil), s.runOrder...),
+		ItemOrder:         append([]string(nil), s.itemOrder...),
+		PinOrder:          append([]string(nil), s.pinOrder...),
+		DiffOrder:         append([]string(nil), s.diffOrder...),
+		ArtifactOrder:     append([]string(nil), s.artifactOrder...),
+		PreviewOrder:      append([]string(nil), s.previewOrder...),
+		UserProfileOrder:  append([]string(nil), s.userProfileOrder...),
+		AgentProfileOrder: append([]string(nil), s.agentProfileOrder...),
+		Settings:          copyMap(s.settings),
+		SettingsMtime:     s.settingsMtime,
 	}
 }
 
@@ -231,6 +296,8 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.diffs = copyMap(snapshot.Diffs)
 	s.artifacts = cloneArtifactMap(snapshot.Artifacts)
 	s.previews = copyMap(snapshot.Previews)
+	s.userProfiles = copyMap(snapshot.UserProfiles)
+	s.agentProfiles = copyMap(snapshot.AgentProfiles)
 	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
 	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
 	s.runOrder = normalizeOrder(snapshot.RunOrder, s.runs)
@@ -239,6 +306,8 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.diffOrder = normalizeOrder(snapshot.DiffOrder, s.diffs)
 	s.artifactOrder = normalizeOrder(snapshot.ArtifactOrder, s.artifacts)
 	s.previewOrder = normalizeOrder(snapshot.PreviewOrder, s.previews)
+	s.userProfileOrder = normalizeOrder(snapshot.UserProfileOrder, s.userProfiles)
+	s.agentProfileOrder = normalizeOrder(snapshot.AgentProfileOrder, s.agentProfiles)
 }
 
 func copyMap[K comparable, V any](source map[K]V) map[K]V {
@@ -331,7 +400,7 @@ func (s *Store) ListProjects() []Project {
 	return projects
 }
 
-func (s *Store) CreateThread(id, projectID, title string) (Thread, error) {
+func (s *Store) CreateThread(id, projectID, title, kind string) (Thread, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -352,6 +421,7 @@ func (s *Store) CreateThread(id, projectID, title string) (Thread, error) {
 		ID:        id,
 		ProjectID: projectID,
 		Title:     title,
+		Kind:      kind,
 		Status:    "active",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -1197,4 +1267,252 @@ func removeString(values []string, target string) []string {
 		}
 	}
 	return out
+}
+
+// ── UserProfile CRUD ──────────────────────────────────────
+
+func (s *Store) CreateUserProfile(profile UserProfile) (UserProfile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if existing, ok := s.userProfiles[profile.ID]; ok {
+		return existing, nil
+	}
+	now := nowString()
+	profile.CreatedAt = now
+	profile.UpdatedAt = now
+	s.userProfiles[profile.ID] = profile
+	s.userProfileOrder = append(s.userProfileOrder, profile.ID)
+	return profile, nil
+}
+
+func (s *Store) GetUserProfile(id string) (UserProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	profile, ok := s.userProfiles[id]
+	return profile, ok
+}
+
+func (s *Store) ListUserProfiles() []UserProfile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	profiles := make([]UserProfile, 0, len(s.userProfileOrder))
+	for _, id := range s.userProfileOrder {
+		profiles = append(profiles, s.userProfiles[id])
+	}
+	return profiles
+}
+
+// GetCurrentUser returns the first profile marked as status="owner",
+// or the first profile overall, or false if no profiles exist.
+func (s *Store) GetCurrentUser() (UserProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, id := range s.userProfileOrder {
+		if p := s.userProfiles[id]; p.Status == "owner" {
+			return p, true
+		}
+	}
+	if len(s.userProfileOrder) > 0 {
+		return s.userProfiles[s.userProfileOrder[0]], true
+	}
+	return UserProfile{}, false
+}
+
+// ── AgentProfile CRUD ──
+
+func (s *Store) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if profile.ID == "" {
+		return AgentProfile{}, fmt.Errorf("agent profile id is required")
+	}
+	if profile.Name == "" {
+		profile.Name = "Unnamed Agent"
+	}
+	if profile.AdapterID == "" {
+		return AgentProfile{}, fmt.Errorf("agent profile adapterId is required")
+	}
+	if _, exists := s.agentProfiles[profile.ID]; exists {
+		return AgentProfile{}, fmt.Errorf("agent profile %q already exists", profile.ID)
+	}
+	now := nowString()
+	if profile.CreatedAt == "" {
+		profile.CreatedAt = now
+	}
+	profile.UpdatedAt = now
+	s.agentProfiles[profile.ID] = profile
+	s.agentProfileOrder = append(s.agentProfileOrder, profile.ID)
+	return profile, nil
+}
+
+func (s *Store) GetAgentProfile(id string) (AgentProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	profile, ok := s.agentProfiles[id]
+	return profile, ok
+}
+
+func (s *Store) ListAgentProfiles(adapterID string) []AgentProfile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	profiles := make([]AgentProfile, 0, len(s.agentProfileOrder))
+	for _, id := range s.agentProfileOrder {
+		profile := s.agentProfiles[id]
+		if adapterID == "" || profile.AdapterID == adapterID {
+			profiles = append(profiles, profile)
+		}
+	}
+	return profiles
+}
+
+func (s *Store) UpdateAgentProfile(id string, patch map[string]any) (AgentProfile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	profile, ok := s.agentProfiles[id]
+	if !ok {
+		return AgentProfile{}, ErrNotFound
+	}
+	if v, found := patch["name"]; found {
+		if sv, valid := v.(string); valid {
+			profile.Name = sv
+		}
+	}
+	if v, found := patch["description"]; found {
+		if sv, valid := v.(string); valid {
+			profile.Description = sv
+		}
+	}
+	if v, found := patch["adapterId"]; found {
+		if sv, valid := v.(string); valid {
+			profile.AdapterID = sv
+		}
+	}
+	if v, found := patch["model"]; found {
+		if sv, valid := v.(string); valid {
+			profile.Model = sv
+		}
+	}
+	if v, found := patch["provider"]; found {
+		if sv, valid := v.(string); valid {
+			profile.Provider = sv
+		}
+	}
+	if v, found := patch["reasoningEffort"]; found {
+		if sv, valid := v.(string); valid {
+			profile.ReasoningEffort = sv
+		}
+	}
+	if v, found := patch["thinkingMode"]; found {
+		if sv, valid := v.(string); valid {
+			profile.ThinkingMode = sv
+		}
+	}
+	if v, found := patch["maxThinkingTokens"]; found {
+		switch n := v.(type) {
+		case float64:
+			profile.MaxThinkingTokens = int(n)
+		case int:
+			profile.MaxThinkingTokens = n
+		}
+	}
+	if v, found := patch["permissionMode"]; found {
+		if sv, valid := v.(string); valid {
+			profile.PermissionMode = sv
+		}
+	}
+	if v, found := patch["systemPrompt"]; found {
+		if sv, valid := v.(string); valid {
+			profile.SystemPrompt = sv
+		}
+	}
+	if v, found := patch["allowedTools"]; found {
+		if arr, valid := v.([]any); valid {
+			tools := make([]string, 0, len(arr))
+			for _, item := range arr {
+				if sv, ok := item.(string); ok {
+					tools = append(tools, sv)
+				}
+			}
+			profile.AllowedTools = tools
+		}
+	}
+	if v, found := patch["mcpConfig"]; found {
+		if sv, valid := v.(string); valid {
+			profile.MCPConfig = sv
+		}
+	}
+	if v, found := patch["skills"]; found {
+		if arr, valid := v.([]any); valid {
+			skills := make([]string, 0, len(arr))
+			for _, item := range arr {
+				if sv, ok := item.(string); ok {
+					skills = append(skills, sv)
+				}
+			}
+			profile.Skills = skills
+		}
+	}
+	if v, found := patch["avatarRef"]; found {
+		if sv, valid := v.(string); valid {
+			profile.AvatarRef = sv
+		}
+	}
+	profile.UpdatedAt = nowString()
+	s.agentProfiles[id] = profile
+	return profile, nil
+}
+
+func (s *Store) DeleteAgentProfile(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.agentProfiles[id]; !ok {
+		return ErrNotFound
+	}
+	delete(s.agentProfiles, id)
+	s.agentProfileOrder = removeString(s.agentProfileOrder, id)
+	return nil
+}
+
+// ── UserSettings CRUD ──────────────────────────────────────
+
+func (s *Store) GetSettings() UserSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	values := make(map[string]string, len(s.settings))
+	for k, v := range s.settings {
+		values[k] = v
+	}
+	return UserSettings{
+		Values:    values,
+		UpdatedAt: s.settingsMtime,
+	}
+}
+
+func (s *Store) UpsertSettings(patch map[string]string) UserSettings {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.settings == nil {
+		s.settings = make(map[string]string)
+	}
+	for k, v := range patch {
+		key := strings.TrimSpace(k)
+		if key == "" {
+			continue
+		}
+		s.settings[key] = v
+	}
+	s.settingsMtime = nowString()
+	return UserSettings{
+		Values:    copyMap(s.settings),
+		UpdatedAt: s.settingsMtime,
+	}
 }
