@@ -131,6 +131,29 @@ function Require-ArrayPath {
     return @()
 }
 
+function Require-BoolPath {
+    param(
+        [object]$Object,
+        [string]$Path,
+        [string]$Label,
+        [Nullable[bool]]$Expected = $null
+    )
+
+    $value = Get-ValueAtPath $Object $Path
+    if ($value -isnot [bool]) {
+        Fail "$Label missing or not a boolean ($Path)"
+        return $null
+    }
+
+    if ($null -ne $Expected -and $value -ne [bool]$Expected) {
+        Fail "$Label must be $([bool]$Expected), got $value"
+        return $value
+    }
+
+    Pass "$Label is declared as $value"
+    return [bool]$value
+}
+
 function Test-ApprovedActionObject {
     param([object]$Value)
 
@@ -178,7 +201,7 @@ function Inspect-JsonTree {
 
     foreach ($prop in $Node.PSObject.Properties) {
         $childPath = "$Path.$($prop.Name)"
-        if ($prop.Name -match $SensitiveNamePattern -and $prop.Value -is [string]) {
+        if ($prop.Name -ne "no_secret_runner" -and $prop.Name -match $SensitiveNamePattern -and $prop.Value -is [string]) {
             $value = [string]$prop.Value
             if (-not [string]::IsNullOrWhiteSpace($value) -and $value -notmatch $SafeSensitiveValuePattern) {
                 Fail "$childPath declares a sensitive value; use owner-only or redacted text, never a secret"
@@ -239,7 +262,10 @@ function Test-RuntimeReadinessEntry {
 Write-Host "AgentHub approved-real preflight manifest gate" -ForegroundColor Magenta
 Write-Host "Input kind: manifest/preflight only" -ForegroundColor Magenta
 Write-Host "No login, CLI/model/API, deploy, sign, notarization, updater, release upload, network, or production command was executed." -ForegroundColor Magenta
-Write-Host "real_tested=false" -ForegroundColor Magenta
+Write-Host "MockAdapterUsed=false" -ForegroundColor Magenta
+Write-Host "RealCliTested=false" -ForegroundColor Magenta
+Write-Host "RealModelTested=false" -ForegroundColor Magenta
+Write-Host "TokenDanceIDLogin=false" -ForegroundColor Magenta
 
 if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
     Fail "explicit -ManifestPath is required"
@@ -303,6 +329,18 @@ Require-StringPath $manifest "target_runtime.id" "target runtime id" | Out-Null
 Require-StringPath $manifest "target_runtime.kind" "target runtime kind" | Out-Null
 Require-StringPath $manifest "cli.command_path" "CLI command path" | Out-Null
 Require-StringPath $manifest "cli.command_plan" "future CLI command plan" | Out-Null
+Require-StringPath $manifest "cli.no_secret_runner" "no-secret runner command/owner" | Out-Null
+
+Require-ObjectPath $manifest "readiness_claims" "readiness_claims" | Out-Null
+Require-BoolPath $manifest "readiness_claims.mock_adapter_used" "MockAdapterUsed preflight claim" $false | Out-Null
+Require-BoolPath $manifest "readiness_claims.real_cli_tested" "RealCliTested preflight claim" $false | Out-Null
+Require-BoolPath $manifest "readiness_claims.real_model_tested" "RealModelTested preflight claim" $false | Out-Null
+Require-BoolPath $manifest "readiness_claims.tokendance_id_login" "TokenDanceID login preflight claim" $false | Out-Null
+Require-StringPath $manifest "readiness_claims.real_cli_tested_reason" "RealCliTested blocked reason" | Out-Null
+Require-StringPath $manifest "readiness_claims.real_model_tested_reason" "RealModelTested blocked reason" | Out-Null
+Require-StringPath $manifest "readiness_claims.tokendance_id_login_reason" "TokenDanceID login blocked reason" | Out-Null
+Require-StringPath $manifest "recording_evidence.path" "recording evidence path" | Out-Null
+Require-StringPath $manifest "recording_evidence.status" "recording evidence status" | Out-Null
 
 $runtimeReadiness = Require-ArrayPath $manifest "runtime_readiness" "runtime_readiness"
 $seenRuntimeIds = @{}
@@ -339,7 +377,10 @@ Write-Host "  fixture=not-run" -ForegroundColor White
 Write-Host "  observed=not-run" -ForegroundColor White
 Write-Host "  approved-real=manifest-validated-only" -ForegroundColor White
 Write-Host "  production=blocked-unless-separately-approved" -ForegroundColor White
-Write-Host "  real_tested=false" -ForegroundColor White
+Write-Host "  MockAdapterUsed=false" -ForegroundColor White
+Write-Host "  RealCliTested=false" -ForegroundColor White
+Write-Host "  RealModelTested=false" -ForegroundColor White
+Write-Host "  TokenDanceIDLogin=false" -ForegroundColor White
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Passed: $Passed  |  Failed: $Failed  |  Blocks: $Blocks" -ForegroundColor $(if ($Failed -eq 0 -and $Blocks -eq 0) { "Green" } else { "Red" })

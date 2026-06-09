@@ -9,22 +9,29 @@ import (
 // CLIInvocationPlan is a redacted, non-executing projection of an adapter
 // request into the command shape ProcessExecutor would invoke.
 type CLIInvocationPlan struct {
-	AdapterID           string   `json:"adapterId"`
-	CommandName         string   `json:"commandName"`
-	ArgFlags            []string `json:"argFlags,omitempty"`
-	ConfigKeys          []string `json:"configKeys,omitempty"`
-	PositionalArgCount  int      `json:"positionalArgCount"`
-	EnvNames            []string `json:"envNames,omitempty"`
-	WorkDir             string   `json:"workDir,omitempty"`
-	PromptRedacted      bool     `json:"promptRedacted"`
-	Observed            bool     `json:"observed"`
-	RealTested          bool     `json:"realTested"`
-	RealTestedReason    string   `json:"realTestedReason"`
-	ExecutionMode       string   `json:"executionMode"`
-	NoSpendDefault      bool     `json:"noSpendDefault"`
-	RedactionApplied    bool     `json:"redactionApplied"`
-	ApprovalRequired    bool     `json:"approvalRequired"`
-	ApprovalEvidenceRef string   `json:"approvalEvidenceRef,omitempty"`
+	AdapterID               string   `json:"adapterId"`
+	CommandName             string   `json:"commandName"`
+	ArgFlags                []string `json:"argFlags,omitempty"`
+	ConfigKeys              []string `json:"configKeys,omitempty"`
+	PositionalArgCount      int      `json:"positionalArgCount"`
+	EnvNames                []string `json:"envNames,omitempty"`
+	WorkDir                 string   `json:"workDir,omitempty"`
+	PromptRedacted          bool     `json:"promptRedacted"`
+	Observed                bool     `json:"observed"`
+	RealTested              bool     `json:"realTested"`
+	RealTestedReason        string   `json:"realTestedReason"`
+	MockAdapterUsed         bool     `json:"mockAdapterUsed"`
+	RealCliTested           bool     `json:"realCliTested"`
+	RealCliTestedReason     string   `json:"realCliTestedReason"`
+	RealModelTested         bool     `json:"realModelTested"`
+	RealModelTestedReason   string   `json:"realModelTestedReason"`
+	TokenDanceIDLogin       bool     `json:"tokenDanceIdLogin"`
+	TokenDanceIDLoginReason string   `json:"tokenDanceIdLoginReason"`
+	ExecutionMode           string   `json:"executionMode"`
+	NoSpendDefault          bool     `json:"noSpendDefault"`
+	RedactionApplied        bool     `json:"redactionApplied"`
+	ApprovalRequired        bool     `json:"approvalRequired"`
+	ApprovalEvidenceRef     string   `json:"approvalEvidenceRef,omitempty"`
 }
 
 // BuildCLIInvocationPlan calls the adapter's BuildCommand without starting the
@@ -34,11 +41,14 @@ type CLIInvocationPlan struct {
 func BuildCLIInvocationPlan(adapter AgentAdapter, ctx RunProcessContext) CLIInvocationPlan {
 	if adapter == nil {
 		return CLIInvocationPlan{
-			RealTestedReason: "no adapter",
-			ExecutionMode:    "fixture",
-			NoSpendDefault:   true,
-			RedactionApplied: true,
-			ApprovalRequired: true,
+			RealTestedReason:        "no adapter",
+			ExecutionMode:           "fixture",
+			NoSpendDefault:          true,
+			RedactionApplied:        true,
+			ApprovalRequired:        true,
+			RealCliTestedReason:     "no adapter",
+			RealModelTestedReason:   "no adapter",
+			TokenDanceIDLoginReason: "no TokenDanceID login attempted by invocation planning",
 		}
 	}
 	cmdPath, args, env, workDir := adapter.BuildCommand(ctx)
@@ -50,47 +60,64 @@ func BuildCLIInvocationPlan(adapter AgentAdapter, ctx RunProcessContext) CLIInvo
 func BuildCLIInvocationPlanFromCommand(adapter AgentAdapter, ctx RunProcessContext, cmdPath string, args []string, env []string, workDir string) CLIInvocationPlan {
 	if adapter == nil {
 		return CLIInvocationPlan{
-			CommandName:      commandNameOnly(cmdPath),
-			RealTestedReason: "no adapter",
-			ExecutionMode:    "fixture",
-			NoSpendDefault:   true,
-			RedactionApplied: true,
-			ApprovalRequired: true,
+			CommandName:             commandNameOnly(cmdPath),
+			RealTestedReason:        "no adapter",
+			ExecutionMode:           "fixture",
+			NoSpendDefault:          true,
+			RedactionApplied:        true,
+			ApprovalRequired:        true,
+			RealCliTestedReason:     "no adapter",
+			RealModelTestedReason:   "no adapter",
+			TokenDanceIDLoginReason: "no TokenDanceID login attempted by invocation planning",
 		}
 	}
 	flags, configKeys, positionalCount := summarizeCLIInvocationArgs(args)
 	return CLIInvocationPlan{
-		AdapterID:          adapter.Metadata().ID,
-		CommandName:        commandNameOnly(cmdPath),
-		ArgFlags:           flags,
-		ConfigKeys:         configKeys,
-		PositionalArgCount: positionalCount,
-		EnvNames:           envNamesOnly(env),
-		WorkDir:            invocationPathNameOnly(firstNonEmpty(workDir, ctx.WorkDir)),
-		PromptRedacted:     strings.TrimSpace(ctx.Prompt) != "",
-		Observed:           false,
-		RealTested:         false,
-		RealTestedReason:   "fixture plan only; no approved observed CLI chain",
-		ExecutionMode:      "fixture",
-		NoSpendDefault:     true,
-		RedactionApplied:   true,
-		ApprovalRequired:   true,
+		AdapterID:               adapter.Metadata().ID,
+		CommandName:             commandNameOnly(cmdPath),
+		ArgFlags:                flags,
+		ConfigKeys:              configKeys,
+		PositionalArgCount:      positionalCount,
+		EnvNames:                envNamesOnly(env),
+		WorkDir:                 invocationPathNameOnly(firstNonEmpty(workDir, ctx.WorkDir)),
+		PromptRedacted:          strings.TrimSpace(ctx.Prompt) != "",
+		Observed:                false,
+		RealTested:              false,
+		RealTestedReason:        "fixture plan only; no approved observed CLI chain",
+		MockAdapterUsed:         false,
+		RealCliTested:           false,
+		RealCliTestedReason:     "fixture plan only; no approved observed CLI chain",
+		RealModelTested:         false,
+		RealModelTestedReason:   "fixture/no-spend plan only; no model call observed",
+		TokenDanceIDLogin:       false,
+		TokenDanceIDLoginReason: "TokenDanceID login is outside Edge CLI invocation planning",
+		ExecutionMode:           "fixture",
+		NoSpendDefault:          true,
+		RedactionApplied:        true,
+		ApprovalRequired:        true,
 	}
 }
 
 func (p CLIInvocationPlan) Payload() map[string]any {
 	payload := map[string]any{
-		"adapterId":          p.AdapterID,
-		"commandName":        p.CommandName,
-		"positionalArgCount": p.PositionalArgCount,
-		"promptRedacted":     p.PromptRedacted,
-		"observed":           p.Observed,
-		"realTested":         p.RealTested,
-		"realTestedReason":   p.RealTestedReason,
-		"executionMode":      p.ExecutionMode,
-		"noSpendDefault":     p.NoSpendDefault,
-		"redactionApplied":   p.RedactionApplied,
-		"approvalRequired":   p.ApprovalRequired,
+		"adapterId":               p.AdapterID,
+		"commandName":             p.CommandName,
+		"positionalArgCount":      p.PositionalArgCount,
+		"promptRedacted":          p.PromptRedacted,
+		"observed":                p.Observed,
+		"realTested":              p.RealTested,
+		"realTestedReason":        p.RealTestedReason,
+		"mockAdapterUsed":         p.MockAdapterUsed,
+		"realCliTested":           p.RealCliTested,
+		"realCliTestedReason":     p.RealCliTestedReason,
+		"realModelTested":         p.RealModelTested,
+		"realModelTestedReason":   p.RealModelTestedReason,
+		"tokenDanceIdLogin":       p.TokenDanceIDLogin,
+		"tokenDanceIdLoginReason": p.TokenDanceIDLoginReason,
+		"executionMode":           p.ExecutionMode,
+		"noSpendDefault":          p.NoSpendDefault,
+		"redactionApplied":        p.RedactionApplied,
+		"approvalRequired":        p.ApprovalRequired,
 	}
 	if len(p.ArgFlags) > 0 {
 		payload["argFlags"] = append([]string(nil), p.ArgFlags...)

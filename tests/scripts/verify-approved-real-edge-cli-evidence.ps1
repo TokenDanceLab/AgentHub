@@ -140,6 +140,15 @@ if (Test-Path -LiteralPath $scriptPath) {
             realCliObserved = $true
             redacted = $true
             noSecrets = $true
+            mockAdapterUsed = $false
+            realCliTested = $true
+            realModelTested = $false
+            tokenDanceIdLogin = $false
+            realCliTestedReason = "approved observed CLI process evidence was dereferenced by event id"
+            realModelTestedReason = "no model API call is part of this evidence verifier"
+            tokenDanceIdLoginReason = "TokenDanceID login is outside Edge CLI evidence verification"
+            failureReason = "none"
+            recordingEvidencePath = "redacted-recording-placeholder.json"
             terminalStatus = "finished"
             exitCode = 0
         }
