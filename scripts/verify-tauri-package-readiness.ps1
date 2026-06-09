@@ -1,7 +1,8 @@
 param(
     [string]$RepoRoot = ".",
     [string]$BuiltArtifactsRoot = "",
-    [switch]$RequireBuiltArtifacts
+    [switch]$RequireBuiltArtifacts,
+    [switch]$RequireBundledSidecar
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +31,20 @@ function Assert-True {
         Fail $Message
     }
     Pass $Message
+}
+
+function Assert-FileExists {
+    param(
+        [string]$RelativePath,
+        [string]$Label
+    )
+
+    $path = Join-Path $RepoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        Fail "$Label blocker: required file is missing ($RelativePath)"
+    }
+
+    Pass "$Label exists ($RelativePath)"
 }
 
 function Assert-GitIgnored {
@@ -500,6 +515,11 @@ Assert-GitIgnored "dist/agenthub-edge-windows-amd64.exe" "Windows sidecar dry in
 Assert-GitIgnored "app/desktop/src-tauri/target/release/bundle/nsis/AgentHub_${desktopVersion}_x64-setup.exe" "Tauri NSIS bundle output"
 Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-pc-windows-msvc.exe" "Windows sidecar binary"
 Assert-GitIgnored "app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin" "macOS arm64 sidecar binary"
+
+if ($RequireBundledSidecar) {
+    Step "Bundled Local Edge sidecar presence gate"
+    Assert-FileExists "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-pc-windows-msvc.exe" "Windows bundled Local Edge sidecar"
+}
 
 Step "macOS unsigned dry policy boundary"
 Assert-True ($readinessWorkflowText -match "run_macos_unsigned_dry_policy") "release readiness workflow declares explicit macOS unsigned dry policy input"
