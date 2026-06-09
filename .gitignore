@@ -140,6 +140,8 @@ docs/handoffs/
 # =============================================================================
 .tmp/
 tmp/
+.expo/
+**/.expo/
 .claude-flow/
 .od/
 .swarm/
@@ -194,6 +196,7 @@ screenshots/
 # Tauri app icons (must be tracked for builds)
 !app/desktop/src-tauri/icons/
 !app/mobile/src-tauri/icons/
+!app/mobile/src-tauri/icons/agenthub-*.png
 !app/desktop/src-tauri/icons/agenthub-icon-rounded-32.png
 !app/desktop/src-tauri/icons/agenthub-icon-rounded-128.png
 !app/desktop/src-tauri/icons/agenthub-icon-rounded-256.png
@@ -201,6 +204,12 @@ screenshots/
 !app/web/public/agenthub-icon-rounded-32.png
 !app/web/public/agenthub-icon-rounded-192.png
 !app/web/public/agenthub-icon-rounded-512.png
+!app/mobile/public/agenthub-icon-192.png
+!app/mobile/public/agenthub-icon-512.png
+
+# Expo Mobile production assets (must be tracked for native builds)
+!app/mobile-rn/assets/
+!app/mobile-rn/assets/agenthub-*.png
 
 # =============================================================================
 # Docs & Local Files
