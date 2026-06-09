@@ -32,7 +32,7 @@ Desktop/Web 当前 active UI 入口已经切到 shared v4 workbench：
 | delete after migration | `HomeDashboard`、`ToolGroup`、`TaskList`、旧 `SettingsPage/AuthPage/WelcomeScreen/StatusBar` 等 Desktop/Web local components | 旧 shell / 旧面板遗留；当前 shared workbench 不应引用 | 确认无 active import 后按批删除 |
 | delete after migration | Desktop/Web duplicate stores：`threadStore`、`runStore`、`uiStore`、`searchStore`、`taskBridgeStore` 等 | 旧客户端状态层；服务端状态已转 TanStack Query + platform model | 只迁移 UI preference，服务端状态不得回流到 Zustand |
 | exclude from v4 PR | `edge-server/*` dirty files | 后端 pins/store 并行改动 | 独立 backend PR |
-| exclude from v4 PR | `app/mobile/*` dirty files | Mobile 并行改动，非本轮 v4 主线 | 独立 mobile PR |
+| exclude from v4 PR | `app/mobile-rn/*` Mobile lane files | Mobile Expo/RN 并行改动，非本轮 Desktop/Web v4 主线 | 独立 mobile PR |
 
 ## 旧文件处理顺序
 

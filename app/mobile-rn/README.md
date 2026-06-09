@@ -1,8 +1,8 @@
 # AgentHub Mobile RN
 
-Expo + React Native is the AgentHub Mobile mainline candidate. The legacy Tauri prototype remains in `app/mobile` only as a frozen reference until the replacement gate is met.
+Expo + React Native is the AgentHub Mobile mainline. The old Tauri Mobile package has been removed from the active source tree; new Mobile work stays in this package.
 
-Current branch handoff, ownership boundaries, and replacement gates are tracked in [docs/handoff.md](docs/handoff.md).
+Current branch handoff, ownership boundaries, and native release gates are tracked in [docs/handoff.md](docs/handoff.md).
 
 ## Design Boundary
 
@@ -64,7 +64,7 @@ corepack pnpm verify:qa
 
 The visual harness also runs a source hygiene pass over RN primitives, layout, and screens before opening the browser. It rejects component-level raw hex/rgb palettes, raw shadow style fields, negative letter spacing, decorative gradients, viewport-scaled type, and visible/accessibility privacy or transport/debug strings. Add new colors, shadows, type, or status language through `src/theme/**` and i18n strings first.
 
-For concurrent Mobile workers, `app/mobile-rn/README.md`, `app/mobile/docs/mobile-expo-rn-migration-plan.md`, and `app/mobile/docs/mobile-v4-plan.md` are this planning worker's write set. Implementation workers should keep code, config, and screenshots in their assigned `app/mobile-rn/**` slices and must not weaken this 5177 visual QA gate to pass.
+For concurrent Mobile workers, keep code, config, docs, tests, and screenshots in assigned `app/mobile-rn/**` slices unless a root-level Mobile governance file explicitly needs to change. Do not weaken the 5177 visual QA gate to pass.
 
 Native development builds:
 
@@ -98,7 +98,7 @@ Native proof status:
 
 ## Current Slice Status
 
-This package is a scaffold plus design foundation, not the replacement gate. Current code proves the RN runtime shape, design token contract, stateful workflow surfaces, pure tests, local Hub contract path, native config parsing, and Expo Web visual preview path. It does not yet prove real TokenDance ID OIDC exchange, SecureStore persistence on device, Hub REST/WS against a live deployed Hub, push notification delivery, or Android/iOS development build installation.
+This package is the active Mobile implementation, but it is not yet an Android/iOS release candidate. Current code proves the RN runtime shape, design token contract, stateful workflow surfaces, pure tests, local Hub contract path, native config parsing, and Expo Web visual preview path. It does not yet prove real TokenDance ID OIDC exchange, SecureStore persistence on device, Hub REST/WS against a live deployed Hub, push notification delivery, or Android/iOS development build installation.
 
 Current verified slice:
 
