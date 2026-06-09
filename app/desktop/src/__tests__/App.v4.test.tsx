@@ -6,11 +6,12 @@ import App, { DesktopWorkbenchApp } from '@/App';
 import { createEventStream } from '@/api/eventClient';
 import { createHubClient } from '@/api/hubClient';
 import { useAgentList } from '@/api/agentQueries';
+import { useAgentProfileList, useCreateAgentProfile, useUpdateAgentProfile, useDeleteAgentProfile } from '@/api/agentProfileQueries';
 import { useHubExecutionTargets, useSyncLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
-import { useCreateThread, useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
+import { useCreateThread, useCurrentUser, useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
 import { queryClient } from '@/api/queryClient';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
@@ -38,6 +39,7 @@ vi.mock('@/api/threadQueries', () => ({
   useThreadPins: vi.fn(),
   useThreadMessages: vi.fn(),
   useThreads: vi.fn(),
+  useCurrentUser: vi.fn(),
 }));
 
 vi.mock('@/api/agentQueries', () => ({
@@ -60,6 +62,14 @@ vi.mock('@/api/modelCatalogQueries', () => ({
 
 vi.mock('@/api/runEvidenceQueries', () => ({
   useRunEvidence: vi.fn(),
+}));
+
+vi.mock('@/api/agentProfileQueries', () => ({
+  useAgentProfileList: vi.fn(),
+  useCreateAgentProfile: vi.fn(),
+  useUpdateAgentProfile: vi.fn(),
+  useDeleteAgentProfile: vi.fn(),
+  edgeAgentProfileToWorkbenchAgent: vi.fn((profile) => profile),
 }));
 
 vi.mock('@/api/runQueries', () => ({
@@ -99,7 +109,7 @@ vi.mock('@/hooks/useHubIntegration', () => ({
 
 const eventHandlers: EventHandler[] = [];
 const createRunMutateAsync = vi.fn();
-const tryAutoLogin = vi.fn();
+const tryAutoLogin = vi.fn().mockResolvedValue(undefined);
 const refetchHealth = vi.fn();
 const mockHubClient = { ackTask: vi.fn() };
 const mockHubWS = {
@@ -116,6 +126,11 @@ const mockHubWS = {
 };
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
+const mockedUseCurrentUser = vi.mocked(useCurrentUser);
+const mockedUseAgentProfileList = vi.mocked(useAgentProfileList);
+const mockedUseCreateAgentProfile = vi.mocked(useCreateAgentProfile);
+const mockedUseUpdateAgentProfile = vi.mocked(useUpdateAgentProfile);
+const mockedUseDeleteAgentProfile = vi.mocked(useDeleteAgentProfile);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
 const mockedUseAgentList = vi.mocked(useAgentList);
 const mockedUseHubExecutionTargets = vi.mocked(useHubExecutionTargets);
@@ -158,7 +173,7 @@ describe('Desktop App v4 root', () => {
       user: null,
       loading: false,
       error: null,
-      loginWithTokenDance: vi.fn(),
+      loginWithTokenDance: vi.fn().mockResolvedValue(undefined),
       logout: vi.fn(),
       tryAutoLogin,
     } as ReturnType<typeof useAuth>);
@@ -246,9 +261,18 @@ describe('Desktop App v4 root', () => {
     mockedUseThreads.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreads>);
+    mockedUseCurrentUser.mockReturnValue({
+      data: undefined,
+    } as ReturnType<typeof useCurrentUser>);
     mockedUseThreadMessages.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreadMessages>);
+    mockedUseAgentProfileList.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+    } as ReturnType<typeof useAgentProfileList>);
+    mockedUseCreateAgentProfile.mockReturnValue({ mutateAsync: vi.fn() } as ReturnType<typeof useCreateAgentProfile>);
+    mockedUseUpdateAgentProfile.mockReturnValue({ mutateAsync: vi.fn() } as ReturnType<typeof useUpdateAgentProfile>);
+    mockedUseDeleteAgentProfile.mockReturnValue({ mutateAsync: vi.fn() } as ReturnType<typeof useDeleteAgentProfile>);
     mockedUseThreadPins.mockReturnValue({
       data: undefined,
     } as ReturnType<typeof useThreadPins>);
@@ -304,7 +328,7 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
-    // Demo mode should write 'mock' to localStorage
+    // Demo mode writes 'mock' to localStorage
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('mock');
   });
 
