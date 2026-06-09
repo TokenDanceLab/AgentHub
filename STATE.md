@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 19:30 +08:00
+最后更新：2026-06-09 19:35 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
@@ -9,9 +9,9 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | `origin/dev/delicious233` 最新 HEAD 是 `c6dcb674 feat(web): wire agent profile install-to-run fixture`。 |
+| 当前 dev | `origin/dev/delicious233` 最新 HEAD 是 `fba668c2 test(web): cover hub project detail readthrough`。 |
 | RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
-| master | `origin/master = f3b91ab0`，落后 dev 约 366 个提交；release 前走 PR/merge gate，不直接改写 master。 |
+| master | `origin/master = f3b91ab0`，落后 dev 约 368 个提交；release 前走 PR/merge gate，不直接改写 master。 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 当前存在大量 dirty 文件且落后远端；新开发和文档收敛从最新 `origin/dev/delicious233` 开隔离 worktree。 |
 | 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
@@ -95,6 +95,16 @@
 - 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
 - `v0.3.0-rc.6` 已存在且指向 `fa6cd35e`，保留为历史 RC 基线；后续 tag 需先通过独立 release gate。
 - Desktop 下一版候选已按 `0.3.0-rc.7` 准备；只有 release gate 通过并获人工确认后才允许创建 `v0.3.0-rc.7` tag。
+- 当前 open PR 仅保留 4 个：`#293`、`#296` 为 Mobile 线，`#294`、`#295` 为旧 Web 分支；release promote 前需要关闭、重开小票或明确接受风险。
+- 第一批清理候选只包含已被 dev 吸收且 worktree clean 的分支；`dev/johnny`、`feat/backend-edge-hub`、`codex/backend-*` 属于旧大分叉，只能 cherry-pick 级复查。
+
+## Release Gate 快照
+
+- `verify-ci-gates.ps1`、`verify-tauri-package-readiness.ps1 -RepoRoot .`、`verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain` 已在 RC7 版本基线上通过。
+- Web focused tests、Web typecheck、shared focused tests、Hub `go test ./... -short -count=1` 已通过。
+- Edge `go test ./... -short -count=1` 仍有 `TestClaudeCodeParseStreamUsesBrokeredPermissionHandler` 未找到 pending Claude permission request 的失败，需要复跑或修复后再声明整仓 release gate 通过。
+- approved-real 金链路当前状态：Desktop Edge CLI no-spend PASS，Hub replay/Web manifest `READY_FOR_APPROVAL`，TokenDanceID readiness `BLOCKED`，缺 `AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`、`AGENTHUB_TDID_LOGIN_TEST_ACCOUNT_REF`。
+- security risk register 仍有 High open release blockers；未获 waiver/closure 前不发布 stable，不把 remote/cloud/auth 口径写成 production-ready。
 
 ## 下一步优先级
 
