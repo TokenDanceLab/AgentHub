@@ -10,6 +10,7 @@ export type {
   ApprovalTranscriptBlock,
   AgentTimelineItem,
   AgentTimelineTranscriptBlock,
+  ApprovalDecisionAction,
   ArtifactTranscriptBlock,
   ChildAgentTranscriptBlock,
   ContextUsageTranscriptBlock,

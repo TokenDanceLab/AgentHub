@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ApprovalDecisionAction } from '../../transcript';
 import styles from './ApprovalCardBlock.module.css';
 
 type ApprovalStatus = 'pending' | 'running' | 'completed' | 'failed';
@@ -7,10 +8,14 @@ type ApprovalRisk = 'low' | 'medium' | 'high' | 'critical';
 interface ApprovalCardBlockProps {
   id: string;
   status: ApprovalStatus;
+  teamId?: string | undefined;
+  teamRunId?: string | undefined;
+  agentTaskId?: string | undefined;
   title?: string | undefined;
   toolName?: string | undefined;
   risk?: ApprovalRisk | undefined;
   reason?: string | undefined;
+  onDecision?: ((action: ApprovalDecisionAction) => void) | undefined;
 }
 
 const riskLabels: Record<ApprovalRisk, string> = {
@@ -37,10 +42,14 @@ const riskClassMap: Record<ApprovalRisk, string> = {
 export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
   id,
   status,
+  teamId,
+  teamRunId,
+  agentTaskId,
   title = '部署/写入审批',
   toolName,
   risk = 'medium',
   reason = '需要用户确认后继续执行。',
+  onDecision,
 }) => {
   const statusLabel = statusLabels[status] ?? status;
   const isPending = status === 'pending' || status === 'running';
@@ -64,8 +73,32 @@ export const ApprovalCardBlock: React.FC<ApprovalCardBlockProps> = ({
         <div className={styles.actions}>
           {isPending ? (
             <>
-              <button className={`${styles.btn} ${styles.primary}`} type="button">批准</button>
-              <button className={`${styles.btn} ${styles.danger}`} type="button">拒绝</button>
+              <button
+                className={`${styles.btn} ${styles.primary}`}
+                onClick={() => onDecision?.({
+                  approvalId: id,
+                  decision: 'allow',
+                  ...(teamId ? { teamId } : {}),
+                  ...(teamRunId ? { teamRunId } : {}),
+                  ...(agentTaskId ? { agentTaskId } : {}),
+                })}
+                type="button"
+              >
+                批准
+              </button>
+              <button
+                className={`${styles.btn} ${styles.danger}`}
+                onClick={() => onDecision?.({
+                  approvalId: id,
+                  decision: 'deny',
+                  ...(teamId ? { teamId } : {}),
+                  ...(teamRunId ? { teamRunId } : {}),
+                  ...(agentTaskId ? { agentTaskId } : {}),
+                })}
+                type="button"
+              >
+                拒绝
+              </button>
             </>
           ) : (
             <span className={`${styles.badge} ${status === 'completed' ? styles.badgeSuccess : styles.badgeDanger}`}>
