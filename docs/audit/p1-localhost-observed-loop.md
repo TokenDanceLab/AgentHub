@@ -75,6 +75,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-local
 Related readiness checks:
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-localhost-real-stack-smoke.ps1 `
+  -RepoRoot . `
+  -ArtifactRoot .tmp\localhost-real-stack-smoke\edge-only `
+  -EvidencePath .tmp\localhost-real-stack-smoke\edge-only\localhost-real-stack-smoke.json `
+  -SkipWeb `
+  -SkipDesktop `
+  -ProbeHub
+
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-local-stack-e2e-readiness.ps1 `
   -RepoRoot . `
   -Mode FixtureOnly `
@@ -105,6 +113,13 @@ The runner records:
   and Local Edge probes
 - `logs\startup.log`
 - `logs\cleanup.log`
+
+The stronger local service smoke writes `agenthub-localhost-real-stack-smoke-v1`
+under `.tmp\localhost-real-stack-smoke\...`. It starts the safe Local Edge
+subset with `agenthub-runner-mock` and a temporary SQLite store, probes Hub
+only, and starts Web/Desktop Vite only when app workspace dependencies already
+exist. That evidence still reports `real_tested=false` and is not live Hub
+dispatch proof.
 
 Artifact roots are accepted only under `.tmp\localhost-observed-loop`,
 `tmp\localhost-observed-loop`, or `$env:TEMP\AgentHub\localhost-observed-loop`.
