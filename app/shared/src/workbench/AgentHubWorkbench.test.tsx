@@ -1020,6 +1020,57 @@ describe('AgentHubWorkbench', () => {
     expect(projectScope.queryByRole('button', { name: '保存项目' })).not.toBeInTheDocument();
   });
 
+  it('reports selected Hub project ids to the Web adapter', () => {
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'hub-session', title: '真实 Hub 会话', kind: 'group' }],
+    });
+    const handleActiveProjectChange = vi.fn();
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={[]}
+        projects={[
+          {
+            id: 'hub-project-1',
+            name: 'Hub 项目一',
+            description: 'First Hub workspace',
+            status: 'Hub',
+            meta: '0 runs',
+            members: [],
+            announcement: 'First Hub workspace',
+            runs: [],
+            artifacts: [],
+            feed: [],
+          },
+          {
+            id: 'hub-project-2',
+            name: 'Hub 项目二',
+            description: 'Second Hub workspace',
+            status: 'Hub',
+            meta: '0 runs',
+            members: [],
+            announcement: 'Second Hub workspace',
+            runs: [],
+            artifacts: [],
+            feed: [],
+          },
+        ]}
+        activeProjectId="hub-project-1"
+        onActiveProjectChange={handleActiveProjectChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    fireEvent.click(screen.getByText('Hub 项目二'));
+
+    expect(handleActiveProjectChange).toHaveBeenCalledWith('hub-project-2');
+  });
+
   it('submits Hub project updates without exposing delete actions', async () => {
     const platform = createMockPlatform({
       surface: 'web',
