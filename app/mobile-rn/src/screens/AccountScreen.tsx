@@ -59,6 +59,9 @@ export function AccountScreen({
       title: t.deviceAndSettings,
       items: [
         { icon: 'bell', label: t.notificationPermission, status: account.notification, color: tokens.color.danger },
+        { icon: 'camera', label: t.cameraPermission, status: 'prompt', color: tokens.color.accent },
+        { icon: 'image', label: t.photoLibraryPermission, status: 'prompt', color: tokens.color.accent },
+        { icon: 'hardDrive', label: t.storageManagement, color: tokens.color.moss },
         { icon: 'file', label: t.devices, color: tokens.color.accent },
         { icon: 'settings', label: t.settings, color: tokens.color.accent },
       ],
