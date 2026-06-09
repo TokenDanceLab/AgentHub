@@ -18,16 +18,22 @@ import (
 )
 
 type mockWorkspaceService struct {
-	createReq *model.Workspace
-	updateReq *service.WorkspaceUpdate
-	listQ     string
-	listSize  int
-	listCur   string
+	createReq  *model.Workspace
+	updateReq  *service.WorkspaceUpdate
+	listQ      string
+	listSize   int
+	listCur    string
+	threadReq  *service.CreateWorkspaceThreadRequest
+	messageReq service.SendWorkspaceThreadMessageRequest
 
-	createFn func(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error)
-	getFn    func(ctx context.Context, id, ownerID string) (*model.Workspace, error)
-	updateFn func(ctx context.Context, id, ownerID string, req *service.WorkspaceUpdate) (*model.Workspace, error)
-	listFn   func(ctx context.Context, ownerID, q, cursor string, pageSize int) (*service.WorkspaceListResult, error)
+	createFn              func(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error)
+	getFn                 func(ctx context.Context, id, ownerID string) (*model.Workspace, error)
+	updateFn              func(ctx context.Context, id, ownerID string, req *service.WorkspaceUpdate) (*model.Workspace, error)
+	listFn                func(ctx context.Context, ownerID, q, cursor string, pageSize int) (*service.WorkspaceListResult, error)
+	listThreadsFn         func(ctx context.Context, projectID, ownerID string) ([]service.WorkspaceThread, error)
+	createThreadFn        func(ctx context.Context, projectID, ownerID string, req *service.CreateWorkspaceThreadRequest) (*service.WorkspaceThread, error)
+	createThreadMessageFn func(ctx context.Context, projectID, threadID, ownerID string, req service.SendWorkspaceThreadMessageRequest) (*service.WorkspaceThreadMessage, error)
+	listThreadMessagesFn  func(ctx context.Context, projectID, threadID, ownerID string, limit int) ([]service.WorkspaceThreadMessage, error)
 }
 
 func (m *mockWorkspaceService) Create(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error) {
@@ -69,6 +75,60 @@ func (m *mockWorkspaceService) List(ctx context.Context, ownerID, q, cursor stri
 		HasMore: true,
 		Cursor:  "workspace-1",
 	}, nil
+}
+
+func (m *mockWorkspaceService) ListThreads(ctx context.Context, projectID, ownerID string) ([]service.WorkspaceThread, error) {
+	if m.listThreadsFn != nil {
+		return m.listThreadsFn(ctx, projectID, ownerID)
+	}
+	return []service.WorkspaceThread{{
+		ID:        projectID + "-thread-1",
+		ProjectID: projectID,
+		Type:      model.SessionTypeGroup,
+		Name:      "项目群",
+	}}, nil
+}
+
+func (m *mockWorkspaceService) CreateThread(ctx context.Context, projectID, ownerID string, req *service.CreateWorkspaceThreadRequest) (*service.WorkspaceThread, error) {
+	m.threadReq = req
+	if m.createThreadFn != nil {
+		return m.createThreadFn(ctx, projectID, ownerID, req)
+	}
+	return &service.WorkspaceThread{
+		ID:        "thread-1",
+		ProjectID: projectID,
+		Type:      model.SessionTypeGroup,
+		Name:      req.Name,
+	}, nil
+}
+
+func (m *mockWorkspaceService) CreateThreadMessage(ctx context.Context, projectID, threadID, ownerID string, req service.SendWorkspaceThreadMessageRequest) (*service.WorkspaceThreadMessage, error) {
+	m.messageReq = req
+	if m.createThreadMessageFn != nil {
+		return m.createThreadMessageFn(ctx, projectID, threadID, ownerID, req)
+	}
+	return &service.WorkspaceThreadMessage{
+		ID:          "message-1",
+		ProjectID:   projectID,
+		ThreadID:    threadID,
+		SeqID:       1,
+		ContentType: req.ContentType,
+		Content:     req.Content,
+	}, nil
+}
+
+func (m *mockWorkspaceService) ListThreadMessages(ctx context.Context, projectID, threadID, ownerID string, limit int) ([]service.WorkspaceThreadMessage, error) {
+	if m.listThreadMessagesFn != nil {
+		return m.listThreadMessagesFn(ctx, projectID, threadID, ownerID, limit)
+	}
+	return []service.WorkspaceThreadMessage{{
+		ID:          "message-1",
+		ProjectID:   projectID,
+		ThreadID:    threadID,
+		SeqID:       1,
+		ContentType: model.ContentTypeText,
+		Content:     `{"text":"hello"}`,
+	}}, nil
 }
 
 func TestWorkspaceHandlerCreateSuccess(t *testing.T) {
@@ -179,4 +239,86 @@ func TestWorkspaceHandlerUpdateSuccess(t *testing.T) {
 	require.NotNil(t, svc.updateReq.Description)
 	require.Equal(t, "Updated", *svc.updateReq.Name)
 	require.Equal(t, "Next", *svc.updateReq.Description)
+}
+
+func TestWorkspaceHandlerProjectThreadRoutesPreserveContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &mockWorkspaceService{}
+	h := handler.NewWorkspaceHandler(svc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "owner-1")
+	c.Params = gin.Params{{Key: "id", Value: "project-1"}}
+	c.Request = httptest.NewRequest(http.MethodPost, "/web/projects/project-1/threads", strings.NewReader(`{"name":"项目群"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	h.CreateProjectThread(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "项目群", svc.threadReq.Name)
+	var threadBody struct {
+		Code string                  `json:"code"`
+		Data service.WorkspaceThread `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &threadBody))
+	require.Equal(t, "project-1", threadBody.Data.ProjectID)
+
+	w = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(w)
+	c.Set("user_id", "owner-1")
+	c.Params = gin.Params{{Key: "id", Value: "project-1"}, {Key: "threadId", Value: "thread-1"}}
+	c.Request = httptest.NewRequest(http.MethodPost, "/web/projects/project-1/threads/thread-1/messages", strings.NewReader(`{"client_msg_id":"00000000-0000-0000-0000-000000000C01","content":"hello"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	h.CreateProjectThreadMessage(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "00000000-0000-0000-0000-000000000c01", svc.messageReq.ClientMsgID)
+	require.Equal(t, "hello", svc.messageReq.Content)
+	var messageBody struct {
+		Code string                         `json:"code"`
+		Data service.WorkspaceThreadMessage `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &messageBody))
+	require.Equal(t, "project-1", messageBody.Data.ProjectID)
+	require.Equal(t, "thread-1", messageBody.Data.ThreadID)
+}
+
+func TestWorkspaceHandlerListsProjectThreadsAndMessages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := handler.NewWorkspaceHandler(&mockWorkspaceService{})
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "owner-1")
+	c.Params = gin.Params{{Key: "id", Value: "project-1"}}
+	c.Request = httptest.NewRequest(http.MethodGet, "/web/projects/project-1/threads", nil)
+
+	h.ListProjectThreads(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var threadBody struct {
+		Code string                    `json:"code"`
+		Data []service.WorkspaceThread `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &threadBody))
+	require.Equal(t, "project-1", threadBody.Data[0].ProjectID)
+
+	w = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(w)
+	c.Set("user_id", "owner-1")
+	c.Params = gin.Params{{Key: "id", Value: "project-1"}, {Key: "threadId", Value: "thread-1"}}
+	c.Request = httptest.NewRequest(http.MethodGet, "/web/projects/project-1/threads/thread-1/messages?limit=25", nil)
+
+	h.ListProjectThreadMessages(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var messageBody struct {
+		Code string                           `json:"code"`
+		Data []service.WorkspaceThreadMessage `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &messageBody))
+	require.Equal(t, "project-1", messageBody.Data[0].ProjectID)
+	require.Equal(t, "thread-1", messageBody.Data[0].ThreadID)
 }

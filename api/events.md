@@ -129,15 +129,22 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 ```json
 {
   "text": "@Reviewer 检查 shared transcript contract",
-  "im_kind": "project_group",
-  "mentions": [
-    { "id": "agent-reviewer", "label": "Reviewer", "runtime_id": "codex" }
-  ],
-  "agent_task": { "task_id": "task-reviewer-1", "status": "queued" },
-  "route_decision": {
-    "action": "dispatch",
-    "target_agent": "Reviewer",
-    "summary": "Route shared transcript contract review to Reviewer."
+  "metadata": {
+    "im_kind": "project_group",
+    "mentions": [
+      { "id": "agent-reviewer", "label": "Reviewer", "runtime_id": "codex" }
+    ],
+    "agent_task": { "task_id": "task-reviewer-1", "status": "queued" },
+    "orchestrator_queue": {
+      "status": "queued",
+      "route": "review",
+      "correlation_id": "corr-reviewer-1"
+    },
+    "route_decision": {
+      "action": "dispatch",
+      "target_agent": "Reviewer",
+      "summary": "Route shared transcript contract review to Reviewer."
+    }
   }
 }
 ```

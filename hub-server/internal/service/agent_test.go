@@ -1425,7 +1425,8 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 			id TEXT PRIMARY KEY,
 			type TEXT NOT NULL,
 			dissolved BOOLEAN DEFAULT FALSE,
-			owner_user_id TEXT
+			owner_user_id TEXT,
+			workspace_id TEXT
 		)`,
 		`CREATE TABLE messages (
 			id TEXT PRIMARY KEY,
