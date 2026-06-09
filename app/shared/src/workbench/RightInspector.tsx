@@ -1,10 +1,4 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import {
-  demoOverviewFiles,
-  demoOverviewTasks,
-  getDemoFileContent,
-  getDemoFileDiff,
-} from '../demo/workbenchDemoData';
 import { buildInspectorEvidenceModel, buildRuntimeEvidenceInspectorModel } from '../inspector';
 import type { RuntimeEvidenceChannel, RuntimeEvidenceSnapshot } from '../inspector';
 import type { EvidenceRef } from '../transcript';
@@ -142,14 +136,14 @@ export function RightInspector({
   }, [reviewFileRequest]);
 
   const overviewTasks = useMemo<TaskItem[]>(() => {
-    if (!runtimeEvidence) return demoOverviewTasks;
+    if (!runtimeEvidence) return [];
     return runtimeEvidenceOverviewTasks(runtimeEvidence);
   }, [runtimeEvidence]);
 
   const overviewFiles = useMemo<PreviewFile[]>(() => {
     const files = runtimeEvidence
       ? runtimeEvidenceOverviewFiles(runtimeEvidence)
-      : demoOverviewFiles;
+      : [];
     return files.map((file) => ({
       ...file,
       isOpen: previewFile?.name === file.name,
@@ -323,9 +317,9 @@ export function RightInspector({
           <OverviewPanel
             tasks={overviewTasks}
             files={overviewFiles}
-            taskSectionTitle={runtimeEvidence ? '运行证据' : 'B0 SQLite 迁移'}
-            kicker={runtimeEvidence ? runtimeEvidenceOverviewKicker(runtimeEvidence) : 'Builder 工作目录'}
-            primaryFileLabel={runtimeEvidence ? 'Hub replay 产物' : '最终文件'}
+            taskSectionTitle={runtimeEvidence ? '运行证据' : '概览'}
+            kicker={runtimeEvidence ? runtimeEvidenceOverviewKicker(runtimeEvidence) : undefined}
+            primaryFileLabel={runtimeEvidence ? 'Hub replay 产物' : '文件'}
             {...(runtimeEvidence ? { workingFileLabel: '运行快照' } : {})}
             onFileClick={handleFileClick}
           />
@@ -353,8 +347,8 @@ export function RightInspector({
               filename={previewFile.name}
               owner={previewFile.owner}
               language={previewFile.type}
-              content={previewFile.content ?? getDemoFileContent(previewFile)}
-              diffContent={previewFile.diffContent ?? getDemoFileDiff(previewFile)}
+              content={previewFile.content ?? `${previewFile.name}\n\n暂无文件内容。`}
+              diffContent={previewFile.diffContent}
               onClose={closePreview}
             />
           ) : (
