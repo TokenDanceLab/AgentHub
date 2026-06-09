@@ -29,4 +29,40 @@ describe('ToolCardBlock', () => {
     expect(screen.getByText('>')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Shell' })).not.toBeInTheDocument();
   });
+
+  it('renders remote replay details and evidence references for tool calls', () => {
+    render(
+      <ToolCardBlock
+        toolName="read_file"
+        status="completed"
+        path="app/shared/src/workbench/TranscriptView.tsx"
+        description="Read 80 lines for transcript replay."
+        detailRows={[
+          { label: 'Params', value: 'offset=120 limit=80' },
+          { label: 'Result', value: '80 lines returned' },
+        ]}
+        evidenceRefs={[
+          {
+            id: 'tool-read-file',
+            kind: 'tool',
+            label: 'tool_call read_file',
+            status: 'completed',
+          },
+          {
+            id: 'file-transcript',
+            kind: 'file',
+            label: 'TranscriptView.tsx',
+            path: 'app/shared/src/workbench/TranscriptView.tsx',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Params')).toBeInTheDocument();
+    expect(screen.getByText('offset=120 limit=80')).toBeInTheDocument();
+    expect(screen.getByText('Result')).toBeInTheDocument();
+    expect(screen.getByText('80 lines returned')).toBeInTheDocument();
+    expect(screen.getByText('tool · tool_call read_file · 完成')).toBeInTheDocument();
+    expect(screen.getByText('file · TranscriptView.tsx')).toBeInTheDocument();
+  });
 });
