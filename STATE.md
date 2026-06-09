@@ -1,6 +1,6 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-09 16:07 +08:00
+最后更新：2026-06-09 16:22 +08:00
 
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，不要把提交 SHA、工作区状态或临时派工写进路线图。
@@ -9,8 +9,8 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web 单任务 approval/artifact contract 消费、Edge fixture adapter runner、Hub file-change diff projection、runtime/provider icon polish、Real/Mock boundary、Desktop exact target observed bridge、Tauri package smoke gate、SDK fixture capability evidence、localhost observed loop gate；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
-| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web task approval/artifact contract consumption、Edge fixture adapter runner contract、Hub task file-change diff metadata、runtime/provider icons polish、real-mode explicit boundary、Desktop exact target sidecar evidence、Tauri package readiness hardening、SDK fixture capability evidence、localhost observed loop runner |
+| 当前 dev | controller 集成批次已包含 Web visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web 单任务 approval/artifact contract 消费、Edge fixture adapter runner、Hub file-change diff projection、runtime/provider icon polish、Real/Mock boundary、Desktop exact target observed bridge、Tauri package smoke gate、SDK fixture capability evidence、localhost observed loop gate、localhost services probe plan、Agent Builder fixture evidence UI；远端 HEAD 以 `git log -1 origin/dev/delicious233` 为准 |
+| 最新 dev 内容 | P0 Desktop/QA、P0 Web 主链/typed transcript、Web offline target dispatch guard、Web approval/evidence、Edge SQLite observed smoke、Desktop sidecar observed smoke、CLI JSON readiness gate、P1 并发拓扑/Edge durable 状态同步、Web real-mode visual smoke、Desktop sidecar binary smoke、Edge SQLite durable hardening、Hub 单任务 approval/artifact 合同、Product-loop observed fixture E2E gate、approved-real preflight manifest gate、Web task approval/artifact contract consumption、Edge fixture adapter runner contract、Hub task file-change diff metadata、runtime/provider icons polish、real-mode explicit boundary、Desktop exact target sidecar evidence、Tauri package readiness hardening、SDK fixture capability evidence、localhost observed loop runner、localhost services probe plan、Desktop Agent Builder fixture evidence |
 | RC tag | `v0.3.0-rc.6 = ceccabe6`，指向 Desktop P0 + product-loop QA gate 稳定基线，不等于最新 dev |
 | master | 暂缓推进；当前只保证 `dev/delicious233` 干净可用 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 落后且有大量 dirty 文件，当前不作为开发或事实来源 |
@@ -45,6 +45,8 @@
 - Tauri package smoke gate 集成提交：`29982e85 test(desktop): harden tauri package smoke gate`，强化 Windows unsigned/dev package reproducibility、sidecar placement、Local Edge diagnostics、macOS unsigned policy boundary；不执行真实 build/sign/notarize/release upload。
 - SDK fixture capability evidence 集成提交：`c49d2ee1 test(edge): expand sdk fixture capability evidence`，扩展 SDK-like / custom OpenAI-compatible fixture metadata、RuntimeManifest capability/health 和 golden tests；不安装 SDK 包、不联网、不跑真实 CLI/model/API。
 - localhost observed loop gate 集成提交：`b9e53b25 test(e2e): add localhost observed loop gate`，新增 no-spend localhost observed runner、manifest、safe artifact root、direct Hub-to-Edge rejection、local stack readiness 组合；当前仍 `RealTested=false`。
+- localhost services probe plan 集成提交：`935704b5 test(e2e): add localhost service probe plan`，在 localhost observed runner 中加入 `ProbeServices` health marker、统一 log root、service probe/pid/health manifests；默认不启动服务，`RealTested=false`。
+- Desktop Agent Builder fixture evidence UI 集成提交：`6c855195 feat(desktop): show fixture agent builder evidence`，在 Builder 中展示 fixture-only、runtime/profile、provider/model、tools/MCP、approval policy、workspace trust、Local Edge fixture health 和 no-spend evidence；不运行真实 SDK/CLI/model/API。
 
 当前不声明已经完成：
 
@@ -76,6 +78,8 @@
 | Tauri package smoke | worker/Curie | 已集成并验证 controller：`29982e85` | readiness/policy + fixture smoke，不做真实签名、公证、release upload |
 | SDK fixture capability | worker/Meitner | 已集成并验证 controller：`c49d2ee1` | Edge fixture capability/golden tests，不安装或运行真实 SDK/CLI |
 | localhost observed loop gate | worker/Gauss | 已集成并验证 controller：`b9e53b25` | runner/manifest/readiness-only gate，`RealTested=false` |
+| localhost services probe | worker/Ptolemy | 已集成并验证 controller：`935704b5` | service probe manifests 和 fail-closed readiness，不启动真实服务 |
+| Agent Builder fixture UI | worker/Franklin | 已集成并验证 controller：`6c855195` | Desktop Builder fixture/no-spend evidence，可见但不声明 live SDK execution |
 | State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
 
