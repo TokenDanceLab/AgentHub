@@ -224,6 +224,30 @@ describe('useWebWorkbenchModel helpers', () => {
     expect(mergeWorkspaceProjectDetail(listProjects, undefined)).toBe(listProjects);
   });
 
+  it('keeps selected Hub project detail visible when it is outside the current page', () => {
+    expect(mergeWorkspaceProjectDetail([
+      {
+        id: 'project-1',
+        name: 'Listed Project',
+        description: 'Current /web/projects page',
+      },
+    ], {
+      id: 'project-selected',
+      name: 'Selected Project',
+      description: 'Loaded through /web/projects/{id}',
+    })).toEqual([
+      expect.objectContaining({
+        id: 'project-selected',
+        name: 'Selected Project',
+        description: 'Loaded through /web/projects/{id}',
+      }),
+      expect.objectContaining({
+        id: 'project-1',
+        name: 'Listed Project',
+      }),
+    ]);
+  });
+
   it('surfaces selected project detail errors in real mode without falling back to mock projects', () => {
     expect(resolveWebProjectsStatus(
       { isFetching: false, error: undefined },
