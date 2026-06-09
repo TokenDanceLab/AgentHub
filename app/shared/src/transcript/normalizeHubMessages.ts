@@ -9,7 +9,7 @@ export interface HubMessageAgentRef {
 export interface HubMessageAgentTaskRef {
   id?: string;
   task_id?: string;
-  status?: 'queued' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled';
+  status?: 'queued' | 'assigned' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled';
   queue_id?: string;
 }
 
@@ -198,7 +198,7 @@ function visibleIMState(
     ...(detailParts.length ? { displayDetail: detailParts.join(' · ') } : {}),
     ...(taskStatus
       ? {
-          badgeLabel: taskStatus === 'queued' ? '@Agent queued' : `@Agent ${taskStatus}`,
+          badgeLabel: `@Agent ${taskStatus}`,
           badgeVariant: taskStatusBadgeVariant(taskStatus),
         }
       : hasMentionedAgents
@@ -274,6 +274,7 @@ function taskStatusField(value: unknown): HubMessageAgentTaskRef['status'] | und
   const status = stringField(value);
   switch (status) {
     case 'queued':
+    case 'assigned':
     case 'dispatched':
     case 'running':
     case 'done':
@@ -296,6 +297,7 @@ function taskStatusBadgeVariant(
       return 'danger';
     case 'running':
     case 'dispatched':
+    case 'assigned':
       return 'thinking';
     case 'queued':
     default:

@@ -33,6 +33,8 @@ export {
   demoWorkbenchAgents,
   demoWorkbenchPins,
   demoWorkbenchTranscripts,
+  projectGroupMessageLoopHubMessages,
+  projectGroupMessageLoopTranscript,
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
 } from './workbenchDemo';
