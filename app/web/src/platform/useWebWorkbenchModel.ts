@@ -5,9 +5,12 @@ import type { WorkbenchDataMode } from '@shared/demo';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   getWorkbenchDataModeOverrideSnapshot,
+  isWorkbenchFixtureDataMode,
+  isWorkbenchRealDataMode,
   resolveWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
   subscribeWorkbenchDataModeOverride,
+  workbenchDataModeLabel,
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
 import {
@@ -19,7 +22,7 @@ import {
 } from '@shared/transcript';
 import { createHubClient } from '@/api/hubClient';
 import type { ContactInfo, WorkspaceProject } from '@/api/hubClient';
-import { selectOnlineLocalEdgeExecutionTarget, useHubExecutionTargets } from '@/api/executionTargetQueries';
+import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
@@ -40,7 +43,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
   );
   const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
   const authenticated = useHubStore((state) => state.authenticated);
-  const hubReady = dataMode !== 'demo' && authenticated && Boolean(getAccessToken());
+  const fixtureMode = isWorkbenchFixtureDataMode(dataMode);
+  const realMode = isWorkbenchRealDataMode(dataMode);
+  const hubReady = !fixtureMode && authenticated && Boolean(getAccessToken());
   const queryClient = useQueryClient();
   const demoSnapshot = useSyncExternalStore(
     workbenchDemoRuntimeStore.subscribe,
@@ -57,7 +62,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     placeholderData: (previous) => previous,
   });
 
-  const conversations = !hubReady && dataMode !== 'real'
+  const conversations = !hubReady && !realMode
     ? demoSnapshot.conversations
     : resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
   const activeConversationId = (
@@ -129,9 +134,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
   const onlineLocalEdgeTargets = (executionTargets.data?.items ?? []).filter((target) =>
     target.target_type === 'local_edge' &&
     target.is_online === true &&
-    target.health_state !== 'offline'
+    target.health_state === 'healthy'
   );
-  const composerExecutionTargets = hubReady || dataMode === 'real'
+  const composerExecutionTargets = hubReady || realMode
     ? onlineLocalEdgeTargets.map((target) => ({
         id: target.id,
         label: target.name ? `${target.name} (${target.id})` : target.id,
@@ -153,7 +158,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     )
     : conversations;
 
-  const transcript = !hubReady && dataMode !== 'real'
+  const transcript = !hubReady && !realMode
     ? workbenchDemoRuntimeStore.resolveTranscript(activeConversationId)
     : resolveWebWorkbenchTranscript(
       hubReady,
@@ -186,6 +191,18 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
         workspaceProjectToProjectInfo(await updateProject.mutateAsync({ projectId, draft }))
       ),
     } : undefined,
+    workbenchStatus: {
+      dataMode: workbenchDataModeLabel(dataMode),
+      targetState: executionTargetStatus.state,
+      targetLabel: executionTargetStatus.selectedTarget
+        ? executionTargetLabel(executionTargetStatus.selectedTarget)
+        : undefined,
+      replayLabel: activeHubSessionId
+        ? `Hub replay: ${liveRuntimeEvents.length} runtime event${liveRuntimeEvents.length === 1 ? '' : 's'} observed`
+        : realMode
+          ? 'Hub replay: no active Hub session'
+          : 'Fixture replay: shared demo transcript',
+    },
     transcript: surfacedTranscript,
   };
 }
@@ -219,7 +236,7 @@ export function resolveWebWorkbenchContacts(
   dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
 ): WorkbenchContactsData | undefined {
   if (!hubReady) {
-    return dataMode === 'real' ? webHubEmptyContacts : undefined;
+    return isWorkbenchRealDataMode(dataMode) ? webHubEmptyContacts : undefined;
   }
   const members = contacts?.map(contactInfoToMember) ?? [];
   return {
@@ -236,7 +253,7 @@ export function resolveWebWorkbenchProjects(
   dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
 ): ProjectInfo[] | undefined {
   if (!hubReady) {
-    return dataMode === 'demo' ? undefined : [];
+    return isWorkbenchFixtureDataMode(dataMode) ? undefined : [];
   }
   return (projects ?? []).map(workspaceProjectToProjectInfo);
 }
@@ -272,8 +289,9 @@ export function resolveWebProjectsStatus(
   dataMode: WorkbenchDataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
   saving = false,
 ): { loading: boolean; error?: string | undefined; actionError?: string | undefined; saving: boolean } {
-  const effectiveRealMode = hubReady || dataMode === 'real';
-  const signedOutRealMode = dataMode === 'real' && !hubReady;
+  const realMode = isWorkbenchRealDataMode(dataMode);
+  const effectiveRealMode = hubReady || realMode;
+  const signedOutRealMode = realMode && !hubReady;
   return {
     loading: effectiveRealMode && projects.isFetching,
     error: signedOutRealMode
@@ -286,7 +304,16 @@ export function resolveWebProjectsStatus(
   };
 }
 
-export type WebExecutionTargetStatusState = 'hidden' | 'signed-out' | 'loading' | 'error' | 'empty' | 'ready';
+export type WebExecutionTargetStatusState =
+  | 'hidden'
+  | 'signed-out'
+  | 'loading'
+  | 'error'
+  | 'no-target'
+  | 'offline'
+  | 'degraded'
+  | 'wrong-profile'
+  | 'ready';
 
 export interface WebExecutionTargetStatus {
   state: WebExecutionTargetStatusState;
@@ -301,7 +328,7 @@ export function resolveWebExecutionTargetStatus(input: {
   error: unknown;
   targets: ExecutionTargetInventoryItem[] | undefined;
 }): WebExecutionTargetStatus {
-  const visibleRealMode = input.hubReady || input.dataMode === 'real';
+  const visibleRealMode = input.hubReady || isWorkbenchRealDataMode(input.dataMode);
   if (!visibleRealMode) return { state: 'hidden' };
   if (!input.hubReady) {
     return targetStatus('signed-out', 'Sign in to Hub before Web can select a local_edge execution target.');
@@ -313,11 +340,38 @@ export function resolveWebExecutionTargetStatus(input: {
     return targetStatus('error', `Hub execution targets unavailable: ${errorMessage(input.error, 'Hub target inventory failed')}`);
   }
 
-  const selectedTarget = selectOnlineLocalEdgeExecutionTarget(input.targets ?? []) as ExecutionTargetInventoryItem | undefined;
-  if (!selectedTarget) {
+  const targets = input.targets ?? [];
+  if (targets.length === 0) {
     return targetStatus(
-      'empty',
+      'no-target',
       'No online local_edge execution target is available. Web real Hub mode will not dispatch agent tasks to mock targets.',
+    );
+  }
+
+  const localEdgeTargets = targets.filter((target) => target.target_type === 'local_edge');
+  if (localEdgeTargets.length === 0) {
+    return targetStatus(
+      'wrong-profile',
+      'Hub reported execution targets, but none are local_edge Desktop/Edge targets for Web agent dispatch.',
+    );
+  }
+
+  const selectedTarget = localEdgeTargets.find((target) =>
+    target.is_online === true && target.health_state === 'healthy'
+  );
+  if (!selectedTarget) {
+    const degradedTarget = localEdgeTargets.find((target) =>
+      target.is_online === true && target.health_state === 'degraded'
+    );
+    if (degradedTarget) {
+      return targetStatus(
+        'degraded',
+        `Desktop/Edge target is degraded: ${executionTargetLabel(degradedTarget)}. Web will wait for a healthy target before dispatch.`,
+      );
+    }
+    return targetStatus(
+      'offline',
+      'Desktop/Edge local_edge targets are offline or unavailable. Web real Hub mode will not dispatch agent tasks to mock targets.',
     );
   }
 
@@ -337,6 +391,10 @@ function targetStatus(state: Exclude<WebExecutionTargetStatusState, 'hidden' | '
     selectedTarget: undefined,
     block: targetStatusBlock(state, text),
   };
+}
+
+function executionTargetLabel(target: Pick<ExecutionTargetInventoryItem, 'id' | 'name'>): string {
+  return target.name ? `${target.name} (${target.id})` : target.id;
 }
 
 function targetStatusBlock(state: WebExecutionTargetStatusState, text: string): TranscriptBlock {
@@ -376,7 +434,7 @@ export function resolveWebWorkbenchTranscript(
   dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
 ): TranscriptBlock[] {
   if (!hubReady) {
-    return dataMode === 'real'
+    return isWorkbenchRealDataMode(dataMode)
       ? webHubEmptyTranscript
       : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
   }
