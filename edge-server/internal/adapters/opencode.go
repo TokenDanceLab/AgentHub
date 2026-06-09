@@ -83,8 +83,12 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--agent", ctx.AgentName)
 	}
 
-	// Session continuity
-	if ctx.SessionID != "" {
+	// Session continuity.
+	// Only pass --session when resuming a specific existing OpenCode session
+	// (ContinueLast=true). For new runs, do NOT pass --session — OpenCode will
+	// reject session IDs that don't exist in its local store. It auto-creates
+	// a new session when no --session flag is provided.
+	if ctx.SessionID != "" && ctx.ContinueLast {
 		args = append(args, "--session", ctx.SessionID)
 	} else if ctx.ContinueLast {
 		args = append(args, "--continue")
