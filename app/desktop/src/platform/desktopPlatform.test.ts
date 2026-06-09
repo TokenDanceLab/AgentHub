@@ -171,4 +171,98 @@ describe('createDesktopPlatform', () => {
     expect(readiness).not.toHaveProperty('command');
     expect(readiness).not.toHaveProperty('cliPath');
   });
+
+  it('exposes local edge diagnostics as read-only host data', async () => {
+    const platform = createDesktopPlatform({
+      getLocalEdgeDiagnostics: vi.fn().mockResolvedValue({
+        readiness: {
+          running: true,
+          pid: 1234,
+          port: 3210,
+          sidecar_name: 'agenthub-edge',
+          target_id: 'local-edge',
+          route: 'local-edge-api',
+          bind_addr: '127.0.0.1:3210',
+          health_url: 'http://127.0.0.1:3210/v1/health',
+          store_db_policy: '<app-data>/agenthub-edge.sqlite',
+          log_paths: {
+            directory: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs',
+            stdout: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stdout.log',
+            stderr: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stderr.log',
+          },
+          sidecar_args: [
+            '--store-backend',
+            'sqlite',
+            '--store-db',
+            '<app-data>/agenthub-edge.sqlite',
+            '--addr',
+            '127.0.0.1:3210',
+            '--runner-profile',
+            'claude-code',
+          ],
+          preflight: {
+            sidecar_available: true,
+            fallback_executable_available: false,
+            auth_token_ready: true,
+            status: 'ready',
+            blocker: null,
+          },
+          direct_cli_spawn: false,
+        },
+        status: {
+          running: true,
+          pid: 1234,
+          port: 3210,
+          health_url: 'http://127.0.0.1:3210/v1/health',
+          last_error: null,
+          log_paths: {
+            directory: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs',
+            stdout: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stdout.log',
+            stderr: 'C:/Users/test/AppData/Roaming/AgentHub/edge-logs/local-edge.stderr.log',
+          },
+        },
+        packaged_login: {
+          loopback: {
+            available: true,
+            bind_host: '127.0.0.1',
+            port: 49888,
+            redirect_uri: 'http://127.0.0.1:49888/callback',
+            error: null,
+          },
+          credential_store: {
+            available: true,
+            service: 'com.agenthub.desktop',
+            error: null,
+          },
+          real_e2e: {
+            status: 'proposal_only',
+            reason: 'Real packaged login E2E requires an explicit TokenDance ID/browser gate.',
+          },
+        },
+        log_tail: {
+          stdout: ['edge ready'],
+          stderr: [],
+        },
+      }),
+    });
+
+    const diagnostics = await platform.host.localEdgeDiagnostics();
+
+    expect(diagnostics).toEqual(expect.objectContaining({
+      status: expect.objectContaining({
+        running: true,
+        health_url: 'http://127.0.0.1:3210/v1/health',
+      }),
+      log_tail: {
+        stdout: ['edge ready'],
+        stderr: [],
+      },
+    }));
+    expect(diagnostics.readiness).toEqual(expect.objectContaining({
+      direct_cli_spawn: false,
+      store_db_policy: '<app-data>/agenthub-edge.sqlite',
+    }));
+    expect(diagnostics).not.toHaveProperty('command');
+    expect(diagnostics).not.toHaveProperty('cliPath');
+  });
 });
