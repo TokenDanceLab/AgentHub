@@ -11,7 +11,22 @@ import {
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
+import type { ProjectDraft, ProjectInfo } from '@shared/workbench';
+import type { WorkbenchContactsData } from '@shared/workbench';
+import {
+  resolveHubContacts,
+  resolveHubProjects,
+  type HubContactLike,
+} from '@shared/workbench/hubDataMapping';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
+import {
+  useHubContacts,
+  useHubWorkspaceProjects,
+  useCreateHubWorkspaceProject,
+  useUpdateHubWorkspaceProject,
+} from '@/api/hubQueries';
+import { getAccessToken } from '@/hooks/useAuth';
+import { useHubStore } from '@/stores/hubStore';
 import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
 
 export interface DesktopWorkbenchModel {
@@ -20,8 +35,19 @@ export interface DesktopWorkbenchModel {
   activeThreadId?: string;
   agents: WorkbenchAgent[];
   conversations: WorkbenchConversation[];
+  contacts?: WorkbenchContactsData;
   dataMode: string;
   isDemo: boolean;
+  projects?: ProjectInfo[];
+  projectsStatus?: {
+    loading?: boolean;
+    error?: string;
+    saving?: boolean;
+  };
+  projectsActions?: {
+    create: (draft: ProjectDraft) => Promise<ProjectInfo>;
+    update: (projectId: string, draft: ProjectDraft) => Promise<ProjectInfo>;
+  };
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
 }
 
@@ -41,6 +67,15 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     workbenchDemoRuntimeStore.getSnapshot,
   );
   const useDemo = !isWorkbenchRealDataMode(dataMode);
+  const hubAuthenticated = useHubStore((state) => state.authenticated);
+  const hubReady = !useDemo && hubAuthenticated && Boolean(getAccessToken());
+
+  // Hub data queries — only active in live mode when Hub is authenticated.
+  const contactsQuery = useHubContacts({ enabled: hubReady });
+  const projectsQuery = useHubWorkspaceProjects({ enabled: hubReady });
+  const createProjectMutation = useCreateHubWorkspaceProject();
+  const updateProjectMutation = useUpdateHubWorkspaceProject();
+
   const threadsQuery = useThreads(undefined, { enabled: !useDemo });
   const threads = useDemo ? [] : threadsQuery.data?.items ?? [];
   const activeThread = useDemo
@@ -89,14 +124,67 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     return [];
   }, [liveTranscript, threadItems, threads.length]);
 
+  // Resolve Hub contacts for the workbench contacts page.
+  const resolvedContacts = useMemo(
+    () => resolveHubContacts(
+      contactsQuery.data as HubContactLike[] | undefined,
+      hubReady,
+      dataMode,
+    ),
+    [contactsQuery.data, hubReady, dataMode],
+  );
+
+  // Resolve Hub workspace projects for the workbench projects page.
+  const resolvedProjects = useMemo(
+    () => resolveHubProjects(
+      projectsQuery.data?.items,
+      hubReady,
+      dataMode,
+      workspaceProjectToProjectInfo,
+    ),
+    [projectsQuery.data?.items, hubReady, dataMode],
+  );
+
+  const resolvedProjectsStatus = useMemo(() => ({
+    loading: hubReady && projectsQuery.isFetching,
+    error: hubReady && projectsQuery.error
+      ? errorMessage(projectsQuery.error, 'Hub Projects 加载失败')
+      : undefined,
+    saving: createProjectMutation.isPending || updateProjectMutation.isPending,
+  }), [hubReady, projectsQuery.isFetching, projectsQuery.error, createProjectMutation.isPending, updateProjectMutation.isPending]);
+
+  const resolvedProjectsActions = hubReady ? {
+    create: async (draft: ProjectDraft): Promise<ProjectInfo> => {
+      const result = await createProjectMutation.mutateAsync({
+        name: draft.name.trim() || '未命名项目',
+        description: draft.description.trim(),
+      });
+      return workspaceProjectToProjectInfo(result);
+    },
+    update: async (projectId: string, draft: ProjectDraft): Promise<ProjectInfo> => {
+      const result = await updateProjectMutation.mutateAsync({
+        projectId,
+        draft: {
+          name: draft.name.trim() || '未命名项目',
+          description: draft.description.trim(),
+        },
+      });
+      return workspaceProjectToProjectInfo(result);
+    },
+  } : undefined;
+
   const liveModel = {
     activeConversationId,
     ...(activeThread?.projectId ? { activeProjectId: activeThread.projectId } : {}),
     ...(activeThread?.threadId ? { activeThreadId: activeThread.threadId } : {}),
     agents: [],
+    contacts: resolvedContacts,
     conversations,
     dataMode,
     isDemo: false,
+    projects: resolvedProjects,
+    projectsStatus: resolvedProjectsStatus,
+    projectsActions: resolvedProjectsActions,
     transcript,
   };
 
@@ -166,4 +254,28 @@ function formatPinTime(timestamp: string): string | undefined {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function workspaceProjectToProjectInfo(
+  project: { id: string; name?: string; description?: string; created_at?: string; updated_at?: string },
+): ProjectInfo {
+  const description = project.description?.trim() || 'Hub workspace project';
+  return {
+    id: project.id,
+    name: project.name?.trim() || '未命名项目',
+    description,
+    status: 'Hub',
+    meta: '0 runs',
+    members: [],
+    announcement: description,
+    runs: [],
+    artifacts: [],
+    feed: [],
+  };
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return fallback;
 }
