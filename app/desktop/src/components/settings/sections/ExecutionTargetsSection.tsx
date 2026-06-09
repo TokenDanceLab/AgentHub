@@ -5,10 +5,12 @@ import Panel from '../primitives/Panel';
 import ExecutionTargetCard from '../primitives/ExecutionTargetCard';
 import Callout from '../primitives/Callout';
 import RunnerRow from '../cards/RunnerRow';
+import LocalCliDiscoveryCard from '../cards/LocalCliDiscoveryCard';
 import { shortId } from '../utils';
 import styles from '../primitives/primitives.module.css';
 import type { DesktopExecutionTarget } from '@/platform/edgeCapabilityMapper';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
+import { emptyLocalCliDiscoveryManifest, type LocalCliDiscoveryManifest } from '../cliDiscovery';
 
 interface ExecutionTargetsSectionProps {
   edgeOnline: boolean;
@@ -27,6 +29,7 @@ interface ExecutionTargetsSectionProps {
   localEdgeTargetSyncStatus?: 'idle' | 'syncing' | 'error';
   localEdgeTargetSyncError?: string | null;
   onSyncLocalEdgeTarget?: () => void;
+  cliDiscovery?: LocalCliDiscoveryManifest;
 }
 
 export default function ExecutionTargetsSection({
@@ -37,6 +40,7 @@ export default function ExecutionTargetsSection({
   localEdgeTargetSyncStatus = 'idle',
   localEdgeTargetSyncError = null,
   onSyncLocalEdgeTarget,
+  cliDiscovery = emptyLocalCliDiscoveryManifest,
 }: ExecutionTargetsSectionProps) {
   const { t } = useTranslation();
   const localEdgeMetric = edgeOnline
@@ -149,6 +153,7 @@ export default function ExecutionTargetsSection({
       {syncErrorBody ? (
         <Callout title={t('settings.localEdgeTargetReadiness')} body={syncErrorBody} />
       ) : null}
+      <LocalCliDiscoveryCard discovery={cliDiscovery} />
       {runnerItems.length > 0 ? (
         <div className={styles.runnerList}>
           {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}
