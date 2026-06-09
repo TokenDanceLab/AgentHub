@@ -38,15 +38,30 @@ function lsWrite(values: Record<string, string>): void {
 export function createDesktopSettingsAdapter(): SettingsPort {
   return {
     async readSettings(): Promise<Record<string, string>> {
+      // Tier 1: Edge (primary backend)
       try {
         const settings = await edgeClient.fetchSettings();
-        // Cache to localStorage for offline fallback
         lsWrite(settings);
         return settings;
       } catch {
-        // Edge unavailable — fall back to localStorage
-        return lsRead();
+        // Edge unavailable
       }
+
+      // Tier 2: Hub (secondary backend)
+      try {
+        const token = getAccessToken();
+        if (token) {
+          const hub = createHubClient({ getToken: getAccessToken });
+          const settings = await hub.fetchSettings();
+          lsWrite(settings);
+          return settings;
+        }
+      } catch {
+        // Hub unavailable
+      }
+
+      // Tier 3: localStorage (offline fallback)
+      return lsRead();
     },
 
     async writeSettings(values: Record<string, string>): Promise<void> {
@@ -57,15 +72,16 @@ export function createDesktopSettingsAdapter(): SettingsPort {
       try {
         await edgeClient.patchSettings(values);
       } catch {
-        // Edge write failed — localStorage is the source of truth for now
+        // Edge write failed — try Hub as fallback
       }
 
-      // 3. Async Hub sync (fire-and-forget, no await)
+      // 3. Async Hub sync (fire-and-forget)
       try {
-        const hub = createHubClient({ getToken: getAccessToken });
-        hub.patchSettings(values).catch(() => {
-          // Hub sync failure is non-critical
-        });
+        const token = getAccessToken();
+        if (token) {
+          const hub = createHubClient({ getToken: getAccessToken });
+          hub.patchSettings(values).catch(() => {});
+        }
       } catch {
         // Hub client not available
       }
