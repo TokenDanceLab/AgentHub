@@ -37,11 +37,11 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	}
 	projectB, _ := s.CreateProject("proj_b", "Project B")
 	projectA, _ := s.CreateProject("proj_a", "Project A")
-	threadB, err := s.CreateThread("thread_b", projectB.ID, "Thread B")
+	threadB, err := s.CreateThread("thread_b", projectB.ID, "Thread B", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread thread_b returned error: %v", err)
 	}
-	threadA, err := s.CreateThread("thread_a", projectA.ID, "Thread A")
+	threadA, err := s.CreateThread("thread_a", projectA.ID, "Thread A", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread thread_a returned error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestFileStoreCleanupRunsPersistsRemovedRunsAndItems(t *testing.T) {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
 	project, _ := s.CreateProject("proj_test", "Test Project")
-	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
+	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}

@@ -519,7 +519,7 @@ func TestSQLiteDurableObservedFixtureSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := sqliteStore.CreateThread("thread_observed_fixture", project.ID, "Observed Fixture Thread")
+	thread, err := sqliteStore.CreateThread("thread_observed_fixture", project.ID, "Observed Fixture Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
@@ -591,7 +591,7 @@ func TestRunStoreReadinessPrintsSQLiteManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := repository.CreateThread("thread_readiness_report", project.ID, "Readiness Report Thread")
+	thread, err := repository.CreateThread("thread_readiness_report", project.ID, "Readiness Report Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}

@@ -243,7 +243,7 @@ func TestRepositoryContractFileStoreSnapshotRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := s.CreateThread("thread_contract", project.ID, "Contract Thread")
+	thread, err := s.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
@@ -303,7 +303,7 @@ func TestRepositoryContractSQLiteStoreRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := s.CreateThread("thread_contract", project.ID, "Contract Thread")
+	thread, err := s.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
@@ -417,10 +417,10 @@ func runRepositoryLifecycleContract(t *testing.T, handle repositoryContractHandl
 		t.Fatalf("duplicate project = %#v, want original project", duplicate)
 	}
 
-	if _, err := repo.CreateThread("thread_missing_project", "missing", "Missing", ""); !errors.Is(err, ErrNotFound) {
+	if _, err := repo.CreateThread("thread_missing_project", "missing", "Missing", "", "", ""); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("CreateThread missing project error = %v, want ErrNotFound", err)
 	}
-	thread, err := repo.CreateThread("thread_contract", project.ID, "")
+	thread, err := repo.CreateThread("thread_contract", project.ID, "", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
@@ -500,11 +500,11 @@ func runRepositoryPinsContract(t *testing.T, handle repositoryContractHandle) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := repo.CreateThread("thread_contract", project.ID, "Contract Thread")
+	thread, err := repo.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
-	otherThread, err := repo.CreateThread("thread_other", project.ID, "Other Thread")
+	otherThread, err := repo.CreateThread("thread_other", project.ID, "Other Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread other returned error: %v", err)
 	}
@@ -556,7 +556,7 @@ func runRepositoryThreadDeleteCascadeContract(t *testing.T, handle repositoryCon
 	repo := handle.store
 
 	project, _ := repo.CreateProject("proj_contract", "Contract Project")
-	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread")
+	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	run, err := repo.CreateRun("run_contract", project.ID, thread.ID)
 	if err != nil {
 		t.Fatalf("CreateRun returned error: %v", err)
@@ -617,7 +617,7 @@ func runRepositoryCleanupCascadeContract(t *testing.T, handle repositoryContract
 	repo := handle.store
 
 	project, _ := repo.CreateProject("proj_contract", "Contract Project")
-	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread")
+	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	run, err := repo.CreateRun("run_contract", project.ID, thread.ID)
 	if err != nil {
 		t.Fatalf("CreateRun returned error: %v", err)
@@ -665,7 +665,7 @@ func runRepositoryArtifactDiffPreviewContract(t *testing.T, handle repositoryCon
 	}
 
 	project, _ := repo.CreateProject("proj_contract", "Contract Project")
-	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread")
+	thread, _ := repo.CreateThread("thread_contract", project.ID, "Contract Thread", "", "", "")
 	run, err := repo.CreateRun("run_contract", project.ID, thread.ID)
 	if err != nil {
 		t.Fatalf("CreateRun returned error: %v", err)
@@ -850,8 +850,8 @@ func runRepositoryRuntimeEvidenceCurrentContract(t *testing.T, handle repository
 	}
 
 	project, _ := repo.CreateProject("proj_evidence_current", "Evidence Current")
-	threadA, _ := repo.CreateThread("thread_evidence_a", project.ID, "Evidence A")
-	threadB, _ := repo.CreateThread("thread_evidence_b", project.ID, "Evidence B")
+	threadA, _ := repo.CreateThread("thread_evidence_a", project.ID, "Evidence A", "", "", "")
+	threadB, _ := repo.CreateThread("thread_evidence_b", project.ID, "Evidence B", "", "", "")
 	runA, err := repo.CreateRun("run_evidence_a", project.ID, threadA.ID)
 	if err != nil {
 		t.Fatalf("CreateRun A returned error: %v", err)
@@ -1070,7 +1070,7 @@ func seedRepositoryReadinessParity(t *testing.T, repo repositoryContractStore) {
 	if err != nil {
 		t.Fatalf("CreateProject returned error: %v", err)
 	}
-	thread, err := repo.CreateThread("thread_parity", project.ID, "Parity Thread")
+	thread, err := repo.CreateThread("thread_parity", project.ID, "Parity Thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}

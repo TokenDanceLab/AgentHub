@@ -36,6 +36,10 @@ const (
 	codeInvalidParams  = -32602
 )
 
+// maxMCPBodyBytes limits the request body size for MCP requests (1 MB).
+// This matches the REST API limit in handlers.go.
+const maxMCPBodyBytes = 1 << 20
+
 // jsonrpcRequest represents a JSON-RPC 2.0 request.
 type jsonrpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -65,6 +69,7 @@ type Server struct {
 	executor           lifecycle.RunExecutor
 	bus                *events.Bus
 	permissionRegistry *api.PermissionRegistry
+	workspaceAllowlist []string
 
 	// sessionID is generated on initialize and returned to clients.
 	// For simplicity, this implementation uses a single-session model.
@@ -87,6 +92,13 @@ func NewServer(
 	}
 }
 
+// SetWorkspaceAllowlist configures the workspace allowlist for workDir validation
+// in start_run requests. When set, workDir values must fall within one of the
+// allowed roots — matching the REST API validation in PostRuns.
+func (s *Server) SetWorkspaceAllowlist(roots []string) {
+	s.workspaceAllowlist = roots
+}
+
 // ServeHTTP handles MCP requests on the /mcp endpoint.
 // It accepts POST requests with JSON-RPC 2.0 payloads.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +113,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxMCPBodyBytes))
 	if err != nil {
 		writeJSONRPCError(w, nil, codeParseError, "failed to read request body")
 		return

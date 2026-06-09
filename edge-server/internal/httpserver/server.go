@@ -143,6 +143,7 @@ func Run(cfg Config) error {
 	// Register MCP (Model Context Protocol) endpoint for external AI clients.
 	// This exposes project/thread/run capabilities as standard MCP tools.
 	mcpServer := mcp.NewServer(handler.Store, handler.Executor, handler.Bus, handler.PermissionRegistry)
+	mcpServer.SetWorkspaceAllowlist(cfg.WorkspaceAllowlist)
 	mux.Handle("/mcp", mcpServer)
 	slog.Info("mcp server endpoint registered at /mcp")
 
@@ -320,7 +321,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// with empty projectId/threadId works out of the box.
 	if cfg.Store != nil {
 		_, _ = cfg.Store.CreateProject("proj_local", "Local Project")
-		_, _ = cfg.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct")
+		_, _ = cfg.Store.CreateThread("thread_local", "proj_local", "Local Thread", "direct", "", "")
 	}
 	return h, nil
 }
