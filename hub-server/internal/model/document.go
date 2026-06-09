@@ -18,19 +18,20 @@ const (
 
 // Document represents a cloud document owned by a user or projected from an artifact.
 type Document struct {
-	ID        string     `gorm:"primaryKey;type:uuid" json:"id"`
-	OwnerID   string     `gorm:"type:uuid;not null;index" json:"owner_id"`
-	Title     string     `gorm:"type:varchar(255);not null" json:"title"`
-	Type      string     `gorm:"type:varchar(32);not null" json:"type"`
+	ID        string    `gorm:"primaryKey;type:uuid" json:"id"`
+	OwnerID   string    `gorm:"type:uuid;not null;index" json:"owner_id"`
+	ProjectID *string   `gorm:"type:uuid" json:"project_id,omitempty"`
+	Title     string    `gorm:"type:varchar(500);not null" json:"title"`
+	Type      string    `gorm:"type:varchar(32);not null;default:'md'" json:"type"`
 	Source    string     `gorm:"type:varchar(32);not null" json:"source"`
-	SourceRef *string    `gorm:"type:varchar(255)" json:"source_ref,omitempty"`
+	SourceRef *string    `gorm:"type:varchar(256)" json:"source_ref,omitempty"`
 	Tag       *string    `gorm:"type:varchar(64)" json:"tag,omitempty"`
-	Location  string     `gorm:"type:varchar(255);not null;default:'我的文档库'" json:"location"`
+	Location  string     `gorm:"type:varchar(128);not null;default:'我的文档库'" json:"location"`
 	Content   *string    `gorm:"type:text" json:"content,omitempty"`
 	Status    string     `gorm:"type:varchar(32);not null;default:'active'" json:"status"`
+	Metadata  string     `gorm:"type:jsonb;not null;default:'{}'" json:"metadata,omitempty"`
 	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt *time.Time `gorm:"type:timestamptz;index" json:"deleted_at,omitempty"`
 }
 
 func (d *Document) BeforeCreate(tx *gorm.DB) error {
