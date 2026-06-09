@@ -1105,6 +1105,26 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<MessageResponse[]>(
         `/client/sessions/${sessionId}/messages/search${qs(params)}`,
       ),
+    editMessage: (messageId: string, body: { content: string }) =>
+      request<MessageResponse>(`/client/messages/${encodeURIComponent(messageId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+
+    addMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
+      request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+        method: 'POST',
+        body: JSON.stringify({ session_id: sessionId, ...reaction }),
+      }),
+
+    removeMessageReaction: (messageId: string, sessionId: string, reaction: { emoji: string }) =>
+      request<undefined>(`/client/messages/${encodeURIComponent(messageId)}/reactions`, {
+        method: 'DELETE',
+        body: JSON.stringify({ session_id: sessionId, ...reaction }),
+      }),
+
+    listMessageReactions: (messageId: string, sessionId: string) =>
+      request<Record<string, unknown>[]>(`/client/messages/${encodeURIComponent(messageId)}/reactions?session_id=${encodeURIComponent(sessionId)}`),
 
     // 鈹€鈹€ Notifications 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
