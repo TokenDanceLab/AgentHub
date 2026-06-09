@@ -119,6 +119,11 @@ type AgentTaskArtifact struct {
 	Action        string    `json:"action,omitempty"`
 	ToolName      string    `json:"tool_name,omitempty"`
 	Status        string    `json:"status,omitempty"`
+	Diff          string    `json:"diff,omitempty"`
+	EditID        string    `json:"edit_id,omitempty"`
+	ReviewStatus  string    `json:"review_status,omitempty"`
+	CanApply      *bool     `json:"can_apply,omitempty"`
+	CanRevert     *bool     `json:"can_revert,omitempty"`
 	ArtifactID    string    `json:"artifact_id,omitempty"`
 	Name          string    `json:"name,omitempty"`
 	MimeType      string    `json:"mime_type,omitempty"`
