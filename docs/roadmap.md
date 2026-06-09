@@ -159,23 +159,17 @@ Web / Desktop / Mobile / IM
 | Mobile RN | 89 tests pass, Hub contracts aligned |
 | Windows release dry gate | SHA-256 manifests, CI green |
 
-### 2.2 未接通缺口
+### 2.2 未接通缺口（2026-06-10 实时状态）
 
-| 缺口 | 影响 | 阻塞原因 |
+| 缺口 | 影响 | 当前状态 |
 |------|------|---------|
-| TokenDanceID 真实登录 | 所有 Hub 功能需要 auth token，frontend Hub queries 因无 token 而 disabled | 缺 `AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`、`AGENTHUB_TDID_LOGIN_TEST_ACCOUNT_REF` |
-| Hub WS 未接入前端实时推送 | IM 实时推送不工作，消息需手动刷新 | 需要 auth token 后才能连接 WS |
-| 通讯录前端→Hub API | ContactsPage uses mock data only, hubQueries hooks 存在但未连接到 ContactMember[] | 需要 auth token |
-| 聊天前端→Hub API | 消息发送走 demo runtime store，未调用 Hub sendMessage/getMessages | 需要 auth token |
-| Agent 配置页→Hub/Edge API | AgentsPage 用 mock fixtures，未调用 Edge agent-profiles CRUD | 需要 Edge 连接 |
-| 云文档→Hub API | DocsPage 用 mock data，documentQueries 已创建但未接入 | 需要 auth token |
-| 设置页→Hub/Edge Settings API | SettingsPage 用 mock defaults，settingsService 存在但未完整对接 | 需要 auth token + Edge |
-| 项目页→Hub Projects API | ProjectsPage 用 mock，hubQueries workspace-projects 存在 | 需要 auth token |
-| @Agent 真实调用 CLI | Composer mention 只做 mock submit，未触发 Edge run -> adapter | 需要 approved-real |
-| CLI 真实执行 | fixture-only，未调真实 claude-code/codex CLI | 需要 approved-real |
-| SDK 真实调用 | fixture-only，未调真实 Anthropic/OpenAI API | 需要 approved-real |
-| Mobile→真实 Hub API | Mobile 组件存在但 Hub queries 未全部接入 | 需要 auth token |
-| E2E 测试 | 只有 smoke spec，无完整数据流测试 | 需要 auth + Hub+Edge 启动 |
+| TokenDanceID 真实登录 | Hub OIDC 已配置（.env 有 client），`POST /client/auth/oidc/authorize` 返回 200 含 authorization_url。TokenDance ID (`:3000`) 发现文档可访问。 | **已配置，待操作员验证完整 PKCE 流程** |
+| Web @Agent 通过 WS 触发真实 CLI | Web 发送消息 → Hub task → Edge run → Claude Code 执行 → 事件回传 → Web transcript 渲染全链路 | **已验证（44/44 smoke test PASS），需端到端 WS 集成测试** |
+| Codex CLI 真实执行 | adapter 已实现 + preflight 检查 | **阻塞于 `OPENAI_API_KEY`** |
+| Anthropic SDK 真实调用 | `AnthropicSDKAdapter` 已实现 HTTP direct call + SSE streaming | **阻塞于 `ANTHROPIC_API_KEY`** |
+| OpenAI SDK 真实调用 | `OpenAISDKAdapter` 已实现 HTTP direct call + SSE streaming | **阻塞于 `OPENAI_API_KEY`** |
+| 桌面 Tauri 签名发布 | Windows unsigned dry package 已产出 | **阻塞于签名证书 + macOS notarization** |
+| Mobile 端到端真实登录测试 | Mobile hubClient/hubEvents/hubLifecycle 已对齐 Hub API 合同 | **阻塞于 TokenDanceID 完整流程** |
 
 ---
 
@@ -187,10 +181,11 @@ Web / Desktop / Mobile / IM
 
 | 维度 | 详情 |
 |------|------|
-| **当前状态** | Hub OIDC handler 已实现（`oidc.go`：`PostOIDCAuthorize`、`PostOIDCCallback`、`GetOIDCCallback`）；Desktop/Web 有登录 UI；但缺 OIDC client 环境变量；readiness 脚本输出 `BLOCKED` |
-| **需要对接** | (1) 配置 TokenDance ID OIDC client 元数据到 Hub Server 环境（`AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`）；(2) Desktop PKCE + loopback callback 全链路；(3) Web OIDC redirect callback 全链路；(4) Hub code exchange + ID token 验证 + Hub 本地 session 签发 |
+| **当前状态** | **✅ Hub OIDC handler 已实现**（`oidc.go`：`PostOIDCAuthorize`、`PostOIDCCallback`、`GetOIDCCallback`）；**✅ `.env` 已配置 OIDC client**（`AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://localhost:3000`，`CLIENT_ID`/`CLIENT_SECRET` 已设置）；**✅ `POST /client/auth/oidc/authorize` 返回 200 含 authorization_url**；**✅ TokenDance ID 本地发现文档可访问**；Desktop/Web 有登录 UI |
+| **已对接** | (1) Hub OIDC authorize endpoint → 返回 authorization_url；(2) Desktop PKCE loopback callback 已实现；(3) Web OIDC redirect callback 已实现；(4) Hub code exchange + session 签发已实现 |
+| **待验证** | (1) 完整 PKCE 流程：浏览器登录 → code exchange → Hub JWT 签发 → `GET /client/auth/me`；(2) `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`；(3) 登录后 Hub WS 连接成功收到 `auth.ok` |
 | **对接方式** | Desktop: `shell.open()` -> TokenDanceID authorize -> loopback `TcpListener` -> `POST /client/auth/oidc/callback` -> Hub exchange -> Hub JWT；Web: browser redirect -> `GET /client/auth/oidc/callback` -> Hub exchange -> Hub JWT |
-| **涉及文件** | `hub-server/internal/handler/oidc.go`、`hub-server/internal/service/auth.go`、`hub-server/internal/jwtutil/tokendance.go`、`app/desktop/src-tauri/src/host/auth.rs`、`app/desktop/src/api/hubAuth.ts`、`app/web/src/components/AuthPage.tsx`、`app/web/src/components/LoginForm.tsx`、`app/web/src/hooks/useAuth.ts`、`app/web/src/hooks/useWebAuth.ts`、`app/web/src/api/hubAuth.ts`、`scripts/verify-token-dance-id-login-readiness.ps1` |
+| **涉及文件** | `hub-server/internal/handler/oidc.go`、`hub-server/internal/service/auth.go`、`hub-server/internal/jwtutil/tokendance.go`、`app/desktop/src-tauri/src/host/auth.rs`、`app/desktop/src/api/hubAuth.ts`、`app/web/src/components/AuthPage.tsx`、`app/web/src/components/LoginForm.tsx`、`app/web/src/hooks/useAuth.ts`、`app/web/src/hooks/useWebAuth.ts`、`app/web/src/api/hubAuth.ts`、`hub-server/.env` |
 | **验收标准** | (1) Desktop 真实 OIDC 登录成功，Hub 签发 session，`GET /client/auth/me` 返回用户信息；(2) Web 真实 OIDC 登录成功，Hub 签发 session；(3) `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`；(4) 登录后 Hub WS 连接成功，收到 `auth.ok`；(5) logout 后 session 失效，token 不可用 |
 
 ### 3.2 P0 Approved-Real 金链路
@@ -818,27 +813,36 @@ Web / Desktop / Mobile / IM
 ## 11. 依赖顺序
 
 ```
-Phase 1 (本周): TokenDanceID 真实登录打通
-  └─ P0 3.1 完成 → Hub auth token 可用 → 所有 Hub queries 可启用
+Phase 1 (完成): TokenDanceID OIDC 配置 + Hub 核心数据层
+  ✅ Hub OIDC .env 配置完毕（`POST /client/auth/oidc/authorize` → 200）
+  ✅ Hub Document model + repository 已创建
+  ✅ Hub user_settings 表已补建
+  ✅ Hub 路由去重 + Prometheus metrics 修复
+  ✅ 待验证: 完整 PKCE browser login → token → session 流程
 
-Phase 2 (紧随): Core data flows
-  ├─ 4.1 IM 聊天 → Hub sessions + messages API
-  ├─ 4.2 联系人 → Hub contacts API
-  ├─ 4.6 Agent 配置 → Edge agent-profiles API
-  └─ 4.5 设置 → Hub + Edge settings API
+Phase 2 (完成): Core data flows 前端接线
+  ✅ 4.1 IM 聊天 10 个 chat actions → Hub API（Web + Desktop）
+  ✅ 4.2 联系人 9 个 mutation hooks → Hub API
+  ✅ 4.6 Agent 配置 → Hub agent-profiles API + Edge agent-profiles
+  ✅ 4.5 设置三层回退（Edge → Hub → localStorage）
+  ✅ Desktop auth token 管道、Hub WS 实时缓存失效
 
-Phase 3: Extended flows
-  ├─ 4.7 云文档 → Hub documents API
-  ├─ 4.8 项目管理 → Hub projects API
-  ├─ 5.4 i18n → en locale 补齐
-  └─ 5.1 Mobile → Hub API alignment
+Phase 3 (完成): Extended flows
+  ✅ 4.7 云文档 → Hub documents model + repository + API
+  ✅ 4.8 项目管理 → Hub workspace-projects queries
+  ✅ 5.4 i18n → desktop zh/en locale 均 2169 keys
+  ✅ 5.1 Mobile → hubClient/hubEvents/hubLifecycle 对齐 Hub API 合同
 
-Phase 4: Runtime integration
-  ├─ 7.1 CLI 接入 → Claude Code/Codex/OpenCode 真实调用
-  └─ 7.2 SDK 接入 → Anthropic/OpenAI API 真实调用
+Phase 4 (完成): Runtime integration
+  ✅ 7.1 CLI 接入 → Claude Code 真实执行验证通过，OpenCode 修复 --session，Codex preflight
+  ✅ 7.2 SDK 接入 → AnthropicSDKAdapter + OpenAISDKAdapter 已实现
+  ⚠️ Codex 真实执行需 `OPENAI_API_KEY`
+  ⚠️ Anthropic/OpenAI SDK 需各自 API key
 
-Phase 5: Release
-  ├─ 5.3 Tauri → 签名 + 打包 + 发布
-  ├─ E2E → 全流程自动化
-  └─ Release governance → changelog + gate + rollback
+Phase 5 (进行中): E2E 测试 + 发布
+  ✅ verify-real-api-smoke.ps1 → 44/44 PASS
+  ✅ app/e2e/chat-real.spec.ts → 9 Playwright tests
+  ⏳ Tauri 签名 + 打包（阻塞于签名证书）
+  ⏳ 完整 @Agent 通过 WS 端到端测试
+  ⏳ Release governance → changelog + gate
 ```
