@@ -91,8 +91,12 @@ function Invoke-RepoScript {
 }
 
 $gatePath = Join-Path $RepoRoot "scripts\verify-p0-remote-control-fixture.ps1"
+$workflowPath = Join-Path $RepoRoot ".github\workflows\checks.yml"
+$ciPolicyPath = Join-Path $RepoRoot "scripts\verify-ci-gates.ps1"
 
 Assert-True (Test-Path -LiteralPath $gatePath) "P0 remote-control fixture total gate exists"
+Assert-True (Test-Path -LiteralPath $workflowPath) "CI workflow exists"
+Assert-True (Test-Path -LiteralPath $ciPolicyPath) "CI policy verifier exists"
 
 if (Test-Path -LiteralPath $gatePath) {
     $scriptText = Get-Content -Raw -LiteralPath $gatePath -Encoding UTF8
@@ -171,6 +175,22 @@ if (Test-Path -LiteralPath $gatePath) {
     )
     Assert-True ($badClaim.ExitCode -ne 0) "total gate rejects non-fixture claim" $badClaim.Output
     Assert-True ($badClaim.Output -match "FixtureOnly") "bad claim failure names FixtureOnly requirement" $badClaim.Output
+}
+
+if ((Test-Path -LiteralPath $workflowPath) -and (Test-Path -LiteralPath $ciPolicyPath)) {
+    $workflowText = Get-Content -Raw -LiteralPath $workflowPath -Encoding UTF8
+    $ciPolicyText = Get-Content -Raw -LiteralPath $ciPolicyPath -Encoding UTF8
+
+    Assert-True ($workflowText -match "P0 remote-control fixture readiness") "CI workflow runs P0 remote-control fixture readiness gate"
+    Assert-True ($workflowText -match [regex]::Escape("pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-p0-remote-control-fixture.ps1")) "CI workflow invokes the P0 fixture gate by script path"
+    Assert-True ($workflowText -notmatch "self-hosted") "CI fixture gate does not require self-hosted runner"
+
+    Assert-True ($ciPolicyText -match "P0 remote-control fixture readiness") "CI policy verifier checks P0 fixture gate step"
+    Assert-True ($ciPolicyText -match "verify-p0-remote-control-fixture\.ps1") "CI policy verifier requires P0 fixture gate command"
+    Assert-True ($ciPolicyText -match "self-hosted") "CI policy verifier forbids self-hosted fixture runners"
+    Assert-True ($ciPolicyText -match "docker") "CI policy verifier forbids docker service fixture shortcuts"
+    Assert-True ($ciPolicyText -match "codesign") "CI policy verifier forbids signing in fixture gate"
+    Assert-True ($ciPolicyText -match "notarization") "CI policy verifier forbids notarization in fixture gate"
 }
 
 if ($Failed -gt 0) {
