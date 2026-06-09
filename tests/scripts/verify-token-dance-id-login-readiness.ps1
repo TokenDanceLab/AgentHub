@@ -36,9 +36,10 @@ function Invoke-RepoScript {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.WorkingDirectory = $RepoRoot
-    foreach ($arg in @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File") + $Arguments) {
-        [void]$psi.ArgumentList.Add($arg)
-    }
+    $allArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File") + $Arguments
+    $psi.Arguments = ($allArgs | ForEach-Object {
+        '"' + ([string]$_).Replace('"', '\"') + '"'
+    }) -join " "
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $stdout = $proc.StandardOutput.ReadToEnd()
@@ -65,9 +66,12 @@ function New-DiscoveryFixture {
 
 $scriptPath = Join-Path $RepoRoot "scripts\verify-token-dance-id-login-readiness.ps1"
 $statePath = Join-Path $RepoRoot "STATE.md"
+$readinessDocPath = Join-Path $RepoRoot "docs\audit\token-dance-id-login-readiness.md"
+$envExamplePath = Join-Path $RepoRoot ".env.example"
 
 Assert-True (Test-Path -LiteralPath $scriptPath) "TokenDanceID login readiness script exists"
 Assert-True (Test-Path -LiteralPath $statePath) "STATE.md exists"
+Assert-True (Test-Path -LiteralPath $readinessDocPath) "TokenDanceID login readiness doc exists"
 
 try {
     $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "agenthub-token-dance-id-login-readiness-$PID"
@@ -148,6 +152,24 @@ try {
         Assert-True ($stateText -match "verify-token-dance-id-login-readiness\.ps1") "STATE references the no-secret login readiness gate"
         Assert-True ($stateText -match "READY_FOR_OPERATOR") "STATE records ready-for-operator status contract"
         Assert-True ($stateText -match "fixture") "STATE states fixture evidence is not real login"
+    }
+
+    if (Test-Path -LiteralPath $readinessDocPath) {
+        $docText = Get-Content -Raw -LiteralPath $readinessDocPath
+        Assert-True ($docText -match "AGENTHUB_TDID_LOGIN_ISSUER_URL") "readiness doc names issuer URL env"
+        Assert-True ($docText -match "AGENTHUB_TDID_LOGIN_CLIENT_ID") "readiness doc names client id env"
+        Assert-True ($docText -match "AGENTHUB_TDID_LOGIN_TEST_ACCOUNT_REF") "readiness doc names test account ref env"
+        Assert-True ($docText -match "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET") "readiness doc distinguishes runtime client secret"
+        Assert-True ($docText -match "verify-p0-approved-real-gold-path\.ps1") "readiness doc includes gold-path command"
+        Assert-True ($docText -match "BLOCKED_WITH_EVIDENCE") "readiness doc preserves blocked-with-evidence boundary"
+    }
+
+    if (Test-Path -LiteralPath $envExamplePath) {
+        $envText = Get-Content -Raw -LiteralPath $envExamplePath
+        Assert-True ($envText -match "AGENTHUB_TDID_LOGIN_ISSUER_URL") ".env.example lists issuer readiness env"
+        Assert-True ($envText -match "AGENTHUB_TDID_LOGIN_CLIENT_ID") ".env.example lists client id readiness env"
+        Assert-True ($envText -match "AGENTHUB_TDID_LOGIN_TEST_ACCOUNT_REF") ".env.example lists test account ref readiness env"
+        Assert-True ($envText -match "not Hub runtime secrets") ".env.example labels readiness env as non-runtime metadata"
     }
 }
 finally {
