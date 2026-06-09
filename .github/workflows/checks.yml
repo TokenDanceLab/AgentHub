@@ -333,7 +333,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./app/mobile
+        working-directory: ./app
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -346,12 +346,14 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Typecheck
-        run: pnpm typecheck
-      - name: Build
-        run: pnpm build
-      - name: Test
-        run: pnpm test -- --run
+      - name: Verify Mobile RN
+        run: pnpm --filter agenthub-mobile-rn verify
+      - name: Expo Doctor
+        run: pnpm --filter agenthub-mobile-rn run doctor
+      - name: Native readiness
+        run: pnpm --filter agenthub-mobile-rn run native:check
+      - name: Mock Hub contract
+        run: pnpm --filter agenthub-mobile-rn run mock:hub:check
 
   # ── E2E Smoke ─────────────────────────────────
   e2e-smoke:

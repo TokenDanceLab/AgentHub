@@ -9,13 +9,11 @@ vendor/
 app/desktop/pnpm-lock.yaml
 app/shared/pnpm-lock.yaml
 app/web/pnpm-lock.yaml
-app/mobile/pnpm-lock.yaml
 
 # npm lockfile (project uses pnpm exclusively)
 package-lock.json
 app/desktop/package-lock.json
 app/web/package-lock.json
-app/mobile/package-lock.json
 app/shared/package-lock.json
 
 # =============================================================================
@@ -60,9 +58,8 @@ agenthub-edge-*
 target/
 app/desktop/src-tauri/target/
 
-# Tauri Android generated (source tracked, builds ignored by inner .gitignore)
+# Desktop Tauri generated (source tracked, builds ignored by inner .gitignore)
 # app/desktop/src-tauri/gen/android/ is committed
-app/mobile/src-tauri/gen/
 
 # =============================================================================
 # IDE & Editors
@@ -140,6 +137,8 @@ docs/handoffs/
 # =============================================================================
 .tmp/
 tmp/
+.expo/
+**/.expo/
 .claude-flow/
 .od/
 .swarm/
@@ -193,7 +192,6 @@ screenshots/
 
 # Tauri app icons (must be tracked for builds)
 !app/desktop/src-tauri/icons/
-!app/mobile/src-tauri/icons/
 !app/desktop/src-tauri/icons/agenthub-icon-rounded-32.png
 !app/desktop/src-tauri/icons/agenthub-icon-rounded-128.png
 !app/desktop/src-tauri/icons/agenthub-icon-rounded-256.png
@@ -201,6 +199,10 @@ screenshots/
 !app/web/public/agenthub-icon-rounded-32.png
 !app/web/public/agenthub-icon-rounded-192.png
 !app/web/public/agenthub-icon-rounded-512.png
+
+# Expo Mobile production assets (must be tracked for native builds)
+!app/mobile-rn/assets/
+!app/mobile-rn/assets/agenthub-*.png
 
 # =============================================================================
 # Docs & Local Files

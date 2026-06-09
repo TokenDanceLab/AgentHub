@@ -37,9 +37,17 @@ export default tseslint.config(
     },
   },
 
+  // eslint-plugin-import order currently crashes under ESLint 10 on the RN package.
+  {
+    files: ["mobile-rn/**/*.{ts,tsx,js,jsx,mjs}"],
+    rules: {
+      "import/order": "off",
+    },
+  },
+
   // React Hooks rules — only for UI packages
   {
-    files: ["desktop/**/*.{tsx,jsx}", "web/**/*.{tsx,jsx}"],
+    files: ["desktop/**/*.{tsx,jsx}", "web/**/*.{tsx,jsx}", "mobile-rn/**/*.{tsx,jsx}"],
     plugins: { "react-hooks": reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
