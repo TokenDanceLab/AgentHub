@@ -9,12 +9,14 @@ import type {
   AgentTeamRun,
   AgentTeamTask,
   AddAgentTeamMemberRequest,
+  CoordinatorRouteDecision,
   CreateAgentTeamRequest,
   CustomAgent,
   StartAgentTeamRunRequest,
   TeamApprovalDecisionRequest,
   TeamConflictResolutionRequest,
   TeamRunState,
+  UpdateAgentTeamRequest,
 } from './hubClient';
 
 export interface UseHubAgentTeamsOptions {
@@ -278,5 +280,197 @@ export function useResolveTeamConflict(options: { getToken?: () => string | null
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
     },
+  });
+}
+
+// ── Update / Delete team ──────────────────────────────────────────
+
+export function useUpdateAgentTeam(options: { getToken?: () => string | null; baseUrl?: string } = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { teamId: string; data: UpdateAgentTeamRequest }) => {
+      const token = (options.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        options.baseUrl ? { baseUrl: options.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.updateAgentTeam(input.teamId, input.data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+    },
+  });
+}
+
+export function useDeleteAgentTeam(options: { getToken?: () => string | null; baseUrl?: string } = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (teamId: string) => {
+      const token = (options.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        options.baseUrl ? { baseUrl: options.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.deleteAgentTeam(teamId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+    },
+  });
+}
+
+// ── Remove team member ────────────────────────────────────────────
+
+export function useRemoveAgentTeamMember(options: { getToken?: () => string | null; baseUrl?: string } = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { teamId: string; memberId: string }) => {
+      const token = (options.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        options.baseUrl ? { baseUrl: options.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.removeAgentTeamMember(input.teamId, input.memberId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+    },
+  });
+}
+
+// ── Route decisions ───────────────────────────────────────────────
+
+export function usePostTeamRouteDecision(options: { getToken?: () => string | null; baseUrl?: string } = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { teamId: string; runId: string; decision: CoordinatorRouteDecision }) => {
+      const token = (options.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        options.baseUrl ? { baseUrl: options.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.postTeamRouteDecision(input.teamId, input.runId, input.decision);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+    },
+  });
+}
+
+// ── Individual queries (on-demand fetching) ───────────────────────
+
+export function useAgentTeamDetail(
+  teamId: string | undefined,
+  opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
+) {
+  return useQuery({
+    queryKey: ['agent-teams', 'detail', teamId],
+    queryFn: async () => {
+      const token = (opts?.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.getAgentTeam(teamId!);
+    },
+    enabled: opts?.enabled ?? !!teamId,
+  });
+}
+
+export function useTeamRuns(
+  teamId: string | undefined,
+  opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
+) {
+  return useQuery({
+    queryKey: ['agent-teams', teamId, 'runs'],
+    queryFn: async () => {
+      const token = (opts?.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.listTeamRuns(teamId!);
+    },
+    enabled: opts?.enabled ?? !!teamId,
+  });
+}
+
+export function useTeamRun(
+  teamId: string | undefined,
+  runId: string | undefined,
+  opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
+) {
+  return useQuery({
+    queryKey: ['agent-teams', teamId, 'runs', runId],
+    queryFn: async () => {
+      const token = (opts?.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.getTeamRun(teamId!, runId!);
+    },
+    enabled: opts?.enabled ?? (!!teamId && !!runId),
+  });
+}
+
+export function useTeamRunState(
+  teamId: string | undefined,
+  runId: string | undefined,
+  opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
+) {
+  return useQuery({
+    queryKey: ['agent-teams', teamId, 'runs', runId, 'state'],
+    queryFn: async () => {
+      const token = (opts?.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.getTeamRunState(teamId!, runId!);
+    },
+    enabled: opts?.enabled ?? (!!teamId && !!runId),
+  });
+}
+
+export function useTeamEvents(
+  teamId: string | undefined,
+  runId: string | undefined,
+  opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
+) {
+  return useQuery({
+    queryKey: ['agent-teams', teamId, 'runs', runId, 'events'],
+    queryFn: async () => {
+      const token = (opts?.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.listTeamEvents(teamId!, runId!);
+    },
+    enabled: opts?.enabled ?? (!!teamId && !!runId),
+  });
+}
+
+export function useTeamTasks(
+  teamId: string | undefined,
+  runId: string | undefined,
+  opts?: { enabled?: boolean; getToken?: () => string | null; baseUrl?: string },
+) {
+  return useQuery({
+    queryKey: ['agent-teams', teamId, 'runs', runId, 'tasks'],
+    queryFn: async () => {
+      const token = (opts?.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      return client.listTeamTasks(teamId!, runId!);
+    },
+    enabled: opts?.enabled ?? (!!teamId && !!runId),
   });
 }
