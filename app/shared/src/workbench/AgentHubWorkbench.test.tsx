@@ -268,6 +268,13 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
+    expect(screen.getByText('运行证据')).toBeInTheDocument();
+    expect(screen.getByText('Hub replay artifact index: 1')).toBeInTheDocument();
+    expect(screen.getByText('Hub replay / run-edge-1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开 reports/runtime.patch 只读预览' })).toBeInTheDocument();
+    expect(screen.queryByText('B0 SQLite 迁移')).not.toBeInTheDocument();
+    expect(screen.queryByText('sqlite-migration-plan.md')).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
 
     expect(screen.getByText('运行证据')).toBeInTheDocument();
