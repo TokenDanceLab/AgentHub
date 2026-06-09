@@ -55,6 +55,7 @@
 当前不声明已经完成：
 
 - 真实 TokenDanceID 登录全链路验收。
+- `scripts/verify-token-dance-id-login-readiness.ps1` 的 `READY_FOR_OPERATOR` 只表示 no-secret readiness 通过：环境提供了 approved test account/client 元数据且 OIDC discovery 可用；fixture discovery 只能验证脚本合约，不能当作真实登录 evidence。
 - 真实 CLI/model/API 消耗或 approved-real 运行证据。
 - 签名安装器、macOS notarization、release upload、updater metadata。
 - Web/Mobile/IM 全部真实远控闭环的发布级验收。
@@ -90,6 +91,7 @@
 | Web artifact/diff inspector | worker/Erdos | 已集成并验证 controller：`01ff715d` | Web/shared 只读消费 Hub file-change diff metadata；不实现 apply/revert |
 | IM/@Agent mainchain UX | worker/Raman | 已集成并验证 controller：`8258983f` | Agent/Target/Task 状态和消息 pin UI；不扩展 Hub pin 持久化 |
 | SDK event fixture matrix | worker/Hegel | 已集成并验证 controller：`83059e82` | Claude/OpenAI SDK-like 离线事件矩阵；不安装 SDK、不跑真实模型/API |
+| TokenDanceID no-secret login readiness | 本并发线 | 分支 `codex/token-dance-id-login-readiness-20260609` 收口中 | `scripts/verify-token-dance-id-login-readiness.ps1` 只检查 approved test account/client 元数据和 OIDC discovery；输出 `BLOCKED`/`READY_FOR_OPERATOR`，不提交账号/密码/token，不执行真实登录，不把 fixture 当真实登录 |
 | State/worktree 审计 | state auditor | 已产出只读报告 | 给出 merged-clean、dirty/manual-confirm、active lane 和 `edge-sql-store` 异常建议；不删除 |
 | Mobile | Trump/mobile | 独立收口 | `codex/mobile-expo-rn-plan` 已保存进度；主控只在协议漂移时介入 |
 
@@ -103,7 +105,7 @@
 
 ## 下一步优先级
 
-1. **真实 TokenDanceID 登录打通**：先跑 no-secret readiness gates，再用一次性测试账号和已批准环境运行真实登录链路，不把 secret 写入仓库。
+1. **真实 TokenDanceID 登录打通**：先跑 `scripts/verify-token-dance-id-login-readiness.ps1`；只有输出 `READY_FOR_OPERATOR` 后，操作员才使用一次性/预批准测试账号和已批准环境运行真实登录链路，不把 secret 写入仓库。`BLOCKED` 必须先补齐 approved client/test-account 元数据或 OIDC discovery。
 2. **approved-real 录屏前审批**：先运行 `scripts\verify-approved-real-demo-readiness.ps1` 产出 redacted manifest；若状态是 `READY_FOR_APPROVAL`，再由人工批准真实 TokenDanceID 测试账号/安全 env、录屏范围和是否允许真实 CLI/model/API。无批准时只能演示 fixture/mock replay。
 3. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
 4. **Windows/Tauri unsigned package smoke**：验证 sidecar binary、no-bundle build 和 unsigned installer readiness；签名、公证、release upload 另行推进。
