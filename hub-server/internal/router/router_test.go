@@ -36,7 +36,7 @@ func TestNoRouteReturnsNotFound(t *testing.T) {
 		&config.Config{},
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	for _, path := range []string{"/does-not-exist", "/metrics", "/debug/pprof/"} {
@@ -103,7 +103,7 @@ func TestHealthRoutesExposeCompatibleLiveAndReadyEndpoints(t *testing.T) {
 		cacheClient,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		healthHandler,
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	tests := []struct {
@@ -195,7 +195,7 @@ func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil,
 		handler.NewMessageHandler(routerMessageServiceStub{}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	req := httptest.NewRequest(http.MethodPut, "/client/messages/msg-1", nil)
@@ -225,7 +225,7 @@ func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil,
 		handler.NewMessageHandler(routerMessageServiceStub{}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	for _, tt := range []struct {
