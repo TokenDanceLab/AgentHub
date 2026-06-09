@@ -124,6 +124,26 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `item.created` | P0 | Thread Item 创建 |
 | `item.updated` | P0 | Thread Item 状态更新 (planned) |
 
+`message.created` 的 text/content JSON 可以携带 IM 编排 metadata，用于 shared transcript 和后续 Hub task/orchestrator queue 投影；metadata 不启动真实 runtime，也不替代 `/web/agent-tasks` 的 `trigger_message_id` 合同。
+
+```json
+{
+  "text": "@Reviewer 检查 shared transcript contract",
+  "im_kind": "project_group",
+  "mentions": [
+    { "id": "agent-reviewer", "label": "Reviewer", "runtime_id": "codex" }
+  ],
+  "agent_task": { "task_id": "task-reviewer-1", "status": "queued" },
+  "route_decision": {
+    "action": "dispatch",
+    "target_agent": "Reviewer",
+    "summary": "Route shared transcript contract review to Reviewer."
+  }
+}
+```
+
+当前 fixture contract 覆盖 human -> agent、agent -> agent、项目群 @Agent 和 orchestrator route decision 的 transcript 可见状态；真实 agent-authored message ingest、群成员权限、消息幂等、任务队列持久化和 route decision 执行仍归后续 Hub/TeamRun 切片。
+
 ### Execution / Runtime
 
 | type | 阶段 | 说明 |
