@@ -4,11 +4,11 @@ Last updated: 2026-06-09
 
 ## Ownership
 
-- Scope: AgentHub Mobile only, under `app/mobile-rn` plus mobile migration docs.
+- Scope: AgentHub Mobile only, under `app/mobile-rn` plus active Mobile governance references.
 - Branch: `codex/mobile-delivery-sprint`.
 - Worktree: use the AgentHub mobile delivery worktree, not the main checkout.
 - Main AgentHub checkout stays read-only for this mobile lane.
-- Legacy `app/mobile` remains the frozen Tauri prototype/reference until the replacement gate passes.
+- The old Tauri Mobile package has been removed from the active source tree. Do not restore it.
 
 ## Current Direction
 
@@ -71,9 +71,9 @@ corepack pnpm --filter agenthub-mobile-rn dev:web
 
 Open `http://localhost:5177/` for the mobile visual preview.
 
-## Replacement Gate
+## Native Release Gate
 
-Do not replace `app/mobile` until these are proven in development builds:
+Do not tag or publish Android/iOS Mobile releases until these are proven in development builds:
 
 - Android development build installs and opens.
 - iOS simulator or EAS development build route is verified.
@@ -88,7 +88,7 @@ Do not replace `app/mobile` until these are proven in development builds:
 - 5177 is a design/visual preview, not native proof.
 - The current delivery branch was created from the latest `origin/dev/delicious233` available at branch creation and should be rebased before handoff if that remote moves again.
 - Feishu reference polish is ongoing: list density, avatar detail, chat composer, account drawer, and typography still need more visual QA rounds.
-- Desktop/Web parity is not complete outside Chat/Tasks. `contacts`, `docs`, `agents`, `projects`, and `settings` currently share a generic mobile surface; the next slice should split them into page-specific mobile screens that preserve Desktop page semantics instead of only listing rows.
+- Desktop/Web parity is not complete outside Chat/Tasks. Contacts, Docs, Agents, Projects, and Settings need more page-specific mobile screens that preserve Desktop page semantics instead of only listing rows.
 - Keep the explicit route mapping documented: Desktop route `runs` is the mobile primary tab `tasks`; legacy run/approval/activity deep links and notifications route into Tasks context instead of separate primary screens.
 - Settings must add Desktop panes such as appearance, notifications, agent/defaults, local/runtime state while keeping mobile-only identity/session controls in account/profile surfaces.
 - Native device proof is still missing.
