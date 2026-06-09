@@ -714,11 +714,11 @@ Web / Desktop / Mobile / IM
 
 ### 7.5 验收标准
 
-- [ ] 文档列表分页加载
-- [ ] 创建/编辑/删除同步
-- [ ] 文档搜索返回结果
-- [ ] 文档预览正确显示
-- [ ] 文档关联项目
+- [x] 文档列表分页加载
+- [x] 创建/编辑/删除同步
+- [x] 文档搜索返回结果
+- [x] 文档预览正确显示
+- [x] 文档关联项目
 
 ---
 
@@ -748,11 +748,11 @@ Web / Desktop / Mobile / IM
 
 ### 8.4 验收标准
 
-- [ ] 修改主题后 Hub 记录偏好，刷新后保持
-- [ ] 登录后 Hub 设置覆盖本地默认
-- [ ] Desktop workspace allowlist 双写
-- [ ] 换 Desktop 登录后偏好可恢复
-- [ ] settingsService subscribe 响应远程变更
+- [x] 修改主题后 Hub 记录偏好，刷新后保持
+- [x] 登录后 Hub 设置覆盖本地默认
+- [x] Desktop workspace allowlist 双写
+- [x] 换 Desktop 登录后偏好可恢复
+- [x] settingsService subscribe 响应远程变更
 
 ---
 
@@ -782,11 +782,11 @@ Web / Desktop / Mobile / IM
 
 ### 9.4 验收标准
 
-- [ ] 项目列表展示 Hub 项目
-- [ ] 创建项目后出现在列表
-- [ ] 线程列表按时间排序
-- [ ] 线程内消息实时更新
-- [ ] 项目产物预览正确显示
+- [x] 项目列表展示 Hub 项目
+- [x] 创建项目后出现在列表
+- [x] 线程列表按时间排序
+- [x] 线程内消息实时更新
+- [x] 项目产物预览正确显示
 
 ---
 
@@ -800,7 +800,7 @@ Web / Desktop / Mobile / IM
 - Claude Code + OpenCode 真实执行已验证
 - Codex PreflightAdapter 快速失败已实现
 - SDK HTTP SSE adapters 已实现
-- `verify-real-api-smoke.ps1` 44/44 通过
+- `verify-real-api-smoke.ps1` ALL 13 phases PASSED (0 failures)
 
 ### 10.2 API 端点
 
@@ -834,19 +834,19 @@ Web / Desktop / Mobile / IM
 
 ### 10.4 验收标准
 
-- [ ] Edge 健康检查返回 ready
-- [ ] CLI 发现状态正确
-- [ ] 触发 run 后状态 pending -> running -> done
-- [ ] 事件流返回完整事件
-- [ ] Approval 展示和决策
-- [ ] Artifact 列表和 Diff 渲染
-- [ ] Target 列表 online/offline
-- [ ] Target ping 可达性
-- [ ] Claude Code 真实执行
-- [ ] OpenCode 真实执行
-- [ ] Codex 预检快速失败
-- [ ] Anthropic SDK HTTP SSE
-- [ ] OpenAI SDK HTTP SSE
+- [x] Edge 健康检查返回 ready
+- [x] CLI 发现状态正确
+- [x] 触发 run 后状态 pending -> running -> done
+- [x] 事件流返回完整事件
+- [x] Approval 展示和决策
+- [x] Artifact 列表和 Diff 渲染
+- [x] Target 列表 online/offline
+- [x] Target ping 可达性
+- [x] Claude Code 真实执行
+- [x] OpenCode 真实执行
+- [x] Codex 预检快速失败
+- [x] Anthropic SDK HTTP SSE
+- [x] OpenAI SDK HTTP SSE
 
 ---
 
@@ -875,12 +875,12 @@ Web / Desktop / Mobile / IM
 
 ### 11.3 验收标准
 
-- [ ] Team CRUD
-- [ ] Team 成员管理
-- [ ] Team Run 启动
-- [ ] 路由决策可视化
-- [ ] 冲突解决
-- [ ] Assignment 派发/完成/失败
+- [x] Team CRUD
+- [x] Team 成员管理
+- [x] Team Run 启动
+- [x] 路由决策可视化
+- [x] 冲突解决
+- [x] Assignment 派发/完成/失败
 
 ---
 
@@ -928,15 +928,15 @@ CLI permission request
 
 ### 12.5 验收标准
 
-- [ ] Claude Code 真实执行产出 typed events
-- [ ] OpenCode 真实执行产出 typed events
-- [ ] Codex 缺 API key 快速失败
-- [ ] Anthropic SDK HTTP SSE 流式调用
-- [ ] OpenAI SDK HTTP SSE 流式调用
-- [ ] 进程生命周期由 Edge lifecycle 管理
-- [ ] stdout/stderr 合并批处理（50ms 或 8KB）
-- [ ] 权限请求映射到 approval 流
-- [ ] SDK event 映射到统一 RunEvent 合同
+- [x] Claude Code 真实执行产出 typed events
+- [x] OpenCode 真实执行产出 typed events
+- [x] Codex 缺 API key 快速失败
+- [x] Anthropic SDK HTTP SSE 流式调用
+- [x] OpenAI SDK HTTP SSE 流式调用
+- [x] 进程生命周期由 Edge lifecycle 管理
+- [x] stdout/stderr 合并批处理（50ms 或 8KB）
+- [x] 权限请求映射到 approval 流
+- [x] SDK event 映射到统一 RunEvent 合同
 
 ---
 
