@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { writeWorkbenchDataModeOverride } from '@shared/demo';
+import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride } from '@shared/demo';
+import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
 import { useAgentList } from '@/api/agentQueries';
@@ -13,6 +14,7 @@ import { useHealth } from '@/hooks/useHealth';
 import { createDesktopPlatform } from '@/platform/desktopPlatform';
 import { mapEdgeAgentsToWorkbenchAgents } from '@/platform/edgeCapabilityMapper';
 import { useDesktopWorkbenchModel } from '@/platform/useDesktopWorkbenchModel';
+import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'demo'>('entry');
@@ -28,17 +30,30 @@ export default function App() {
   }
 
   return (
-    <DesktopChrome>
+    <DesktopChrome showNavigationControls={entryMode !== 'entry'}>
       {entryMode === 'entry' ? (
-        <DesktopEntryGate onContinueDemo={continueDemo} edgeOnline={edgeOnline} />
+        <DesktopEntryGate
+          onContinueDemo={continueDemo}
+          onToggleTheme={toggleAppliedAgentHubTheme}
+          edgeOnline={edgeOnline}
+        />
       ) : (
-        <DesktopWorkbenchApp />
+        <DesktopWorkbenchApp
+          onLogout={() => {
+            window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
+            setEntryMode('entry');
+          }}
+        />
       )}
     </DesktopChrome>
   );
 }
 
-export function DesktopWorkbenchApp() {
+export interface DesktopWorkbenchAppProps {
+  onLogout?: (() => void) | undefined;
+}
+
+export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {}) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const workbench = useDesktopWorkbenchModel(selectedConversationId);
   const { online: edgeOnline } = useHealth();
@@ -50,7 +65,32 @@ export function DesktopWorkbenchApp() {
     if (!workbench.activeThreadId) return undefined;
     return resolveCurrentTranscriptRunId(workbench.transcript);
   }, [workbench.activeThreadId, workbench.transcript]);
-  const runtimeEvidence = useRunEvidence(activeRunId);
+  const edgeRunEvidence = useRunEvidence(liveEdgeEnabled ? activeRunId : undefined);
+
+  // Demo mode: use per-conversation JS evidence; Real mode: use Edge API evidence.
+  const runtimeEvidence = workbench.isDemo
+    ? getDemoRuntimeEvidence(workbench.activeConversationId)
+    : (activeRunId ? {
+        runId: activeRunId,
+        diffs: edgeRunEvidence.diffs,
+        artifacts: edgeRunEvidence.artifacts,
+        previews: edgeRunEvidence.previews,
+        loading: {
+          diff: edgeRunEvidence.diffLoading,
+          artifacts: edgeRunEvidence.artifactLoading,
+          previews: edgeRunEvidence.previewLoading,
+        },
+        errors: {
+          diff: edgeRunEvidence.diffError,
+          artifacts: edgeRunEvidence.artifactError,
+          previews: edgeRunEvidence.previewError,
+        },
+        sources: {
+          diff: edgeRunEvidence.diffSource,
+          artifacts: edgeRunEvidence.artifactSource,
+          previews: edgeRunEvidence.previewSource,
+        },
+      } : undefined);
   const desktopPlatform = useMemo(() => createDesktopPlatform({
     ...(workbench.activeProjectId ? { activeProjectId: workbench.activeProjectId } : {}),
     ...(workbench.activeThreadId ? { activeThreadId: workbench.activeThreadId } : {}),
@@ -69,28 +109,9 @@ export function DesktopWorkbenchApp() {
         agents={workbench.isDemo ? workbench.agents : edgeAgents}
         conversations={workbench.conversations}
         onActiveConversationChange={setSelectedConversationId}
+        onLogout={onLogout}
         platform={desktopPlatform}
-        runtimeEvidence={activeRunId ? {
-          runId: activeRunId,
-          diffs: runtimeEvidence.diffs,
-          artifacts: runtimeEvidence.artifacts,
-          previews: runtimeEvidence.previews,
-          loading: {
-            diff: runtimeEvidence.diffLoading,
-            artifacts: runtimeEvidence.artifactLoading,
-            previews: runtimeEvidence.previewLoading,
-          },
-          errors: {
-            diff: runtimeEvidence.diffError,
-            artifacts: runtimeEvidence.artifactError,
-            previews: runtimeEvidence.previewError,
-          },
-          sources: {
-            diff: runtimeEvidence.diffSource,
-            artifacts: runtimeEvidence.artifactSource,
-            previews: runtimeEvidence.previewSource,
-          },
-        } : undefined}
+        runtimeEvidence={runtimeEvidence}
         showComposerAgentPicker={false}
         showComposerStatus={false}
         showHeaderDataModeControl={false}
