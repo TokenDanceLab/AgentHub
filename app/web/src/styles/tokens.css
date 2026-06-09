@@ -298,6 +298,15 @@ body {
   overflow: hidden;
 }
 
+@media (max-width: 760px) {
+  body,
+  #root {
+    width: 100vw;
+    max-width: 100vw;
+    min-width: 0;
+  }
+}
+
 button,
 input,
 textarea,
