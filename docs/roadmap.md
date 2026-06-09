@@ -26,7 +26,11 @@ Web / Mobile / IM
 目标：用户可以通过 Web 控制一台 Desktop 目标，由本地 Edge 调用
 CLI/SDK Runtime，并把结果回放到 Web。
 
-状态同步：P0 fixture-only 证据门禁固定链路为 Web -> Hub -> registered Desktop/Edge -> Local Edge -> CLI/SDK adapter；真实登录、真实 CLI/model、部署、签名和公证仍需审批。
+48 小时战役只围绕一条主链推进：Web/Mobile/IM 通过 Hub 控制已注册的
+Desktop target，由 Desktop 启动 Local Edge，再由 Edge 调用 CLI/SDK adapter，
+最后把 transcript、approval、artifact、health 和 replay 同步回 Hub。
+真实登录、真实 CLI/model、部署、签名和公证仍需单独审批；在审批前只做
+fixture、observed 或 no-spend readiness 证据。
 
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
@@ -37,6 +41,16 @@ CLI/SDK Runtime，并把结果回放到 Web。
 | Desktop Local Edge | Desktop 登录、注册目标、启动/诊断 Local Edge、保留日志和 app data、Windows 打包 | Desktop 可以作为本地执行锚点使用，不依赖用户手动开终端。 |
 | Mock / Real 分离 | mock、fixture、observed、approved-real、production 模式在 UI 和 gate 中显式标记 | real mode 不能静默降级到 mock。 |
 | Product-loop E2E | 本地可复现 E2E 覆盖 Web -> Hub -> Desktop -> Edge -> adapter -> replay -> Web | 发布前有一个聚焦 smoke gate 证明核心产品链路。 |
+
+### P0 并行拓扑
+
+| 线 | 负责人 | 范围 | 依赖 |
+|---|---|---|---|
+| Web real-mode 主屏 | Trump | Web/shared 入口、target selector、transcript、approval/artifact 入口、visual smoke | Hub 现有 API；后续吃 Hub 单任务 approval/artifact 新合同 |
+| Hub 单任务合同 | Johnny | `/web/agent-tasks` approval decision、artifact metadata/list、OpenAPI 和 service/handler tests | 复用 TeamRun projection；不碰 Edge durable/CLI readiness |
+| Desktop/Tauri sidecar | Controller/Desktop worker | Windows sidecar binary placement、package readiness、strict missing/present smoke | 不签名、不公证、不提交 binary |
+| Product-loop E2E | Controller | 组合 Web + Hub + Desktop + Edge fixture/observed gate | 等前三线回收后开单独 worktree |
+| Mobile/IM 消费 | Trump/Mobile | 使用同一 Hub target/run/approval/replay 合同 | 不分叉 runtime 或登录语义 |
 
 ## P1：真实开发可用性
 
@@ -51,6 +65,8 @@ CLI/SDK Runtime，并把结果回放到 Web。
 | Web Real-mode Workbench | Projects、Agents、Targets、Runs、Transcripts、Approvals、Artifacts 全部接 Hub | Web 不再主要依赖 mock 工作台。 |
 | Desktop Workspace Control | Workspace picker、trusted boundary、recent projects、sidecar logs、runtime diagnostics、package readiness | Desktop 用户能理解并恢复本地运行状态。 |
 | Runtime / Model Icons | 基于 LobeHub 的 provider/model/runtime/tool logo 和稳健 fallback | 模型和运行时界面更专业、更易扫描。 |
+| Target Routing / Health | target 注册、心跳、健康降级、exact-device dispatch、用户可读修复建议 | Web/Mobile/IM 能判断目标是否可控制，失败时知道缺 Desktop、缺 Edge、缺 runtime 还是未登录。 |
+| Approval / Artifact 一致性 | 单任务和 TeamRun 使用同一 approval/artifact 投影语义 | 前端不需要为单任务和团队任务维护两套控制逻辑。 |
 
 ## P2：发布和多平台扩展
 
@@ -65,6 +81,7 @@ CLI/SDK Runtime，并把结果回放到 Web。
 | Mobile 协议对齐 | Mobile 消费同一套 Hub target、run、approval、replay 合同 | Mobile 能远程监控和控制，不分叉产品语义。 |
 | Feishu / IM 入口 | Feishu/Lark bot 或工作台卡片可以启动/跟随 Hub 任务 | IM 是协作入口，不是第二套登录或 runtime 系统。 |
 | Release Governance | 版本号、tag、changelog、artifact、gate、rollback policy | `dev`、`master`、rc tag 都有稳定且可审计的含义。 |
+| Demo / Evidence 生成 | 从真实或 fixture gate 产出可复验截图、日志、健康报告和 demo script | 比赛/提交材料可由证据负责人消费，不反向阻塞开发主链。 |
 
 ## P3：平台化和生态
 
@@ -84,19 +101,20 @@ CLI/SDK Runtime，并把结果回放到 Web。
 | 负责人 | 产品区域 |
 |---|---|
 | Controller Codex | 总路线图、分支集成、Desktop/Tauri/Local Edge 路径、发布 gate、最终验证 |
-| Trump | Web、Mobile 和 shared 前端产品体验 |
-| Johnny | Hub、Edge、事件合同、后端路由、持久化 |
+| Trump | Web、Mobile 和 shared 前端产品体验；负责启动 Web 页面调 UI 细节和 mobile 协议对齐 |
+| Johnny | Hub、Edge、事件合同、后端路由、持久化；负责 approval/artifact、target health 和 Edge durable 后端切片 |
 | Mobile 执行线程 | 作为 Trump 下属执行线程推进 Mobile app，通过共享 Hub 合同对齐 |
 | Evidence/docs 负责人 | 比赛材料、截图、demo、外部报告、提交包 |
 
 ## 依赖顺序
 
-1. 冻结干净 baseline 和分支拓扑。
-2. 稳定 Hub/Edge event contract 和 approval contract。
-3. Web 按合同实现一屏主链。
-4. Desktop Local Edge 启动、诊断和打包硬化。
-5. 对组合后的栈运行 product-loop E2E。
-6. 扩展持久化、SDK/custom runtime、artifact、部署、Mobile/IM 集成。
+1. 冻结干净 baseline 和分支拓扑，只从 `origin/dev/delicious233` 开新 worktree。
+2. 稳定 Hub/Edge event、approval、artifact 和 target health 合同。
+3. Web 按合同实现一屏主链，Mobile/IM 消费同一合同。
+4. Desktop Local Edge 启动、诊断、sidecar binary 和打包硬化。
+5. 对组合后的栈运行 product-loop fixture/observed E2E。
+6. 经审批后推进真实登录、真实 CLI/model/API、部署、签名、公证和 release。
+7. 扩展 Edge SQLite durable、SDK/custom runtime、runtime icons、TeamRun 平台化和企业治理。
 
 ## 非协商边界
 
