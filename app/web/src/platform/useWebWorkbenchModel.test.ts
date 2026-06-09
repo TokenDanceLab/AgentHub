@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appendHubRuntimeEvent,
   projectDraftToHubRequest,
+  mergeWorkspaceProjectDetail,
   resolveWebWorkbenchContacts,
   resolveWebExecutionTargetStatus,
   resolveWebWorkbenchProjects,
@@ -184,6 +185,55 @@ describe('useWebWorkbenchModel helpers', () => {
     })).toEqual({
       name: 'Untitled',
       description: '',
+    });
+  });
+
+  it('merges selected Hub project detail over the list item', () => {
+    const listProjects = [
+      {
+        id: 'project-1',
+        name: 'AgentHub List',
+        description: 'List summary',
+      },
+      {
+        id: 'project-2',
+        name: 'Other Project',
+        description: 'Other summary',
+      },
+    ];
+
+    expect(mergeWorkspaceProjectDetail(listProjects, {
+      id: 'project-1',
+      name: 'AgentHub Detail',
+      description: 'Loaded from Hub detail',
+    })).toEqual([
+      expect.objectContaining({
+        id: 'project-1',
+        name: 'AgentHub Detail',
+        description: 'Loaded from Hub detail',
+      }),
+      expect.objectContaining({
+        id: 'project-2',
+        name: 'Other Project',
+      }),
+    ]);
+    expect(mergeWorkspaceProjectDetail(listProjects, undefined)).toBe(listProjects);
+  });
+
+  it('surfaces selected project detail errors in real mode without falling back to mock projects', () => {
+    expect(resolveWebProjectsStatus(
+      { isFetching: false, error: undefined },
+      undefined,
+      undefined,
+      true,
+      'approved-real',
+      false,
+      { isFetching: false, error: new Error('Hub project detail failed') },
+    )).toEqual({
+      loading: false,
+      error: 'Hub project detail failed',
+      actionError: undefined,
+      saving: false,
     });
   });
 

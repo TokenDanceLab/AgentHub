@@ -35,7 +35,7 @@ import { useWebHubRealtime } from './webHubRealtime';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
-export function useWebWorkbenchModel(selectedConversationId?: string) {
+export function useWebWorkbenchModel(selectedConversationId?: string, selectedProjectId?: string) {
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
     getWorkbenchDataModeOverrideSnapshot,
@@ -117,6 +117,16 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     staleTime: 10_000,
     placeholderData: (previous) => previous,
   });
+  const selectedProjectDetailId = hubReady
+    ? selectedProjectId ?? projects.data?.items[0]?.id
+    : undefined;
+  const selectedProject = useQuery({
+    queryKey: ['web-v4', 'hub-project', selectedProjectDetailId],
+    queryFn: () => hubClient.getWorkspaceProject(selectedProjectDetailId!),
+    enabled: Boolean(selectedProjectDetailId),
+    staleTime: 10_000,
+    placeholderData: (previous) => previous,
+  });
   const createProject = useMutation({
     mutationFn: (draft: ProjectDraft) => hubClient.createWorkspaceProject(projectDraftToHubRequest(draft)),
     onSettled: () => {
@@ -126,8 +136,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
   const updateProject = useMutation({
     mutationFn: ({ projectId, draft }: { projectId: string; draft: ProjectDraft }) =>
       hubClient.updateWorkspaceProject(projectId, projectDraftToHubRequest(draft)),
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-projects'] });
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-project', variables.projectId] });
     },
   });
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
@@ -176,7 +187,11 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
     contacts: resolveWebWorkbenchContacts(contacts.data, hubReady, dataMode),
     conversations: resolvedConversations,
     composerExecutionTargets,
-    projects: resolveWebWorkbenchProjects(projects.data?.items, hubReady, dataMode),
+    projects: resolveWebWorkbenchProjects(
+      mergeWorkspaceProjectDetail(projects.data?.items, selectedProject.data),
+      hubReady,
+      dataMode,
+    ),
     projectsStatus: resolveWebProjectsStatus(
       { isFetching: projects.isFetching, error: projects.error },
       createProject.error,
@@ -184,6 +199,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string) {
       hubReady,
       dataMode,
       createProject.isPending || updateProject.isPending,
+      { isFetching: selectedProject.isFetching, error: selectedProject.error },
     ),
     projectsActions: hubReady ? {
       create: async (draft: ProjectDraft) => workspaceProjectToProjectInfo(await createProject.mutateAsync(draft)),
@@ -274,6 +290,22 @@ export function workspaceProjectToProjectInfo(project: WorkspaceProject): Projec
   };
 }
 
+export function mergeWorkspaceProjectDetail(
+  projects: WorkspaceProject[] | undefined,
+  detail: WorkspaceProject | undefined,
+): WorkspaceProject[] | undefined {
+  if (!detail) return projects;
+  const current = projects ?? [];
+  if (current.length === 0) return [detail];
+  let found = false;
+  const merged = current.map((project) => {
+    if (project.id !== detail.id) return project;
+    found = true;
+    return { ...project, ...detail };
+  });
+  return found ? merged : [detail, ...current];
+}
+
 export function projectDraftToHubRequest(draft: ProjectDraft): { name: string; description: string } {
   return {
     name: draft.name.trim() || '未命名项目',
@@ -288,16 +320,19 @@ export function resolveWebProjectsStatus(
   hubReady: boolean,
   dataMode: WorkbenchDataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
   saving = false,
+  selectedProject: { isFetching: boolean; error?: unknown } = { isFetching: false },
 ): { loading: boolean; error?: string | undefined; actionError?: string | undefined; saving: boolean } {
   const realMode = isWorkbenchRealDataMode(dataMode);
   const effectiveRealMode = hubReady || realMode;
   const signedOutRealMode = realMode && !hubReady;
   return {
-    loading: effectiveRealMode && projects.isFetching,
+    loading: effectiveRealMode && (projects.isFetching || selectedProject.isFetching),
     error: signedOutRealMode
       ? 'Sign in to Hub to load workspace projects.'
       : effectiveRealMode && projects.error
         ? errorMessage(projects.error, 'Hub Projects 加载失败')
+        : effectiveRealMode && selectedProject.error
+          ? errorMessage(selectedProject.error, 'Hub Project 详情加载失败')
         : undefined,
     actionError: effectiveRealMode ? errorMessage(createError ?? updateError, '') || undefined : undefined,
     saving,

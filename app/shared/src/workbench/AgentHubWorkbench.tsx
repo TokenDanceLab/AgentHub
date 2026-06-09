@@ -88,6 +88,7 @@ export interface AgentHubWorkbenchProps {
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
   projects?: ProjectInfo[] | undefined;
+  activeProjectId?: string | undefined;
   projectsStatus?: {
     loading?: boolean | undefined;
     error?: string | undefined;
@@ -96,6 +97,7 @@ export interface AgentHubWorkbenchProps {
   } | undefined;
   activeConversationId?: string;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
+  onActiveProjectChange?: ((projectId: string) => void) | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
@@ -118,9 +120,11 @@ export function AgentHubWorkbench({
   agentProfilesStatus,
   contacts,
   projects,
+  activeProjectId,
   projectsStatus,
   activeConversationId,
   onActiveConversationChange,
+  onActiveProjectChange,
   onAgentCreate,
   onAgentUpdate,
   onAgentDelete,
@@ -1046,7 +1050,9 @@ export function AgentHubWorkbench({
               contacts={contacts}
               focusedAgentId={focusedAgentId}
               projects={projects}
+              activeProjectId={activeProjectId}
               projectsStatus={projectsStatus}
+              onActiveProjectChange={onActiveProjectChange}
               onProjectCreate={onProjectCreate}
               onProjectUpdate={onProjectUpdate}
               onAgentCreate={onAgentCreate}
