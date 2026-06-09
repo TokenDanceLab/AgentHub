@@ -294,6 +294,7 @@ if (Test-Path -LiteralPath $scriptPath) {
     Assert-True ($passingObserved.Output -match "observed_manifest_accepted=true") "approved passing observed chain reports accepted manifest status" $passingObserved.Output
     Assert-True ($passingObserved.Output -match "Status: OBSERVED_MANIFEST_ACCEPTED") "approved passing observed chain reports manifest accepted status" $passingObserved.Output
     Assert-True ($passingObserved.Output -match "separate verifier") "approved passing observed chain names separate verifier requirement" $passingObserved.Output
+    Assert-True ($passingObserved.Output -match "verify-approved-real-edge-cli-evidence\.ps1") "approved passing observed chain names approved-real verifier" $passingObserved.Output
 }
 
 if (Test-Path -LiteralPath $docPath) {
@@ -304,6 +305,7 @@ if (Test-Path -LiteralPath $docPath) {
     Assert-True ($docText -match "approval marker") "audit doc records observed approval marker gate"
     Assert-True ($docText -match "observedEvidenceRef") "audit doc records observed evidence reference requirement"
     Assert-True ($docText -match "correlationId") "audit doc records correlation requirement"
+    Assert-True ($docText -match "verify-approved-real-edge-cli-evidence\.ps1") "audit doc records approved-real verifier handoff"
 }
 
 if ($Failed -gt 0) {
