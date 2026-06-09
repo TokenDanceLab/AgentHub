@@ -851,9 +851,15 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 				stats := sqlDB.Stats()
 				metrics.DBPoolInUse.Set(float64(stats.InUse))
 			}
-			metrics.WSConnections.Set(float64(a.mgr.Count()))
-			metrics.RedisPoolHits.Set(float64(a.CacheClient.PoolStats().Hits))
-			metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
+			if a.mgr != nil {
+				metrics.WSConnections.Set(float64(a.mgr.Count()))
+			}
+			if a.CacheClient != nil {
+				metrics.RedisPoolHits.Set(float64(a.CacheClient.PoolStats().Hits))
+			}
+			if a.bus != nil {
+				metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
+			}
 		}
 	}()
 }
