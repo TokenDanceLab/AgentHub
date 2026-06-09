@@ -64,6 +64,10 @@ Hub/Target/Task 数据时必须显式空态或错误态，不能静默回 demo�
 | Windows package smoke | unsigned/dev package、sidecar placement、dry package gate、Windows 启动诊断可复验 | 不签名、不上传 release；只证明本地打包前置条件和失败边界。 |
 | 文档收敛 | Roadmap 只写路线，STATE 只写当前事实，architecture 只写结构边界 | 评审、开发者和 Agent 不再被多套状态叙事误导。 |
 
+2026-06-09 packaging 记录：Windows dry gate 已能在隔离 worktree 中产出 unsigned NSIS installer、portable zip、Windows Local Edge sidecar 和 hash manifest。release-readiness 的 Windows dry job 应复用 `scripts/verify-tauri-package-dry.ps1`，只上传 workflow artifacts；updater `latest.json`/`.sig`、签名、公证和 GitHub Release upload 仍是后续审批片。
+
+2026-06-09 release gate 记录：`scripts/verify-release-gate.ps1` 负责 dev->master refs、RC/tag 规范、release-readiness dry workflow 边界、Windows unsigned artifact manifest 和 Open Critical/High security blockers 的可执行检查；公开 release 必须先关闭或明确接受安全/signing/updater blockers。
+
 ### P2：发布前置和多端入口
 
 目标：为可控 beta 做准备，但不抢在主链稳定前承诺生产发布。
