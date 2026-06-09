@@ -142,15 +142,19 @@ export function RightInspector({
   }, [reviewFileRequest]);
 
   const overviewTasks = useMemo<TaskItem[]>(() => {
-    return demoOverviewTasks;
-  }, []);
+    if (!runtimeEvidence) return demoOverviewTasks;
+    return runtimeEvidenceOverviewTasks(runtimeEvidence);
+  }, [runtimeEvidence]);
 
-  const overviewFiles = useMemo<FileItem[]>(() => {
-    return demoOverviewFiles.map((file) => ({
+  const overviewFiles = useMemo<PreviewFile[]>(() => {
+    const files = runtimeEvidence
+      ? runtimeEvidenceOverviewFiles(runtimeEvidence)
+      : demoOverviewFiles;
+    return files.map((file) => ({
       ...file,
       isOpen: previewFile?.name === file.name,
     }));
-  }, [previewFile?.name]);
+  }, [previewFile?.name, runtimeEvidence]);
 
   const handleFileClick = useCallback((file: FileItem) => {
     setPreviewFile(file);
@@ -319,9 +323,10 @@ export function RightInspector({
           <OverviewPanel
             tasks={overviewTasks}
             files={overviewFiles}
-            taskSectionTitle="B0 SQLite 迁移"
-            kicker="Builder 工作目录"
-            primaryFileLabel="最终文件"
+            taskSectionTitle={runtimeEvidence ? '运行证据' : 'B0 SQLite 迁移'}
+            kicker={runtimeEvidence ? runtimeEvidenceOverviewKicker(runtimeEvidence) : 'Builder 工作目录'}
+            primaryFileLabel={runtimeEvidence ? 'Hub replay 产物' : '最终文件'}
+            {...(runtimeEvidence ? { workingFileLabel: '运行快照' } : {})}
             onFileClick={handleFileClick}
           />
         )}
@@ -384,6 +389,71 @@ export function RightInspector({
       </div>
     </aside>
   );
+}
+
+function runtimeEvidenceOverviewTasks(runtimeEvidence: RuntimeEvidenceSnapshot): TaskItem[] {
+  const tasks: TaskItem[] = [];
+  if (runtimeEvidence.runId) {
+    tasks.push({ label: `跟随 ${runtimeEvidence.runId}`, status: 'active' });
+  }
+  if (runtimeEvidence.artifacts.length > 0) {
+    tasks.push({ label: `Hub replay artifact index: ${runtimeEvidence.artifacts.length}`, status: 'done' });
+  }
+  if (runtimeEvidence.diffs.length > 0) {
+    tasks.push({ label: `Diff snapshot: ${runtimeEvidence.diffs.length}`, status: 'done' });
+  }
+  if (runtimeEvidence.previews.length > 0) {
+    tasks.push({ label: `Preview index: ${runtimeEvidence.previews.length}`, status: 'done' });
+  }
+  return tasks.length > 0
+    ? tasks
+    : [{ label: '等待 Hub replay evidence', status: 'todo' }];
+}
+
+function runtimeEvidenceOverviewFiles(runtimeEvidence: RuntimeEvidenceSnapshot): PreviewFile[] {
+  return [
+    ...runtimeEvidence.artifacts.map((artifact) => ({
+      name: artifact.path,
+      type: artifact.kind,
+      isPrimary: true,
+      owner: 'Hub replay',
+      content: [
+        `# ${artifact.path}`,
+        '',
+        `- Run: ${artifact.runId || runtimeEvidence.runId || 'unknown'}`,
+        `- Thread: ${artifact.threadId || 'unknown'}`,
+        `- Kind: ${artifact.kind}`,
+        `- Created: ${artifact.createdAt || 'unknown'}`,
+      ].join('\n'),
+    })),
+    ...runtimeEvidence.diffs.map((file) => ({
+      name: file.filePath,
+      type: 'diff',
+      owner: 'Hub replay',
+      content: [
+        `Read-only runtime diff evidence for ${file.filePath}.`,
+        'Artifact content/apply/discard are not available in this inspector slice.',
+      ].join('\n'),
+      diffContent: fileDiffToText(file),
+    })),
+    ...runtimeEvidence.previews.map((preview) => ({
+      name: preview.url || preview.id,
+      type: 'preview',
+      owner: 'Hub replay',
+      content: [
+        `# Preview ${preview.id}`,
+        '',
+        `- Run: ${preview.runId || runtimeEvidence.runId || 'unknown'}`,
+        `- Status: ${preview.status}`,
+        `- URL: ${preview.url || 'not available'}`,
+        `- Created: ${preview.createdAt || 'unknown'}`,
+      ].join('\n'),
+    })),
+  ];
+}
+
+function runtimeEvidenceOverviewKicker(runtimeEvidence: RuntimeEvidenceSnapshot): string {
+  return runtimeEvidence.runId ? `Hub replay / ${runtimeEvidence.runId}` : 'Hub replay';
 }
 
 function RuntimeEvidencePanel({
