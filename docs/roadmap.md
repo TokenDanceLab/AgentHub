@@ -1,140 +1,146 @@
 # AgentHub 产品路线图
 
 本文只写未来路线、优先级、模块拆分和产品边界。当前分支状态、
-提交 SHA、工作区治理、具体派工任务写在仓库根目录 `STATE.md`。
+已合入提交、工作区治理和临时派工写在仓库根目录 `STATE.md`。
 
 ## 产品北极星
 
-AgentHub 要成为跨平台 AI 编码 Agent 的远程控制工作台：
+AgentHub 要成为 IM 形态的多 Agent 协作工作台。用户面对的是联系人、
+群聊、项目会话、Agent 队友、审批、Diff、Preview 和产物，而不是一组
+Runtime 下拉框。
 
 ```text
-Web / Mobile / IM
-  -> Hub 身份、路由、回放、权限
-  -> 已注册 Desktop 目标
-  -> 本地 Edge sidecar
-  -> CLI / Agent SDK / 自定义 Runtime
-  -> 类型化事件、产物、审批、执行记录
-  -> Web / Mobile / IM 渲染和控制
+Web / Desktop / Mobile / IM
+  -> Hub 身份、会话、联系人、群聊、权限、路由、回放
+  -> Execution Target: Local Edge / Remote Edge / Cloud Edge / Hub Relay
+  -> Edge Runtime adapter: Claude Code / Codex / OpenCode / SDK / Custom
+  -> 类型化事件、审批、Diff、Preview、Artifact、执行记录
+  -> 同一条 IM 任务流渲染和控制
 ```
 
-用户体验目标不是“选择运行时下拉框”，而是“在联系人、群聊或工作台
-线程里和 Agent 队友协作”。目标健康、运行时、权限、执行计划、差异、
-预览和产物都应该出现在同一条任务流里。
+产品判断标准：
 
-## P0：可用远程控制主链
+- Agent Profile 回答“谁来做事”，Agent Runtime 回答“用什么执行”。
+- IM 是核心体验：单聊、群聊、`@Agent`、Orchestrator 分派和上下文连续必须在同一条任务流里成立。
+- 产物必须内联：代码 Diff、网页预览、文件附件、审批、部署状态和生成资产不应散落在日志或后台页面。
+- Web 远控、Desktop 本地执行、Mobile/IM 审批查看使用同一 Hub/Edge 事件合同。
+- mock、fixture、observed、approved-real、production 必须显式区分；真实登录、真实 CLI/model/API、部署、签名、公证和 release upload 都需要明确审批。
 
-目标：用户可以通过 Web 控制一台 Desktop 目标，由本地 Edge 调用
-CLI/SDK Runtime，并把结果回放到 Web。
+## 近期收敛目标
 
-48 小时战役只围绕一条主链推进：Web/Mobile/IM 通过 Hub 控制已注册的
-Desktop target，由 Desktop 启动 Local Edge，再由 Edge 调用 CLI/SDK adapter，
-最后把 transcript、approval、artifact、health 和 replay 同步回 Hub。
-真实登录、真实 CLI/model、部署、签名和公证仍需单独审批；在审批前只做
-fixture、observed 或 no-spend readiness 证据。
+近期优先把“可讲清、可操作、可复验”的主链收紧。路线图只写产品路线、
+优先级和边界；当前事实写入 `STATE.md`。
 
-P0 远控认证与拓扑前置链路：`Web -> Hub -> 已注册 Desktop/Edge -> Local Edge -> CLI/SDK adapter`。
-真实 TokenDanceID/OIDC 登录和真实 CLI/model 执行仍是显式审批门（approval gate）。
-真实 TokenDanceID 登录需要先具备：已批准的 OAuth client、一次性或预批准测试账号（test account）、明确的 Hub/Web/Desktop
-测试环境、浏览器证据边界，以及 callback、session、target inventory、`/client/auth/me` 的脱敏证明；
-token、密码、client secret、cookie、authorization 值不得进入文档、日志、截图、commit 或报告。
+### P0：一屏远控主链可用
+
+目标：用户在 Web 或 Desktop 的 IM 工作台里选择 Agent 和目标设备，发送任务，
+看到路由、执行、审批、Diff、Preview、Artifact 和完成状态回放。没有真实
+Hub/Target/Task 数据时必须显式空态或错误态，不能静默回 demo。
+
+| 方向 | 路线项 | 完成标准 |
+|---|---|---|
+| IM / @Agent 主链 | 单聊、项目群、`@Agent`、Orchestrator route decision、消息 pin、目标选择和启动按钮收敛到一屏主链 | 用户不用理解 Runtime 术语，也能知道当前 Agent、Target、Task 是否可启动、排队、执行或失败。 |
+| Web real-mode Workbench | Web 只通过 Hub 消费 `agent-tasks`、target、approval、artifact、diff 和 replay 合同 | real mode 下没有 Hub/target/task 数据时显示清楚的 empty/error；demo/mock/fixture 标识明确。 |
+| Desktop Local Edge 目标 | Desktop 能展示 Local Edge、device、target 注册/同步、sidecar readiness、SQLite app-data 路径和诊断 | Web 远控前能判断目标是否在线、是否匹配当前 Desktop、是否缺 sidecar 或登录。 |
+| Hub 单任务合同 | 单任务 approval decision、artifact list、file-change diff metadata、owner scope、exact target/device control 稳定 | Web/IM/Mobile 后续不需要为 TeamRun 和单任务维护两套控制语义。 |
+| Edge 执行事件 | CLI/SDK/fixture adapter 输出统一映射到 typed transcript event、approval、file-change、artifact、result | 不执行真实模型也能复验协议形状；真实 CLI/model/API 进入 approved-real 之后再开。 |
+| Artifact / Diff / Preview | inspector 能展示 artifact、file-change diff、edit/review/apply/revert metadata 和 preview 入口 | 用户能在聊天上下文内检查产物和差异；近期只做只读投影，不承诺真实 apply/revert 写文件。 |
+| Approval Loop | approval request、decide、resume/abort 语义贯通到 UI 和 Hub/Edge 事件 | 高风险动作前可远程 approve/deny，决策进入 transcript/replay。 |
+| No-secret readiness | 真实登录或真实 CLI 前先跑无密 readiness/preflight gate | 输出只包含脱敏 manifest、环境缺口和审批状态，不记录 token、密码、client secret、cookie 或生产路径。 |
+
+### P1：演示稳定和 dogfood 可用
+
+目标：把 P0 主链从“能看懂”推进到“能日常试用”，重点补持久化、健康、
+本地服务组合和 Agent 配置能力。
+
+| 方向 | 路线项 | 完成标准 |
+|---|---|---|
+| Product-loop E2E | Web -> Hub -> Desktop -> Local Edge -> adapter -> replay -> Web 的 observed/fixture gate 变成常用 smoke | 一条命令能复跑主链，明确 `real_tested`、mock adapter 和 no-spend 边界。 |
+| Localhost service runner | Web dev server、Hub、Local Edge mock/SQLite、service probe、health manifest 可组合启动或探测 | 本地真实服务子集可逐步替换 fixture；失败时能定位是 Web、Hub、Edge、target 还是 adapter。 |
+| Edge SQLite durable | SQLite store readiness、迁移、row-first restore、per-write reopen 和 replay projection 持续硬化 | runs、items、pins、approvals、artifacts、replay state 重启后可靠，且仍标明 alpha/durable 边界。 |
+| Agent Profile / Builder | AgentSpec、Profile、market fixture、runtime/model/provider、Skill、MCP、tool allowlist、memory、approval policy、target preference 形成配置闭环 | 用户看到的是可管理 Agent 队友；Hub 持久化、安装/发布 mutation 和头像资产管线作为下一批后端合同。 |
+| Runtime / SDK 扩展 | Claude/OpenAI SDK-like、OpenAI-compatible/custom、Codex、Claude Code、OpenCode 都进入统一 capability matrix | 新 runtime 通过 manifest、capabilities、icon、approval policy、event mapper 接入，不把 provider 规则写死在产品层。 |
+| Target Health | Hub、Desktop、Web 统一 ready/offline/degraded/missing/signed-out/pagination-limited 等状态 | 用户能知道是缺登录、缺 Desktop、缺 Edge、缺 runtime、target mismatch 还是 Hub inventory 不完整。 |
+| Windows package smoke | unsigned/dev package、sidecar placement、dry package gate、Windows 启动诊断可复验 | 不签名、不上传 release；只证明本地打包前置条件和失败边界。 |
+| 文档收敛 | Roadmap 只写路线，STATE 只写当前事实，architecture 只写结构边界 | 评审、开发者和 Agent 不再被多套状态叙事误导。 |
+
+### P2：发布前置和多端入口
+
+目标：为可控 beta 做准备，但不抢在主链稳定前承诺生产发布。
+
+| 方向 | 路线项 | 完成标准 |
+|---|---|---|
+| TokenDanceID 登录 | Web/Desktop OIDC readiness、callback、Hub session、logout/refresh 缺口清单和无密 gate | 真实账号、真实 client 和录屏范围经审批后再测；文档只保留公开配置名和脱敏结论。 |
+| Mobile 协议对齐 | Mobile 只消费 Hub target/run/approval/replay 合同，不分叉 runtime 或登录语义 | Mobile 可作为轻量查看、审批、预览入口；不抢 Desktop/Web v4 主线端口。 |
+| Feishu / IM 入口 | 飞书/Lark bot、事件、卡片、工作台/H5 只作为协作入口 | 飞书 OAuth/account binding 仍归 TokenDanceID；卡片回调快返，慢任务异步入队。 |
+| Web deployment readiness | 环境变量、OIDC callback、静态构建、Hub API route、rollback gate 明确 | 只在审批后部署；不把生产 endpoint、secret 或私有路径写入仓库。 |
+| macOS package path | sidecar 命名、app data、unsigned DMG smoke、entitlements、notarization plan 拆清 | 不假设 Windows 结果自动覆盖 macOS。 |
+| Release governance | rc tag、changelog、artifact、gate、rollback policy 和 open blocker 状态一致 | `dev`、`master`、rc tag 的含义稳定且可审计。 |
+
+## 长期路线
+
+### Phase A：IM 多 Agent 产品闭环
 
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| IM / @Agent 主链 | Agent/联系人式入口、目标选择、任务输入、启动运行、路由状态、回放面板；当前 shared message fixture 已覆盖 human -> agent、agent -> agent、项目群 @Agent queued 和 orchestrator route decision 的可见投影 | 用户能从一个 Web 页面启动任务，不需要理解后端运行时术语；后续仍需真实 agent-authored message ingest、群成员权限、项目群创建、任务队列持久化和 route decision 执行闭环。 |
-| Target Health | Hub、Desktop、Web 统一展示目标、运行时、Profile、Workspace 健康 | Web/Desktop 能清楚展示 ready/offline/degraded/missing/signed-out，并给出下一步。 |
-| Transcript Blocks | 路由、子任务、权限请求、工具调用、文件变更、产物、预览、失败、完成等类型化时间线 | 用户看到的是结构化工作记录，不是原始 JSON 或控制台噪声。 |
-| Artifact / Diff / Preview 最小闭环 | 文件变更、artifact、diff、预览、apply/revert 状态进入同一条任务流和右侧 inspector | 用户能在远控任务里检查输出、差异、预览和执行结果，而不是离开聊天流找日志。 |
-| Approval Loop | Edge 发起权限请求，Web 通过 Hub approve/deny，Edge resume/abort，回放记录决策 | 远程执行危险动作或用户可见动作前可以被控制。 |
-| Desktop Local Edge | Desktop 登录、注册目标、启动/诊断 Local Edge、保留日志和 app data、Windows 打包 | Desktop 可以作为本地执行锚点使用，不依赖用户手动开终端。 |
-| Mock / Real 分离 | mock、fixture、observed、approved-real、production 模式在 UI 和 gate 中显式标记 | real mode 不能静默降级到 mock。 |
-| Product-loop E2E | 本地可复现 E2E 覆盖 Web -> Hub -> Desktop -> Edge -> adapter -> replay -> Web | 发布前有一个聚焦 smoke gate 证明核心产品链路。 |
-| 可演示证据链 | 任务事件导出、日志脱敏、截图/录屏脚本、fixture/observed/approved-real 证据边界 | 评审能在 3 分钟内看懂并复验核心链路。 |
+| Conversation Model | 单聊、群聊、项目会话、联系人、群成员、置顶、归档、搜索、最近活动 | IM 列表和消息流可承载真实日常工作，而不是 demo fixture。 |
+| Orchestrator | 复杂任务拆解、子 Agent 分派、并行/串行策略、失败降级、聚合回复 | 群聊里多个 Agent 像队友一样协作，route decision 可解释、可回放。 |
+| Context Continuity | 会话历史、pinned messages、workspace context、memory、AGENTS.md、Skill/MCP 输入统一 | Agent 能基于历史迭代，不靠用户重复粘贴上下文。 |
+| Message Actions | 回复、引用、重新生成、复制、pin、一键检查 Diff、打开预览 | 常用 IM 操作和开发操作在同一消息模型下成立。 |
 
-### P0 并行拓扑
-
-| 线 | 负责人 | 范围 | 依赖 |
-|---|---|---|---|
-| Web real-mode 主屏 | Trump | Web/shared 入口、target selector、transcript、approval/artifact/diff/preview 入口、visual smoke | Hub 现有 API；后续吃 Hub 单任务 approval/artifact 新合同 |
-| Hub 单任务合同 | Johnny | `/web/agent-tasks` approval decision、artifact metadata/list、OpenAPI 和 service/handler tests | 复用 TeamRun projection；不碰 Edge durable/CLI readiness |
-| Desktop/Tauri sidecar | Controller/Desktop worker | Windows sidecar binary placement、package readiness、strict missing/present smoke | 不签名、不公证、不提交 binary |
-| Real/Mock Gate | Trump | real mode 无 Hub/target/task 数据时显式 empty/error，不静默回 mock；demo/mock 明确标识 | 不改后端合同；不重做视觉主题 |
-| Artifact/Diff/Preview 最小闭环 | Johnny + Trump | Edge/Hub 事件和 Web/shared 卡片按最小 apply/revert 状态打通 | 不做完整云部署、复杂 diff 编辑器或 Gantt |
-| Product-loop E2E | Controller | 组合 Web + Hub + Desktop + Edge fixture/observed gate | 等前三线回收后开单独 worktree |
-| Mobile/IM 消费 | Trump/Mobile | 使用同一 Hub target/run/approval/replay 合同 | 不分叉 runtime 或登录语义 |
-
-## P1：真实开发可用性
-
-目标：让远程控制链路足够支撑日常 dogfood，而不是只跑通演示。
+### Phase B：Runtime / Agent 平台化
 
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| Artifact / Diff / Preview | Transcript 内一等公民的 artifact、diff、preview、file-change 卡片 | 用户可以在任务上下文里检查输出、拟议修改、预览和生成资产。 |
-| Edge SQLite 持久化 | Edge Store 从 alpha 进入有迁移保护的 durable 模式 | runs、items、pins、approvals、artifacts、replay state 重启后仍可靠。 |
-| Agent SDK / 自定义 Runtime | OpenAI Agents SDK、Claude Agent SDK、OpenCode、CLI Adapter、自定义 Agent 纳入统一 Runtime Registry | 新运行时可注册 metadata、capabilities、icon、approval policy、adapter strategy，不把 provider 规则写死在产品层。 |
-| Agent/Profile 健康 | AgentProfile、Runtime、Target、Workspace、Skill/MCP 绑定形成可读健康矩阵 | 用户能区分“Agent 配置可用”“Desktop 在线”“Runtime 可执行”“权限缺失”。 |
-| Hub Replay / Event Contract | 稳定 run、route、subtask、approval、artifact、preview、file、failure 事件分类 | Web/Mobile/IM 使用同一事件契约渲染。 |
-| Web Real-mode Workbench | Projects、Agents、Targets、Runs、Transcripts、Approvals、Artifacts 全部接 Hub | Web 不再主要依赖 mock 工作台。 |
-| Desktop Workspace Control | Workspace picker、trusted boundary、recent projects、sidecar logs、runtime diagnostics、package readiness | Desktop 用户能理解并恢复本地运行状态。 |
-| Runtime / Model Icons | 基于 LobeHub 的 provider/model/runtime/tool logo 和稳健 fallback | 模型和运行时界面更专业、更易扫描。 |
-| Target Routing / Health | target 注册、心跳、健康降级、exact-device dispatch、用户可读修复建议 | Web/Mobile/IM 能判断目标是否可控制，失败时知道缺 Desktop、缺 Edge、缺 runtime 还是未登录。 |
-| Approval / Artifact 一致性 | 单任务和 TeamRun 使用同一 approval/artifact 投影语义 | 前端不需要为单任务和团队任务维护两套控制逻辑。 |
+| Runtime Registry | Claude Code、Codex、OpenCode、OpenAI Agents SDK、Claude Agent SDK、OpenAI-compatible/custom runtime | 每个 runtime 有 metadata、capability、icon、adapter strategy、approval policy 和健康检查。 |
+| Agent Profile Store | Hub 持久化 Profile、模板、市场安装、团队可见性、版本和审计 | Agent 是可管理实体，不只是 fixture 卡片或 runtime alias。 |
+| Custom Agent Builder | 名称、头像、system prompt、runtime/model、skills、MCP、tools、memory、approval、target preference | 用户可以创建自己的 Agent 队友并在 IM 中使用。 |
+| MCP / Tool Registry | tool schema、权限、icon、审计、运行时兼容矩阵 | 工具调用类型化、可审查、可跨 runtime 复用。 |
 
-2026-06-09 记录：AgentProfile/市场 48h 小切片已先落到 shared fixture catalog，覆盖 runtime/model/provider、skills、MCP、tool allowlist、memory、avatar、approval 和 target preference，并投影到 Agents 页面/Agent Builder/市场卡片摘要；当前仍是 fixture/demo 合同，不触发真实 CLI/model/API。下一步缺口是 Hub `AgentProfile` 持久化字段映射、市场安装/发布 mutation、真实头像 asset 管线和 strict real-mode 空态/错误态。
-
-## P2：发布和多平台扩展
-
-目标：让 Web、Desktop、Mobile、IM 进入可控 beta。
+### Phase C：远程执行和协作网络
 
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| Web 部署 | 生产环境变量、OIDC callback、静态构建、Hub API 路由、部署 gate | Web 可以在审批后部署，并有回滚路径。 |
-| Windows 安装器 | 先有 dev/prod smoke 和 unsigned beta package，再进入签名、updater metadata、release upload | Windows 用户可以正常安装、启动 Desktop，并看到 Local Edge 诊断。 |
-| macOS 打包 | sidecar 命名、entitlements、app data 路径、unsigned DMG smoke、notarization、签名、staple plan | macOS 不是默认假设兼容，而是有单独验证路径。 |
-| TokenDanceID 登录 | Web/Desktop 真实 OIDC 登录、登出、session refresh | 使用 disposable 账号完成真实登录证明，不泄露 secret。 |
-| Mobile 协议对齐 | Mobile 消费同一套 Hub target、run、approval、replay 合同 | Mobile 能远程监控和控制，不分叉产品语义。 |
-| Feishu / IM 入口 | Feishu/Lark bot 或工作台卡片可以启动/跟随 Hub 任务 | IM 是协作入口，不是第二套登录或 runtime 系统。 |
-| Release Governance | 版本号、tag、changelog、artifact、gate、rollback policy | `dev`、`master`、rc tag 都有稳定且可审计的含义。 |
-| Demo / Evidence 生成 | 从真实或 fixture gate 产出可复验截图、日志、健康报告和 demo script | 比赛/提交材料可由证据负责人消费，不反向阻塞开发主链。 |
+| Target Routing | Local Edge、Remote Edge、Cloud Edge、Hub Relay target 的注册、心跳、exact-device dispatch 和降级 | Web/Mobile/IM 能稳定控制正确目标，失败时给出可操作修复建议。 |
+| Hub Replay / Sync | run、route、subtask、approval、artifact、preview、file、failure 事件统一同步 | Web、Desktop、Mobile、IM 用同一事件契约渲染。 |
+| Permissions / Audit | Hub-local org/project membership、resource/action check、device proof、审批审计 | TokenDance ID 只证明身份；AgentHub 自己决定能做什么。 |
+| Remote Approval | Mobile/IM/Web 远程 approve/deny、watch、pause、abort | 用户离开 Desktop 也能控制关键执行节点。 |
 
-## P3：平台化和生态
-
-目标：让 AgentHub 从单机远控产品扩展为可治理、可扩展的平台。
+### Phase D：产物、预览和交付
 
 | 模块 | 路线项 | 完成标准 |
 |---|---|---|
-| Multi-agent Orchestration | TeamRun plan、worker split、parallel steps、review loops、trace visualization | 用户能观察和控制多 Agent 协作，而不只是看单次运行日志。 |
-| Runtime Marketplace | 发布、安装、共享 AgentProfile、Runtime Adapter、Tools、Prompts、Skills | 团队能复用并治理 Agent 能力。 |
-| MCP / Tool Registry | 工具 schema、权限、icon、审计行为统一注册 | 工具调用类型化、可审查、可跨 runtime 复用。 |
-| Custom Agent Builder | 自定义 Agent 名称、头像、runtime/profile、skills、MCP servers、approval policy、capabilities 配置 | 用户可以创建自己的 Agent 队友，而不是只能选择内置 runtime。 |
-| Sandbox / Policy | Workspace trust、文件系统边界、approval policy、网络/runtime 约束 | 本地执行能力强但可控。 |
-| Observability | correlation id、event search、run diagnostics、logs、metrics、health dashboards | Web、Hub、Desktop、Edge、Runtime 的失败能串起来排查。 |
-| Enterprise / Multi-tenant | org、role、audit、quota、workspace ownership、deployment boundary | AgentHub 能从单用户本地 setup 扩到团队和组织。 |
+| Artifact Store | 文件、网页、文档、报告、图片、包、日志摘要统一索引 | 产物能按项目、会话、run、Agent 查找和预览。 |
+| Diff / Apply | 只读 diff、review、apply/revert、冲突提示、版本历史 | 用户能安全检查并应用 Agent 修改。 |
+| Preview Providers | 本地网页、静态站、文档、PPT、图片、代码、外部 provider 只读预览 | 产物内联可看、可追溯，编辑能力按 provider 分层实现。 |
+| Deployment | 预览 URL、静态站、容器化、源码包、状态卡片 | 部署是可审批的产物动作，不是隐藏脚本。 |
 
-## 负责人模型
+### Phase E：发布、观测和企业治理
 
-| 负责人 | 产品区域 |
-|---|---|
-| Controller Codex | 总路线图、分支集成、Desktop/Tauri/Local Edge 路径、发布 gate、最终验证 |
-| Trump | Web、Mobile 和 shared 前端产品体验；负责启动 Web 页面调 UI 细节和 mobile 协议对齐 |
-| Johnny | Hub、Edge、事件合同、后端路由、持久化；负责 approval/artifact、target health 和 Edge durable 后端切片 |
-| Mobile 执行线程 | 作为 Trump 下属执行线程推进 Mobile app，通过共享 Hub 合同对齐 |
-| Evidence/docs 负责人 | 比赛材料、截图、demo、外部报告、提交包 |
+| 模块 | 路线项 | 完成标准 |
+|---|---|---|
+| Cross-platform Release | Windows installer、macOS package、Web deploy、Mobile beta、updater 和 rollback | 每个平台都有独立 smoke、签名/公证策略和发布门禁。 |
+| Observability | correlation id、event search、run diagnostics、logs、metrics、health dashboard | Web、Hub、Desktop、Edge、Runtime 的失败能串起来排查。 |
+| Multi-tenant | org、role、quota、workspace ownership、audit export、deployment boundary | 从单用户本地 setup 扩展到团队和组织。 |
+| Evidence Consumption | 从 product gates 输出可复验、脱敏、可引用的开发证据 | 后续演示或验收流程消费这些输出；路线图不记录明细。 |
 
 ## 依赖顺序
 
-1. 冻结干净 baseline 和分支拓扑，只从 `origin/dev/delicious233` 开新 worktree。
-2. 稳定 Hub/Edge event、approval、artifact 和 target health 合同。
-3. Web 按合同实现一屏主链，Mobile/IM 消费同一合同。
-4. Desktop Local Edge 启动、诊断、sidecar binary 和打包硬化。
-5. 对组合后的栈运行 product-loop fixture/observed E2E。
-6. 经审批后推进真实登录、真实 CLI/model/API、部署、签名、公证和 release。
-7. 扩展 Edge SQLite durable、SDK/custom runtime、runtime icons、TeamRun 平台化和企业治理。
+1. 稳定 Hub/Edge event、approval、artifact、target health 和 Agent Profile 合同。
+2. Web/Desktop shared workbench 按合同实现一屏 IM 主链。
+3. Desktop Local Edge 启动、诊断、sidecar、SQLite app-data 和 exact target 绑定硬化。
+4. Edge CLI/SDK/custom runtime adapter 统一输出 typed events。
+5. Product-loop observed/fixture E2E 覆盖 Web -> Hub -> Desktop -> Edge -> adapter -> replay。
+6. 经审批后推进真实 TokenDanceID 登录、真实 CLI/model/API、部署、签名、公证和 release。
+7. 扩展 Mobile/IM、Agent marketplace、MCP/tool registry、TeamRun 编排和企业治理。
 
 ## 非协商边界
 
 - Web 只和 Hub 通信，不直接连接 Local Edge 或 raw runtime。
 - Desktop renderer 不获得 raw process execution 权限。
 - Local Edge 负责本地执行、adapter 调用、runtime policy、日志和证据。
+- Hub 负责账号、IM、同步、路由、权限、审计和远程控制面。
+- Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离。
 - Mock 和 fixture 模式必须显式；real mode 不能静默降级。
 - 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
-- Roadmap 只写未来路线；当前事实写在 `STATE.md`。
+- Roadmap 只写路线；当前事实写在 `STATE.md`。
