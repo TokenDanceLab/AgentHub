@@ -47,6 +47,8 @@
 - Desktop sidecar observed fixture smoke 已覆盖 fixture/mock sidecar health、SQLite app-data path、stdout/stderr log path、health URL、preflight/readiness、no direct CLI spawn。
 - Desktop exact target observed bridge 已记录 expected/observed `target_id` / `edge_device_id`，能区分 matched、mismatch、offline、missing。
 - Tauri package smoke gate 已强化 Windows unsigned/dev package reproducibility、sidecar placement、Local Edge diagnostics、macOS unsigned policy boundary；不执行真实 build/sign/notarize/release upload。
+- Windows/Tauri packaging release dry 已在隔离 worktree `codex/packaging-release-windows-tauri-20260609` 复跑，产出 unsigned NSIS installer、portable zip、Windows Local Edge sidecar 和 `artifact-manifest.json` hash 证据，artifact root 为 `.tmp\tauri-package-release-20260609`；不签名、不公证、不上传 release、不提交二进制，updater `latest.json`/`.sig` 仍是后续 signing/release approval gate。
+- Release gate 负责人线已补 `scripts/verify-release-gate.ps1` 和 `docs/audit/release-gate-2026-06-09.md`，覆盖 dev->master refs、RC/tag 规范、release-readiness dry workflow 边界、Windows unsigned artifact manifest 和 Open Critical/High security blockers；公开 release 仍阻断于 signing/notarization/updater approval 与开放 High 风险。
 - Desktop Agent Builder fixture evidence UI 已合入，展示 fixture-only runtime/profile、provider/model、tools/MCP、approval policy、workspace trust、Local Edge fixture health 和 no-spend evidence。
 
 ### Edge / CLI / SDK / SQLite
@@ -83,6 +85,7 @@
 | Web/IM 主链 | 最新 dev 已合入 target health、agent mainchain actions、group orchestration fixtures、real-mode boundary、artifact/diff inspector | 仍需真实 Hub data、真实 task queue 和群成员权限闭环。 |
 | Hub approval/artifact/diff | 最新 dev 已合入单任务 approval/artifact 合同、diff metadata、approval context gate、编排路由审计队列字段 | apply/revert 写文件、TeamRun/单任务完全统一和 production 权限 gate 继续推进。 |
 | Desktop/Local Edge | 最新 dev 已合入 diagnostics、sidecar observed/binary/package smoke、exact target bridge、Builder fixture UI | 真实签名包、真实 sidecar binary 发布和跨平台安装仍需审批与平台 gate。 |
+| Windows/Tauri packaging release dry | `codex/packaging-release-windows-tauri-20260609` 正在收口 release-readiness dry gate 复用本地 `verify-tauri-package-dry.ps1`，本地 artifact root `.tmp\tauri-package-release-20260609` 已产出 installer/portable/sidecar/hash manifest | unsigned workflow artifacts only；不签名、不公证、不上传 release、不提交二进制；macOS 仍是 future unsigned dry policy。 |
 | Edge/CLI/SDK/SQLite | 最新 dev 已合入 SQLite durable/readiness、fixture adapter runner、CLI JSON readiness、SDK capability/event matrix | 真实 CLI/model/API 消耗和 production durable store promotion 尚未完成。 |
 | Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、localhost probe/smoke、approved-real/no-secret gates、P0 approved-real gold-path harness | 缺账号/env 或缺 evidence 时必须输出 `BLOCKED_WITH_EVIDENCE`；本文不记录 secret 或证据包细节。 |
 | Mobile | 独立收口 | 只按 Hub target/run/approval/replay 合同对齐，不分叉 runtime 或登录语义。 |
@@ -112,7 +115,7 @@
 2. **真实 TokenDanceID 登录打通**：先跑 `scripts/verify-token-dance-id-login-readiness.ps1`；只有输出 `READY_FOR_OPERATOR` 后，操作员才使用一次性/预批准测试账号和已批准环境运行真实登录链路，不把 secret 写入仓库。`BLOCKED` 必须先补齐 approved client/test-account 元数据或 OIDC discovery。
 3. **approved-real 录屏前审批**：先运行 `scripts\verify-approved-real-demo-readiness.ps1` 或顶层 gold-path harness 产出 redacted manifest；若状态是 `READY_FOR_APPROVAL`，再由人工批准真实 TokenDanceID 测试账号/安全 env、录屏范围和是否允许真实 CLI/model/API。无批准时只能演示 fixture/mock replay。
 4. **localhost observed service runner 升级**：在现有 no-spend manifest gate 上，逐步加入可启动的 Web dev server、Local Edge mock/SQLite 和 Hub health/service probe。
-5. **Windows/Tauri unsigned package smoke**：验证 sidecar binary、no-bundle build 和 unsigned installer readiness；签名、公证、release upload 另行推进。
+5. **Windows/Tauri unsigned package smoke**：当前 dry gate 已能产出 unsigned NSIS installer、portable zip、Windows Local Edge sidecar 和 `artifact-manifest.json` hash 证据；签名、公证、release upload、updater `latest.json`/`.sig` 另行审批推进。
 6. **受控 approved-real CLI/SDK 方案**：已具备 preflight manifest gate；真实 CLI/model/API 消耗、部署和签名仍必须另获批准。
 
 ## 安全规则
