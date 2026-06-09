@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
 import { ScreenHeader } from '@/components/layout';
-import { Badge, SearchField, SegmentedControl, Surface } from '@/components/primitives';
+import { Badge, MotionPressable, SearchField, SegmentedControl, Surface } from '@/components/primitives';
 import { useStrings } from '@/i18n/strings';
 import { useNativeCapabilities } from '@/integrations/useNativeCapabilities';
 import { useAgentHubTheme } from '@/theme';
@@ -724,9 +724,10 @@ function PaneTabRail({
         const selected = option.value === value;
 
         return (
-          <Pressable
+          <MotionPressable
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            feedback="control"
             key={option.value}
             onPress={() => onChange(option.value)}
             style={({ pressed }) => ({
@@ -756,7 +757,7 @@ function PaneTabRail({
             >
               {option.label}
             </Text>
-          </Pressable>
+          </MotionPressable>
         );
       })}
     </ScrollView>
@@ -882,11 +883,12 @@ function SurfaceListRow({
   const { tokens } = useAgentHubTheme();
 
   return (
-    <Pressable
+    <MotionPressable
       accessibilityRole="button"
+      feedback="row"
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 60,
+        minHeight: 56,
         flexDirection: 'row',
         alignItems: 'center',
         gap: tokens.space.sm,
@@ -941,7 +943,7 @@ function SurfaceListRow({
       {row.target || row.onPress ? (
         <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={17} />
       ) : null}
-    </Pressable>
+    </MotionPressable>
   );
 }
 
@@ -957,11 +959,12 @@ function OverflowListRow({
   const { tokens } = useAgentHubTheme();
 
   return (
-    <Pressable
+    <MotionPressable
       accessibilityRole="button"
+      feedback="row"
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 52,
+        minHeight: 50,
         flexDirection: 'row',
         alignItems: 'center',
         gap: tokens.space.sm,
@@ -1019,6 +1022,6 @@ function OverflowListRow({
       {row.target || row.onPress ? (
         <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={17} />
       ) : null}
-    </Pressable>
+    </MotionPressable>
   );
 }

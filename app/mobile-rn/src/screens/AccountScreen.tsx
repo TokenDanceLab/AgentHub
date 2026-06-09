@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
-import { Badge, Button } from '@/components/primitives';
+import { Badge, Button, MotionPressable } from '@/components/primitives';
 import { useStrings } from '@/i18n/strings';
 import { useNativeCapabilities } from '@/integrations/useNativeCapabilities';
 import { useAgentHubTheme } from '@/theme';
@@ -392,13 +392,14 @@ function AccountMenuSectionView({ section }: { section: AccountMenuSection }): R
       </Text>
       <View>
         {section.items.map((item) => (
-          <Pressable
+          <MotionPressable
             accessibilityLabel={item.label}
             accessibilityRole="button"
+            feedback="row"
             key={item.label}
             onPress={item.onPress}
             style={({ pressed }) => ({
-              minHeight: tokens.touch.primary,
+              minHeight: 44,
               flexDirection: 'row',
               alignItems: 'center',
               gap: tokens.space.sm,
@@ -434,7 +435,7 @@ function AccountMenuSectionView({ section }: { section: AccountMenuSection }): R
             </Text>
             {item.status ? <AccountStatusBadge value={item.status} /> : null}
             <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={18} />
-          </Pressable>
+          </MotionPressable>
         ))}
       </View>
     </View>
@@ -446,9 +447,10 @@ function AccountStatusButton({ label, tone }: { label: string; tone: 'success' |
   const color = tone === 'success' ? tokens.color.moss : tokens.color.warning;
 
   return (
-    <Pressable
+    <MotionPressable
       accessibilityLabel={label}
       accessibilityRole="button"
+      feedback="control"
       hitSlop={6}
       style={({ pressed }) => ({
         minHeight: tokens.touch.minimum,
@@ -475,7 +477,7 @@ function AccountStatusButton({ label, tone }: { label: string; tone: 'success' |
       >
         {label}
       </Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 
