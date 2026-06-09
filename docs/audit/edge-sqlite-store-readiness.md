@@ -17,6 +17,7 @@ What exists on the current dev branch plus this slice:
 - Relational projection tables exist for owners, workspaces, runs, artifacts, diffs, and previews.
 - `SQLiteReadiness(path)` reports applied migration version, `PRAGMA integrity_check`, generic row counts, and projection row counts for local smoke/preflight usage.
 - `SQLiteReadinessManifestForPath(path)` returns schema `agenthub-edge-sqlite-readiness-v1`, `ready` / `blocked` status, expected migration version, missing/unknown migration versions, required row kinds, required projection tables, and row/projection counts.
+- `agenthub-edge --store-readiness --store-backend sqlite --store-db <path>` prints the readiness manifest and exits non-zero when the manifest status is `blocked`.
 - Desktop Local Edge host readiness exposes the SQLite backend, readiness manifest schema, expected migration version, app-data DB policy, logs, sidecar args, and preflight blockers before starting Local Edge.
 - Existing contract tests cover memory, file, and SQLite restore behavior; SQLite migration tests cover idempotent apply, rollback to snapshot-only schema, foreign keys, nested path creation, transient lock waiting, generic row restore, projection content, and per-write reopen readiness.
 
@@ -165,6 +166,7 @@ This slice adds a local readiness helper, manifest/status reporting, FileStore p
 
 - `SQLiteReadiness(path)` reports migration version, integrity check, generic row counts, and projection counts.
 - `SQLiteReadinessManifestForPath(path)` reports schema `agenthub-edge-sqlite-readiness-v1`, ready/blocked status, latest/expected migration versions, missing/unknown migration versions, required row kinds, required projection tables, and row/projection counts.
+- `agenthub-edge --store-readiness` now uses the manifest as the CLI guard surface and fails closed for blocked migration state.
 - `TestSQLiteStoreReadinessRestoresAfterEachDurableWrite` reopens after each key write boundary: project, thread, run status, replay item, pin, file-change diff, artifact content source, and preview.
 - `TestFileStoreAndSQLiteReadinessRowKindParity` writes the same local contract data to JSON FileStore and SQLite, then compares file snapshot counts with SQLite manifest row counts.
 - Desktop Local Edge host readiness now advertises `store_backend=sqlite`, `store_readiness_manifest_schema=agenthub-edge-sqlite-readiness-v1`, and `expected_store_migration_version=4` in the read-only preflight/diagnostic surface.

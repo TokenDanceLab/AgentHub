@@ -581,7 +581,7 @@ func TestSQLiteDurableObservedFixtureSmoke(t *testing.T) {
 	}
 }
 
-func TestRunStoreReadinessPrintsSQLiteReport(t *testing.T) {
+func TestRunStoreReadinessPrintsSQLiteManifest(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "edge-readiness-report.db")
 	repository, err := store.NewSQLite(dbPath)
 	if err != nil {
@@ -638,6 +638,55 @@ func TestRunStoreReadinessPrintsSQLiteReport(t *testing.T) {
 	}
 	if report.ProjectionCounts["edge_runs"] != 1 {
 		t.Fatalf("edge_runs projection count = %d, want 1", report.ProjectionCounts["edge_runs"])
+	}
+}
+
+func TestRunStoreReadinessBlocksStaleSQLiteMigrationState(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "edge-readiness-blocked.db")
+	repository, err := store.NewSQLite(dbPath)
+	if err != nil {
+		t.Fatalf("NewSQLite returned error: %v", err)
+	}
+	repository.Close()
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite db returned error: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM agenthub_sqlite_migrations WHERE version = ?`, store.LatestSQLiteMigrationVersion()); err != nil {
+		_ = db.Close()
+		t.Fatalf("delete latest migration returned error: %v", err)
+	}
+	_ = db.Close()
+
+	var out bytes.Buffer
+	err = runStoreReadiness(config{
+		StoreBackend:   "sqlite",
+		StoreDB:        dbPath,
+		StoreReadiness: true,
+	}, &out)
+	if err == nil || !strings.Contains(err.Error(), "blocked") {
+		t.Fatalf("runStoreReadiness error = %v, want blocked readiness error", err)
+	}
+
+	var manifest struct {
+		Schema                   string `json:"schema"`
+		Status                   string `json:"status"`
+		MigrationStatus          string `json:"migration_status"`
+		ExpectedMigrationVersion int    `json:"expected_migration_version"`
+		MissingMigrationVersions []int  `json:"missing_migration_versions"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &manifest); err != nil {
+		t.Fatalf("blocked readiness JSON was not valid: %v\n%s", err, out.String())
+	}
+	if manifest.Schema != store.SQLiteReadinessManifestSchema {
+		t.Fatalf("Schema = %q, want %q", manifest.Schema, store.SQLiteReadinessManifestSchema)
+	}
+	if manifest.Status != "blocked" || manifest.MigrationStatus != "behind" {
+		t.Fatalf("manifest status = %q migration = %q, want blocked/behind", manifest.Status, manifest.MigrationStatus)
+	}
+	if got := manifest.MissingMigrationVersions; len(got) != 1 || got[0] != manifest.ExpectedMigrationVersion {
+		t.Fatalf("missing migrations = %v, want latest %d", got, manifest.ExpectedMigrationVersion)
 	}
 }
 
