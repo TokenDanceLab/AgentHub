@@ -532,6 +532,13 @@ function RuntimeEvidencePanel({
                 <span className={styles.fileName}>{artifact.path}</span>
                 <span className={styles.fileMeta}>{artifact.kind}</span>
               </div>
+              <ArtifactWorkspaceProjection
+                artifact={artifact}
+                diffCount={runtimeEvidence.diffs.length}
+                evidenceSourceLabel={artifactSummary?.sourceLabel}
+                previewStatus={artifactWorkspacePreviewStatus(runtimeEvidence.previews)}
+                runId={runtimeEvidence.runId}
+              />
             </li>
           ))}
         </RuntimeEvidenceSection>
@@ -561,6 +568,39 @@ function RuntimeEvidencePanel({
           })}
         </RuntimeEvidenceSection>
       )}
+    </div>
+  );
+}
+
+function ArtifactWorkspaceProjection({
+  artifact,
+  diffCount,
+  evidenceSourceLabel,
+  previewStatus,
+  runId,
+}: {
+  artifact: RuntimeEvidenceSnapshot['artifacts'][number];
+  diffCount: number;
+  evidenceSourceLabel?: string | undefined;
+  previewStatus: string;
+  runId?: string | undefined;
+}): React.ReactElement {
+  const topic = artifact.threadId || 'unknown';
+  const version = artifact.runId || runId || 'unknown';
+  const diffLabel = diffCount === 1 ? '1 file' : `${diffCount} files`;
+  return (
+    <div
+      aria-label={`Artifact workspace ${artifact.path}`}
+      className={styles.artifactWorkspace}
+      role="group"
+    >
+      <span>Topic: {topic}</span>
+      <span>Version: {version}</span>
+      <span>Preview: {previewStatus}</span>
+      <span>Download: metadata only</span>
+      <span>Export: evidence bundle ready</span>
+      <span>Evidence: {evidenceSourceLabel ?? 'None'}</span>
+      <span>Diff projection: {diffLabel}</span>
     </div>
   );
 }
@@ -767,6 +807,11 @@ function diffLinePrefix(type: FileDiff['hunks'][number]['lines'][number]['type']
 
 function diffMeta(file: FileDiff): string {
   return `+${file.additions} -${file.deletions}`;
+}
+
+function artifactWorkspacePreviewStatus(previews: RuntimeEvidenceSnapshot['previews']): string {
+  const readyPreview = previews.find((preview) => preview.status === 'ready');
+  return readyPreview?.status ?? previews[0]?.status ?? 'none';
 }
 
 function inspectorTabLabel(mode: InspectorMode): string {

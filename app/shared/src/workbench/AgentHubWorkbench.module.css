@@ -1867,6 +1867,25 @@
   color: var(--text-3);
 }
 
+.artifactWorkspace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 2px 25px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  background: var(--surface-low);
+  color: var(--text-2);
+  font: 500 0.6875rem/1.4 var(--font-sans);
+}
+
+.artifactWorkspace span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 /* ── Runtime evidence ── */
 .runtimeEvidence {
   display: grid;
