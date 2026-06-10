@@ -108,7 +108,15 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
 
   // Hub WebSocket — invalidate React Query caches when real-time events arrive.
   const queryClient = useQueryClient();
-  const hubWS = useHubWebSocket({ enabled: hubReady });
+  const hubWS = useHubWebSocket({
+    enabled: hubReady,
+    onReconnect: () => {
+      // On reconnect, invalidate agent task queries so the REST refetch
+      // picks up any events missed during the WS disconnection gap.
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'agent-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+    },
+  });
 
   // When a Hub WS event arrives, invalidate the relevant query caches so
   // React Query refetches fresh data from the Hub REST API.

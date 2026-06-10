@@ -1,6 +1,6 @@
 # AgentHub Archive Index
 
-日期：2026-05-25
+日期：2026-06-10（上次更新 2026-05-25）
 
 本文是 `docs/archive/` 的阅读索引。归档文档保留历史方案、早期规格和设计取舍记录，不再作为当前实现的权威来源。
 
@@ -10,11 +10,12 @@
 
 | 主题 | 权威文档 |
 |---|---|
-| 产品定位、系统架构、实现指南 | `docs/architecture.md`（三合一主文档） |
+| 产品定位、系统架构、实现指南 | `docs/architecture.md`（三合一主文档）+ `docs/architecture/`（子模块详情） |
 | 全局开发路线图 | `docs/roadmap.md` |
+| 功能收口路线图 | `docs/roadmap-feature-close.md` |
 | REST 契约 | `api/openapi.yaml`、`api/README.md`、`api/conventions.md` |
 | WebSocket 事件契约 | `api/events.md` |
-| 当前接手状态 | `docs/handoffs/STATE.md` |
+| 当前事实状态 | `STATE.md`（仓库根） |
 | 分支治理与协作规则 | `AGENTS.md`、`docs/governance/branch-governance.md` |
 
 跨 TokenDance workspace 的身份、统一登录、设计系统和文档治理以仓库上层 `../docs/` 为准。生产拓扑、DNS、TLS、机器状态和部署实情属于 `C:\Users\Ding\server\STATE.md` 及 server workspace，不应复制到本仓文档。
@@ -135,3 +136,40 @@
 ## 根 docs 归档建议
 
 根目录中仍有少量旧 handoff/roadmap 文档包含独立 Runner 或旧分支信息。受本轮写入范围限制，未移动这些文件；建议见 `stale-docs-2026-05-25.md`。
+
+## 2026-06-10 新增归档
+
+### v4 Sprint 快照（从 `docs/` 顶层移入）
+
+这些文件是 2026-06-07 v4 sprint 期间的一次性快照，结论已合并到 `docs/architecture.md`、`docs/roadmap.md` 或 `STATE.md`：
+
+| 原文件 | 归档位置 | 内容 | 归档原因 |
+|---|---|---|---|
+| `docs/handoff-2026-06-09.md` | `v4-sprint-2026-06-07/handoff-2026-06-09.md` | PR #297 合并交接 | 一次性交接，已由 `STATE.md` 覆盖 |
+| `docs/v4-frontend-progress-2026-06-07.md` | `v4-sprint-2026-06-07/` | 前端进度快照 | 已被后续迭代完全覆盖 |
+| `docs/v4-design-parity-audit-2026-06-07.md` | `v4-sprint-2026-06-07/` | UI 审计快照 | 结论已合并到 v4 计划 |
+| `docs/v4-legacy-client-inventory-2026-06-07.md` | `v4-sprint-2026-06-07/` | 旧客户端清理清单 | 迁移已基本完成 |
+| `docs/v4-merge-pr-readiness-2026-06-07.md` | `v4-sprint-2026-06-07/` | PR #291 合并准备 | PR #291 被 #297 取代并合入 |
+| `docs/v4-pr-draft.md` | `v4-sprint-2026-06-07/` | PR #291 草稿 | 已被 PR #297 取代 |
+| `docs/v4-clean-rebuild-decision-questions.md` | `v4-sprint-2026-06-07/` | 决策问题清单 | 所有决策已确认并执行 |
+
+### GLM-5.1 全项目审计（从 `docs/review-2026-06-07-glm-5.1/` 移入）
+
+| 原位置 | 归档位置 | 内容 |
+|---|---|---|
+| `docs/review-2026-06-07-glm-5.1/` | `archive/review-2026-06-07-glm-5.1/` | 8 维度并行审计 + 交叉审核，4,972 行 |
+
+### 比赛评审快照（从 `docs/review/` 移入）
+
+| 原位置 | 归档位置 | 内容 |
+|---|---|---|
+| `docs/review/2026-06-06-round6-*.md` | `archive/` | Round 6 比赛提交差距分析 |
+| `docs/review/archive/*` | 未跟踪文件，已随 `docs/review/` 目录整体移除 | Round 1-5 评审快照 |
+
+### 旧 Handoff 文件（从 `docs/handoffs/` 移入）
+
+| 原位置 | 归档位置 | 内容 | 归档原因 |
+|---|---|---|---|
+| `docs/handoffs/SESSION-HANDOFF-2026-06-05.md` | `archive/handoffs-2026-06-05/` | Session 交接 | 超过 3 天，按 handoff 规则归档 |
+| `docs/handoffs/claude-session-20260605.md` | `archive/handoffs-2026-06-05/` | Claude 会话交接 | 超过 3 天 |
+| `docs/handoffs/STATE.md` | `archive/handoffs-2026-06-05/` | 旧项目状态 | 已由仓库根 `STATE.md` 取代 |
