@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { ChatMessage } from '../types/chat';
+import type { TranscriptBlock } from '../transcript';
 import styles from './MessageSearchPanel.module.css';
 
 interface SearchResult {
@@ -12,8 +13,19 @@ interface SearchResult {
   matchEnd: number;
 }
 
+/** Searchable item extracted from either ChatMessage or TranscriptBlock. */
+interface SearchableItem {
+  id: string;
+  agentName?: string;
+  timestamp: string;
+  text: string;
+}
+
 interface Props {
-  messages: ChatMessage[];
+  /** Legacy ChatMessage items. */
+  messages?: ChatMessage[];
+  /** TranscriptBlock items (takes precedence over messages when both provided). */
+  transcriptBlocks?: TranscriptBlock[];
   open: boolean;
   onClose: () => void;
   onJumpToMessage: (messageId: string, messageIndex: number) => void;
@@ -45,8 +57,59 @@ function extractMessageText(msg: ChatMessage): string {
     .join(' ');
 }
 
+function extractTranscriptBlockText(block: TranscriptBlock): string {
+  switch (block.kind) {
+    case 'text': return [block.displayTitle, block.displayDetail, block.text].filter(Boolean).join(' ');
+    case 'tool_call': return `${block.toolName} ${block.target ?? ''} ${block.summary ?? ''}`;
+    case 'tool_result': return `${block.toolName} ${block.summary ?? ''}`;
+    case 'artifact': return `${block.title} ${block.path ?? ''} ${block.artifactKind ?? ''}`;
+    case 'preview': return `${block.previewId} ${block.url ?? ''}`;
+    case 'file_change': return `${block.action} ${block.path}`;
+    case 'diff': return `${block.title} ${block.files.join(' ')}`;
+    case 'approval': return `${block.title} ${block.reason ?? ''}`;
+    case 'permission_request': return `${block.title} ${block.reason ?? ''}`;
+    case 'permission_result': return `${block.title} ${block.reason ?? ''}`;
+    case 'thinking': return block.content ?? '';
+    case 'subagent':
+    case 'subtask': return `${block.title} ${block.summary ?? ''}`;
+    case 'child_agent': return `${block.title} ${block.summary ?? ''}`;
+    case 'route_decision': return `${block.action} ${block.summary ?? ''}`;
+    case 'context_usage': return `${block.modelLabel ?? ''} token usage`;
+    case 'result': return block.summary ?? '';
+    case 'failure': return block.reason ?? block.title;
+    case 'finished': return block.title;
+    case 'agent_timeline': return block.title ?? '';
+    case 'run_session': return `${block.title} ${block.runId ?? ''}`;
+    case 'run_step_group': return block.title;
+    case 'attachment': return block.contentType ?? '';
+    case 'replay_gap': return '';
+    default: return '';
+  }
+}
+
+function toSearchableItems(messages?: ChatMessage[], transcriptBlocks?: TranscriptBlock[]): SearchableItem[] {
+  if (transcriptBlocks && transcriptBlocks.length > 0) {
+    return transcriptBlocks.map((block) => ({
+      id: block.id,
+      agentName: block.author.role === 'agent' ? block.author.name : undefined,
+      timestamp: block.createdAt ?? '',
+      text: extractTranscriptBlockText(block),
+    }));
+  }
+  if (messages) {
+    return messages.map((msg) => ({
+      id: msg.id,
+      agentName: msg.agentName,
+      timestamp: msg.timestamp,
+      text: extractMessageText(msg),
+    }));
+  }
+  return [];
+}
+
 export default function MessageSearchPanel({
   messages,
+  transcriptBlocks,
   open,
   onClose,
   onJumpToMessage,
@@ -58,6 +121,11 @@ export default function MessageSearchPanel({
 }: Props) {
   const [query, setQuery] = useState('');
   const inputRef = useState<HTMLInputElement | null>(null);
+
+  const searchableItems = useMemo(
+    () => toSearchableItems(messages, transcriptBlocks),
+    [messages, transcriptBlocks],
+  );
 
   const setInputRef = useCallback((el: HTMLInputElement | null) => {
     inputRef[1](el);
@@ -87,25 +155,24 @@ export default function MessageSearchPanel({
     const lowerQuery = query.toLowerCase();
     const items: SearchResult[] = [];
 
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
-      if (!msg) continue;
-      const text = extractMessageText(msg);
-      const lowerText = text.toLowerCase();
+    for (let i = 0; i < searchableItems.length; i++) {
+      const item = searchableItems[i];
+      if (!item || !item.text) continue;
+      const lowerText = item.text.toLowerCase();
       const idx = lowerText.indexOf(lowerQuery);
       if (idx === -1) continue;
 
       const snippetStart = Math.max(0, idx - 40);
-      const snippetEnd = Math.min(text.length, idx + query.length + 40);
+      const snippetEnd = Math.min(item.text.length, idx + query.length + 40);
       const snippet = (snippetStart > 0 ? '...' : '') +
-        text.slice(snippetStart, snippetEnd) +
-        (snippetEnd < text.length ? '...' : '');
+        item.text.slice(snippetStart, snippetEnd) +
+        (snippetEnd < item.text.length ? '...' : '');
 
       items.push({
-        messageId: msg.id,
+        messageId: item.id,
         messageIndex: i,
-        ...(msg.agentName != null && { agentName: msg.agentName }),
-        timestamp: msg.timestamp,
+        ...(item.agentName != null && { agentName: item.agentName }),
+        timestamp: item.timestamp,
         snippet,
         matchStart: idx - snippetStart + (snippetStart > 0 ? 3 : 0),
         matchEnd: idx - snippetStart + query.length + (snippetStart > 0 ? 3 : 0),
@@ -113,7 +180,7 @@ export default function MessageSearchPanel({
     }
 
     return items;
-  }, [messages, query]);
+  }, [searchableItems, query]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
