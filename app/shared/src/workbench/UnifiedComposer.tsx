@@ -173,6 +173,22 @@ export function UnifiedComposer({
           </button>
         </div>
       )}
+      {composer.quote && (
+        <div className={styles.quoteBar}>
+          <span className={styles.quoteBarLabel}>
+            {composer.quote.author ? `${composer.quote.author}: ` : ''}{composer.quote.text.slice(0, 60)}
+          </span>
+          <button
+            aria-label="取消引用"
+            className={styles.quoteBarCancel}
+            disabled={isSubmitting}
+            onClick={() => dispatchComposer({ type: 'setQuote', quote: null })}
+            type="button"
+          >
+            x
+          </button>
+        </div>
+      )}
       {composer.mentions.length > 0 && (
         <div className={styles.composerMentions} aria-label="Selected agents">
           {composer.mentions.map((mention) => (
