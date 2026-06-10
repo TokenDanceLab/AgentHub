@@ -91,7 +91,12 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - approved-real preflight manifest gate、redacted demo manifest gate 和 no-secret demo readiness gate 已合入，用于审批前检查 approval、budget、timeout、artifact root、redaction、runtime、URL、测试账号标识和 secret scan。
 - Web deploy/readiness、boundary、product-loop fixture QA 和 Tauri readiness gate 已作为当前 dev 基础能力存在。
 
-### 2026-06-10 数据流打通成果（本轮新增）
+### 2026-06-10 主线合入
+
+- `dev/delicious233` → `origin/master` fast-forward 完成（95afab54）
+- PR #297 之前的 master 基线：`origin/master = b7e9c1a4 Merge pull request #297 from TokenDanceLab/dev/delicious233`
+- 新 master HEAD：`95afab54 docs(state): HEAD 2c48951f, RC8 tagged, BYTEDANCE.md created`
+- 98 次提交已推送至 master，覆盖 2026-06-10 全链路打通全部成果
 
 **IM 聊天全链路（Web + Desktop）**：
 - Web hubClient 新增 4 个方法：`editMessage`、`addMessageReaction`、`removeMessageReaction`、`listMessageReactions`
