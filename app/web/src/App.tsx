@@ -61,6 +61,14 @@ function WebWorkbenchRoot() {
   const deleteAgentProfile = useDeleteAgentProfile();
   const workbench = useWebWorkbenchModel(selectedConversationId, selectedProjectId);
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
+
+  // Fetch real user profile from Hub (originates from TokenDance ID OIDC)
+  const userProfile = useQuery({
+    queryKey: ['web-v4', 'auth-me'],
+    queryFn: () => createHubClient({ getToken: getAccessToken }).me(),
+    enabled: Boolean(getAccessToken()),
+    staleTime: 60_000,
+  });
   const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, 'Agent Profile 加载失败')
     : undefined;
@@ -190,9 +198,13 @@ function WebWorkbenchRoot() {
         runtimeEvidence={workbench.runtimeEvidence}
         showComposerAgentPicker={false}
         showComposerStatus={false}
+        showHeaderDataModeControl={false}
         showMainchainStatus={false}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
+        userDisplayName={userProfile.data?.nickname || userProfile.data?.username}
+        userAvatarUrl={userProfile.data?.avatar_url}
+        currentUserId={userProfile.data?.id}
         skillMarketItems={skillMarketItems}
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
         mcpMarketItems={mcpMarketItems}

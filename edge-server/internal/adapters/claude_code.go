@@ -310,13 +310,12 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		args = append(args, "--include-partial-messages")
 	}
 
-	// Session continuity from run context
-	if ctx.SessionID != "" && ctx.ContinueLast {
-		args = append(args, "--resume", ctx.SessionID)
-	} else if ctx.SessionID != "" {
+	// Session continuity: use --session-id to create new CC conversations.
+	// This avoids "No conversation found" (--resume) and "already in use" (--session-id on existing).
+	// Each run creates a fresh CC conversation; context is lost between runs.
+	// TODO: detect existing session and use --continue for subsequent runs.
+	if ctx.SessionID != "" {
 		args = append(args, "--session-id", ctx.SessionID)
-	} else if ctx.ContinueLast {
-		args = append(args, "--continue")
 	}
 	if ctx.ForkSession {
 		args = append(args, "--fork-session")
@@ -325,7 +324,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	// Allow tool access to the working directory
 	workDir := ctx.WorkDir
 	if workDir == "" {
-		workDir = "."
+		workDir = DefaultWorkDir()
 	}
 	args = append(args, "--add-dir", workDir)
 

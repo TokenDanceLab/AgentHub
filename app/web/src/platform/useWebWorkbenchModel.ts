@@ -11,7 +11,6 @@ import {
   resolveDemoWorkbenchTranscript,
   subscribeWorkbenchDataModeOverride,
   workbenchDataModeLabel,
-  workbenchDemoRuntimeStore,
 } from '@shared/demo';
 import {
   contactInfoToMember,
@@ -88,11 +87,6 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const realMode = isWorkbenchRealDataMode(dataMode);
   const hubReady = !fixtureMode && authenticated && Boolean(getAccessToken());
   const queryClient = useQueryClient();
-  const demoSnapshot = useSyncExternalStore(
-    workbenchDemoRuntimeStore.subscribe,
-    workbenchDemoRuntimeStore.getSnapshot,
-    workbenchDemoRuntimeStore.getSnapshot,
-  );
   const [liveRuntimeEvents, setLiveRuntimeEvents] = useState<HubRuntimeEventTranscriptInput[]>([]);
 
   // Subscribe to agent activity changes for the streaming status bar.
@@ -110,9 +104,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     placeholderData: (previous) => previous,
   });
 
-  const conversations = !hubReady && !realMode
-    ? demoSnapshot.conversations
-    : resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
+  const conversations = resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode);
   const activeConversationId = (
     conversations.some((conversation) => conversation.id === selectedConversationId)
       ? selectedConversationId
@@ -383,15 +375,13 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     activeAgentTaskApprovals.data,
     activeAgentTaskArtifacts.data,
   );
-  const transcript = !hubReady && !realMode
-    ? workbenchDemoRuntimeStore.resolveTranscript(activeConversationId)
-    : resolveWebWorkbenchTranscript(
-      hubReady,
-      activeHubSessionId,
-      messages.data,
-      mergedRuntimeEvents,
-      dataMode,
-    );
+  const transcript = resolveWebWorkbenchTranscript(
+    hubReady,
+    activeHubSessionId,
+    messages.data,
+    mergedRuntimeEvents,
+    dataMode,
+  );
   const taskContractStatusBlocks = resolveWebTaskContractStatusBlocks(
     activeAgentTaskId,
     activeAgentTaskApprovals.error,
