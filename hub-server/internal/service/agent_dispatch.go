@@ -123,6 +123,14 @@ func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pendi
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	// AH-SR-014: If AGENTHUB_EDGE_AUTH_TOKEN is configured, pass it as a
+	// Bearer token so the Edge server's localAuthMiddleware can verify it.
+	// This is the shared-secret trust chain between Hub and Edge for HTTP
+	// dispatch. In dev mode (AGENTHUB_DEV=1) the Edge skips auth entirely.
+	if edgeAuthToken := strings.TrimSpace(os.Getenv("AGENTHUB_EDGE_AUTH_TOKEN")); edgeAuthToken != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+edgeAuthToken)
+	}
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {

@@ -216,6 +216,23 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		args = append(args, "--json-schema", ctx.StructuredOutputSchema)
 	}
 
+	// On Windows, agents frequently reference "/tmp" (a Unix convention) in
+	// prompts. This path does not exist on Windows — the equivalent is
+	// os.TempDir() (e.g. C:\Users\<user>\AppData\Local\Temp). Grant the
+	// agent write access to the system temp directory and inject a hint so
+	// it knows to use the native path.
+	var windowsTmpHint string
+	if runtime.GOOS == "windows" {
+		if tmpDir := os.TempDir(); tmpDir != "" {
+			windowsTmpHint = fmt.Sprintf(
+				"[Windows path note] The system temp directory is %s. "+
+					"When the user references /tmp, use this Windows path instead. "+
+					"Example: /tmp/hello.py → %s\\hello.py",
+				tmpDir, tmpDir,
+			)
+		}
+	}
+
 	// System prompt customization
 	if ctx.SystemPrompt != "" {
 		args = append(args, "--system-prompt", ctx.SystemPrompt)
@@ -235,6 +252,14 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 			appendPrompt = contextPreface + "\n\n" + appendPrompt
 		} else {
 			appendPrompt = contextPreface
+		}
+	}
+	// Inject Windows temp directory hint if applicable.
+	if windowsTmpHint != "" {
+		if appendPrompt != "" {
+			appendPrompt = windowsTmpHint + "\n\n" + appendPrompt
+		} else {
+			appendPrompt = windowsTmpHint
 		}
 	}
 	if appendPrompt != "" {
@@ -303,6 +328,14 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		workDir = "."
 	}
 	args = append(args, "--add-dir", workDir)
+
+	// On Windows, also grant access to the system temp directory so the agent
+	// can write to it when prompts reference /tmp.
+	if runtime.GOOS == "windows" {
+		if tmpDir := os.TempDir(); tmpDir != "" {
+			args = append(args, "--add-dir", tmpDir)
+		}
+	}
 
 	// Pass auth env vars through to the Claude Code child process.
 	// Strategy:

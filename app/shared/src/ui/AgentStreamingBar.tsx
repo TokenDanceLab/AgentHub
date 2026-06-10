@@ -59,7 +59,7 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
     <div className={`${styles.bar} ${className ?? ''}`} role="status" aria-live="polite">
       {agents.length === 1 ? (
         <div className={styles.agent}>
-          <span className={styles.icon} aria-hidden="true">{STATUS_ICON[agents[0]!.status]}</span>
+          <span className={`${styles.icon} ${isActive(agents[0]!.status) ? styles.iconPulse : ''}`} aria-hidden="true">{STATUS_ICON[agents[0]!.status]}</span>
           <span className={styles.name}>{agents[0]!.name}</span>
           <span className={`${styles.status} ${statusClassName(agents[0]!.status)}`}>
             {statusLabel(agents[0]!.status)}
@@ -67,7 +67,7 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
         </div>
       ) : (
         <div className={styles.agent}>
-          <span className={styles.icon} aria-hidden="true">{'\u{1F916}'}</span>
+          <span className={`${styles.icon} ${styles.iconPulse}`} aria-hidden="true">{'\u{1F916}'}</span>
           <span className={styles.name}>{activeCount} agents active</span>
           <span className={styles.detail}>
             {agents.map((a) => STATUS_ICON[a.status]).join(' ')}
@@ -82,9 +82,9 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
 
 function statusLabel(status: AgentActivityStatus): string {
   switch (status) {
-    case 'dispatching': return 'dispatching';
-    case 'thinking': return 'thinking';
-    case 'streaming': return 'streaming';
+    case 'dispatching': return 'dispatching…';
+    case 'thinking': return 'thinking…';
+    case 'streaming': return 'streaming…';
     case 'done': return 'done';
     case 'failed': return 'failed';
   }
@@ -94,8 +94,12 @@ function statusClassName(status: AgentActivityStatus): string {
   switch (status) {
     case 'streaming': return styles.statusStreaming ?? '';
     case 'thinking': return styles.statusThinking ?? '';
+    case 'dispatching': return styles.statusThinking ?? '';
     case 'done': return styles.statusDone ?? '';
     case 'failed': return styles.statusFailed ?? '';
-    default: return '';
   }
+}
+
+function isActive(status: AgentActivityStatus): boolean {
+  return status === 'dispatching' || status === 'thinking' || status === 'streaming';
 }

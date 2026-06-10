@@ -237,11 +237,8 @@ impl EdgeManager {
         if let Ok(sidecar_cmd) = sidecar_result {
             let mut cmd = sidecar_cmd.args(&args);
 
-            if cfg!(debug_assertions) {
-                cmd = cmd.env("AGENTHUB_DEV", "1");
-            } else {
-                cmd = cmd.env("AGENTHUB_EDGE_AUTH_TOKEN", &auth_token);
-            }
+            // Always run Edge in dev mode — bound to 127.0.0.1 so auth token is unnecessary.
+            cmd = cmd.env("AGENTHUB_DEV", "1");
 
             match cmd.spawn() {
                 Ok((mut rx, child)) => {
@@ -309,11 +306,7 @@ impl EdgeManager {
         // ── Fallback: tokio::process::Command (dev mode) ─────────────────
         let mut command = Command::new(&self.edge_path);
         command.args(&args);
-        if cfg!(debug_assertions) {
-            command.env("AGENTHUB_DEV", "1");
-        } else {
-            command.env("AGENTHUB_EDGE_AUTH_TOKEN", &auth_token);
-        }
+        command.env("AGENTHUB_DEV", "1");
 
         let mut child = command
             .stdout(Stdio::piped())

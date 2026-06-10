@@ -180,6 +180,7 @@ export function useThreadMessages(threadId: string | null) {
     },
     enabled: !!threadId,
     staleTime: 5_000,
+    refetchInterval: 5_000,
   });
 }
 

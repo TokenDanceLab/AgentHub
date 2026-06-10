@@ -206,16 +206,73 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deploy' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('composer-attachment-input')).not.toBeInTheDocument();
-    expect(screen.getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
-    expect(screen.getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
-    expect(screen.getByText('Hub replay for desktop run')).toBeInTheDocument();
-    expect(screen.getByText('Source: Hub replay')).toBeInTheDocument();
-    expect(screen.getByText('Mode: Replay')).toBeInTheDocument();
-    expect(screen.getByText('Target: Edge run evidence')).toBeInTheDocument();
-    expect(screen.getByText('Hub task: task-v4')).toBeInTheDocument();
-    expect(screen.getByText('Edge run: edge-run-v4')).toBeInTheDocument();
-    expect(screen.getByText('Adapter: codex')).toBeInTheDocument();
-    expect(screen.getByText('Device: desktop-device-1')).toBeInTheDocument();
+    const transcriptRegion = screen.getByRole('region', { name: 'Transcript' });
+    expect(within(transcriptRegion).getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
+    expect(within(transcriptRegion).getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
+    expect(within(transcriptRegion).queryByText('Hub replay for desktop run')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Source: Hub replay')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Mode: Replay')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Target: Edge run evidence')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Hub task: task-v4')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Edge run: edge-run-v4')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Adapter: codex')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('Device: desktop-device-1')).not.toBeInTheDocument();
+  });
+
+  it('keeps run orchestration out of the chat transcript and resolves Builder DM identity', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{
+        id: 'builder',
+        title: 'Builder',
+        kind: 'direct',
+        avatarLabel: 'B',
+        avatarColor: 'linear-gradient(135deg, #2563eb, #0f766e)',
+      }],
+    });
+    const directTranscript: TranscriptBlock[] = [
+      {
+        id: 'user-1',
+        kind: 'text',
+        author: { id: 'user', name: 'Delicious233', role: 'human' },
+        createdAt: '2026-06-11T09:30:00.000Z',
+        text: '检查当前 DesktopUI',
+      },
+      {
+        id: 'agent-1',
+        kind: 'text',
+        author: { id: 'agent', name: 'Agent', role: 'agent' },
+        createdAt: '2026-06-11T09:31:00.000Z',
+        text: '我先检查浏览器中的聊天布局。',
+      },
+      {
+        id: 'run-group-1',
+        kind: 'run_step_group',
+        author: { id: 'agent', name: 'Agent', role: 'agent' },
+        icon: 'agent',
+        title: '2 agents active',
+        status: 'running',
+        children: [],
+      },
+    ];
+
+    const { container } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={directTranscript}
+      />,
+    );
+
+    const transcriptRegion = screen.getByRole('region', { name: 'Transcript' });
+    expect(within(transcriptRegion).getByText('检查当前 DesktopUI')).toBeInTheDocument();
+    expect(within(transcriptRegion).getByText('我先检查浏览器中的聊天布局。')).toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('2 agents active')).not.toBeInTheDocument();
+    expect(within(transcriptRegion).queryByText('09:30')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-agent-profile="Builder"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-agent-profile="Agent"]')).not.toBeInTheDocument();
   });
 
   it('renders read-only runtime evidence snapshots in the right inspector', () => {
@@ -762,6 +819,7 @@ describe('AgentHubWorkbench', () => {
         id: 'group-1',
         kind: 'run_step_group',
         author: { id: 'builder', name: 'Builder', role: 'agent' },
+        icon: 'file',
         title: '生成 SQLite 迁移',
         status: 'completed',
         children: [

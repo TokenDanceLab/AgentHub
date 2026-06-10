@@ -8,6 +8,7 @@
   --inspector-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --sidebar-motion-duration: var(--inspector-motion-duration);
   --sidebar-motion-ease: var(--inspector-motion-ease);
+  --composer-scroll-gap: 18px;
 
   display: grid;
   grid-template-columns: 52px minmax(0, var(--sidebar-w)) minmax(0, 1fr) minmax(0, var(--inspector-w));
@@ -308,6 +309,11 @@
 
 .conversationButton[aria-current='true'] {
   background: var(--primary-light);
+  padding-left: 7px;
+}
+
+.conversationButton[aria-current='true'] .conversationTitle {
+  font-weight: 600;
 }
 
 .conversationButton[data-unread='true'] .conversationTitle {
@@ -511,8 +517,29 @@
   transition: opacity var(--dur-normal) var(--ease);
 }
 
-.conversationButton:hover .conversationActions {
+.conversationButton:hover .conversationActions,
+.conversationButton:focus-within .conversationActions {
   opacity: 1;
+}
+
+.conversationEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.conversationEmptyTitle {
+  font: 500 0.8125rem var(--font-sans);
+  color: var(--text-2);
+}
+
+.conversationEmptyHint {
+  font: 400 0.6875rem var(--font-sans);
+  color: var(--text-3);
 }
 
 .conversationActionBtn {
@@ -551,7 +578,7 @@
 .workspace {
   position: relative;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -565,7 +592,7 @@
 }
 
 .workspace[data-mode='chat'][data-mainchain='false'] {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
 }
 
 .mainchainStrip {
@@ -991,16 +1018,17 @@
 .composer {
   --composer-col: min(100%, 820px);
 
-  position: absolute;
+  position: relative;
   z-index: 12;
-  right: 0;
-  bottom: 0;
-  left: 0;
   display: grid;
   gap: 8px;
-  padding: 42px 22px 20px;
+  padding: 12px 22px 20px;
   border-top: none;
-  background: transparent;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--app-bg) 86%, transparent) 0,
+    var(--app-bg) 24px
+  );
   pointer-events: none;
 }
 
@@ -1108,21 +1136,7 @@
 }
 
 .composer::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: max(22px, calc((100% - var(--composer-col)) / 2));
-  width: min(calc(100% - 44px), var(--composer-col));
-  border-radius: var(--r-xl);
-  background: linear-gradient(
-    to bottom,
-    transparent 0,
-    color-mix(in srgb, var(--app-bg) 0%, transparent) 8px,
-    color-mix(in srgb, var(--app-bg) 78%, transparent) 38px,
-    var(--app-bg) 100%
-  );
-  content: '';
-  pointer-events: none;
+  display: none;
 }
 
 .composerRow {
@@ -1952,6 +1966,36 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  padding: 0;
+  scroll-padding-bottom: var(--composer-scroll-gap);
+}
+.transcriptRegion > *:last-child {
+  scroll-margin-bottom: var(--composer-scroll-gap);
+}
+
+/* Streaming status indicator — sits at the bottom of the transcript region,
+   above the composer, to show agent thinking/streaming state. */
+.transcriptStreamingBar {
+  --chat-col: min(100%, 820px);
+
+  position: relative;
+  width: min(calc(100% - 40px), var(--chat-col));
+  z-index: 10;
+  margin: 0 auto 8px;
+  flex-shrink: 0;
+  border-color: var(--primary-soft, color-mix(in srgb, var(--primary) 20%, var(--bdr)));
+  animation: streamingBarFadeIn var(--dur-normal) var(--ease) both;
+}
+
+@keyframes streamingBarFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .pinnedAnnouncementWrap {
@@ -1980,14 +2024,23 @@
   --agent-inset: 34px;
 
   flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px 132px;
+  min-height: 0;
+  /* overflow-y handled by parent .transcriptRegion for single-scrollbar */
+  padding: 16px 20px 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   list-style: none;
   margin: 0;
   transition: padding var(--dur-panel) var(--ease-panel);
+}
+
+.transcript::after {
+  content: '';
+  display: block;
+  flex: 0 0 var(--composer-scroll-gap);
+  width: 1px;
+  pointer-events: none;
 }
 
 .transcriptRegion[data-pinned='true'] .transcript {
@@ -2015,6 +2068,10 @@
     box-shadow var(--dur-normal) var(--ease),
     transform var(--dur-medium) var(--ease-panel),
     opacity var(--dur-normal) var(--ease);
+}
+
+.block:last-child {
+  scroll-margin-bottom: var(--composer-scroll-gap);
 }
 
 .block:focus-visible :global([data-card-surface]:not([data-user-bubble])) {
@@ -2626,6 +2683,8 @@
   .shell[data-inspector-collapsed='true'],
   .shell[data-sidebar-collapsed='true'],
   .shell[data-sidebar-collapsed='true'][data-inspector-collapsed='true'] {
+    --composer-scroll-gap: 18px;
+
     grid-template-columns: 52px minmax(0, 1fr);
     width: 100vw;
     max-width: 100vw;
@@ -2895,4 +2954,30 @@
   color: var(--text-3);
   font: 400 0.6875rem var(--font-mono);
   margin-left: auto;
+}
+
+/* ── Initial loading indicator ────────────────────────────── */
+
+.workspaceLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.workspaceLoadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: deploySpin 0.8s linear infinite;
+}
+
+.workspaceLoadingLabel {
+  color: var(--text-3);
+  font: 400 0.8125rem var(--font-sans);
 }

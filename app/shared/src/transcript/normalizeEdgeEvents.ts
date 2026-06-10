@@ -29,7 +29,13 @@ export function normalizeEdgeEventsToTranscript(events: EventEnvelope[] | undefi
     .map((entry) => entry.block);
 }
 
+// System-level run lifecycle events that should not appear as transcript blocks.
+// These are status indicators, not conversational content.
+const SKIPPED_EVENT_TYPES = new Set(['run.queued']);
+
 function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
+  if (SKIPPED_EVENT_TYPES.has(event.type)) return null;
+
   switch (event.type) {
     case 'run.queued':
       return runTextBlock(event, 'queued', 'pending');

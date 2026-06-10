@@ -7,6 +7,7 @@ export interface ThreadTranscriptItemInput {
   kind?: string;
   type?: string;
   role?: string;
+  senderName?: string;
   status?: string;
   content?: string;
   runId?: string;
@@ -15,7 +16,8 @@ export interface ThreadTranscriptItemInput {
   updatedAt?: string;
 }
 
-const MESSAGE_TYPES = new Set(['message', 'user_message', 'agent_message', 'assistant_message']);
+const MESSAGE_TYPES = new Set(['message', 'user_message', 'agent_message', 'assistant_message', 'text_message']);
+const SKIPPED_TYPES = new Set(['run']);
 
 export function normalizeThreadItemsToTranscript(items: ThreadTranscriptItemInput[] | undefined): TranscriptBlock[] {
   if (!items?.length) return [];
@@ -37,7 +39,7 @@ function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock |
   const content = item.content?.trim() ?? '';
   if (!content) return null;
 
-  const author = normalizeAuthor(item.role);
+  const author = normalizeAuthor(item.role, item.senderName);
   if (!author) return null;
 
   const itemType = normalizeItemType(item.type ?? item.kind);
@@ -80,6 +82,7 @@ function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock |
     };
   }
 
+  if (isSkippedType(itemType)) return null;
   if (itemType && !MESSAGE_TYPES.has(itemType)) return null;
 
   return {
@@ -89,22 +92,28 @@ function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock |
   };
 }
 
-function normalizeAuthor(role: string | undefined): TranscriptAuthor | null {
+function normalizeAuthor(role: string | undefined, senderName?: string): TranscriptAuthor | null {
   switch (role?.trim()) {
     case 'user':
-      return { id: 'user', name: '用户', role: 'human' };
+    case 'human':
+      return { id: 'user', name: senderName?.trim() || 'Delicious233', role: 'human' };
     case 'agent':
     case 'assistant':
-      return { id: 'agent', name: 'Agent', role: 'agent' };
+      return { id: senderName?.trim() || 'agent', name: senderName?.trim() || 'Agent', role: 'agent' };
     case 'system':
       return { id: 'system', name: 'AgentHub', role: 'system' };
     default:
+      // system messages (run queued, etc.) — skip
       return null;
   }
 }
 
 function normalizeItemType(type: string | undefined): string | undefined {
   return type?.trim().toLowerCase() || undefined;
+}
+
+function isSkippedType(itemType: string | undefined): boolean {
+  return itemType ? SKIPPED_TYPES.has(itemType) : false;
 }
 
 function runEvidence(runId: string | undefined, status: string | undefined): EvidenceRef[] {

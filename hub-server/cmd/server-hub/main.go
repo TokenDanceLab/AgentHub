@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/agenthub/hub-server/internal/app"
 	"github.com/agenthub/hub-server/internal/cache"
@@ -17,6 +18,11 @@ func main() {
 		slog.Error("failed to normalize working directory", "error", err)
 		os.Exit(1)
 	}
+
+	// Auto-load .env file if present so developers don't need to `source .env`
+	// before running the binary. This is a convenience for local dev; production
+	// deployments set env vars through the container orchestrator.
+	loadDotEnv(".env")
 
 	cfg, err := config.Load("configs/config.yaml")
 	if err != nil {
@@ -79,4 +85,36 @@ func hasHubServerLayout(dir string) bool {
 
 	info, err := os.Stat(filepath.Join(dir, "migrations"))
 	return err == nil && info.IsDir()
+}
+
+// loadDotEnv reads a .env file and exports its key=value pairs into the
+// process environment. Existing env vars are NOT overwritten so that
+// explicit `export AGENTHUB_*` always wins. Lines starting with '#' and
+// blank lines are ignored.
+func loadDotEnv(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return // .env is optional; silently skip if missing
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		// Strip surrounding quotes if present.
+		if len(value) >= 2 && (value[0] == '"' || value[0] == '\'') && value[len(value)-1] == value[0] {
+			value = value[1 : len(value)-1]
+		}
+		// Do not overwrite an already-set env var.
+		if os.Getenv(key) != "" {
+			continue
+		}
+		os.Setenv(key, value)
+	}
 }
