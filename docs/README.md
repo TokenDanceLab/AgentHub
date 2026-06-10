@@ -10,7 +10,7 @@
 | 2 | [design-decisions.md](design-decisions.md) | **为什么这样选**。Go+CLI / Hub-Edge / 自研WS / Tauri / 三级审批 5 个关键决策 |
 | 3 | [architecture.md](architecture.md) | **怎么运作**。产品定位 + 三层架构 + 数据流 + 实现状态 |
 | 4 | [governance/threat-model.md](governance/threat-model.md) | **安全深度**。信任边界图 + 安全亮点卡（浓缩 44 条风险台账） |
-| 5 | [roadmap.md](roadmap.md) | **做到哪了，接下来做什么**。当前 Sprint + 已知缺口 |
+| 5 | [roadmap/README.md](roadmap/README.md) | **接下来做什么**。按管线/轻UI/右侧栏分层的功能收口计划 + 竞品优先级 + Release Gate |
 | 6 | [competition/teamrun-e2e-evidence.md](competition/teamrun-e2e-evidence.md) | **真实运行证据**。TeamRun 端到端 |
 
 > 完整对外文档（角色化导航 + 架构图 + 中英双语）：**https://hub.vectorcontrol.tech/docs**
