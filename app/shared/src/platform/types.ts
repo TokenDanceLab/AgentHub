@@ -54,6 +54,7 @@ export interface WorkbenchAgent {
   permissionMode?: string | undefined;
   reasoningEffort?: string | undefined;
   skills?: string[] | undefined;
+  capabilities?: string[] | undefined;
   mcpServers?: string[] | undefined;
   toolAllowlist?: string[] | undefined;
   memorySources?: string[] | undefined;
