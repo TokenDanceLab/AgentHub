@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react';
+import type { DagNode } from '../../ui/DagTree';
+import { DagTree } from '../../ui/DagTree';
 import { DesignFileIcon, DesignNavIcon } from '../designIcons';
 import styles from './OverviewPanel.module.css';
 
@@ -41,6 +43,9 @@ export interface OverviewPanelProps {
   /** Label above the working files group. Defaults to "工作文件". */
   workingFileLabel?: string;
 
+  /** Optional DAG nodes for agent dispatch tree, shown between tasks and files. */
+  dagNodes?: DagNode[] | undefined;
+
   /** Fired when a file row is clicked. */
   onFileClick?: (file: FileItem) => void;
 }
@@ -54,6 +59,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
   kicker,
   primaryFileLabel = '交付文件',
   workingFileLabel = '工作文件',
+  dagNodes,
   onFileClick,
 }) => {
   const [tasksOpen, setTasksOpen] = useState(true);
@@ -115,6 +121,11 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
           ))}
         </div>
       </section>
+
+      {/* ── DagTree: agent dispatch hierarchy (between tasks and files) ── */}
+      {dagNodes && dagNodes.length > 0 && (
+        <DagTree nodes={dagNodes} title="Agent 调度树" />
+      )}
 
       {/* ── Files section ── */}
       <section className={`${styles.section} ${filesOpen ? '' : styles.sectionCollapsed}`}>
