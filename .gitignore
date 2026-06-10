@@ -38,8 +38,13 @@ test-results/
 **/coverage
 **/.golangci.bck.yml
 edge-server/cov_full
+hub-server/uploads/
 hub-server/tests/uploads/
 test_store.json
+
+# Temp/dev artifacts
+BACKEND-MERGE-PLAN.md
+edge-server/hello_e2e.js
 
 # =============================================================================
 # Go Binaries
@@ -142,6 +147,7 @@ tmp/
 **/.expo/
 app/mobile-rn/android/
 app/mobile-rn/ios/
+app/mobile/
 .claude-flow/
 .od/
 .swarm/

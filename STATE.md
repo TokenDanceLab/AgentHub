@@ -316,7 +316,7 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 5. **E2E Smoke 全过** ✅ — `verify-real-api-smoke.ps1` ALL 13 PHASES PASSED。
 6. **Mobile / i18n / Desktop package** ✅ — 91 tests, zh/en 各 2169 keys, Tauri unsigned dry gate.
 
-### P1 UI — 右侧检视面板增强（8 项 ✅ 全部完成）
+### P1 UI — 右侧检视面板增强（8 项 ✅ 全部完成） + Wave 1 补充（已合入）
 
 基于 `docs/right-panel-enhancement-design.md`，8 个 P0 任务增强 `RightInspector`（overview / browser / files）：
 
@@ -329,6 +329,19 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 7. ✅ `ContextUsage` 嵌入 — 嵌入 Overview tab
 8. ✅ Deploy preview 自动切换 — Browser tab
 
+Wave 1 新增（已合入 c9832aa0）：
+
+9. ✅ IM 消息回复/引用/重新生成 — 上下文菜单 + replyTo 横幅条
+10. ✅ 图片和文件附件 — `AttachmentBlock` 组件
+11. ✅ 消息搜索高亮 + scroll-to-block — `TranscriptView` 高亮链路
+12. ✅ WebSocket 连接状态指示器 — 三色状态
+13. ✅ StepCard 可视化 — `RunStepGroupTranscriptBlock` 折叠/展开
+14. ✅ Per-hunk Diff accept/reject — `DiffReviewPanel` → Edge apply 端点
+15. ✅ 消息重新生成 API — `POST /web/agent-tasks/:id/regenerate`
+16. ✅ cc-switch 模型别名展示 — Desktop edgeClient + modelCatalogQueries
+17. ✅ Agent 能力标签 — 联系人列表彩色标签
+18. ✅ Skill Market (8 项) + MCP Market (6 项) — 真实 seed 数据
+
 ### P2 常规事项
 
 1. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。
@@ -338,19 +351,24 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 5. **Tauri 签名发布**：获取签名证书是进入生产的关键路径安全阻塞项。
 6. **完成 release governance**：changelog + gate + rollback 文档。
 
-### 会话统计（2026-06-10 晚间）
+### 会话统计（2026-06-10 全天）
 
-- 16 次提交（`93648a4a..9f8ae16e`）
-- 162 文件变更，17,000+ 行插入
-- 30+ subagent 部署
-- 10 份审计报告产出（feature reality check、preview components、cc-switch DB schema、AgentMemory design、roadmap restructuring 等）
+- 42 次提交（含 Wave 0 基线 + Wave 1 全部 + Wave 2 部分）
+- 216 文件变更，27,000+ 行插入
+- 8 个并行 Wave 1 Agent 全部交付
+- 5 份 E2E/审计报告（Hub API 61 端点、adapter E2E、real web、smoke、SDK adapter）
+- Hub API：61 端点测试（49 返回 200），50 个 migration
+- Edge：6 个适配器，45+ handler 端点
 
 ## 基础设施状态
 
 | 组件 | 当前事实 |
 |---|---|
 | Edge 适配器 | Claude Code + Codex + OpenCode + Anthropic SDK + OpenAI SDK + Orchestrator（6 个适配器，SDK `available=true`） |
-| Hub | `:8080`，PostgreSQL + Redis，49 个 migration |
+| Hub | `:8080`，PostgreSQL + Redis，50 个 migration，61 端点已测（49 返回 200） |
+| Edge | `:3210`，6 adapters，45+ handler 端点 |
+| Desktop Vite | `:5173`，运行中 |
+| Web Vite | `:5174`，运行中 |
 | cc-switch | 检测到 active，路由运行在 `127.0.0.1:15721`，Edge 已集成 |
 | API key | 配置在 `~/.config/local-secrets/`（已 gitignore） |
 | Base URL | `https://api.vectorcontrol.tech/v1`（Anthropic + OpenAI 格式均可用） |
