@@ -14,7 +14,7 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationSidebar } from './ConversationSidebar';
 import {
@@ -37,6 +37,7 @@ import { WorkspaceHeader } from './WorkspaceHeader';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
+import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
@@ -172,6 +173,14 @@ export interface AgentHubWorkbenchProps {
   /** Current user profile info, shown in GlobalRail avatar and profile popover. */
   userDisplayName?: string | undefined;
   userAvatarUrl?: string | undefined;
+  /** Public Skill market items from Hub API. */
+  skillMarketItems?: SkillMarketItem[] | undefined;
+  /** Whether Skill market data is loading. */
+  skillMarketLoading?: boolean | undefined;
+  /** Public MCP Server market items from Hub API. */
+  mcpMarketItems?: MCPMarketItem[] | undefined;
+  /** Whether MCP Server market data is loading. */
+  mcpMarketLoading?: boolean | undefined;
 }
 
 export function AgentHubWorkbench({
@@ -209,6 +218,10 @@ export function AgentHubWorkbench({
   transcript,
   userDisplayName,
   userAvatarUrl,
+  skillMarketItems,
+  skillMarketLoading,
+  mcpMarketItems,
+  mcpMarketLoading,
 }: AgentHubWorkbenchProps): React.ReactElement {
   // Create settings service if platform provides a settings port
   const settingsService = useMemo<SettingsService | null>(
@@ -1253,6 +1266,10 @@ export function AgentHubWorkbench({
               localCliDiscovery={localCliDiscovery}
               modelCatalog={modelCatalog}
               settingsService={settingsService}
+              skillMarketItems={skillMarketItems}
+              skillMarketLoading={skillMarketLoading}
+              mcpMarketItems={mcpMarketItems}
+              mcpMarketLoading={mcpMarketLoading}
             />
           </section>
         )}
