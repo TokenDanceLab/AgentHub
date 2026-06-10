@@ -248,7 +248,7 @@ export const WORKBENCH_MOCK_SETTINGS_DEFAULTS = {
   vitePreviewUrl: 'http://127.0.0.1:5176/desktop/',
   dataMode: '自动',
   composerSubmitBehavior: 'Enter 发送',
-  workspacePath: 'D:\\Code\\TokenDance\\agenthub-design',
+  workspacePath: 'D:\\Code\\TokenDance\\tokendance-design',
   targetProjectPath: 'D:\\Code\\TokenDance\\AgentHub',
   hrmOverlayEnabled: true,
   visualQaMode: '按需',

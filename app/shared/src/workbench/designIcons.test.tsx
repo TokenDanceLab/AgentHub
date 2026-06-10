@@ -33,7 +33,7 @@ describe('design icon registry', () => {
     expect(getDesignFileIconType('unknown-kind', 'README.unknown')).toBe('file');
   });
 
-  it('keeps file icon colors aligned to agenthub-design/desktop', () => {
+  it('keeps file icon colors aligned to tokendance-design/desktop', () => {
     expect(getDesignFileIconColor('md')).toBe('var(--text-2)');
     expect(getDesignFileIconColor('css')).toBe('#1572b6');
     expect(getDesignFileIconColor('html')).toBe('#e34f26');
@@ -44,7 +44,7 @@ describe('design icon registry', () => {
     expect(getDesignFileIconColor('xlsx')).toBe('#217346');
   });
 
-  it('keeps icon sizing constants aligned to agenthub-design/desktop CSS', () => {
+  it('keeps icon sizing constants aligned to tokendance-design/desktop CSS', () => {
     expect(DESIGN_FILE_ICON_SIZE).toBe(17);
     expect(DESIGN_FILE_ICON_RADIUS).toBe(3);
     expect(DESIGN_NAV_ICON_SIZE).toBe(16);

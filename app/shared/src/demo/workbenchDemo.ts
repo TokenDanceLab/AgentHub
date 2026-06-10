@@ -806,7 +806,7 @@ function createConversationPreviewTranscript(conversationId: string): Transcript
       id: `${conversationId}-user-1`,
       kind: 'text',
       author: { id: 'delicious233', name: 'Delicious233', role: 'human' },
-      text: `打开 ${agentName} 会话，继续按 agenthub-design v4 工作台检查当前任务。`,
+      text: `打开 ${agentName} 会话，继续按 tokendance-design v4 工作台检查当前任务。`,
     },
     {
       id: `${conversationId}-reply-1`,

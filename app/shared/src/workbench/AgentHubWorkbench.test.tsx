@@ -48,7 +48,7 @@ describe('AgentHubWorkbench', () => {
       id: 'msg-1',
       kind: 'text',
       author: { id: 'user', name: 'Delicious233', role: 'human' },
-      text: '全面参考 agenthub-design/desktop',
+      text: '全面参考 tokendance-design/desktop',
     },
     {
       id: 'tool-1',
@@ -207,7 +207,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByRole('button', { name: 'Deploy' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('composer-attachment-input')).not.toBeInTheDocument();
     const transcriptRegion = screen.getByRole('region', { name: 'Transcript' });
-    expect(within(transcriptRegion).getByText('全面参考 agenthub-design/desktop')).toBeInTheDocument();
+    expect(within(transcriptRegion).getByText('全面参考 tokendance-design/desktop')).toBeInTheDocument();
     expect(within(transcriptRegion).getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
     expect(within(transcriptRegion).queryByText('Hub replay for desktop run')).not.toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('Source: Hub replay')).not.toBeInTheDocument();
@@ -1878,7 +1878,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.contextMenu(firstCard!, { clientX: 120, clientY: 180 });
 
     const menu = screen.getByRole('menu', { name: '卡片操作菜单' });
-    expect(menu).toHaveTextContent('全面参考 agenthub-design/desktop');
+    expect(menu).toHaveTextContent('全面参考 tokendance-design/desktop');
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(13);
     expect(within(menu).getByText('复制')).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /表情回复/ })).toBeInTheDocument();
@@ -2003,7 +2003,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.keyDown(firstCard, { key: 'F10', shiftKey: true });
 
     const menu = screen.getByRole('menu', { name: '卡片操作菜单' });
-    expect(menu).toHaveTextContent('全面参考 agenthub-design/desktop');
+    expect(menu).toHaveTextContent('全面参考 tokendance-design/desktop');
     fireEvent.click(within(menu).getByRole('menuitem', { name: /多选/ }));
 
     const secondCard = container.querySelector('[data-selectable-card="tool-1"]') as HTMLElement;
