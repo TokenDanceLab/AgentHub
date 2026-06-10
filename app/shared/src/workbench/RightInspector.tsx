@@ -19,6 +19,8 @@ import { buildDagNodesFromTranscript } from '../ui/DagTree';
 import { SlideshowPreview } from '../ui/SlideshowPreview';
 import { TablePreview } from '../ui/TablePreview';
 import { DocxPreview } from '../ui/DocxPreview';
+import { DiffReviewPanel, type DiffHunkDecision, type DiffReviewFile } from '../ui/DiffReviewPanel';
+import { applyRunDiff, applyAllRunDiffs } from '../apiClient';
 import {
   DESIGN_NAV_GLYPH_SIZE,
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
@@ -35,6 +37,12 @@ type PreviewFile = FileItem & {
   content?: string | undefined;
   diffContent?: string | undefined;
   owner?: string | undefined;
+  /** When present, this is an interactive diff from a run — enables accept/reject with Edge apply. */
+  interactiveDiff?: {
+    runId: string;
+    fileDiff: FileDiff;
+    workDir: string;
+  } | undefined;
 };
 
 function TabMark({
@@ -111,6 +119,8 @@ export interface RightInspectorProps {
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
   reviewFileRequest?: FileItem | null | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  /** Workspace directory for the active run — required for diff apply write-back. */
+  workDir?: string | undefined;
   /** Context usage blocks from the transcript, used for the compact context bar in Overview. */
   contextBlocks?: ContextUsageTranscriptBlock[] | undefined;
   /** Route decision / sub-agent blocks for DagTree visualization. */
@@ -135,6 +145,7 @@ export function RightInspector({
   onOpenPreview,
   reviewFileRequest,
   runtimeEvidence,
+  workDir,
   contextBlocks,
   routeBlocks,
   deployPreviewUrl,
@@ -421,7 +432,7 @@ export function RightInspector({
               <RuntimeEvidencePanel
                 runtimeEvidence={runtimeEvidence}
                 onOpenDiff={(file) => {
-                  setPreviewFile(runtimeDiffPreviewFile(file));
+                  setPreviewFile(runtimeDiffPreviewFile(file, runtimeEvidence?.runId, workDir));
                   setActiveMode('files');
                 }}
                 onOpenPreviewUrl={(url) => {
@@ -943,7 +954,7 @@ function canOpenEvidence(
   return Boolean(onOpenPreview) && (canOpenPreview?.(evidence) ?? true);
 }
 
-function runtimeDiffPreviewFile(file: FileDiff): PreviewFile {
+function runtimeDiffPreviewFile(file: FileDiff, runId: string | undefined, workDir: string | undefined): PreviewFile {
   return {
     name: file.filePath,
     type: file.status,
@@ -953,6 +964,7 @@ function runtimeDiffPreviewFile(file: FileDiff): PreviewFile {
       'Artifact content/apply/discard are not available in this inspector slice.',
     ].join('\n'),
     diffContent: fileDiffToText(file),
+    interactiveDiff: (runId && workDir) ? { runId, fileDiff: file, workDir } : undefined,
   };
 }
 
@@ -1017,6 +1029,68 @@ function extractFileUrl(content: string | undefined): string {
   return '';
 }
 
+/** Interactive diff preview with hunk accept/reject that writes back to the workdir via Edge API. */
+function InteractiveDiffPreview({
+  file,
+  onClose,
+}: {
+  file: PreviewFile;
+  onClose: () => void;
+}): React.ReactElement {
+  const { runId, fileDiff, workDir } = file.interactiveDiff!;
+
+  const reviewFiles: DiffReviewFile[] = useMemo(() => [{
+    filePath: fileDiff.filePath,
+    status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
+    additions: fileDiff.additions,
+    deletions: fileDiff.deletions,
+    hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
+  }], [fileDiff]);
+
+  const handleApplyHunk = useCallback(
+    async (decision: DiffHunkDecision) => {
+      await applyRunDiff(runId, {
+        file_path: decision.filePath,
+        hunk_index: decision.hunkIndex,
+        accepted: decision.accepted,
+        workDir,
+      });
+    },
+    [runId, workDir],
+  );
+
+  const handleApplyAllHunks = useCallback(
+    async (decisions: DiffHunkDecision[]) => {
+      await applyAllRunDiffs(runId, {
+        decisions: decisions.map((d) => ({
+          file_path: d.filePath,
+          hunk_index: d.hunkIndex,
+          accepted: d.accepted,
+        })),
+        workDir,
+      });
+    },
+    [runId, workDir],
+  );
+
+  return (
+    <div className={styles.filePreview}>
+      <div className={styles.filePreviewHeader}>
+        <button className={styles.filePreviewClose} onClick={onClose} type="button">
+          {'<'} 返回
+        </button>
+        <span className={styles.filePreviewTitle}>{fileDiff.filePath}</span>
+      </div>
+      <DiffReviewPanel
+        files={reviewFiles}
+        runId={runId}
+        onApplyHunk={handleApplyHunk}
+        onApplyAllHunks={handleApplyAllHunks}
+      />
+    </div>
+  );
+}
+
 function FilePreviewRouter({
   file,
   onClose,
@@ -1024,6 +1098,16 @@ function FilePreviewRouter({
   file: PreviewFile;
   onClose: () => void;
 }): React.ReactElement {
+  // Interactive diff review with accept/reject write-back
+  if (file.interactiveDiff) {
+    return (
+      <InteractiveDiffPreview
+        file={file}
+        onClose={onClose}
+      />
+    );
+  }
+
   const kind = detectFilePreviewKind(file.name);
   const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
   const fileUrl = extractFileUrl(file.content);
