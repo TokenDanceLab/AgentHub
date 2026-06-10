@@ -473,6 +473,14 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
         tokenPromise = undefined;
       }
 
+      // Probe Hub health first — if unreachable, reject so caller falls back to fixture
+      try {
+        const res = await shared.request<{ status: string }>('/health');
+        if (!res) throw new Error('no health response');
+      } catch {
+        throw new Error('Hub unavailable — use fixture fallback');
+      }
+
       // Build a mobile snapshot from real Hub API data
       const [sessions, contacts] = await Promise.all([
         shared.listSessions().catch(() => [] as HubSession[]),
