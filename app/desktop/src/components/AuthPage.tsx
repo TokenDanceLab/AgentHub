@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, Terminal } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
-import { HUB_URL } from '@/config';
+import { HUB_URL, HUB_WS_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
 import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
@@ -92,38 +92,48 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
 
       <LoginForm onSuccess={handleLoginSuccess} />
 
-      {/* Collapsible advanced settings */}
+      {/* Developer mode toggle */}
       <button
-        className={styles.advancedToggle}
+        className={styles.devToggle}
         onClick={() => setShowAdvanced((v) => !v)}
         type="button"
       >
-        <span className={`${styles.advancedToggleIcon} ${showAdvanced ? styles.advancedToggleIconOpen : ''}`}>
-          <ChevronDown size={14} />
+        <span className={styles.devToggleIcon}>
+          <Terminal size={12} />
         </span>
-        {t('auth.advancedSettings')}
+        <span>{t('auth.advancedSettings')}</span>
+        <span className={`${styles.devChevron} ${showAdvanced ? styles.devChevronOpen : ''}`}>
+          <ChevronDown size={12} />
+        </span>
       </button>
 
       {showAdvanced && (
-        <div className={styles.advancedSection}>
+        <div className={styles.devPanel}>
+          <div className={styles.devRow}>
+            <span className={styles.devLabel}>Hub REST</span>
+            <span className={styles.devValue}>{hubUrl}</span>
+            <span className={hubDotClass} aria-hidden="true" />
+          </div>
+          <div className={styles.devRow}>
+            <span className={styles.devLabel}>Hub WS</span>
+            <span className={styles.devValue}>{HUB_WS_URL}</span>
+          </div>
+          <div className={styles.devRow}>
+            <span className={styles.devLabel}>Status</span>
+            <span className={styles.devValue}>
+              {hubStatus === 'connected' ? t('auth.hubConnected')
+                : hubStatus === 'disconnected' ? t('auth.hubDisconnected')
+                  : t('auth.hubChecking')}
+            </span>
+          </div>
           <input
-            className={styles.hubInput}
+            className={styles.devInput}
             type="url"
             value={hubUrl}
             onChange={handleHubUrlChange}
             placeholder="http://localhost:8080"
             aria-label={t('auth.hubUrl')}
           />
-          <div className={styles.hubStatus}>
-            <span className={hubDotClass} aria-hidden="true" />
-            <span className={styles.hubStatusText}>
-              {hubStatus === 'connected'
-                ? t('auth.hubConnected')
-                : hubStatus === 'disconnected'
-                  ? t('auth.hubDisconnected')
-                  : t('auth.hubChecking')}
-            </span>
-          </div>
         </div>
       )}
     </div>

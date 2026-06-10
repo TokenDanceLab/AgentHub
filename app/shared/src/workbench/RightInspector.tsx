@@ -9,6 +9,7 @@ import {
   OverviewPanel,
   type TaskItem,
   type FileItem,
+  type RunResultInfo,
   FilePreview,
   BrowserPreview,
 } from './inspector';
@@ -129,6 +130,8 @@ export interface RightInspectorProps {
   deployPreviewUrl?: string | undefined;
   /** Deploy status indicator for the browser tab. */
   deployStatus?: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
+  /** Run result from the transcript, displayed as a banner in the overview tab. */
+  runResult?: RunResultInfo | undefined;
   onResizeBy: (delta: number) => void;
   onResizeStart: (clientX: number) => void;
   width: number;
@@ -150,6 +153,7 @@ export function RightInspector({
   routeBlocks,
   deployPreviewUrl,
   deployStatus,
+  runResult,
   onResizeBy,
   onResizeStart,
   width,
@@ -390,6 +394,7 @@ export function RightInspector({
             <OverviewPanel
               tasks={overviewTasks}
               files={overviewFiles}
+              runResult={runResult}
               taskSectionTitle={runtimeEvidence ? '运行证据' : '概览'}
               {...(runtimeEvidence ? { kicker: runtimeEvidenceOverviewKicker(runtimeEvidence) } : {})}
               primaryFileLabel={runtimeEvidence ? 'Hub replay 产物' : '文件'}

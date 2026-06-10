@@ -27,9 +27,16 @@ export interface FileItem {
   isOpen?: boolean;
 }
 
+export interface RunResultInfo {
+  success: boolean;
+  summary?: string | undefined;
+  duration?: string | undefined;
+}
+
 export interface OverviewPanelProps {
   tasks: TaskItem[];
   files: FileItem[];
+  runResult?: RunResultInfo | undefined;
 
   /** Section title for the task list. Defaults to "Tasks". */
   taskSectionTitle?: string;
@@ -55,6 +62,7 @@ export interface OverviewPanelProps {
 export const OverviewPanel: React.FC<OverviewPanelProps> = ({
   tasks,
   files,
+  runResult,
   taskSectionTitle = '任务',
   kicker,
   primaryFileLabel = '交付文件',
@@ -75,6 +83,19 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
   return (
     <div className={styles.panel}>
+      {/* ── Run result banner ── */}
+      {runResult && (
+        <div className={`${styles.runResult} ${runResult.success ? styles.runResultOk : styles.runResultFail}`}>
+          <span className={styles.runResultTitle}>{runResult.success ? '运行结果' : '运行失败'}</span>
+          <span className={`${styles.runResultBadge} ${runResult.success ? styles.badgeOk : styles.badgeFail}`}>
+            {runResult.success ? '完成' : '失败'}
+          </span>
+          {runResult.summary && (
+            <span className={styles.runResultSummary}>{runResult.summary}</span>
+          )}
+        </div>
+      )}
+
       {/* ── Tasks section ── */}
       <section className={`${styles.section} ${tasksOpen ? '' : styles.sectionCollapsed}`}>
         <div className={styles.sectionHead}>
