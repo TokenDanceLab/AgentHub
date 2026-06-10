@@ -34,6 +34,7 @@ import { UnifiedComposer } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
+import MessageSearchPanel from '../ui/MessageSearchPanel';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
@@ -287,6 +288,8 @@ export function AgentHubWorkbench({
   } | null>(null);
   const [focusedAgentId, setFocusedAgentId] = useState<string | undefined>(undefined);
   const [reviewFileRequest, setReviewFileRequest] = useState<FileItem | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
   const inspectorWidthRef = useRef(INSPECTOR_DEFAULT_WIDTH);
@@ -492,6 +495,21 @@ export function AgentHubWorkbench({
     document.addEventListener('keydown', handleSelectionKey);
     return () => document.removeEventListener('keydown', handleSelectionKey);
   }, [selectedBlockIds, selectionMode, transcript]);
+
+  // Ctrl/Cmd+F opens search when on chat page
+  useEffect(() => {
+    if (!isChatPage) return;
+
+    function handleSearchShortcut(event: KeyboardEvent): void {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+
+    document.addEventListener('keydown', handleSearchShortcut);
+    return () => document.removeEventListener('keydown', handleSearchShortcut);
+  }, [isChatPage]);
 
   useEffect(() => () => {
     if (selectionHoldRef.current?.timer) {
@@ -844,6 +862,15 @@ export function AgentHubWorkbench({
   function openReviewFile(file: FileItem): void {
     openInspector();
     setReviewFileRequest({ ...file });
+  }
+
+  function handleSearchJump(messageId: string, _messageIndex?: number): void {
+    setSearchOpen(false);
+    setSearchHighlightId(messageId);
+  }
+
+  function handleSearchHighlightEnd(): void {
+    setSearchHighlightId(null);
   }
 
   function blockTitle(block: TranscriptBlock): string {
@@ -1272,6 +1299,7 @@ export function AgentHubWorkbench({
               dataMode={workbenchStatus?.dataMode}
               inspectorCollapsed={inspectorCollapsed}
               onToggleInspector={toggleInspector}
+              onOpenSearch={() => setSearchOpen(true)}
               showDataModeControl={showHeaderDataModeControl}
             />
             {showMainchainStatus ? (
@@ -1283,13 +1311,13 @@ export function AgentHubWorkbench({
             <TranscriptView
               actionedBlockIds={actionedBlockIds}
               contextBlockId={contextMenu?.blockId}
-              highlightedBlockId={highlightedBlockId}
+              highlightedBlockId={searchHighlightId ?? highlightedBlockId}
               onBlockContextMenu={openBlockContextMenu}
               onBlockPointerDown={beginBlockHoldSelection}
               onBlockPointerMove={(_block, event) => updateBlockHoldSelection(event)}
               onBlockPointerUp={handleBlockPointerUp}
               onBlockSelect={handleBlockSelect}
-              onHighlightEnd={onHighlightEnd}
+              onHighlightEnd={searchHighlightId ? handleSearchHighlightEnd : onHighlightEnd}
               onAgentProfileOpen={openAgentProfile}
               onApprovalDecision={(action) => {
                 void onApprovalDecision?.(action);
@@ -1304,6 +1332,17 @@ export function AgentHubWorkbench({
               selectionMode={selectionMode}
               softHiddenBlockIds={softHiddenBlockIds}
               transcript={transcript}
+            />
+            <MessageSearchPanel
+              open={searchOpen}
+              onClose={() => setSearchOpen(false)}
+              onJumpToMessage={handleSearchJump}
+              highlightMessageId={searchHighlightId}
+              onHighlightEnd={handleSearchHighlightEnd}
+              transcriptBlocks={transcript}
+              searchLabel="搜索消息"
+              searchPlaceholder="搜索消息内容..."
+              noResultsLabel="未找到匹配的消息"
             />
             {!selectionMode && (
               <UnifiedComposer
