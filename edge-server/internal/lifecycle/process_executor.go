@@ -527,7 +527,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			"argFlags", argSummary.ArgFlags,
 			"configKeys", argSummary.ConfigKeys,
 			"positionalArgCount", argSummary.PositionalArgCount,
-			"unknownFlagCount": argSummary.UnknownFlagCount,
+			"unknownFlagCount", argSummary.UnknownFlagCount,
 			"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
 			"argsRedacted", true,
 			"attempt", attempt,
