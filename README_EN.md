@@ -10,7 +10,12 @@
   ![version](https://img.shields.io/badge/version-0.3.0-blue?style=flat-square)
   ![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
   ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
+  ![tauri](https://img.shields.io/badge/tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=black)
   ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
+</div>
+
+<div align="center">
+  <img src="screenshots/desktop-workbench-preview.png" alt="AgentHub Desktop Workbench — Builder running a SQLite migration task" width="800" />
 </div>
 
 ## What is AgentHub?
