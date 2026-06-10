@@ -366,7 +366,7 @@ export function DocsPage({
             <span />
           </div>
           {rows.map((doc) => (
-            <DocTableRow key={doc.id} doc={doc} onClick={onDocClick} onDelete={onDeleteDoc} profiles={profiles} />
+            <DocTableRow key={doc.id} doc={doc} onClick={onDocClick} onDelete={onDeleteDoc ? () => onDeleteDoc(doc.id) : undefined} profiles={profiles} />
           ))}
         </div>
         {activePreview && (

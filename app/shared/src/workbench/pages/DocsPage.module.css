@@ -447,6 +447,58 @@
   stroke-linejoin: round;
 }
 
+/* ── Doc delete button ── */
+.docDeleteBtn {
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  border-radius: var(--r-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.docDeleteBtn:hover {
+  color: var(--danger, #e5484d);
+  background: color-mix(in srgb, var(--danger, #e5484d) 10%, transparent);
+}
+
+.docDeleteBtn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.confirmDeleteBtn {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: var(--danger, #e5484d);
+  color: white;
+  font: 500 0.6875rem var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cancelDeleteBtn {
+  padding: 2px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--text-2);
+  font: 400 0.6875rem var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .previewPanel {
   margin-top: 14px;
   border: 1px solid var(--bdr);
