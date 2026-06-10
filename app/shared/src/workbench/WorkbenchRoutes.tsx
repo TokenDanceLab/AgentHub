@@ -137,6 +137,9 @@ export interface WorkbenchRoutesProps {
   mcpMarketItems?: MCPMarketItem[] | undefined;
   /** Whether MCP Server market data is loading. */
   mcpMarketLoading?: boolean | undefined;
+  /** Called when the user navigates between workbench pages.
+   *  Used by the Settings page to navigate to Agents config. */
+  onNavigatePage?: ((page: WorkbenchPage) => void) | undefined;
 }
 
 /** Contact mutation callbacks wired to Hub API. */
@@ -571,6 +574,7 @@ export function WorkbenchRoutes({
   skillMarketLoading,
   mcpMarketItems,
   mcpMarketLoading,
+  onNavigatePage,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
@@ -1381,7 +1385,7 @@ export function WorkbenchRoutes({
           localCliDiscovery={localCliDiscovery}
           onOpenAgentConfig={() => {
             setAgentsPane('installed');
-            setActivePage('agents');
+            onNavigatePage?.('agents');
           }}
           onSelectPane={setSettingsPane}
           spaceMeta="桌面设计 demo"

@@ -1517,6 +1517,17 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<{ items: Record<string, unknown>[]; page: { nextCursor?: string; hasMore: boolean } }>(
         `/web/mcp-servers${qs({ is_public: 'true', ...params ?? {} })}`,
       ),
+
+    // ── Settings (user preferences) ────────────────────
+
+    fetchSettings: () =>
+      request<Record<string, string>>('/client/settings'),
+
+    patchSettings: (values: Record<string, string>) =>
+      request<Record<string, string>>('/client/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ values }),
+      }),
   };
 }
 
