@@ -1184,10 +1184,10 @@ export function WorkbenchRoutes({
           }))}
           toolMatrixTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
           {...(effectiveSelectedAgentId ? { selectedAgentId: effectiveSelectedAgentId } : {})}
-          skillMarketItems={skillMarketItems}
-          skillMarketLoading={skillMarketLoading}
-          mcpMarketItems={mcpMarketItems}
-          mcpMarketLoading={mcpMarketLoading}
+          skillMarketItems={skillMarketItems ?? []}
+          skillMarketLoading={skillMarketLoading ?? false}
+          mcpMarketItems={mcpMarketItems ?? []}
+          mcpMarketLoading={mcpMarketLoading ?? false}
         />
       );
     case 'runs':

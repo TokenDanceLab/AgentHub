@@ -7,7 +7,7 @@ import { getAccessToken } from '@/hooks/useAuth';
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
 let _hubClient: ReturnType<typeof createHubClient> | null = null;
-function getHubClient() {
+export function getHubClient() {
   if (!_hubClient) _hubClient = createHubClient({ getToken: getAccessToken });
   return _hubClient;
 }
