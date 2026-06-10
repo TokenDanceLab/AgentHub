@@ -474,17 +474,10 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
       }
 
       // Build a mobile snapshot from real Hub API data
-      let sessions: HubSession[];
-      let contacts: HubContactInfo[];
-      try {
-        [sessions, contacts] = await Promise.all([
-          shared.listSessions(),
-          shared.listContacts(),
-        ]);
-      } catch {
-        // Hub unreachable — reject so App.tsx falls back to fixture
-        throw new Error('Hub unavailable');
-      }
+      const [sessions, contacts] = await Promise.all([
+        shared.listSessions().catch(() => [] as HubSession[]),
+        shared.listContacts().catch(() => [] as HubContactInfo[]),
+      ]);
 
       return mapSessionsToMobileFixture(sessions, contacts);
     },
