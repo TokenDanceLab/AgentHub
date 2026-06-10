@@ -1674,7 +1674,75 @@ server {
 
 ---
 
-## 18. 非协商边界
+## 18. 右侧检视面板增强（RightInspector）
+
+> 2026-06-10 · 设计文档 `docs/right-panel-enhancement-design.md`
+> 原则：不动主聊天流（GlobalRail / TranscriptView / Composer），只增强 RightInspector 三个 tab。
+
+### 18.1 设计哲学
+
+- 左侧 `GlobalRail`、中间 `TranscriptView`、底部 `UnifiedComposer` — **不动**
+- 只改 `RightInspector`（overview / browser / files 三个 tab）
+- Inspector 宽度：默认 `400px`，可拖拽 `48-760px`，可折叠
+
+### 18.2 P0 任务（8 项）
+
+| # | 任务 | 位置 | 复杂度 | 状态 |
+|---|------|------|--------|------|
+| 1 | `AgentStreamingBar` — 实时 Agent 运行状态条 | Overview tab | 低（~30 行 TSX，复用 StatusBadge） | ⏳ |
+| 2 | PDF/图片/HTML/MD/Code 预览 | Files tab | 低（全原生，无需库） | ⏳ |
+| 3 | `SlideshowPreview` — PPT/PPTX 查看器 | Files tab | 中（`pptxjs` ~100KB） | ⏳ |
+| 4 | `TablePreview` — Excel/CSV 查看器 | Files tab | 中（`xlsx` ~200KB） | ⏳ |
+| 5 | `DocxPreview` — DOCX 查看器 | Files tab | 低（`mammoth` ~50KB） | ⏳ |
+| 6 | `DagTree` — AgentTeam 任务依赖树 | Overview tab | 低（~40 行 TSX，纯 HTML `<ul>`） | ⏳ |
+| 7 | `ContextUsage` 嵌入 Overview tab | Overview tab | 极低（组件已存在，1 行声明） | ⏳ |
+| 8 | Deploy preview 自动切换 | Browser tab | 极低（已有 iframe + URL 检测） | ⏳ |
+
+### 18.3 数据源映射
+
+| 任务 | 数据源 | 已有组件/接口 |
+|------|--------|-------------|
+| AgentStreamingBar | Hub WS `agent.dispatch`/`agent.stream`/`agent.done`/`agent.failed`（4 个事件常量已在 `hubEvents.ts`） | `StatusBadge` |
+| DagTree | Hub `AgentTeam` route_decisions POST，`RouteDecisionTranscriptBlock` 已定义；Edge `orchestrator_dispatch.go`（141 行） | — |
+| ContextUsage | `ContextUsage.tsx` 已存在于 Desktop 和 Web 两个 app | `ContextUsage.tsx` |
+| Deploy preview | Edge deploy URL 事件 | 已有 `<iframe>` 逻辑 |
+| Files 预览 | `ArtifactBrowser.tsx` `DOCUMENT_EXTENSIONS` 已定义 | `MarkdownRenderer`、`CodeBlock` 已存在 |
+
+### 18.4 新增 UI 组件汇总
+
+| 组件 | 依赖 | 新增代码量估计 |
+|------|------|------------|
+| `SlideshowPreview` | `pptxjs@3.x`（~100KB gzip） | 新组件 |
+| `TablePreview` | `xlsx@0.18.x`（~200KB） | 新组件 |
+| `DocxPreview` | `mammoth@1.x`（~50KB） | 新组件 |
+| `AgentStreamingBar` | 无（复用 StatusBadge） | ~30 行 TSX |
+| `DagTree` | 无（纯 HTML `<ul>`） | ~40 行 TSX |
+
+### 18.5 不做的事（保持简单）
+
+- 不改 GlobalRail / TranscriptView / Composer
+- 不新建 tab（保持 overview/browser/files 三 tab 结构）
+- 不加力导向 DAG 图（只做 `<ul>` 树）
+- 不加 ContextBus 面板（现有 `ContextUsage` 足够）
+- 不加对话式创建 Agent 向导
+- 不加模型预算/部署闭环面板
+- 不加多模态聊天
+
+### 18.6 验收标准
+
+- [ ] AgentStreamingBar 显示 active agent 状态（思考中/执行中/完成/失败）
+- [ ] PDF 文件点击后在 Files tab 内渲染 iframe 预览
+- [ ] PPTX 文件点击后渲染 SlideshowPreview（翻页 + 缩略图）
+- [ ] Excel/CSV 文件点击后渲染 TablePreview（可排序表格）
+- [ ] DOCX 文件点击后渲染 DocxPreview（HTML 渲染）
+- [ ] Markdown/Code/HTML/TXT 文件使用已有组件渲染
+- [ ] DagTree 显示 AgentTeam 任务依赖树（缩进列表 + 状态图标）
+- [ ] ContextUsage 进度条嵌入 Overview tab
+- [ ] Deploy 成功后 Browser tab 自动切换到 deploy URL
+
+---
+
+## 19. 非协商边界
 
 1. **Web 只和 Hub 通信**，不直接连接 Local Edge 或 raw runtime。
 2. **Desktop renderer 不获得 raw process execution 权限**。
@@ -1730,6 +1798,12 @@ Phase 5 (P3): 生产就绪
   ├─ 17. 性能 -> 基线建立 + N+1 消除
   └─ 14. E2E -> 全流程自动化
 
+Phase 5.5 (P1 UI): 右侧面板增强
+  ├─ 18. RightInspector -> AgentStreamingBar + DagTree + ContextUsage (Overview)
+  ├─ 18. RightInspector -> PDF/MD/Code/HTML/IMG 预览 (Files)
+  ├─ 18. RightInspector -> SlideshowPreview/TablePreview/DocxPreview (Files)
+  └─ 18. RightInspector -> Deploy preview 自动切换 (Browser)
+
 Phase 6 (P4): 发布
   ├─ 13.2 Desktop Tauri -> 签名 + 打包
   └─ 14. Release -> changelog + gate + rollback
@@ -1758,6 +1832,10 @@ Phase 6 (P4): 发布
   └── 性能 (17) ──> API 基线 ──> N+1 消除
                    └─> WS 延迟基线 ──> 缓存调优
                    └─> 慢查询日志 ──> 索引审计
+  ├── 右侧面板 (18) ──> AgentStreamingBar (WS events)
+  │                └─> DagTree (AgentTeam route)
+  │                └─> Files 预览 (ArtifactBrowser)
+  │                └─> Deploy preview (iframe)
 ```
 
 ---
@@ -1817,7 +1895,7 @@ Phase 6 (P4): 发布
 ## 附录 D. 剩余未勾选项跟踪
 
 > 当前 roadmap 中所有未勾选项汇总，含阻塞原因和计划阶段。
-> 上次审计：2026-06-10，通过代码库验证关闭 28 项（78 -> 50 以下）。
+> 上次审计：2026-06-10，通过代码库验证关闭 28 项（78 -> 50 以下）。右侧面板 9 项待实现。
 
 | 未勾选项 | 所属章节 | 阻塞原因 | 计划阶段 |
 |---------|---------|---------|---------|
@@ -1844,6 +1922,14 @@ Phase 6 (P4): 发布
 | React Query 缓存调优 | 17. 性能 | 开发（目标配置表已规划） | P3 |
 | 慢查询日志已启用 | 17. 性能 | 开发 | P3 |
 | Hub 内存/CPU 基线已建立 | 17. 性能 | 监控（Docker stats 可用） | P3 |
+| AgentStreamingBar 实现 | 18. 右侧面板 | 新组件开发（~30 行 TSX） | P1 |
+| PDF/图片/HTML/MD/Code 预览 | 18. 右侧面板 | Files tab 原生渲染 | P1 |
+| SlideshowPreview (PPT/PPTX) | 18. 右侧面板 | 新组件 + pptxjs 依赖 | P1 |
+| TablePreview (Excel/CSV) | 18. 右侧面板 | 新组件 + xlsx 依赖 | P1 |
+| DocxPreview (DOCX) | 18. 右侧面板 | 新组件 + mammoth 依赖 | P1 |
+| DagTree (AgentTeam 进度) | 18. 右侧面板 | 新组件（~40 行 TSX） | P1 |
+| ContextUsage 嵌入 Overview | 18. 右侧面板 | 组件已存在，1 行声明 | P1 |
+| Deploy preview 自动切换 | 18. 右侧面板 | 已有 iframe + URL 检测 | P1 |
 
 ---
 
