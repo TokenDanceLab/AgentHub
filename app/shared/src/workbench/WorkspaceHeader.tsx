@@ -1,9 +1,4 @@
 import React from 'react';
-import {
-  normalizeWorkbenchDataMode,
-  writeWorkbenchDataModeOverride,
-  type WorkbenchDataMode,
-} from '../demo';
 import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
 import styles from './AgentHubWorkbench.module.css';
@@ -15,7 +10,6 @@ export interface WorkspaceHeaderProps {
   onToggleInspector: () => void;
   /** Called when the user clicks the search icon. */
   onOpenSearch?: (() => void) | undefined;
-  showDataModeControl?: boolean | undefined;
 }
 
 export function WorkspaceHeader({
@@ -24,7 +18,6 @@ export function WorkspaceHeader({
   inspectorCollapsed,
   onToggleInspector,
   onOpenSearch,
-  showDataModeControl = true,
 }: WorkspaceHeaderProps): React.ReactElement {
   const initial = activeConversation?.avatarLabel ?? (activeConversation?.title ?? 'A').slice(0, 1);
   const hasModel = Boolean(activeConversation?.model);
@@ -65,19 +58,11 @@ export function WorkspaceHeader({
           {hasModel ? (
             <span className={styles.workspaceModel}>{activeConversation!.model}</span>
           ) : null}
-          {showDataModeControl ? (
-            <select
-              aria-label="数据模式"
-              className={styles.workspaceDataMode}
-              onChange={(event) => writeWorkbenchDataModeOverride(event.target.value as WorkbenchDataMode)}
-              title="切换 Mock / Real 数据模式"
-              value={dataModeValue}
-            >
-              <option value="auto">Auto</option>
-              <option value="mock">Mock</option>
-              <option value="approved-real">Real</option>
-            </select>
-          ) : null}
+          {dataModeValue !== 'auto' && (
+            <span className={styles.workspaceDataMode} title={`数据模式: ${dataModeValue}`}>
+              {dataModeValue}
+            </span>
+          )}
         </div>
 
         <div aria-label="Workspace tabs" className={styles.workspaceTabs} role="tablist">
@@ -162,9 +147,6 @@ export function WorkspaceHeader({
   );
 }
 
-function dataModeControlValue(value: string | undefined): WorkbenchDataMode {
-  const normalized = normalizeWorkbenchDataMode(value);
-  if (normalized === 'fixture') return 'mock';
-  if (normalized === 'observed') return 'approved-real';
-  return normalized;
+function dataModeControlValue(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? 'auto';
 }
