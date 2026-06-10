@@ -270,6 +270,35 @@ export interface HubCustomAgent extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface HubSkill {
+  id: string;
+  name: string;
+  description?: string;
+  skill_type?: string;
+  version?: string;
+  install_count?: number;
+  is_public?: boolean;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
+export interface HubMCPServer {
+  id: string;
+  name: string;
+  description?: string;
+  transport?: string;
+  command?: string;
+  url?: string;
+  install_count?: number;
+  is_public?: boolean;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
 export type HubAgentTaskStatus =
   | 'queued'
   | 'dispatched'
@@ -1071,6 +1100,28 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<void>(`/web/custom-agents/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }),
+
+    listPublicSkills: (params?: {
+      skill_type?: string;
+      q?: string;
+      is_public?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<HubListResponse<HubSkill>>(
+        `/web/skills${qs({ is_public: 'true', ...params ?? {} })}`,
+      ),
+
+    listPublicMCPServers: (params?: {
+      transport?: string;
+      q?: string;
+      is_public?: string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<HubListResponse<HubMCPServer>>(
+        `/web/mcp-servers${qs({ is_public: 'true', ...params ?? {} })}`,
+      ),
   };
 }
 
