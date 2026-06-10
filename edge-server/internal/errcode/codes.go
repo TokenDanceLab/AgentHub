@@ -66,6 +66,11 @@ var (
 	ErrPlanNotFound      = New("PLAN_NOT_FOUND", "no pending plan found for this run", http.StatusNotFound)
 	ErrInvalidPlanDecision = New("INVALID_PLAN_DECISION", "decision must be approve or reject", http.StatusBadRequest)
 
+	// Deploy
+	ErrDeployInvalidSlug    = New("DEPLOY_INVALID_SLUG", "slug must be lowercase alphanumeric with hyphens, 2-63 chars", http.StatusBadRequest)
+	ErrDeployNoArtifacts    = New("DEPLOY_NO_ARTIFACTS", "run has no deployable artifacts", http.StatusBadRequest)
+	ErrDeployRunNotFinished = New("DEPLOY_RUN_NOT_FINISHED", "run must be in a terminal state before deploying", http.StatusBadRequest)
+
 	// Metrics
 	ErrNotConfigured = New("NOT_CONFIGURED", "resource not configured", http.StatusServiceUnavailable)
 )
