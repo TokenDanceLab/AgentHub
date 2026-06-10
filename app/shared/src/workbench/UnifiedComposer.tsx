@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, type FormEvent } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type {
   ComposerAction,
   ComposerAttachment,
@@ -9,6 +9,11 @@ import { browserFilesToComposerAttachments, canSubmitComposer, formatComposerAtt
 import { DesignNavIcon } from './designIcons';
 import type { ComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
+
+export interface AttachmentUploadState {
+  percent: number;
+  phase: 'hashing' | 'uploading' | 'done';
+}
 
 export interface UnifiedComposerProps {
   composer: ComposerState;
@@ -25,6 +30,7 @@ export interface UnifiedComposerProps {
     targetLabel?: string | undefined;
     targetState?: string | undefined;
   } | undefined;
+  uploadProgresses?: Record<string, AttachmentUploadState>;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   inputRef?: React.Ref<HTMLTextAreaElement>;
   targetLabel?: string | undefined;
@@ -43,6 +49,7 @@ export function UnifiedComposer({
   status,
   submitBehavior = 'enter-send',
   targetLabel = 'AgentHub',
+  uploadProgresses,
 }: UnifiedComposerProps): React.ReactElement {
   const isSubmitting = composer.submitState === 'submitting';
   const targetSelectionRequired = Boolean(executionTargets) && composer.mentions.length > 0;
@@ -218,14 +225,18 @@ export function UnifiedComposer({
       )}
       {composer.attachments.length > 0 && (
         <div className={styles.composerAttachmentBar} aria-label="Attachments">
-          {composer.attachments.map((attachment) => (
-            <ComposerAttachmentChip
-              attachment={attachment}
-              isSubmitting={isSubmitting}
-              key={attachment.id}
-              onRemove={() => dispatchComposer({ type: 'removeAttachment', attachmentId: attachment.id })}
-            />
-          ))}
+          {composer.attachments.map((attachment) => {
+            const progress = uploadProgresses?.[attachment.id];
+            return (
+              <ComposerAttachmentChip
+                attachment={attachment}
+                isSubmitting={isSubmitting}
+                key={attachment.id}
+                onRemove={() => dispatchComposer({ type: 'removeAttachment', attachmentId: attachment.id })}
+                {...(progress ? { uploadProgress: progress } : {})}
+              />
+            );
+          })}
         </div>
       )}
       <div className={styles.composerRow}>
@@ -332,16 +343,19 @@ function ComposerAttachmentChip({
   attachment,
   isSubmitting,
   onRemove,
+  uploadProgress,
 }: {
   attachment: ComposerAttachment;
   isSubmitting: boolean;
   onRemove: () => void;
+  uploadProgress?: AttachmentUploadState;
 }): React.ReactElement {
   const isImage = attachment.mime?.startsWith('image/');
   const sizeLabel = attachment.size ? formatComposerAttachmentSize(attachment.size) : undefined;
+  const isUploading = uploadProgress && uploadProgress.phase !== 'done' && !attachment.attachmentRef;
 
   return (
-    <div className={styles.attachmentChip}>
+    <div className={styles.attachmentChip} {...(isUploading ? { 'data-uploading': 'true' } : {})}>
       {isImage && attachment.contentPreview && (
         <span className={styles.attachmentChipThumb} aria-hidden="true">
           {attachment.contentPreview.slice(0, 2)}
@@ -353,15 +367,21 @@ function ComposerAttachmentChip({
       {sizeLabel && (
         <span className={styles.attachmentChipSize}>{sizeLabel}</span>
       )}
-      <button
-        aria-label={`Remove ${attachment.name}`}
-        className={styles.attachmentChipRemove}
-        disabled={isSubmitting}
-        onClick={onRemove}
-        type="button"
-      >
-        &times;
-      </button>
+      {isUploading ? (
+        <span className={styles.attachmentUploadBar}>
+          <span className={styles.attachmentUploadFill} style={{ width: `${uploadProgress.percent}%` }} />
+        </span>
+      ) : (
+        <button
+          aria-label={`Remove ${attachment.name}`}
+          className={styles.attachmentChipRemove}
+          disabled={isSubmitting}
+          onClick={onRemove}
+          type="button"
+        >
+          &times;
+        </button>
+      )}
     </div>
   );
 }

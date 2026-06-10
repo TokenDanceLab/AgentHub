@@ -135,6 +135,17 @@ export interface ReplyToInfo {
   content_type: string;
 }
 
+export interface MessageAttachment {
+  id: string;
+  hash: string;
+  size: number;
+  mime_type: string;
+  original_name?: string;
+  uploader_user_id?: string;
+  metadata?: string;
+  created_at?: string;
+}
+
 export interface MessageResponse {
   id: string;
   session_id: string;
@@ -147,6 +158,7 @@ export interface MessageResponse {
   reply_to_message_id?: string;
   reply_to?: ReplyToInfo;
   recalled?: boolean;
+  attachments?: MessageAttachment[];
   created_at?: string;
 }
 
