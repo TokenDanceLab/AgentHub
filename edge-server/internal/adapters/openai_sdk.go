@@ -157,7 +157,7 @@ func (a *OpenAISDKAdapter) ParseStream(ctx context.Context, stdout io.Reader, st
 
 	// Extract RunProcessContext from the context to get the prompt and model.
 	var runCtx RunProcessContext
-	if rc, ok := ctx.Value(ctxRunContext).(RunProcessContext); ok {
+	if rc, ok := ctx.Value(CtxRunContext).(RunProcessContext); ok {
 		runCtx = rc
 	}
 
