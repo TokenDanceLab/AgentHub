@@ -1,6 +1,6 @@
 # BYTEDANCE.md — AgentHub 项目主文档
 
-> 最后更新：2026-06-10
+> 最后更新：2026-06-10 (Wave 1 complete)
 > 关联文档：`STATE.md`（当前事实）、`docs/roadmap/`（路线图）、`docs/architecture.md`（架构边界）
 
 ---
@@ -115,8 +115,9 @@ Web / Desktop / Mobile / IM
 | Hub Server | http://127.0.0.1:8080 | ✅ 运行中 |
 | Edge Server | http://127.0.0.1:3210 | ✅ 运行中 |
 | TokenDance ID | http://127.0.0.1:3000 | ✅ 运行中 |
-| Web Vite | http://127.0.0.1:5174 | 按需启动 |
-| Desktop Vite | http://127.0.0.1:5173 | 按需启动 |
+| Web Vite | http://127.0.0.1:5174 | ✅ 运行中 |
+| Desktop Vite | http://127.0.0.1:5173 | ✅ 运行中 |
+| cc-switch proxy | http://127.0.0.1:15721 | ✅ 运行中（模型别名路由） |
 | PostgreSQL | localhost:5432 | Docker (`agenthub-postgres`) |
 | Redis | localhost:6379 | Docker (`agenthub-redis`) |
 
@@ -340,22 +341,70 @@ Roadmap 已从单一 `docs/roadmap.md` 拆分为 `docs/roadmap/` 模块化目录
 
 ---
 
-## 12. 会话统计（2026-06-10）
+## 12. Wave 1 能力清单（2026-06-10）
+
+Wave 1 由 8 个并行 Agent 完成全部 P0 数据缺口，以下能力已合入 `dev/delicious233`：
+
+### IM 消息交互
+
+| 能力 | 说明 |
+|------|------|
+| 消息回复/引用/重新生成 | 长按消息 → 回复/引用/重新生成上下文菜单；`ReplyToContext` + `ComposerReducer.setReplyTo`；`UnifiedComposer` replyTo 横幅条 |
+| 图片和文件附件 | Composer 附件选择 → 上传 → `AttachmentBlock` 组件渲染预览（含样式模块） |
+| 消息搜索高亮 + 滚动定位 | `AgentHubWorkbench` 搜索关键词 → `TranscriptView` 高亮匹配 + scroll-to-block |
+| WebSocket 连接状态指示 | 连接/断线/重连三色状态指示器 |
+| 消息重新生成 API | `POST /web/agent-tasks/:id/regenerate` → Hub 重新 dispatch → WS 事件流式替换 |
+
+### Diff / StepCard / Agent 可视化
+
+| 能力 | 说明 |
+|------|------|
+| StepCard 可视化 | `RunStepGroupTranscriptBlock` 折叠/展开组件，子步骤 timeline 渲染 |
+| Per-hunk Diff accept/reject | `DiffReviewPanel` accept/reject 按钮 → Edge apply 端点 + 状态徽章 |
+
+### Agent 配置与市场
+
+| 能力 | 说明 |
+|------|------|
+| cc-switch 模型别名展示 | Desktop `edgeClient.getCCSwitchStatus/getCCSwitchProviders`；Agent 配置面板显示 cc-switch 路由的实际模型 |
+| Agent 能力标签 | 联系人列表每个 Agent 旁显示彩色能力标签，按 skill 分类着色 |
+| Skill Market | 8 项 seed 数据（PPTX Generator、DOCX Report、Excel Analyzer、PDF Toolkit、Diagram、Code Doc、Image Processor、Markdown） |
+| MCP Market | 6 项 seed 数据（Filesystem、GitHub、Postgres、Brave Search、Puppeteer、Memory） |
+
+---
+
+## 13. 会话统计（2026-06-10）
 
 本次开发会话的关键数据：
 
 | 指标 | 数值 |
 |------|------|
-| Commits（2026-06-08 起） | 20+ 个功能/修复 commit |
-| 文件变更 | 178 files changed |
-| 代码量 | 21,276 insertions, 723 deletions |
-| 部署 subagents | 30+ 个 subagent 会话（code review、E2E 测试、文档生成、UI 接线） |
-| E2E 验证报告 | 4 份（adapter E2E、real web、smoke、Hub API） |
-| 新 Edge API 端点 | `/v1/ccswitch/status`、`/v1/ccswitch/providers`、`/v1/memory`（GET/POST） |
+| Commits（2026-06-08 起） | 42 个功能/修复/文档 commit |
+| 文件变更 | 216 files changed |
+| 代码量 | 27,000+ insertions |
+| Wave 0 | 基线验证（9f8ae16e 及之前） |
+| Wave 1 | 8 个并行 Agent 完成全部 P0 数据缺口 |
+| Wave 2-3 | 进行中（i18n workbench、AgentsPage、web platform、edge protocol 更新） |
+| E2E 验证报告 | 5 份（adapter E2E、real web、smoke、Hub API 61 端点、SDK adapter） |
+| Hub API | 61 端点测试（49 返回 200），50 个 migration |
+| Edge API | 6 个适配器，45+ 个 handler 端点 |
 
 ---
 
-## 13. 关键链接
+## 14. 当前基础设施
+
+| 服务 | 端口 | 状态 |
+|------|------|------|
+| Desktop Vite | 5173 | ✅ 运行中 |
+| Web Vite | 5174 | ✅ 运行中 |
+| Mobile | Expo RN | ✅ 开发模式 |
+| Hub Server | 8080 | ✅ 运行中（50 migrations，61 端点已测） |
+| Edge Server | 3210 | ✅ 运行中（6 adapters，45+ endpoints） |
+| cc-switch proxy | 15721 | ✅ active（模型别名路由） |
+
+---
+
+## 15. 关键链接
 
 - 仓库：https://github.com/TokenDanceLab/AgentHub
 - TokenDance ID：https://id.vectorcontrol.tech
