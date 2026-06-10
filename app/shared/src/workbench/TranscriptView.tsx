@@ -315,6 +315,10 @@ function renderTextBlock(
     </button>
   ) : null;
 
+  const quoteBlock = block.quote ? (
+    <blockquote className={styles.inlineBlockquote}>{block.quote}</blockquote>
+  ) : null;
+
   if (!isCurrentUserAuthor(block.author)) {
     const time = formatBlockTime(block.createdAt);
 
@@ -328,6 +332,7 @@ function renderTextBlock(
         onAvatarClick={onAgentProfileOpen}
       >
         {replyRef}
+        {quoteBlock}
         {renderAgentText(block)}
       </AgentMessage>
     );
@@ -336,6 +341,7 @@ function renderTextBlock(
   return (
     <UserMessage hideAvatar={hideUserAvatar} avatarInitials={agentAvatar(block.author.name)}>
       {replyRef}
+      {quoteBlock}
       {renderMessageText(block.text, block.hasNewerVersion)}
     </UserMessage>
   );
@@ -441,15 +447,16 @@ function parseBlockquotes(text: string): ParsedPart[] {
 
 function renderAgentText(block: Extract<TranscriptBlock, { kind: 'text' }>): React.ReactElement {
   const [title, rest] = agentTextParts(block);
+  const grayed = block.hasNewerVersion ? 'true' as const : undefined;
   if (!rest) {
-    return <p className={styles.blockText}>{title}</p>;
+    return <p className={styles.blockText} data-grayed={grayed}>{title}</p>;
   }
 
   return (
-    <>
+    <div className={styles.blockText} data-grayed={grayed}>
       <div className={styles.inlineTitle}>{title}</div>
       <div className={styles.inlineMutedLoose}>{rest}</div>
-    </>
+    </div>
   );
 }
 
