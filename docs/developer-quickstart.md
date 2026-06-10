@@ -8,7 +8,7 @@
 
 | 工具 | 最低版本 | 用途 |
 |------|---------|------|
-| Go | 1.22+ | Hub Server 和 Edge Server |
+| Go | 1.25+ | Hub Server 和 Edge Server |
 | Node.js | 20+ | 前端构建和开发 |
 | corepack | 启用 | pnpm 版本管理（`corepack enable`） |
 | PostgreSQL | 16+ | Hub 数据库 |
@@ -68,7 +68,7 @@ curl http://localhost:8080/health
 # 期望：{"status":"ok"}
 ```
 
-首次启动会自动运行数据库迁移（`hub-server/migrations/` 下的 49 个迁移文件）。
+首次启动会自动运行数据库迁移（`hub-server/migrations/` 下的 50 对迁移文件，共 100 文件）。
 
 ## 5. 启动 Edge Server
 
@@ -140,25 +140,23 @@ corepack pnpm tauri dev
 
 ## 8. 创建测试用户并获取 JWT
 
-当 TokenDance ID OIDC 未配置时（开发环境常见情况），可以直接签发 JWT 进行测试。
+当 TokenDance ID OIDC 未配置时（开发环境常见情况），可以通过以下方式获取测试 JWT。
 
-### 方式一：通过 Hub API 直接注册
+### 方式一：配置 TokenDance ID OIDC（推荐）
 
-```bash
-# 注册测试用户
-curl -X POST http://localhost:8080/client/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"testpass123","nickname":"Test User"}'
-
-# 登录获取 token
-curl -X POST http://localhost:8080/client/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"testpass123"}'
-```
+1. 确保 TokenDance ID 服务已启动并可达（默认端口 3000）。
+2. 在 `.env` 中配置 OIDC 参数：
+   ```bash
+   AGENTHUB_TOKENDANCE_ID_CLIENT_ID=<your-client-id>
+   AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=<your-client-secret>
+   AGENTHUB_TOKENDANCE_ID_ISSUER=http://localhost:3000
+   ```
+3. 启动 Hub Server 后，访问 Web 前端 `http://localhost:5174`，点击登录按钮完成 OIDC 流程。
+4. 前端会自动获取并存储 JWT token。
 
 ### 方式二：通过 E2E 测试脚本自动创建
 
-E2E smoke 脚本会自动创建测试用户并签发 token：
+E2E smoke 脚本会自动签发测试 token：
 
 ```powershell
 # 需要 Hub 和 Edge 都已启动
@@ -222,7 +220,7 @@ npx playwright test
 
 | 脚本 | 用途 |
 |------|------|
-| `tests/scripts/verify-real-api-smoke.ps1` | Hub + Edge 全链路 smoke（44 断言） |
+| `tests/scripts/verify-real-api-smoke.ps1` | Hub + Edge 全链路 smoke（100+ 断言） |
 | `tests/scripts/verify-p0-approved-real-gold-path.ps1` | P0 approved-real 金链路 |
 | `scripts/verify-ci-gates.ps1` | CI 门禁检查 |
 | `scripts/verify-release-gate.ps1` | Release gate 检查 |

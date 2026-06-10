@@ -22,7 +22,7 @@
 
 | 工具 | 最低版本 | 用途 |
 |------|---------|------|
-| Go | 1.22+ | Hub Server 和 Edge Server 后端 |
+| Go | 1.25+ | Hub Server 和 Edge Server 后端 |
 | Node.js | 20+ | 前端构建、测试和开发 |
 | corepack | 启用 | pnpm 版本管理（`corepack enable`） |
 | PostgreSQL | 16+ | Hub 数据库 |
@@ -129,7 +129,7 @@ AGENTHUB_JWT_SECRET=dev-secret-change-in-production-min-length-32
 
 ### 2.2 TypeScript（前端 / Mobile）
 
-- **类型安全**：启用 `exactOptionalPropertyTypes`。禁止使用 `any`，必要时用 `unknown` 并做类型收窄。
+- **类型安全**：`app/web`、`app/desktop`、`app/mobile-rn` 启用 `exactOptionalPropertyTypes`，`app/shared/` 设为 `false`。禁止使用 `any`，必要时用 `unknown` 并做类型收窄。
 - **Lint**：各 app 独立 eslint 配置，提交前运行 `pnpm lint`。
 - **格式化**：使用 Prettier 统一格式。
 - **共享 UI 包**：通用组件放在 `app/shared/src/ui/`（`@agenthub/shared`），desktop 和 web 从中导入。禁止在 app 内创建重复的本地 UI 副本。
@@ -235,9 +235,10 @@ hub-server/
     config/           # 配置加载
     app/              # 应用初始化
     cache/            # Redis 缓存
+    log/              # 结构化日志
     metrics/          # Prometheus 指标
     errcode/          # 错误码定义
-  migrations/         # 数据库迁移文件（49 个）
+  migrations/         # 数据库迁移文件（50 对）
   deployments/        # Docker 部署配置
 ```
 
@@ -262,6 +263,7 @@ edge-server/
     skills/           # Skill 管理
     security/         # 安全相关
     hub/              # Hub 通信客户端
+    ccswitch/         # CC-Switch 模型代理配置
     jwtutil/          # JWT 工具
     middleware/        # 中间件
     metrics/          # Prometheus 指标
@@ -288,7 +290,7 @@ app/
       platform/       # Tauri + Local Edge adapter
       main.tsx        # Desktop 启动入口
     src-tauri/
-      src/host/       # Tauri host capability modules（edge、fs、dialog、auth、window、system）
+      src/host/       # Tauri host capability modules（edge、fs、auth、window、system）
 
   web/                # Web 浏览器应用
     src/
@@ -563,7 +565,7 @@ npx playwright test
 #### 集成 Smoke 测试
 
 ```powershell
-# Hub + Edge 全链路 smoke（44+ 断言）
+# Hub + Edge 全链路 smoke（100+ 断言）
 .\tests\scripts\verify-real-api-smoke.ps1 -RepoRoot .
 
 # P0 approved-real 金链路
@@ -669,18 +671,10 @@ corepack install
 
 ### Q: Token / Auth 问题
 
-开发环境下，可以通过 API 直接注册测试用户并获取 JWT：
+开发环境下，认证通过 TokenDance ID OIDC 完成。在 `.env` 中配置 OIDC 参数后启动 Hub Server，前端会自动跳转登录流程获取 JWT。如果 OIDC 未配置，E2E smoke 脚本可以直接签发测试 token：
 
-```bash
-# 注册
-curl -X POST http://localhost:8080/client/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"testpass123","nickname":"Test User"}'
-
-# 登录获取 token
-curl -X POST http://localhost:8080/client/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"testpass123"}'
+```powershell
+.\tests\scripts\verify-real-api-smoke.ps1 -RepoRoot .
 ```
 
 ### Q: Edge 适配器注册问题
