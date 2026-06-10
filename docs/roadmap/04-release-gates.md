@@ -91,19 +91,19 @@ Mock 验收 (demo data 走通)
 
 ```powershell
 # CI 门
-.\\tests\\scripts\\verify-ci-gates.ps1
+.\\scripts\\verify-ci-gates.ps1
 
 # 真实 API smoke
-.\\tests\\scripts\\verify-real-api-smoke.ps1
+.\\scripts\\verify-real-api-smoke.ps1
 
 # Approved-Real 金链路
-.\\tests\\scripts\\verify-p0-approved-real-gold-path.ps1 -RepoRoot .
+.\\scripts\\verify-p0-approved-real-gold-path.ps1 -RepoRoot .
 
 # OIDC 登录
-.\\tests\\scripts\\verify-token-dance-id-login-readiness.ps1 -RepoRoot .
+.\\scripts\\verify-token-dance-id-login-readiness.ps1 -RepoRoot .
 
 # Release 门
-.\\tests\\scripts\\verify-release-gate.ps1
+.\\scripts\\verify-release-gate.ps1
 ```
 
 - [ ] 全部 gate 脚本通过
