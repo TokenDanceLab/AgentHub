@@ -305,10 +305,14 @@ function renderTextBlock(
   hideUserAvatar = false,
 ): React.ReactElement {
   const replyRef = block.replyToMessageId ? (
-    <div className={styles.replyQuote}>
+    <button
+      className={styles.replyQuote}
+      onClick={() => scrollToBlock(block.replyToMessageId!)}
+      type="button"
+    >
       <span className={styles.replyQuoteAuthor}>{block.replyAuthor ?? '未知'}</span>
       <span className={styles.replyQuoteText}>{block.replyPreview ?? '...'}</span>
-    </div>
+    </button>
   ) : null;
 
   if (!isCurrentUserAuthor(block.author)) {
@@ -332,9 +336,107 @@ function renderTextBlock(
   return (
     <UserMessage hideAvatar={hideUserAvatar} avatarInitials={agentAvatar(block.author.name)}>
       {replyRef}
-      <p className={styles.blockText} data-grayed={block.hasNewerVersion ? 'true' : undefined}>{block.text}</p>
+      {renderMessageText(block.text, block.hasNewerVersion)}
     </UserMessage>
   );
+}
+
+/** Scroll to a transcript block by its id. */
+function scrollToBlock(blockId: string): void {
+  const candidates = [blockId, `hub-message-${blockId}`, `thread-item-${blockId}`];
+  for (const candidate of candidates) {
+    const el = document.querySelector(`[data-scroll-block="${candidate}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
+}
+
+/** Render message text, parsing blockquote sections (> ...) into styled elements. */
+function renderMessageText(text: string, hasNewerVersion?: boolean): React.ReactElement {
+  const parts = parseBlockquotes(text);
+  if (parts.length === 1 && parts[0]!.kind === 'text') {
+    return <p className={styles.blockText} data-grayed={hasNewerVersion ? 'true' : undefined}>{text}</p>;
+  }
+
+  return (
+    <div className={styles.blockText} data-grayed={hasNewerVersion ? 'true' : undefined}>
+      {parts.map((part, index) => {
+        if (part.kind === 'quote') {
+          return (
+            <blockquote key={index} className={styles.inlineBlockquote}>
+              {part.lines!.map((line, lineIndex) => (
+                <React.Fragment key={lineIndex}>
+                  {lineIndex > 0 && <br />}
+                  {line}
+                </React.Fragment>
+              ))}
+            </blockquote>
+          );
+        }
+        return <React.Fragment key={index}>{part.text && <p>{part.text}</p>}</React.Fragment>;
+      })}
+    </div>
+  );
+}
+
+interface ParsedPart {
+  kind: 'text' | 'quote';
+  text?: string;
+  lines?: string[];
+}
+
+function parseBlockquotes(text: string): ParsedPart[] {
+  const lines = text.split('\n');
+  const parts: ParsedPart[] = [];
+  const currentText: string[] = [];
+  const currentQuote: string[] = [];
+  let inQuote = false;
+
+  function flushText(): void {
+    if (currentText.length > 0) {
+      parts.push({ kind: 'text', text: currentText.join('\n') });
+      currentText.length = 0;
+    }
+  }
+
+  function flushQuote(): void {
+    if (currentQuote.length > 0) {
+      parts.push({ kind: 'quote', lines: [...currentQuote] });
+      currentQuote.length = 0;
+    }
+  }
+
+  for (const line of lines) {
+    const quoteMatch = line.match(/^>\s?(.*)/);
+    if (quoteMatch) {
+      if (!inQuote) {
+        flushText();
+        inQuote = true;
+      }
+      currentQuote.push(quoteMatch[1]!);
+    } else {
+      if (inQuote) {
+        if (line.trim() === '' && currentQuote.length > 0) {
+          currentQuote.push('');
+          continue;
+        }
+        flushQuote();
+        inQuote = false;
+      }
+      currentText.push(line);
+    }
+  }
+
+  flushText();
+  flushQuote();
+
+  if (parts.length === 0) {
+    return [{ kind: 'text', text }];
+  }
+
+  return parts;
 }
 
 function renderAgentText(block: Extract<TranscriptBlock, { kind: 'text' }>): React.ReactElement {

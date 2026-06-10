@@ -1,5 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, demoWorkbenchTranscripts } from '@shared/demo';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import { useHubSessions, useHubMessages } from '@/api/sessionQueries';
@@ -14,6 +16,12 @@ vi.mock('@/api/threadQueries', () => ({
 vi.mock('@/api/sessionQueries', () => ({
   useHubSessions: vi.fn(),
   useHubMessages: vi.fn(),
+  useHubSendMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubRecallMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubEditMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubPinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubUnpinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubMarkRead: vi.fn(() => ({ mutateAsync: vi.fn() })),
 }));
 
 vi.mock('@/api/hubQueries', () => ({
@@ -44,6 +52,14 @@ vi.mock('./useDesktopEdgeEvents', () => ({
   useDesktopEdgeEvents: vi.fn(() => []),
 }));
 
+vi.mock('@/hooks/useHubWebSocket', () => ({
+  useHubWebSocket: vi.fn(() => ({ lastEvent: null })),
+}));
+
+vi.mock('@/api/edgeClient', () => ({
+  fetchHealth: vi.fn(() => Promise.reject(new Error('Edge not available'))),
+}));
+
 const mockedUseThreads = vi.mocked(useThreads);
 const mockedUseThreadMessages = vi.mocked(useThreadMessages);
 const mockedUseThreadPins = vi.mocked(useThreadPins);
@@ -51,6 +67,8 @@ const mockedUseHubSessions = vi.mocked(useHubSessions);
 const mockedUseHubMessages = vi.mocked(useHubMessages);
 
 describe('useDesktopWorkbenchModel', () => {
+  const queryClient = new QueryClient();
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
@@ -75,8 +93,18 @@ describe('useDesktopWorkbenchModel', () => {
     } as unknown as ReturnType<typeof useHubMessages>);
   });
 
+  function renderWithProvider() {
+    return renderHook(() => useDesktopWorkbenchModel(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
   it('uses the Desktop demo conversation while live threads are loading', () => {
-    const { result } = renderHook(() => useDesktopWorkbenchModel());
+    const { result } = renderWithProvider();
 
     expect(result.current.activeConversationId).toBe('agent-collab');
     expect(result.current.isDemo).toBe(true);
@@ -92,7 +120,7 @@ describe('useDesktopWorkbenchModel', () => {
       data: { items: [], page: { hasMore: false } },
     } as ReturnType<typeof useThreads>);
 
-    const { result } = renderHook(() => useDesktopWorkbenchModel());
+    const { result } = renderWithProvider();
 
     expect(result.current.activeConversationId).toBe('agent-collab');
     expect(result.current.dataMode).toBe('mock (auto fallback)');
@@ -112,7 +140,7 @@ describe('useDesktopWorkbenchModel', () => {
       },
     } as ReturnType<typeof useThreads>);
 
-    const { result } = renderHook(() => useDesktopWorkbenchModel());
+    const { result } = renderWithProvider();
 
     expect(result.current.activeConversationId).toBe('agent-collab');
     expect(result.current.dataMode).toBe('mock (auto fallback)');
@@ -134,7 +162,7 @@ describe('useDesktopWorkbenchModel', () => {
       },
     } as ReturnType<typeof useThreads>);
 
-    const { result } = renderHook(() => useDesktopWorkbenchModel());
+    const { result } = renderWithProvider();
 
     expect(result.current.activeConversationId).toBe('live-thread');
     expect(result.current.dataMode).toBe('approved-real');

@@ -25,6 +25,7 @@ const mentionedComposer: ComposerState = {
   workDir: '',
   submitState: 'idle',
   replyTo: null,
+  quote: null,
 };
 
 describe('UnifiedComposer execution target selection', () => {
