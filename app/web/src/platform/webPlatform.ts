@@ -160,12 +160,15 @@ export function resolveWebWorkbenchConversations(
   hubAuthenticated: boolean,
   dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
 ): WorkbenchConversation[] {
-  if (!hubAuthenticated) return [webHubEmptyConversation];
+  const mapped = hubAuthenticated
+    ? (sessions
+        ?.map(hubSessionToWorkbenchConversation)
+        .filter((conversation): conversation is WorkbenchConversation => Boolean(conversation)) ?? [])
+    : [];
 
-  const mapped = sessions
-    ?.map(hubSessionToWorkbenchConversation)
-    .filter((conversation): conversation is WorkbenchConversation => Boolean(conversation)) ?? [];
-  return mapped.length > 0 ? mapped : [webHubEmptyConversation];
+  if (mapped.length > 0) return mapped;
+  if (isWorkbenchRealDataMode(dataMode)) return [webHubEmptyConversation];
+  return webConversations;
 }
 
 function formatHubPinTime(timestamp: string | undefined): string | undefined {
