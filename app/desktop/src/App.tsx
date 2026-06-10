@@ -117,7 +117,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const createThread = useCreateThread();
   const decideTeamApproval = useDecideTeamApproval();
   const { data: threadsData } = useThreads(undefined, { enabled: liveEdgeEnabled });
-  const { data: currentUser } = useCurrentUser(liveEdgeEnabled);
+  const { data: currentUser } = useCurrentUser(edgeOnline);
   const { data: documentListData } = useDocumentList(undefined, { enabled: liveEdgeEnabled });
   const createDocumentMutation = useCreateDocument();
 
