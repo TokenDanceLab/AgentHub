@@ -13,6 +13,8 @@ export interface WorkspaceHeaderProps {
   dataMode?: string | undefined;
   inspectorCollapsed: boolean;
   onToggleInspector: () => void;
+  /** Called when the user clicks the search icon. */
+  onOpenSearch?: (() => void) | undefined;
   showDataModeControl?: boolean | undefined;
 }
 
@@ -21,6 +23,7 @@ export function WorkspaceHeader({
   dataMode,
   inspectorCollapsed,
   onToggleInspector,
+  onOpenSearch,
   showDataModeControl = true,
 }: WorkspaceHeaderProps): React.ReactElement {
   const initial = activeConversation?.avatarLabel ?? (activeConversation?.title ?? 'A').slice(0, 1);
@@ -114,6 +117,7 @@ export function WorkspaceHeader({
         <button
           aria-label="搜索"
           className={styles.iconButton}
+          onClick={onOpenSearch}
           title="搜索"
           type="button"
         >

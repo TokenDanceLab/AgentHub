@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../i18n';
 import {
   DesignNavIcon,
   DESIGN_NAV_GLYPH_SIZE,
@@ -364,13 +366,15 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
     recentShortcuts = [],
   } = props;
 
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+
   const navItems: { id: AgentsPaneId; label: string; icon: DesignNavIconName }[] = [
-    { id: 'installed', label: '已安装', icon: 'package' },
-    { id: 'market', label: 'Agent 市场', icon: 'store' },
+    { id: 'installed', label: t('agents.nav.installed'), icon: 'package' },
+    { id: 'market', label: t('agents.nav.market'), icon: 'store' },
     { id: 'skillMarket', label: 'Skill 市场', icon: 'library' },
     { id: 'mcpMarket', label: 'MCP 市场', icon: 'service' },
     { id: 'policy', label: '运行策略', icon: 'policy' },
-    { id: 'tools', label: '工具权限', icon: 'tools' },
+    { id: 'tools', label: t('agents.detail.tools'), icon: 'tools' },
     { id: 'models', label: '模型配置', icon: 'model' },
     { id: 'audit', label: '审计日志', icon: 'audit' },
   ];
@@ -401,10 +405,10 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
   return (
     <section className={`${styles['agents-page']} workbench agents-page`}>
       <aside className={`${styles['workbench-nav']} workbench-nav`}>
-        <div className={`${styles['workbench-title']} workbench-title`}>Agent</div>
+        <div className={`${styles['workbench-title']} workbench-title`}>{t('nav.agents')}</div>
         <input
           className={`${styles['workbench-search']} workbench-search`}
-          placeholder="搜索 Agent、模型或权限"
+          placeholder={t('agents.installed.search')}
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
@@ -473,6 +477,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     recentEvents = [],
   } = props;
 
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
   const selectedAgentBusy = Boolean(selectedAgent && (savingAgentId === selectedAgent.id || deletingAgentId === selectedAgent.id));
 
@@ -480,7 +485,7 @@ const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     <main className={`${styles['agent-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>Agent管理</h1>
+          <h1>{t('agents.installed.title')}</h1>
           <p className={styles['head-subcopy']}>
             查看 Agent 基础配置、skills 和工具权限；写入能力按 Hub / Edge 合同逐步接入。
           </p>
@@ -931,13 +936,14 @@ const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
     onMarketSearchChange,
   } = props;
 
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const categories: MarketCategory[] = ['推荐', '研发', '文档', '测试', '安全', '发布'];
 
   return (
     <main className={`${styles['agent-main']} ${styles['agent-market-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>Agent 市场</h1>
+          <h1>{t('agents.market.title')}</h1>
           <p className={styles['head-subcopy']}>
             从 TokenDance 模板库安装可复用 Agent，不影响已安装配置。
           </p>
@@ -952,7 +958,7 @@ const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
         <input
           className={styles['market-search']}
           type="search"
-          placeholder="搜索模板、能力或场景"
+          placeholder={t('agents.market.search')}
           value={marketSearchQuery}
           onChange={(e) => onMarketSearchChange?.(e.target.value)}
         />
