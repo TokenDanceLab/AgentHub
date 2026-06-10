@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { buildInspectorEvidenceModel, buildRuntimeEvidenceInspectorModel } from '../inspector';
 import type { RuntimeEvidenceChannel, RuntimeEvidenceSnapshot } from '../inspector';
-import type { EvidenceRef } from '../transcript';
+import type { EvidenceRef, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { FileDiff } from '../types/chat';
 import {
   OverviewPanel,
@@ -10,6 +10,13 @@ import {
   FilePreview,
   BrowserPreview,
 } from './inspector';
+import { AgentStreamingBar } from '../ui/AgentStreamingBar';
+import { formatTokens } from '../context/breakdown';
+import type { DagNode } from '../ui/DagTree';
+import { buildDagNodesFromTranscript } from '../ui/DagTree';
+import { SlideshowPreview } from '../ui/SlideshowPreview';
+import { TablePreview } from '../ui/TablePreview';
+import { DocxPreview } from '../ui/DocxPreview';
 import {
   DESIGN_NAV_GLYPH_SIZE,
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
@@ -96,6 +103,14 @@ export interface RightInspectorProps {
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
   reviewFileRequest?: FileItem | null | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  /** Context usage blocks from the transcript, used for the compact context bar in Overview. */
+  contextBlocks?: ContextUsageTranscriptBlock[] | undefined;
+  /** Route decision / sub-agent blocks for DagTree visualization. */
+  routeBlocks?: Array<RouteDecisionTranscriptBlock | SubagentTranscriptBlock | ChildAgentTranscriptBlock> | undefined;
+  /** Deploy preview URL to auto-load in the browser tab. When set, switches to browser. */
+  deployPreviewUrl?: string | undefined;
+  /** Deploy status indicator for the browser tab. */
+  deployStatus?: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
   onResizeBy: (delta: number) => void;
   onResizeStart: (clientX: number) => void;
   width: number;
@@ -112,6 +127,10 @@ export function RightInspector({
   onOpenPreview,
   reviewFileRequest,
   runtimeEvidence,
+  contextBlocks,
+  routeBlocks,
+  deployPreviewUrl,
+  deployStatus,
   onResizeBy,
   onResizeStart,
   width,
@@ -123,6 +142,30 @@ export function RightInspector({
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
 
   const model = buildInspectorEvidenceModel(evidence);
+
+  // ── DagTree nodes from route decision blocks ──
+  const dagNodes = useMemo<DagNode[]>(() => {
+    if (!routeBlocks || routeBlocks.length === 0) return [];
+    return buildDagNodesFromTranscript(routeBlocks);
+  }, [routeBlocks]);
+
+  // ── Deploy auto-switch: when a deploy preview URL appears, switch to browser tab ──
+  const lastAutoSwitchedUrl = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!deployPreviewUrl || !browserPreviewEnabled) return;
+    // Only auto-switch on NEW deploy URLs (not on re-renders of the same URL)
+    if (lastAutoSwitchedUrl.current === deployPreviewUrl) return;
+    lastAutoSwitchedUrl.current = deployPreviewUrl;
+
+    setVisibleTabs((current) => {
+      const next = new Set(current);
+      next.add('browser');
+      return next;
+    });
+    setBrowserUrl(deployPreviewUrl);
+    setActiveMode('browser');
+  }, [deployPreviewUrl, browserPreviewEnabled]);
 
   useEffect(() => {
     if (!reviewFileRequest) return;
@@ -314,23 +357,35 @@ export function RightInspector({
         )}
 
         {activeMode === 'overview' && visibleTabs.has('overview') && (
-          <OverviewPanel
-            tasks={overviewTasks}
-            files={overviewFiles}
-            taskSectionTitle={runtimeEvidence ? '运行证据' : '概览'}
-            {...(runtimeEvidence ? { kicker: runtimeEvidenceOverviewKicker(runtimeEvidence) } : {})}
-            primaryFileLabel={runtimeEvidence ? 'Hub replay 产物' : '文件'}
-            {...(runtimeEvidence ? { workingFileLabel: '运行快照' } : {})}
-            onFileClick={handleFileClick}
-          />
+          <div className={styles.overviewContent}>
+            <AgentStreamingBar />
+            {contextBlocks && contextBlocks.length > 0 && (
+              <OverviewContextUsage blocks={contextBlocks} />
+            )}
+            <OverviewPanel
+              tasks={overviewTasks}
+              files={overviewFiles}
+              taskSectionTitle={runtimeEvidence ? '运行证据' : '概览'}
+              {...(runtimeEvidence ? { kicker: runtimeEvidenceOverviewKicker(runtimeEvidence) } : {})}
+              primaryFileLabel={runtimeEvidence ? 'Hub replay 产物' : '文件'}
+              {...(runtimeEvidence ? { workingFileLabel: '运行快照' } : {})}
+              dagNodes={dagNodes}
+              onFileClick={handleFileClick}
+            />
+          </div>
         )}
 
         {activeMode === 'browser' && visibleTabs.has('browser') && (
           browserPreviewEnabled ? (
-            <BrowserPreview
-              url={browserPreviewUrl}
-              onClose={closePreview}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              {deployStatus && (
+                <DeployStatusBar status={deployStatus} url={deployPreviewUrl} />
+              )}
+              <BrowserPreview
+                url={browserPreviewUrl}
+                onClose={closePreview}
+              />
+            </div>
           ) : (
             <BrowserPanelFallback
               artifacts={model.artifacts}
@@ -343,12 +398,8 @@ export function RightInspector({
 
         {activeMode === 'files' && visibleTabs.has('files') && (
           previewFile ? (
-            <FilePreview
-              filename={previewFile.name}
-              owner={previewFile.owner}
-              language={previewFile.type}
-              content={previewFile.content ?? `${previewFile.name}\n\n暂无文件内容。`}
-              diffContent={previewFile.diffContent}
+            <FilePreviewRouter
+              file={previewFile}
               onClose={closePreview}
             />
           ) : (
@@ -628,6 +679,103 @@ function RuntimeEvidenceSection({
 
 /* ═══ Sub-panels ═══ */
 
+function OverviewContextUsage({
+  blocks,
+}: {
+  blocks: ContextUsageTranscriptBlock[];
+}): React.ReactElement {
+  // Use the latest block (most recent context usage snapshot).
+  const latest = blocks[blocks.length - 1];
+  if (!latest || (!latest.inputTokens && !latest.outputTokens)) {
+    return <></>;
+  }
+
+  const totalTokens = latest.inputTokens + latest.outputTokens;
+  const usagePercent = latest.usagePercent ?? (
+    latest.contextLimit && latest.contextLimit > 0
+      ? Math.round((totalTokens / latest.contextLimit) * 100)
+      : null
+  );
+
+  const isWarning = usagePercent != null && usagePercent >= 70 && usagePercent < 90;
+  const isDanger = usagePercent != null && usagePercent >= 90;
+
+  const barVariant = isDanger
+    ? styles.contextBarDanger
+    : isWarning
+      ? styles.contextBarWarning
+      : '';
+
+  return (
+    <div className={styles.contextSection} role="status" aria-label="Context usage">
+      <div className={styles.contextHead}>
+        <span>{latest.modelLabel || 'Context'}</span>
+        {usagePercent != null && (
+          <span className={styles.contextPercent}>{usagePercent}%</span>
+        )}
+      </div>
+      {usagePercent != null && (
+        <div className={`${styles.contextBar} ${barVariant}`}>
+          <div
+            className={styles.contextBarFill}
+            style={{ width: `${Math.min(usagePercent, 100)}%` }}
+          />
+        </div>
+      )}
+      <div className={styles.contextStats}>
+        <span>{formatTokens(latest.inputTokens)} in</span>
+        <span>{formatTokens(latest.outputTokens)} out</span>
+        {latest.cost && <span className={styles.contextCost}>{latest.cost}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Deploy Status Indicator ═══ */
+
+function DeployStatusBar({
+  status,
+  url,
+}: {
+  status: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed';
+  url?: string | undefined;
+}): React.ReactElement {
+  const isReady = status === 'deployed';
+  const isFailed = status === 'failed';
+  const isDeploying = status === 'building' || status === 'deploying';
+
+  const statusLabel = DEPLOY_STATUS_LABEL[status] ?? status;
+  const dotColor = isReady ? 'var(--success)' : isFailed ? 'var(--danger)' : 'var(--primary)';
+
+  return (
+    <div
+      className={styles.deployStatusBar}
+      data-deploy-status={status}
+      role="status"
+      aria-label={`部署状态: ${statusLabel}`}
+    >
+      <span
+        className={styles.deployStatusDot}
+        style={{ background: dotColor }}
+        aria-hidden="true"
+      />
+      <span className={styles.deployStatusLabel}>{statusLabel}</span>
+      {isDeploying && <span className={styles.deploySpinner} aria-hidden="true" />}
+      {url && isReady && (
+        <span className={styles.deployUrl} title={url}>{url.replace(/^https?:\/\//, '')}</span>
+      )}
+    </div>
+  );
+}
+
+const DEPLOY_STATUS_LABEL: Record<string, string> = {
+  pending: '待部署',
+  building: '构建中',
+  deploying: '部署中',
+  deployed: '已就绪',
+  failed: '部署失败',
+};
+
 function BrowserPanelFallback({
   artifacts,
   canOpenPreview,
@@ -757,6 +905,76 @@ function FilesPanel({
       })}
     </ul>
   );
+}
+
+/* ═══ File Preview Router ═══ */
+
+type FilePreviewKind = 'code' | 'pptx' | 'pptx-legacy' | 'xlsx' | 'xls' | 'csv' | 'docx';
+
+function detectFilePreviewKind(fileName: string): FilePreviewKind {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pptx')) return 'pptx';
+  if (lower.endsWith('.ppt')) return 'pptx-legacy';
+  if (lower.endsWith('.xlsx')) return 'xlsx';
+  if (lower.endsWith('.xls')) return 'xls';
+  if (lower.endsWith('.csv')) return 'csv';
+  if (lower.endsWith('.docx')) return 'docx';
+  return 'code';
+}
+
+function FilePreviewRouter({
+  file,
+  onClose,
+}: {
+  file: PreviewFile;
+  onClose: () => void;
+}): React.ReactElement {
+  const kind = detectFilePreviewKind(file.name);
+
+  switch (kind) {
+    case 'pptx':
+    case 'pptx-legacy':
+      return (
+        <SlideshowPreview
+          fileName={file.name}
+          fileUrl={file.content ?? ''}
+          onClose={onClose}
+        />
+      );
+
+    case 'xlsx':
+    case 'xls':
+    case 'csv':
+      return (
+        <TablePreview
+          fileName={file.name}
+          fileUrl={file.content ?? ''}
+          onClose={onClose}
+        />
+      );
+
+    case 'docx':
+      return (
+        <DocxPreview
+          fileName={file.name}
+          fileUrl={file.content ?? ''}
+          onClose={onClose}
+        />
+      );
+
+    default:
+      /* Fallback to the existing code-based FilePreview */
+      return (
+        <FilePreview
+          filename={file.name}
+          owner={file.owner}
+          language={file.type}
+          content={file.content ?? `${file.name}\n\n暂无文件内容。`}
+          diffContent={file.diffContent}
+          onClose={onClose}
+        />
+      );
+  }
 }
 
 /* ═══ Helpers ═══ */
