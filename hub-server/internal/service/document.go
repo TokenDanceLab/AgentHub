@@ -172,7 +172,8 @@ func (s *DocumentService) projectArtifactDocuments(ctx context.Context, userID s
 		Joins("JOIN pending_agent_tasks pat ON pat.id = agent_run_events.task_id").
 		Where("pat.triggered_by_user_id = ?", userID).
 		Where("agent_run_events.event_type = ?", "run.agent.file_change").
-		Where("pat.status IN ?", []string{model.TaskStatusDone, model.TaskStatusDispatched, model.TaskStatusRunning})
+		Where("pat.status IN ?", []string{model.TaskStatusDone, model.TaskStatusDispatched, model.TaskStatusRunning}).
+		Where("(agent_run_events.payload->>'path') NOT LIKE ?", ".fingerprint/%")
 
 	if filter.After != "" {
 		q = q.Where("agent_run_events.created_at < ?", filter.After)

@@ -1065,9 +1065,8 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
 		return
 	}
-	if !req.Continue && req.SessionID != "" && threadHasAssistantHistory(repository.ListThreadItems(req.ThreadID)) {
-		req.Continue = true
-	}
+	// Session handling is now always --continue in the adapter (CC manages conversations).
+	// No auto-continue logic needed here.
 
 	if h.Executor == nil {
 		h.runCreateMu.Unlock()
@@ -1441,6 +1440,18 @@ func threadHasAssistantHistory(items []store.Item) bool {
 	for _, item := range items {
 		if item.Type == "agent_message" && (item.Role == "agent" || item.Role == "assistant") && strings.TrimSpace(item.Content) != "" {
 			return true
+		}
+	}
+	return false
+}
+
+// sessionHasRuns checks if any previous run used this session ID.
+func sessionHasRuns(repo store.Repository, sessionID string) bool {
+	for _, thread := range repo.ListThreads("") {
+		for _, run := range repo.ListRuns(thread.ID) {
+			if run.ID == sessionID {
+				return true
+			}
 		}
 	}
 	return false
