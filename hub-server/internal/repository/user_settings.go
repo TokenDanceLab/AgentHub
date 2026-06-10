@@ -25,24 +25,27 @@ func (r *UserSettingsRepository) GetSettings(userID string) ([]model.UserSetting
 	return settings, nil
 }
 
-// UpsertSettings creates or updates settings for a user. It performs an
-// upsert on the (user_id, key) unique constraint.
+// UpsertSettings creates or updates settings for a user. It performs a
+// batch upsert on the (user_id, key) unique constraint in a single query
+// instead of one query per key (fixes N+1 pattern N1).
 func (r *UserSettingsRepository) UpsertSettings(userID string, values map[string]string) ([]model.UserSetting, error) {
-	var settings []model.UserSetting
+	settings := make([]model.UserSetting, 0, len(values))
 	for key, value := range values {
-		setting := model.UserSetting{
+		settings = append(settings, model.UserSetting{
 			UserID: userID,
 			Key:    key,
 			Value:  value,
-		}
-		result := r.db.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "user_id"}, {Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value"}),
-		}).Create(&setting)
-		if result.Error != nil {
-			return nil, result.Error
-		}
-		settings = append(settings, setting)
+		})
+	}
+	if len(settings) == 0 {
+		return settings, nil
+	}
+	err := r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value"}),
+	}).Create(&settings).Error
+	if err != nil {
+		return nil, err
 	}
 	return settings, nil
 }

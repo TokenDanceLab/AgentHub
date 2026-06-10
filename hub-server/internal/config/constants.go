@@ -158,6 +158,23 @@ const WSPingTimeout = 5 * time.Second
 // connection is closed.
 const WSMaxMissedPongs = 2
 
+// WSIPRateLimitPerMinute is the maximum number of new WebSocket connections
+// allowed per client IP within one minute.
+const WSIPRateLimitPerMinute = 30
+
+// WSMessageRateLimit is the maximum number of messages per second allowed per
+// WebSocket connection (token bucket refill rate).
+const WSMessageRateLimit = 10
+
+// WSMessageBurst is the token bucket burst size for per-connection message
+// rate limiting.
+const WSMessageBurst = 20
+
+// WSMaxConnsPerUser is the maximum number of concurrent WebSocket connections
+// allowed per user. When this limit is reached, the oldest connection is
+// kicked to make room for the new one.
+const WSMaxConnsPerUser = 5
+
 // ── Event bus ────────────────────────────────────────────────────────────────
 
 // EventBusPoolSize is the worker pool size for asynchronous event handlers.
