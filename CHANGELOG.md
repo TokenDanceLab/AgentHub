@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.3.0-rc.8] — 2026-06-10
+
+### 发布定位
+- 统一收口 `dev/delicious233` 全线合入，基线来自 `origin/master` fast-forward 至 `95afab54`。
+- 42 次提交覆盖 Wave 0+1+2 全部成果：IM 全链路 10/10 chat actions、Desktop 认证令牌管道、Edge CLI 适配器真实执行、SDK HTTP 适配器 E2E 验证、Mobile hubClient 30+ 方法全面对齐、右侧面板 14 项增强、i18n zh/en 各 2169 键。
+- 本候选版本面向比赛提交全部功能验收，不声明生产签名、商店发布或真实模型消耗完成。
+
+### IM 聊天全链路（Web + Desktop）
+- Web hubClient 新增 4 个方法：`editMessage`、`addMessageReaction`、`removeMessageReaction`、`listMessageReactions`
+- Desktop hubClient 同步新增 4 个 Reaction 方法
+- Web `useWebWorkbenchModel` 新增 10 个 chat actions：recall、edit、pin、unpin、forward、searchMessages、searchSessionMessages、markRead、addReaction、removeReaction
+- 自动已读回执：进入会话后自动标记最后一条消息为已读
+- Desktop `useDesktopWorkbenchModel` 同步接入 chatActions（send、recall、edit、pin、unpin、markRead）
+
+### Desktop 认证令牌管道
+- `hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`、`projectQueries.ts` 全部传入 `{ getToken: getAccessToken }` 用于认证请求
+- Hub WebSocket (`useHubWebSocket.ts`) 接入 workbench model，实时事件驱动 React Query 缓存失效
+
+### Hub Server 数据层完善
+- 新增 `model.Document` + `repository.Document`（云文档全链路 CRUD）
+- 修复 Document model/schema 不匹配
+- 修复 `user_settings` 表缺失（迁移 0049 手动补建）
+- 修复 Prometheus metrics 空指针
+- 50 个 migration，61 端点已测（49 返回 200）
+
+### Edge CLI / SDK 适配器
+- Claude Code 适配器：真实 CLI 执行验证通过
+- OpenCode 适配器：修复 `--session` 只在 resume 时传递
+- Codex 适配器：新增 `PreflightAdapter` 接口，预检 `OPENAI_API_KEY` 缺失时快速失败
+- `AnthropicSDKAdapter` + `OpenAISDKAdapter`：HTTP direct call + SSE streaming，E2E verified via vectorcontrol.tech proxy
+
+### Mobile API 对齐
+- `hubClient` 扩展至 30+ 方法，覆盖 Hub API 全部合同
+- Platform adapter 实现，支持 iOS/Android/Web 三平台
+- 3 种数据模式：online（直连 Hub）、offline（本地缓存）、demo（fixture）
+- 91 tests PASS
+
+### 右侧面板 14 项增强（全部完成）
+- `AgentStreamingBar`、`DagTree`、`ContextUsage`（Overview tab）
+- `SlideshowPreview`（PPT/PPTX）、`TablePreview`（Excel/CSV）、`DocxPreview`（DOCX）、`FilePreviewRouter`（Files tab）
+- Deploy preview 自动切换（Browser tab）
+- IM 消息回复/引用/重新生成、图片附件、消息搜索高亮、WS 连接状态指示器、StepCard、Per-hunk Diff accept/reject、消息重新生成 API
+
+### Skill Market + MCP Market UI
+- Skill Market 8 项 seed + MCP Market 6 项 seed
+- Market 数据在 WorkbenchRoutes 中可用
+
+### E2E 测试与验证
+- `verify-real-api-smoke.ps1`：ALL 13 PHASES PASSED (95+/96 断言)
+- OIDC Full PKCE Flow 验证通过
+- CI Gates / Tauri package readiness / Tauri installer smoke 全部 PASS
+- Mobile RN：20 files, 91 tests PASS
+
+### 已知阻塞
+- 签名证书（生产发布阻断项）
+- Codex `OPENAI_API_KEY` 缺失
+- WS library compatibility with Hub upgrade response
+
 ## [0.3.0-rc.7] — 2026-06-09
 
 ### 发布定位
@@ -55,7 +113,7 @@
 - Team run events, conflict resolution, artifact indexing
 - Approval controls queue with team decision recording
 - Runtime event history, stream validation, offline task queue
-- 78 database migrations (PostgreSQL + Redis)
+- 50 database migrations (PostgreSQL + Redis)
 
 ### Edge Server
 - Local execution node with Agent Runtime adapters (Claude Code, Codex, OpenCode)

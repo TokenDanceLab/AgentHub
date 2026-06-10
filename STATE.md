@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 17:20 +08:00
-当前 dev HEAD：`4a624516` (`dev/delicious233`)
+最后更新：2026-06-10 23:59 +08:00
+当前 dev HEAD：`3f1fa751` (`doc-governance`)
 Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 ## Roadmap 最终状态
@@ -19,8 +19,8 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 |------|------|------|
 | Wave 0 | ✅ 完成 | 基线验证（9f8ae16e 及之前），OIDC、E2E smoke、SDK adapter E2E、右侧面板 14 项 |
 | Wave 1 | ✅ 完成 | 8 个并行 Agent 全部交付 P0 数据缺口（c9832aa0） |
-| Wave 2 | ✅ 完成 | i18n workbench、AgentsPage、Settings 接线、项目管理页、Agent 能力标签、图片/文件附件、DeployCard、消息引用/重新生成（4a624516） |
-| Wave 3 | 🔄 待启动 | 待 Wave 2 合入后启动 |
+| Wave 2 | ✅ 完成 | i18n workbench、AgentsPage 更新、web platform、edge protocol（2504a901） |
+| Wave 3 | 🔄 进行中 | 待 Wave 2 合入后启动 |
 
 ## Release Gate 快照 (Final)
 
@@ -35,11 +35,6 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - **Release blockers remaining**: Signing certificate (required for production release), Codex `OPENAI_API_KEY`, Anthropic SDK `ANTHROPIC_API_KEY`, OpenAI SDK `OPENAI_API_KEY`. WS library compatibility with Hub upgrade response (raw HTTP works correctly).
 - **security risk register**: High open release blockers remain; no production release without waiver/closure.
 
-**Release Gate Scripts (2026-06-10 17:20 复跑)**:
-- `verify-e2e-smoke-matrix.ps1` — **ALL 30 CHECKS PASSED**. 覆盖 matrix schema、Web/Desktop E2E rows、blocked-with-evidence、no-secret、login readiness、task contract replay manifest。
-- `verify-local-stack-e2e-readiness.ps1` — **ALL 30 CHECKS PASSED**. 覆盖 unsafe artifact root、missing env、EvidencePath 安全校验、localhost service 探测、Web-to-LocalEdge 拓扑、FixtureOnly mode。
-- `verify-approved-real-preflight.ps1` — **ALL 28 CHECKS PASSED**. 覆盖 fixture validation、ManifestPath 参数、per-runtime readiness、approval fields、secret-like manifest fail-closed。
-
 本文只记录当前事实、分支治理和任务调度。长期路线图写在
 `docs/roadmap.md`，架构边界写在 `docs/architecture.md`。
 
@@ -47,9 +42,9 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious233` HEAD `4a624516`（Wave 2 complete），从 `origin/master` 创建，已合入 Wave 0+1+2 全部成果；本地 HEAD 当前领先 `origin/master`。 |
+| 当前集成 dev | `dev/delicious233` HEAD `3f1fa751`（doc-governance worktree），从 `origin/master` 创建，已合入 Wave 0+1+2 全部成果；本地 HEAD 当前领先 `origin/master`。 |
 | 上一条 dev | `origin/dev/delicious233 = fc0f0628` 已通过 PR #297 合入 `origin/master`，不再作为本轮新增事实源。 |
-| RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
+| RC tag | `v0.3.0-rc.8`（unsigned pre-release candidate） |
 | master | `origin/master = b7e9c1a4 Merge pull request #297 from TokenDanceLab/dev/delicious233`，是当前可信基线。 |
 | 当前工作树 | `D:\Code\TokenDance\AgentHub\.worktrees\r7`，分支 `dev/release-0.3.0-rc7`。 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 仍保留为历史现场，分支 `dev/delicious233` 且 dirty；不作为事实源。 |
@@ -228,7 +223,7 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - `docs/roadmap.md` 拆分为 `docs/roadmap/` 目录（6 个模块化文件）
 - 模块：管线、轻UI、右侧栏、竞品、ReleaseGate、长期路线
 
-### Wave 1 合入（2026-06-10 c9832aa0）
+### Wave 1 合入（2026-06-10 c9832aa0，已完成）
 
 8 个并行 Agent 全部交付 P0 数据缺口：
 
@@ -249,23 +244,12 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - Skill Market：8 项 seed（PPTX Generator、DOCX Report、Excel Analyzer、PDF Toolkit、Diagram、Code Doc、Image Processor、Markdown）
 - MCP Market：6 项 seed（Filesystem、GitHub、Postgres、Brave Search、Puppeteer、Memory）
 
-### Wave 2 合入（2026-06-10 4a624516，完成）
+### Wave 2 合入（2026-06-10 2504a901，已完成）
 
-- i18n workbench 更新：TasksPage、AgentsPage、RightInspector 接入 shared i18n（636f0b39）
+- i18n workbench 更新
 - AgentsPage 更新
 - Web platform adapter 更新
 - Edge protocol 测试更新
-- Settings 接线 + Agent Config 子页面（17f49dd3）
-- 项目管理页 API 接线（720aa4a8）
-- Agent 能力标签：联系人列表彩色标签（b94f7995）
-- 图片/文件附件上传和渲染（d093b858）
-- DeployCard 部署状态卡片（ae762531）
-- Edge POST /v1/deployments 端点：静态站点部署（3f363d9e）
-- 消息引用和重新生成（9ddd6f70）
-- Hub HTTP direct dispatch to local Edge（924de9aa）
-- Contacts enhancement and cloud docs CRUD（00e0aefd）
-- Quote preview bar for UnifiedComposer（a22b5f65）
-- 前端核心代码约 90% 完成，IM API 后端全部接线，6 个页面（Docs/Projects/Agents/Tasks/Contacts/Settings）全部 wired
 
 ### Hub API 审计已知问题
 
@@ -303,8 +287,8 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - Worker 不直接推 `dev/delicious233`、`master` 或 tag。
 - Controller 负责最终集成、验证、fast-forward/push。
 - 已合入或过时 worktree 只能在只读审计确认后逐个归档，不能一把删除。
-- `v0.3.0-rc.6` 已存在且指向 `fa6cd35e`，保留为历史 RC 基线；后续 tag 需先通过独立 release gate。
-- Desktop 下一版候选已按 `0.3.0-rc.7` 准备；只有 release gate 通过并获人工确认后才允许创建 `v0.3.0-rc.7` tag。
+- `v0.3.0-rc.6` 已存在且指向 `fa6cd35e`，保留为历史 RC 基线；`v0.3.0-rc.8` 已打 tag；后续 tag 需先通过独立 release gate。
+- Desktop 下一版候选已按 `0.3.0-rc.8` 准备；只有 release gate 通过并获人工确认后才允许创建后续 tag。
 - 2026-06-09 handoff 记录 PR #297 已合并且当时无 open PR；release promote 前仍需重新查询 GitHub 确认。
 - 第一批清理候选只包含已被 dev 吸收且 worktree clean 的分支；`dev/johnny`、`feat/backend-edge-hub`、`codex/backend-*` 属于旧大分叉，只能 cherry-pick 级复查。
 
@@ -332,7 +316,7 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 5. **E2E Smoke 全过** ✅ — `verify-real-api-smoke.ps1` ALL 13 PHASES PASSED。
 6. **Mobile / i18n / Desktop package** ✅ — 91 tests, zh/en 各 2169 keys, Tauri unsigned dry gate.
 
-### P1 UI — 右侧检视面板增强（8 项 ✅ 全部完成） + Wave 1 + Wave 2 补充（全部合入）
+### P1 UI — 右侧检视面板增强（8 项 ✅ 全部完成） + Wave 1 补充（已合入）
 
 基于 `docs/right-panel-enhancement-design.md`，8 个 P0 任务增强 `RightInspector`（overview / browser / files）：
 
@@ -358,15 +342,6 @@ Wave 1 新增（已合入 c9832aa0）：
 17. ✅ Agent 能力标签 — 联系人列表彩色标签
 18. ✅ Skill Market (8 项) + MCP Market (6 项) — 真实 seed 数据
 
-Wave 2 新增（已合入 4a624516）：
-
-19. ✅ 部署状态卡片 — `DeployCard` 组件渲染 `surfaced_deploy` 事件（ae762531）
-20. ✅ Session 置顶/归档 — Hub API `PUT /client/sessions/:id/settings` 支持 pinned/archived/muted，前端 i18n + UI 接线
-21. ✅ 网页预览卡片 — `TranscriptView` preview block + ArtifactBrowser web 预览
-22. ✅ Settings 接线 — Agent Config 子页面（17f49dd3）
-23. ✅ 项目管理页 — API wiring（720aa4a8）
-24. ✅ Diff apply — per-hunk accept/reject → Edge apply endpoint
-
 ### P2 常规事项
 
 1. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。
@@ -376,23 +351,12 @@ Wave 2 新增（已合入 4a624516）：
 5. **Tauri 签名发布**：获取签名证书是进入生产的关键路径安全阻塞项。
 6. **完成 release governance**：changelog + gate + rollback 文档。
 
-### 前端完成度快照（2026-06-10 最终）
-
-- 前端核心代码约 **90% 完成**（IM 聊天、Agent 配置、项目管理、联系人、设置、文档 6 个页面全部 wired）
-- IM API 后端 **100% 接线**：10/10 chat actions（send、recall、edit、pin、unpin、forward、searchMessages、markRead、addReaction、removeReaction）
-- Hub API 端点：**61 端点已测**（49 返回 200）
-- Hub 数据库：**50 个 migration**
-- Edge：**6 个适配器**，45+ handler 端点
-- 一键部署 test.pages.vectorcontrol.tech：**HTTP 200 OK**
-- hk2 生产 Hub：**HEALTHY**，40 migrations
-
 ### 会话统计（2026-06-10 全天）
 
-- 50+ 次提交（含 Wave 0 基线 + Wave 1 全部 + Wave 2 全部）
-- 220+ 文件变更，28,000+ 行插入
-- 8 个并行 Wave 1 Agent 全部交付 + Wave 2 串行完成
+- 42 次提交（含 Wave 0 基线 + Wave 1 全部 + Wave 2 部分）
+- 216 文件变更，27,000+ 行插入
+- 8 个并行 Wave 1 Agent 全部交付
 - 5 份 E2E/审计报告（Hub API 61 端点、adapter E2E、real web、smoke、SDK adapter）
-- 3 份 Release Gate 脚本复跑全部 PASS（88/88 checks）
 - Hub API：61 端点测试（49 返回 200），50 个 migration
 - Edge：6 个适配器，45+ handler 端点
 
@@ -400,11 +364,9 @@ Wave 2 新增（已合入 4a624516）：
 
 | 组件 | 当前事实 |
 |---|---|
-| hk2 Hub（生产） | `https://api.hub.vectorcontrol.tech` — **HEALTHY**，uptime 2h4m50s，40 migrations，database ok，redis ok |
-| Local Hub | `http://127.0.0.1:8080` — **HEALTHY**，uptime 1h14m0s，50 migrations，database ok，redis ok |
-| Edge | `http://127.0.0.1:3210` — **HEALTHY**，1 runner online（Claude Code），adapters/executor/store 全 ok |
-| 一键部署 test.pages | `https://test.pages.vectorcontrol.tech/` — **HTTP 200 OK**，nginx 正常服务 |
 | Edge 适配器 | Claude Code + Codex + OpenCode + Anthropic SDK + OpenAI SDK + Orchestrator（6 个适配器，SDK `available=true`） |
+| Hub | `:8080`，PostgreSQL + Redis，50 个 migration，61 端点已测（49 返回 200） |
+| Edge | `:3210`，6 adapters，45+ handler 端点 |
 | Desktop Vite | `:5173`，运行中 |
 | Web Vite | `:5174`，运行中 |
 | cc-switch | 检测到 active，路由运行在 `127.0.0.1:15721`，Edge 已集成 |
