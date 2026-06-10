@@ -1283,6 +1283,9 @@ export function createHubClient(opts: HubClientOptions = {}) {
     cancelAgentTask: (taskId: string) =>
       request<EmptyHubResponse>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
 
+    regenerateAgentTask: (taskId: string) =>
+      request<PendingAgentTask>(`/web/agent-tasks/${encodeURIComponent(taskId)}/regenerate`, { method: 'POST' }),
+
     // ── Agent run event summary ────────────────────
 
     getTaskRunEventSummary: (taskId: string) =>

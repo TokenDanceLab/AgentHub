@@ -94,6 +94,7 @@ export async function browserFilesToComposerAttachments(files: File[]): Promise<
       size: file.size,
       ...(file.type ? { mime: file.type } : {}),
       ...(contentPreview ? { contentPreview, truncated } : {}),
+      file,
     };
   }));
 }

@@ -19,9 +19,10 @@ import {
   PinnedAnnouncement,
   AgentTimeline,
   RunSessionCard,
-  RunStepGroup,
   ApprovalCardBlock,
 } from './blocks';
+import { StepCard } from '../ui/StepCard';
+import type { StepCardSubStep } from '../ui/StepCard';
 import styles from './AgentHubWorkbench.module.css';
 
 const USER_AVATAR_GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -666,6 +667,7 @@ function renderRunStepGroupBlock(
   diffControls?: InlineDiffControls | undefined,
   onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
 ): React.ReactElement {
+  const subSteps = buildStepCardSubSteps(block.children);
   const renderedChildren: React.ReactNode[] = [];
   const consumedDiffIds = new Set<string>();
   for (let index = 0; index < block.children.length; index += 1) {
@@ -688,17 +690,122 @@ function renderRunStepGroupBlock(
 
   return (
     <div className={styles.agentBlockRow}>
-      <RunStepGroup
+      <StepCard
         defaultOpen={block.open}
         icon={block.icon}
-        {...(block.meta ? { meta: block.meta } : {})}
         status={block.status}
+        subSteps={subSteps}
         title={block.title}
+        {...(block.meta ? { meta: block.meta } : {})}
       >
         {renderedChildren}
-      </RunStepGroup>
+      </StepCard>
     </div>
   );
+}
+
+function buildStepCardSubSteps(children: TranscriptBlock[]): StepCardSubStep[] {
+  return children.map((child): StepCardSubStep => {
+    switch (child.kind) {
+      case 'text':
+        return {
+          key: child.id,
+          kind: 'text',
+          label: child.displayTitle ?? child.text.split('\n')[0] ?? '消息',
+          status: child.evidenceRefs?.some((r) => r.status === 'running') ? 'running'
+            : child.evidenceRefs?.some((r) => r.status === 'failed') ? 'failed'
+            : child.evidenceRefs?.every((r) => r.status === 'completed') ? 'completed'
+            : undefined,
+        };
+      case 'tool_call':
+        return {
+          key: child.id,
+          kind: 'tool_call',
+          label: child.toolName,
+          detail: child.summary ?? child.target,
+          status: child.status,
+        };
+      case 'tool_result':
+        return {
+          key: child.id,
+          kind: 'tool_call',
+          label: `${child.toolName} result`,
+          detail: child.summary,
+          status: child.status,
+        };
+      case 'artifact': {
+        const fileRef = child.evidenceRefs?.find((ref) => ref.kind === 'file');
+        const path = child.path ?? fileRef?.path ?? fileRef?.label;
+        return {
+          key: child.id,
+          kind: 'artifact',
+          label: path ?? child.title,
+          detail: child.action ? `${child.action}` : undefined,
+          status: 'completed',
+        };
+      }
+      case 'file_change':
+        return {
+          key: child.id,
+          kind: 'artifact',
+          label: child.path,
+          detail: child.action,
+          status: 'completed',
+        };
+      case 'diff':
+        return {
+          key: child.id,
+          kind: 'artifact',
+          label: child.files[0] ?? child.title,
+          detail: child.additions != null || child.deletions != null
+            ? `+${child.additions ?? 0} -${child.deletions ?? 0}`
+            : undefined,
+          status: 'completed',
+        };
+      case 'thinking':
+        return {
+          key: child.id,
+          kind: 'plan',
+          label: child.isThinking ? '推理中...' : '推理摘要',
+          detail: child.content?.slice(0, 80),
+          status: child.isThinking ? 'running' : 'completed',
+        };
+      case 'approval':
+      case 'permission_request':
+      case 'permission_result':
+        return {
+          key: child.id,
+          kind: 'skill',
+          label: child.title,
+          status: child.status,
+        };
+      case 'subagent':
+      case 'subtask':
+      case 'child_agent':
+        return {
+          key: child.id,
+          kind: 'plan',
+          label: child.title,
+          detail: child.summary,
+          status: child.status,
+        };
+      case 'run_session':
+        return {
+          key: child.id,
+          kind: 'plan' as const,
+          label: child.title,
+          status: child.status as 'pending' | 'running' | 'completed' | 'failed' | undefined,
+        };
+      default: {
+        const block = child as TranscriptBlock & { title?: string };
+        return {
+          key: block.id,
+          kind: 'text' as const,
+          label: block.title ?? block.id,
+        };
+      }
+    }
+  });
 }
 
 function findPairedDiffBlock(

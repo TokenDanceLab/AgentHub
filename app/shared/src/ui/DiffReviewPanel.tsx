@@ -148,12 +148,26 @@ export interface DiffReviewLabels {
   rejectAll?: string;
   acceptLine?: string;
   rejectLine?: string;
+  applied?: string;
+  rejected?: string;
+}
+
+export interface DiffHunkDecision {
+  filePath: string;
+  hunkIndex: number;
+  accepted: boolean;
 }
 
 export interface DiffReviewPanelProps {
   files: DiffReviewFile[];
+  /** Edge run ID — required for applying hunks via Edge API. */
+  runId?: string;
   onAcceptAll?: () => void;
   onRejectAll?: () => void;
+  /** Called when a single hunk is accepted or rejected. Implementor calls Edge POST /v1/runs/:id/apply. */
+  onApplyHunk?: (decision: DiffHunkDecision) => void | Promise<void>;
+  /** Called when all hunks are accepted or rejected in batch. */
+  onApplyAllHunks?: (decisions: DiffHunkDecision[]) => void | Promise<void>;
   labels?: DiffReviewLabels;
   /** When set, the panel will switch to the tab matching this file path. */
   focusedFilePath?: string;
@@ -175,6 +189,8 @@ const DEFAULT_LABELS: Required<DiffReviewLabels> = {
   rejectAll: 'Reject All',
   acceptLine: 'Accept line',
   rejectLine: 'Reject line',
+  applied: 'Applied',
+  rejected: 'Rejected',
 };
 
 function cx(...classes: Array<string | false | null | undefined>): string {
@@ -185,8 +201,11 @@ function cx(...classes: Array<string | false | null | undefined>): string {
 
 export function DiffReviewPanel({
   files,
+  runId,
   onAcceptAll,
   onRejectAll,
+  onApplyHunk,
+  onApplyAllHunks,
   labels: customLabels,
   focusedFilePath,
   className,
@@ -203,6 +222,8 @@ export function DiffReviewPanel({
   const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [acceptedLines, setAcceptedLines] = useState<Set<string>>(new Set());
   const [rejectedLines, setRejectedLines] = useState<Set<string>>(new Set());
+  // Hunk-level committed state: tracks hunks that have been applied/rejected via Edge API
+  const [hunkStates, setHunkStates] = useState<Record<string, 'applied' | 'rejected'>>({});
 
   // When focusedFilePath changes from outside, switch to matching tab
   useEffect(() => {
@@ -241,7 +262,25 @@ export function DiffReviewPanel({
   const leftKey = useCallback((rowIndex: number) => `L-${safeIndex}-${rowIndex}`, [safeIndex]);
   const rightKey = useCallback((rowIndex: number) => `R-${safeIndex}-${rowIndex}`, [safeIndex]);
 
-  // Toggle accept for a line pair
+  // Hunk state key helper: "filePath:hunkIndex"
+  const hunkKey = useCallback((filePath: string, hunkIndex: number) => `${filePath}:${hunkIndex}`, []);
+
+  // Build hunk index mapping: maps row index to hunk index for the active file
+  const rowToHunkIndex = useMemo(() => {
+    if (!activeFile) return new Map<number, number>();
+    const map = new Map<number, number>();
+    let rowIndex = 0;
+    activeFile.hunks.forEach((hunk, hunkIdx) => {
+      const rows = buildSideBySideRows(hunk);
+      for (let i = 0; i < rows.length; i++) {
+        map.set(rowIndex + i, hunkIdx);
+      }
+      rowIndex += rows.length;
+    });
+    return map;
+  }, [activeFile]);
+
+  // Toggle accept for a line pair and commit hunk decision
   const toggleAccept = useCallback(
     (rowIndex: number) => {
       const lKey = leftKey(rowIndex);
@@ -266,6 +305,18 @@ export function DiffReviewPanel({
       });
     },
     [leftKey, rightKey],
+  );
+
+  // Commit hunk decision to Edge API
+  const commitHunkDecision = useCallback(
+    (filePath: string, hunkIndex: number, accepted: boolean) => {
+      const key = hunkKey(filePath, hunkIndex);
+      setHunkStates((prev) => ({ ...prev, [key]: accepted ? 'applied' : 'rejected' }));
+      if (onApplyHunk && runId) {
+        onApplyHunk({ filePath, hunkIndex, accepted });
+      }
+    },
+    [onApplyHunk, runId, hunkKey],
   );
 
   // Toggle reject for a line pair
@@ -295,7 +346,7 @@ export function DiffReviewPanel({
     [leftKey, rightKey],
   );
 
-  // Accept all / reject all
+  // Accept all / reject all — also commits hunk decisions
   const handleAcceptAll = useCallback(() => {
     const allKeys = new Set<string>();
     sideBySideRows.forEach((_row, rowIndex) => {
@@ -304,8 +355,24 @@ export function DiffReviewPanel({
     });
     setAcceptedLines(allKeys);
     setRejectedLines(new Set());
+
+    // Commit hunk-level decisions
+    if (activeFile) {
+      const decisions: DiffHunkDecision[] = [];
+      const newStates: Record<string, 'applied' | 'rejected'> = {};
+      activeFile.hunks.forEach((_hunk, hunkIdx) => {
+        const key = hunkKey(activeFile.filePath, hunkIdx);
+        newStates[key] = 'applied';
+        decisions.push({ filePath: activeFile.filePath, hunkIndex: hunkIdx, accepted: true });
+      });
+      setHunkStates((prev) => ({ ...prev, ...newStates }));
+      if (onApplyAllHunks && decisions.length > 0) {
+        onApplyAllHunks(decisions);
+      }
+    }
+
     onAcceptAll?.();
-  }, [sideBySideRows, leftKey, rightKey, onAcceptAll]);
+  }, [sideBySideRows, leftKey, rightKey, onAcceptAll, activeFile, onApplyAllHunks, hunkKey]);
 
   const handleRejectAll = useCallback(() => {
     const allKeys = new Set<string>();
@@ -315,8 +382,54 @@ export function DiffReviewPanel({
     });
     setRejectedLines(allKeys);
     setAcceptedLines(new Set());
+
+    // Commit hunk-level decisions
+    if (activeFile) {
+      const decisions: DiffHunkDecision[] = [];
+      const newStates: Record<string, 'applied' | 'rejected'> = {};
+      activeFile.hunks.forEach((_hunk, hunkIdx) => {
+        const key = hunkKey(activeFile.filePath, hunkIdx);
+        newStates[key] = 'rejected';
+        decisions.push({ filePath: activeFile.filePath, hunkIndex: hunkIdx, accepted: false });
+      });
+      setHunkStates((prev) => ({ ...prev, ...newStates }));
+      if (onApplyAllHunks && decisions.length > 0) {
+        onApplyAllHunks(decisions);
+      }
+    }
+
     onRejectAll?.();
-  }, [sideBySideRows, leftKey, rightKey, onRejectAll]);
+  }, [sideBySideRows, leftKey, rightKey, onRejectAll, activeFile, onApplyAllHunks, hunkKey]);
+
+  // Handle accept line click — toggle local state and commit hunk decision
+  const handleAcceptClick = useCallback(
+    (rowIndex: number) => {
+      toggleAccept(rowIndex);
+      // Commit hunk decision for the row's hunk
+      if (activeFile) {
+        const hunkIdx = rowToHunkIndex.get(rowIndex);
+        if (hunkIdx != null) {
+          commitHunkDecision(activeFile.filePath, hunkIdx, true);
+        }
+      }
+    },
+    [toggleAccept, activeFile, rowToHunkIndex, commitHunkDecision],
+  );
+
+  // Handle reject line click — toggle local state and commit hunk decision
+  const handleRejectClick = useCallback(
+    (rowIndex: number) => {
+      toggleReject(rowIndex);
+      // Commit hunk decision for the row's hunk
+      if (activeFile) {
+        const hunkIdx = rowToHunkIndex.get(rowIndex);
+        if (hunkIdx != null) {
+          commitHunkDecision(activeFile.filePath, hunkIdx, false);
+        }
+      }
+    },
+    [toggleReject, activeFile, rowToHunkIndex, commitHunkDecision],
+  );
 
   // ── Empty state ──────────────────────────────────────────────────────
 
@@ -411,8 +524,21 @@ export function DiffReviewPanel({
                 rowState === 'rejected' && styles.diffRowRejected,
               );
 
+              // Check if this is the first row of a new hunk with a committed state
+              const hunkIdx = rowToHunkIndex.get(rowIndex);
+              const hunkState = activeFile && hunkIdx != null
+                ? hunkStates[hunkKey(activeFile.filePath, hunkIdx)]
+                : undefined;
+              const prevHunkIdx = rowIndex > 0 ? rowToHunkIndex.get(rowIndex - 1) : undefined;
+              const isFirstRowOfHunk = hunkIdx != null && hunkIdx !== prevHunkIdx;
+
               return (
                 <div key={rowIndex} className={rowClass}>
+                  {isFirstRowOfHunk && hunkState && (
+                    <span className={cx(styles.hunkBadge, hunkState === 'applied' ? styles.hunkBadgeApplied : styles.hunkBadgeRejected)}>
+                      {hunkState === 'applied' ? labels.applied : labels.rejected}
+                    </span>
+                  )}
                   <span className={styles.lineNum}>
                     {row.left?.lineNumber != null ? row.left.lineNumber : ''}
                   </span>
@@ -431,7 +557,7 @@ export function DiffReviewPanel({
                           lineActionBtnClassName,
                           rowState === 'accepted' && styles.lineAcceptBtnActive,
                         )}
-                        onClick={() => toggleAccept(rowIndex)}
+                        onClick={() => handleAcceptClick(rowIndex)}
                         aria-label={labels.acceptLine}
                         title={labels.acceptLine}
                       >
@@ -444,7 +570,7 @@ export function DiffReviewPanel({
                           lineActionBtnClassName,
                           rowState === 'rejected' && styles.lineRejectBtnActive,
                         )}
-                        onClick={() => toggleReject(rowIndex)}
+                        onClick={() => handleRejectClick(rowIndex)}
                         aria-label={labels.rejectLine}
                         title={labels.rejectLine}
                       >
@@ -478,8 +604,21 @@ export function DiffReviewPanel({
                 rowState === 'rejected' && styles.diffRowRejected,
               );
 
+              // Check if this is the first row of a new hunk with a committed state
+              const hunkIdx = rowToHunkIndex.get(rowIndex);
+              const hunkState = activeFile && hunkIdx != null
+                ? hunkStates[hunkKey(activeFile.filePath, hunkIdx)]
+                : undefined;
+              const prevHunkIdx = rowIndex > 0 ? rowToHunkIndex.get(rowIndex - 1) : undefined;
+              const isFirstRowOfHunk = hunkIdx != null && hunkIdx !== prevHunkIdx;
+
               return (
                 <div key={rowIndex} className={rowClass}>
+                  {isFirstRowOfHunk && hunkState && (
+                    <span className={cx(styles.hunkBadge, hunkState === 'applied' ? styles.hunkBadgeApplied : styles.hunkBadgeRejected)}>
+                      {hunkState === 'applied' ? labels.applied : labels.rejected}
+                    </span>
+                  )}
                   <span className={styles.lineNum}>
                     {row.right?.lineNumber != null ? row.right.lineNumber : ''}
                   </span>
@@ -498,7 +637,7 @@ export function DiffReviewPanel({
                           lineActionBtnClassName,
                           rowState === 'accepted' && styles.lineAcceptBtnActive,
                         )}
-                        onClick={() => toggleAccept(rowIndex)}
+                        onClick={() => handleAcceptClick(rowIndex)}
                         aria-label={labels.acceptLine}
                         title={labels.acceptLine}
                       >
@@ -511,7 +650,7 @@ export function DiffReviewPanel({
                           lineActionBtnClassName,
                           rowState === 'rejected' && styles.lineRejectBtnActive,
                         )}
-                        onClick={() => toggleReject(rowIndex)}
+                        onClick={() => handleRejectClick(rowIndex)}
                         aria-label={labels.rejectLine}
                         title={labels.rejectLine}
                       >

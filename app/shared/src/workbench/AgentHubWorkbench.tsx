@@ -164,6 +164,10 @@ export interface AgentHubWorkbenchProps {
     default?: boolean;
     tags?: string[];
   }> | undefined;
+  /** cc-switch transparent proxy status from Edge API. */
+  ccSwitchStatus?: import('./pages/AgentsPage').CCSwitchStatusInfo | undefined;
+  /** cc-switch provider model alias mappings. */
+  ccSwitchProviders?: import('./pages/AgentsPage').CCSwitchProviderInfo[] | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   showComposerAgentPicker?: boolean | undefined;
   showComposerStatus?: boolean | undefined;
@@ -1324,6 +1328,8 @@ export function AgentHubWorkbench({
               documentsActions={documentsActions}
               localCliDiscovery={localCliDiscovery}
               modelCatalog={modelCatalog}
+              ccSwitchStatus={ccSwitchStatus}
+              ccSwitchProviders={ccSwitchProviders}
               settingsService={settingsService}
               skillMarketItems={skillMarketItems}
               skillMarketLoading={skillMarketLoading}
