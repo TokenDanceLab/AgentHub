@@ -1,4 +1,5 @@
 import { createHubWsUrl, type HubWsEvent, type HubWsEventType } from './hubClient';
+import { HUB_EVENTS } from '@agenthub/shared/hubEvents';
 
 export type HubEventStreamStatus = 'connecting' | 'open' | 'error' | 'closed';
 
@@ -34,30 +35,39 @@ export interface HubEventStream {
   close: () => void;
 }
 
-// Event types matching hub-server/internal/ws/frame.go and hubEvents.ts
+// Event types matching hub-server/internal/ws/frame.go and shared/src/hubEvents.ts.
+// Derived from HUB_EVENTS constants to guarantee alignment with the 27 server events.
 // Plus legacy mobile-only types for backward compatibility.
 const knownEventTypes = new Set<HubWsEventType>([
-  // Real Hub server events
-  'auth',
-  'auth.ok',
-  'auth.fail',
-  'message.new',
-  'message.recall',
-  'message.read',
-  'session.created',
-  'session.dissolved',
-  'session.info_updated',
-  'device.online',
-  'device.offline',
-  'device.kicked',
-  'agent.dispatch',
-  'agent.stream',
-  'agent.done',
-  'agent.failed',
-  'agent.cancel',
-  'notification.new',
-  'friend.request',
-  'friend.accepted',
+  // Real Hub server events (from HUB_EVENTS)
+  HUB_EVENTS.AUTH,
+  HUB_EVENTS.AUTH_OK,
+  HUB_EVENTS.AUTH_FAIL,
+  HUB_EVENTS.MESSAGE_NEW,
+  HUB_EVENTS.MESSAGE_RECALL,
+  HUB_EVENTS.MESSAGE_PIN,
+  HUB_EVENTS.MESSAGE_UNPIN,
+  HUB_EVENTS.MESSAGE_READ,
+  HUB_EVENTS.SESSION_CREATED,
+  HUB_EVENTS.SESSION_DISSOLVED,
+  HUB_EVENTS.SESSION_MEMBER_JOINED,
+  HUB_EVENTS.SESSION_MEMBER_LEFT,
+  HUB_EVENTS.SESSION_INFO_UPDATED,
+  HUB_EVENTS.DEVICE_ONLINE,
+  HUB_EVENTS.DEVICE_OFFLINE,
+  HUB_EVENTS.DEVICE_KICKED,
+  HUB_EVENTS.AGENT_DISPATCH,
+  HUB_EVENTS.AGENT_STREAM,
+  HUB_EVENTS.AGENT_DONE,
+  HUB_EVENTS.AGENT_FAILED,
+  HUB_EVENTS.AGENT_CANCEL,
+  HUB_EVENTS.AGENT_CONTROL,
+  HUB_EVENTS.NOTIFICATION_NEW,
+  HUB_EVENTS.FRIEND_REQUEST,
+  HUB_EVENTS.FRIEND_ACCEPTED,
+  HUB_EVENTS.SYNC_REQUEST,
+  HUB_EVENTS.SYNC_EVENTS,
+  // Server error frame
   'error',
   // Legacy mobile-only event types
   'snapshot.updated',
