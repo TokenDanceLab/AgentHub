@@ -14,7 +14,7 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationSidebar } from './ConversationSidebar';
 import {
@@ -300,6 +300,26 @@ export function AgentHubWorkbench({
     transcript,
     workbenchStatus,
   });
+
+  // ── Inspector data: route decisions, context usage, deploy preview ──
+  const inspectorRouteBlocks = useMemo(
+    () => transcript.filter((block): block is RouteDecisionTranscriptBlock | SubagentTranscriptBlock | ChildAgentTranscriptBlock =>
+      block.kind === 'route_decision' || block.kind === 'subagent' || block.kind === 'child_agent',
+    ),
+    [transcript],
+  );
+  const inspectorContextBlocks = useMemo(
+    () => transcript.filter((block): block is ContextUsageTranscriptBlock => block.kind === 'context_usage'),
+    [transcript],
+  );
+  const inspectorDeployPreviewUrl = useMemo(() => {
+    // Look for the latest preview block with a URL (deploy preview)
+    for (let i = transcript.length - 1; i >= 0; i--) {
+      const block = transcript[i];
+      if (block.kind === 'preview' && block.url) return block.url;
+    }
+    return undefined;
+  }, [transcript]);
 
   useEffect(() => {
     selectionModeRef.current = selectionMode;
@@ -1280,12 +1300,15 @@ export function AgentHubWorkbench({
           browserPreviewEnabled={platform.capabilities.browserPreview}
           canOpenPreview={platform.preview?.canOpenEvidence}
           collapsed={inspectorCollapsed}
+          contextBlocks={inspectorContextBlocks}
           defaultBrowserUrl={DEFAULT_BROWSER_PREVIEW_URL}
+          deployPreviewUrl={inspectorDeployPreviewUrl}
           evidence={evidence}
           maxWidth={INSPECTOR_MAX_WIDTH}
           minWidth={INSPECTOR_MIN_WIDTH}
           onOpenPreview={platform.preview?.openEvidence}
           reviewFileRequest={reviewFileRequest}
+          routeBlocks={inspectorRouteBlocks}
           runtimeEvidence={runtimeEvidence}
           onResizeBy={resizeInspectorBy}
           onResizeStart={beginInspectorResize}
