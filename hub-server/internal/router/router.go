@@ -207,7 +207,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	web := r.Group("/web")
 	web.Use(middleware.AuthMiddleware(cfg))
 	web.Use(middleware.RequireHubSession())
-	web.Use(middleware.DeviceTypeCheck("web"))
+	web.Use(middleware.DeviceTypeCheck("web", "mobile"))
 	{
 		web.POST("/agent-tasks", agentHandler.TriggerTask)
 		web.POST("/agent-tasks/:id/cancel", agentHandler.CancelTask)
