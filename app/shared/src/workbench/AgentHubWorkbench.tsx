@@ -134,6 +134,10 @@ export interface AgentHubWorkbenchProps {
   } | undefined;
   activeConversationId?: string;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
+  /** Called when the user toggles pin on a session. Parent should call Hub API and refresh. */
+  onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
+  /** Called when the user toggles archive on a session. Parent should call Hub API and refresh. */
+  onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
   onActiveProjectChange?: ((projectId: string) => void) | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
@@ -212,6 +216,8 @@ export function AgentHubWorkbench({
   projectsStatus,
   activeConversationId,
   onActiveConversationChange,
+  onConversationPin,
+  onConversationArchive,
   onActiveProjectChange,
   onAgentCreate,
   onAgentUpdate,
@@ -1296,6 +1302,8 @@ export function AgentHubWorkbench({
             conversations={conversations}
             onAvatarClick={openConversationAvatar}
             onSelectConversation={selectConversation}
+            onPinConversation={onConversationPin}
+            onArchiveConversation={onConversationArchive}
           />
           <div
             aria-label="调整最近频道宽度"
