@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { MoreHorizontal } from 'lucide-react-native';
 
 import { createHubClient } from '@/api/hubClient';
 import { createHubEventStream, type HubEventStream, type HubWebSocketLike } from '@/api/hubEvents';
@@ -195,27 +194,8 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
           showBack={false}
           onBack={() => setActiveTab('chat')}
           onOpenRuns={() => setActiveTab('tasks')}
+          onToggleInspector={useInspectorPane ? () => setInspectorCollapsed((c) => !c) : undefined}
         />
-        {useInspectorPane ? (
-          <Pressable
-            onPress={() => setInspectorCollapsed((c) => !c)}
-            style={{
-              position: 'absolute',
-              top: tokens.space.sm,
-              right: tokens.space.xs,
-              width: 28,
-              height: 28,
-              borderRadius: 14,
-              backgroundColor: tokens.color.surface,
-              borderWidth: 1,
-              borderColor: tokens.color.line,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <MoreHorizontal size={16} color={tokens.color.inkMuted} />
-          </Pressable>
-        ) : null}
       </View>
       {showInspector ? (
         <View
