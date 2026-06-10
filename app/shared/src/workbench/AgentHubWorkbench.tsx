@@ -33,6 +33,7 @@ import type { FileItem } from './inspector';
 import { UnifiedComposer, type AttachmentUploadState } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
+import type { HubClient } from '../hubClient';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import MessageSearchPanel from '../ui/MessageSearchPanel';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
@@ -144,6 +145,8 @@ export interface AgentHubWorkbenchProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  /** Hub client for direct project API access when onProjectCreate/Update are not provided. */
+  hubClient?: HubClient | undefined;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /** 用户想与某个联系人/Agent 开始私聊，但当前没有已有会话时触发。上层负责创建会话并切换。 */
   onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
@@ -217,6 +220,7 @@ export function AgentHubWorkbench({
   onLogout,
   onProjectCreate,
   onProjectUpdate,
+  hubClient,
   onApprovalDecision,
   onNavigateToConversation,
   contactsActions,
@@ -1413,6 +1417,7 @@ export function AgentHubWorkbench({
               onActiveProjectChange={onActiveProjectChange}
               onProjectCreate={onProjectCreate}
               onProjectUpdate={onProjectUpdate}
+              hubClient={hubClient}
               onAgentCreate={onAgentCreate}
               onAgentUpdate={onAgentUpdate}
               onAgentDelete={onAgentDelete}
@@ -1450,6 +1455,7 @@ export function AgentHubWorkbench({
           reviewFileRequest={reviewFileRequest}
           routeBlocks={inspectorRouteBlocks}
           runtimeEvidence={runtimeEvidence}
+          workDir={composer.workDir?.trim() || undefined}
           onResizeBy={resizeInspectorBy}
           onResizeStart={beginInspectorResize}
           width={inspectorWidth}
