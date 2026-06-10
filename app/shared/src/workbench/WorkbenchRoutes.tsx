@@ -118,6 +118,10 @@ export interface WorkbenchRoutesProps {
     default?: boolean;
     tags?: string[];
   }> | undefined;
+  /** cc-switch transparent proxy status from Edge API. */
+  ccSwitchStatus?: import('./pages/AgentsPage').CCSwitchStatusInfo | undefined;
+  /** cc-switch provider model alias mappings. */
+  ccSwitchProviders?: import('./pages/AgentsPage').CCSwitchProviderInfo[] | undefined;
   /** Settings service for persistent user preferences. When provided,
    *  settings are read from / written to the backend adapter. */
   settingsService?: SettingsService | null | undefined;
