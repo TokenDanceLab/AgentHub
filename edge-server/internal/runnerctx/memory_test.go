@@ -362,3 +362,286 @@ func TestBuildMemoryPromptNoMemory(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && strings.Contains(s, substr)
 }
+
+// ── EnsureMemoryDir Tests ──────────────────────────────────────────────────
+
+func TestEnsureMemoryDir(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := EnsureMemoryDir(dir); err != nil {
+		t.Fatalf("EnsureMemoryDir returned error: %v", err)
+	}
+
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	info, err := os.Stat(memDir)
+	if err != nil {
+		t.Fatalf("memory dir not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("memory path is not a directory")
+	}
+
+	// Check default project.md was created
+	projectPath := filepath.Join(memDir, "project.md")
+	data, err := os.ReadFile(projectPath)
+	if err != nil {
+		t.Fatalf("project.md not created: %v", err)
+	}
+	if !contains(string(data), "project-onboarding") {
+		t.Errorf("project.md missing default entry: %q", string(data))
+	}
+}
+
+func TestEnsureMemoryDirIdempotent(t *testing.T) {
+	dir := t.TempDir()
+
+	// First call creates the directory and default file
+	if err := EnsureMemoryDir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write custom content to project.md
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	customContent := "---\nid: custom\n---\n\nCustom content."
+	if err := os.WriteFile(filepath.Join(memDir, "project.md"), []byte(customContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second call should NOT overwrite the file
+	if err := EnsureMemoryDir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(memDir, "project.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != customContent {
+		t.Errorf("EnsureMemoryDir overwrote existing project.md")
+	}
+}
+
+func TestEnsureMemoryDirEmptyWorkDir(t *testing.T) {
+	if err := EnsureMemoryDir(""); err != nil {
+		t.Errorf("expected nil for empty workDir, got: %v", err)
+	}
+}
+
+// ── WriteMemoryEntry Tests ─────────────────────────────────────────────────
+
+func TestWriteMemoryEntryProject(t *testing.T) {
+	dir := t.TempDir()
+
+	entry, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{
+			ID:      "test-write-1",
+			Content: "The user prefers dark mode in the IDE.",
+			Tags:    []string{"ui", "preference"},
+			Source:  "user",
+		},
+	})
+	if err != nil {
+		t.Fatalf("WriteMemoryEntry returned error: %v", err)
+	}
+
+	if entry.ID != "test-write-1" {
+		t.Errorf("ID = %q, want %q", entry.ID, "test-write-1")
+	}
+	if entry.Source != "user" {
+		t.Errorf("Source = %q, want %q", entry.Source, "user")
+	}
+	if entry.CreatedAt == "" {
+		t.Error("CreatedAt is empty")
+	}
+
+	// Verify the file was written
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	data, err := os.ReadFile(filepath.Join(memDir, "project.md"))
+	if err != nil {
+		t.Fatalf("project.md not found: %v", err)
+	}
+	content := string(data)
+	if !contains(content, "test-write-1") {
+		t.Errorf("project.md missing entry ID: %q", content)
+	}
+	if !contains(content, "dark mode") {
+		t.Errorf("project.md missing entry content: %q", content)
+	}
+}
+
+func TestWriteMemoryEntryThread(t *testing.T) {
+	dir := t.TempDir()
+
+	entry, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir:  dir,
+		ThreadID: "t1",
+		Entry: MemoryEntry{
+			ID:      "thread-mem-1",
+			Content: "User asked about deployment.",
+			Source:  "agent",
+		},
+	})
+	if err != nil {
+		t.Fatalf("WriteMemoryEntry returned error: %v", err)
+	}
+	if entry.Source != "agent" {
+		t.Errorf("Source = %q, want %q", entry.Source, "agent")
+	}
+
+	// Verify the thread file was written
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	data, err := os.ReadFile(filepath.Join(memDir, "thread_t1.md"))
+	if err != nil {
+		t.Fatalf("thread_t1.md not found: %v", err)
+	}
+	if !contains(string(data), "thread-mem-1") {
+		t.Errorf("thread file missing entry ID")
+	}
+}
+
+func TestWriteMemoryEntryAgent(t *testing.T) {
+	dir := t.TempDir()
+
+	_, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		AgentID: "codex",
+		Entry: MemoryEntry{
+			ID:      "agent-mem-1",
+			Content: "Codex works best with -c model=gpt-4.",
+			Source:  "system",
+		},
+	})
+	if err != nil {
+		t.Fatalf("WriteMemoryEntry returned error: %v", err)
+	}
+
+	memDir := filepath.Join(dir, ".agenthub", "memory")
+	data, err := os.ReadFile(filepath.Join(memDir, "agent_codex.md"))
+	if err != nil {
+		t.Fatalf("agent_codex.md not found: %v", err)
+	}
+	if !contains(string(data), "agent-mem-1") {
+		t.Errorf("agent file missing entry ID")
+	}
+}
+
+func TestWriteMemoryEntryAppend(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write first entry
+	_, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{
+			ID:      "entry-1",
+			Content: "First entry.",
+			Source:  "user",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write second entry (append)
+	_, err = WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{
+			ID:      "entry-2",
+			Content: "Second entry.",
+			Source:  "user",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Both entries should be readable
+	result := ReadMemory(dir, "", "")
+	if len(result.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(result.Entries))
+	}
+}
+
+func TestWriteMemoryEntryOverwrite(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write initial entry
+	_, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{
+			ID:      "old-entry",
+			Content: "Old content.",
+			Source:  "user",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Overwrite with new entry
+	_, err = WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Overwrite: true,
+		Entry: MemoryEntry{
+			ID:      "new-entry",
+			Content: "New content.",
+			Source:  "user",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Only the new entry should exist
+	result := ReadMemory(dir, "", "")
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 entry after overwrite, got %d", len(result.Entries))
+	}
+	if result.Entries[0].ID != "new-entry" {
+		t.Errorf("ID = %q, want %q", result.Entries[0].ID, "new-entry")
+	}
+}
+
+func TestWriteMemoryEntryDefaultSource(t *testing.T) {
+	dir := t.TempDir()
+
+	entry, err := WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{
+			ID:      "no-source",
+			Content: "Content without explicit source.",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.Source != "user" {
+		t.Errorf("Source = %q, want %q (default)", entry.Source, "user")
+	}
+}
+
+func TestWriteThenReadRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write entries across all three scopes
+	_, _ = WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir,
+		Entry: MemoryEntry{ID: "p1", Content: "Project fact.", Source: "system"},
+	})
+	_, _ = WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir, ThreadID: "t1",
+		Entry: MemoryEntry{ID: "t1", Content: "Thread fact.", Source: "user"},
+	})
+	_, _ = WriteMemoryEntry(MemoryWriteRequest{
+		WorkDir: dir, AgentID: "a1",
+		Entry: MemoryEntry{ID: "a1", Content: "Agent fact.", Source: "agent"},
+	})
+
+	result := ReadMemory(dir, "t1", "a1")
+	if len(result.Entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(result.Entries))
+	}
+	if result.PromptText == "" {
+		t.Error("PromptText is empty after round-trip")
+	}
+}

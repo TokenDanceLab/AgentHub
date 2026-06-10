@@ -362,6 +362,11 @@ func WriteMemoryEntry(req MemoryWriteRequest) (MemoryEntry, error) {
 
 	memDir := filepath.Join(req.WorkDir, memorySubdir)
 
+	// Ensure the memory directory exists before writing.
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		return MemoryEntry{}, fmt.Errorf("create memory dir: %w", err)
+	}
+
 	// Determine target file
 	var targetFile string
 	var category string
