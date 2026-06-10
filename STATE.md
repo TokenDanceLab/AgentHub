@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 23:00 +08:00
-当前 dev HEAD：`9f8ae16e` (`dev/delicious233`)
+最后更新：2026-06-10 23:59 +08:00
+当前 dev HEAD：`c9832aa0` (`dev/delicious233`)，后续 W2 提交至 `2504a901`
 Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 ## Roadmap 最终状态
@@ -12,6 +12,15 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - 安全风险登记册关闭（流程）
 
 右侧面板增强（Section 18）新增 9 个未勾选项（P1 UI 任务），独立于发布阻塞。
+
+### Wave 进度
+
+| Wave | 状态 | 说明 |
+|------|------|------|
+| Wave 0 | ✅ 完成 | 基线验证（9f8ae16e 及之前），OIDC、E2E smoke、SDK adapter E2E、右侧面板 14 项 |
+| Wave 1 | ✅ 完成 | 8 个并行 Agent 全部交付 P0 数据缺口（c9832aa0） |
+| Wave 2 | 🔄 进行中 | i18n workbench、AgentsPage 更新、web platform、edge protocol（2504a901） |
+| Wave 3 | 🔄 进行中 | 待 Wave 2 合入后启动 |
 
 ## Release Gate 快照 (Final)
 
