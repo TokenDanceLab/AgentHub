@@ -20,6 +20,7 @@ import {
   AgentTimeline,
   RunSessionCard,
   ApprovalCardBlock,
+  URLPreviewCard,
 } from './blocks';
 import { StepCard } from '../ui/StepCard';
 import DeployCard from '../ui/DeployCard';
@@ -371,8 +372,15 @@ function scrollToBlock(blockId: string): void {
 /** Render message text, parsing blockquote sections (> ...) into styled elements. */
 function renderMessageText(text: string, hasNewerVersion?: boolean): React.ReactElement {
   const parts = parseBlockquotes(text);
+  const urlCards = extractUrlPreviewCards(text);
+
   if (parts.length === 1 && parts[0]!.kind === 'text') {
-    return <p className={styles.blockText} data-grayed={hasNewerVersion ? 'true' : undefined}>{text}</p>;
+    return (
+      <div data-grayed={hasNewerVersion ? 'true' : undefined}>
+        <p className={styles.blockText}>{parts[0]!.text}</p>
+        {urlCards}
+      </div>
+    );
   }
 
   return (
@@ -392,7 +400,39 @@ function renderMessageText(text: string, hasNewerVersion?: boolean): React.React
         }
         return <React.Fragment key={index}>{part.text && <p>{part.text}</p>}</React.Fragment>;
       })}
+      {urlCards}
     </div>
+  );
+}
+
+/** Regex to detect http(s) URLs in message text. */
+const URL_REGEX = /https?:\/\/[^\s<>()[\]{}'")\]]+/g;
+
+/** Extract unique URLs from text and render URLPreviewCard elements. */
+function extractUrlPreviewCards(text: string): React.ReactElement | null {
+  const matches = text.match(URL_REGEX);
+  if (!matches || matches.length === 0) return null;
+
+  // Deduplicate URLs
+  const seen = new Set<string>();
+  const uniqueUrls: string[] = [];
+  for (const url of matches) {
+    // Strip trailing punctuation that may have been captured
+    const cleaned = url.replace(/[.,;:!?]+$/, '');
+    if (!seen.has(cleaned)) {
+      seen.add(cleaned);
+      uniqueUrls.push(cleaned);
+    }
+  }
+
+  if (uniqueUrls.length === 0) return null;
+
+  return (
+    <React.Fragment>
+      {uniqueUrls.map((url) => (
+        <URLPreviewCard key={url} url={url} />
+      ))}
+    </React.Fragment>
   );
 }
 
