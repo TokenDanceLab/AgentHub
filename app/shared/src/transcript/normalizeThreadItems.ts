@@ -96,7 +96,7 @@ function normalizeAuthor(role: string | undefined, senderName?: string): Transcr
   switch (role?.trim()) {
     case 'user':
     case 'human':
-      return { id: 'user', name: senderName?.trim() || 'Delicious233', role: 'human' };
+      return { id: 'user', name: senderName?.trim() || '用户', role: 'human' };
     case 'agent':
     case 'assistant':
       return { id: senderName?.trim() || 'agent', name: senderName?.trim() || 'Agent', role: 'agent' };

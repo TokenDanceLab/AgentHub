@@ -81,6 +81,8 @@ export interface TranscriptViewProps {
     onCopy?: (() => void) | undefined;
     onDismiss?: (() => void) | undefined;
   } | undefined;
+  /** Current user's Hub ID for distinguishing own messages. */
+  currentUserId?: string | undefined;
 }
 
 export function TranscriptView({
@@ -103,6 +105,7 @@ export function TranscriptView({
   softHiddenBlockIds = [],
   transcript,
   pinnedAnnouncement,
+  currentUserId,
 }: TranscriptViewProps): React.ReactElement {
   const [expandedDiffIds, setExpandedDiffIds] = React.useState<Set<string>>(() => new Set());
   const highlightTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -336,11 +339,10 @@ function renderTranscriptBlock(
     case 'context_usage':
       return renderContextUsageBlock(block);
     case 'result':
-      return renderResultBlock(block);
     case 'failure':
-      return renderFailureBlock(block);
     case 'finished':
-      return renderFinishedBlock(block);
+      // eslint-disable-next-line react/jsx-no-useless-fragment
+      return React.createElement(React.Fragment);
     case 'replay_gap':
       // eslint-disable-next-line react/jsx-no-useless-fragment
       return React.createElement(React.Fragment);
@@ -1322,10 +1324,11 @@ function renderAttachmentBlock(
 
 /* ═══ Helpers ═══ */
 
-function isCurrentUserAuthor(author: TranscriptAuthor): boolean {
+function isCurrentUserAuthor(author: TranscriptAuthor, currentUserId?: string): boolean {
+  if (currentUserId && author.id === currentUserId) return true;
   const id = author.id.trim().toLowerCase();
-  const name = author.name.trim().toLowerCase();
-  return id === 'delicious233' || id === 'delicious' || name === 'delicious233' || author.role === 'human';
+  if (currentUserId && id === currentUserId.trim().toLowerCase()) return true;
+  return author.role === 'human';
 }
 
 function agentAvatar(name: string): string {

@@ -86,6 +86,8 @@ export interface SettingsPageProps {
    *  Navigates to the AgentsPage where per-agent runtime, model, system
    *  prompt and MCP bindings can be configured. */
   onOpenAgentConfig?: () => void;
+  /** Current user display name from OIDC. */
+  currentUserDisplayName?: string | undefined;
 }
 
 export type SettingsPaneId = 'appearance' | 'notify' | 'agent' | 'local' | 'states';
@@ -734,7 +736,7 @@ export function SettingsPage(props: SettingsPageProps): React.ReactElement {
         <div className={styles.navCaption}>当前空间</div>
         <SettingsScopeRow title={spaceTitle} meta={spaceMeta} />
         <SettingsScopeRow title="TokenDance" meta="组织空间" />
-        <SettingsScopeRow title="Delicious233" meta="当前用户" />
+        <SettingsScopeRow title={props.currentUserDisplayName ?? '未登录'} meta="当前用户" />
       </aside>
 
       {/* ── Right main ── */}
