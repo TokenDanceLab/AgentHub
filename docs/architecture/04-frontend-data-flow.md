@@ -12,14 +12,14 @@
 
 ```ts
 interface AgentHubPlatform {
-  surface: "desktop" | "web";
-  capabilities: PlatformCapabilities;
+  surface: AgentHubSurface;           // "desktop" | "web"
+  capabilities: SurfaceCapabilities;  // { localEdge, localFiles, browserPreview }
   conversations: ConversationPort;
   runs: RunPort;
-  agents: AgentProfilePort;
-  artifacts: ArtifactPort;
-  approvals: ApprovalPort;
-  host?: DesktopHostPort;
+  attachments?: AttachmentPort;
+  host?: HostDiagnosticsPort;
+  preview?: PreviewPort;
+  settings?: SettingsPort;
 }
 ```
 
@@ -41,20 +41,62 @@ interface AgentHubPlatform {
 
 UI 能根据 `capabilities` 隐藏或禁用不可用动作，但不能 fork 另一套组件。
 
+## Desktop Query Hooks (`app/desktop/src/api/`)
+
+| 文件 | 用途 |
+|---|---|
+| `hubClient.ts` | Hub REST 客户端（sendMessage/recall/edit/pin/unpin/markRead/reactions） |
+| `hubQueries.ts` | Hub 联系人/会话/消息 React Query hooks |
+| `sessionQueries.ts` | 会话 CRUD + 消息操作 hooks（pin/unpin/forward/markRead/reactions） |
+| `hubWS.ts` | Hub WebSocket 连接管理 |
+| `hubAuth.ts` | Hub 认证 + token 管理 |
+| `hubTokenStorage.ts` | Token 持久化 |
+| `edgeClient.ts` | Edge REST 客户端 |
+| `edgeAuth.ts` | Edge 认证 |
+| `eventClient.ts` | Edge EventStore 客户端 |
+| `runQueries.ts` | Edge run lifecycle hooks |
+| `runEvidenceQueries.ts` | Run evidence 查询 |
+| `threadQueries.ts` | Thread CRUD hooks |
+| `agentQueries.ts` | Agent 列表查询 |
+| `agentProfileQueries.ts` | Hub Agent Profile CRUD hooks |
+| `agentTeamQueries.ts` | Agent Team Run hooks |
+| `contactQueries.ts` | 联系人 hooks |
+| `projectQueries.ts` | Hub projects hooks |
+| `documentQueries.ts` | Hub documents CRUD hooks |
+| `executionTargetQueries.ts` | Execution target hooks |
+| `modelCatalogQueries.ts` | 模型目录发现 |
+| `teamRunQueries.ts` | TeamRun 编排 hooks |
+| `deviceId.ts` | 设备 ID 管理 |
+| `schemas.ts` | Zod schema 验证 |
+| `allowlistValidation.ts` | Tool allowlist 验证 |
+| `transport.ts` | HTTP transport 层 |
+| `queryClient.ts` | React Query client 配置 |
+
+## Web Query Hooks (`app/web/src/api/`)
+
+| 文件 | 用途 |
+|---|---|
+| `hubClient.ts` | Hub REST 客户端（sendMessage/recall/edit/pin/unpin/markRead/forward/reactions/search） |
+| `hubWS.ts` | Hub WebSocket 连接管理 |
+| `hubAuth.ts` | Hub 认证 + token 管理 |
+| `hubTokenStorage.ts` | Token 持久化 |
+| `edgeClient.ts` | Edge REST 客户端 |
+| `transport.ts` | HTTP transport 层 |
+| `queryClient.ts` | React Query client 配置 |
+| `runQueries.ts` | Edge run lifecycle hooks |
+| `threadQueries.ts` | Thread CRUD hooks |
+| `agentQueries.ts` | Agent 列表查询 |
+| `agentTeamQueries.ts` | Agent Team hooks |
+| `contactQueries.ts` | 联系人 hooks |
+| `projectQueries.ts` | Hub projects hooks |
+| `executionTargetQueries.ts` | Execution target hooks |
+| `deviceId.ts` | 设备 ID 管理 |
+
 ## React Query Hooks
 
-所有后端数据通过 React Query 管理：
+所有后端数据通过 React Query 管理。Desktop 的 Hub API 查询统一通过 `getToken` 回调注入 auth token，不硬编码 token 值。
 
-- `hubQueries.ts` — Hub API 查询
-- `sessionQueries.ts` — 会话查询
-- `documentQueries.ts` — 文档查询
-- `projectQueries.ts` — 项目查询
-
-Desktop 的 Hub API 查询统一通过 `getToken` 回调注入 auth token，不硬编码 token 值。
-
-## WebSocket Events
-
-### 实时缓存失效模式
+## WebSocket 实时缓存失效模式
 
 ```text
 Hub WS event (message.new / session.updated / ...)
@@ -63,7 +105,7 @@ Hub WS event (message.new / session.updated / ...)
   -> UI 自动重新获取最新数据
 ```
 
-Desktop `useHubWebSocket.ts` 接入 workbench model 后，Hub 的实时事件直接驱动 React Query 缓存失效。覆盖消息、会话、联系人和 Agent 相关的所有实时更新。
+覆盖消息、会话、联系人和 Agent 相关的所有实时更新。
 
 ## Settings 三层回退模式
 
@@ -75,7 +117,7 @@ Edge settings API (本地实时配置)
     -> localStorage (离线兜底)
 ```
 
-实现位置：Desktop platform adapter 的 settings 读取逻辑。Hub 设置优先于本地默认，Edge 设置优先于 Hub（本地执行相关配置优先本地）。
+Hub 设置优先于本地默认，Edge 设置优先于 Hub（本地执行相关配置优先本地）。
 
 ## Agent Profile 合并策略
 
@@ -92,6 +134,21 @@ Edge local profiles (本地已安装的 Agent)
 - Edge 本地 profile 优先保证离线可用
 - Hub profile 提供跨设备共享
 - Raw adapter 是底层 runtime 的可用列表
+
+## 数据模式 (`app/shared/src/demo/dataMode.ts`)
+
+工作台数据模式控制 UI 数据来源和展示行为：
+
+| 模式 | 值 | 用途 |
+|---|---|---|
+| Auto | `auto` | 根据环境自动选择，默认回落到 mock |
+| Mock | `mock` | 纯内存硬编码数据，无后端依赖 |
+| Fixture | `fixture` | 基于 runtime manifest 的静态 fixture 数据 |
+| Observed | `observed` | 读取已持久化的真实运行记录（replay） |
+| Approved Real | `approved-real` | 真实 API/CLI 调用，需审批和 API key |
+
+- 持久化 key：`agenthub.workbench.dataMode`（localStorage）
+- `isWorkbenchFixtureDataMode()` / `isWorkbenchRealDataMode()` — 模式判断 helper
 
 ## 安全边界
 

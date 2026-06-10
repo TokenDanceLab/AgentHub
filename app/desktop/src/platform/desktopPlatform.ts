@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { formatComposerPromptWithContext } from '@shared/composer';
-import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
+import type { AttachmentRef, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
+import { computeFileHash } from '@shared/composer';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   demoWorkbenchAgents,
@@ -11,6 +12,8 @@ import type { AgentHubPlatform, LocalCliDiscoveryManifest, WorkbenchAgent, Workb
 import type { EvidenceRef } from '@shared/transcript';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
+import { createHubClient } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
 import { pickDesktopComposerAttachments } from './desktopAttachments';
 import { canOpenDesktopEvidencePreview, openDesktopEvidencePreview } from './desktopPreview';
 import { resolveDesktopTargetPreference, type DesktopTargetPreference } from './targetPreference';
@@ -132,6 +135,22 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
     },
     attachments: {
       pickFiles: options.pickLocalAttachments ?? pickDesktopComposerAttachments,
+      async uploadAttachment(file: File): Promise<AttachmentRef> {
+        const client = createHubClient({ getToken: getAccessToken });
+        const hash = await computeFileHash(file);
+        const ref = await client.uploadAttachment(file, hash);
+        return {
+          id: ref.id,
+          name: ref.original_name || file.name,
+          original_name: ref.original_name,
+          size: ref.size,
+          mime_type: ref.mime_type,
+          hash: ref.hash,
+          url: client.downloadAttachmentUrl(ref.id),
+          metadata: ref.metadata,
+          created_at: ref.created_at,
+        };
+      },
     },
     preview: {
       canOpenEvidence: canOpenDesktopEvidencePreview,

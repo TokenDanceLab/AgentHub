@@ -266,6 +266,16 @@ export interface FinishedTranscriptBlock extends TranscriptBlockBase {
   duration?: string;
 }
 
+export interface ReplayGapTranscriptBlock extends TranscriptBlockBase {
+  kind: 'replay_gap';
+  /** Number of events that were replayed to fill the gap. */
+  replayedCount: number;
+  /** Task ID the replayed events belong to. */
+  taskId?: string;
+  /** Whether the gap is still being filled (recovery in progress). */
+  recovering?: boolean;
+}
+
 export type TranscriptBlock =
   | TextTranscriptBlock
   | ToolCallTranscriptBlock
@@ -288,4 +298,5 @@ export type TranscriptBlock =
   | ContextUsageTranscriptBlock
   | ResultTranscriptBlock
   | FailureTranscriptBlock
-  | FinishedTranscriptBlock;
+  | FinishedTranscriptBlock
+  | ReplayGapTranscriptBlock;

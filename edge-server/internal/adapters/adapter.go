@@ -129,6 +129,12 @@ const (
 	BusEventRateLimit           = "run.agent.rate_limit"
 	BusEventCLIInvocationPlan   = "run.agent.cli_invocation_plan"
 
+	// MCP-specific tool call event. Emitted when a tool call originates from an MCP
+	// server (rather than a built-in tool like Bash or Read). Downstream consumers
+	// can distinguish MCP tool activity from native tool activity by subscribing to
+	// this event type instead of the generic BusEventToolCall.
+	BusEventMCPToolCall = "run.agent.mcp_tool_call"
+
 	// Permission gating events
 	BusEventPermissionRequested = "run.agent.permission_requested"
 	BusEventPermissionDecided   = "run.agent.permission_decided"

@@ -1,5 +1,7 @@
 export {
+  attachmentRefToComposerAttachment,
   browserFilesToComposerAttachments,
+  computeFileHash,
   desktopPathsToComposerAttachments,
   formatComposerAttachmentContext,
   formatComposerAttachmentSize,
@@ -19,6 +21,7 @@ export {
 } from './composerReducer';
 export type {
   ApprovalMode,
+  AttachmentRef,
   ComposerAction,
   ComposerAttachment,
   ComposerIntent,
