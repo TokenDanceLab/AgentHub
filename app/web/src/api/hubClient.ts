@@ -1474,6 +1474,32 @@ export function createHubClient(opts: HubClientOptions = {}) {
     /** Get the download URL for an attachment (relative to Hub base). */
     downloadAttachmentUrl: (attachmentId: string) =>
       `${base}/client/attachments/${encodeURIComponent(attachmentId)}`,
+
+    // ── Skills ─────────────────────────────────────
+
+    listPublicSkills: (params?: {
+      skill_type?: string;
+      q?: string;
+      is_public?: boolean;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<{ items: Record<string, unknown>[]; page: { nextCursor?: string; hasMore: boolean } }>(
+        `/web/skills${qs({ is_public: 'true', ...params ?? {} })}`,
+      ),
+
+    // ── MCP Servers ─────────────────────────────────
+
+    listPublicMCPServers: (params?: {
+      transport?: string;
+      q?: string;
+      is_public?: boolean;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<{ items: Record<string, unknown>[]; page: { nextCursor?: string; hasMore: boolean } }>(
+        `/web/mcp-servers${qs({ is_public: 'true', ...params ?? {} })}`,
+      ),
   };
 }
 
