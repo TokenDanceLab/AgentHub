@@ -248,7 +248,7 @@ export const WORKBENCH_MOCK_SETTINGS_DEFAULTS = {
   vitePreviewUrl: 'http://127.0.0.1:5176/desktop/',
   dataMode: '自动',
   composerSubmitBehavior: 'Enter 发送',
-  workspacePath: '<REPO_ROOT>-design',
+  workspacePath: '<WORKSPACE>\\tokendance-design',
   targetProjectPath: '<REPO_ROOT>',
   hrmOverlayEnabled: true,
   visualQaMode: '按需',
