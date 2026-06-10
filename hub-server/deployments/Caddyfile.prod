@@ -43,6 +43,8 @@ api.hub.vectorcontrol.tech {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         # 限制浏览器特性权限
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        # 内容安全策略
+        Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
     }
 
     # ── 速率限制（每 IP 每分钟 200 请求）──
