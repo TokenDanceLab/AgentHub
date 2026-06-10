@@ -19,7 +19,7 @@ Claude Code、Codex、OpenCode 是 Agent Runtime，不是用户直接管理的�
 ## 2. 当前架构决策
 
 1. Desktop/Web 使用同一套 v4 UI 工作台，不再维护两套主聊天界面。
-2. `agenthub-design/index.html` 和 `agenthub-design/desktop/` 是 UI 壳子的权威参考；根 `index.html` 是设计系统入口，`desktop/` 是真正的 Desktop 壳子和交互原型，但实现必须落在 AgentHub 仓库内。当前验收口径是 **1:1 迁移设计原型的信息架构、DOM 结构、密度、token、交互和首屏视觉**，不是重新设计。
+2. `tokendance-design/index.html` 和 `tokendance-design/desktop/` 是 UI 壳子的权威参考；根 `index.html` 是设计系统入口，`desktop/` 是真正的 Desktop 壳子和交互原型，但实现必须落在 AgentHub 仓库内。当前验收口径是 **1:1 迁移设计原型的信息架构、DOM 结构、密度、token、交互和首屏视觉**，不是重新设计。
 3. `app/shared` 是共享 UI、共享 transcript contract、共享 composer/inspector 的权威位置。
 4. `app/desktop` 和 `app/web` 只提供 platform adapter、启动入口和平台专属能力。
 5. 旧 Desktop/Web UI 文件是迁移素材，不是长期架构。

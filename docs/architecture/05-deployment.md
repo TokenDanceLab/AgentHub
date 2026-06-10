@@ -74,7 +74,7 @@ Design demo 端口：
 
 | Demo | 端口 |
 |---|---|
-| `agenthub-design/desktop/` | `5176/desktop` |
+| `tokendance-design/desktop/` | `5176/desktop` |
 
 ## 相关文档
 

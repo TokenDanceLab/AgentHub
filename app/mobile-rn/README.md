@@ -6,7 +6,7 @@ Current branch handoff, ownership boundaries, and native release gates are track
 
 ## Design Boundary
 
-Mobile inherits AgentHub Desktop/Web v4, the shared workbench semantics, and `agenthub-design/desktop` direction. AgentHub Desktop and the TokenDance/AgentHub design-system docs are authoritative for visual tokens, component semantics, status language, and execution vocabulary. Feishu/Lark mobile is only an IM interaction reference for information architecture and native interaction density: bottom tabs, queue scanning, badges, search/new entry placement, unread state, recovery, and sheets.
+Mobile inherits AgentHub Desktop/Web v4, the shared workbench semantics, and `tokendance-design/desktop` direction. AgentHub Desktop and the TokenDance design-system docs are authoritative for visual tokens, component semantics, status language, and execution vocabulary. Feishu/Lark mobile is only an IM interaction reference for information architecture and native interaction density: bottom tabs, queue scanning, badges, search/new entry placement, unread state, recovery, and sheets.
 
 The RN app is light-first by default. Dark/OLED/system theme modes are kept ready, but new screenshots and user-visible polish start from the white/light experience. Locale should default to the device/system locale, with zh/en copy kept in the RN i18n layer and aligned to AgentHub terminology.
 
