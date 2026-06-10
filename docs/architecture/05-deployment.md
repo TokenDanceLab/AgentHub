@@ -6,63 +6,62 @@
 
 ## 概述
 
-AgentHub 当前阶段以 hk2 为主要生产部署节点。Desktop 本地不部署 Hub；Web 访问 Hub 经 Nginx 反向代理。
+AgentHub 当前阶段以 hk2 为主要生产部署节点。
 
-## hk2 部署
+## hk2 生产部署
 
-hk2 是当前主要的生产 Host，运行：
+生产 Hub Server 部署在 hk2（核云 VPS，香港），公开地址 `https://hub.vectorcontrol.tech`。
 
-- AgentHub Hub Server
-- AgentHub Edge Server
-- Nginx 反向代理
-- PostgreSQL（shared）
-- Redis（shared）
+**技术栈**：Docker Compose + Nginx + Let's Encrypt SSL
 
-## 项目结构
+### Docker Compose 服务
 
-```text
-app/desktop/
-  src-tauri/src/host/     Tauri host capability modules
-    mod.rs
-    edge.rs               Edge start/stop/status/auth token
-    fs.rs                 文件树、读写、allowlist
-    dialog.rs             文件/目录选择
-    auth.rs               OIDC loopback、session/keyring
-    window.rs             窗口、托盘、通知
-    system.rs             平台信息、诊断
-  src-tauri/src/commands.rs   register_commands() + migration shims
+配置文件：`hub-server/deployments/hk2/docker-compose.hk2.yml`
 
-hub-server/               Hub 服务端应用
+| 服务 | 镜像 | 资源限制 | 端口 |
+|---|---|---|---|
+| `postgres` | `postgres:16-alpine` | 512MB / 1 CPU | 5432（内部） |
+| `redis` | `redis:7-alpine` | 384MB / 0.5 CPU | 6379（内部） |
+| `hub-server` | `ghcr.io/tokendancelab/agenthub-hub:latest` | 256MB / 1 CPU | 8090→8080（loopback only） |
 
-edge-server/              可独立部署的 Edge 服务端应用
-```
+### Nginx 配置
 
-## Docker Compose
+配置文件：`hub-server/deployments/hk2/nginx-hk2.conf`
 
-当前部署使用 Docker Compose 管理多容器：
+| Location | 认证 | 后端 |
+|---|---|---|
+| `/health` | 无 | Hub backend |
+| `/api/*` | OAuth2-proxy | Hub backend |
+| `/client/*` | OAuth2-proxy | Hub backend |
+| `/client/ws` | OAuth2-proxy | Hub backend（WebSocket upgrade, 3600s timeout） |
+| `/auth/tokendance/*` | 无 | Hub backend（OIDC callback） |
+| `/oauth2/*` | 无 | oauth2-proxy @ 127.0.0.1:4181 |
+| `/` | 无 | 静态主页（Astro export） |
 
-- `hub-server` 容器
-- `edge-server` 容器
-- PostgreSQL 容器
-- Redis 容器
-- Nginx 容器
+### SSL 与安全
 
-## Nginx
+- SSL：使用 `api.vectorcontrol.tech` 通配符证书（certbot HTTP-01）
+- `agenthub.vectorcontrol.tech` 301 重定向到 `hub.vectorcontrol.tech`
+- HTTP -> HTTPS 重定向
+- Rate limiting：API 200r/m、Auth 10r/m
+- 安全头：X-Frame-Options DENY、HSTS preload、CSP
 
-Nginx 负责：
+### 网络
 
-- 前端静态文件服务（Desktop `5173`、Web `5174`、design demo `5176`）
-- Hub API 反向代理
-- WebSocket 升级（用于实时事件推送）
-- SSL 终止
+- Docker 网络：`agenthub-net`（172.18.0.0/16 bridge），与 aihub-hk2 网络隔离
+- 日志：JSON file driver，10MB max / 3 files rotation
+- DNS：`hub.vectorcontrol.tech` A record 指向 hk2 公网 IP
 
-## SSL
+## 开发环境
 
-生产使用泛域名证书（Let's Encrypt wildcard），Nginx 层处理 SSL 终止，内网容器间 HTTP 明文通信。
+开发 Docker Compose（根目录 `docker-compose.yml`）提供相同技术栈但：
 
-## 环境变量
+- 默认绑定 `127.0.0.1`，避免开发密码暴露
+- Hub Server 从本地 Dockerfile 构建（`hub-server/deployments/Dockerfile`）
+- PostgreSQL / Redis 密码使用开发默认值
+- 端口：Hub API 8080、Admin 6060、PostgreSQL 5432、Redis 6379
 
-桌面端开发端口规范：
+## 开发端口规范
 
 | 端 | 端口 | 说明 |
 |---|---|---|
@@ -77,25 +76,8 @@ Design demo 端口：
 |---|---|
 | `agenthub-design/desktop/` | `5176/desktop` |
 
-## 开发环境
-
-本地开发：
-
-```bash
-# Desktop
-cd app/desktop && npm run dev
-
-# Web
-cd app/web && npm run dev
-
-# Edge Server
-cd edge-server && go run .
-
-# Hub Server
-cd hub-server && go run .
-```
-
 ## 相关文档
 
 - [02-edge-server.md](02-edge-server.md) — Edge Server 独立部署细节
 - [01-hub-server.md](01-hub-server.md) — Hub Server 部署依赖（PostgreSQL、Redis）
+- [06-auth-identity.md](06-auth-identity.md) — OIDC callback 与 Nginx 路由

@@ -10,6 +10,7 @@ import {
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
 import { normalizeHubMessagesToTranscript } from '@shared/transcript';
+import { getAgentActivityStore, type AgentActivitySnapshot } from '@shared/transcript/agentActivity';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
 import type { ProjectDraft, ProjectInfo } from '@shared/workbench';
@@ -75,6 +76,8 @@ export interface DesktopWorkbenchModel {
     update: (projectId: string, draft: ProjectDraft) => Promise<ProjectInfo>;
   };
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
+  /** Agent activity state for the streaming status bar. */
+  agentActivity?: AgentActivitySnapshot;
 }
 
 const EMPTY_TRANSCRIPT: ReturnType<typeof normalizeThreadItemsToTranscript> = [];
@@ -95,6 +98,13 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const useDemo = !isWorkbenchRealDataMode(dataMode);
   const hubAuthenticated = useHubStore((state) => state.authenticated);
   const hubReady = !useDemo && hubAuthenticated && Boolean(getAccessToken());
+
+  // Subscribe to agent activity changes for the streaming status bar.
+  const agentActivity = useSyncExternalStore(
+    getAgentActivityStore().subscribe,
+    getAgentActivityStore().getSnapshot,
+    getAgentActivityStore().getSnapshot,
+  );
 
   // Hub WebSocket — invalidate React Query caches when real-time events arrive.
   const queryClient = useQueryClient();
@@ -203,6 +213,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
       dataMode: dataMode === 'auto' ? 'mock (auto fallback)' : dataMode,
       isDemo: true,
       transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedDemoConversation),
+      agentActivity,
     };
   }, [dataMode, demoSnapshot, selectedConversationId]);
 
@@ -336,6 +347,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     ...(resolvedProjectsActions != null ? { projectsActions: resolvedProjectsActions } : {}),
     ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     transcript,
+    agentActivity,
   };
 
   return useDemo ? demoModel : liveModel;

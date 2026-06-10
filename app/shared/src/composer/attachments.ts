@@ -1,7 +1,31 @@
-import type { ComposerAttachment } from './types';
+import type { AttachmentRef, ComposerAttachment } from './types';
 
 const MAX_COMPOSER_ATTACHMENT_PREVIEW = 12_000;
 const PREVIEW_FILE_NAME_PATTERN = /\.(txt|md|markdown|json|jsonl|csv|tsv|yaml|yml|toml|xml|html|css|scss|js|jsx|ts|tsx|go|rs|py|java|c|cpp|h|hpp|log)$/i;
+
+/** Compute the SHA-256 hex digest of a File (used as the upload hash). */
+export async function computeFileHash(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = new Uint8Array(hashBuffer);
+  return Array.from(hashArray).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Build a ComposerAttachment from a successful Hub upload. */
+export function attachmentRefToComposerAttachment(
+  ref: AttachmentRef,
+  file: File,
+  source: 'browser' | 'desktop' = 'browser',
+): ComposerAttachment {
+  return {
+    id: ref.id,
+    name: ref.original_name || file.name,
+    source,
+    size: ref.size,
+    mime: ref.mime_type,
+    attachmentRef: ref,
+  };
+}
 
 export function formatComposerAttachmentSize(value: number | undefined): string | undefined {
   if (value == null) return undefined;

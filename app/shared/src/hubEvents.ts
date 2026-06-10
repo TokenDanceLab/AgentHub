@@ -39,6 +39,10 @@ export const HUB_EVENTS = {
   NOTIFICATION_NEW: 'notification.new',
   FRIEND_REQUEST: 'friend.request',
   FRIEND_ACCEPTED: 'friend.accepted',
+
+  // ── Sync / replay (reconnection gap fill) ────
+  SYNC_REQUEST: 'sync.request',
+  SYNC_EVENTS: 'sync.events',
 } as const;
 
 export type HubEventType = (typeof HUB_EVENTS)[keyof typeof HUB_EVENTS];

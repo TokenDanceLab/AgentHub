@@ -1,3 +1,5 @@
+> ⚠️ 已归档：UI 审计快照，结论已合并到 v4 计划和 `docs/architecture.md`。归档日期：2026-06-10。
+
 # v4 UI 与 agenthub-design 对齐审计
 
 > 日期：2026-06-07

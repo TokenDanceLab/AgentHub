@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
+import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@/api/hubWS';
+import { createHubClient } from '@/api/hubClient';
+import { trackEventSeq, replayMissedEvents } from '@/api/runEventReplay';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { getAccessToken } from '@/hooks/useAuth';
 
 type HubPayload = Record<string, unknown>;
@@ -25,6 +29,7 @@ const MESSAGE_EVENTS = new Set<string>([
 ]);
 
 const AGENT_EVENTS = new Set<string>([
+  HUB_EVENTS.AGENT_DISPATCH,
   HUB_EVENTS.AGENT_STREAM,
   HUB_EVENTS.AGENT_DONE,
   HUB_EVENTS.AGENT_FAILED,
@@ -36,6 +41,8 @@ export interface WebHubRealtimeOptions {
   runtimeSessionId?: string | null;
   runtimeTaskId?: string | null;
   onRuntimeEvent?: (event: HubRuntimeEventTranscriptInput) => void;
+  /** Callback invoked with replayed events after a WS reconnect gap fill. */
+  onReplayEvents?: (events: HubRuntimeEventTranscriptInput[], taskId: string) => void;
   createSocket?: CreateHubWS;
   getToken?: () => string | null;
 }
@@ -45,6 +52,7 @@ export function useWebHubRealtime({
   runtimeSessionId,
   runtimeTaskId,
   onRuntimeEvent,
+  onReplayEvents,
   createSocket = createHubWS,
   getToken = getAccessToken,
 }: WebHubRealtimeOptions): void {
@@ -52,17 +60,46 @@ export function useWebHubRealtime({
   const runtimeSessionIdRef = useRef(runtimeSessionId);
   const runtimeTaskIdRef = useRef(runtimeTaskId);
   const onRuntimeEventRef = useRef(onRuntimeEvent);
+  const onReplayEventsRef = useRef(onReplayEvents);
 
   useEffect(() => {
     runtimeSessionIdRef.current = runtimeSessionId;
     runtimeTaskIdRef.current = runtimeTaskId;
     onRuntimeEventRef.current = onRuntimeEvent;
-  }, [onRuntimeEvent, runtimeSessionId, runtimeTaskId]);
+    onReplayEventsRef.current = onReplayEvents;
+  }, [onRuntimeEvent, onReplayEvents, runtimeSessionId, runtimeTaskId]);
 
   useEffect(() => {
     if (!enabled) return undefined;
 
-    const socket = createSocket({ getToken });
+    let replaying = false;
+    const hubClient = createHubClient({ getToken });
+
+    const socket = createSocket({
+      getToken,
+      onAuthSuccess: () => {
+        // After (re)connect auth, attempt replay for the active task.
+        if (replaying) return;
+        replaying = true;
+        const store = useConnectionStore.getState();
+        // Only replay if we have previously tracked seq ids (i.e. this is a reconnect).
+        const taskId = runtimeTaskIdRef.current;
+        if (!taskId || store.lastEventSeq[taskId] == null) {
+          replaying = false;
+          return;
+        }
+        store.setReconnecting(false);
+        void replayMissedEvents({
+          socket,
+          hubClient,
+          getActiveTaskId: () => runtimeTaskIdRef.current ?? undefined,
+          onReplayEvents: (events, tid) => {
+            onReplayEventsRef.current?.(events, tid);
+            replaying = false;
+          },
+        }).catch(() => { replaying = false; });
+      },
+    });
     const unsubscribe = socket.onAny((type, payload) => {
       invalidateWebWorkbenchHubQueries(queryClient, type, payload);
       dispatchHubRuntimeEvent(
@@ -72,6 +109,11 @@ export function useWebHubRealtime({
         onRuntimeEventRef.current,
         runtimeTaskIdRef.current,
       );
+      // Track seq_id from agent events for replay cursor.
+      if (AGENT_EVENTS.has(type)) {
+        trackSeqFromPayload(payload);
+        getAgentActivityStore().handleEvent(type, payload);
+      }
     });
 
     socket.connect();
@@ -265,4 +307,18 @@ function readString(payload: unknown, ...keys: string[]): string | undefined {
 function readPayloadValue(payload: unknown, key: string): unknown {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
   return (payload as HubPayload)[key];
+}
+
+/**
+ * Extract task_id and event_seq from an agent WS event payload
+ * and update the replay cursor in the connection store.
+ */
+function trackSeqFromPayload(payload: unknown): void {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
+  const record = payload as HubPayload;
+  const taskId = typeof record.task_id === 'string' ? record.task_id : undefined;
+  const eventSeq = typeof record.event_seq === 'number' ? record.event_seq : undefined;
+  if (taskId && eventSeq != null) {
+    trackEventSeq(taskId, eventSeq);
+  }
 }
