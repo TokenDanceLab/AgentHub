@@ -405,6 +405,8 @@ export function createMockHubClient(delayMs = 80): HubClient {
     decideTaskApproval: () => { throw new Error('Mock: decideTaskApproval not available'); },
     listTaskArtifacts: async () => ({ artifacts: [], task_id: '' }),
     listExecutionTargets: async () => ({ items: [], page: { hasMore: false } }),
+    listPublicSkills: async () => ({ items: [], page: { hasMore: false } }),
+    listPublicMCPServers: async () => ({ items: [], page: { hasMore: false } }),
     ackTask: async () => {},
     streamTask: async () => {},
     doneTask: async () => {},
@@ -566,6 +568,8 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     listTaskArtifacts: (taskId) =>
       shared.request<HubAgentTaskArtifactList>(`/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`),
     listExecutionTargets: () => shared.listExecutionTargets(),
+    listPublicSkills: (params) => shared.listPublicSkills(params),
+    listPublicMCPServers: (params) => shared.listPublicMCPServers(params),
     ackTask: (taskId, runId) => shared.ackTask(taskId, runId),
     streamTask: (taskId, content, runId) => shared.streamTask(taskId, content, runId),
     doneTask: (taskId, finalContent, runId) => shared.doneTask(taskId, finalContent, runId),
