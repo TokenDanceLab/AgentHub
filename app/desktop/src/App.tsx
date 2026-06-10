@@ -53,9 +53,7 @@ export default function App() {
   }
 
   function handleConnectEdge(): void {
-    // Demo mode auto-detects Edge availability and reads from Edge API.
-    // Use 'mock' data mode so the app shows demo conversations powered by real Edge data.
-    writeWorkbenchDataModeOverride('mock');
+    writeWorkbenchDataModeOverride('observed');
     setEntryMode('workbench');
   }
 
@@ -427,7 +425,6 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         runtimeEvidence={runtimeEvidence}
         showComposerAgentPicker={false}
         showComposerStatus={false}
-        showHeaderDataModeControl={false}
         showMainchainStatus={false}
         transcript={workbench.transcript}
         userDisplayName={currentUser?.displayName}

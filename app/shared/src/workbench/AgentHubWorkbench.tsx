@@ -199,7 +199,6 @@ export interface AgentHubWorkbenchProps {
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   showComposerAgentPicker?: boolean | undefined;
   showComposerStatus?: boolean | undefined;
-  showHeaderDataModeControl?: boolean | undefined;
   showMainchainStatus?: boolean | undefined;
   transcript: TranscriptBlock[];
   /** Current user profile info, shown in GlobalRail avatar and profile popover. */
@@ -260,7 +259,6 @@ export function AgentHubWorkbench({
   runtimeEvidence,
   showComposerAgentPicker = true,
   showComposerStatus = true,
-  showHeaderDataModeControl = true,
   showMainchainStatus = true,
   transcript,
   userDisplayName,
@@ -1455,7 +1453,6 @@ export function AgentHubWorkbench({
               inspectorCollapsed={inspectorCollapsed}
               onToggleInspector={toggleInspector}
               onOpenSearch={() => setSearchOpen(true)}
-              showDataModeControl={showHeaderDataModeControl}
             />
             {showMainchainStatus ? (
               <MainchainStatusStrip
