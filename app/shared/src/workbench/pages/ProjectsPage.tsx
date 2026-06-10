@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../i18n';
 import {
   DesignFileIcon,
   DesignNavIcon,
@@ -180,19 +182,19 @@ export const DEFAULT_PROJECTS: ProjectInfo[] = [
   },
 ];
 
-const FILTER_ITEMS: { id: ProjectFilter; label: string; icon: DesignNavIconName }[] = [
-  { id: 'all', label: '全部项目', icon: 'grid' },
-  { id: 'running', label: '运行中', icon: 'running' },
-  { id: 'completed', label: '已完成', icon: 'done' },
-  { id: 'archived', label: '归档', icon: 'archive' },
+const FILTER_ITEMS: { id: ProjectFilter; labelKey: string; icon: DesignNavIconName }[] = [
+  { id: 'all', labelKey: 'projects.nav.all', icon: 'grid' },
+  { id: 'running', labelKey: 'projects.nav.running', icon: 'running' },
+  { id: 'completed', labelKey: 'projects.nav.completed', icon: 'done' },
+  { id: 'archived', labelKey: 'projects.nav.archived', icon: 'archive' },
 ];
 
-const TAB_ITEMS: { id: ProjectTab; label: string; icon: DesignNavIconName }[] = [
-  { id: 'overview', label: '概览', icon: 'home' },
-  { id: 'runs', label: '运行', icon: 'running' },
-  { id: 'artifacts', label: '产物', icon: 'package' },
-  { id: 'archive', label: '归档', icon: 'archive' },
-  { id: 'settings', label: '设置', icon: 'tools' },
+const TAB_ITEMS: { id: ProjectTab; labelKey: string; icon: DesignNavIconName }[] = [
+  { id: 'overview', labelKey: 'projects.tab.overview', icon: 'home' },
+  { id: 'runs', labelKey: 'projects.projectRuns', icon: 'running' },
+  { id: 'artifacts', labelKey: 'inspector.artifacts', icon: 'package' },
+  { id: 'archive', labelKey: 'projects.nav.archived', icon: 'archive' },
+  { id: 'settings', labelKey: 'projects.tab.settings', icon: 'tools' },
 ];
 
 // ── State dot class resolver ──
@@ -299,6 +301,7 @@ function FilterList({
   activeFilter: ProjectFilter;
   onFilterChange: (filter: ProjectFilter) => void;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={styles.filterList}>
       {FILTER_ITEMS.map((item) => (
@@ -311,7 +314,7 @@ function FilterList({
           <span className={styles.filterBtnIcon}>
             <DesignNavIcon name={item.icon} size={15} />
           </span>
-          {item.label}
+          {t(item.labelKey)}
         </button>
       ))}
     </div>
@@ -325,6 +328,7 @@ function ProjectTabs({
   activeTab: ProjectTab;
   onTabChange: (tab: ProjectTab) => void;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={styles.tabs}>
       {TAB_ITEMS.map((item) => (
@@ -335,7 +339,7 @@ function ProjectTabs({
           onClick={() => onTabChange(item.id)}
         >
           <DesignNavIcon name={item.icon} size={15} />
-          {item.label}
+          {t(item.labelKey)}
         </button>
       ))}
     </div>
@@ -963,6 +967,7 @@ export function ProjectsPage({
   onRunClick,
   onArtifactClick,
 }: ProjectsPageProps): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null;
   const [editorMode, setEditorMode] = useState<'create' | 'update' | null>(null);
   const [draft, setDraft] = useState<ProjectDraft>({ name: '', description: '' });
@@ -1042,26 +1047,26 @@ export function ProjectsPage({
       {/* ── Left nav ── */}
       <aside className={`${styles.nav} workbench-nav project-nav`}>
         <div className={styles.navHeader}>
-          <div className={`${styles.navTitle} workbench-title`}>项目</div>
+          <div className={`${styles.navTitle} workbench-title`}>{t('nav.projects')}</div>
           {canCreateProject ? (
             <button
               type="button"
               className={`${styles.newProjectBtn} ${styles.navNewProjectBtn} outline-action`}
               onClick={startProjectCreate}
             >
-              新建项目
+              {t('projects.newProject')}
             </button>
           ) : null}
         </div>
         <input
           className={`${styles.search} workbench-search`}
-          placeholder="搜索项目"
+          placeholder={t('header.search')}
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
-        <div className={styles.navCaption}>项目空间</div>
+        <div className={styles.navCaption}>{t('nav.projects')}</div>
         {projectsLoading ? (
-          <div className={styles.navCaption} role="status">项目加载中</div>
+          <div className={styles.navCaption} role="status">{t('nav.projects')}</div>
         ) : null}
         {projectsError ? (
           <div className={styles.navCaption} role="alert">{projectsError}</div>

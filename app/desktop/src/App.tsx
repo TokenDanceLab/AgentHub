@@ -87,6 +87,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const { online: edgeOnline } = useHealth();
 
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
+  // In demo mode with Edge available, also fetch evidence from Edge API.
+  const demoEdgeEnabled = edgeOnline && workbench.isDemo && workbench.edgeDemoData === true;
+  const edgeFetchEnabled = liveEdgeEnabled || demoEdgeEnabled;
   const { data: agentData } = useAgentList(liveEdgeEnabled);
   const { data: modelCatalog } = useModelCatalog(liveEdgeEnabled);
   const { data: ccSwitchStatus } = useCCSwitchStatus(liveEdgeEnabled);
@@ -145,14 +148,38 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   }), [liveEdgeEnabled, createDocumentMutation]);
 
   const activeRunId = useMemo(() => {
-    if (!workbench.activeThreadId) return undefined;
+    if (!workbench.activeThreadId && !demoEdgeEnabled) return undefined;
     return resolveCurrentTranscriptRunId(workbench.transcript);
-  }, [workbench.activeThreadId, workbench.transcript]);
-  const edgeRunEvidence = useRunEvidence(liveEdgeEnabled ? activeRunId : undefined);
+  }, [workbench.activeThreadId, workbench.transcript, demoEdgeEnabled]);
+  // In demo+edge mode, also fetch run evidence from Edge API.
+  const edgeRunEvidence = useRunEvidence(edgeFetchEnabled ? activeRunId : undefined);
 
-  // Demo mode: use per-conversation JS evidence; Real mode: use Edge API evidence.
+  // Demo mode: when Edge is available, use Edge API evidence; otherwise use JS mock.
+  // Real mode: always use Edge API evidence.
   const runtimeEvidence = workbench.isDemo
-    ? getDemoRuntimeEvidence(workbench.activeConversationId)
+    ? (demoEdgeEnabled && activeRunId
+      ? {
+          runId: activeRunId,
+          diffs: edgeRunEvidence.diffs,
+          artifacts: edgeRunEvidence.artifacts,
+          previews: edgeRunEvidence.previews,
+          loading: {
+            diff: edgeRunEvidence.diffLoading,
+            artifacts: edgeRunEvidence.artifactLoading,
+            previews: edgeRunEvidence.previewLoading,
+          },
+          errors: {
+            diff: edgeRunEvidence.diffError,
+            artifacts: edgeRunEvidence.artifactError,
+            previews: edgeRunEvidence.previewError,
+          },
+          sources: {
+            diff: edgeRunEvidence.diffSource,
+            artifacts: edgeRunEvidence.artifactSource,
+            previews: edgeRunEvidence.previewSource,
+          },
+        }
+      : getDemoRuntimeEvidence(workbench.activeConversationId))
     : (activeRunId ? {
         runId: activeRunId,
         diffs: edgeRunEvidence.diffs,

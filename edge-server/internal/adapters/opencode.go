@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
@@ -16,16 +19,73 @@ import (
 //
 // Phase 1: opencode run "prompt" — batch mode, plain text output.
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
+//
+// Environment variables:
+//   - OPENCODE_API_KEY: API key for the configured provider. OpenCode reads this
+//     from its config or env. When using cc-switch, the key is the cc-switch API key.
+//   - Provider-specific keys (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY) are passed
+//     through based on the provider configured in OpenCode's config.
 type OpenCodeAdapter struct {
 	binaryPath string
-	available  bool                     // #177: true if the CLI binary exists and is executable
-	budget     *runnerctx.ContextBudget // extracted from ctx in ParseStream; nil = no tracking
+	argPrefix  []string // prepended before args when .cmd shim bypassed (Windows node path)
+	available  bool     // #177: true if the CLI binary exists and is executable
+	budget     *runnerctx.ContextBudget
+	// API keys captured from parent env for passthrough to child process.
+	// The env sanitizer strips sensitive keys, so adapter-level injection is needed.
+	envVars map[string]string // key=value env pairs to inject
 }
 
 // NewOpenCodeAdapter creates an OpenCode adapter.
 func NewOpenCodeAdapter(binaryPath string) *OpenCodeAdapter {
-	_, err := exec.LookPath(binaryPath)
-	return &OpenCodeAdapter{binaryPath: binaryPath, available: err == nil}
+	cmdPath, argPrefix, available := resolveOpenCodeCommand(binaryPath, exec.LookPath, os.Stat, runtime.GOOS)
+
+	// Capture provider-specific API keys for passthrough. OpenCode supports
+	// multiple providers, and the key needed depends on the provider config.
+	// We capture all known provider keys and pass them through.
+	envVars := make(map[string]string)
+	for _, key := range []string{
+		"OPENAI_API_KEY",
+		"ANTHROPIC_API_KEY",
+		"OPENROUTER_API_KEY",
+		"GEMINI_API_KEY",
+	} {
+		if val := os.Getenv(key); val != "" {
+			envVars[key] = val
+		}
+	}
+
+	return &OpenCodeAdapter{
+		binaryPath: cmdPath,
+		argPrefix:  argPrefix,
+		available:  available,
+		envVars:    envVars,
+	}
+}
+
+// resolveOpenCodeCommand handles Windows .cmd shim bypass for the opencode CLI.
+// Mirrors the same pattern used for Claude Code and Codex adapters.
+func resolveOpenCodeCommand(binaryPath string, lookPath func(string) (string, error), stat func(string) (os.FileInfo, error), goos string) (string, []string, bool) {
+	resolved, err := lookPath(binaryPath)
+	if err != nil {
+		return binaryPath, nil, false
+	}
+
+	if goos != "windows" || !strings.EqualFold(filepath.Ext(resolved), ".cmd") {
+		return resolved, nil, true
+	}
+
+	// The npm opencode.cmd shim may corrupt multiline prompts via %* forwarding.
+	// Call the Node entrypoint directly for reliable argv passing.
+	script := filepath.Join(filepath.Dir(resolved), "node_modules", "opencode", "bin", "opencode.js")
+	info, err := stat(script)
+	if err != nil || info.IsDir() {
+		return resolved, nil, true
+	}
+	nodePath, err := lookPath("node")
+	if err != nil {
+		return resolved, nil, true
+	}
+	return nodePath, []string{script}, true
 }
 
 func (a *OpenCodeAdapter) Metadata() AdapterMetadata {
