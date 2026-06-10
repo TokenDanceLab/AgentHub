@@ -12,7 +12,7 @@ func AddReaction(db *gorm.DB, reaction *model.MessageReaction) error {
 
 func RemoveReaction(db *gorm.DB, sessionID, messageID, userID, reaction string) error {
 	return db.
-		Where("session_id = ? AND message_id = ? AND user_id = ? AND reaction = ?", sessionID, messageID, userID, reaction).
+		Where("session_id = ? AND message_id = ? AND user_id = ? AND emoji = ?", sessionID, messageID, userID, reaction).
 		Delete(&model.MessageReaction{}).Error
 }
 

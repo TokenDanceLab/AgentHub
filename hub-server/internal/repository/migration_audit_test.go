@@ -139,9 +139,9 @@ func TestMigration0045MessageReactionsCreatesUniqueUserReactionTable(t *testing.
 	requireSQL(t, normalizedUp, "session_id uuid not null references sessions(id) on delete cascade")
 	requireSQL(t, normalizedUp, "message_id uuid not null")
 	requireSQL(t, normalizedUp, "user_id uuid not null references users(id) on delete cascade")
-	requireSQL(t, normalizedUp, "reaction varchar(64) not null")
+	requireSQL(t, normalizedUp, "emoji varchar(64) not null")
 	requireSQL(t, normalizedUp, "constraint fk_message_reactions_message_session foreign key (session_id, message_id) references messages (session_id, id) on delete cascade")
-	requireSQL(t, normalizedUp, "constraint uq_message_reaction unique (session_id, message_id, user_id, reaction)")
+	requireSQL(t, normalizedUp, "constraint uq_message_reaction unique (session_id, message_id, user_id, emoji)")
 	requireSQL(t, normalizedUp, "create index if not exists idx_message_reactions_message on message_reactions (session_id, message_id)")
 	requireSQL(t, normalizedUp, "create index if not exists idx_message_reactions_user on message_reactions (user_id)")
 
