@@ -4,7 +4,7 @@ export function collectTranscriptEvidence(blocks: TranscriptBlock[]): EvidenceRe
   const evidence: EvidenceRef[] = [];
   const indexById = new Map<string, number>();
 
-  for (const block of blocks) {
+  function visit(block: TranscriptBlock): void {
     for (const ref of block.evidenceRefs ?? []) {
       const existingIndex = indexById.get(ref.id);
       if (existingIndex !== undefined) {
@@ -17,6 +17,14 @@ export function collectTranscriptEvidence(blocks: TranscriptBlock[]): EvidenceRe
       indexById.set(ref.id, evidence.length);
       evidence.push(ref);
     }
+
+    if (block.kind === 'run_step_group') {
+      block.children.forEach(visit);
+    }
+  }
+
+  for (const block of blocks) {
+    visit(block);
   }
 
   return evidence;

@@ -35,7 +35,12 @@ export function ConversationSidebar({
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter((c) => c.title.toLowerCase().includes(q));
+      list = list.filter((c) => {
+        if (c.title.toLowerCase().includes(q)) return true;
+        if (c.subtitle && c.subtitle.toLowerCase().includes(q)) return true;
+        if (c.members && c.members.some((m) => m.toLowerCase().includes(q))) return true;
+        return false;
+      });
     }
     return list;
   })();
@@ -78,6 +83,14 @@ export function ConversationSidebar({
         </button>
       )}
       <ul className={styles.conversationList}>
+        {sortedConversations.length === 0 && (
+          <li className={styles.conversationEmpty}>
+            <span className={styles.conversationEmptyTitle}>No conversations</span>
+            <span className={styles.conversationEmptyHint}>
+              {searchQuery.trim() ? 'Try a different search term' : 'Start a new conversation to begin'}
+            </span>
+          </li>
+        )}
         {sortedConversations.map((conversation) => {
           const initial = conversation.avatarLabel ?? conversation.title.slice(0, 1);
           const isActive = conversation.id === activeConversationId;
@@ -174,7 +187,11 @@ export function ConversationSidebar({
                     <button
                       aria-label="归档"
                       className={styles.conversationActionBtn}
-                      onClick={() => onArchiveConversation(conversation.id, true)}
+                      onClick={() => {
+                        if (window.confirm('Archive this conversation?')) {
+                          onArchiveConversation(conversation.id, true);
+                        }
+                      }}
                       title="归档"
                       type="button"
                     >

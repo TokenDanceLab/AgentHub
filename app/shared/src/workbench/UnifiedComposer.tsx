@@ -68,8 +68,6 @@ export function UnifiedComposer({
     status?.dataMode ? `Data: ${status.dataMode}` : undefined,
     status?.targetState ? `Target: ${status.targetState}${status.targetLabel ? ` - ${status.targetLabel}` : ''}` : undefined,
     status?.replayLabel,
-    isSubmitting ? 'Run/task: starting' : undefined,
-    composer.submitState === 'error' ? 'Run/task: start failed' : undefined,
     targetStatus,
   ].filter((item): item is string => Boolean(item));
 
@@ -95,7 +93,14 @@ export function UnifiedComposer({
     if (!shouldSubmit) return;
 
     event.preventDefault();
-    if (!submitDisabled) {
+    // Use the textarea's current DOM value instead of composer.text to avoid
+    // stale-state issues: React batches state updates, so the latest onChange
+    // dispatch may not have re-rendered yet when Enter fires immediately after.
+    const currentText = event.currentTarget.value ?? '';
+    const hasText = currentText.trim().length > 0;
+    const canSubmit = hasText || composer.attachments.length > 0;
+    const targetOk = !targetSelectionRequired || executionTargetId.trim().length > 0;
+    if (canSubmit && !isSubmitting && targetOk) {
       event.currentTarget.form?.requestSubmit();
     }
   }
