@@ -18,6 +18,7 @@ export type { HubRuntimeEventTranscriptInput } from './normalizeHubRuntimeEvents
 export type { ThreadTranscriptItemInput } from './normalizeThreadItems';
 export type {
   ApprovalTranscriptBlock,
+  DeployTranscriptBlock,
   AgentTimelineItem,
   AgentTimelineTranscriptBlock,
   ApprovalDecisionAction,
