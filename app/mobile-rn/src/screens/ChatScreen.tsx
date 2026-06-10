@@ -16,6 +16,7 @@ interface ChatScreenProps {
   showBack?: boolean;
   onBack: () => void;
   onOpenRuns: () => void;
+  onToggleInspector?: () => void;
 }
 
 function formatChatCopy(value: string): string {
@@ -217,6 +218,7 @@ export function ChatScreen({
   showBack = true,
   onBack,
   onOpenRuns,
+  onToggleInspector,
 }: ChatScreenProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
   const t = useStrings();
@@ -230,7 +232,7 @@ export function ChatScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: tokens.color.panel }}>
-      <ChatHeader activeRun={activeRun} showBack={showBack} onBack={onBack} thread={thread} />
+      <ChatHeader activeRun={activeRun} showBack={showBack} onBack={onBack} thread={thread} onToggleInspector={onToggleInspector} />
       <ChatTabs />
       <ScrollView
         contentContainerStyle={{
