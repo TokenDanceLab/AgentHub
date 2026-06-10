@@ -112,3 +112,5 @@ export { AgentStreamingBar } from './AgentStreamingBar';
 export type { AgentStreamingBarProps } from './AgentStreamingBar';
 export { DagTree } from './DagTree';
 export type { DagTreeProps, DagNode, DagNodeStatus } from './DagTree';
+export { StepCard } from './StepCard';
+export type { StepCardProps, StepCardSubStep, StepCardStatus, SubStepKind } from './StepCard';
