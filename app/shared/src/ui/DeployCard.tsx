@@ -3,9 +3,11 @@ import styles from './DeployCard.module.css';
 
 export interface DeployCardProps {
   deployId?: string | undefined;
-  status?: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
+  status?: 'pending' | 'ready' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
   statusMessage?: string | undefined;
   url?: string | undefined;
+  /** Called when the user clicks the deploy button. */
+  onDeploy?: (() => void) | undefined;
 }
 
 const STATUS_ICON: Record<string, typeof Rocket> = {
@@ -18,6 +20,7 @@ const STATUS_ICON: Record<string, typeof Rocket> = {
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '待部署',
+  ready: '就绪',
   building: '构建中',
   deploying: '部署中',
   deployed: '已就绪',
@@ -28,6 +31,7 @@ export default function DeployCard({
   status,
   statusMessage,
   url,
+  onDeploy,
 }: DeployCardProps) {
   const resolvedStatus = status ?? 'pending';
   const StatusIcon = STATUS_ICON[resolvedStatus] ?? Rocket;
@@ -76,6 +80,19 @@ export default function DeployCard({
               <span>打开</span>
             </a>
           </div>
+        </div>
+      )}
+
+      {!url && onDeploy && (
+        <div className={styles.urlBox}>
+          <button
+            className={styles.previewBtn}
+            type="button"
+            onClick={onDeploy}
+          >
+            <Rocket size={13} />
+            <span>部署到公网</span>
+          </button>
         </div>
       )}
     </div>
