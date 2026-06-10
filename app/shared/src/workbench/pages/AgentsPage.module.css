@@ -451,6 +451,48 @@
   white-space: nowrap;
 }
 
+/* ── Capability tags in agent list rows ── */
+
+.agent-capability-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.capability-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  font: 500 0.625rem/1.4 var(--font-sans);
+  white-space: nowrap;
+}
+
+.capability-tag.tag-blue {
+  background: oklch(0.92 0.06 250);
+  color: oklch(0.35 0.12 250);
+}
+
+.capability-tag.tag-green {
+  background: oklch(0.92 0.06 150);
+  color: oklch(0.35 0.12 150);
+}
+
+.capability-tag.tag-orange {
+  background: oklch(0.93 0.06 70);
+  color: oklch(0.38 0.12 70);
+}
+
+.capability-tag.tag-purple {
+  background: oklch(0.92 0.06 310);
+  color: oklch(0.35 0.12 310);
+}
+
+.capability-tag.tag-teal {
+  background: oklch(0.92 0.06 185);
+  color: oklch(0.35 0.12 185);
+}
+
 /* ── Agent avatar ── */
 
 .agent-avatar {

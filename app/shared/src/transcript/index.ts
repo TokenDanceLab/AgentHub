@@ -22,6 +22,7 @@ export type {
   AgentTimelineTranscriptBlock,
   ApprovalDecisionAction,
   ArtifactTranscriptBlock,
+  AttachmentTranscriptBlock,
   ChildAgentTranscriptBlock,
   ContextUsageTranscriptBlock,
   DiffTranscriptBlock,

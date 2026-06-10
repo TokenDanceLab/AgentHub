@@ -3,6 +3,7 @@
 import type { ComponentProps } from 'react';
 
 import { AgentMessage } from './AgentMessage';
+import { AttachmentBlock } from './AttachmentBlock';
 import { UserMessage } from './UserMessage';
 import { ToolCardBlock, STATUS_LABELS as TOOL_STATUS_LABELS } from './ToolCardBlock';
 import { FileChangeCard } from './FileChangeCard';
@@ -22,6 +23,7 @@ import { RunStepGroup } from './RunStepGroup';
 
 export {
   AgentMessage,
+  AttachmentBlock,
   UserMessage,
   ToolCardBlock,
   TOOL_STATUS_LABELS,
@@ -45,6 +47,7 @@ export {
 /* ── Prop types ── */
 
 export type AgentMessageProps = ComponentProps<typeof AgentMessage>;
+export type AttachmentBlockProps = ComponentProps<typeof AttachmentBlock>;
 export type UserMessageProps = ComponentProps<typeof UserMessage>;
 export type ToolCardBlockProps = ComponentProps<typeof ToolCardBlock>;
 export type FileChangeCardProps = ComponentProps<typeof FileChangeCard>;

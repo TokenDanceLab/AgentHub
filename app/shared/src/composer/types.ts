@@ -45,6 +45,12 @@ export interface ComposerAttachment {
   attachmentRef?: AttachmentRef;
 }
 
+export interface ReplyToContext {
+  messageId: string;
+  author: string;
+  preview: string;
+}
+
 export interface ComposerState {
   conversationId: string;
   text: string;
@@ -54,6 +60,7 @@ export interface ComposerState {
   approvalMode: ApprovalMode;
   workDir: string;
   submitState: ComposerSubmitState;
+  replyTo: ReplyToContext | null;
 }
 
 export interface ComposerIntent {
@@ -64,6 +71,7 @@ export interface ComposerIntent {
   attachments: ComposerAttachment[];
   approvalMode: ApprovalMode;
   workDir?: string;
+  replyTo?: ReplyToContext;
 }
 
 export interface ComposerSubmitResult {
@@ -81,4 +89,5 @@ export type ComposerAction =
   | { type: 'setSubmitState'; submitState: ComposerSubmitState }
   | { type: 'addAttachment'; attachment: ComposerAttachment }
   | { type: 'removeAttachment'; attachmentId: string }
+  | { type: 'setReplyTo'; replyTo: ReplyToContext | null }
   | { type: 'resetAfterSubmit' };
