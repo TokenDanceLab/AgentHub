@@ -136,6 +136,17 @@ export interface SendMessageResponse {
   created_at: string;
 }
 
+export interface MessageAttachment {
+  id: string;
+  hash: string;
+  size: number;
+  mime_type: string;
+  original_name?: string;
+  uploader_user_id?: string;
+  metadata?: string;
+  created_at?: string;
+}
+
 export interface ReplyToInfo {
   id: string;
   sender_id: string;
@@ -155,6 +166,9 @@ export interface MessageResponse {
   reply_to?: ReplyToInfo;
   recalled?: boolean;
   created_at?: string;
+  attachments?: MessageAttachment[];
+  edited?: boolean;
+  edited_at?: string;
 }
 
 // 鈹€鈹€ Devices 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
