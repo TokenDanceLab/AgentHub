@@ -335,3 +335,95 @@ You can add facts, preferences, and context that the agent should remember.
 `
 	return os.WriteFile(projectPath, []byte(defaultContent), 0644)
 }
+
+// ── Writing ──────────────────────────────────────────────────────────────────
+
+// MemoryWriteRequest describes a memory entry to write.
+type MemoryWriteRequest struct {
+	WorkDir   string
+	ThreadID  string
+	AgentID   string
+	Entry     MemoryEntry
+	Overwrite bool // replace the entire file instead of appending
+}
+
+// WriteMemoryEntry appends (or overwrites) a memory entry to the appropriate
+// file under {workDir}/.agenthub/memory/. The target file is selected by scope:
+//   - agentID set  -> agent_{agentID}.md
+//   - threadID set -> thread_{threadID}.md
+//   - otherwise    -> project.md
+//
+// When Overwrite is true, the file is replaced with just this entry.
+// When Overwrite is false (default), the entry is appended to the end of the file.
+func WriteMemoryEntry(req MemoryWriteRequest) (MemoryEntry, error) {
+	if req.WorkDir == "" {
+		return MemoryEntry{}, fmt.Errorf("workDir is required")
+	}
+
+	memDir := filepath.Join(req.WorkDir, memorySubdir)
+
+	// Determine target file
+	var targetFile string
+	var category string
+	switch {
+	case req.AgentID != "":
+		targetFile = filepath.Join(memDir, agentMemoryFile(req.AgentID))
+		category = "agent " + req.AgentID
+	case req.ThreadID != "":
+		targetFile = filepath.Join(memDir, threadMemoryFile(req.ThreadID))
+		category = "thread " + req.ThreadID
+	default:
+		targetFile = filepath.Join(memDir, projectFile)
+		category = "project"
+	}
+
+	// Validate source
+	source := req.Entry.Source
+	if source == "" {
+		source = "user"
+	}
+	if source != "user" && source != "agent" && source != "system" {
+		source = "user"
+	}
+	entry := req.Entry
+	entry.Source = source
+	if entry.CreatedAt == "" {
+		entry.CreatedAt = time.Now().Format(time.RFC3339)
+	}
+	entry.UpdatedAt = time.Now().Format(time.RFC3339)
+
+	// Format the entry as YAML frontmatter + Markdown body
+	var tagsLine string
+	if len(entry.Tags) > 0 {
+		tagsLine = fmt.Sprintf("tags: [%s]", strings.Join(entry.Tags, ", "))
+	}
+	var sb strings.Builder
+	sb.WriteString("---\n")
+	sb.WriteString(fmt.Sprintf("id: %s\n", entry.ID))
+	sb.WriteString(fmt.Sprintf("source: %s\n", entry.Source))
+	if tagsLine != "" {
+		sb.WriteString(tagsLine + "\n")
+	}
+	sb.WriteString(fmt.Sprintf("created: %s\n", entry.CreatedAt))
+	sb.WriteString(fmt.Sprintf("updated: %s\n", entry.UpdatedAt))
+	sb.WriteString("---\n\n")
+	sb.WriteString(entry.Content + "\n")
+
+	if req.Overwrite {
+		if err := os.WriteFile(targetFile, []byte(sb.String()), 0644); err != nil {
+			return MemoryEntry{}, fmt.Errorf("write memory file %s: %w", category, err)
+		}
+	} else {
+		// Append to existing file
+		f, err := os.OpenFile(targetFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return MemoryEntry{}, fmt.Errorf("open memory file %s: %w", category, err)
+		}
+		defer f.Close()
+		if _, err := f.WriteString("\n" + sb.String()); err != nil {
+			return MemoryEntry{}, fmt.Errorf("append memory file %s: %w", category, err)
+		}
+	}
+
+	return entry, nil
+}
