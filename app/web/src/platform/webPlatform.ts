@@ -11,7 +11,7 @@ import {
   type WorkbenchDemoRuntimeStore,
 } from '@shared/demo';
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
-import type { AttachmentRef, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
+import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import { computeFileHash } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { AgentInfo } from '@shared/types';
@@ -249,6 +249,42 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
 export interface SubmitWebComposerIntentOptions {
   queryClient?: QueryClient;
   now?: () => string;
+}
+
+/**
+ * Upload any attachments that have a browser File reference but have not
+ * yet been uploaded to the Hub attachment store. Returns a new attachments
+ * array with attachmentRef populated for each successfully uploaded file.
+ */
+async function uploadPendingAttachments(intent: ComposerIntent): Promise<ComposerAttachment[]> {
+  const hubAttachments = createHubClient({ getToken: getAccessToken });
+  return Promise.all(intent.attachments.map(async (attachment) => {
+    // Already uploaded or no File to upload
+    if (attachment.attachmentRef || !attachment.file) return attachment;
+
+    try {
+      const hash = await computeFileHash(attachment.file);
+      const ref = await hubAttachments.uploadAttachment(attachment.file, hash);
+      return {
+        ...attachment,
+        attachmentRef: {
+          id: ref.id,
+          name: ref.original_name || attachment.name,
+          original_name: ref.original_name,
+          size: ref.size,
+          mime_type: ref.mime_type,
+          hash: ref.hash,
+          url: hubAttachments.downloadAttachmentUrl(ref.id),
+          metadata: ref.metadata,
+          created_at: ref.created_at,
+        },
+      };
+    } catch {
+      // If upload fails, keep the attachment without a ref so the text
+      // content is still included in the message.
+      return attachment;
+    }
+  }));
 }
 
 export async function submitWebComposerIntent(
