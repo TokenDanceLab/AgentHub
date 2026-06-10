@@ -77,13 +77,11 @@ export const EDGE_AUTH_TOKEN = import.meta.env.VITE_EDGE_AUTH_TOKEN || '';
 function envOrDev(key: string, devDefault: string): string {
   const val = (import.meta.env as Record<string, string | undefined>)[key];
   if (val) return val;
-  if (import.meta.env.DEV) return devDefault;
-  console.error(`[AgentHub Desktop] ${key} is not set. Configure it for production deployment.`);
-  return '';
+  return devDefault;
 }
 
-export const HUB_URL = envOrDev('VITE_HUB_URL', 'http://localhost:8080');
-export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'ws://localhost:8080/client/ws');
+export const HUB_URL = envOrDev('VITE_HUB_URL', 'https://api.hub.vectorcontrol.tech');
+export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'wss://api.hub.vectorcontrol.tech/client/ws');
 export const TOKENDANCE_LOGIN_URL = import.meta.env.VITE_TOKENDANCE_LOGIN_URL || '';
 
 export const HEALTH_POLL_MS = 5000;

@@ -1,11 +1,12 @@
-import { useMemo, useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride, workbenchDemoRuntimeStore } from '@shared/demo';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
+import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import type { ApprovalDecisionAction } from '@shared/transcript';
-import type { WorkbenchConversation } from '@shared/platform';
+import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import { useAgentList } from '@/api/agentQueries';
 import { useDecideTeamApproval } from '@/api/agentTeamQueries';
 import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
@@ -33,6 +34,7 @@ import {
 import { getHubClient } from '@/api/hubQueries';
 import type { AgentConfig, DocRow, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
+import { useToastStore } from '@/stores/toastStore';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
@@ -50,6 +52,13 @@ export default function App() {
     setEntryMode('workbench');
   }
 
+  function handleConnectEdge(): void {
+    // Demo mode auto-detects Edge availability and reads from Edge API.
+    // Use 'mock' data mode so the app shows demo conversations powered by real Edge data.
+    writeWorkbenchDataModeOverride('mock');
+    setEntryMode('workbench');
+  }
+
   function handleLoginSuccess(): void {
     writeWorkbenchDataModeOverride('approved-real');
     setEntryMode('workbench');
@@ -61,7 +70,7 @@ export default function App() {
         <DesktopEntryGate
           onLoginSuccess={handleLoginSuccess}
           onContinueDemo={continueDemo}
-          onConnectEdge={() => {/* TODO: connect to local edge */}}
+          onConnectEdge={handleConnectEdge}
           onToggleTheme={toggleAppliedAgentHubTheme}
           edgeOnline={edgeOnline}
         />
@@ -85,6 +94,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const workbench = useDesktopWorkbenchModel(selectedConversationId);
   const { online: edgeOnline } = useHealth();
+  const queryClient = useQueryClient();
+  const submitRunRef = useRef(false);
+  const agentsRef = useRef<WorkbenchAgent[] | undefined>(undefined);
+  const showToast = useToastStore((s) => s.showToast);
 
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
   // In demo mode with Edge available, also fetch evidence from Edge API.
@@ -201,11 +214,59 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
           previews: edgeRunEvidence.previewSource,
         },
       } : undefined);
+  // Wrap submitRun to invalidate thread items after run creation so the transcript
+  // refreshes to show new agent messages. The invalidation is immediate plus a few
+  // delayed follow-ups to catch async agent responses that arrive after the run starts.
+  const submitRunWithRefresh = useCallback(
+    async (req: Parameters<typeof createRun.mutateAsync>[0]) => {
+      if (submitRunRef.current) {
+        showToast('warning', '已有正在运行的请求，请等待完成后再试。');
+        return undefined as unknown as ReturnType<typeof createRun.mutateAsync>;
+      }
+      submitRunRef.current = true;
+      // Immediately show a "dispatching" indicator so the user knows
+      // the request was received.  The Edge SSE bridge in
+      // useDesktopEdgeEvents will update the status to thinking/streaming
+      // once the run actually starts.
+      const pendingRunId = `pending-${Date.now()}`;
+      getAgentActivityStore().pushAgentStatus(
+        pendingRunId,
+        agentsRef.current?.[0]?.name ?? 'Agent',
+        'dispatching',
+      );
+      try {
+        const threadId = req?.threadId ?? workbench.activeThreadId;
+        const run = await createRun.mutateAsync(req);
+        // Once we get a real runId back, swap the pending entry for the real one.
+        const realRunId = run?.runId;
+        if (realRunId) {
+          getAgentActivityStore().state.activeAgents.delete(pendingRunId);
+        }
+        // Immediate invalidation — useCreateRun.onSettled also does this, but we
+        // additionally schedule delayed re-fetches for the agent's async response.
+        if (threadId) {
+          void queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
+          // Follow-up invalidations at 2s and 4s to catch agent responses.
+          setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] }), 2_000);
+          setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] }), 4_000);
+        }
+        return run;
+      } catch (err) {
+        // On failure, clean up the pending entry.
+        getAgentActivityStore().state.activeAgents.delete(pendingRunId);
+        throw err;
+      } finally {
+        submitRunRef.current = false;
+      }
+    },
+    [createRun.mutateAsync, queryClient, workbench.activeThreadId, showToast],
+  );
+
   const desktopPlatform = useMemo(() => createDesktopPlatform({
     ...(workbench.activeProjectId ? { activeProjectId: workbench.activeProjectId } : {}),
     ...(workbench.activeThreadId ? { activeThreadId: workbench.activeThreadId } : {}),
-    ...(!workbench.isDemo ? { submitRun: createRun.mutateAsync } : {}),
-  }), [createRun.mutateAsync, workbench.activeProjectId, workbench.activeThreadId, workbench.isDemo]);
+    ...(edgeOnline ? { submitRun: submitRunWithRefresh } : {}),
+  }), [submitRunWithRefresh, workbench.activeProjectId, workbench.activeThreadId, edgeOnline]);
   const edgeAgents = useMemo(
     () => mapEdgeAgentsToWorkbenchAgents(agentData?.items ?? [], modelCatalog),
     [agentData?.items, modelCatalog],
@@ -228,6 +289,12 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     }
     return edgeAgents;
   }, [workbench.isDemo, workbench.agents, profileData?.items, hubProfileData, edgeAgents]);
+
+  // Keep agentsRef in sync so submitRunWithRefresh can read it without being
+  // declared after it.
+  useEffect(() => {
+    agentsRef.current = agents;
+  }, [agents]);
 
   async function handleAgentCreate(agent: AgentConfig): Promise<void> {
     setAgentActionError(undefined);
@@ -373,6 +440,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
           dataMode: workbench.dataMode,
           targetState: workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',
           targetLabel: workbench.isDemo ? 'Demo runtime' : 'Local Edge',
+          initialLoading: workbench.threadsLoading === true && workbench.conversations.length === 0,
+          loadError: workbench.threadsError ?? workbench.itemsError,
         }}
       />
     </>
