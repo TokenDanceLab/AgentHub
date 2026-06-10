@@ -9,6 +9,10 @@ export type {
   ToolPermission,
   RiskLevel,
   ModelState,
+  SkillMarketItem,
+  SkillType,
+  MCPMarketItem,
+  MCPTransportType,
 } from './AgentsPage';
 
 export { ContactsPage } from './ContactsPage';
