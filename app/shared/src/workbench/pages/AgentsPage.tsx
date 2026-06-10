@@ -182,6 +182,24 @@ export interface MCPMarketItem {
   updated_at?: string;
 }
 
+/* ── cc-switch integration ── */
+
+export interface CCSwitchStatusInfo {
+  installed: boolean;
+  routingActive: boolean;
+  proxyPort?: number;
+  activeAppTypes?: string[];
+}
+
+export interface CCSwitchProviderInfo {
+  providerId: string;
+  providerName: string;
+  appType: string;
+  isCurrent: boolean;
+  isActive: boolean;
+  modelAliases?: Record<string, string>;
+}
+
 /* ── Props ── */
 
 export interface AgentsPageProps {
@@ -308,6 +326,10 @@ export interface AgentsPageProps {
   onMcpInstall?: ((mcp: MCPMarketItem) => void) | undefined;
   onMcpUninstall?: ((mcpId: string) => void) | undefined;
   installedMcpIds?: string[];
+
+  /* ── cc-switch model proxy ── */
+  ccSwitchStatus?: CCSwitchStatusInfo;
+  ccSwitchProviders?: CCSwitchProviderInfo[];
 
   /* ── Recent change shortcuts in nav ── */
   recentShortcuts?: string[];
@@ -1246,6 +1268,8 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
     modelHealthRows = [],
     onModelAdd,
     onModelRouteClick,
+    ccSwitchStatus,
+    ccSwitchProviders = [],
   } = props;
 
   return (
