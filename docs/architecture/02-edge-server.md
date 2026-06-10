@@ -20,7 +20,7 @@ Edge Server（`edge-server/`）是本机执行层：
 ```text
 Desktop shared workbench
   -> Desktop platform adapter
-  -> Local Edge Server           <-- 本文档
+  -> Local Edge Server           <-- 本文档（执行 / Thread / Run / Artifact）
   -> AgentAdapter
   -> Claude Code / Codex / OpenCode
 ```

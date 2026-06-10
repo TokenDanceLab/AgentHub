@@ -26,7 +26,8 @@ interface AgentHubPlatform {
 ### Desktop Adapter
 
 - Local Edge status/start/stop
-- Edge REST/WS
+- Edge REST/WS（Thread / Run / Artifact / Agent）
+- **Hub REST/WS**（认证 / 联系人 / 会话 / 消息 / 项目 / 文档）—— 通过 `hubClient.ts` 直连 Hub Server，不经过 Edge
 - Tauri file/dialog/window/keyring/notification
 - Local workspace allowlist
 - TokenDance ID loopback callback
