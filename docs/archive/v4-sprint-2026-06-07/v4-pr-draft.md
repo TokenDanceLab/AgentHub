@@ -1,3 +1,5 @@
+> ⚠️ 已归档：Draft PR #291 的文案草稿，已被 PR #297 取代。归档日期：2026-06-10。
+
 # Draft PR: Desktop/Web v4 Shared Workbench
 
 > Draft PR 已创建：[TokenDanceLab/AgentHub#291](https://github.com/TokenDanceLab/AgentHub/pull/291)。

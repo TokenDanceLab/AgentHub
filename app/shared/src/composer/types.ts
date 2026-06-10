@@ -12,6 +12,25 @@ export interface ComposerMention {
   runtimeId?: string;
 }
 
+/**
+ * Reference to an attachment stored on the Hub server.
+ * Returned by `POST /client/attachments` and embedded in messages
+ * with `content_type: "file"` or `content_type: "image"`.
+ */
+export interface AttachmentRef {
+  id: string;
+  name: string;
+  /** Original filename from the Hub server (maps to `original_name` in the API). */
+  original_name?: string;
+  size: number;
+  mime_type: string;
+  hash?: string;
+  /** Download URL relative to the Hub server base (e.g. `/client/attachments/:id`). */
+  url?: string;
+  metadata?: string;
+  created_at?: string;
+}
+
 export interface ComposerAttachment {
   id: string;
   name: string;
@@ -22,6 +41,8 @@ export interface ComposerAttachment {
   mime?: string;
   contentPreview?: string;
   truncated?: boolean;
+  /** Populated after a successful Hub upload. */
+  attachmentRef?: AttachmentRef;
 }
 
 export interface ComposerState {

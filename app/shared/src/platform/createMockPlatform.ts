@@ -1,4 +1,4 @@
-import type { ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
+import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
 import type { EvidenceRef } from '../transcript';
 import type {
   AgentHubPlatform,
@@ -54,6 +54,15 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
       ? {
           attachments: {
             pickFiles: seed.pickFiles,
+            async uploadAttachment(file: File): Promise<AttachmentRef> {
+              return {
+                id: `mock-attachment-${file.name}`,
+                name: file.name,
+                original_name: file.name,
+                size: file.size,
+                mime_type: file.type || 'application/octet-stream',
+              };
+            },
           },
         }
       : {}),

@@ -82,14 +82,16 @@ type ProcessExecutor struct {
 	shutdownGracePeriod  time.Duration
 	shutdownForceTimeout time.Duration
 
-	mu         sync.Mutex
-	running    map[string]context.CancelFunc
-	stdins     map[string]io.Writer                 // runID to stdin (for adapter-aware interrupt)
-	processes  map[string]*os.Process               // runID to os.Process (for graceful shutdown)
-	runOutputs map[string]*runnerctx.RunOutputStore // runID to temp log for output persistence and replay
-	runToAgent map[string]string                    // runID to agentInstanceID for result aggregation
-	hubTasks   map[string]string                    // runID to Hub taskID (for Edge→Hub callbacks)
-	hubOutputs map[string]*hubOutputCollector       // runID to bounded final response collector
+	mu          sync.Mutex
+	running     map[string]context.CancelFunc
+	stdins      map[string]io.Writer                       // runID to stdin (for adapter-aware interrupt)
+	processes   map[string]*os.Process                     // runID to os.Process (for graceful shutdown)
+	runOutputs  map[string]*runnerctx.RunOutputStore       // runID to temp log for output persistence and replay
+	runToAgent  map[string]string                          // runID to agentInstanceID for result aggregation
+	hubTasks    map[string]string                          // runID to Hub taskID (for Edge→Hub callbacks)
+	hubOutputs  map[string]*hubOutputCollector             // runID to bounded final response collector
+	workDirs    map[string]string                          // runID to workDir (for post-finish surfacing)
+	surfacers   map[string]*adapters.WorkdirSnapshot       // runID to pre-run snapshot (for auto-surface detection)
 }
 
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
@@ -136,13 +138,15 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		runTimeout:                runTimeout,
 		shutdownGracePeriod:       shutdownGP,
 		shutdownForceTimeout:      shutdownFT,
-		running:                   make(map[string]context.CancelFunc),
-		stdins:                    make(map[string]io.Writer),
-		processes:                 make(map[string]*os.Process),
-		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
-		runToAgent:                make(map[string]string),
-		hubTasks:                  make(map[string]string),
-		hubOutputs:                make(map[string]*hubOutputCollector),
+		running:     make(map[string]context.CancelFunc),
+		stdins:      make(map[string]io.Writer),
+		processes:   make(map[string]*os.Process),
+		runOutputs:  make(map[string]*runnerctx.RunOutputStore),
+		runToAgent:  make(map[string]string),
+		hubTasks:    make(map[string]string),
+		hubOutputs:  make(map[string]*hubOutputCollector),
+		workDirs:    make(map[string]string),
+		surfacers:   make(map[string]*adapters.WorkdirSnapshot),
 	}, nil
 }
 
@@ -447,6 +451,16 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if adapter != nil {
 		plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
 		e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
+	}
+
+	// Take workdir snapshot for auto-surface detection (post-finish).
+	// Captures pre-run file state so we can detect new/modified files.
+	if workDir != "" {
+		snapshot := adapters.TakeWorkdirSnapshot(workDir)
+		e.mu.Lock()
+		e.workDirs[run.ID] = workDir
+		e.surfacers[run.ID] = snapshot
+		e.mu.Unlock()
 	}
 
 	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
@@ -1035,6 +1049,10 @@ func (e *ProcessExecutor) finish(runID string) {
 		e.agentRegistry.ShutdownCascade(runID)
 	}
 
+	// Auto-surface: detect file changes and emit artifact/preview/diff events.
+	// Only surfaces when the run finished successfully.
+	e.surfaceRunArtifacts(runID)
+
 	e.mu.Lock()
 	delete(e.running, runID)
 	delete(e.stdins, runID)
@@ -1042,6 +1060,8 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.runToAgent, runID)
 	delete(e.hubTasks, runID)
 	delete(e.hubOutputs, runID)
+	delete(e.workDirs, runID)
+	delete(e.surfacers, runID)
 	if s, ok := e.runOutputs[runID]; ok {
 		if err := s.Close(); err != nil {
 			slog.Warn("process: failed to close output store", "runId", runID, "err", err)
@@ -1049,6 +1069,35 @@ func (e *ProcessExecutor) finish(runID string) {
 		delete(e.runOutputs, runID)
 	}
 	e.mu.Unlock()
+}
+
+// surfaceRunArtifacts performs auto-surface detection after a run completes.
+// It reads the pre-run workdir snapshot, scans for new/modified files, and
+// emits surfaced artifact/preview/diff events so the frontend can render them
+// inline in the chat transcript. Errors are logged but never block cleanup.
+func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
+	e.mu.Lock()
+	snapshot := e.surfacers[runID]
+	e.mu.Unlock()
+
+	if snapshot == nil {
+		return // no workdir tracked for this run
+	}
+
+	// Only surface for successfully finished runs.
+	current, ok := e.store.GetRun(runID)
+	if !ok || current.Status != "finished" {
+		return
+	}
+
+	// Resolve a store.Writer for direct persistence.
+	writer, ok := e.store.(store.Writer)
+	if !ok {
+		slog.Debug("surfacing: store does not implement Writer, skipping", "runId", runID)
+		return
+	}
+
+	adapters.SurfaceAndEmit(e.bus, writer, snapshot, current)
 }
 
 // sendSubAgentResult delivers a result message from a completed sub-agent run

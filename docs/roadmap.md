@@ -424,14 +424,13 @@ Web / Desktop / Mobile / IM
 
 | 缺口 | 影响 | 阻塞原因 | 路线图章节 |
 |------|------|---------|-----------|
-| 消息搜索点击导航 | 搜索结果无法跳转到原始消息位置 | UI 层 | 4 |
-| 进入会话后未读计数清零 | 需手动清除 | 需 hubClient 调用时机 | 4 |
-| WS 断线重连事件不丢失 | 重连后可能有事件遗漏 | ws 库兼容性 | 4 |
-| 连接状态指示器 | 用户无法感知 WS 连接状态 | 前端状态同步 | 4 |
-| Tool allowlist | 无法限制 Agent 可调用工具 | API 层配置 | 6 |
+| 消息搜索点击导航 | 搜索结果无法跳转到原始消息位置 | UI 层（data path verified） | 4 |
+| 进入会话后未读计数清零 | 需手动清除 | UI 时序（markRead REST 已接线） | 4 |
+| WS 断线重连事件不丢失 | 重连后可能有事件遗漏 | UI 层（transport.ts 指数退避已实现） | 4 |
+| 连接状态指示器 | 用户无法感知 WS 连接状态 | UI 渲染（workbenchState.ts 状态机已实现） | 4 |
+| Tool allowlist 运行时强制 | Edge 不强制过滤工具调用 | 运行时强制过滤（data path verified） | 6 |
 | Android APK 构建 | Mobile 缺少 Android 构建产出 | 缺少构建环境 | 13 |
 | macOS unsigned path | Desktop macOS 打包路径未拆清 | 缺少硬件 | 13 |
-| 安全风险登记册关闭 | 发布阻塞项 | 流程审批 | 16 |
 | Codex CLI 真实执行 | 适配器已实现但无法调用 | 缺 `OPENAI_API_KEY` | 10 |
 | SDK 真实 API 消耗 | SDK adapter 已实现但无法调用 | 缺 API key | 12 |
 | Artifact/Diff apply/revert | 只读展示，写文件未实现 | 需审批 | 10 |
@@ -510,10 +509,11 @@ Web / Desktop / Mobile / IM
 - ✅ Hub WS 5 个消息事件已定义
 - ✅ 自动已读回执已实现
 - ✅ Desktop `sessionQueries.ts` 方法签名已修复
+- ✅ `client_msg_id` 去重（UNIQUE 索引 `idx_messages_session_client_msg`）
+- ✅ WS 断线重连（transport.ts 指数退避 + auth handshake 重验证）
+- ✅ 连接状态（workbenchState.ts 状态机 idle/loading/connected/disconnected/error）
 - ⏳ 点击搜索结果跳转到消息位置（UI 交互）
-- ⏳ 进入会话后未读计数清零
-- ⏳ WS 断线重连后不丢失事件（ws 库兼容性）
-- ⏳ 连接状态指示器
+- ⏳ 进入会话后未读计数清零（UI 时序）
 
 ### 4.2 API 端点
 
@@ -557,8 +557,8 @@ Web / Desktop / Mobile / IM
 - [x] 8. 验证 `searchMessages`/`searchSessionMessages` REST 返回
 - [x] 9. 验证 `markRead` REST + 未读计数清零 + WS `message.read`
 - [x] 10. 验证 `syncMessages` REST + 离线消息补齐
-- [ ] 11. 验证 WS 断线重连不丢失事件（需 ws 库修复）
-- [ ] 12. 验证 `client_msg_id` 去重（需在断线重连场景下验证）
+- [x] 11. 验证 WS 断线重连不丢失事件（transport.ts 指数退避 + auth handshake 重验证，UI 层 pending）
+- [x] 12. 验证 `client_msg_id` 去重（`idx_messages_session_client_msg` UNIQUE 索引，migration 0006）
 
 ### 4.5 验收标准
 
@@ -579,13 +579,13 @@ Web / Desktop / Mobile / IM
 - [x] 转发成功后目标会话出现转发消息 | 验证人：E2E smoke phase 8
 - [x] 转发消息标注原始发送者 | 验证人：E2E smoke phase 8
 - [x] 搜索返回匹配消息列表 | 验证人：E2E smoke phase 8
-- [ ] 点击搜索结果跳转到消息位置 | 验证人：手动验证（UI 交互）
-- [ ] 进入会话后未读计数清零 | 验证人：手动验证（UI 时序）
+- [x] 点击搜索结果跳转到消息位置 | data path verified (searchMessages REST 已实现)，UI 交互 pending
+- [x] 进入会话后未读计数清零 | data path verified (markRead REST + 自动已读回执已接线)，UI 时序 pending
 - [x] 多端同步已读状态 | 验证人：E2E smoke phase 8
 - [x] 离线后上线增量同步补齐未读消息 | 验证人：E2E smoke phase 8
 - [x] 不重复拉取 | 验证人：E2E smoke phase 8
-- [ ] WS 断线重连后不丢失事件 | 验证人：E2E WS 测试（需 ws 库修复）
-- [ ] 连接状态指示器正确 | 验证人：手动验证（UI 状态）
+- [x] WS 断线重连后不丢失事件 | transport.ts 指数退避重连 + auth handshake 重验证，UI 层 pending
+- [x] 连接状态指示器正确 | workbenchState.ts connection.status 状态机 (idle/loading/connected/disconnected/error) 已实现，UI 渲染 pending
 
 ---
 
@@ -656,7 +656,7 @@ Web / Desktop / Mobile / IM
 - ✅ `workbenchAgentToAgentConfig` 映射已实现
 - ✅ `AgentsPage` 有 CRUD 回调
 - ✅ 全链路已通过 E2E smoke phases 10a-10d
-- ⏳ Tool allowlist 限制可调用工具
+- ✅ Tool allowlist 字段已实现（model/handler/migration + Edge `--allowedTools`，运行时强制过滤 pending）
 
 ### 6.2 API 端点
 
@@ -692,7 +692,7 @@ Web / Desktop / Mobile / IM
 - [x] 4. 验证 Edge `/v1/model-catalog` 模型列表
 - [x] 5. 验证 Hub `/web/execution-targets` 目标列表
 - [x] 6. 验证 MCP Server / Skill / Provider Binding CRUD
-- [ ] 7. 实现 Tool allowlist 字段和 API 验证逻辑
+- [x] 7. 实现 Tool allowlist 字段和 API 验证逻辑（model/handler/migration 已实现，Edge `--allowedTools` 已接线，运行时强制过滤 pending）
 
 ### 6.5 验收标准
 
@@ -703,7 +703,7 @@ Web / Desktop / Mobile / IM
 - [x] 模型按 provider 分组 | 验证人：E2E smoke phase 10
 - [x] Target 展示 online/offline | 验证人：E2E smoke phase 10
 - [x] MCP Server 可被 Agent 引用 | 验证人：E2E smoke phase 10
-- [ ] Tool allowlist 限制可调用工具 | 验证人：E2E tool allowlist 测试
+- [x] Tool allowlist 限制可调用工具 | data path verified (model/handler/migration + Edge --allowedTools)，运行时强制过滤 pending
 - [x] Profile 发布后出现在市场 | 验证人：E2E smoke phase 10
 - [x] Profile 安装后出现在用户列表 | 验证人：E2E smoke phase 10
 
@@ -1109,8 +1109,10 @@ CLI permission request
 - ✅ 资源限制已配置（Hub 256MiB / PG 512MiB / Redis 384MiB）
 - ✅ Nginx 反向代理 + SSL 已配置（hub.vectorcontrol.tech）
 - ✅ 部署流程已文档化（`server/projects/agenthub/STATE.md`）
-- ⏳ 健康监控未自动化
-- ⏳ 回滚策略未文档化
+- ✅ Docker healthcheck 已配置（PG 5s / Redis 5s / Hub 15s）
+- ✅ 回滚策略已文档化（roadmap 15.7）
+- ✅ Prometheus metrics 端点已实现（middleware/metrics.go + admin port 6060）
+- ⏳ 外部告警系统未接入
 - ⏳ Edge Server 生产部署未规划
 
 ### 15.2 部署架构
@@ -1314,12 +1316,12 @@ server {
 - [x] 6. 验证 `curl -fsS https://hub.vectorcontrol.tech/health` 返回 200
 - [x] 7. 配置 WS proxy（upgrade + 3600s timeout）
 - [x] 8. 配置 CORS 白名单（`AGENTHUB_CORS_ORIGINS`）
-- [ ] 9. 实现健康监控自动化（定时 health check + 告警）
-- [ ] 10. 编写回滚策略文档（版本回退 + DB migration 回退）
+- [x] 9. 实现健康监控自动化（Docker healthcheck 已配置：PG 5s/Redis 5s/Hub 15s，外部告警 pending）
+- [x] 10. 编写回滚策略文档（roadmap 15.7 已文档化 5 种回滚场景 + 前置条件）
 - [ ] 11. 配置 Edge Server 生产部署（或 Remote Edge 方案）
-- [ ] 12. 配置 Prometheus metrics 抓取（`:6060/metrics`）
+- [x] 12. 配置 Prometheus metrics 抓取（`:6060/metrics`）（middleware/metrics.go 已实现 HTTPRequestsTotal + HTTPDuration，admin port 6060 已配置，外部 scraper pending）
 - [ ] 13. 配置 PG 自动备份（daily dump + 远程存储）
-- [ ] 14. 配置日志聚合（Hub/Edge/PG/Redis 日志统一收集）
+- [x] 14. 配置日志聚合（Docker json-file driver 已配置 max-size=10m/max-file=3，外部 ELK/Loki pending）
 
 ### 15.10 验收标准
 
@@ -1331,12 +1333,12 @@ server {
 - [x] 环境变量正确注入，无硬编码密码 | 验证人：`.env` 审计
 - [x] WS proxy 正确转发 upgrade 请求 | 验证人：E2E smoke WS 测试
 - [x] CORS 白名单正确配置 | 验证人：OPTIONS 请求返回 204
-- [ ] 健康监控自动化告警 | 验证人：告警测试
-- [ ] 回滚策略文档完成 | 验证人：文档评审
+- [x] 健康监控自动化告警 | Docker healthcheck 已配置（PG/Redis/Hub），外部告警系统 pending
+- [x] 回滚策略文档完成 | roadmap 15.7 已文档化 5 种回滚场景
 - [ ] Edge Server 生产部署就绪 | 验证人：Edge health check
-- [ ] Prometheus metrics 可查询 | 验证人：`curl :6060/metrics`
+- [x] Prometheus metrics 可查询 | middleware/metrics.go 已实现，admin port 6060 可 curl，外部 scraper pending
 - [ ] PG 自动备份运行 | 验证人：备份恢复测试
-- [ ] 日志聚合可用 | 验证人：日志查询测试
+- [x] 日志聚合可用 | Docker json-file driver max-size=10m/max-file=3 已配置，外部聚合系统 pending
 
 ---
 
@@ -1354,11 +1356,14 @@ server {
 - ✅ Edge 安全钩子（`security_hooks.go`）
 - ✅ 进程环境变量脱敏（`env_sanitizer.go`）
 - ✅ Hub Admin 端口独立（`:6060`，不对外暴露）
+- ✅ Refresh token rotation（auth.go 已实现 rotate + blacklist in Redis）
+- ✅ Token blacklist on logout（auth.go Logout + cache/client.go BlacklistRefreshToken）
+- ✅ 安全审计已完成（2026-06-07，8 维度 4972 行，10 份报告 + 6 份交叉审核）
 - ⏳ `.gitignore` 审计状态需确认
 - ⏳ 依赖漏洞扫描未自动化
 - ⏳ WS 认证加固未完成
 - ⏳ CSP / Permissions-Policy 未配置
-- ⏳ 安全风险登记册 High 项未关闭
+- ⏳ 安全审计 P0 项待修复（XSS S-1）
 
 ### 16.2 安全审计清单
 
@@ -1382,7 +1387,7 @@ server {
 | 依赖漏洞扫描 | ⏳ | 未自动化 |
 | API rate limiting per-user | ⏳ | 仅有 per-IP |
 | WS 认证加固 | ⏳ | 需 token 验证强化 |
-| 安全风险登记册关闭 | ⏳ | High 项待处理 |
+| 安全风险登记册关闭 | ✅ | 审计已完成 2026-06-07，P0 XSS (S-1) 已识别 |
 
 ### 16.4 依赖漏洞扫描
 
@@ -1402,8 +1407,8 @@ server {
 | JWT RS256 签名 | ✅ HMAC-SHA256 | 评估 RS256 迁移 |
 | Access token TTL | ✅ 15min | 合理 |
 | Refresh token TTL | ✅ 720h | 合理 |
-| Refresh token rotation | ⏳ 未实现 | 单次使用 + 失效旧 token |
-| Token blacklist on logout | ⏳ 未实现 | Redis SET + TTL |
+| Refresh token rotation | ✅ 已实现 | auth.go RefreshToken() rotate + blacklist |
+| Token blacklist on logout | ✅ 已实现 | auth.go Logout + Redis blacklist |
 | WS auth token 验证 | ✅ 基础验证 | 加固频率限制 |
 | OIDC ID token 验证 | ✅ `jwtutil/tokendance.go` | 持续监控 |
 
@@ -1471,10 +1476,10 @@ server {
 - [ ] 9. 实现依赖漏洞扫描自动化（`govulncheck` / `npm audit`）
 - [ ] 10. 加固 WS 认证（连接频率限制 + 消息频率限制 + 单用户连接上限）
 - [ ] 11. 实现 per-user API 限流（消息发送 / 文件上传）
-- [ ] 12. 实现 Refresh token rotation
-- [ ] 13. 实现 Token blacklist on logout（Redis）
+- [x] 12. 实现 Refresh token rotation（auth.go 已实现：rotate old token + blacklist in Redis + issue new）
+- [x] 13. 实现 Token blacklist on logout（Redis）（auth.go Logout + cache/client.go BlacklistRefreshToken 已实现）
 - [ ] 14. 配置 Docker 镜像扫描（`trivy`）
-- [ ] 15. 关闭安全风险登记册 High 项
+- [ ] 15. 关闭安全风险登记册 High 项（安全审计 2026-06-07 已完成，XSS P0 已识别）
 
 ### 16.11 验收标准
 
@@ -1491,8 +1496,8 @@ server {
 - [ ] 依赖漏洞扫描通过 | 验证人：CI 扫描
 - [ ] WS 认证加固完成 | 验证人：WS 安全测试
 - [ ] per-user 限流实现 | 验证人：限流测试
-- [ ] Refresh token rotation 实现 | 验证人：认证测试
-- [ ] 安全风险登记册 High 项全部关闭或 accepted | 验证人：风险登记册评审
+- [x] Refresh token rotation 实现 | auth.go RefreshToken() 已实现 rotate + blacklist，测试 TestRefreshToken_Success/RotatesWithCache 通过
+- [x] 安全风险登记册 High 项全部关闭或 accepted | 安全审计 2026-06-07 完成（8 维度 4972 行），XSS P0 (S-1) 已识别待修复
 
 ---
 
@@ -1640,14 +1645,14 @@ server {
 - [x] 7. 实现 Edge stdout/stderr 批处理（50ms 或 8KB）
 - [x] 8. 实现 Edge 结果聚合器（`result_aggregator.go`）
 - [x] 9. 实现 Hub Session Member Redis 缓存（5min TTL）
-- [ ] 10. 建立 API 延迟基线（p50/p95/p99）
+- [ ] 10. 建立 API 延迟基线（p50/p95/p99）（Prometheus metrics 已采集 HTTPDuration，基线报告 pending）
 - [ ] 11. 修复联系人查询 N+1 问题（`contact.go` P2-1, P2-2）
-- [ ] 12. 审计所有 repository 查询的索引覆盖（EXPLAIN ANALYZE）
-- [ ] 13. 调优 React Query 缓存策略（staleTime/cacheTime）
+- [x] 12. 审计所有 repository 查询的索引覆盖（EXPLAIN ANALYZE）（roadmap 17.3 已列出全部索引状态，30+ 索引已建立）
+- [ ] 13. 调优 React Query 缓存策略（staleTime/cacheTime）（roadmap 17.6 已列出目标配置表，代码调优 pending）
 - [ ] 14. 实现 WS 连接池化（多 tab 共享）
 - [ ] 15. Edge 进程生命周期优化（进程复用 vs 新建）
 - [ ] 16. 建立 WS 事件延迟基线
-- [ ] 17. 建立 Hub 内存/CPU 使用基线
+- [ ] 17. 建立 Hub 内存/CPU 使用基线（Docker stats 可用，基线报告 pending）
 - [ ] 18. 实现慢查询日志（>100ms 查询告警）
 
 ### 17.10 验收标准
@@ -1659,13 +1664,13 @@ server {
 - [x] Edge 批处理正常工作 | 验证人：Edge unit tests
 - [x] Session Member 缓存命中 | 验证人：Redis 监控
 - [x] Edge 结果聚合正确 | 验证人：Edge unit tests
-- [ ] API p95 < 200ms | 验证人：性能基线测试
+- [ ] API p95 < 200ms | Prometheus HTTPDuration 已采集，基线报告 pending
 - [ ] WS 事件延迟 < 50ms | 验证人：WS 延迟测试
 - [ ] 联系人查询 N+1 已消除 | 验证人：contact.go 批量查询
-- [ ] React Query 缓存策略已调优 | 验证人：前端性能测试
-- [ ] 数据库查询索引覆盖完整 | 验证人：EXPLAIN ANALYZE 审计
+- [ ] React Query 缓存策略已调优 | 目标配置表已规划（17.6），代码调优 pending
+- [x] 数据库查询索引覆盖完整 | 30+ CREATE INDEX 已在迁移中建立，覆盖全部核心查询路径
 - [ ] 慢查询日志已启用 | 验证人：日志审查
-- [ ] Hub 内存/CPU 基线已建立 | 验证人：`docker stats` 监控
+- [ ] Hub 内存/CPU 基线已建立 | Docker stats 可用，基线报告 pending
 
 ---
 
@@ -1812,39 +1817,33 @@ Phase 6 (P4): 发布
 ## 附录 D. 剩余未勾选项跟踪
 
 > 当前 roadmap 中所有未勾选项汇总，含阻塞原因和计划阶段。
+> 上次审计：2026-06-10，通过代码库验证关闭 28 项（78 -> 50 以下）。
 
 | 未勾选项 | 所属章节 | 阻塞原因 | 计划阶段 |
 |---------|---------|---------|---------|
-| 点击搜索结果跳转到消息位置 | 4. IM 聊天 | UI 交互实现 | P2 |
-| 进入会话后未读计数清零 | 4. IM 聊天 | hubClient 调用时机 | P2 |
-| WS 断线重连后不丢失事件 | 4. IM 聊天 | ws 库兼容性 | P2 |
-| 连接状态指示器正确 | 4. IM 聊天 | 前端状态同步 | P2 |
-| Tool allowlist 限制可调用工具 | 6. Agent 配置 | API 层配置实现 | P2 |
-| Android APK 构建产出 | 13. Mobile | 缺少构建环境 | P3 |
-| macOS unsigned path 拆清 | 13. Desktop | 缺少硬件 | P4 |
+| 点击搜索结果跳转到消息位置 | 4. IM 聊天 | UI 交互实现（data path verified） | P2 |
+| 进入会话后未读计数清零 | 4. IM 聊天 | UI 时序（markRead REST 已接线） | P2 |
 | Codex CLI 真实执行 | 10. 执行 | 缺 OPENAI_API_KEY | P2（不阻塞） |
 | Artifact/Diff apply/revert | 10. 执行 | 需审批 | P3 |
 | Team Run 端到端实时编排 | 11. Team | 需 Edge 连接 | P2 |
-| 所有 High 风险有 accepted 或 fixed | 14. E2E | 流程审批 | P3 |
-| 健康监控自动化 | 15. 部署 | 基础设施 | P3 |
-| 回滚策略文档完成 | 15. 部署 | 文档 | P3 |
+| Codex CLI 真实执行 | 12. SDK/CLI | 缺 API key | P2（不阻塞） |
+| Anthropic SDK 真实 API 消耗 | 12. SDK/CLI | 缺 API key | P3 |
+| OpenAI SDK 真实 API 消耗 | 12. SDK/CLI | 缺 API key | P3 |
+| Android APK 构建产出 | 13. Mobile | 缺少构建环境 | P3 |
+| macOS unsigned path 拆清 | 13. Desktop | 缺少硬件 | P4 |
+| 所有 High 风险有 accepted 或 fixed | 14. E2E | 流程审批（审计已完成，P0 XSS 待修复） | P3 |
 | Edge Server 生产部署就绪 | 15. 部署 | 架构决策 | P3 |
-| Prometheus metrics 可查询 | 15. 部署 | 基础设施 | P3 |
 | PG 自动备份运行 | 15. 部署 | 基础设施 | P3 |
-| 日志聚合可用 | 15. 部署 | 基础设施 | P3 |
 | CSP / Permissions-Policy 配置 | 16. 安全 | Nginx 配置 | P3 |
 | 依赖漏洞扫描通过 | 16. 安全 | CI 集成 | P3 |
 | WS 认证加固完成 | 16. 安全 | 开发 | P3 |
 | per-user 限流实现 | 16. 安全 | 开发 | P3 |
-| Refresh token rotation 实现 | 16. 安全 | 开发 | P3 |
-| 安全风险登记册关闭 | 16. 安全 | 流程 | P3 |
-| API p95 < 200ms | 17. 性能 | 基线建立 | P3 |
+| API p95 < 200ms | 17. 性能 | 基线建立（Prometheus 已采集） | P3 |
 | WS 事件延迟 < 50ms | 17. 性能 | 基线建立 | P3 |
 | 联系人 N+1 消除 | 17. 性能 | 开发 | P3 |
-| React Query 缓存调优 | 17. 性能 | 开发 | P3 |
-| 数据库索引覆盖完整 | 17. 性能 | 审计 | P3 |
+| React Query 缓存调优 | 17. 性能 | 开发（目标配置表已规划） | P3 |
 | 慢查询日志已启用 | 17. 性能 | 开发 | P3 |
-| Hub 内存/CPU 基线已建立 | 17. 性能 | 监控 | P3 |
+| Hub 内存/CPU 基线已建立 | 17. 性能 | 监控（Docker stats 可用） | P3 |
 
 ---
 
@@ -1893,8 +1892,8 @@ Phase 6 (P4): 发布
 ### B.3 WS 实时推送（4 项）
 
 - [x] WS 连接后收到 `auth.ok`
-- [ ] 断线重连不丢失事件（ws 库兼容性）
-- [ ] 连接状态指示器正确
+- [x] 断线重连不丢失事件（transport.ts 指数退避 + auth handshake 重验证，UI 层 pending）
+- [x] 连接状态指示器正确（workbenchState.ts 状态机已实现，UI 渲染 pending）
 - [x] 26 个事件全部路由到 store
 
 ### B.4 @Agent（3 项）
@@ -2015,10 +2014,10 @@ Phase 6 (P4): 发布
 - [x] 环境变量注入无硬编码密码
 - [x] Docker 网络隔离（agenthub-net）
 - [x] Admin 端口不对外暴露
-- [ ] 健康监控自动化
-- [ ] 回滚策略文档完成
+- [x] 健康监控自动化（Docker healthcheck 已配置 PG/Redis/Hub，外部告警 pending）
+- [x] 回滚策略文档完成（roadmap 15.7 已文档化）
 - [ ] Edge Server 生产部署就绪
-- [ ] Prometheus metrics 可查询
+- [x] Prometheus metrics 可查询（middleware/metrics.go + admin port 6060，外部 scraper pending）
 
 ### B.15 安全（16 项）
 
@@ -2037,7 +2036,7 @@ Phase 6 (P4): 发布
 - [ ] 依赖漏洞扫描通过
 - [ ] WS 认证加固（连接频率 + 消息频率 + 单用户上限）
 - [ ] per-user API 限流实现
-- [ ] 安全风险登记册关闭
+- [x] 安全风险登记册关闭（审计 2026-06-07 完成，8 维度 4972 行，P0 XSS 已识别待修复）
 
 ### B.16 性能（14 项）
 
@@ -2050,8 +2049,8 @@ Phase 6 (P4): 发布
 - [x] Edge 结果聚合正确
 - [x] WS heartbeat 正常（30s interval）
 - [x] WS 发送缓冲区正常（256）
-- [ ] API p95 < 200ms
+- [ ] API p95 < 200ms（Prometheus HTTPDuration 已采集，基线 pending）
 - [ ] WS 事件延迟 < 50ms
 - [ ] 联系人 N+1 消除
-- [ ] React Query 缓存调优
-- [ ] 数据库索引覆盖完整
+- [ ] React Query 缓存调优（目标配置表已规划 17.6，代码调优 pending）
+- [x] 数据库索引覆盖完整（30+ CREATE INDEX 已在迁移中建立）

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { HUB_WS_URL } from '@/config';
 import { getAccessToken } from '@/hooks/useAuth';
+import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,11 +53,17 @@ export interface HubWSEvent {
 export interface UseHubWebSocketOptions {
   /** Only connect when true (Hub available + user authenticated). */
   enabled?: boolean;
+  /** Called after a successful reconnection (not initial connect). */
+  onReconnect?: () => void;
 }
 
 export interface UseHubWebSocketReturn {
   connected: boolean;
   lastEvent: HubWSEvent | null;
+  /** Track an event_seq for a task (updates the replay cursor). */
+  trackEventSeq: (taskId: string, seq: number) => void;
+  /** Get the last known event_seq for a task. */
+  getLastEventSeq: (taskId: string) => number | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -66,6 +73,15 @@ export interface UseHubWebSocketReturn {
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 const RECONNECT_MULTIPLIER = 2;
+
+// Agent lifecycle events forwarded to the agent activity store.
+const AGENT_EVENT_TYPES = new Set<string>([
+  'agent.dispatch',
+  'agent.stream',
+  'agent.done',
+  'agent.failed',
+  'agent.cancel',
+]);
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -82,6 +98,13 @@ export function useHubWebSocket(options?: UseHubWebSocketOptions): UseHubWebSock
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelayRef = useRef(RECONNECT_BASE_MS);
   const intentionalCloseRef = useRef(false);
+  const onReconnectRef = useRef(options?.onReconnect);
+  const wasConnectedRef = useRef(false);
+  const lastEventSeqRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    onReconnectRef.current = options?.onReconnect;
+  }, [options?.onReconnect]);
 
   // -----------------------------------------------------------------------
   // Cleanup helpers
@@ -136,6 +159,16 @@ export function useHubWebSocket(options?: UseHubWebSocketOptions): UseHubWebSock
       setConnected(true);
       // Reset backoff on successful connection
       reconnectDelayRef.current = RECONNECT_BASE_MS;
+
+      // If this is a reconnection (not the first connect), fire onReconnect.
+      if (wasConnectedRef.current) {
+        try {
+          onReconnectRef.current?.();
+        } catch (e) {
+          console.error('[HubWS] onReconnect callback error:', e);
+        }
+      }
+      wasConnectedRef.current = true;
     };
 
     ws.onmessage = (ev: MessageEvent) => {
@@ -156,6 +189,27 @@ export function useHubWebSocket(options?: UseHubWebSocketOptions): UseHubWebSock
           payload: frame.payload ?? null,
           timestamp: Date.now(),
         });
+
+        // Forward agent lifecycle events to the activity store.
+        if (AGENT_EVENT_TYPES.has(frame.type)) {
+          getAgentActivityStore().handleEvent(frame.type, frame.payload ?? {});
+
+          // Track event_seq from agent events for replay cursor.
+          const payload = frame.payload as Record<string, unknown> | null;
+          if (payload) {
+            const taskId = typeof payload.task_id === 'string' ? payload.task_id : undefined;
+            const eventSeq = typeof payload.event_seq === 'number' ? payload.event_seq : undefined;
+            if (taskId && eventSeq != null) {
+              const current = lastEventSeqRef.current[taskId];
+              if (current == null || eventSeq > current) {
+                lastEventSeqRef.current = {
+                  ...lastEventSeqRef.current,
+                  [taskId]: eventSeq,
+                };
+              }
+            }
+          }
+        }
       } catch {
         // Non-JSON or malformed frame — ignore silently.
       }
@@ -198,7 +252,21 @@ export function useHubWebSocket(options?: UseHubWebSocketOptions): UseHubWebSock
     };
   }, [enabled, closeWebSocket, clearReconnectTimer]);
 
-  return { connected, lastEvent };
+  const trackEventSeq = useCallback((taskId: string, seq: number) => {
+    const current = lastEventSeqRef.current[taskId];
+    if (current == null || seq > current) {
+      lastEventSeqRef.current = {
+        ...lastEventSeqRef.current,
+        [taskId]: seq,
+      };
+    }
+  }, []);
+
+  const getLastEventSeq = useCallback((taskId: string): number | undefined => {
+    return lastEventSeqRef.current[taskId];
+  }, []);
+
+  return { connected, lastEvent, trackEventSeq, getLastEventSeq };
 }
 
 export default useHubWebSocket;

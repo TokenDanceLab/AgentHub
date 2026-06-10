@@ -226,12 +226,18 @@ func (p *NDJSONStreamParser) parseAssistantMessage(scope map[string]any, msg *cl
 			if block.ID != "" {
 				p.toolNames[block.ID] = block.Name
 			}
-			p.emit(scope, BusEventToolCall, map[string]any{
+			toolCallPayload := map[string]any{
 				"callId":   block.ID,
 				"toolName": block.Name,
 				"input":    block.Input,
 				"status":   "pending",
-			})
+			}
+			p.emit(scope, BusEventToolCall, toolCallPayload)
+			// Emit dedicated MCP tool call event for MCP-sourced tools.
+			// Claude Code MCP tools have names matching "mcp__<server>__<tool>".
+			if IsMCPToolCall(block.Name) {
+				p.emitter.Emit(BusEventMCPToolCall, scope, toolCallPayload)
+			}
 		case "thinking":
 			p.emit(scope, BusEventThinking, map[string]any{
 				"content": block.Thinking,
@@ -261,12 +267,16 @@ func (p *NDJSONStreamParser) parseStreamEvent(scope map[string]any, msg *claudeS
 			if msg.Event.ContentBlock.ID != "" {
 				p.toolNames[msg.Event.ContentBlock.ID] = msg.Event.ContentBlock.Name
 			}
-			p.emit(scope, BusEventToolCall, map[string]any{
+			toolCallPayload := map[string]any{
 				"callId":   msg.Event.ContentBlock.ID,
 				"toolName": msg.Event.ContentBlock.Name,
 				"input":    msg.Event.ContentBlock.Input,
 				"status":   "started",
-			})
+			}
+			p.emit(scope, BusEventToolCall, toolCallPayload)
+			if IsMCPToolCall(msg.Event.ContentBlock.Name) {
+				p.emitter.Emit(BusEventMCPToolCall, scope, toolCallPayload)
+			}
 		}
 	case "content_block_stop":
 		// End of a content block — no additional info needed
