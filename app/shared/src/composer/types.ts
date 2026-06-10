@@ -84,6 +84,7 @@ export interface ComposerIntent {
   approvalMode: ApprovalMode;
   workDir?: string;
   replyTo?: ReplyToContext;
+  quote?: QuoteContext;
 }
 
 export interface ComposerSubmitResult {
