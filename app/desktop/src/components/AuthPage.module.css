@@ -421,3 +421,106 @@
 }
 
 .hubStatusText { font-size: 11px; }
+
+/* ── Developer mode toggle ── */
+.devToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  width: fit-content;
+  margin-inline: auto;
+  transition: color 0.15s, background 0.15s;
+}
+
+.devToggle:hover {
+  color: var(--foreground);
+  background: var(--glass-bg-light);
+}
+
+.devToggleIcon {
+  display: inline-flex;
+  opacity: 0.65;
+}
+
+.devChevron {
+  display: inline-flex;
+  transition: transform 0.2s;
+}
+
+.devChevronOpen { transform: rotate(180deg); }
+
+/* ── Developer info panel ── */
+.devPanel {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass-bg-light);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  animation: devPanelIn 0.18s var(--ease-panel, ease-out) both;
+}
+
+@keyframes devPanelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.devRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.devLabel {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 56px;
+}
+
+.devValue {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.devInput {
+  margin-top: 4px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.devInput::placeholder { color: var(--text-weakest); }
+
+.devInput:focus {
+  border-color: var(--glass-tint-plum);
+  background: var(--glass-bg-subtle);
+}
