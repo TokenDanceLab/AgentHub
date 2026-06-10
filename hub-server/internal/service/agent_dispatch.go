@@ -558,3 +558,47 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 
 	return nil
 }
+
+// RegenerateAgentTask creates a new task using the same prompt as an existing task.
+// It looks up the original task, verifies ownership, and triggers a new task with
+// the same trigger message, agent instance, and target.
+func (s *AgentService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
+	original, err := repository.GetPendingTaskByID(s.db, taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if original.TriggeredByUserID != userID {
+		return nil, errcode.AgentTaskNotFound
+	}
+
+	// Only allow regenerating from terminal tasks (done/failed/cancelled/timeout).
+	switch original.Status {
+	case model.TaskStatusDone, model.TaskStatusFailed, model.TaskStatusCancelled, model.TaskStatusTimeout:
+		// ok
+	default:
+		return nil, errcode.ErrBadRequest.WithMessage("can only regenerate completed or failed tasks")
+	}
+
+	ai, err := repository.GetAgentInstanceByID(s.db, original.AgentInstanceID)
+	if err != nil {
+		return nil, err
+	}
+
+	newTask, err := s.TriggerAgentTask(ctx, userID, original.TriggerMessageID, ai.ID, ai.AgentType, "", "", original.TargetID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.bus.Publish(ctx, Event{Type: "agent.regenerate", Payload: map[string]string{
+		"original_task_id":   taskID,
+		"new_task_id":        newTask.ID,
+		"agent_instance_id":  ai.ID,
+		"session_id":         ai.SessionID,
+		"trigger_message_id": original.TriggerMessageID,
+	}})
+
+	return newTask, nil
+}
