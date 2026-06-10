@@ -90,6 +90,21 @@ func (h *SkillHandler) ListSkills(c *gin.Context) {
 	skillType := c.Query("skill_type")
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	isPublic := c.DefaultQuery("is_public", "")
+
+	if isPublic == "true" {
+		// Public market: return all published skills (no owner filter).
+		result, err := h.service.SearchPublic(c.Request.Context(), q, skillType, cursor, pageSize)
+		if err != nil {
+			Fail(c, errcode.ErrInternal)
+			return
+		}
+		OK(c, gin.H{
+			"items": result.Items,
+			"page":  gin.H{"nextCursor": result.Cursor, "hasMore": result.HasMore},
+		})
+		return
+	}
 
 	result, err := h.service.List(c.Request.Context(), userID, q, skillType, cursor, pageSize)
 	if err != nil {
