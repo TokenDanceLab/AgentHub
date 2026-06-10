@@ -324,6 +324,18 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		ccReader := ccswitch.NewReader()
 		h.CCSwitchStatus = &ccStatus
 		h.CCSwitchReader = ccReader
+
+		// Wire cc-switch dynamic model resolver into Claude Code adapter
+		// so model aliases are resolved through the transparent proxy mapping.
+		if cfg.AdapterRegistry != nil && ccReader != nil {
+			if a, ok := cfg.AdapterRegistry.Get("claude-code"); ok {
+				if claudeAdapter, ok := a.(interface{ SetCCSwitchResolver(adapters.CCSwitchModelResolver) }); ok {
+					claudeAdapter.SetCCSwitchResolver(ccReader)
+					slog.Debug("cc-switch model resolver wired into claude-code adapter")
+				}
+			}
+		}
+
 		if ccStatus.RoutingActive {
 			slog.Info("cc-switch detected and routing is active",
 				"db", ccStatus.DBPath,

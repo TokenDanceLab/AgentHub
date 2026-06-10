@@ -189,6 +189,8 @@ export interface AgentHubWorkbenchProps {
   highlightedBlockId?: string | undefined;
   /** Called when the highlight animation ends. */
   onHighlightEnd?: (() => void) | undefined;
+  /** Called when the user requests regeneration of an agent message. Receives the block ID. */
+  onRegenerate?: ((blockId: string) => void) | undefined;
   /** WebSocket connection status for the rail indicator dot. */
   connectionStatus?: ConnectionStatusKind | undefined;
 }
@@ -236,6 +238,7 @@ export function AgentHubWorkbench({
   mcpMarketLoading,
   highlightedBlockId,
   onHighlightEnd,
+  onRegenerate,
 }: AgentHubWorkbenchProps): React.ReactElement {
   // Create settings service if platform provides a settings port
   const settingsService = useMemo<SettingsService | null>(
@@ -1076,11 +1079,26 @@ export function AgentHubWorkbench({
       const quoteText = selectedText || block.text.slice(0, 80);
       const quoted = `> ${quoteText.split('\n').join('\n> ')}\n\n`;
       dispatchComposer({ type: 'setText', text: quoted });
+      dispatchComposer({
+        type: 'setQuote',
+        quote: {
+          text: quoteText,
+          author: block.author.name,
+          messageId: block.id,
+        },
+      });
       window.setTimeout(() => composerInputRef.current?.focus(), 0);
     }
     if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
-      // For regenerate, we signal via a toast — actual API call is up to the platform layer
-      showWorkbenchToast(`正在重新生成: ${title}`);
+      // Mark old message as having a newer version so it renders grayed out
+      setSoftHiddenBlockIds((current) => {
+        const next = new Set(current);
+        next.add(block.id);
+        return Array.from(next);
+      });
+      onRegenerate?.(blockId);
+      pulseBlock(blockId);
+      showWorkbenchToast(cardActionLabel(action, title));
       return;
     }
     pulseBlock(blockId);

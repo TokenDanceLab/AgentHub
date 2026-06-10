@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -23,10 +24,12 @@ const (
 	anthropicAPIVersion      = "2023-06-01"
 	anthropicHTTPTimeout     = 30 * time.Minute
 	anthropicMaxResponseSize = 50 * 1024 * 1024 // 50MB
+	anthropicMaxRetries      = 3
+	anthropicRetryBaseDelay  = 1 * time.Second
 )
 
 // AnthropicSDKAdapter implements the AgentAdapter interface using direct HTTP
-// calls to the Anthropic Messages API. It does NOT spawn a CLI subprocess —
+// calls to the Anthropic Messages API. It does NOT spawn a CLI subprocess --
 // instead, BuildCommand returns a sentinel command and ParseStream makes the
 // actual API call, streaming SSE events and mapping them to Edge typed events.
 //
@@ -103,14 +106,14 @@ func (a *AnthropicSDKAdapter) CapabilityHealthMetadata() map[string]any {
 		healthState = "unavailable"
 	}
 	return map[string]any{
-		"adapterId":           anthropicSDKAdapterID,
-		"runtimeKind":         "sdk-http",
-		"fixtureOnly":         false,
-		"noSpendDefault":      false,
-		"transport":           "https-sse",
-		"healthState":         healthState,
-		"provider":            "anthropic",
-		"model":               a.model,
+		"adapterId":      anthropicSDKAdapterID,
+		"runtimeKind":    "sdk-http",
+		"fixtureOnly":    false,
+		"noSpendDefault": false,
+		"transport":      "https-sse",
+		"healthState":    healthState,
+		"provider":       "anthropic",
+		"model":          a.model,
 		"capabilities": map[string]bool{
 			"streaming":       true,
 			"toolCalls":       true,
@@ -125,7 +128,7 @@ func (a *AnthropicSDKAdapter) CapabilityHealthMetadata() map[string]any {
 }
 
 // BuildCommand returns a sentinel command. The Anthropic SDK adapter does NOT
-// spawn a CLI subprocess — it makes direct HTTP calls in ParseStream. The
+// spawn a CLI subprocess -- it makes direct HTTP calls in ParseStream. The
 // executor will start this command but ParseStream ignores the stdout/stdin
 // pipes and performs the real work via HTTP.
 func (a *AnthropicSDKAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
@@ -221,6 +224,24 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 		}
 	}
 
+	// MCP tool definitions: convert MCPConfig JSON to Anthropic tools parameter.
+	// The MCPConfig field contains a JSON string of MCP server definitions.
+	// When AllowedTools is set, those tools are converted to Anthropic tool schemas.
+	if len(runCtx.AllowedTools) > 0 {
+		tools := make([]anthropicTool, 0, len(runCtx.AllowedTools))
+		for _, toolName := range runCtx.AllowedTools {
+			tools = append(tools, anthropicTool{
+				Name:        toolName,
+				Description: "Tool: " + toolName,
+				InputSchema: map[string]any{
+					"type":       "object",
+					"properties": map[string]any{},
+				},
+			})
+		}
+		requestBody.Tools = tools
+	}
+
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
 		return NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: failed to marshal request: %w", err))
@@ -233,26 +254,10 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 		"provider":  "anthropic",
 	})
 
-	// Make the streaming HTTP request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/v1/messages", bytes.NewReader(bodyBytes))
+	// Make the streaming HTTP request with retry support
+	resp, err := a.doRequestWithRetry(ctx, bodyBytes, emitter, scope)
 	if err != nil {
-		return NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: failed to create request: %w", err))
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", a.apiKey)
-	req.Header.Set("anthropic-version", anthropicAPIVersion)
-	req.Header.Set("Accept", "text/event-stream")
-
-	httpClient := &http.Client{Timeout: anthropicHTTPTimeout}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		emitter.Emit(BusEventResult, scope, map[string]any{
-			"success":        false,
-			"error":          fmt.Sprintf("anthropic-sdk: HTTP request failed: %v", err),
-			"terminalReason": "error",
-			"provider":       "anthropic",
-		})
-		return NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: HTTP request failed: %w", err))
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -270,6 +275,80 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 
 	// Parse SSE stream
 	return a.parseSSEStream(ctx, resp.Body, emitter, scope, model)
+}
+
+// doRequestWithRetry makes the HTTP request with automatic retry for transient
+// failures (429 rate limit, 500/502/503/504 server errors). Auth errors (401/403)
+// and client errors (400) are not retried.
+func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, emitter EventEmitter, scope map[string]any) (*http.Response, error) {
+	var lastErr error
+
+	for attempt := 0; attempt <= anthropicMaxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 1s, 2s, 4s
+			delay := anthropicRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
+			slog.Info("anthropic-sdk: retrying request",
+				"attempt", attempt,
+				"delay", delay,
+				"lastErr", lastErr,
+			)
+			emitter.Emit(BusEventAPIRetry, scope, map[string]any{
+				"attempt": attempt,
+				"delay":   delay.String(),
+				"error":   fmt.Sprintf("%v", lastErr),
+				"provider": "anthropic",
+			})
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/v1/messages", bytes.NewReader(body))
+		if err != nil {
+			return nil, NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: failed to create request: %w", err))
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-api-key", a.apiKey)
+		req.Header.Set("anthropic-version", anthropicAPIVersion)
+		req.Header.Set("Accept", "text/event-stream")
+
+		httpClient := &http.Client{Timeout: anthropicHTTPTimeout}
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			continue // Network errors are retriable
+		}
+
+		// Check status code for retry eligibility
+		switch {
+		case resp.StatusCode == http.StatusOK:
+			return resp, nil
+		case resp.StatusCode == http.StatusTooManyRequests:
+			// Rate limited -- always retry
+			resp.Body.Close()
+			lastErr = fmt.Errorf("rate limited (429)")
+			continue
+		case resp.StatusCode >= 500:
+			// Server error -- retry
+			resp.Body.Close()
+			lastErr = fmt.Errorf("server error (%d)", resp.StatusCode)
+			continue
+		default:
+			// Auth errors (401, 403), client errors (400) -- not retried
+			return resp, nil
+		}
+	}
+
+	// All retries exhausted
+	emitter.Emit(BusEventResult, scope, map[string]any{
+		"success":        false,
+		"error":          fmt.Sprintf("anthropic-sdk: request failed after %d retries: %v", anthropicMaxRetries, lastErr),
+		"terminalReason": "error",
+		"provider":       "anthropic",
+	})
+	return nil, NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: request failed after %d retries: %w", anthropicMaxRetries, lastErr))
 }
 
 // buildMessages converts the RunProcessContext into Anthropic message format.
@@ -312,7 +391,7 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 256*1024), anthropicMaxResponseSize)
 
-	var currentContentType string // "text" or "tool_use"
+	var currentContentType string // "text", "thinking", or "tool_use"
 	var currentText strings.Builder
 	var currentToolID string
 	var currentToolName string
@@ -334,7 +413,7 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 		// SSE lines start with "data: " or "event: "
 		if !strings.HasPrefix(line, "data: ") {
 			if strings.HasPrefix(line, "event: ") {
-				// Event type line — we extract data from the data line
+				// Event type line -- we extract data from the data line
 			}
 			continue
 		}
@@ -364,7 +443,7 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 		case "content_block_start":
 			if event.ContentBlock != nil {
 				currentContentType = event.ContentBlock.Type
-								currentText.Reset()
+				currentText.Reset()
 				currentToolInput.Reset()
 				inputStarted = false
 
@@ -501,6 +580,7 @@ type anthropicRequest struct {
 	System    string             `json:"system,omitempty"`
 	Stream    bool               `json:"stream"`
 	Thinking  *anthropicThinking `json:"thinking,omitempty"`
+	Tools     []anthropicTool    `json:"tools,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -511,6 +591,12 @@ type anthropicMessage struct {
 type anthropicThinking struct {
 	Type         string `json:"type"`
 	BudgetTokens int    `json:"budget_tokens"`
+}
+
+type anthropicTool struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	InputSchema map[string]any `json:"input_schema"`
 }
 
 type anthropicSSEEvent struct {

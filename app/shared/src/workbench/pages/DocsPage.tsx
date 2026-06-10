@@ -1,4 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../i18n';
 import {
   DesignNavIcon,
   DESIGN_NAV_GLYPH_SIZE,
@@ -81,6 +83,8 @@ export interface DocsPageProps {
   onPlusTab?: (() => void) | undefined;
   /** Called when a shortcut is clicked */
   onShortcutClick?: ((name: string) => void) | undefined;
+  /** Called to delete a document */
+  onDeleteDoc?: ((documentId: string) => Promise<unknown> | void) | undefined;
 }
 
 // ── Defaults ──
@@ -118,11 +122,11 @@ const NAV_ICONS: Record<string, DesignNavIconName> = {
 
 // ── Tab definitions ──
 
-const DOC_TABS: { id: DocsPane; label: string }[] = [
-  { id: 'recent', label: '最近访问' },
-  { id: 'owned', label: '归我所有' },
-  { id: 'shared', label: '与我共享' },
-  { id: 'starred', label: '收藏' },
+const DOC_TABS: { id: DocsPane; labelKey: string }[] = [
+  { id: 'recent', labelKey: 'docs.tab.recent' },
+  { id: 'owned', labelKey: 'docs.tab.mine' },
+  { id: 'shared', labelKey: 'docs.tab.shared' },
+  { id: 'starred', labelKey: 'docs.tab.starred' },
 ];
 
 // ── Sub-components ──
@@ -130,16 +134,31 @@ const DOC_TABS: { id: DocsPane; label: string }[] = [
 function DocTableRow({
   doc,
   onClick,
+  onDelete,
   profiles = [],
 }: {
   doc: DocRow;
   onClick?: ((doc: DocRow) => void) | undefined;
+  onDelete?: ((doc: DocRow) => void) | undefined;
   profiles?: WorkbenchProfileSource[] | undefined;
 }) {
+  const [confirming, setConfirming] = useState(false);
   const handleClick = useCallback(() => {
     onClick?.(doc);
   }, [doc, onClick]);
   const owner = resolveWorkbenchProfile(doc.owner, profiles);
+
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirming) { setConfirming(true); return; }
+    onDelete?.(doc);
+    setConfirming(false);
+  }, [confirming, doc, onDelete]);
+
+  const handleCancelDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirming(false);
+  }, []);
 
   return (
     <button type="button" className={`${styles.docRow} doc-row`} data-card-surface onClick={handleClick}>
@@ -162,7 +181,18 @@ function DocTableRow({
       </span>
       <span>{doc.time}</span>
       <span className={styles.docMore}>
-        <DesignNavIcon name="more" size={14} />
+        {confirming ? (
+          <>
+            <button type="button" className={styles.confirmDeleteBtn} onClick={handleDelete}>确认删除</button>
+            <button type="button" className={styles.cancelDeleteBtn} onClick={handleCancelDelete}>取消</button>
+          </>
+        ) : onDelete ? (
+          <button type="button" className={styles.docDeleteBtn} onClick={handleDelete} title="删除文档">
+            <DesignNavIcon name="close" size={14} />
+          </button>
+        ) : (
+          <DesignNavIcon name="more" size={14} />
+        )}
       </span>
     </button>
   );
@@ -190,7 +220,9 @@ export function DocsPage({
   onSettings,
   onPlusTab,
   onShortcutClick,
+  onDeleteDoc,
 }: DocsPageProps): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const resolvedNavItems =
     navItems.length > 0
       ? navItems
@@ -206,10 +238,10 @@ export function DocsPage({
     <section className={`${styles.page} workbench docs-page`}>
       {/* ── Left nav ── */}
       <aside className={`${styles.nav} workbench-nav`}>
-        <div className={`${styles.navTitle} workbench-title`}>云文档</div>
+        <div className={`${styles.navTitle} workbench-title`}>{t('nav.docs')}</div>
         <input
           className={`${styles.search} workbench-search`}
-          placeholder="搜索"
+          placeholder={t('header.search')}
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
@@ -311,7 +343,7 @@ export function DocsPage({
               }`}
               onClick={() => onTabChange?.(tab.id)}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </button>
           ))}
           <button
@@ -334,7 +366,7 @@ export function DocsPage({
             <span />
           </div>
           {rows.map((doc) => (
-            <DocTableRow key={doc.id} doc={doc} onClick={onDocClick} profiles={profiles} />
+            <DocTableRow key={doc.id} doc={doc} onClick={onDocClick} onDelete={onDeleteDoc} profiles={profiles} />
           ))}
         </div>
         {activePreview && (

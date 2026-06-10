@@ -948,6 +948,58 @@
   color: var(--text-1);
 }
 
+/* ── Quote preview banner above composer ── */
+.quoteBar {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(100%, 880px);
+  margin: 0 auto;
+  padding: 6px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface-low);
+  font: var(--caption);
+  color: var(--text-2);
+  transition: background var(--dur-normal) var(--ease);
+}
+
+.quoteBarLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+}
+
+.quoteBarCancel {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  font: 600 12px var(--font-sans);
+  padding: 0;
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.quoteBarCancel:hover {
+  background: var(--surface-highest);
+  color: var(--text-1);
+}
+
 .composer::before {
   position: absolute;
   top: 0;
@@ -1967,10 +2019,19 @@
   gap: 2px;
   margin-bottom: 6px;
   padding: 6px 10px;
+  border: 0;
   border-left: 3px solid var(--primary);
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
   background: color-mix(in srgb, var(--primary) 8%, transparent);
   font: var(--caption);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--dur-normal) var(--ease);
+}
+
+.replyQuote:hover {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
 .replyQuoteAuthor {
@@ -1983,6 +2044,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── Inline blockquote (quoted text in messages) ── */
+.inlineBlockquote {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--text-3);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: color-mix(in srgb, var(--surface-highest) 40%, transparent);
+  color: var(--text-2);
+  font: var(--caption);
+  font-style: italic;
+  white-space: pre-line;
+}
+
+.blockText > p {
+  margin: 0;
 }
 
 .agentBlockRow {

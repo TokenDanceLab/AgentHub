@@ -15,6 +15,13 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
+// CCSwitchModelResolver resolves model aliases through the cc-switch database.
+// When non-nil, the adapter will attempt to resolve model names dynamically
+// through cc-switch before falling back to the static alias table.
+type CCSwitchModelResolver interface {
+	ResolveModelAlias(alias, appType string) (string, bool)
+}
+
 // ClaudeCodeAdapter integrates the claude CLI via NDJSON stream-json protocol.
 //
 // Invocation: claude -p "prompt" --output-format stream-json --verbose
@@ -27,6 +34,11 @@ type ClaudeCodeAdapter struct {
 	maxTurns         int
 	available        bool // #177: true if the CLI binary exists and is executable
 	permissionBroker *PermissionDecisionBroker
+
+	// ccSwitchResolver dynamically resolves model aliases through the cc-switch
+	// database. When non-nil and cc-switch routing is active, this takes
+	// precedence over the static ModelAliases table for model resolution.
+	ccSwitchResolver CCSwitchModelResolver
 
 	// Auth env vars captured from parent environment and passed through to the
 	// child process. The env sanitizer strips sensitive keys (ANTHROPIC_API_KEY,
@@ -123,6 +135,30 @@ func (a *ClaudeCodeAdapter) SetPermissionBroker(broker *PermissionDecisionBroker
 	a.permissionBroker = broker
 }
 
+// SetCCSwitchResolver configures dynamic model resolution through the cc-switch
+// database. When set, the adapter will resolve model aliases via cc-switch first
+// (reflecting the actual transparent proxy mapping), falling back to the static
+// ModelAliases table only when cc-switch cannot resolve the alias.
+func (a *ClaudeCodeAdapter) SetCCSwitchResolver(resolver CCSwitchModelResolver) {
+	a.ccSwitchResolver = resolver
+}
+
+// resolveModelForAdapter resolves a model name for the claude-code adapter,
+// checking cc-switch dynamic aliases first, then falling back to static aliases.
+func (a *ClaudeCodeAdapter) resolveModelForAdapter(model string) string {
+	if model == "" {
+		return ""
+	}
+	// Try cc-switch dynamic resolution first (reflects actual transparent proxy).
+	if a.ccSwitchResolver != nil {
+		if resolved, ok := a.ccSwitchResolver.ResolveModelAlias(model, "claude"); ok {
+			return resolved
+		}
+	}
+	// Fall back to static alias table.
+	return ResolveModel("claude-code", model)
+}
+
 func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	prompt := ctx.Prompt
 	if prompt == "" {
@@ -137,9 +173,10 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		fmt.Sprintf("--max-turns=%d", a.maxTurns),
 	)
 
-	// Model: runCtx override first, fallback to adapter default
+	// Model: runCtx override first, fallback to adapter default.
+	// Uses cc-switch dynamic resolution when available.
 	if ctx.Model != "" {
-		args = append(args, "--model", ResolveModel("claude-code", ctx.Model))
+		args = append(args, "--model", a.resolveModelForAdapter(ctx.Model))
 	} else if a.model != "" {
 		args = append(args, "--model", a.model)
 	}

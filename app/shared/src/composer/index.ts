@@ -30,5 +30,6 @@ export type {
   ComposerState,
   ComposerSubmitResult,
   ComposerSubmitState,
+  QuoteContext,
   ReplyToContext,
 } from './types';
