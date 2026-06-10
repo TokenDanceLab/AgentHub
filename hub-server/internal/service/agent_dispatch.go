@@ -1,10 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -60,6 +64,89 @@ type dispatchTargetSnapshot struct {
 	ID         string
 	TargetType string
 	DeviceID   string
+}
+
+// edgeRunRequest is the payload POSTed to the Edge /v1/runs endpoint for HTTP dispatch.
+type edgeRunRequest struct {
+	ProjectID      string               `json:"projectId"`
+	ThreadID       string               `json:"threadId"`
+	Prompt         string               `json:"prompt"`
+	AgentID        string               `json:"agentId,omitempty"`
+	Model          string               `json:"model,omitempty"`
+	SystemPrompt   string               `json:"systemPrompt,omitempty"`
+	HubTaskID      string               `json:"hubTaskId"`
+	Messages       []dispatchMessage    `json:"messages,omitempty"`
+	PinnedMessages []dispatchMessage    `json:"pinnedMessages,omitempty"`
+}
+
+// edgeRunResponse captures the relevant fields from Edge's /v1/runs response.
+type edgeRunResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		RunID string `json:"runId"`
+	} `json:"data"`
+}
+
+// dispatchToEdgeHTTP attempts to dispatch a task directly via HTTP POST to a
+// local Edge server. Returns the Edge run ID on success, or empty string if
+// the Edge server is unreachable or returns an error.
+func (s *AgentService) dispatchToEdgeHTTP(ctx context.Context, task *model.PendingAgentTask, dp *dispatchPayload) string {
+	edgeURL := os.Getenv("AGENTHUB_EDGE_URL")
+	if edgeURL == "" {
+		edgeURL = "http://127.0.0.1:3210"
+	}
+
+	// Build the Edge run request from the dispatch payload.
+	reqBody := edgeRunRequest{
+		ProjectID:      "proj_local",
+		ThreadID:       "thread_local",
+		Prompt:         dp.Prompt,
+		AgentID:        normalizeRuntimeAgentType(dp.AgentType),
+		Model:          "claude",
+		SystemPrompt:   dp.SystemPrompt,
+		HubTaskID:      task.ID,
+		Messages:       dp.Messages,
+		PinnedMessages: dp.PinnedMessages,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		slog.Error("edge http dispatch: failed to marshal request", "task_id", task.ID, "error", err)
+		return ""
+	}
+
+	url := edgeURL + "/v1/runs"
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		slog.Error("edge http dispatch: failed to create request", "task_id", task.ID, "error", err)
+		return ""
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		slog.Debug("edge http dispatch: edge server unreachable", "task_id", task.ID, "url", url, "error", err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
+		slog.Warn("edge http dispatch: edge returned non-success", "task_id", task.ID, "status", resp.StatusCode, "body", string(respBody))
+		return ""
+	}
+
+	var edgeResp edgeRunResponse
+	if err := json.Unmarshal(respBody, &edgeResp); err != nil {
+		slog.Warn("edge http dispatch: failed to decode response", "task_id", task.ID, "error", err)
+		return ""
+	}
+
+	runID := edgeResp.Data.RunID
+	slog.Info("edge http dispatch: task dispatched to local Edge", "task_id", task.ID, "edge_run_id", runID, "url", url)
+	return runID
 }
 
 func normalizeRuntimeAgentType(agentType string) string {
@@ -305,6 +392,19 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	dp.PinnedMessages = s.loadPinnedMessages(ai.SessionID)
 
 	payload, _ := json.Marshal(dp)
+
+	// Try HTTP direct dispatch to local Edge server first.
+	// Only attempt when there is no explicit target binding (unbound tasks
+	// that would otherwise go through WebSocket push or offline queue).
+	if task.TargetID == "" {
+		if edgeRunID := s.dispatchToEdgeHTTP(ctx, task, &dp); edgeRunID != "" {
+			// Mark as dispatched with a synthetic device ID indicating HTTP dispatch.
+			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, "http-edge-local"); err != nil {
+				slog.Error("failed to mark http-dispatched task", "task_id", task.ID, "error", err)
+			}
+			return
+		}
+	}
 
 	cacheClient := resolveAgentCache(s.cacheClient)
 	if task.TargetID != "" {
