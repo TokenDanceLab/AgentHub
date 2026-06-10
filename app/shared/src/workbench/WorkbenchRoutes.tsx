@@ -646,8 +646,8 @@ export function WorkbenchRoutes({
     setHubProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
     try {
       const updated = await hubClient.updateWorkspaceProject(projectId, {
-        name: draft.name.trim() || undefined,
-        description: draft.description.trim() || undefined,
+        ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
+        ...(draft.description.trim() ? { description: draft.description.trim() } : {}),
       });
       const info = workspaceProjectToProjectInfo(updated);
       await loadHubProjects();
