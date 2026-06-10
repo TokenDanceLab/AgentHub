@@ -1,0 +1,302 @@
+package api
+
+import (
+	"archive/tar"
+	"compress/gzip"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/store"
+)
+
+// slugPattern enforces DNS-safe subdomain names for *.pages.vectorcontrol.tech.
+var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$`)
+
+// Deployment configuration. These can be overridden via environment variables.
+const (
+	defaultDeployTargetHost   = "hk2"
+	defaultDeployTargetPath   = "/opt/agenthub-pages"
+	defaultPagesDomain        = "pages.vectorcontrol.tech"
+	envDeployTargetHost       = "AGENTHUB_DEPLOY_HOST"
+	envDeployTargetPath       = "AGENTHUB_DEPLOY_PATH"
+	envPagesDomain            = "AGENTHUB_PAGES_DOMAIN"
+)
+
+// DeployTargetHost returns the SSH target host for deployments.
+func DeployTargetHost() string {
+	if v := os.Getenv(envDeployTargetHost); v != "" {
+		return v
+	}
+	return defaultDeployTargetHost
+}
+
+// DeployTargetPath returns the remote base directory for deployments.
+func DeployTargetPath() string {
+	if v := os.Getenv(envDeployTargetPath); v != "" {
+		return v
+	}
+	return defaultDeployTargetPath
+}
+
+// PagesDomain returns the domain used for generated deployment URLs.
+func PagesDomain() string {
+	if v := os.Getenv(envPagesDomain); v != "" {
+		return v
+	}
+	return defaultPagesDomain
+}
+
+// validateSlug checks that a slug is DNS-safe for use as a subdomain.
+func validateSlug(slug string) error {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return fmt.Errorf("slug is required")
+	}
+	if !slugPattern.MatchString(slug) {
+		return fmt.Errorf("slug must be lowercase alphanumeric with hyphens, 2-63 chars")
+	}
+	return nil
+}
+
+// PostDeployments handles POST /v1/deployments.
+// It takes a runId and slug, collects the run's artifacts, tars them,
+// and SCPs the result to the configured deployment target.
+func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+
+	var req struct {
+		RunID string `json:"runId"`
+		Slug  string `json:"slug"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	req.Slug = strings.TrimSpace(req.Slug)
+
+	if req.RunID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrRunIDRequired))
+		return
+	}
+	if err := validateSlug(req.Slug); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrDeployInvalidSlug.WithMessage(err.Error())))
+		return
+	}
+
+	repository := ensureStore(h)
+
+	// Verify run exists and is in a terminal state.
+	run, ok := repository.GetRun(req.RunID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+	if !isTerminalRunStatus(run.Status) {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrDeployRunNotFinished))
+		return
+	}
+
+	// Collect artifacts for this run.
+	artifacts := repository.ListArtifacts(req.RunID)
+	if len(artifacts) == 0 {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrDeployNoArtifacts))
+		return
+	}
+
+	// Build a tar archive from the artifact content sources.
+	// We collect files from the workspace that match artifact paths.
+	tmpFile, err := os.CreateTemp("", "agenthub-deploy-*.tar.gz")
+	if err != nil {
+		slog.Error("deploy: failed to create temp file", "err", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to create temp archive")))
+		return
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if err := buildArtifactArchive(artifacts, tmpFile); err != nil {
+		slog.Error("deploy: failed to build archive", "err", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to build archive: "+err.Error())))
+		return
+	}
+	tmpFile.Close()
+
+	// SCP the archive to the remote host.
+	remotePath := DeployTargetPath() + "/" + req.Slug
+	targetHost := DeployTargetHost()
+
+	// Ensure remote directory exists and is clean.
+	if err := runSSHCommand(targetHost, "sudo", "mkdir", "-p", remotePath); err != nil {
+		slog.Error("deploy: failed to create remote dir", "err", err, "host", targetHost, "path", remotePath)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to create remote directory")))
+		return
+	}
+
+	// Clear previous deployment content.
+	if err := runSSHCommand(targetHost, "sudo", "rm", "-rf", remotePath+"/*"); err != nil {
+		slog.Warn("deploy: failed to clear previous deployment", "err", err)
+	}
+
+	// SCP the tar.gz to a temp location on the remote.
+	remoteTmp := remotePath + "/deploy.tar.gz"
+	if err := runSCP(tmpPath, targetHost+":"+remoteTmp); err != nil {
+		slog.Error("deploy: scp failed", "err", err, "host", targetHost)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to transfer archive")))
+		return
+	}
+
+	// Extract on remote and clean up tar.
+	extractCmd := fmt.Sprintf("sudo tar -xzf %s -C %s && sudo rm -f %s && sudo chown -R www-data:www-data %s",
+		remoteTmp, remotePath, remoteTmp, remotePath)
+	if err := runSSHCommand(targetHost, "bash", "-c", extractCmd); err != nil {
+		slog.Error("deploy: remote extract failed", "err", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to extract on remote")))
+		return
+	}
+
+	url := fmt.Sprintf("https://%s.%s", req.Slug, PagesDomain())
+	slog.Info("deploy: success", "runId", req.RunID, "slug", req.Slug, "url", url)
+
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"runId":     req.RunID,
+		"slug":      req.Slug,
+		"url":       url,
+		"status":    "deployed",
+		"artifacts": len(artifacts),
+	})
+}
+
+// buildArtifactArchive creates a tar.gz archive from the artifacts' content source paths.
+// For artifacts with workspace_relative content sources, it reads the actual files from
+// the workspace. For others, it creates placeholder entries.
+func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
+	gw := gzip.NewWriter(w)
+	defer gw.Close()
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	for _, artifact := range artifacts {
+		if artifact.ContentSource == nil || !artifact.ContentSource.Readable {
+			// Create a placeholder file entry.
+			name := artifact.Path
+			if name == "" {
+				name = artifact.ID
+			}
+			hdr := &tar.Header{
+				Name: filepath.Base(name),
+				Mode: 0644,
+				Size: 0,
+			}
+			if err := tw.WriteHeader(hdr); err != nil {
+				return fmt.Errorf("write header for %s: %w", name, err)
+			}
+			continue
+		}
+
+		// Read the file from the content source path.
+		sourcePath := artifact.ContentSource.Path
+		if sourcePath == "" {
+			continue
+		}
+
+		f, err := os.Open(sourcePath)
+		if err != nil {
+			slog.Warn("deploy: skipping artifact file (not readable)", "path", sourcePath, "err", err)
+			continue
+		}
+		info, err := f.Stat()
+		if err != nil {
+			f.Close()
+			continue
+		}
+
+		if info.IsDir() {
+			// If it's a directory, walk and add all files.
+			f.Close()
+			if err := addDirToArchive(tw, sourcePath); err != nil {
+				slog.Warn("deploy: failed to add directory", "path", sourcePath, "err", err)
+			}
+			continue
+		}
+
+		hdr := &tar.Header{
+			Name: filepath.Base(sourcePath),
+			Mode: 0644,
+			Size: info.Size(),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			f.Close()
+			return fmt.Errorf("write header: %w", err)
+		}
+		if _, err := io.Copy(tw, f); err != nil {
+			f.Close()
+			return fmt.Errorf("copy file content: %w", err)
+		}
+		f.Close()
+	}
+	return nil
+}
+
+// addDirToArchive recursively adds all files in a directory to the tar archive.
+func addDirToArchive(tw *tar.Writer, dirPath string) error {
+	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip errors
+		}
+		if info.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(dirPath, path)
+		if err != nil {
+			return nil
+		}
+		// Normalize to forward slashes.
+		rel = strings.ReplaceAll(rel, "\\", "/")
+
+		f, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer f.Close()
+
+		hdr := &tar.Header{
+			Name: rel,
+			Mode: 0644,
+			Size: info.Size(),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		_, err = io.Copy(tw, f)
+		return err
+	})
+}
+
+// runSSHCommand executes a command on a remote host via SSH.
+func runSSHCommand(host string, args ...string) error {
+	sshArgs := append([]string{host}, args...)
+	cmd := exec.Command("ssh", sshArgs...)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	return cmd.Run()
+}
+
+// runSCP copies a local file to a remote host via SCP.
+func runSCP(localPath, remoteDest string) error {
+	cmd := exec.Command("scp", "-q", localPath, remoteDest)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	return cmd.Run()
+}
