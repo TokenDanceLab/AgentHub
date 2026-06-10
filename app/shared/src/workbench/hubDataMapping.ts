@@ -222,6 +222,9 @@ export interface HubSessionLike {
   name?: string;
   owner_user_id?: string;
   members?: Array<{ member_id: string; role?: string }>;
+  pinned?: boolean;
+  archived?: boolean;
+  muted?: boolean;
   unread_count?: number;
   last_message_at?: string;
   member_count?: number;
@@ -247,6 +250,8 @@ export function hubSessionToConversation(session: HubSessionLike): WorkbenchConv
     subtitle: session.member_count != null ? `${session.member_count} 人` : undefined,
     updatedLabel,
     avatarLabel: title.slice(0, 2).toUpperCase(),
+    ...(session.pinned ? { pinned: true } : {}),
+    ...(session.archived ? { archived: true } : {}),
     ...(session.unread_count ? { unreadCount: session.unread_count } : {}),
     ...(memberNames?.length ? { members: memberNames } : {}),
   };
