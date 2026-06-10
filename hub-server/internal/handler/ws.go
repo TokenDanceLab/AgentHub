@@ -12,17 +12,33 @@ import (
 
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
 type WebSocketHandler struct {
-	manager   *ws.Manager
-	jwtSecret string
-	onTyping  func(userID, sessionID string)
+	manager     *ws.Manager
+	jwtSecret   string
+	onTyping    func(userID, sessionID string)
+	userLimiter *middleware.WSUserConnLimiter
 }
 
 func NewWebSocketHandler(manager *ws.Manager, jwtSecret string) *WebSocketHandler {
-	return &WebSocketHandler{manager: manager, jwtSecret: jwtSecret}
+	limiter := middleware.NewWSUserConnLimiter(func(connID string) {
+		// Kick the oldest connection by closing it. The writeLoop/readLoop
+		// goroutines will detect the closure and unregister.
+		if c := manager.FindByConnID(connID); c != nil {
+			c.Close()
+		}
+		if metrics.WSKickedConns != nil {
+			metrics.WSKickedConns.Inc()
+		}
+	})
+	return &WebSocketHandler{
+		manager:     manager,
+		jwtSecret:   jwtSecret,
+		userLimiter: limiter,
+	}
 }
 
 func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string)) {
@@ -53,9 +69,10 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	// use the Gin context values directly and skip in-protocol auth frame.
 	if userID := c.GetString("user_id"); userID != "" {
 		h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
+		h.userLimiter.Acquire(userID, conn.ID)
 		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
 		go h.writeLoop(conn)
-		go h.messageLoop(conn)
+		go h.authenticatedReadLoop(conn)
 		return
 	}
 
@@ -81,7 +98,7 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 }
 
 func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
-	defer h.manager.Unregister(conn.ID)
+	defer h.cleanupConn(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -125,14 +142,42 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 	}
 
 	h.manager.SetAuth(conn.ID, claims.UserID, claims.DeviceType, claims.DeviceID)
+	h.userLimiter.Acquire(claims.UserID, conn.ID)
 
 	h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
 
+	h.processIncoming(conn)
+}
+
+// authenticatedReadLoop reads messages from an already-authenticated WebSocket connection.
+// It is used when the upgrade request was already authenticated by middleware,
+// so no in-protocol auth frame exchange is needed.
+func (h *WebSocketHandler) authenticatedReadLoop(conn *ws.Conn) {
+	defer h.cleanupConn(conn)
+	h.processIncoming(conn)
+}
+
+// processIncoming is the shared message-read loop for authenticated connections.
+// Per-connection message rate limiting is enforced: messages that exceed the rate
+// limit are dropped and a warning is logged.
+func (h *WebSocketHandler) processIncoming(conn *ws.Conn) {
 	for {
 		_, data, err := conn.W.Read(context.Background())
 		if err != nil {
 			slog.Info("ws read error", "user_id", conn.UserID, "err", err)
 			return
+		}
+
+		// Per-connection message rate limiting.
+		if !conn.AllowMessage() {
+			if metrics.WSRateLimitedMsgs != nil {
+				metrics.WSRateLimitedMsgs.Inc()
+			}
+			slog.Warn("ws message rate limited: dropping message",
+				"conn_id", conn.ID,
+				"user_id", conn.UserID,
+			)
+			continue
 		}
 
 		frame, err := ws.ParseFrame(data)
@@ -149,31 +194,11 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 	}
 }
 
-// messageLoop reads messages from an already-authenticated WebSocket connection.
-// It is used when the upgrade request was already authenticated by middleware,
-// so no in-protocol auth frame exchange is needed.
-func (h *WebSocketHandler) messageLoop(conn *ws.Conn) {
-	defer h.manager.Unregister(conn.ID)
-
-	for {
-		_, data, err := conn.W.Read(context.Background())
-		if err != nil {
-			slog.Info("ws read error", "user_id", conn.UserID, "err", err)
-			return
-		}
-
-		frame, err := ws.ParseFrame(data)
-		if err != nil {
-			continue
-		}
-
-		switch frame.Type {
-		case ws.TypeTyping:
-			h.handleTyping(conn, frame)
-		default:
-			slog.Debug("ws unknown frame type", "type", frame.Type)
-		}
-	}
+// cleanupConn unregisters the connection from the manager and releases the
+// per-user connection limiter slot.
+func (h *WebSocketHandler) cleanupConn(conn *ws.Conn) {
+	h.userLimiter.Release(conn.UserID, conn.ID)
+	h.manager.Unregister(conn.ID)
 }
 
 func (h *WebSocketHandler) handleTyping(conn *ws.Conn, frame *ws.Frame) {

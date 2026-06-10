@@ -58,6 +58,10 @@ type Handler struct {
 	PermissionRegistry *PermissionRegistry
 	PermissionBroker   *adapters.PermissionDecisionBroker
 
+	// MCPConfigStore holds Hub-synced MCP server configs for injection into runs.
+	// When non-nil, run creation merges Hub-synced configs into the run's MCPConfig.
+	MCPConfigStore *adapters.MCPConfigStore
+
 	runCreateMu               sync.Mutex
 	permissionRegistryMu      sync.Mutex
 	permissionObserverCancel  func()
@@ -1160,6 +1164,23 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		// The SkillRegistry is shared across runs and lazily lists name+description.
 		if h.SkillRegistry != nil {
 			runCtx.SkillsPrompt = h.SkillRegistry.SystemPromptContext()
+		}
+		// Inject AgentHub memory from .agenthub/memory/ files into the system prompt.
+		// Memory is read from the workspace directory and prepended to SkillsPrompt
+		// so agents have persistent context across runs.
+		if memPrompt := runnerctx.BuildMemoryPrompt(req.WorkDir, req.ThreadID, req.AgentID); memPrompt != "" {
+			if runCtx.SkillsPrompt != "" {
+				runCtx.SkillsPrompt = memPrompt + "
+
+" + runCtx.SkillsPrompt
+			} else {
+				runCtx.SkillsPrompt = memPrompt
+			}
+		}
+		// Merge Hub-synced MCP server configs into the run's MCPConfig.
+		// Run-level config wins on key conflicts; Hub configs fill in the gaps.
+		if h.MCPConfigStore != nil {
+			runCtx.MCPConfig = adapters.MergeConfigJSON(runCtx.MCPConfig, h.MCPConfigStore)
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
 			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {

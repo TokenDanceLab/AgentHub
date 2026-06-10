@@ -67,6 +67,7 @@ type Config struct {
 	WorkspaceAllowlist []string           // optional roots allowed for request workDir
 	SkillsDirs         []string           // optional SKILL.md search dirs; empty = use defaults
 	EventLogPath       string             // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
+	MCPConfigStore     *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -309,6 +310,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		Metrics:            edgeMetrics,
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 		SkillRegistry:      skillReg,
+		MCPConfigStore:     cfg.MCPConfigStore,
 	}
 	// Validate security-critical configuration at startup.
 	// An empty workspace allowlist means all non-empty workDir values
