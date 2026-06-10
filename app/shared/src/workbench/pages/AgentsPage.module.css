@@ -272,12 +272,13 @@
 .agent-layout {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(520px, 1fr) minmax(380px, 420px);
+  grid-template-columns: minmax(420px, 1fr) minmax(320px, 1fr);
   gap: 14px;
   align-items: start;
 }
 
 .agent-section {
+  min-width: 0;
   border: 1px solid var(--bdr);
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -568,6 +569,8 @@
   border-radius: var(--r-lg);
   background: var(--surface);
   padding: 16px;
+  min-width: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -636,7 +639,7 @@
   border-radius: var(--r-sm);
   background: var(--surface-low);
   display: grid;
-  grid-template-columns: 9px 18px minmax(0, 1fr) minmax(120px, auto);
+  grid-template-columns: 9px 18px minmax(0, 1fr) minmax(0, auto);
   align-items: center;
   gap: 9px;
 }
@@ -651,10 +654,13 @@
 }
 
 .agent-runtime-line em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--primary);
   font: 600 0.6875rem var(--font-mono);
   font-style: normal;
-  white-space: nowrap;
 }
 
 .agent-capability-strip {
