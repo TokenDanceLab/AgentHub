@@ -207,9 +207,9 @@ func newMessageReactionTestDB(t *testing.T) *gorm.DB {
 			session_id TEXT NOT NULL,
 			message_id TEXT NOT NULL,
 			user_id TEXT NOT NULL,
-			reaction TEXT NOT NULL,
+			emoji TEXT NOT NULL,
 			created_at DATETIME,
-			UNIQUE (session_id, message_id, user_id, reaction)
+			UNIQUE (session_id, message_id, user_id, emoji)
 		)`,
 	}
 
