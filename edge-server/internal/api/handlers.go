@@ -596,7 +596,39 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 		return
 	}
 
-	item, err := ensureStore(h).CreateThreadMessage(genID("item_"), threadID, req.Role, req.Content)
+	repo := ensureStore(h)
+	role := strings.TrimSpace(req.Role)
+	if role == "" {
+		role = "user"
+	}
+
+	// Look up thread to get project ID for the new item.
+	thread, ok := repo.GetThread(threadID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		return
+	}
+
+	// For user messages, look up the current user profile to set sender info.
+	var senderID, senderName string
+	if role == "user" {
+		if profile, ok := repo.GetCurrentUser(); ok {
+			senderID = profile.ID
+			senderName = profile.DisplayName
+		}
+	}
+
+	item, err := repo.CreateItem(store.Item{
+		ID:         genID("item_"),
+		ProjectID:  thread.ProjectID,
+		ThreadID:   threadID,
+		Type:       "user_message",
+		Role:       role,
+		Status:     "created",
+		Content:    req.Content,
+		SenderID:   senderID,
+		SenderName: senderName,
+	})
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
 		return
@@ -1065,8 +1097,12 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
 		return
 	}
-	// Session handling is now always --continue in the adapter (CC manages conversations).
-	// No auto-continue logic needed here.
+	// Session handling: if this thread has been run before, CC already has a
+	// conversation. Use --continue to continue it. For brand-new threads,
+	// use --session-id to create the first CC conversation.
+	if req.SessionID != "" && hasFinishedRuns(repository, req.ThreadID) {
+		req.Continue = true
+	}
 
 	if h.Executor == nil {
 		h.runCreateMu.Unlock()
@@ -1439,6 +1475,17 @@ func runtimeSessionIDForThread(threadID string) string {
 func threadHasAssistantHistory(items []store.Item) bool {
 	for _, item := range items {
 		if item.Type == "agent_message" && (item.Role == "agent" || item.Role == "assistant") && strings.TrimSpace(item.Content) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// hasFinishedRuns checks if the thread has any completed runs.
+// Used to decide between --session-id (first run) and --continue (subsequent runs).
+func hasFinishedRuns(repo store.Repository, threadID string) bool {
+	for _, run := range repo.ListRuns(threadID) {
+		if run.Status == "finished" || run.Status == "failed" {
 			return true
 		}
 	}
