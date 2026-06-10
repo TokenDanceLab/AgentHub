@@ -18,9 +18,18 @@ Hub Server（`hub-server/`）是 AgentHub 的云端中枢：
 ## 在架构中的位置
 
 ```text
+Desktop shared workbench
+  -> Desktop platform adapter
+  -> Local Edge Server
+  -> Hub Server              <-- 本文档（认证 / 联系人 / 会话 / 消息）
+  -> AgentAdapter
+  -> Claude Code / Codex / OpenCode
+```
+
+```text
 Web shared workbench
   -> Web platform adapter
-  -> Hub Server              <-- 本文档
+  -> Hub Server              <-- 本文档（全量 API）
   -> Edge routing / relay
   -> Edge Server
   -> AgentAdapter
