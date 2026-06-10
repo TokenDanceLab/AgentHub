@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { MoreHorizontal } from 'lucide-react-native';
 
 import { createHubClient } from '@/api/hubClient';
 import { createHubEventStream, type HubEventStream, type HubWebSocketLike } from '@/api/hubEvents';
@@ -212,9 +213,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
               justifyContent: 'center',
             }}
           >
-            <Text style={{ fontSize: 14, color: tokens.color.inkMuted }}>
-              {inspectorCollapsed ? '☰' : '✕'}
-            </Text>
+            <MoreHorizontal size={16} color={tokens.color.inkMuted} />
           </Pressable>
         ) : null}
       </View>
