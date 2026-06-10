@@ -21,6 +21,14 @@ import styles from './ContactsPage.module.css';
    ContactsPage — pure presentational workbench page
    ═══════════════════════════════════════════════════════════════════════ */
 
+// ── Capability tag colors (matches AgentsPage convention) ──
+
+const CAPABILITY_TAG_COLORS: readonly string[] = ['tagBlue', 'tagGreen', 'tagOrange', 'tagPurple', 'tagTeal'];
+
+function capabilityColor(index: number): string {
+  return CAPABILITY_TAG_COLORS[index % CAPABILITY_TAG_COLORS.length] ?? '';
+}
+
 // ── Data shapes ──
 
 export interface FriendRequestRow {
@@ -58,6 +66,7 @@ export interface ContactMember {
   tag?: string;
   org: string;
   status: string;
+  capabilities?: string[];
 }
 
 export interface ContactGroup {
@@ -301,6 +310,21 @@ function MemberRow({
         {member.initials}
       </div>
       <span className={styles.memberName}>{member.name}</span>
+      {member.capabilities && member.capabilities.length > 0 && (
+        <span className={styles.capabilityTags}>
+          {member.capabilities.slice(0, 3).map((cap, i) => {
+            const color = capabilityColor(i);
+            return (
+              <span
+                key={cap}
+                className={`${styles.capabilityTag} ${color ? styles[color as keyof typeof styles] : ''}`}
+              >
+                {cap}
+              </span>
+            );
+          })}
+        </span>
+      )}
       {member.tag && <span className={styles.memberTag}>{member.tag}</span>}
       <span
         className={`${styles.memberOrg} ${isGroup ? styles.groupMemberOrg : ''}`}
