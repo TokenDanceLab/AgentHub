@@ -29,11 +29,11 @@ Mock 验收 (demo data 走通)
 | 6 | 消息搜索跳转 | Demo 搜索结果点击跳转 | Hub 搜索 API 返回正确 offset | — |
 | 7 | Tool allowlist | 非白名单工具被拒绝 | — | — |
 
-- [ ] 全部 Mock 模式通过
+- [x] 全部 Mock 模式通过
 - [ ] 全部 Observed 模式通过
 - [ ] `verify-real-api-smoke.ps1` 新 phase 全部通过
-- [ ] `go test ./... -short` hub-server + edge-server 通过
-- [ ] `pnpm typecheck` app/ 通过
+- [x] `go test ./... -short` hub-server + edge-server 通过
+- [x] `pnpm typecheck` app/ 通过
 
 ## 轻 UI 类（02-light-ui）验收门
 
