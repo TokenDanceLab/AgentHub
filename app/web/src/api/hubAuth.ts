@@ -20,7 +20,7 @@ import { useHubStore } from '@/stores/hubStore';
 
 const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "tokendance" | "hub"
 const OIDC_PENDING_KEY = 'agenthub_oidc_pkce_pending';
-const OIDC_CALLBACK_PATH = '/auth/tokendance/callback';
+const OIDC_CALLBACK_PATH = import.meta.env.VITE_OIDC_CALLBACK_PATH || '/auth/tokendance/callback';
 
 // ── Types ────────────────────────────────────────
 
@@ -145,7 +145,8 @@ function saveTokenSource(source: HubAuthState['tokenSource']): void {
 
 function leaveCallbackRoute(): void {
   if (typeof window === 'undefined') return;
-  window.history.replaceState({}, document.title, '/');
+  const base = import.meta.env.BASE_URL || '/';
+  window.history.replaceState({}, document.title, base);
 }
 
 // ── Token exchange via Hub ────────────────────────
