@@ -328,8 +328,8 @@ export interface AgentsPageProps {
   installedMcpIds?: string[];
 
   /* ── cc-switch model proxy ── */
-  ccSwitchStatus?: CCSwitchStatusInfo;
-  ccSwitchProviders?: CCSwitchProviderInfo[];
+  ccSwitchStatus?: CCSwitchStatusInfo | undefined;
+  ccSwitchProviders?: CCSwitchProviderInfo[] | undefined;
 
   /* ── Recent change shortcuts in nav ── */
   recentShortcuts?: string[];
