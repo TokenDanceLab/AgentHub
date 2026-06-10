@@ -2134,6 +2134,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// cc-switch integration
 	mux.HandleFunc("/v1/ccswitch/status", h.GetCCSwitchStatus)
 	mux.HandleFunc("/v1/ccswitch/providers", h.GetCCSwitchProviders)
+	// Deployments (static site deploy to *.pages.vectorcontrol.tech)
+	mux.HandleFunc("/v1/deployments", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			h.PostDeployments(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
 	// Memory
 	mux.HandleFunc("/v1/memory", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
