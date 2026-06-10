@@ -398,6 +398,13 @@ export function createHubAuth(client?: HubClient): HubAuth {
       // 3. Call Hub to bind PKCE/state/device and get the authorization URL.
       //    Pass the redirect_uri so Hub and TokenDance ID use the same one.
       const authClient = createPublicClient();
+      console.debug('[oidc] Calling Hub authorize', {
+        hubUrl: import.meta.env.VITE_HUB_URL || '(default)',
+        isTauri: isTauri(),
+        redirectUri,
+        deviceId,
+        origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+      });
 
       let authorizeResp: { state: string; authorization_url: string };
       try {
@@ -419,6 +426,12 @@ export function createHubAuth(client?: HubClient): HubAuth {
         authorizeResp = await authClient.oidcAuthorize(authorizeBody);
       } catch (err) {
         const detail = err instanceof Error ? err.message : 'Unknown error';
+        console.error('[oidc] authorize FAILED', {
+          detail,
+          errorName: (err as Error)?.name,
+          errorCause: (err as Error)?.cause,
+          stack: (err as Error)?.stack?.split('\n').slice(0, 3).join('\n'),
+        });
         const oidcErr = new OidcError('startFailed', `Failed to start OIDC login: ${detail}`, detail);
         oidcErr.cause = err;
         throw oidcErr;

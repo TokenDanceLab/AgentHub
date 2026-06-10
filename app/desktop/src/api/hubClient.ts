@@ -843,7 +843,84 @@ export class HubError extends Error {
   }
 }
 
-// 鈹€鈹€ Client factory 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Tauri proxy fallback ─────────────────────────────────────────────────
+
+/**
+ * When WebView2 `fetch()` fails (e.g. doesn't respect HTTP_PROXY env vars),
+ * fall back to the Rust backend's `reqwest`-based proxy which does.
+ * Only used in Tauri mode; returns `{ used: false }` in browser mode.
+ */
+async function tauriProxyFallback<T>(
+  url: string,
+  options: RequestInit,
+  headers: Record<string, string>,
+  originalError: unknown,
+): Promise<{ used: true; value: unknown } | { used: false }> {
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  if (!isTauri) return { used: false };
+
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const body = typeof options.body === 'string' ? options.body : '';
+    console.debug('[hubClient] tauri proxy fallback →', options.method || 'POST', url);
+    const resp = await invoke<{ status: number; body: string; headers: Record<string, string> }>(
+      'proxy_http_post',
+      { url, body, headers },
+    );
+    console.debug('[hubClient] tauri proxy response', resp.status, url);
+
+    // Parse the response body
+    let parsed: unknown;
+    try {
+      parsed = resp.body ? JSON.parse(resp.body) : undefined;
+    } catch {
+      parsed = undefined;
+    }
+
+    if (resp.status < 200 || resp.status >= 300) {
+      throw new AppError(
+        {
+          error: {
+            code: resp.status >= 500 ? 'internal_error' : 'bad_request',
+            message: `HTTP ${resp.status} (via Tauri proxy)`,
+          },
+        },
+        resp.status,
+        parsed,
+      );
+    }
+
+    // Unwrap Hub envelope if present
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'code' in parsed &&
+      typeof (parsed as { code?: unknown }).code === 'string'
+    ) {
+      const envelope = parsed as { code: string; data?: unknown; message?: string };
+      if (envelope.code === 'OK' || envelope.code === 'ok') {
+        return { used: true, value: envelope.data };
+      }
+      throw new AppError(
+        {
+          error: {
+            code: envelope.code || 'hub_error',
+            message: envelope.message || 'Hub request failed (via Tauri proxy)',
+          },
+        },
+        resp.status,
+        parsed,
+      );
+    }
+
+    return { used: true, value: parsed };
+  } catch (proxyErr) {
+    console.warn('[hubClient] tauri proxy fallback also failed:', proxyErr);
+    return { used: false };
+  }
+}
+
+// ── Client factory ──────────────────────────────────────────────
 
 export interface HubClientOptions {
   baseUrl?: string;
@@ -884,7 +961,35 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    const res = await fetch(`${base}${path}`, { ...options, headers });
+    const url = `${base}${path}`;
+    console.debug('[hubClient] request', options.method || 'GET', url);
+    let res: Response;
+    try {
+      res = await fetch(url, { ...options, headers });
+    } catch (fetchErr) {
+      console.warn('[hubClient] fetch() failed, attempting Tauri proxy fallback', url, {
+        name: (fetchErr as Error)?.name,
+        message: (fetchErr as Error)?.message,
+      });
+      // In Tauri mode, fall back to the Rust backend HTTP proxy.
+      // WebView2 fetch() does not respect HTTP_PROXY/HTTPS_PROXY env vars;
+      // the Rust reqwest client does.
+      const tauriResult = await tauriProxyFallback<T>(url, options, headers, fetchErr);
+      if (tauriResult.used) {
+        return tauriResult.value as T;
+      }
+      // Not in Tauri or fallback also failed — throw the original error
+      console.error('[hubClient] fetch FAILED (no fallback)', url, {
+        name: (fetchErr as Error)?.name,
+        message: (fetchErr as Error)?.message,
+        cause: (fetchErr as Error)?.cause,
+        base,
+        isTauri: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window,
+        origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+      });
+      throw fetchErr;
+    }
+    console.debug('[hubClient] response', res.status, url);
     const body = res.status === 204 ? undefined : await readJsonBody(res);
 
     if (!res.ok) {
