@@ -36,6 +36,8 @@ import {
   type HubExecutionTargetRequest,
   type HubRelayCommand,
   type HubRelayCommandRequest,
+  type HubSkill,
+  type HubMCPServer,
 } from '@agenthub/shared/hubClient';
 
 import { mobileFixture } from '@/data/mobileFixtures';
@@ -315,6 +317,9 @@ export interface HubClient {
   listTaskArtifacts: (taskId: string) => Promise<HubAgentTaskArtifactList>;
   // Execution Targets
   listExecutionTargets: () => Promise<HubListResponse<HubExecutionTarget>>;
+  // Skills & MCP
+  listPublicSkills: (params?: { skill_type?: string; q?: string; is_public?: string; pageCursor?: string; pageSize?: number }) => Promise<HubListResponse<HubSkill>>;
+  listPublicMCPServers: (params?: { transport?: string; q?: string; is_public?: string; pageCursor?: string; pageSize?: number }) => Promise<HubListResponse<HubMCPServer>>;
   // Edge task lifecycle
   ackTask: (taskId: string, runId?: string) => Promise<void>;
   streamTask: (taskId: string, content: string, runId?: string) => Promise<void>;
