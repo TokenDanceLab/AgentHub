@@ -28,6 +28,8 @@ import styles from './AgentsPage.module.css';
 export type AgentsPaneId =
   | 'installed'
   | 'market'
+  | 'skillMarket'
+  | 'mcpMarket'
   | 'policy'
   | 'tools'
   | 'models'
@@ -145,6 +147,41 @@ export interface AgentRecentEvent {
   text: string;
 }
 
+/* ── Skill Market ── */
+
+export type SkillType = 'prompt' | 'tool' | 'workflow' | 'integration' | string;
+
+export interface SkillMarketItem {
+  id: string;
+  name: string;
+  description: string;
+  skill_type: SkillType;
+  version?: string;
+  install_count?: number;
+  is_public?: boolean;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/* ── MCP Market ── */
+
+export type MCPTransportType = 'stdio' | 'http' | 'sse' | string;
+
+export interface MCPMarketItem {
+  id: string;
+  name: string;
+  description: string;
+  transport: MCPTransportType;
+  command?: string;
+  url?: string;
+  install_count?: number;
+  is_public?: boolean;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 /* ── Props ── */
 
 export interface AgentsPageProps {
@@ -250,6 +287,28 @@ export interface AgentsPageProps {
   onAuditFilterChange?: ((filter: string) => void) | undefined;
   onAuditExport?: (() => void) | undefined;
 
+  /* ── Skill Market view ── */
+  skillMarketItems?: SkillMarketItem[];
+  skillMarketLoading?: boolean;
+  skillMarketSearchQuery?: string;
+  onSkillMarketSearchChange?: ((query: string) => void) | undefined;
+  activeSkillTypeFilter?: string;
+  onSkillTypeFilterChange?: ((skillType: string) => void) | undefined;
+  onSkillInstall?: ((skill: SkillMarketItem) => void) | undefined;
+  onSkillUninstall?: ((skillId: string) => void) | undefined;
+  installedSkillIds?: string[];
+
+  /* ── MCP Market view ── */
+  mcpMarketItems?: MCPMarketItem[];
+  mcpMarketLoading?: boolean;
+  mcpMarketSearchQuery?: string;
+  onMcpMarketSearchChange?: ((query: string) => void) | undefined;
+  activeTransportFilter?: string;
+  onTransportFilterChange?: ((transport: string) => void) | undefined;
+  onMcpInstall?: ((mcp: MCPMarketItem) => void) | undefined;
+  onMcpUninstall?: ((mcpId: string) => void) | undefined;
+  installedMcpIds?: string[];
+
   /* ── Recent change shortcuts in nav ── */
   recentShortcuts?: string[];
 }
@@ -286,6 +345,8 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
   const navItems: { id: AgentsPaneId; label: string; icon: DesignNavIconName }[] = [
     { id: 'installed', label: '已安装', icon: 'package' },
     { id: 'market', label: 'Agent 市场', icon: 'store' },
+    { id: 'skillMarket', label: 'Skill 市场', icon: 'library' },
+    { id: 'mcpMarket', label: 'MCP 市场', icon: 'service' },
     { id: 'policy', label: '运行策略', icon: 'policy' },
     { id: 'tools', label: '工具权限', icon: 'tools' },
     { id: 'models', label: '模型配置', icon: 'model' },
@@ -298,6 +359,10 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
         return <AgentInstalledView {...props} />;
       case 'market':
         return <AgentMarketView {...props} />;
+      case 'skillMarket':
+        return <SkillMarketView {...props} />;
+      case 'mcpMarket':
+        return <MCPMarketView {...props} />;
       case 'policy':
         return <AgentPolicyView {...props} />;
       case 'tools':
@@ -1326,8 +1391,228 @@ const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Shared helpers
+   7. Skill 市场 (SkillMarket)
    ═══════════════════════════════════════════════════════════════════════ */
+
+const SkillMarketView: React.FC<AgentsPageProps> = (props) => {
+  const {
+    skillMarketItems = [],
+    skillMarketLoading = false,
+    skillMarketSearchQuery = '',
+    onSkillMarketSearchChange,
+    activeSkillTypeFilter = '',
+    onSkillTypeFilterChange,
+    onSkillInstall,
+    onSkillUninstall,
+    installedSkillIds = [],
+  } = props;
+
+  const skillTypes = ['', 'prompt', 'tool', 'workflow', 'integration'];
+
+  return (
+    <main className={`${styles['agent-main']} ${styles['agent-market-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
+        <div>
+          <h1>Skill 市场</h1>
+          <p className={styles['head-subcopy']}>
+            浏览公共 Skill，一键安装到当前 Agent Profile。已安装的 Skill 可随时卸载。
+          </p>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className={styles['market-toolbar']}>
+        <input
+          className={styles['market-search']}
+          type="search"
+          placeholder="搜索 Skill 名称或描述"
+          value={skillMarketSearchQuery}
+          onChange={(e) => onSkillMarketSearchChange?.(e.target.value)}
+        />
+        <div className={styles['market-cats']}>
+          {skillTypes.map((type) => (
+            <button
+              key={type}
+              className={`${activeSkillTypeFilter === type ? styles.active : ''}`}
+              type="button"
+              onClick={() => onSkillTypeFilterChange?.(type)}
+            >
+              {type || '全部'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section className={styles['agent-section']}>
+        <div className={styles['section-title-row']}>
+          <h2>公共 Skill</h2>
+          <span>{skillMarketLoading ? '加载中' : `${skillMarketItems.length} skills`}</span>
+        </div>
+        {skillMarketItems.length === 0 && !skillMarketLoading && (
+          <div className={styles['agent-empty-state']} role="status">
+            <strong>暂无公共 Skill</strong>
+            <span>Hub 上暂无已发布的 Skill，发布后在此浏览安装。</span>
+          </div>
+        )}
+        <div className={styles['market-list']}>
+          {skillMarketItems.map((skill) => {
+            const isInstalled = installedSkillIds.includes(skill.id);
+            return (
+              <div
+                key={skill.id}
+                className={`${styles['market-list-row']} ${styles['market-item-card']}`}
+              >
+                <div className={styles['market-icon']}>
+                  <DesignNavIcon name="library" size={16} />
+                </div>
+                <div>
+                  <strong>{skill.name}</strong>
+                  <span>{skill.description}</span>
+                </div>
+                <em className={styles['skill-type-badge']}>{skill.skill_type}</em>
+                <small>
+                  {[
+                    skill.version ? `v${skill.version}` : '',
+                    skill.install_count ? `${skill.install_count} installs` : '',
+                  ].filter(Boolean).join(' · ')}
+                </small>
+                {isInstalled ? (
+                  <button
+                    className={`${styles['market-action-btn']} ${styles.uninstall}`}
+                    type="button"
+                    onClick={() => onSkillUninstall?.(skill.id)}
+                  >
+                    卸载
+                  </button>
+                ) : (
+                  <button
+                    className={`${styles['market-action-btn']} ${styles.install}`}
+                    type="button"
+                    onClick={() => onSkillInstall?.(skill)}
+                  >
+                    安装
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </main>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   8. MCP 市场 (MCPMarket)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const MCPMarketView: React.FC<AgentsPageProps> = (props) => {
+  const {
+    mcpMarketItems = [],
+    mcpMarketLoading = false,
+    mcpMarketSearchQuery = '',
+    onMcpMarketSearchChange,
+    activeTransportFilter = '',
+    onTransportFilterChange,
+    onMcpInstall,
+    onMcpUninstall,
+    installedMcpIds = [],
+  } = props;
+
+  const transports = ['', 'stdio', 'http', 'sse'];
+
+  return (
+    <main className={`${styles['agent-main']} ${styles['agent-market-main']} workbench-main`}>
+      <div className={`${styles['workbench-head']} workbench-head`}>
+        <div>
+          <h1>MCP 市场</h1>
+          <p className={styles['head-subcopy']}>
+            浏览公共 MCP Server，安装到 Agent Profile 以扩展工具能力。支持 stdio、HTTP、SSE 传输。
+          </p>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className={styles['market-toolbar']}>
+        <input
+          className={styles['market-search']}
+          type="search"
+          placeholder="搜索 MCP Server 名称或描述"
+          value={mcpMarketSearchQuery}
+          onChange={(e) => onMcpMarketSearchChange?.(e.target.value)}
+        />
+        <div className={styles['market-cats']}>
+          {transports.map((t) => (
+            <button
+              key={t}
+              className={`${activeTransportFilter === t ? styles.active : ''}`}
+              type="button"
+              onClick={() => onTransportFilterChange?.(t)}
+            >
+              {t || '全部'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section className={styles['agent-section']}>
+        <div className={styles['section-title-row']}>
+          <h2>公共 MCP Server</h2>
+          <span>{mcpMarketLoading ? '加载中' : `${mcpMarketItems.length} servers`}</span>
+        </div>
+        {mcpMarketItems.length === 0 && !mcpMarketLoading && (
+          <div className={styles['agent-empty-state']} role="status">
+            <strong>暂无公共 MCP Server</strong>
+            <span>Hub 上暂无已发布的 MCP Server，发布后在此浏览安装。</span>
+          </div>
+        )}
+        <div className={styles['market-list']}>
+          {mcpMarketItems.map((mcp) => {
+            const isInstalled = installedMcpIds.includes(mcp.id);
+            return (
+              <div
+                key={mcp.id}
+                className={`${styles['market-list-row']} ${styles['market-item-card']}`}
+              >
+                <div className={styles['market-icon']}>
+                  <DesignNavIcon name="service" size={16} />
+                </div>
+                <div>
+                  <strong>{mcp.name}</strong>
+                  <span>{mcp.description}</span>
+                </div>
+                <em className={styles['transport-badge']}>{mcp.transport}</em>
+                <small>
+                  {[
+                    mcp.command || mcp.url || '',
+                    mcp.install_count ? `${mcp.install_count} installs` : '',
+                  ].filter(Boolean).join(' · ')}
+                </small>
+                {isInstalled ? (
+                  <button
+                    className={`${styles['market-action-btn']} ${styles.uninstall}`}
+                    type="button"
+                    onClick={() => onMcpUninstall?.(mcp.id)}
+                  >
+                    卸载
+                  </button>
+                ) : (
+                  <button
+                    className={`${styles['market-action-btn']} ${styles.install}`}
+                    type="button"
+                    onClick={() => onMcpInstall?.(mcp)}
+                  >
+                    安装
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </main>
+  );
+};
 
 const AgentAvatar: React.FC<{
   agent: AgentConfig;
