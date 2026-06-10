@@ -39,17 +39,6 @@ type ClaudeCodeAdapter struct {
 	// database. When non-nil and cc-switch routing is active, this takes
 	// precedence over the static ModelAliases table for model resolution.
 	ccSwitchResolver CCSwitchModelResolver
-
-	// Auth env vars captured from parent environment and passed through to the
-	// child process. The env sanitizer strips sensitive keys (ANTHROPIC_API_KEY,
-	// CLAUDE_API_KEY, ANTHROPIC_AUTH_TOKEN) from the sanitized child env, and
-	// ANTHROPIC_BASE_URL is not on the whitelist either, so adapter-level
-	// passthrough is required. Without this, Claude Code fails immediately
-	// with an authentication error.
-	anthropicAPIKey    string // ANTHROPIC_API_KEY
-	claudeAPIKey       string // CLAUDE_API_KEY
-	anthropicAuthToken string // ANTHROPIC_AUTH_TOKEN (used by cc-switch transparent proxy)
-	anthropicBaseURL   string // ANTHROPIC_BASE_URL (used by cc-switch transparent proxy)
 }
 
 // NewClaudeCodeAdapter creates a Claude Code adapter.
@@ -57,26 +46,14 @@ type ClaudeCodeAdapter struct {
 // model and permissionMode serve as defaults when the run context does not specify them.
 func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeAdapter {
 	cmdPath, argPrefix, available := resolveClaudeCommand(binaryPath, exec.LookPath, os.Stat, runtime.GOOS)
-	// Capture auth env vars from parent environment so we can pass them through
-	// to the Claude Code child process. The env sanitizer strips sensitive keys
-	// from the sanitized child env, so adapter-level passthrough is required.
-	// Without this, Claude Code fails immediately with an authentication error.
-	anthropicAPIKey := os.Getenv("ANTHROPIC_API_KEY")
-	claudeAPIKey := os.Getenv("CLAUDE_API_KEY")
-	anthropicAuthToken := os.Getenv("ANTHROPIC_AUTH_TOKEN")
-	anthropicBaseURL := os.Getenv("ANTHROPIC_BASE_URL")
 	return &ClaudeCodeAdapter{
-		binaryPath:         cmdPath,
-		argPrefix:          argPrefix,
-		model:              model,
-		permissionMode:     permissionMode,
-		maxTurns:           50,
-		available:          available,
-		permissionBroker:   nil,
-		anthropicAPIKey:    anthropicAPIKey,
-		claudeAPIKey:       claudeAPIKey,
-		anthropicAuthToken: anthropicAuthToken,
-		anthropicBaseURL:   anthropicBaseURL,
+		binaryPath:       cmdPath,
+		argPrefix:        argPrefix,
+		model:            model,
+		permissionMode:   permissionMode,
+		maxTurns:         50,
+		available:        available,
+		permissionBroker: nil,
 	}
 }
 

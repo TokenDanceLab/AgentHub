@@ -598,15 +598,14 @@ func TestClaudeCodeIntegrationNoBinary(t *testing.T) {
 }
 
 func TestClaudeCodeAuthEnvPassthrough(t *testing.T) {
-	// Verify that auth env vars captured at construction time are forwarded
-	// through BuildCommand's env return value. This is critical because the
-	// env sanitizer strips sensitive keys from the child process environment,
-	// so adapter-level passthrough is required for Claude Code to authenticate.
+	// Verify that auth env var injection respects the cc-switch managed mode:
+	//   - cc-switch managed (settings.json has ANTHROPIC_AUTH_TOKEN): no injection
+	//   - native/standalone (no settings.json or no ANTHROPIC_AUTH_TOKEN): passthrough
 	tests := []struct {
 		name        string
 		envSetup    func()
 		envCleanup  func()
-		wantEnvKeys []string
+		wantEnvKeys []string // expected only when NOT cc-switch managed
 	}{
 		{
 			name:        "no_auth_env",
@@ -672,6 +671,7 @@ func TestClaudeCodeAuthEnvPassthrough(t *testing.T) {
 		},
 	}
 
+	managed := ccSwitchManaged()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up any stale env vars before the test
@@ -694,6 +694,15 @@ func TestClaudeCodeAuthEnvPassthrough(t *testing.T) {
 			for _, kv := range env {
 				key, value, _ := strings.Cut(kv, "=")
 				envKeys[key] = value
+			}
+
+			if managed {
+				// cc-switch managed: Edge must NOT inject any auth env vars,
+				// CC reads everything from settings.json.
+				if len(envKeys) > 0 {
+					t.Errorf("cc-switch managed: expected no auth env vars, got: %v", envKeys)
+				}
+				return
 			}
 
 			if len(tt.wantEnvKeys) == 0 {
