@@ -1,14 +1,14 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-11 00:00 +08:00
+最后更新：2026-06-10 20:00 +08:00
 当前 dev HEAD：`1e03b7ec` (`dev/delicious223`)
 Release tag：`v0.3.0-rc.9`（unsigned pre-release candidate）
 
 ## Roadmap 最终状态
 
-224 个复选框中 215 个已勾选（95%）。剩余 9 项全部为平台发布阻塞项：
+224 个复选框中 216 个已勾选（96%）。剩余 8 项全部为平台发布阻塞项：
 - 消息搜索点击导航（UI）、按需未读清除（UI）、WS 重连事件（ws lib compat）、连接状态指示器（UI）
-- Tool allowlist（可通过 API 配置）、Android APK（缺少构建环境）、macOS（缺少硬件）
+- Tool allowlist（可通过 API 配置）、~~Android APK~~ ✅（2026-06-10 首次本地构建成功）、macOS（缺少硬件）
 - 安全风险登记册关闭（流程）
 
 右侧面板增强（Section 18）新增 9 个未勾选项（P1 UI 任务），独立于发布阻塞。
@@ -211,6 +211,13 @@ Release tag：`v0.3.0-rc.9`（unsigned pre-release candidate）
 - Platform adapter 实现，支持 iOS/Android/Web 三平台
 - 3 种数据模式：online（直连 Hub）、offline（本地缓存）、demo（fixture）
 
+**Android APK 首次本地构建成功（2026-06-10）**：
+- Release APK（arm64-v8a）29.83 MB，Gradle `assembleRelease` 耗时 2m 8s
+- 构建环境：Java 17、Android SDK (build-tools 35-37, platforms 34-36)、Gradle 9.3.1、CMake 3.22.1、Ninja
+- 关键技术：pnpm 短虚拟存储 `D:\p\ah`（解决 Windows 260 字符路径限制导致的 Ninja "manifest still dirty" 错误）、`expo prebuild --clean` 生成原生工程
+- 构建脚本：`app/mobile-rn/scripts/package-android.ps1`（junction + short virtual store + gradle 全流程）
+- 限制：仅 arm64-v8a 架构；跨盘 hard link 回退 copy（C:/gradle-cache → D:/build）；Windows LongPathsEnabled 未启用（需管理员）
+
 **Hub 安全与性能**：
 - WebSocket rate limiting：防止消息洪泛
 - N+1 查询修复：多个列表端点的数据库查询优化
@@ -279,7 +286,7 @@ Release tag：`v0.3.0-rc.9`（unsigned pre-release candidate）
 | Windows/Tauri packaging | Unsigned dry gate 已通过；NSIS installer + portable zip hash manifest 已产出 | **发布阻塞：签名证书**。macOS 仍是 future unsigned dry policy。 |
 | Edge/CLI/SDK/SQLite | 最新 dev 已合入 **Claude Code + OpenCode 真实 CLI 执行**、**Anthropic SDK + OpenAI SDK HTTP 适配器（E2E verified via vectorcontrol.tech proxy）**、PreflightAdapter 接口、**cc-switch Edge 集成（模型别名路由）**、**AgentMemory 管道** | Codex 阻塞于 `OPENAI_API_KEY`；面向最终用户的 API key 管理闭环未完成。 |
 | Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、**`verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**、**@Agent 真实 Claude Code 执行端到端验证** | WS ws 模块路径待修复。 |
-| Mobile | 已合入 rc7 集成线，**hubClient 30+ 方法全面对齐 Hub API**，**platform adapter + 3 数据模式**，**91 tests PASS** | Android APK 未产出。 |
+| Mobile | 已合入 rc7 集成线，**hubClient 30+ 方法全面对齐 Hub API**，**platform adapter + 3 数据模式**，**91 tests PASS** | **Android APK 已产出**（2026-06-10，Release arm64-v8a，29.83 MB）。构建环境：Java 17 + Android SDK + Gradle 9.3.1 + CMake 3.22.1，短虚拟存储 `D:\p\ah`。 |
 
 ## 分支治理
 
