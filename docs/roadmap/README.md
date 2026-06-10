@@ -33,21 +33,40 @@
 
 ### P1: 功能补全
 
-| # | 项目 | 内容 |
-|---|------|------|
-| 5 | **对话式创建 Agent** | 比赛要求"对话式创建"——当前只有表单版 |
-| 6 | ~~**Android APK 构建**~~ ✅ | Release arm64-v8a 29.83 MB (2026-06-10) |
-| 7 | **OIDC 全链路验证** | TokenDance ID → Hub → JWT → WS 完整重验 |
-| 8 | **演示材料** | 3-5 支视频 + 5-7 张截图 |
+| # | 项目 | 内容 | 竞品驱动 |
+|---|------|------|----------|
+| 5 | **对话式创建 Agent** | 比赛要求"对话式创建"——当前只有表单版 | GuqierMcl InstructAgent |
+| 6 | ~~**Android APK 构建**~~ ✅ | Release arm64-v8a 29.83 MB (2026-06-10) | — |
+| 7 | **OIDC 全链路验证** | TokenDance ID → Hub → JWT → WS 完整重验 | — |
+| 8 | **演示材料** | 3-5 支视频 + 5-7 张截图 | SeiyunSky 7 视频(Pres=9) |
 
 ### P2: 优化
 
-| # | 项目 | 内容 |
-|---|------|------|
-| 9 | **cc-switch 模型可视化** | Agent 配置页显示真实模型别名 |
-| 10 | **Settings 完善** | preferences 跨端同步 |
-| 11 | **性能** | Edge event store 压缩、Hub WS 连接池 |
-| 12 | **文档** | API 参考文档、部署手册 |
+| # | 项目 | 内容 | 竞品驱动 |
+|---|------|------|----------|
+| 9 | **cc-switch 模型可视化** | Agent 配置页显示真实模型别名 | — |
+| 10 | **Settings 完善** | preferences 跨端同步 | — |
+| 11 | **性能** | Edge event store 压缩、Hub WS 连接池 | — |
+| 12 | **文档** | API 参考文档、部署手册 | — |
+
+### P3: 竞品驱动补强（40 仓审计发现的高价值缺失）
+
+| # | 项目 | 来源 | 内容 | 预计 |
+|---|------|------|------|------|
+| 13 | **上下文压缩器** | SeiyunSky (3 层) | `context_budget.go` 已有结构——补接线：micro_compact(工具输出折叠) → global_summarize(LLM 总结 2000 字) → 渐进式触发。解决长对话 token 溢出 | 60m |
+| 14 | **Turn/撤销系统** | doloveplayer (TurnManager 367 行) | 消息操作的版本感：重新生成后旧回复可切回、undo 占位符、版本切换器。已在 W1-1 消息操作中部分覆盖，补 TurnBoundary 组件 | 90m |
+| 15 | **COMPETE 编排模式** | Queena (SPLIT/COMPETE/PIPELINE) | 同任务派给 2+ agent 并行执行 → 聚合对比摘要而非 merge。Orchestrator dispatch 已支持并行，补 compete 聚合逻辑 | 45m |
+| 16 | **E2E 链路一键冒烟** | W0-1 分解 | `verify-real-api-smoke.ps1` 拆为单命令可跑的子脚本，补"一键 @Agent 全链路"模式（OIDC → 群聊 → dispatch → Edge → CLI → transcript）| 30m |
+| 17 | **AI_COLLABORATION.md** | Queena/DDJH44 (376 条记录) | 从 `.agents/` + 11 ADR + superpowers + 46 git commits today 导出一份结构化的 AI 协作证据文档。不是代码，但考核权重 30% | 20m |
+
+### P4: 不做但需要答辩准备的
+
+| # | 项目 | 为什么不做 | 答辩话术 |
+|---|------|------------|----------|
+| — | Matrix 协议 | 架构选择差异 | "Hub-Edge 需要实时云同步+本地离线执行，类型化 WS 事件有 OpenAPI 文档" |
+| — | K8s 控制平面 | 过度设计 | "Edge lifecycle+adapter registry 已实现同等能力，17 文件 reconsile 循环对比赛项目过重" |
+| — | 力导向 DAG 图 | 太重 | "`<ul>` 树 + DagTree 组件已覆盖 AgentTeam 进度可视化需求" |
+| — | PPT 导出 | P2 可选项 | "PPT/Slideshow **预览** 已通过 SlideshowPreview 组件完成，导出是 nice-to-have" |
 
 ---
 
