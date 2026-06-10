@@ -45,6 +45,10 @@ type OrchestratorAdapter struct {
 	depth               int
 	parentModel         string
 	dispatchConcurrency int
+
+	// Plan approval gate (P0 #3): when non-nil, the orchestrator pauses after
+	// detecting dispatch events and waits for user approval before spawning sub-agents.
+	planBroker *PlanApprovalBroker
 }
 
 // NewOrchestratorAdapter creates an orchestrator wrapping a Claude Code instance.
@@ -91,6 +95,14 @@ func (a *OrchestratorAdapter) WithDispatchConcurrency(n int) *OrchestratorAdapte
 // WithAdapterRegistry attaches the adapter registry for agent name validation (O-01).
 func (a *OrchestratorAdapter) WithAdapterRegistry(r *Registry) *OrchestratorAdapter {
 	a.adapterRegistry = r
+	return a
+}
+
+// WithPlanBroker attaches the plan approval broker for the plan confirmation gate (P0 #3).
+// When set, the orchestrator pauses after detecting dispatch events and waits for
+// user approval before spawning sub-agents.
+func (a *OrchestratorAdapter) WithPlanBroker(b *PlanApprovalBroker) *OrchestratorAdapter {
+	a.planBroker = b
 	return a
 }
 
@@ -141,6 +153,7 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 			maxConcurrency:  a.dispatchConcurrency,
 			ctx:             ctx,
 			dispatched:      make(map[string]dispatchEvent),
+			planBroker:      a.planBroker,
 			failureRecovery: frm,
 		}
 		if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
@@ -208,6 +221,7 @@ type dispatchEvent struct {
 	Model       string   `json:"model,omitempty"`
 	SubtaskID   string   `json:"subtaskId,omitempty"`
 	TargetFiles []string `json:"targetFiles,omitempty"` // files this sub-agent intends to modify
+	DependsOn   []string `json:"dependsOn,omitempty"`   // task IDs this dispatch depends on
 
 	// siblings is set by fanOutDispatches to carry sibling agent context.
 	// Not parsed from JSON — populated programmatically before handleDispatch.
@@ -801,4 +815,93 @@ func formatResultSummary(payload map[string]any) string {
 		s = s[:500] + "..."
 	}
 	return s
+}
+
+// awaitPlanApproval implements the plan confirmation gate (P0 #3).
+// When the plan broker is configured, it builds a plan from the detected dispatch
+// events, emits a plan.proposed event, and blocks until the user approves or rejects.
+// Returns true if the plan is approved (or approval gate is disabled), false if rejected.
+func (d *dispatchInterceptor) awaitPlanApproval(events []dispatchEvent, scope map[string]any) bool {
+	if d.planBroker == nil {
+		return true // approval gate not configured
+	}
+
+	// Build the plan from detected dispatch events.
+	tasks := make([]PlanTask, len(events))
+	for i, evt := range events {
+		deps := evt.DependsOn
+		if deps == nil {
+			deps = []string{}
+		}
+		tasks[i] = PlanTask{
+			AgentID:   evt.Agent,
+			Task:      evt.Task,
+			DependsOn: deps,
+		}
+	}
+
+	mode := "parallel"
+	if len(events) == 1 {
+		mode = "single"
+	}
+
+	plan := PendingPlan{
+		RunID:     d.parentRun.ID,
+		ProjectID: d.parentRun.ProjectID,
+		ThreadID:  d.parentRun.ThreadID,
+		Tasks:     tasks,
+		Mode:      mode,
+		CreatedAt: time.Now().UTC(),
+		Status:    "pending",
+	}
+
+	// Emit plan.proposed so the frontend can render the approval UI.
+	d.inner.Emit(BusEventPlanProposed, scope, map[string]any{
+		"runId": plan.RunID,
+		"plan": map[string]any{
+			"tasks": tasks,
+			"mode":  mode,
+		},
+	})
+
+	// Register the plan with the broker and wait for user decision.
+	wait, ok := d.planBroker.SubmitPlan(d.ctx, plan)
+	if !ok {
+		slog.Warn("plan approval: failed to submit plan, proceeding without approval",
+			"runId", plan.RunID,
+		)
+		return true
+	}
+
+	decision := wait(d.ctx)
+
+	if decision.Approved {
+		slog.Info("plan approval: plan approved",
+			"runId", plan.RunID,
+			"taskCount", len(tasks),
+		)
+		d.inner.Emit(BusEventPlanApproved, scope, map[string]any{
+			"runId":  plan.RunID,
+			"reason": decision.Reason,
+		})
+		return true
+	}
+
+	slog.Info("plan approval: plan rejected",
+		"runId", plan.RunID,
+		"reason", decision.Reason,
+	)
+	d.inner.Emit(BusEventPlanRejected, scope, map[string]any{
+		"runId":  plan.RunID,
+		"reason": decision.Reason,
+	})
+
+	// Inject rejection notification into the orchestrator's text stream
+	// so it knows the plan was not executed.
+	d.inner.Emit(BusEventTextBlock, scope, map[string]any{
+		"text":   fmt.Sprintf("[Plan rejected by user: %s]", decision.Reason),
+		"source": "plan_gate",
+	})
+
+	return false
 }

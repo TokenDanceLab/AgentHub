@@ -62,6 +62,10 @@ var (
 	ErrRunIDRequired     = New("RUN_ID_REQUIRED", "runId is required", http.StatusBadRequest)
 	ErrRequestIDRequired = New("REQUEST_ID_REQUIRED", "requestId is required", http.StatusBadRequest)
 
+	// Plan approval
+	ErrPlanNotFound      = New("PLAN_NOT_FOUND", "no pending plan found for this run", http.StatusNotFound)
+	ErrInvalidPlanDecision = New("INVALID_PLAN_DECISION", "decision must be approve or reject", http.StatusBadRequest)
+
 	// Metrics
 	ErrNotConfigured = New("NOT_CONFIGURED", "resource not configured", http.StatusServiceUnavailable)
 )
