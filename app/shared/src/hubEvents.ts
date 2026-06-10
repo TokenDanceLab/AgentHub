@@ -43,6 +43,12 @@ export const HUB_EVENTS = {
   // ── Sync / replay (reconnection gap fill) ────
   SYNC_REQUEST: 'sync.request',
   SYNC_EVENTS: 'sync.events',
+
+  // ── Plan approval gate (P0 #3) ──────────────
+  PLAN_PROPOSED: 'run.agent.plan_proposed',
+  PLAN_APPROVED: 'run.agent.plan_approved',
+  PLAN_REJECTED: 'run.agent.plan_rejected',
+  PLAN_EXPIRED:  'run.agent.plan_expired',
 } as const;
 
 export type HubEventType = (typeof HUB_EVENTS)[keyof typeof HUB_EVENTS];
