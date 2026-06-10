@@ -1,8 +1,8 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 23:59 +08:00
-当前 dev HEAD：`3f1fa751` (`doc-governance`)
-Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
+最后更新：2026-06-11 00:00 +08:00
+当前 dev HEAD：`1e03b7ec` (`dev/maintainer`)
+Release tag：`v0.3.0-rc.9`（unsigned pre-release candidate）
 
 ## Roadmap 最终状态
 
@@ -42,12 +42,12 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/maintainer` HEAD `3f1fa751`（doc-governance worktree），从 `origin/master` 创建，已合入 Wave 0+1+2 全部成果；本地 HEAD 当前领先 `origin/master`。 |
-| 上一条 dev | `origin/dev/maintainer = fc0f0628` 已通过 PR #297 合入 `origin/master`，不再作为本轮新增事实源。 |
-| RC tag | `v0.3.0-rc.8`（unsigned pre-release candidate） |
-| master | `origin/master = b7e9c1a4 Merge pull request #297 from TokenDanceLab/dev/maintainer`，是当前可信基线。 |
-| 当前工作树 | `<REPO_ROOT>\.worktrees\r7`，分支 `dev/release-0.3.0-rc7`。 |
-| 主工作树 | `<REPO_ROOT>` 仍保留为历史现场，分支 `dev/maintainer` 且 dirty；不作为事实源。 |
+| 当前集成 dev | `dev/maintainer` HEAD `1e03b7ec`，从 `dev/maintainer` 创建；v0.4.0 roadmap 已归档创建。 |
+| 上一条 dev | `origin/dev/maintainer = 1e03b7ec`，领先 `origin/master`（`750e27cc`）1 个 commit（v0.4.0 roadmap 归档）。 |
+| RC tag | `v0.3.0-rc.9`（unsigned pre-release candidate，指向 `750e27cc`） |
+| master | `origin/master = 750e27cc`，是当前可信基线。 |
+| 当前工作树 | `<REPO_ROOT>`，分支 `dev/maintainer`。 |
+| 主工作树 | `<REPO_ROOT>`，分支 `dev/maintainer`（从 `dev/maintainer` 分叉）。 |
 | 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/right-panel-enhancement-design.md` 写右侧面板设计规范；`docs/roadmap/` 写模块化路线图（6 个文件）。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
 
