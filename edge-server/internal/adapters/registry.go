@@ -85,6 +85,17 @@ func (r *Registry) List() []AdapterMetadata {
 	return result
 }
 
+// ListIDs returns the IDs of all registered adapters.
+func (r *Registry) ListIDs() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	ids := make([]string, 0, len(r.adapters))
+	for id := range r.adapters {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 // SetDefault sets the default adapter for a role.
 // Common roles: "default" (1v1 chat), "orchestrator" (group chat coordinator).
 func (r *Registry) SetDefault(role, adapterID string) {
