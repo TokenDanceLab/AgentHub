@@ -20,7 +20,7 @@ import type {
 } from '@shared/types';
 import { parseError } from '@shared/errors';
 import type { AppError } from '@shared/errors';
-import { edgeAuthHeaders, refreshEdgeAuthToken } from './edgeAuth';
+import { edgeAuthHeaders, getEdgeAuthToken, refreshEdgeAuthToken } from './edgeAuth';
 import {
   HealthResponseSchema,
   RunnerSchema,
@@ -89,6 +89,28 @@ function edgeRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): Req
 }
 
 /**
+ * Check if Edge is running in dev mode (AGENTHUB_DEV=1).
+ * When the Tauri desktop app starts Edge, it always passes AGENTHUB_DEV=1,
+ * which disables auth on the server side. In that case EDGE_AUTH_TOKEN will
+ * be empty and we should not send auth headers at all.
+ */
+function isEdgeDevMode(): boolean {
+  // If no auth token is configured, Edge was started in dev mode by Tauri
+  // and does not require authentication. Sending an empty Bearer token
+  // would cause the server to attempt auth validation and fail.
+  return !getEdgeAuthToken();
+}
+
+function edgeDevRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): RequestInit {
+  if (isEdgeDevMode()) {
+    // Dev mode: no auth needed. Merge base headers only.
+    if (!baseHeaders) return init;
+    return { ...init, headers: baseHeaders };
+  }
+  return edgeRequestInit(init, baseHeaders);
+}
+
+/**
  * Auth-aware fetch wrapper. On 401, refreshes the Edge auth token from the
  * Vite dev middleware and retries the request once. This handles the case
  * where Desktop restarts Edge (generating a new token) while the Vite dev
@@ -136,13 +158,13 @@ export async function fetchHealth(): Promise<HealthResponse> {
 }
 
 export async function fetchRunners(): Promise<ListResponse<Runner>> {
-  const res = await edgeFetch(`${BASE}/v1/runners`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/runners`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<Runner>>(listResponseSchema(RunnerSchema), unwrapEdgeResponse(await res.json()), 'runners');
 }
 
 export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
-  const res = await edgeFetch(`${BASE}/v1/agents`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/agents`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   const raw = unwrapEdgeResponse(await res.json());
   const normalized = normalizeAgentList(raw);
@@ -150,7 +172,7 @@ export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
 }
 
 export async function fetchModelCatalog(): Promise<ModelCatalogResponse> {
-  const res = await edgeFetch(`${BASE}/v1/model-catalog`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/model-catalog`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ModelCatalogResponse>(ModelCatalogResponseSchema, unwrapEdgeResponse(await res.json()), 'modelCatalog');
 }
@@ -186,7 +208,7 @@ function normalizeAgentCapabilities(raw: unknown): AgentInfo['capabilities'] {
 
 export async function fetchThreads(projectId?: string): Promise<ListResponse<ThreadInfo>> {
   const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-  const res = await edgeFetch(`${BASE}/v1/threads${params}`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/threads${params}`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<ThreadInfo>>(listResponseSchema(ThreadInfoSchema), unwrapEdgeResponse(await res.json()), 'threads');
 }
@@ -203,7 +225,7 @@ export async function createThread(input?: string | CreateThreadRequest, threadI
     : { title: input ?? '', threadId: threadId ?? '' };
   const res = await edgeFetch(`${BASE}/v1/threads`, {
     method: 'POST',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       projectId: body.projectId,
       threadId: body.threadId ?? '',
@@ -216,7 +238,7 @@ export async function createThread(input?: string | CreateThreadRequest, threadI
 
 export async function fetchThreadItems(threadId: string): Promise<ListResponse<ThreadItemInfo>> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/items`, {
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<ThreadItemInfo>>(listResponseSchema(ThreadItemInfoSchema), unwrapEdgeResponse(await res.json()), 'threadItems');
@@ -224,7 +246,7 @@ export async function fetchThreadItems(threadId: string): Promise<ListResponse<T
 
 export async function fetchThreadPins(threadId: string): Promise<ListResponse<ThreadPinInfo>> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<ThreadPinInfo>>(listResponseSchema(ThreadPinInfoSchema), unwrapEdgeResponse(await res.json()), 'threadPins');
@@ -233,7 +255,7 @@ export async function fetchThreadPins(threadId: string): Promise<ListResponse<Th
 export async function pinThreadItem(threadId: string, itemId: string, pinnedBy?: string): Promise<ThreadPinInfo> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
     method: 'POST',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({ itemId, pinnedBy }),
   });
   if (!res.ok) throw await parseError(res);
@@ -243,7 +265,7 @@ export async function pinThreadItem(threadId: string, itemId: string, pinnedBy?:
 export async function deleteThreadPin(threadId: string, itemId: string): Promise<void> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins?itemId=${encodeURIComponent(itemId)}`, {
     method: 'DELETE',
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
 }
@@ -253,7 +275,7 @@ export async function fetchRuns(projectId?: string, threadId?: string): Promise<
   if (projectId) params.set('projectId', projectId);
   if (threadId) params.set('threadId', threadId);
   const qs = params.toString();
-  const res = await edgeFetch(`${BASE}/v1/runs${qs ? `?${qs}` : ''}`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/runs${qs ? `?${qs}` : ''}`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<RunInfo>>(listResponseSchema(RunInfoSchema), unwrapEdgeResponse(await res.json()), 'runs');
 }
@@ -263,7 +285,7 @@ export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
     method: 'POST',
   };
   if (req) init.body = JSON.stringify(req);
-  const res = await edgeFetch(`${BASE}/v1/runs`, edgeRequestInit(init, req ? { 'Content-Type': 'application/json' } : undefined));
+  const res = await edgeFetch(`${BASE}/v1/runs`, edgeDevRequestInit(init, req ? { 'Content-Type': 'application/json' } : undefined));
   if (!res.ok) throw await parseError(res);
   return safeParse<RunInfo>(RunInfoSchema, unwrapEdgeResponse(await res.json()), 'startRun');
 }
@@ -271,7 +293,7 @@ export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
 export async function cancelRun(runId: string): Promise<RunInfo> {
   const res = await edgeFetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
     method: 'POST',
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
   return safeParse<RunInfo>(RunInfoSchema, unwrapEdgeResponse(await res.json()), 'cancelRun');
@@ -279,20 +301,20 @@ export async function cancelRun(runId: string): Promise<RunInfo> {
 
 export async function fetchRunDiff(runId: string): Promise<RunDiff> {
   const res = await edgeFetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}/diff`, {
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
   return safeParse<RunDiff>(RunDiffSchema, unwrapEdgeResponse(await res.json()), 'runDiff');
 }
 
 export async function fetchArtifacts(): Promise<ListResponse<Artifact>> {
-  const res = await edgeFetch(`${BASE}/v1/artifacts`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/artifacts`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<Artifact>>(listResponseSchema(ArtifactSchema), unwrapEdgeResponse(await res.json()), 'artifacts');
 }
 
 export async function fetchPreviews(): Promise<ListResponse<Preview>> {
-  const res = await edgeFetch(`${BASE}/v1/previews`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/previews`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<Preview>>(listResponseSchema(PreviewSchema), unwrapEdgeResponse(await res.json()), 'previews');
 }
@@ -300,7 +322,7 @@ export async function fetchPreviews(): Promise<ListResponse<Preview>> {
 export async function renameThread(threadId: string, title: string): Promise<ThreadInfo> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'PATCH',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({ title }),
   });
   if (!res.ok) throw await parseError(res);
@@ -310,7 +332,7 @@ export async function renameThread(threadId: string, title: string): Promise<Thr
 export async function updateThreadStatus(threadId: string, status: 'active' | 'archived'): Promise<ThreadInfo> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'PATCH',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({ status }),
   });
   if (!res.ok) throw await parseError(res);
@@ -320,7 +342,7 @@ export async function updateThreadStatus(threadId: string, status: 'active' | 'a
 export async function archiveThread(threadId: string): Promise<ThreadInfo> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
     method: 'POST',
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
   return safeParse<ThreadInfo>(ThreadInfoSchema, unwrapEdgeResponse(await res.json()), 'archiveThread');
@@ -329,7 +351,7 @@ export async function archiveThread(threadId: string): Promise<ThreadInfo> {
 export async function deleteThread(threadId: string): Promise<'deleted' | 'archived'> {
   const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'DELETE',
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (res.ok) return 'deleted';
 
@@ -357,7 +379,7 @@ export interface PermissionDecideRequest {
 export async function decidePermission(req: PermissionDecideRequest): Promise<void> {
   const res = await edgeFetch(`${BASE}/v1/permissions/decide`, {
     method: 'POST',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(req),
   });
   if (!res.ok) throw await parseError(res);
@@ -389,7 +411,7 @@ export async function fetchAgentProfiles(adapterId?: string): Promise<ListRespon
   const url = adapterId
     ? `${BASE}/v1/agent-profiles?adapterId=${encodeURIComponent(adapterId)}`
     : `${BASE}/v1/agent-profiles`;
-  const res = await edgeFetch(url, edgeRequestInit());
+  const res = await edgeFetch(url, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   return safeParse<ListResponse<EdgeAgentProfile>>(
     listResponseSchema(EdgeAgentProfileSchema),
@@ -401,7 +423,7 @@ export async function fetchAgentProfiles(adapterId?: string): Promise<ListRespon
 export async function createAgentProfile(data: Record<string, unknown>): Promise<EdgeAgentProfile> {
   const res = await edgeFetch(`${BASE}/v1/agent-profiles`, {
     method: 'POST',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw await parseError(res);
@@ -411,7 +433,7 @@ export async function createAgentProfile(data: Record<string, unknown>): Promise
 export async function updateAgentProfile(id: string, patch: Partial<EdgeAgentProfile>): Promise<EdgeAgentProfile> {
   const res = await edgeFetch(`${BASE}/v1/agent-profiles/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw await parseError(res);
@@ -421,7 +443,7 @@ export async function updateAgentProfile(id: string, patch: Partial<EdgeAgentPro
 export async function deleteAgentProfile(id: string): Promise<void> {
   const res = await edgeFetch(`${BASE}/v1/agent-profiles/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    ...edgeRequestInit(),
+    ...edgeDevRequestInit(),
   });
   if (!res.ok) throw await parseError(res);
 }
@@ -453,7 +475,7 @@ export interface CCSwitchProviderModelMapping {
 
 export async function fetchCCSwitchStatus(): Promise<CCSwitchStatus> {
   try {
-    const res = await edgeFetch(`${BASE}/v1/ccswitch/status`, edgeRequestInit());
+    const res = await edgeFetch(`${BASE}/v1/ccswitch/status`, edgeDevRequestInit());
     if (!res.ok) throw await parseError(res);
     return unwrapEdgeResponse(await res.json()) as CCSwitchStatus;
   } catch {
@@ -464,7 +486,7 @@ export async function fetchCCSwitchStatus(): Promise<CCSwitchStatus> {
 export async function fetchCCSwitchProviders(appType?: string): Promise<CCSwitchProviderModelMapping[]> {
   try {
     const params = appType ? `?appType=${encodeURIComponent(appType)}` : '';
-    const res = await edgeFetch(`${BASE}/v1/ccswitch/providers${params}`, edgeRequestInit());
+    const res = await edgeFetch(`${BASE}/v1/ccswitch/providers${params}`, edgeDevRequestInit());
     if (!res.ok) throw await parseError(res);
     const data = unwrapEdgeResponse(await res.json());
     // Response may be { items: [...] } or raw array
@@ -481,7 +503,7 @@ export async function fetchCCSwitchProviders(appType?: string): Promise<CCSwitch
 
 export async function fetchSettings(): Promise<Record<string, string>> {
   try {
-    const res = await edgeFetch(`${BASE}/v1/settings`, edgeRequestInit());
+    const res = await edgeFetch(`${BASE}/v1/settings`, edgeDevRequestInit());
     if (!res.ok) throw await parseError(res);
     return unwrapEdgeResponse(await res.json()) as Record<string, string>;
   } catch {
@@ -492,7 +514,7 @@ export async function fetchSettings(): Promise<Record<string, string>> {
 export async function patchSettings(values: Record<string, string>): Promise<Record<string, string>> {
   const res = await edgeFetch(`${BASE}/v1/settings`, {
     method: 'PATCH',
-    ...edgeRequestInit({}, { 'Content-Type': 'application/json' }),
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(values),
   });
   if (!res.ok) throw await parseError(res);
@@ -502,7 +524,7 @@ export async function patchSettings(values: Record<string, string>): Promise<Rec
 // ── User profiles ─────────────────────────────────
 
 export async function fetchCurrentUser(): Promise<UserProfileInfo> {
-  const res = await edgeFetch(`${BASE}/v1/users/current`, edgeRequestInit());
+  const res = await edgeFetch(`${BASE}/v1/users/current`, edgeDevRequestInit());
   if (!res.ok) throw await parseError(res);
   const data = unwrapEdgeResponse(await res.json());
   const rawAvatarUrl = (data as Record<string, unknown>).avatarUrl as string | undefined;

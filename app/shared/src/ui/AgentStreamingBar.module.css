@@ -78,3 +78,18 @@
 .statusFailed {
   color: var(--danger);
 }
+
+/* ── Pulse animation for active agent icon ── */
+
+.iconPulse {
+  animation: iconPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}

@@ -115,7 +115,7 @@ const GlobalRateLimitRetryAfterSeconds = 60
 const AuthRegisterRateLimit = 3
 
 // AuthLoginRateLimit is the per-IP login cap in AuthRateLimitWindow.
-const AuthLoginRateLimit = 5
+const AuthLoginRateLimit = 20
 
 // AuthRateLimitWindow is the sliding window for login/register limits.
 const AuthRateLimitWindow = time.Minute

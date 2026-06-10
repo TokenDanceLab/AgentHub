@@ -134,14 +134,17 @@ services:
       AGENTHUB_PPROF_USER: ${AGENTHUB_PPROF_USER:-admin}
       AGENTHUB_PPROF_PASS: ${AGENTHUB_PPROF_PASS:?AGENTHUB_PPROF_PASS is required}
       # CORS
-      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech}
+      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech,https://tauri.localhost}
       # TokenDance ID OIDC
       AGENTHUB_TOKENDANCE_ID_ISSUER_URL: ${AGENTHUB_TOKENDANCE_ID_ISSUER_URL:-https://id.vectorcontrol.tech}
       AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-}
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
       AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.vectorcontrol.tech/auth/tokendance/callback}
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.vectorcontrol.tech/auth/tokendance/callback,http://127.0.0.1/callback}
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.vectorcontrol.tech/auth/tokendance/callback,http://127.0.0.1/callback,http://127.0.0.1:8400/callback}
+      # Edge HTTP dispatch (Hub→Edge direct HTTP calls)
+      AGENTHUB_EDGE_URL: ${AGENTHUB_EDGE_URL:-}
+      AGENTHUB_EDGE_AUTH_TOKEN: ${AGENTHUB_EDGE_AUTH_TOKEN:-}
     ports:
       - "127.0.0.1:8090:8080"   # Loopback only — nginx reverse proxy
       - "127.0.0.1:6060:6060"   # pprof/metrics — localhost only

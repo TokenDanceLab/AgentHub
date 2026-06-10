@@ -113,6 +113,7 @@ export function useCancelRun() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['runs'] });
+      qc.invalidateQueries({ queryKey: ['threadItems'] });
     },
   });
 }

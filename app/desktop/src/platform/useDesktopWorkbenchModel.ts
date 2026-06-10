@@ -82,6 +82,14 @@ export interface DesktopWorkbenchModel {
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
   /** Agent activity state for the streaming status bar. */
   agentActivity?: AgentActivitySnapshot;
+  /** Whether threads are currently being fetched (first load or refetching). */
+  threadsLoading?: boolean;
+  /** Whether thread items/messages are currently being fetched. */
+  itemsLoading?: boolean;
+  /** Error from thread fetch, if any. */
+  threadsError?: string;
+  /** Error from thread items fetch, if any. */
+  itemsError?: string;
 }
 
 const EMPTY_TRANSCRIPT: ReturnType<typeof normalizeThreadItemsToTranscript> = [];
@@ -280,6 +288,12 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
         isDemo: true,
         transcript: edgeTranscript.length > 0 ? edgeTranscript : EMPTY_TRANSCRIPT,
         agentActivity,
+        ...(activeThread?.projectId ? { activeProjectId: activeThread.projectId } : {}),
+        ...(activeThread?.threadId ? { activeThreadId: activeThread.threadId } : {}),
+        threadsLoading: threadsQuery.isLoading,
+        itemsLoading: threadItemsQuery.isLoading,
+        ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
+        ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
       };
     }
     // Fallback: JS mock store when Edge is unavailable.
@@ -295,6 +309,10 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
       isDemo: true,
       transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedDemoConversation),
       agentActivity,
+      threadsLoading: false,
+      itemsLoading: false,
+      ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
+      ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
     };
   }, [dataMode, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread?.threadId, threadPins, threadItems, agentActivity]);
 
@@ -429,6 +447,10 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     transcript,
     agentActivity,
+    threadsLoading: threadsQuery.isLoading,
+    itemsLoading: threadItemsQuery.isLoading,
+    ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
+    ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
   };
 
   return useDemo ? demoModel : liveModel;

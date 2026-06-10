@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, getAccessToken } from '@/hooks/useAuth';
@@ -18,6 +18,7 @@ export function useWebAuth() {
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const setShowAuthModal = useHubStore((s) => s.setShowAuthModal);
   const addToast = useToastStore((s) => s.addToast);
+  const [authReady, setAuthReady] = useState(false);
 
   // Auto-login on mount; refetch threads & agents once authenticated.
   useEffect(() => {
@@ -31,6 +32,9 @@ export function useWebAuth() {
       })
       .catch(() => {
         /* Auth surfaces handle explicit login errors. */
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true);
       });
     return () => {
       cancelled = true;
@@ -51,5 +55,5 @@ export function useWebAuth() {
     return true;
   }, [addToast, hubAuthenticated, setShowAuthModal, t]);
 
-  return { ensureAuth };
+  return { ensureAuth, authReady };
 }
