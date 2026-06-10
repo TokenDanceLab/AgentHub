@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ApprovalDecisionAction, TranscriptBlock, TranscriptAuthor } from '../transcript';
+import type { WorkbenchConversation } from '../platform';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { FileItem } from './inspector';
 import {
@@ -23,7 +24,9 @@ import {
   URLPreviewCard,
 } from './blocks';
 import { StepCard } from '../ui/StepCard';
+import MarkdownContent from '../ui/Markdown';
 import DeployCard from '../ui/DeployCard';
+import { EmptyState } from '../ui/EmptyState';
 import type { StepCardSubStep } from '../ui/StepCard';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -49,6 +52,7 @@ export interface TranscriptPointerEvent {
 
 export interface TranscriptViewProps {
   transcript: TranscriptBlock[];
+  activeConversation?: WorkbenchConversation | undefined;
   contextBlockId?: string | undefined;
   /** Highlight a specific block (e.g. from search result click). Scrolls into view and applies a 3 s CSS highlight. */
   highlightedBlockId?: string | undefined;
@@ -81,6 +85,7 @@ export interface TranscriptViewProps {
 
 export function TranscriptView({
   actionedBlockIds = [],
+  activeConversation,
   contextBlockId,
   highlightedBlockId,
   onHighlightEnd,
@@ -101,6 +106,41 @@ export function TranscriptView({
 }: TranscriptViewProps): React.ReactElement {
   const [expandedDiffIds, setExpandedDiffIds] = React.useState<Set<string>>(() => new Set());
   const highlightTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transcriptRef = React.useRef<HTMLOListElement>(null);
+  const regionRef = React.useRef<HTMLElement>(null);
+  const autoScrollAnchorRef = React.useRef<boolean>(true);
+
+  // Auto-scroll: keep track of whether user is near the bottom of the region
+  const handleTranscriptScroll = React.useCallback(() => {
+    const el = regionRef.current;
+    if (!el) return;
+    const threshold = 150;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    autoScrollAnchorRef.current = distanceFromBottom <= threshold;
+  }, []);
+
+  // Compute a scroll key that changes whenever any block's streaming-relevant content changes
+  const scrollKey = React.useMemo(() => {
+    if (transcript.length === 0) return '';
+    const last = transcript[transcript.length - 1];
+    if (!last) return String(transcript.length);
+    // Include properties that may change during streaming for various block kinds
+    return [transcript.length, last.id, (last as any).text, (last as any).content, (last as any).summary, (last as any).status].join('|');
+  }, [transcript]);
+
+  // Auto-scroll to bottom when user sends a message or new blocks arrive.
+  // Uses scrollTop = scrollHeight (not smooth) to avoid fighting streaming reflows.
+  React.useEffect(() => {
+    if (transcript.length === 0) return;
+    // When the user sends a new message (transcript grew), ALWAYS scroll to bottom.
+    // When streaming updates the last block, only scroll if already near bottom.
+    const rafId = requestAnimationFrame(() => {
+      const el = regionRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [scrollKey]);
 
   // Scroll to highlighted block when highlightedBlockId changes
   React.useEffect(() => {
@@ -148,6 +188,8 @@ export function TranscriptView({
       aria-label="Transcript"
       className={styles.transcriptRegion}
       data-pinned={pinnedAnnouncement ? 'true' : 'false'}
+      ref={regionRef}
+      onScroll={handleTranscriptScroll}
     >
       {pinnedAnnouncement && (
         <div className={styles.pinnedAnnouncementWrap}>
@@ -162,74 +204,82 @@ export function TranscriptView({
         </div>
       )}
 
-      <ol className={styles.transcript} data-transcript-list>
-        {visibleTranscript.map((block, index) => {
-          const showDateDivider =
-            Boolean(block.createdAt) && (
-              index === 0 || shouldShowDateDivider(visibleTranscript[index - 1]!, block)
-            );
-          const hideGroupedUserAvatar = !showDateDivider && shouldHideGroupedUserAvatar(block, visibleTranscript[index - 1]);
+      {visibleTranscript.length === 0 ? (
+        <EmptyState
+          title="开始对话"
+          description="发送消息即可开始与 Agent 对话，工作记录将显示在这里。"
+        />
+      ) : (
+        <ol className={styles.transcript} data-transcript-list ref={transcriptRef}>
+          {visibleTranscript.map((block, index) => {
+            const showDateDivider =
+              Boolean(block.createdAt) && (
+                index === 0 || shouldShowDateDivider(visibleTranscript[index - 1]!, block)
+              );
+            const hideGroupedUserAvatar = !showDateDivider && shouldHideGroupedUserAvatar(block, visibleTranscript[index - 1]);
 
-          return (
-            <React.Fragment key={block.id}>
-              {showDateDivider && <DateDivider date={formatBlockDate(block)} />}
-              <li
-                className={[
-                  styles.block,
-                  contextBlockId === block.id ? styles.blockContext : '',
-                  highlightedBlockId === block.id ? styles.blockHighlighted : '',
-                  selectedIds.has(block.id) ? styles.blockSelected : '',
-                  actionedIds.has(block.id) ? styles.blockActioned : '',
-                  softHiddenIds.has(block.id) ? styles.blockSoftHidden : '',
-                ].filter(Boolean).join(' ')}
-                aria-selected={selectedIds.has(block.id)}
-                data-message-id={block.id}
-                data-scroll-block={block.id}
-                data-selectable-card={block.id}
-                data-card-state={[
-                  contextBlockId === block.id ? 'context' : '',
-                  selectedIds.has(block.id) ? 'selected' : '',
-                  actionedIds.has(block.id) ? 'actioned' : '',
-                  softHiddenIds.has(block.id) ? 'soft-hidden' : '',
-                ].filter(Boolean).join(' ')}
-                onKeyDown={(event) => {
-                  if ((event.key === 'Enter' || event.key === ' ') && selectionMode) {
-                    event.preventDefault();
-                    onBlockSelect?.(block.id, { shiftKey: event.shiftKey });
-                    return;
-                  }
-                  if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-                    event.preventDefault();
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    onBlockContextMenu?.(block, {
-                      preventDefault: () => undefined,
-                      clientX: rect.left + 28,
-                      clientY: rect.top + 16,
-                    });
-                  }
-                }}
-                onContextMenu={(event) => onBlockContextMenu?.(block, event)}
-                onPointerCancel={(event) => onBlockPointerUp?.(block, event)}
-                onPointerDown={(event) => onBlockPointerDown?.(block, event)}
-                onPointerLeave={(event) => onBlockPointerUp?.(block, event)}
-                onPointerMove={(event) => onBlockPointerMove?.(block, event)}
-                onPointerUp={(event) => onBlockPointerUp?.(block, event)}
-                tabIndex={0}
-              >
-                {renderTranscriptBlock(
-                  block,
-                  onAgentProfileOpen,
-                  onReviewFile,
-                  hideGroupedUserAvatar,
-                  diffControls,
-                  onApprovalDecision,
-                  onDeploySubmit,
-                )}
-              </li>
-            </React.Fragment>
-          );
-        })}
-      </ol>
+            return (
+              <React.Fragment key={block.id}>
+                {showDateDivider && <DateDivider date={formatBlockDate(block)} />}
+                <li
+                  className={[
+                    styles.block,
+                    contextBlockId === block.id ? styles.blockContext : '',
+                    highlightedBlockId === block.id ? styles.blockHighlighted : '',
+                    selectedIds.has(block.id) ? styles.blockSelected : '',
+                    actionedIds.has(block.id) ? styles.blockActioned : '',
+                    softHiddenIds.has(block.id) ? styles.blockSoftHidden : '',
+                  ].filter(Boolean).join(' ')}
+                  aria-selected={selectedIds.has(block.id)}
+                  data-message-id={block.id}
+                  data-scroll-block={block.id}
+                  data-selectable-card={block.id}
+                  data-card-state={[
+                    contextBlockId === block.id ? 'context' : '',
+                    selectedIds.has(block.id) ? 'selected' : '',
+                    actionedIds.has(block.id) ? 'actioned' : '',
+                    softHiddenIds.has(block.id) ? 'soft-hidden' : '',
+                  ].filter(Boolean).join(' ')}
+                  onKeyDown={(event) => {
+                    if ((event.key === 'Enter' || event.key === ' ') && selectionMode) {
+                      event.preventDefault();
+                      onBlockSelect?.(block.id, { shiftKey: event.shiftKey });
+                      return;
+                    }
+                    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                      event.preventDefault();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      onBlockContextMenu?.(block, {
+                        preventDefault: () => undefined,
+                        clientX: rect.left + 28,
+                        clientY: rect.top + 16,
+                      });
+                    }
+                  }}
+                  onContextMenu={(event) => onBlockContextMenu?.(block, event)}
+                  onPointerCancel={(event) => onBlockPointerUp?.(block, event)}
+                  onPointerDown={(event) => onBlockPointerDown?.(block, event)}
+                  onPointerLeave={(event) => onBlockPointerUp?.(block, event)}
+                  onPointerMove={(event) => onBlockPointerMove?.(block, event)}
+                  onPointerUp={(event) => onBlockPointerUp?.(block, event)}
+                  tabIndex={0}
+                >
+                  {renderTranscriptBlock(
+                    block,
+                    onAgentProfileOpen,
+                    onReviewFile,
+                    hideGroupedUserAvatar,
+                    diffControls,
+                    onApprovalDecision,
+                    onDeploySubmit,
+                    activeConversation,
+                  )}
+                </li>
+              </React.Fragment>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }
@@ -244,10 +294,11 @@ function renderTranscriptBlock(
   diffControls?: InlineDiffControls | undefined,
   onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
   onDeploySubmit?: ((runId: string, slug: string) => void) | undefined,
+  activeConversation?: WorkbenchConversation | undefined,
 ): React.ReactElement {
   switch (block.kind) {
     case 'text':
-      return renderTextBlock(block, onAgentProfileOpen, hideUserAvatar);
+      return renderTextBlock(block, onAgentProfileOpen, hideUserAvatar, activeConversation);
     case 'tool_call':
       return renderToolCallBlock(block);
     case 'tool_result':
@@ -313,6 +364,7 @@ function renderTextBlock(
   block: Extract<TranscriptBlock, { kind: 'text' }>,
   onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined,
   hideUserAvatar = false,
+  activeConversation?: WorkbenchConversation | undefined,
 ): React.ReactElement {
   const replyRef = block.replyToMessageId ? (
     <button
@@ -329,16 +381,17 @@ function renderTextBlock(
     <blockquote className={styles.inlineBlockquote}>{block.quote}</blockquote>
   ) : null;
 
-  if (!isCurrentUserAuthor(block.author)) {
-    const time = formatBlockTime(block.createdAt);
+  const time = formatBlockTime(block.createdAt);
 
+  if (!isCurrentUserAuthor(block.author)) {
+    const displayAuthor = resolveAgentDisplayAuthor(block.author, activeConversation);
     return (
       <AgentMessage
-        avatar={agentAvatar(block.author.name)}
-        avatarColor={agentAvatarColor(block.author.name)}
+        avatar={displayAuthor.avatar}
+        avatarColor={displayAuthor.avatarColor}
         {...agentMessageBadge(block)}
         {...(time ? { time } : {})}
-        name={block.author.name}
+        name={displayAuthor.name}
         onAvatarClick={onAgentProfileOpen}
       >
         {replyRef}
@@ -369,37 +422,13 @@ function scrollToBlock(blockId: string): void {
   }
 }
 
-/** Render message text, parsing blockquote sections (> ...) into styled elements. */
+/** Render message text with full markdown support. */
 function renderMessageText(text: string, hasNewerVersion?: boolean): React.ReactElement {
-  const parts = parseBlockquotes(text);
   const urlCards = extractUrlPreviewCards(text);
-
-  if (parts.length === 1 && parts[0]!.kind === 'text') {
-    return (
-      <div data-grayed={hasNewerVersion ? 'true' : undefined}>
-        <p className={styles.blockText}>{parts[0]!.text}</p>
-        {urlCards}
-      </div>
-    );
-  }
 
   return (
     <div className={styles.blockText} data-grayed={hasNewerVersion ? 'true' : undefined}>
-      {parts.map((part, index) => {
-        if (part.kind === 'quote') {
-          return (
-            <blockquote key={index} className={styles.inlineBlockquote}>
-              {part.lines!.map((line, lineIndex) => (
-                <React.Fragment key={lineIndex}>
-                  {lineIndex > 0 && <br />}
-                  {line}
-                </React.Fragment>
-              ))}
-            </blockquote>
-          );
-        }
-        return <React.Fragment key={index}>{part.text && <p>{part.text}</p>}</React.Fragment>;
-      })}
+      <MarkdownContent content={text} />
       {urlCards}
     </div>
   );
@@ -498,13 +527,17 @@ function renderAgentText(block: Extract<TranscriptBlock, { kind: 'text' }>): Rea
   const [title, rest] = agentTextParts(block);
   const grayed = block.hasNewerVersion ? 'true' as const : undefined;
   if (!rest) {
-    return <p className={styles.blockText} data-grayed={grayed}>{title}</p>;
+    return (
+      <div className={styles.blockText} data-grayed={grayed}>
+        <MarkdownContent content={title} />
+      </div>
+    );
   }
 
   return (
     <div className={styles.blockText} data-grayed={grayed}>
       <div className={styles.inlineTitle}>{title}</div>
-      <div className={styles.inlineMutedLoose}>{rest}</div>
+      <MarkdownContent content={rest} />
     </div>
   );
 }
@@ -1292,7 +1325,7 @@ function renderAttachmentBlock(
 function isCurrentUserAuthor(author: TranscriptAuthor): boolean {
   const id = author.id.trim().toLowerCase();
   const name = author.name.trim().toLowerCase();
-  return id === 'delicious233' || id === 'delicious' || name === 'delicious233';
+  return id === 'delicious233' || id === 'delicious' || name === 'delicious233' || author.role === 'human';
 }
 
 function agentAvatar(name: string): string {
@@ -1301,6 +1334,32 @@ function agentAvatar(name: string): string {
 
 function agentAvatarColor(name: string): string {
   return workbenchAgentColor({ name });
+}
+
+function resolveAgentDisplayAuthor(
+  author: TranscriptAuthor,
+  activeConversation?: WorkbenchConversation | undefined,
+): { name: string; avatar: string; avatarColor: string } {
+  if (isGenericAgentAuthor(author) && activeConversation?.kind === 'direct' && activeConversation.title.trim()) {
+    const name = activeConversation.title.trim();
+    return {
+      name,
+      avatar: activeConversation.avatarLabel ?? agentAvatar(name),
+      avatarColor: activeConversation.avatarColor ?? agentAvatarColor(name),
+    };
+  }
+
+  return {
+    name: author.name,
+    avatar: agentAvatar(author.name),
+    avatarColor: agentAvatarColor(author.name),
+  };
+}
+
+function isGenericAgentAuthor(author: TranscriptAuthor): boolean {
+  const id = author.id.trim().toLowerCase();
+  const name = author.name.trim().toLowerCase();
+  return author.role === 'agent' && (id === 'agent' || name === 'agent');
 }
 
 function agentMessageBadge(

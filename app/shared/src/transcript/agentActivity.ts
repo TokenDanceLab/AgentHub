@@ -43,6 +43,11 @@ export interface AgentActivityStore {
   readonly state: AgentActivityState;
   /** Feed a raw Hub WS event into the store. Ignores non-agent events. */
   handleEvent(eventType: HubEventType | string, payload: unknown): void;
+  /**
+   * Directly push an agent status update into the store.
+   * Used by Edge SSE event consumers that don't go through Hub WS events.
+   */
+  pushAgentStatus(agentId: string, agentName: string, status: AgentActivityStatus, toolCalls?: number): void;
   /** Subscribe to state changes. Returns an unsubscribe function. */
   subscribe(listener: AgentActivityListener): () => void;
   /** Convenience: get a serialisable snapshot (no Map). */
@@ -78,6 +83,36 @@ export function createAgentActivityStore(): AgentActivityStore {
       removalTimers.delete(key);
       notify();
     }, delayMs));
+  }
+
+  function pushAgentStatus(
+    agentId: string,
+    agentName: string,
+    status: AgentActivityStatus,
+    toolCalls?: number,
+  ): void {
+    // Clear any pending removal timer.
+    const existing = removalTimers.get(agentId);
+    if (existing !== undefined) {
+      clearTimeout(existing);
+      removalTimers.delete(agentId);
+    }
+
+    const current = state.activeAgents.get(agentId);
+    state.activeAgents.set(agentId, {
+      agentId,
+      agentName: current?.agentName ?? agentName,
+      status,
+      startedAt: current?.startedAt ?? Date.now(),
+      toolCalls: Math.max(current?.toolCalls ?? 0, toolCalls ?? 0),
+    });
+    notify();
+
+    if (status === 'done') {
+      scheduleRemoval(agentId, DONE_REMOVE_MS);
+    } else if (status === 'failed') {
+      scheduleRemoval(agentId, FAILED_REMOVE_MS);
+    }
   }
 
   function handleEvent(eventType: HubEventType | string, payload: unknown): void {
@@ -194,7 +229,7 @@ export function createAgentActivityStore(): AgentActivityStore {
     notify();
   }
 
-  return { state, handleEvent, subscribe, getSnapshot, reset };
+  return { state, handleEvent, pushAgentStatus, subscribe, getSnapshot, reset };
 }
 
 // ── Singleton ─────────────────────────────────────────────────────────────

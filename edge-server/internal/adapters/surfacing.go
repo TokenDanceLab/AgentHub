@@ -107,6 +107,43 @@ func isTextFilePath(relPath string) bool {
 	return false
 }
 
+// isBinaryArtifact returns true for file types that should NOT be surfaced
+// as agent output artifacts. These are typically compiled binaries, object
+// files, database files, and other non-human-readable artifacts that the
+// agent did not intentionally produce as deliverables.
+func isBinaryArtifact(relPath string) bool {
+	ext := strings.ToLower(filepath.Ext(relPath))
+	switch ext {
+	// Compiled executables and object code
+	case ".exe", ".dll", ".so", ".dylib", ".o", ".obj", ".a", ".lib",
+		".bin", ".out":
+		return true
+	// Database files
+	case ".db", ".sqlite", ".sqlite3", ".mdb":
+		return true
+	// Archive and compressed files (usually build artifacts)
+	case ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar", ".zst":
+		return true
+	// Disk images and firmware
+	case ".img", ".iso", ".dmg":
+		return true
+	}
+
+	// Backup files (e.g. agenthub-edge.exe~, file.bak)
+	base := filepath.Base(relPath)
+	if strings.HasSuffix(base, "~") || strings.HasSuffix(base, ".bak") {
+		return true
+	}
+
+	// WAL/SHM companion database files
+	if strings.HasSuffix(base, "-wal") || strings.HasSuffix(base, "-shm") ||
+		strings.HasSuffix(base, "-journal") {
+		return true
+	}
+
+	return false
+}
+
 // ── Workdir snapshot ────────────────────────────────────────────────────
 
 // fileRecord captures pre-run file state for change detection.
@@ -163,6 +200,11 @@ func TakeWorkdirSnapshot(workDir string) *WorkdirSnapshot {
 			return nil
 		}
 		relPath = filepath.ToSlash(relPath)
+
+		// Skip binary artifacts (executables, DBs, archives, backups).
+		if isBinaryArtifact(relPath) {
+			return nil
+		}
 
 		rec := fileRecord{
 			Size:    fi.Size(),
@@ -275,6 +317,11 @@ func walkCurrentState(dir string) map[string]fileRecord {
 			return nil
 		}
 		relPath = filepath.ToSlash(relPath)
+
+		// Skip binary artifacts (executables, DBs, archives, backups).
+		if isBinaryArtifact(relPath) {
+			return nil
+		}
 
 		rec := fileRecord{
 			Size:    fi.Size(),

@@ -1,7 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   buildComposerIntent,
-  canSubmitComposer,
   type ComposerMention,
   composerReducer,
   createInitialComposerState,
@@ -14,7 +13,7 @@ import type {
 } from '../platform';
 import { toggleAppliedAgentHubTheme } from '../theme';
 import { collectTranscriptEvidence } from '../transcript';
-import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
+import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock, TextTranscriptBlock } from '../transcript';
 import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationSidebar } from './ConversationSidebar';
 import {
@@ -35,6 +34,7 @@ import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
 import { WorkspaceHeader } from './WorkspaceHeader';
+
 import MessageSearchPanel from '../ui/MessageSearchPanel';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
@@ -61,6 +61,22 @@ const SELECTION_HOLD_CANCEL_DISTANCE = 36;
 const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
 type MainchainStatusKind = 'done' | 'active' | 'waiting' | 'blocked' | 'empty';
+
+function isSidebarOnlyTranscriptBlock(block: TranscriptBlock): boolean {
+  switch (block.kind) {
+    case 'run_step_group':
+    case 'run_session':
+    case 'agent_timeline':
+    case 'route_decision':
+    case 'subagent':
+    case 'subtask':
+    case 'child_agent':
+    case 'context_usage':
+      return true;
+    default:
+      return false;
+  }
+}
 
 interface MainchainNode {
   id: string;
@@ -121,6 +137,10 @@ export interface AgentHubWorkbenchProps {
     replayLabel?: string | undefined;
     targetLabel?: string | undefined;
     targetState?: string | undefined;
+    /** Whether the workbench is loading initial data (threads/conversations not yet loaded). */
+    initialLoading?: boolean | undefined;
+    /** Error message from initial data load, if any. */
+    loadError?: string | undefined;
   } | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
@@ -287,6 +307,7 @@ export function AgentHubWorkbench({
   const [selectBarRect, setSelectBarRect] = useState<{ left: number; width: number } | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [dismissedPinnedIds, setDismissedPinnedIds] = useState<Set<string>>(new Set());
   const [localCliDiscovery, setLocalCliDiscovery] = useState<LocalCliDiscoveryManifest | null>(null);
   const [activeAgentProfile, setActiveAgentProfile] = useState<AgentProfileState | null>(null);
   const [activeHumanProfile, setActiveHumanProfile] = useState<HumanProfileState | null>(null);
@@ -302,6 +323,7 @@ export function AgentHubWorkbench({
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
+  const isSubmittingRef = useRef(false);
   const inspectorWidthRef = useRef(INSPECTOR_DEFAULT_WIDTH);
   const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
   const sidebarShouldCollapseRef = useRef(false);
@@ -319,7 +341,27 @@ export function AgentHubWorkbench({
     createInitialComposerState,
   );
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
+  /** Optimistic user message shown in transcript before the API confirms the run. */
+  const [pendingUserBlock, setPendingUserBlock] = useState<TextTranscriptBlock | null>(null);
   const composerSubmitBehavior = useComposerSubmitBehavior();
+  const chatTranscript = useMemo(
+    () => transcript.filter((block) => !isSidebarOnlyTranscriptBlock(block)),
+    [transcript],
+  );
+  // Chat transcript with optimistic user message appended (for rendering only).
+  // Derived data (evidence, inspector blocks) continues to use the raw transcript.
+  const displayTranscript = useMemo(
+    () => pendingUserBlock ? [...chatTranscript, pendingUserBlock] : chatTranscript,
+    [chatTranscript, pendingUserBlock],
+  );
+  // Clear the optimistic block as soon as the real transcript gains new blocks
+  // (i.e. the API response has arrived and the query cache was updated).
+  useEffect(() => {
+    if (!pendingUserBlock) return;
+    if (transcript.some((block) => block.id === pendingUserBlock.id)) {
+      setPendingUserBlock(null);
+    }
+  }, [transcript, pendingUserBlock]);
   const evidence = collectTranscriptEvidence(transcript);
   const mainchainSummary = buildMainchainSummary({
     composerTargetLabel: composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label,
@@ -548,12 +590,53 @@ export function AgentHubWorkbench({
 
   async function submitComposer(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (!canSubmitComposer(composer)) return;
 
+    // Guard against double-submit race: two rapid Enter presses
+    if (isSubmittingRef.current) return;
+
+    // Read the textarea's current DOM value to avoid stale React state.
+    // When the user types and presses Enter quickly, React may not have
+    // re-rendered yet, so composer.text can be stale.
+    const form = event.currentTarget;
+    const textarea = form.querySelector<HTMLTextAreaElement>('textarea[aria-label="Composer input"]');
+    const liveText = textarea?.value ?? composer.text;
+
+    if (liveText.trim().length === 0 && composer.attachments.length === 0) return;
+
+    // Capture conversation ID to prevent thread-switch race:
+    // if the user switches threads during async operations, the intent
+    // must still target the original conversation.
+    const capturedConversationId = currentConversationId;
+
+    isSubmittingRef.current = true;
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
+
     try {
-      let enrichedAttachments = composer.attachments;
-      const pendingAttachments = composer.attachments.filter((a) => !a.attachmentRef && a.file);
+      // Build intent and capture attachment state BEFORE resetting the composer.
+      const intent = buildComposerIntent(composer);
+      const intentWithLiveText = { ...intent, text: liveText.trim(), conversationId: capturedConversationId };
+      const capturedAttachments = composer.attachments;
+      const pendingAttachments = capturedAttachments.filter((a) => !a.attachmentRef && a.file);
+
+      // ── Optimistic UI: reset the composer immediately so the user can
+      // type the next message while uploads and the API call are in flight. ──
+      const optimisticId = `pending-user-${Date.now()}`;
+      setPendingUserBlock({
+        id: optimisticId,
+        kind: 'text',
+        text: liveText.trim(),
+        author: { id: 'user', name: 'You', role: 'human' as const },
+        createdAt: new Date().toISOString(),
+        ...(composer.replyTo ? { replyToMessageId: composer.replyTo.messageId, replyPreview: composer.replyTo.preview, replyAuthor: composer.replyTo.author } : {}),
+        ...(composer.quote ? { quote: composer.quote.text } : {}),
+      });
+
+      dispatchComposer({ type: 'resetAfterSubmit' });
+      dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
+      setUploadProgresses({});
+
+      // Upload attachments in background (composer is already cleared).
+      let enrichedAttachments = capturedAttachments;
       if (pendingAttachments.length > 0 && platform.attachments?.uploadAttachment) {
         const uploadPort = platform.attachments;
         for (const attachment of pendingAttachments) {
@@ -581,19 +664,26 @@ export function AgentHubWorkbench({
         }
       }
 
-      const intent = buildComposerIntent(composer);
       const finalIntent = enrichedAttachments.length > 0
-        ? { ...intent, attachments: enrichedAttachments }
-        : intent;
-      await platform.runs.submitComposerIntent({
+        ? { ...intentWithLiveText, attachments: enrichedAttachments }
+        : intentWithLiveText;
+
+      const submitPayload = {
         ...finalIntent,
         ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}),
-      });
-      dispatchComposer({ type: 'resetAfterSubmit' });
-      setUploadProgresses({});
-    } catch {
+      };
+
+      await platform.runs.submitComposerIntent(submitPayload);
+
+      setPendingUserBlock(null);
+      dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
+    } catch (err) {
+      setPendingUserBlock(null);
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
       setUploadProgresses({});
+      showWorkbenchToast(err instanceof Error ? err.message : '提交失败，请重试');
+    } finally {
+      isSubmittingRef.current = false;
     }
   }
 
@@ -1339,7 +1429,12 @@ export function AgentHubWorkbench({
         data-surface={platform.surface}
         data-workspace-main
       >
-        {isChatPage ? (
+        {workbenchStatus?.initialLoading && conversations.length === 0 ? (
+          <div className={styles.workspaceLoading} role="status">
+            <span className={styles.workspaceLoadingSpinner} />
+            <span className={styles.workspaceLoadingLabel}>正在连接 Edge 并加载数据...</span>
+          </div>
+        ) : isChatPage ? (
           <>
             <WorkspaceHeader
               activeConversation={activeConversation}
@@ -1370,15 +1465,23 @@ export function AgentHubWorkbench({
                 void onApprovalDecision?.(action);
               }}
               onReviewFile={openReviewFile}
-              pinnedAnnouncement={activeConversation?.pinnedAnnouncement ? {
+              activeConversation={activeConversation}
+              pinnedAnnouncement={activeConversation?.pinnedAnnouncement && !dismissedPinnedIds.has(activeConversation.id) ? {
                 ...activeConversation.pinnedAnnouncement,
                 onCopy: () => showWorkbenchToast('已打开置顶内容'),
-                onDismiss: () => showWorkbenchToast('已关闭置顶'),
+                onDismiss: () => {
+                  setDismissedPinnedIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(activeConversation.id);
+                    return next;
+                  });
+                  showWorkbenchToast('已关闭置顶');
+                },
               } : undefined}
               selectedBlockIds={selectedBlockIds}
               selectionMode={selectionMode}
               softHiddenBlockIds={softHiddenBlockIds}
-              transcript={transcript}
+              transcript={displayTranscript}
             />
             <MessageSearchPanel
               open={searchOpen}
@@ -1386,7 +1489,7 @@ export function AgentHubWorkbench({
               onJumpToMessage={handleSearchJump}
               highlightMessageId={searchHighlightId}
               onHighlightEnd={handleSearchHighlightEnd}
-              transcriptBlocks={transcript}
+              transcriptBlocks={displayTranscript}
               searchLabel="搜索消息"
               searchPlaceholder="搜索消息内容..."
               noResultsLabel="未找到匹配的消息"

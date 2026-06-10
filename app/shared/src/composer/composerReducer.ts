@@ -32,6 +32,7 @@ export function composerReducer(
       return {
         ...state,
         text: action.text,
+        submitState: state.submitState === 'error' ? 'idle' : state.submitState,
       };
     case 'setMode':
       return {
