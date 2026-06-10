@@ -27,7 +27,6 @@
 | 2 | [architecture.md](architecture.md) | **怎么运作**。产品定位 + 三层架构 + 数据流 + 实现状态 |
 | 3 | [desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md) | **怎么重构**。Desktop/Web v4 shared workbench 的实施边界、任务和验收 |
 | 4 | [backend-integration-governance.md](backend-integration-governance.md) | **怎么合后端和联调**。AH-SYNC、后端切片、Desktop/Edge、Web/Hub、DB 和真实 CLI gate 的统一规则 |
-
 | 5 | [v4-shared-i18n-design.md](v4-shared-i18n-design.md) | **i18n 怎么同源**。shared workbench 的 namespace 设计、key parity 和迁移规则 |
 | 6 | [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) | **下一步怎么接生产链路**。Desktop/Tauri/Local Edge 与 Web/Hub 的平台边界、旧客户端清理和分阶段验收 |
 | 7 | [roadmap-feature-close.md](roadmap-feature-close.md) | **功能收口路线图**。基于竞品审计的功能缺口和实现优先级 |
@@ -61,6 +60,7 @@ docs/
 ├── backend-integration-governance.md
 ├── v4-shared-i18n-design.md
 ├── desktop-edge-web-integration-plan.md
+├── right-panel-enhancement-design.md
 ├── developer-quickstart.md
 ├── contributing.md      ← 开发者贡献指南
 ├── adr/                 ← 架构决策记录（11 篇）
