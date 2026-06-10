@@ -1322,6 +1322,22 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		}
 	}
 
+	// Inject sibling context so the sub-agent knows about other agents working
+	// in parallel. This prevents file conflicts when multiple sub-agents modify
+	// the same workspace concurrently.
+	if len(task.SiblingAgents) > 0 {
+		siblingPrompt := adapters.BuildSiblingContextPrompt(task.SiblingAgents)
+		if siblingPrompt != "" {
+			if runCtx.AppendSystemPrompt != "" {
+				runCtx.AppendSystemPrompt = siblingPrompt + "
+
+" + runCtx.AppendSystemPrompt
+			} else {
+				runCtx.AppendSystemPrompt = siblingPrompt
+			}
+		}
+	}
+
 	// Store the run-to-agent mapping so result aggregation can find the agent later.
 	e.mu.Lock()
 	e.runToAgent[runID] = agentInstanceID
