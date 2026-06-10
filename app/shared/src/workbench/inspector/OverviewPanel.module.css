@@ -10,6 +10,53 @@
   gap: 12px;
 }
 
+/* ── Run result banner ── */
+.runResult {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.runResultOk {
+  border-color: color-mix(in srgb, var(--success) 20%, var(--bdr));
+  background: var(--success-bg);
+}
+
+.runResultFail {
+  border-color: color-mix(in srgb, var(--danger) 20%, var(--bdr));
+  background: var(--danger-bg);
+}
+
+.runResultTitle {
+  font: 600 0.8125rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.runResultOk .runResultTitle { color: var(--success); }
+.runResultFail .runResultTitle { color: var(--danger); }
+
+.runResultBadge {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  font: 600 0.6875rem var(--font-sans);
+}
+
+.badgeOk { background: var(--success-bg); color: var(--success); }
+.badgeFail { background: var(--danger-bg); color: var(--danger); }
+
+.runResultSummary {
+  width: 100%;
+  margin-top: 2px;
+  color: var(--text-2);
+  font: 400 0.75rem/1.55 var(--font-sans);
+}
+
 /* ── Section card ── */
 .section {
   display: flex;

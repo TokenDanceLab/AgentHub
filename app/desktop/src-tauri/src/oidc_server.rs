@@ -10,7 +10,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
 use serde::Serialize;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 static OIDC_STOPPED: AtomicBool = AtomicBool::new(false);
 
@@ -193,8 +193,8 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
 
                     if code.is_empty() || state.is_empty() {
                         let body = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>AgentHub Error</title>\
-                        <style>body{{font-family:-apple-system,system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a0a0a;color:#eee}}\
-                        h1{{color:#f87171}}p{{color:#999}}</style></head>\
+                        <style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a0a0a;color:#eee}\
+                        h1{color:#f87171}p{color:#999}</style></head>\
                         <body><div style=\"text-align:center\"><h1>Invalid Callback</h1>\
                         <p>The callback URL is missing required parameters. Please try logging in again.</p></div></body></html>";
                         let resp = format!(
@@ -216,9 +216,9 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
 
                     // Success — return a nice HTML page
                     let body = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>AgentHub Login</title>\
-                    <style>body{{font-family:-apple-system,system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0f0f0f;color:#eee}}\
-                    svg{{width:64px;height:64px;margin-bottom:16px}}\
-                    h1{{color:#4ade80;margin:0 0 8px}}p{{color:#999;margin:0}}</style></head>\
+                    <style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0f0f0f;color:#eee}\
+                    svg{width:64px;height:64px;margin-bottom:16px}\
+                    h1{color:#4ade80;margin:0 0 8px}p{color:#999;margin:0}</style></head>\
                     <body><div style=\"text-align:center\">\
                     <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#4ade80\" stroke-width=\"2\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>\
                     <h1>Login Successful</h1>\
@@ -236,6 +236,17 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                             "state": state,
                         }),
                     );
+
+                    // Bring the window to the foreground after successful callback.
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                        #[cfg(target_os = "windows")]
+                        {
+                            bring_window_to_front(&window);
+                        }
+                    }
+
                     OIDC_STOPPED.store(true, Ordering::Relaxed);
                     return;
                 }
@@ -274,6 +285,61 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
 pub async fn stop_oidc_callback_server() -> Result<(), String> {
     OIDC_STOPPED.store(true, Ordering::Relaxed);
     Ok(())
+}
+
+/// Proxy an HTTP POST request through the Rust backend.
+/// This is needed because WebView2 `fetch()` does not respect `HTTP_PROXY`/`HTTPS_PROXY`
+/// environment variables (it uses Windows system proxy instead). The Rust `reqwest` client
+/// respects env vars, so requests that need a proxy must go through this command.
+#[tauri::command]
+pub async fn proxy_http_post(
+    url: String,
+    body: String,
+    headers: Option<std::collections::HashMap<String, String>>,
+) -> Result<ProxyHttpResponse, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("failed to build HTTP client: {e}"))?;
+
+    let mut req = client.post(&url).header("Content-Type", "application/json");
+
+    if let Some(hdrs) = headers {
+        for (k, v) in hdrs {
+            req = req.header(&k, &v);
+        }
+    }
+
+    req = req.body(body);
+
+    let resp = req.send().await.map_err(|e| {
+        log::error!("[proxy_http_post] request to {url} failed: {e}");
+        format!("request failed: {e}")
+    })?;
+
+    let status = resp.status().as_u16();
+    let resp_headers: std::collections::HashMap<String, String> = resp
+        .headers()
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+        .collect();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("failed to read response body: {e}"))?;
+
+    Ok(ProxyHttpResponse {
+        status,
+        body: text,
+        headers: resp_headers,
+    })
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ProxyHttpResponse {
+    pub status: u16,
+    pub body: String,
+    pub headers: std::collections::HashMap<String, String>,
 }
 
 fn url_decode(s: &str) -> String {
@@ -317,6 +383,31 @@ fn escape_html(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+/// Bring the window to the foreground using raw Win32 FFI.
+/// This avoids type-version conflicts between `windows-sys` and Tauri's internal `raw-window-handle`.
+#[cfg(target_os = "windows")]
+fn bring_window_to_front(window: &tauri::WebviewWindow) {
+    use std::ffi::c_void;
+
+    type HWND = *mut c_void;
+
+    extern "system" {
+        fn SetForegroundWindow(hWnd: HWND) -> i32;
+        fn BringWindowToTop(hWnd: HWND) -> i32;
+    }
+
+    if let Ok(hwnd) = window.hwnd() {
+        // raw-window-handle 0.6+: HWND wraps *mut c_void as first field
+        let raw: HWND = unsafe { std::ptr::addr_of!(hwnd.0).read() };
+        if !raw.is_null() {
+            unsafe {
+                let _ = SetForegroundWindow(raw);
+                let _ = BringWindowToTop(raw);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

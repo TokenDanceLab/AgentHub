@@ -19,18 +19,24 @@ export function useDesktopEdgeEvents(
     knownRunIds.current = new Set<string>();
     if (!activeThreadId) return undefined;
 
+    console.log(`[EdgeEvents] Connecting for thread: ${activeThreadId}`);
     const stream = createEventStream();
+    stream.onStatusChange((status) => {
+      console.log(`[EdgeEvents] WebSocket status: ${status}`);
+    });
     const unsubscribe = stream.subscribe((event) => {
+      console.log(`[EdgeEvents] Received: ${event.type} run=${eventRunId(event) ?? 'none'} thread=${eventThreadId(event) ?? 'none'}`);
       if (!matchesActiveThread(event, activeThreadId, knownRunIds.current)) return;
 
       const runId = eventRunId(event);
       if (runId) knownRunIds.current.add(runId);
 
-      // Feed Edge SSE events into the agent activity store so the
-      // streaming indicator appears while the run is in progress.
       pushEdgeEventToAgentActivity(event);
-
-      setEvents((current) => appendLiveEvent(current, event));
+      setEvents((current) => {
+        const next = appendLiveEvent(current, event);
+        console.log(`[EdgeEvents] Events: ${next.length}`);
+        return next;
+      });
     });
 
     return () => {
