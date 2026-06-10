@@ -470,7 +470,19 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 	cmd := exec.CommandContext(ctx, cmdPath, args...)
 	cmd.Dir = workDir
-	cmd.Env = e.envForRun(run, env, extraEnv)
+	if adapter != nil {
+		// Adapter mode: the adapter returns only auth env vars (e.g.
+		// ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL) that must be overlaid on
+		// top of the sanitized parent environment. Passing them as
+		// profileEnv would replace the entire child env with just those
+		// vars, stripping PATH, SYSTEMROOT and other OS essentials — which
+		// causes the CLI to fail immediately. Instead, merge adapter env
+		// into extraEnv so SanitizedEnv provides the full OS base plus the
+		// adapter's auth passthrough.
+		cmd.Env = e.envForRun(run, nil, append(extraEnv, env...))
+	} else {
+		cmd.Env = e.envForRun(run, env, extraEnv)
+	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		e.publishFailed(run, fmt.Errorf("open stdout pipe: %w", err))

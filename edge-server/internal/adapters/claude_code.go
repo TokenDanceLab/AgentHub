@@ -159,6 +159,33 @@ func (a *ClaudeCodeAdapter) resolveModelForAdapter(model string) string {
 	return ResolveModel("claude-code", model)
 }
 
+// ccSwitchManaged returns true when the user's Claude Code is managed by
+// cc-switch via settings.json. In this mode, all auth configuration is
+// already in settings.json (ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL, model
+// mappings) and Edge must not inject conflicting env vars — doing so
+// overrides settings.json and causes immediate auth failures when the
+// transparent proxy is active.
+func ccSwitchManaged() bool {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return false // file missing → not cc-switch managed
+	}
+	var settings struct {
+		Env map[string]string `json:"env"`
+	}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return false
+	}
+	// cc-switch sets ANTHROPIC_AUTH_TOKEN in settings.json. When present,
+	// CC handles all auth internally via its own settings layer.
+	return settings.Env["ANTHROPIC_AUTH_TOKEN"] != ""
+}
+
 func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	prompt := ctx.Prompt
 	if prompt == "" {
@@ -290,25 +317,27 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	}
 	args = append(args, "--add-dir", workDir)
 
-	// Pass auth env vars through to the Claude Code child process. The env
-	// sanitizer strips sensitive keys (ANTHROPIC_API_KEY, CLAUDE_API_KEY,
-	// ANTHROPIC_AUTH_TOKEN) from the sanitized parent env, and
-	// ANTHROPIC_BASE_URL is not on the whitelist either, so adapter-level
-	// passthrough is required. Without this, Claude Code fails immediately
-	// with an authentication error.
+	// Pass auth env vars through to the Claude Code child process.
+	// Strategy:
+	//   - cc-switch managed: don't inject anything, CC reads settings.json.
+	//     Injecting env vars would override settings.json and cause auth failures.
+	//   - native/standalone: CC needs explicit auth credentials from OS env.
 	var env []string
-	if a.anthropicAPIKey != "" {
-		env = append(env, "ANTHROPIC_API_KEY="+a.anthropicAPIKey)
+	if !ccSwitchManaged() {
+		if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
+			env = append(env, "ANTHROPIC_API_KEY="+key)
+		}
+		if key := os.Getenv("CLAUDE_API_KEY"); key != "" {
+			env = append(env, "CLAUDE_API_KEY="+key)
+		}
+		if key := os.Getenv("ANTHROPIC_AUTH_TOKEN"); key != "" {
+			env = append(env, "ANTHROPIC_AUTH_TOKEN="+key)
+		}
+		if url := os.Getenv("ANTHROPIC_BASE_URL"); url != "" {
+			env = append(env, "ANTHROPIC_BASE_URL="+url)
+		}
 	}
-	if a.claudeAPIKey != "" {
-		env = append(env, "CLAUDE_API_KEY="+a.claudeAPIKey)
-	}
-	if a.anthropicAuthToken != "" {
-		env = append(env, "ANTHROPIC_AUTH_TOKEN="+a.anthropicAuthToken)
-	}
-	if a.anthropicBaseURL != "" {
-		env = append(env, "ANTHROPIC_BASE_URL="+a.anthropicBaseURL)
-	}
+	// cc-switch managed: env stays empty → CC reads settings.json
 
 	return a.binaryPath, args, env, workDir
 }
@@ -341,15 +370,19 @@ func (a *ClaudeCodeAdapter) Available() bool { return a.available }
 
 // PreflightCheck verifies that Claude Code can actually execute by checking both
 // the binary presence and required authentication. At least one auth mechanism
-// must be available: ANTHROPIC_API_KEY, CLAUDE_API_KEY, or ANTHROPIC_AUTH_TOKEN
-// (the latter typically comes from cc-switch transparent proxy). Returns an
-// error describing what is missing if the adapter is not ready.
+// must be available: cc-switch managed (settings.json), ANTHROPIC_API_KEY,
+// CLAUDE_API_KEY, or ANTHROPIC_AUTH_TOKEN. Returns an error describing what is
+// missing if the adapter is not ready.
 func (a *ClaudeCodeAdapter) PreflightCheck() error {
 	if !a.available {
 		return fmt.Errorf("claude CLI binary not found: %s", a.binaryPath)
 	}
-	if a.anthropicAPIKey == "" && a.claudeAPIKey == "" && a.anthropicAuthToken == "" {
-		return fmt.Errorf("claude-code requires at least one of: ANTHROPIC_API_KEY, CLAUDE_API_KEY, ANTHROPIC_AUTH_TOKEN")
+	// cc-switch managed mode: settings.json has auth, CC handles everything.
+	if ccSwitchManaged() {
+		return nil
+	}
+	if os.Getenv("ANTHROPIC_API_KEY") == "" && os.Getenv("CLAUDE_API_KEY") == "" && os.Getenv("ANTHROPIC_AUTH_TOKEN") == "" {
+		return fmt.Errorf("claude-code requires at least one of: ANTHROPIC_API_KEY, CLAUDE_API_KEY, ANTHROPIC_AUTH_TOKEN (or cc-switch managed settings.json)")
 	}
 	return nil
 }
