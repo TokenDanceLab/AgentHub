@@ -70,7 +70,7 @@ export function serialiseEntry(entry: MemoryEntry): string {
   const frontmatter = [
     `id: ${entry.id}`,
     `created: ${entry.createdAt}`,
-    `updated: ${entry.updated}`,
+    `updated: ${entry.updatedAt}`,
     ...(tags ? [`tags: ${tags}`] : []),
     `source: ${entry.source}`,
   ].join('\n');
@@ -146,6 +146,9 @@ function parseSection(section: string): MemoryEntry | null {
   }
 
   const [, yamlBlock, body] = match;
+  if (!yamlBlock || !body) {
+    return null;
+  }
   const fm = parseYamlFrontmatter(yamlBlock);
   if (!fm) {
     return null;
