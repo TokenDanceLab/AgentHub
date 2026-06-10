@@ -58,10 +58,10 @@ Mock 验收 (demo data 走通)
 | 12 | Agent 能力标签 | 联系人列表 → 每个 Agent 旁显示彩色能力标签 | — |
 | 13 | 重新生成 | 长按 → 重新生成 → 新回复流式替换 | — |
 
-- [ ] 全部 Mock 模式通过
+- [ ] 全部 Mock 模式通过（11/13 已合入：#1-2, #4-6, #8-12）
 - [ ] Desktop dev server (5173) 手动走通所有路径
 - [ ] Web dev server (5174) 手动走通
-- [ ] `pnpm typecheck` app/ 通过
+- [x] `pnpm typecheck` app/ 通过
 - [ ] `pnpm test` app/ 通过（不改 UI 测试的情况下）
 
 ## 右侧栏类（03-right-panel）验收门
@@ -82,9 +82,9 @@ Mock 验收 (demo data 走通)
 | 12 | DagTree | AgentTeam 任务 → 树渲染 + 状态图标 | — |
 | 13 | 部署自动切换 | Agent 部署成功 → URL 自动打开 | — |
 
-- [ ] 全部 Mock 模式通过
+- [x] 全部 Mock 模式通过
 - [ ] Desktop dev server (5173) 手动走通所有格式
-- [ ] `pnpm typecheck` app/ 通过
+- [x] `pnpm typecheck` app/ 通过
 - [ ] `pnpm test` app/ 通过
 
 ## Release Gate（最终发布门）
@@ -107,8 +107,8 @@ Mock 验收 (demo data 走通)
 ```
 
 - [ ] 全部 gate 脚本通过
-- [ ] `go test ./... -short` 全部 Go 测试通过
-- [ ] `pnpm typecheck && pnpm test` 前端通过
+- [x] `go test ./... -short` 全部 Go 测试通过
+- [x] `pnpm typecheck && pnpm test` 前端通过
 - [ ] 3-5 支演示视频录制完成（需你操作）
 - [ ] 5-7 张截图导出（Desktop/Web/产物/审批/DAG）
 - [ ] 一份 AI 协作证据包导出（AI_COLLABORATION.md）
@@ -134,8 +134,8 @@ Mock 验收 (demo data 走通)
 
 ## 整体进度追踪
 
-- [ ] 管线类 12/12 Mock + Observed 双模式通过
-- [ ] 轻 UI 类 13/13 Mock 模式通过
-- [ ] 右侧栏类 13/13 Mock 模式通过
-- [ ] Release Gate 6/6 脚本通过
+- [ ] 管线类 12/12 Mock + Observed 双模式通过（Mock ✅，Observed 待完成）
+- [ ] 轻 UI 类 13/13 Mock 模式通过（11/13 已合入）
+- [x] 右侧栏类 13/13 Mock 模式通过
+- [ ] Release Gate 6/6 脚本通过（2/6 Go test + pnpm typecheck/test 通过）
 - [ ] 演示材料（截图 + 视频 + AI 协作证据包）
