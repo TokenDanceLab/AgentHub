@@ -651,3 +651,273 @@ This gives the user full visibility into what model is **actually** processing t
 | `src-tauri/src/deeplink/provider.rs` | Deeplink import, Provider construction from URL params |
 | `src-tauri/src/database/schema.rs` | SQLite schema (providers table, etc.) |
 | `src-tauri/src/proxy/providers/claude.rs` | Claude adapter: format detection, transform dispatch |
+
+---
+
+<!-- 合并自 cc-switch-providers-models.md -->
+
+## 10. Provider Preset System
+
+### 10.1 Preset Files by App
+
+| File | App | Config Target |
+|------|-----|---------------|
+| `src/config/claudeProviderPresets.ts` | Claude Code | `~/.claude/settings.json` (env vars) |
+| `src/config/claudeDesktopProviderPresets.ts` | Claude Desktop | `~/.claude/settings.json` + profile routes |
+| `src/config/codexProviderPresets.ts` | Codex (OpenAI) | `~/.codex/config.toml` + `~/.codex/auth.json` |
+| `src/config/geminiProviderPresets.ts` | Gemini CLI | `~/.gemini/config.yaml` (env vars) |
+| `src/config/opencodeProviderPresets.ts` | OpenCode | `~/.opencode/config.json` (AI SDK format) |
+| `src/config/openclawProviderPresets.ts` | OpenClaw | `~/.openclaw/openclaw.json` |
+| `src/config/hermesProviderPresets.ts` | Hermes | `~/.hermes/config.yaml` |
+| `src/config/universalProviderPresets.ts` | Cross-app | Generates per-app providers from shared config |
+
+### 10.2 Provider Categories
+
+```typescript
+type ProviderCategory =
+  | "official"        // Anthropic, OpenAI, Google
+  | "cn_official"     // Chinese domestic providers (Volcengine, Baidu, Zhipu, etc.)
+  | "cloud_provider"  // AWS Bedrock
+  | "aggregator"      // API gateways (OpenRouter, SiliconFlow, AiHubMix, etc.)
+  | "third_party"     // Third-party resellers
+  | "custom"          // User-defined
+```
+
+### 10.3 Complete Provider Preset Inventory
+
+**Claude Code Presets (40+)**:
+
+| Category | Providers |
+|----------|-----------|
+| Official | Claude Official |
+| CN Official | Volcengine Agentplan, BytePlus, DouBaoSeed, Zhipu GLM (CN/EN), Baidu Qianfan, Bailian (x2), Kimi (x2), StepFun (CN/EN), MiniMax (CN/EN), BaiLing, Xiaomi MiMo (x2) |
+| Cloud Provider | AWS Bedrock (AKSK + API Key) |
+| Aggregator | Shengsuanyun, AiHubMix, CherryIN, SiliconFlow (CN/EN), DMXAPI, Compshare (x2), ModelScope, OpenRouter, TheRouter, Novita AI, CCSub, AtlasCloud, PIPELLM |
+| Third Party | PatewayAI, DeepSeek, OpenCode Go, Longcat, KAT-Coder, PackyCode, APIKEY.FUN, APINebula, SudoCode, ClaudeAPI, ClaudeCN, RunAPI, RelaxyCode, Cubence, AIGoCode, RightCode, AICodeMirror, CrazyRouter, SSSSAiCode, Micu, CTok.ai, E-FlowCode, LemonData, Nvidia, GitHub Copilot, Codex |
+
+**Gemini Native and API Format Support**:
+
+Special presets with non-Anthropic API formats:
+- **Gemini Native** (`apiFormat: "gemini_native"`): Full Gemini generateContent protocol
+- **GitHub Copilot** (`providerType: "github_copilot"`, `apiFormat: "openai_chat"`): OAuth + format transform
+- **Codex** (`providerType: "codex_oauth"`, `apiFormat: "openai_responses"`): ChatGPT Plus/Pro OAuth
+- **OpenCode Go** (`apiFormat: "openai_chat"`): OpenAI Chat Completions
+- **Nvidia** (`apiFormat: "openai_chat"`): NVIDIA NIM endpoint
+
+---
+
+## 11. MCP Configuration Injection
+
+### 11.1 Multi-App MCP Architecture
+
+CC-Switch manages MCP servers in a **unified structure** with per-app enable flags:
+
+```typescript
+interface McpServer {
+  id: string;
+  name: string;
+  server: McpServerSpec;      // { command, args, env } or { url, headers }
+  apps: McpApps;               // { claude, codex, gemini, opencode, openclaw, hermes }
+  description?: string;
+  tags?: string[];
+}
+```
+
+### 11.2 Per-App MCP Sync
+
+Each app has its own sync module that writes to the app's native config:
+
+| Module | Target File |
+|--------|-------------|
+| `mcp/claude.rs` | `~/.claude.json` (mcpServers field) |
+| `mcp/codex.rs` | `~/.codex/config.toml` (mcp_servers section) |
+| `mcp/gemini.rs` | `~/.gemini/config.yaml` (mcpServers section) |
+| `mcp/opencode.rs` | `~/.opencode/config.json` (mcpServers section) |
+| `mcp/hermes.rs` | `~/.hermes/config.yaml` (mcp_servers section) |
+
+### 11.3 Claude MCP Write Path
+
+```rust
+// src-tauri/src/mcp/claude.rs
+pub fn sync_enabled_to_claude(config: &MultiAppConfig) -> Result<(), AppError> {
+    let enabled = collect_enabled_servers(&config.mcp.claude);
+    crate::claude_mcp::set_mcp_servers_map(&enabled)
+}
+```
+
+The actual write happens in `claude_mcp.rs`:
+1. Reads `~/.claude.json`
+2. Filters servers with `enabled == true`
+3. Strips UI-only fields (`enabled`, `source`, `id`, `name`, `description`, `tags`)
+4. On Windows, wraps `npx`/`npm` commands in `cmd /c` (unless WSL path detected)
+5. Writes back to `~/.claude.json`
+
+### 11.4 Smart Write Behavior
+
+- **Skip if Claude not installed**: If `~/.claude/` directory doesn't exist and `~/.claude.json` doesn't exist, MCP sync is silently skipped
+- **Directory override support**: If user overrides Claude config dir, MCP path is derived from the override's parent
+- **Atomic writes**: All config writes use temp file + rename for crash safety
+
+---
+
+## 12. Session State Machine
+
+### 12.1 Session Scanning
+
+Sessions are **read-only scans** of each app's native session storage. CC-Switch does not create or manage CLI processes.
+
+```rust
+// src-tauri/src/session_manager/mod.rs
+pub fn scan_sessions() -> Vec<SessionMeta> {
+    // Parallel scan across all providers
+    let (r1, r2, r3, r4, r5, r6) = std::thread::scope(|s| {
+        let h1 = s.spawn(codex::scan_sessions);
+        let h2 = s.spawn(claude::scan_sessions);
+        let h3 = s.spawn(opencode::scan_sessions);
+        let h4 = s.spawn(openclaw::scan_sessions);
+        let h5 = s.spawn(gemini::scan_sessions);
+        let h6 = s.spawn(hermes::scan_sessions);
+        // ...
+    });
+}
+```
+
+### 12.2 Session Storage Locations
+
+| Provider | Session Root | Format |
+|----------|-------------|--------|
+| Claude | `~/.claude/projects/` | JSONL (one JSON object per line) |
+| Codex | `~/.codex/sessions/` (multiple roots) | JSONL |
+| OpenCode | `~/.opencode/` | SQLite (`sqlite:` prefix) or JSONL |
+| OpenClaw | `~/.openclaw/agents/` | JSONL |
+| Gemini | `~/.gemini/tmp/` | JSONL |
+| Hermes | `~/.hermes/sessions/` | SQLite or JSONL |
+
+### 12.3 Session Metadata
+
+```rust
+pub struct SessionMeta {
+    pub provider_id: String,       // "claude" | "codex" | "gemini" | ...
+    pub session_id: String,
+    pub title: Option<String>,     // Custom title > first user message > dir basename
+    pub summary: Option<String>,   // Last non-empty assistant message
+    pub project_dir: Option<String>,
+    pub created_at: Option<i64>,
+    pub last_active_at: Option<i64>,
+    pub source_path: Option<String>,
+    pub resume_command: Option<String>,  // e.g., "claude --resume {session_id}"
+}
+```
+
+### 12.4 Claude Session Parsing
+
+Claude sessions are JSONL files in `~/.claude/projects/<path-hash>/`:
+- `sessionId` extracted from first line
+- `cwd` extracted as project directory
+- Title priority: `custom-title` entry > first user message (excluding command caveats) > directory basename
+- Agent sessions (prefixed `agent-`) are excluded from listing
+- Tool results inside user messages are reclassified as "tool" role
+
+### 12.5 Session Deletion
+
+Deletion validates that the source path is within the provider's allowed root(s) before removing:
+- The main `.jsonl` file
+- The sidecar directory (same name without extension), which contains subagents and tool results
+
+---
+
+## 13. Settings / Runtime Config
+
+### 13.1 Settings Storage
+
+- **Database** (`~/.cc-switch/cc-switch.db`): Providers, MCP servers, failover config, prompts, usage data
+- **Device-local** (`~/.cc-switch/settings.json`): UI preferences, current provider per app, directory overrides, sync settings
+
+### 13.2 Current Provider Resolution
+
+```rust
+// src-tauri/src/settings.rs
+pub fn get_effective_current_provider(db: &Database, app_type: &AppType) -> Option<String> {
+    // 1. Read from local settings.json (device-level)
+    // 2. Validate ID exists in database
+    // 3. If invalid, clean up local settings and fallback to database is_current
+}
+```
+
+This allows multi-device sync where each device can have a different active provider.
+
+### 13.3 Directory Override System
+
+Each app's config directory can be overridden via settings:
+
+```rust
+claude_config_dir: Option<String>,    // Overrides ~/.claude
+codex_config_dir: Option<String>,     // Overrides ~/.codex
+gemini_config_dir: Option<String>,    // Overrides ~/.gemini
+opencode_config_dir: Option<String>,  // Overrides ~/.opencode
+openclaw_config_dir: Option<String>,  // Overrides ~/.openclaw
+hermes_config_dir: Option<String>,    // Overrides ~/.hermes
+```
+
+Supports `~` expansion and relative paths.
+
+---
+
+## 14. Universal Provider (Cross-App)
+
+### 14.1 Concept
+
+Universal providers (e.g., NewAPI) share a single base URL and API key across multiple apps, with per-app model configuration:
+
+```typescript
+interface UniversalProvider {
+    id: string;
+    providerType: string;     // "newapi" | "custom_gateway"
+    apps: { claude, codex, gemini };  // Which apps to enable
+    baseUrl: string;          // Shared API endpoint
+    apiKey: string;           // Shared API key
+    models: {
+        claude?: { model, haikuModel, sonnetModel, opusModel },
+        codex?:  { model, reasoningEffort },
+        gemini?: { model },
+    };
+}
+```
+
+### 14.2 Per-App Generation
+
+When a universal provider is saved, it generates separate per-app `Provider` instances:
+- `to_claude_provider()`: Writes env vars to Claude settings
+- `to_codex_provider()`: Generates TOML config + auth.json for Codex
+- `to_gemini_provider()`: Writes Gemini env vars
+
+---
+
+## 15. Source File Reference (Extended)
+
+### Backend (Rust)
+- `src-tauri/src/provider.rs` - Provider, ProviderMeta, UniversalProvider structs
+- `src-tauri/src/settings.rs` - AppSettings, current provider, directory overrides
+- `src-tauri/src/config.rs` - Path resolution, JSON file I/O
+- `src-tauri/src/proxy/model_mapper.rs` - Model alias mapping logic
+- `src-tauri/src/proxy/providers/mod.rs` - ProviderType enum, adapter dispatch
+- `src-tauri/src/proxy/providers/claude.rs` - Claude adapter, API format detection
+- `src-tauri/src/proxy/providers/transform.rs` - Format conversion (Anthropic <-> OpenAI)
+- `src-tauri/src/mcp/claude.rs` - MCP sync to ~/.claude.json
+- `src-tauri/src/claude_mcp.rs` - Low-level ~/.claude.json read/write
+- `src-tauri/src/session_manager/mod.rs` - Session scanning/dispatch
+- `src-tauri/src/session_manager/providers/claude.rs` - Claude session parsing
+- `src-tauri/src/commands/provider.rs` - Tauri commands for provider CRUD
+- `src-tauri/src/services/config.rs` - Live config writing to app native paths
+
+### Frontend (TypeScript/React)
+- `src/config/claudeProviderPresets.ts` - 40+ Claude Code provider presets
+- `src/config/claudeDesktopProviderPresets.ts` - Claude Desktop presets with route mapping
+- `src/config/codexProviderPresets.ts` - Codex presets with TOML templates
+- `src/config/geminiProviderPresets.ts` - Gemini CLI presets
+- `src/config/universalProviderPresets.ts` - Cross-app universal provider presets
+- `src/types.ts` - Full type definitions
+- `src/components/providers/forms/ProviderPresetSelector.tsx` - Preset picker UI
+- `src/components/providers/forms/ProviderForm.tsx` - Provider creation/edit form
+- `src/components/providers/forms/ClaudeFormFields.tsx` - Claude-specific fields
+- `src/components/providers/forms/CodexFormFields.tsx` - Codex-specific fields

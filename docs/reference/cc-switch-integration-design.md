@@ -1,6 +1,7 @@
 # cc-switch Integration Design for AgentHub
 
 > Research date: 2026-06-10
+> 最后更新：2026-06-10
 > cc-switch source: `D:\Code\Projects\archive\cc-switch` (Tauri desktop app, Rust backend, SQLite)
 > AgentHub source: `D:\Code\TokenDance\AgentHub` (Go edge-server)
 
@@ -1122,3 +1123,180 @@ func discoverCCSwitchSkills(reader *ccswitch.Reader) ([]skills.Skill, error) {
 6. **Skills directory sharing**: cc-switch skills are in `~/.cc-switch/skills/` with SKILL.md format. AgentHub's existing parser can read them directly. No format conversion needed.
 
 7. **Session data**: Not read from cc-switch. Sessions are in agent-specific directories that AgentHub can scan independently.
+
+---
+
+<!-- 合并自 cc-switch-db-schema.md -->
+
+## 10. Runtime State Snapshot (2026-06-10)
+
+The following sections capture the live runtime state of cc-switch at the time of extraction. These values change frequently; refer to the database for current data.
+
+### 10.1 Current Active Provider (Claude App)
+
+- **Name**: NewAPI / DeepSeek / GLM
+- **Provider ID**: `e7e2dd52-4689-49aa-817f-d861a9422847`
+- **Model Mapping**:
+  - Opus -> `deepseek-v4-pro[1M]`
+  - Sonnet -> `glm-5.1`
+  - Haiku -> `deepseek-v4-flash`
+  - Reasoning -> `deepseek-v4-pro`
+  - Subagent -> `deepseek-v4-pro`
+
+### 10.2 All Claude Providers Summary
+
+| # | Name | Opus Model | Sonnet Model | Haiku Model | is_current | Healthy |
+|---|------|-----------|-------------|------------|------------|---------|
+| 0 | NewAPI / Qwen3.7 / GLM | qwen3.7-max[1M] | qwen3.7-plus[1M] | glm-5.1 | No | Yes |
+| 1 | NewAPI / DeepSeek / Mimo / GLM | glm-5.1 | deepseek-v4-pro[1M] | mimo-v2.5 | No | Yes |
+| 2 | NewAPI /GLM | glm-5.1 | glm-5.1 | glm-5.1 | No | Yes |
+| 3 | NewAPI / DeepSeek / Qwen / GLM | deepseek-v4-pro[1M] | qwen3.7-max[1M] | glm-5.1 | No | - |
+| 4 | **NewAPI / DeepSeek / GLM** | **deepseek-v4-pro[1M]** | **glm-5.1** | **deepseek-v4-flash** | **Yes** | **Yes** |
+| 5 | NewAPI / DeepSeek Pro / Flash / GLM | deepseek-v4-pro[1M] | deepseek-v4-flash[1M] | deepseek-v4-flash | No | Yes |
+| 6 | NewAPI / DeepSeek | deepseek-v4-pro[1M] | deepseek-v4-flash[1M] | glm-5.1 | No | - |
+| 7 | NewAPI / Opus 4.8 | claude-opus-4-8[1M] | deepseek-v4-pro[1M] | deepseek-v4-pro | No | - |
+| 8 | NewAPI Test (us1) | deepseek-v4-pro[1M] | kimi-k2.6[1M] | glm-5.1 | No | - |
+| 9 | NewAPI / Opus 4.7 | claude-opus-4-8[1M] | deepseek-v4-pro[1M] | deepseek-v4-pro | No | - |
+| 10 | Anyrouter / Opus 4.8 | claude-opus-4-8[1M] | claude-opus-4-8[1M] | claude-haiku-4-5 | No | Yes |
+| 11 | Anyrouter / Opus 4.7 copy | claude-opus-4-8[1M] | claude-opus-4-8[1M] | claude-haiku-4-5 | No | - |
+| 12 | DeepSeek Official | deepseek-v4-pro[1M] | deepseek-v4-flash[1M] | deepseek-v4-flash | No | Yes |
+| 13-21 | DeepSeek Official 1-40 | deepseek-v4-pro[1M] | deepseek-v4-flash[1M] | deepseek-v4-flash | No | Mixed (some unhealthy) |
+
+### 10.3 Endpoint URLs by Category
+
+- **NewAPI aggregators**: `https://api.vectorcontrol.tech/v1`
+- **DeepSeek Official**: `https://api.deepseek.com/anthropic`
+- **Anyrouter**: `https://a-ocnfniawgw.cn-shanghai.fcapp.run`
+- **DashScope (Aliyun)**: `https://coding.dashscope.aliyuncs.com/apps/anthropic`
+- **TokenDanceGateway**: `https://www.vectorcontrol.tech/v1`
+
+### 10.4 Proxy Configuration (Live)
+
+| app_type | proxy_enabled | listen | auto_failover | enabled | live_takeover |
+|----------|--------------|--------|---------------|---------|---------------|
+| claude | 1 | 127.0.0.1:15721 | 1 | 1 | 0 |
+| codex | 1 | 127.0.0.1:15721 | 0 | 0 | 0 |
+| gemini | 1 | 127.0.0.1:15721 | 0 | 0 | 0 |
+
+**Circuit Breaker (Claude)**:
+- Failure threshold: 8 consecutive failures
+- Success threshold: 3 consecutive successes
+- Timeout: 90 seconds
+- Error rate threshold: 0.7 (70%)
+- Min requests: 15
+- Max retries: 6
+- Streaming first-byte timeout: 90s
+- Streaming idle timeout: 180s
+- Non-streaming timeout: 600s
+
+### 10.5 MCP Server Configuration
+
+| ID | Name | Type | Enabled For | Command |
+|----|------|------|-------------|---------|
+| codex-browser | codex-browser | stdio | Claude only | `D:\Code\Projects\codex-browser-bridge\bin\codex-browser-bridge.exe -mode mcp` |
+
+### 10.6 Skills
+
+- **Installed Skills**: Empty (no skills installed in the skills table currently)
+
+- **Configured Skill Repos**:
+
+| Owner | Repo | Branch |
+|-------|------|--------|
+| anthropics | skills | main |
+| ComposioHQ | awesome-claude-skills | master |
+| cexll | myclaude | master |
+| JimLiu | baoyu-skills | main |
+
+### 10.7 Global Settings
+
+| Key | Value (summary) |
+|-----|-----------------|
+| `common_config_claude` | JSON: env vars, theme=dark, bypassPermissions, custom statusLine command, no auto-updates |
+| `common_config_codex` | TOML: danger-full-access, pragmatic personality, max 40 agent threads, one-half-dark theme |
+| `common_config_opencode` | JSON: minimal schema config |
+| `stream_check_config` | JSON: 45s timeout, 2 retries, degraded at 6s, claude test model=haiku-4.5 |
+| `claude_desktop_gateway_token` | Gateway auth token for Claude Desktop |
+| `rectifier_config` | JSON: disabled, thinking signature/budget request enabled |
+| `optimizer_config` | JSON: disabled, thinking optimizer + cache injection enabled |
+| `official_providers_seeded` | true |
+| `universal_providers` | {} (empty) |
+
+### 10.8 Proxy Status
+
+**cc-switch proxy is ACTIVE and running.**
+
+- **Process**: `cc-switch.exe` (PID 14696)
+- **Listening**: `127.0.0.1:15721`
+- **Memory**: ~79 MB
+- **Claude Code settings.json** points to proxy:
+  - `ANTHROPIC_BASE_URL`: `http://127.0.0.1:15721`
+  - `ANTHROPIC_AUTH_TOKEN`: `PROXY_MANAGED`
+  - Model: `opus[1m]`
+
+### 10.9 Provider Health Summary (Claude)
+
+**Healthy Providers**:
+
+| Provider | Last Success |
+|----------|-------------|
+| NewAPI / DeepSeek / GLM (current) | 2026-06-10 04:37 |
+| DeepSeek Official 1 | 2026-06-10 04:32 |
+| DeepSeek Official 2 | 2026-06-09 18:52 |
+| DeepSeek Official 6 | 2026-06-05 08:13 |
+| NewAPI / DeepSeek Pro / Flash / GLM | 2026-06-07 17:06 |
+| NewAPI /GLM | 2026-06-07 15:00 |
+| DeepSeek Official 40 | 2026-06-05 08:13 |
+| DeepSeek Official 17 | 2026-06-05 08:13 |
+| DeepSeek Official 18 | 2026-06-05 08:12 |
+| DeepSeek Official 26 | 2026-06-05 08:12 |
+| DeepSeek Official 28 | 2026-06-05 08:13 |
+| DeepSeek Official 11 | 2026-06-05 08:13 |
+| Anyrouter / Opus 4.8 | 2026-05-30 17:00 |
+
+**Unhealthy Providers (Circuit Open)**:
+
+| Provider | Consecutive Failures | Last Error |
+|----------|---------------------|------------|
+| DeepSeek Official 17 | 10 | Connect error |
+| DeepSeek Official 18 | 12 | Connect error |
+| DeepSeek Official 26 | 8 | Connect error |
+| DeepSeek Official 28 | 10 | Insufficient Balance (402) |
+| DeepSeek Official 11 | 13 | Connect error |
+| DeepSeek Official 40 | 10 | Connect error |
+
+### 10.10 Model Pricing Reference (Selected Models)
+
+| Model | Input $/M | Output $/M | Cache Read $/M |
+|-------|-----------|------------|----------------|
+| deepseek-v4-pro | 0.435 | 0.87 | 0.003625 |
+| deepseek-v4-flash | 0.14 | 0.28 | 0.0028 |
+| glm-5.1 | 1.4 | 4.4 | 0.26 |
+| glm-5 | 1.0 | 3.2 | 0.2 |
+| mimo-v2.5 | 0.09 | 0.29 | 0.009 |
+| mimo-v2.5-pro | 1.0 | 3.0 | 0 |
+| qwen3.7-max (via qwen3.6-plus) | 0.325 | 1.95 | 0 |
+| kimi-k2.6 | 0.95 | 4.0 | 0.16 |
+| claude-opus-4-8 | 5.0 | 25.0 | 0.50 |
+| gpt-5.5 | 5.0 | 30.0 | 0.50 |
+| gpt-5.4 | 2.5 | 15.0 | 0.25 |
+| doubao-seed-2.0-pro | 0.47 | 2.37 | 0 |
+
+### 10.11 Key Integration Points for Edge Client
+
+**How cc-switch Works**:
+1. **Proxy intercepts** all Anthropic API calls at `127.0.0.1:15721`
+2. **Provider selection**: Routes to the `is_current=1` provider, falls back via `sort_index` order when auto-failover is enabled
+3. **Model mapping**: Translates Claude model names to backend models via `ANTHROPIC_DEFAULT_*_MODEL` env vars
+4. **Health tracking**: Circuit breaker tracks failures per provider, auto-switches when threshold exceeded
+5. **Cost tracking**: Per-request logging with token counts and calculated costs from `model_pricing` table
+6. **Settings injection**: Writes `settings.json` with `ANTHROPIC_AUTH_TOKEN=PROXY_MANAGED` and proxy URL
+
+**What Edge Client Needs to Integrate**:
+1. **Read providers table** for `app_type='claude'` to show available providers
+2. **Read proxy_config** to show proxy status
+3. **Read provider_health** to show health status
+4. **Read model_pricing** for cost display
+5. **Write providers** to add/modify providers (requires understanding settings_config JSON schema)
+6. **Toggle is_current** to switch active provider
+7. **Read proxy_request_logs** for usage analytics
