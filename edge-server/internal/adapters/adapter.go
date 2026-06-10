@@ -194,6 +194,12 @@ const (
 	BusEventContextUsage        = "run.agent.context_usage"
 	BusEventContextWarning      = "run.agent.context_warning"
 	BusEventContextCompaction   = "run.agent.context_compaction"
+
+	// Plan approval gate events (P0 #3: Plan confirmation gate)
+	BusEventPlanProposed  = "run.agent.plan_proposed"
+	BusEventPlanApproved  = "run.agent.plan_approved"
+	BusEventPlanRejected  = "run.agent.plan_rejected"
+	BusEventPlanExpired   = "run.agent.plan_expired"
 )
 
 // Context keys for adapter-level context propagation.
