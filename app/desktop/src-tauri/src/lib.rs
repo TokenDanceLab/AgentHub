@@ -73,6 +73,7 @@ pub fn run() {
             // oidc_server (direct — tauri::command proc-macro is module-local)
             oidc_server::start_oidc_callback_server,
             oidc_server::stop_oidc_callback_server,
+            oidc_server::proxy_http_post,
             // secure_store (direct)
             secure_store::clear_hub_refresh_token,
             secure_store::read_hub_refresh_token,

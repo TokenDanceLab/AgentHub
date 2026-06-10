@@ -1,7 +1,7 @@
 /* ═══ Inspector panels barrel exports ═══ */
 
 export { OverviewPanel } from './OverviewPanel';
-export type { OverviewPanelProps, TaskItem, FileItem } from './OverviewPanel';
+export type { OverviewPanelProps, TaskItem, FileItem, RunResultInfo } from './OverviewPanel';
 
 export { FilePreview } from './FilePreview';
 export type { FilePreviewProps } from './FilePreview';

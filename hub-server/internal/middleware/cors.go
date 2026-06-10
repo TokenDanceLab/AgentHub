@@ -35,10 +35,11 @@ func CORS() (gin.HandlerFunc, error) {
 
 func defaultCORSOrigins(env string) string {
 	if isProductionEnvironment(env) {
-		return "https://hub.vectorcontrol.tech"
+		// Allow Web app + Tauri Desktop (origin: https://tauri.localhost)
+		return "https://hub.vectorcontrol.tech,https://tauri.localhost"
 	}
-	// Dev: TokenDance ID/local web (3000), Desktop Vite (5173), Web Vite (5174)
-	return "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
+	// Dev: TokenDance ID/local web (3000), Desktop Vite (5173), Web Vite (5174), Tauri Desktop
+	return "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"
 }
 
 func corsEnvironment() string {

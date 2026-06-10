@@ -242,7 +242,7 @@ var seedThreads = []seedThreadDef{
 		},
 	},
 
-	// 5. Orchestrator — 子任务分派
+	// 5. Orchestrator — 子任务分派 (seed run: finished)
 	{
 		ID:          "orchestrator",
 		Title:       "Orchestrator",
@@ -255,7 +255,7 @@ var seedThreads = []seedThreadDef{
 		},
 		Run: &seedRunDef{
 			ID:     "run-orch-1",
-			Status: "started",
+			Status: "finished",
 			Artifacts: []seedArtifactDef{
 				{ID: "artifact-orch-1", Kind: "markdown", Path: "docs/tasks/b0-migration-taskboard.md", SizeBytes: 640},
 			},
@@ -333,7 +333,7 @@ var seedThreads = []seedThreadDef{
 		},
 		Run: &seedRunDef{
 			ID:     "run-ai-1",
-			Status: "started",
+			Status: "finished",
 			Artifacts: []seedArtifactDef{
 				{ID: "artifact-ai-1", Kind: "markdown", Path: "docs/research/ai-game-competition-report.md", SizeBytes: 4096},
 				{ID: "artifact-ai-2", Kind: "file", Path: "docs/research/ai-game-engine-comparison.csv", SizeBytes: 2048},
@@ -390,17 +390,17 @@ var seedUserProfiles = []UserProfile{
 	{
 		ID:          "user-delicious233",
 		DisplayName: "Delicious233",
-		AvatarURL:   "https://avatars.githubusercontent.com/u/71818788?v=4",
+		AvatarURL:   "https://avatars.githubusercontent.com/u/101502465?v=4",
 		Status:      "owner",
 	},
 	{
 		ID:          "user-johnny",
-		DisplayName: "Johnny",
-		AvatarURL:   "",
+		DisplayName: "Johnny-Cheung",
+		AvatarURL:   "https://avatars.githubusercontent.com/u/221092178?v=4",
 	},
 	{
 		ID:          "user-trump",
-		DisplayName: "Trump",
+		DisplayName: "Xavier-Trump",
 		AvatarURL:   "",
 	},
 	{
