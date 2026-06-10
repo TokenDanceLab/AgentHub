@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
@@ -69,6 +69,8 @@ import {
 import type { SettingsService } from './settingsService';
 import { createSettingsService } from './settingsService';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
+import type { HubClient } from '../hubClient';
+import { workspaceProjectToProjectInfo } from './hubDataMapping';
 import styles from './AgentHubWorkbench.module.css';
 
 type WorkbenchPage = Exclude<GlobalRailPage, 'chat'>;
@@ -94,6 +96,8 @@ export interface WorkbenchRoutesProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
+  /** Hub client for direct project API access when callbacks are not provided. */
+  hubClient?: HubClient | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
@@ -549,6 +553,7 @@ export function WorkbenchRoutes({
   onActiveProjectChange,
   onProjectCreate,
   onProjectUpdate,
+  hubClient,
   onAgentCreate,
   onAgentUpdate,
   onAgentDelete,
@@ -585,7 +590,76 @@ export function WorkbenchRoutes({
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
   const realDataMode = isRouteRealDataMode(dataMode);
-  const sourceProjects = projects ?? (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS);
+  // ── Internal Hub project state (used when hubClient is provided and parent doesn't manage projects) ──
+  const [hubProjects, setHubProjects] = useState<ProjectInfo[]>([]);
+  const [hubProjectsStatus, setHubProjectsStatus] = useState<WorkbenchProjectsStatus>({});
+  const hubProjectsEnabled = Boolean(hubClient) && !projects;
+
+  const loadHubProjects = useCallback(async () => {
+    if (!hubClient) return;
+    setHubProjectsStatus((prev) => ({ ...prev, loading: true, error: undefined }));
+    try {
+      const response = await hubClient.listWorkspaceProjects({ pageSize: 50 });
+      setHubProjects((response.items ?? []).map(workspaceProjectToProjectInfo));
+      setHubProjectsStatus((prev) => ({ ...prev, loading: false }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load projects';
+      setHubProjectsStatus((prev) => ({ ...prev, loading: false, error: message }));
+    }
+  }, [hubClient]);
+
+  useEffect(() => {
+    if (!hubProjectsEnabled) return;
+    loadHubProjects();
+  }, [hubProjectsEnabled, loadHubProjects]);
+
+  const handleProjectCreate = useCallback(async (draft: ProjectDraft): Promise<ProjectInfo | void> => {
+    if (onProjectCreate) return onProjectCreate(draft);
+    if (!hubClient) return;
+    setHubProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
+    try {
+      const created = await hubClient.createWorkspaceProject({
+        name: draft.name.trim() || 'Untitled Project',
+        description: draft.description.trim(),
+      });
+      const info = workspaceProjectToProjectInfo(created);
+      await loadHubProjects();
+      setHubProjectsStatus((prev) => ({ ...prev, saving: false }));
+      return info;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create project';
+      setHubProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
+      throw err;
+    }
+  }, [onProjectCreate, hubClient, loadHubProjects]);
+
+  const handleProjectUpdate = useCallback(async (
+    projectId: string,
+    draft: ProjectDraft,
+  ): Promise<ProjectInfo | void> => {
+    if (onProjectUpdate) return onProjectUpdate(projectId, draft);
+    if (!hubClient) return;
+    setHubProjectsStatus((prev) => ({ ...prev, saving: true, actionError: undefined }));
+    try {
+      const updated = await hubClient.updateWorkspaceProject(projectId, {
+        name: draft.name.trim() || undefined,
+        description: draft.description.trim() || undefined,
+      });
+      const info = workspaceProjectToProjectInfo(updated);
+      await loadHubProjects();
+      setHubProjectsStatus((prev) => ({ ...prev, saving: false }));
+      return info;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update project';
+      setHubProjectsStatus((prev) => ({ ...prev, saving: false, actionError: message }));
+      throw err;
+    }
+  }, [onProjectUpdate, hubClient, loadHubProjects]);
+
+  const sourceProjects = projects
+    ?? (hubProjectsEnabled ? hubProjects : (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS));
+  const effectiveProjectsStatus = projectsStatus
+    ?? (hubProjectsEnabled ? hubProjectsStatus : undefined);
   const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
   const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
     ? activeProjectId
@@ -1287,15 +1361,15 @@ export function WorkbenchRoutes({
             setProjectPreview(createProjectArtifactPreview(id, artifact));
           }}
           onClosePreview={() => setProjectPreview(null)}
-          onProjectCreate={onProjectCreate}
+          onProjectCreate={handleProjectCreate}
           onProjectSelect={selectProject}
-          onProjectUpdate={onProjectUpdate}
+          onProjectUpdate={handleProjectUpdate}
           onTabChange={setProjectTab}
-          projectActionError={projectsStatus?.actionError}
-          projectSaving={projectsStatus?.saving}
+          projectActionError={effectiveProjectsStatus?.actionError}
+          projectSaving={effectiveProjectsStatus?.saving}
           projects={sourceProjects}
-          projectsError={projectsStatus?.error}
-          projectsLoading={projectsStatus?.loading}
+          projectsError={effectiveProjectsStatus?.error}
+          projectsLoading={effectiveProjectsStatus?.loading}
         />
       );
     case 'settings':
@@ -1305,6 +1379,10 @@ export function WorkbenchRoutes({
           activePane={settingsPane}
           onChangeSetting={handleSettingChange}
           localCliDiscovery={localCliDiscovery}
+          onOpenAgentConfig={() => {
+            setAgentsPane('installed');
+            setActivePage('agents');
+          }}
           onSelectPane={setSettingsPane}
           spaceMeta="桌面设计 demo"
           spaceTitle="AgentHub Desktop"
