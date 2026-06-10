@@ -1754,20 +1754,8 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 }
 
 func (s *AgentTeamService) hasTimedOutActiveAssignment(runID string) (bool, error) {
-	assignments, err := repository.ListAssignmentsByTeamRun(s.db, runID)
-	if err != nil {
-		return false, err
-	}
 	deadline := time.Now().Add(-s.guardrails.AssignmentTimeout)
-	for _, assignment := range assignments {
-		if assignment.CreatedAt.IsZero() || !isActiveAssignmentStatus(assignment.Status) {
-			continue
-		}
-		if assignment.CreatedAt.Before(deadline) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return repository.HasTimedOutActiveAssignment(s.db, runID, deadline)
 }
 
 func (s *AgentTeamService) teamRunBudgetExceeded(runID string) (bool, error) {

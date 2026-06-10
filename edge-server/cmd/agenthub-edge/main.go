@@ -165,6 +165,7 @@ func main() {
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 		SkillsDirs:         append([]string(nil), cfg.SkillsDirs...),
 		EventLogPath:       cfg.EventLogPath,
+		MCPConfigStore:     mcpConfigStore,
 	}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{

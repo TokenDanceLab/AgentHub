@@ -71,7 +71,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	client := r.Group("/client")
 	{
-		client.GET("/ws", middleware.WSAuthMiddleware(cfg), wsHandler.ServeWS)
+		client.GET("/ws", middleware.WSIPRateLimit(), middleware.WSAuthMiddleware(cfg), wsHandler.ServeWS)
 
 		auth := client.Group("/auth")
 		{

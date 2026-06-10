@@ -407,10 +407,10 @@ func TestAddGroupMembers_FailClosedOnIsMemberActiveError(t *testing.T) {
 		WithArgs("owner-1", "accepted").
 		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("u2"))
 
-	// IsMemberActive returns DB error — must NOT silently pass
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE`)).
-		WithArgs("sess-1", "user", "u2").
-		WillReturnError(gorm.ErrInvalidDB)
+		// AreMembersActive returns DB error — must NOT silently pass
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT "member_id" FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id IN ($3) AND left_at IS NULL`)).
+			WithArgs("sess-1", "user", "u2").
+			WillReturnError(gorm.ErrInvalidDB)
 
 	svc := NewSessionService(db, nil)
 	err := svc.AddGroupMembers(context.Background(), "owner-1", "sess-1", []string{"u2"})
@@ -785,27 +785,17 @@ func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("user-2").AddRow("user-3"))
 
 	// Input has [user-2, user-2, user-3] - deduplicated to [user-2, user-3].
-	// After dedup, only 2 IsMemberActive + 2 IsMemberSoftDeleted checks (not 3+3).
+	// After dedup, batch AreMembersActive + AreMembersSoftDeleted (2 queries, not 4+).
 
-	// IsMemberActive for user-2: not active
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL`)).
-		WithArgs("sess-1", "user", "user-2").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	// AreMembersActive for [user-2, user-3]: none active
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "member_id" FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id IN ($3,$4) AND left_at IS NULL`)).
+		WithArgs("sess-1", "user", "user-2", "user-3").
+		WillReturnRows(sqlmock.NewRows([]string{"member_id"}))
 
-	// IsMemberActive for user-3: not active
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL`)).
-		WithArgs("sess-1", "user", "user-3").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-
-	// IsMemberSoftDeleted for user-2: not soft deleted
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NOT NULL`)).
-		WithArgs("sess-1", "user", "user-2").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-
-	// IsMemberSoftDeleted for user-3: not soft deleted
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NOT NULL`)).
-		WithArgs("sess-1", "user", "user-3").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	// AreMembersSoftDeleted for [user-2, user-3]: none soft deleted
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "member_id" FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id IN ($3,$4) AND left_at IS NOT NULL`)).
+		WithArgs("sess-1", "user", "user-2", "user-3").
+		WillReturnRows(sqlmock.NewRows([]string{"member_id"}))
 
 	// BatchCreateMembers for [user-2, user-3]
 	mock.ExpectBegin()
@@ -837,12 +827,14 @@ func TestAddGroupMembers_PublishesMemberJoinedEvents(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "friend_id" FROM "friendships" WHERE user_id = $1 AND status = $2`)).
 		WithArgs("owner-1", "accepted").
 		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("u2"))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL`)).
+	// AreMembersActive for [u2]: not active
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "member_id" FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id IN ($3) AND left_at IS NULL`)).
 		WithArgs("sess-1", "user", "u2").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NOT NULL`)).
+		WillReturnRows(sqlmock.NewRows([]string{"member_id"}))
+	// AreMembersSoftDeleted for [u2]: not soft deleted
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "member_id" FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id IN ($3) AND left_at IS NOT NULL`)).
 		WithArgs("sess-1", "user", "u2").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+		WillReturnRows(sqlmock.NewRows([]string{"member_id"}))
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "session_members"`)).
 		WillReturnResult(sqlmock.NewResult(1, 1))

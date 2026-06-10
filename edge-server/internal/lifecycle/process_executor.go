@@ -576,14 +576,17 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", stderr)
 
 	// Inject context budget for token tracking in stream parsers.
+	// Also inject RunProcessContext unconditionally — SDK adapters
+	// (anthropic-sdk, openai-sdk) need prompt, model, and messages
+	// regardless of whether a WorkDir is set.
 	parserCtx := ctx
 	if runCtx.Budget != nil {
 		parserCtx = context.WithValue(parserCtx, adapters.CtxBudgetKey, runCtx.Budget)
 	}
 	if runCtx.WorkDir != "" {
 		parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
-		parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
 	}
+	parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
 
 	var parseErr error
 	if adapter != nil {
