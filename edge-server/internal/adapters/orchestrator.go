@@ -123,6 +123,11 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 		if a.messageQueue != nil {
 			a.messageQueue.EnsureAgent(run.ID, 64)
 		}
+		// Build failure recovery manager if adapter registry is available.
+		var frm *FailureRecoveryManager
+		if a.adapterRegistry != nil && a.spawner != nil {
+			frm = NewFailureRecoveryManager(a.adapterRegistry, a.spawner)
+		}
 		effectiveEmitter = &dispatchInterceptor{
 			inner:           emitter,
 			registry:        a.agentRegistry,
@@ -136,6 +141,7 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 			maxConcurrency:  a.dispatchConcurrency,
 			ctx:             ctx,
 			dispatched:      make(map[string]dispatchEvent),
+			failureRecovery: frm,
 		}
 		if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
 			effectiveEmitter.(*dispatchInterceptor).budget = budget
@@ -153,23 +159,59 @@ func (a *OrchestratorAdapter) Available() bool {
 }
 
 // DefaultOrchestratorPrompt returns the built-in orchestrator system prompt.
+// It instructs the orchestrator to output structured plans with DAG dependencies.
 func DefaultOrchestratorPrompt(availableAgents []string) string {
-	return "You are the Orchestrator. Available sub-agents: " + formatAgentList(availableAgents) + "\n" +
+	agentList := formatAgentList(availableAgents)
+	return "You are the Orchestrator. Available sub-agents: " + agentList + "\n" +
 		"Analyze the request. Identify parallelizable sub-tasks. Dispatch each to the appropriate agent.\n" +
-		"Aggregate results into a coherent final response. Delegate whenever possible.\n"
+		"Aggregate results into a coherent final response. Delegate whenever possible.\n" +
+		"\n" +
+		"When planning complex multi-step tasks, you MUST output your plan as a JSON object with this EXACT structure:\n" +
+		"```json\n" +
+		"{\n" +
+		"  \"plan\": {\n" +
+		"    \"mode\": \"parallel\",\n" +
+		"    \"tasks\": [\n" +
+		"      {\n" +
+		"        \"id\": \"task-1\",\n" +
+		"        \"agent\": \"<agent-name>\",\n" +
+		"        \"description\": \"<what to do>\",\n" +
+		"        \"targetFiles\": [\"path/to/file\"],\n" +
+		"        \"dependsOn\": [],\n" +
+		"        \"expectedOutput\": \"<expected result>\"\n" +
+		"      }\n" +
+		"    ]\n" +
+		"  }\n" +
+		"}\n" +
+		"```\n" +
+		"\n" +
+		"Rules for the plan:\n" +
+		"- \"mode\" must be one of: \"parallel\" (independent tasks), \"sequential\" (strict ordering), \"pipeline\" (stage-based).\n" +
+		"- Each task MUST have a unique \"id\" (e.g. \"task-1\", \"task-2\").\n" +
+		"- \"agent\" must be one of: " + agentList + ".\n" +
+		"- \"dependsOn\" is an array of task IDs that must complete before this task starts. Use [] for tasks with no dependencies.\n" +
+		"- Tasks with no dependencies in the same batch CAN run in parallel.\n" +
+		"- \"targetFiles\" lists files the task will read or modify.\n" +
+		"- \"expectedOutput\" briefly describes what the sub-agent should produce.\n" +
+		"- After outputting the plan, dispatch each task via: {\"action\":\"dispatch\",\"agent\":\"<agent>\",\"task\":\"<description>\",\"subtaskId\":\"<id>\"}\n"
 }
 
 // --- dispatch interception ---
 
 // dispatchEvent is the expected JSON shape for a sub-agent dispatch.
 type dispatchEvent struct {
-	Action    string `json:"action"`
-	Agent     string `json:"agent"`
-	Task      string `json:"task"`
-	Role      string `json:"role"`
-	ThreadID  string `json:"threadId,omitempty"`
-	Model     string `json:"model,omitempty"`
-	SubtaskID string `json:"subtaskId,omitempty"`
+	Action      string   `json:"action"`
+	Agent       string   `json:"agent"`
+	Task        string   `json:"task"`
+	Role        string   `json:"role"`
+	ThreadID    string   `json:"threadId,omitempty"`
+	Model       string   `json:"model,omitempty"`
+	SubtaskID   string   `json:"subtaskId,omitempty"`
+	TargetFiles []string `json:"targetFiles,omitempty"` // files this sub-agent intends to modify
+
+	// siblings is set by fanOutDispatches to carry sibling agent context.
+	// Not parsed from JSON — populated programmatically before handleDispatch.
+	siblings []SiblingInfo
 }
 
 // dispatchInterceptor wraps an EventEmitter to detect dispatch events.
@@ -192,6 +234,10 @@ type dispatchInterceptor struct {
 	dispatchedMu       sync.Mutex
 	dispatchedCount    int               // total sub-agents dispatched by this interceptor
 	dispatched         map[string]dispatchEvent // agentID -> original dispatch event for result injection
+
+	// Failure degradation: classifies sub-agent errors and drives recovery
+	// (retry / switch / skip / fail).
+	failureRecovery *FailureRecoveryManager
 }
 
 func (d *dispatchInterceptor) Emit(eventType string, scope map[string]any, payload any) {
@@ -241,11 +287,32 @@ func (d *dispatchInterceptor) scanForDispatch(payload any, scope map[string]any)
 // semaphore-limited goroutine pool. Blocks until all dispatches complete.
 // Concurrency bounded by maxConcurrency (default DefaultDispatchConcurrency = 10,
 // matching OpenCode default tool concurrency).
+//
+// Before dispatching, each event is injected with sibling context so every
+// sub-agent knows what other agents in the same parallel batch are doing.
+// This prevents file conflicts when multiple agents work on the same workspace.
 func (d *dispatchInterceptor) fanOutDispatches(events []dispatchEvent, scope map[string]any) {
 	maxConc := d.maxConcurrency
 	if maxConc <= 0 {
 		maxConc = DefaultDispatchConcurrency
 	}
+
+	// Build sibling context: for each event, collect the other events as siblings.
+	for i := range events {
+		var siblings []SiblingInfo
+		for j := range events {
+			if i == j {
+				continue
+			}
+			siblings = append(siblings, SiblingInfo{
+				AgentName:   events[j].Agent,
+				TaskDesc:    events[j].Task,
+				TargetFiles: events[j].TargetFiles,
+			})
+		}
+		events[i].siblings = siblings
+	}
+
 	sem := make(chan struct{}, maxConc)
 	var wg sync.WaitGroup
 
@@ -324,15 +391,16 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 	var runID string
 	if d.spawner != nil {
 		task := SubAgentTask{
-			TaskID:      "task_" + genHexID(),
-			Description: evt.Task,
-			AgentID:     evt.Agent,
-			Prompt:      evt.Task,
-			Depth:       d.depth + 1,
-			ParentRunID: d.parentRun.ID,
-			ThreadID:    threadID,
-			Model:       model,
-			Budget:      d.budget,
+			TaskID:       "task_" + genHexID(),
+			Description:  evt.Task,
+			AgentID:      evt.Agent,
+			Prompt:       evt.Task,
+			Depth:        d.depth + 1,
+			ParentRunID:  d.parentRun.ID,
+			ThreadID:     threadID,
+			Model:        model,
+			Budget:       d.budget,
+			SiblingAgents: evt.siblings,
 		}
 		var err error
 		_, runID, err = d.spawner.SpawnSubAgent(d.parentRun, task)
@@ -507,6 +575,8 @@ func (d *dispatchInterceptor) processResultMessage(msg agents.Message) {
 
 // handleSubAgentResult injects a sub-agent result or error as a system message
 // into the orchestrator's text stream, emits a status update, and updates progress.
+// For errors, it invokes the failure recovery manager to classify and potentially
+// retry, switch agents, or skip the task.
 func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError bool) {
 	payload, _ := msg.Payload.(map[string]any)
 	agentName := ""
@@ -516,6 +586,86 @@ func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError b
 		}
 	}
 	agentID := msg.FromAgentID
+
+	// For error results, attempt failure recovery before injecting.
+	if isError && d.failureRecovery != nil {
+		errMsg := ""
+		if payload != nil {
+			if err, ok := payload["result"].(string); ok {
+				errMsg = err
+			}
+		}
+
+		taskID := ""
+		if payload != nil {
+			if tid, ok := payload["runId"].(string); ok {
+				taskID = tid
+			}
+		}
+
+		scope := map[string]any{"runId": d.parentRun.ID}
+		decision, _ := d.failureRecovery.HandleSubAgentFailure(
+			d.ctx,
+			d.parentRun,
+			agentID,
+			agentName,
+			taskID,
+			fmt.Errorf("%s", errMsg),
+			nil, // no RunError code available from message payload
+			d.inner,
+			scope,
+		)
+
+		switch decision {
+		case DecisionRetry:
+			// Recovery manager already handled backoff.
+			// Inject retry notification into orchestrator stream so it knows
+			// the sub-agent will be re-attempted.
+			retryMsg := fmt.Sprintf("[Sub-agent: %s] transient failure, retrying...\nError: %s", agentName, errMsg)
+			d.inner.Emit(BusEventTextBlock, scope, map[string]any{
+				"text":   retryMsg,
+				"source": "sub_agent_retry",
+			})
+			return
+
+		case DecisionSwitchAgent:
+			// Inject switch notification so orchestrator knows a different
+			// agent is being tried for this task.
+			switchMsg := fmt.Sprintf("[Sub-agent: %s] capability failure, switching to alternate agent...\nError: %s", agentName, errMsg)
+			d.inner.Emit(BusEventTextBlock, scope, map[string]any{
+				"text":   switchMsg,
+				"source": "sub_agent_switch",
+			})
+			return
+
+		case DecisionSkip:
+			// Skip: inject skip notification and continue.
+			skipMsg := fmt.Sprintf("[Sub-agent: %s] task skipped (unrecoverable)\nError: %s", agentName, errMsg)
+			d.inner.Emit(BusEventTextBlock, scope, map[string]any{
+				"text":   skipMsg,
+				"source": "sub_agent_skip",
+			})
+			// Still emit status update for the skipped agent.
+			errStr := ""
+			if payload != nil {
+				if err, ok := payload["result"].(string); ok {
+					errStr = err
+				}
+			}
+			d.inner.Emit(BusEventSubAgentStatus, scope, map[string]any{
+				"agentId":   agentID,
+				"agentName": agentName,
+				"status":    string(agents.StatusError),
+				"progress":  "skipped",
+				"error":     errStr,
+			})
+			d.emitProgressSummary(scope)
+			return
+
+		case DecisionFail:
+			// Fall through to the normal error injection below.
+		}
+	}
 
 	// Build the injected message following OpenCode's XML task result injection pattern.
 	var injectedText string
