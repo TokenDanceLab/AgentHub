@@ -24,6 +24,7 @@ type PlanTask struct {
 	ID             string     `json:"id"`
 	Agent          string     `json:"agent"`
 	Description    string     `json:"description"`
+	Mode           string     `json:"mode,omitempty"`           // "parallel" or "sequential" execution hint for this task
 	TargetFiles    []string   `json:"targetFiles,omitempty"`
 	DependsOn      []string   `json:"dependsOn,omitempty"`
 	ExpectedOutput string     `json:"expectedOutput,omitempty"`
@@ -32,8 +33,9 @@ type PlanTask struct {
 
 // ExecutionPlan represents a structured plan output by the orchestrator.
 type ExecutionPlan struct {
-	Mode  string     `json:"mode"` // "parallel", "sequential", "pipeline"
-	Tasks []PlanTask `json:"tasks"`
+	Summary string     `json:"summary,omitempty"` // one-line description of the overall plan
+	Mode    string     `json:"mode"`              // "parallel", "sequential", "pipeline"
+	Tasks   []PlanTask `json:"tasks"`
 }
 
 // structuredPlanEnvelope is the top-level JSON envelope the orchestrator outputs.
