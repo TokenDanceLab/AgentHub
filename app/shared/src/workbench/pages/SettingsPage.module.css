@@ -674,6 +674,80 @@
   border-color: transparent;
 }
 
+/* ── Agent config link section ── */
+.agentConfigLink {
+  max-width: 920px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid var(--primary);
+  border-radius: var(--r-lg);
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-medium) var(--ease);
+}
+
+.agentConfigLink:hover {
+  background: var(--surface);
+  box-shadow: var(--e-1);
+}
+
+.agentConfigLinkContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.agentConfigLinkContent h3 {
+  margin: 0;
+  font: 600 0.9375rem var(--font-sans);
+  color: var(--text-1);
+}
+
+.agentConfigLinkContent p {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font: 400 0.75rem/1.45 var(--font-sans);
+}
+
+.agentConfigLinkBtn {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--primary);
+  border-radius: var(--r-md);
+  background: var(--primary);
+  color: var(--surface);
+  font: 600 0.8125rem var(--font-sans);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.agentConfigLinkBtn:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+.agentConfigLinkBtn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 @media (max-width: 700px) {
   .page {
     min-width: 0;
@@ -712,5 +786,15 @@
 
   .stateGrid {
     grid-template-columns: 1fr;
+  }
+
+  .agentConfigLink {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .agentConfigLinkBtn {
+    width: 100%;
+    justify-content: center;
   }
 }

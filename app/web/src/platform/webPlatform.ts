@@ -28,6 +28,7 @@ import {
 import { getAccessToken } from '@/hooks/useAuth';
 import type { Session } from '@/api/hubClient';
 import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
+import { createWebSettingsAdapter } from './webSettingsAdapter';
 
 type WebRunHubClient =
   Pick<HubClient, 'addAgentToSession' | 'sendMessage' | 'triggerAgentTask'> &
@@ -243,6 +244,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
       },
     },
+    settings: createWebSettingsAdapter(),
   };
 }
 
@@ -342,6 +344,29 @@ export async function submitWebComposerIntent(
   return { intentId: task.id || message.message_id };
 }
 
+function buildAttachmentContentJSON(
+  attachment: ComposerAttachment,
+  text?: string,
+): string {
+  const ref = attachment.attachmentRef;
+  if (!ref) return JSON.stringify({ name: attachment.name });
+  const payload: Record<string, string> = {
+    attachment_id: ref.id,
+    name: ref.original_name ?? ref.name ?? attachment.name,
+  };
+  if (text?.trim()) {
+    payload.caption = text.trim();
+  }
+  return JSON.stringify(payload);
+}
+
+function firstUploadedAttachment(
+  attachments: ComposerAttachment[],
+  mimePrefix: string,
+): ComposerAttachment | undefined {
+  return attachments.find((a) => a.mime?.startsWith(mimePrefix) && a.attachmentRef);
+}
+
 async function sendComposerMessage(
   hubClient: WebRunHubClient,
   clientMessageId: string,
@@ -349,23 +374,29 @@ async function sendComposerMessage(
 ): Promise<SendMessageResponse> {
   const hasAttachments = intent.attachments.length > 0;
   const firstImageAttachment = hasAttachments
-    ? intent.attachments.find((a) => a.mime?.startsWith('image/') && a.attachmentRef)
+    ? firstUploadedAttachment(intent.attachments, 'image/')
     : undefined;
   const firstFileAttachment = hasAttachments && !firstImageAttachment
-    ? intent.attachments.find((a) => a.attachmentRef)
+    ? firstUploadedAttachment(intent.attachments, '')
     : undefined;
 
   let contentType: import('@shared/hubClient').HubContentType = 'text';
-  if (firstImageAttachment) {
+  let content: string;
+
+  if (firstImageAttachment?.attachmentRef) {
     contentType = 'image';
-  } else if (firstFileAttachment) {
+    content = buildAttachmentContentJSON(firstImageAttachment, intent.text.trim());
+  } else if (firstFileAttachment?.attachmentRef) {
     contentType = 'file';
+    content = buildAttachmentContentJSON(firstFileAttachment, intent.text.trim());
+  } else {
+    content = buildHubComposerPrompt(intent);
   }
 
   return hubClient.sendMessage(intent.conversationId, {
     client_msg_id: clientMessageId,
     content_type: contentType,
-    content: buildHubComposerPrompt(intent),
+    content,
     ...(intent.replyTo ? { reply_to_message_id: intent.replyTo.messageId } : {}),
   });
 }
@@ -377,18 +408,27 @@ export function optimisticHubMessageFromIntent(
 ): MessageResponse {
   const hasAttachments = intent.attachments.length > 0;
   const firstImageAttachment = hasAttachments
-    ? intent.attachments.find((a) => a.mime?.startsWith('image/') && a.attachmentRef)
+    ? firstUploadedAttachment(intent.attachments, 'image/')
     : undefined;
   const firstFileAttachment = hasAttachments && !firstImageAttachment
-    ? intent.attachments.find((a) => a.attachmentRef)
+    ? firstUploadedAttachment(intent.attachments, '')
     : undefined;
 
   let contentType: import('@shared/hubClient').HubContentType = 'text';
-  if (firstImageAttachment) {
+  let content: string;
+
+  if (firstImageAttachment?.attachmentRef) {
     contentType = 'image';
-  } else if (firstFileAttachment) {
+    content = buildAttachmentContentJSON(firstImageAttachment, intent.text.trim());
+  } else if (firstFileAttachment?.attachmentRef) {
     contentType = 'file';
+    content = buildAttachmentContentJSON(firstFileAttachment, intent.text.trim());
+  } else {
+    content = buildHubComposerPrompt(intent);
   }
+
+  const attachmentRefs = intent.attachments
+    .filter((a): a is ComposerAttachment & { attachmentRef: AttachmentRef } => Boolean(a.attachmentRef));
 
   return {
     id: clientMessageId,
@@ -398,9 +438,22 @@ export function optimisticHubMessageFromIntent(
     sender_type: 'user',
     sender_id: 'web-current-user',
     content_type: contentType,
-    content: buildHubComposerPrompt(intent),
+    content,
     created_at: createdAt,
     ...(intent.replyTo ? { reply_to: { id: intent.replyTo.messageId, sender_id: intent.replyTo.author, content_type: 'text' } } : {}),
+    ...(attachmentRefs.length > 0
+      ? {
+          attachments: attachmentRefs.map((a) => ({
+            id: a.attachmentRef.id,
+            hash: a.attachmentRef.hash ?? '',
+            size: a.attachmentRef.size,
+            mime_type: a.attachmentRef.mime_type,
+            ...(a.attachmentRef.original_name ? { original_name: a.attachmentRef.original_name } : {}),
+            ...(a.attachmentRef.metadata ? { metadata: a.attachmentRef.metadata } : {}),
+            ...(a.attachmentRef.created_at ? { created_at: a.attachmentRef.created_at } : {}),
+          })),
+        }
+      : {}),
   };
 }
 

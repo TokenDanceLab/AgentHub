@@ -309,6 +309,40 @@ export function getRunDiff(runId: string): Promise<RunDiff> {
   return request(`/v1/runs/${encodeURIComponent(runId)}/diff`);
 }
 
+/** Apply a single hunk decision — writes the hunk to the filesystem via Edge. */
+export function applyRunDiff(
+  runId: string,
+  body: {
+    file_path: string;
+    hunk_index: number;
+    accepted: boolean;
+    workDir: string;
+  },
+): Promise<{ code: string; data: unknown }> {
+  return request(`/v1/runs/${encodeURIComponent(runId)}/apply`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Batch-apply multiple hunk decisions in one request. */
+export function applyAllRunDiffs(
+  runId: string,
+  body: {
+    decisions: Array<{
+      file_path: string;
+      hunk_index: number;
+      accepted: boolean;
+    }>;
+    workDir: string;
+  },
+): Promise<{ code: string; data: unknown }> {
+  return request(`/v1/runs/${encodeURIComponent(runId)}/apply-all`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 // ── Approvals ─────────────────────────────────
 
 export function listApprovals(): Promise<ListResponse<Approval>> {
