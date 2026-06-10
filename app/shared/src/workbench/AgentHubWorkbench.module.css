@@ -2297,3 +2297,142 @@
 .shell[data-inspector-collapsed='true'] .inspectorToggleBtn .iconExpand {
   display: block;
 }
+
+/* ═══ Overview content wrapper ═══ */
+
+.overviewContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Context usage (Overview) ── */
+
+.contextSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.contextSection:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+.contextHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 500 0.75rem/1.5 var(--font-sans);
+  color: var(--text-1);
+}
+
+.contextPercent {
+  font: 600 0.75rem var(--font-sans);
+  color: var(--text-2);
+}
+
+.contextBar {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-high);
+  overflow: hidden;
+}
+
+.contextBarFill {
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--primary);
+  transition: width var(--dur-normal) var(--ease);
+}
+
+.contextBarWarning .contextBarFill {
+  background: var(--warning);
+}
+
+.contextBarDanger .contextBarFill {
+  background: var(--danger);
+}
+
+.contextStats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 400 0.6875rem var(--font-sans);
+  color: var(--text-3);
+}
+
+.contextCost {
+  margin-left: auto;
+  color: var(--text-2);
+}
+
+/* ── Overview content wrapper ── */
+.overviewContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ═══ Deploy Status Bar (Browser tab) ═══ */
+.deployStatusBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--surface-low);
+  font: 500 0.6875rem var(--font-sans);
+  color: var(--text-2);
+  flex: 0 0 auto;
+}
+
+.deployStatusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  flex-shrink: 0;
+}
+
+.deployStatusBar[data-deploy-status='deployed'] .deployStatusDot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 24%, transparent);
+}
+
+.deployStatusBar[data-deploy-status='failed'] .deployStatusDot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+.deployStatusLabel {
+  white-space: nowrap;
+}
+
+.deploySpinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bdr);
+  border-top-color: var(--primary);
+  border-radius: var(--r-full);
+  animation: deploySpin 0.8s linear infinite;
+}
+
+@keyframes deploySpin {
+  to { transform: rotate(360deg); }
+}
+
+.deployUrl {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font: 400 0.6875rem var(--font-mono);
+  margin-left: auto;
+}
