@@ -91,7 +91,7 @@ function toSearchableItems(messages?: ChatMessage[], transcriptBlocks?: Transcri
   if (transcriptBlocks && transcriptBlocks.length > 0) {
     return transcriptBlocks.map((block) => ({
       id: block.id,
-      agentName: block.author.role === 'agent' ? block.author.name : undefined,
+      ...(block.author.role === 'agent' && block.author.name ? { agentName: block.author.name } : {}),
       timestamp: block.createdAt ?? '',
       text: extractTranscriptBlockText(block),
     }));
@@ -99,7 +99,7 @@ function toSearchableItems(messages?: ChatMessage[], transcriptBlocks?: Transcri
   if (messages) {
     return messages.map((msg) => ({
       id: msg.id,
-      agentName: msg.agentName,
+      ...(msg.agentName ? { agentName: msg.agentName } : {}),
       timestamp: msg.timestamp,
       text: extractMessageText(msg),
     }));
