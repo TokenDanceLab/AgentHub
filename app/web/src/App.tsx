@@ -182,6 +182,10 @@ function WebWorkbenchRoot() {
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
         onApprovalDecision={workbench.onApprovalDecision}
         onNavigateToConversation={handleNavigateToConversation}
+        onRegenerate={(blockId) => {
+          const messageId = blockId.replace(/^hub-message-/, '');
+          void createHubClient({ getToken: getAccessToken }).regenerateAgentTask(messageId).catch(() => {});
+        }}
         platform={webPlatform}
         runtimeEvidence={workbench.runtimeEvidence}
         showComposerAgentPicker={false}

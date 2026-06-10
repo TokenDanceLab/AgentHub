@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore, useEffect } from 'react';
+import { useMemo, useSyncExternalStore, useEffect, useState, useCallback, useRef } from 'react';
 import {
   demoWorkbenchAgents,
   getWorkbenchDataModeOverrideSnapshot,
@@ -44,6 +44,8 @@ import { useHubStore } from '@/stores/hubStore';
 import { useDesktopEdgeEvents } from './useDesktopEdgeEvents';
 import { useHubWebSocket } from '@/hooks/useHubWebSocket';
 import { useQueryClient } from '@tanstack/react-query';
+import { fetchHealth } from '@/api/edgeClient';
+import { HEALTH_POLL_MS } from '@/config';
 
 export interface DesktopChatActions {
   sendMessage: (sessionId: string, content: string, contentType?: string) => Promise<unknown>;
@@ -65,6 +67,8 @@ export interface DesktopWorkbenchModel {
   chatActions?: DesktopChatActions;
   dataMode: string;
   isDemo: boolean;
+  /** When isDemo=true, indicates whether Edge API is available and demo uses real data. */
+  edgeDemoData?: boolean;
   projects?: ProjectInfo[];
   projectsStatus?: {
     loading?: boolean;
@@ -83,6 +87,41 @@ export interface DesktopWorkbenchModel {
 const EMPTY_TRANSCRIPT: ReturnType<typeof normalizeThreadItemsToTranscript> = [];
 const DESKTOP_DEMO_DEFAULT_CONVERSATION_ID = 'agent-collab';
 
+/**
+ * Lightweight Edge health check for demo mode.
+ * Polls /v1/health so that demo mode can detect whether Edge is available
+ * and fall through to real API data instead of JS mock objects.
+ */
+function useEdgeAvailableForDemo(enabled: boolean): boolean {
+  const [available, setAvailable] = useState(false);
+  const mountedRef = useRef(true);
+
+  const poll = useCallback(async () => {
+    try {
+      await fetchHealth();
+      if (mountedRef.current) setAvailable(true);
+    } catch {
+      if (mountedRef.current) setAvailable(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    if (!enabled) {
+      setAvailable(false);
+      return;
+    }
+    queueMicrotask(() => { void poll(); });
+    const id = setInterval(poll, HEALTH_POLL_MS);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(id);
+    };
+  }, [enabled, poll]);
+
+  return enabled && available;
+}
+
 export function useDesktopWorkbenchModel(selectedConversationId?: string): DesktopWorkbenchModel {
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
@@ -96,6 +135,11 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
     workbenchDemoRuntimeStore.getSnapshot,
   );
   const useDemo = !isWorkbenchRealDataMode(dataMode);
+  // In demo mode, detect whether Edge is available. If so, use Edge API data
+  // instead of the JS mock store, so the right sidebar gets real evidence.
+  const edgeAvailableForDemo = useEdgeAvailableForDemo(useDemo);
+  // When demo mode + Edge available, load data from Edge API.
+  const useEdgeDemoData = useDemo && edgeAvailableForDemo;
   const hubAuthenticated = useHubStore((state) => state.authenticated);
   const hubReady = !useDemo && hubAuthenticated && Boolean(getAccessToken());
 
@@ -181,8 +225,10 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const unpinMessageMutation = useHubUnpinMessage();
   const markReadMutation = useHubMarkRead();
 
-  const threadsQuery = useThreads(undefined, { enabled: !useDemo });
-  const threads = useDemo ? [] : threadsQuery.data?.items ?? [];
+  // Enable Edge queries in demo mode when Edge is available.
+  const edgeEnabled = !useDemo || useEdgeDemoData;
+  const threadsQuery = useThreads(undefined, { enabled: edgeEnabled });
+  const threads = edgeEnabled ? (threadsQuery.data?.items ?? []) : [];
 
   // Determine whether to use Hub sessions as the primary conversation source.
   // Hub sessions provide IM/social conversations; Edge threads provide execution threads.
@@ -192,24 +238,51 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
   const activeHubSession = useHubConversations
     ? hubSessions.find((s) => s.id === selectedConversationId) ?? hubSessions[0]
     : undefined;
-  const activeThread = useDemo
-    ? undefined
-    : threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0];
+  const activeThread = edgeEnabled
+    ? threads.find((thread) => thread.threadId === selectedConversationId) ?? threads[0]
+    : undefined;
   const activeConversationId = activeHubSession?.id ?? activeThread?.threadId ?? selectedConversationId ?? '';
 
   // Edge thread messages (execution path).
-  const threadItemsQuery = useThreadMessages(useDemo ? null : activeThread?.threadId ?? null);
-  const threadPinsQuery = useThreadPins(useDemo ? null : activeThread?.threadId ?? null);
+  const threadItemsQuery = useThreadMessages(edgeEnabled ? activeThread?.threadId ?? null : null);
+  const threadPinsQuery = useThreadPins(edgeEnabled ? activeThread?.threadId ?? null : null);
   const threadItems = threadItemsQuery.data?.items;
   const threadPins = threadPinsQuery.data?.items;
   const persistedUntilMs = useMemo(() => latestThreadItemTimestampMs(threadItems), [threadItems]);
-  const liveTranscript = useDesktopEdgeEvents(useDemo ? undefined : activeThread?.threadId, persistedUntilMs);
+  const liveTranscript = useDesktopEdgeEvents(edgeEnabled ? activeThread?.threadId : undefined, persistedUntilMs);
 
   // Hub session messages (IM path) — only when a Hub session is active.
   const hubMessagesQuery = useHubMessages(activeHubSession?.id ?? '', { enabled: hubReady && !!activeHubSession?.id });
   const hubMessages = hubMessagesQuery.data ?? [];
 
   const demoModel = useMemo(() => {
+    // When Edge is available in demo mode, use real API data for conversations
+    // and transcript so the right sidebar gets real diffs/artifacts/previews.
+    if (useEdgeDemoData && threads.length > 0) {
+      const edgeConversations = threads.map((thread) =>
+        threadToConversation(
+          thread,
+          thread.threadId === activeThread?.threadId ? threadPins : undefined,
+        ),
+      );
+      const selectedDemoConversation = edgeConversations.some((c) => c.id === selectedConversationId)
+        ? selectedConversationId!
+        : edgeConversations[0]?.id ?? DESKTOP_DEMO_DEFAULT_CONVERSATION_ID;
+      // Use the already-fetched threadItems from the active thread query.
+      const items = threadItems ?? [];
+      const edgeTranscript = normalizeThreadItemsToTranscript(items);
+      return {
+        activeConversationId: selectedDemoConversation,
+        agents: demoWorkbenchAgents,
+        conversations: edgeConversations,
+        dataMode: 'demo+edge' as string,
+        edgeDemoData: true as const,
+        isDemo: true,
+        transcript: edgeTranscript.length > 0 ? edgeTranscript : EMPTY_TRANSCRIPT,
+        agentActivity,
+      };
+    }
+    // Fallback: JS mock store when Edge is unavailable.
     const selectedDemoConversation = demoSnapshot.conversations.some((conversation) => conversation.id === selectedConversationId)
       ? selectedConversationId!
       : DESKTOP_DEMO_DEFAULT_CONVERSATION_ID;
@@ -223,7 +296,7 @@ export function useDesktopWorkbenchModel(selectedConversationId?: string): Deskt
       transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedDemoConversation),
       agentActivity,
     };
-  }, [dataMode, demoSnapshot, selectedConversationId]);
+  }, [dataMode, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread?.threadId, threadPins, threadItems, agentActivity]);
 
   const conversations = useMemo(() => {
     // Merge Hub sessions + Edge threads into a unified conversation list.
