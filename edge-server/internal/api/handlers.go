@@ -1716,6 +1716,74 @@ func (h *Handler) GetCCSwitchProviders(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------------------
+// GET/POST /v1/memory — read/write AgentHub memory files
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetMemory(w http.ResponseWriter, r *http.Request) {
+	workDir := r.URL.Query().Get("workDir")
+	threadID := r.URL.Query().Get("threadId")
+	agentID := r.URL.Query().Get("agentId")
+
+	if err := h.validateWorkDirAllowed(workDir); err != nil {
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		return
+	}
+
+	result := runnerctx.ReadMemory(workDir, threadID, agentID)
+	writeSuccess(w, http.StatusOK, result)
+}
+
+func (h *Handler) PostMemory(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		WorkDir   string   `json:"workDir"`
+		ThreadID  string   `json:"threadId"`
+		AgentID   string   `json:"agentId"`
+		ID        string   `json:"id"`
+		Content   string   `json:"content"`
+		Source    string   `json:"source"`
+		Tags      []string `json:"tags"`
+		Overwrite bool     `json:"overwrite"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	if req.WorkDir == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("workDir is required")))
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("content is required")))
+		return
+	}
+	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		return
+	}
+	if req.ID == "" {
+		req.ID = genID("mem_")
+	}
+
+	entry, err := runnerctx.WriteMemoryEntry(runnerctx.MemoryWriteRequest{
+		WorkDir:   req.WorkDir,
+		ThreadID:  req.ThreadID,
+		AgentID:   req.AgentID,
+		Entry: runnerctx.MemoryEntry{
+			ID:      req.ID,
+			Content: req.Content,
+			Source:  req.Source,
+			Tags:    req.Tags,
+		},
+		Overwrite: req.Overwrite,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage(err.Error())))
+		return
+	}
+	writeSuccess(w, http.StatusCreated, entry)
+}
+
+// ---------------------------------------------------------------------------
 // RegisterRoutes registers all routes on the given mux.
 // ---------------------------------------------------------------------------
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -1973,4 +2041,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// cc-switch integration
 	mux.HandleFunc("/v1/ccswitch/status", h.GetCCSwitchStatus)
 	mux.HandleFunc("/v1/ccswitch/providers", h.GetCCSwitchProviders)
+	// Memory
+	mux.HandleFunc("/v1/memory", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetMemory(w, r)
+		case http.MethodPost:
+			h.PostMemory(w, r)
+		default:
+			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		}
+	})
 }
