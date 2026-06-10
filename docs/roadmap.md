@@ -1,8 +1,10 @@
 # AgentHub 全链路数据对接路线图
 
 > 最后更新：2026-06-10
+> ⚠️ **本文是架构参考 + 数据流基线 + gap 清单，不再承载功能 Roadmap。**
+> 功能收口 Roadmap 已拆分为：[docs/roadmap/README.md](roadmap/README.md)
 > 本文档只写路线、优先级和边界。当前分支状态和任务调度写在 `STATE.md`。
-> 验收标准：发布 Release，完成全部真实数据流打通。非必要不碰 UI 层，UI 作为需求文档。
+> 验收标准：发布 Release，完成全部真实数据流打通。
 
 ---
 
