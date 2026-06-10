@@ -163,7 +163,7 @@ export function GlobalRail({
         anchorRef={avatarRef}
         avatar={userAvatarUrl ? '' : displayInitial}
         avatarColor="var(--primary)"
-        avatarUrl={userAvatarUrl}
+        {...(userAvatarUrl ? { avatarUrl: userAvatarUrl } : {})}
         badge="当前用户"
         isOpen={profileOpen}
         name={displayName}
