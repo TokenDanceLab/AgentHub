@@ -274,28 +274,29 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 	}
 	memberIDs = unique
 
+	// Batch check active membership instead of N individual queries (fixes N+1 N3).
+	activeMap, err := repository.AreMembersActive(s.db, sessionID, model.MemberTypeUser, memberIDs)
+	if err != nil {
+		return err
+	}
 	for _, mid := range memberIDs {
-		active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, mid)
-		if err != nil {
-			return err
-		}
-		if active {
+		if activeMap[mid] {
 			return errcode.GroupAlreadyMember
 		}
 	}
 
+	// Batch check soft-deleted membership instead of N individual queries (fixes N+1 N3).
+	softDeletedMap, err := repository.AreMembersSoftDeleted(s.db, sessionID, model.MemberTypeUser, memberIDs)
+	if err != nil {
+		return err
+	}
+
+	var toReactivate []string
 	members := make([]*model.SessionMember, 0, len(memberIDs))
 	joinedMembers := make([]*model.SessionMember, 0, len(memberIDs))
 	for _, mid := range memberIDs {
-		// Reactivate soft-deleted members instead of creating duplicates.
-		softDeleted, err := repository.IsMemberSoftDeleted(s.db, sessionID, model.MemberTypeUser, mid)
-		if err != nil {
-			return err
-		}
-		if softDeleted {
-			if err := repository.ReactivateMember(s.db, sessionID, model.MemberTypeUser, mid, model.MemberRoleMember); err != nil {
-				return err
-			}
+		if softDeletedMap[mid] {
+			toReactivate = append(toReactivate, mid)
 			joinedMembers = append(joinedMembers, &model.SessionMember{
 				SessionID: sessionID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
 			})
@@ -306,6 +307,13 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 		}
 		members = append(members, member)
 		joinedMembers = append(joinedMembers, member)
+	}
+
+	// Batch reactivate soft-deleted members in a single query.
+	if len(toReactivate) > 0 {
+		if err := repository.BatchReactivateMembers(s.db, sessionID, model.MemberTypeUser, toReactivate, model.MemberRoleMember); err != nil {
+			return err
+		}
 	}
 	if len(members) > 0 {
 		if err := repository.BatchCreateMembers(s.db, members); err != nil {

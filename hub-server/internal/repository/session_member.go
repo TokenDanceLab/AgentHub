@@ -135,3 +135,69 @@ func IsMemberSoftDeleted(db *gorm.DB, sessionID, memberType, memberID string) (b
 			sessionID, memberType, memberID).Count(&count).Error
 	return count > 0, err
 }
+
+// AreMembersActive returns a map of memberID -> isActive for the given member
+// IDs. Uses a single query instead of N individual IsMemberActive calls
+// (fixes N+1 pattern N3).
+func AreMembersActive(db *gorm.DB, sessionID, memberType string, memberIDs []string) (map[string]bool, error) {
+	if len(memberIDs) == 0 {
+		return map[string]bool{}, nil
+	}
+	var members []model.SessionMember
+	err := db.Where("session_id = ? AND member_type = ? AND member_id IN ? AND left_at IS NULL",
+		sessionID, memberType, memberIDs).
+		Select("member_id").
+		Find(&members).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]bool, len(memberIDs))
+	for _, m := range members {
+		result[m.MemberID] = true
+	}
+	return result, nil
+}
+
+// AreMembersSoftDeleted returns a map of memberID -> isSoftDeleted for the
+// given member IDs. Uses a single query instead of N individual
+// IsMemberSoftDeleted calls (fixes N+1 pattern N3).
+func AreMembersSoftDeleted(db *gorm.DB, sessionID, memberType string, memberIDs []string) (map[string]bool, error) {
+	if len(memberIDs) == 0 {
+		return map[string]bool{}, nil
+	}
+	var members []model.SessionMember
+	err := db.Where("session_id = ? AND member_type = ? AND member_id IN ? AND left_at IS NOT NULL",
+		sessionID, memberType, memberIDs).
+		Select("member_id").
+		Find(&members).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]bool, len(memberIDs))
+	for _, m := range members {
+		result[m.MemberID] = true
+	}
+	return result, nil
+}
+
+// BatchReactivateMembers clears left_at for all soft-deleted members in a
+// single UPDATE query instead of N individual ReactivateMember calls
+// (fixes N+1 pattern N3).
+func BatchReactivateMembers(db *gorm.DB, sessionID, memberType string, memberIDs []string, role string) error {
+	if len(memberIDs) == 0 {
+		return nil
+	}
+	now := time.Now()
+	result := db.Model(&model.SessionMember{}).
+		Where("session_id = ? AND member_type = ? AND member_id IN ? AND left_at IS NOT NULL",
+			sessionID, memberType, memberIDs).
+		Updates(map[string]interface{}{
+			"left_at":   nil,
+			"role":      role,
+			"joined_at": now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}

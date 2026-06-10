@@ -12,6 +12,8 @@ var (
 	HTTPDuration      *prometheus.HistogramVec
 	WSConnections     prometheus.Gauge
 	WSDroppedFrames   prometheus.Counter
+	WSRateLimitedMsgs prometheus.Counter
+	WSKickedConns     prometheus.Counter
 	DBPoolInUse       prometheus.Gauge
 	RedisPoolHits     prometheus.Gauge
 	EventBusQueueLen  prometheus.Gauge
@@ -53,6 +55,20 @@ func Register() {
 			},
 		)
 
+		WSRateLimitedMsgs = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_rate_limited_messages_total",
+				Help: "Total number of WebSocket messages dropped due to per-connection rate limiting.",
+			},
+		)
+
+		WSKickedConns = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_kicked_connections_total",
+				Help: "Total number of WebSocket connections kicked due to per-user concurrent connection limit.",
+			},
+		)
+
 		DBPoolInUse = prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "db_pool_in_use",
@@ -85,6 +101,8 @@ func Register() {
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
 		prometheus.MustRegister(WSDroppedFrames)
+		prometheus.MustRegister(WSRateLimitedMsgs)
+		prometheus.MustRegister(WSKickedConns)
 		prometheus.MustRegister(DBPoolInUse)
 		prometheus.MustRegister(RedisPoolHits)
 		prometheus.MustRegister(EventBusQueueLen)
