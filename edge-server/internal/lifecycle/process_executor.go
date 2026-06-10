@@ -1270,11 +1270,21 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		emitter = e.decisionLoopFactory.Wrap(stdin, emitter, run)
 	}
 
-	// Wrap emitter with security hooks (PreToolUse / PostToolUse).
+	// Build the security hook chain. The tool allowlist hook runs first (before
+	// the security hook) so that allowlist-rejected tools are blocked before any
+	// dangerous-pattern analysis. When AllowedTools is empty, the allowlist hook
+	// is a no-op and is not added to the chain.
+	//
 	// This is the unified security layer: all three adapters (Claude Code,
 	// Codex, OpenCode) are covered at the ProcessExecutor level, regardless
 	// of whether they use NDJSONStreamParser or emit events directly.
-	emitter = adapters.NewSecureEmitter(ctx, emitter, adapters.HookChain{adapters.NewSecurityHook()})
+	hooks := adapters.HookChain{adapters.NewSecurityHook()}
+	if rc, ok := adapters.RunProcessContextFromContext(ctx); ok && len(rc.AllowedTools) > 0 {
+		allowlistHook := adapters.NewToolAllowlistHook(rc.AllowedTools, emitter, scope)
+		// Prepend: allowlist check runs before security classification
+		hooks = adapters.HookChain{allowlistHook, adapters.NewSecurityHook()}
+	}
+	emitter = adapters.NewSecureEmitter(ctx, emitter, hooks)
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
