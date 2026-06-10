@@ -29,8 +29,10 @@ DDL 已过，40+ 竞品冻结。开发竞速结束。现在决定排名的不是
 |---|---|---|
 | GuqierMcl 的 timeline-projection | 先展示 RunEvent replay（刷新不丢数据），再展示我们 Go 后端架构深度是他们 TS 做不到的 | [01 #3](01-pipeline.md) |
 | Queena 的 StepCard | 用 RunStepGroupTranscriptBlock（已定义）+ 轻 UI 展示同等能力，同时强调我们的 block 类型比他们多 3 倍 | [02 #5](02-light-ui.md) |
-| DDJH44 的完整 IM | 展示 AgentTeam 22 端点全链路——IM 基础功能我们后端已经覆盖，只是前端没露完 | [00 state](00-state.md) |
+| DDJH44 的完整 IM | 展示 AgentTeam 22 端点全链路——IM 基础功能我们后端已经覆盖，只是前端没露完。补消息回复/引用/图片附件/重新生成 [02 #9-13](02-light-ui.md) | [00 state](00-state.md) |
 | SeiyunSky 的 7 视频 | 录 3-5 支视频（三端/三Runtime/审批/Diff/产物预览）。代码量碾压 + 视频补齐 = 全面压制 | 录屏（需你操作） |
+| doloveplayer 的 DAG 编排 + 三级降级 | 新增失败降级 [01 #8](01-pipeline.md) + Plan 确认门 [01 #10](01-pipeline.md) + Pipeline 模式 [01 #11](01-pipeline.md)——与其学 DAG 引擎，不如补比赛硬要求的失败恢复 | [01-pipeline](01-pipeline.md) #8-12 |
+| Queena 的 Plan 审批 + 同级上下文 | Plan 确认门 [01 #10](01-pipeline.md) + 同级上下文 [01 #9](01-pipeline.md)——他们最值得学的就是"Plan 停一下让用户确认"和"每个 worker 知道其他人在干什么" | [01-pipeline](01-pipeline.md) #8-11 |
 
 ---
 

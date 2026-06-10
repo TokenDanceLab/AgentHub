@@ -40,13 +40,6 @@ type PendingPlan struct {
 	Status    string         `json:"status"`          // "pending", "approved", "rejected", "expired"
 }
 
-// PlanTask describes a single task within a proposed plan.
-type PlanTask struct {
-	AgentID   string   `json:"agentId"`
-	Task      string   `json:"task"`
-	DependsOn []string `json:"dependsOn,omitempty"`
-}
-
 // PlanDecision is the user's decision on a proposed plan.
 type PlanDecision struct {
 	Approved bool   `json:"approved"`
