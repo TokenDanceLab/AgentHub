@@ -59,3 +59,43 @@
 | [06 Orchestrator](06-orchestrator-enhancement.md) | 失败降级 · Plan 确认门 |
 | [07 bytedance 对照](07-bytedance-gaps.md) | 比赛课题逐条对照 |
 | [08 已完成归档](08-completed.md) | ✅ 全部 Wave 1-3 已完成项 |
+
+---
+
+## 4. 竞品动态（2026-06-10 最终拉取）
+
+> 50+ 仓库已全部拉取。DDL 已过，竞品格局固化。
+
+| 竞品 | 今日变更 | 方向 | 威胁变化 |
+|---|---|---|---|
+| **doloveplayer** | +3479/-196（29 文件） | 🔴 **Turn 系统**：TurnManager 367 行、TurnBoundary UI、VersionSwitcher、UndoPlaceholder——和我们刚完成的 W1-1 完全对标 | ⬆️ 唯一还在做深度工程的 |
+| **metrogg** | +872/-115（19 文件） | Tauri Desktop 248 行、timeline-event-writer 82 行、room 投影测试 | → Desktop 变扎实了 |
+| **yjzhang2003/bytesing** | +1508/-99（41 文件） | Electron 桌面 auth IPC 110 行、local-services 123 行、UI styles 275 行、v0.1.0 tag | → Desktop 完整度提升 |
+| **TreeX-X** | +2078/-1950（53 文件） | Orchestrator playbook 大修：auto-routing 291 行、workflow-state schema、ANALYSIS.md | → 参考线，非直接竞品 |
+| **jk-z-z-z** | +2758/-896（41 文件） | 6 个 AI 协作 skills、产品/技术文档、dev rules/spec | → 文档收口 |
+
+**已冻结**：GuqierMcl（仅版本号）、Queena1021、DDJH44（仅 logo 改名）、SeiyunSky、MasterOfAgents、Shallow-W、Toufumind、LancherM、Evan0571、IAyousa 等 40+
+
+### 关键判断
+
+1. **开发窗口彻底关闭**。除了 doloveplayer 的 Turn 系统，所有竞品今天都在做文档/清理/版本号，没有任何新功能。
+2. **doloveplayer 的 Turn 系统**直接对标我们刚完成的 W1-1（消息回复/引用/重新生成）。他们用了 367 行 TurnManager + TurnBoundary UI + VersionSwitcher，工程量大。但我们的实现是 60 分钟轻 UI 接线——说明 Hub message API 基础好。
+3. **metrogg 的 Desktop 在追**，248 行 Tauri lib.rs 新增。但我们 72 Rust 文件 vs 他们 ~10 文件——差距仍然巨大。
+4. **bytedance.md 对照**：所有非 P2 的需求已进入 01-06 子文档。07 已全部归口。剩余缺失：① 对话式创建 Agent（下版本）② P2 部署/版本历史（下版本）③ 演示视频（需你操作）。
+
+## 5. 建议
+
+### 现在该做什么
+
+剩余 4 项全是**验证 + 收口**，不是新功能：
+
+- **W0-1/2/3**：E2E 冒烟 + @Agent 真实 CC + OIDC 登录。这 3 项必须你操作（跑 PS1 脚本、浏览器完成 PKCE、打真实 CLI）。
+- **W1-8**：Orchestrator 增强代码已写好（4 Go 文件），Sonnet agent 正在跑 Edge 验证。通过后关闭。
+- **W3-3**：Release gate 脚本。代码就绪后 agent 可以跑，但真实 API smoke 需要你配合。
+- **W3-4**：录 3-5 支视频 + 5-7 张截图。SeiyunSky 有 7 支视频碾压我们——这个差距需要你补。
+
+### 不建议再做的
+
+- ❌ 不要再加新功能。38/42 项 P0 已完成，剩下的全是验证。
+- ❌ 不要再改 UI。右侧栏 13/13 格式、StepCard、streaming bar 都已完成。
+- ❌ 不要再审计竞品。窗口关了，doloveplayer 的 Turn 系统是唯一值得看的，已经记录了。
