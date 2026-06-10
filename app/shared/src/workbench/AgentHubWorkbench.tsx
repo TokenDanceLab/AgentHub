@@ -25,7 +25,7 @@ import {
   type ContextMenuItem,
   type MultiSelectBarAction,
 } from './floating';
-import { GlobalRail, type GlobalRailPage } from './GlobalRail';
+import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
 import type { EvidenceRef } from '../transcript';
@@ -181,6 +181,12 @@ export interface AgentHubWorkbenchProps {
   mcpMarketItems?: MCPMarketItem[] | undefined;
   /** Whether MCP Server market data is loading. */
   mcpMarketLoading?: boolean | undefined;
+  /** Block ID to highlight (e.g. from a search result click). Cleared after 3 s animation. */
+  highlightedBlockId?: string | undefined;
+  /** Called when the highlight animation ends. */
+  onHighlightEnd?: (() => void) | undefined;
+  /** WebSocket connection status for the rail indicator dot. */
+  connectionStatus?: ConnectionStatusKind | undefined;
 }
 
 export function AgentHubWorkbench({
@@ -222,6 +228,8 @@ export function AgentHubWorkbench({
   skillMarketLoading,
   mcpMarketItems,
   mcpMarketLoading,
+  highlightedBlockId,
+  onHighlightEnd,
 }: AgentHubWorkbenchProps): React.ReactElement {
   // Create settings service if platform provides a settings port
   const settingsService = useMemo<SettingsService | null>(
@@ -1038,12 +1046,36 @@ export function AgentHubWorkbench({
 
   function runContextAction(action: string, blockId: string): void {
     const title = blockTitleById(blockId);
+    const block = transcript.find((item) => item.id === blockId);
     if (action === 'copy') copyText(title);
     if (action === 'link') copyText(`agenthub://card/${blockId}`);
     if (action === 'delete') {
       setSoftHiddenBlockIds((current) => (
         current.includes(blockId) ? current : [...current, blockId]
       ));
+    }
+    if (action === 'reply' && block) {
+      dispatchComposer({
+        type: 'setReplyTo',
+        replyTo: {
+          messageId: blockId,
+          author: block.author.name,
+          preview: title,
+        },
+      });
+      window.setTimeout(() => composerInputRef.current?.focus(), 0);
+    }
+    if (action === 'quote' && block && block.kind === 'text') {
+      const selectedText = window.getSelection()?.toString().trim();
+      const quoteText = selectedText || block.text.slice(0, 80);
+      const quoted = `> ${quoteText.split('\n').join('\n> ')}\n\n`;
+      dispatchComposer({ type: 'setText', text: quoted });
+      window.setTimeout(() => composerInputRef.current?.focus(), 0);
+    }
+    if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
+      // For regenerate, we signal via a toast — actual API call is up to the platform layer
+      showWorkbenchToast(`正在重新生成: ${title}`);
+      return;
     }
     pulseBlock(blockId);
     showWorkbenchToast(cardActionLabel(action, title));
@@ -1087,11 +1119,15 @@ export function AgentHubWorkbench({
   }
 
   function contextMenuGroups(blockId: string): Array<Array<ContextMenuItem>> {
+    const block = transcript.find((item) => item.id === blockId);
+    const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
+    const isTextBlock = block?.kind === 'text';
     return [
       [
         { label: '复制', icon: 'fileText', shortcut: 'Ctrl C', onClick: () => runContextAction('copy', blockId) },
         { label: '表情回复', icon: 'star', chevron: true, onClick: () => runContextAction('react', blockId) },
         { label: '回复', icon: 'notes', onClick: () => runContextAction('reply', blockId) },
+        ...(isTextBlock ? [{ label: '引用', icon: 'copy' as const, onClick: () => runContextAction('quote', blockId) }] : []),
         { label: '转发', icon: 'external', onClick: () => runContextAction('forward', blockId) },
       ],
       [
@@ -1102,6 +1138,7 @@ export function AgentHubWorkbench({
         { label: '翻译', icon: 'library', onClick: () => runContextAction('translate', blockId) },
       ],
       [
+        ...(isAgentText ? [{ label: '重新生成', icon: 'refresh' as const, onClick: () => runContextAction('regenerate', blockId) }] : []),
         { label: '添加任务', icon: 'running', onClick: () => runContextAction('task', blockId) },
         { label: '导出到文档', icon: 'download', onClick: () => runContextAction('export', blockId) },
         { label: '快捷应用', icon: 'tools', chevron: true, onClick: () => runContextAction('apps', blockId) },
@@ -1222,11 +1259,13 @@ export function AgentHubWorkbench({
             <TranscriptView
               actionedBlockIds={actionedBlockIds}
               contextBlockId={contextMenu?.blockId}
+              highlightedBlockId={highlightedBlockId}
               onBlockContextMenu={openBlockContextMenu}
               onBlockPointerDown={beginBlockHoldSelection}
               onBlockPointerMove={(_block, event) => updateBlockHoldSelection(event)}
               onBlockPointerUp={handleBlockPointerUp}
               onBlockSelect={handleBlockSelect}
+              onHighlightEnd={onHighlightEnd}
               onAgentProfileOpen={openAgentProfile}
               onApprovalDecision={(action) => {
                 void onApprovalDecision?.(action);

@@ -1,0 +1,164 @@
+.imageWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 320px;
+}
+
+.imageThumb {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  display: block;
+  max-width: 280px;
+  transition:
+    box-shadow var(--dur-normal) var(--ease),
+    transform var(--dur-normal) var(--ease);
+}
+
+.imageThumb:hover {
+  box-shadow: var(--e-2);
+  transform: scale(1.02);
+}
+
+.imageThumb:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.imageImg {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: var(--r-md);
+  object-fit: cover;
+}
+
+/* ── Lightbox ── */
+
+.lightbox {
+  position: fixed;
+  z-index: 9999;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  animation: lightboxIn 200ms ease forwards;
+}
+
+@keyframes lightboxIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.lightboxImg {
+  max-width: min(92vw, 960px);
+  max-height: min(88vh, 720px);
+  border-radius: var(--r-lg);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.36);
+  object-fit: contain;
+  cursor: default;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--dur-normal) var(--ease);
+}
+
+.lightboxClose:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ── File card ── */
+
+.fileCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 320px;
+  padding: 10px 12px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition:
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.fileCard:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+.fileIcon {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fileCopy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fileName {
+  font: 500 0.8125rem var(--font-sans);
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  font: 400 0.6875rem var(--font-sans);
+  color: var(--text-3);
+}
+
+.fileDownload {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  transition:
+    background var(--dur-normal) var(--ease),
+    color var(--dur-normal) var(--ease);
+}
+
+.fileDownload:hover {
+  background: var(--surface-high);
+  color: var(--primary);
+}

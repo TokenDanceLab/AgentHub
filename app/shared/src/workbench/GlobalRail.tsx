@@ -29,6 +29,8 @@ const topNavItems: NavItem[] = [
   { id: 'projects', label: '项目', icon: 'railProjects' },
 ];
 
+export type ConnectionStatusKind = 'connected' | 'connecting' | 'disconnected';
+
 export interface GlobalRailProps {
   /** Controlled active page. When omitted, the rail manages its own state starting at 'chat'. */
   activePage?: GlobalRailPage;
@@ -39,6 +41,8 @@ export interface GlobalRailProps {
   /** User profile data for the current user. */
   userDisplayName?: string | undefined;
   userAvatarUrl?: string | undefined;
+  /** WebSocket connection status shown as a colored dot in the rail footer. */
+  connectionStatus?: ConnectionStatusKind | undefined;
 }
 
 export function GlobalRail({
@@ -48,6 +52,7 @@ export function GlobalRail({
   onToggleTheme,
   userDisplayName,
   userAvatarUrl,
+  connectionStatus,
 }: GlobalRailProps): React.ReactElement {
   const [internalPage, setInternalPage] = useState<GlobalRailPage>('chat');
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -148,6 +153,15 @@ export function GlobalRail({
         <DesignNavIcon name="sun" size={18} />
       </button>
 
+      {connectionStatus && (
+        <span
+          aria-label={`WebSocket ${connectionStatusLabel(connectionStatus)}`}
+          className={styles.connectionDot}
+          data-status={connectionStatus}
+          title={`WebSocket ${connectionStatusLabel(connectionStatus)}`}
+        />
+      )}
+
       <ProfilePopover
         accountMenu={[
           { label: '我的个人名片' },
@@ -196,5 +210,18 @@ function profileActionLabel(action: string): string {
       return '已打开设置';
     default:
       return action;
+  }
+}
+
+function connectionStatusLabel(status: ConnectionStatusKind): string {
+  switch (status) {
+    case 'connected':
+      return '已连接';
+    case 'connecting':
+      return '连接中';
+    case 'disconnected':
+      return '已断开';
+    default:
+      return status;
   }
 }
