@@ -127,7 +127,7 @@ func (a *OpenAISDKAdapter) CapabilityHealthMetadata() map[string]any {
 func (a *OpenAISDKAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	workDir := ctx.WorkDir
 	if workDir == "" {
-		workDir = "."
+		workDir = DefaultWorkDir()
 	}
 	cmd, args := sdkNoopCommand()
 	return cmd, args, nil, workDir

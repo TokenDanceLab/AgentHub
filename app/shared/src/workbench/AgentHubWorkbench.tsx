@@ -205,6 +205,8 @@ export interface AgentHubWorkbenchProps {
   /** Current user profile info, shown in GlobalRail avatar and profile popover. */
   userDisplayName?: string | undefined;
   userAvatarUrl?: string | undefined;
+  /** Current user's Hub ID, used to distinguish "my" messages/tasks from others. */
+  currentUserId?: string | undefined;
   /** Public Skill market items from Hub API. */
   skillMarketItems?: SkillMarketItem[] | undefined;
   /** Whether Skill market data is loading. */
@@ -263,6 +265,7 @@ export function AgentHubWorkbench({
   transcript,
   userDisplayName,
   userAvatarUrl,
+  currentUserId,
   skillMarketItems,
   skillMarketLoading,
   mcpMarketItems,
@@ -390,6 +393,16 @@ export function AgentHubWorkbench({
     for (let i = transcript.length - 1; i >= 0; i--) {
       const block = transcript[i]!;
       if (block.kind === 'preview' && block.url) return block.url;
+    }
+    return undefined;
+  }, [transcript]);
+
+  const inspectorRunResult = useMemo(() => {
+    for (let i = transcript.length - 1; i >= 0; i--) {
+      const block = transcript[i]!;
+      if (block.kind === 'result') return { success: block.success, summary: block.summary, duration: block.duration };
+      if (block.kind === 'finished') return { success: true, summary: block.title, duration: block.duration };
+      if (block.kind === 'failure') return { success: false, summary: block.reason ?? block.title };
     }
     return undefined;
   }, [transcript]);
@@ -1547,6 +1560,8 @@ export function AgentHubWorkbench({
               mcpMarketItems={mcpMarketItems}
               mcpMarketLoading={mcpMarketLoading}
               onNavigatePage={setActivePage}
+              currentUserId={currentUserId}
+              userDisplayName={userDisplayName}
             />
           </section>
         )}
@@ -1567,6 +1582,7 @@ export function AgentHubWorkbench({
           reviewFileRequest={reviewFileRequest}
           routeBlocks={inspectorRouteBlocks}
           runtimeEvidence={runtimeEvidence}
+          runResult={inspectorRunResult}
           workDir={composer.workDir?.trim() || undefined}
           onResizeBy={resizeInspectorBy}
           onResizeStart={beginInspectorResize}

@@ -201,13 +201,14 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 	if err != nil {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
-	slog.Debug("oidc.jwt.validated", "sub", claims.Subject)
+	slog.Debug("oidc.jwt.validated", "sub", claims.Subject, "name", claims.Name, "email", claims.Email)
 	if claims.Subject == "" {
 		return nil, errcode.OIDCSubNotFound
 	}
 
-	// 4. Find or create Hub user by TokenDance sub
-	user, err := repository.FindOrCreateByTokenDanceSub(s.db, claims.Subject)
+	// 4. Find or create Hub user by TokenDance sub, with profile from ID token
+	slog.Debug("oidc.user.find_or_create", "sub", claims.Subject, "name", claims.Name, "picture_len", len(claims.Picture))
+	user, err := repository.FindOrCreateByTokenDanceSub(s.db, claims.Subject, claims.Name, claims.Picture)
 	if err != nil {
 		return nil, fmt.Errorf("find or create user by sub: %w", err)
 	}

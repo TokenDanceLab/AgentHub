@@ -160,7 +160,7 @@ export function resolveWebWorkbenchConversations(
   hubAuthenticated: boolean,
   dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
 ): WorkbenchConversation[] {
-  if (!hubAuthenticated) return isWorkbenchRealDataMode(dataMode) ? [webHubEmptyConversation] : webConversations;
+  if (!hubAuthenticated) return [webHubEmptyConversation];
 
   const mapped = sessions
     ?.map(hubSessionToWorkbenchConversation)

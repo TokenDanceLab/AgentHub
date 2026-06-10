@@ -138,7 +138,7 @@ func (a *RuntimeManifestAdapter) CapabilityHealthMetadata() map[string]any {
 func (a *RuntimeManifestAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	workDir := ctx.WorkDir
 	if workDir == "" {
-		workDir = "."
+		workDir = DefaultWorkDir()
 	}
 	if a.manifest.Fixture.Type == runtimeManifestFixtureFile {
 		cmdPath, args := runtimeManifestFixtureReplayCommand()

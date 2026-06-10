@@ -13,7 +13,6 @@ import type { WorkbenchContactsData } from './WorkbenchRoutes';
 import type { DocRow } from './pages/DocsPage';
 import type { WorkbenchConversation } from '../platform';
 import {
-  isWorkbenchRealDataMode,
   isWorkbenchFixtureDataMode,
   type WorkbenchDataMode,
 } from '../demo';
@@ -64,7 +63,7 @@ export function resolveHubContacts(
   dataMode: WorkbenchDataMode,
 ): WorkbenchContactsData | undefined {
   if (!hubReady) {
-    return isWorkbenchRealDataMode(dataMode) ? hubEmptyContacts : undefined;
+    return hubEmptyContacts;
   }
   const members = contacts?.map(contactInfoToMember) ?? [];
   return {
