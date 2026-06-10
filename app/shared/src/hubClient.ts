@@ -311,6 +311,62 @@ export interface HubMCPServer {
   [key: string]: unknown;
 }
 
+export interface HubWorkspaceProject {
+  id: string;
+  name: string;
+  description?: string;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HubWorkspaceProjectListResponse {
+  items: HubWorkspaceProject[];
+  page: HubPageInfo;
+}
+
+export interface HubCreateWorkspaceProjectRequest {
+  name: string;
+  description?: string;
+}
+
+export type HubUpdateWorkspaceProjectRequest = Partial<HubCreateWorkspaceProjectRequest>;
+
+export interface HubWorkspaceProjectThread {
+  id: string;
+  project_id: string;
+  type?: string;
+  name: string;
+  owner_user_id?: string;
+  role?: string;
+  member_count: number;
+  last_message_at?: string;
+  created_at: string;
+}
+
+export interface HubCreateWorkspaceProjectThreadRequest {
+  name: string;
+}
+
+export interface HubSendWorkspaceProjectThreadMessageRequest {
+  client_msg_id: string;
+  content_type: string;
+  content: string;
+}
+
+export interface HubWorkspaceProjectThreadMessage {
+  id: string;
+  project_id: string;
+  thread_id: string;
+  seq_id: number;
+  client_msg_id: string;
+  sender_type: string;
+  sender_id: string;
+  content_type: string;
+  content: string;
+  created_at: string;
+}
+
 export type HubAgentTaskStatus =
   | 'queued'
   | 'dispatched'
@@ -1150,6 +1206,49 @@ export function createHubClient(opts: HubClientOptions = {}) {
     }) =>
       request<HubListResponse<HubMCPServer>>(
         `/web/mcp-servers${qs({ is_public: 'true', ...params ?? {} })}`,
+      ),
+
+    // ── Workspace Projects ──────────────────────────────────────────
+    listWorkspaceProjects: (params?: { pageSize?: number; pageCursor?: string; q?: string }) =>
+      request<HubWorkspaceProjectListResponse>(`/web/projects${qs(params ?? {})}`),
+    getWorkspaceProject: (id: string) =>
+      request<HubWorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`),
+    createWorkspaceProject: (data: HubCreateWorkspaceProjectRequest) =>
+      request<HubWorkspaceProject>('/web/projects', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateWorkspaceProject: (id: string, data: HubUpdateWorkspaceProjectRequest) =>
+      request<HubWorkspaceProject>(`/web/projects/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    listWorkspaceProjectThreads: (projectId: string) =>
+      request<HubWorkspaceProjectThread[]>(`/web/projects/${encodeURIComponent(projectId)}/threads`),
+    createWorkspaceProjectThread: (projectId: string, data: HubCreateWorkspaceProjectThreadRequest) =>
+      request<HubWorkspaceProjectThread>(`/web/projects/${encodeURIComponent(projectId)}/threads`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    listWorkspaceProjectThreadMessages: (
+      projectId: string,
+      threadId: string,
+      params?: { limit?: number },
+    ) =>
+      request<HubWorkspaceProjectThreadMessage[]>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages${qs(params ?? {})}`,
+      ),
+    sendWorkspaceProjectThreadMessage: (
+      projectId: string,
+      threadId: string,
+      data: HubSendWorkspaceProjectThreadMessageRequest,
+    ) =>
+      request<HubWorkspaceProjectThreadMessage>(
+        `/web/projects/${encodeURIComponent(projectId)}/threads/${encodeURIComponent(threadId)}/messages`,
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
       ),
   };
 }
