@@ -475,6 +475,7 @@ func TestTaskEventSummaryAliasReturnsRuntimeSummary(t *testing.T) {
 type mockAgentService struct {
 	triggerTaskFn           func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
 	triggerTaskWithTargetFn func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
+	regenerateAgentTaskFn   func(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error)
 	addAgentFn              func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	cancelTaskFn            func(ctx context.Context, userID, taskID string) error
 	handleAckFn             func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
@@ -497,6 +498,12 @@ func (m *mockAgentService) TriggerAgentTask(ctx context.Context, userID, trigger
 	}
 	if m.triggerTaskFn != nil {
 		return m.triggerTaskFn(ctx, userID, triggerMessageID)
+	}
+	return nil, nil
+}
+func (m *mockAgentService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
+	if m.regenerateAgentTaskFn != nil {
+		return m.regenerateAgentTaskFn(ctx, userID, taskID)
 	}
 	return nil, nil
 }
