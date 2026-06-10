@@ -179,18 +179,31 @@ func DefaultOrchestratorPrompt(availableAgents []string) string {
 		"Analyze the request. Identify parallelizable sub-tasks. Dispatch each to the appropriate agent.\n" +
 		"Aggregate results into a coherent final response. Delegate whenever possible.\n" +
 		"\n" +
+		"## Plan Output Format\n" +
+		"\n" +
 		"When planning complex multi-step tasks, you MUST output your plan as a JSON object with this EXACT structure:\n" +
 		"```json\n" +
 		"{\n" +
 		"  \"plan\": {\n" +
+		"    \"summary\": \"one-line description of the overall plan\",\n" +
 		"    \"mode\": \"parallel\",\n" +
 		"    \"tasks\": [\n" +
 		"      {\n" +
 		"        \"id\": \"task-1\",\n" +
 		"        \"agent\": \"<agent-name>\",\n" +
 		"        \"description\": \"<what to do>\",\n" +
-		"        \"targetFiles\": [\"path/to/file\"],\n" +
 		"        \"dependsOn\": [],\n" +
+		"        \"mode\": \"parallel\",\n" +
+		"        \"targetFiles\": [\"path/to/file\"],\n" +
+		"        \"expectedOutput\": \"<expected result>\"\n" +
+		"      },\n" +
+		"      {\n" +
+		"        \"id\": \"task-2\",\n" +
+		"        \"agent\": \"<agent-name>\",\n" +
+		"        \"description\": \"<what to do>\",\n" +
+		"        \"dependsOn\": [\"task-1\"],\n" +
+		"        \"mode\": \"sequential\",\n" +
+		"        \"targetFiles\": [\"path/to/other\"],\n" +
 		"        \"expectedOutput\": \"<expected result>\"\n" +
 		"      }\n" +
 		"    ]\n" +
@@ -198,15 +211,62 @@ func DefaultOrchestratorPrompt(availableAgents []string) string {
 		"}\n" +
 		"```\n" +
 		"\n" +
-		"Rules for the plan:\n" +
-		"- \"mode\" must be one of: \"parallel\" (independent tasks), \"sequential\" (strict ordering), \"pipeline\" (stage-based).\n" +
+		"## Example\n" +
+		"\n" +
+		"Given the request \"Review the auth module, then implement the login UI, and also write unit tests for both\":\n" +
+		"```json\n" +
+		"{\n" +
+		"  \"plan\": {\n" +
+		"    \"summary\": \"Review auth module, implement login UI, write tests\",\n" +
+		"    \"mode\": \"pipeline\",\n" +
+		"    \"tasks\": [\n" +
+		"      {\n" +
+		"        \"id\": \"task-1\",\n" +
+		"        \"agent\": \"code-reviewer\",\n" +
+		"        \"description\": \"Review code quality of auth module\",\n" +
+		"        \"dependsOn\": [],\n" +
+		"        \"mode\": \"sequential\",\n" +
+		"        \"targetFiles\": [\"src/auth/\"],\n" +
+		"        \"expectedOutput\": \"Code review report with issues\"\n" +
+		"      },\n" +
+		"      {\n" +
+		"        \"id\": \"task-2\",\n" +
+		"        \"agent\": \"frontend-dev\",\n" +
+		"        \"description\": \"Implement login UI component based on review feedback\",\n" +
+		"        \"dependsOn\": [\"task-1\"],\n" +
+		"        \"mode\": \"sequential\",\n" +
+		"        \"targetFiles\": [\"src/components/Login.tsx\"],\n" +
+		"        \"expectedOutput\": \"Working login component\"\n" +
+		"      },\n" +
+		"      {\n" +
+		"        \"id\": \"task-3\",\n" +
+		"        \"agent\": \"test-engineer\",\n" +
+		"        \"description\": \"Write unit tests for auth module and login UI\",\n" +
+		"        \"dependsOn\": [\"task-2\"],\n" +
+		"        \"mode\": \"parallel\",\n" +
+		"        \"targetFiles\": [\"tests/auth.test.ts\", \"tests/login.test.ts\"],\n" +
+		"        \"expectedOutput\": \"Passing test suites\"\n" +
+		"      }\n" +
+		"    ]\n" +
+		"  }\n" +
+		"}\n" +
+		"```\n" +
+		"\n" +
+		"## Field Rules\n" +
+		"\n" +
+		"- \"summary\": a one-line human-readable description of the overall plan.\n" +
+		"- \"mode\" (plan-level): one of \"parallel\" (independent tasks), \"sequential\" (strict ordering), \"pipeline\" (stage-based).\n" +
+		"- \"mode\" (task-level): \"parallel\" (can run concurrently with siblings at same depth) or \"sequential\" (must wait for siblings).\n" +
 		"- Each task MUST have a unique \"id\" (e.g. \"task-1\", \"task-2\").\n" +
 		"- \"agent\" must be one of: " + agentList + ".\n" +
 		"- \"dependsOn\" is an array of task IDs that must complete before this task starts. Use [] for tasks with no dependencies.\n" +
-		"- Tasks with no dependencies in the same batch CAN run in parallel.\n" +
+		"- Tasks with no dependencies and mode \"parallel\" CAN run concurrently.\n" +
 		"- \"targetFiles\" lists files the task will read or modify.\n" +
 		"- \"expectedOutput\" briefly describes what the sub-agent should produce.\n" +
-		"- After outputting the plan, dispatch each task via: {\"action\":\"dispatch\",\"agent\":\"<agent>\",\"task\":\"<description>\",\"subtaskId\":\"<id>\"}\n"
+		"\n" +
+		"## Dispatching\n" +
+		"\n" +
+		"After outputting the plan, dispatch each task via: {\"action\":\"dispatch\",\"agent\":\"<agent>\",\"task\":\"<description>\",\"subtaskId\":\"<id>\"}\n"
 }
 
 // --- dispatch interception ---
