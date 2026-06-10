@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/httpserver"
@@ -61,6 +63,10 @@ type config struct {
 
 	// Event log persistence for crash recovery and replay
 	EventLogPath string // append-only JSON-lines event log path; empty = no persistence
+
+	// MCP Hub sync: periodically fetch MCP server configs from Hub's /web/mcp-servers endpoint
+	HubMCPSyncURL string // Hub URL for MCP config sync; empty = no sync
+	HubMCPSyncInterval string // sync interval (default "5m")
 }
 
 type repeatedString []string
@@ -130,6 +136,18 @@ func main() {
 	}
 
 	adapterReg := buildAdapterRegistry(cfg)
+
+	// Start MCP config syncer if configured. The syncer fetches MCP server
+	// definitions from the Hub server's /web/mcp-servers endpoint periodically
+	// and stores them in an in-memory MCPConfigStore for injection into runs.
+	var mcpConfigStore *adapters.MCPConfigStore
+	if cfg.HubMCPSyncURL != "" {
+		mcpConfigStore = adapters.NewMCPConfigStore()
+		syncInterval := parseDurationOrDefault(cfg.HubMCPSyncInterval, 5*time.Minute)
+		syncer := adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore)
+		go syncer.Run(context.Background(), syncInterval)
+		slog.Info("mcp hub sync enabled", "url", cfg.HubMCPSyncURL, "interval", syncInterval)
+	}
 
 	serverConfig := httpserver.Config{
 		Addr:               cfg.Addr,
@@ -253,6 +271,9 @@ func buildConfig(args []string) (config, error) {
 	fs.Var(&cfg.SkillsDirs, "skills-dir", "directory containing SKILL.md subdirectories; may be repeated; defaults to .agents/skills and .codex/skills")
 
 	fs.StringVar(&cfg.EventLogPath, "event-log-path", getEnv("AGENTHUB_EVENT_LOG_PATH", ""), "append-only JSON-lines event log path for crash recovery and replay; empty = no persistence")
+
+	fs.StringVar(&cfg.HubMCPSyncURL, "hub-mcp-sync-url", getEnv("AGENTHUB_HUB_MCP_SYNC_URL", ""), "Hub URL for periodic MCP server config sync; empty = no sync")
+	fs.StringVar(&cfg.HubMCPSyncInterval, "hub-mcp-sync-interval", getEnv("AGENTHUB_HUB_MCP_SYNC_INTERVAL", "5m"), "interval for MCP config sync from Hub (e.g. 5m, 30s)")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -541,3 +562,16 @@ func resolveSDKAPIKey(value, envName string) string {
 	return value
 }
 
+// parseDurationOrDefault parses a duration string (e.g. "5m", "30s") and
+// returns the parsed value. If parsing fails, it returns the default.
+func parseDurationOrDefault(s string, defaultVal time.Duration) time.Duration {
+	if s == "" {
+		return defaultVal
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		slog.Warn("invalid duration, using default", "input", s, "default", defaultVal, "err", err)
+		return defaultVal
+	}
+	return d
+}
