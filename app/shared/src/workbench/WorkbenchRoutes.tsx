@@ -1134,8 +1134,7 @@ export function WorkbenchRoutes({
           onDocClick={(doc) => setDocsPreview(createDocPreview(doc))}
           rows={documents ?? WORKBENCH_MOCK_DOC_ROWS}
           onCreateDoc={documentsActions?.onCreateDoc}
-          onDeleteDoc={documentsActions?.onDeleteDoc ? (doc) => documentsActions.onDeleteDoc?.(doc.id) : undefined}
-          onSaveDoc={documentsActions?.onUpdateDoc}
+          onDeleteDoc={documentsActions?.onDeleteDoc}
         />
       );
     case 'agents':
