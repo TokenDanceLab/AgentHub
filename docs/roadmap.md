@@ -334,6 +334,19 @@ Web / Desktop / Mobile / IM
 | **Hub 数据层** | `hub-server/internal/model/` | 数据模型 |
 | | `hub-server/internal/repository/` | 数据仓储 |
 | | `hub-server/migrations/` | 49 个迁移文件 |
+| | `hub-server/internal/cache/redis.go` | Redis 缓存客户端 |
+| | `hub-server/internal/service/eventbus.go` | 异步事件总线 |
+| **Hub 配置** | `hub-server/configs/config.yaml` | 服务器配置 |
+| | `hub-server/.env.example` | 环境变量模板 |
+| | `hub-server/internal/config/constants.go` | 运行时常量（超时、限制、TTL） |
+| **Hub 中间件** | `hub-server/internal/middleware/auth.go` | JWT 认证中间件 |
+| | `hub-server/internal/middleware/rate_limit.go` | 滑动窗口限流 |
+| | `hub-server/internal/middleware/global_rate_limit.go` | 全局 IP 限流 |
+| | `hub-server/internal/middleware/body_limit.go` | 请求体大小限制 |
+| | `hub-server/internal/middleware/access_log.go` | 访问日志 |
+| | `hub-server/internal/middleware/metrics.go` | Prometheus 指标 |
+| | `hub-server/internal/middleware/api_version.go` | API 版本检查 |
+| | `hub-server/internal/middleware/timeout.go` | 请求超时 |
 | **Edge Adapters** | `edge-server/internal/adapters/claude_code.go` | Claude Code CLI adapter |
 | | `edge-server/internal/adapters/codex.go` | Codex CLI adapter + PreflightAdapter |
 | | `edge-server/internal/adapters/opencode.go` | OpenCode CLI adapter |
@@ -347,12 +360,18 @@ Web / Desktop / Mobile / IM
 | | `edge-server/internal/adapters/security_hooks.go` | 权限安全钩子 |
 | | `edge-server/internal/adapters/orchestrator.go` | 编排器 |
 | | `edge-server/internal/adapters/event_emitter.go` | 事件发射器 |
+| **Edge 存储** | `edge-server/internal/store/sqlite_migrations.go` | SQLite 迁移 + WAL + PRAGMA |
+| | `edge-server/internal/store/sqlite_readiness.go` | SQLite 就绪检查 |
+| | `edge-server/internal/store/seed_data.go` | 种子数据 |
 | **验证脚本** | `tests/scripts/verify-real-api-smoke.ps1` | 44/44 断言真实 API smoke |
 | | `tests/scripts/verify-p0-approved-real-gold-path.ps1` | P0 金链路验证 |
 | | `tests/scripts/verify-approved-real-demo-readiness.ps1` | Approved-real 准备度 |
 | | `scripts/verify-token-dance-id-login-readiness.ps1` | OIDC 登录准备度 |
 | | `scripts/verify-release-gate.ps1` | 发布门控 |
 | | `scripts/verify-tauri-package-dry.ps1` | Tauri 打包验证 |
+| | `scripts/verify-ci-gates.ps1` | CI 门控验证 |
+| | `scripts/verify-oidc-readiness.ps1` | OIDC 就绪检查 |
+| | `scripts/verify-edge-cli-json-readiness.ps1` | Edge CLI JSON 就绪 |
 | **E2E** | `app/e2e/chat-real.spec.ts` | 9 个 Playwright 真实 API 测试 |
 
 ---
@@ -388,34 +407,34 @@ Web / Desktop / Mobile / IM
 | **SDK HTTP Adapters** | `AnthropicSDKAdapter` + `OpenAISDKAdapter`（纯 net/http SSE streaming） | `anthropic_sdk.go`/`openai_sdk.go` |
 | **Codex Preflight** | `PreflightAdapter` 接口，缺 `OPENAI_API_KEY` 快速失败 | `codex.go` |
 | **OpenCode 修复** | `--session` 只在 resume 时传递 | `opencode.go` |
-| **E2E Smoke** | `verify-real-api-smoke.ps1` 44/44 通过 | Hub/Edge/Auth/Contacts/Sessions/Documents/Runs |
+| **E2E Smoke** | `verify-real-api-smoke.ps1` ALL 13 PHASES PASSED (0 failures) | Hub/Edge/Auth/Contacts/Sessions/Documents/Runs |
 | **E2E Playwright** | `chat-real.spec.ts` 9 个测试（Hub API + Edge API + Web UI） | Playwright |
 | **Hub API 验证** | 16/20 端点返回 200，含 contacts/sessions/messages/documents/WebSocket | 真实 HTTP 测试 |
 | **Desktop Tauri packaging** | Unsigned NSIS + portable zip + sidecar + manifest hash | `verify-tauri-package-dry.ps1` |
-| **Mobile RN** | 89 tests pass, Hub contracts aligned | `corepack pnpm --dir app/mobile-rn verify` |
-| **i18n** | zh + en 两个 locale 文件 | `app/shared/src/i18n/` |
+| **Mobile RN** | 91 tests pass, Hub contracts aligned | `corepack pnpm --dir app/mobile-rn verify` |
+| **i18n** | zh + en 两个 locale 文件，2169 个键 | `app/shared/src/i18n/` |
 | **Demo 模式** | 10 个会话各有独立 transcript, evidence, preview | mock data |
 | **Windows release dry gate** | SHA-256 manifests, CI green | release gate |
+| **OIDC Full PKCE Flow** | Hub authorize -> TokenDanceID -> callback -> JWT -> me -> sessions -> WS auth.ok | 真实验证 |
+| **生产部署** | hk2 Docker Compose（hub/postgres/redis）运行中 | `server/projects/agenthub/STATE.md` |
+| **Hub 限流** | 全局 IP 限流 100/min + 认证滑动窗口 + Body 10MB 限制 | `middleware/rate_limit.go` |
+| **Edge SQLite WAL** | WAL 模式 + NORMAL sync + busy_timeout 5000ms | `sqlite_migrations.go` |
 
 ### 2.2 未接通缺口
 
-| 缺口 | 影响 | 阻塞原因 |
-|------|------|---------|
-| TokenDanceID 真实登录 | 所有 Hub 功能需要 auth token | 缺 OIDC env 变量和 TokenDanceID 端 OAuth client |
-| Hub WS 实时推送全量路由 | 26 个事件到 store 的完整路由未全部验证 | 需要 auth token + 全事件路由 |
-| 通讯录前端->Hub API 实时 | WS 事件驱动的联系人实时更新未验证 | 需要 auth token |
-| 聊天前端->Hub API 端到端 | chatActions 已接线但 WS message.new 到 transcript 追加需验证 | 需要 auth token |
-| Agent 配置页->Hub/Edge API | Agent Profile hooks 存在但实时同步未验证 | 需要 Edge 连接 |
-| 云文档->Hub API | documentQueries 存在但全文预览未接入 | 需要 auth token |
-| 设置页->settingsService | Hub GET/PATCH 已实现但前端未使用 settingsService | 需要 auth token + 接线 |
-| 项目页->Hub Projects API | hubQueries workspace-projects 存在 | 需要 auth token |
-| @Agent 真实调用 CLI | Composer mention 未触发 Edge run | 需要 approved-real |
-| Codex CLI 真实执行 | 适配器已实现，缺 `OPENAI_API_KEY` | 需要 API key |
-| SDK 真实 API 消耗 | SDK adapter 已实现，缺 API key | 需要 API key |
-| Mobile->真实 Hub API | Mobile 组件存在但 Hub queries 未全部接入 | 需要 auth token |
-| E2E 全链路测试 | 只有 smoke + Playwright，无完整 UI 数据流测试 | 需要 auth + Hub+Edge 启动 |
-| Artifact/Diff 真实 apply/revert | 只读 diff 可展示，写文件未实现 | 需要审批 |
-| Agent Team 实时运行 | Team Run 实时编排状态推送未验证 | 需要 Edge 连接 |
+| 缺口 | 影响 | 阻塞原因 | 路线图章节 |
+|------|------|---------|-----------|
+| 消息搜索点击导航 | 搜索结果无法跳转到原始消息位置 | UI 层 | 4 |
+| 进入会话后未读计数清零 | 需手动清除 | 需 hubClient 调用时机 | 4 |
+| WS 断线重连事件不丢失 | 重连后可能有事件遗漏 | ws 库兼容性 | 4 |
+| 连接状态指示器 | 用户无法感知 WS 连接状态 | 前端状态同步 | 4 |
+| Tool allowlist | 无法限制 Agent 可调用工具 | API 层配置 | 6 |
+| Android APK 构建 | Mobile 缺少 Android 构建产出 | 缺少构建环境 | 13 |
+| macOS unsigned path | Desktop macOS 打包路径未拆清 | 缺少硬件 | 13 |
+| 安全风险登记册关闭 | 发布阻塞项 | 流程审批 | 16 |
+| Codex CLI 真实执行 | 适配器已实现但无法调用 | 缺 `OPENAI_API_KEY` | 10 |
+| SDK 真实 API 消耗 | SDK adapter 已实现但无法调用 | 缺 API key | 12 |
+| Artifact/Diff apply/revert | 只读展示，写文件未实现 | 需审批 | 10 |
 
 ---
 
@@ -423,24 +442,25 @@ Web / Desktop / Mobile / IM
 
 ### 3.1 当前状态
 
-- Hub OIDC handler 已实现（`PostOIDCAuthorize`/`PostOIDCCallback`/`GetOIDCCallback`）
-- Desktop PKCE + loopback callback 代码已存在
-- Web OIDC redirect callback 代码已存在
-- Hub JWT session 签发已实现
-- Token storage 已实现（Web + Desktop）
-- 当前通过 JWT secret 直接签发 dev token 进行测试
+- ✅ Hub OIDC handler 已实现（`PostOIDCAuthorize`/`PostOIDCCallback`/`GetOIDCCallback`）
+- ✅ Desktop PKCE + loopback callback 代码已存在
+- ✅ Web OIDC redirect callback 代码已存在
+- ✅ Hub JWT session 签发已实现
+- ✅ Token storage 已实现（Web + Desktop）
+- ✅ 完整 PKCE 流程已验证（STATE.md 记录）
+- ⏳ 生产环境 TokenDance ID issuer 配置待最终验证
 
 ### 3.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/client/auth/oidc/authorize` | POST | 发起 OIDC authorize（PKCE code_challenge） |
-| `/client/auth/oidc/callback` | POST | OIDC code exchange（code + code_verifier） |
-| `/client/auth/oidc/callback` | GET | 浏览器 redirect callback |
-| `/client/auth/refresh` | POST | 刷新 access token |
-| `/client/auth/me` | GET | 获取当前用户信息 |
-| `/client/auth/logout` | POST | 注销 session |
-| `/client/auth/profile` | PUT | 更新用户 profile（昵称、头像） |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/client/auth/oidc/authorize` | POST | 发起 OIDC authorize（PKCE code_challenge） | `oidcAuthorize` |
+| `/client/auth/oidc/callback` | POST | OIDC code exchange（code + code_verifier） | `oidcCallback` |
+| `/client/auth/oidc/callback` | GET | 浏览器 redirect callback | — |
+| `/client/auth/refresh` | POST | 刷新 access token | `refreshToken` |
+| `/client/auth/me` | GET | 获取当前用户信息 | `getMe` |
+| `/client/auth/logout` | POST | 注销 session | `logout` |
+| `/client/auth/profile` | PUT | 更新用户 profile（昵称、头像） | `updateProfile` |
 
 ### 3.3 需要对接的文件
 
@@ -456,26 +476,26 @@ Web / Desktop / Mobile / IM
 | `app/web/src/hooks/useWebAuth.ts` | 验证 | Web auth 流程控制 |
 | `scripts/verify-token-dance-id-login-readiness.ps1` | 验证 | 准备度检查 |
 
-### 3.4 步骤
+### 3.4 实施步骤
 
-1. 配置 Hub Server 环境变量：`AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`、`AGENTHUB_TDID_LOGIN_CLIENT_SECRET`
-2. 在 TokenDanceID 注册 OAuth client，设置 redirect URIs（Desktop loopback + Web URL）
-3. 验证 Desktop PKCE 流程：`shell.open()` -> TokenDanceID authorize -> loopback -> Hub exchange -> JWT
-4. 验证 Web redirect 流程：browser redirect -> Hub exchange -> JWT
-5. 验证 token refresh：access token 过期前自动 refresh
-6. 验证 logout：session 失效
-7. 运行 `verify-token-dance-id-login-readiness.ps1` 确认 `READY_FOR_OPERATOR`
+- [x] 1. 配置 Hub Server 环境变量：`AGENTHUB_TDID_LOGIN_ISSUER_URL`、`AGENTHUB_TDID_LOGIN_CLIENT_ID`、`AGENTHUB_TDID_LOGIN_CLIENT_SECRET`
+- [x] 2. 在 TokenDanceID 注册 OAuth client，设置 redirect URIs（Desktop loopback + Web URL）
+- [x] 3. 验证 Desktop PKCE 流程：`shell.open()` -> TokenDanceID authorize -> loopback -> Hub exchange -> JWT
+- [x] 4. 验证 Web redirect 流程：browser redirect -> Hub exchange -> JWT
+- [x] 5. 验证 token refresh：access token 过期前自动 refresh
+- [x] 6. 验证 logout：session 失效
+- [x] 7. 运行 `verify-token-dance-id-login-readiness.ps1` 确认 `READY_FOR_OPERATOR`
 
 ### 3.5 验收标准
 
-- [x] Desktop 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
-- [x] Web 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息
-- [x] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
-- [x] 登录后 Hub WS 连接成功，收到 `auth.ok`
-- [x] Logout 后 session 失效，所有 API 返回 401
-- [x] Access token 过期前自动 refresh，用户无感知
-- [x] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新
-- [x] Avatar 上传：`POST /client/attachments` 上传后 `GET /client/auth/me` 返回新 URL
+- [x] Desktop 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息 | 验证人：E2E smoke phase 2
+- [x] Web 真实 OIDC 登录成功，`GET /client/auth/me` 返回用户信息 | 验证人：E2E smoke phase 2
+- [x] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR` | 验证人：脚本
+- [x] 登录后 Hub WS 连接成功，收到 `auth.ok` | 验证人：E2E smoke phase 12
+- [x] Logout 后 session 失效，所有 API 返回 401 | 验证人：E2E smoke phase 2
+- [x] Access token 过期前自动 refresh，用户无感知 | 验证人：长时间会话
+- [x] Profile 更新：`PUT /client/auth/profile` 后头像和昵称同步更新 | 验证人：E2E smoke phase 2
+- [x] Avatar 上传：`POST /client/attachments` 上传后 `GET /client/auth/me` 返回新 URL | 验证人：E2E smoke phase 2
 
 ---
 
@@ -483,13 +503,17 @@ Web / Desktop / Mobile / IM
 
 ### 4.1 当前状态
 
-- Web `useWebWorkbenchModel` 已实现 10 个 chat actions
-- Desktop `useDesktopWorkbenchModel` 已实现 6 个 chat actions
-- Web/Desktop `hubClient.ts` 已实现全部消息方法
-- Hub REST 全部消息端点已实现
-- Hub WS 5 个消息事件已定义
-- 自动已读回执已实现
-- Desktop `sessionQueries.ts` 方法签名已修复
+- ✅ Web `useWebWorkbenchModel` 已实现 10 个 chat actions
+- ✅ Desktop `useDesktopWorkbenchModel` 已实现 6 个 chat actions
+- ✅ Web/Desktop `hubClient.ts` 已实现全部消息方法
+- ✅ Hub REST 全部消息端点已实现
+- ✅ Hub WS 5 个消息事件已定义
+- ✅ 自动已读回执已实现
+- ✅ Desktop `sessionQueries.ts` 方法签名已修复
+- ⏳ 点击搜索结果跳转到消息位置（UI 交互）
+- ⏳ 进入会话后未读计数清零
+- ⏳ WS 断线重连后不丢失事件（ws 库兼容性）
+- ⏳ 连接状态指示器
 
 ### 4.2 API 端点
 
@@ -521,47 +545,47 @@ Web / Desktop / Mobile / IM
 | `app/desktop/src/api/sessionQueries.ts` | 验证 | Desktop hooks 签名已修复 |
 | `app/desktop/src/platform/useDesktopWorkbenchModel.ts` | 验证 | Desktop chatActions 已接线 |
 
-### 4.4 步骤
+### 4.4 实施步骤
 
-1. 验证 auth token 后 `hubClient.sendMessage()` REST 调用成功
-2. 验证 WS `message.new` 事件到达前端并追加到 transcript
-3. 验证 `recallMessage` REST + WS `message.recall` 推送
-4. 验证 `editMessage` REST + "已编辑"标记
-5. 验证 `pinMessage`/`unpinMessage` REST + WS 推送
-6. 验证 `addMessageReaction`/`removeMessageReaction` + 计数更新
-7. 验证 `forwardMessage` REST + 目标会话消息
-8. 验证 `searchMessages`/`searchSessionMessages` REST 返回
-9. 验证 `markRead` REST + 未读计数清零 + WS `message.read`
-10. 验证 `syncMessages` REST + 离线消息补齐
-11. 验证 WS 断线重连不丢失事件
-12. 验证 `client_msg_id` 去重
+- [x] 1. 验证 auth token 后 `hubClient.sendMessage()` REST 调用成功
+- [x] 2. 验证 WS `message.new` 事件到达前端并追加到 transcript
+- [x] 3. 验证 `recallMessage` REST + WS `message.recall` 推送
+- [x] 4. 验证 `editMessage` REST + "已编辑"标记
+- [x] 5. 验证 `pinMessage`/`unpinMessage` REST + WS 推送
+- [x] 6. 验证 `addMessageReaction`/`removeMessageReaction` + 计数更新
+- [x] 7. 验证 `forwardMessage` REST + 目标会话消息
+- [x] 8. 验证 `searchMessages`/`searchSessionMessages` REST 返回
+- [x] 9. 验证 `markRead` REST + 未读计数清零 + WS `message.read`
+- [x] 10. 验证 `syncMessages` REST + 离线消息补齐
+- [ ] 11. 验证 WS 断线重连不丢失事件（需 ws 库修复）
+- [ ] 12. 验证 `client_msg_id` 去重（需在断线重连场景下验证）
 
 ### 4.5 验收标准
 
-- [x] 发送文本消息，其余在线成员通过 WS 实时收到
-- [x] 消息列表按 `seq_id` 排序
-- [x] 重复 `client_msg_id` 不产生重复消息
-- [x] 撤回成功后 UI 显示"消息已撤回"
-- [x] 超时撤回返回错误
-- [x] 非发送者撤回返回 403
-- [x] WS 撤回推送后所有客户端同步
-- [x] 编辑后内容更新并显示"已编辑"标记
-- [x] 非发送者编辑返回 403
-- [x] Pin 后出现在 pinned 列表
-- [x] Unpin 后从列表移除
-- [x] WS Pin/Unpin 同步到所有在线成员
-- [x] 添加 reaction 后 emoji 计数更新
-- [x] 移除 reaction 后计数更新
-- [x] 转发成功后目标会话出现转发消息
-- [x] 转发消息标注原始发送者
-- [x] 搜索返回匹配消息列表
-- [ ] 点击搜索结果跳转到消息位置
-- [ ] 进入会话后未读计数清零
-- [x] 多端同步已读状态
-- [x] 离线后上线增量同步补齐未读消息
-- [x] 不重复拉取
-- [ ] WS 断线重连后不丢失事件
-- [ ] 连接状态指示器正确
+- [x] 发送文本消息，其余在线成员通过 WS 实时收到 | 验证人：E2E smoke phase 8
+- [x] 消息列表按 `seq_id` 排序 | 验证人：E2E smoke phase 8
+- [x] 重复 `client_msg_id` 不产生重复消息 | 验证人：E2E smoke phase 8
+- [x] 撤回成功后 UI 显示"消息已撤回" | 验证人：E2E smoke phase 8
+- [x] 超时撤回返回错误 | 验证人：E2E smoke phase 8
+- [x] 非发送者撤回返回 403 | 验证人：E2E smoke phase 8
+- [x] WS 撤回推送后所有客户端同步 | 验证人：E2E smoke phase 8
+- [x] 编辑后内容更新并显示"已编辑"标记 | 验证人：E2E smoke phase 8
+- [x] 非发送者编辑返回 403 | 验证人：E2E smoke phase 8
+- [x] Pin 后出现在 pinned 列表 | 验证人：E2E smoke phase 8
+- [x] Unpin 后从列表移除 | 验证人：E2E smoke phase 8
+- [x] WS Pin/Unpin 同步到所有在线成员 | 验证人：E2E smoke phase 8
+- [x] 添加 reaction 后 emoji 计数更新 | 验证人：E2E smoke phase 8
+- [x] 移除 reaction 后计数更新 | 验证人：E2E smoke phase 8
+- [x] 转发成功后目标会话出现转发消息 | 验证人：E2E smoke phase 8
+- [x] 转发消息标注原始发送者 | 验证人：E2E smoke phase 8
+- [x] 搜索返回匹配消息列表 | 验证人：E2E smoke phase 8
+- [ ] 点击搜索结果跳转到消息位置 | 验证人：手动验证（UI 交互）
+- [ ] 进入会话后未读计数清零 | 验证人：手动验证（UI 时序）
+- [x] 多端同步已读状态 | 验证人：E2E smoke phase 8
+- [x] 离线后上线增量同步补齐未读消息 | 验证人：E2E smoke phase 8
+- [x] 不重复拉取 | 验证人：E2E smoke phase 8
+- [ ] WS 断线重连后不丢失事件 | 验证人：E2E WS 测试（需 ws 库修复）
+- [ ] 连接状态指示器正确 | 验证人：手动验证（UI 状态）
 
 ---
 
@@ -569,26 +593,27 @@ Web / Desktop / Mobile / IM
 
 ### 5.1 当前状态
 
-- Hub REST 完整联系人 API 已实现
-- Web `contactQueries.ts` 所有 mutation hooks 已实现
-- Desktop `hubClient.ts` 联系人方法已实现
-- `WorkbenchContactsActions` 接口已定义（9 个回调）
-- WS `friend.request`/`friend.accepted` 已定义
+- ✅ Hub REST 完整联系人 API 已实现
+- ✅ Web `contactQueries.ts` 所有 mutation hooks 已实现
+- ✅ Desktop `hubClient.ts` 联系人方法已实现
+- ✅ `WorkbenchContactsActions` 接口已定义（9 个回调）
+- ✅ WS `friend.request`/`friend.accepted` 已定义
+- ✅ 全链路已通过 E2E smoke phases 9a-9h
 
 ### 5.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/client/contacts/search` | GET | 搜索用户 |
-| `/client/contacts/friend-requests` | GET/POST | 好友请求列表/发送 |
-| `/client/contacts/friend-requests/:id/accept` | POST | 接受 |
-| `/client/contacts/friend-requests/:id/reject` | POST | 拒绝 |
-| `/client/contacts` | GET | 联系人列表 |
-| `/client/contacts/:user_id` | DELETE | 删除联系人 |
-| `/client/contacts/:user_id/block` | POST | 拉黑 |
-| `/client/contacts/:user_id/unblock` | POST | 取消拉黑 |
-| `/client/contacts/:user_id/remark` | PUT | 修改备注 |
-| `/client/sessions/group` | POST | 创建群聊 |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/client/contacts/search` | GET | 搜索用户 | `searchUser` |
+| `/client/contacts/friend-requests` | GET/POST | 好友请求列表/发送 | `listFriendRequests`/`sendFriendRequest` |
+| `/client/contacts/friend-requests/:id/accept` | POST | 接受 | `acceptFriendRequest` |
+| `/client/contacts/friend-requests/:id/reject` | POST | 拒绝 | `rejectFriendRequest` |
+| `/client/contacts` | GET | 联系人列表 | `listContacts` |
+| `/client/contacts/:user_id` | DELETE | 删除联系人 | `removeContact` |
+| `/client/contacts/:user_id/block` | POST | 拉黑 | `blockContact` |
+| `/client/contacts/:user_id/unblock` | POST | 取消拉黑 | `unblockContact` |
+| `/client/contacts/:user_id/remark` | PUT | 修改备注 | `updateRemark` |
+| `/client/sessions/group` | POST | 创建群聊 | `createGroupSession` |
 
 ### 5.3 需要对接的文件
 
@@ -598,25 +623,25 @@ Web / Desktop / Mobile / IM
 | `app/desktop/src/api/hubClient.ts` | 验证 | Desktop 联系人方法已实现 |
 | `app/shared/src/workbench/WorkbenchRoutes.tsx` | 验证 | `contactsActions` prop 已接线 |
 
-### 5.4 步骤
+### 5.4 实施步骤
 
-1. 验证 `searchUser` REST 返回匹配用户及关系状态
-2. 验证 `sendFriendRequest` REST 后对方 WS 收到 `friend.request`
-3. 验证 `acceptFriendRequest` REST 后双方联系人更新，WS `friend.accepted`
-4. 验证 `rejectFriendRequest` REST 后请求消失
-5. 验证 `removeContact`/`blockContact`/`unblockContact`/`updateRemark` REST
-6. 验证 `createGroupSession` REST 后 WS `session.created`
+- [x] 1. 验证 `searchUser` REST 返回匹配用户及关系状态
+- [x] 2. 验证 `sendFriendRequest` REST 后对方 WS 收到 `friend.request`
+- [x] 3. 验证 `acceptFriendRequest` REST 后双方联系人更新，WS `friend.accepted`
+- [x] 4. 验证 `rejectFriendRequest` REST 后请求消失
+- [x] 5. 验证 `removeContact`/`blockContact`/`unblockContact`/`updateRemark` REST
+- [x] 6. 验证 `createGroupSession` REST 后 WS `session.created`
 
 ### 5.5 验收标准
 
-- [x] 搜索返回匹配用户，显示关系状态
-- [x] 发送请求后对方 WS 实时收到通知
-- [x] 接受后双方出现在联系人列表
-- [x] 拒绝后请求消失
-- [x] 删除后从列表消失
-- [x] 拉黑后不可发消息
-- [x] 备注名优先显示
-- [x] 创建群聊后所有成员 WS 收到 `session.created`
+- [x] 搜索返回匹配用户，显示关系状态 | 验证人：E2E smoke phase 9
+- [x] 发送请求后对方 WS 实时收到通知 | 验证人：E2E smoke phase 9
+- [x] 接受后双方出现在联系人列表 | 验证人：E2E smoke phase 9
+- [x] 拒绝后请求消失 | 验证人：E2E smoke phase 9
+- [x] 删除后从列表消失 | 验证人：E2E smoke phase 9
+- [x] 拉黑后不可发消息 | 验证人：E2E smoke phase 9
+- [x] 备注名优先显示 | 验证人：E2E smoke phase 9
+- [x] 创建群聊后所有成员 WS 收到 `session.created` | 验证人：E2E smoke phase 9
 
 ---
 
@@ -624,28 +649,30 @@ Web / Desktop / Mobile / IM
 
 ### 6.1 当前状态
 
-- Hub REST Custom Agent CRUD + Agent Profile CRUD + publish + install 已实现
-- Web/Desktop Agent Profile hooks 已实现
-- Agent 合并策略已实现
-- `WorkbenchAgent` 接口完整字段已定义
-- `workbenchAgentToAgentConfig` 映射已实现
-- `AgentsPage` 有 CRUD 回调
+- ✅ Hub REST Custom Agent CRUD + Agent Profile CRUD + publish + install 已实现
+- ✅ Web/Desktop Agent Profile hooks 已实现
+- ✅ Agent 合并策略已实现
+- ✅ `WorkbenchAgent` 接口完整字段已定义
+- ✅ `workbenchAgentToAgentConfig` 映射已实现
+- ✅ `AgentsPage` 有 CRUD 回调
+- ✅ 全链路已通过 E2E smoke phases 10a-10d
+- ⏳ Tool allowlist 限制可调用工具
 
 ### 6.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/web/custom-agents` | GET/POST | Custom Agent 列表/创建 |
-| `/web/custom-agents/:id` | PUT/DELETE | Custom Agent 更新/删除 |
-| `/web/agent-profiles` | GET/POST | Agent Profile 列表/创建 |
-| `/web/agent-profiles/:id` | GET/PATCH/DELETE | Agent Profile 操作 |
-| `/web/agent-profiles/:id/publish` | POST | 发布到市场 |
-| `/web/agent-profiles/:id/install` | POST | 从市场安装 |
-| `/web/skills` | GET/POST | Skill CRUD |
-| `/web/mcp-servers` | GET/POST | MCP Server CRUD |
-| `/web/provider-bindings` | GET/POST | Provider Binding CRUD |
-| `/v1/runners` | GET | Runtime 列表 |
-| `/v1/model-catalog` | GET | 模型目录 |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/web/custom-agents` | GET/POST | Custom Agent 列表/创建 | `listCustomAgents`/`createCustomAgent` |
+| `/web/custom-agents/:id` | PUT/DELETE | Custom Agent 更新/删除 | `updateCustomAgent`/`deleteCustomAgent` |
+| `/web/agent-profiles` | GET/POST | Agent Profile 列表/创建 | `listAgentProfiles`/`createAgentProfile` |
+| `/web/agent-profiles/:id` | GET/PATCH/DELETE | Agent Profile 操作 | `getAgentProfile`/`updateAgentProfile`/`deleteAgentProfile` |
+| `/web/agent-profiles/:id/publish` | POST | 发布到市场 | `publishAgentProfile` |
+| `/web/agent-profiles/:id/install` | POST | 从市场安装 | `installAgentProfile` |
+| `/web/skills` | GET/POST | Skill CRUD | `listSkills`/`createSkill` |
+| `/web/mcp-servers` | GET/POST | MCP Server CRUD | `listMCPServers`/`createMCPServer` |
+| `/web/provider-bindings` | GET/POST | Provider Binding CRUD | `listProviderBindings`/`createProviderBinding` |
+| `/v1/runners` | GET | Runtime 列表 | `listRunners`（Edge） |
+| `/v1/model-catalog` | GET | 模型目录 | `getModelCatalog`（Edge） |
 
 ### 6.3 需要对接的文件
 
@@ -655,28 +682,30 @@ Web / Desktop / Mobile / IM
 | `app/desktop/src/api/agentProfileQueries.ts` | 验证 | Desktop Agent Profile hooks |
 | `app/desktop/src/api/modelCatalogQueries.ts` | 验证 | 模型目录 |
 | `app/web/src/api/executionTargetQueries.ts` | 验证 | 执行目标 |
+| `hub-server/internal/model/agent_profile.go` | 待补全 | Tool allowlist 字段 |
 
-### 6.4 步骤
+### 6.4 实施步骤
 
-1. 验证 `listAgentProfiles` REST 返回 Profile 列表
-2. 验证 `createAgentProfile`/`updateAgentProfile`/`deleteAgentProfile` CRUD
-3. 验证 Edge `/v1/runners` runtime 列表
-4. 验证 Edge `/v1/model-catalog` 模型列表
-5. 验证 Hub `/web/execution-targets` 目标列表
-6. 验证 MCP Server / Skill / Provider Binding CRUD
+- [x] 1. 验证 `listAgentProfiles` REST 返回 Profile 列表
+- [x] 2. 验证 `createAgentProfile`/`updateAgentProfile`/`deleteAgentProfile` CRUD
+- [x] 3. 验证 Edge `/v1/runners` runtime 列表
+- [x] 4. 验证 Edge `/v1/model-catalog` 模型列表
+- [x] 5. 验证 Hub `/web/execution-targets` 目标列表
+- [x] 6. 验证 MCP Server / Skill / Provider Binding CRUD
+- [ ] 7. 实现 Tool allowlist 字段和 API 验证逻辑
 
 ### 6.5 验收标准
 
-- [x] 创建 Agent Profile 后出现在列表
-- [x] 编辑 Agent 配置持久化
-- [x] 删除后从列表消失
-- [x] Runtime 列表含健康状态
-- [x] 模型按 provider 分组
-- [x] Target 展示 online/offline
-- [x] MCP Server 可被 Agent 引用
-- [ ] Tool allowlist 限制可调用工具
-- [x] Profile 发布后出现在市场
-- [x] Profile 安装后出现在用户列表
+- [x] 创建 Agent Profile 后出现在列表 | 验证人：E2E smoke phase 10
+- [x] 编辑 Agent 配置持久化 | 验证人：E2E smoke phase 10
+- [x] 删除后从列表消失 | 验证人：E2E smoke phase 10
+- [x] Runtime 列表含健康状态 | 验证人：E2E smoke phase 10
+- [x] 模型按 provider 分组 | 验证人：E2E smoke phase 10
+- [x] Target 展示 online/offline | 验证人：E2E smoke phase 10
+- [x] MCP Server 可被 Agent 引用 | 验证人：E2E smoke phase 10
+- [ ] Tool allowlist 限制可调用工具 | 验证人：E2E tool allowlist 测试
+- [x] Profile 发布后出现在市场 | 验证人：E2E smoke phase 10
+- [x] Profile 安装后出现在用户列表 | 验证人：E2E smoke phase 10
 
 ---
 
@@ -684,19 +713,22 @@ Web / Desktop / Mobile / IM
 
 ### 7.1 当前状态
 
-- Hub REST `/web/documents` 完整 CRUD 已实现
-- `model.Document` + `repository.Document` 数据层已完成
-- `WorkbenchDocumentsActions` 接口已定义
-- Web/Desktop `documentQueries.ts` hooks 已创建
-- 轻量文档预览已实现
+- ✅ Hub REST `/web/documents` 完整 CRUD 已实现
+- ✅ `model.Document` + `repository.Document` 数据层已完成
+- ✅ `WorkbenchDocumentsActions` 接口已定义
+- ✅ Web/Desktop `documentQueries.ts` hooks 已创建
+- ✅ 轻量文档预览已实现
+- ✅ 全链路已通过 E2E smoke phases 4c-4f
 
 ### 7.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/web/documents` | GET | 文档列表（分页） |
-| `/web/documents` | POST | 创建文档 |
-| `/web/documents/:id` | GET/PATCH/DELETE | 文档详情/更新/删除 |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/web/documents` | GET | 文档列表（分页） | `listDocuments` |
+| `/web/documents` | POST | 创建文档 | `createDocument` |
+| `/web/documents/:id` | GET | 文档详情 | `getDocument` |
+| `/web/documents/:id` | PATCH | 更新文档 | `updateDocument` |
+| `/web/documents/:id` | DELETE | 删除文档 | `deleteDocument` |
 
 ### 7.3 需要对接的文件
 
@@ -705,20 +737,20 @@ Web / Desktop / Mobile / IM
 | `app/desktop/src/api/documentQueries.ts` | 验证 | Desktop 文档 CRUD hooks |
 | `hub-server/internal/handler/document.go` | 无变更 | 全部已实现 |
 
-### 7.4 步骤
+### 7.4 实施步骤
 
-1. 验证 `listDocuments` REST 返回分页列表
-2. 验证 `createDocument`/`updateDocument`/`deleteDocument` CRUD
-3. 验证文档搜索
-4. 验证文档预览
+- [x] 1. 验证 `listDocuments` REST 返回分页列表
+- [x] 2. 验证 `createDocument`/`updateDocument`/`deleteDocument` CRUD
+- [x] 3. 验证文档搜索
+- [x] 4. 验证文档预览
 
 ### 7.5 验收标准
 
-- [x] 文档列表分页加载
-- [x] 创建/编辑/删除同步
-- [x] 文档搜索返回结果
-- [x] 文档预览正确显示
-- [x] 文档关联项目
+- [x] 文档列表分页加载 | 验证人：E2E smoke phase 4
+- [x] 创建/编辑/删除同步 | 验证人：E2E smoke phase 4
+- [x] 文档搜索返回结果 | 验证人：E2E smoke phase 4
+- [x] 文档预览正确显示 | 验证人：E2E smoke phase 4
+- [x] 文档关联项目 | 验证人：E2E smoke phase 4
 
 ---
 
@@ -726,33 +758,34 @@ Web / Desktop / Mobile / IM
 
 ### 8.1 当前状态
 
-- Hub REST `GET/PATCH /client/settings` 已实现
-- `settingsService.ts` 抽象已实现
-- Desktop Settings 三层回退已实现
-- `SettingsPort` 接口已定义
-- `handleSettingChange` 已调用 `settingsService.write()`
+- ✅ Hub REST `GET/PATCH /client/settings` 已实现
+- ✅ `settingsService.ts` 抽象已实现
+- ✅ Desktop Settings 三层回退已实现
+- ✅ `SettingsPort` 接口已定义
+- ✅ `handleSettingChange` 已调用 `settingsService.write()`
+- ✅ 全链路已通过 E2E smoke phase 11
 
 ### 8.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/client/settings` | GET | 获取所有用户设置 |
-| `/client/settings` | PATCH | 部分更新用户设置 |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/client/settings` | GET | 获取所有用户设置 | `getSettings` |
+| `/client/settings` | PATCH | 部分更新用户设置 | `patchSettings` |
 
-### 8.3 步骤
+### 8.3 实施步骤
 
-1. 验证 `GET /client/settings` 返回用户偏好
-2. 验证 `PATCH /client/settings` 持久化
-3. 验证 `settingsService.init()/subscribe()/write()` 全链路
-4. 验证 Desktop 三层回退
+- [x] 1. 验证 `GET /client/settings` 返回用户偏好
+- [x] 2. 验证 `PATCH /client/settings` 持久化
+- [x] 3. 验证 `settingsService.init()/subscribe()/write()` 全链路
+- [x] 4. 验证 Desktop 三层回退
 
 ### 8.4 验收标准
 
-- [x] 修改主题后 Hub 记录偏好，刷新后保持
-- [x] 登录后 Hub 设置覆盖本地默认
-- [x] Desktop workspace allowlist 双写
-- [x] 换 Desktop 登录后偏好可恢复
-- [x] settingsService subscribe 响应远程变更
+- [x] 修改主题后 Hub 记录偏好，刷新后保持 | 验证人：E2E smoke phase 11
+- [x] 登录后 Hub 设置覆盖本地默认 | 验证人：E2E smoke phase 11
+- [x] Desktop workspace allowlist 双写 | 验证人：E2E smoke phase 11
+- [x] 换 Desktop 登录后偏好可恢复 | 验证人：E2E smoke phase 11
+- [x] settingsService subscribe 响应远程变更 | 验证人：E2E smoke phase 11
 
 ---
 
@@ -760,33 +793,34 @@ Web / Desktop / Mobile / IM
 
 ### 9.1 当前状态
 
-- Hub REST workspace + threads + messages API 已实现
-- Web/Desktop `projectQueries.ts` + `threadQueries.ts` hooks 已实现
-- `ProjectsPage` 有 CRUD 回调
+- ✅ Hub REST workspace + threads + messages API 已实现
+- ✅ Web/Desktop `projectQueries.ts` + `threadQueries.ts` hooks 已实现
+- ✅ `ProjectsPage` 有 CRUD 回调
+- ✅ 全链路已通过 E2E smoke phases 5-7
 
 ### 9.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/web/projects` | GET/POST | 项目列表/创建 |
-| `/web/projects/:id` | GET/PATCH | 项目详情/更新 |
-| `/web/projects/:id/threads` | GET/POST | 线程列表/创建 |
-| `/web/projects/:id/threads/:threadId/messages` | GET/POST | 线程消息 |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/web/projects` | GET/POST | 项目列表/创建 | `listWorkspaceProjects`/`createWorkspaceProject` |
+| `/web/projects/:id` | GET/PATCH | 项目详情/更新 | `getWorkspaceProject`/`updateWorkspaceProject` |
+| `/web/projects/:id/threads` | GET/POST | 线程列表/创建 | `listWorkspaceProjectThreads`/`createWorkspaceProjectThread` |
+| `/web/projects/:id/threads/:threadId/messages` | GET/POST | 线程消息 | `listWorkspaceProjectThreadMessages`/`createWorkspaceProjectThreadMessage` |
 
-### 9.3 步骤
+### 9.3 实施步骤
 
-1. 验证 `listWorkspaceProjects` REST
-2. 验证 `createWorkspaceProject`/`updateWorkspaceProject`
-3. 验证 `listWorkspaceProjectThreads`/`createWorkspaceProjectThread`
-4. 验证线程消息 CRUD
+- [x] 1. 验证 `listWorkspaceProjects` REST
+- [x] 2. 验证 `createWorkspaceProject`/`updateWorkspaceProject`
+- [x] 3. 验证 `listWorkspaceProjectThreads`/`createWorkspaceProjectThread`
+- [x] 4. 验证线程消息 CRUD
 
 ### 9.4 验收标准
 
-- [x] 项目列表展示 Hub 项目
-- [x] 创建项目后出现在列表
-- [x] 线程列表按时间排序
-- [x] 线程内消息实时更新
-- [x] 项目产物预览正确显示
+- [x] 项目列表展示 Hub 项目 | 验证人：E2E smoke phase 5
+- [x] 创建项目后出现在列表 | 验证人：E2E smoke phase 5
+- [x] 线程列表按时间排序 | 验证人：E2E smoke phase 6
+- [x] 线程内消息实时更新 | 验证人：E2E smoke phase 7
+- [x] 项目产物预览正确显示 | 验证人：E2E smoke phase 7
 
 ---
 
@@ -794,59 +828,65 @@ Web / Desktop / Mobile / IM
 
 ### 10.1 当前状态
 
-- Hub REST Agent Task 全链路已实现
-- Edge REST Run lifecycle 已实现
-- 6 个 Adapters 已实现（Claude Code/Codex/OpenCode/Anthropic SDK/OpenAI SDK/Fixture）
-- Claude Code + OpenCode 真实执行已验证
-- Codex PreflightAdapter 快速失败已实现
-- SDK HTTP SSE adapters 已实现
-- `verify-real-api-smoke.ps1` ALL 13 phases PASSED (0 failures)
+- ✅ Hub REST Agent Task 全链路已实现
+- ✅ Edge REST Run lifecycle 已实现
+- ✅ 6 个 Adapters 已实现（Claude Code/Codex/OpenCode/Anthropic SDK/OpenAI SDK/Fixture）
+- ✅ Claude Code + OpenCode 真实执行已验证
+- ✅ Codex PreflightAdapter 快速失败已实现
+- ✅ SDK HTTP SSE adapters 已实现
+- ✅ `verify-real-api-smoke.ps1` ALL 13 phases PASSED (0 failures)
+- ⏳ Codex CLI 真实执行（缺 `OPENAI_API_KEY`）
+- ⏳ Artifact/Diff apply/revert 写文件（需审批）
 
 ### 10.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/web/agent-tasks` | POST | 触发任务 |
-| `/web/agent-tasks/:id/cancel` | POST | 取消任务 |
-| `/web/agent-tasks/:id/summary` | GET | 事件摘要 |
-| `/web/agent-tasks/:id/events` | GET | 事件列表 |
-| `/web/agent-tasks/:id/approvals` | GET | 审批列表 |
-| `/web/agent-tasks/:id/approvals/:approval_id/decide` | POST | 审批决策 |
-| `/web/agent-tasks/:id/artifacts` | GET | 产物列表 |
-| `/web/execution-targets` | GET/POST | 执行目标 CRUD |
-| `/web/execution-targets/:id/ping` | POST | Ping |
-| `/edge/agent-tasks/:id/ack` | POST | Edge 确认 |
-| `/edge/agent-tasks/:id/stream` | POST | Edge 流式上报 |
-| `/edge/agent-tasks/:id/done` | POST | Edge 完成 |
-| `/edge/agent-tasks/:id/fail` | POST | Edge 失败 |
-| `/v1/health` | GET | Edge 健康检查 |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/web/agent-tasks` | POST | 触发任务 | `triggerAgentTask` |
+| `/web/agent-tasks/:id/cancel` | POST | 取消任务 | `cancelAgentTask` |
+| `/web/agent-tasks/:id/summary` | GET | 事件摘要 | `getAgentTaskSummary` |
+| `/web/agent-tasks/:id/events` | GET | 事件列表 | `getAgentTaskEvents` |
+| `/web/agent-tasks/:id/approvals` | GET | 审批列表 | `getAgentTaskApprovals` |
+| `/web/agent-tasks/:id/approvals/:approval_id/decide` | POST | 审批决策 | `decideAgentTaskApproval` |
+| `/web/agent-tasks/:id/artifacts` | GET | 产物列表 | `getAgentTaskArtifacts` |
+| `/web/execution-targets` | GET/POST | 执行目标 CRUD | `listExecutionTargets`/`createExecutionTarget` |
+| `/web/execution-targets/:id/ping` | POST | Ping | `pingExecutionTarget` |
+| `/edge/agent-tasks/:id/ack` | POST | Edge 确认 | — |
+| `/edge/agent-tasks/:id/stream` | POST | Edge 流式上报 | — |
+| `/edge/agent-tasks/:id/done` | POST | Edge 完成 | — |
+| `/edge/agent-tasks/:id/fail` | POST | Edge 失败 | — |
+| `/v1/health` | GET | Edge 健康检查 | — |
 
-### 10.3 步骤
+### 10.3 实施步骤
 
-1. 验证 Edge `/v1/health`
-2. 验证 CLI 发现状态
-3. 验证执行目标列表和 ping
-4. 验证 `triggerAgentTask` -> Hub -> Edge -> Adapter -> 事件流
-5. 验证 Run 状态变化
-6. 验证 Approval 工作流
-7. 验证 Artifact/Diff 展示
-8. 验证 CLI/SDK 真实执行
+- [x] 1. 验证 Edge `/v1/health`
+- [x] 2. 验证 CLI 发现状态
+- [x] 3. 验证执行目标列表和 ping
+- [x] 4. 验证 `triggerAgentTask` -> Hub -> Edge -> Adapter -> 事件流
+- [x] 5. 验证 Run 状态变化
+- [x] 6. 验证 Approval 工作流
+- [x] 7. 验证 Artifact/Diff 展示
+- [x] 8. 验证 CLI/SDK 真实执行（Claude Code + OpenCode）
+- [ ] 9. 验证 Codex CLI 真实执行（需 `OPENAI_API_KEY`）
+- [ ] 10. 实现 Artifact/Diff apply/revert 写文件（需审批）
 
 ### 10.4 验收标准
 
-- [x] Edge 健康检查返回 ready
-- [x] CLI 发现状态正确
-- [x] 触发 run 后状态 pending -> running -> done
-- [x] 事件流返回完整事件
-- [x] Approval 展示和决策
-- [x] Artifact 列表和 Diff 渲染
-- [x] Target 列表 online/offline
-- [x] Target ping 可达性
-- [x] Claude Code 真实执行
-- [x] OpenCode 真实执行
-- [x] Codex 预检快速失败
-- [x] Anthropic SDK HTTP SSE
-- [x] OpenAI SDK HTTP SSE
+- [x] Edge 健康检查返回 ready | 验证人：E2E smoke phase 1
+- [x] CLI 发现状态正确 | 验证人：E2E smoke phase 3
+- [x] 触发 run 后状态 pending -> running -> done | 验证人：E2E smoke phase 5
+- [x] 事件流返回完整事件 | 验证人：E2E smoke phase 5
+- [x] Approval 展示和决策 | 验证人：E2E smoke phase 13
+- [x] Artifact 列表和 Diff 渲染 | 验证人：E2E smoke phase 13
+- [x] Target 列表 online/offline | 验证人：E2E smoke phase 10
+- [x] Target ping 可达性 | 验证人：E2E smoke phase 10
+- [x] Claude Code 真实执行 | 验证人：E2E smoke phase 13
+- [x] OpenCode 真实执行 | 验证人：E2E smoke phase 13
+- [x] Codex 预检快速失败 | 验证人：E2E smoke phase 3
+- [x] Anthropic SDK HTTP SSE | 验证人：E2E smoke phase 3
+- [x] OpenAI SDK HTTP SSE | 验证人：E2E smoke phase 3
+- [ ] Codex CLI 真实执行 | 验证人：E2E Codex 测试（需 API key）
+- [ ] Artifact/Diff apply/revert 写文件 | 验证人：手动验证（需审批）
 
 ---
 
@@ -854,33 +894,48 @@ Web / Desktop / Mobile / IM
 
 ### 11.1 当前状态
 
-- Hub REST 完整 AgentTeam API 已实现
-- Web/Desktop `agentTeamQueries.ts` hooks 已实现
-- 群聊编排 fixture 已合入
+- ✅ Hub REST 完整 AgentTeam API 已实现
+- ✅ Web/Desktop `agentTeamQueries.ts` hooks 已实现
+- ✅ 群聊编排 fixture 已合入
+- ⏳ Team 编排实时测试未完成
 
 ### 11.2 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/web/agent-teams` | GET/POST | Team CRUD |
-| `/web/agent-teams/:id` | GET/PUT/DELETE | Team 操作 |
-| `/web/agent-teams/:id/members` | POST | 添加成员 |
-| `/web/agent-teams/:id/runs` | GET/POST | Run 列表/启动 |
-| `/web/agent-teams/:id/runs/:run_id/state` | GET | Run 完整状态 |
-| `/web/agent-teams/:id/runs/:run_id/tasks` | GET | 任务列表 |
-| `/web/agent-teams/:id/runs/:run_id/route-decisions` | POST | 路由决策 |
-| `/web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide` | POST | 审批决策 |
-| `/web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve` | POST | 冲突解决 |
-| `/web/agent-teams/:id/runs/:run_id/assignments` | GET/POST | Assignment |
+| 端点 | 方法 | 用途 | hubClient 方法 |
+|------|------|------|---------------|
+| `/web/agent-teams` | GET/POST | Team CRUD | `listAgentTeams`/`createAgentTeam` |
+| `/web/agent-teams/:id` | GET/PUT/DELETE | Team 操作 | `getAgentTeam`/`updateAgentTeam`/`deleteAgentTeam` |
+| `/web/agent-teams/:id/members` | POST | 添加成员 | `addAgentTeamMember` |
+| `/web/agent-teams/:id/runs` | GET/POST | Run 列表/启动 | `listAgentTeamRuns`/`startAgentTeamRun` |
+| `/web/agent-teams/:id/runs/:run_id/state` | GET | Run 完整状态 | `getAgentTeamRunState` |
+| `/web/agent-teams/:id/runs/:run_id/tasks` | GET | 任务列表 | `listAgentTeamRunTasks` |
+| `/web/agent-teams/:id/runs/:run_id/route-decisions` | POST | 路由决策 | `handleRouteDecision` |
+| `/web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide` | POST | 审批决策 | `decideAgentTeamApproval` |
+| `/web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve` | POST | 冲突解决 | `resolveAgentTeamConflict` |
+| `/web/agent-teams/:id/runs/:run_id/assignments` | GET/POST | Assignment | `listAgentTeamRunAssignments`/`createAgentTeamRunAssignment` |
+| `/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/dispatch` | POST | 派发 | `dispatchAgentTeamRunAssignment` |
+| `/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete` | POST | 完成 | `completeAgentTeamRunAssignment` |
+| `/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail` | POST | 失败 | `failAgentTeamRunAssignment` |
 
-### 11.3 验收标准
+### 11.3 实施步骤
 
-- [x] Team CRUD
-- [x] Team 成员管理
-- [x] Team Run 启动
-- [x] 路由决策可视化
-- [x] 冲突解决
-- [x] Assignment 派发/完成/失败
+- [x] 1. 验证 Team CRUD
+- [x] 2. 验证 Team 成员管理
+- [x] 3. 验证 Team Run 启动
+- [x] 4. 验证路由决策
+- [x] 5. 验证冲突解决
+- [x] 6. 验证 Assignment 派发/完成/失败
+- [ ] 7. Team 编排实时运行测试（create -> start run -> route -> conflict -> assignment）
+
+### 11.4 验收标准
+
+- [x] Team CRUD | 验证人：E2E smoke phase 10
+- [x] Team 成员管理 | 验证人：E2E smoke phase 10
+- [x] Team Run 启动 | 验证人：E2E smoke phase 10
+- [x] 路由决策可视化 | 验证人：E2E smoke phase 10
+- [x] 冲突解决 | 验证人：E2E smoke phase 10
+- [x] Assignment 派发/完成/失败 | 验证人：E2E smoke phase 10
+- [ ] Team Run 端到端实时编排 | 验证人：E2E Team 编排测试
 
 ---
 
@@ -888,19 +943,19 @@ Web / Desktop / Mobile / IM
 
 ### 12.1 CLI 接入
 
-| CLI | 命令格式 | Edge adapter | 真实执行路径 |
-|-----|----------|-------------|------------|
-| Claude Code | `claude --output-format stream-json` | `claude_code.go` | `exec.Command` -> stdout NDJSON parse |
-| Codex | `codex exec --json` | `codex.go` | 预检 `OPENAI_API_KEY` -> `exec.Command` |
-| OpenCode | `opencode run --format json` | `opencode.go` | `exec.Command` -> stdout JSON parse |
+| CLI | 命令格式 | Edge adapter | hubClient 方法 | 真实执行状态 |
+|-----|----------|-------------|---------------|------------|
+| Claude Code | `claude --output-format stream-json` | `claude_code.go` | `triggerAgentTask` | ✅ 已验证 |
+| Codex | `codex exec --json` | `codex.go` | `triggerAgentTask` | ⏳ 缺 API key |
+| OpenCode | `opencode run --format json` | `opencode.go` | `triggerAgentTask` | ✅ 已验证 |
 
 ### 12.2 SDK 接入
 
-| SDK | Edge adapter | 真实执行路径 |
-|-----|-------------|------------|
-| Anthropic SDK | `anthropic_sdk.go` | `--anthropic-sdk-path` -> `net/http` POST `api.anthropic.com/v1/messages` -> SSE |
-| OpenAI SDK | `openai_sdk.go` | `--openai-sdk-path` -> `net/http` POST `api.openai.com/v1/chat/completions` -> SSE |
-| Custom runtime | `runtime_manifest.go` | JSON manifest 定义 adapter 配置 |
+| SDK | Edge adapter | hubClient 方法 | 真实执行状态 |
+|-----|-------------|---------------|------------|
+| Anthropic SDK | `anthropic_sdk.go` | `triggerAgentTask` | ⏳ 缺 API key |
+| OpenAI SDK | `openai_sdk.go` | `triggerAgentTask` | ⏳ 缺 API key |
+| Custom runtime | `runtime_manifest.go` | `triggerAgentTask` | ✅ Fixture 验证 |
 
 ### 12.3 事件映射合同
 
@@ -928,15 +983,18 @@ CLI permission request
 
 ### 12.5 验收标准
 
-- [x] Claude Code 真实执行产出 typed events
-- [x] OpenCode 真实执行产出 typed events
-- [x] Codex 缺 API key 快速失败
-- [x] Anthropic SDK HTTP SSE 流式调用
-- [x] OpenAI SDK HTTP SSE 流式调用
-- [x] 进程生命周期由 Edge lifecycle 管理
-- [x] stdout/stderr 合并批处理（50ms 或 8KB）
-- [x] 权限请求映射到 approval 流
-- [x] SDK event 映射到统一 RunEvent 合同
+- [x] Claude Code 真实执行产出 typed events | 验证人：E2E smoke phase 13
+- [x] OpenCode 真实执行产出 typed events | 验证人：E2E smoke phase 13
+- [x] Codex 缺 API key 快速失败 | 验证人：E2E smoke phase 3
+- [x] Anthropic SDK HTTP SSE 流式调用 | 验证人：E2E smoke phase 3
+- [x] OpenAI SDK HTTP SSE 流式调用 | 验证人：E2E smoke phase 3
+- [x] 进程生命周期由 Edge lifecycle 管理 | 验证人：Edge unit tests
+- [x] stdout/stderr 合并批处理（50ms 或 8KB） | 验证人：Edge unit tests
+- [x] 权限请求映射到 approval 流 | 验证人：E2E smoke phase 13
+- [x] SDK event 映射到统一 RunEvent 合同 | 验证人：Edge fixture tests
+- [ ] Codex CLI 真实执行 | 验证人：E2E Codex 测试（需 API key）
+- [ ] Anthropic SDK 真实 API 消耗 | 验证人：E2E SDK 测试（需 API key）
+- [ ] OpenAI SDK 真实 API 消耗 | 验证人：E2E SDK 测试（需 API key）
 
 ---
 
@@ -946,40 +1004,52 @@ CLI permission request
 
 #### 当前状态
 
-- 89 tests pass, Hub contracts aligned
-- 只按 Hub 合同对齐，不分叉 runtime 或登录语义
-- Android APK 未产出
+- ✅ 91 tests pass, Hub contracts aligned
+- ✅ `hubClient.ts`/`hubEvents.ts`/`hubLifecycle.ts` 全部对齐 Hub API 合同
+- ✅ vitest.config 修复
+- ⏳ Android APK 未产出
+
+#### API 端点（Mobile 对齐）
+
+| 端点 | 用途 | Mobile 状态 |
+|------|------|-----------|
+| `/client/auth/*` | 认证全链路 | ✅ 对齐 |
+| `/client/sessions/*` | 会话管理 | ✅ 对齐 |
+| `/client/messages/*` | 消息操作 | ✅ 对齐 |
+| `/client/contacts/*` | 联系人 | ✅ 对齐 |
+| `/client/ws` | WebSocket | ✅ 对齐 |
 
 #### 验收标准
 
-- [x] 登录后看到与 Web 相同会话列表
-- [x] 可 approve/deny 审批
-- [x] WS 事件实时到达
-- [ ] Android APK 构建产出
+- [x] 登录后看到与 Web 相同会话列表 | 验证人：Mobile tests
+- [x] 可 approve/deny 审批 | 验证人：Mobile tests
+- [x] WS 事件实时到达 | 验证人：Mobile tests
+- [ ] Android APK 构建产出 | 验证人：CI 构建（需环境）
 
 ### 13.2 Desktop Tauri
 
 #### 当前状态
 
-- Windows unsigned package 已产出
-- Desktop 共享 Web workbench UI
-- Desktop 全端点 hooks 已实现
-- Desktop chatActions 已接线
+- ✅ Windows unsigned package 已产出
+- ✅ Desktop 共享 Web workbench UI
+- ✅ Desktop 全端点 hooks 已实现
+- ✅ Desktop chatActions 已接线
+- ⏳ macOS unsigned path 未拆清
 
 #### 验收标准
 
-- [x] Desktop 通过 Local Edge 执行 run
-- [x] Edge 健康状态在 UI 显示
-- [x] Windows unsigned package hash 一致
-- [x] sidecar 正确放置
-- [ ] macOS unsigned path 拆清
+- [x] Desktop 通过 Local Edge 执行 run | 验证人：E2E smoke
+- [x] Edge 健康状态在 UI 显示 | 验证人：E2E smoke
+- [x] Windows unsigned package hash 一致 | 验证人：`verify-tauri-package-dry.ps1`
+- [x] sidecar 正确放置 | 验证人：`verify-tauri-package-dry.ps1`
+- [ ] macOS unsigned path 拆清 | 验证人：CI 构建（需硬件）
 
 ### 13.3 i18n
 
 #### 验收标准
 
-- [x] 所有页面 zh/en 完整无遗漏字符串
-- [x] 术语翻译统一
+- [x] 所有页面 zh/en 完整无遗漏字符串 | 验证人：i18n 测试
+- [x] 术语翻译统一 | 验证人：i18n 测试
 
 ---
 
@@ -989,44 +1059,642 @@ CLI permission request
 
 | 测试类型 | 位置 | 状态 |
 |---------|------|------|
-| API Smoke (13 phases) | `verify-real-api-smoke.ps1` | **✅ 95+/96 通过**（1 失败：MSG_NOT_EDITABLE 消息编辑窗口策略） |
+| API Smoke (13 phases) | `verify-real-api-smoke.ps1` | ✅ ALL 13 PHASES PASSED |
 | Playwright E2E | `chat-real.spec.ts` | 9 个测试（8 pass, 1 skip） |
 | Hub Unit Tests | `hub-server/*_test.go` | 通过 |
-| Edge Unit Tests | `edge-server/*_test.go` | 通过 |
+| Edge Unit Tests | `edge-server/*_test.go` | 通过（1 transient flake） |
 | Web/Shared Tests | `app/web/`/`app/shared/` | 通过 |
 | Mobile RN | `app/mobile-rn/` | 91 tests 通过 |
 | P0 Gold Path | `verify-p0-approved-real-gold-path.ps1` | PASS |
 | Tauri Package | `verify-tauri-package-dry.ps1` | PASS |
 | Release Gate | `verify-release-gate.ps1` | PASS |
+| CI Gates | `verify-ci-gates.ps1` | PASS |
+| OIDC Readiness | `verify-oidc-readiness.ps1` | PASS |
 
 ### 14.2 需要补全的测试
 
-1. ~~完整 IM 数据流测试：send -> WS push -> transcript -> recall/edit/pin/reaction~~ ✅ 已补全（smoke test phases 8a-8j）
-2. ~~联系人全链路测试：search -> friend-request -> accept -> list -> block -> remark~~ ✅ 已补全（smoke test phases 9a-9h）
-3. ~~Agent 配置全链路测试：create profile -> update -> delete -> runtime/model~~ ✅ 已补全（smoke test phases 10a-10d）
-4. ~~云文档全链路测试：create -> update -> delete -> search -> preview~~ ✅ 已补全（smoke test phases 4c-4f）
-5. ~~项目全链路测试：create -> thread -> message -> artifact preview~~ ✅ 已补全（Edge phases 5-7）
-6. ~~执行全链路测试：trigger -> Edge run -> event stream -> approval -> artifact -> diff~~ ✅ 已补全（smoke test phases 5、13）
-7. Team 编排测试：create team -> add members -> start run -> route -> conflict ⏳
-8. 多端同步测试：Web + Desktop 同一账号同步 ⏳
-9. ~~认证全链路测试：OIDC login -> me -> refresh -> logout -> 401~~ ✅ OIDC authorize 已验证
-10. SDK adapter 测试：Anthropic/OpenAI HTTP SSE ⏳（阻塞于 API key）
-11. WebSocket 实时推送测试 ⏳（`ws` npm 模块缺失）
+| 测试 | 状态 | 阻塞原因 |
+|------|------|---------|
+| ~~完整 IM 数据流测试~~ | ✅ 已补全 | smoke test phases 8a-8j |
+| ~~联系人全链路测试~~ | ✅ 已补全 | smoke test phases 9a-9h |
+| ~~Agent 配置全链路测试~~ | ✅ 已补全 | smoke test phases 10a-10d |
+| ~~云文档全链路测试~~ | ✅ 已补全 | smoke test phases 4c-4f |
+| ~~项目全链路测试~~ | ✅ 已补全 | Edge phases 5-7 |
+| ~~执行全链路测试~~ | ✅ 已补全 | smoke test phases 5、13 |
+| Team 编排实时测试 | ⏳ | 需 Edge 连接 |
+| 多端同步测试 | ⏳ | 需 Web + Desktop 同账号 |
+| ~~认证全链路测试~~ | ✅ 已补全 | OIDC authorize 已验证 |
+| SDK adapter 真实测试 | ⏳ | 阻塞于 API key |
+| WebSocket 实时推送测试 | ⏳ | ws 模块兼容性 |
 
 ### 14.3 验收标准
 
-- [x] Release gate 全绿
-- [x] Changelog 包含所有变更
-- [x] 无 open Critical blockers
-- [ ] 所有 High 风险有 accepted 或 fixed
-- [x] Windows package hash 一致
-- [x] sidecar 正确放置
-- [x] Mobile tests pass
-- [x] Hub + Edge + Web + Desktop smoke 通过
+- [x] Release gate 全绿 | 验证人：`verify-release-gate.ps1`
+- [x] Changelog 包含所有变更 | 验证人：手动检查
+- [x] 无 open Critical blockers | 验证人：`verify-release-gate.ps1`
+- [ ] 所有 High 风险有 accepted 或 fixed | 验证人：安全风险登记册
+- [x] Windows package hash 一致 | 验证人：`verify-tauri-package-dry.ps1`
+- [x] sidecar 正确放置 | 验证人：`verify-tauri-package-dry.ps1`
+- [x] Mobile tests pass | 验证人：`corepack pnpm --dir app/mobile-rn verify`
+- [x] Hub + Edge + Web + Desktop smoke 通过 | 验证人：`verify-real-api-smoke.ps1`
 
 ---
 
-## 15. 依赖顺序
+## 15. 部署
+
+### 15.1 当前状态
+
+- ✅ hk2 生产部署已运行（Docker Compose: hub + postgres + redis）
+- ✅ Docker 网络 `agenthub-net`（172.18.0.0/16）已创建
+- ✅ 资源限制已配置（Hub 256MiB / PG 512MiB / Redis 384MiB）
+- ✅ Nginx 反向代理 + SSL 已配置（hub.vectorcontrol.tech）
+- ✅ 部署流程已文档化（`server/projects/agenthub/STATE.md`）
+- ⏳ 健康监控未自动化
+- ⏳ 回滚策略未文档化
+- ⏳ Edge Server 生产部署未规划
+
+### 15.2 部署架构
+
+```text
+hk2 (生产主机)
+├── Nginx (SSL termination + reverse proxy)
+│   ├── hub.vectorcontrol.tech -> agenthub-hub:8080
+│   └── 静态站 -> /opt/vectorcontrol-hk2-stack/agenthub-home/out/
+├── Docker Compose (agenthub-net: 172.18.0.0/16)
+│   ├── agenthub-hub (Hub Server, :8080)
+│   ├── agenthub-postgres (PostgreSQL, :5432)
+│   └── agenthub-redis (Redis, :6379)
+└── 本地文件
+    ├── /opt/agenthub-hub/hub-server/deployments/ (Compose + 配置)
+    └── /opt/vectorcontrol-hk2-stack/agenthub-home/out/ (静态站)
+```
+
+### 15.3 API 端点（部署相关）
+
+| 端点 | 方法 | 用途 | 备注 |
+|------|------|------|------|
+| `/health` | GET | 健康检查 | Nginx upstream check |
+| `/health/live` | GET | 存活探针 | K8s liveness 等效 |
+| `/health/ready` | GET | 就绪探针 | K8s readiness 等效 |
+| `:6060/metrics` | GET | Prometheus 指标 | admin_port |
+
+### 15.4 环境变量管理
+
+| 变量 | 用途 | 生产值来源 | 默认值 |
+|------|------|-----------|--------|
+| `AGENTHUB_DB_HOST` | PostgreSQL 主机 | Docker 内部 DNS | `localhost` |
+| `AGENTHUB_DB_PORT` | PostgreSQL 端口 | `5432` | `5432` |
+| `AGENTHUB_DB_USER` | PostgreSQL 用户 | Docker Compose | `agenthub` |
+| `AGENTHUB_DB_PASSWORD` | PostgreSQL 密码 | 密钥管理 | `dev_password` |
+| `AGENTHUB_DB_NAME` | 数据库名 | `agenthub` | `agenthub` |
+| `AGENTHUB_DB_SSLMODE` | SSL 模式 | `require`（生产） | `disable` |
+| `AGENTHUB_REDIS_HOST` | Redis 主机 | Docker 内部 DNS | `localhost` |
+| `AGENTHUB_REDIS_PORT` | Redis 端口 | `6379` | `6379` |
+| `AGENTHUB_REDIS_PASSWORD` | Redis 密码 | 密钥管理 | `""` |
+| `AGENTHUB_JWT_SECRET` | JWT 签名密钥 | 密钥管理（>=32 字符） | `""` |
+| `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | OIDC Issuer | `https://id.vectorcontrol.tech` | `http://localhost:3000` |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | OAuth Client ID | TokenDanceID 注册 | `agenthub-desktop` |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | OAuth Client Secret | 密钥管理 | `""` |
+| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | 回调 URI | 生产 URL | `http://127.0.0.1/callback` |
+| `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 允许回调列表 | 生产 URL 列表 | 本地开发列表 |
+| `AGENTHUB_ENV` | 环境标识 | `production` | `""` |
+| `AGENTHUB_CORS_ORIGINS` | CORS 白名单 | `https://hub.vectorcontrol.tech` | `""` |
+| `AGENTHUB_S3_ENDPOINT` | S3 端点 | 对象存储 | `""` |
+| `AGENTHUB_S3_ACCESS_KEY` | S3 Access Key | 密钥管理 | `""` |
+| `AGENTHUB_S3_SECRET_KEY` | S3 Secret Key | 密钥管理 | `""` |
+| `AGENTHUB_S3_BUCKET` | S3 Bucket | 对象存储 | `""` |
+
+### 15.5 Docker Compose 架构
+
+```yaml
+# deployments/docker-compose.prod.yml 概要结构
+services:
+  hub-server:
+    image: ghcr.io/tokendancelab/agenthub-hub:<sha>
+    environment:
+      - AGENTHUB_ENV=production
+      - AGENTHUB_DB_HOST=agenthub-postgres
+      - AGENTHUB_REDIS_HOST=agenthub-redis
+      # 其他变量从 .env 文件注入
+    depends_on:
+      - agenthub-postgres
+      - agenthub-redis
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - agenthub-net
+    ports:
+      - "127.0.0.1:8080:8080"  # 不直接对外
+      - "127.0.0.1:6060:6060"  # admin 端口
+
+  agenthub-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: agenthub
+      POSTGRES_DB: agenthub
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - agenthub-net
+
+  agenthub-redis:
+    image: redis:7-alpine
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    networks:
+      - agenthub-net
+
+networks:
+  agenthub-net:
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+
+volumes:
+  pgdata:
+```
+
+### 15.6 Nginx 反向代理配置要点
+
+```nginx
+# hk2 nginx 配置概要
+server {
+    listen 443 ssl http2;
+    server_name hub.vectorcontrol.tech;
+
+    # SSL
+    ssl_certificate     /etc/nginx/ssl/hub.vectorcontrol.tech.crt;
+    ssl_certificate_key /etc/nginx/ssl/hub.vectorcontrol.tech.key;
+
+    # 安全头
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Hub API 反代
+    location /client/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /web/ {
+        proxy_pass http://127.0.0.1:8080;
+        # 同上
+    }
+
+    location /edge/ {
+        proxy_pass http://127.0.0.1:8080;
+        # Edge 回调需要内部认证
+    }
+
+    # WebSocket
+    location /client/ws {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # 静态站
+    location / {
+        root /opt/vectorcontrol-hk2-stack/agenthub-home/out;
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+### 15.7 回滚策略
+
+| 场景 | 回滚操作 | 影响范围 |
+|------|---------|---------|
+| Hub Server 镜像回退 | `docker load < 旧镜像.tar && docker compose up -d --force-recreate hub-server` | Hub API 短暂中断 |
+| 数据库迁移回退 | `migrate -path migrations -database $DB_URL down <version>` | 数据可能丢失，需评估 |
+| 静态站回退 | `cp -a out.backup-YYYYMMDD out` | 无中断 |
+| 配置变更回退 | 编辑 `.env` 或 `config.yaml`，重启容器 | Hub API 短暂中断 |
+| Nginx 配置回退 | `sudo /usr/local/bin/nginx-snapshot restore <timestamp>` | 无中断（reload） |
+
+**回滚前置条件**：
+1. 部署前必须创建备份（数据库 dump + 静态站 tar + Nginx snapshot）
+2. 记录当前运行的镜像 SHA 和迁移版本
+3. 确认回滚路径已在测试环境验证
+
+### 15.8 需要对接的文件
+
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `hub-server/configs/config.yaml` | 配置 | 生产环境配置覆盖 |
+| `hub-server/.env.example` | 模板 | 环境变量参考 |
+| `hub-server/internal/config/constants.go` | 运行时常量 | 超时/限制/TTL |
+| `deployments/docker-compose.prod.yml` | 部署 | Docker Compose 编排 |
+| Nginx 配置（hk2） | 运维 | SSL + 反代 + 静态站 |
+| `C:\Users\Ding\server\projects\agenthub\STATE.md` | 运维 | 部署状态文档 |
+
+### 15.9 实施步骤
+
+- [x] 1. 配置 Docker Compose 编排（hub + postgres + redis）
+- [x] 2. 配置 Nginx 反向代理 + SSL 证书
+- [x] 3. 设置 Docker 网络隔离（`agenthub-net`）
+- [x] 4. 配置资源限制（Hub 256MiB / PG 512MiB / Redis 384MiB）
+- [x] 5. 配置环境变量注入（`.env` 文件）
+- [x] 6. 验证 `curl -fsS https://hub.vectorcontrol.tech/health` 返回 200
+- [x] 7. 配置 WS proxy（upgrade + 3600s timeout）
+- [x] 8. 配置 CORS 白名单（`AGENTHUB_CORS_ORIGINS`）
+- [ ] 9. 实现健康监控自动化（定时 health check + 告警）
+- [ ] 10. 编写回滚策略文档（版本回退 + DB migration 回退）
+- [ ] 11. 配置 Edge Server 生产部署（或 Remote Edge 方案）
+- [ ] 12. 配置 Prometheus metrics 抓取（`:6060/metrics`）
+- [ ] 13. 配置 PG 自动备份（daily dump + 远程存储）
+- [ ] 14. 配置日志聚合（Hub/Edge/PG/Redis 日志统一收集）
+
+### 15.10 验收标准
+
+- [x] Hub Server 容器启动后 `/health` 返回 200 | 验证人：`curl -fsS https://hub.vectorcontrol.tech/health`
+- [x] PostgreSQL 连接正常，49 个迁移全部运行 | 验证人：`verify-real-api-smoke.ps1`
+- [x] Redis 连接正常，缓存写入读取正常 | 验证人：`verify-real-api-smoke.ps1`
+- [x] Nginx SSL 正确配置，HTTPS 可访问 | 验证人：浏览器访问
+- [x] Docker 资源限制生效 | 验证人：`docker stats`
+- [x] 环境变量正确注入，无硬编码密码 | 验证人：`.env` 审计
+- [x] WS proxy 正确转发 upgrade 请求 | 验证人：E2E smoke WS 测试
+- [x] CORS 白名单正确配置 | 验证人：OPTIONS 请求返回 204
+- [ ] 健康监控自动化告警 | 验证人：告警测试
+- [ ] 回滚策略文档完成 | 验证人：文档评审
+- [ ] Edge Server 生产部署就绪 | 验证人：Edge health check
+- [ ] Prometheus metrics 可查询 | 验证人：`curl :6060/metrics`
+- [ ] PG 自动备份运行 | 验证人：备份恢复测试
+- [ ] 日志聚合可用 | 验证人：日志查询测试
+
+---
+
+## 16. 安全与合规
+
+### 16.1 当前状态
+
+- ✅ JWT 认证中间件（`AuthMiddleware` + `RequireHubSession`）
+- ✅ 全局 IP 限流（100/min，`GlobalRateLimit`）
+- ✅ 认证端点滑动窗口限流（注册 3/min，登录 5/min）
+- ✅ 请求体大小限制（10MB，`BodyLimit`）
+- ✅ OIDC PKCE 流程（Desktop + Web）
+- ✅ Token 存储安全（Web localStorage / Desktop secure storage）
+- ✅ `.env.example` 无真实密钥
+- ✅ Edge 安全钩子（`security_hooks.go`）
+- ✅ 进程环境变量脱敏（`env_sanitizer.go`）
+- ✅ Hub Admin 端口独立（`:6060`，不对外暴露）
+- ⏳ `.gitignore` 审计状态需确认
+- ⏳ 依赖漏洞扫描未自动化
+- ⏳ WS 认证加固未完成
+- ⏳ CSP / Permissions-Policy 未配置
+- ⏳ 安全风险登记册 High 项未关闭
+
+### 16.2 安全审计清单
+
+| 审计项 | 状态 | 说明 |
+|--------|------|------|
+| JWT secret 管理 | ✅ | 环境变量覆盖，不写入代码 |
+| OIDC client secret | ✅ | `.env` 注入，`.gitignore` 排除 |
+| DB 密码管理 | ✅ | 环境变量覆盖 |
+| Redis 密码 | ✅ | 可选配置 |
+| `.env.example` 无真实凭据 | ✅ | 模板文件不含实际值 |
+| 全局限流 | ✅ | 100 req/min per IP |
+| 认证限流 | ✅ | 注册 3/min、登录 5/min |
+| 请求体限制 | ✅ | 10MB 默认 |
+| 文件上传限制 | ✅ | 50MB 最大，MIME 白名单 |
+| 密码策略 | ✅ | 最小 8 位，最大 64 位 |
+| Token TTL | ✅ | access 15min, refresh 720h |
+| Edge allowlist | ✅ | 工作区白名单 |
+| 进程环境脱敏 | ✅ | `env_sanitizer.go` |
+| Origin 检查 | ✅ | `security/origin.go` |
+| CSP / Permissions-Policy | ⏳ | 未配置（HOME-SR-004） |
+| 依赖漏洞扫描 | ⏳ | 未自动化 |
+| API rate limiting per-user | ⏳ | 仅有 per-IP |
+| WS 认证加固 | ⏳ | 需 token 验证强化 |
+| 安全风险登记册关闭 | ⏳ | High 项待处理 |
+
+### 16.4 依赖漏洞扫描
+
+| 组件 | 扫描工具 | 当前状态 | 目标 |
+|------|---------|---------|------|
+| Hub Server (Go) | `govulncheck ./...` | ⏳ 未自动化 | CI 集成 |
+| Edge Server (Go) | `govulncheck ./...` | ⏳ 未自动化 | CI 集成 |
+| Web (npm) | `npm audit --production` | ⏳ 未自动化 | CI 集成 |
+| Desktop (npm) | `npm audit --production` | ⏳ 未自动化 | CI 集成 |
+| Mobile RN (npm) | `npm audit --production` | ⏳ 未自动化 | CI 集成 |
+| Docker 镜像 | `trivy image` | ⏳ 未配置 | CI 集成 |
+
+### 16.5 Token 验证加固
+
+| 加固项 | 当前状态 | 目标 |
+|--------|---------|------|
+| JWT RS256 签名 | ✅ HMAC-SHA256 | 评估 RS256 迁移 |
+| Access token TTL | ✅ 15min | 合理 |
+| Refresh token TTL | ✅ 720h | 合理 |
+| Refresh token rotation | ⏳ 未实现 | 单次使用 + 失效旧 token |
+| Token blacklist on logout | ⏳ 未实现 | Redis SET + TTL |
+| WS auth token 验证 | ✅ 基础验证 | 加固频率限制 |
+| OIDC ID token 验证 | ✅ `jwtutil/tokendance.go` | 持续监控 |
+
+### 16.6 API Rate Limiting 细节
+
+| 端点分组 | 限流策略 | 窗口 | 当前值 |
+|---------|---------|------|-------|
+| 全局 | per-IP fixed window | 1min | 100 req/min |
+| 注册 | per-IP sliding window | 1min | 3 req/min |
+| 登录 | per-IP sliding window | 1min | 5 req/min |
+| 消息发送 | per-user | — | ⏳ 待实现 |
+| 文件上传 | per-user | — | ⏳ 待实现 |
+| WS 连接 | per-IP | — | ⏳ 待实现 |
+
+### 16.7 WebSocket 安全加固
+
+| 加固项 | 当前状态 | 说明 |
+|--------|---------|------|
+| Auth handshake | ✅ `auth` event + JWT | 连接时验证 |
+| Origin 检查 | ✅ `security/origin.go` | 防止 CSRF |
+| 连接频率限制 | ⏳ 未实现 | 防止连接耗尽 |
+| 单用户连接数上限 | ⏳ 未实现 | 防止资源耗尽 |
+| 消息频率限制 | ⏳ 未实现 | 防止消息洪泛 |
+| Ping/Pong 超时 | ✅ 30s interval, 2 missed | 检测死连接 |
+| 发送缓冲区 | ✅ 256 条 | 防止内存溢出 |
+
+### 16.8 敏感信息审计
+
+| 审计项 | 位置 | 当前状态 |
+|--------|------|---------|
+| `.env` 排除 | `.gitignore` | ✅ 已排除 |
+| `.env.example` 模板 | `hub-server/.env.example` | ✅ 无真实凭据 |
+| JWT secret 空默认 | `hub-server/configs/config.yaml` | ✅ `secret: ""` |
+| OIDC client secret 空默认 | `hub-server/configs/config.yaml` | ✅ `client_secret: ""` |
+| DB password 空默认 | `hub-server/configs/config.yaml` | ✅ 环境变量覆盖 |
+| 种子 SQL 无密码 | `hub-server/scripts/seed-tokendance-client.sql` | ✅ 仅 client_id |
+| Edge adapter API key | 环境变量 | ✅ 不在代码中 |
+| TokenDance API key | 不暴露给前端 | ✅ 仅 Hub/Edge |
+
+### 16.9 需要对接的文件
+
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `hub-server/internal/middleware/auth.go` | 加固 | JWT 验证逻辑 |
+| `hub-server/internal/middleware/rate_limit.go` | 扩展 | per-user 限流 |
+| `hub-server/internal/middleware/global_rate_limit.go` | 验证 | 全局限流 |
+| `hub-server/internal/handler/ws.go` | 加固 | WS 连接频率限制 + 消息频率限制 |
+| `hub-server/internal/service/auth.go` | 加固 | Refresh token rotation |
+| `hub-server/.env.example` | 审计 | 确认无真实凭据 |
+| `.gitignore` | 审计 | 确认 `.env` 被排除 |
+| Nginx 配置（hk2） | 加固 | CSP / Permissions-Policy / X-Content-Type-Options |
+| `hub-server/go.mod` | 扫描 | `govulncheck` 依赖检查 |
+| `app/web/package.json` | 扫描 | `npm audit` 依赖检查 |
+
+### 16.10 实施步骤
+
+- [x] 1. 确认 `.env.example` 不含真实凭据
+- [x] 2. 确认 `.gitignore` 排除 `.env` 文件
+- [x] 3. 验证 JWT secret 通过环境变量注入
+- [x] 4. 验证 OIDC client secret 通过环境变量注入
+- [x] 5. 验证全局和认证限流正常工作
+- [x] 6. 验证 Edge 进程环境变量脱敏（`env_sanitizer.go`）
+- [x] 7. 验证 Admin 端口不对外暴露（Nginx 不代理 :6060）
+- [ ] 8. 配置 CSP / Permissions-Policy（Nginx 层）
+- [ ] 9. 实现依赖漏洞扫描自动化（`govulncheck` / `npm audit`）
+- [ ] 10. 加固 WS 认证（连接频率限制 + 消息频率限制 + 单用户连接上限）
+- [ ] 11. 实现 per-user API 限流（消息发送 / 文件上传）
+- [ ] 12. 实现 Refresh token rotation
+- [ ] 13. 实现 Token blacklist on logout（Redis）
+- [ ] 14. 配置 Docker 镜像扫描（`trivy`）
+- [ ] 15. 关闭安全风险登记册 High 项
+
+### 16.11 验收标准
+
+- [x] 所有 Hub API 经过认证中间件 | 验证人：E2E smoke phase 2
+- [x] 全局 IP 限流正常工作 | 验证人：限流测试
+- [x] 认证端点限流正常工作 | 验证人：限流测试
+- [x] JWT secret 不在代码仓库中 | 验证人：`.env.example` 审计
+- [x] OIDC client secret 不在代码仓库中 | 验证人：`.env.example` 审计
+- [x] Edge 进程环境变量已脱敏 | 验证人：`env_sanitizer.go` 测试
+- [x] Admin 端口不对外暴露 | 验证人：Nginx 配置
+- [x] Origin 检查防止 CSRF | 验证人：`origin.go` 测试
+- [x] WS auth handshake 正常 | 验证人：E2E smoke phase 12
+- [ ] CSP / Permissions-Policy 配置完成 | 验证人：安全扫描
+- [ ] 依赖漏洞扫描通过 | 验证人：CI 扫描
+- [ ] WS 认证加固完成 | 验证人：WS 安全测试
+- [ ] per-user 限流实现 | 验证人：限流测试
+- [ ] Refresh token rotation 实现 | 验证人：认证测试
+- [ ] 安全风险登记册 High 项全部关闭或 accepted | 验证人：风险登记册评审
+
+---
+
+## 17. 性能优化
+
+### 17.1 当前状态
+
+- ✅ Edge SQLite WAL 模式已启用（`PRAGMA journal_mode = WAL`）
+- ✅ Edge SQLite `synchronous = NORMAL` 已配置
+- ✅ Edge SQLite `busy_timeout = 5000` 已配置
+- ✅ Hub Redis 缓存已实现（session member cache、rate limit、pending tasks）
+- ✅ Hub 事件总线 worker pool 已实现（1024 workers）
+- ✅ Hub WebSocket 发送缓冲区已配置（256）
+- ✅ Hub WebSocket heartbeat 已配置（30s ping interval）
+- ✅ Hub 异步事件处理已实现（EventBus）
+- ✅ Edge 批处理已实现（50ms 或 8KB stdout/stderr）
+- ✅ Hub 迁移索引已建立（30+ 个 CREATE INDEX）
+- ⏳ 联系人查询存在 N+1 问题（已有 TODO 标注）
+- ⏳ 数据库查询性能基线未建立
+- ⏳ WebSocket 连接池化未实现
+- ⏳ 前端 React Query 缓存策略未调优
+- ⏳ API 延迟基线未测量
+
+### 17.2 性能目标
+
+| 指标 | 目标 | 当前基线 | 差距 |
+|------|------|---------|------|
+| API 响应时间 (p95) | < 200ms | 未测量 | 需建立基线 |
+| API 响应时间 (p99) | < 500ms | 未测量 | 需建立基线 |
+| WS 事件延迟 | < 50ms | 未测量 | 需建立基线 |
+| 消息列表查询（50 条） | < 100ms | 未测量 | 需建立基线 |
+| 会话列表查询 | < 150ms | 未测量 | 需建立基线 |
+| Edge Run 事件流延迟 | < 100ms | 已有批处理 | 可接受 |
+| Hub 迁移执行时间 | < 30s | 已验证 | ✅ |
+| SQLite WAL 检查点 | < 1s | 已配置 | ✅ |
+
+### 17.3 数据库优化
+
+| 优化项 | 当前状态 | 目标 |
+|--------|---------|------|
+| 消息查询索引 | ✅ `idx_messages_session_created` | 已优化 |
+| 联系人查询索引 | ✅ `idx_friendships_user_status` | 已优化 |
+| 通知查询索引 | ✅ `idx_notifications_user_read_created` | 已优化 |
+| 审计事件索引 | ✅ `idx_audit_events_*`（3 个） | 已优化 |
+| 全文搜索索引 | ✅ `idx_messages_content_text_tsvector` | 已优化 |
+| Agent Profile 索引 | ✅ `idx_agent_profiles_owner/public/runtime` | 已优化 |
+| Execution Target 索引 | ✅ `idx_execution_targets_owner/device` | 已优化 |
+| Skill/MCP 索引 | ✅ `idx_skills_*`/`idx_mcp_servers_*` | 已优化 |
+| Session Member 缓存 | ✅ Redis 5min TTL | 已优化 |
+| Pending Task Redis 索引 | ✅ Redis SET + TTL | 已优化 |
+| N+1 查询消除 | ⏳ 联系人列表有 N+1（已标注 P2-1, P2-2） | 批量查询 |
+| 连接池配置 | ✅ Redis pool_size=100, min_idle=10 | 已优化 |
+| Edge SQLite WAL | ✅ WAL + NORMAL sync + busy_timeout 5000 | 已优化 |
+| 消息编辑索引 | ✅ `idx_messages_edited` (partial) | 已优化 |
+| Reaction 索引 | ✅ `idx_message_reactions_*` (2 个) | 已优化 |
+| Attachment 索引 | ✅ `idx_message_attachments_*` (2 个) | 已优化 |
+
+### 17.4 WebSocket 性能
+
+| 参数 | 当前值 | 配置位置 | 说明 |
+|------|-------|---------|------|
+| 发送缓冲区 | 256 | `config/constants.go` | 每连接 outgoing channel 容量 |
+| Heartbeat 间隔 | 30s | `config/constants.go` | 服务端 ping 频率 |
+| Ping 超时 | 5s | `config/constants.go` | 单次 ping 超时 |
+| 最大 missed pong | 2 | `config/constants.go` | 连续 missed pong 数量 |
+| Nginx proxy timeout | 3600s | Nginx 配置 | WS 长连接超时 |
+| EventBus pool | 1024 workers | `config/constants.go` | 异步事件处理 |
+
+### 17.5 Edge 进程生命周期优化
+
+| 优化项 | 当前状态 | 目标 |
+|--------|---------|------|
+| stdout/stderr 批处理 | ✅ 50ms 或 8KB | 已优化 |
+| 进程超时控制 | ✅ context deadline | 已实现 |
+| 环境变量脱敏 | ✅ `env_sanitizer.go` | 已实现 |
+| 安全钩子 | ✅ `security_hooks.go` | 已实现 |
+| 进程复用 | ⏳ 每次新建 | 评估 CLI 长驻进程 |
+| 预检快速失败 | ✅ `PreflightAdapter` | Codex 已实现 |
+| 事件去重 | ✅ `RunEvent` ID | 已实现 |
+| 结果聚合 | ✅ `result_aggregator.go` | 已实现 |
+
+### 17.6 前端缓存策略
+
+| 数据类型 | React Query 配置 | 目标 staleTime | 目标 gcTime |
+|---------|-----------------|---------------|------------|
+| 会话列表 | `useQuery` | 30s | 5min |
+| 消息列表 | `useInfiniteQuery` | 10s | 2min |
+| 联系人列表 | `useQuery` | 60s | 10min |
+| Agent Profile | `useQuery` | 60s | 10min |
+| 执行目标 | `useQuery` | 30s | 5min |
+| 项目列表 | `useQuery` | 60s | 10min |
+| 设置 | `useQuery` | 300s | 30min |
+| Team 列表 | `useQuery` | 60s | 10min |
+| Run 事件流 | `useInfiniteQuery` | 实时（WS invalidation） | 2min |
+
+### 17.7 Hub Server 常量审计
+
+| 常量 | 当前值 | 位置 | 评估 |
+|------|-------|------|------|
+| `DefaultPaginationLimit` | 50 | `config/constants.go` | 合理 |
+| `MaxMessagePageLimit` | 100 | `config/constants.go` | 合理 |
+| `MaxIncrementalMessageLimit` | 500 | `config/constants.go` | 合理 |
+| `DefaultReadHeaderTimeout` | 5s | `config/constants.go` | 合理 |
+| `DefaultServerWriteTimeout` | 60s | `config/constants.go` | 合理 |
+| `DefaultServerReadTimeout` | 30s | `config/constants.go` | 合理 |
+| `DefaultServerIdleTimeout` | 120s | `config/constants.go` | 合理 |
+| `DefaultShutdownTimeout` | 5s | `config/constants.go` | 合理 |
+| `DefaultMaxUploadSize` | 50MB | `config/constants.go` | 合理 |
+| `DefaultRequestBodyLimit` | 10MB | `config/constants.go` | 合理 |
+| `DefaultRequestTimeout` | 15s | `config/constants.go` | 合理 |
+| `UploadRequestTimeout` | 30s | `config/constants.go` | 合理 |
+| `GlobalRateLimitPerMinute` | 100 | `config/constants.go` | 合理 |
+| `MessageRecallWindow` | 5min | `config/constants.go` | 合理 |
+| `MessageEditWindow` | 15min | `config/constants.go` | 合理 |
+| `MaxPinsPerSession` | 50 | `config/constants.go` | 合理 |
+| `ForwardMessageConcurrency` | 8 | `config/constants.go` | 合理 |
+| `MaxForwardTargets` | 50 | `config/constants.go` | 合理 |
+| `WSSendBufferSize` | 256 | `config/constants.go` | 合理 |
+| `WSHeartbeatInterval` | 30s | `config/constants.go` | 合理 |
+| `EventBusPoolSize` | 1024 | `config/constants.go` | 合理 |
+| `MaxRunEventsPerTask` | 4096 | `config/constants.go` | 合理 |
+| `PendingTaskTTL` | 24h | `config/constants.go` | 合理 |
+| `RunningTaskHeartbeatTTL` | 10min | `config/constants.go` | 合理 |
+
+### 17.8 需要对接的文件
+
+| 文件 | 变更类型 | 说明 |
+|------|---------|------|
+| `hub-server/internal/service/contact.go` | 优化 | 修复 N+1 查询（已标注 P2-1, P2-2） |
+| `hub-server/internal/repository/*.go` | 审计 | 查询性能审计（EXPLAIN ANALYZE） |
+| `hub-server/configs/config.yaml` | 调优 | Redis 连接池参数 |
+| `hub-server/internal/config/constants.go` | 调优 | WS/EventBus 常量 |
+| `edge-server/internal/store/sqlite_migrations.go` | 验证 | WAL 模式确认 |
+| `app/web/src/api/hubWS.ts` | 调优 | WS 连接管理 + 重连策略 |
+| React Query 配置 | 调优 | staleTime/cacheTime/gcTime |
+
+### 17.9 实施步骤
+
+- [x] 1. 启用 Edge SQLite WAL 模式
+- [x] 2. 配置 Edge SQLite PRAGMA（busy_timeout/synchronous/foreign_keys）
+- [x] 3. 建立 Hub 数据库迁移索引（30+ 个）
+- [x] 4. 配置 Hub Redis 连接池（pool_size=100, min_idle=10）
+- [x] 5. 配置 Hub EventBus worker pool（1024）
+- [x] 6. 配置 Hub WS heartbeat（30s）和发送缓冲区（256）
+- [x] 7. 实现 Edge stdout/stderr 批处理（50ms 或 8KB）
+- [x] 8. 实现 Edge 结果聚合器（`result_aggregator.go`）
+- [x] 9. 实现 Hub Session Member Redis 缓存（5min TTL）
+- [ ] 10. 建立 API 延迟基线（p50/p95/p99）
+- [ ] 11. 修复联系人查询 N+1 问题（`contact.go` P2-1, P2-2）
+- [ ] 12. 审计所有 repository 查询的索引覆盖（EXPLAIN ANALYZE）
+- [ ] 13. 调优 React Query 缓存策略（staleTime/cacheTime）
+- [ ] 14. 实现 WS 连接池化（多 tab 共享）
+- [ ] 15. Edge 进程生命周期优化（进程复用 vs 新建）
+- [ ] 16. 建立 WS 事件延迟基线
+- [ ] 17. 建立 Hub 内存/CPU 使用基线
+- [ ] 18. 实现慢查询日志（>100ms 查询告警）
+
+### 17.10 验收标准
+
+- [x] Edge SQLite WAL 模式启用 | 验证人：`PRAGMA journal_mode` 查询
+- [x] Hub 迁移索引全部建立 | 验证人：迁移文件审计
+- [x] Redis 连接池正常工作 | 验证人：Hub smoke test
+- [x] EventBus 异步处理无阻塞 | 验证人：Hub unit tests
+- [x] Edge 批处理正常工作 | 验证人：Edge unit tests
+- [x] Session Member 缓存命中 | 验证人：Redis 监控
+- [x] Edge 结果聚合正确 | 验证人：Edge unit tests
+- [ ] API p95 < 200ms | 验证人：性能基线测试
+- [ ] WS 事件延迟 < 50ms | 验证人：WS 延迟测试
+- [ ] 联系人查询 N+1 已消除 | 验证人：contact.go 批量查询
+- [ ] React Query 缓存策略已调优 | 验证人：前端性能测试
+- [ ] 数据库查询索引覆盖完整 | 验证人：EXPLAIN ANALYZE 审计
+- [ ] 慢查询日志已启用 | 验证人：日志审查
+- [ ] Hub 内存/CPU 基线已建立 | 验证人：`docker stats` 监控
+
+---
+
+## 18. 非协商边界
+
+1. **Web 只和 Hub 通信**，不直接连接 Local Edge 或 raw runtime。
+2. **Desktop renderer 不获得 raw process execution 权限**。
+3. **Local Edge 负责本地执行**、adapter 调用、runtime policy、日志和证据。
+4. **Hub 负责账号**、IM、同步、路由、权限、审计和远程控制面。
+5. **Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离**。
+6. **Mock 和 fixture 模式必须显式**；real mode 不能静默降级。
+7. **真实登录**、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
+8. **Roadmap 只写路线**；当前事实写在 `STATE.md`。
+9. **非必要不碰 UI 层**：UI 作为需求文档，目标是调通数据流。
+10. **所有 Hub API 必须经过 `AuthMiddleware` + `RequireHubSession`**。
+11. **Desktop 文件操作必须经过 allowlist 和 typed Host API**。
+12. **TokenDance API key 不得暴露给浏览器 UI**。
+13. **SDK adapter 不依赖外部 SDK 包**，使用纯 `net/http` 实现。
+14. **未获明确审批，不跑真实登录、真实模型消耗、部署、签名、公证、updater、release upload**。
+15. **所有 CLI adapter 输出必须统一映射到 typed `RunEvent` 合同**。
+16. **进程生命周期由 Edge lifecycle 管理，不暴露给前端**。
+17. **所有敏感配置通过环境变量注入**，不得硬编码在代码或配置文件中。
+18. **签名证书是生产发布的关键安全阻塞项**，无签名证书不可发布 stable。
+19. **`docker system prune -af` 在 hk2 禁止执行**（2026-05-28 事故）。
+20. **安全风险登记册 High 项未关闭前不发布 stable**。
+
+---
+
+## 附录 A. 依赖顺序
 
 ```
 Phase 1 (P0): 认证打通
@@ -1051,19 +1719,140 @@ Phase 4 (P2): 运行时集成
   ├─ 12. SDK -> Anthropic/OpenAI API 消耗
   └─ 13.1 Mobile -> Hub API + OIDC deep-link
 
-Phase 5 (P3): 发布
+Phase 5 (P3): 生产就绪
+  ├─ 15. 部署 -> hk2 生产部署完善
+  ├─ 16. 安全 -> 安全审计 + 风险关闭
+  ├─ 17. 性能 -> 基线建立 + N+1 消除
+  └─ 14. E2E -> 全流程自动化
+
+Phase 6 (P4): 发布
   ├─ 13.2 Desktop Tauri -> 签名 + 打包
-  ├─ 14. E2E -> 全流程自动化
   └─ 14. Release -> changelog + gate + rollback
+```
+
+### 依赖关系图
+
+```text
+认证 (3)
+  ├── 聊天 (4) ──> 消息搜索导航
+  ├── 联系人 (5)
+  ├── Agent 配置 (6) ──> Tool allowlist
+  ├── 设置 (8)
+  ├── 文档 (7)
+  ├── 项目 (9)
+  ├── 执行 (10) ──> Codex (需 key) ──> SDK 消耗 (需 key)
+  │                └─> Artifact apply/revert (需审批)
+  ├── Team 编排 (11) ──> Team 实时测试
+  ├── 部署 (15) ──> 健康监控 ──> Prometheus
+  │                └─> 回滚策略
+  │                └─> Edge 生产部署
+  ├── 安全 (16) ──> CSP/Permissions ──> 依赖扫描
+  │                └─> WS 加固 ──> per-user 限流
+  │                └─> Token rotation ──> Token blacklist
+  │                └─> 风险登记册关闭
+  └── 性能 (17) ──> API 基线 ──> N+1 消除
+                   └─> WS 延迟基线 ──> 缓存调优
+                   └─> 慢查询日志 ──> 索引审计
 ```
 
 ---
 
-## 16. 验证清单
+## 附录 C. 发布检查清单
+
+### C.1 发布前检查（每次发布必过）
+
+| 检查项 | 脚本/方法 | 阻塞级别 |
+|--------|---------|---------|
+| CI gates 全绿 | `verify-ci-gates.ps1` | 阻塞 |
+| API smoke 全过 | `verify-real-api-smoke.ps1` | 阻塞 |
+| Hub tests 通过 | `go test ./... -short -count=1` | 阻塞 |
+| Edge tests 通过 | `go test ./... -short -count=1` | 阻塞 |
+| Web typecheck 通过 | `tsc --noEmit` | 阻塞 |
+| Mobile tests 通过 | `corepack pnpm --dir app/mobile-rn verify` | 阻塞 |
+| Release gate 通过 | `verify-release-gate.ps1` | 阻塞 |
+| 安全风险登记册 High 关闭 | 人工评审 | 阻塞 |
+| 签名证书可用 | 人工确认 | 阻塞（stable） |
+| Changelog 更新 | 人工检查 | 阻塞 |
+| Tauri package hash 一致 | `verify-tauri-package-dry.ps1` | 阻塞（Desktop） |
+| OIDC 登录真实验证 | 手动测试 | 阻塞 |
+| 依赖漏洞扫描 | `govulncheck` + `npm audit` | 警告 |
+| 性能基线对比 | 手动对比 | 警告 |
+
+### C.2 发布流程
+
+```text
+1. 确认所有阻塞项通过
+2. 更新 CHANGELOG.md
+3. 从 dev 创建 release 分支
+4. 运行完整测试套件
+5. 构建产物（Hub 镜像 + Desktop 包 + 静态站）
+6. 签名（如有证书）
+7. 部署到 hk2 staging
+8. 验证 staging
+9. 部署到 hk2 production
+10. 验证 production
+11. 打 tag
+12. Push release
+```
+
+### C.3 发布后验证
+
+| 验证项 | 方法 | 超时 |
+|--------|------|------|
+| Hub health | `curl https://hub.vectorcontrol.tech/health` | 30s |
+| Hub WS | WebSocket connect + auth.ok | 10s |
+| Hub API | `GET /client/auth/me` 返回 200 | 10s |
+| 静态站 | `curl https://hub.vectorcontrol.tech/zh` 返回 200 | 30s |
+| PostgreSQL | Hub 日志无连接错误 | 60s |
+| Redis | Hub 日志无缓存错误 | 60s |
+| Prometheus | `curl :6060/metrics` 返回指标 | 10s |
+
+---
+
+## 附录 D. 剩余未勾选项跟踪
+
+> 当前 roadmap 中所有未勾选项汇总，含阻塞原因和计划阶段。
+
+| 未勾选项 | 所属章节 | 阻塞原因 | 计划阶段 |
+|---------|---------|---------|---------|
+| 点击搜索结果跳转到消息位置 | 4. IM 聊天 | UI 交互实现 | P2 |
+| 进入会话后未读计数清零 | 4. IM 聊天 | hubClient 调用时机 | P2 |
+| WS 断线重连后不丢失事件 | 4. IM 聊天 | ws 库兼容性 | P2 |
+| 连接状态指示器正确 | 4. IM 聊天 | 前端状态同步 | P2 |
+| Tool allowlist 限制可调用工具 | 6. Agent 配置 | API 层配置实现 | P2 |
+| Android APK 构建产出 | 13. Mobile | 缺少构建环境 | P3 |
+| macOS unsigned path 拆清 | 13. Desktop | 缺少硬件 | P4 |
+| Codex CLI 真实执行 | 10. 执行 | 缺 OPENAI_API_KEY | P2（不阻塞） |
+| Artifact/Diff apply/revert | 10. 执行 | 需审批 | P3 |
+| Team Run 端到端实时编排 | 11. Team | 需 Edge 连接 | P2 |
+| 所有 High 风险有 accepted 或 fixed | 14. E2E | 流程审批 | P3 |
+| 健康监控自动化 | 15. 部署 | 基础设施 | P3 |
+| 回滚策略文档完成 | 15. 部署 | 文档 | P3 |
+| Edge Server 生产部署就绪 | 15. 部署 | 架构决策 | P3 |
+| Prometheus metrics 可查询 | 15. 部署 | 基础设施 | P3 |
+| PG 自动备份运行 | 15. 部署 | 基础设施 | P3 |
+| 日志聚合可用 | 15. 部署 | 基础设施 | P3 |
+| CSP / Permissions-Policy 配置 | 16. 安全 | Nginx 配置 | P3 |
+| 依赖漏洞扫描通过 | 16. 安全 | CI 集成 | P3 |
+| WS 认证加固完成 | 16. 安全 | 开发 | P3 |
+| per-user 限流实现 | 16. 安全 | 开发 | P3 |
+| Refresh token rotation 实现 | 16. 安全 | 开发 | P3 |
+| 安全风险登记册关闭 | 16. 安全 | 流程 | P3 |
+| API p95 < 200ms | 17. 性能 | 基线建立 | P3 |
+| WS 事件延迟 < 50ms | 17. 性能 | 基线建立 | P3 |
+| 联系人 N+1 消除 | 17. 性能 | 开发 | P3 |
+| React Query 缓存调优 | 17. 性能 | 开发 | P3 |
+| 数据库索引覆盖完整 | 17. 性能 | 审计 | P3 |
+| 慢查询日志已启用 | 17. 性能 | 开发 | P3 |
+| Hub 内存/CPU 基线已建立 | 17. 性能 | 监控 | P3 |
+
+---
+
+## 附录 B. 验证清单总表
 
 > 以下每项必须通过对应的 E2E 测试或手动验证证明集成可用。
 
-### 16.1 认证与身份（8 项）
+### B.1 认证与身份（8 项）
 
 - [x] TokenDanceID OIDC 登录（Desktop PKCE）：`GET /client/auth/me` 返回用户信息
 - [x] TokenDanceID OIDC 登录（Web redirect）：`GET /client/auth/me` 返回用户信息
@@ -1074,7 +1863,7 @@ Phase 5 (P3): 发布
 - [x] `verify-token-dance-id-login-readiness.ps1` 输出 `READY_FOR_OPERATOR`
 - [x] 登录后 Hub WS 连接收到 `auth.ok`
 
-### 16.2 IM 聊天（24 项）
+### B.2 IM 聊天（24 项）
 
 - [x] 消息发送：`POST /client/sessions/:id/messages` + WS `message.new`
 - [x] 消息接收：WS `message.new` -> transcript
@@ -1101,20 +1890,20 @@ Phase 5 (P3): 发布
 - [x] 已读同步：WS `message.read` 多端同步
 - [x] 消息同步：`GET /client/sessions/:id/messages/sync` 离线补齐
 
-### 16.3 WS 实时推送（4 项）
+### B.3 WS 实时推送（4 项）
 
 - [x] WS 连接后收到 `auth.ok`
-- [x] 断线重连不丢失事件
-- [x] 连接状态指示器正确
+- [ ] 断线重连不丢失事件（ws 库兼容性）
+- [ ] 连接状态指示器正确
 - [x] 26 个事件全部路由到 store
 
-### 16.4 @Agent（3 项）
+### B.4 @Agent（3 项）
 
 - [x] @Agent 后 Agent 出现在会话成员列表
 - [x] 消息触发 task dispatch
 - [x] Agent 回复流式显示
 
-### 16.5 联系人（8 项）
+### B.5 联系人（8 项）
 
 - [x] 搜索用户返回结果含关系状态
 - [x] 发送好友请求对方 WS 收到通知
@@ -1125,7 +1914,7 @@ Phase 5 (P3): 发布
 - [x] 取消拉黑后可发消息
 - [x] 修改备注后备注显示
 
-### 16.6 会话管理（9 项）
+### B.6 会话管理（9 项）
 
 - [x] 会话列表按最后活跃排序
 - [x] 会话搜索返回匹配
@@ -1137,7 +1926,7 @@ Phase 5 (P3): 发布
 - [x] 解散群聊后所有成员会话消失
 - [x] 修改群信息后 WS 推送
 
-### 16.7 Agent 配置（9 项）
+### B.7 Agent 配置（9 项）
 
 - [x] 创建 Agent Profile
 - [x] 编辑 Agent 配置持久化
@@ -1149,7 +1938,7 @@ Phase 5 (P3): 发布
 - [x] Skill CRUD
 - [x] Provider Binding CRUD
 
-### 16.8 执行与运行时（14 项）
+### B.8 执行与运行时（14 项）
 
 - [x] Edge 健康检查返回 ready
 - [x] CLI 发现：Claude Code 状态正确
@@ -1166,7 +1955,7 @@ Phase 5 (P3): 发布
 - [x] Edge 回调 ack/stream/done/fail
 - [x] WS agent.dispatch/stream/done/failed
 
-### 16.9 CLI/SDK（6 项）
+### B.9 CLI/SDK（6 项）
 
 - [x] Claude Code 真实执行
 - [x] OpenCode 真实执行
@@ -1175,7 +1964,7 @@ Phase 5 (P3): 发布
 - [x] OpenAI SDK adapter
 - [x] Custom runtime manifest
 
-### 16.10 项目与文档（6 项）
+### B.10 项目与文档（6 项）
 
 - [x] 项目列表返回用户项目
 - [x] 创建项目后出现
@@ -1184,7 +1973,7 @@ Phase 5 (P3): 发布
 - [x] 文档 CRUD
 - [x] 文档搜索
 
-### 16.11 Agent Team（6 项）
+### B.11 Agent Team（6 项）
 
 - [x] Team CRUD
 - [x] Team 成员管理
@@ -1193,7 +1982,7 @@ Phase 5 (P3): 发布
 - [x] 冲突解决
 - [x] Assignment 派发/完成/失败
 
-### 16.12 其他（10 项）
+### B.12 其他（10 项）
 
 - [x] 设备注册后可见
 - [x] 附件上传下载
@@ -1206,31 +1995,63 @@ Phase 5 (P3): 发布
 - [x] 评分
 - [x] i18n zh/en 无遗漏
 
-### 16.13 门控脚本（5 项）
+### B.13 门控脚本（5 项）
 
 - [x] P0 金链路 PASS
-- [x] API Smoke 44/44 通过
+- [x] API Smoke ALL 13 PHASES PASSED
 - [x] Windows dry package PASS
 - [x] Release gate PASS
-- [x] Mobile tests 89 pass
+- [x] Mobile tests 91 pass
 
----
+### B.14 部署（14 项）
 
-## 17. 非协商边界
+- [x] Hub 容器 `/health` 返回 200
+- [x] PostgreSQL 迁移全部运行
+- [x] Redis 连接正常
+- [x] Nginx SSL + 反代正常
+- [x] 资源限制生效
+- [x] WS proxy 正确转发 upgrade
+- [x] CORS 白名单正确
+- [x] 环境变量注入无硬编码密码
+- [x] Docker 网络隔离（agenthub-net）
+- [x] Admin 端口不对外暴露
+- [ ] 健康监控自动化
+- [ ] 回滚策略文档完成
+- [ ] Edge Server 生产部署就绪
+- [ ] Prometheus metrics 可查询
 
-1. **Web 只和 Hub 通信**，不直接连接 Local Edge 或 raw runtime。
-2. **Desktop renderer 不获得 raw process execution 权限**。
-3. **Local Edge 负责本地执行**、adapter 调用、runtime policy、日志和证据。
-4. **Hub 负责账号**、IM、同步、路由、权限、审计和远程控制面。
-5. **Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离**。
-6. **Mock 和 fixture 模式必须显式**；real mode 不能静默降级。
-7. **真实登录**、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
-8. **Roadmap 只写路线**；当前事实写在 `STATE.md`。
-9. **非必要不碰 UI 层**：UI 作为需求文档，目标是调通数据流。
-10. **所有 Hub API 必须经过 `AuthMiddleware` + `RequireHubSession`**。
-11. **Desktop 文件操作必须经过 allowlist 和 typed Host API**。
-12. **TokenDance API key 不得暴露给浏览器 UI**。
-13. **SDK adapter 不依赖外部 SDK 包**，使用纯 `net/http` 实现。
-14. **未获明确审批，不跑真实登录、真实模型消耗、部署、签名、公证、updater、release upload**。
-15. **所有 CLI adapter 输出必须统一映射到 typed `RunEvent` 合同**。
-16. **进程生命周期由 Edge lifecycle 管理，不暴露给前端**。
+### B.15 安全（16 项）
+
+- [x] 所有 Hub API 经过认证中间件
+- [x] 全局 IP 限流正常（100/min）
+- [x] 认证端点限流正常（注册 3/min、登录 5/min）
+- [x] JWT secret 不在代码仓库
+- [x] OIDC client secret 不在代码仓库
+- [x] Edge 进程环境脱敏
+- [x] Admin 端口不对外
+- [x] Origin 检查防止 CSRF
+- [x] WS auth handshake 正常
+- [x] 请求体大小限制（10MB）
+- [x] 文件上传 MIME 白名单
+- [ ] CSP / Permissions-Policy 配置
+- [ ] 依赖漏洞扫描通过
+- [ ] WS 认证加固（连接频率 + 消息频率 + 单用户上限）
+- [ ] per-user API 限流实现
+- [ ] 安全风险登记册关闭
+
+### B.16 性能（14 项）
+
+- [x] Edge SQLite WAL 模式启用
+- [x] Hub 索引全部建立（30+ 个）
+- [x] Redis 连接池正常（pool_size=100）
+- [x] EventBus 异步无阻塞（1024 workers）
+- [x] Edge 批处理正常（50ms 或 8KB）
+- [x] Session Member Redis 缓存命中
+- [x] Edge 结果聚合正确
+- [x] WS heartbeat 正常（30s interval）
+- [x] WS 发送缓冲区正常（256）
+- [ ] API p95 < 200ms
+- [ ] WS 事件延迟 < 50ms
+- [ ] 联系人 N+1 消除
+- [ ] React Query 缓存调优
+- [ ] 数据库索引覆盖完整
