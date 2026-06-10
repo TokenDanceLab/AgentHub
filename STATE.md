@@ -42,7 +42,7 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 ## 已合入能力
 
-当前 `origin/dev/delicious233` 已经具备以下公开仓库内可确认能力。
+当前 `origin/master`（含 `dev/delicious233` 通过 PR #297 合入的所有能力）已具备以下公开仓库内可确认能力。`dev/release-0.3.0-rc7` worktree 在此基础上继续累积 release gate 增量。
 
 ### Web / IM / shared workbench
 
@@ -63,7 +63,7 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - Hub file-change diff projection 已合入，artifact list 可从 `run.agent.file_change` 投影最小 `diff`、`edit_id`、`review_status`、`can_apply`、`can_revert` 只读字段。
 - approval roundtrip context gate 已合入，用于锁定 task approval request/decision 的上下文投影。
 - 编排路由审计队列字段已进入 Hub dev 基线。
-- TokenDance ID OIDC 后端登录交换已在 Hub README/API 层描述；真实 TokenDanceID 登录全链路仍未声明完成。
+- TokenDance ID OIDC 全链路 PKCE 流程已验证通过：Hub authorize → TokenDance ID → authorization code → Hub callback → Hub JWT issued → `GET /client/auth/me` 返回 user with tokendance_sub → `GET /client/sessions` 返回 200 → WS raw HTTP upgrade with `auth.ok` frame 确认。TokenDance ID (`:3000`) 和 Hub OIDC 处理器完全互通。
 
 ### Desktop / Local Edge / package readiness
 
@@ -153,12 +153,11 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 **文档**：
 - `docs/roadmap.md`：13 个模块 + Phase E 长期路线，844 行（完全重写）
 - `docs/developer-quickstart.md`：新文件（先决条件、启动说明、测试用户 + JWT 创建、FAQ）
-- `docs/architecture.md`：新增 9.1 节（运行时适配器）和 9.2 节（数据流模式）
+- `docs/architecture.md`：新增 9.1 节（运行时适配器）、9.2 节（数据流模式）、9.3 节（WebSocket 事件）、10 节（Hub Server 路由表）、15 节（部署架构）、5 节补充（平台类型、前端 hooks 清单、数据模式）
 - `STATE.md`：更新所有成就
 
 ## 当前不声明已经完成
 
-- 真实 TokenDanceID 登录全链路验收（Hub OIDC handler 已实现，`.env` 已配置 client，`POST /client/auth/oidc/authorize` 返回 200；TokenDance ID 可访问。待验证完整 PKCE 流程）。
 - 真实 Web/Mobile/IM 全部远控闭环的发布级验收。
 - Hub AgentProfile 市场安装/发布 mutation、真实头像 asset 管线和持久化配置闭环。
 - Artifact/Diff 的真实 apply/revert 文件写入。
@@ -192,12 +191,12 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 ## Release Gate 快照
 
+> 本节已被文档顶部 "Release Gate 快照 (Final)" 取代，保留此标题占位以维持章节编号一致。最新测试结果以顶部 Final 版本为准。
+
 - `verify-ci-gates.ps1`、`verify-tauri-package-readiness.ps1 -RepoRoot .`、`verify-tauri-installer-smoke.ps1 -RepoRoot . -StrictToolchain` 已在 RC7 版本基线上通过。
 - Web focused tests、Web typecheck、shared focused tests、Hub `go test ./... -short -count=1` 已通过。
 - Edge `go test ./... -short -count=1` 已在最新 dev 复跑通过；此前 `TestClaudeCodeParseStreamUsesBrokeredPermissionHandler` 未找到 pending Claude permission request 的失败按 transient flake 记录。
 - approved-real 金链路当前状态：Desktop Edge CLI no-spend PASS，Hub replay/Web manifest `READY_FOR_APPROVAL`。
-- **TokenDanceID OIDC 已配置**：`AGENTHUB_TOKENDANCE_ID_CLIENT_ID`/`CLIENT_SECRET` 已填入 `.env`；`POST /client/auth/oidc/authorize` 返回 200 含 authorization_url；TokenDance ID (`:3000`) 发现文档可访问。待验证完整 PKCE 流程。
-- 2026-06-10 本轮复验：**`tests\scripts\verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**（1 个失败：WS ws 模块路径，非阻塞）。
 - Mobile RN 新增集成复验：`corepack pnpm --dir app/mobile-rn verify` PASS，20 个 test files / 91 tests 通过。
 - Windows unsigned dry package 复验：`scripts\verify-tauri-package-dry.ps1 -RepoRoot . -RunWindowsBundle -StrictToolchain` PASS，artifact root 为 `.tmp\tauri-package-release-rc7`。
 - Tauri 发布已**阻塞**：缺乏签名证书、macOS 公证和 updater metadata。
@@ -205,12 +204,11 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 ## 下一步优先级
 
-1. **完成 OIDC 完整 PKCE 流程验证**：Hub OIDC 已配置，TokenDance ID 可访问。下一轮操作员运行完整 PKCE 登录流。
-2. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。
-3. **真实 SDK 消耗**：Anthropic/OpenAI SDK 适配器已实现但不阻塞——需要 API key。
-4. **完整的 @Agent WS 端到端**：通过 Hub WS 验证 Edge run 事件端到端到达 transcript。
-5. **Tauri 签名发布**：获取签名证书是进入生产的关键路径安全阻塞项。
-6. **完成 release governance**：changelog + gate + rollback 文档。
+1. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。
+2. **真实 SDK 消耗**：Anthropic/OpenAI SDK 适配器已实现但不阻塞——需要 API key。
+3. **完整的 @Agent WS 端到端**：通过 Hub WS 验证 Edge run 事件端到端到达 transcript。
+4. **Tauri 签名发布**：获取签名证书是进入生产的关键路径安全阻塞项。
+5. **完成 release governance**：changelog + gate + rollback 文档。
 
 ## 安全规则
 
