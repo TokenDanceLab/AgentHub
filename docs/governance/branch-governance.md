@@ -1,6 +1,6 @@
 # 分支治理
 
-最后更新：2026-06-08（dev/delicious233 主线 + backend 受控切片合并）
+最后更新：2026-06-10（dev/delicious233 主线，worktree/远端分支快照校正）
 
 ## 合并规则
 
@@ -22,7 +22,19 @@ feat/* -> dev/delicious233 -> master
 | **dev/delicious233** | 主开发事实源；Desktop/Web v4 PR #291 已合入该线 | 活跃 |
 | **master** | 稳定快照；PR #292 已同步到 `dev/delicious233` 对应状态 | 保留 |
 | feat/backend-edge-hub | 后端/Edge-Hub 并行线；只能按切片 ready-for-review 后由主负责人合并 | 受控推进 |
-| codex/backend-*-0607 | 后端临时切片分支；先登记审查，再合入/归档/删除 | 待清理 |
+| codex/backend-docs-governance | 后端文档治理切片 | 待审 |
+| codex/backend-gate-fixes | 后端门禁修复切片 | 待审 |
+| codex/backend-johnny-pick | 后端 Johnny cherry-pick 切片 | 待审 |
+| codex/backend-openapi-contract | 后端 OpenAPI contract 切片 | 待审 |
+| codex/backend-sync-at4 | 后端同步切片 | 待审 |
+| codex/mobile-expo-rn-plan | Mobile Expo/RN 规划切片 | 待审 |
+| codex/mobile-v4-im-redesign | Mobile v4 IM 重设计切片 | 待审 |
+| codex/p0-web-agent-main-chain | P0 Web Agent 主链切片 | 待审 |
+| codex/p0-web-transcript-artifacts | P0 Web transcript/artifacts 切片 | 待审 |
+| codex/p1-desktop-sidecar-binary-smoke | P1 Desktop sidecar binary smoke | 待审 |
+| codex/p1-edge-sqlite-durable-hardening | P1 Edge SQLite 持久化加固 | 待审 |
+| codex/web-projects-readthrough | Web projects 读审切片 | 待审 |
+| dev/release-0.3.0-rc7 | 0.3.0 RC7 发布分支 | 发布准备 |
 | feat/web-desktop-parity | 早期 Web parity 本地分支，唯一提交 `797983e`；已导出 patch 后删除本地分支 | 已归档 |
 | worktree-feat+web-desktop-parity | 早期 Web parity 本地/远端分支已删除；本地 patch 归档只作参考 | 已归档 |
 
@@ -31,9 +43,7 @@ feat/* -> dev/delicious233 -> master
 | Worktree | HEAD/分支 | 用途 | 规则 |
 |---|---|---|---|
 | 主工作树 | `dev/delicious233` | 当前主线、Desktop/Web v4 已合入 | 直接开发前先确认 dirty paths，禁止 `git add .` |
-| `.worktrees/backend` | `feat/backend-edge-hub` | 后端/Edge-Hub 并行线 | 按 AH-SYNC 推进，不自行合并 |
-| `.worktrees/backend-*-0607` | `codex/backend-*-0607` | 后端历史切片和 review worktree | 登记后按重复/已合入/待审分类清理 |
-| `.worktrees/johnny-dev` | detached HEAD | 协作者 Johnny 状态检查线 | 只读/隔离，不能自动合并 |
+| `.worktrees/doc-governance` | `docs/doc-governance` | 文档治理校正工作树 | 仅文档修改，不触及生产代码 |
 
 旧残留目录 `.worktrees/codex-trump-fork` 已移动到 `.worktrees/.trash/codex-trump-fork-archived-20260526`，未直接删除。
 
@@ -50,8 +60,21 @@ feat/* -> dev/delicious233 -> master
 | 远端分支 | 相对 `origin/dev/delicious233` | 处理建议 |
 |---|---:|---|
 | `origin/feat/backend-edge-hub` | backend 并行线 | 按切片 review 后合入 `dev/delicious233`，不整包直合 |
-| `origin/dev/trump` | 主线 ahead 3 / 分支 ahead 0 | Trump 线当前无独有提交但落后主线；保留，不作为本轮 UI 来源 |
-| `origin/dev/johnny` | 主线 ahead 320 / 分支 ahead 11 | Johnny 线仍有少量独有提交但大幅落后；只单独审，不直合 |
+| `origin/dev/trump` | 主线 ahead 652 / 分支 ahead 0 | Trump 线当前无独有提交但落后主线；保留，不作为本轮 UI 来源 |
+| `origin/dev/johnny` | 主线 ahead 969 / 分支 ahead 11 | Johnny 线仍有少量独有提交但大幅落后；只单独审，不直合 |
+| `origin/codex/backend-docs-governance` | 后端文档治理切片 | 待审后合入或归档 |
+| `origin/codex/backend-gate-fixes` | 后端门禁修复切片 | 待审后合入或归档 |
+| `origin/codex/backend-johnny-pick` | 后端 Johnny cherry-pick | 待审后合入或归档 |
+| `origin/codex/backend-openapi-contract` | 后端 OpenAPI contract | 待审后合入或归档 |
+| `origin/codex/backend-sync-at4` | 后端同步切片 | 待审后合入或归档 |
+| `origin/codex/mobile-expo-rn-plan` | Mobile 规划切片 | 待审后合入或归档 |
+| `origin/codex/mobile-v4-im-redesign` | Mobile IM 重设计 | 待审后合入或归档 |
+| `origin/codex/p0-web-agent-main-chain` | P0 Web Agent | 待审后合入或归档 |
+| `origin/codex/p0-web-transcript-artifacts` | P0 Web transcript | 待审后合入或归档 |
+| `origin/codex/p1-desktop-sidecar-binary-smoke` | P1 Desktop smoke | 待审后合入或归档 |
+| `origin/codex/p1-edge-sqlite-durable-hardening` | P1 Edge SQLite | 待审后合入或归档 |
+| `origin/codex/web-projects-readthrough` | Web projects 读审 | 待审后合入或归档 |
+| `origin/dev/release-0.3.0-rc7` | 0.3.0 RC7 发布分支 | 发布流程管理 |
 
 当前 `origin` 活跃 heads 以 live `git branch -r` 为准。已删除的过时 `feat/*`、`fix/*`、`phase-*`、`integration/*` 不得在 AGENTS/roadmap 中重新引用为活跃远端。
 
@@ -92,7 +115,5 @@ feat/* -> dev/delicious233 -> master
 后端临时分支先按 [backend-integration-governance.md](../backend-integration-governance.md) 分类处理。当前原则：
 
 - `feat/backend-edge-hub` 保留为后端整合主线，先拆切片 review。
-- `codex/backend-api-contract-0607`、`codex/backend-cli-e2e-0607`、`codex/backend-oidc-log-0607`、`codex/backend-release-artifact-0607`、`codex/backend-docs-governance`、`codex/backend-johnny-pick`、`codex/backend-openapi-contract` 属 patch-unique 待审，不能直接删。
-- 已删除本地干净重复 worktree 和本地分支：`codex/backend-docs-sync-*`、`codex/backend-review-readonly`、`codex/backend-gate-fixes`、`codex/backend-sync-at4`、`codex/backend-ci-e2e-0607`、`codex/backend-db-migration-0607`、`codex/backend-env-sanitizer-0607`、`codex/backend-health-ready-0607`、`codex/backend-hub-edge-e2e-0607`、`codex/backend-remote-cors-0607`、`codex/backend-target-credential-0607`、`codex/backend-ws-delivery-0607`。
-- `codex/backend-edge-split` 和 `codex/backend-test-coverage` 当前 worktree 有未提交改动，先保留，等待 owner 或主负责人审查后再处理。
-- `.worktrees/johnny-dev` 是协作者检查线，不纳入 backend/codex 清理。
+- `codex/backend-api-contract-0607`、`codex/backend-cli-e2e-0607`、`codex/backend-oidc-log-0607`、`codex/backend-release-artifact-0607` 已从远端删除；对应本地分支和 worktree 已清理。
+- 保留的后端切片分支：`codex/backend-docs-governance`、`codex/backend-gate-fixes`、`codex/backend-johnny-pick`、`codex/backend-openapi-contract`、`codex/backend-sync-at4`。
