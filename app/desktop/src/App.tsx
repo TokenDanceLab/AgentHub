@@ -316,8 +316,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
           ccSwitchStatus={ccSwitchStatus ? {
             installed: ccSwitchStatus.installed,
             routingActive: ccSwitchStatus.routingActive,
-            proxyPort: ccSwitchStatus.proxyPort,
-            activeAppTypes: ccSwitchStatus.activeAppTypes,
+            ...(ccSwitchStatus.proxyPort != null ? { proxyPort: ccSwitchStatus.proxyPort } : {}),
+            ...(ccSwitchStatus.activeAppTypes ? { activeAppTypes: ccSwitchStatus.activeAppTypes } : {}),
           } : undefined}
           ccSwitchProviders={ccSwitchProviders?.map((p) => ({
             providerId: p.providerId,
@@ -325,7 +325,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
             appType: p.appType,
             isCurrent: p.isCurrent,
             isActive: p.isActive,
-            modelAliases: p.modelAliases,
+            ...(p.modelAliases ? { modelAliases: p.modelAliases } : {}),
           }))}
         platform={desktopPlatform}
         projects={workbench.projects}
