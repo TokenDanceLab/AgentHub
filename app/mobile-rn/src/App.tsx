@@ -57,6 +57,8 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   const { width } = useWindowDimensions();
   const useSplitPane = width >= 700;
   const useInspectorPane = width >= 1024;
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const showInspector = useInspectorPane && !inspectorCollapsed;
   const [activeTab, setActiveTab] = useState<MobileTab>(preview.tab ?? inferInitialTab(preview.scenario));
   const [accountReturnTab, setAccountReturnTab] = useState<MobileTab>('chat');
   const [selectedThreadId, setSelectedThreadId] = useState(preview.threadId ?? fixture.threads[0]?.id ?? '');
@@ -182,7 +184,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
         style={{
           flex: 1,
           minWidth: 0,
-          borderRightWidth: useInspectorPane ? 1 : 0,
+          borderRightWidth: showInspector ? 1 : 0,
           borderRightColor: tokens.color.line,
         }}
       >
@@ -193,8 +195,30 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
           onBack={() => setActiveTab('chat')}
           onOpenRuns={() => setActiveTab('tasks')}
         />
+        {useInspectorPane ? (
+          <Pressable
+            onPress={() => setInspectorCollapsed((c) => !c)}
+            style={{
+              position: 'absolute',
+              top: tokens.space.sm,
+              right: tokens.space.xs,
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: tokens.color.surface,
+              borderWidth: 1,
+              borderColor: tokens.color.line,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 14, color: tokens.color.textSecondary }}>
+              {inspectorCollapsed ? '☰' : '✕'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
-      {useInspectorPane ? (
+      {showInspector ? (
         <View
           testID="tablet-thread-inspector-pane"
           style={{
