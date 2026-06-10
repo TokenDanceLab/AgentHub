@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -249,8 +250,17 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	}
 
 	// MCP server config (--mcp-config)
+	// The merged MCP config JSON is written to a temp file so the CLI receives
+	// a file path (as --mcp-config expects) rather than inline JSON, which
+	// could exceed OS argument length limits.
 	if ctx.MCPConfig != "" {
-		args = append(args, "--mcp-config", ctx.MCPConfig)
+		if mcpPath, err := WriteMCPConfigTempFile(ctx.MCPConfig); err != nil {
+			slog.Warn("mcp: failed to write temp config file, passing inline",
+				"err", err)
+			args = append(args, "--mcp-config", ctx.MCPConfig)
+		} else {
+			args = append(args, "--mcp-config", mcpPath)
+		}
 	}
 
 	// Tool allowlisting (--allowedTools)
