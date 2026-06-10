@@ -17,8 +17,8 @@ func TestPlanApprovalBroker_SubmitAndApprove(t *testing.T) {
 		ProjectID: "proj_test",
 		ThreadID:  "thread_test",
 		Tasks: []PlanTask{
-			{AgentID: "codex", Task: "Refactor Button.tsx", DependsOn: []string{}},
-			{AgentID: "codex", Task: "Update tests", DependsOn: []string{"task-1"}},
+			{ID: "task-1", Agent: "codex", Description: "Refactor Button.tsx", DependsOn: []string{}},
+			{ID: "task-2", Agent: "codex", Description: "Update tests", DependsOn: []string{"task-1"}},
 		},
 		Mode:      "parallel",
 		CreatedAt: time.Now().UTC(),
@@ -62,7 +62,7 @@ func TestPlanApprovalBroker_Reject(t *testing.T) {
 
 	plan := PendingPlan{
 		RunID:  "run_reject_test",
-		Tasks:  []PlanTask{{AgentID: "codex", Task: "do stuff"}},
+		Tasks:  []PlanTask{{ID: "task-1", Agent: "codex", Description: "do stuff"}},
 		Mode:   "single",
 		Status: "pending",
 	}
@@ -94,7 +94,7 @@ func TestPlanApprovalBroker_AutoApproveTimeout(t *testing.T) {
 
 	plan := PendingPlan{
 		RunID:  "run_timeout_test",
-		Tasks:  []PlanTask{{AgentID: "codex", Task: "do stuff"}},
+		Tasks:  []PlanTask{{ID: "task-1", Agent: "codex", Description: "do stuff"}},
 		Mode:   "single",
 		Status: "pending",
 	}
@@ -130,7 +130,7 @@ func TestPlanApprovalBroker_ContextCancelled(t *testing.T) {
 
 	plan := PendingPlan{
 		RunID:  "run_cancel_test",
-		Tasks:  []PlanTask{{AgentID: "codex", Task: "do stuff"}},
+		Tasks:  []PlanTask{{ID: "task-1", Agent: "codex", Description: "do stuff"}},
 		Mode:   "single",
 		Status: "pending",
 	}
@@ -196,8 +196,8 @@ func TestPlanApprovalBroker_ListPending(t *testing.T) {
 		AutoApproveTimeout: 60 * time.Second,
 	})
 
-	plan1 := PendingPlan{RunID: "run_1", Tasks: []PlanTask{{AgentID: "codex", Task: "a"}}, Mode: "single"}
-	plan2 := PendingPlan{RunID: "run_2", Tasks: []PlanTask{{AgentID: "codex", Task: "b"}}, Mode: "single"}
+	plan1 := PendingPlan{RunID: "run_1", Tasks: []PlanTask{{ID: "t1", Agent: "codex", Description: "a"}}, Mode: "single"}
+	plan2 := PendingPlan{RunID: "run_2", Tasks: []PlanTask{{ID: "t2", Agent: "codex", Description: "b"}}, Mode: "single"}
 
 	_, ok1 := broker.SubmitPlan(context.Background(), plan1)
 	_, ok2 := broker.SubmitPlan(context.Background(), plan2)
@@ -231,7 +231,7 @@ func TestPlanApprovalBroker_GetPending(t *testing.T) {
 	plan := PendingPlan{
 		RunID: "run_get_test",
 		Tasks: []PlanTask{
-			{AgentID: "codex", Task: "do stuff", DependsOn: []string{}},
+			{ID: "t1", Agent: "codex", Description: "do stuff", DependsOn: []string{}},
 		},
 		Mode: "single",
 	}
