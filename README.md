@@ -1,14 +1,18 @@
-# AgentHub
+<div align="center">
+  <img src="app/desktop/src/assets/agenthub-product-icon-rounded.svg" width="96" alt="AgentHub" />
 
-AgentHub 是一个面向 AI Agent 团队协作的开源工作台。它把 Web、Desktop、Mobile、Hub Server、Edge Server 和多种 CLI Runtime 连接到同一条协作链路，让用户在类似 IM 的界面里创建项目、拉起 Agent、审批任务、查看回放和管理本地执行目标。
+  # AgentHub
 
-[English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [路线图](docs/roadmap.md) · [API](api/)
+  面向 AI Agent 团队协作的开源工作台。Web、Desktop、Mobile、Hub Server、Edge Server 和多种 CLI Runtime 连接到同一条协作链路——在 IM 界面里创建项目、拉起 Agent、审批任务、查看回放、管理本地执行目标。
 
-![status](https://img.shields.io/badge/status-active_development-blue?style=flat-square)
-![version](https://img.shields.io/badge/version-0.3.0--rc.8-orange?style=flat-square)
-![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
-![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
-![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
+  [English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [路线图](docs/roadmap.md) · [API](api/)
+
+  ![status](https://img.shields.io/badge/status-active_development-blue?style=flat-square)
+  ![version](https://img.shields.io/badge/version-0.3.0--rc.8-orange?style=flat-square)
+  ![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
+  ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
+  ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
+</div>
 
 ## 完整文档
 
@@ -170,4 +174,4 @@ Apache-2.0. See [LICENSE](LICENSE).
 
 ---
 
-AgentHub 是一个开源产品化项目，正在持续迭代。本项目参加 **飞书 AI 全栈开发挑战赛**，赛题「AgentHub — 多 Agent 协作平台」。
+AgentHub 是一个开源产品化项目，正在持续迭代。欢迎 Star、Issue、PR。
