@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -152,20 +151,9 @@ func ReadMemory(workDir, threadID, agentID string) MemoryReadResult {
 
 // ── File Parsing ─────────────────────────────────────────────────────────────
 
-// entrySectionRegex matches a YAML frontmatter block followed by Markdown content.
-// Each section in a memory file looks like:
-//
-//	---
-//	id: mem_abc123
-//	created: 2026-06-10T12:00:00Z
-//	...
-//	---
-//
-//	The content goes here.
-var entrySectionRegex = regexp.MustCompile(
-	`(?m)^---\n([\s\S]*?)\n---\n\n([\s\S]*?)(?=^---\n|\z)`)
-
 // readMemoryFile reads and parses a single memory Markdown file.
+// Each entry is a YAML frontmatter block delimited by "---" on its own line,
+// followed by a Markdown body. Multiple entries can appear in one file.
 func readMemoryFile(path string) ([]MemoryEntry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -178,24 +166,58 @@ func readMemoryFile(path string) ([]MemoryEntry, error) {
 	}
 
 	var entries []MemoryEntry
-	matches := entrySectionRegex.FindAllStringSubmatch(content, -1)
 
-	for _, match := range matches {
-		if len(match) < 3 {
-			continue
-		}
-		yamlBlock := match[1]
-		body := strings.TrimSpace(match[2])
+	// Split the file into sections at "---" delimiters.
+	// Each entry consists of: frontmatter lines (between pairs of "---")
+	// followed by body content (until the next "---" or end of file).
+	lines := strings.Split(content, "\n")
+	var inFrontmatter bool
+	var yamlLines []string
+	var bodyLines []string
+	var pendingFrontmatter []string // collected frontmatter waiting for body
 
-		if body == "" {
-			continue
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "---" {
+			if !inFrontmatter {
+				// Start of frontmatter. If we had accumulated body text,
+				// flush the previous entry first.
+				if len(pendingFrontmatter) > 0 && len(bodyLines) > 0 {
+					body := strings.TrimSpace(strings.Join(bodyLines, "\n"))
+					if body != "" {
+						entry, err := parseFrontmatter(
+							strings.Join(pendingFrontmatter, "\n"), body)
+						if err == nil {
+							entries = append(entries, entry)
+						}
+					}
+				}
+				inFrontmatter = true
+				yamlLines = nil
+				bodyLines = nil
+			} else {
+				// End of frontmatter — body follows.
+				inFrontmatter = false
+				pendingFrontmatter = append([]string{}, yamlLines...)
+				bodyLines = nil
+			}
+		} else if inFrontmatter {
+			yamlLines = append(yamlLines, line)
+		} else {
+			bodyLines = append(bodyLines, line)
 		}
+	}
 
-		entry, err := parseFrontmatter(yamlBlock, body)
-		if err != nil {
-			continue // skip malformed entries
+	// Flush the last entry.
+	if len(pendingFrontmatter) > 0 && len(bodyLines) > 0 {
+		body := strings.TrimSpace(strings.Join(bodyLines, "\n"))
+		if body != "" {
+			entry, err := parseFrontmatter(
+				strings.Join(pendingFrontmatter, "\n"), body)
+			if err == nil {
+				entries = append(entries, entry)
+			}
 		}
-		entries = append(entries, entry)
 	}
 
 	return entries, nil
@@ -284,4 +306,32 @@ func parseInlineArray(s string) []string {
 func BuildMemoryPrompt(workDir, threadID, agentID string) string {
 	result := ReadMemory(workDir, threadID, agentID)
 	return result.PromptText
+}
+
+// EnsureMemoryDir creates the .agenthub/memory/ directory tree under workDir
+// and seeds it with a default project.md if it does not already exist.
+// This is called lazily on first memory access so that users get a visible
+// onboarding file without any manual setup.
+func EnsureMemoryDir(workDir string) error {
+	if workDir == "" {
+		return nil
+	}
+	memDir := filepath.Join(workDir, memorySubdir)
+	if err := os.MkdirAll(memDir, 0755); err != nil {
+		return fmt.Errorf("create memory dir %s: %w", memDir, err)
+	}
+	projectPath := filepath.Join(memDir, projectFile)
+	if _, err := os.Stat(projectPath); err == nil {
+		return nil // already exists
+	}
+	defaultContent := `---
+id: project-onboarding
+source: system
+created: ` + time.Now().Format(time.RFC3339) + `
+---
+
+This is the project memory file. AgentHub will load entries here before each run.
+You can add facts, preferences, and context that the agent should remember.
+`
+	return os.WriteFile(projectPath, []byte(defaultContent), 0644)
 }
