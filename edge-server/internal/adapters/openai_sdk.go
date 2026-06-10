@@ -62,8 +62,13 @@ func NewOpenAISDKAdapter(apiKey, model string) *OpenAISDKAdapter {
 	} else {
 		a.available = true
 	}
-	// Allow base URL override for proxies / compatible endpoints
+	// Allow base URL override for proxies / compatible endpoints.
+	// Normalize: strip trailing "/v1" so the adapter can consistently
+	// append "/v1/chat/completions" without creating a doubled path like
+	// "/v1/v1/chat/completions" when the proxy URL already includes "/v1".
 	if customURL := os.Getenv("OPENAI_BASE_URL"); customURL != "" {
+		customURL = strings.TrimRight(customURL, "/")
+		customURL = strings.TrimSuffix(customURL, "/v1")
 		a.baseURL = strings.TrimRight(customURL, "/")
 	}
 	return a

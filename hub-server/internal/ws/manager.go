@@ -12,6 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 	"github.com/coder/websocket"
+	"golang.org/x/time/rate"
 )
 
 // Conn represents a single WebSocket connection tracked by the Manager.
@@ -29,6 +30,10 @@ type Conn struct {
 	// closed is set atomically before the Send channel is closed.  PushToConn
 	// and closeSend use sendMu so channel send and close never race.
 	closed atomic.Bool
+
+	// msgLimiter enforces per-connection message rate limiting using a
+	// token-bucket algorithm.
+	msgLimiter *rate.Limiter
 }
 
 // DeliveryStatus describes the observable result of a non-blocking WebSocket
@@ -72,6 +77,15 @@ func (c *Conn) Close() {
 	}
 }
 
+// AllowMessage checks the per-connection message rate limiter. Returns true
+// if the message should be processed, false if it should be dropped.
+func (c *Conn) AllowMessage() bool {
+	if c.msgLimiter == nil {
+		return true
+	}
+	return c.msgLimiter.Allow()
+}
+
 // closeSend closes the Send channel exactly once and marks the connection as
 // closed so PushToConn can avoid a panic on closed-channel send.
 func (c *Conn) closeSend() {
@@ -108,9 +122,11 @@ func (m *Manager) Count() int {
 }
 
 func NewConn(ws *websocket.Conn) *Conn {
+	r := rate.Every(time.Second / time.Duration(config.WSMessageRateLimit))
 	return &Conn{
-		W:    ws,
-		Send: make(chan []byte, config.WSSendBufferSize),
+		W:          ws,
+		Send:       make(chan []byte, config.WSSendBufferSize),
+		msgLimiter: rate.NewLimiter(r, config.WSMessageBurst),
 	}
 }
 

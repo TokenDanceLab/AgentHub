@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
@@ -171,6 +173,24 @@ func GetAssignmentByToMember(db *gorm.DB, teamRunID, toMemberID string) (*model.
 	err := db.Where("team_run_id = ? AND to_member_id = ?", teamRunID, toMemberID).
 		Order("depth DESC").First(&a).Error
 	return &a, err
+}
+
+// HasTimedOutActiveAssignment checks if any active assignment in the given
+// team run has been running longer than the specified deadline. Uses a single
+// SQL query with LIMIT 1 instead of fetching all assignments and filtering
+// in Go (fixes N+1 pattern N6).
+func HasTimedOutActiveAssignment(db *gorm.DB, teamRunID string, deadline time.Time) (bool, error) {
+	var count int64
+	err := db.Model(&model.AgentTeamAssignment{}).
+		Where("team_run_id = ? AND status IN (?, ?, ?) AND created_at < ?",
+			teamRunID,
+			model.AssignmentStatusPending,
+			model.AssignmentStatusDispatched,
+			model.AssignmentStatusRunning,
+			deadline).
+		Limit(1).
+		Count(&count).Error
+	return count > 0, err
 }
 
 // AgentTeamTask
