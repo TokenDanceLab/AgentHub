@@ -59,7 +59,9 @@ export default function App() {
         <DesktopEntryGate
           onLoginSuccess={handleLoginSuccess}
           onContinueDemo={continueDemo}
+          onConnectEdge={() => {/* TODO: connect to local edge */}}
           onToggleTheme={toggleAppliedAgentHubTheme}
+          edgeOnline={edgeOnline}
         />
       ) : (
         <DesktopWorkbenchApp

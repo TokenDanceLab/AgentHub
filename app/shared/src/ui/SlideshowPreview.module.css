@@ -1,0 +1,305 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   SlideshowPreview — PPTX slide viewer with navigation
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface);
+  overflow: hidden;
+  animation: previewIn var(--dur-medium, 0.25s) var(--ease-spring, ease-out);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.fileName {
+  font: 600 0.8125rem/1.2 var(--font-sans);
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  background: var(--primary-light);
+  color: var(--primary);
+  font: 500 0.625rem/1.4 var(--font-sans);
+}
+
+.counter {
+  flex-shrink: 0;
+  color: var(--text-3);
+  font: 500 0.6875rem var(--font-sans);
+}
+
+.closeBtn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+}
+
+.closeBtn:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+/* ── Slide area ── */
+.slideArea {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+/* ── Navigation buttons ── */
+.navBtn {
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+}
+
+.navBtn:hover:not(:disabled) {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+.navBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ── Slide canvas ── */
+.slideCanvas {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-low);
+  overflow: auto;
+  padding: 16px;
+}
+
+.slideContent {
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 16 / 9;
+  background: white;
+  border-radius: var(--r-md, 8px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.slideImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.slideTextContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slideText {
+  margin: 0;
+  color: #1a1a2e;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.slideText:first-child {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.slideEmpty {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+}
+
+/* ── Thumbnail strip ── */
+.thumbnailStrip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--bdr);
+  background: var(--surface-low);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.thumbnail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 8px;
+  min-width: 64px;
+  border: 2px solid transparent;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 0.625rem;
+  transition: border-color var(--dur-normal) var(--ease), background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+}
+
+.thumbnail:hover {
+  border-color: var(--bdr-strong);
+  color: var(--text-1);
+}
+
+.thumbnailActive {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.thumbnailNumber {
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.thumbnailLabel {
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.5625rem;
+}
+
+/* ── Loading state ── */
+.loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  color: var(--text-3);
+  font-size: var(--font-size-sm, 0.8125rem);
+  padding: var(--space-xl);
+  min-height: 200px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--bdr);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: previewSpin 0.7s linear infinite;
+}
+
+@keyframes previewSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error state ── */
+.error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  color: var(--text-3);
+  font-size: var(--font-size-sm, 0.8125rem);
+  padding: var(--space-xl);
+  min-height: 200px;
+  text-align: center;
+}
+
+.errorIcon {
+  color: var(--danger, #ef4444);
+  opacity: 0.6;
+}
+
+.errorMessage {
+  max-width: 480px;
+  word-break: break-word;
+}
+
+.retryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-xs);
+  padding: 6px 14px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--font-size-xs, 0.6875rem);
+  cursor: pointer;
+  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+}
+
+.retryBtn:hover {
+  background: var(--surface-high);
+  color: var(--text-1);
+}
+
+/* ── Entry animation ── */
+@keyframes previewIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
