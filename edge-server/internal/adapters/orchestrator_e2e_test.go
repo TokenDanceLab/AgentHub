@@ -65,7 +65,7 @@ func newTestStore(t *testing.T) store.RunLifecycleStore {
 	if err != nil {
 		t.Fatalf("CreateProject: %v", err)
 	}
-	_, err = s.CreateThread("thread-1", "proj-1", "test-thread", "")
+	_, err = s.CreateThread("thread-1", "proj-1", "test-thread", "", "", "")
 	if err != nil {
 		t.Fatalf("CreateThread: %v", err)
 	}
