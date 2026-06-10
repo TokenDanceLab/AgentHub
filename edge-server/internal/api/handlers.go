@@ -59,6 +59,10 @@ type Handler struct {
 	PermissionRegistry *PermissionRegistry
 	PermissionBroker   *adapters.PermissionDecisionBroker
 
+	// PlanApprovalBroker manages pending orchestrator plans and connects
+	// them to user approval/rejection decisions (P0 #3: plan confirmation gate).
+	PlanApprovalBroker *adapters.PlanApprovalBroker
+
 	// MCPConfigStore holds Hub-synced MCP server configs for injection into runs.
 	// When non-nil, run creation merges Hub-synced configs into the run's MCPConfig.
 	MCPConfigStore *adapters.MCPConfigStore
@@ -1617,6 +1621,93 @@ func pendingPermissionFromBroker(broker *adapters.PermissionDecisionBroker, runI
 		ToolName:  pending.ToolName,
 		ToolUseID: pending.ToolUseID,
 	}, true
+}
+
+// ---------------------------------------------------------------------------
+// POST /v1/plans/decide  (Plan confirmation gate - P0 #3)
+// ---------------------------------------------------------------------------
+
+func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+
+	var req struct {
+		RunID    string `json:"runId"`
+		Decision string `json:"decision"` // "approve" or "reject"
+		Reason   string `json:"reason,omitempty"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		return
+	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	req.Decision = strings.TrimSpace(req.Decision)
+	if req.RunID == "" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrRunIDRequired))
+		return
+	}
+	if req.Decision != "approve" && req.Decision != "reject" {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidPlanDecision))
+		return
+	}
+
+	broker := h.PlanApprovalBroker
+	if broker == nil {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPlanNotFound))
+		return
+	}
+
+	approved := req.Decision == "approve"
+	plan, ok := broker.Decide(req.RunID, adapters.PlanDecision{
+		Approved: approved,
+		Reason:   req.Reason,
+	})
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPlanNotFound))
+		return
+	}
+
+	// Emit the corresponding plan event for observability.
+	scope := map[string]any{"runId": req.RunID}
+	if plan.ProjectID != "" {
+		scope["projectId"] = plan.ProjectID
+	}
+	if plan.ThreadID != "" {
+		scope["threadId"] = plan.ThreadID
+	}
+	eventType := adapters.BusEventPlanApproved
+	if !approved {
+		eventType = adapters.BusEventPlanRejected
+	}
+	ensureBus(h).Publish(eventType, scope, map[string]any{
+		"runId":  req.RunID,
+		"reason": req.Reason,
+	})
+
+	slog.Info("plan decided by user", "runId", req.RunID, "decision", req.Decision)
+	writeSuccess(w, http.StatusOK, map[string]any{"status": "ok"})
+}
+
+// ---------------------------------------------------------------------------
+// GET /v1/plans/pending  (Plan confirmation gate - P0 #3)
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetPlansPending(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+
+	broker := h.PlanApprovalBroker
+	if broker == nil {
+		writeSuccess(w, http.StatusOK, []any{})
+		return
+	}
+
+	plans := broker.ListPending()
+	writeSuccess(w, http.StatusOK, plans)
 }
 
 // ---------------------------------------------------------------------------
