@@ -1,6 +1,10 @@
 # AgentHub 架构文档
 
 > 最后更新：2026-06-10 | 当前架构基准：Desktop/Web v4 shared workbench clean rebuild + 2026-06-10 数据流打通
+>
+> **详细子文档**：[docs/architecture/](architecture/) 目录包含 6 份独立模块文档，本文档保留核心概览并链接到各子文档。
+
+---
 
 ## 1. 产品定位
 
@@ -21,330 +25,9 @@ Claude Code、Codex、OpenCode 是 Agent Runtime，不是用户直接管理的�
 5. 旧 Desktop/Web UI 文件是迁移素材，不是长期架构。
 6. Tauri Host API 必须从巨石 command 文件拆成可测试、可审计的能力模块。
 7. v4 目标消息合同是 shared `TranscriptBlock` / `EvidenceRef`；旧 `ChatView.types`、旧 `ChatMessage` 和旧 `FileDiff` 只能作为迁移输入或测试素材，不能继续作为 Desktop/Web 的目标跨端模型。
-8. Desktop/Tauri 前端固定使用 `5173`，Web 前端固定使用 `5174`。Mobile 主线已切到 Expo + React Native，浏览器视觉预览固定使用 `5177`，避免抢占 Desktop/Web/design demo 端口。
+8. Desktop/Tauri 前端固定使用 `5173`，Web 前端固定使用 `5174`。Mobile 主线已切到 Expo + React Native，浏览器视觉预览固定使用 `5177`。
 
-## 3. v4 工作台信息架构
-
-v4 第一屏是一个密集但清晰的 IM 工作台，不是营销页，也不是 IDE 皮肤。
-
-### UI 壳子参考
-
-实现时全面参考以下设计资产：
-
-| 设计资产 | 用途 | 实现要求 |
-|---|---|---|
-| `agenthub-design/index.html` | 设计系统入口、主题和设计版本导航 | 用于确认设计系统方向，不作为生产 UI 代码来源 |
-| `agenthub-design/desktop/index.html` | Desktop 壳子 DOM 结构 | 转译为 shared React workbench，不直接复制静态 HTML |
-| `agenthub-design/desktop/styles.css` | v4 布局、密度、token、light/dark、rail/sidebar/workspace/inspector/composer 样式 | 提取 token 意图和布局规则，落到 shared CSS Modules/token 层 |
-| `agenthub-design/desktop/app.js` | 原型交互：会话切换、inspector resize/collapse、profile popover、workbench pages、selection/context menu | 转成 typed state、React reducer/hooks 和 platform adapter 事件 |
-| `agenthub-design/desktop/agenthub-desktop-prototype-single.html` | 单文件快照 | 只作视觉回归和离线对照 |
-
-这些设计资产是 UI 壳子的参考权威；AgentHub 仓库内的 shared React 组件和测试是工程权威。
-
-当前 1:1 迁移的视觉验收规则：
-
-- `agenthub-design/desktop/styles.css` 是布局、密度、圆角、色阶、focus 和动效边界的优先依据；不能按个人审美新增 hover 位移、弹性 scale 或大阴影。
-- 普通 shell/button/tab/card/list row 以颜色、边框、阴影和 focus ring 反馈为主；只有 design 源码明确存在的菜单/弹层入场、折叠面板、发送按钮、run-step toggle 和 monitor-file 行响应可以保留 transform。
-- `v4_style_compare.mjs` 负责稳定首屏 computed-style 对比；置顶公告 padding、diff 展开态、sidebar/inspector 折叠态这类功能状态由各自 smoke 覆盖，不混进基础样式基线。
-- Desktop `5173`、Web `5174` 与 design demo `5176/desktop` 必须同时通过基础样式和 motion smoke；Web 仍不得渲染 Desktop window chrome。
-
-```text
-Window Chrome
-  Global Rail
-  Conversation Sidebar
-  Workspace
-    Workspace Header
-    Workspace Tabs
-    Unified Transcript
-    Unified Composer
-  Right Inspector
-```
-
-| 区域 | 职责 | 规则 |
-|---|---|---|
-| Window Chrome | Desktop 窗口拖拽、标题、窗口按钮 | Desktop-only wrapper；Web 不渲染假桌面窗口；共享工作台不依赖窗口 API |
-| Global Rail | 对话、联系人、云文档、Agent、任务、项目、设置 | 图标优先，必须有 tooltip/aria-label |
-| Conversation Sidebar | 私聊、群聊、项目会话、未读、最近活动 | 展示 Agent Profile / Human / Project，不展示 Runtime 当联系人 |
-| Workspace Header | 当前会话、Agent Profile、Runtime/model/thread 状态、动作入口 | 状态紧凑，不堆叠大卡片 |
-| Unified Transcript | 用户消息、Agent 回复、Thinking、Tool、Diff、Approval、Artifact、Deploy | 所有来源投影到同一 `TranscriptBlock` 合同 |
-| Unified Composer | 文本输入、发送状态、平台提交意图 | 首屏必须对齐 `agenthub-design/desktop`：`.composer`、隐藏 `.composer-bar`、`.composer-row`、`textarea`、发送按钮和 `+` 伪元素；`@Agent`、附件、mode、workdir、approval mode 只能作为 reducer/adapter 语义或未来明确设计槽位，不得作为首屏可见控件 |
-| Right Inspector | 运行证据、任务队列、tool timeline、changed files、preview/browser/file panes | 不是装饰栏，必须回答"做了什么、改了什么、产物在哪" |
-
-### Shared Shell 交互基线
-
-当前 shared workbench 已冻结以下交互边界：
-
-- Desktop `5173` 可由 `DesktopChrome` 包裹窗口 chrome；Web `5174` 不渲染 fake Desktop chrome。
-- Chat 页左侧最近频道栏使用 `--sidebar-w` 驱动，默认 260px、键盘/拖拽范围 180-360px；点击当前 GlobalRail `对话` 图标可折叠/展开，越过 96px snap 阈值后自动折叠。
-- 右侧 inspector 使用 `--inspector-w` 驱动，支持键盘/拖拽 resize；越过 96px snap 阈值时在 pointermove 阶段立即结束 resize 并进入 collapsed，不能残留 48px 窄栏等待 pointerup。
-- 右侧 inspector 拖宽导致 workspace 低于可读宽度时，shared workbench 必须优先保护聊天列：自动折叠左侧最近频道栏，而不是用硬 `min-width` 顶穿窗口或让置顶卡越过 inspector。
-- Chat 顶部置顶公告和底部 composer 都必须限制在 workspace 安全边界内；滚动到底部时最新消息应停在 composer 上方，不能被输入框遮挡。
-- 深浅主题切换必须通过 shared `app/shared/src/theme.ts` 的 `applyAgentHubTheme()` 或 `toggleAppliedAgentHubTheme()`；切换时根节点短暂进入 `data-theme-sync=true`，Desktop/Web 全局 CSS 在两帧内禁用 transition/animation，让主题 token 同帧提交。
-- 后续新增主题入口、侧栏入口、inspector 入口必须复用这些 shared 状态和 helper，不得在 Desktop/Web 私有层重复写一套。
-
-## 4. 前端分层
-
-```text
-app/shared
-  src/ui/            基础 UI primitives
-  src/workbench/     v4 产品工作台 shell
-  src/transcript/    统一消息/事件 block contract 和 renderer
-  src/composer/      统一输入区状态和组件
-  src/inspector/     统一证据面板和预览面板
-  src/platform/      Desktop/Web platform adapter interface
-  src/demo/          数据模式 (auto/mock/fixture/observed/approved-real)
-  src/hubEvents.ts   Hub WebSocket 事件类型常量
-
-app/desktop
-  src/platform/      Tauri + Local Edge adapter
-  src/api/           Desktop query hooks 和 transport 层
-  src/main.tsx       Desktop 启动入口
-  src-tauri/src/host Tauri host capability modules
-
-app/web
-  src/platform/      Hub + browser adapter
-  src/api/           Web query hooks 和 transport 层
-  src/main.tsx       Web 启动入口
-```
-
-### `app/shared/src/ui`
-
-基础组件层只提供可复用 primitives 和小型业务卡片，例如 Button、Modal、MessageBubble、ToolTimeline、DiffReviewPanel、ArtifactCard、DeployCard。当前目录已有组件和测试基础，但 exports 不完整，v4 重构时必须明确 public API，删除未采用的半公开入口。
-
-### `app/shared/src/workbench`
-
-承载 v4 工作台产品结构：
-
-- `AgentHubWorkbench`
-- `GlobalRail`
-- `ConversationSidebar`
-- `WorkspaceHeader`
-- `WorkspaceTabs`
-- `WorkbenchRoutes`
-- `WorkbenchLayout`
-
-Workbench 只依赖 shared contracts 和 platform adapter，不直接调用 Tauri invoke、Hub client 或 Edge client。
-
-### `app/shared/src/transcript`
-
-统一消息流合同：
-
-```text
-Conversation -> Message -> TranscriptBlock -> EvidenceRef
-```
-
-目标 block 类型：
-
-- `text`
-- `thinking`
-- `tool_call`
-- `tool_result`
-- `diff`
-- `approval`
-- `artifact`
-- `deploy`
-- `route_decision`
-- `child_agent`
-- `context_usage`
-- `error`
-
-Desktop Edge events、Hub IM messages、TeamRun events 和 Web remote task events 都必须 normalize 到该合同后再渲染。禁止新增 Markdown-only 第二消息流。
-
-当前实现已落地 `text`、`tool_call`、`diff`、`approval`、`artifact` 和 `EvidenceRef` 聚合；剩余旧 `ChatView.types` 中的 `thinking`、`tool_result`、`deploy`、`route_decision`、`child_agent`、`context_usage`、`error` 等 block kind 必须先补进 shared contract 或映射为现有 `TranscriptBlock` 后，才能删除旧 Chat/IM 组件本体。
-
-过渡规则：
-
-- `app/shared/src/transcript/types.ts` 是 v4 渲染合同。
-- `app/shared/src/types/chat.ts` 只保留兼容旧测试、搜索、Diff、artifact 提取和迁移工具需要的旧消息视图合同。
-- 旧 `app/desktop/src/components/ChatView.types.ts` 和 `app/web/src/components/ChatView.types.ts` 不再新增字段；下一批实现应把引用迁到 shared 类型，再删除旧类型文件。
-- Diff 类型应从旧 ChatView 类型中抽离到 shared diff contract，供 shared inspector、DiffReviewPanel、旧 DiffViewer 迁移期共用。
-
-### `app/shared/src/composer`
-
-Composer 负责输入体验和发送意图，不拥有平台执行细节：
-
-- 首屏 UI：严格对齐设计 demo 的单行/多行输入胶囊，只显示输入框和发送按钮。
-- mode：Ask / Plan / Code / Review / Deploy，只能作为意图字段或未来明确设计槽位，不在首屏自造工具条。
-- mention：Agent Profile / Human / Project，只能作为意图字段或未来明确设计槽位，不在首屏自造 `@Agent` 按钮和 chip。
-- attachment：文件、目录、artifact、网页链接，只能作为意图字段或未来明确设计槽位，不在首屏自造附件按钮和 chip。
-- execution context：workspace、approval mode、target，只能来自平台默认值、会话上下文或未来明确设计槽位，不在首屏自造下拉/输入控件。
-- draft：per conversation draft persistence
-- submit state：idle / pending / streaming / failed
-- keyboard preference：默认 `Enter` 发送，`Ctrl+Enter` / `Cmd+Enter` 换行；设置页可切到 `Ctrl+Enter 发送`。偏好由 shared `workbenchPreferences` 管理，持久化 key 为 `agenthub.workbench.composerSubmitBehavior`，Desktop/Web 不得在 platform 私有层另写一套键盘规则。
-- demo submit：demo/mock preview 也必须经过 shared submit intent，追加用户消息和 mock reply；Desktop 只有在真实 Edge `projectId/threadId` 存在时才走 Edge run，否则回落到 demo runtime。
-
-### `app/shared/src/inspector`
-
-Inspector 负责 evidence-first 工作面板：
-
-- run progress
-- active/done/warning queue
-- tool timeline
-- changed files
-- artifacts
-- approval requests
-- browser preview
-- file preview
-- deploy status
-
-窄屏可折叠，但入口必须明确。宽屏 Desktop/Web 默认优先保证 transcript 和 inspector 同屏可见。
-
-### 文档与产物浏览
-
-AgentHub 不在 v4 首轮实现完整飞书/Notion 式协同编辑器。当前产品边界是：
-
-- **Project Artifacts**：项目页展示项目内运行产物、交付物、归档包和报告索引；点击产物进入同一套只读预览。
-- **Document Library**：云文档页展示跨项目文档、共享文档、最近访问、项目产物和外部文档入口；它是轻量文档中心，不是第二套重型编辑器。
-- **File / Artifact Preview**：`WorkbenchDocumentPreview` 是当前统一预览合同，复用 `FilePreview` 支持源码、Markdown 预览、Diff 和打开方式菜单。
-- **Document Providers**：正文来源后续可接 Hub artifact store、本地 workspace、Feishu/Google Docs/Tencent Docs/WPS 等 provider；页面只消费统一 preview contract，不直接绑定 provider。
-
-因此，项目页与云文档页可以有"飞书味"的轻量文档体验，但多人在线编辑、复杂评论、版本冲突、外部权限同步等能力应作为 provider/Hub 层后续模块，不在 shared UI 里临时自造。
-
-### 数据模式 (`app/shared/src/demo/dataMode.ts`)
-
-工作台数据模式控制 UI 数据来源和展示行为：
-
-| 模式 | 值 | 用途 |
-|---|---|---|
-| Auto | `auto` | 根据环境自动选择，默认回落到 mock |
-| Mock | `mock` | 纯内存硬编码数据，无后端依赖 |
-| Fixture | `fixture` | 基于 runtime manifest 的静态 fixture 数据，可离线运行 |
-| Observed | `observed` | 读取已持久化的真实运行记录（replay），不触发新执行 |
-| Approved Real | `approved-real` | 真实 API/CLI 调用，需审批和 API key |
-
-- 持久化 key：`agenthub.workbench.dataMode`（localStorage）
-- `isWorkbenchFixtureDataMode()` — 判断是否为 fixture 系模式（mock 或 fixture）
-- `isWorkbenchRealDataMode()` — 判断是否为真实数据模式（observed 或 approved-real）
-- 各平台 adapter 在 `observed` / `approved-real` 下显示真实数据，数据缺失时展示 empty/error，不静默回落到 mock
-
-## 5. Platform Adapter
-
-共享 UI 通过 platform adapter 获取能力。
-
-```ts
-interface AgentHubPlatform {
-  surface: AgentHubSurface;           // "desktop" | "web"
-  capabilities: SurfaceCapabilities;  // { localEdge, localFiles, browserPreview }
-  conversations: ConversationPort;
-  runs: RunPort;
-  attachments?: AttachmentPort;
-  host?: HostDiagnosticsPort;
-  preview?: PreviewPort;
-  settings?: SettingsPort;
-}
-```
-
-实际代码定义（`app/shared/src/platform/types.ts`）：
-
-| Port | 接口 | 职责 |
-|---|---|---|
-| `ConversationPort` | `list()` | 获取会话列表 |
-| `RunPort` | `submitComposerIntent(intent)` | 提交 composer 意图并返回结果 |
-| `AttachmentPort` | `pickFiles()` | 文件选择器（可选） |
-| `HostDiagnosticsPort` | `localCliDiscovery?()` | 本地 CLI 发现和诊断（可选） |
-| `PreviewPort` | `canOpenEvidence?()`, `openEvidence()` | 证据预览（可选） |
-| `SettingsPort` | `readSettings()`, `writeSettings()` | 设置读写（可选） |
-
-Desktop adapter：
-
-- Local Edge status/start/stop
-- Edge REST/WS
-- Tauri file/dialog/window/keyring/notification
-- local workspace allowlist
-- TokenDance ID loopback callback
-
-Web adapter：
-
-- Hub REST/WS
-- Hub session
-- remote Edge/Cloud target routing
-- browser-safe preview
-- remote approval
-
-UI 能根据 `capabilities` 隐藏或禁用不可用动作，但不能 fork 另一套组件。
-
-### Desktop Query Hooks (`app/desktop/src/api/`)
-
-| 文件 | 用途 |
-|---|---|
-| `hubClient.ts` | Hub REST 客户端（sendMessage/recall/edit/pin/unpin/markRead/reactions） |
-| `hubQueries.ts` | Hub 联系人/会话/消息 React Query hooks |
-| `sessionQueries.ts` | 会话 CRUD + 消息操作 hooks（pin/unpin/forward/markRead/reactions） |
-| `hubWS.ts` | Hub WebSocket 连接管理 |
-| `hubAuth.ts` | Hub 认证 + token 管理 |
-| `hubTokenStorage.ts` | Token 持久化 |
-| `edgeClient.ts` | Edge REST 客户端 |
-| `edgeAuth.ts` | Edge 认证 |
-| `eventClient.ts` | Edge EventStore 客户端 |
-| `runQueries.ts` | Edge run lifecycle hooks |
-| `runEvidenceQueries.ts` | Run evidence 查询 |
-| `threadQueries.ts` | Thread CRUD hooks |
-| `agentQueries.ts` | Agent 列表查询 |
-| `agentProfileQueries.ts` | Hub Agent Profile CRUD hooks |
-| `agentTeamQueries.ts` | Agent Team Run hooks |
-| `contactQueries.ts` | 联系人 hooks |
-| `projectQueries.ts` | Hub projects hooks |
-| `documentQueries.ts` | Hub documents CRUD hooks |
-| `executionTargetQueries.ts` | Execution target hooks |
-| `modelCatalogQueries.ts` | 模型目录发现 |
-| `teamRunQueries.ts` | TeamRun 编排 hooks |
-| `deviceId.ts` | 设备 ID 管理 |
-| `schemas.ts` | Zod schema 验证 |
-| `allowlistValidation.ts` | Tool allowlist 验证 |
-| `transport.ts` | HTTP transport 层 |
-| `queryClient.ts` | React Query client 配置 |
-
-### Web Query Hooks (`app/web/src/api/`)
-
-| 文件 | 用途 |
-|---|---|
-| `hubClient.ts` | Hub REST 客户端（sendMessage/recall/edit/pin/unpin/markRead/forward/reactions/search） |
-| `hubWS.ts` | Hub WebSocket 连接管理 |
-| `hubAuth.ts` | Hub 认证 + token 管理 |
-| `hubTokenStorage.ts` | Token 持久化 |
-| `edgeClient.ts` | Edge REST 客户端 |
-| `transport.ts` | HTTP transport 层 |
-| `queryClient.ts` | React Query client 配置 |
-| `runQueries.ts` | Edge run lifecycle hooks |
-| `threadQueries.ts` | Thread CRUD hooks |
-| `agentQueries.ts` | Agent 列表查询 |
-| `agentTeamQueries.ts` | Agent Team hooks |
-| `contactQueries.ts` | 联系人 hooks |
-| `projectQueries.ts` | Hub projects hooks |
-| `executionTargetQueries.ts` | Execution target hooks |
-| `deviceId.ts` | 设备 ID 管理 |
-
-## 6. Tauri Host API
-
-`app/desktop/src-tauri/src/commands.rs` 当前承担过多职责。v4 后的目标结构：
-
-```text
-src-tauri/src/host/
-  mod.rs
-  edge.rs
-  fs.rs
-  dialog.rs
-  auth.rs
-  window.rs
-  system.rs
-
-src-tauri/src/commands.rs
-  register_commands()
-  compatibility shims during migration
-```
-
-| 模块 | 职责 |
-|---|---|
-| `edge.rs` | Edge start/stop/status/auth token |
-| `fs.rs` | 文件树、读写、复制、移动、删除、路径 allowlist |
-| `dialog.rs` | 文件/目录选择和保存路径 |
-| `auth.rs` | OIDC loopback、session/keyring |
-| `window.rs` | 窗口、托盘、通知、外链 |
-| `system.rs` | 平台信息、诊断、路径发现 |
-
-所有危险能力必须经过 typed request、allowlist、错误码和测试。UI 不拼接任意 shell 命令。
-
-## 7. Runtime / Edge / Hub 总体架构
+## 3. 五层架构
 
 ```text
 Desktop shared workbench
@@ -361,267 +44,24 @@ Web shared workbench
   -> AgentAdapter
 ```
 
-| 组件 | 目录 | 职责 |
-|---|---|---|
-| Shared Workbench | `app/shared/` | v4 UI、transcript、composer、inspector、platform contracts |
-| Desktop App | `app/desktop/` | Desktop adapter、Tauri shell、Local Edge 本机能力 |
-| Web App | `app/web/` | Web adapter、Hub session、远程审批和查看 |
-| Edge Server | `edge-server/` | 本地项目、Thread、Context Builder、Run lifecycle、Agent Runtime adapter、Artifact index |
-| Hub Server | `hub-server/` | TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计 |
-| API Contract | `api/` | REST API 和 WebSocket event 契约 |
+| 层 | 组件 | 目录 | 职责 |
+|---|---|---|---|
+| Shared UI | Shared Workbench | `app/shared/` | v4 UI、transcript、composer、inspector、platform contracts |
+| Desktop | Desktop App | `app/desktop/` | Desktop adapter、Tauri shell、Local Edge 本机能力 |
+| Web | Web App | `app/web/` | Web adapter、Hub session、远程审批和查看 |
+| Edge | Edge Server | `edge-server/` | 本地项目、Thread、Context Builder、Run lifecycle、Agent Runtime adapter、Artifact index |
+| Hub | Hub Server | `hub-server/` | TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计 |
+| API | API Contract | `api/` | REST API 和 WebSocket event 契约 |
 
-## 8. Agent 产品模型
+详细子文档：
+- **Hub Server（路由、中间件、WebSocket 事件、Chat Actions）** → [architecture/01-hub-server.md](architecture/01-hub-server.md)
+- **Edge Server（adapter registry、process lifecycle、EventStore）** → [architecture/02-edge-server.md](architecture/02-edge-server.md)
+- **Runtime Adapters（全部 adapter、事件映射、Preflight）** → [architecture/03-runtime-adapters.md](architecture/03-runtime-adapters.md)
+- **Frontend Data Flow（Platform adapter、React Query、Settings 回退、Profile 合并）** → [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)
+- **Deployment（hk2、Docker Compose、Nginx、SSL）** → [architecture/05-deployment.md](architecture/05-deployment.md)
+- **Auth & Identity（OIDC PKCE、JWT、TokenDance ID、设备注册）** → [architecture/06-auth-identity.md](architecture/06-auth-identity.md)
 
-| 概念 | 含义 | 权威来源 |
-|---|---|---|
-| Agent Runtime | 能启动和解析某类 Agent CLI/SDK 的执行适配器，回答"用什么运行" | Edge adapter registry |
-| Agent Profile | 用户可选择的 Agent 实体，回答"谁来做事" | Hub profile store / Edge local profile |
-| Agent Configuration | Profile 的配置集合：AGENTS.md、memory、上下文、Skill、MCP、模型参数、审批策略 | Edge Context Builder + Hub store |
-| Execution Target | 一次 Run 的实际执行位置：local、remote、cloud、relay | Edge registration + Hub routing |
-| Conversation | 用户可见的 IM 会话：私聊、群聊、项目会话 | Hub/Edge conversation store |
-| Run Session | 一次执行的生命周期和事件序列 | Edge lifecycle + EventStore |
-| Artifact | Agent 产物索引、预览、应用和版本 | Edge artifact index + workspace |
-
-## 9. 通信方式
-
-| 通信 | 方式 |
-|---|---|
-| Shared UI -> platform adapter | TypeScript interface |
-| Desktop adapter -> Tauri host | typed invoke |
-| Desktop adapter -> Local Edge | REST JSON + WebSocket |
-| Web adapter -> Hub | REST JSON + WebSocket |
-| Hub -> Edge | REST callbacks + Hub WebSocket dispatch/relay |
-| Edge lifecycle -> AgentAdapter | Go interface + process context |
-| AgentAdapter -> Edge | typed runtime events |
-| Hub -> TokenDance ID | OIDC Authorization Code + PKCE / JWKS |
-
-安全边界：
-
-- UI 不能直接启动 Agent CLI。
-- Web 不能持有 TokenDance API key 或本机文件系统能力。
-- Desktop 文件操作必须经过 allowlist 和 typed Host API。
-- Hub 权限由 Hub-local membership/resource/action 决定，TokenDance ID 只证明身份。
-
-### 9.1 Runtime Adapters
-
-Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内部 `RunEvent` 流。
-
-#### CLI Adapters
-
-| Adapter | 注册 ID | 文件 | 功能 |
-|---------|---------|------|------|
-| Claude Code | `claude-code` | `claude_code.go` | 真实 CLI 执行验证通过，`claude --output-format stream-json` |
-| Codex | `codex` | `codex.go` | PreflightAdapter 预检 `OPENAI_API_KEY`，env var 透传 |
-| OpenCode | `opencode` | `opencode.go` | `--session` 仅在 resume 时传递 |
-
-#### SDK HTTP Adapters
-
-| Adapter | 注册 ID | 文件 | 调用方式 |
-|---------|---------|------|---------|
-| `AnthropicSDKAdapter` | `anthropic-sdk` | `anthropic_sdk.go` | HTTP direct call Anthropic Messages API + SSE streaming |
-| `OpenAISDKAdapter` | `openai-sdk` | `openai_sdk.go` | HTTP direct call OpenAI Chat Completions API + SSE streaming |
-
-SDK adapter 特征：
-
-- 注册标志：`--anthropic-sdk-path` / `--openai-sdk-path`
-- API key 通过环境变量 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` 注入（flag 值为 `env` 或空时从环境变量读取，否则直接使用 flag 值作为 key）
-- 无外部 SDK 依赖，纯 `net/http`
-- Key 缺失时 `Available=false`，不阻塞 Edge 启动
-- 属于 `sdkAdapterIDs`，`IsSDKAdapter()` 返回 true
-
-#### Orchestrator Adapter
-
-| Adapter | 注册 ID | 文件 | 功能 |
-|---------|---------|------|------|
-| `OrchestratorAdapter` | `orchestrator` | `orchestrator.go` | 群聊编排：包装 Claude Code + 系统提示，分解任务并分发给子 Agent |
-
-- 仅在 `--claude-code-path` 非空时自动注册
-- 作为 `orchestrator` 角色的默认 adapter
-- 自动发现已注册的子 Agent（`claude-code`、`codex`、`opencode`、`anthropic-sdk`、`openai-sdk`），生成调度提示
-- 支持子 Agent spawn 重试（最多 3 次，指数退避）和并发调度（默认 10）
-
-#### Runtime Manifest / Fixture Adapter
-
-| Adapter | 注册 ID | 文件 | 功能 |
-|---------|---------|------|------|
-| `RuntimeManifestAdapter` | 由 manifest JSON 定义 | `runtime_manifest.go` | 基于 JSON manifest 的自定义 fixture adapter |
-
-- 通过 `--runtime-manifest` 标志注册（可重复），env `AGENTHUB_RUNTIME_MANIFESTS`
-- Manifest schema: `agenthub-runtime-manifest-v1`
-- Fixture 类型：`fixture-file`（从文件回放）和 `fixture-subprocess`（启动子进程）
-- 支持 `--agenthub-runtime-fixture-replay` 独立回放模式
-- `AgentSpec fixture` 使用此机制注册 demo runtime/profile
-
-#### PreflightAdapter 接口
-
-```go
-// PreflightAdapter 在真实执行前检查必要条件，快速失败
-type PreflightAdapter interface {
-    Preflight(ctx context.Context) error
-}
-```
-
-Codex adapter 实现了此接口：预检 `OPENAI_API_KEY` 是否存在，缺失时返回描述性错误而非进程启动后失败。
-
-### 9.2 数据流模式
-
-本轮数据流打通建立了以下关键模式。
-
-#### Auth Token 管道模式
-
-```
-Desktop Tauri keyring/session
-  -> getAccessToken() callback
-  -> { getToken: getAccessToken }
-  -> hubQueries / sessionQueries / documentQueries / projectQueries
-  -> Hub REST API Authorization: Bearer <token>
-```
-
-所有 Desktop 的 Hub API 查询（`hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`、`projectQueries.ts`）统一通过 `getToken` 回调注入 auth token，不硬编码 token 值。
-
-#### WebSocket 实时缓存失效模式
-
-```
-Hub WS event (message.new / session.updated / ...)
-  -> useHubWebSocket event handler
-  -> React Query queryClient.invalidateQueries([queryKey])
-  -> UI 自动重新获取最新数据
-```
-
-Desktop `useHubWebSocket.ts` 接入 workbench model 后，Hub 的实时事件直接驱动 React Query 缓存失效，无需手动刷新。这一模式覆盖消息、会话、联系人和 Agent 相关的所有实时更新。
-
-#### Chat Actions 模式
-
-Web 和 Desktop 的 workbench model 分别暴露 chat actions，统一命名但各自实现：
-
-| Action | Web `useWebWorkbenchModel` | Desktop `useDesktopWorkbenchModel` |
-|--------|---------------------------|-----------------------------------|
-| send | Hub REST sendMessage | Hub REST sendMessage |
-| recall | Hub REST recallMessage | Hub REST recallMessage |
-| edit | Hub REST editMessage | Hub REST editMessage |
-| pin | Hub REST pinMessage | Hub REST pinMessage |
-| unpin | Hub REST unpinMessage | Hub REST unpinMessage |
-| markRead | Hub REST markRead | Hub REST markRead |
-| addReaction | Hub REST addMessageReaction | -- |
-| removeReaction | Hub REST removeMessageReaction | -- |
-| forward | Hub REST forwardMessage | -- |
-| searchMessages | Hub REST searchMessages | -- |
-
-自动已读回执：进入会话后自动标记最后一条消息为已读。
-
-#### Settings 三层回退模式
-
-Desktop 设置读取按以下优先级回退：
-
-```
-Edge settings API (本地实时配置)
-  -> Hub settings API (跨设备同步)
-    -> localStorage (离线兜底)
-```
-
-实现位置：Desktop platform adapter 的 settings 读取逻辑。Hub 设置优先于本地默认，Edge 设置优先于 Hub（本地执行相关配置优先本地）。
-
-#### Agent Profile 合并策略
-
-Desktop 的 Agent 列表按以下优先级合并：
-
-```
-Edge local profiles (本地已安装的 Agent)
-  > Hub agent profiles (云端共享的 Agent)
-    > raw adapter list (运行时自动发现的 Agent)
-```
-
-实现位置：`useHubAgentProfiles` 等 hooks + Desktop workbench model。Edge 本地 profile 优先保证离线可用；Hub profile 提供跨设备共享；raw adapter 是底层 runtime 的可用列表。
-
-### 9.3 Hub WebSocket 事件
-
-Hub WebSocket 使用 JSON frame 格式：`{ type, payload, seq_id? }`。事件类型定义在 `app/shared/src/hubEvents.ts`（前端常量）和 `hub-server/internal/ws/frame.go`（后端定义）。
-
-共 26 个事件类型：
-
-| 分类 | 事件 | 常量 |
-|---|---|---|
-| **Auth** | `auth` | `AUTH` |
-| | `auth.ok` | `AUTH_OK` |
-| | `auth.fail` | `AUTH_FAIL` |
-| **Message** | `message.new` | `MESSAGE_NEW` |
-| | `message.recall` | `MESSAGE_RECALL` |
-| | `message.pin` | `MESSAGE_PIN` |
-| | `message.unpin` | `MESSAGE_UNPIN` |
-| | `message.read` | `MESSAGE_READ` |
-| **Session** | `session.created` | `SESSION_CREATED` |
-| | `session.dissolved` | `SESSION_DISSOLVED` |
-| | `session.member_joined` | `SESSION_MEMBER_JOINED` |
-| | `session.member_left` | `SESSION_MEMBER_LEFT` |
-| | `session.info_updated` | `SESSION_INFO_UPDATED` |
-| **Device** | `device.online` | `DEVICE_ONLINE` |
-| | `device.offline` | `DEVICE_OFFLINE` |
-| | `device.kicked` | `DEVICE_KICKED` |
-| **Agent** | `agent.dispatch` | `AGENT_DISPATCH` |
-| | `agent.stream` | `AGENT_STREAM` |
-| | `agent.done` | `AGENT_DONE` |
-| | `agent.failed` | `AGENT_FAILED` |
-| | `agent.cancel` | `AGENT_CANCEL` |
-| | `agent.control` | `AGENT_CONTROL` |
-| **Notification** | `notification.new` | `NOTIFICATION_NEW` |
-| | `friend.request` | `FRIEND_REQUEST` |
-| | `friend.accepted` | `FRIEND_ACCEPTED` |
-
-## 10. Hub Server 路由表
-
-Hub Server（`hub-server/internal/router/router.go`）使用 Gin 框架，所有路由在 `SetupRoutes` 中注册。
-
-### 全局中间件
-
-CORS、API Version、Body Limit (default 10MB)、Global Rate Limit、Request ID、Access Log、Prometheus Metrics、Request Timeout。
-
-### 路由组
-
-| 路由前缀 | 认证 | 说明 |
-|---|---|---|
-| `GET /health` `/health/live` `/health/ready` | 无 | 健康检查 |
-| `GET /api/public/stats` | 无 | 公开统计 |
-| `GET /client/ws` | WS Auth | WebSocket 连接 |
-| `POST /client/auth/refresh` | IP Rate Limit | JWT 刷新 |
-| `POST /client/auth/oidc/authorize` | IP Rate Limit | OIDC 授权启动 |
-| `POST /client/auth/oidc/callback` | IP Rate Limit | OIDC 回调（code exchange） |
-| `GET /client/auth/oidc/callback` | IP Rate Limit | OIDC 回调（browser redirect） |
-| `GET /client/auth/me` `POST /client/auth/logout` `PUT /client/auth/profile` | Hub Session | 认证管理 |
-| `/client/contacts/*` | Hub Session | 联系人：搜索、好友请求（发送/接受/拒绝）、列表、删除、拉黑/解黑、备注 |
-| `/client/sessions/*` | Hub Session | 会话：列表、创建私聊/群聊、成员管理、转让/解散/离开、设置、消息发送/获取/增量同步、置顶、已读、搜索消息、添加 Agent |
-| `/client/messages/*` | Hub Session | 消息操作：撤回、编辑、置顶/取消置顶、表情回复、转发、搜索 |
-| `/client/attachments/*` | Hub Session | 附件：探测、上传、下载 |
-| `/client/notifications/*` | Hub Session | 通知：列表、标记已读、全部已读 |
-| `GET/PATCH /client/settings` | Hub Session | 用户设置（key-value store） |
-| `/edge/*` | Hub Session + Desktop only | Edge 设备注册、Agent Task 回调（ack/stream/done/fail） |
-| `POST /cloud/edge/register` | Hub Session | Cloud Edge 注册 |
-| `/web/*` | Hub Session + Web only | Web 端专用 API（见下） |
-
-### Web 端路由 (`/web/*`)
-
-| 路由前缀 | 说明 |
-|---|---|
-| `POST /web/agent-tasks` | 触发 Agent 任务 |
-| `POST /web/agent-tasks/:id/cancel` | 取消任务 |
-| `GET /web/agent-tasks/:id/events` `summary` | 事件流和摘要 |
-| `GET /web/agent-tasks/:id/approvals` | 任务审批列表 |
-| `POST /web/agent-tasks/:id/approvals/:approval_id/decide` | 审批决定 |
-| `GET /web/agent-tasks/:id/artifacts` | 任务产物列表 |
-| `/web/custom-agents` | 自定义 Agent CRUD |
-| `/web/agent-profiles` | Agent Profile CRUD + 发布/安装 |
-| `/web/skills` | Skill CRUD + 发布/取消发布 |
-| `/web/mcp-servers` | MCP Server CRUD + 发布/取消发布 |
-| `/web/market/*` | 市场搜索/安装/评分 |
-| `/web/provider-bindings` | Provider Binding CRUD |
-| `/web/execution-targets` | Execution Target CRUD + Ping |
-| `/web/documents` | 云文档 CRUD |
-| `/web/projects` | 项目 CRUD + Thread + Thread Messages |
-| `GET /web/audit-events` | 审计事件（Admin only） |
-| `/web/relay/commands` | Relay 命令（Admin only） |
-| `GET /web/devices` | 设备列表 |
-| `/web/agent-teams` | Agent Team CRUD + Run + Assignment + Route Decision + Approval + Conflict |
-
-## 11. 数据线
+## 4. 数据流
 
 **控制线**
 
@@ -647,15 +87,123 @@ RunEvent -> EvidenceRef -> Inspector -> Artifact/File/Preview
 Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 ```
 
-## 12. 旧系统清理策略
+## 5. Platform Adapter Interface
+
+共享 UI 通过 platform adapter 获取能力：
+
+```ts
+interface AgentHubPlatform {
+  surface: AgentHubSurface;           // "desktop" | "web"
+  capabilities: SurfaceCapabilities;  // { localEdge, localFiles, browserPreview }
+  conversations: ConversationPort;
+  runs: RunPort;
+  attachments?: AttachmentPort;
+  host?: HostDiagnosticsPort;
+  preview?: PreviewPort;
+  settings?: SettingsPort;
+}
+```
+
+- **Desktop adapter**：Local Edge、Tauri file/dialog/window/keyring、local workspace allowlist、TokenDance ID loopback callback
+- **Web adapter**：Hub REST/WS、Hub session、remote Edge/Cloud routing、browser-safe preview、remote approval
+
+UI 能根据 `capabilities` 隐藏或禁用不可用动作，但不能 fork 另一套组件。
+
+前端数据流详情 → [architecture/04-frontend-data-flow.md](architecture/04-frontend-data-flow.md)
+
+## 6. 非协商边界
+
+- UI 不能直接启动 Agent CLI
+- Web 不能持有 TokenDance API key 或本机文件系统能力
+- Desktop 文件操作必须经过 allowlist 和 typed Host API
+- Hub 权限由 Hub-local membership/resource/action 决定，TokenDance ID 只证明身份
+- 所有 adapter 必须将事件 normalize 到统一 `RunEvent` -> `TranscriptBlock` 合同
+- 禁止新增 Markdown-only 第二消息流
+
+## 7. Agent 产品模型
+
+| 概念 | 含义 | 权威来源 |
+|---|---|---|
+| Agent Runtime | 能启动和解析某类 Agent CLI/SDK 的执行适配器，回答"用什么运行" | Edge adapter registry |
+| Agent Profile | 用户可选择的 Agent 实体，回答"谁来做事" | Hub profile store / Edge local profile |
+| Agent Configuration | Profile 的配置集合：AGENTS.md、memory、上下文、Skill、MCP、模型参数、审批策略 | Edge Context Builder + Hub store |
+| Execution Target | 一次 Run 的实际执行位置：local、remote、cloud、relay | Edge registration + Hub routing |
+| Conversation | 用户可见的 IM 会话：私聊、群聊、项目会话 | Hub/Edge conversation store |
+| Run Session | 一次执行的生命周期和事件序列 | Edge lifecycle + EventStore |
+| Artifact | Agent 产物索引、预览、应用和版本 | Edge artifact index + workspace |
+
+## 8. 前端分层
+
+```text
+app/shared
+  src/ui/            基础 UI primitives
+  src/workbench/     v4 产品工作台 shell
+  src/transcript/    统一消息/事件 block contract 和 renderer
+  src/composer/      统一输入区状态和组件
+  src/inspector/     统一证据面板和预览面板
+  src/platform/      Desktop/Web platform adapter interface
+  src/demo/          数据模式 (auto/mock/fixture/observed/approved-real)
+
+app/desktop
+  src/platform/      Tauri + Local Edge adapter
+  src/api/           Desktop query hooks 和 transport 层
+  src/main.tsx       Desktop 启动入口
+  src-tauri/src/host Tauri host capability modules
+
+app/web
+  src/platform/      Hub + browser adapter
+  src/api/           Web query hooks 和 transport 层
+  src/main.tsx       Web 启动入口
+```
+
+### Transcript 合同
+
+```text
+Conversation -> Message -> TranscriptBlock -> EvidenceRef
+```
+
+目标 block 类型：`text`、`thinking`、`tool_call`、`tool_result`、`diff`、`approval`、`artifact`、`deploy`、`route_decision`、`child_agent`、`context_usage`、`error`
+
+`app/shared/src/transcript/types.ts` 是 v4 渲染合同。所有来源必须 normalize 到该合同后再渲染。
+
+### Tauri Host API
+
+目标结构（从巨石 commands.rs 拆分）：
+
+```text
+src-tauri/src/host/
+  mod.rs       edge.rs      fs.rs        dialog.rs    auth.rs      window.rs    system.rs
+```
+
+| 模块 | 职责 |
+|---|---|
+| `edge.rs` | Edge start/stop/status/auth token |
+| `fs.rs` | 文件树、读写、复制、移动、删除、路径 allowlist |
+| `dialog.rs` | 文件/目录选择和保存路径 |
+| `auth.rs` | OIDC loopback、session/keyring |
+| `window.rs` | 窗口、托盘、通知、外链 |
+| `system.rs` | 平台信息、诊断、路径发现 |
+
+所有危险能力必须经过 typed request、allowlist、错误码和测试。
+
+## 9. 通信方式
+
+| 通信 | 方式 |
+|---|---|
+| Shared UI -> platform adapter | TypeScript interface |
+| Desktop adapter -> Tauri host | typed invoke |
+| Desktop adapter -> Local Edge | REST JSON + WebSocket |
+| Web adapter -> Hub | REST JSON + WebSocket |
+| Hub -> Edge | REST callbacks + Hub WebSocket dispatch/relay |
+| Edge lifecycle -> AgentAdapter | Go interface + process context |
+| AgentAdapter -> Edge | typed runtime events |
+| Hub -> TokenDance ID | OIDC Authorization Code + PKCE / JWKS |
+
+## 10. 旧系统清理策略
 
 以下对象不得作为 v4 后的活跃主工作台：
 
-- Desktop `ChatView`
-- Desktop `PromptInput`
-- Desktop `IMBlockRenderer`
-- Desktop `RunDetail`
-- Desktop `ThreadPanel`
+- Desktop `ChatView` / `PromptInput` / `IMBlockRenderer` / `RunDetail` / `ThreadPanel`
 - Desktop/Web 分叉 `viewRegistry`
 - `useChatMessages` / `useIMChat` 千行 hooks
 - Web 复制版 `ChatView` / `PromptInput` / `RunDetail` / `ThreadPanel`
@@ -667,26 +215,26 @@ Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 
 | 类别 | 对象 | 处理策略 |
 |---|---|---|
-| 已迁移到 shared 兼容层 | 旧 `ChatView.types` 中的 `ChatMessage`、`MessageBlock`、`ToolResultBlock`、`FileDiff`、`DiffHunk`、`DiffLine`、Web `ReplyTarget` | 当前集中在 `app/shared/src/types/chat.ts`；只作为迁移兼容层，不再作为 v4 目标合同 |
-| 已删除组件本体 | Desktop/Web `ChatView`、`PromptInput`、`ThreadPanel`、Web `RunDetail`、Desktop IM `IMBlockRenderer`、旧 hooks | active import 已被扫描门禁阻断；旧组件、CSS 和旧测试已删除，继续防止回归 |
-| 暂缓但必须隔离 | Desktop/Web `DiffViewer`、Desktop `ArtifactBrowser`、Search/Dialog 类旧视图工具、Web `hubAdapters` 的旧 `ChatMessage` 转换路径 | 保留为功能参考或迁移输入；不得重新接回 v4 active route |
-| 已删除 active path | 旧 Desktop/Web `viewRegistry`、旧 `MainView`、旧 `IMView`、Desktop 旧 `RunDetail/RightInspector/PermissionDialog`、Web 孤儿 `PermissionDialog` | 由 `scripts/verify-v4-old-ui-active-paths.ps1` 持续阻断回归 |
+| 已迁移到 shared 兼容层 | 旧 `ChatView.types` 中的 `ChatMessage`、`MessageBlock` 等 | 集中在 `app/shared/src/types/chat.ts`；只作为迁移兼容层 |
+| 已删除组件本体 | Desktop/Web `ChatView`、`PromptInput`、`ThreadPanel` 等 | active import 已被扫描门禁阻断 |
+| 暂缓但必须隔离 | Desktop/Web `DiffViewer`、`ArtifactBrowser`、Search/Dialog 类 | 保留为功能参考或迁移输入 |
+| 已删除 active path | 旧 `viewRegistry`、旧 `MainView`、旧 `IMView` 等 | 由 `scripts/verify-v4-old-ui-active-paths.ps1` 持续阻断 |
 
-下一批最小安全切片是"剩余旧工具隔离迁移"：把 `DiffViewer`、`ArtifactBrowser`、Search/Dialog、Web `hubAdapters` 中仍有价值的 diff、artifact、搜索和 runtime projection 逻辑迁到 shared transcript / inspector / diff contract；迁完后删除旧 local component、hook、store 和 test。完整清单见 [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md)。
+完整清单见 [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md)。
 
-## 13. 验收门禁
+## 11. 验收门禁
 
 | 门禁 | 要求 |
 |---|---|
 | Typecheck | shared、desktop、web 分别通过 |
-| Unit tests | transcript normalization、composer state、inspector data、platform adapters 覆盖核心路径 |
-| Tauri tests | Host API path validation、dangerous operations、Edge lifecycle 覆盖 |
-| Visual QA | Desktop/Web 各 1440x920、1280x800、390x844 截图；chat 首屏 computed-style 对比覆盖 5173/5174/5176 |
+| Unit tests | transcript normalization、composer state、inspector data、platform adapters |
+| Tauri tests | Host API path validation、dangerous operations、Edge lifecycle |
+| Visual QA | Desktop/Web 各 1440x920、1280x800、390x844 截图 |
 | Browser QA | Playwright 验证无横向滚动、无遮挡、composer 不遮挡最后消息 |
-| Legacy scan | active route/import 不依赖旧 UI；活跃文档允许保留迁移记录和清理清单中的旧名称 |
+| Legacy scan | active route/import 不依赖旧 UI |
 | Docs sync | roadmap、architecture、README、governance 同步 |
 
-## 14. 阶段划分
+## 12. 阶段划分
 
 | 阶段 | 目标 | 状态 |
 |---|---|---|
@@ -698,59 +246,11 @@ Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 | D5 | Tauri Host API 拆分 | 未开始 |
 | D6 | 旧 UI 清理、视觉 QA、发布门禁 | 旧主路径已完成，剩余迁移债务和正式 Visual QA 继续 |
 
-## 15. 部署架构
-
-### hk2 生产部署
-
-生产 Hub Server 部署在 hk2（核云 VPS，香港），公开地址 `https://hub.vectorcontrol.tech`。
-
-**技术栈**：Docker Compose + Nginx + Let's Encrypt SSL
-
-**Docker Compose 服务**（`hub-server/deployments/hk2/docker-compose.hk2.yml`）：
-
-| 服务 | 镜像 | 资源限制 | 端口 |
-|---|---|---|---|
-| `postgres` | `postgres:16-alpine` | 512MB / 1 CPU | 5432（内部） |
-| `redis` | `redis:7-alpine` | 384MB / 0.5 CPU | 6379（内部） |
-| `hub-server` | `ghcr.io/tokendancelab/agenthub-hub:latest` | 256MB / 1 CPU | 8090→8080（loopback only） |
-
-**Nginx 配置**（`hub-server/deployments/hk2/nginx-hk2.conf`）：
-
-| Location | 认证 | 后端 |
-|---|---|---|
-| `/health` | 无 | Hub backend |
-| `/api/*` | OAuth2-proxy | Hub backend |
-| `/client/*` | OAuth2-proxy | Hub backend |
-| `/client/ws` | OAuth2-proxy | Hub backend（WebSocket upgrade, 3600s timeout） |
-| `/auth/tokendance/*` | 无 | Hub backend（OIDC callback） |
-| `/oauth2/*` | 无 | oauth2-proxy @ 127.0.0.1:4181 |
-| `/` | 无 | 静态主页（Astro export） |
-
-- SSL：使用 `api.vectorcontrol.tech` 通配符证书（certbot HTTP-01）
-- `agenthub.vectorcontrol.tech` 301 重定向到 `hub.vectorcontrol.tech`
-- HTTP → HTTPS 重定向
-- Rate limiting：API 200r/m、Auth 10r/m
-- 安全头：X-Frame-Options DENY、HSTS preload、CSP
-
-**Docker 网络**：`agenthub-net`（172.18.0.0/16 bridge），与 aihub-hk2 网络隔离。
-
-**日志**：JSON file driver，10MB max / 3 files rotation。
-
-**DNS**：`hub.vectorcontrol.tech` A record 指向 hk2 公网 IP。
-
-### 开发环境
-
-开发 Docker Compose（根目录 `docker-compose.yml`）提供相同技术栈但：
-
-- 默认绑定 `127.0.0.1`，避免开发密码暴露
-- Hub Server 从本地 Dockerfile 构建（`hub-server/deployments/Dockerfile`）
-- PostgreSQL / Redis 密码使用开发默认值
-- 端口：Hub API 8080、Admin 6060、PostgreSQL 5432、Redis 6379
-
-## 16. 文档权威
+## 13. 文档权威
 
 - 当前目标和优先级：[roadmap.md](roadmap.md)
 - v4 实施计划：[desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md)
 - 待确认问题：[v4-clean-rebuild-decision-questions.md](v4-clean-rebuild-decision-questions.md)
 - 分支事实：[governance/branch-governance.md](governance/branch-governance.md)
 - 历史材料：[archive/](archive/)
+- **架构子文档**：[architecture/](architecture/)
