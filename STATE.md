@@ -42,7 +42,7 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious233` HEAD `9f8ae16e`，从 `origin/master` 创建，已合入 Mobile RN release-gates 增量 + 2026-06-10 晚间 cc-switch/memory/market/SDK 全链路打通；本地 HEAD 当前领先 `origin/master`。 |
+| 当前集成 dev | `dev/delicious233` HEAD `c9832aa0`（Wave 1 complete），后续 Wave 2 提交至 `2504a901`，从 `origin/master` 创建，已合入 Wave 0+1 全部成果；本地 HEAD 当前领先 `origin/master`。 |
 | 上一条 dev | `origin/dev/delicious233 = fc0f0628` 已通过 PR #297 合入 `origin/master`，不再作为本轮新增事实源。 |
 | RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
 | master | `origin/master = b7e9c1a4 Merge pull request #297 from TokenDanceLab/dev/delicious233`，是当前可信基线。 |
@@ -222,6 +222,42 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 **Roadmap 体系化拆分**：
 - `docs/roadmap.md` 拆分为 `docs/roadmap/` 目录（6 个模块化文件）
 - 模块：管线、轻UI、右侧栏、竞品、ReleaseGate、长期路线
+
+### Wave 1 合入（2026-06-10 c9832aa0）
+
+8 个并行 Agent 全部交付 P0 数据缺口：
+
+**IM 消息交互增强**：
+- 消息回复/引用/重新生成：`TranscriptView` 上下文菜单 + `UnifiedComposer` replyTo 横幅条
+- 图片和文件附件：`AttachmentBlock` 组件 + 样式模块
+- 消息搜索高亮 + scroll-to-block：`AgentHubWorkbench` → `TranscriptView` 高亮链路
+- WebSocket 连接状态指示器：三色状态指示
+- 消息重新生成 API：`POST /web/agent-tasks/:id/regenerate` + Hub `agent_dispatch.go` + WS 事件
+
+**Diff / StepCard 可视化**：
+- `StepCard` 组件：`RunStepGroupTranscriptBlock` 折叠/展开 + 子步骤 timeline
+- Per-hunk Diff accept/reject：`DiffReviewPanel` 按钮 → Edge apply 端点 + 状态徽章
+
+**Agent 配置与市场**：
+- cc-switch 模型别名展示：Desktop `edgeClient.getCCSwitchStatus/getCCSwitchProviders` + `modelCatalogQueries` 联动
+- Agent 能力标签：联系人列表彩色标签，按 skill 分类着色
+- Skill Market：8 项 seed（PPTX Generator、DOCX Report、Excel Analyzer、PDF Toolkit、Diagram、Code Doc、Image Processor、Markdown）
+- MCP Market：6 项 seed（Filesystem、GitHub、Postgres、Brave Search、Puppeteer、Memory）
+
+### Wave 2 合入（2026-06-10 2504a901，进行中）
+
+- i18n workbench 更新
+- AgentsPage 更新
+- Web platform adapter 更新
+- Edge protocol 测试更新
+
+### Hub API 审计已知问题
+
+| 问题 | 严重度 | 状态 |
+|------|--------|------|
+| Message reaction emoji 列名不匹配 | HIGH | ✅ 已修复（b8a0c25e） |
+| Logout 500（无 refresh token） | MEDIUM | ❌ 未修复：手动生成 JWT 无 refresh token，logout 应幂等返回 200 |
+| Private session create 400 | LOW | ❌ 未修复：请求绑定问题，单用户场景自建会话被拒绝 |
 
 ## 当前不声明已经完成
 
