@@ -155,6 +155,7 @@ export {
   STATUS_LABELS,
   ContextUsageBlock,
   AgentTimeline,
+  URLPreviewCard,
 } from './blocks';
 export type {
   AgentMessageProps,
@@ -173,6 +174,7 @@ export type {
   RouteDecisionBlockProps,
   ContextUsageBlockProps,
   AgentTimelineProps,
+  URLPreviewCardProps,
 } from './blocks';
 
 /* ═══ Inspector panels ═══ */
