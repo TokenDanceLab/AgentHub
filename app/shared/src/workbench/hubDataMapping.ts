@@ -98,8 +98,36 @@ export interface HubWorkspaceProjectLike {
   id: string;
   name?: string;
   description?: string;
+  owner_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/**
+ * Convert a Hub workspace project to the ProjectInfo shape consumed by ProjectsPage.
+ */
+export function workspaceProjectToProjectInfo(project: HubWorkspaceProjectLike): ProjectInfo {
+  const description = project.description?.trim() || 'Hub workspace project';
+  return {
+    id: project.id,
+    name: project.name?.trim() || '未命名项目',
+    description,
+    status: 'Active',
+    meta: project.created_at
+      ? `Created ${formatProjectDate(project.created_at)}`
+      : 'Hub project',
+    members: [],
+    announcement: description,
+    runs: [],
+    artifacts: [],
+    feed: [],
+  };
+}
+
+function formatProjectDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 export function resolveHubProjects<TProject extends HubWorkspaceProjectLike>(
@@ -112,6 +140,17 @@ export function resolveHubProjects<TProject extends HubWorkspaceProjectLike>(
     return isWorkbenchFixtureDataMode(dataMode) ? undefined : [];
   }
   return (projects ?? []).map(mapFn);
+}
+
+/**
+ * Convenience wrapper: resolve Hub workspace projects using the default mapping.
+ */
+export function resolveHubProjectsDefault(
+  projects: HubWorkspaceProjectLike[] | undefined,
+  hubReady: boolean,
+  dataMode: WorkbenchDataMode,
+): ProjectInfo[] | undefined {
+  return resolveHubProjects(projects, hubReady, dataMode, workspaceProjectToProjectInfo);
 }
 
 // ── Document mapping ────────────────────────────────────────────────
