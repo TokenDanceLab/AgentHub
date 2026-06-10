@@ -295,11 +295,13 @@ function ChatHeader({
   showBack,
   thread,
   onBack,
+  onToggleInspector,
 }: {
   activeRun: MobileRun | undefined;
   showBack: boolean;
   thread: MobileThread | undefined;
   onBack: () => void;
+  onToggleInspector?: () => void;
 }): React.ReactElement {
   const { tokens } = useAgentHubTheme();
   const t = useStrings();
@@ -364,7 +366,7 @@ function ChatHeader({
         </Text>
       </View>
       <View style={{ width: 48, alignItems: 'flex-end' }}>
-        <IconButton accessibilityLabel={t.openMenu} icon="more" />
+        <IconButton accessibilityLabel={t.openMenu} icon="more" onPress={onToggleInspector} />
       </View>
     </View>
   );
