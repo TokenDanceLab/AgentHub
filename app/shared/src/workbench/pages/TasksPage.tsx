@@ -1,4 +1,6 @@
 import React, { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../i18n';
 import {
   DesignNavIcon,
   DESIGN_NAV_GLYPH_SIZE,
@@ -446,6 +448,7 @@ function TaskTable({
   onSaveEdit?: (() => void) | undefined;
   onCancelEdit?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   // Flatten all tasks across groups for the default group title
   const totalTasks = groups.reduce((sum, g) => sum + g.tasks.length, 0);
 
@@ -506,7 +509,7 @@ function TaskTable({
 
       <button type="button" className={`${styles.addRow} task-add-row`} onClick={onAddRow}>
         <DesignNavIcon name="plus" size={15} />
-        新建任务
+        {t('tasks.newTask')}
       </button>
     </div>
   );
@@ -559,6 +562,7 @@ export function TasksPage({
   onSaveTaskEdit,
   onCancelTaskEdit,
 }: TasksPageProps): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const title = PANE_TITLES[activePane] ?? '我负责的';
 
   return (
@@ -624,7 +628,7 @@ export function TasksPage({
           onClick={onTaskList}
         >
           <NavGlyph name="fileText" />
-          任务清单
+          {t('nav.tasks')}清单
           <small className={styles.navBadgePlus}>+</small>
         </button>
 
@@ -650,7 +654,7 @@ export function TasksPage({
           </div>
           <div className={styles.headActions}>
             <button type="button" className={`${styles.createBtn} btn btn-p`} onClick={onCreateTask}>
-              新建任务
+              {t('tasks.newTask')}
             </button>
             <button
               type="button"
@@ -698,7 +702,7 @@ export function TasksPage({
             onClick={onCreateTask}
           >
             <DesignNavIcon name="plus" size={15} />
-            新建任务
+            {t('tasks.newTask')}
           </button>
           <button
             type="button"
