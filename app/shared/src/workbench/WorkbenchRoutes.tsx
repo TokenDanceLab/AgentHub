@@ -140,6 +140,10 @@ export interface WorkbenchRoutesProps {
   /** Called when the user navigates between workbench pages.
    *  Used by the Settings page to navigate to Agents config. */
   onNavigatePage?: ((page: WorkbenchPage) => void) | undefined;
+  /** Current user's Hub ID, used to filter "my" tasks. */
+  currentUserId?: string | undefined;
+  /** Current user display name for Settings page. */
+  userDisplayName?: string | undefined;
 }
 
 /** Contact mutation callbacks wired to Hub API. */
@@ -339,16 +343,16 @@ function flattenTaskGroups(groups: TaskGroup[]): TaskItem[] {
   return groups.flatMap((group) => group.tasks);
 }
 
-function taskMatchesPane(task: TaskItem, pane: TasksPane): boolean {
+function taskMatchesPane(task: TaskItem, pane: TasksPane, currentUserId?: string): boolean {
   switch (pane) {
     case 'watching':
       return WATCHING_TASK_IDS.has(task.id) || task.project === 'AgentHub 设计评审';
     case 'activity':
       return ACTIVITY_TASK_IDS.has(task.id) || task.startTime === '刚刚';
     case 'created':
-      return task.creator === 'Delicious233';
+      return currentUserId ? task.creator === currentUserId : false;
     case 'assigned':
-      return task.creator === 'Delicious233' && task.assignee !== 'Delicious233';
+      return currentUserId ? task.creator === currentUserId && task.assignee !== currentUserId : false;
     case 'done':
       return task.status === '已完成';
     case 'owned':
@@ -396,13 +400,14 @@ function buildTaskGroups(
   sortMode: TaskSortMode,
   groupMode: TaskGroupMode,
   viewMode: ViewMode,
+  currentUserId?: string,
 ): TaskGroup[] {
   const filteredGroups = sourceGroups
     .map((group) => ({
       ...group,
       tasks: sortTasks(
         group.tasks.filter((task) => (
-          taskMatchesPane(task, pane)
+          taskMatchesPane(task, pane, currentUserId)
           && (pane === 'done' || !filterActive || task.status !== '已完成')
         )),
         sortMode,
@@ -437,7 +442,7 @@ function createLocalTask(index: number): TaskItem {
     assignee: 'Builder',
     startTime: '刚刚',
     dueDate: '今天 22:00',
-    creator: 'Delicious233',
+    creator: '当前用户',
     status: '未开始',
   };
 }
@@ -575,6 +580,8 @@ export function WorkbenchRoutes({
   mcpMarketItems,
   mcpMarketLoading,
   onNavigatePage,
+  currentUserId,
+  userDisplayName,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
@@ -582,7 +589,7 @@ export function WorkbenchRoutes({
   const [agentsPane, setAgentsPane] = useState<AgentsPaneId>('installed');
   const [tasksPane, setTasksPane] = useState<TasksPane>('owned');
   const [taskViewMode, setTaskViewMode] = useState<ViewMode>('list');
-  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>(WORKBENCH_MOCK_TASK_GROUPS);
+  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [taskFilterActive, setTaskFilterActive] = useState(true);
   const [taskSortMode, setTaskSortMode] = useState<TaskSortMode>('custom');
   const [taskGroupMode, setTaskGroupMode] = useState<TaskGroupMode>('custom');
@@ -982,7 +989,7 @@ export function WorkbenchRoutes({
     });
   }
 
-  const sourceTaskGroups = realDataMode ? [] : taskGroups;
+  const sourceTaskGroups = realDataMode ? taskGroups : (taskGroups.length > 0 ? taskGroups : WORKBENCH_MOCK_TASK_GROUPS);
   const visibleTaskGroups = useMemo(() => buildTaskGroups(
     sourceTaskGroups,
     tasksPane,
@@ -990,7 +997,8 @@ export function WorkbenchRoutes({
     taskSortMode,
     taskGroupMode,
     taskViewMode,
-  ), [sourceTaskGroups, taskFilterActive, taskGroupMode, taskSortMode, taskViewMode, tasksPane]);
+    currentUserId,
+  ), [sourceTaskGroups, taskFilterActive, taskGroupMode, taskSortMode, taskViewMode, tasksPane, currentUserId]);
   const visibleTasks = flattenTaskGroups(visibleTaskGroups);
   const allTasks = flattenTaskGroups(sourceTaskGroups);
   const selectedTask = allTasks.find((task) => task.id === selectedTaskId) ?? null;
@@ -1147,8 +1155,8 @@ export function WorkbenchRoutes({
       setTaskActionLabel('请先选择任务');
       return;
     }
-    updateTask(selectedTask.id, { assignee: 'Delicious233' });
-    setTaskActionLabel(`${selectedTask.title} 已指派给 Delicious233`);
+    updateTask(selectedTask.id, { assignee: currentUserId ?? '当前用户' });
+    setTaskActionLabel(`${selectedTask.title} 已指派给 ${userDisplayName ?? '当前用户'}`);
   }
 
   function handleGroupBySelectedTaskProject(): void {
@@ -1166,7 +1174,7 @@ export function WorkbenchRoutes({
       setTaskActionLabel('请先选择任务');
       return;
     }
-    setTasksPane(selectedTask.assignee === 'Delicious233' ? 'owned' : 'all');
+    setTasksPane(selectedTask.assignee === currentUserId ? 'owned' : 'all');
     setTaskFilterActive(false);
     setTaskActionLabel(`当前负责人：${selectedTask.assignee}`);
   }
@@ -1390,6 +1398,7 @@ export function WorkbenchRoutes({
           onSelectPane={setSettingsPane}
           spaceMeta="桌面设计 demo"
           spaceTitle="AgentHub Desktop"
+          currentUserDisplayName={userDisplayName}
         />
       );
     default:
