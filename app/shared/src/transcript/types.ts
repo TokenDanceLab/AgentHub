@@ -50,6 +50,8 @@ export interface TextTranscriptBlock extends TranscriptBlockBase {
   replyPreview?: string;
   /** Author name of the replied message. */
   replyAuthor?: string;
+  /** Quoted text excerpt (rendered as blockquote in the message bubble). */
+  quote?: string;
   /** Previous version content when this message was regenerated. */
   previousVersion?: string;
   /** Whether a newer version exists (old message shown grayed). */
