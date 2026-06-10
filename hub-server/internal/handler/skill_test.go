@@ -242,6 +242,43 @@ func TestSkillHandler_ListSkills(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "skill-1")
 }
 
+func TestSkillHandler_ListSkills_Public(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	searchPublicCalled := false
+	listCalled := false
+	svc := &mockSkillService{
+		searchPublic: func(ctx context.Context, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+			searchPublicCalled = true
+			assert.Equal(t, "agent_skill", skillType)
+			return &service.SkillListResult{
+				Items:   []model.Skill{{ID: "public-skill-1", Name: "Public Skill"}},
+				HasMore: false,
+			}, nil
+		},
+		list: func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+			listCalled = true
+			return &service.SkillListResult{}, nil
+		},
+	}
+	h := NewSkillHandler(svc)
+
+	r := gin.New()
+	r.GET("/web/skills", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.ListSkills(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/web/skills?is_public=true&skill_type=agent_skill", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, searchPublicCalled, "SearchPublic should be called when is_public=true")
+	require.False(t, listCalled, "List should NOT be called when is_public=true")
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "public-skill-1")
+}
+
 func TestSkillHandler_UpdateSkill(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
