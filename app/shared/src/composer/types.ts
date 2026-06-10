@@ -56,6 +56,12 @@ export interface ReplyToContext {
   preview: string;
 }
 
+export interface QuoteContext {
+  text: string;
+  author?: string;
+  messageId?: string;
+}
+
 export interface ComposerState {
   conversationId: string;
   text: string;
@@ -66,6 +72,7 @@ export interface ComposerState {
   workDir: string;
   submitState: ComposerSubmitState;
   replyTo: ReplyToContext | null;
+  quote: QuoteContext | null;
 }
 
 export interface ComposerIntent {
@@ -95,4 +102,5 @@ export type ComposerAction =
   | { type: 'addAttachment'; attachment: ComposerAttachment }
   | { type: 'removeAttachment'; attachmentId: string }
   | { type: 'setReplyTo'; replyTo: ReplyToContext | null }
+  | { type: 'setQuote'; quote: QuoteContext | null }
   | { type: 'resetAfterSubmit' };

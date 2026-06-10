@@ -1,4 +1,6 @@
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../i18n';
 import {
   DesignNavIcon,
   DESIGN_NAV_GLYPH_SIZE,
@@ -20,6 +22,34 @@ import styles from './ContactsPage.module.css';
    ═══════════════════════════════════════════════════════════════════════ */
 
 // ── Data shapes ──
+
+export interface FriendRequestRow {
+  request_id: string;
+  user_id: string;
+  username: string;
+  nickname: string;
+  avatar_url?: string;
+  message: string;
+  created_at: string;
+}
+
+export interface HubContactRow {
+  user_id: string;
+  username: string;
+  nickname: string;
+  avatar_url?: string;
+  remark?: string;
+  online: boolean;
+  type: string;
+}
+
+export interface HubSearchResultRow {
+  user_id: string;
+  username: string;
+  nickname: string;
+  avatar_url?: string;
+  relationship: string;
+}
 
 export interface ContactMember {
   id: string;
@@ -109,6 +139,16 @@ export interface ContactsPageProps {
   externalContacts?: ContactMember[];
   /** Pending contact requests (used in "new" pane) */
   pendingContacts?: ContactMember[];
+  /** Received friend requests from Hub API */
+  friendRequests?: FriendRequestRow[];
+  /** Sent friend requests from Hub API */
+  sentRequests?: FriendRequestRow[];
+  /** Hub contacts (from API) */
+  hubContacts?: HubContactRow[];
+  /** Search result from Hub user search */
+  searchResult?: HubSearchResultRow | null;
+  /** Whether a search is in progress */
+  searchLoading?: boolean;
   /** Starred contacts (used in starred pane) */
   starredContacts?: ContactMember[];
   /** Groups (used in groups pane) */
@@ -269,6 +309,72 @@ function MemberRow({
       </span>
       <span className={styles.memberStatus}>{member.status}</span>
     </button>
+  );
+}
+
+// ── Friend request card ──
+
+function FriendRequestCard({ request, direction, onAccept, onReject, loading }: {
+  request: FriendRequestRow;
+  direction: 'received' | 'sent';
+  onAccept?: ((requestId: string) => void) | undefined;
+  onReject?: ((requestId: string) => void) | undefined;
+  loading?: boolean;
+}): React.ReactElement {
+  const initials = (request.nickname || request.username).slice(0, 2).toUpperCase();
+  const displayName = request.nickname || request.username;
+  const timeLabel = request.created_at
+    ? new Date(request.created_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+    : '';
+  return (
+    <div className={styles.requestCard} data-card-surface>
+      <div className={styles.requestAvatar}>{initials}</div>
+      <div className={styles.requestInfo}>
+        <span className={styles.requestName}>{displayName}</span>
+        {request.message && <span className={styles.requestMsg}>{request.message}</span>}
+        <span className={styles.requestMeta}>
+          {direction === 'received' ? '收到请求' : '已发送'} {timeLabel && `· ${timeLabel}`}
+        </span>
+      </div>
+      {direction === 'received' && (
+        <div className={styles.requestActions}>
+          <button type="button" className={styles.acceptBtn} disabled={loading} onClick={() => onAccept?.(request.request_id)}>接受</button>
+          <button type="button" className={styles.rejectBtn} disabled={loading} onClick={() => onReject?.(request.request_id)}>拒绝</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Search result card ──
+
+function SearchUserCard({ result, onSendRequest, loading }: {
+  result: HubSearchResultRow;
+  onSendRequest?: ((userId: string) => void) | undefined;
+  loading?: boolean;
+}): React.ReactElement {
+  const initials = (result.nickname || result.username).slice(0, 2).toUpperCase();
+  const displayName = result.nickname || result.username;
+  const relationshipLabel = (): string => {
+    switch (result.relationship) {
+      case 'friend': return '已是好友';
+      case 'pending_sent': return '已发送请求';
+      case 'pending_received': return '收到对方请求';
+      case 'blocked': return '已屏蔽';
+      default: return '陌生人';
+    }
+  };
+  return (
+    <div className={styles.searchResultCard} data-card-surface>
+      <div className={styles.requestAvatar}>{initials}</div>
+      <div className={styles.requestInfo}>
+        <span className={styles.requestName}>{displayName}</span>
+        <span className={styles.requestMeta}>@{result.username} · {relationshipLabel()}</span>
+      </div>
+      {result.relationship === 'stranger' && (
+        <button type="button" className={styles.acceptBtn} disabled={loading} onClick={() => onSendRequest?.(result.user_id)}>添加好友</button>
+      )}
+    </div>
   );
 }
 
@@ -621,6 +727,11 @@ export function ContactsPage({
   members,
   externalContacts,
   pendingContacts,
+  friendRequests,
+  sentRequests,
+  hubContacts,
+  searchResult,
+  searchLoading,
   starredContacts,
   groups,
   serviceDesks,
@@ -635,14 +746,39 @@ export function ContactsPage({
   onModalClose,
   onCopyInvite,
   onSendPhoneInvite,
+  onSearchUser,
+  onSendFriendRequest,
+  onAcceptRequest,
+  onRejectRequest,
+  onRemoveContact,
+  onBlockContact,
+  onUpdateRemark,
 }: ContactsPageProps): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const resolvedPending = pendingContacts ?? WORKBENCH_MOCK_PENDING_CONTACTS;
+  const requestCount = (friendRequests?.length ?? 0) + (sentRequests?.length ?? 0);
   const navItems = NAV_ITEMS.map((item) =>
-    item.id === 'new' && resolvedPending.length > 0
-      ? { ...item, badge: resolvedPending.length }
+    item.id === 'new' && (resolvedPending.length > 0 || requestCount > 0)
+      ? { ...item, badge: resolvedPending.length > 0 ? resolvedPending.length : requestCount }
       : item,
   );
   const [activeProfile, setActiveProfile] = useState<ContactProfile | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const handleAcceptRequest = useCallback(async (requestId: string) => {
+    setActionLoading(true);
+    try { await onAcceptRequest?.(requestId); } finally { setActionLoading(false); }
+  }, [onAcceptRequest]);
+
+  const handleRejectRequest = useCallback(async (requestId: string) => {
+    setActionLoading(true);
+    try { await onRejectRequest?.(requestId); } finally { setActionLoading(false); }
+  }, [onRejectRequest]);
+
+  const handleSendFriendRequest = useCallback(async (userId: string) => {
+    setActionLoading(true);
+    try { await onSendFriendRequest?.(userId); } finally { setActionLoading(false); }
+  }, [onSendFriendRequest]);
 
   const openMemberProfile = useCallback((member: ContactMember, anchor: HTMLElement) => {
     setActiveProfile({
@@ -713,9 +849,9 @@ export function ContactsPage({
           <main className={`${styles.main} workbench-main`}>
             <div className={`${styles.head} workbench-head`}>
               <div>
-                <h1 className={styles.headTitle}>新的联系人</h1>
+                <h1 className={styles.headTitle}>{t('contacts.new.title', '新的联系人')}</h1>
                 <p className={styles.headSubcopy}>
-                  处理企业成员申请、外部联系人请求和手机号邀请。
+                  {t('contacts.new.subtitle', '搜索用户、发送好友请求、处理收到的请求。')}
                 </p>
               </div>
               <button
@@ -723,22 +859,92 @@ export function ContactsPage({
                 className={`${styles.addBtn} outline-action`}
                 onClick={onAddContact}
               >
-                添加联系人
+                {t('contacts.add', '添加联系人')}
               </button>
             </div>
-            <QuickActionGrid onAddContact={onAddContact} variant="invite" />
-            <div className={styles.sectionTitle}>待处理</div>
-            <div className={styles.memberList}>
-              {resolvedPending.map((m) => (
-                <MemberRow
-                  avatarExpanded={activeProfile?.kind === 'member' && activeProfile.id === m.id}
-                  key={m.id}
-                  member={m}
-                  onAvatarClick={openMemberProfile}
-                  onClick={onMemberClick}
+
+            {/* Search user */}
+            {onSearchUser && (
+              <div className={styles.searchSection}>
+                <input
+                  className={styles.userSearchInput}
+                  placeholder={t('contacts.search.userPlaceholder', '输入用户 ID 或用户名搜索')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const value = (e.target as HTMLInputElement).value.trim();
+                      if (value) onSearchUser(value);
+                    }
+                  }}
                 />
-              ))}
-            </div>
+                {searchLoading && <span className={styles.searchLoading}>{t('contacts.search.loading', '搜索中...')}</span>}
+                {searchResult && (
+                  <div className={styles.searchResults}>
+                    <SearchUserCard
+                      result={searchResult}
+                      onSendRequest={handleSendFriendRequest}
+                      loading={actionLoading}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Received friend requests */}
+            {friendRequests && friendRequests.length > 0 && (
+              <>
+                <div className={styles.sectionTitle}>{t('contacts.requests.received', '收到的好友请求')}</div>
+                <div className={styles.requestList}>
+                  {friendRequests.map((req) => (
+                    <FriendRequestCard
+                      key={req.request_id}
+                      request={req}
+                      direction="received"
+                      onAccept={handleAcceptRequest}
+                      onReject={handleRejectRequest}
+                      loading={actionLoading}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Sent friend requests */}
+            {sentRequests && sentRequests.length > 0 && (
+              <>
+                <div className={styles.sectionTitle}>{t('contacts.requests.sent', '已发送的请求')}</div>
+                <div className={styles.requestList}>
+                  {sentRequests.map((req) => (
+                    <FriendRequestCard
+                      key={req.request_id}
+                      request={req}
+                      direction="sent"
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Legacy pending contacts (mock fallback) */}
+            {resolvedPending.length > 0 && (
+              <>
+                <div className={styles.sectionTitle}>{t('contacts.pending', '待处理')}</div>
+                <div className={styles.memberList}>
+                  {resolvedPending.map((m) => (
+                    <MemberRow
+                      avatarExpanded={activeProfile?.kind === 'member' && activeProfile.id === m.id}
+                      key={m.id}
+                      member={m}
+                      onAvatarClick={openMemberProfile}
+                      onClick={onMemberClick}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {(!friendRequests || friendRequests.length === 0) && resolvedPending.length === 0 && (
+              <div className={styles.emptyState}>{t('contacts.empty', '暂无待处理的好友请求')}</div>
+            )}
           </main>
         );
 
@@ -884,10 +1090,10 @@ export function ContactsPage({
     <section className={`${styles.page} workbench contacts-page`}>
       {/* ── Left nav ── */}
       <aside className={`${styles.nav} workbench-nav`}>
-        <div className={`${styles.navTitle} workbench-title`}>通讯录</div>
+        <div className={`${styles.navTitle} workbench-title`}>{t('nav.contacts')}</div>
         <input
           className={`${styles.search} workbench-search`}
-          placeholder="搜索联系人、群组或服务台"
+          placeholder={t('contacts.search.placeholder')}
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
         />

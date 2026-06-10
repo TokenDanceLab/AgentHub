@@ -11,6 +11,7 @@ export function createInitialComposerState(conversationId: string): ComposerStat
     workDir: '',
     submitState: 'idle',
     replyTo: null,
+    quote: null,
   };
 }
 
@@ -68,6 +69,11 @@ export function composerReducer(
         ...state,
         replyTo: action.replyTo,
       };
+    case 'setQuote':
+      return {
+        ...state,
+        quote: action.quote,
+      };
     case 'addAttachment':
       if (state.attachments.some((attachment) => attachment.id === action.attachment.id)) {
         return state;
@@ -89,6 +95,7 @@ export function composerReducer(
         attachments: [],
         submitState: 'idle',
         replyTo: null,
+      quote: null,
       };
     default:
       return state;
@@ -109,5 +116,6 @@ export function buildComposerIntent(state: ComposerState): ComposerIntent {
     approvalMode: state.approvalMode,
     ...(state.workDir.trim() ? { workDir: state.workDir.trim() } : {}),
     ...(state.replyTo ? { replyTo: state.replyTo } : {}),
+    ...(state.quote ? { quote: state.quote } : {}),
   };
 }

@@ -23,6 +23,9 @@ export type {
   ServiceDesk,
   ContactsPane,
   ContactModalTab,
+  FriendRequestRow,
+  HubContactRow,
+  HubSearchResultRow,
 } from './ContactsPage';
 
 export { DocsPage } from './DocsPage';

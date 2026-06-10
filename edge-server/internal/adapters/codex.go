@@ -187,6 +187,10 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 	if a.openaiKey != "" {
 		env = append(env, "OPENAI_API_KEY="+a.openaiKey)
 	}
+	url := os.Getenv("OPENAI_BASE_URL")
+	if url != "" {
+		env = append(env, "OPENAI_BASE_URL="+url)
+	}
 
 	return a.binaryPath, args, env, workDir
 }
