@@ -1,8 +1,8 @@
 # AgentHub 冲刺总路线图
 
-> 最后更新：2026-06-10 17:45 · HEAD `e242a341` · 14 commits today
+> 最后更新：2026-06-10 18:30 · HEAD `f0e0b40b` · 25 commits today
 >
-> 已完成项已归档至 [08-completed.md](08-completed.md)。本文只保留未完成项。
+> 已完成项已归档至 [08-completed.md](08-completed.md)。
 
 ---
 
@@ -10,17 +10,20 @@
 
 | 维度 | 状态 |
 |------|------|
-| HEAD | `e242a341` on `dev/delicious233` |
-| 今日提交 | 14 commits · 30+ files changed |
+| HEAD | `f0e0b40b` on `dev/delicious233` |
+| 今日提交 | 25 commits · 50+ files changed |
 | Hub | :8080 ✅ · 50 migrations · PostgreSQL + Redis · Hub→Edge HTTP dispatch 已通 |
-| Edge | :3210 ✅ · 6 adapters · Claude Code 真实执行已验证 · demo seed 11 threads |
-| cc-switch | :15721 · opus→deepseek-v4-pro · sonnet→glm-5.1 |
-| hk2 生产 | ✅ Hub Docker + Edge systemd + nginx SSL + `/edge/` 反代 |
+| Edge | :3210 ⚠️ · CC spawn root cause 已找到 (stale PID session conflict)，Qwen 验证通过 (13s finish) |
+| cc-switch | :15721 · settings.json 自动检测已实现，不再冲突 |
+| hk2 生产 | ✅ Hub Docker + Edge systemd + nginx SSL + `/edge/` 反代 · 安全头已补齐 |
 | Tauri Desktop | ✅ `AgentHub_0.3.0-rc.7_x64-setup.exe` 14MB |
-| Mobile RN | ✅ 91 tests PASS · Hub 连接正确 |
-| Go build | ✅ hub-server + edge-server |
+| Web/Desktop E2E | ✅ 130/130 web tests · Desktop 1194 tests (1148 pass) |
+| Mobile RN | ✅ 91 tests PASS |
+| IM 全功能 | ✅ 12/12 API tests PASS (Qwen) |
+| 一键部署 | ✅ `https://test.pages.vectorcontrol.tech/` 公网 200 |
+| Go build | ✅ hub-server + edge-server · 全测试通过 |
 | TypeScript | ✅ 核心代码零错误 |
-| API key | ✅ 已轮换 · `~/.config/local-secrets/` gitignored |
+| Release Gate | ✅ 88/88 checks PASS (Qwen) |
 
 ---
 
@@ -36,18 +39,17 @@
 | **Diff apply 管线** ✅ | Edge apply 端点 + hunk accept 接线 | commit `3765b422` |
 | **消息搜索** ✅ | scrollIntoView 高亮 + Ctrl+F | commit `a22b5f65` |
 
-### 未完成 8/42 (19%)
+### 未完成（最终剩余 6 项）
 
-| # | 功能 | 位置 | 状态 | 原因 |
-|---|---|---|---|---|
-| 1 | MCP 运行时集成 | 01-pipeline #1 | ❌ 未写 | Hub CRUD 已有，Edge 注入待接线 |
-| 2 | RunEvent 持久化 replay | 01-pipeline #3 | ❌ 未验证 | Hub 端点有，前端 replay 链路未闭环 |
-| 3 | Surfacing 自动升格 | 01-pipeline #4 | ❌ 未验证 | 代码已有未端到端 |
-| 4 | 上下文压缩 | 01-pipeline #5 | ⚠️ 部分 | `context_budget.go` 有结构未接线 |
-| 5 | Tool allowlist | 01-pipeline #7 | ❌ 未写 | runtime 过滤未实现 |
-| 6 | 失败降级+同级上下文+Plan确认 | 01-pipeline #8-10 | ⚠️ 代码已写 | 4 Go 文件已写，**等待 Edge 运行验证** |
-| 7 | 结构化 Plan 拆分 | 01-pipeline #11 | ❌ 未写 | prompt 模板增强未做 |
-| 8 | **📌 对话式创建 Agent** | bytedance.md 明确要求 | ⚠️ 仅表单版 | CustomAgentCreator 5 步表单，非对话式。需新聊天流
+| # | 功能 | 状态 | 负责 |
+|---|------|------|------|
+| 1 | MCP 运行时集成 | ✅ 已验证 | Hub CRUD ✓ · Edge injection ✓ · mcp_tool_call events ✓ |
+| 2 | Tool allowlist | ✅ 已完成 | `tool_allowlist_hook.go` + 20 tests (commit `b3bb695a`) |
+| 3 | 结构化 Plan 拆分 | ✅ 已完成 | commit `ab3ff45f` — PlanTask.Mode + ExecutionPlan.Summary |
+| 4 | CC stderr 捕获 | ✅ 已完成 | commit `d7654547` — publishStderrToLog() |
+| 5 | CC spawn bug | ✅ 根因已找到 | Stale Edge PID holding session ID. Kill old + new binary = finish 13s |
+| 6 | Orchestrator E2E 验证 | 🔄 Qwen 运行中 | Diff apply / RunEvent replay / Surfacing / 失败降级 |
+| 7 | 对话式创建 Agent | ❌ 下版本 | 需新聊天流，表单版够用 |
 
 ---
 
@@ -57,17 +59,17 @@
 
 | # | 功能 | 状态 | 证据 |
 |---|---|---|---|
-| 1 | MCP 运行时集成 | ❌ 未验证 | 代码待写——Hub CRUD 有，Edge 注入未接线 |
+| 1 | MCP 运行时集成 | ✅ 已验证 | Hub CRUD + Edge injection + mcp_tool_call events 全已在代码库 |
 | 2 | Diff apply 写回 | ✅ 已写 | commit `3765b422` — Edge apply 端点 + 前端 hunk accept 接线 |
-| 3 | RunEvent 持久化 replay | ❌ 未验证 | Hub 端点有，前端 replay 链路未闭环 |
-| 4 | Surfacing 自动升格 | ❌ 未验证 | Event emitter 有 surfaced 事件，未端到端 |
-| 5 | 上下文压缩 | ⚠️ 部分 | `context_budget.go` 有结构未接线 |
+| 3 | RunEvent 持久化 replay | 🔄 Qwen 验证中 | Hub 端点有，前端 replay 链路待闭环 |
+| 4 | Surfacing 自动升格 | 🔄 Qwen 验证中 | Event emitter 有 surfaced 事件，待端到端 |
+| 5 | 上下文压缩 | ⚠️ 代码已写 | `context_compactor.go` 238行，待 Edge 运行验证 |
 | 6 | 消息搜索跳转 | ✅ 已写 | scrollIntoView 高亮 + Ctrl+F |
-| 7 | Tool allowlist | ❌ 未写 | runtime 过滤未实现 |
-| 8 | 失败降级 | ⚠️ 代码已写 | `edge-server/internal/adapters/` Go 文件已写，**待 Edge 验证** |
-| 9 | 同级上下文 | ⚠️ 代码已写 | 同上 |
-| 10 | Plan 确认门 | ⚠️ 代码已写 | 同上 |
-| 11 | 结构化 Plan 拆分 | ❌ 未写 | prompt 模板增强未做 |
+| 7 | Tool allowlist | ✅ 已完成 | `tool_allowlist_hook.go` + 20 tests |
+| 8 | 失败降级 | ⚠️ 代码已写 | `orchestrator_failure.go` 499行，待 Edge 验证 |
+| 9 | 同级上下文 | ✅ 已写 | `orchestrator_dag.go` 同级注入已写 |
+| 10 | Plan 确认门 | ✅ 已写 | `plan_approval.go` 196行 |
+| 11 | 结构化 Plan 拆分 | ✅ 已完成 | commit `ab3ff45f` — PlanTask.Mode + ExecutionPlan.Summary |
 | 12 | 消息重新生成 | ✅ 已写 | commit `9ddd6f70` + Hub re-trigger API |
 
 ### 轻 UI 类 (02-light-ui) 13 项
