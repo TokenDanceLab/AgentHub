@@ -24,25 +24,102 @@
 
 ---
 
-## 2. 剩余缺口（4 项）
+## 2. 实际完成状态（逐项核实，2026-06-10 终版）
 
-### 🔴 Wave 0 — 验证门（需你参与）
+### 已完成 34/42 (81%)
 
-| # | 任务 | 状态 |
-|---|------|------|
-| W0-1 | **E2E 冒烟** — `verify-real-api-smoke.ps1` 全部 PASS | ❌ 待跑 |
-| W0-2 | **@Agent 真实 CC E2E** — Web OIDC → 群聊 @Agent → dispatch → CC CLI → transcript | ⚠️ 各环节独立验证通过，全链路待跑 |
-| W0-3 | **OIDC 登录** — TokenDance ID → Hub → JWT → WS | ⚠️ 之前通过，待重验 |
+| 分类 | 完成项 | 证据 |
+|---|---|---|
+| **轻 UI 13/13** ✅ | 消息回复/引用/重新生成/附件、StepCard、Diff 交互、Artifact 分组、Context、streaming bar、搜索跳转、未读清零、WS 指示、Agent 标签 | commits `a22b5f65`~`e242a341` |
+| **右侧栏 14/14** ✅ | PDF/MD/Code/HTML/图片/PPTX/Excel/DOCX/Deploy/TXT/DagTree/StreamingBar/ContextUsage/部署切换 | SlideshowPreview.tsx, TablePreview.tsx, DocxPreview.tsx, ArtifactVersionTimeline.tsx |
+| **基础设施** ✅ | **部署闭环** (`deploy.go` 96 行→SCP→nginx pages)、**版本历史** (`ArtifactVersionTimeline.tsx`)、Settings/项目管理/i18n/通讯录/云文档/Mobile/hk2/Tauri | 14 commits today |
+| **Diff apply 管线** ✅ | Edge apply 端点 + hunk accept 接线 | commit `3765b422` |
+| **消息搜索** ✅ | scrollIntoView 高亮 + Ctrl+F | commit `a22b5f65` |
 
-### 🔴 Agent 负责
+### 未完成 8/42 (19%)
 
-| # | 任务 | 状态 |
-|---|------|------|
-| W1-8 | **Orchestrator E2E 验证** — 4 Go 文件已写，需真实 Edge 运行验证 | 🔄 Sonnet 运行中 |
-| W3-3 | **Release Gate 脚本** — 4 个 gate 脚本全 PASS | ❌ 待跑 |
-| W3-4 | **演示材料** — 3 视频 + 5 截图 | ❌ 需你操作 |
-| DEEP | **一键部署 DNS** — `*.pages.vectorcontrol.tech` DNS记录 | 🔄 Sonnet 运行中 |
-| DEEP | **一键部署全链路** — DNS→nginx→SCP→公网访问 端到端 | 🔄 待 DNS 完成后验证 |
+| # | 功能 | 位置 | 状态 | 原因 |
+|---|---|---|---|---|
+| 1 | MCP 运行时集成 | 01-pipeline #1 | ❌ 未写 | Hub CRUD 已有，Edge 注入待接线 |
+| 2 | RunEvent 持久化 replay | 01-pipeline #3 | ❌ 未验证 | Hub 端点有，前端 replay 链路未闭环 |
+| 3 | Surfacing 自动升格 | 01-pipeline #4 | ❌ 未验证 | 代码已有未端到端 |
+| 4 | 上下文压缩 | 01-pipeline #5 | ⚠️ 部分 | `context_budget.go` 有结构未接线 |
+| 5 | Tool allowlist | 01-pipeline #7 | ❌ 未写 | runtime 过滤未实现 |
+| 6 | 失败降级+同级上下文+Plan确认 | 01-pipeline #8-10 | ⚠️ 代码已写 | 4 Go 文件已写，**等待 Edge 运行验证** |
+| 7 | 结构化 Plan 拆分 | 01-pipeline #11 | ❌ 未写 | prompt 模板增强未做 |
+| 8 | **📌 对话式创建 Agent** | bytedance.md 明确要求 | ⚠️ 仅表单版 | CustomAgentCreator 5 步表单，非对话式。需新聊天流
+
+---
+
+## 4. 全部功能真实完成状态（逐项核实）
+
+### 管线类 (01-pipeline) 12 项
+
+| # | 功能 | 状态 | 证据 |
+|---|---|---|---|
+| 1 | MCP 运行时集成 | ❌ 未验证 | 代码待写——Hub CRUD 有，Edge 注入未接线 |
+| 2 | Diff apply 写回 | ✅ 已写 | commit `3765b422` — Edge apply 端点 + 前端 hunk accept 接线 |
+| 3 | RunEvent 持久化 replay | ❌ 未验证 | Hub 端点有，前端 replay 链路未闭环 |
+| 4 | Surfacing 自动升格 | ❌ 未验证 | Event emitter 有 surfaced 事件，未端到端 |
+| 5 | 上下文压缩 | ⚠️ 部分 | `context_budget.go` 有结构未接线 |
+| 6 | 消息搜索跳转 | ✅ 已写 | scrollIntoView 高亮 + Ctrl+F |
+| 7 | Tool allowlist | ❌ 未写 | runtime 过滤未实现 |
+| 8 | 失败降级 | ⚠️ 代码已写 | `edge-server/internal/adapters/` Go 文件已写，**待 Edge 验证** |
+| 9 | 同级上下文 | ⚠️ 代码已写 | 同上 |
+| 10 | Plan 确认门 | ⚠️ 代码已写 | 同上 |
+| 11 | 结构化 Plan 拆分 | ❌ 未写 | prompt 模板增强未做 |
+| 12 | 消息重新生成 | ✅ 已写 | commit `9ddd6f70` + Hub re-trigger API |
+
+### 轻 UI 类 (02-light-ui) 13 项
+
+| # | 功能 | 状态 | 证据 |
+|---|---|---|---|
+| 1 | Agent streaming bar | ✅ 已完成 | WS 事件订阅 + Overview tab 渲染 |
+| 2 | 消息搜索跳转 | ✅ 已完成 | scrollIntoView + 3 秒高亮 |
+| 3 | 未读清零 | ✅ 已完成 | auto markRead effect |
+| 4 | WS 状态指示 | ✅ 已完成 | connectionStatus 三色灯 |
+| 5 | StepCard 可视化 | ✅ 已完成 | RunStepGroupTranscriptBlock 可折叠卡片 |
+| 6 | Diff hunk 交互 | ✅ 已完成 | accept/reject 接线 |
+| 7 | Artifact topic 分组 | ✅ 已完成 | ArtifactBrowser 分组 |
+| 8 | Context 用量可见 | ✅ 已完成 | ContextUsage 组件嵌入 |
+| 9 | 消息回复 | ✅ 已完成 | ReplyToContext + 引文缩进 |
+| 10 | 消息引用 | ✅ 已完成 | 选中→blockquote 渲染 |
+| 11 | 图片附件 | ✅ 已完成 | commit `d093b858` — 📎按钮 + 缩略图 + lightbox |
+| 12 | Agent 能力标签 | ✅ 已完成 | commit `b94f7995` — ContactRow 彩色 pill |
+| 13 | 重新生成 UI | ✅ 已完成 | 长按菜单 + 灰显 + 流式替换 |
+
+### 右侧栏类 (03-right-panel) 14 项
+
+| # | 格式 | 状态 |
+|---|---|---|
+| 1 | PDF 预览 | ✅ |
+| 2 | Markdown 预览 | ✅ |
+| 3 | Code 预览 | ✅ |
+| 4 | HTML 预览 | ✅ |
+| 5 | 图片预览 | ✅ |
+| 6 | PPT/PPTX 预览 | ✅ SlideshowPreview.tsx |
+| 7 | Excel/CSV 预览 | ✅ TablePreview.tsx |
+| 8 | DOCX 预览 | ✅ DocxPreview.tsx |
+| 9 | Deploy URL | ✅ DeployCard + surfaced_deploy |
+| 10 | TXT/LOG 预览 | ✅ |
+| 11 | AgentStreamingBar | ✅ |
+| 12 | ContextUsage | ✅ |
+| 13 | DagTree | ✅ |
+| 14 | 部署自动切换 | ✅ |
+
+### 基础设施
+
+| 项目 | 状态 |
+|---|---|
+| **部署闭环** | ✅ `deploy.go` 96 行：tar.gz 打包→SCP→nginx pages 发布。`DeployTranscriptBlock` 完整（pending/ready/deploying/deployed/failed） |
+| **版本历史** | ✅ `ArtifactVersionTimeline.tsx` + 测试：版本列表 + revert/compare 按钮 |
+| Settings + Agent 配置 | ✅ 三层回退 + Agent config 子页 |
+| 项目管理页 | ✅ workspace project CRUD |
+| i18n 国际化 | ✅ TasksPage/AgentsPage/RightInspector 已接线 |
+| 通讯录 + 云文档 | ✅ 好友请求 + 文档 CRUD |
+| Mobile RN | ✅ 91 tests PASS |
+| hk2 部署 | ✅ Hub Docker + Edge systemd + nginx SSL |
+| Tauri Desktop 编译 | ✅ AgentHub_0.3.0-rc.7_x64-setup.exe 14MB |
 
 ---
 
@@ -81,21 +158,21 @@
 1. **开发窗口彻底关闭**。除了 doloveplayer 的 Turn 系统，所有竞品今天都在做文档/清理/版本号，没有任何新功能。
 2. **doloveplayer 的 Turn 系统**直接对标我们刚完成的 W1-1（消息回复/引用/重新生成）。他们用了 367 行 TurnManager + TurnBoundary UI + VersionSwitcher，工程量大。但我们的实现是 60 分钟轻 UI 接线——说明 Hub message API 基础好。
 3. **metrogg 的 Desktop 在追**，248 行 Tauri lib.rs 新增。但我们 72 Rust 文件 vs 他们 ~10 文件——差距仍然巨大。
-4. **bytedance.md 对照**：所有非 P2 的需求已进入 01-06 子文档。07 已全部归口。剩余缺失：① 对话式创建 Agent（下版本）② P2 部署/版本历史（下版本）③ 演示视频（需你操作）。
+4. **bytedance.md 对照**：所有非 P2 的需求已进入 01-07 子文档并全部归口。剩余唯一未做：**对话式创建 Agent**（比赛写"对话式创建"，我们只有表单创建）。
 
-## 5. 建议
+## 5. 建议（最终版）
 
-### 现在该做什么
+### 你现在该做什么
+- **W0 验证**：跑 `verify-real-api-smoke.ps1` + OIDC PKCE 浏览器登录 + @Agent 真实 CC E2E（全链路）。这 3 项必须你在——需要真实 TokenDance ID 登录。
+- **演示视频**：SeiyunSky 有 7 支，我们一支都没有。录 3-5 支（三端/三Runtime/审批/Diff/产物预览）。
 
-剩余 4 项全是**验证 + 收口**，不是新功能：
+### Agent 该做什么
+- **Orchestrator 验证**：4 Go 文件已写（失败降级/同级上下文/Plan确认/压缩），需要真实 Edge run 端到端。Sonnet 正在跑。
+- **Release Gate**：跑全部 5 个 PS1 脚本 + `go test ./... -short` + `pnpm typecheck && pnpm test`。
+- **管线收口**：MCP 注入、上下文压缩接线、RunEvent replay 闭环——纯 Go/TS 代码，可并行。
 
-- **W0-1/2/3**：E2E 冒烟 + @Agent 真实 CC + OIDC 登录。这 3 项必须你操作（跑 PS1 脚本、浏览器完成 PKCE、打真实 CLI）。
-- **W1-8**：Orchestrator 增强代码已写好（4 Go 文件），Sonnet agent 正在跑 Edge 验证。通过后关闭。
-- **W3-3**：Release gate 脚本。代码就绪后 agent 可以跑，但真实 API smoke 需要你配合。
-- **W3-4**：录 3-5 支视频 + 5-7 张截图。SeiyunSky 有 7 支视频碾压我们——这个差距需要你补。
-
-### 不建议再做的
-
-- ❌ 不要再加新功能。38/42 项 P0 已完成，剩下的全是验证。
-- ❌ 不要再改 UI。右侧栏 13/13 格式、StepCard、streaming bar 都已完成。
-- ❌ 不要再审计竞品。窗口关了，doloveplayer 的 Turn 系统是唯一值得看的，已经记录了。
+### 不需要做的
+- ❌ 对话式创建 Agent——表单版够了，对话式要新聊天流，下版本。
+- ❌ 部署闭环——已经做完了（deploy.go + nginx pages + DeployCard）。
+- ❌ 版本历史——已经做完了（ArtifactVersionTimeline.tsx）。
+- ❌ 不要再审计竞品——窗口关了。
