@@ -38,32 +38,59 @@ type ExecutionPlan struct {
 	Tasks   []PlanTask `json:"tasks"`
 }
 
-// structuredPlanEnvelope is the top-level JSON envelope the orchestrator outputs.
+// structuredPlanEnvelope is the legacy top-level JSON envelope the orchestrator
+// outputs. Retained for backward compatibility with the older nested format
+// where tasks were wrapped inside a "plan" object with summary and mode.
 type structuredPlanEnvelope struct {
 	Plan ExecutionPlan `json:"plan"`
+}
+
+// flatPlanEnvelope is the current simplified JSON format where tasks appear
+// directly at the top level without a wrapping "plan" object.
+type flatPlanEnvelope struct {
+	Tasks []PlanTask `json:"tasks"`
+}
+
+// initTaskStatuses sets any unset task status to TaskPending and auto-generates
+// task IDs from agent names when IDs are not provided (the new schema uses agent
+// names as implicit task identifiers).
+func initTaskStatuses(tasks []PlanTask) {
+	for i := range tasks {
+		if tasks[i].Status == "" {
+			tasks[i].Status = TaskPending
+		}
+		if tasks[i].ID == "" && tasks[i].Agent != "" {
+			tasks[i].ID = tasks[i].Agent
+		}
+	}
 }
 
 // --- Plan parsing ---
 
 // ParsePlan extracts a structured ExecutionPlan from the orchestrator's text output.
-// It scans the text for a JSON block containing a "plan" key with "tasks" array.
+// It supports two JSON formats:
+//   - Flat format (current): {"tasks": [...]}
+//   - Nested format (legacy): {"plan": {"summary": "...", "mode": "...", "tasks": [...]}}
+//
+// It first tries to parse the text as flat JSON, then falls back to the nested
+// format, and finally scans line-by-line for embedded JSON blocks.
 // Returns the parsed plan or an error if no valid plan is found.
 func ParsePlan(text string) (*ExecutionPlan, error) {
-	// Strategy 1: Try parsing the entire text as JSON.
-	var env structuredPlanEnvelope
-	if err := json.Unmarshal([]byte(text), &env); err == nil {
-		if len(env.Plan.Tasks) > 0 {
-			// Initialize task statuses.
-			for i := range env.Plan.Tasks {
-				if env.Plan.Tasks[i].Status == "" {
-					env.Plan.Tasks[i].Status = TaskPending
-				}
-			}
-			return &env.Plan, nil
-		}
+	// Strategy 1: Try flat format — {"tasks": [...]}.
+	var flat flatPlanEnvelope
+	if err := json.Unmarshal([]byte(text), &flat); err == nil && len(flat.Tasks) > 0 {
+		initTaskStatuses(flat.Tasks)
+		return &ExecutionPlan{Tasks: flat.Tasks}, nil
 	}
 
-	// Strategy 2: Scan for a JSON block that starts with {"plan":
+	// Strategy 2: Try legacy nested format — {"plan": {"tasks": [...]}}.
+	var env structuredPlanEnvelope
+	if err := json.Unmarshal([]byte(text), &env); err == nil && len(env.Plan.Tasks) > 0 {
+		initTaskStatuses(env.Plan.Tasks)
+		return &env.Plan, nil
+	}
+
+	// Strategy 3: Scan for an embedded JSON block (flat or nested).
 	plan := scanForPlanBlock(text)
 	if plan != nil {
 		return plan, nil
@@ -73,26 +100,38 @@ func ParsePlan(text string) (*ExecutionPlan, error) {
 }
 
 // scanForPlanBlock scans text line-by-line to find a contiguous JSON block
-// that contains a "plan" object with a "tasks" array.
+// that contains a plan with a "tasks" array. It tries both the flat format
+// ({"tasks":[...]}) and the legacy nested format ({"plan":{"tasks":[...]}}).
 func scanForPlanBlock(text string) *ExecutionPlan {
 	lines := strings.Split(text, "\n")
 	var buf strings.Builder
 	inBlock := false
 	braceDepth := 0
 
+	// tryParse attempts to parse a JSON candidate as flat then nested format.
+	tryParse := func(candidate string) *ExecutionPlan {
+		// Try flat format first.
+		var flat flatPlanEnvelope
+		if err := json.Unmarshal([]byte(candidate), &flat); err == nil && len(flat.Tasks) > 0 {
+			initTaskStatuses(flat.Tasks)
+			return &ExecutionPlan{Tasks: flat.Tasks}
+		}
+		// Fall back to nested format.
+		var env structuredPlanEnvelope
+		if err := json.Unmarshal([]byte(candidate), &env); err == nil && len(env.Plan.Tasks) > 0 {
+			initTaskStatuses(env.Plan.Tasks)
+			return &env.Plan
+		}
+		return nil
+	}
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
 		// Try each line as a standalone JSON object first.
 		if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
-			var env structuredPlanEnvelope
-			if err := json.Unmarshal([]byte(trimmed), &env); err == nil && len(env.Plan.Tasks) > 0 {
-				for i := range env.Plan.Tasks {
-					if env.Plan.Tasks[i].Status == "" {
-						env.Plan.Tasks[i].Status = TaskPending
-					}
-				}
-				return &env.Plan
+			if plan := tryParse(trimmed); plan != nil {
+				return plan
 			}
 		}
 
@@ -112,15 +151,8 @@ func scanForPlanBlock(text string) *ExecutionPlan {
 				braceDepth--
 				if braceDepth == 0 && inBlock {
 					inBlock = false
-					candidate := buf.String()
-					var env structuredPlanEnvelope
-					if err := json.Unmarshal([]byte(candidate), &env); err == nil && len(env.Plan.Tasks) > 0 {
-						for i := range env.Plan.Tasks {
-							if env.Plan.Tasks[i].Status == "" {
-								env.Plan.Tasks[i].Status = TaskPending
-							}
-						}
-						return &env.Plan
+					if plan := tryParse(buf.String()); plan != nil {
+						return plan
 					}
 				}
 			}
@@ -133,7 +165,9 @@ func scanForPlanBlock(text string) *ExecutionPlan {
 
 // ValidatePlan checks a plan for structural correctness:
 //   - at least one task
-//   - all task IDs are non-empty and unique
+//   - all tasks have a non-empty agent
+//   - task IDs are auto-generated from agent names when not provided
+//   - all task IDs are unique after auto-generation
 //   - all DependsOn references resolve to existing task IDs
 //   - no circular dependencies (via Kahn's algorithm)
 //   - all agent IDs are valid (against the adapter registry, if provided)
@@ -146,18 +180,9 @@ func ValidatePlan(plan *ExecutionPlan, validAgents []string) error {
 		return fmt.Errorf("plan has no tasks")
 	}
 
-	// Normalize mode.
-	if plan.Mode == "" {
-		plan.Mode = "parallel"
-	}
-	switch plan.Mode {
-	case "parallel", "sequential", "pipeline":
-		// ok
-	default:
-		return fmt.Errorf("invalid plan mode %q; must be parallel, sequential, or pipeline", plan.Mode)
-	}
-
-	// Validate task IDs and uniqueness.
+	// Validate task IDs and uniqueness. When tasks come from ParsePlan, IDs
+	// are already auto-generated from agent names. For manually constructed
+	// plans, IDs must be set explicitly.
 	ids := make(map[string]int, len(plan.Tasks))
 	for i, task := range plan.Tasks {
 		if task.ID == "" {
@@ -167,6 +192,17 @@ func ValidatePlan(plan *ExecutionPlan, validAgents []string) error {
 			return fmt.Errorf("duplicate task id %q at indices %d and %d", task.ID, prev, i)
 		}
 		ids[task.ID] = i
+	}
+
+	// Normalize mode.
+	if plan.Mode == "" {
+		plan.Mode = "parallel"
+	}
+	switch plan.Mode {
+	case "parallel", "sequential", "pipeline":
+		// ok
+	default:
+		return fmt.Errorf("invalid plan mode %q; must be parallel, sequential, or pipeline", plan.Mode)
 	}
 
 	// Validate DependsOn references.

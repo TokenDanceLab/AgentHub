@@ -200,6 +200,9 @@ const (
 	BusEventPlanApproved  = "run.agent.plan_approved"
 	BusEventPlanRejected  = "run.agent.plan_rejected"
 	BusEventPlanExpired   = "run.agent.plan_expired"
+
+	// Tool allowlist enforcement events (Edge runtime)
+	BusEventToolRejected = "run.agent.tool_rejected"
 )
 
 // Context keys for adapter-level context propagation.
@@ -213,15 +216,25 @@ const CtxSessionID ctxKey = "agenthub-session-id"
 // redact or relativize paths from CLI-native events.
 const CtxWorkDir ctxKey = "agenthub-work-dir"
 
-// ctxRunContext is used by SDK adapters (anthropic-sdk, openai-sdk) to extract
+// CtxRunContext is used by SDK adapters (anthropic-sdk, openai-sdk) to extract
 // the full RunProcessContext from the context passed to ParseStream. SDK adapters
 // need the prompt, model, and other parameters to build their HTTP requests.
-const ctxRunContext ctxKey = "agenthub-run-context"
+// It is also used by the lifecycle layer to extract AllowedTools for runtime
+// tool allowlist enforcement.
+const CtxRunContext ctxKey = "agenthub-run-context"
 
 // SDKAdapterContext returns a context with the RunProcessContext attached,
 // enabling SDK adapters to extract prompt/model parameters in ParseStream.
 func SDKAdapterContext(ctx context.Context, runCtx RunProcessContext) context.Context {
-	return context.WithValue(ctx, ctxRunContext, runCtx)
+	return context.WithValue(ctx, CtxRunContext, runCtx)
+}
+
+// RunProcessContextFromContext extracts the RunProcessContext from the given
+// context, if one was attached via SDKAdapterContext. Returns the zero value
+// and false if no RunProcessContext is present.
+func RunProcessContextFromContext(ctx context.Context) (RunProcessContext, bool) {
+	rc, ok := ctx.Value(CtxRunContext).(RunProcessContext)
+	return rc, ok
 }
 
 // --- Stream parse error handling ---
