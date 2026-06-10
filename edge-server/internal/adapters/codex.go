@@ -155,6 +155,13 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 	// Structured JSON output
 	args = append(args, "--json")
 
+	// MCP server config injection. Codex accepts MCP server definitions via
+	// config override: -c mcp_servers=<json>. The value is a JSON object mapping
+	// server names to their configs (same schema as Claude Code's mcpServers).
+	if ctx.MCPConfig != "" {
+		args = append(args, "-c", "mcp_servers="+ctx.MCPConfig)
+	}
+
 	// Skills prompt: prepend to the prompt text since Codex has no --append-system-prompt.
 	if ctx.SkillsPrompt != "" {
 		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
@@ -559,6 +566,11 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 		payload["kind"] = "web_search"
 	}
 	emitter.Emit(BusEventToolCall, scope, payload)
+	// Emit dedicated MCP tool call event for downstream consumers that need
+	// to distinguish MCP server tool activity from built-in tool activity.
+	if base.Type == "mcp_tool_call" {
+		emitter.Emit(BusEventMCPToolCall, scope, payload)
+	}
 }
 
 func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {
@@ -795,6 +807,9 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 		payload["input"] = map[string]any{"query": item.Query, "action": item.Action}
 	}
 	emitter.Emit(BusEventToolCall, scope, payload)
+	if base.Type == "mcp_tool_call" {
+		emitter.Emit(BusEventMCPToolCall, scope, payload)
+	}
 }
 
 func (a *CodexAdapter) emitTaskStarted(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {

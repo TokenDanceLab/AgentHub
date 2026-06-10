@@ -41,6 +41,8 @@ export interface HubWSHandle {
   send: (type: string, payload: unknown) => void;
   /** Send a typing indicator for a session. */
   sendTyping: (sessionId: string) => void;
+  /** Send a sync.request frame to request missed events after a given seq_id. */
+  sendSync: (afterSeqId: number) => void;
   /** Subscribe to events of a specific Hub type. Returns unsubscribe fn. */
   on: (type: HubEventType, handler: (payload: unknown) => void) => () => void;
   /** Subscribe to ALL events (after auth). Returns unsubscribe fn. */
@@ -172,6 +174,10 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
 
     sendTyping(sessionId: string): void {
       transport.send({ type: 'typing', payload: { session_id: sessionId } });
+    },
+
+    sendSync(afterSeqId: number): void {
+      transport.send({ type: HUB_EVENTS.SYNC_REQUEST, payload: { after_seq_id: afterSeqId } });
     },
 
     on(type: HubEventType, handler: (payload: unknown) => void): () => void {

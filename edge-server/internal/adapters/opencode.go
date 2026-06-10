@@ -151,6 +151,13 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 
 	var env []string // runtime vars set by process executor
 
+	// MCP server config injection via environment variable. OpenCode reads MCP
+	// server configs from OPENCODE_MCP_SERVERS env var (JSON object mapping
+	// server names to configs). This is set in the child process environment.
+	if ctx.MCPConfig != "" {
+		env = append(env, "OPENCODE_MCP_SERVERS="+ctx.MCPConfig)
+	}
+
 	return a.binaryPath, args, env, workDir
 }
 
@@ -226,13 +233,18 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 		if evt.Part != nil && evt.Part.State != nil {
 			toolName := evt.Part.Tool
 			state := evt.Part.State
-			// Emit tool call event (start notification)
-			emitter.Emit(BusEventToolCall, scope, map[string]any{
+			toolCallPayload := map[string]any{
 				"callId":   evt.Part.CallID,
 				"toolName": toolName,
 				"input":    state.Input,
 				"status":   state.Status,
-			})
+			}
+			// Emit tool call event (start notification)
+			emitter.Emit(BusEventToolCall, scope, toolCallPayload)
+			// Emit dedicated MCP tool call event for MCP-sourced tools
+			if IsMCPToolCall(toolName) {
+				emitter.Emit(BusEventMCPToolCall, scope, toolCallPayload)
+			}
 			// Emit tool result event (completion/error)
 			resultPayload := map[string]any{
 				"callId":   evt.Part.CallID,
