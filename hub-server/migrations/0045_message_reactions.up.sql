@@ -5,14 +5,14 @@ CREATE TABLE IF NOT EXISTS message_reactions (
     session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     message_id  UUID NOT NULL,
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reaction    VARCHAR(64) NOT NULL,
+    emoji      VARCHAR(64) NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_message_reactions_message_session
         FOREIGN KEY (session_id, message_id)
         REFERENCES messages (session_id, id)
         ON DELETE CASCADE,
-    CONSTRAINT uq_message_reaction UNIQUE (session_id, message_id, user_id, reaction)
+    CONSTRAINT uq_message_reaction UNIQUE (session_id, message_id, user_id, emoji)
 );
 
 CREATE INDEX IF NOT EXISTS idx_message_reactions_message
