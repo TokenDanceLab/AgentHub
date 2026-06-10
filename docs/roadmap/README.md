@@ -16,7 +16,7 @@
 | hk2 生产 | ✅ Hub Docker + Edge systemd |
 | Desktop/Mobile/Web | ✅ 三端皆通 |
 | 测试 | 41/41 Go · 0 TS errors · 88/88 Gate |
-| APK | ⚠️ 缺 Android 构建环境 |
+| APK | ✅ Release arm64-v8a 29.83 MB (2026-06-10) |
 
 ---
 
@@ -36,7 +36,7 @@
 | # | 项目 | 内容 |
 |---|------|------|
 | 5 | **对话式创建 Agent** | 比赛要求"对话式创建"——当前只有表单版 |
-| 6 | **Android APK 构建** | 需要 Android 构建环境 |
+| 6 | ~~**Android APK 构建**~~ ✅ | Release arm64-v8a 29.83 MB (2026-06-10) |
 | 7 | **OIDC 全链路验证** | TokenDance ID → Hub → JWT → WS 完整重验 |
 | 8 | **演示材料** | 3-5 支视频 + 5-7 张截图 |
 
@@ -67,4 +67,4 @@
 |-----------|------|----------|
 | M1: 全链路通 | Orchestrator E2E + @Agent E2E + replay + surfacing | TBD |
 | M2: 比赛交付 | 对话式创建 + OIDC + 演示材料 | TBD |
-| M3: v0.4.0-rc1 | 命令余项 + APK + 文档 | TBD |
+| M3: v0.4.0-rc1 | 命令余项 + ~~APK~~ ✅ + 文档 | TBD |
