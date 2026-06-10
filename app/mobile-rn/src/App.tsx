@@ -212,7 +212,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
               justifyContent: 'center',
             }}
           >
-            <Text style={{ fontSize: 14, color: tokens.color.textSecondary }}>
+            <Text style={{ fontSize: 14, color: tokens.color.inkMuted }}>
               {inspectorCollapsed ? '☰' : '✕'}
             </Text>
           </Pressable>
