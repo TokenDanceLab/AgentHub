@@ -1,78 +1,70 @@
-# AgentHub 冲刺总路线图
+# AgentHub v0.4.0 Roadmap
 
-> 最后更新：2026-06-10 · HEAD `3f1fa751` · 14 commits today
->
-> 已完成项已归档至 [06-completed.md](06-completed.md)。本文只保留未完成项。
-
----
-
-## 0. 当前基线
-
-| 维度 | 状态 |
-|------|------|
-| HEAD | `3f1fa751` on `dev/delicious233` |
-| 今日提交 | 14 commits · 30+ files changed |
-| Hub | :8080 ✅ · 50 migrations · PostgreSQL + Redis · Hub→Edge HTTP dispatch 已通 |
-| Edge | :3210 ✅ · 6 adapters · Claude Code 真实执行已验证 · demo seed 11 threads |
-| cc-switch | :15721 · opus→deepseek-v4-pro · sonnet→glm-5.1 |
-| hk2 生产 | ✅ Hub Docker + Edge systemd + nginx SSL + `/edge/` 反代 |
-| Tauri Desktop | ✅ `AgentHub_0.3.0-rc.7_x64-setup.exe` 14MB |
-| Mobile RN | ✅ 91 tests PASS · Hub 连接正确 |
-| Go build | ✅ hub-server + edge-server |
-| TypeScript | ✅ 核心代码零错误 |
-| API key | ✅ 已轮换 · `~/.config/local-secrets/` gitignored |
+> 2026-06-10 · 基于 v0.3.0-rc.9 完成报告
+> 上一版本详细 roadmap 已归档至 `docs/archive/roadmap-v0.3.0/`
 
 ---
 
-## 2. 剩余缺口（4 项）
+## 0. 基线
 
-### 🔴 Wave 0 — 验证门（需你参与）
+| 维度 | v0.3.0 交付 |
+|------|------------|
+| IM 功能 | 13/13 ✅ |
+| 右侧栏预览 | 14/14 ✅ |
+| 管线代码 | 12/12 (8 done + 4 code-written) |
+| 一键部署 | ✅ `*.pages.vectorcontrol.tech` |
+| hk2 生产 | ✅ Hub Docker + Edge systemd |
+| Desktop/Mobile/Web | ✅ 三端皆通 |
+| 测试 | 41/41 Go · 0 TS errors · 88/88 Gate |
+| APK | ⚠️ 缺 Android 构建环境 |
 
-| # | 任务 | 状态 |
+---
+
+## 1. v0.4.0 主线目标
+
+### P0: 运行验证（代码已写，需要跑起来）
+
+| # | 项目 | 内容 |
 |---|------|------|
-| W0-1 | **E2E 冒烟** — `verify-real-api-smoke.ps1` 全部 PASS | ❌ 待跑 |
-| W0-2 | **@Agent 真实 CC E2E** — Web OIDC → 群聊 @Agent → dispatch → CC CLI → transcript | ⚠️ 各环节独立验证通过，全链路待跑 |
-| W0-3 | **OIDC 登录** — TokenDance ID → Hub → JWT → WS | ⚠️ 之前通过，待重验 |
+| 1 | **Orchestrator 端到端** | 4 个 Go 文件在真实 Edge + 多 Agent 任务中跑通 |
+| 2 | **RunEvent replay** | 前端断线重连增量补齐闭环 |
+| 3 | **Surfacing 自动升格** | Agent 写文件 → 聊天流内联预览卡片全流程 |
+| 4 | **@Agent E2E** | Web OIDC 登录 → 群聊 @Agent → Hub dispatch → Edge → CC CLI → transcript 渲染 |
 
-### 🔴 Agent 负责
+### P1: 功能补全
 
-| # | 任务 | 状态 |
+| # | 项目 | 内容 |
 |---|------|------|
-| W1-8 | **Orchestrator E2E 验证** — 4 Go 文件已写，需真实 Edge 运行验证 | 🔄 Sonnet 运行中 |
-| W3-3 | **Release Gate 脚本** — 4 个 gate 脚本全 PASS | ❌ 待跑 |
-| W3-4 | **演示材料** — 3 视频 + 5 截图 | ❌ 需你操作 |
-| DEEP | **一键部署 DNS** — `*.pages.vectorcontrol.tech` DNS记录 | 🔄 Sonnet 运行中 |
-| DEEP | **一键部署全链路** — DNS→nginx→SCP→公网访问 端到端 | 🔄 待 DNS 完成后验证 |
+| 5 | **对话式创建 Agent** | 比赛要求"对话式创建"——当前只有表单版 |
+| 6 | **Android APK 构建** | 需要 Android 构建环境 |
+| 7 | **OIDC 全链路验证** | TokenDance ID → Hub → JWT → WS 完整重验 |
+| 8 | **演示材料** | 3-5 支视频 + 5-7 张截图 |
+
+### P2: 优化
+
+| # | 项目 | 内容 |
+|---|------|------|
+| 9 | **cc-switch 模型可视化** | Agent 配置页显示真实模型别名 |
+| 10 | **Settings 完善** | preferences 跨端同步 |
+| 11 | **性能** | Edge event store 压缩、Hub WS 连接池 |
+| 12 | **文档** | API 参考文档、部署手册 |
 
 ---
 
-## 3. 子文档索引
+## 2. 不做（明确排除）
 
-| 文档 | 内容 |
-|------|------|
-| [00 状态与缺口](00-state.md) | 现有资产 · gap 清单 |
-| [01 管线类](01-pipeline.md) | 后端/合同层 |
-| [02 轻 UI 接线](02-light-ui.md) | 复用组件 + 少量 CSS |
-| [03 右侧栏增强](03-right-panel.md) | Inspector 内容增强 |
-| [04 Release Gate](04-release-gates.md) | 验收标准 · checkbox |
-| [05 Orchestrator](05-orchestrator-enhancement.md) | 失败降级 · Plan 确认门 |
-| [06 已完成归档](06-completed.md) | ✅ 全部 Wave 1-3 已完成项 |
+- macOS 签名/公证 — 缺硬件
+- iOS 端 — 缺设备 + 证书
+- 力导向 DAG 图 — `<ul>` tree 够用
+- Matrix 协议 — 架构选择差异
+- 竞品再审计 — 窗口已关
 
 ---
 
-## 5. 建议
+## 3. 里程碑
 
-### 现在该做什么
-
-剩余 4 项全是**验证 + 收口**，不是新功能：
-
-- **W0-1/2/3**：E2E 冒烟 + @Agent 真实 CC + OIDC 登录。这 3 项必须你操作（跑 PS1 脚本、浏览器完成 PKCE、打真实 CLI）。
-- **W1-8**：Orchestrator 增强代码已写好（4 Go 文件），Sonnet agent 正在跑 Edge 验证。通过后关闭。
-- **W3-3**：Release gate 脚本。代码就绪后 agent 可以跑，但真实 API smoke 需要你配合。
-- **W3-4**：录 3-5 支视频 + 5-7 张截图。演示材料差距需要你补。
-
-### 不建议再做的
-
-- ❌ 不要再加新功能。38/42 项 P0 已完成，剩下的全是验证。
-- ❌ 不要再改 UI。右侧栏 13/13 格式、StepCard、streaming bar 都已完成。
-- ❌ 不要再审计竞品。竞品格局已固化。
+| Milestone | 内容 | 目标日期 |
+|-----------|------|----------|
+| M1: 全链路通 | Orchestrator E2E + @Agent E2E + replay + surfacing | TBD |
+| M2: 比赛交付 | 对话式创建 + OIDC + 演示材料 | TBD |
+| M3: v0.4.0-rc1 | 命令余项 + APK + 文档 | TBD |
