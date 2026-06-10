@@ -142,13 +142,13 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
         return {
           id: ref.id,
           name: ref.original_name || file.name,
-          original_name: ref.original_name,
+          ...(ref.original_name ? { original_name: ref.original_name } : {}),
           size: ref.size,
           mime_type: ref.mime_type,
-          hash: ref.hash,
+          ...(ref.hash ? { hash: ref.hash } : {}),
           url: client.downloadAttachmentUrl(ref.id),
-          metadata: ref.metadata,
-          created_at: ref.created_at,
+          ...(ref.metadata ? { metadata: ref.metadata } : {}),
+          ...(ref.created_at ? { created_at: ref.created_at } : {}),
         };
       },
     },

@@ -17,6 +17,9 @@ export function fileTypeFromPreviewName(name: string): string {
   if (lower.endsWith('.html')) return 'html';
   if (lower.endsWith('.sql') || lower.endsWith('.db')) return 'db';
   if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return 'xlsx';
+  if (lower.endsWith('.csv')) return 'csv';
+  if (lower.endsWith('.pptx') || lower.endsWith('.ppt')) return 'pptx';
+  if (lower.endsWith('.docx')) return 'docx';
   return 'txt';
 }
 

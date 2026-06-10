@@ -27,7 +27,7 @@ export interface FilePreviewProps {
   onClose: () => void;
 }
 
-type FilePreviewMode = 'code' | 'markdown' | 'diff';
+type FilePreviewMode = 'code' | 'markdown' | 'diff' | 'pdf' | 'html' | 'image' | 'text';
 
 interface OpenWithItem {
   label: string;
@@ -74,7 +74,12 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   const lines = useMemo(() => content.split('\n'), [content]);
   const diffLines = useMemo(() => (diffContent ?? syntheticDiff(filename, content)).split('\n'), [content, diffContent, filename]);
   const langLabel = fileTypeLabel(filename, language);
+  const isNativeImage = isImageFile(filename);
+  const isNativePdf = isPdfFile(filename);
+  const isNativeHtml = isHtmlFile(filename);
+  const isPlainText = isTextFile(filename);
   const canRenderMarkdown = isMarkdownFile(filename);
+  const nativeMode = isNativePdf ? 'pdf' : isNativeHtml ? 'html' : isNativeImage ? 'image' : isPlainText ? 'text' : null;
 
   return (
     <section
@@ -88,6 +93,17 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           <strong className={styles.fileTitleName} title={filename}>{filename}</strong>
         </div>
         <div className={styles.modeTabs} role="tablist" aria-label="文件预览模式">
+          {nativeMode && (
+            <button
+              aria-selected={mode === nativeMode}
+              className={styles.modeTab}
+              onClick={() => setMode(nativeMode)}
+              role="tab"
+              type="button"
+            >
+              {nativeMode === 'pdf' ? 'PDF' : nativeMode === 'html' ? 'HTML' : nativeMode === 'image' ? '图片' : '文本'}
+            </button>
+          )}
           <button
             aria-selected={mode === 'code'}
             className={styles.modeTab}
@@ -175,7 +191,15 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
         {lastOpenTarget && <span className={styles.metaItem}>已选择 {lastOpenTarget}</span>}
       </div>
 
-      {mode === 'markdown' ? (
+      {mode === 'pdf' ? (
+        <PdfPreview filename={filename} />
+      ) : mode === 'html' ? (
+        <HtmlPreview content={content} />
+      ) : mode === 'image' ? (
+        <ImagePreview filename={filename} />
+      ) : mode === 'text' ? (
+        <TextPreview content={content} />
+      ) : mode === 'markdown' ? (
         <MarkdownPreview content={content} />
       ) : mode === 'diff' ? (
         <DiffPreview lines={diffLines} language={codeLanguage} />
@@ -240,7 +264,28 @@ function renderMarkdownLine(line: string, index: number): React.ReactElement {
 }
 
 function defaultPreviewMode(filename: string): FilePreviewMode {
-  return isMarkdownFile(filename) ? 'markdown' : 'code';
+  if (isPdfFile(filename)) return 'pdf';
+  if (isHtmlFile(filename)) return 'html';
+  if (isImageFile(filename)) return 'image';
+  if (isTextFile(filename)) return 'text';
+  if (isMarkdownFile(filename)) return 'markdown';
+  return 'code';
+}
+
+function isPdfFile(filename: string): boolean {
+  return /\.pdf$/i.test(filename);
+}
+
+function isHtmlFile(filename: string): boolean {
+  return /\.(html?|htm)$/i.test(filename);
+}
+
+function isImageFile(filename: string): boolean {
+  return /\.(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/i.test(filename);
+}
+
+function isTextFile(filename: string): boolean {
+  return /\.(txt|log|csv)$/i.test(filename);
 }
 
 function isMarkdownFile(filename: string): boolean {
@@ -262,6 +307,71 @@ function diffLineClass(line: string, css: typeof styles): string {
   if (line.startsWith('+') && !line.startsWith('+++')) return css.diffAdd ?? '';
   if (line.startsWith('-') && !line.startsWith('---')) return css.diffDel ?? '';
   return '';
+}
+
+function PdfPreview({ filename }: { filename: string }): React.ReactElement {
+  // Browser-native PDF rendering via iframe. The filename is used as a hint;
+  // in a real integration, the actual file URL would be passed instead.
+  // When content is a data URI or blob URL, it can be loaded directly.
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <iframe
+        title={`PDF 预览 ${filename}`}
+        style={{ flex: 1, border: 0, minHeight: 0 }}
+        src={`data:application/pdf;base64,`}
+        role="document"
+      />
+    </div>
+  );
+}
+
+function HtmlPreview({ content }: { content: string }): React.ReactElement {
+  return (
+    <iframe
+      title="HTML 预览"
+      style={{ flex: 1, border: 0, minHeight: 0 }}
+      srcDoc={content}
+      sandbox="allow-scripts"
+      role="document"
+    />
+  );
+}
+
+function ImagePreview({ filename }: { filename: string }): React.ReactElement {
+  // Image preview — the actual image URL would be resolved by the parent.
+  // Shows a placeholder when only filename is available.
+  return (
+    <div style={{
+      flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      minHeight: 0,
+      overflow: 'auto',
+    }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 12,
+        color: 'var(--text-3)',
+        font: '400 0.75rem var(--font-sans)',
+      }}>
+        <DesignFileIcon className={styles.fileIcon} name={filename} />
+        <span>图片预览: {filename}</span>
+        <span style={{ fontSize: '0.6875rem' }}>图片内容将通过文件 URL 加载</span>
+      </div>
+    </div>
+  );
+}
+
+function TextPreview({ content }: { content: string }): React.ReactElement {
+  return (
+    <pre className={styles.code} tabIndex={0} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      <code className={styles.codeInner}>{content}</code>
+    </pre>
+  );
 }
 
 function highlightDiffLine(line: string, language: string): string {

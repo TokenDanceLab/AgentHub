@@ -907,76 +907,6 @@ function FilesPanel({
   );
 }
 
-/* ═══ File Preview Router ═══ */
-
-type FilePreviewKind = 'code' | 'pptx' | 'pptx-legacy' | 'xlsx' | 'xls' | 'csv' | 'docx';
-
-function detectFilePreviewKind(fileName: string): FilePreviewKind {
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith('.pptx')) return 'pptx';
-  if (lower.endsWith('.ppt')) return 'pptx-legacy';
-  if (lower.endsWith('.xlsx')) return 'xlsx';
-  if (lower.endsWith('.xls')) return 'xls';
-  if (lower.endsWith('.csv')) return 'csv';
-  if (lower.endsWith('.docx')) return 'docx';
-  return 'code';
-}
-
-function FilePreviewRouter({
-  file,
-  onClose,
-}: {
-  file: PreviewFile;
-  onClose: () => void;
-}): React.ReactElement {
-  const kind = detectFilePreviewKind(file.name);
-
-  switch (kind) {
-    case 'pptx':
-    case 'pptx-legacy':
-      return (
-        <SlideshowPreview
-          fileName={file.name}
-          fileUrl={file.content ?? ''}
-          onClose={onClose}
-        />
-      );
-
-    case 'xlsx':
-    case 'xls':
-    case 'csv':
-      return (
-        <TablePreview
-          fileName={file.name}
-          fileUrl={file.content ?? ''}
-          onClose={onClose}
-        />
-      );
-
-    case 'docx':
-      return (
-        <DocxPreview
-          fileName={file.name}
-          fileUrl={file.content ?? ''}
-          onClose={onClose}
-        />
-      );
-
-    default:
-      /* Fallback to the existing code-based FilePreview */
-      return (
-        <FilePreview
-          filename={file.name}
-          owner={file.owner}
-          language={file.type}
-          content={file.content ?? `${file.name}\n\n暂无文件内容。`}
-          diffContent={file.diffContent}
-          onClose={onClose}
-        />
-      );
-  }
-}
-
 /* ═══ Helpers ═══ */
 
 function canOpenEvidence(
@@ -1028,4 +958,162 @@ function artifactWorkspacePreviewStatus(previews: RuntimeEvidenceSnapshot['previ
 
 function inspectorTabLabel(mode: InspectorMode): string {
   return inspectorTabs.find((tab) => tab.mode === mode)?.label ?? mode;
+}
+
+/* ═══ File Preview Router ═══ */
+
+type FilePreviewKind = 'code' | 'pptx' | 'pptx-legacy' | 'xlsx' | 'xls' | 'csv' | 'docx' | 'pdf' | 'html' | 'image' | 'text';
+
+function detectFilePreviewKind(fileName: string): FilePreviewKind {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pptx')) return 'pptx';
+  if (lower.endsWith('.ppt')) return 'pptx-legacy';
+  if (lower.endsWith('.xlsx')) return 'xlsx';
+  if (lower.endsWith('.xls')) return 'xls';
+  if (lower.endsWith('.csv')) return 'csv';
+  if (lower.endsWith('.docx')) return 'docx';
+  if (lower.endsWith('.pdf')) return 'pdf';
+  if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
+  if (/\.(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/.test(lower)) return 'image';
+  if (/\.(txt|log)$/.test(lower)) return 'text';
+  return 'code';
+}
+
+function FilePreviewRouter({
+  file,
+  onClose,
+}: {
+  file: PreviewFile;
+  onClose: () => void;
+}): React.ReactElement {
+  const kind = detectFilePreviewKind(file.name);
+  const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
+
+  switch (kind) {
+    case 'pptx':
+    case 'pptx-legacy':
+      return (
+        <SlideshowPreview
+          fileName={file.name}
+          fileUrl={file.content ?? ''}
+          onClose={onClose}
+        />
+      );
+
+    case 'xlsx':
+    case 'xls':
+    case 'csv':
+      return (
+        <TablePreview
+          fileName={file.name}
+          fileUrl={file.content ?? ''}
+          onClose={onClose}
+        />
+      );
+
+    case 'docx':
+      return (
+        <DocxPreview
+          fileName={file.name}
+          fileUrl={file.content ?? ''}
+          onClose={onClose}
+        />
+      );
+
+    case 'pdf':
+      return <NativePdfPreview filename={file.name} />;
+
+    case 'html':
+      return <NativeHtmlPreview content={content} />;
+
+    case 'image':
+      return <NativeImagePreview filename={file.name} />;
+
+    case 'text':
+      return <NativeTextPreview content={content} />;
+
+    default:
+      return (
+        <FilePreview
+          filename={file.name}
+          owner={file.owner}
+          language={file.type}
+          content={file.content ?? `${file.name}\n\n暂无文件内容。`}
+          diffContent={file.diffContent}
+          onClose={onClose}
+        />
+      );
+  }
+}
+
+/* ═══ Native File Previews (zero extra libraries) ═══ */
+
+function NativePdfPreview({ filename }: { filename: string }): React.ReactElement {
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <iframe
+        title={`PDF 预览 ${filename}`}
+        style={{ flex: 1, border: 0, minHeight: 0 }}
+        role="document"
+      />
+    </div>
+  );
+}
+
+function NativeHtmlPreview({ content }: { content: string }): React.ReactElement {
+  return (
+    <iframe
+      title="HTML 预览"
+      style={{ flex: 1, border: 0, minHeight: 0, width: '100%' }}
+      srcDoc={content}
+      sandbox="allow-scripts"
+      role="document"
+    />
+  );
+}
+
+function NativeImagePreview({ filename }: { filename: string }): React.ReactElement {
+  return (
+    <div style={{
+      flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      overflow: 'auto',
+      minHeight: 0,
+    }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 8,
+        color: 'var(--text-3)',
+        font: '400 0.75rem var(--font-sans)',
+      }}>
+        <DesignFileIcon className={styles.fileIcon} name={filename} />
+        <span>图片预览: {filename}</span>
+        <span style={{ fontSize: '0.6875rem' }}>图片内容将通过文件 URL 加载</span>
+      </div>
+    </div>
+  );
+}
+
+function NativeTextPreview({ content }: { content: string }): React.ReactElement {
+  return (
+    <pre style={{
+      flex: 1,
+      margin: 0,
+      padding: 16,
+      overflow: 'auto',
+      font: '400 0.8125rem/1.6 var(--font-mono)',
+      color: 'var(--text-2)',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      background: 'var(--surface)',
+      minHeight: 0,
+    }}>
+      {content}
+    </pre>
+  );
 }
