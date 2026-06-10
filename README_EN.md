@@ -15,7 +15,7 @@
 </div>
 
 <div align="center">
-  <img src="screenshots/desktop-workbench-preview.png" alt="AgentHub Desktop Workbench — Builder running a SQLite migration task" width="800" />
+  <img src="docs/images/desktop-workbench-preview.png" alt="AgentHub Desktop Workbench" width="800" />
 </div>
 
 ## What is AgentHub?

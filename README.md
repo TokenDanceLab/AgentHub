@@ -15,7 +15,7 @@
 </div>
 
 <div align="center">
-  <img src="screenshots/desktop-workbench-preview.png" alt="AgentHub Desktop 工作台 — Builder 正在执行 SQLite 迁移任务" width="800" />
+  <img src="docs/images/desktop-workbench-preview.png" alt="AgentHub Desktop 工作台" width="800" />
 </div>
 
 ## 产品定位
