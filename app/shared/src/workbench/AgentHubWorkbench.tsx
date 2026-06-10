@@ -220,6 +220,8 @@ export function AgentHubWorkbench({
   documents,
   documentsActions,
   modelCatalog,
+  ccSwitchStatus,
+  ccSwitchProviders,
   runtimeEvidence,
   showComposerAgentPicker = true,
   showComposerStatus = true,
