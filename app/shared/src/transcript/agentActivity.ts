@@ -55,8 +55,14 @@ export function createAgentActivityStore(): AgentActivityStore {
   const state: AgentActivityState = { activeAgents: new Map() };
   const listeners = new Set<AgentActivityListener>();
   const removalTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  let cachedSnapshot: AgentActivitySnapshot = { activeAgents: [] };
+
+  function invalidateSnapshot(): void {
+    cachedSnapshot = { activeAgents: [] };
+  }
 
   function notify(): void {
+    invalidateSnapshot();
     for (const listener of listeners) {
       listener(state);
     }
@@ -166,21 +172,19 @@ export function createAgentActivityStore(): AgentActivityStore {
   }
 
   function getSnapshot(): AgentActivitySnapshot {
+    if (cachedSnapshot.activeAgents.length > 0 || state.activeAgents.size === 0) {
+      return cachedSnapshot;
+    }
     const activeAgents: AgentActivitySnapshot['activeAgents'] = [];
     for (const entry of state.activeAgents.values()) {
-      // Skip entries that are already done/failed but still in the map
-      // (they're waiting for auto-removal).  The snapshot should only
-      // show entries that are still "live" in the UI.
-      if (entry.status === 'done' || entry.status === 'failed') {
-        // Include them so the UI can show a brief "completed/failed" state.
-      }
       activeAgents.push({
         id: entry.agentId,
         name: entry.agentName,
         status: entry.status,
       });
     }
-    return { activeAgents };
+    cachedSnapshot = { activeAgents };
+    return cachedSnapshot;
   }
 
   function reset(): void {
