@@ -1170,9 +1170,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		// so agents have persistent context across runs.
 		if memPrompt := runnerctx.BuildMemoryPrompt(req.WorkDir, req.ThreadID, req.AgentID); memPrompt != "" {
 			if runCtx.SkillsPrompt != "" {
-				runCtx.SkillsPrompt = memPrompt + "
-
-" + runCtx.SkillsPrompt
+				runCtx.SkillsPrompt = memPrompt + "\n\n" + runCtx.SkillsPrompt
 			} else {
 				runCtx.SkillsPrompt = memPrompt
 			}
