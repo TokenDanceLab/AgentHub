@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 08:15 +08:00
-当前 dev HEAD：`2c48951f` (`dev/delicious233`)
+最后更新：2026-06-10 17:30 +08:00
+当前 dev HEAD：`a8555bbe` (`dev/delicious233`)
 Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 ## Roadmap 最终状态
@@ -10,6 +10,8 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - 消息搜索点击导航（UI）、按需未读清除（UI）、WS 重连事件（ws lib compat）、连接状态指示器（UI）
 - Tool allowlist（可通过 API 配置）、Android APK（缺少构建环境）、macOS（缺少硬件）
 - 安全风险登记册关闭（流程）
+
+右侧面板增强（Section 18）新增 9 个未勾选项（P1 UI 任务），独立于发布阻塞。
 
 ## Release Gate 快照 (Final)
 
@@ -31,13 +33,13 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/release-0.3.0-rc7` 从 `origin/master` 创建，已合入 Mobile RN release-gates 增量；本地 HEAD 当前领先 `origin/master`。 |
+| 当前集成 dev | `dev/delicious233` HEAD `a8555bbe`，从 `origin/master` 创建，已合入 Mobile RN release-gates 增量；本地 HEAD 当前领先 `origin/master`。 |
 | 上一条 dev | `origin/dev/delicious233 = fc0f0628` 已通过 PR #297 合入 `origin/master`，不再作为本轮新增事实源。 |
 | RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
 | master | `origin/master = b7e9c1a4 Merge pull request #297 from TokenDanceLab/dev/delicious233`，是当前可信基线。 |
 | 当前工作树 | `D:\Code\TokenDance\AgentHub\.worktrees\r7`，分支 `dev/release-0.3.0-rc7`。 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 仍保留为历史现场，分支 `dev/delicious233` 且 dirty；不作为事实源。 |
-| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界。 |
+| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/right-panel-enhancement-design.md` 写右侧面板设计规范。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
 
 ## 已合入能力
@@ -203,6 +205,30 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - security risk register 仍有 High open release blockers；未获 waiver/closure 前不发布 stable，不把 remote/cloud/auth 口径写成 production-ready。
 
 ## 下一步优先级
+
+### P0 管道完成项（2026-06-10 主线打通）
+
+1. **OIDC Full PKCE Flow** ✅ — TokenDance ID 真实登录全链路验证通过。
+2. **IM 聊天全链路（10/10 chat actions）** ✅ — Web + Desktop 全部 Chat Actions 接入 Hub API。
+3. **Desktop 认证令牌管道** ✅ — hubQueries/sessionQueries/documentQueries/projectQueries 全部传入认证。
+4. **Edge CLI 适配器** ✅ — Claude Code + OpenCode 真实执行验证；Codex PreflightAdapter + SDK HTTP adapters 实现。
+5. **E2E Smoke 全过** ✅ — `verify-real-api-smoke.ps1` ALL 13 PHASES PASSED。
+6. **Mobile / i18n / Desktop package** ✅ — 91 tests, zh/en 各 2169 keys, Tauri unsigned dry gate.
+
+### P1 UI — 右侧检视面板增强（8 项进行中）
+
+基于 `docs/right-panel-enhancement-design.md`，8 个 P0 任务增强 `RightInspector`（overview / browser / files）：
+
+1. ⏳ `AgentStreamingBar` — 实时 Agent 运行状态条（Overview tab，~30 行 TSX）
+2. ⏳ PDF/图片/HTML/MD/Code 预览 — Files tab 原生渲染
+3. ⏳ `SlideshowPreview` — PPT/PPTX 预览（Files tab，pptxjs 依赖）
+4. ⏳ `TablePreview` — Excel/CSV 预览（Files tab，xlsx 依赖）
+5. ⏳ `DocxPreview` — DOCX 预览（Files tab，mammoth 依赖）
+6. ⏳ `DagTree` — AgentTeam 任务依赖树（Overview tab，~40 行 TSX）
+7. ⏳ `ContextUsage` 嵌入 — 嵌入 Overview tab（组件已存在，1 行声明）
+8. ⏳ Deploy preview 自动切换 — Browser tab（已有 iframe + URL 检测）
+
+### P2 常规事项
 
 1. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。
 2. **真实 SDK 消耗**：Anthropic/OpenAI SDK 适配器已实现但不阻塞——需要 API key。
