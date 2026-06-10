@@ -177,7 +177,7 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 
 	workDir := ctx.WorkDir
 	if workDir == "" {
-		workDir = "."
+		workDir = DefaultWorkDir()
 	}
 
 	var env []string

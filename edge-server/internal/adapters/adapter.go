@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
@@ -15,6 +16,15 @@ import (
 
 // RunProcessContext is an alias for the shared runnerctx.RunProcessContext.
 type RunProcessContext = runnerctx.RunProcessContext
+
+// DefaultWorkDir returns a sensible default working directory for agent runs:
+// the user's home directory, falling back to "." if unavailable.
+func DefaultWorkDir() string {
+	if home, err := os.UserHomeDir(); err == nil {
+		return home
+	}
+	return "."
+}
 
 // AgentAdapter is the unified interface for all Agent CLI backends.
 // Each implementation speaks a CLI's native protocol directly.

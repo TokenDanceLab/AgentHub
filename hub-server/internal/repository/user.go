@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -82,10 +83,30 @@ func FindByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
 
 // FindOrCreateByTokenDanceSub looks up an existing user by TokenDance ID sub,
 // or creates a new Hub user account linked to the sub on first login.
-func FindOrCreateByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
+// name and picture come from the TokenDance ID token claims (GitHub profile).
+// On each login the nickname and avatar are refreshed if non-empty claims are provided.
+func FindOrCreateByTokenDanceSub(db *gorm.DB, sub, name, picture string) (*model.User, error) {
 	// Try to find existing user
 	user, err := FindByTokenDanceSub(db, sub)
 	if err == nil {
+		// Refresh profile from TokenDance ID on each login
+		updated := false
+		if name != "" && user.Nickname != name {
+			user.Nickname = name
+			updated = true
+		}
+		if picture != "" && user.AvatarURL != picture {
+			user.AvatarURL = picture
+			updated = true
+		}
+		if updated {
+			if saveErr := db.Model(user).Updates(map[string]interface{}{
+				"nickname":   user.Nickname,
+				"avatar_url": user.AvatarURL,
+			}).Error; saveErr != nil {
+				slog.Warn("refresh tokendance profile failed", "user_id", user.ID, "error", saveErr)
+			}
+		}
 		return user, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -97,9 +118,14 @@ func FindOrCreateByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
 	// TokenDance subjects cannot collide after truncation.
 	username := tokenDanceUsername(sub)
 	now := time.Now()
+	nickname := name
+	if nickname == "" {
+		nickname = tokenDanceNickname(sub)
+	}
 	user = &model.User{
 		Username:              username,
-		Nickname:              tokenDanceNickname(sub), // can be changed later
+		Nickname:              nickname,
+		AvatarURL:             picture,
 		TokenDanceSub:         &sub,
 		TokenDanceSubLinkedAt: &now,
 	}

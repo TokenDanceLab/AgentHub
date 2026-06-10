@@ -73,7 +73,7 @@ export function WorkspaceHeader({
               title="切换 Mock / Real 数据模式"
               value={dataModeValue}
             >
-              <option value="auto">Auto / Mock</option>
+              <option value="auto">Auto</option>
               <option value="mock">Mock</option>
               <option value="approved-real">Real</option>
             </select>

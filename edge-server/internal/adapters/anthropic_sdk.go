@@ -134,7 +134,7 @@ func (a *AnthropicSDKAdapter) CapabilityHealthMetadata() map[string]any {
 func (a *AnthropicSDKAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	workDir := ctx.WorkDir
 	if workDir == "" {
-		workDir = "."
+		workDir = DefaultWorkDir()
 	}
 	// Return a harmless no-op command that exits immediately.
 	// The real work happens in ParseStream via HTTP.
