@@ -32,14 +32,15 @@ Claude Code、Codex、OpenCode 是 Agent Runtime，不是用户直接管理的�
 ```text
 Desktop shared workbench
   -> Desktop platform adapter
-  -> Local Edge Server
+  -> Local Edge Server   (执行：Thread / Run / Artifact / Agent Runtime)
+  -> Hub Server          (认证 / 联系人 / 会话 / 消息 / AgentTeam)
   -> AgentAdapter
   -> Claude Code / Codex / OpenCode
 
 Web shared workbench
   -> Web platform adapter
-  -> Hub Server
-  -> Edge routing / relay
+  -> Hub Server          (认证 / 联系人 / 会话 / 消息 / 项目 / 文档)
+  -> Edge routing / relay (远程 Edge 接入)
   -> Edge Server
   -> AgentAdapter
 ```
@@ -193,6 +194,7 @@ src-tauri/src/host/
 | Shared UI -> platform adapter | TypeScript interface |
 | Desktop adapter -> Tauri host | typed invoke |
 | Desktop adapter -> Local Edge | REST JSON + WebSocket |
+| Desktop adapter -> Hub Server | REST JSON + WebSocket（认证/联系人/会话/消息） |
 | Web adapter -> Hub | REST JSON + WebSocket |
 | Hub -> Edge | REST callbacks + Hub WebSocket dispatch/relay |
 | Edge lifecycle -> AgentAdapter | Go interface + process context |
