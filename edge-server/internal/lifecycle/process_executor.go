@@ -742,6 +742,16 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 			allowed, truncatedNow, written, maxBytes := limiter.allow(buf[:n])
 			if len(allowed) > 0 || truncatedNow {
 				text := string(allowed)
+				// Log stderr to structured logger so CC failure diagnostics
+				// are visible in Edge server logs without subscribing to bus events.
+				if stream == "stderr" && text != "" {
+					for _, line := range strings.Split(text, "\n") {
+						line = strings.TrimRight(line, "\r")
+						if line != "" {
+							slog.Error("cc stderr", "runId", run.ID, "line", line)
+						}
+					}
+				}
 				if outStore != nil && len(allowed) > 0 {
 					if _, err := outStore.Write(text); err != nil {
 						slog.Warn("process: failed to write output store", "runId", run.ID, "err", err)
