@@ -1,11 +1,11 @@
-import React, { useEffect, type FormEvent } from 'react';
+import React, { useCallback, useEffect, useRef, type FormEvent } from 'react';
 import type {
   ComposerAction,
   ComposerAttachment,
   ComposerMention,
   ComposerState,
 } from '../composer';
-import { canSubmitComposer } from '../composer';
+import { browserFilesToComposerAttachments, canSubmitComposer, formatComposerAttachmentSize } from '../composer';
 import { DesignNavIcon } from './designIcons';
 import type { ComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
@@ -38,6 +38,7 @@ export function UnifiedComposer({
   inputRef,
   mentionableAgents = [],
   onExecutionTargetChange,
+  onPickLocalAttachments,
   onSubmit,
   status,
   submitBehavior = 'enter-send',
@@ -64,6 +65,8 @@ export function UnifiedComposer({
     composer.submitState === 'error' ? 'Run/task: start failed' : undefined,
     targetStatus,
   ].filter((item): item is string => Boolean(item));
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!executionTargets || !executionTargetId) return;
@@ -107,8 +110,69 @@ export function UnifiedComposer({
     dispatchComposer({ type: 'addMention', mention });
   }
 
+  const handleFilePick = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const fileList = event.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    // Desktop platform: delegate to the native file picker if available
+    if (onPickLocalAttachments) {
+      try {
+        const attachments = await onPickLocalAttachments();
+        attachments.forEach((attachment) => {
+          dispatchComposer({ type: 'addAttachment', attachment });
+        });
+      } catch {
+        // User cancelled or picker failed — nothing to do
+      }
+      // Reset so the same file can be picked again
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Web platform: use browser file input directly
+    const files = Array.from(fileList);
+    const attachments = await browserFilesToComposerAttachments(files);
+    attachments.forEach((attachment) => {
+      dispatchComposer({ type: 'addAttachment', attachment });
+    });
+    // Reset so the same file can be picked again
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [dispatchComposer, onPickLocalAttachments]);
+
+  function openFilePicker(): void {
+    // Desktop: use the platform-native picker
+    if (onPickLocalAttachments) {
+      void onPickLocalAttachments().then((attachments) => {
+        attachments.forEach((attachment) => {
+          dispatchComposer({ type: 'addAttachment', attachment });
+        });
+      }).catch(() => {
+        // User cancelled
+      });
+      return;
+    }
+    // Web: trigger the hidden file input
+    fileInputRef.current?.click();
+  }
+
   return (
     <form className={styles.composer} onSubmit={onSubmit}>
+      {composer.replyTo && (
+        <div className={styles.replyToBar}>
+          <span className={styles.replyToLabel}>
+            回复至 {composer.replyTo.author}: {composer.replyTo.preview}
+          </span>
+          <button
+            aria-label="取消回复"
+            className={styles.replyToCancel}
+            disabled={isSubmitting}
+            onClick={() => dispatchComposer({ type: 'setReplyTo', replyTo: null })}
+            type="button"
+          >
+            x
+          </button>
+        </div>
+      )}
       {composer.mentions.length > 0 && (
         <div className={styles.composerMentions} aria-label="Selected agents">
           {composer.mentions.map((mention) => (
@@ -136,6 +200,18 @@ export function UnifiedComposer({
           </span>
         </div>
       )}
+      {composer.attachments.length > 0 && (
+        <div className={styles.composerAttachmentBar} aria-label="Attachments">
+          {composer.attachments.map((attachment) => (
+            <ComposerAttachmentChip
+              attachment={attachment}
+              isSubmitting={isSubmitting}
+              key={attachment.id}
+              onRemove={() => dispatchComposer({ type: 'removeAttachment', attachmentId: attachment.id })}
+            />
+          ))}
+        </div>
+      )}
       <div className={styles.composerRow}>
         <textarea
           aria-label="Composer input"
@@ -147,6 +223,27 @@ export function UnifiedComposer({
           rows={1}
           value={composer.text}
         />
+
+        <input
+          accept="image/*,.pdf,.txt,.md,.json,.csv,.yaml,.yml,.toml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.go,.rs,.java,.c,.cpp,.h,.hpp,.log,.zip,.tar,.gz"
+          aria-hidden="true"
+          hidden
+          onChange={handleFilePick}
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          tabIndex={-1}
+          type="file"
+        />
+
+        <button
+          aria-label="Add attachment"
+          className={styles.attachmentButton}
+          disabled={isSubmitting}
+          onClick={openFilePicker}
+          type="button"
+        >
+          <DesignNavIcon name="paperclip" />
+        </button>
 
         {mentionableAgents.length > 0 && (
           <label className={styles.composerAgentPicker}>
@@ -210,5 +307,45 @@ export function UnifiedComposer({
         </div>
       )}
     </form>
+  );
+}
+
+/* ── Attachment chip ── */
+
+function ComposerAttachmentChip({
+  attachment,
+  isSubmitting,
+  onRemove,
+}: {
+  attachment: ComposerAttachment;
+  isSubmitting: boolean;
+  onRemove: () => void;
+}): React.ReactElement {
+  const isImage = attachment.mime?.startsWith('image/');
+  const sizeLabel = attachment.size ? formatComposerAttachmentSize(attachment.size) : undefined;
+
+  return (
+    <div className={styles.attachmentChip}>
+      {isImage && attachment.contentPreview && (
+        <span className={styles.attachmentChipThumb} aria-hidden="true">
+          {attachment.contentPreview.slice(0, 2)}
+        </span>
+      )}
+      <span className={styles.attachmentChipName}>
+        {attachment.name}
+      </span>
+      {sizeLabel && (
+        <span className={styles.attachmentChipSize}>{sizeLabel}</span>
+      )}
+      <button
+        aria-label={`Remove ${attachment.name}`}
+        className={styles.attachmentChipRemove}
+        disabled={isSubmitting}
+        onClick={onRemove}
+        type="button"
+      >
+        &times;
+      </button>
+    </div>
   );
 }

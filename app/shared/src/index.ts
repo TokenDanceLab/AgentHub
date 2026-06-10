@@ -414,6 +414,7 @@ export type {
   AgentTimelineItem,
   AgentTimelineTranscriptBlock,
   ArtifactTranscriptBlock,
+  AttachmentTranscriptBlock,
   ChildAgentTranscriptBlock,
   ContextUsageTranscriptBlock,
   DiffTranscriptBlock,

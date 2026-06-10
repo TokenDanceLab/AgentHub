@@ -44,6 +44,16 @@ export interface TextTranscriptBlock extends TranscriptBlockBase {
   displayDetail?: string;
   badgeLabel?: string;
   badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary';
+  /** ID of the message this is replying to. */
+  replyToMessageId?: string;
+  /** Short preview of the replied message content. */
+  replyPreview?: string;
+  /** Author name of the replied message. */
+  replyAuthor?: string;
+  /** Previous version content when this message was regenerated. */
+  previousVersion?: string;
+  /** Whether a newer version exists (old message shown grayed). */
+  hasNewerVersion?: boolean;
 }
 
 export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
@@ -276,6 +286,14 @@ export interface ReplayGapTranscriptBlock extends TranscriptBlockBase {
   recovering?: boolean;
 }
 
+export interface AttachmentTranscriptBlock extends TranscriptBlockBase {
+  kind: 'attachment';
+  /** The attachment reference stored on the Hub server. */
+  attachmentRef: import('../composer').AttachmentRef;
+  /** Whether this is an image or a generic file attachment. */
+  contentType: 'image' | 'file';
+}
+
 export type TranscriptBlock =
   | TextTranscriptBlock
   | ToolCallTranscriptBlock
@@ -299,4 +317,5 @@ export type TranscriptBlock =
   | ResultTranscriptBlock
   | FailureTranscriptBlock
   | FinishedTranscriptBlock
-  | ReplayGapTranscriptBlock;
+  | ReplayGapTranscriptBlock
+  | AttachmentTranscriptBlock;

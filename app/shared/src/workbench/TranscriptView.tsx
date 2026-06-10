@@ -4,6 +4,7 @@ import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry
 import type { FileItem } from './inspector';
 import {
   AgentMessage,
+  AttachmentBlock,
   UserMessage,
   ToolCardBlock,
   FileChangeCard,
@@ -46,6 +47,10 @@ export interface TranscriptPointerEvent {
 export interface TranscriptViewProps {
   transcript: TranscriptBlock[];
   contextBlockId?: string | undefined;
+  /** Highlight a specific block (e.g. from search result click). Scrolls into view and applies a 3 s CSS highlight. */
+  highlightedBlockId?: string | undefined;
+  /** Called when the highlight period ends (after 3 s), allowing the parent to clear the highlightedBlockId. */
+  onHighlightEnd?: (() => void) | undefined;
   actionedBlockIds?: string[] | undefined;
   selectedBlockIds?: string[] | undefined;
   selectionMode?: boolean | undefined;
@@ -72,6 +77,8 @@ export interface TranscriptViewProps {
 export function TranscriptView({
   actionedBlockIds = [],
   contextBlockId,
+  highlightedBlockId,
+  onHighlightEnd,
   onBlockContextMenu,
   onBlockPointerDown,
   onBlockPointerMove,
@@ -87,6 +94,30 @@ export function TranscriptView({
   pinnedAnnouncement,
 }: TranscriptViewProps): React.ReactElement {
   const [expandedDiffIds, setExpandedDiffIds] = React.useState<Set<string>>(() => new Set());
+  const highlightTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Scroll to highlighted block when highlightedBlockId changes
+  React.useEffect(() => {
+    if (!highlightedBlockId) return;
+    const el = document.querySelector(`[data-scroll-block="${highlightedBlockId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = setTimeout(() => {
+      highlightTimerRef.current = null;
+      onHighlightEnd?.();
+    }, 3000);
+    return () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+        highlightTimerRef.current = null;
+      }
+    };
+  }, [highlightedBlockId, onHighlightEnd]);
+
   const actionedIds = new Set(actionedBlockIds);
   const selectedIds = new Set(selectedBlockIds);
   const softHiddenIds = new Set(softHiddenBlockIds);
@@ -140,11 +171,13 @@ export function TranscriptView({
                 className={[
                   styles.block,
                   contextBlockId === block.id ? styles.blockContext : '',
+                  highlightedBlockId === block.id ? styles.blockHighlighted : '',
                   selectedIds.has(block.id) ? styles.blockSelected : '',
                   actionedIds.has(block.id) ? styles.blockActioned : '',
                   softHiddenIds.has(block.id) ? styles.blockSoftHidden : '',
                 ].filter(Boolean).join(' ')}
                 aria-selected={selectedIds.has(block.id)}
+                data-scroll-block={block.id}
                 data-selectable-card={block.id}
                 data-card-state={[
                   contextBlockId === block.id ? 'context' : '',
@@ -251,6 +284,8 @@ function renderTranscriptBlock(
     case 'replay_gap':
       // eslint-disable-next-line react/jsx-no-useless-fragment
       return React.createElement(React.Fragment);
+    case 'attachment':
+      return renderAttachmentBlock(block);
     default:
       return assertNever(block);
   }
@@ -268,6 +303,13 @@ function renderTextBlock(
   onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined,
   hideUserAvatar = false,
 ): React.ReactElement {
+  const replyRef = block.replyToMessageId ? (
+    <div className={styles.replyQuote}>
+      <span className={styles.replyQuoteAuthor}>{block.replyAuthor ?? '未知'}</span>
+      <span className={styles.replyQuoteText}>{block.replyPreview ?? '...'}</span>
+    </div>
+  ) : null;
+
   if (!isCurrentUserAuthor(block.author)) {
     const time = formatBlockTime(block.createdAt);
 
@@ -280,6 +322,7 @@ function renderTextBlock(
         name={block.author.name}
         onAvatarClick={onAgentProfileOpen}
       >
+        {replyRef}
         {renderAgentText(block)}
       </AgentMessage>
     );
@@ -287,7 +330,8 @@ function renderTextBlock(
 
   return (
     <UserMessage hideAvatar={hideUserAvatar} avatarInitials={agentAvatar(block.author.name)}>
-      <p className={styles.blockText}>{block.text}</p>
+      {replyRef}
+      <p className={styles.blockText} data-grayed={block.hasNewerVersion ? 'true' : undefined}>{block.text}</p>
     </UserMessage>
   );
 }
@@ -913,6 +957,34 @@ function renderFinishedBlock(
       success={true}
       summary={block.title}
     />
+  );
+}
+
+/* ── Attachment block ── */
+
+function renderAttachmentBlock(
+  block: Extract<TranscriptBlock, { kind: 'attachment' }>,
+): React.ReactElement {
+  if (!isCurrentUserAuthor(block.author)) {
+    return (
+      <div className={styles.agentBlockRow}>
+        <div className={styles.agentRunShell}>
+          <AttachmentBlock
+            attachmentRef={block.attachmentRef}
+            contentType={block.contentType}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <UserMessage hideAvatar={false} avatarInitials={agentAvatar(block.author.name)}>
+      <AttachmentBlock
+        attachmentRef={block.attachmentRef}
+        contentType={block.contentType}
+      />
+    </UserMessage>
   );
 }
 
