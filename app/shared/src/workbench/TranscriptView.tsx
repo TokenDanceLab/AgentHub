@@ -22,6 +22,7 @@ import {
   ApprovalCardBlock,
 } from './blocks';
 import { StepCard } from '../ui/StepCard';
+import DeployCard from '../ui/DeployCard';
 import type { StepCardSubStep } from '../ui/StepCard';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -64,6 +65,8 @@ export interface TranscriptViewProps {
   onAgentProfileOpen?: ((agentName: string, anchor: HTMLElement) => void) | undefined;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined;
   onReviewFile?: ((file: FileItem) => void) | undefined;
+  /** Called when a user clicks "Deploy" on a deploy block. */
+  onDeploySubmit?: ((runId: string, slug: string) => void) | undefined;
   /** Optional pinned announcement to show at the top of the transcript. */
   pinnedAnnouncement?: {
     title: string;
@@ -88,6 +91,7 @@ export function TranscriptView({
   onAgentProfileOpen,
   onApprovalDecision,
   onReviewFile,
+  onDeploySubmit,
   selectedBlockIds = [],
   selectionMode = false,
   softHiddenBlockIds = [],
@@ -178,6 +182,7 @@ export function TranscriptView({
                   softHiddenIds.has(block.id) ? styles.blockSoftHidden : '',
                 ].filter(Boolean).join(' ')}
                 aria-selected={selectedIds.has(block.id)}
+                data-message-id={block.id}
                 data-scroll-block={block.id}
                 data-selectable-card={block.id}
                 data-card-state={[
@@ -217,6 +222,7 @@ export function TranscriptView({
                   hideGroupedUserAvatar,
                   diffControls,
                   onApprovalDecision,
+                  onDeploySubmit,
                 )}
               </li>
             </React.Fragment>
@@ -236,6 +242,7 @@ function renderTranscriptBlock(
   hideUserAvatar = false,
   diffControls?: InlineDiffControls | undefined,
   onApprovalDecision?: ((action: ApprovalDecisionAction) => void) | undefined,
+  onDeploySubmit?: ((runId: string, slug: string) => void) | undefined,
 ): React.ReactElement {
   switch (block.kind) {
     case 'text':
@@ -287,6 +294,8 @@ function renderTranscriptBlock(
       return React.createElement(React.Fragment);
     case 'attachment':
       return renderAttachmentBlock(block);
+    case 'deploy':
+      return renderDeployBlock(block, onDeploySubmit);
     default:
       return assertNever(block);
   }
@@ -1046,6 +1055,23 @@ function renderRunStepChild(
     default:
       return renderTranscriptBlock(block, undefined, onReviewFile, false, diffControls, onApprovalDecision);
   }
+}
+
+function renderDeployBlock(
+  block: Extract<TranscriptBlock, { kind: 'deploy' }>,
+  onDeploySubmit?: ((runId: string, slug: string) => void) | undefined,
+): React.ReactElement {
+  return React.createElement(DeployCard, {
+    status: block.status,
+    url: block.url,
+    onDeploy: onDeploySubmit && block.runId
+      ? () => {
+          // Derive a slug from the run ID or let the parent generate one.
+          const slug = block.runId!.replace(/_/g, '-').slice(0, 20);
+          onDeploySubmit(block.runId!, slug);
+        }
+      : undefined,
+  });
 }
 
 function assertNever(value: never): never {

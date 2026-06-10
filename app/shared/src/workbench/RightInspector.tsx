@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../i18n';
 import { buildInspectorEvidenceModel, buildRuntimeEvidenceInspectorModel } from '../inspector';
 import type { RuntimeEvidenceChannel, RuntimeEvidenceSnapshot } from '../inspector';
 import type { EvidenceRef, ContextUsageTranscriptBlock, RouteDecisionTranscriptBlock, SubagentTranscriptBlock, ChildAgentTranscriptBlock } from '../transcript';
@@ -40,15 +42,17 @@ function TabMark({
   children,
   mode,
   onClose,
+  t,
 }: {
   char: string;
   children: React.ReactElement;
   mode: InspectorMode;
   onClose: (mode: InspectorMode) => void;
+  t: (key: string) => string;
 }) {
   return (
     <span
-      aria-label={`关闭 ${inspectorTabLabel(mode)}`}
+      aria-label={t('inspector.closeTab').replace('{{label}}', inspectorTabLabel(mode, t))}
       className={styles.inspectorTabMark}
       data-inspector-close
       onClick={(event) => {
@@ -58,7 +62,7 @@ function TabMark({
       }}
       role="button"
       tabIndex={-1}
-      title={`关闭 ${inspectorTabLabel(mode)}`}
+      title={t('inspector.closeTab').replace('{{label}}', inspectorTabLabel(mode, t))}
     >
       {children}
       <b>{char}</b>
@@ -75,20 +79,24 @@ interface InspectorTabDef {
   icon: DesignNavIconName;
 }
 
-const inspectorTabs: InspectorTabDef[] = [
-  { mode: 'overview', label: '概览', markChar: '×', icon: 'overview' },
-  { mode: 'browser', label: '浏览器', markChar: '×', icon: 'browser' },
-  { mode: 'files', label: '文件', markChar: '×', icon: 'fileText' },
-];
+function getInspectorTabs(t: (key: string) => string): InspectorTabDef[] {
+  return [
+    { mode: 'overview', label: t('inspector.overview'), markChar: '×', icon: 'overview' },
+    { mode: 'browser', label: t('inspector.browser'), markChar: '×', icon: 'browser' },
+    { mode: 'files', label: t('inspector.files'), markChar: '×', icon: 'fileText' },
+  ];
+}
 
 const defaultVisibleTabs = new Set<InspectorMode>(['overview', 'browser', 'files']);
 
-const quickOpenItems = [
-  { id: 'files', label: '文件', shortcut: 'Ctrl+P', mode: 'files' as InspectorMode },
-  { id: 'chat', label: '侧边聊天', shortcut: '', mode: null },
-  { id: 'browser', label: '浏览器', shortcut: 'Ctrl+T', mode: 'browser' as InspectorMode },
-  { id: 'terminal', label: '终端', shortcut: 'Ctrl+`', mode: null },
-];
+function getQuickOpenItems(t: (key: string) => string) {
+  return [
+    { id: 'files', label: t('inspector.quickOpenFiles'), shortcut: 'Ctrl+P', mode: 'files' as InspectorMode },
+    { id: 'chat', label: t('inspector.quickOpenChat'), shortcut: '', mode: null },
+    { id: 'browser', label: t('inspector.quickOpenBrowser'), shortcut: 'Ctrl+T', mode: 'browser' as InspectorMode },
+    { id: 'terminal', label: t('inspector.quickOpenTerminal'), shortcut: 'Ctrl+`', mode: null },
+  ];
+}
 
 /* ═══ Component ═══ */
 
@@ -135,6 +143,9 @@ export function RightInspector({
   onResizeStart,
   width,
 }: RightInspectorProps): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const inspectorTabs = getInspectorTabs(t);
+  const quickOpenItems = getQuickOpenItems(t);
   const [activeMode, setActiveMode] = useState<InspectorMode>('overview');
   const [visibleTabs, setVisibleTabs] = useState<Set<InspectorMode>>(() => new Set(defaultVisibleTabs));
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
@@ -295,7 +306,7 @@ export function RightInspector({
                 role="tab"
                 type="button"
               >
-                <TabMark char={tab.markChar} mode={tab.mode} onClose={closeInspectorTab}>
+                <TabMark char={tab.markChar} mode={tab.mode} onClose={closeInspectorTab} t={t}>
                   <DesignNavIcon
                     className={styles.inspectorTabIcon}
                     name={tab.icon}
@@ -971,8 +982,8 @@ function artifactWorkspacePreviewStatus(previews: RuntimeEvidenceSnapshot['previ
   return readyPreview?.status ?? previews[0]?.status ?? 'none';
 }
 
-function inspectorTabLabel(mode: InspectorMode): string {
-  return inspectorTabs.find((tab) => tab.mode === mode)?.label ?? mode;
+function inspectorTabLabel(mode: InspectorMode, t: (key: string) => string): string {
+  return getInspectorTabs(t).find((tab) => tab.mode === mode)?.label ?? mode;
 }
 
 /* ═══ File Preview Router ═══ */
