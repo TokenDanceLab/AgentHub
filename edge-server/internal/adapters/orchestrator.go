@@ -228,6 +228,12 @@ type dispatchInterceptor struct {
 	budget          *runnerctx.ContextBudget
 	maxConcurrency  int
 
+	// Plan approval gate (P0 #3): when planBroker is non-nil, the interceptor
+	// pauses after detecting dispatch events and emits a plan.proposed event.
+	// It then blocks until the user approves or rejects the plan, or the
+	// auto-approve timeout fires. When nil, dispatches proceed immediately.
+	planBroker *PlanApprovalBroker
+
 	// Sub-agent result injection and status tracking.
 	ctx                context.Context    // set from ParseStream; cancelled when run ends
 	resultListenerOnce sync.Once         // ensures result listener starts exactly once
@@ -249,6 +255,8 @@ func (d *dispatchInterceptor) Emit(eventType string, scope map[string]any, paylo
 }
 
 // scanForDispatch collects dispatch events and fans out multiple dispatches concurrently.
+// When the plan approval gate is enabled (planBroker != nil), it first pauses,
+// emits a plan.proposed event, and waits for user approval before proceeding.
 func (d *dispatchInterceptor) scanForDispatch(payload any, scope map[string]any) {
 	text := extractTextContent(payload)
 	if text == "" {
@@ -273,6 +281,11 @@ func (d *dispatchInterceptor) scanForDispatch(payload any, scope map[string]any)
 
 	if len(events) == 0 {
 		return
+	}
+
+	// Plan approval gate (P0 #3): pause and wait for user decision.
+	if !d.awaitPlanApproval(events, scope) {
+		return // plan was rejected or cancelled
 	}
 
 	if len(events) == 1 {
