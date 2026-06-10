@@ -22,11 +22,22 @@ import (
 type ClaudeCodeAdapter struct {
 	binaryPath       string
 	argPrefix        []string // prepended before args when .cmd shim bypassed (Windows node path)
-	model            string // default model (fallback when runCtx.Model is empty)
-	permissionMode   string // default permission mode (fallback when runCtx.PermissionMode is empty)
+	model            string   // default model (fallback when runCtx.Model is empty)
+	permissionMode   string   // default permission mode (fallback when runCtx.PermissionMode is empty)
 	maxTurns         int
 	available        bool // #177: true if the CLI binary exists and is executable
 	permissionBroker *PermissionDecisionBroker
+
+	// Auth env vars captured from parent environment and passed through to the
+	// child process. The env sanitizer strips sensitive keys (ANTHROPIC_API_KEY,
+	// CLAUDE_API_KEY, ANTHROPIC_AUTH_TOKEN) from the sanitized child env, and
+	// ANTHROPIC_BASE_URL is not on the whitelist either, so adapter-level
+	// passthrough is required. Without this, Claude Code fails immediately
+	// with an authentication error.
+	anthropicAPIKey    string // ANTHROPIC_API_KEY
+	claudeAPIKey       string // CLAUDE_API_KEY
+	anthropicAuthToken string // ANTHROPIC_AUTH_TOKEN (used by cc-switch transparent proxy)
+	anthropicBaseURL   string // ANTHROPIC_BASE_URL (used by cc-switch transparent proxy)
 }
 
 // NewClaudeCodeAdapter creates a Claude Code adapter.
@@ -34,14 +45,26 @@ type ClaudeCodeAdapter struct {
 // model and permissionMode serve as defaults when the run context does not specify them.
 func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeAdapter {
 	cmdPath, argPrefix, available := resolveClaudeCommand(binaryPath, exec.LookPath, os.Stat, runtime.GOOS)
+	// Capture auth env vars from parent environment so we can pass them through
+	// to the Claude Code child process. The env sanitizer strips sensitive keys
+	// from the sanitized child env, so adapter-level passthrough is required.
+	// Without this, Claude Code fails immediately with an authentication error.
+	anthropicAPIKey := os.Getenv("ANTHROPIC_API_KEY")
+	claudeAPIKey := os.Getenv("CLAUDE_API_KEY")
+	anthropicAuthToken := os.Getenv("ANTHROPIC_AUTH_TOKEN")
+	anthropicBaseURL := os.Getenv("ANTHROPIC_BASE_URL")
 	return &ClaudeCodeAdapter{
-		binaryPath:       cmdPath,
-		argPrefix:        argPrefix,
-		model:            model,
-		permissionMode:   permissionMode,
-		maxTurns:         50,
-		available:        available,
-		permissionBroker: nil,
+		binaryPath:         cmdPath,
+		argPrefix:          argPrefix,
+		model:              model,
+		permissionMode:     permissionMode,
+		maxTurns:           50,
+		available:          available,
+		permissionBroker:   nil,
+		anthropicAPIKey:    anthropicAPIKey,
+		claudeAPIKey:       claudeAPIKey,
+		anthropicAuthToken: anthropicAuthToken,
+		anthropicBaseURL:   anthropicBaseURL,
 	}
 }
 
@@ -230,7 +253,27 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	}
 	args = append(args, "--add-dir", workDir)
 
-	return a.binaryPath, args, nil, workDir
+	// Pass auth env vars through to the Claude Code child process. The env
+	// sanitizer strips sensitive keys (ANTHROPIC_API_KEY, CLAUDE_API_KEY,
+	// ANTHROPIC_AUTH_TOKEN) from the sanitized parent env, and
+	// ANTHROPIC_BASE_URL is not on the whitelist either, so adapter-level
+	// passthrough is required. Without this, Claude Code fails immediately
+	// with an authentication error.
+	var env []string
+	if a.anthropicAPIKey != "" {
+		env = append(env, "ANTHROPIC_API_KEY="+a.anthropicAPIKey)
+	}
+	if a.claudeAPIKey != "" {
+		env = append(env, "CLAUDE_API_KEY="+a.claudeAPIKey)
+	}
+	if a.anthropicAuthToken != "" {
+		env = append(env, "ANTHROPIC_AUTH_TOKEN="+a.anthropicAuthToken)
+	}
+	if a.anthropicBaseURL != "" {
+		env = append(env, "ANTHROPIC_BASE_URL="+a.anthropicBaseURL)
+	}
+
+	return a.binaryPath, args, env, workDir
 }
 
 func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
@@ -258,3 +301,18 @@ func (a *ClaudeCodeAdapter) NeedsStdin() bool { return true }
 // Available reports whether the claude CLI binary was found at startup.
 // #177: check binary at startup, report unavailable if missing.
 func (a *ClaudeCodeAdapter) Available() bool { return a.available }
+
+// PreflightCheck verifies that Claude Code can actually execute by checking both
+// the binary presence and required authentication. At least one auth mechanism
+// must be available: ANTHROPIC_API_KEY, CLAUDE_API_KEY, or ANTHROPIC_AUTH_TOKEN
+// (the latter typically comes from cc-switch transparent proxy). Returns an
+// error describing what is missing if the adapter is not ready.
+func (a *ClaudeCodeAdapter) PreflightCheck() error {
+	if !a.available {
+		return fmt.Errorf("claude CLI binary not found: %s", a.binaryPath)
+	}
+	if a.anthropicAPIKey == "" && a.claudeAPIKey == "" && a.anthropicAuthToken == "" {
+		return fmt.Errorf("claude-code requires at least one of: ANTHROPIC_API_KEY, CLAUDE_API_KEY, ANTHROPIC_AUTH_TOKEN")
+	}
+	return nil
+}
