@@ -1,18 +1,20 @@
 # 文档规范
 
-最后更新：2026-06-07
+最后更新：2026-06-10
 
 ## 文档分层
 
 | 层级 | 文件 | 内容 | 修改权限 |
 |------|------|------|:--:|
 | **路线图** | `docs/roadmap.md` | Sprint 目标 + 待办清单 + 已完成汇总 | Delicious233 |
-| **架构** | `docs/architecture.md` | 产品定位 + 三层架构 + 数据流 + 实现状态 | 三人协商 |
-| **阶段计划/进度** | `docs/<topic>-plan.md` / `docs/<topic>-progress-YYYY-MM-DD.md` | 当前阶段的实施边界、任务、验收、风险和阶段性接手摘要 | 任务负责人 |
+| **功能收口** | `docs/roadmap-feature-close.md` | 基于竞品审计的功能缺口和优先级 | Delicious233 |
+| **架构** | `docs/architecture.md` + `docs/architecture/` | 产品定位 + 三层架构 + 数据流 + 实现状态 | 三人协商 |
+| **阶段计划/进度** | `docs/<topic>-plan.md` | 当前阶段的实施边界、任务、验收、风险 | 任务负责人 |
 | **ADR** | `docs/adr/` | 架构决策记录（11 篇） | 任何人 |
 | **设计** | `docs/designs/` | 组件设计文档（4 篇） | 任何人 |
 | **治理** | `docs/governance/` | 分支规范、文档标准、安全风险 | 三人协商 |
-| **参考** | `docs/reference/` | 技术参考 + 25 项目竞品调研 | 按需查阅 |
+| **审计** | `docs/audit/` | 发布门禁审计证据 | 只读 |
+| **参考** | `docs/reference/` | 技术参考 + 竞品调研 | 按需查阅 |
 | **归档** | `docs/archive/` | 历史方案、旧审查（INDEX.md 为索引） | 只读 |
 
 ## 命名和格式

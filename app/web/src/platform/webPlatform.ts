@@ -11,7 +11,8 @@ import {
   type WorkbenchDemoRuntimeStore,
 } from '@shared/demo';
 import type { AgentHubPlatform, WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
-import type { ComposerIntent, ComposerSubmitResult } from '@shared/composer';
+import type { AttachmentRef, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
+import { computeFileHash } from '@shared/composer';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { AgentInfo } from '@shared/types';
 import { queryClient as defaultQueryClient } from '@/api/queryClient';
@@ -200,6 +201,28 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     preview: {
       canOpenEvidence: canOpenWebEvidencePreview,
       openEvidence: openWebEvidencePreview,
+    },
+    attachments: {
+      async pickFiles(): Promise<never[]> {
+        // Web platform uses browser file input directly via the composer UI.
+        throw new Error('Web platform does not support programmatic file picking. Use the composer file input instead.');
+      },
+      async uploadAttachment(file: File): Promise<AttachmentRef> {
+        const client = createHubClient({ getToken: getAccessToken });
+        const hash = await computeFileHash(file);
+        const ref = await client.uploadAttachment(file, hash);
+        return {
+          id: ref.id,
+          name: ref.original_name || file.name,
+          original_name: ref.original_name,
+          size: ref.size,
+          mime_type: ref.mime_type,
+          hash: ref.hash,
+          url: client.downloadAttachmentUrl(ref.id),
+          metadata: ref.metadata,
+          created_at: ref.created_at,
+        };
+      },
     },
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
