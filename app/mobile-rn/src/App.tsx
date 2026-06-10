@@ -84,7 +84,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     const client = createHubClient({ baseUrl: localPreviewBaseUrl });
     const loadSnapshot = () => {
       client.getMobileSnapshot().then((snapshot) => {
-        if (!cancelled) {
+        if (!cancelled && snapshot.threads.length > 0) {
           setLocalHubSnapshot({ key: localPreviewKey, fixture: snapshot });
           setSelectedThreadId((current) => (
             snapshot.threads.some((thread) => thread.id === current)
