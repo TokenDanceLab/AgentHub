@@ -1435,6 +1435,7 @@ export function AgentHubWorkbench({
               skillMarketLoading={skillMarketLoading}
               mcpMarketItems={mcpMarketItems}
               mcpMarketLoading={mcpMarketLoading}
+              onNavigatePage={setActivePage}
             />
           </section>
         )}
