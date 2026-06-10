@@ -24,6 +24,7 @@ import {
   normalizeHubRuntimeEventsToTranscript,
   collectTranscriptEvidence,
   resolveCurrentTranscriptRunId,
+  getAgentActivityStore,
   type ApprovalDecisionAction,
   type HubMessageTranscriptInput,
   type HubRuntimeEventTranscriptInput,
@@ -94,6 +95,13 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   );
   const [liveRuntimeEvents, setLiveRuntimeEvents] = useState<HubRuntimeEventTranscriptInput[]>([]);
 
+  // Subscribe to agent activity changes for the streaming status bar.
+  const agentActivity = useSyncExternalStore(
+    getAgentActivityStore().subscribe,
+    getAgentActivityStore().getSnapshot,
+    getAgentActivityStore().getSnapshot,
+  );
+
   const sessions = useQuery({
     queryKey: ['web-v4', 'hub-sessions', hubReady],
     queryFn: () => hubClient.listSessions(),
@@ -120,6 +128,17 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     setLiveRuntimeEvents((current) => appendHubRuntimeEvent(current, event));
   }, []);
 
+  const onReplayEvents = useCallback((events: HubRuntimeEventTranscriptInput[]) => {
+    if (events.length === 0) return;
+    setLiveRuntimeEvents((current) => {
+      let merged = current;
+      for (const event of events) {
+        merged = appendHubRuntimeEvent(merged, event);
+      }
+      return merged;
+    });
+  }, []);
+
   const activeAgentTask = useQuery({
     queryKey: activeHubSessionId
       ? webActiveAgentTaskQueryKey(activeHubSessionId)
@@ -136,6 +155,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     runtimeSessionId: activeHubSessionId,
     runtimeTaskId: activeAgentTaskId ?? null,
     onRuntimeEvent: appendLiveRuntimeEvent,
+    onReplayEvents,
   });
 
   const messages = useQuery({
@@ -465,6 +485,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
           : 'Fixture replay: shared demo transcript',
     },
     transcript: surfacedTranscript,
+    agentActivity,
   };
 }
 

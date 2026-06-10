@@ -1742,6 +1742,18 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			h.GetRunDiff(w, r, runID)
 			return
 		}
+		// POST /v1/runs/{runId}/apply — apply a single hunk decision
+		if strings.HasSuffix(r.URL.Path, "/apply") && r.Method == http.MethodPost {
+			runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/apply")
+			h.PostApplyRunDiff(w, r, runID)
+			return
+		}
+		// POST /v1/runs/{runId}/apply-all — batch apply multiple hunk decisions
+		if strings.HasSuffix(r.URL.Path, "/apply-all") && r.Method == http.MethodPost {
+			runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/apply-all")
+			h.PostApplyAllRunDiffs(w, r, runID)
+			return
+		}
 		if r.Method == http.MethodGet {
 			runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
 			if run, ok := ensureStore(h).GetRun(runID); ok {

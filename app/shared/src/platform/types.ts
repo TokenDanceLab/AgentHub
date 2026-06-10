@@ -1,5 +1,6 @@
-import type { ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
+import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
 import type { EvidenceRef } from '../transcript';
+import type { AgentActivitySnapshot } from '../transcript/agentActivity';
 
 export type AgentHubSurface = 'desktop' | 'web';
 
@@ -71,6 +72,8 @@ export interface RunPort {
 
 export interface AttachmentPort {
   pickFiles(): Promise<ComposerAttachment[]>;
+  /** Upload a file to the Hub attachment store. Returns the server-side attachment ref. */
+  uploadAttachment(file: File): Promise<AttachmentRef>;
 }
 
 export interface PreviewPort {
@@ -117,4 +120,6 @@ export interface AgentHubPlatform {
   preview?: PreviewPort;
   runs: RunPort;
   settings?: SettingsPort;
+  /** Agent activity state for the streaming status bar. */
+  agentActivity?: AgentActivitySnapshot;
 }

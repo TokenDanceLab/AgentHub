@@ -777,6 +777,24 @@ export interface StartAgentTeamRunRequest {
   target_id?: string;
 }
 
+// ── Attachments ──────────────────────────────────
+
+export interface AttachmentRef {
+  id: string;
+  hash: string;
+  size: number;
+  mime_type: string;
+  original_name?: string;
+  uploader_user_id?: string;
+  metadata?: string;
+  created_at?: string;
+}
+
+export interface ProbeAttachmentResponse {
+  exists: boolean;
+  attachment?: AttachmentRef;
+}
+
 interface HubEnvelope<T> {
   code: string;
   message?: string;
@@ -884,6 +902,46 @@ export function createHubClient(opts: HubClientOptions = {}) {
     }
     const s = p.toString();
     return s ? `?${s}` : '';
+  }
+
+  /** Upload a file via multipart/form-data (does NOT set Content-Type header; browser sets it with boundary). */
+  async function uploadMultipart<T>(path: string, formData: FormData): Promise<T> {
+    const token = opts.getToken?.();
+    const headers: Record<string, string> = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+    const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: formData });
+    const body = res.status === 204 ? undefined : await readJsonBody(res);
+    if (!res.ok) {
+      if (isSharedErrorBody(body)) {
+        throw new AppError({ error: body.error }, res.status, body);
+      }
+      if (isHubEnvelope(body)) {
+        throw new AppError(
+          {
+            error: {
+              code: body.code || 'hub_error',
+              message: body.message || res.statusText || 'Hub upload failed',
+            },
+          },
+          res.status,
+          body,
+        );
+      }
+      throw new AppError(
+        {
+          error: {
+            code: res.status >= 500 ? 'internal_error' : 'bad_request',
+            message: `HTTP ${res.status}: ${res.statusText}`,
+          },
+        },
+        res.status,
+        body,
+      );
+    }
+    if (res.status === 204) return undefined as T;
+    if (isHubEnvelope<T>(body)) return body.data as T;
+    return body as T;
   }
 
   return {
@@ -1195,6 +1253,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
     listTaskRunEvents: (taskId: string) =>
       request<AgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
 
+    /** Fetch task run events with event_seq strictly after the given value (for replay gap fill). */
+    listTaskRunEventsAfter: (taskId: string, afterSeq: number) =>
+      request<AgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events${qs({ after_seq: afterSeq, limit: 500 })}`),
+
     getTaskRunEventSummary: (taskId: string) =>
       request<AgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/summary`),
 
@@ -1390,6 +1452,28 @@ export function createHubClient(opts: HubClientOptions = {}) {
         method: 'POST',
         body: JSON.stringify(resolution),
       }),
+
+    // ── Attachments ──────────────────────────────
+
+    /** Check if an attachment with the given SHA-256 hash already exists. */
+    probeAttachment: (hash: string) =>
+      request<ProbeAttachmentResponse>('/client/attachments/probe', {
+        method: 'POST',
+        body: JSON.stringify({ hash }),
+      }),
+
+    /** Upload a file as multipart/form-data. The client must compute the SHA-256 hash. */
+    uploadAttachment: (file: File, hash: string) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('hash', hash);
+      formData.append('original_name', file.name);
+      return uploadMultipart<AttachmentRef>('/client/attachments', formData);
+    },
+
+    /** Get the download URL for an attachment (relative to Hub base). */
+    downloadAttachmentUrl: (attachmentId: string) =>
+      `${base}/client/attachments/${encodeURIComponent(attachmentId)}`,
   };
 }
 

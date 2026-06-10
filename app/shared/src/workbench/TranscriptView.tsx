@@ -248,6 +248,9 @@ function renderTranscriptBlock(
       return renderFailureBlock(block);
     case 'finished':
       return renderFinishedBlock(block);
+    case 'replay_gap':
+      // eslint-disable-next-line react/jsx-no-useless-fragment
+      return React.createElement(React.Fragment);
     default:
       return assertNever(block);
   }
