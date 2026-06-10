@@ -103,6 +103,8 @@ export type {
   ToolPermission,
   RiskLevel,
   ModelState,
+  SkillMarketItem,
+  MCPMarketItem,
   ContactsPageProps,
   ContactMember,
   ContactGroup,

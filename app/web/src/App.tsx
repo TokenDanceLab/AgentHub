@@ -1,7 +1,7 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { AgentHubWorkbench } from '@shared/workbench';
-import type { AgentConfig, ProjectDraft, ProjectInfo } from '@shared/workbench';
+import type { AgentConfig, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import {
   getWorkbenchDataModeOverrideSnapshot,
   isWorkbenchRealDataMode,
@@ -65,6 +65,34 @@ function WebWorkbenchRoot() {
     ? errorMessage(agentList.error, 'Agent Profile 加载失败')
     : undefined;
   const hubClientForConversations = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+  const hubReady = !realMode ? false : Boolean(getAccessToken());
+
+  // Fetch public Skills for the Skill Market tab
+  const skillMarketQuery = useQuery({
+    queryKey: ['web-v4', 'public-skills', hubReady],
+    queryFn: () => hubClientForConversations.listPublicSkills(),
+    enabled: hubReady,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+  });
+
+  // Fetch public MCP Servers for the MCP Market tab
+  const mcpMarketQuery = useQuery({
+    queryKey: ['web-v4', 'public-mcp-servers', hubReady],
+    queryFn: () => hubClientForConversations.listPublicMCPServers(),
+    enabled: hubReady,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+  });
+
+  const skillMarketItems = useMemo<SkillMarketItem[]>(
+    () => (skillMarketQuery.data?.items ?? []).map(normalizeHubSkillToMarketItem),
+    [skillMarketQuery.data?.items],
+  );
+  const mcpMarketItems = useMemo<MCPMarketItem[]>(
+    () => (mcpMarketQuery.data?.items ?? []).map(normalizeHubMcpToMarketItem),
+    [mcpMarketQuery.data?.items],
+  );
 
   const handleNavigateToConversation = useCallback(async (target: { name: string; id: string; kind: 'dm' | 'group' }) => {
     try {
@@ -161,6 +189,10 @@ function WebWorkbenchRoot() {
         showMainchainStatus={false}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
+        skillMarketItems={skillMarketItems}
+        skillMarketLoading={hubReady && skillMarketQuery.isFetching}
+        mcpMarketItems={mcpMarketItems}
+        mcpMarketLoading={hubReady && mcpMarketQuery.isFetching}
       />
       {showAuthModal && (
         <div className={styles.authOverlay} role="presentation">
@@ -177,4 +209,37 @@ function WebWorkbenchRoot() {
 function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   return fallback;
+}
+
+function normalizeHubSkillToMarketItem(raw: Record<string, unknown>): SkillMarketItem {
+  const item: SkillMarketItem = {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    description: String(raw.description ?? ''),
+    skill_type: String(raw.skill_type ?? 'tool'),
+  };
+  if (raw.version != null) item.version = String(raw.version);
+  if (typeof raw.install_count === 'number') item.install_count = raw.install_count;
+  if (raw.is_public === true) item.is_public = true;
+  if (raw.owner_id != null) item.owner_id = String(raw.owner_id);
+  if (raw.created_at != null) item.created_at = String(raw.created_at);
+  if (raw.updated_at != null) item.updated_at = String(raw.updated_at);
+  return item;
+}
+
+function normalizeHubMcpToMarketItem(raw: Record<string, unknown>): MCPMarketItem {
+  const item: MCPMarketItem = {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    description: String(raw.description ?? ''),
+    transport: String(raw.transport ?? 'stdio'),
+  };
+  if (raw.command != null) item.command = String(raw.command);
+  if (raw.url != null) item.url = String(raw.url);
+  if (typeof raw.install_count === 'number') item.install_count = raw.install_count;
+  if (raw.is_public === true) item.is_public = true;
+  if (raw.owner_id != null) item.owner_id = String(raw.owner_id);
+  if (raw.created_at != null) item.created_at = String(raw.created_at);
+  if (raw.updated_at != null) item.updated_at = String(raw.updated_at);
+  return item;
 }

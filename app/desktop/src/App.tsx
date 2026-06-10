@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride, workbenchDemoRuntimeStore } from '@shared/demo';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
@@ -29,7 +30,8 @@ import {
   useHubAgentProfiles,
   hubAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
-import type { AgentConfig, DocRow } from '@shared/workbench';
+import { getHubClient } from '@/api/hubQueries';
+import type { AgentConfig, DocRow, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 
 export default function App() {
@@ -102,6 +104,35 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const { data: currentUser } = useCurrentUser(liveEdgeEnabled);
   const { data: documentListData } = useDocumentList(undefined, { enabled: liveEdgeEnabled });
   const createDocumentMutation = useCreateDocument();
+
+  // Fetch public Skills for the Skill Market tab
+  const hubClient = getHubClient();
+  const hubReady = !workbench.isDemo;
+  const skillMarketQuery = useQuery({
+    queryKey: ['desktop', 'public-skills', hubReady],
+    queryFn: () => hubClient.listPublicSkills(),
+    enabled: hubReady,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+  });
+
+  // Fetch public MCP Servers for the MCP Market tab
+  const mcpMarketQuery = useQuery({
+    queryKey: ['desktop', 'public-mcp-servers', hubReady],
+    queryFn: () => hubClient.listPublicMCPServers(),
+    enabled: hubReady,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+  });
+
+  const skillMarketItems = useMemo<SkillMarketItem[]>(
+    () => (skillMarketQuery.data?.items ?? []).map(normalizeHubSkillToMarketItem),
+    [skillMarketQuery.data?.items],
+  );
+  const mcpMarketItems = useMemo<MCPMarketItem[]>(
+    () => (mcpMarketQuery.data?.items ?? []).map(normalizeHubMcpToMarketItem),
+    [mcpMarketQuery.data?.items],
+  );
 
   const documents = useMemo<DocRow[] | undefined>(
     () => (liveEdgeEnabled && documentListData?.items ? documentListData.items.map(hubDocToDocRow) : undefined),
@@ -291,6 +322,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         transcript={workbench.transcript}
         userDisplayName={currentUser?.displayName}
         userAvatarUrl={currentUser?.avatarUrl}
+        skillMarketItems={skillMarketItems}
+        skillMarketLoading={hubReady && skillMarketQuery.isFetching}
+        mcpMarketItems={mcpMarketItems}
+        mcpMarketLoading={hubReady && mcpMarketQuery.isFetching}
         workbenchStatus={{
           dataMode: workbench.dataMode,
           targetState: workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',
@@ -299,4 +334,37 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
       />
     </>
   );
+}
+
+function normalizeHubSkillToMarketItem(raw: Record<string, unknown>): SkillMarketItem {
+  const item: SkillMarketItem = {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    description: String(raw.description ?? ''),
+    skill_type: String(raw.skill_type ?? 'tool'),
+  };
+  if (raw.version != null) item.version = String(raw.version);
+  if (typeof raw.install_count === 'number') item.install_count = raw.install_count;
+  if (raw.is_public === true) item.is_public = true;
+  if (raw.owner_id != null) item.owner_id = String(raw.owner_id);
+  if (raw.created_at != null) item.created_at = String(raw.created_at);
+  if (raw.updated_at != null) item.updated_at = String(raw.updated_at);
+  return item;
+}
+
+function normalizeHubMcpToMarketItem(raw: Record<string, unknown>): MCPMarketItem {
+  const item: MCPMarketItem = {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    description: String(raw.description ?? ''),
+    transport: String(raw.transport ?? 'stdio'),
+  };
+  if (raw.command != null) item.command = String(raw.command);
+  if (raw.url != null) item.url = String(raw.url);
+  if (typeof raw.install_count === 'number') item.install_count = raw.install_count;
+  if (raw.is_public === true) item.is_public = true;
+  if (raw.owner_id != null) item.owner_id = String(raw.owner_id);
+  if (raw.created_at != null) item.created_at = String(raw.created_at);
+  if (raw.updated_at != null) item.updated_at = String(raw.updated_at);
+  return item;
 }
