@@ -82,6 +82,10 @@ export interface SettingsPageProps {
   onSelectPane: (pane: SettingsPaneId) => void;
   /** Called when any setting value changes. */
   onChangeSetting: (key: string, value: string | boolean) => void;
+  /** Called when the user wants to open individual Agent configuration.
+   *  Navigates to the AgentsPage where per-agent runtime, model, system
+   *  prompt and MCP bindings can be configured. */
+  onOpenAgentConfig?: () => void;
 }
 
 export type SettingsPaneId = 'appearance' | 'notify' | 'agent' | 'local' | 'states';
@@ -571,6 +575,26 @@ function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement {
           </SettingsRow>
         ))}
       </SettingsSection>
+
+      {props.onOpenAgentConfig && (
+        <section className={styles.agentConfigLink} aria-label="Agent 配置入口">
+          <div className={styles.agentConfigLinkContent}>
+            <h3>单个 Agent 配置</h3>
+            <p>
+              为每个 Agent 单独配置运行器 (CC/Codex/OpenCode/SDK)、模型、System Prompt
+              和 MCP 绑定。
+            </p>
+          </div>
+          <button
+            className={styles.agentConfigLinkBtn}
+            type="button"
+            onClick={props.onOpenAgentConfig}
+          >
+            打开 Agent 配置
+            <DesignNavIcon name="external" size={14} />
+          </button>
+        </section>
+      )}
     </>
   );
 }

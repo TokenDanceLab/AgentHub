@@ -56,6 +56,58 @@ func (h *SessionHandler) CreatePrivate(c *gin.Context) {
 	OK(c, result)
 }
 
+// createSessionReq is the unified request body for POST /sessions.
+// It dispatches to CreatePrivate or CreateGroup based on the type field.
+type createSessionReq struct {
+	Type         string   `json:"type" binding:"required"`
+	TargetUserID string   `json:"target_user_id"`
+	Name         string   `json:"name"`
+	MemberIDs    []string `json:"member_ids"`
+}
+
+func (h *SessionHandler) Create(c *gin.Context) {
+	var req createSessionReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	switch req.Type {
+	case "private":
+		if req.TargetUserID == "" {
+			Fail(c, errcode.ErrBadRequest.WithMessage("target_user_id is required for private sessions"))
+			return
+		}
+		result, err := h.service.CreatePrivateSession(c.Request.Context(), userID, req.TargetUserID)
+		if err != nil {
+			if e, ok := err.(*errcode.Error); ok {
+				Fail(c, e)
+				return
+			}
+			Fail(c, errcode.ErrInternal)
+			return
+		}
+		OK(c, result)
+	case "group":
+		if req.Name == "" {
+			Fail(c, errcode.ErrBadRequest.WithMessage("name is required for group sessions"))
+			return
+		}
+		result, err := h.service.CreateGroupSession(c.Request.Context(), userID, req.Name, req.MemberIDs)
+		if err != nil {
+			if e, ok := err.(*errcode.Error); ok {
+				Fail(c, e)
+				return
+			}
+			Fail(c, errcode.ErrInternal)
+			return
+		}
+		OK(c, result)
+	default:
+		Fail(c, errcode.ErrBadRequest.WithMessage("type must be 'private' or 'group'"))
+	}
+}
+
 type createGroupReq struct {
 	Name      string   `json:"name" binding:"required"`
 	MemberIDs []string `json:"member_ids" binding:"required"`

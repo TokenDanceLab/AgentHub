@@ -115,6 +115,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		sessions.Use(middleware.RequireHubSession())
 		{
 			sessions.GET("", sessionHandler.List)
+			sessions.POST("", sessionHandler.Create)
 			sessions.POST("/private", sessionHandler.CreatePrivate)
 			sessions.POST("/group", sessionHandler.CreateGroup)
 			sessions.POST("/:id/members", sessionHandler.AddMembers)

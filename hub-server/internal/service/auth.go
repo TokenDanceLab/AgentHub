@@ -109,6 +109,11 @@ func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType s
 	_ = resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, blacklistKey, s.jwtCfg.RefreshTTL)
 
 	// Also revoke in the database (source of truth).
+	// Idempotent: skip when userID or deviceID is empty so that callers
+	// without a stored refresh token (e.g. manually-issued JWT) still get 200.
+	if userID == "" || deviceID == "" {
+		return nil
+	}
 	return repository.RevokeRefreshTokensByUserDevice(s.db, userID, deviceID)
 }
 
