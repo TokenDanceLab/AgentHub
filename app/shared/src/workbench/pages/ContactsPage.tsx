@@ -7,12 +7,6 @@ import {
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
   type DesignNavIconName,
 } from '../designIcons';
-import {
-  WORKBENCH_MOCK_CONTACT_SHORTCUTS,
-  WORKBENCH_MOCK_EXTERNAL_CONTACTS,
-  WORKBENCH_MOCK_PENDING_CONTACTS,
-  WORKBENCH_MOCK_SERVICE_DESKS,
-} from '../mockData';
 import { ProfilePopover } from '../floating';
 import { Select } from '../../ui';
 import styles from './ContactsPage.module.css';
@@ -759,7 +753,7 @@ export function ContactsPage({
   starredContacts,
   groups,
   serviceDesks,
-  recentShortcuts = WORKBENCH_MOCK_CONTACT_SHORTCUTS,
+  recentShortcuts = [],
   onAddContact,
   onCreateGroup,
   onNewTicket,
@@ -779,7 +773,7 @@ export function ContactsPage({
   onUpdateRemark,
 }: ContactsPageProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
-  const resolvedPending = pendingContacts ?? WORKBENCH_MOCK_PENDING_CONTACTS;
+  const resolvedPending = pendingContacts ?? [];
   const requestCount = (friendRequests?.length ?? 0) + (sentRequests?.length ?? 0);
   const navItems = NAV_ITEMS.map((item) =>
     item.id === 'new' && (resolvedPending.length > 0 || requestCount > 0)
@@ -864,7 +858,7 @@ export function ContactsPage({
           title: '外部联系人',
           subtitle: '客户、合作方和临时项目协作者，不进入 TokenDance 组织架构。',
           actionLabel: '添加外部联系人',
-          rows: externalContacts ?? WORKBENCH_MOCK_EXTERNAL_CONTACTS,
+          rows: externalContacts ?? [],
           sectionTitle: '外部联系人',
         });
 
@@ -1034,7 +1028,7 @@ export function ContactsPage({
               </button>
             </div>
             <div className={styles.serviceGrid}>
-              {(serviceDesks ?? WORKBENCH_MOCK_SERVICE_DESKS).map((desk) => (
+              {(serviceDesks ?? []).map((desk) => (
                 <ServiceCardRow
                   avatarExpanded={activeProfile?.kind === 'service' && activeProfile.id === desk.id}
                   key={desk.id}

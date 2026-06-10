@@ -44,6 +44,7 @@ var skipDirs = map[string]bool{
 	".venv": true, "venv": true, ".next": true, "dist": true,
 	"build": true, "target": true, ".idea": true, ".vscode": true,
 	".cache": true, ".tox": true, "vendor": true,
+	".fingerprint": true, ".cargo": true,
 }
 
 // ── File type classification ─────────────────────────────────────────────
@@ -116,7 +117,11 @@ func isBinaryArtifact(relPath string) bool {
 	switch ext {
 	// Compiled executables and object code
 	case ".exe", ".dll", ".so", ".dylib", ".o", ".obj", ".a", ".lib",
-		".bin", ".out":
+		".bin", ".out",
+		// Rust build artifacts
+		".pdb", ".rlib", ".rmeta", ".d", ".pdb.gz",
+		// Go build artifacts
+		".test":
 		return true
 	// Database files
 	case ".db", ".sqlite", ".sqlite3", ".mdb":

@@ -60,7 +60,7 @@ export function GlobalRail({
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
 
-  const displayName = userDisplayName ?? 'Delicious233';
+  const displayName = userDisplayName ?? '用户';
   const displayInitial = displayName.slice(0, 1).toUpperCase();
 
   // Use controlled props when provided, otherwise fall back to internal state.
