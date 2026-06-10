@@ -20,6 +20,7 @@ import { RouteDecisionBlock, STATUS_LABELS } from './RouteDecisionBlock';
 import { ContextUsageBlock } from './ContextUsageBlock';
 import { AgentTimeline } from './AgentTimeline';
 import { RunStepGroup } from './RunStepGroup';
+import { URLPreviewCard } from './URLPreviewCard';
 
 export {
   AgentMessage,
@@ -42,6 +43,7 @@ export {
   ContextUsageBlock,
   AgentTimeline,
   RunStepGroup,
+  URLPreviewCard,
 };
 
 /* ── Prop types ── */
@@ -64,3 +66,4 @@ export type RouteDecisionBlockProps = ComponentProps<typeof RouteDecisionBlock>;
 export type ContextUsageBlockProps = ComponentProps<typeof ContextUsageBlock>;
 export type AgentTimelineProps = ComponentProps<typeof AgentTimeline>;
 export type RunStepGroupProps = ComponentProps<typeof RunStepGroup>;
+export type URLPreviewCardProps = ComponentProps<typeof URLPreviewCard>;
