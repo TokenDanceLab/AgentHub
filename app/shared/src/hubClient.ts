@@ -206,6 +206,17 @@ export interface HubReplyToInfo {
   created_at: string;
 }
 
+export interface HubMessageAttachment {
+  id: string;
+  hash: string;
+  size: number;
+  mime_type: string;
+  original_name?: string;
+  uploader_user_id?: string;
+  metadata?: string;
+  created_at?: string;
+}
+
 export interface HubMessage {
   id: string;
   session_id: string;
@@ -218,6 +229,7 @@ export interface HubMessage {
   reply_to_message_id?: string;
   reply_to?: HubReplyToInfo;
   recalled?: boolean;
+  attachments?: HubMessageAttachment[];
   created_at?: string;
 }
 

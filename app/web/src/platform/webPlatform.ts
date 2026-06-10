@@ -214,13 +214,13 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         return {
           id: ref.id,
           name: ref.original_name || file.name,
-          original_name: ref.original_name,
+          ...(ref.original_name ? { original_name: ref.original_name } : {}),
           size: ref.size,
           mime_type: ref.mime_type,
-          hash: ref.hash,
+          ...(ref.hash ? { hash: ref.hash } : {}),
           url: client.downloadAttachmentUrl(ref.id),
-          metadata: ref.metadata,
-          created_at: ref.created_at,
+          ...(ref.metadata ? { metadata: ref.metadata } : {}),
+          ...(ref.created_at ? { created_at: ref.created_at } : {}),
         };
       },
     },
@@ -270,13 +270,13 @@ async function uploadPendingAttachments(intent: ComposerIntent): Promise<Compose
         attachmentRef: {
           id: ref.id,
           name: ref.original_name || attachment.name,
-          original_name: ref.original_name,
+          ...(ref.original_name ? { original_name: ref.original_name } : {}),
           size: ref.size,
           mime_type: ref.mime_type,
-          hash: ref.hash,
+          ...(ref.hash ? { hash: ref.hash } : {}),
           url: hubAttachments.downloadAttachmentUrl(ref.id),
-          metadata: ref.metadata,
-          created_at: ref.created_at,
+          ...(ref.metadata ? { metadata: ref.metadata } : {}),
+          ...(ref.created_at ? { created_at: ref.created_at } : {}),
         },
       };
     } catch {
@@ -400,7 +400,7 @@ export function optimisticHubMessageFromIntent(
     content_type: contentType,
     content: buildHubComposerPrompt(intent),
     created_at: createdAt,
-    ...(intent.replyTo ? { reply_to: { id: intent.replyTo.messageId, sender_id: intent.replyTo.author } } : {}),
+    ...(intent.replyTo ? { reply_to: { id: intent.replyTo.messageId, sender_id: intent.replyTo.author, content_type: 'text' } } : {}),
   };
 }
 

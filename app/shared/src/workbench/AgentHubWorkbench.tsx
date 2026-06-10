@@ -30,7 +30,7 @@ import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
-import { UnifiedComposer } from './UnifiedComposer';
+import { UnifiedComposer, type AttachmentUploadState } from './UnifiedComposer';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import { WorkspaceHeader } from './WorkspaceHeader';
@@ -308,6 +308,7 @@ export function AgentHubWorkbench({
     currentConversationId,
     createInitialComposerState,
   );
+  const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
   const composerSubmitBehavior = useComposerSubmitBehavior();
   const evidence = collectTranscriptEvidence(transcript);
   const mainchainSummary = buildMainchainSummary({
@@ -541,14 +542,48 @@ export function AgentHubWorkbench({
 
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
     try {
+      let enrichedAttachments = composer.attachments;
+      const pendingAttachments = composer.attachments.filter((a) => !a.attachmentRef && a.file);
+      if (pendingAttachments.length > 0 && platform.attachments?.uploadAttachment) {
+        const uploadPort = platform.attachments;
+        for (const attachment of pendingAttachments) {
+          if (!attachment.file) continue;
+          try {
+            setUploadProgresses((prev) => ({
+              ...prev,
+              [attachment.id]: { percent: 5, phase: 'hashing' },
+            }));
+            const ref = await uploadPort.uploadAttachment(attachment.file);
+            setUploadProgresses((prev) => ({
+              ...prev,
+              [attachment.id]: { percent: 100, phase: 'done' },
+            }));
+            enrichedAttachments = enrichedAttachments.map((a) =>
+              a.id === attachment.id ? { ...a, attachmentRef: ref } : a,
+            );
+          } catch {
+            setUploadProgresses((prev) => {
+              const next = { ...prev };
+              delete next[attachment.id];
+              return next;
+            });
+          }
+        }
+      }
+
       const intent = buildComposerIntent(composer);
+      const finalIntent = enrichedAttachments.length > 0
+        ? { ...intent, attachments: enrichedAttachments }
+        : intent;
       await platform.runs.submitComposerIntent({
-        ...intent,
+        ...finalIntent,
         ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}),
       });
       dispatchComposer({ type: 'resetAfterSubmit' });
+      setUploadProgresses({});
     } catch {
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
+      setUploadProgresses({});
     }
   }
 
@@ -1358,6 +1393,7 @@ export function AgentHubWorkbench({
                 status={showComposerStatus ? workbenchStatus : undefined}
                 submitBehavior={composerSubmitBehavior}
                 targetLabel={activeConversation?.title ?? 'AgentHub'}
+                uploadProgresses={uploadProgresses}
               />
             )}
           </>
