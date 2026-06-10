@@ -15,7 +15,7 @@ export { SkeletonLine, SkeletonBlock, SkeletonCircle } from './Skeleton';
 export { default as Modal } from './Modal';
 // export type { ModalProps } from './Modal';
 export { DiffReviewPanel } from './DiffReviewPanel';
-export type { DiffReviewFile, DiffReviewLabels, DiffReviewPanelProps } from './DiffReviewPanel';
+export type { DiffReviewFile, DiffReviewLabels, DiffHunkDecision, DiffReviewPanelProps } from './DiffReviewPanel';
 export { TextShimmer } from './TextShimmer';
 export { Select } from './Select';
 export type { SelectProps } from './Select';
