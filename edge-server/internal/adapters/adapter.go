@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -89,6 +90,21 @@ type SubAgentTask struct {
 	// Budget carries the context budget from the parent orchestrator to the
 	// child sub-agent. When nil, the sub-agent runs without budget tracking.
 	Budget *runnerctx.ContextBudget `json:"-"`
+
+	// SiblingAgents carries information about other sub-agents dispatched in
+	// the same parallel batch. Each sub-agent receives this context so it can
+	// avoid modifying files that other agents are working on. This prevents
+	// file conflicts when multiple agents run concurrently in the same workspace.
+	SiblingAgents []SiblingInfo `json:"siblingAgents,omitempty"`
+}
+
+// SiblingInfo describes a sibling sub-agent for parallel coordination.
+// When multiple sub-agents are dispatched together, each receives a list
+// of its siblings so it can avoid modifying overlapping files.
+type SiblingInfo struct {
+	AgentName   string   `json:"agentName"`          // display name or adapter ID
+	TaskDesc    string   `json:"taskDesc"`            // human-readable task description
+	TargetFiles []string `json:"targetFiles,omitempty"` // files this agent is expected to modify
 }
 
 // SubAgentSpawner is implemented by the lifecycle layer to create new runs for
@@ -97,6 +113,42 @@ type SubAgentTask struct {
 // This enables the AgentTree pattern from Codex CLI.
 type SubAgentSpawner interface {
 	SpawnSubAgent(run store.Run, task SubAgentTask) (agentInstanceID string, runID string, err error)
+}
+
+// BuildSiblingContextPrompt generates a human-readable prompt section that informs
+// a sub-agent about its sibling agents working in parallel. Returns empty string
+// when there are no siblings. The prompt warns the agent not to modify files that
+// other agents are touching.
+func BuildSiblingContextPrompt(siblings []SiblingInfo) string {
+	if len(siblings) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("[同级 Agent 上下文]\n")
+	b.WriteString("你正在与其他 Agent 并行工作。以下是你的同级 Agent 及其任务：\n\n")
+
+	for i, sib := range siblings {
+		fmt.Fprintf(&b, "- Agent %d (%s): %s", i+1, sib.AgentName, sib.TaskDesc)
+		if len(sib.TargetFiles) > 0 {
+			b.WriteString(" (")
+			for j, f := range sib.TargetFiles {
+				if j > 0 {
+					b.WriteString(", ")
+				}
+				b.WriteString(f)
+			}
+			b.WriteString(")")
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n注意：\n")
+	b.WriteString("- 不要修改其他 Agent 正在处理的文件\n")
+	b.WriteString("- 如果需要在共享文件上工作，先完成你的改动，不要等待\n")
+	b.WriteString("- 如果两个 Agent 修改同一个文件，最后写入的会覆盖\n")
+
+	return b.String()
 }
 
 // --- Unified event types emitted by all adapters ---
