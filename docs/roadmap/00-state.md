@@ -33,6 +33,13 @@
 
 | 缺口 | 影响 | 阻塞位置 | 路线图覆盖 |
 |---|---|---|---|
+| **失败降级** | Orchestrator 子任务失败后无恢复机制 | 管线 | [06 Orchestrator #1](06-orchestrator-enhancement.md) |
+| **代码冲突处理** | 多 Agent 并行写同文件时冲突 | 管线 | [06 Orchestrator #2](06-orchestrator-enhancement.md) |
+| **Plan 确认门** | 无用户审批 plan 直接执行 | 管线 | [06 Orchestrator #3](06-orchestrator-enhancement.md) |
+| **消息引用/回复/重新生成** | IM 消息操作不完整 | UI（Composer 边界） | [07 bytedance 对照](07-bytedance-gaps.md) #1 |
+| **AI_COLLABORATION.md** | 缺 30% 考核维度的关键交付物 | 文档 | [07 bytedance 对照](07-bytedance-gaps.md) #6 |
+| **对话式创建 Agent** | 比赛明确要求"对话式创建" | UI（新聊天流） | [07 bytedance 对照](07-bytedance-gaps.md) #3 |
+| 图片/文件附件在聊天中 | IM 不能发图片/文件 | UI + 管线 | [07 bytedance 对照](07-bytedance-gaps.md) #2 |
 | 消息搜索点击导航 | 搜索结果无法跳转原始消息 | UI 层 | [02 轻 UI](02-light-ui.md) #2 |
 | 进入会话后未读清零 | 需手动清除 | UI 时序 | [02 轻 UI](02-light-ui.md) #3 |
 | WS 断线重连事件不丢 | 重连后可能遗漏事件 | UI + 管线 | [01 管线](01-pipeline.md) #3 |
