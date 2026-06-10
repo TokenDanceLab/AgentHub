@@ -1309,6 +1309,19 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		SessionID: threadID, // always set to child's own thread
 	}
 
+	// Inject AgentHub memory into the sub-agent run so it has persistent context.
+	// Mirror the same logic as the PostRuns handler in api/handlers.go.
+	// The parent's workDir is looked up from the executor's tracking map.
+	e.mu.Lock()
+	parentWorkDir := e.workDirs[parentRun.ID]
+	e.mu.Unlock()
+	if parentWorkDir != "" {
+		runCtx.WorkDir = parentWorkDir
+		if memPrompt := runnerctx.BuildMemoryPrompt(parentWorkDir, threadID, task.AgentID); memPrompt != "" {
+			runCtx.SkillsPrompt = memPrompt
+		}
+	}
+
 	// Store the run-to-agent mapping so result aggregation can find the agent later.
 	e.mu.Lock()
 	e.runToAgent[runID] = agentInstanceID

@@ -21,6 +21,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/ccswitch"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -61,6 +62,14 @@ type Handler struct {
 	// MCPConfigStore holds Hub-synced MCP server configs for injection into runs.
 	// When non-nil, run creation merges Hub-synced configs into the run's MCPConfig.
 	MCPConfigStore *adapters.MCPConfigStore
+
+	// CCSwitchStatus holds the detected cc-switch installation status.
+	// nil means cc-switch was not found on this machine.
+	CCSwitchStatus *ccswitch.CCSwitchStatus
+
+	// CCSwitchReader reads cc-switch database for model alias resolution.
+	// nil means cc-switch is not installed or database is not readable.
+	CCSwitchReader *ccswitch.Reader
 
 	runCreateMu               sync.Mutex
 	permissionRegistryMu      sync.Mutex
@@ -1168,6 +1177,12 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		// Inject AgentHub memory from .agenthub/memory/ files into the system prompt.
 		// Memory is read from the workspace directory and prepended to SkillsPrompt
 		// so agents have persistent context across runs.
+		// Ensure the memory directory exists on first use (seeds project.md if new).
+		if req.WorkDir != "" {
+			if err := runnerctx.EnsureMemoryDir(req.WorkDir); err != nil {
+				slog.Warn("memory: failed to ensure memory directory", "workDir", req.WorkDir, "err", err)
+			}
+		}
 		if memPrompt := runnerctx.BuildMemoryPrompt(req.WorkDir, req.ThreadID, req.AgentID); memPrompt != "" {
 			if runCtx.SkillsPrompt != "" {
 				runCtx.SkillsPrompt = memPrompt + "\n\n" + runCtx.SkillsPrompt
@@ -1653,6 +1668,54 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 }
 
 // ---------------------------------------------------------------------------
+// GET /v1/ccswitch/status
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetCCSwitchStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+	if h.CCSwitchStatus == nil {
+		writeSuccess(w, http.StatusOK, map[string]any{
+			"installed":     false,
+			"routingActive": false,
+		})
+		return
+	}
+	writeSuccess(w, http.StatusOK, h.CCSwitchStatus)
+}
+
+// ---------------------------------------------------------------------------
+// GET /v1/ccswitch/providers
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetCCSwitchProviders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		return
+	}
+	if h.CCSwitchReader == nil {
+		writeSuccess(w, http.StatusOK, listResponse([]any{}))
+		return
+	}
+
+	appType := r.URL.Query().Get("appType")
+	if appType == "" {
+		appType = "claude" // default to claude app type
+	}
+
+	providers, err := h.CCSwitchReader.ReadProviders(appType)
+	if err != nil {
+		slog.Warn("cc-switch: failed to read providers", "err", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to read cc-switch providers")))
+		return
+	}
+
+	writeSuccess(w, http.StatusOK, listResponse(providers))
+}
+
+// ---------------------------------------------------------------------------
 // RegisterRoutes registers all routes on the given mux.
 // ---------------------------------------------------------------------------
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -1907,4 +1970,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 		}
 	})
+	// cc-switch integration
+	mux.HandleFunc("/v1/ccswitch/status", h.GetCCSwitchStatus)
+	mux.HandleFunc("/v1/ccswitch/providers", h.GetCCSwitchProviders)
 }

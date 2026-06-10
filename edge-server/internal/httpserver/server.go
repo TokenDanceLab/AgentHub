@@ -18,6 +18,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
+	"github.com/agenthub/edge-server/internal/ccswitch"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
@@ -312,6 +313,26 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		SkillRegistry:      skillReg,
 		MCPConfigStore:     cfg.MCPConfigStore,
 	}
+
+	// Detect cc-switch and wire into handler for API endpoints and model
+	// catalog enrichment. Non-fatal: missing cc-switch is normal.
+	ccStatus := ccswitch.Detect()
+	if ccStatus.Installed {
+		ccReader := ccswitch.NewReader()
+		h.CCSwitchStatus = &ccStatus
+		h.CCSwitchReader = ccReader
+		if ccStatus.RoutingActive {
+			slog.Info("cc-switch detected and routing is active",
+				"db", ccStatus.DBPath,
+				"port", ccStatus.ProxyPort,
+				"appTypes", ccStatus.ActiveAppTypes)
+		} else {
+			slog.Info("cc-switch detected but routing is inactive", "db", ccStatus.DBPath)
+		}
+	} else {
+		slog.Debug("cc-switch not detected")
+	}
+
 	// Validate security-critical configuration at startup.
 	// An empty workspace allowlist means all non-empty workDir values
 	// will be rejected (fail-closed).  Warn the operator so they are
