@@ -24,6 +24,7 @@ const mentionedComposer: ComposerState = {
   approvalMode: 'suggest',
   workDir: '',
   submitState: 'idle',
+  replyTo: null,
 };
 
 describe('UnifiedComposer execution target selection', () => {
