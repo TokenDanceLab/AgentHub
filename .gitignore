@@ -33,6 +33,7 @@ app/desktop/app/
 coverage/
 playwright-report/
 test-results/
+tests/results/
 **/coverage.out
 **/coverage.html
 **/coverage
