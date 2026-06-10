@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-10 17:30 +08:00
-当前 dev HEAD：`a8555bbe` (`dev/delicious233`)
+最后更新：2026-06-10 23:00 +08:00
+当前 dev HEAD：`9f8ae16e` (`dev/delicious233`)
 Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 ## Roadmap 最终状态
@@ -33,13 +33,13 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious233` HEAD `a8555bbe`，从 `origin/master` 创建，已合入 Mobile RN release-gates 增量；本地 HEAD 当前领先 `origin/master`。 |
+| 当前集成 dev | `dev/delicious233` HEAD `9f8ae16e`，从 `origin/master` 创建，已合入 Mobile RN release-gates 增量 + 2026-06-10 晚间 cc-switch/memory/market/SDK 全链路打通；本地 HEAD 当前领先 `origin/master`。 |
 | 上一条 dev | `origin/dev/delicious233 = fc0f0628` 已通过 PR #297 合入 `origin/master`，不再作为本轮新增事实源。 |
 | RC tag | `v0.3.0-rc.6 = fa6cd35e`，是已存在的历史 RC 基线，不移动、不重打。下一版候选使用 `0.3.0-rc.7` / `v0.3.0-rc.7`。 |
 | master | `origin/master = b7e9c1a4 Merge pull request #297 from TokenDanceLab/dev/delicious233`，是当前可信基线。 |
 | 当前工作树 | `D:\Code\TokenDance\AgentHub\.worktrees\r7`，分支 `dev/release-0.3.0-rc7`。 |
 | 主工作树 | `D:\Code\TokenDance\AgentHub` 仍保留为历史现场，分支 `dev/delicious233` 且 dirty；不作为事实源。 |
-| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/right-panel-enhancement-design.md` 写右侧面板设计规范。 |
+| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/right-panel-enhancement-design.md` 写右侧面板设计规范；`docs/roadmap/` 写模块化路线图（6 个文件）。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
 
 ## 已合入能力
@@ -158,6 +158,62 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - `docs/architecture.md`：新增 9.1 节（运行时适配器）、9.2 节（数据流模式）、9.3 节（WebSocket 事件）、10 节（Hub Server 路由表）、15 节（部署架构）、5 节补充（平台类型、前端 hooks 清单、数据模式）
 - `STATE.md`：更新所有成就
 
+### 2026-06-10 晚间合入（cc-switch / Memory / Market / SDK / UI）
+
+**cc-switch Edge 集成**：
+- Edge 读取 `cc-switch.db`（SQLite），检测代理是否 active，暴露模型别名映射
+- 别名路由：`opus` → `deepseek-v4-pro`，`sonnet` → `glm-5.1`（通过 cc-switch 代理层透明转发）
+- `GET /v1/ccswitch/status` 端点：返回代理状态、活跃 provider、路由表
+- `GET /v1/ccswitch/providers` 端点：返回所有可用 provider 及其健康状态
+- cc-switch 检测为 active，路由运行在 `127.0.0.1:15721`
+
+**AgentMemory 管道**：
+- Edge 启动时自动读取 `.agenthub/memory/*.md` 文件并注入 agent 运行上下文
+- `GET /v1/memory` 端点：列出当前 agent 的所有 memory 条目
+- `POST /v1/memory` 端点：创建/更新 memory 条目
+- Memory 正则兼容 RE2 引擎（Edge 环境）
+
+**SDK 适配器 E2E 验证**：
+- `AnthropicSDKAdapter`：`available=true`，通过 `https://api.vectorcontrol.tech/v1` 代理 E2E 测试通过
+- `OpenAISDKAdapter`：`available=true`，通过 `https://api.vectorcontrol.tech/v1` 代理 E2E 测试通过
+- SDK adapter base URL 去重 `/v1` 后缀、`RunProcessContext` 无条件注入
+- API key 配置在 `~/.config/local-secrets/`（已 gitignore）
+
+**右侧面板 14 项增强（全部合入）**：
+- `AgentStreamingBar`：实时 Agent 运行状态条（Overview tab）
+- `DagTree`：AgentTeam 任务依赖树（Overview tab）
+- `ContextUsage`：上下文使用量嵌入（Overview tab）
+- `SlideshowPreview`：PPT/PPTX 预览（Files tab）
+- `TablePreview`：Excel/CSV 预览（Files tab）
+- `DocxPreview`：DOCX 预览（Files tab）
+- `FilePreviewRouter`：统一文件预览路由（Files tab）
+- Deploy preview 自动切换（Browser tab）
+- `contextBlocks` / `routeBlocks` / `deployPreviewUrl` 数据管道已接入 RightInspector
+- Skill/MCP Market 数据在 WorkbenchRoutes 中可用
+
+**Skill Market + MCP Market UI**：
+- Skill Market 子页面：在 Agent Config 中展示可用 skill 列表，支持搜索和安装
+- MCP Market 子页面：在 Agent Config 中展示可用 MCP server 列表，支持搜索和安装
+- Market seed migration：8 个 skill + 6 个 MCP server 初始数据
+- Tauri cargo build 修复和依赖清理
+
+**Mobile hubClient 全面对齐**：
+- `hubClient` 扩展至 30+ 方法，覆盖 Hub API 全部合同
+- Platform adapter 实现，支持 iOS/Android/Web 三平台
+- 3 种数据模式：online（直连 Hub）、offline（本地缓存）、demo（fixture）
+
+**Hub 安全与性能**：
+- WebSocket rate limiting：防止消息洪泛
+- N+1 查询修复：多个列表端点的数据库查询优化
+- Slow query log：慢查询自动记录，便于性能调优
+
+**前端数据管道审计**：
+- 6 个数据管道缺口识别并修复（contextBlocks、routeBlocks、deployPreviewUrl、market 数据、inspector 数据、workbench routes）
+
+**Roadmap 体系化拆分**：
+- `docs/roadmap.md` 拆分为 `docs/roadmap/` 目录（6 个模块化文件）
+- 模块：管线、轻UI、右侧栏、竞品、ReleaseGate、长期路线
+
 ## 当前不声明已经完成
 
 - 真实 Web/Mobile/IM 全部远控闭环的发布级验收。
@@ -166,7 +222,7 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 - 签名安装器、macOS notarization、release upload、updater metadata — **发布阻断项**。
 - 生产部署、公开发布。
 - Codex CLI 真实执行（缺 `OPENAI_API_KEY`）。
-- Anthropic SDK / OpenAI SDK 的真实 API key 消耗（适配器已实现，key 未配置）。
+- Anthropic SDK / OpenAI SDK 的真实模型消耗——适配器已 E2E 验证（通过 vectorcontrol.tech 代理），但面向最终用户的真实 API key 管理闭环未完成。
 
 ## 当前并发线
 
@@ -176,9 +232,9 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 | Hub approval/artifact/diff | 最新 dev 已合入单任务 approval/artifact 合同、diff metadata、approval context gate、编排路由审计队列字段 | apply/revert 写文件、TeamRun/单任务完全统一和 production 权限 gate 继续推进。 |
 | Desktop/Local Edge | 最新 dev 已合入 diagnostics、sidecar observed/binary/package smoke、exact target bridge、Builder fixture UI、**auth token 管道、Hub WS 实时缓存失效、chatActions、Agent profile 融合** | 真实签名包、真实 sidecar binary 发布和跨平台安装仍需审批与平台 gate。 |
 | Windows/Tauri packaging | Unsigned dry gate 已通过；NSIS installer + portable zip hash manifest 已产出 | **发布阻塞：签名证书**。macOS 仍是 future unsigned dry policy。 |
-| Edge/CLI/SDK/SQLite | 最新 dev 已合入 **Claude Code + OpenCode 真实 CLI 执行**、**Anthropic SDK + OpenAI SDK HTTP 适配器**、PreflightAdapter 接口 | Codex 阻塞于 `OPENAI_API_KEY`；SDK 阻塞于 API key。 |
+| Edge/CLI/SDK/SQLite | 最新 dev 已合入 **Claude Code + OpenCode 真实 CLI 执行**、**Anthropic SDK + OpenAI SDK HTTP 适配器（E2E verified via vectorcontrol.tech proxy）**、PreflightAdapter 接口、**cc-switch Edge 集成（模型别名路由）**、**AgentMemory 管道** | Codex 阻塞于 `OPENAI_API_KEY`；面向最终用户的 API key 管理闭环未完成。 |
 | Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、**`verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**、**@Agent 真实 Claude Code 执行端到端验证** | WS ws 模块路径待修复。 |
-| Mobile | 已合入 rc7 集成线，**hubClient/hubEvents/hubLifecycle 对齐 Hub API**，**91 tests PASS** | Android APK 未产出。 |
+| Mobile | 已合入 rc7 集成线，**hubClient 30+ 方法全面对齐 Hub API**，**platform adapter + 3 数据模式**，**91 tests PASS** | Android APK 未产出。 |
 
 ## 分支治理
 
@@ -215,26 +271,44 @@ Release tag：`v0.3.0-rc.8`（unsigned pre-release candidate）
 5. **E2E Smoke 全过** ✅ — `verify-real-api-smoke.ps1` ALL 13 PHASES PASSED。
 6. **Mobile / i18n / Desktop package** ✅ — 91 tests, zh/en 各 2169 keys, Tauri unsigned dry gate.
 
-### P1 UI — 右侧检视面板增强（8 项进行中）
+### P1 UI — 右侧检视面板增强（8 项 ✅ 全部完成）
 
 基于 `docs/right-panel-enhancement-design.md`，8 个 P0 任务增强 `RightInspector`（overview / browser / files）：
 
-1. ⏳ `AgentStreamingBar` — 实时 Agent 运行状态条（Overview tab，~30 行 TSX）
-2. ⏳ PDF/图片/HTML/MD/Code 预览 — Files tab 原生渲染
-3. ⏳ `SlideshowPreview` — PPT/PPTX 预览（Files tab，pptxjs 依赖）
-4. ⏳ `TablePreview` — Excel/CSV 预览（Files tab，xlsx 依赖）
-5. ⏳ `DocxPreview` — DOCX 预览（Files tab，mammoth 依赖）
-6. ⏳ `DagTree` — AgentTeam 任务依赖树（Overview tab，~40 行 TSX）
-7. ⏳ `ContextUsage` 嵌入 — 嵌入 Overview tab（组件已存在，1 行声明）
-8. ⏳ Deploy preview 自动切换 — Browser tab（已有 iframe + URL 检测）
+1. ✅ `AgentStreamingBar` — 实时 Agent 运行状态条（Overview tab）
+2. ✅ PDF/图片/HTML/MD/Code 预览 — Files tab 原生渲染（`FilePreviewRouter`）
+3. ✅ `SlideshowPreview` — PPT/PPTX 预览（Files tab）
+4. ✅ `TablePreview` — Excel/CSV 预览（Files tab）
+5. ✅ `DocxPreview` — DOCX 预览（Files tab）
+6. ✅ `DagTree` — AgentTeam 任务依赖树（Overview tab）
+7. ✅ `ContextUsage` 嵌入 — 嵌入 Overview tab
+8. ✅ Deploy preview 自动切换 — Browser tab
 
 ### P2 常规事项
 
 1. **Codex CLI 真实执行**：适配器已实现但不阻塞——需要 `OPENAI_API_KEY`。
-2. **真实 SDK 消耗**：Anthropic/OpenAI SDK 适配器已实现但不阻塞——需要 API key。
-3. **完整的 @Agent WS 端到端**：通过 Hub WS 验证 Edge run 事件端到端到达 transcript。
-4. **Tauri 签名发布**：获取签名证书是进入生产的关键路径安全阻塞项。
-5. **完成 release governance**：changelog + gate + rollback 文档。
+2. **SDK API key 管理闭环**：Anthropic/OpenAI SDK 适配器已 E2E 验证（vectorcontrol.tech proxy），面向最终用户的 key 管理和轮换闭环待完成。
+3. **cc-switch 生产集成**：Edge cc-switch 集成已工作，生产环境路由稳定性和 failover 策略待验证。
+4. **完整的 @Agent WS 端到端**：通过 Hub WS 验证 Edge run 事件端到端到达 transcript。
+5. **Tauri 签名发布**：获取签名证书是进入生产的关键路径安全阻塞项。
+6. **完成 release governance**：changelog + gate + rollback 文档。
+
+### 会话统计（2026-06-10 晚间）
+
+- 16 次提交（`93648a4a..9f8ae16e`）
+- 162 文件变更，17,000+ 行插入
+- 30+ subagent 部署
+- 10 份审计报告产出（feature reality check、preview components、cc-switch DB schema、AgentMemory design、roadmap restructuring 等）
+
+## 基础设施状态
+
+| 组件 | 当前事实 |
+|---|---|
+| Edge 适配器 | Claude Code + Codex + OpenCode + Anthropic SDK + OpenAI SDK + Orchestrator（6 个适配器，SDK `available=true`） |
+| Hub | `:8080`，PostgreSQL + Redis，49 个 migration |
+| cc-switch | 检测到 active，路由运行在 `127.0.0.1:15721`，Edge 已集成 |
+| API key | 配置在 `~/.config/local-secrets/`（已 gitignore） |
+| Base URL | `https://api.vectorcontrol.tech/v1`（Anthropic + OpenAI 格式均可用） |
 
 ## 安全规则
 
