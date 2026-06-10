@@ -5,7 +5,7 @@ AgentHub 是一个面向 AI Agent 团队协作的开源工作台。它把 Web、
 [English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [路线图](docs/roadmap.md) · [API](api/)
 
 ![status](https://img.shields.io/badge/status-active_development-blue?style=flat-square)
-![version](https://img.shields.io/badge/version-0.3.0--rc.7-orange?style=flat-square)
+![version](https://img.shields.io/badge/version-0.3.0--rc.8-orange?style=flat-square)
 ![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
 ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
 ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
@@ -34,7 +34,7 @@ AgentHub 是一个面向 AI Agent 团队协作的开源工作台。它把 Web、
 
 ## 当前状态
 
-AgentHub 正在进入 `v0.3.0-rc.7` 候选阶段。当前集成线是 `dev/release-0.3.0-rc7`：先吸收已确认的 Mobile RN 增量和 release gate 修复，再合入 `master`，然后生成 Windows Desktop 与 Android 预览证据。
+AgentHub 正在进入 `v0.3.0-rc.8` 候选阶段。当前开发分支是 `dev/delicious233`：先吸收已确认的 Mobile RN 增量和 release gate 修复，再合入 `master`，然后生成 Windows Desktop 与 Android 预览证据。
 
 | 模块 | 状态 | 说明 |
 |---|---|---|
@@ -68,7 +68,7 @@ corepack pnpm install --dir app --frozen-lockfile
 ```powershell
 cd hub-server
 go test ./... -short
-go run ./cmd/agenthub-hub
+go run ./cmd/server-hub
 ```
 
 ### 启动 Web
@@ -149,10 +149,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-p0-ap
 
 ## 发布节奏
 
-1. `dev/release-0.3.0-rc7` 先达到完整绿色 CI 和 release gate。
+1. `dev/delicious233` 先达到完整绿色 CI 和 release gate。
 2. 清理或关闭已过时的 PR、分支与 worktree。
-3. 新建 `dev/release-0.3.0-rc7 -> master` promote PR。
-4. 合入 `master` 后打 `v0.3.0-rc.7` tag。
+3. 新建 `dev/delicious233 -> master` promote PR。
+4. 合入 `master` 后打 `v0.3.0-rc.8` tag。
 5. 生成 Windows Desktop 和 Android 预览证据；签名、公证、商店发布另走批准。
 
 ## 文档

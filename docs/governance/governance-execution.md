@@ -1,13 +1,12 @@
 # AgentHub Governance Execution
 
-最后更新：2026-06-02
+最后更新：2026-06-10
 
 This file maps TokenDance system governance into AgentHub execution items. AgentHub is the multi-agent collaboration platform; it is a relying party of TokenDance ID and owns Hub, Edge, Desktop, Web, and Mobile clients.
 
 ## Root Inputs
 
 - `..\..\docs\ecosystem\ecosystem-execution-queue.md`
-- `..\..\docs\governance\scorecard-evidence.md`
 - `..\..\docs\identity\identity-auth.md`
 - `..\..\docs\identity\authorization-model.md`
 - `..\..\docs\identity\feishu-integration.md`
@@ -32,7 +31,7 @@ This file maps TokenDance system governance into AgentHub execution items. Agent
 
 1. Every login, OIDC, session, Feishu, authorization, or multi-client issue should reference the relevant root queue ID.
 2. Hub-issued sessions are the product-local authority; TokenDance ID only proves identity.
-3. Desktop and Mobile are independent Tauri projects (distinct `src-tauri/`, separate ports 5173/5174).
+3. Desktop is a Tauri project; Mobile is an Expo/React Native project. They share the same Hub auth boundary but are distinct codebases.
 4. Edge Server is local-only; it connects to Hub for task dispatch and SSO identity.
 5. Web client is Hub-only (no local Edge loopback); no direct third-party provider login.
 6. Production deployment and ops evidence remains in server workspace; do not copy host/path/secret into this repo.
