@@ -601,7 +601,27 @@ func (s *Server) toolSendMessage(args json.RawMessage) (json.RawMessage, error) 
 	}
 
 	itemID := generateID("item_")
-	item, err := s.store.CreateThreadMessage(itemID, params.ThreadID, role, params.Content)
+
+	// For user messages, look up the current user profile to set sender info.
+	var senderID, senderName string
+	if role == "user" {
+		if profile, ok := s.store.GetCurrentUser(); ok {
+			senderID = profile.ID
+			senderName = profile.DisplayName
+		}
+	}
+
+	item, err := s.store.CreateItem(store.Item{
+		ID:         itemID,
+		ProjectID:  thread.ProjectID,
+		ThreadID:   params.ThreadID,
+		Type:       "user_message",
+		Role:       role,
+		Status:     "created",
+		Content:    params.Content,
+		SenderID:   senderID,
+		SenderName: senderName,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create message: %w", err)
 	}

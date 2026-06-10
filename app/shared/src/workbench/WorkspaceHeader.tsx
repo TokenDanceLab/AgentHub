@@ -58,11 +58,6 @@ export function WorkspaceHeader({
           {hasModel ? (
             <span className={styles.workspaceModel}>{activeConversation!.model}</span>
           ) : null}
-          {dataModeValue !== 'auto' && (
-            <span className={styles.workspaceDataMode} title={`数据模式: ${dataModeValue}`}>
-              {dataModeValue}
-            </span>
-          )}
         </div>
 
         <div aria-label="Workspace tabs" className={styles.workspaceTabs} role="tablist">
