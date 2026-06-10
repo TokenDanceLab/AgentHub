@@ -9,7 +9,7 @@ import type { WorkbenchConversation } from '@shared/platform';
 import { useAgentList } from '@/api/agentQueries';
 import { useDecideTeamApproval } from '@/api/agentTeamQueries';
 import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
-import { useModelCatalog } from '@/api/modelCatalogQueries';
+import { useModelCatalog, useCCSwitchStatus, useCCSwitchProviders } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun } from '@/api/runQueries';
 import { useCreateThread, useCurrentUser, useThreads } from '@/api/threadQueries';
@@ -89,6 +89,8 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
   const { data: agentData } = useAgentList(liveEdgeEnabled);
   const { data: modelCatalog } = useModelCatalog(liveEdgeEnabled);
+  const { data: ccSwitchStatus } = useCCSwitchStatus(liveEdgeEnabled);
+  const { data: ccSwitchProviders } = useCCSwitchProviders(undefined, liveEdgeEnabled);
   const { data: profileData } = useAgentProfileList(liveEdgeEnabled);
   const { data: hubProfileData } = useHubAgentProfiles({ enabled: !workbench.isDemo && !liveEdgeEnabled });
   const createAgentProfile = useCreateAgentProfile();
@@ -311,6 +313,20 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         activeProjectId={workbench.activeProjectId}
         onActiveProjectChange={handleActiveProjectChange}
           modelCatalog={modelCatalog?.items}
+          ccSwitchStatus={ccSwitchStatus ? {
+            installed: ccSwitchStatus.installed,
+            routingActive: ccSwitchStatus.routingActive,
+            proxyPort: ccSwitchStatus.proxyPort,
+            activeAppTypes: ccSwitchStatus.activeAppTypes,
+          } : undefined}
+          ccSwitchProviders={ccSwitchProviders?.map((p) => ({
+            providerId: p.providerId,
+            providerName: p.providerName,
+            appType: p.appType,
+            isCurrent: p.isCurrent,
+            isActive: p.isActive,
+            modelAliases: p.modelAliases,
+          }))}
         platform={desktopPlatform}
         projects={workbench.projects}
         projectsStatus={workbench.projectsStatus}

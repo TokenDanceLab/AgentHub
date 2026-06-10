@@ -477,6 +477,13 @@ export interface HubAgentCancelPayload {
   task_id: string;
 }
 
+export interface HubAgentRegeneratePayload {
+  original_task_id: string;
+  new_task_id: string;
+  trigger_message_id: string;
+  agent_instance_id: string;
+}
+
 export interface HubFriendEventPayload {
   request_id?: string;
   user_id?: string;
@@ -548,6 +555,10 @@ export type HubAgentCancelFrame = HubFrame<
   HubAgentCancelPayload,
   typeof HUB_EVENTS.AGENT_CANCEL
 >;
+export type HubAgentRegenerateFrame = HubFrame<
+  HubAgentRegeneratePayload,
+  typeof HUB_EVENTS.AGENT_REGENERATE
+>;
 export type HubDeviceOnlineFrame = HubFrame<
   HubDevicePresencePayload,
   typeof HUB_EVENTS.DEVICE_ONLINE
@@ -588,6 +599,7 @@ export type HubKnownFrame =
   | HubAgentDoneFrame
   | HubAgentFailedFrame
   | HubAgentCancelFrame
+  | HubAgentRegenerateFrame
   | HubDeviceOnlineFrame
   | HubDeviceOfflineFrame
   | HubDeviceKickedFrame
@@ -1036,6 +1048,11 @@ export function createHubClient(opts: HubClientOptions = {}) {
         ],
         { method: 'POST' },
       ),
+
+    regenerateAgentTask: (taskId: string) =>
+      request<HubAgentTask>(`/web/agent-tasks/${encodeURIComponent(taskId)}/regenerate`, {
+        method: 'POST',
+      }),
 
     listExecutionTargets: () =>
       request<HubListResponse<HubExecutionTarget>>('/web/execution-targets'),

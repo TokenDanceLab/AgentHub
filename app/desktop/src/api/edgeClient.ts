@@ -426,6 +426,57 @@ export async function deleteAgentProfile(id: string): Promise<void> {
   if (!res.ok) throw await parseError(res);
 }
 
+// ── cc-switch integration ──────────────────────────────────────────────
+
+export interface CCSwitchStatus {
+  installed: boolean;
+  dbPath?: string;
+  configDir?: string;
+  routingActive: boolean;
+  proxyPort?: number;
+  activeAppTypes?: string[];
+}
+
+export interface CCSwitchProviderModelMapping {
+  providerId: string;
+  providerName: string;
+  appType: string;
+  providerType?: string;
+  baseUrl?: string;
+  apiKeySet: boolean;
+  isCurrent: boolean;
+  inFailover: boolean;
+  isActive: boolean;
+  costMultiplier?: string;
+  modelAliases?: Record<string, string>;
+}
+
+export async function fetchCCSwitchStatus(): Promise<CCSwitchStatus> {
+  try {
+    const res = await edgeFetch(`${BASE}/v1/ccswitch/status`, edgeRequestInit());
+    if (!res.ok) throw await parseError(res);
+    return unwrapEdgeResponse(await res.json()) as CCSwitchStatus;
+  } catch {
+    return { installed: false, routingActive: false };
+  }
+}
+
+export async function fetchCCSwitchProviders(appType?: string): Promise<CCSwitchProviderModelMapping[]> {
+  try {
+    const params = appType ? `?appType=${encodeURIComponent(appType)}` : '';
+    const res = await edgeFetch(`${BASE}/v1/ccswitch/providers${params}`, edgeRequestInit());
+    if (!res.ok) throw await parseError(res);
+    const data = unwrapEdgeResponse(await res.json());
+    // Response may be { items: [...] } or raw array
+    if (data && typeof data === 'object' && 'items' in data) {
+      return (data as { items: CCSwitchProviderModelMapping[] }).items;
+    }
+    return Array.isArray(data) ? data as CCSwitchProviderModelMapping[] : [];
+  } catch {
+    return [];
+  }
+}
+
 // ── Settings ──────────────────────────────────────────────────────────
 
 export async function fetchSettings(): Promise<Record<string, string>> {
