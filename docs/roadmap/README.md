@@ -13,7 +13,7 @@
 | [02 轻 UI 接线](02-light-ui.md) | 复用现有组件 + 少量 CSS，不动主聊天流 | agent 主导，少量 UI review |
 | [03 右侧栏增强](03-right-panel.md) | 需要新 UI 面，但全在右侧 inspector 内 | 需要 UI 方向确认 |
 | [04 竞品驱动优先级](04-competition-gap.md) | 竞品强项对照 + 威胁评估 → 优先级修正 | 决策参考 |
-| [06 Orchestrator 增强](06-orchestrator-enhancement.md) | Orchestrator 差距分析 vs 比赛要求 + 失败降级/同级上下文/Plan 确认门/Pipeline | 开发决策 |
+| [07 bytedance.md 对照缺口](07-bytedance-gaps.md) | 逐条对照比赛课题全部要求，标记 ✅/⚠️/❌ + 未入 Roadmap 的缺口 | 交付前最终审计 |
 | [05 收口标准与 Release Gate](05-release-gates.md) | 每条功能"完成"的验收标准 + release gate 清单 | 做完后逐项打钩 |
 
 ## 🌐 相关文档
