@@ -198,7 +198,6 @@ function WebWorkbenchRoot() {
         runtimeEvidence={workbench.runtimeEvidence}
         showComposerAgentPicker={false}
         showComposerStatus={false}
-        showHeaderDataModeControl={false}
         showMainchainStatus={false}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
