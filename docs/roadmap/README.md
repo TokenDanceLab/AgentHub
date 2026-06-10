@@ -1,8 +1,8 @@
 # AgentHub 冲刺总路线图
 
-> 最后更新：2026-06-10 17:00 · 基于 HEAD `027d00ff`
+> 最后更新：2026-06-10 17:45 · HEAD `e242a341` · 14 commits today
 >
-> 已完成项已归档至 [08-completed.md](08-completed.md)。本文只保留未完成项和最新基线。
+> 已完成项已归档至 [08-completed.md](08-completed.md)。本文只保留未完成项。
 
 ---
 
@@ -10,51 +10,39 @@
 
 | 维度 | 状态 |
 |------|------|
-| 提交 | 8 commits since RC baseline (1995 total · 2108 files · 514k insertions) |
-| HEAD | `027d00ff` on `dev/delicious233` |
-| Hub | :8080 ✅ (50 migrations, PostgreSQL + Redis) |
-| Edge | :3210 ✅ (6 adapters, Claude Code 真实执行已验证) |
-| cc-switch | 代理活跃 :15721，opus→deepseek-v4-pro · sonnet→glm-5.1 |
-| API keys | `~/.config/local-secrets/` gitignored · key已轮换 |
-| Go build | PASS (hub-server + edge-server) |
-| TypeScript | ⚠️ 54 errors (核心代码 ~5 处，stories/test 可忽略) |
-| hk2 生产 | ✅ Hub Docker + Edge systemd + nginx `/edge/` 反代 + SSL |
+| HEAD | `e242a341` on `dev/delicious233` |
+| 今日提交 | 14 commits · 30+ files changed |
+| Hub | :8080 ✅ · 50 migrations · PostgreSQL + Redis · Hub→Edge HTTP dispatch 已通 |
+| Edge | :3210 ✅ · 6 adapters · Claude Code 真实执行已验证 · demo seed 11 threads |
+| cc-switch | :15721 · opus→deepseek-v4-pro · sonnet→glm-5.1 |
+| hk2 生产 | ✅ Hub Docker + Edge systemd + nginx SSL + `/edge/` 反代 |
 | Tauri Desktop | ✅ `AgentHub_0.3.0-rc.7_x64-setup.exe` 14MB |
-
-## 1. 架构（不动的东西）
-
-详见 [00-state.md](00-state.md)。绝对不动：GlobalRail · TranscriptView · Composer 主结构。
+| Mobile RN | ✅ 91 tests PASS · Hub 连接正确 |
+| Go build | ✅ hub-server + edge-server |
+| TypeScript | ✅ 核心代码零错误 |
+| API key | ✅ 已轮换 · `~/.config/local-secrets/` gitignored |
 
 ---
 
-## 2. 剩余冲刺项（14 项 · 2 波）
+## 2. 剩余缺口（4 项）
 
 ### 🔴 Wave 0 — 验证门（需你参与）
 
-| # | 任务 | 验收标准 | 预计 |
-|---|------|----------|------|
-| W0-1 | **E2E 冒烟重跑** | `verify-real-api-smoke.ps1` 全部 PASS | 20m |
-| W0-2 | **@Agent 真实 CC E2E** | Web OIDC 登录 → 群聊 @Agent → Hub→Edge HTTP dispatch → CC CLI → transcript | 30m |
-| W0-3 | **OIDC 登录重验证** | TokenDance ID → Hub callback → JWT → WS auth.ok | 20m |
+| # | 任务 | 状态 |
+|---|------|------|
+| W0-1 | **E2E 冒烟** — `verify-real-api-smoke.ps1` 全部 PASS | ❌ 待跑 |
+| W0-2 | **@Agent 真实 CC E2E** — Web OIDC → 群聊 @Agent → dispatch → CC CLI → transcript | ⚠️ 各环节独立验证通过，全链路待跑 |
+| W0-3 | **OIDC 登录** — TokenDance ID → Hub → JWT → WS | ⚠️ 之前通过，待重验 |
 
-### 🔴 Wave 1 — Agent 负责（已派/待派）
+### 🔴 Agent 负责
 
-| # | 任务 | 状态 | 预计 |
-|---|------|------|------|
-| W1-2 | **图片 + 文件附件** | 🔄 Sonnet agent 运行中 | 30m |
-| W1-5 | **Diff apply 管线** | 🔄 Sonnet agent 刚派 | 30m |
-| W1-6 | **Agent 能力标签** | 🔄 Sonnet agent 刚派 | 15m |
-| W1-6 | **demo 数据验证** | ⚠️ Edge SQLite seed 代码已写，未运行验证 | 15m |
-| W1-8 | **Orchestrator E2E 验证** | ⚠️ 4 Go 文件已写，需真实 Edge 运行验证 | 30m |
-| W2-2 | **Settings + Agent 配置子页** | ❌ 前批agent stalled，需重派 | 45m |
-| W2-4 | **项目管理页** | ❌ 需派 agent | 30m |
-| W2-5 | **Hub bug 修复** | ⚠️ reaction emoji 已修 · logout/私密会话待修 | 20m |
-| W2-5 | **Mobile RN 验证** | ❌ 需验证 | 30m |
-| W3-3 | **Release Gate 脚本** | ❌ 4 个 gate 脚本待跑 | 45m |
-| W3-4 | **演示材料** | ❌ 3 视频 + 5 截图 — **需你操作** | 90m |
-| DEEP | **一键静态部署全栈** | 🔄 Opus agent 运行中（DNS + nginx + 前端 DeployCard） | 60m |
-| DEEP | **Orchestrator 运行验证** | ⚠️ 代码已写，需重启 Edge 验证 | 20m |
-| — | **TS 编译错误修复** | ⚠️ 核心 ~5 处错误，agent 运行中 | 15m |
+| # | 任务 | 状态 |
+|---|------|------|
+| W1-8 | **Orchestrator E2E 验证** — 4 Go 文件已写，需真实 Edge 运行验证 | 🔄 Sonnet 运行中 |
+| W3-3 | **Release Gate 脚本** — 4 个 gate 脚本全 PASS | ❌ 待跑 |
+| W3-4 | **演示材料** — 3 视频 + 5 截图 | ❌ 需你操作 |
+| DEEP | **一键部署 DNS** — `*.pages.vectorcontrol.tech` DNS记录 | 🔄 Sonnet 运行中 |
+| DEEP | **一键部署全链路** — DNS→nginx→SCP→公网访问 端到端 | 🔄 待 DNS 完成后验证 |
 
 ---
 
@@ -70,4 +58,4 @@
 | [05 Release Gate](05-release-gates.md) | 验收标准 · checkbox |
 | [06 Orchestrator](06-orchestrator-enhancement.md) | 失败降级 · Plan 确认门 |
 | [07 bytedance 对照](07-bytedance-gaps.md) | 比赛课题逐条对照 |
-| [08 已完成归档](08-completed.md) | ✅ 已完成项存档 |
+| [08 已完成归档](08-completed.md) | ✅ 全部 Wave 1-3 已完成项 |
