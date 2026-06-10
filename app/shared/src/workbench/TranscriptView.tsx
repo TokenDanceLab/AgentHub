@@ -691,7 +691,7 @@ function renderRunStepGroupBlock(
   return (
     <div className={styles.agentBlockRow}>
       <StepCard
-        defaultOpen={block.open}
+        {...(block.open != null && { defaultOpen: block.open })}
         icon={block.icon}
         status={block.status}
         subSteps={subSteps}
@@ -707,69 +707,82 @@ function renderRunStepGroupBlock(
 function buildStepCardSubSteps(children: TranscriptBlock[]): StepCardSubStep[] {
   return children.map((child): StepCardSubStep => {
     switch (child.kind) {
-      case 'text':
+      case 'text': {
+        const status = child.evidenceRefs?.some((r) => r.status === 'running') ? 'running'
+          : child.evidenceRefs?.some((r) => r.status === 'failed') ? 'failed'
+          : child.evidenceRefs?.every((r) => r.status === 'completed') ? 'completed'
+          : undefined;
         return {
           key: child.id,
           kind: 'text',
           label: child.displayTitle ?? child.text.split('\n')[0] ?? '消息',
-          status: child.evidenceRefs?.some((r) => r.status === 'running') ? 'running'
-            : child.evidenceRefs?.some((r) => r.status === 'failed') ? 'failed'
-            : child.evidenceRefs?.every((r) => r.status === 'completed') ? 'completed'
-            : undefined,
+          ...(status != null && { status }),
         };
-      case 'tool_call':
+      }
+      case 'tool_call': {
+        const detail = child.summary ?? child.target;
         return {
           key: child.id,
           kind: 'tool_call',
           label: child.toolName,
-          detail: child.summary ?? child.target,
-          status: child.status,
+          ...(detail != null && { detail }),
+          ...(child.status != null && { status: child.status }),
         };
-      case 'tool_result':
+      }
+      case 'tool_result': {
+        const detail = child.summary;
         return {
           key: child.id,
           kind: 'tool_call',
           label: `${child.toolName} result`,
-          detail: child.summary,
-          status: child.status,
+          ...(detail != null && { detail }),
+          ...(child.status != null && { status: child.status }),
         };
+      }
       case 'artifact': {
         const fileRef = child.evidenceRefs?.find((ref) => ref.kind === 'file');
         const path = child.path ?? fileRef?.path ?? fileRef?.label;
+        const detail = child.action ? `${child.action}` : undefined;
         return {
           key: child.id,
           kind: 'artifact',
           label: path ?? child.title,
-          detail: child.action ? `${child.action}` : undefined,
+          ...(detail != null && { detail }),
           status: 'completed',
         };
       }
-      case 'file_change':
+      case 'file_change': {
+        const detail = child.action;
         return {
           key: child.id,
           kind: 'artifact',
           label: child.path,
-          detail: child.action,
+          ...(detail != null && { detail }),
           status: 'completed',
         };
-      case 'diff':
+      }
+      case 'diff': {
+        const detail = child.additions != null || child.deletions != null
+          ? `+${child.additions ?? 0} -${child.deletions ?? 0}`
+          : undefined;
         return {
           key: child.id,
           kind: 'artifact',
           label: child.files[0] ?? child.title,
-          detail: child.additions != null || child.deletions != null
-            ? `+${child.additions ?? 0} -${child.deletions ?? 0}`
-            : undefined,
+          ...(detail != null && { detail }),
           status: 'completed',
         };
-      case 'thinking':
+      }
+      case 'thinking': {
+        const detail = child.content?.slice(0, 80);
         return {
           key: child.id,
           kind: 'plan',
           label: child.isThinking ? '推理中...' : '推理摘要',
-          detail: child.content?.slice(0, 80),
+          ...(detail != null && { detail }),
           status: child.isThinking ? 'running' : 'completed',
         };
+      }
       case 'approval':
       case 'permission_request':
       case 'permission_result':
@@ -777,25 +790,29 @@ function buildStepCardSubSteps(children: TranscriptBlock[]): StepCardSubStep[] {
           key: child.id,
           kind: 'skill',
           label: child.title,
-          status: child.status,
+          ...(child.status != null && { status: child.status }),
         };
       case 'subagent':
       case 'subtask':
-      case 'child_agent':
+      case 'child_agent': {
+        const detail = child.summary;
         return {
           key: child.id,
           kind: 'plan',
           label: child.title,
-          detail: child.summary,
-          status: child.status,
+          ...(detail != null && { detail }),
+          ...(child.status != null && { status: child.status }),
         };
-      case 'run_session':
+      }
+      case 'run_session': {
+        const status = child.status as 'pending' | 'running' | 'completed' | 'failed' | undefined;
         return {
           key: child.id,
           kind: 'plan' as const,
           label: child.title,
-          status: child.status as 'pending' | 'running' | 'completed' | 'failed' | undefined,
+          ...(status != null && { status }),
         };
+      }
       default: {
         const block = child as TranscriptBlock & { title?: string };
         return {
