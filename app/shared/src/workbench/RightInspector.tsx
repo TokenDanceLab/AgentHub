@@ -194,9 +194,12 @@ export function RightInspector({
   }, [previewFile?.name, runtimeEvidence]);
 
   const handleFileClick = useCallback((file: FileItem) => {
-    setPreviewFile(file);
+    // Look up the full PreviewFile (with content/URL data) from overviewFiles,
+    // since FileItem from the OverviewPanel only has name/type/isPrimary/isOpen.
+    const richFile = overviewFiles.find((f) => f.name === file.name);
+    setPreviewFile(richFile ?? file);
     setActiveMode('files');
-  }, []);
+  }, [overviewFiles]);
 
   const closePreview = useCallback(() => {
     setPreviewFile(null);
@@ -457,20 +460,26 @@ function runtimeEvidenceOverviewTasks(runtimeEvidence: RuntimeEvidenceSnapshot):
 
 function runtimeEvidenceOverviewFiles(runtimeEvidence: RuntimeEvidenceSnapshot): PreviewFile[] {
   return [
-    ...runtimeEvidence.artifacts.map((artifact) => ({
-      name: artifact.path,
-      type: artifact.kind,
-      isPrimary: true,
-      owner: 'Hub replay',
-      content: [
-        `# ${artifact.path}`,
-        '',
-        `- Run: ${artifact.runId || runtimeEvidence.runId || 'unknown'}`,
-        `- Thread: ${artifact.threadId || 'unknown'}`,
-        `- Kind: ${artifact.kind}`,
-        `- Created: ${artifact.createdAt || 'unknown'}`,
-      ].join('\n'),
-    })),
+    ...runtimeEvidence.artifacts.map((artifact) => {
+      const artifactRunId = artifact.runId || runtimeEvidence.runId;
+      const artifactContentUrl = artifactRunId
+        ? `/v1/runs/${artifactRunId}/artifacts/${artifact.id}/content`
+        : undefined;
+      return {
+        name: artifact.path,
+        type: artifact.kind,
+        isPrimary: true,
+        owner: 'Hub replay',
+        content: artifactContentUrl ?? [
+          `# ${artifact.path}`,
+          '',
+          `- Run: ${artifact.runId || runtimeEvidence.runId || 'unknown'}`,
+          `- Thread: ${artifact.threadId || 'unknown'}`,
+          `- Kind: ${artifact.kind}`,
+          `- Created: ${artifact.createdAt || 'unknown'}`,
+        ].join('\n'),
+      };
+    }),
     ...runtimeEvidence.diffs.map((file) => ({
       name: file.filePath,
       type: 'diff',
@@ -481,19 +490,25 @@ function runtimeEvidenceOverviewFiles(runtimeEvidence: RuntimeEvidenceSnapshot):
       ].join('\n'),
       diffContent: fileDiffToText(file),
     })),
-    ...runtimeEvidence.previews.map((preview) => ({
-      name: preview.url || preview.id,
-      type: 'preview',
-      owner: 'Hub replay',
-      content: [
-        `# Preview ${preview.id}`,
-        '',
-        `- Run: ${preview.runId || runtimeEvidence.runId || 'unknown'}`,
-        `- Status: ${preview.status}`,
-        `- URL: ${preview.url || 'not available'}`,
-        `- Created: ${preview.createdAt || 'unknown'}`,
-      ].join('\n'),
-    })),
+    ...runtimeEvidence.previews.map((preview) => {
+      const previewRunId = preview.runId || runtimeEvidence.runId;
+      const previewContentUrl = preview.url || (previewRunId
+        ? `/v1/runs/${previewRunId}/previews/${preview.id}/content`
+        : undefined);
+      return {
+        name: preview.url || preview.id,
+        type: 'preview',
+        owner: 'Hub replay',
+        content: previewContentUrl ?? [
+          `# Preview ${preview.id}`,
+          '',
+          `- Run: ${preview.runId || runtimeEvidence.runId || 'unknown'}`,
+          `- Status: ${preview.status}`,
+          `- URL: ${preview.url || 'not available'}`,
+          `- Created: ${preview.createdAt || 'unknown'}`,
+        ].join('\n'),
+      };
+    }),
   ];
 }
 
@@ -979,6 +994,18 @@ function detectFilePreviewKind(fileName: string): FilePreviewKind {
   return 'code';
 }
 
+/** Extract a fetchable URL from a PreviewFile's content field.
+ *  runtimeEvidenceOverviewFiles puts real Edge API paths (e.g. /v1/runs/…/content)
+ *  or full preview URLs into `content`; fallback text starts with `#` or prose. */
+function extractFileUrl(content: string | undefined): string {
+  if (!content) return '';
+  // Real URLs start with '/' (relative API path) or 'http'
+  if (content.startsWith('/') || content.startsWith('http://') || content.startsWith('https://')) {
+    return content;
+  }
+  return '';
+}
+
 function FilePreviewRouter({
   file,
   onClose,
@@ -988,6 +1015,7 @@ function FilePreviewRouter({
 }): React.ReactElement {
   const kind = detectFilePreviewKind(file.name);
   const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
+  const fileUrl = extractFileUrl(file.content);
 
   switch (kind) {
     case 'pptx':
@@ -995,7 +1023,7 @@ function FilePreviewRouter({
       return (
         <SlideshowPreview
           fileName={file.name}
-          fileUrl={file.content ?? ''}
+          fileUrl={fileUrl}
           onClose={onClose}
         />
       );
@@ -1006,7 +1034,7 @@ function FilePreviewRouter({
       return (
         <TablePreview
           fileName={file.name}
-          fileUrl={file.content ?? ''}
+          fileUrl={fileUrl}
           onClose={onClose}
         />
       );
@@ -1015,7 +1043,7 @@ function FilePreviewRouter({
       return (
         <DocxPreview
           fileName={file.name}
-          fileUrl={file.content ?? ''}
+          fileUrl={fileUrl}
           onClose={onClose}
         />
       );

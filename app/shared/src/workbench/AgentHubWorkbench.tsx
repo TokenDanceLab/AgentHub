@@ -315,7 +315,7 @@ export function AgentHubWorkbench({
   const inspectorDeployPreviewUrl = useMemo(() => {
     // Look for the latest preview block with a URL (deploy preview)
     for (let i = transcript.length - 1; i >= 0; i--) {
-      const block = transcript[i];
+      const block = transcript[i]!;
       if (block.kind === 'preview' && block.url) return block.url;
     }
     return undefined;

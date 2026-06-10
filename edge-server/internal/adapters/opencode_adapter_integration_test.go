@@ -167,7 +167,8 @@ func TestOpenCodeBuildCommandArgs(t *testing.T) {
 		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
 			Run:       run,
 			Prompt:    "hi",
-			SessionID: "ses_abc",
+			SessionID:    "ses_abc",
+			ContinueLast: true, // OpenCode requires ContinueLast to pass --session
 		})
 		hasSession := false
 		for i, a := range args {
