@@ -38,7 +38,7 @@ import {
   SettingsPage,
   TasksPage,
 } from './pages';
-import type { AgentConfig, AgentsPaneId, ToolPermission } from './pages/AgentsPage';
+import type { AgentConfig, AgentsPaneId, ToolPermission, SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { TaskEditDraft } from './pages/TasksPage';
 import type { GlobalRailPage } from './GlobalRail';
 import {
@@ -121,6 +121,14 @@ export interface WorkbenchRoutesProps {
   /** Settings service for persistent user preferences. When provided,
    *  settings are read from / written to the backend adapter. */
   settingsService?: SettingsService | null | undefined;
+  /** Public Skill market items from Hub API. */
+  skillMarketItems?: SkillMarketItem[] | undefined;
+  /** Whether Skill market data is loading. */
+  skillMarketLoading?: boolean | undefined;
+  /** Public MCP Server market items from Hub API. */
+  mcpMarketItems?: MCPMarketItem[] | undefined;
+  /** Whether MCP Server market data is loading. */
+  mcpMarketLoading?: boolean | undefined;
 }
 
 /** Contact mutation callbacks wired to Hub API. */
@@ -548,6 +556,10 @@ export function WorkbenchRoutes({
   documentsActions,
   modelCatalog,
   settingsService,
+  skillMarketItems,
+  skillMarketLoading,
+  mcpMarketItems,
+  mcpMarketLoading,
 }: WorkbenchRoutesProps): React.ReactElement {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const [docsNav, setDocsNav] = useState('home');
@@ -1172,6 +1184,10 @@ export function WorkbenchRoutes({
           }))}
           toolMatrixTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
           {...(effectiveSelectedAgentId ? { selectedAgentId: effectiveSelectedAgentId } : {})}
+          skillMarketItems={skillMarketItems}
+          skillMarketLoading={skillMarketLoading}
+          mcpMarketItems={mcpMarketItems}
+          mcpMarketLoading={mcpMarketLoading}
         />
       );
     case 'runs':
