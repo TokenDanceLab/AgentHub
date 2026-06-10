@@ -1660,7 +1660,7 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 	}
 
 	approved := req.Decision == "approve"
-	plan, ok := broker.Decide(req.RunID, adapters.PlanDecision{
+	_, ok := broker.Decide(req.RunID, adapters.PlanDecision{
 		Approved: approved,
 		Reason:   req.Reason,
 	})
@@ -1669,22 +1669,9 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Emit the corresponding plan event for observability.
-	scope := map[string]any{"runId": req.RunID}
-	if plan.ProjectID != "" {
-		scope["projectId"] = plan.ProjectID
-	}
-	if plan.ThreadID != "" {
-		scope["threadId"] = plan.ThreadID
-	}
-	eventType := adapters.BusEventPlanApproved
-	if !approved {
-		eventType = adapters.BusEventPlanRejected
-	}
-	ensureBus(h).Publish(eventType, scope, map[string]any{
-		"runId":  req.RunID,
-		"reason": req.Reason,
-	})
+	// Note: the plan_approved/plan_rejected event is emitted by the
+	// dispatchInterceptor in awaitPlanApproval after the broker decision
+	// resolves. We do not emit a duplicate here.
 
 	slog.Info("plan decided by user", "runId", req.RunID, "decision", req.Decision)
 	writeSuccess(w, http.StatusOK, map[string]any{"status": "ok"})
