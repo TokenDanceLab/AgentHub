@@ -296,6 +296,22 @@ export interface AttachmentTranscriptBlock extends TranscriptBlockBase {
   contentType: 'image' | 'file';
 }
 
+export interface DeployTranscriptBlock extends TranscriptBlockBase {
+  kind: 'deploy';
+  /** The run ID that produced the deploy artifact. */
+  runId: string;
+  /** The artifact ID being deployed. */
+  artifactId?: string;
+  /** The file path being deployed. */
+  path?: string;
+  /** Type of deployment. */
+  deployType?: string;
+  /** Deployment status. */
+  status?: 'pending' | 'ready' | 'deploying' | 'deployed' | 'failed';
+  /** The deployed URL (set after successful deployment). */
+  url?: string;
+}
+
 export type TranscriptBlock =
   | TextTranscriptBlock
   | ToolCallTranscriptBlock
@@ -320,4 +336,5 @@ export type TranscriptBlock =
   | FailureTranscriptBlock
   | FinishedTranscriptBlock
   | ReplayGapTranscriptBlock
-  | AttachmentTranscriptBlock;
+  | AttachmentTranscriptBlock
+  | DeployTranscriptBlock;
