@@ -162,7 +162,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\scripts\verify-p0-ap
 - [架构文档](docs/architecture.md)
 - [API 合同](api/)
 - [安全风险台账](docs/governance/security-risk-register.md)
-- [TokenDanceID 登录 readiness](docs/audit/token-dance-id-login-readiness.md)
+- [新人入门](docs/developer-quickstart.md)
 
 ## License
 
