@@ -1,8 +1,8 @@
 # ADR Index
 
-最后更新：2026-06-03
+最后更新：2026-06-10
 
-本目录保存 AgentHub 项目已采纳的架构决策记录（Architecture Decision Records）。ADR 解释"为什么当时这样决定"，不自动覆盖当前主文档。若 ADR 与 `docs/architecture/system-architecture.md`、`docs/architecture/implementation-guide.md` 或 `api/` 契约冲突，以当前主文档和契约为准，并在后续新增 ADR 记录变更原因。
+本目录保存 AgentHub 项目已采纳的架构决策记录（Architecture Decision Records）。ADR 解释"为什么当时这样决定"，不自动覆盖当前主文档。若 ADR 与 `docs/architecture.md`、`docs/architecture/` 或 `api/` 契约冲突，以当前主文档和契约为准，并在后续新增 ADR 记录变更原因。
 
 ## 阅读规则
 

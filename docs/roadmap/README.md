@@ -133,11 +133,9 @@
 | [01 管线类](01-pipeline.md) | 后端/合同层 |
 | [02 轻 UI 接线](02-light-ui.md) | 复用组件 + 少量 CSS |
 | [03 右侧栏增强](03-right-panel.md) | Inspector 内容增强 |
-| [04 竞品优先级](04-competition-gap.md) | 竞品驱动优先级 |
-| [05 Release Gate](05-release-gates.md) | 验收标准 · checkbox |
-| [06 Orchestrator](06-orchestrator-enhancement.md) | 失败降级 · Plan 确认门 |
-| [07 bytedance 对照](07-bytedance-gaps.md) | 比赛课题逐条对照 |
-| [08 已完成归档](08-completed.md) | ✅ 全部 Wave 1-3 已完成项 |
+| [04 Release Gate](04-release-gates.md) | 验收标准 · checkbox |
+| [05 Orchestrator](05-orchestrator-enhancement.md) | 失败降级 · Plan 确认门 |
+| [06 已完成归档](06-completed.md) | ✅ 全部 Wave 1-3 已完成项 |
 
 ---
 

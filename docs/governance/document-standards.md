@@ -6,38 +6,35 @@
 
 | 层级 | 文件 | 内容 | 修改权限 |
 |------|------|------|:--:|
-| **路线图** | `docs/roadmap.md` | Sprint 目标 + 待办清单 + 已完成汇总 | Delicious233 |
-| **功能收口** | `docs/roadmap-feature-close.md` | 基于竞品审计的功能缺口和优先级 | Delicious233 |
-| **架构** | `docs/architecture.md` + `docs/architecture/` | 产品定位 + 三层架构 + 数据流 + 实现状态 | 三人协商 |
-| **阶段计划/进度** | `docs/<topic>-plan.md` | 当前阶段的实施边界、任务、验收、风险 | 任务负责人 |
+| **路线图** | `docs/roadmap.md` + `docs/roadmap/` | Sprint 目标 + 模块化路线图 | Delicious233 |
+| **架构** | `docs/architecture.md` + `docs/architecture/` | 产品定位 + 三层架构 + 数据流 | 三人协商 |
 | **ADR** | `docs/adr/` | 架构决策记录（11 篇） | 任何人 |
-| **设计** | `docs/designs/` | 组件设计文档（4 篇） | 任何人 |
-| **治理** | `docs/governance/` | 分支规范、文档标准、安全风险 | 三人协商 |
-| **审计** | `docs/audit/` | 发布门禁审计证据 | 只读 |
+| **设计** | `docs/designs/` | 进行中设计文档 | 任何人 |
+| **治理** | `docs/governance/` | 分支规范、文档标准、安全风险、威胁模型 | 三人协商 |
+| **部署** | `docs/deployment/` | 部署手册 | 运维 |
 | **参考** | `docs/reference/` | 技术参考 + 竞品调研 | 按需查阅 |
-| **归档** | `docs/archive/` | 历史方案、旧审查（INDEX.md 为索引） | 只读 |
 
 ## 命名和格式
 
 - 文件名用小写和连字符：`product-requirements.md`
-- 阶段性进度收口使用 `*-progress-YYYY-MM-DD.md`，必须由 `docs/README.md`、`roadmap.md` 或当前阶段计划链接，不另建状态目录
 - 中文优先，代码标识保持英文
-- 每个文件开头标注最后更新日期
+- 每个文件开头标注 `最后更新：YYYY-MM-DD`
 - 不写绝对路径（`D:\Code\...`）
 - 不写 `target: master`（合并目标统一 `dev/delicious233`）
+- 不引用源码行号（用函数名/类型名等稳定锚点）
 
 ## 规则
 
-1. **路线图唯一**：当前目标和优先级只写在 `roadmap.md`，完成打钩，不另建第二套 backlog
-2. **主文档优先**：架构说明写进 `architecture.md`
-3. **计划直达**：阶段性实施计划直接放在 `docs/`，并由 roadmap 链接
-4. **归档不删**：过时文档移入 `archive/`，不直接删除
+1. **路线图唯一**：当前目标和优先级写在 `roadmap/`，完成打钩，不另建第二套 backlog
+2. **主文档优先**：架构说明写进 `architecture.md` + `architecture/`
+3. **计划直达**：阶段性实施计划直接放在 `docs/`，由 roadmap 链接
+4. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力），不归档
 5. 同一事实不出现在多个文档中
-6. 不用过时阶段名（M1/M3a/mock run）描述当前状态
+6. 不用过时阶段名描述当前状态
 
 ## 新文档检查清单
 
 创建新文档前先确认：
 - 能否合并到现有主文档（roadmap / architecture / 当前阶段计划）？
 - 是否属于 ADR 或设计文档？
-- 归档类内容是否应放入 `archive/`？
+- 读者是谁？新人还是团队成员？对应写到哪一层？
