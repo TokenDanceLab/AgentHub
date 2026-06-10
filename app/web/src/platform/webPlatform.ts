@@ -296,7 +296,10 @@ export async function submitWebComposerIntent(
   options: SubmitWebComposerIntentOptions = {},
 ): Promise<ComposerSubmitResult> {
   // Upload any attachments that have a File reference but no server-side ref yet
-  const enrichedAttachments = await uploadPendingAttachments(intent);
+  const pendingUploads = intent.attachments.filter((a) => a.file && !a.attachmentRef);
+  const enrichedAttachments = pendingUploads.length > 0
+    ? await uploadPendingAttachments(intent)
+    : intent.attachments;
   const enrichedIntent = { ...intent, attachments: enrichedAttachments };
 
   const mention = enrichedIntent.mentions[0];
