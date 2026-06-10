@@ -1,81 +1,58 @@
 # AgentHub 文档
 
-> 双入口：**评审/新用户**走上半部分了解产品；**开发者**走下半部分接入开发。
+最后更新：2026-06-10
 
-## 🏆 评审与产品入口（先读这些）
+## 快速入口
 
-| 顺序 | 文档 | 为什么 |
-|:----:|------|--------|
-| 1 | [competition/competitive-positioning.md](competition/competitive-positioning.md) | **我们在赛道里的位置**。工程规模对比 + 架构维度 + 独有能力 + 评分对应 |
-| 2 | [design-decisions.md](design-decisions.md) | **为什么这样选**。Go+CLI / Hub-Edge / 自研WS / Tauri / 三级审批 5 个关键决策 |
-| 3 | [architecture.md](architecture.md) | **怎么运作**。产品定位 + 三层架构 + 数据流 + 实现状态 |
-| 4 | [governance/threat-model.md](governance/threat-model.md) | **安全深度**。信任边界图 + 安全亮点卡（浓缩 44 条风险台账） |
-| 5 | [roadmap/README.md](roadmap/README.md) | **接下来做什么**。按管线/轻UI/右侧栏分层的功能收口计划 + 竞品优先级 + Release Gate |
-| 6 | [competition/teamrun-e2e-evidence.md](competition/teamrun-e2e-evidence.md) | **真实运行证据**。TeamRun 端到端 |
+| 角色 | 先读 | 然后 |
+|------|------|------|
+| **新开发者** | [developer-quickstart.md](developer-quickstart.md) | [architecture.md](architecture.md) → [roadmap.md](roadmap.md) |
+| **评审/产品** | [design-decisions.md](design-decisions.md) | [architecture.md](architecture.md) → [governance/threat-model.md](governance/threat-model.md) |
+| **贡献者** | [contributing.md](contributing.md) | [developer-quickstart.md](developer-quickstart.md) |
 
-> 完整对外文档（角色化导航 + 架构图 + 中英双语）：**https://hub.vectorcontrol.tech/docs**
+端口速记：Desktop/Tauri `5173`，Web `5174`，Mobile RN Expo `5177`，Hub `8080`，Edge `3210`。
 
-## 🔧 开发者入口
+## 目录结构
 
-> 新 Agent / 新开发者？按顺序读：**roadmap → architecture → v4 plan → integration governance → i18n design → integration plan → feature close**
-
-### 必读 (3 分钟)
-
-| 顺序 | 文档 | 为什么 |
-|:----:|------|--------|
-| 1 | [roadmap.md](roadmap.md) | **该做什么**。当前 Sprint 目标 + 可打钩任务 + 已知缺口 |
-| 2 | [architecture.md](architecture.md) | **怎么运作**。产品定位 + 三层架构 + 数据流 + 实现状态 |
-| 3 | [desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md) | **怎么重构**。Desktop/Web v4 shared workbench 的实施边界、任务和验收 |
-| 4 | [backend-integration-governance.md](backend-integration-governance.md) | **怎么合后端和联调**。AH-SYNC、后端切片、Desktop/Edge、Web/Hub、DB 和真实 CLI gate 的统一规则 |
-| 5 | [v4-shared-i18n-design.md](v4-shared-i18n-design.md) | **i18n 怎么同源**。shared workbench 的 namespace 设计、key parity 和迁移规则 |
-| 6 | [desktop-edge-web-integration-plan.md](desktop-edge-web-integration-plan.md) | **下一步怎么接生产链路**。Desktop/Tauri/Local Edge 与 Web/Hub 的平台边界、旧客户端清理和分阶段验收 |
-| 7 | [roadmap-feature-close.md](roadmap-feature-close.md) | **功能收口路线图**。基于竞品审计的功能缺口和实现优先级 |
-
-读完 roadmap、architecture 和当前任务计划即可开始工作。
-
-端口速记：Desktop/Tauri 前端是 `5173`，Web 前端是 `5174`，Mobile RN Expo Web 视觉预览是 `5177`，`5176/desktop` 是只读的 `agenthub-design` design demo。
+```
+docs/
+├── README.md                          ← 导航索引（你在这里）
+├── developer-quickstart.md            ← 新人入门
+├── architecture.md                    ← 架构概览（→ architecture/ 模块详情）
+├── architecture/                      ← 6 篇模块化架构文档
+├── roadmap.md                         ← 路线图概览（→ roadmap/ 模块详情）
+├── roadmap/                           ← 模块化路线图
+├── contributing.md                    ← 贡献指南
+├── design-decisions.md                ← 5 个关键技术决策摘要
+├── right-panel-enhancement-design.md  ← 右侧面板增强设计
+├── adr/                               ← 架构决策记录（11 篇）
+├── designs/                           ← 进行中设计文档
+├── governance/                        ← 治理：分支规范、文档标准、安全风险、威胁模型
+├── deployment/                        ← 部署手册
+├── release/                           ← 发布清单
+└── reference/                         ← 技术参考 + 竞品调研
+    ├── competitive-analysis.md
+    ├── cc-switch-integration-design.md
+    ├── cc-switch-provider-model-ref.md
+    ├── cc-switch-storage.md
+    ├── cc-switch-model-mapping-deep.md
+    ├── sdk-agent-strategy.md
+    ├── research-synthesis.md
+    └── projects/                      ← 竞品调研（15 个项目）
+```
 
 ## 按需查阅
 
 | 需要 | 去看 |
 |------|------|
 | 某个架构决策的背景 | [adr/](adr/) — 11 篇 ADR |
-| 某个组件的设计方案 | [designs/](designs/) — 4 篇设计文档 |
-| 竞品和设计参考怎么做的 | [reference/](reference/) — 竞品、CLI、桌面 UX 和设计系统调研 |
-| 分支规则、安全风险 | [governance/](governance/) — 分支治理、文档标准、安全风险登记 |
-| 历史方案、旧审查 | [archive/](archive/) — 完整归档索引见 [archive/INDEX.md](archive/INDEX.md) |
-| 完整路线图历史 | [archive/roadmap-full-history-20260605.md](archive/roadmap-full-history-20260605.md) |
-
-## 目录结构
-
-```
-docs/
-├── README.md            ← 你在这里（评审入口 + 开发者入口）
-├── roadmap.md           ← Sprint 目标 + 待办清单
-├── roadmap-feature-close.md ← 功能收口路线图（基于竞品审计）
-├── architecture.md      ← 三合一主文档
-├── architecture/        ← 架构子文档（6 篇）
-├── design-decisions.md  ← 5 个关键技术决策（评审向）
-├── desktop-web-v4-clean-rebuild-plan.md
-├── backend-integration-governance.md
-├── v4-shared-i18n-design.md
-├── desktop-edge-web-integration-plan.md
-├── right-panel-enhancement-design.md
-├── developer-quickstart.md
-├── contributing.md      ← 开发者贡献指南
-├── adr/                 ← 架构决策记录（11 篇）
-├── audit/               ← 发布门禁审计证据
-├── competition/         ← 竞品定位 + 真实运行证据（评审向）
-├── designs/             ← 组件设计文档
-├── deployment/          ← 部署 runbook
-├── governance/          ← 分支规范、文档标准、安全风险台账、威胁模型
-├── reference/           ← 竞品深度调研 + 技术参考
-└── archive/             ← 历史归档 (INDEX.md 为索引)
-```
-
-## 规则
-
-1. **路线图唯一**：当前目标和优先级写在 `roadmap.md`，完成打钩，不另建第二套 backlog
-2. **主文档优先**：架构说明写进 `architecture.md`
-3. **计划直达**：阶段性实施计划直接放在 `docs/`，并由 roadmap 链接
-4. **归档不删**：过时文档移入 `archive/`，不直接删除
+| 右侧面板功能设计 | [right-panel-enhancement-design.md](right-panel-enhancement-design.md) |
+| Artifact 生命周期 | [designs/artifact-lifecycle-plan.md](designs/artifact-lifecycle-plan.md) |
+| Adapter 架构 | [designs/enhanced-adapter-architecture.md](designs/enhanced-adapter-architecture.md) |
+| 竞品分析 | [reference/competitive-analysis.md](reference/competitive-analysis.md) |
+| cc-switch 集成 | [reference/cc-switch-integration-design.md](reference/cc-switch-integration-design.md) |
+| SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
+| 分支规则 | [governance/branch-governance.md](governance/branch-governance.md) |
+| 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
+| 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |
+| 部署 | [deployment/hk2-deployment-runbook.md](deployment/hk2-deployment-runbook.md) |

@@ -24,19 +24,18 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
 2. 读 `docs/roadmap.md` 和 `docs/architecture.md` — 当前目标、架构边界和实现阶段。
-3. 做 Desktop/Web v4 重构时，继续读 `docs/desktop-web-v4-clean-rebuild-plan.md`、`docs/v4-frontend-progress-2026-06-07.md` 和 `docs/v4-clean-rebuild-decision-questions.md`。
+3. 做 Desktop/Web v4 重构时，继续读 `docs/roadmap/` 子文档了解各模块进展。
 4. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，默认先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行；但本轮 Desktop/Web v4 clean rebuild 用户已明确要求不用 dev-loop，按 `docs/roadmap.md` 和 `docs/desktop-web-v4-clean-rebuild-plan.md` 直接推进。短任务（单文件修复、小改动）不需要。
+5. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，默认先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 6. 只读相关主文档章节：产品或架构不清读 `docs/architecture.md`。
 7. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 8. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity/identity-auth.md`、`../docs/identity/authorization-model.md`、`../docs/security/security-risk.md`、`../docs/identity/feishu-integration.md`、`../docs/ecosystem/product-matrix.md`、`../docs/ecosystem/ecosystem-execution-queue.md`、`../docs/identity/i18n-packaging.md`、`../docs/design/design-system.md`、`../docs/design/design-playbook.md` 或 `../docs/design/visual-qa-matrix.md` 中相关文档。
 9. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
-10. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance/scorecard-evidence.md`、`../docs/archive/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
-11. 持续开发和任务拆解读 `docs/architecture.md`（路线图摘要）和当前分支路线图。
-12. 客户端任务读 `docs/roadmap.md` 和 `docs/architecture.md`。
-13. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
+10. 持续开发和任务拆解读 `docs/architecture.md`（路线图摘要）和当前分支路线图。
+11. 客户端任务读 `docs/roadmap.md` 和 `docs/architecture.md`。
+12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
-`docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
+`reference/**` 是第三方源码调研，默认不改、不翻译、不全文扫描。
 
 ## 2. 三人分工
 
@@ -338,27 +337,25 @@ feat/* → dev/delicious233 → master
 
 ## 5. 文档规则
 
-- 主文档只保留一份：`docs/architecture.md`。
-- `docs/roadmap.md` 记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
+- 主文档只保留一份：`docs/architecture.md`（概览）+ `docs/architecture/`（模块详情）。
+- `docs/roadmap.md`（概览）+ `docs/roadmap/`（模块路线图）记录持续开发目标、当前进展和下一步。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
-- 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
+- 新增长期说明先考虑合并进主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
-- 历史方案、旧审查、旧计划放 `docs/archive/`。
+- 过时文档直接删除（git 历史保留追溯能力），不归档。
 - 文档、issue、PR 正文中文为主；代码标识、路径、API 字段、命令保留英文。
 - 不使用未解释缩写。第一次出现时写白话解释。
 - 修改目录、协议、分工后，同步 `README.md`、本文件和相关主文档。
 - 不在文档中依赖个人本机绝对路径、私人服务器、私人账号或不可公开的环境。
-- 如果别人克隆仓库后需要某个配置或命令才能开发，把它写进 `README.md`、三份主文档或 `.env.example`。
+- 如果别人克隆仓库后需要某个配置或命令才能开发，把它写进 `README.md`、主文档或 `.env.example`。
 
 ### 文档维护规则
 
-1. **归档不删**：过时文档移入 `docs/archive/`，不直接删除。归档文件在开头加 `> ⚠️ 已归档：[原因]。当前权威文档见 [xxx]。` 标记。
+1. **过时即删**：不再使用的文档直接删除（git 历史保留追溯能力）。
 2. **代码变更同步文档**：重构接口、改错误码格式、改目录结构后，必须同步更新 `api/conventions.md`、`docs/architecture.md`、`docs/roadmap.md` 中对应章节，不留过期描述。
 3. **行号引用禁令**：文档不引用源码行号（行号随重构失效）。改用函数名、类型名或"XX 文件中"等稳定锚点。
-4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase A/B/C/D + 子编号 A0/A1...），不使用旧命名（M1/M3a/P0-1/Phase 0/Phase 1）。旧文档归档时保留原名不改。
-5. **时间戳快照归档**：文件名含日期的快照文档（如 `*-20260531.md`、`*closeout-20260601.md`）完成任务后归档到 `docs/archive/`，不留在活跃目录。
-6. **计数同步**：`docs/README.md` 和 `docs/governance/document-standards.md` 中的文档篇数计数必须与实际文件数一致；增删文件后同步更新。
-7. **自检频率**：项目级 AGENTS.md 最多每 14 天自检一次（第 4 节规则）；`docs/` 目录结构每 7 天可做一次过期扫描。
+4. **阶段名一致性**：文档中使用当前 Phase 命名（Phase A/B/C/D + 子编号 A0/A1...），不使用旧命名。
+5. **自检频率**：项目级 AGENTS.md 最多每 14 天自检一次；`docs/` 目录结构每 7 天可做一次过期扫描。
 
 ## 6. 安全和隐私
 
