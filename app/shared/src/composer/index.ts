@@ -33,3 +33,13 @@ export type {
   QuoteContext,
   ReplyToContext,
 } from './types';
+export {
+  uploadAttachmentWithProgress,
+  uploadPendingAttachmentsWithProgress,
+} from './upload';
+export type {
+  AttachmentUploadContext,
+  AttachmentUploadProgress,
+  ProgressCallback as UploadProgressCallback,
+  UploadResult as AttachmentUploadResult,
+} from './upload';

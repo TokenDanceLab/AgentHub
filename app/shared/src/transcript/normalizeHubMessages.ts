@@ -1,3 +1,4 @@
+import type { AttachmentRef } from '../composer';
 import type { TranscriptAuthor, TranscriptBlock } from './types';
 
 export interface HubMessageAgentRef {
@@ -20,6 +21,17 @@ export interface HubMessageRouteDecisionRef {
   targetAgent?: string;
 }
 
+export interface HubMessageAttachment {
+  id: string;
+  hash?: string;
+  size: number;
+  mime_type: string;
+  original_name?: string;
+  uploader_user_id?: string;
+  metadata?: string;
+  created_at?: string;
+}
+
 export interface HubMessageTranscriptInput {
   id?: string;
   message_id?: string;
@@ -32,6 +44,7 @@ export interface HubMessageTranscriptInput {
   content?: unknown;
   recalled?: boolean;
   created_at?: string;
+  attachments?: HubMessageAttachment[];
   sender?: {
     username?: string;
     nickname?: string;
@@ -59,8 +72,36 @@ function normalizeHubMessage(message: HubMessageTranscriptInput): TranscriptBloc
   const id = message.client_msg_id ?? message.id ?? message.message_id ?? fallbackMessageId(message);
   if (!id) return null;
 
-  const metadata = message.recalled ? null : hubContentMetadata(message.content);
-  const text = message.recalled ? '消息已撤回' : renderHubContent(message.content, metadata?.record);
+  const contentType = message.content_type?.trim().toLowerCase();
+  const recalled = message.recalled;
+
+  // Image or file attachment message
+  if (!recalled && (contentType === 'image' || contentType === 'file')) {
+    const attachment = message.attachments?.[0];
+    if (attachment) {
+      const attachmentRef: AttachmentRef = {
+        id: attachment.id,
+        name: attachment.original_name ?? 'file',
+        ...(attachment.original_name ? { original_name: attachment.original_name } : {}),
+        size: attachment.size,
+        mime_type: attachment.mime_type,
+        ...(attachment.hash ? { hash: attachment.hash } : {}),
+        ...(attachment.created_at ? { created_at: attachment.created_at } : {}),
+      };
+      return {
+        id: `hub-message-${id}`,
+        author: normalizeAuthor(message),
+        ...(message.created_at ? { createdAt: message.created_at } : {}),
+        kind: 'attachment',
+        attachmentRef,
+        contentType: contentType === 'image' ? 'image' : 'file',
+      };
+    }
+    // Fallback: treat as text if attachment data is missing
+  }
+
+  const metadata = recalled ? null : hubContentMetadata(message.content);
+  const text = recalled ? '消息已撤回' : renderHubContent(message.content, metadata?.record);
   if (!text.trim()) return null;
 
   if (metadata?.routeDecision) {

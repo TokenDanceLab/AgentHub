@@ -1345,6 +1345,30 @@
   color: var(--text-2);
   font: 500 0.75rem var(--font-sans);
   overflow: hidden;
+  position: relative;
+}
+
+.attachmentChip[data-uploading='true'] {
+  border-color: var(--primary);
+  opacity: 0.92;
+}
+
+.attachmentUploadBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--surface-high);
+  border-radius: 0 0 var(--r-full) var(--r-full);
+  overflow: hidden;
+}
+
+.attachmentUploadFill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: inherit;
+  transition: width 150ms ease-out;
 }
 
 .attachmentChipThumb {
