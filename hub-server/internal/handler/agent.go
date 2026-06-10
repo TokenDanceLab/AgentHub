@@ -17,6 +17,7 @@ import (
 type AgentService interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
+	RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error)
 	CancelTask(ctx context.Context, userID, taskID string) error
 	HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
 	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
@@ -118,6 +119,22 @@ func (h *AgentHandler) CancelTask(c *gin.Context) {
 		return
 	}
 	OK(c, nil)
+}
+
+// RegenerateTask POST /web/agent-tasks/:id/regenerate
+func (h *AgentHandler) RegenerateTask(c *gin.Context) {
+	userID := c.GetString("user_id")
+	taskID := c.Param("id")
+	newTask, err := h.service.RegenerateAgentTask(c.Request.Context(), userID, taskID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, newTask)
 }
 
 // TaskAck POST /edge/agent-tasks/:id/ack

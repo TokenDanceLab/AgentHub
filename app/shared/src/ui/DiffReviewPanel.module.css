@@ -403,6 +403,32 @@
   text-decoration: line-through;
 }
 
+/* ── Hunk state badge ─────────────────────────────────────────────── */
+.hunkBadge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  z-index: var(--z-sticky);
+  font-size: 9px;
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-sans);
+  padding: 0 5px;
+  border-radius: var(--radius-xs);
+  line-height: 16px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hunkBadgeApplied {
+  background: var(--diff-added-bg);
+  color: var(--diff-added-border);
+}
+
+.hunkBadgeRejected {
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-border);
+}
+
 /* ── Empty state ───────────────────────────────────────────────── */
 .empty {
   display: flex;

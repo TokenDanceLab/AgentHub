@@ -43,6 +43,11 @@ export interface ComposerAttachment {
   truncated?: boolean;
   /** Populated after a successful Hub upload. */
   attachmentRef?: AttachmentRef;
+  /**
+   * Transient file reference retained during the composer editing session.
+   * Used to upload the file on submit. Not serialized or persisted.
+   */
+  file?: File;
 }
 
 export interface ReplyToContext {

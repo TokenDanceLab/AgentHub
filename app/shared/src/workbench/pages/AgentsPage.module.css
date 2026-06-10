@@ -1619,6 +1619,130 @@
    5. 模型配置 (Models)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* ── cc-switch proxy status ── */
+
+.ccswitch-section {
+  border: 1px solid var(--bdr);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 14px;
+  margin-bottom: 14px;
+  transition:
+    background var(--dur-normal) var(--ease),
+    border-color var(--dur-normal) var(--ease),
+    box-shadow var(--dur-normal) var(--ease);
+}
+
+.ccswitch-section:hover {
+  border-color: var(--bdr-strong);
+  box-shadow: var(--e-1);
+}
+
+.ccswitch-badge {
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  font: 600 0.6875rem var(--font-sans);
+  white-space: nowrap;
+}
+
+.ccswitch-badge.active {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.ccswitch-badge.inactive {
+  background: var(--surface-low);
+  color: var(--text-3);
+}
+
+.ccswitch-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--bdr);
+  border-bottom: 1px solid var(--bdr);
+}
+
+.ccswitch-status-row {
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--bdr);
+}
+
+.ccswitch-status-row:first-child {
+  border-top: 0;
+}
+
+.ccswitch-status-row span {
+  color: var(--text-3);
+  font: 600 0.6875rem var(--font-sans);
+}
+
+.ccswitch-status-row strong {
+  min-width: 0;
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ccswitch-provider {
+  margin-top: 10px;
+  border-top: 1px solid var(--bdr);
+  padding-top: 10px;
+}
+
+.ccswitch-alias-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ccswitch-alias-row {
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) 24px minmax(0, 2fr);
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--bdr);
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+}
+
+.ccswitch-alias-row:first-child {
+  border-top: 0;
+}
+
+.ccswitch-alias-row span {
+  color: var(--text-3);
+  font: 600 0.6875rem var(--font-sans);
+}
+
+.ccswitch-alias-row em {
+  color: var(--text-3);
+  font-style: normal;
+  text-align: center;
+}
+
+.ccswitch-alias-row strong {
+  min-width: 0;
+  color: var(--primary);
+  font: 600 0.6875rem var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ccswitch-no-aliases {
+  margin-top: 6px;
+  color: var(--text-3);
+  font: 400 0.75rem var(--font-sans);
+}
+
 .model-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

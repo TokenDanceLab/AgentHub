@@ -559,6 +559,8 @@ export function WorkbenchRoutes({
   localCliDiscovery,
   documentsActions,
   modelCatalog,
+  ccSwitchStatus,
+  ccSwitchProviders,
   settingsService,
   skillMarketItems,
   skillMarketLoading,
@@ -1192,6 +1194,8 @@ export function WorkbenchRoutes({
           skillMarketLoading={skillMarketLoading ?? false}
           mcpMarketItems={mcpMarketItems ?? []}
           mcpMarketLoading={mcpMarketLoading ?? false}
+          ccSwitchStatus={ccSwitchStatus}
+          ccSwitchProviders={ccSwitchProviders}
         />
       );
     case 'runs':

@@ -301,6 +301,7 @@ export interface HubClient {
   addAgentToSession: (sessionId: string, body: HubAddAgentToSessionRequest) => Promise<void>;
   triggerAgentTask: (triggerMessageId: string, options?: HubTriggerAgentTaskOptions) => Promise<HubAgentTask>;
   cancelAgentTask: (taskId: string) => Promise<void>;
+  regenerateAgentTask: (taskId: string) => Promise<HubAgentTask>;
   listTaskRunEvents: (taskId: string) => Promise<HubAgentRunEvent[]>;
   listTaskRunEventsAfter: (taskId: string, afterSeq: number) => Promise<HubAgentRunEvent[]>;
   getTaskRunEventSummary: (taskId: string) => Promise<HubAgentRunEventSummary>;
@@ -386,6 +387,7 @@ export function createMockHubClient(delayMs = 80): HubClient {
     addAgentToSession: async () => {},
     triggerAgentTask: () => { throw new Error('Mock: triggerAgentTask not available'); },
     cancelAgentTask: async () => {},
+    regenerateAgentTask: () => { throw new Error('Mock: regenerateAgentTask not available'); },
     listTaskRunEvents: async () => [],
     listTaskRunEventsAfter: async () => [],
     getTaskRunEventSummary: () => { throw new Error('Mock: getTaskRunEventSummary not available'); },
@@ -537,6 +539,7 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     addAgentToSession: (sessionId, body) => shared.addAgentToSession(sessionId, body),
     triggerAgentTask: (triggerMessageId, options) => shared.triggerAgentTask(triggerMessageId, options),
     cancelAgentTask: (taskId) => shared.cancelAgentTask(taskId),
+    regenerateAgentTask: (taskId) => shared.regenerateAgentTask(taskId),
     listTaskRunEvents: (taskId) =>
       shared.request<HubAgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
     listTaskRunEventsAfter: (taskId, afterSeq) =>

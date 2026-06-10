@@ -1263,6 +1263,63 @@ const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
         </button>
       </div>
 
+      {/* cc-switch proxy status */}
+      {ccSwitchStatus && (
+        <section className={styles['ccswitch-section']}>
+          <div className={styles['section-title-row']}>
+            <h2>cc-switch 透明代理</h2>
+            <span className={`${styles['ccswitch-badge']} ${ccSwitchStatus.routingActive ? styles.active : styles.inactive}`}>
+              {ccSwitchStatus.routingActive ? '已连接' : '未启用'}
+            </span>
+          </div>
+          <div className={styles['ccswitch-status-grid']}>
+            <div className={styles['ccswitch-status-row']}>
+              <span>安装状态</span>
+              <strong>{ccSwitchStatus.installed ? '已安装' : '未检测到'}</strong>
+            </div>
+            <div className={styles['ccswitch-status-row']}>
+              <span>路由状态</span>
+              <strong>{ccSwitchStatus.routingActive ? '活跃' : '未启用'}</strong>
+            </div>
+            {ccSwitchStatus.proxyPort ? (
+              <div className={styles['ccswitch-status-row']}>
+                <span>代理端口</span>
+                <strong>{ccSwitchStatus.proxyPort}</strong>
+              </div>
+            ) : null}
+            {ccSwitchStatus.activeAppTypes?.length ? (
+              <div className={styles['ccswitch-status-row']}>
+                <span>活跃应用</span>
+                <strong>{ccSwitchStatus.activeAppTypes.join(', ')}</strong>
+              </div>
+            ) : null}
+          </div>
+          {ccSwitchProviders.filter((p) => p.isCurrent).map((provider) => (
+            <div key={provider.providerId} className={styles['ccswitch-provider']}>
+              <div className={styles['section-title-row']}>
+                <h3>{provider.providerName}</h3>
+                <span>current provider</span>
+              </div>
+              {provider.modelAliases && Object.keys(provider.modelAliases).length > 0 ? (
+                <div className={styles['ccswitch-alias-grid']}>
+                  {Object.entries(provider.modelAliases)
+                    .filter(([key]) => !key.endsWith('_name'))
+                    .map(([alias, resolved]) => (
+                      <div key={alias} className={styles['ccswitch-alias-row']}>
+                        <span>{alias}</span>
+                        <em>&rarr;</em>
+                        <strong>{resolved}</strong>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className={styles['ccswitch-no-aliases']}>当前 Provider 无模型别名映射</p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* Model grid */}
       <div className={styles['model-grid']}>
         {models.map((model) => (

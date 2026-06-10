@@ -257,27 +257,31 @@ export async function submitWebComposerIntent(
   intent: ComposerIntent,
   options: SubmitWebComposerIntentOptions = {},
 ): Promise<ComposerSubmitResult> {
-  const mention = intent.mentions[0];
+  // Upload any attachments that have a File reference but no server-side ref yet
+  const enrichedAttachments = await uploadPendingAttachments(intent);
+  const enrichedIntent = { ...intent, attachments: enrichedAttachments };
+
+  const mention = enrichedIntent.mentions[0];
   if (mention && !mention.runtimeId) {
     throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
   }
   const dispatchTarget = mention
-    ? await resolveWebDispatchTarget(hubClient, (intent as WebComposerIntent).executionTargetId)
+    ? await resolveWebDispatchTarget(hubClient, (enrichedIntent as WebComposerIntent).executionTargetId)
     : undefined;
   const agentInstance = mention
-    ? await ensureMentionedAgentInstance(hubClient, intent.conversationId, mention, options.queryClient)
+    ? await ensureMentionedAgentInstance(hubClient, enrichedIntent.conversationId, mention, options.queryClient)
     : undefined;
 
   const clientMessageId = createClientMessageId();
-  const optimisticMessage = optimisticHubMessageFromIntent(intent, clientMessageId, options.now?.() ?? new Date().toISOString());
+  const optimisticMessage = optimisticHubMessageFromIntent(enrichedIntent, clientMessageId, options.now?.() ?? new Date().toISOString());
   upsertHubMessage(options.queryClient, optimisticMessage);
 
   let message: SendMessageResponse;
   try {
-    message = await sendComposerMessage(hubClient, clientMessageId, intent);
-    confirmOptimisticHubMessage(options.queryClient, intent.conversationId, clientMessageId, message);
+    message = await sendComposerMessage(hubClient, clientMessageId, enrichedIntent);
+    confirmOptimisticHubMessage(options.queryClient, enrichedIntent.conversationId, clientMessageId, message);
   } catch (error) {
-    removeOptimisticHubMessage(options.queryClient, intent.conversationId, clientMessageId);
+    removeOptimisticHubMessage(options.queryClient, enrichedIntent.conversationId, clientMessageId);
     throw error;
   }
 
@@ -285,7 +289,7 @@ export async function submitWebComposerIntent(
     return { intentId: message.message_id };
   }
 
-  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, dispatchTarget, intent);
+  const task = await triggerMentionedAgent(hubClient, message.message_id, agentInstance?.id, dispatchTarget, enrichedIntent);
   if (task.id) {
     const targetId = task.target_id ?? dispatchTarget?.id;
     recordWebAgentTaskIndex(options.queryClient, {
@@ -307,10 +311,26 @@ async function sendComposerMessage(
   clientMessageId: string,
   intent: ComposerIntent,
 ): Promise<SendMessageResponse> {
+  const hasAttachments = intent.attachments.length > 0;
+  const firstImageAttachment = hasAttachments
+    ? intent.attachments.find((a) => a.mime?.startsWith('image/') && a.attachmentRef)
+    : undefined;
+  const firstFileAttachment = hasAttachments && !firstImageAttachment
+    ? intent.attachments.find((a) => a.attachmentRef)
+    : undefined;
+
+  let contentType: import('@shared/hubClient').HubContentType = 'text';
+  if (firstImageAttachment) {
+    contentType = 'image';
+  } else if (firstFileAttachment) {
+    contentType = 'file';
+  }
+
   return hubClient.sendMessage(intent.conversationId, {
     client_msg_id: clientMessageId,
-    content_type: 'text',
+    content_type: contentType,
     content: buildHubComposerPrompt(intent),
+    ...(intent.replyTo ? { reply_to_message_id: intent.replyTo.messageId } : {}),
   });
 }
 
@@ -319,6 +339,21 @@ export function optimisticHubMessageFromIntent(
   clientMessageId: string,
   createdAt: string,
 ): MessageResponse {
+  const hasAttachments = intent.attachments.length > 0;
+  const firstImageAttachment = hasAttachments
+    ? intent.attachments.find((a) => a.mime?.startsWith('image/') && a.attachmentRef)
+    : undefined;
+  const firstFileAttachment = hasAttachments && !firstImageAttachment
+    ? intent.attachments.find((a) => a.attachmentRef)
+    : undefined;
+
+  let contentType: import('@shared/hubClient').HubContentType = 'text';
+  if (firstImageAttachment) {
+    contentType = 'image';
+  } else if (firstFileAttachment) {
+    contentType = 'file';
+  }
+
   return {
     id: clientMessageId,
     session_id: intent.conversationId,
@@ -326,9 +361,10 @@ export function optimisticHubMessageFromIntent(
     client_msg_id: clientMessageId,
     sender_type: 'user',
     sender_id: 'web-current-user',
-    content_type: 'text',
+    content_type: contentType,
     content: buildHubComposerPrompt(intent),
     created_at: createdAt,
+    ...(intent.replyTo ? { reply_to: { id: intent.replyTo.messageId, sender_id: intent.replyTo.author } } : {}),
   };
 }
 
