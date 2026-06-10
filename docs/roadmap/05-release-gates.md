@@ -28,6 +28,11 @@ Mock 验收 (demo data 走通)
 | 5 | 上下文压缩 | 模拟超长对话 → 压缩触发 | — | — |
 | 6 | 消息搜索跳转 | Demo 搜索结果点击跳转 | Hub 搜索 API 返回正确 offset | — |
 | 7 | Tool allowlist | 非白名单工具被拒绝 | — | — |
+| 8 | 失败降级 | 子 agent crash → 3 次重试 → LLM 决策 replan → 上报 | 真实 Edge agent crash 后自动恢复 | — |
+| 9 | 同级上下文 | 3 worker 并发 → 每个 prompt 含同级边界警告 | 真实 Edge 3 agent 并发，文件冲突归 0 | — |
+| 10 | Plan 确认门 | 群聊 PlanCard → 用户确认 → 分发 | 真实 Hub WS plan.proposed + plan:approve 闭环 | — |
+| 11 | 结构化 Plan | LLM 拆解 → 结构化 dispatch schema | 真实 Edge orchestrator 输出验证 | — |
+| 12 | 消息重新生成 | 用户点重新生成 → Hub 重新 dispatch → 新回复覆盖 | Hub re-trigger API 通过 | — |
 
 - [x] 全部 Mock 模式通过
 - [ ] 全部 Observed 模式通过
@@ -47,6 +52,11 @@ Mock 验收 (demo data 走通)
 | 6 | Diff hunk 交互 | Accept/reject → 状态更新 | 与管线 #2 联动验证 |
 | 7 | Artifact topic 分组 | 多产物 → 按 topic 分组展示 | — |
 | 8 | Context 用量可见 | 对话中 → Overview 进度条正确 | — |
+| 9 | 消息回复 | 长按消息 → 回复模式 → 引文缩进渲染 | — |
+| 10 | 消息引用 | 选中文本 → 引用发送 → blockquote 渲染 | — |
+| 11 | 图片附件 | 选图片 → 上传 → 消息气泡嵌入预览 | — |
+| 12 | Agent 能力标签 | 联系人列表 → 每个 Agent 旁显示彩色能力标签 | — |
+| 13 | 重新生成 | 长按 → 重新生成 → 新回复流式替换 | — |
 
 - [ ] 全部 Mock 模式通过
 - [ ] Desktop dev server (5173) 手动走通所有路径
@@ -124,8 +134,8 @@ Mock 验收 (demo data 走通)
 
 ## 整体进度追踪
 
-- [ ] 管线类 7/7 Mock + Observed 双模式通过
-- [ ] 轻 UI 类 8/8 Mock 模式通过
+- [ ] 管线类 12/12 Mock + Observed 双模式通过
+- [ ] 轻 UI 类 13/13 Mock 模式通过
 - [ ] 右侧栏类 13/13 Mock 模式通过
 - [ ] Release Gate 6/6 脚本通过
 - [ ] 演示材料（截图 + 视频 + AI 协作证据包）

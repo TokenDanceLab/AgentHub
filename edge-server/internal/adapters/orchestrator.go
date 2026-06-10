@@ -834,9 +834,9 @@ func (d *dispatchInterceptor) awaitPlanApproval(events []dispatchEvent, scope ma
 			deps = []string{}
 		}
 		tasks[i] = PlanTask{
-			AgentID:   evt.Agent,
-			Task:      evt.Task,
-			DependsOn: deps,
+			Agent:       evt.Agent,
+			Description: evt.Task,
+			DependsOn:   deps,
 		}
 	}
 
