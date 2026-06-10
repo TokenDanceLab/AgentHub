@@ -435,254 +435,300 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}()
 	}
 
-	var cmdPath string
-	var args, env []string
-	var workDir string
-	adapterCtx := adapters.RunProcessContext(runCtx)
+	// Session retry loop: when CC exits quickly with a session conflict error
+	// ("Session ID ... is already in use" or "No conversation found with session ID"),
+	// generate a fresh random session ID and retry once. This handles the case where
+	// a stale CC process from a previous Edge instance still holds the session lock.
+	const maxSessionRetries = 2
+	var lastWaitErr error
+	for attempt := 0; attempt < maxSessionRetries; attempt++ {
+		var cmdPath string
+		var args, env []string
+		var workDir string
+		adapterCtx := adapters.RunProcessContext(runCtx)
 
-	if adapter != nil {
-		// Adapter mode: BuildCommand provides full command configuration
-		cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
-	} else {
-		// Profile mode: use configured command template
-		var err error
-		args, env, err = e.profile.Template.Expand(runCtx)
+		if adapter != nil {
+			// Adapter mode: BuildCommand provides full command configuration
+			cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
+		} else {
+			// Profile mode: use configured command template
+			var err error
+			args, env, err = e.profile.Template.Expand(runCtx)
+			if err != nil {
+				e.publishFailed(run, err)
+				return
+			}
+			cmdPath = e.profile.Command
+			workDir = e.profile.WorkDir
+		}
+		if adapter != nil {
+			plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
+			e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
+		}
+
+		// Take workdir snapshot for auto-surface detection (post-finish).
+		// Captures pre-run file state so we can detect new/modified files.
+		if workDir != "" {
+			snapshot := adapters.TakeWorkdirSnapshot(workDir)
+			e.mu.Lock()
+			e.workDirs[run.ID] = workDir
+			e.surfacers[run.ID] = snapshot
+			e.mu.Unlock()
+		}
+
+		_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
 		if err != nil {
 			e.publishFailed(run, err)
 			return
 		}
-		cmdPath = e.profile.Command
-		workDir = e.profile.WorkDir
-	}
-	if adapter != nil {
-		plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
-		e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
-	}
-
-	// Take workdir snapshot for auto-surface detection (post-finish).
-	// Captures pre-run file state so we can detect new/modified files.
-	if workDir != "" {
-		snapshot := adapters.TakeWorkdirSnapshot(workDir)
-		e.mu.Lock()
-		e.workDirs[run.ID] = workDir
-		e.surfacers[run.ID] = snapshot
-		e.mu.Unlock()
-	}
-
-	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
-	if err != nil {
-		e.publishFailed(run, err)
-		return
-	}
-	cmd := exec.CommandContext(ctx, cmdPath, args...)
-	cmd.Dir = workDir
-	if adapter != nil {
-		// Adapter mode: the adapter returns only auth env vars (e.g.
-		// ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL) that must be overlaid on
-		// top of the sanitized parent environment. Passing them as
-		// profileEnv would replace the entire child env with just those
-		// vars, stripping PATH, SYSTEMROOT and other OS essentials — which
-		// causes the CLI to fail immediately. Instead, merge adapter env
-		// into extraEnv so SanitizedEnv provides the full OS base plus the
-		// adapter's auth passthrough.
-		cmd.Env = e.envForRun(run, nil, append(extraEnv, env...))
-	} else {
-		cmd.Env = e.envForRun(run, env, extraEnv)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		e.publishFailed(run, fmt.Errorf("open stdout pipe: %w", err))
-		return
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		e.publishFailed(run, fmt.Errorf("open stderr pipe: %w", err))
-		return
-	}
-	var stdin io.WriteCloser
-	if adapter != nil && adapter.NeedsStdin() {
-		stdin, err = cmd.StdinPipe()
+		cmd := exec.CommandContext(ctx, cmdPath, args...)
+		cmd.Dir = workDir
+		if adapter != nil {
+			// Adapter mode: the adapter returns only auth env vars (e.g.
+			// ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL) that must be overlaid on
+			// top of the sanitized parent environment. Passing them as
+			// profileEnv would replace the entire child env with just those
+			// vars, stripping PATH, SYSTEMROOT and other OS essentials — which
+			// causes the CLI to fail immediately. Instead, merge adapter env
+			// into extraEnv so SanitizedEnv provides the full OS base plus the
+			// adapter's auth passthrough.
+			cmd.Env = e.envForRun(run, nil, append(extraEnv, env...))
+		} else {
+			cmd.Env = e.envForRun(run, env, extraEnv)
+		}
+		stdout, err := cmd.StdoutPipe()
 		if err != nil {
-			e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
+			e.publishFailed(run, fmt.Errorf("open stdout pipe: %w", err))
 			return
 		}
-		e.mu.Lock()
-		e.stdins[run.ID] = stdin
-		e.mu.Unlock()
-	}
-	setResourceLimits(cmd)
-	argSummary := summarizeProcessArgsForLog(args)
-	slog.Debug("executor.subprocess.starting",
-		"runId", run.ID,
-		"commandName", processCommandNameForLog(cmdPath),
-		"commandRedacted", true,
-		"argCount", len(args),
-		"argFlags", argSummary.ArgFlags,
-		"configKeys", argSummary.ConfigKeys,
-		"positionalArgCount", argSummary.PositionalArgCount,
-		"unknownFlagCount", argSummary.UnknownFlagCount,
-		"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
-		"argsRedacted", true,
-	)
-	if err := cmd.Start(); err != nil {
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			e.publishFailed(run, fmt.Errorf("open stderr pipe: %w", err))
+			return
+		}
+		var stdin io.WriteCloser
+		if adapter != nil && adapter.NeedsStdin() {
+			stdin, err = cmd.StdinPipe()
+			if err != nil {
+				e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
+				return
+			}
+			e.mu.Lock()
+			e.stdins[run.ID] = stdin
+			e.mu.Unlock()
+		}
+		setResourceLimits(cmd)
+		argSummary := summarizeProcessArgsForLog(args)
+		slog.Debug("executor.subprocess.starting",
+			"runId", run.ID,
+			"commandName", processCommandNameForLog(cmdPath),
+			"commandRedacted", true,
+			"argCount", len(args),
+			"argFlags", argSummary.ArgFlags,
+			"configKeys", argSummary.ConfigKeys,
+			"positionalArgCount", argSummary.PositionalArgCount,
+			"unknownFlagCount": argSummary.UnknownFlagCount,
+			"redactedConfigKeyCount", argSummary.RedactedConfigKeyCount,
+			"argsRedacted", true,
+			"attempt", attempt,
+		)
+		subprocessStart := time.Now()
+		if err := cmd.Start(); err != nil {
+			if ctx.Err() != nil {
+				if cmd.Process != nil {
+					_, _ = cmd.Process.Wait()
+				}
+				e.publishCancelled(run)
+				return
+			}
+			e.publishFailed(run, err)
+			return
+		}
+		// If context was cancelled after Start but before we checked, kill the child.
 		if ctx.Err() != nil {
 			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
 				_, _ = cmd.Process.Wait()
 			}
 			e.publishCancelled(run)
 			return
 		}
-		e.publishFailed(run, err)
-		return
-	}
-	// If context was cancelled after Start but before we checked, kill the child.
-	if ctx.Err() != nil {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-			_, _ = cmd.Process.Wait()
+
+		slog.Debug("executor.subprocess.started", "runId", run.ID, "pid", cmd.Process.Pid)
+
+		// Track process for graceful shutdown signals (SIGTERM on Unix).
+		e.mu.Lock()
+		e.processes[run.ID] = cmd.Process
+		e.mu.Unlock()
+
+		// Close stdin unless the adapter needs it for the control protocol
+		// (permission responses) or a DecisionLoop is configured (force-finish
+		// via stdin interrupt). An open pipe with no data causes CLI agents
+		// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
+		// eagerly when neither mechanism requires stdin.
+		if stdin != nil && !adapter.NeedsStdin() && e.decisionLoopFactory == nil {
+			_ = stdin.Close()
+			e.mu.Lock()
+			delete(e.stdins, run.ID)
+			e.mu.Unlock()
 		}
-		e.publishCancelled(run)
-		return
-	}
 
-	slog.Debug("executor.subprocess.started", "runId", run.ID, "pid", cmd.Process.Pid)
+		// Record metrics: run has started successfully
+		if e.metrics != nil {
+			e.metrics.RecordRunStart(adapterLabel)
+			runStartTime = time.Now()
+		}
 
-	// Track process for graceful shutdown signals (SIGTERM on Unix).
-	e.mu.Lock()
-	e.processes[run.ID] = cmd.Process
-	e.mu.Unlock()
+		started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
+		if ok {
+			e.bus.Publish("run.started", runScope(started), RunResponse(started))
+			// Fire Hub TaskAck callback (Edge→Hub direct bridge)
+			e.fireHubAck(run.ID)
+		}
+		e.checkPersistError(run.ID)
 
-	// Close stdin unless the adapter needs it for the control protocol
-	// (permission responses) or a DecisionLoop is configured (force-finish
-	// via stdin interrupt). An open pipe with no data causes CLI agents
-	// (Claude Code) to wait ~3s and warn "no stdin data", so we close it
-	// eagerly when neither mechanism requires stdin.
-	if stdin != nil && !adapter.NeedsStdin() && e.decisionLoopFactory == nil {
-		_ = stdin.Close()
-		e.mu.Lock()
-		delete(e.stdins, run.ID)
-		e.mu.Unlock()
-	}
-
-	// Record metrics: run has started successfully
-	if e.metrics != nil {
-		e.metrics.RecordRunStart(adapterLabel)
-		runStartTime = time.Now()
-	}
-
-	started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
-	if ok {
-		e.bus.Publish("run.started", runScope(started), RunResponse(started))
-		// Fire Hub TaskAck callback (Edge→Hub direct bridge)
-		e.fireHubAck(run.ID)
-	}
-	e.checkPersistError(run.ID)
-
-	// Create temp file for run output persistence and replay
-	outStore, err := runnerctx.NewRunOutputStore(run.ID)
-	if err != nil {
-		slog.Warn("process: failed to create run output store", "runId", run.ID, "err", err)
-	} else {
-		e.mu.Lock()
-		e.runOutputs[run.ID] = outStore
-		e.mu.Unlock()
-	}
-
-	var wg sync.WaitGroup
-	outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
-	wg.Add(1)
-	go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", stderr)
-
-	// Inject context budget for token tracking in stream parsers.
-	// Also inject RunProcessContext unconditionally — SDK adapters
-	// (anthropic-sdk, openai-sdk) need prompt, model, and messages
-	// regardless of whether a WorkDir is set.
-	parserCtx := ctx
-	if runCtx.Budget != nil {
-		parserCtx = context.WithValue(parserCtx, adapters.CtxBudgetKey, runCtx.Budget)
-	}
-	if runCtx.WorkDir != "" {
-		parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
-	}
-	parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
-
-	var parseErr error
-	if adapter != nil {
-		wg.Add(1)
-		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
-	} else {
-		// Raw capture: stdout goes to run.output.batch events
-		wg.Add(1)
-		go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
-	}
-
-	// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
-	// descriptors; otherwise structured parsers can race with Wait and see
-	// transient "file already closed" read errors.
-	wg.Wait()
-	waitErr := cmd.Wait()
-	slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(waitErr))
-
-	// Context budget compaction check: after the stream completes, evaluate
-	// whether the context budget exceeded the auto-compaction threshold.
-	// When triggered, we log the budget state and emit a compaction event
-	// so upstream session managers can compact the actual message history.
-	if runCtx.Budget != nil && runCtx.Budget.ShouldCompact() {
-		usagePct := runCtx.Budget.UsagePercent()
-		tokensUsed := runCtx.Budget.UsedTokens.Load()
-		remaining := runCtx.Budget.Remaining()
-		slog.Info("process: context compaction threshold reached",
-			"runId", run.ID,
-			"usagePercent", usagePct,
-			"tokensUsed", tokensUsed,
-			"tokensRemaining", remaining,
-		)
-		e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), map[string]any{
-			"runId":           run.ID,
-			"usagePercent":    usagePct,
-			"tokensUsed":      tokensUsed,
-			"tokensRemaining": remaining,
-			"threshold":       runnerctx.CompactionThreshold,
-		})
-	}
-
-	if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
-		e.publishCancelled(run)
-		e.sendSubAgentResult(run.ID, "cancelled", nil)
-		return
-	}
-	if waitErr != nil {
-		e.publishFailed(run, errorWithRunOutput(waitErr, outStore))
-		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": waitErr.Error()})
-		return
-	}
-	// #179: handle structured output parse errors with recoverability distinction.
-	// Non-recoverable errors (pipe broken, context cancelled) fail the run.
-	// Recoverable errors (malformed event, orphaned tool) emit a warning and
-	// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
-	if parseErr != nil {
-		var psErr *adapters.ParseStreamError
-		if errors.As(parseErr, &psErr) && psErr.Recoverable() {
-			slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "err", parseErr)
-			e.bus.Publish(adapters.BusEventContextWarning, runScope(run), map[string]any{
-				"runId":   run.ID,
-				"message": fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
-				"warning": psErr.Error(),
-			})
+		// Create temp file for run output persistence and replay
+		outStore, err := runnerctx.NewRunOutputStore(run.ID)
+		if err != nil {
+			slog.Warn("process: failed to create run output store", "runId", run.ID, "err", err)
 		} else {
-			e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
-			e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
+			e.mu.Lock()
+			e.runOutputs[run.ID] = outStore
+			e.mu.Unlock()
+		}
+
+		var wg sync.WaitGroup
+		outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
+		wg.Add(1)
+		go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", stderr)
+
+		// Inject context budget for token tracking in stream parsers.
+		// Also inject RunProcessContext unconditionally — SDK adapters
+		// (anthropic-sdk, openai-sdk) need prompt, model, and messages
+		// regardless of whether a WorkDir is set.
+		parserCtx := ctx
+		if runCtx.Budget != nil {
+			parserCtx = context.WithValue(parserCtx, adapters.CtxBudgetKey, runCtx.Budget)
+		}
+		if runCtx.WorkDir != "" {
+			parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
+		}
+		parserCtx = adapters.SDKAdapterContext(parserCtx, adapters.RunProcessContext(runCtx))
+
+		var parseErr error
+		if adapter != nil {
+			wg.Add(1)
+			go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
+		} else {
+			// Raw capture: stdout goes to run.output.batch events
+			wg.Add(1)
+			go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
+		}
+
+		// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
+		// descriptors; otherwise structured parsers can race with Wait and see
+		// transient "file already closed" read errors.
+		wg.Wait()
+		lastWaitErr = cmd.Wait()
+		slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(lastWaitErr), "attempt", attempt)
+
+		// Context budget compaction check: after the stream completes, evaluate
+		// whether the context budget exceeded the auto-compaction threshold.
+		// When triggered, we log the budget state and emit a compaction event
+		// so upstream session managers can compact the actual message history.
+		if runCtx.Budget != nil && runCtx.Budget.ShouldCompact() {
+			usagePct := runCtx.Budget.UsagePercent()
+			tokensUsed := runCtx.Budget.UsedTokens.Load()
+			remaining := runCtx.Budget.Remaining()
+			slog.Info("process: context compaction threshold reached",
+				"runId", run.ID,
+				"usagePercent", usagePct,
+				"tokensUsed", tokensUsed,
+				"tokensRemaining", remaining,
+			)
+			e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), map[string]any{
+				"runId":           run.ID,
+				"usagePercent":    usagePct,
+				"tokensUsed":      tokensUsed,
+				"tokensRemaining": remaining,
+				"threshold":       runnerctx.CompactionThreshold,
+			})
+		}
+
+		if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
+			e.publishCancelled(run)
+			e.sendSubAgentResult(run.ID, "cancelled", nil)
 			return
 		}
+
+		// Session conflict retry: if CC failed quickly with a session conflict
+		// error and this is the first attempt, reset the session ID and retry.
+		if lastWaitErr != nil && attempt == 0 && isSessionConflictError(lastWaitErr) && time.Since(subprocessStart) < sessionRetryWindow {
+			newSession := newRandomSessionID()
+			slog.Warn("process: session conflict detected, retrying with fresh session ID",
+				"runId", run.ID,
+				"oldSessionId", runCtx.SessionID,
+				"newSessionId", newSession,
+				"err", lastWaitErr,
+			)
+			runCtx.SessionID = newSession
+			runCtx.ContinueLast = false
+			// Clean up the tracked process from this attempt before retrying.
+			e.mu.Lock()
+			delete(e.processes, run.ID)
+			if s, ok := e.runOutputs[run.ID]; ok {
+				_ = s.Close()
+				delete(e.runOutputs, run.ID)
+			}
+			e.mu.Unlock()
+			// Reset run status back to queued so the retry can transition to started.
+			if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); ok {
+				slog.Debug("process: reset run status to queued for session retry", "runId", run.ID)
+			}
+			continue
+		}
+
+		// Not retrying — process the final result.
+		if lastWaitErr != nil {
+			e.publishFailed(run, errorWithRunOutput(lastWaitErr, outStore))
+			e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastWaitErr.Error()})
+			return
+		}
+		// #179: handle structured output parse errors with recoverability distinction.
+		// Non-recoverable errors (pipe broken, context cancelled) fail the run.
+		// Recoverable errors (malformed event, orphaned tool) emit a warning and
+		// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
+		if parseErr != nil {
+			var psErr *adapters.ParseStreamError
+			if errors.As(parseErr, &psErr) && psErr.Recoverable() {
+				slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "err", parseErr)
+				e.bus.Publish(adapters.BusEventContextWarning, runScope(run), map[string]any{
+					"runId":   run.ID,
+					"message": fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap()),
+					"warning": psErr.Error(),
+				})
+			} else {
+				e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
+				e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
+				return
+			}
+		}
+		finished, ok := e.store.SetRunStatusIf(run.ID, "finished", "started")
+		if ok {
+			e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
+			e.sendSubAgentResult(run.ID, "finished", RunResponse(finished))
+			// Fire Hub TaskDone callback (Edge→Hub direct bridge)
+			e.fireHubDone(run.ID, RunResponse(finished))
+		}
+		e.checkPersistError(run.ID)
+		return
 	}
-	finished, ok := e.store.SetRunStatusIf(run.ID, "finished", "started")
-	if ok {
-		e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
-		e.sendSubAgentResult(run.ID, "finished", RunResponse(finished))
-		// Fire Hub TaskDone callback (Edge→Hub direct bridge)
-		e.fireHubDone(run.ID, RunResponse(finished))
+
+	// Exhausted retries — report the last error.
+	if lastWaitErr != nil {
+		e.publishFailed(run, errorWithRunOutput(lastWaitErr, nil))
+		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": lastWaitErr.Error()})
 	}
-	e.checkPersistError(run.ID)
 }
 
 func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, limiter *runOutputLimiter, stream string, reader io.Reader) {
