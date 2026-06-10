@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -169,6 +170,11 @@ const (
 	hubCallbackChunkMaxBytes          = 16 * 1024
 	persistedAssistantMessageMaxBytes = 200 * 1024
 	persistedFailureMessageMaxBytes   = 8 * 1024
+
+	// sessionRetryWindow is the maximum wall-clock duration (from cmd.Start to
+	// cmd.Wait) within which a "session already in use" or "no conversation
+	// found" error triggers an automatic retry with a fresh session ID.
+	sessionRetryWindow = 10 * time.Second
 )
 
 type runOutputLimiter struct {
@@ -1379,6 +1385,30 @@ func childBudget(parent *runnerctx.ContextBudget, depth int) *runnerctx.ContextB
 	fraction := int64(1 << depth) // 2, 4, 8, ...
 	ratio := 1.0 / float64(fraction)
 	return parent.AllocateChild(ratio)
+}
+
+// isSessionConflictError returns true when the error message indicates a
+// Claude Code session conflict — either "Session ID ... is already in use"
+// or "No conversation found with session ID". In both cases, retrying with
+// a fresh random session ID (and ContinueLast=false) is the correct recovery.
+func isSessionConflictError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "is already in use") ||
+		strings.Contains(msg, "No conversation found with session ID")
+}
+
+// newRandomSessionID generates a random UUID v4 string for retrying CC
+// sessions when the deterministic session ID conflicts with a stale process.
+func newRandomSessionID() string {
+	var uuid [16]byte
+	_, _ = rand.Read(uuid[:])
+	uuid[6] = (uuid[6] & 0x0f) | 0x40 // version 4
+	uuid[8] = (uuid[8] & 0x3f) | 0x80 // variant 2
+	return fmt.Sprintf("%x-%x-%x-%x-%x",
+		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
 
 // ── Hub callback fire-and-forget helpers ─────────────────────────────────
