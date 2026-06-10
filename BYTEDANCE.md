@@ -1,7 +1,7 @@
 # BYTEDANCE.md — AgentHub 项目主文档
 
 > 最后更新：2026-06-10
-> 关联文档：`STATE.md`（当前事实）、`docs/roadmap.md`（路线图）、`docs/architecture.md`（架构边界）
+> 关联文档：`STATE.md`（当前事实）、`docs/roadmap/`（路线图）、`docs/architecture.md`（架构边界）
 
 ---
 
@@ -91,7 +91,14 @@ Web / Desktop / Mobile / IM
 
 ### ADR-004: SDK Adapter 纯 HTTP 实现
 
-**决策**：SDK adapters 不依赖外部 SDK 包，使用 Go 标准 `net/http` 实现 HTTP direct call + SSE streaming。
+**决策**：SDK adapters 不依赖外部 SDK 包，使用 Go 标准 `net/http` 实现 HTTP direct call + SSE streaming。`BuildCommand` 返回跨平台 no-op 哨兵命令（`true` / `cmd /c exit 0`），`ParseStream` 直接发 HTTP 请求并解析 SSE 事件流。
+
+**实现细节**：
+- **Anthropic SDK adapter**（`anthropic-sdk`）：直接 HTTP 到 Messages API (`/v1/messages`)，SSE streaming，支持 thinking mode（`budget_tokens`）、tool calls、multi-turn history
+- **OpenAI SDK adapter**（`openai-sdk`）：直接 HTTP 到 Chat Completions API (`/v1/chat/completions`)，SSE streaming，支持 reasoning effort、structured output schema、reasoning content
+- 两个 adapter 均支持 `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` 环境变量自定义 base URL（自动去除末尾 `/v1` 防止路径重复），适配代理网关
+- 启用方式：`--anthropic-sdk-path` 和 `--openai-sdk-path` flags（也支持 `AGENTHUB_ANTHROPIC_SDK_PATH` / `AGENTHUB_OPENAI_SDK_PATH` 环境变量）
+- E2E 测试通过 `api.vectorcontrol.tech` 代理网关验证，结果记录在 `tests/results/adapters-e2e-2026-06-10.md`
 
 ### ADR-005: TokenDance ID 作为统一身份源
 
@@ -187,7 +194,168 @@ pwsh -NoProfile -File tests/scripts/verify-real-api-smoke.ps1
 
 ---
 
-## 8. 关键链接
+## 8. cc-switch 透明代理集成
+
+cc-switch 是一个本地透明代理，位于 Claude Code / Codex 和上游 API 提供商之间。它重写请求，使 Claude Code 认为在与 Anthropic 对话，但实际后端可能是 DeepSeek、GLM、Qwen 等模型。
+
+### 架构
+
+```text
+Claude Code / Codex
+  → cc-switch proxy (本地 SQLite 配置)
+  → 上游 API provider (DeepSeek / GLM / Qwen / ...)
+```
+
+cc-switch 维护一个 SQLite 数据库（`~/.cc-switch/cc-switch.db`），存储 provider 配置、model alias 映射和 proxy routing 状态。Edge Server 启动时自动检测 cc-switch 安装状态。
+
+### Edge 集成
+
+Edge Server 通过 `ccswitch` 包（`edge-server/internal/ccswitch/`）读取 cc-switch 数据库：
+
+- **`ccswitch.Detect()`**：探测本地 cc-switch 安装状态（`CCSwitchStatus`），包括 `Installed`、`RoutingActive`、`ProxyPort`、`ActiveAppTypes`
+- **`ccswitch.Reader`**：读取 provider 配置和 model alias 映射（`ProviderModelMapping`），支持按 `app_type` 过滤
+- **`Reader.ResolveModelAlias(alias, appType)`**：将 Claude Code model alias（如 `claude-sonnet`）解析为 cc-switch 路由的实际 model
+
+### API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/ccswitch/status` | GET | cc-switch 安装状态、routing 是否活跃、proxy 端口 |
+| `/v1/ccswitch/providers` | GET | 当前 provider 配置、model alias 映射、base URL |
+
+### Model Catalog 联动
+
+`model_catalog.go` 中的 `addCcSwitchDBCatalog` 将 cc-switch 数据库中的透明代理映射注入 Edge model catalog，使前端能展示"用户选择 claude-sonnet → 实际路由到 deepseek-v4-pro"的完整映射链。
+
+---
+
+## 9. AgentMemory 文件系统
+
+AgentHub 实现了基于文件系统的 Agent Memory 机制，允许跨会话、跨 agent 持久化上下文信息。
+
+### 目录结构
+
+```text
+{workspace}/
+  .agenthub/
+    memory/
+      project.md          # 项目级事实（所有 thread/agent 共享）
+      thread_{threadID}.md # 线程级上下文
+      agent_{agentID}.md   # Agent 级偏好和记忆
+```
+
+### 文件格式
+
+每个 entry 使用 YAML frontmatter + Markdown body：
+
+```markdown
+---
+id: project-onboarding
+source: system
+tags: [context, preference]
+created: 2026-06-10T12:00:00Z
+updated: 2026-06-10T12:00:00Z
+---
+
+这是项目记忆文件。AgentHub 会在每次运行前加载此处的条目。
+```
+
+- `source` 取值：`user`、`agent`、`system`
+- `tags` 为可选的 inline YAML 数组
+- 单文件可包含多个 entry（多组 `---` 分隔）
+
+### 注入链路
+
+```
+ReadMemory(workDir, threadID, agentID)
+  → 按作用域读取 project.md + thread_{id}.md + agent_{id}.md
+  → 格式化为 [AgentHub Memory - {category}] 区块
+  → BuildMemoryPrompt() 生成完整 prompt 文本
+  → 注入到 SkillsPrompt → RunProcessContext.AppendSystemPrompt
+  → 传递给 agent adapter 的 system prompt
+```
+
+Memory 目录不存在时不报错（memory 是可选的），首次写入时 `EnsureMemoryDir` 自动创建并生成 onboarding 文件。
+
+### API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/memory` | GET | 读取指定 workspace/thread/agent 的 memory entries |
+| `/v1/memory` | POST | 写入或追加 memory entry（支持 overwrite 模式） |
+
+---
+
+## 10. 右侧栏增强（14 项）
+
+RightInspector 组件（`app/shared/src/workbench/RightInspector.tsx`，800+ 行）是右侧检视面板的核心，包含 overview / browser / files 三个 tab。本次会话完成了 14 项增强：
+
+### Files tab — 文件预览格式（10 项）
+
+| # | 格式 | 渲染方式 | 依赖 |
+|---|------|----------|------|
+| 1 | PDF `.pdf` | `<iframe>` 浏览器原生 PDF viewer | 无 |
+| 2 | Markdown `.md` | `MarkdownRenderer`（已有） | 无 |
+| 3 | Code `.ts/.py/.go/...` | `CodeBlock`（已有） | 无 |
+| 4 | HTML `.html` | `<iframe srcDoc>` 沙箱 | 无 |
+| 5 | 图片 `.png/.jpg/.gif/.svg` | `<img>` + lightbox zoom | 无 |
+| 6 | **PPT/PPTX** `.ppt/.pptx` | `pptxjs` → canvas slideshow + 缩略图条 | `pptxjs@3.x` |
+| 7 | **Excel/CSV** `.xlsx/.csv` | SheetJS → 可排序表格 | `xlsx@0.18` |
+| 8 | **DOCX** `.docx` | `mammoth.js` → HTML 渲染 | `mammoth@1.x` |
+| 9 | Deploy URL | Browser tab 自动切换到部署 URL | 无 |
+| 10 | TXT/LOG `.txt/.log` | `<pre>` 等宽纯文本 | 无 |
+
+新增依赖共 ~350KB gzip（仅浏览器端，不影响 Edge/Hub 后端）。
+
+### Overview tab — 运行状态（3 项）
+
+| # | 组件 | 说明 |
+|---|------|------|
+| 11 | **AgentStreamingBar** | 2+ Agent 并发时显示头像+状态图标，完成后消失 |
+| 12 | **ContextUsage** | 显示 token 用量，接近阈值时变色 |
+| 13 | **DagTree** | AgentTeam 任务树状显示节点+状态图标+用时（`<ul>` 缩进树，非力导向图） |
+
+### Browser tab — 部署预览（1 项）
+
+| # | 功能 | 说明 |
+|---|------|------|
+| 14 | **部署 URL 自动切换** | Agent 部署成功后 Browser tab 自动切换到部署 URL |
+
+---
+
+## 11. Roadmap 模块化结构
+
+Roadmap 已从单一 `docs/roadmap.md` 拆分为 `docs/roadmap/` 模块化目录，每条子文档聚焦一类工作：
+
+| 文档 | 内容 |
+|------|------|
+| `00-state.md` | 已完成能力清单、未接通 gap、当前数据流状态 |
+| `01-pipeline.md` | 不需要新 UI 的纯后端/合同层接线 |
+| `02-light-ui.md` | 复用现有组件+少量 CSS 的轻接线 |
+| `03-right-panel.md` | 右侧 inspector 内的新 UI 面 |
+| `04-competition-gap.md` | 竞品强项对照+威胁评估 |
+| `05-release-gates.md` | 功能完成验收标准+release gate 清单 |
+
+设计原则：不动主聊天流（TranscriptView + Composer），只动后端/合同层和右侧检视面板。
+
+---
+
+## 12. 会话统计（2026-06-10）
+
+本次开发会话的关键数据：
+
+| 指标 | 数值 |
+|------|------|
+| Commits（2026-06-08 起） | 20+ 个功能/修复 commit |
+| 文件变更 | 178 files changed |
+| 代码量 | 21,276 insertions, 723 deletions |
+| 部署 subagents | 30+ 个 subagent 会话（code review、E2E 测试、文档生成、UI 接线） |
+| E2E 验证报告 | 4 份（adapter E2E、real web、smoke、Hub API） |
+| 新 Edge API 端点 | `/v1/ccswitch/status`、`/v1/ccswitch/providers`、`/v1/memory`（GET/POST） |
+
+---
+
+## 13. 关键链接
 
 - 仓库：https://github.com/TokenDanceLab/AgentHub
 - TokenDance ID：https://id.vectorcontrol.tech
