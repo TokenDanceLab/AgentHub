@@ -180,6 +180,9 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 		DisplayName:   "Claude",
 	}
 
+	// Point Edge dispatch at a dead port so it always falls back to Redis.
+	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
+
 	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "", nil)
 
 	snapshot := cache.snapshot()
