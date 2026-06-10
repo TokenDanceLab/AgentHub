@@ -311,7 +311,7 @@ feat/* → dev/delicious233 → master
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
-历史本地执行主链路和旧里程碑的已验收子项已合入主线；当前 Desktop/Web v4 clean rebuild 以 `docs/roadmap.md`、`docs/architecture.md` 和 `docs/desktop-web-v4-clean-rebuild-plan.md` 为准。
+历史本地执行主链路和旧里程碑的已验收子项已合入主线；当前 Desktop/Web v4 clean rebuild 以 `docs/roadmap.md`、`docs/architecture.md` 和 `docs/roadmap/` 子文档为准。
 
 进度同步：
 

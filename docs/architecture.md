@@ -249,8 +249,5 @@ src-tauri/src/host/
 ## 13. 文档权威
 
 - 当前目标和优先级：[roadmap.md](roadmap.md)
-- v4 实施计划：[desktop-web-v4-clean-rebuild-plan.md](desktop-web-v4-clean-rebuild-plan.md)
-- 待确认问题：[v4-clean-rebuild-decision-questions.md](v4-clean-rebuild-decision-questions.md)
 - 分支事实：[governance/branch-governance.md](governance/branch-governance.md)
-- 历史材料：[archive/](archive/)
 - **架构子文档**：[architecture/](architecture/)
