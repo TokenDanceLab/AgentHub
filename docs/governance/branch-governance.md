@@ -13,7 +13,7 @@ feat/* -> dev/delicious233 -> master
 - `feat/*` 合入前先同步最新 `dev/delicious233`，解决冲突并跑对应验证。
 - 完成后删除已合入的 `feat/*` 分支和对应 worktree。
 - `dev/trump`、Johnny 聚合分支和 Web parity 残留分支不作为自动合入来源。
-- 后端进入主线前按 [backend-integration-governance.md](../backend-integration-governance.md) 的 AH-SYNC 和切片门禁执行。
+- 后端进入主线前按 `docs/roadmap/` 中的管线门禁执行。
 
 ## 当前本地状态
 
