@@ -2071,6 +2071,21 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
 	})
+	// Plan approval gate (P0 #3: Plan confirmation gate)
+	mux.HandleFunc("/v1/plans/decide", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			h.PostPlanDecide(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
+	mux.HandleFunc("/v1/plans/pending", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.GetPlansPending(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+	})
 	// User profiles
 	mux.HandleFunc("/v1/users", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {

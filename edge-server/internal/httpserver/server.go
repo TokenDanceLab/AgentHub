@@ -285,7 +285,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	configureLocalRunner(reg, cfg.ProcessExecutor, agentAdapterForRegistry(cfg.AdapterRegistry, cfg.AgentDefault), executor)
 
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
-	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)
+	// Plan approval gate (P0 #3): create broker and wire into both orchestrator and handler.
+	planBroker := adapters.NewPlanApprovalBroker(adapters.DefaultPlanApprovalConfig())
+	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue, planBroker)
 
 	// Build SkillRegistry from configured directories. Discovery failure is
 	// non-fatal — skills injection is purely optional.
@@ -312,6 +314,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 		SkillRegistry:      skillReg,
 		MCPConfigStore:     cfg.MCPConfigStore,
+		PlanApprovalBroker: planBroker,
 	}
 
 	// Detect cc-switch and wire into handler for API endpoints and model
@@ -413,9 +416,10 @@ func runnerCapabilitiesForAdapter(adapterID string, caps adapters.AgentCapabilit
 	return capabilities
 }
 
-// wireOrchestrator sets the SubAgentSpawner, AgentRegistry, and MessageQueue on
-// the orchestrator adapter so it can spawn sub-agent runs during ParseStream.
-func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecutor, agentReg *agents.Registry, msgQueue *agents.Queue) {
+// wireOrchestrator sets the SubAgentSpawner, AgentRegistry, MessageQueue, and
+// PlanApprovalBroker on the orchestrator adapter so it can spawn sub-agent runs
+// and gate them behind plan approval.
+func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecutor, agentReg *agents.Registry, msgQueue *agents.Queue, planBroker *adapters.PlanApprovalBroker) {
 	if adapterReg == nil || executor == nil {
 		return
 	}
@@ -433,6 +437,7 @@ func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecu
 	}
 	orchAdapter.WithAgentRegistry(agentReg)
 	orchAdapter.WithMessageQueue(msgQueue)
+	orchAdapter.WithPlanBroker(planBroker)
 }
 
 func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string) http.Handler {
