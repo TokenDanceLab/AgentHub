@@ -1329,9 +1329,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		siblingPrompt := adapters.BuildSiblingContextPrompt(task.SiblingAgents)
 		if siblingPrompt != "" {
 			if runCtx.AppendSystemPrompt != "" {
-				runCtx.AppendSystemPrompt = siblingPrompt + "
-
-" + runCtx.AppendSystemPrompt
+				runCtx.AppendSystemPrompt = siblingPrompt + "\n\n" + runCtx.AppendSystemPrompt
 			} else {
 				runCtx.AppendSystemPrompt = siblingPrompt
 			}
