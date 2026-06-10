@@ -55,6 +55,9 @@ func (m *mockEdgeAgentService) ListTaskRunEvents(ctx context.Context, userID, ta
 func (m *mockEdgeAgentService) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
 	return nil, nil
 }
+func (m *mockEdgeAgentService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
+	return nil, nil
+}
 
 // mockEdgeDeviceService implements handler.DeviceService.
 type mockEdgeDeviceService struct {
