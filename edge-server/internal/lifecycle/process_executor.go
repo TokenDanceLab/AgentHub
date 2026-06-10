@@ -663,7 +663,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 		// Session conflict retry: if CC failed quickly with a session conflict
 		// error and this is the first attempt, reset the session ID and retry.
-		if lastWaitErr != nil && attempt == 0 && isSessionConflictError(lastWaitErr) && time.Since(subprocessStart) < sessionRetryWindow {
+		// On Windows, exec.ExitError.Error() does not include stderr content
+		// (stderr is read via StderrPipe in a separate goroutine and stored in
+		// outStore), so we also pass the captured stderr output.
+		var stderrCapture string
+		if outStore != nil {
+			stderrCapture, _ = outStore.ReadAll()
+		}
+		if lastWaitErr != nil && attempt == 0 && isSessionConflictError(lastWaitErr, stderrCapture) && time.Since(subprocessStart) < sessionRetryWindow {
 			newSession := newRandomSessionID()
 			slog.Warn("process: session conflict detected, retrying with fresh session ID",
 				"runId", run.ID,
@@ -1453,17 +1460,43 @@ func childBudget(parent *runnerctx.ContextBudget, depth int) *runnerctx.ContextB
 	return parent.AllocateChild(ratio)
 }
 
-// isSessionConflictError returns true when the error message indicates a
-// Claude Code session conflict — either "Session ID ... is already in use"
-// or "No conversation found with session ID". In both cases, retrying with
-// a fresh random session ID (and ContinueLast=false) is the correct recovery.
-func isSessionConflictError(err error) bool {
+// isSessionConflictError returns true when the error message or the process
+// stderr indicates a Claude Code session conflict — either "Session ID ... is
+// already in use" or "No conversation found with session ID". In both cases,
+// retrying with a fresh random session ID (and ContinueLast=false) is the
+// correct recovery.
+//
+// On Windows, exec.ExitError.Error() returns only "exit status N" without
+// stderr content (stderr is read via StderrPipe in a separate goroutine).
+// The caller should pass the captured stderr output as the second argument
+// so the check can inspect it.
+func isSessionConflictError(err error, stderrOutput string) bool {
 	if err == nil {
 		return false
 	}
 	msg := err.Error()
-	return strings.Contains(msg, "is already in use") ||
-		strings.Contains(msg, "No conversation found with session ID")
+	if strings.Contains(msg, "is already in use") ||
+		strings.Contains(msg, "No conversation found with session ID") {
+		return true
+	}
+	// On Windows, stderr is not included in the ExitError message.
+	// Check the captured stderr output from the pipe goroutine.
+	if stderrOutput != "" {
+		if strings.Contains(stderrOutput, "is already in use") ||
+			strings.Contains(stderrOutput, "No conversation found with session ID") {
+			return true
+		}
+	}
+	// Also check ExitError.Stderr (populated when StderrPipe is NOT used).
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+		stderrStr := string(exitErr.Stderr)
+		if strings.Contains(stderrStr, "is already in use") ||
+			strings.Contains(stderrStr, "No conversation found with session ID") {
+			return true
+		}
+	}
+	return false
 }
 
 // newRandomSessionID generates a random UUID v4 string for retrying CC
