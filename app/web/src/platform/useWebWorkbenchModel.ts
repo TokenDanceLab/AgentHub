@@ -1104,11 +1104,15 @@ export function resolveWebWorkbenchTranscript(
       ? webHubEmptyTranscript
       : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
   }
-  if (!activeHubSessionId) return webHubEmptyTranscript;
-  return [
-    ...normalizeHubMessagesToTranscript(messages),
-    ...normalizeHubRuntimeEventsToTranscript(liveRuntimeEvents),
-  ];
+  if (activeHubSessionId) {
+    return [
+      ...normalizeHubMessagesToTranscript(messages),
+      ...normalizeHubRuntimeEventsToTranscript(liveRuntimeEvents),
+    ];
+  }
+  return isWorkbenchRealDataMode(dataMode)
+    ? webHubEmptyTranscript
+    : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
 }
 
 export function appendHubRuntimeEvent(
