@@ -167,7 +167,7 @@ The first adapter experiments should use fixture event streams, not live model c
 
 ### 1. `AgentHubAgentSpec` v1 contract draft
 
-Owner scope: `docs/reference/sdk-agent-strategy.md`, optional `api/openapi.yaml` component-only schema, and fixture JSON under `docs/reference/` or `docs/competition/`.
+Owner scope: `docs/reference/sdk-agent-strategy.md`, optional `api/openapi.yaml` component-only schema, and fixture JSON under `docs/reference/`.
 
 Deliverables:
 
