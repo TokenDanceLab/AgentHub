@@ -306,9 +306,9 @@ Defer:
 - Production remote/cloud Execution Target routing for SDK adapters.
 - Provider trace ingestion beyond fixture evidence.
 
-## ByteDance Demo Value
+## Demo Value
 
-The ByteDance demo needs to show AgentHub as a collaboration product, not as a thin SDK launcher. A custom AgentHub agent layer strengthens the demo in four concrete ways:
+The demo needs to show AgentHub as a collaboration product, not as a thin SDK launcher. A custom AgentHub agent layer strengthens the demo in four concrete ways:
 
 1. Reviewer-visible product identity: Builder, Reviewer, Supervisor, and Worker appear as durable Agent Profiles, while Codex/Claude/OpenAI/OpenCode remain runtime mechanisms.
 2. Credible TeamRun story: route decisions, assignments, approvals, and replayable events are Hub-owned, so the demo can show multi-agent coordination instead of provider-specific handoff screenshots.
