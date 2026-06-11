@@ -147,19 +147,19 @@ func TestArtifactContentSourcePathSafety(t *testing.T) {
 	}{
 		{
 			name:       "POSIX absolute falls back to basename",
-			sourcePath: "/Users/ding/private/secret.log",
+			sourcePath: "/Users/example/private/secret.log",
 			wantKind:   ArtifactContentSourceBasename,
 			wantPath:   "secret.log",
 		},
 		{
 			name:       "Windows drive slash absolute falls back to basename",
-			sourcePath: "C:/Users/Ding/private/secret.log",
+			sourcePath: "C:/Users/Example/private/secret.log",
 			wantKind:   ArtifactContentSourceBasename,
 			wantPath:   "secret.log",
 		},
 		{
 			name:       "Windows drive backslash absolute falls back to basename",
-			sourcePath: `C:\Users\Ding\private\secret.log`,
+			sourcePath: `C:\Users\Example\private\secret.log`,
 			wantKind:   ArtifactContentSourceBasename,
 			wantPath:   "secret.log",
 		},
@@ -171,7 +171,7 @@ func TestArtifactContentSourcePathSafety(t *testing.T) {
 		},
 		{
 			name:       "Windows drive relative nested path falls back to basename",
-			sourcePath: `C:Users\Ding\private\secret.log`,
+			sourcePath: `C:Users\Example\private\secret.log`,
 			wantKind:   ArtifactContentSourceBasename,
 			wantPath:   "secret.log",
 		},
@@ -263,7 +263,7 @@ func TestRepositoryContractFileStoreSnapshotRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateItem returned error: %v", err)
 	}
-	if _, err := s.PinThreadItem(thread.ID, item.ID, "Delicious233"); err != nil {
+	if _, err := s.PinThreadItem(thread.ID, item.ID, "ExampleUser"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 	s.Flush()
@@ -287,7 +287,7 @@ func TestRepositoryContractFileStoreSnapshotRestore(t *testing.T) {
 	if got := restored.ListThreadItems(thread.ID); len(got) != 1 || got[0].ID != item.ID || got[0].Content != "contract item" {
 		t.Fatalf("restored items = %#v, want item_contract content", got)
 	}
-	if got := restored.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "Delicious233" {
+	if got := restored.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "ExampleUser" {
 		t.Fatalf("restored pins = %#v, want item_contract pin", got)
 	}
 }
@@ -323,7 +323,7 @@ func TestRepositoryContractSQLiteStoreRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateItem returned error: %v", err)
 	}
-	if _, err := s.PinThreadItem(thread.ID, item.ID, "Delicious233"); err != nil {
+	if _, err := s.PinThreadItem(thread.ID, item.ID, "ExampleUser"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 	s.Close()
@@ -346,7 +346,7 @@ func TestRepositoryContractSQLiteStoreRestore(t *testing.T) {
 	if got := restored.ListThreadItems(thread.ID); len(got) != 1 || got[0].ID != item.ID || got[0].Content != "contract item" {
 		t.Fatalf("restored items = %#v, want item_contract content", got)
 	}
-	if got := restored.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "Delicious233" {
+	if got := restored.ListThreadPins(thread.ID); len(got) != 1 || got[0].ItemID != item.ID || got[0].PinnedBy != "ExampleUser" {
 		t.Fatalf("restored pins = %#v, want item_contract pin", got)
 	}
 }
@@ -516,11 +516,11 @@ func runRepositoryPinsContract(t *testing.T, handle repositoryContractHandle) {
 		t.Fatalf("CreateThreadMessage other returned error: %v", err)
 	}
 
-	pin, err := repo.PinThreadItem(thread.ID, item.ID, "  Delicious233  ")
+	pin, err := repo.PinThreadItem(thread.ID, item.ID, "  ExampleUser  ")
 	if err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
-	if pin.ThreadID != thread.ID || pin.ItemID != item.ID || pin.PinnedBy != "Delicious233" {
+	if pin.ThreadID != thread.ID || pin.ItemID != item.ID || pin.PinnedBy != "ExampleUser" {
 		t.Fatalf("pin = %#v, want scoped trimmed pin", pin)
 	}
 	updated, err := repo.PinThreadItem(thread.ID, item.ID, "AgentHub")
@@ -570,7 +570,7 @@ func runRepositoryThreadDeleteCascadeContract(t *testing.T, handle repositoryCon
 	if err != nil {
 		t.Fatalf("CreateItem returned error: %v", err)
 	}
-	if _, err := repo.PinThreadItem(thread.ID, item.ID, "Delicious233"); err != nil {
+	if _, err := repo.PinThreadItem(thread.ID, item.ID, "ExampleUser"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 
@@ -634,7 +634,7 @@ func runRepositoryCleanupCascadeContract(t *testing.T, handle repositoryContract
 	if err != nil {
 		t.Fatalf("CreateItem returned error: %v", err)
 	}
-	if _, err := repo.PinThreadItem(thread.ID, item.ID, "Delicious233"); err != nil {
+	if _, err := repo.PinThreadItem(thread.ID, item.ID, "ExampleUser"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 
