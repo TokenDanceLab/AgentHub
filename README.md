@@ -22,24 +22,13 @@
 
 AgentHub 让你像在 IM 群聊里协作一样，把 Builder、Reviewer、Researcher、Deployer 等 AI Agent 放进同一个项目会话，围绕代码、文档、Diff、Preview、Approval 和产物协同工作。
 
-```text
-用户 → Web / Desktop / Mobile 工作台
-         ↕
-      Hub Server（身份 · IM · 项目 · 审批 · 同步）
-         ↕
-      Edge Server（本地/远程执行 · Runtime Adapter）
-         ↕
-      Claude Code / Codex / OpenCode
-```
-
 ## 核心特性
 
-- **IM 形态协作** — 单聊、群聊、@Agent、Orchestrator 分派，在同一条任务流里完成
+- **IM 形态协作** — 单聊、群聊、@Agent，在同一条任务流里完成
 - **多 Runtime 调度** — Claude Code、Codex、OpenCode 通过统一 Adapter 接入
-- **Diff / Preview / Approval** — 代码变更内联展示，审批流与安全边界
+- **Diff / Preview / Approval** — 代码变更内联展示，审批流可控
 - **三端原生** — Tauri Desktop + Web + Expo React Native Mobile
 - **Hub-Edge 分布式** — 本地执行不依赖 Hub；Hub 提供多端同步、远程查看和审计
-- **Glass 拟态设计** — OKLCH 设计 token、CSS Modules、共享 UI 组件库
 
 ## 技术栈
 
@@ -100,17 +89,6 @@ corepack pnpm --filter agenthub-desktop dev
 | `edge-server` | 本地执行节点：CLI Adapter、SQLite、事件回放 |
 | `api` | OpenAPI 与 WebSocket 事件合同 |
 | `docs` | 架构、路线图、设计文档 |
-
-## 文档
-
-| 内容 | 链接 |
-|---|---|
-| 产品文档 | [hub.vectorcontrol.tech/docs](https://hub.vectorcontrol.tech/docs) |
-| 架构设计 | [docs/architecture.md](docs/architecture.md) |
-| API 合同 | [api/](api/) |
-| 路线图 | [docs/roadmap.md](docs/roadmap.md) |
-| 设计系统 | [docs/design/](docs/design/) |
-| 安全 | [docs/governance/security-risk-register.md](docs/governance/security-risk-register.md) |
 
 ## 贡献
 
