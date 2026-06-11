@@ -22,52 +22,13 @@
 
 AgentHub lets you collaborate with AI agents the same way you'd work with a team in a group chat. Drop Builder, Reviewer, Researcher, and Deployer agents into a shared project session — they work together on code, documents, diffs, previews, approvals, and artifacts.
 
-```mermaid
-flowchart LR
-  subgraph Clients["🖥️ Clients"]
-    Web["Web"]
-    Desktop["Desktop"]
-    Mobile["Mobile"]
-  end
-
-  subgraph Hub["Hub Server"]
-    Auth["Identity/OIDC"]
-    IM["IM/Sessions"]
-    Project["Projects/Tasks"]
-    Approve["Approvals/Artifacts"]
-  end
-
-  subgraph Edge["Edge Server"]
-    Lifecycle["Run Lifecycle"]
-    Adapter["Agent Adapter"]
-    Store["SQLite EventStore"]
-  end
-
-  subgraph Runtime["Agent Runtime"]
-    CC["Claude Code"]
-    CX["Codex"]
-    OC["OpenCode"]
-  end
-
-  TokenDance["TokenDance ID"]
-
-  Clients -->|login/OIDC| TokenDance
-  Web -->|REST/WS| Hub
-  Desktop -->|local| Edge
-  Desktop -->|sync| Hub
-  Mobile -->|REST/WS| Hub
-  Hub -->|route/relay| Edge
-  Edge -->|CLI process| Runtime
-```
-
 ## Key Features
 
-- **IM-native collaboration** — DMs, group chats, @agent mentions, orchestrator routing — all in one task stream
+- **IM-native collaboration** — DMs, group chats, @agent mentions — all in one task stream
 - **Multi-runtime dispatch** — Claude Code, Codex, OpenCode through a unified adapter interface
-- **Diff / Preview / Approval** — inline code changes, review workflows, and security boundaries
+- **Diff / Preview / Approval** — inline code changes, review workflows
 - **Three native clients** — Tauri Desktop + Web + Expo React Native Mobile
 - **Hub-Edge distributed** — local execution works offline; Hub adds multi-device sync, remote viewing, and audit
-- **Glass morphism design** — OKLCH design tokens, CSS Modules, shared component library
 
 ## Tech Stack
 
@@ -128,17 +89,6 @@ corepack pnpm --filter agenthub-desktop dev
 | `edge-server` | Local execution node: CLI adapters, SQLite, event replay |
 | `api` | OpenAPI and WebSocket event contracts |
 | `docs` | Architecture, roadmap, design docs |
-
-## Documentation
-
-| Content | Link |
-|---|---|
-| Product docs | [hub.vectorcontrol.tech/docs](https://hub.vectorcontrol.tech/docs) |
-| Architecture | [docs/architecture.md](docs/architecture.md) |
-| API contract | [api/](api/) |
-| Roadmap | [docs/roadmap.md](docs/roadmap.md) |
-| Design system | [docs/design/](docs/design/) |
-| Security | [docs/governance/security-risk-register.md](docs/governance/security-risk-register.md) |
 
 ## Contributing
 
