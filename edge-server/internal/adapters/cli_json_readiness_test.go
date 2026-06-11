@@ -14,8 +14,8 @@ import (
 func TestCLIJSONReadinessCommandPlansRedactPromptEnvAndPaths(t *testing.T) {
 	secretPrompt := "SECRET_PROMPT_SHOULD_NOT_APPEAR"
 	secretEnv := "OPENAI_API_KEY=sk-test-secret-value"
-	privateWorkDir := `C:\Users\Ding\private\agenthub`
-	privateCommandPath := `C:\Users\Ding\.codex\bin\codex.cmd`
+	privateWorkDir := `C:\Users\Example\private\agenthub`
+	privateCommandPath := `C:\Users\Example\.codex\bin\codex.cmd`
 	ctx := RunProcessContext{
 		Prompt:          secretPrompt,
 		AgentID:         "codex",
@@ -38,7 +38,7 @@ func TestCLIJSONReadinessCommandPlansRedactPromptEnvAndPaths(t *testing.T) {
 	for _, leaked := range []string{
 		secretPrompt,
 		"sk-test-secret-value",
-		`C:\Users\Ding`,
+		`C:\Users\Example`,
 		`.codex\bin`,
 		privateCommandPath,
 		privateWorkDir,
@@ -76,11 +76,11 @@ func TestCLIJSONReadinessCommandPlansRedactPromptEnvAndPaths(t *testing.T) {
 func TestCLIJSONReadinessPayloadSplitsRealCliModelAndLoginClaims(t *testing.T) {
 	plan := BuildCLIInvocationPlanFromCommand(
 		NewOpenCodeAdapter("opencode"),
-		RunProcessContext{Prompt: "fixture prompt", AgentID: "opencode", WorkDir: `C:\Users\Ding\private\agenthub`},
+		RunProcessContext{Prompt: "fixture prompt", AgentID: "opencode", WorkDir: `C:\Users\Example\private\agenthub`},
 		`C:\tools\opencode.exe`,
 		[]string{"run", "--json"},
 		[]string{"TOKEN_DANCE_API_KEY=secret-value"},
-		`C:\Users\Ding\private\agenthub`,
+		`C:\Users\Example\private\agenthub`,
 	)
 	payload := plan.Payload()
 
