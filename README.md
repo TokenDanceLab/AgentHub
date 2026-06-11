@@ -34,10 +34,10 @@ AgentHub 让你像在 IM 群聊里协作一样，把 Builder、Reviewer、Resear
 
 | 层 | 技术 |
 |---|---|
-| 前端 | React 19 · TypeScript · Vite · CSS Modules · Tauri 2 |
-| 后端 | Go 1.25+ · PostgreSQL · Redis · SQLite (Edge) |
-| 认证 | TokenDance ID · OIDC PKCE · JWT |
-| 部署 | Docker Compose · Nginx · GitHub Actions |
+| Desktop | Tauri 2 · React 19 · TypeScript · Vite |
+| Web | React 19 · TypeScript · Vite |
+| Mobile | React Native · Expo |
+| 后端 | Go · PostgreSQL · Redis · SQLite |
 
 ## 快速开始
 
@@ -76,6 +76,10 @@ corepack pnpm --filter agenthub-web dev
 cd app
 corepack pnpm --filter agenthub-desktop dev
 ```
+
+### 生产部署
+
+Docker Compose + Nginx 反向代理。详见 [deployments/README.md](hub-server/deployments/README.md)。
 
 ## 仓库结构
 
