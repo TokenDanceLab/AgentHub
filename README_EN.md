@@ -36,10 +36,21 @@ AgentHub lets you collaborate with AI agents the same way you'd work with a team
 |---|---|
 | Desktop | Tauri 2 · React 19 · TypeScript · Vite |
 | Web | React 19 · TypeScript · Vite |
-| Mobile | React Native 0.85 · Expo SDK 56 |
-| Shared UI | CSS Modules · OKLCH design tokens |
-| Backend | Go 1.25+ · PostgreSQL · Redis · SQLite (Edge) |
-| Auth | TokenDance ID · OIDC PKCE · JWT |
+| Mobile | React Native · Expo |
+| Backend | Go · PostgreSQL · Redis · SQLite |
+
+## Repository Structure
+
+| Directory | Description |
+|---|---|
+| `app/web` | Browser workbench |
+| `app/desktop` | Tauri Desktop workbench |
+| `app/mobile-rn` | Expo / React Native Mobile |
+| `app/shared` | Shared UI components, types, transcript logic |
+| `hub-server` | Hub API: identity, sessions, projects, tasks, messages, approvals |
+| `edge-server` | Local execution node: CLI adapters, SQLite, event replay |
+| `api` | OpenAPI and WebSocket event contracts |
+| `docs` | Architecture, roadmap, design docs |
 
 ## Quick Start
 
@@ -82,19 +93,6 @@ corepack pnpm --filter agenthub-desktop dev
 ### Production Deploy
 
 Docker Compose + Nginx. See [deployments/README.md](hub-server/deployments/README.md).
-
-## Repository Structure
-
-| Directory | Description |
-|---|---|
-| `app/web` | Browser workbench |
-| `app/desktop` | Tauri Desktop workbench |
-| `app/mobile-rn` | Expo / React Native Mobile |
-| `app/shared` | Shared UI components, types, transcript logic |
-| `hub-server` | Hub API: identity, sessions, projects, tasks, messages, approvals |
-| `edge-server` | Local execution node: CLI adapters, SQLite, event replay |
-| `api` | OpenAPI and WebSocket event contracts |
-| `docs` | Architecture, roadmap, design docs |
 
 ## Contributing
 
