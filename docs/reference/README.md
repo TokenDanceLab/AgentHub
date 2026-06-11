@@ -9,7 +9,7 @@ reference/
 ├── README.md               # 本文件
 ├── *.md                    # 技术参考（审计报告、设计系统、UX 分析等）
 ├── desktop-ui-qa-sop.md    # Desktop UI QA SOP（运维操作规程）
-└── projects/               # 25 个参考项目深度调研
+└── projects/               # 15 个参考项目深度调研
 ```
 
 ## 说明
