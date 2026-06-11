@@ -65,9 +65,9 @@ describe('RuntimeBrandIcon', () => {
       value: 'gemini',
       lobeType: 'provider',
     });
-    expect(resolveRuntimeBrandIcon({ kind: 'provider', name: 'ByteDance Doubao' })).toMatchObject({
+    expect(resolveRuntimeBrandIcon({ kind: 'provider', name: 'Example AI' })).toMatchObject({
       source: 'lobehub',
-      value: 'bytedance',
+      value: 'example',
       lobeType: 'provider',
     });
     expect(resolveRuntimeBrandIcon({ kind: 'provider', name: 'Doubao' })).toMatchObject({

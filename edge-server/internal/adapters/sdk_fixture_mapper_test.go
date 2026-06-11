@@ -253,7 +253,7 @@ func TestAgentHubAgentSpecV1CompilesSDKAndCLIInvocationFixtures(t *testing.T) {
 				},
 				TargetPreference: map[string]any{
 					"mode":      "local-edge",
-					"workspace": `C:\Users\Ding\private\agenthub`,
+					"workspace": `C:\Users\Example\private\agenthub`,
 				},
 				Fixture: AgentSpecFixturePolicyV1{Mode: "fixture-only", NoSpend: true, LiveRuntimeAllowed: false},
 			}
@@ -272,7 +272,7 @@ func TestAgentHubAgentSpecV1CompilesSDKAndCLIInvocationFixtures(t *testing.T) {
 				t.Fatalf("parser contract missing core runtime events: %#v", invocation.ParserContract)
 			}
 			encoded := marshalSDKFixtureJSON(t, invocation)
-			for _, leaked := range []string{`C:\Users\Ding`, "fixture prompt", "API_KEY"} {
+			for _, leaked := range []string{`C:\Users\Example`, "fixture prompt", "API_KEY"} {
 				if strings.Contains(encoded, leaked) {
 					t.Fatalf("runtime invocation fixture leaked %q:\n%s", leaked, encoded)
 				}
@@ -356,7 +356,7 @@ func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.
 							"spend":     "blocked",
 						},
 						Metadata: map[string]any{
-							"workspace_path":    "D:\\Code\\TokenDance\\AgentHub\\private",
+							"workspace_path":    "D:\\Projects\\ExampleAgentHub\\private",
 							"sdk_session_token": "not-real",
 							"api_key":           "sk-not-real",
 						},
@@ -386,7 +386,7 @@ func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.
 				t.Fatalf("health payload = %#v", payload["health"])
 			}
 			replay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
-			for _, leaked := range []string{"sk-not-real", "D:\\Code\\TokenDance", "not-real"} {
+			for _, leaked := range []string{"sk-not-real", "D:\\Projects\\ExampleAgentHub", "not-real"} {
 				if strings.Contains(replay, leaked) {
 					t.Fatalf("capability health replay leaked %q:\n%s", leaked, replay)
 				}
@@ -489,7 +489,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 				ToolName:  "write_file",
 				SessionID: "session_contract",
 				Input: map[string]any{
-					"path":          "D:\\Code\\TokenDance\\AgentHub\\.env",
+					"path":          "D:\\Projects\\ExampleAgentHub\\.env",
 					"access_token":  "secret-token",
 					"safe_argument": "kept",
 				},
@@ -599,7 +599,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 	}
 
 	hubReplay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
-	for _, leaked := range []string{"secret-token", "secret-value", "sk-not-real", "C:\\Users\\Ding", "D:\\Code\\TokenDance"} {
+	for _, leaked := range []string{"secret-token", "secret-value", "sk-not-real", "C:\\Users\\Ding", "D:\\Projects\\ExampleAgentHub"} {
 		if strings.Contains(hubReplay, leaked) {
 			t.Fatalf("Hub replay contract leaked %q:\n%s", leaked, hubReplay)
 		}
@@ -661,10 +661,10 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 			{
 				ID:      "free_text_file",
 				Type:    "file_change",
-				Path:    "D:\\Code\\TokenDance\\AgentHub\\secret.env",
+				Path:    "D:\\Projects\\ExampleAgentHub\\secret.env",
 				Diff:    "+ OPENAI_API_KEY=sk-diff-secret-123456\n+ Authorization: Bearer diff-bearer-secret\n+ path=C:\\Users\\Ding\\secret.env",
 				Summary: "private_key=-----BEGIN PRIVATE KEY-----",
-				Reason:  "prompt=copy /Users/ding/private/prompt.md",
+				Reason:  "prompt=copy /Users/example/private/prompt.md",
 			},
 			{
 				ID:      "free_text_terminal",
@@ -697,10 +697,10 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 		"raw-prompt.md",
 		"C:\\Users\\Ding",
 		"D:\\Private",
-		"D:\\Code\\TokenDance",
+		"D:\\Projects\\ExampleAgentHub",
 		"/home/ding/private",
 		"/var/private",
-		"/Users/ding/private",
+		"/Users/example/private",
 	} {
 		if strings.Contains(replay, leaked) {
 			t.Fatalf("free-text redaction leaked %q:\n%s", leaked, replay)

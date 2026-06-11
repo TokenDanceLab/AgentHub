@@ -7,7 +7,7 @@
 
   [中文](README.md) · [Website](https://hub.vectorcontrol.tech) · [Docs](https://hub.vectorcontrol.tech/docs) · [API](api/)
 
-  ![version](https://img.shields.io/badge/version-0.3.0-blue?style=flat-square)
+  ![version](https://img.shields.io/badge/version-0.4.0-blue?style=flat-square)
   ![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
   ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
   ![tauri](https://img.shields.io/badge/tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=black)
@@ -22,99 +22,22 @@
 
 AgentHub lets you collaborate with AI agents the same way you'd work with a team in a group chat. Drop Builder, Reviewer, Researcher, and Deployer agents into a shared project session — they work together on code, documents, diffs, previews, approvals, and artifacts.
 
-```mermaid
-flowchart LR
-  subgraph Clients["🖥️ Clients"]
-    Web["Web"]
-    Desktop["Desktop"]
-    Mobile["Mobile"]
-  end
-
-  subgraph Hub["Hub Server"]
-    Auth["Identity/OIDC"]
-    IM["IM/Sessions"]
-    Project["Projects/Tasks"]
-    Approve["Approvals/Artifacts"]
-  end
-
-  subgraph Edge["Edge Server"]
-    Lifecycle["Run Lifecycle"]
-    Adapter["Agent Adapter"]
-    Store["SQLite EventStore"]
-  end
-
-  subgraph Runtime["Agent Runtime"]
-    CC["Claude Code"]
-    CX["Codex"]
-    OC["OpenCode"]
-  end
-
-  TokenDance["TokenDance ID"]
-
-  Clients -->|login/OIDC| TokenDance
-  Web -->|REST/WS| Hub
-  Desktop -->|local| Edge
-  Desktop -->|sync| Hub
-  Mobile -->|REST/WS| Hub
-  Hub -->|route/relay| Edge
-  Edge -->|CLI process| Runtime
-```
-
 ## Key Features
 
-- **IM-native collaboration** — DMs, group chats, @agent mentions, orchestrator routing — all in one task stream
+- **IM-native collaboration** — DMs, group chats, @agent mentions — all in one task stream
 - **Multi-runtime dispatch** — Claude Code, Codex, OpenCode through a unified adapter interface
-- **Diff / Preview / Approval** — inline code changes, review workflows, and security boundaries
+- **Diff / Preview / Approval** — inline code changes, review workflows
 - **Three native clients** — Tauri Desktop + Web + Expo React Native Mobile
 - **Hub-Edge distributed** — local execution works offline; Hub adds multi-device sync, remote viewing, and audit
-- **Glass morphism design** — OKLCH design tokens, CSS Modules, shared component library
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19 · TypeScript · Vite · CSS Modules · Tauri 2 |
-| Backend | Go 1.25+ · PostgreSQL · Redis · SQLite (Edge) |
-| Auth | TokenDance ID · OIDC PKCE · JWT |
-| Deploy | Docker Compose · Nginx · GitHub Actions |
-
-## Quick Start
-
-### Requirements
-
-- Go 1.25+
-- Node.js 20+
-- pnpm / Corepack
-
-### Install
-
-```bash
-git clone https://github.com/TokenDanceLab/AgentHub.git
-cd AgentHub
-corepack enable
-corepack pnpm install --dir app --frozen-lockfile
-```
-
-### Run Hub Server
-
-```bash
-cd hub-server
-go run ./cmd/server-hub
-```
-
-### Run Web Workbench
-
-```bash
-cd app
-corepack pnpm --filter agenthub-web dev
-```
-
-### Run Desktop
-
-```bash
-cd app
-corepack pnpm --filter agenthub-desktop dev
-```
+| Desktop | Tauri 2 · React 19 · TypeScript · Vite |
+| Web | React 19 · TypeScript · Vite |
+| Mobile | React Native · Expo |
+| Backend | Go · PostgreSQL · Redis · SQLite |
 
 ## Repository Structure
 
@@ -128,17 +51,6 @@ corepack pnpm --filter agenthub-desktop dev
 | `edge-server` | Local execution node: CLI adapters, SQLite, event replay |
 | `api` | OpenAPI and WebSocket event contracts |
 | `docs` | Architecture, roadmap, design docs |
-
-## Documentation
-
-| Content | Link |
-|---|---|
-| Product docs | [hub.vectorcontrol.tech/docs](https://hub.vectorcontrol.tech/docs) |
-| Architecture | [docs/architecture.md](docs/architecture.md) |
-| API contract | [api/](api/) |
-| Roadmap | [docs/roadmap.md](docs/roadmap.md) |
-| Design system | [docs/design/](docs/design/) |
-| Security | [docs/governance/security-risk-register.md](docs/governance/security-risk-register.md) |
 
 ## Contributing
 

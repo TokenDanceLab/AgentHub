@@ -1050,7 +1050,7 @@ $wsModulePath = $null
 $possiblePaths = @(
     (Join-Path $PSScriptRoot ".." ".." "app" "node_modules" "ws"),
     (Join-Path $PSScriptRoot ".." ".." "node_modules" "ws"),
-    "C:\Users\Ding\node_modules\ws"
+    "$env:USERPROFILE\node_modules\ws"
 )
 foreach ($p in $possiblePaths) {
     $resolved = if (Test-Path $p) { (Resolve-Path $p).Path } else { $null }
