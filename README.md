@@ -52,48 +52,6 @@ AgentHub 让你像在 IM 群聊里协作一样，把 Builder、Reviewer、Resear
 | `api` | OpenAPI 与 WebSocket 事件合同 |
 | `docs` | 架构、路线图、设计文档 |
 
-## 快速开始
-
-### 环境
-
-- Go 1.25+
-- Node.js 20+
-- pnpm / Corepack
-
-### 安装
-
-```bash
-git clone https://github.com/TokenDanceLab/AgentHub.git
-cd AgentHub
-corepack enable
-corepack pnpm install --dir app --frozen-lockfile
-```
-
-### 启动 Hub Server
-
-```bash
-cd hub-server
-go run ./cmd/server-hub
-```
-
-### 启动 Web 工作台
-
-```bash
-cd app
-corepack pnpm --filter agenthub-web dev
-```
-
-### 启动 Desktop
-
-```bash
-cd app
-corepack pnpm --filter agenthub-desktop dev
-```
-
-### 生产部署
-
-Docker Compose + Nginx 反向代理。详见 [deployments/README.md](hub-server/deployments/README.md)。
-
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。详情见 [CONTRIBUTING.md](CONTRIBUTING.md)。
