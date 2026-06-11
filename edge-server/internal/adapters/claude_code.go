@@ -310,12 +310,9 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		args = append(args, "--include-partial-messages")
 	}
 
-	// Session continuity:
-	// - First run (ContinueLast=false): --session-id creates a new CC conversation
-	// - Subsequent runs (ContinueLast=true): --continue continues the most recent conversation
-	if ctx.ContinueLast {
-		args = append(args, "--continue")
-	} else if ctx.SessionID != "" {
+	// Each run creates a fresh CC conversation via --session-id.
+	// Subsequent runs on the same thread get a new conversation each time.
+	if ctx.SessionID != "" {
 		args = append(args, "--session-id", ctx.SessionID)
 	}
 	if ctx.ForkSession {
