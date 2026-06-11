@@ -34,10 +34,12 @@ AgentHub lets you collaborate with AI agents the same way you'd work with a team
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19 · TypeScript · Vite · CSS Modules · Tauri 2 |
+| Desktop | Tauri 2 · React 19 · TypeScript · Vite |
+| Web | React 19 · TypeScript · Vite |
+| Mobile | React Native 0.85 · Expo SDK 56 |
+| Shared UI | CSS Modules · OKLCH design tokens |
 | Backend | Go 1.25+ · PostgreSQL · Redis · SQLite (Edge) |
 | Auth | TokenDance ID · OIDC PKCE · JWT |
-| Deploy | Docker Compose · Nginx · GitHub Actions |
 
 ## Quick Start
 
@@ -76,6 +78,10 @@ corepack pnpm --filter agenthub-web dev
 cd app
 corepack pnpm --filter agenthub-desktop dev
 ```
+
+### Production Deploy
+
+Docker Compose + Nginx. See [deployments/README.md](hub-server/deployments/README.md).
 
 ## Repository Structure
 
