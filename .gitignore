@@ -246,6 +246,11 @@ docs/GOAL.md
 # Local ops docs — deployment details, SSH, server addresses (not for repo)
 .ops/
 
+# Sensitive deployment runbooks (host-specific, not for public repo)
+docs/deployment/hk2-*.md
+docs/deployment/*-deployment-runbook.md
+docs/deployment/*deployment*
+
 # Cloned reference repos (at repo root only)
 /reference/*
 !/reference/INDEX.md

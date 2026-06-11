@@ -17,14 +17,14 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// slugPattern enforces DNS-safe subdomain names for *.pages.vectorcontrol.tech.
+// slugPattern enforces DNS-safe subdomain names for *.example.agenthub.dev.
 var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$`)
 
 // Deployment configuration. These can be overridden via environment variables.
 const (
-	defaultDeployTargetHost   = "hk2"
+	defaultDeployTargetHost   = "remote-edge"
 	defaultDeployTargetPath   = "/opt/agenthub-pages"
-	defaultPagesDomain        = "pages.vectorcontrol.tech"
+	defaultPagesDomain        = "example.agenthub.dev"
 	envDeployTargetHost       = "AGENTHUB_DEPLOY_HOST"
 	envDeployTargetPath       = "AGENTHUB_DEPLOY_PATH"
 	envPagesDomain            = "AGENTHUB_PAGES_DOMAIN"
