@@ -22,14 +22,42 @@
 
 AgentHub 让你像在 IM 群聊里协作一样，把 Builder、Reviewer、Researcher、Deployer 等 AI Agent 放进同一个项目会话，围绕代码、文档、Diff、Preview、Approval 和产物协同工作。
 
-```text
-用户 → Web / Desktop / Mobile 工作台
-         ↕
-      Hub Server（身份 · IM · 项目 · 审批 · 同步）
-         ↕
-      Edge Server（本地/远程执行 · Runtime Adapter）
-         ↕
-      Claude Code / Codex / OpenCode
+```mermaid
+flowchart LR
+  subgraph Clients["🖥️ 客户端"]
+    Web["Web 工作台"]
+    Desktop["Desktop 工作台"]
+    Mobile["Mobile"]
+  end
+
+  subgraph Hub["Hub Server"]
+    Auth["身份/OIDC"]
+    IM["IM/会话"]
+    Project["项目/任务"]
+    Approve["审批/产物"]
+  end
+
+  subgraph Edge["Edge Server"]
+    Lifecycle["Run Lifecycle"]
+    Adapter["Agent Adapter"]
+    Store["SQLite EventStore"]
+  end
+
+  subgraph Runtime["Agent Runtime"]
+    CC["Claude Code"]
+    CX["Codex"]
+    OC["OpenCode"]
+  end
+
+  TokenDance["TokenDance ID"]
+
+  Clients -->|login/OIDC| TokenDance
+  Web -->|REST/WS| Hub
+  Desktop -->|本地 Edge| Edge
+  Desktop -->|远程同步| Hub
+  Mobile -->|REST/WS| Hub
+  Hub -->|路由/中继| Edge
+  Edge -->|CLI 进程| Runtime
 ```
 
 ## 核心特性
