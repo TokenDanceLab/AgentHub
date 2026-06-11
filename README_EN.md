@@ -3,7 +3,7 @@
 
   # AgentHub
 
-  Open-source AI agent collaboration workbench. Web, Desktop, and Mobile — three native clients connected to a distributed Hub-Edge architecture with unified multi-runtime scheduling.
+  Invite AI agents as teammates into your group chat. Real people, AI Builder, AI Reviewer — all in the same IM conversation. Messages are your task stream. Chat is your workbench.
 
   [中文](README.md) · [Website](https://hub.vectorcontrol.tech) · [Docs](https://hub.vectorcontrol.tech/docs) · [API](api/)
 
@@ -20,7 +20,7 @@
 
 ## What is AgentHub?
 
-AgentHub lets you collaborate with AI agents the same way you'd work with a team in a group chat. Drop Builder, Reviewer, Researcher, and Deployer agents into a shared project session — they work together on code, documents, diffs, previews, approvals, and artifacts.
+AgentHub lets you collaborate with human teammates and AI agents in the same group chat. Drop real people, Builder, Reviewer, Researcher, and Deployer agents into a shared project session — they work together on code, documents, diffs, previews, approvals, and artifacts.
 
 ## Key Features
 

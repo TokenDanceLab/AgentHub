@@ -3,7 +3,7 @@
 
   # AgentHub
 
-  面向 AI Agent 团队协作的开源工作台。Web、Desktop、Mobile 三端原生，Hub-Edge 分布式架构，多 Runtime 统一调度。
+  把 AI Agent 当队友一样拉进群聊。和真人好友、AI Builder、AI Reviewer 在同一个 IM 里聊天协作——消息就是任务流，聊天就是工作台。
 
   [English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [文档](https://hub.vectorcontrol.tech/docs) · [API](api/)
 
@@ -20,7 +20,7 @@
 
 ## 产品定位
 
-AgentHub 让你像在 IM 群聊里协作一样，把 Builder、Reviewer、Researcher、Deployer 等 AI Agent 放进同一个项目会话，围绕代码、文档、Diff、Preview、Approval 和产物协同工作。
+AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Reviewer、Researcher、Deployer 等 AI Agent 放进同一个项目会话，围绕代码、文档、Diff、Preview、Approval 和产物协同工作。
 
 ## 核心特性
 
