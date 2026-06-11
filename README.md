@@ -39,6 +39,19 @@ AgentHub 让你像在 IM 群聊里协作一样，把 Builder、Reviewer、Resear
 | Mobile | React Native · Expo |
 | 后端 | Go · PostgreSQL · Redis · SQLite |
 
+## 仓库结构
+
+| 目录 | 说明 |
+|---|---|
+| `app/web` | 浏览器工作台 |
+| `app/desktop` | Tauri Desktop 工作台 |
+| `app/mobile-rn` | Expo / React Native Mobile |
+| `app/shared` | 共享 UI 组件、类型、transcript 逻辑 |
+| `hub-server` | Hub API：身份、会话、项目、任务、消息、审批 |
+| `edge-server` | 本地执行节点：CLI Adapter、SQLite、事件回放 |
+| `api` | OpenAPI 与 WebSocket 事件合同 |
+| `docs` | 架构、路线图、设计文档 |
+
 ## 快速开始
 
 ### 环境
@@ -80,19 +93,6 @@ corepack pnpm --filter agenthub-desktop dev
 ### 生产部署
 
 Docker Compose + Nginx 反向代理。详见 [deployments/README.md](hub-server/deployments/README.md)。
-
-## 仓库结构
-
-| 目录 | 说明 |
-|---|---|
-| `app/web` | 浏览器工作台 |
-| `app/desktop` | Tauri Desktop 工作台 |
-| `app/mobile-rn` | Expo / React Native Mobile |
-| `app/shared` | 共享 UI 组件、类型、transcript 逻辑 |
-| `hub-server` | Hub API：身份、会话、项目、任务、消息、审批 |
-| `edge-server` | 本地执行节点：CLI Adapter、SQLite、事件回放 |
-| `api` | OpenAPI 与 WebSocket 事件合同 |
-| `docs` | 架构、路线图、设计文档 |
 
 ## 贡献
 
