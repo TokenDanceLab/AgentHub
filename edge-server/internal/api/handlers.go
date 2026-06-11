@@ -1097,12 +1097,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
 		return
 	}
-	// Session handling: if this thread has been run before, CC already has a
-	// conversation. Use --continue to continue it. For brand-new threads,
-	// use --session-id to create the first CC conversation.
-	if req.SessionID != "" && hasFinishedRuns(repository, req.ThreadID) {
-		req.Continue = true
-	}
+	// Each run creates a fresh CC conversation via --session-id.
 
 	if h.Executor == nil {
 		h.runCreateMu.Unlock()
