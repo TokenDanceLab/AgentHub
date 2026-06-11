@@ -22,14 +22,42 @@
 
 AgentHub lets you collaborate with AI agents the same way you'd work with a team in a group chat. Drop Builder, Reviewer, Researcher, and Deployer agents into a shared project session — they work together on code, documents, diffs, previews, approvals, and artifacts.
 
-```text
-Users → Web / Desktop / Mobile workbench
-          ↕
-       Hub Server (identity · IM · projects · approvals · sync)
-          ↕
-       Edge Server (local/remote execution · runtime adapters)
-          ↕
-       Claude Code / Codex / OpenCode
+```mermaid
+flowchart LR
+  subgraph Clients["🖥️ Clients"]
+    Web["Web"]
+    Desktop["Desktop"]
+    Mobile["Mobile"]
+  end
+
+  subgraph Hub["Hub Server"]
+    Auth["Identity/OIDC"]
+    IM["IM/Sessions"]
+    Project["Projects/Tasks"]
+    Approve["Approvals/Artifacts"]
+  end
+
+  subgraph Edge["Edge Server"]
+    Lifecycle["Run Lifecycle"]
+    Adapter["Agent Adapter"]
+    Store["SQLite EventStore"]
+  end
+
+  subgraph Runtime["Agent Runtime"]
+    CC["Claude Code"]
+    CX["Codex"]
+    OC["OpenCode"]
+  end
+
+  TokenDance["TokenDance ID"]
+
+  Clients -->|login/OIDC| TokenDance
+  Web -->|REST/WS| Hub
+  Desktop -->|local| Edge
+  Desktop -->|sync| Hub
+  Mobile -->|REST/WS| Hub
+  Hub -->|route/relay| Edge
+  Edge -->|CLI process| Runtime
 ```
 
 ## Key Features
