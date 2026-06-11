@@ -52,48 +52,6 @@ AgentHub lets you collaborate with AI agents the same way you'd work with a team
 | `api` | OpenAPI and WebSocket event contracts |
 | `docs` | Architecture, roadmap, design docs |
 
-## Quick Start
-
-### Requirements
-
-- Go 1.25+
-- Node.js 20+
-- pnpm / Corepack
-
-### Install
-
-```bash
-git clone https://github.com/TokenDanceLab/AgentHub.git
-cd AgentHub
-corepack enable
-corepack pnpm install --dir app --frozen-lockfile
-```
-
-### Run Hub Server
-
-```bash
-cd hub-server
-go run ./cmd/server-hub
-```
-
-### Run Web Workbench
-
-```bash
-cd app
-corepack pnpm --filter agenthub-web dev
-```
-
-### Run Desktop
-
-```bash
-cd app
-corepack pnpm --filter agenthub-desktop dev
-```
-
-### Production Deploy
-
-Docker Compose + Nginx. See [deployments/README.md](hub-server/deployments/README.md).
-
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
