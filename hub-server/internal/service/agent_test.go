@@ -685,7 +685,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 func TestMergeModelParamsLetsDispatchOverrideProfileDefaults(t *testing.T) {
 	merged := mergeModelParams(
 		`{"model":"claude-sonnet-4-6","reasoning_effort":"medium","permission_mode":"default"}`,
-		`{"reasoning_effort":"high","work_dir":"D:\\Code\\TokenDance"}`,
+		`{"reasoning_effort":"high","work_dir":"D:\\Projects\\ExampleAgentHub"}`,
 	)
 
 	var got map[string]any
@@ -693,7 +693,7 @@ func TestMergeModelParamsLetsDispatchOverrideProfileDefaults(t *testing.T) {
 	require.Equal(t, "claude-sonnet-4-6", got["model"])
 	require.Equal(t, "high", got["reasoning_effort"])
 	require.Equal(t, "default", got["permission_mode"])
-	require.Equal(t, `D:\Code\TokenDance`, got["work_dir"])
+	require.Equal(t, `D:\Projects\ExampleAgentHub`, got["work_dir"])
 }
 
 func TestSelectAgentInstanceHonorsRequestedRuntime(t *testing.T) {

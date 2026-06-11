@@ -53,13 +53,13 @@
 
 ## 4. 为什么 Tauri，而不是 Electron 或纯 Web？
 
-**决策**：桌面端用 Tauri 2（Rust 内核 + WebView），移动端用 Tauri Android 原生，而非 Electron 或浏览器 PWA。
+**决策**：桌面端用 Tauri 2（Rust 内核 + WebView），移动端用 Expo React Native，而非 Electron 或浏览器 PWA。
 
 **理由**：
 - **体积与性能**：Tauri 用系统 WebView，比 Electron（捆绑 Chromium）轻约 10×，启动快、内存低。
 - **真原生能力**：72 个 Rust 文件实现系统托盘、原生通知、OIDC loopback server、Edge 进程管理、OS secure store、自动更新——这些 PWA 做不到，Electron 要重写。
 - **Rust 安全**：secure_store / oidc.rs 用 Rust 写，内存安全，凭据落 OS keychain。
-- **跨端复用**：同一套 shared UI（@shared/ui + OKLCH tokens + Glass 设计系统）跑在 Desktop / Web / Mobile。
+- **跨端复用**：同一套 shared UI（@agenthub/shared + OKLCH tokens）跑在 Desktop / Web / Mobile。
 
 **代价**：Rust 学习曲线 + Tauri 生态比 Electron 小。换来的是轻量、原生、安全的真桌面 + 移动应用。
 

@@ -754,7 +754,7 @@ goose -dir migrations postgres "user=agenthub password=dev_password dbname=agent
 - 真实服务器 IP、内网地址、数据库连接串。
 - API key、token、私钥、证书。
 - 生产账号、个人路径、个人服务器信息。
-- 服务器别名（如 hk1、hk2、us1）。
+- 服务器主机名。
 
 需要示例配置时只提交 `.env.example`，值用占位符。
 

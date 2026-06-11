@@ -2187,7 +2187,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// cc-switch integration
 	mux.HandleFunc("/v1/ccswitch/status", h.GetCCSwitchStatus)
 	mux.HandleFunc("/v1/ccswitch/providers", h.GetCCSwitchProviders)
-	// Deployments (static site deploy to *.pages.vectorcontrol.tech)
+	// Deployments (static site deploy to *.example.agenthub.dev)
 	mux.HandleFunc("/v1/deployments", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.PostDeployments(w, r)

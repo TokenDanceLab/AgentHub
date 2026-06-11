@@ -13,7 +13,7 @@
 - `README.md` 是对外展示页，给评审、同学和新读者快速了解项目，不放细碎开发约束。
 - `README_EN.md` 是英文补充入口，只保留对外介绍。
 - `AGENTS.md` 是给开发者和 Agent 的开发规范、开发风格和流程约束；每个 Agent 开始工作前必须读。
-- 在 `D:\Code\TokenDance` workspace 内做跨系统治理时，先读 `../AGENTS.md` 和 `../docs/`；AgentHub 仓内 docs 只负责本产品实现细节。
+- 在 workspace 内做跨系统治理时，先读 `../AGENTS.md` 和 `../docs/`；AgentHub 仓内 docs 只负责本产品实现细节。
 
 人类同学先读：
 
@@ -131,7 +131,7 @@ AgentHub 的 `docs/governance/security-risk-register.md` 是本仓库风险事�
 
 - 涉及 Hub 登录/session、Edge 远程执行、Desktop/Web token storage、Feishu/Lark action、TokenDance API key、integration secret、公开 stats 或 generated artifact 的风险变更，必须同步更新本仓库风险表。
 - Critical/High 风险在未修复、未验证或未显式 accepted 之前阻断公开发布；accepted risk 必须写 owner、日期、原因、补偿控制和复查触发条件。
-- 需要生产 endpoint、host、日志、备份或 secret 证明的结论只在 `C:\Users\Ding\server` 或私有运维文档记录；AgentHub 公开文档只写证据指针和无密结论。
+- 需要生产 endpoint、host、日志、备份或 secret 证明的结论只在私有运维文档记录；AgentHub 公开文档只写证据指针和无密结论。
 - 发布前从 workspace 根运行 `.\scripts\verify-ci-gates.ps1`；默认治理 pass 里的 security warning 不是可忽略噪声，而是未关闭 release blocker。
 
 ### Feishu/Lark 应用边界
@@ -280,26 +280,22 @@ fix/short-topic
 当前分支状态和合并规则详见 `docs/governance/branch-governance.md`。摘要：
 
 ```
-feat/* → dev/delicious233 → master
+feat/* → dev/delicious223 → dev/delicious233 → master
 ```
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **feat/desktop-web-v4-clean-rebuild** | 当前 Desktop/Web v4 shared UI 主工作树，最终合回 `dev/delicious233` | 当前工作 |
-| **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
-| master | PR-only 稳定快照，v0.1.0 已同步 | ✅ 当前 |
-| origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线，本轮 Desktop/Web UI 暂不合并 | 隔离 |
-| origin/dev/trump | Trump 分支当前落后主线，无独有提交；不作为本轮 UI 来源 | 保留，不自动合并 |
-| origin/dev/johnny | Johnny 开发线仍有少量独有提交但大幅落后 | 单独审，不直合 |
-| ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
-| ~~OIDC 旧保存分支~~ | 旧保存点已被主文档覆盖 | ✅ 已删除 |
-| ~~codex/johnny-fork~~ | Codex 实验分支 | ✅ 已清理 |
-| ~~codex/trump-ui-fork~~ | Codex UI fork | ✅ 已清理 |
+| **dev/delicious223** | 当前 v0.4.0 开发主线（从 dev/delicious233 fork） | ✅ 活跃 |
+| **dev/delicious233** | v0.3.0 集成主线 | ✅ 当前 |
+| master | PR-only 稳定快照 | ✅ 当前 |
+| origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线 | 隔离 |
+| ~~origin/dev/trump~~ | 已归档 | ✅ 已清理 |
+| ~~origin/dev/johnny~~ | 已归档 | ✅ 已清理 |
+| ~~feat/web-desktop-parity~~ | 已导出 patch 并删除远端 | ✅ 已归档 |
 | ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
-| ~~feat/web-agent-closeout-20260526~~ | WebAgent 收尾 | ✅ 已合入并删除 |
+| ~~feat/team-hub-authz~~ | 授权修复 | ✅ 已合入并删除 |
 
 接手提醒：当前主树可能存在 ahead/dirty 并行状态。继续前先运行 `git status --short --branch` 和 `git worktree list`，以 live 输出为准；不要按本表直接推断可提交范围。
-| ~~feat/team-hub-authz / team-hub-reliability / team-adapter-compat~~ | 授权、可靠性、adapter 修复 | ✅ 已合入并删除 |
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
@@ -366,7 +362,7 @@ feat/* → dev/delicious233 → master
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
 - 本机 Agent 记忆和运行状态，例如 `.claude/`、`.codex/`、`.agents/`（仓库级 `.agents/skills/dev-loop/` 是唯一例外）。
-- 服务器别名（hk1、hk2、us1、gz1）不得出现在仓库文件中；生产配置限 `.env.production`（已 gitignored）。
+- 服务器主机名不得出现在仓库文件中；生产配置限 `.env.production`（已 gitignored）。
 
 执行规则：
 
