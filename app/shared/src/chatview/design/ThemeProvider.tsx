@@ -15,7 +15,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
-const STORAGE_KEY = 'tokendance-theme'
+const STORAGE_KEY = 'chatview-theme'
 
 function loadTheme(): Theme {
   if (typeof window === 'undefined') return 'light'

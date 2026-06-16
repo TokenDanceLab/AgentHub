@@ -4,6 +4,7 @@
 
 import type { RowItem } from '../data/mock'
 import type { TransKey } from '../i18n/translations'
+import { SEP } from '../adapter'
 
 export interface LabelResult {
   key: TransKey
@@ -13,7 +14,7 @@ export interface LabelResult {
 /** Extract sub-agent name from label like "Agent · Linter" */
 function subName(item: RowItem): string {
   // If label contains " · ", extract the part after it
-  const idx = item.label.indexOf(' · ')
+  const idx = item.label.indexOf(SEP)
   if (idx > -1) return item.label.slice(idx + 3)
   return item.label.startsWith('Agent ') ? item.label.slice(6) : ''
 }

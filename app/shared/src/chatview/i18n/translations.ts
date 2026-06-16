@@ -168,7 +168,7 @@ export const translations = {
     'mock.session.builder': 'Builder · status enum migration',
     'mock.session.runtime': 'Runtime: Claude Code',
     'mock.session.target': 'Target: local',
-    'mock.deploy.url': 'https://preview.agenthub.dev/deploy-af3b21',
+    'mock.deploy.url': 'https://example.com/preview/deploy-af3b21',
     'mock.deploy.meta': 'Deployed · 16:12',
     'mock.attachment.report': 'schema-diff-report.md',
 
@@ -367,7 +367,7 @@ export const translations = {
     'mock.session.builder': 'Builder · status 枚举迁移',
     'mock.session.runtime': 'Runtime: Claude Code',
     'mock.session.target': 'Target: local',
-    'mock.deploy.url': 'https://preview.agenthub.dev/deploy-af3b21',
+    'mock.deploy.url': 'https://example.com/preview/deploy-af3b21',
     'mock.deploy.meta': '已部署 · 16:12',
     'mock.attachment.report': 'schema-diff-report.md',
 
