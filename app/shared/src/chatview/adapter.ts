@@ -58,7 +58,8 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: 'running',
         collapsible: true,
         toolName: t.toolName.toLowerCase(),
-        content: t.summary ?? t.target,
+        content: t.summary || t.target,
+        extra: t.target && !t.summary ? t.target : undefined,
       } as RowItem
     }
 
@@ -259,8 +260,16 @@ export interface AgentTranscriptBlock {
   id: string; agent: string; role: string; time: string
   rows: RowItem[]; bubbles: string[]; standaloneRows: RowItem[]
   runs: never[]
+  displayTitle?: string
+  badgeLabel?: string
+  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
 }
-export interface UserTranscriptMsg { type: 'user'; name?: string; time?: string; text: string }
+export interface UserTranscriptMsg {
+  type: 'user'; name?: string; time?: string; text: string
+  displayTitle?: string
+  badgeLabel?: string
+  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
+}
 export type ChatViewTranscriptItem = UserTranscriptMsg | AgentTranscriptBlock
 
 export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTranscriptItem[] {
@@ -274,7 +283,12 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
     if (role === 'human' && block.kind === 'text') {
       if (currentAgent) { items.push(currentAgent); currentAgent = null }
       const t = block as TextTranscriptBlock
-      items.push({ type: 'user', name: block.author.name, time: timeStr(block.createdAt), text: t.text })
+      items.push({
+        type: 'user', name: block.author.name, time: timeStr(block.createdAt), text: t.text,
+        displayTitle: t.displayTitle,
+        badgeLabel: t.badgeLabel,
+        badgeVariant: t.badgeVariant,
+      })
       continue
     }
 
@@ -283,7 +297,13 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       const t = block as TextTranscriptBlock
       if (!currentAgent || currentAgent.id !== block.author.id) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+        currentAgent = {
+          id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt),
+          rows: [], bubbles: [], standaloneRows: [], runs: [],
+          displayTitle: t.displayTitle,
+          badgeLabel: t.badgeLabel,
+          badgeVariant: t.badgeVariant,
+        }
       }
       const bubbleText = t.displayDetail || t.text
       if (bubbleText) currentAgent.bubbles.push(bubbleText)
