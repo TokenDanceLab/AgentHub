@@ -29,7 +29,7 @@ function EmptyState() {
  */
 export function ChatViewTranscript({ transcript }: Props) {
   const [locale, setLocale] = useState<'zh-CN' | 'en-US'>('zh-CN')
-  const items = useMemo(() => blocksToTranscriptItems(transcript) as any, [transcript])
+  const items = useMemo(() => blocksToTranscriptItems(transcript), [transcript])
 
   return (
     <div className="chatview">
