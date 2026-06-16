@@ -381,6 +381,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     messages.data,
     mergedRuntimeEvents,
     dataMode,
+    selectedConversationId,
   );
   const taskContractStatusBlocks = resolveWebTaskContractStatusBlocks(
     activeAgentTaskId,
@@ -1098,11 +1099,12 @@ export function resolveWebWorkbenchTranscript(
   messages: HubMessageTranscriptInput[] | undefined,
   liveRuntimeEvents: HubRuntimeEventTranscriptInput[],
   dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
+  conversationId?: string,
 ): TranscriptBlock[] {
   if (!hubReady) {
     return isWorkbenchRealDataMode(dataMode)
       ? webHubEmptyTranscript
-      : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
+      : resolveDemoWorkbenchTranscript(conversationId || WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
   }
   if (activeHubSessionId) {
     return [
@@ -1112,7 +1114,7 @@ export function resolveWebWorkbenchTranscript(
   }
   return isWorkbenchRealDataMode(dataMode)
     ? webHubEmptyTranscript
-    : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
+    : resolveDemoWorkbenchTranscript(conversationId || WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
 }
 
 export function appendHubRuntimeEvent(
