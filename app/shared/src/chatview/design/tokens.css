@@ -10,8 +10,11 @@
   --label-xs: 600 0.6875rem/1.5 var(--font-sans);
 
   --sp-xs: 4px; --sp-sm: 8px; --sp-md: 12px; --sp-lg: 20px; --sp-xl: 28px;
+  --sp-xxs: 6px; --sp-2: 2px; --sp-10: 10px; --sp-14: 14px; --sp-16: 16px;
   --r-xs: 3px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 9999px;
-  --dur: 160ms; --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur: 160ms; --dur-slow: 400ms; --dur-pulse: 1.2s; --dur-route: 1.5s; --dur-bar: 0.5s;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --think-max-h: 240px; --avatar-size: 32px; --icon-size: 18px;
 
   /* Surfaces — matches AgentHub main repo themes.css */
   --app-bg: #f7f6f9;
