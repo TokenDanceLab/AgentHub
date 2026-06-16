@@ -18,7 +18,7 @@ export default function Transcript({ items, chatMode }: Props) {
     <div className="transcript">
       {items.map((item, i) => {
         if ('type' in item && item.type === 'divider') return null
-        if (isUser(item)) return <UserMsg key={`u${i}`} item={item} chatMode={chatMode} />
+        if (isUser(item)) return <UserMsg key={item.text + (item.name || '')} item={item} chatMode={chatMode} />
         if (isAgent(item)) return <AgentGroup key={item.id} block={item} chatMode={chatMode} />
         return null
       })}
