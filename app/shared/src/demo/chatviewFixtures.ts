@@ -21,20 +21,20 @@ const U = (id: string, name = 'Ding') => ({ id, name, role: 'human' as const })
 // ═══════════════════════════════════════════════════════════════════════
 
 export const chatviewBuilderTranscript: TranscriptBlock[] = [
-  { id: 'bu1', kind: 'text', createdAt: T(0), author: U('ding'), text: '把 users 表的 status 改成 ENUM 类型，用 PostgreSQL 原生枚举' },
-  { id: 'ba1', kind: 'text', createdAt: T(1), author: B('builder'), text: '收到。先确认当前 schema 和所有引用点，再出迁移方案。', displayTitle: '确认任务', displayDetail: '先确认当前 schema 和所有引用点，再出迁移方案。' },
+  { id: 'bu1', kind: 'text', createdAt: T(0), author: U('ding'), text: 'Change the status column in users table to ENUM type using PostgreSQL native enum' },
+  { id: 'ba1', kind: 'text', createdAt: T(1), author: B('builder'), text: 'Got it. Confirming current schema and all reference points first, then producing a migration plan.', displayTitle: 'Task acknowledgment', displayDetail: 'Confirming current schema and all reference points first, then producing a migration plan.' },
   {
     id: 'bth1', kind: 'thinking', createdAt: T(2), author: B('builder'),
-    content: '用户要把 status 改成枚举。当前 schema 中 status 为 VARCHAR(20)，值域 active/inactive/banned。需要创建 PostgreSQL 自定义 ENUM 类型，兼容现有数据。涉及文件：model 定义、API handler 校验、迁移脚本。',
+    content: 'User wants to change status to an enum. Currently status is VARCHAR(20) with values active/inactive/banned. Need to create a PostgreSQL custom ENUM type, compatible with existing data. Files involved: model definition, API handler validation, migration script.',
     isThinking: true,
   },
   { id: 'bto1', kind: 'tool_call', createdAt: T(3), author: B('builder'), toolName: 'Read', status: 'running' },
-  { id: 'btr1', kind: 'tool_result', createdAt: T(4), author: B('builder'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 行 · status 字段当前为 VARCHAR(20)' },
+  { id: 'btr1', kind: 'tool_result', createdAt: T(4), author: B('builder'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 lines · status field currently VARCHAR(20)' },
   { id: 'bto2', kind: 'tool_call', createdAt: T(5), author: B('builder'), toolName: 'Grep', status: 'running' },
-  { id: 'btr2', kind: 'tool_result', createdAt: T(6), author: B('builder'), toolName: 'Grep', status: 'completed', summary: 'src/ → "status" · 12 匹配 · 5 文件 · model + handler + 3 处业务引用' },
+  { id: 'btr2', kind: 'tool_result', createdAt: T(6), author: B('builder'), toolName: 'Grep', status: 'completed', summary: 'src/ → "status" · 12 matches · 5 files · model + handler + 3 business references' },
   {
     id: 'bth2', kind: 'thinking', createdAt: T(7), author: B('builder'),
-    content: 'VARCHAR(20)，值 active/inactive/banned。创建迁移脚本 003，更新 user.ts 模型，更新 API handler 类型守卫。三个文件改动范围可控。',
+    content: 'VARCHAR(20), values active/inactive/banned. Create migration script 003, update user.ts model, update API handler type guard. Three files, scope is manageable.',
     isThinking: false,
   },
   {
@@ -55,26 +55,26 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   {
     id: 'bsub1', kind: 'subagent', createdAt: T(11), author: B('builder'),
     title: 'Linter 检查', worker: 'Linter', status: 'completed',
-    summary: '0 errors, 0 warnings · eslint + prettier + tsc 全部通过',
+    summary: '0 errors, 0 warnings · eslint + prettier + tsc all passed',
   },
   {
     id: 'bsub2', kind: 'subagent', createdAt: T(12), author: B('builder'),
     title: '安全检查', worker: 'SecurityAuditor', status: 'completed',
-    summary: '审计完成：0 漏洞，0 风险项。ENUM 迁移安全，权限模型无变更。',
+    summary: 'Audit complete: 0 vulnerabilities, 0 risk items. ENUM migration is safe, permission model unchanged.',
   },
   {
     id: 'bsub3', kind: 'subagent', createdAt: T(13), author: B('builder'),
     title: '文档生成', worker: 'DocGenerator', status: 'completed',
-    summary: 'CHANGELOG.md 已更新 · API 文档已同步',
+    summary: 'CHANGELOG.md updated · API docs synced',
   },
-  { id: 'ba2', kind: 'text', createdAt: T(14), author: B('builder'), text: '改动完成。迁移脚本和模型定义已更新，Linter 和安全审计均通过。需要审批后继续。', displayTitle: '改动完成', displayDetail: '迁移脚本和模型定义已更新，Linter 和安全审计均通过。' },
+  { id: 'ba2', kind: 'text', createdAt: T(14), author: B('builder'), text: 'Changes ready. Migration script and model definition updated, linter and security audit both passed. Approval required to proceed.', displayTitle: 'Changes ready', displayDetail: 'Migration script and model definition updated, linter and security audit both passed.' },
   {
     id: 'bap1', kind: 'approval', createdAt: T(15), author: B('builder'),
     title: '部署/写入审批', status: 'pending',
-    reason: 'Builder 请求修改 3 个文件。需要确认后继续。',
+    reason: 'Builder requests modification of 3 files. Confirmation required to proceed.',
   },
-  { id: 'bu2', kind: 'text', createdAt: T(16), author: U('ding'), text: '批准，继续' },
-  { id: 'ba3', kind: 'text', createdAt: T(17), author: B('builder'), text: '审批通过。正在部署预览。' },
+  { id: 'bu2', kind: 'text', createdAt: T(16), author: U('ding'), text: 'Approved, proceed' },
+  { id: 'ba3', kind: 'text', createdAt: T(17), author: B('builder'), text: 'Approval granted. Deploying preview.' },
   {
     id: 'bdep1', kind: 'deploy', createdAt: T(18), author: B('builder'),
     runId: 'run_builder_001', status: 'deployed', url: 'https://preview.example.com/deploy-af3b21',
@@ -84,7 +84,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     inputTokens: 68400, outputTokens: 2100, usagePercent: 42,
     contextLimit: 200000, modelLabel: 'Claude Sonnet 4',
   },
-  { id: 'ba4', kind: 'text', createdAt: T(20), author: B('builder'), text: '全部完成。迁移脚本 + 模型 + handler 已更新，测试 12/12 通过。' },
+  { id: 'ba4', kind: 'text', createdAt: T(20), author: B('builder'), text: 'All done. Migration script + model + handler updated, 12/12 tests passing.' },
 ]
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -96,38 +96,38 @@ const R = (id: string) => ({ id, name: 'Reviewer', role: 'agent' as const })
 const Q = (id: string) => ({ id, name: 'QA', role: 'agent' as const })
 
 export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
-  { id: 'gu1', kind: 'text', createdAt: T(0), author: U('ding'), text: '@Orchestrator 把 users 表的 status 改成 ENUM 类型，安排一下' },
+  { id: 'gu1', kind: 'text', createdAt: T(0), author: U('ding'), text: '@Orchestrator Change the status column in users table to ENUM type, coordinate this' },
 
   // ── Orchestrator ReAct ──
   {
     id: 'goth1', kind: 'thinking', createdAt: T(1), author: O('orch'),
-    content: '@Ding 要求把 users 表的 status 从 VARCHAR 改成 ENUM。先了解项目结构，找到相关文件，确认改动范围。',
+    content: '@Ding asked to change the users table status from VARCHAR to ENUM. First, understand the project structure, locate relevant files, confirm the scope of changes.',
     isThinking: true,
   },
   { id: 'goto1', kind: 'tool_call', createdAt: T(2), author: O('orch'), toolName: 'Read', status: 'running' },
-  { id: 'gotr1', kind: 'tool_result', createdAt: T(3), author: O('orch'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 行 · status 字段当前为 VARCHAR(20)' },
+  { id: 'gotr1', kind: 'tool_result', createdAt: T(3), author: O('orch'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 lines · status field currently VARCHAR(20)' },
   { id: 'goto2', kind: 'tool_call', createdAt: T(4), author: O('orch'), toolName: 'Grep', status: 'running' },
-  { id: 'gotr2', kind: 'tool_result', createdAt: T(5), author: O('orch'), toolName: 'Grep', status: 'completed', summary: 'src/ → "status" · 12 匹配 · 5 文件 · model + handler + 3 处引用' },
+  { id: 'gotr2', kind: 'tool_result', createdAt: T(5), author: O('orch'), toolName: 'Grep', status: 'completed', summary: 'src/ → "status" · 12 matches · 5 files · model + handler + 3 references' },
   {
     id: 'goth2', kind: 'thinking', createdAt: T(6), author: O('orch'),
-    content: '改动涉及 3 处：model 定义改 @Column、handler 校验改 @IsEnum、需新建迁移脚本。拆 3 个子任务：Builder 负责实现，Reviewer 负责审查，QA 总体验收。Builder 与 Reviewer 可并行。',
+    content: 'Changes span 3 locations: model definition @Column, handler validation @IsEnum, new migration script needed. Split into 3 subtasks: Builder handles implementation, Reviewer handles review, QA handles final acceptance. Builder and Reviewer can run in parallel.',
     isThinking: false,
   },
   {
     id: 'gort1', kind: 'route_decision', createdAt: T(7), author: O('orch'),
-    action: '拆解完成 · 并行 + 串行', summary: '两阶段：Builder + Reviewer 并行实现与审查 → QA 串行总体验收。',
+    action: 'Decomposed · parallel + sequential', summary: 'Two phases: Builder + Reviewer parallel for implementation and review → QA sequential for final acceptance.',
     targetAgent: 'Builder, Reviewer → QA',
   },
-  { id: 'go1', kind: 'text', createdAt: T(8), author: O('orch'), text: '分析完成。拆解为 2 阶段：Builder + Reviewer 并行 → QA 总体验收。', displayDetail: '拆解为 2 阶段：Builder + Reviewer 并行 → QA 总体验收。' },
+  { id: 'go1', kind: 'text', createdAt: T(8), author: O('orch'), text: 'Analysis complete. Decomposed into 2 phases: Builder + Reviewer parallel → QA final acceptance.', displayDetail: 'Decomposed into 2 phases: Builder + Reviewer parallel → QA final acceptance.' },
 
   // ── Builder ──
   {
     id: 'gbth1', kind: 'thinking', createdAt: T(9), author: B('builder2'),
-    content: 'VARCHAR(20)，现有值 active/inactive/banned。创建迁移脚本，更新模型定义，更新 API handler 类型守卫。',
+    content: 'VARCHAR(20), existing values active/inactive/banned. Create migration script, update model definition, update API handler type guard.',
     isThinking: true,
   },
   { id: 'gbto1', kind: 'tool_call', createdAt: T(10), author: B('builder2'), toolName: 'Read', status: 'running' },
-  { id: 'gbtr1', kind: 'tool_result', createdAt: T(11), author: B('builder2'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 行' },
+  { id: 'gbtr1', kind: 'tool_result', createdAt: T(11), author: B('builder2'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 lines' },
   { id: 'gbto2', kind: 'tool_call', createdAt: T(12), author: B('builder2'), toolName: 'Read', status: 'running' },
   { id: 'gbtr2', kind: 'tool_result', createdAt: T(13), author: B('builder2'), toolName: 'Read', status: 'completed', summary: 'src/handlers/user.ts · 89 行' },
   {
