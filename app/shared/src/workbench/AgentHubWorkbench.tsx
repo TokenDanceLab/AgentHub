@@ -1465,6 +1465,24 @@ export function AgentHubWorkbench({
             <ChatViewTranscript transcript={displayTranscript} />
             {/* ── TranscriptView (legacy — reference below) ── */}
             <TranscriptView
+              actionedBlockIds={actionedBlockIds}
+              contextBlockId={contextMenu?.blockId}
+              highlightedBlockId={searchHighlightId ?? highlightedBlockId}
+              onBlockContextMenu={openBlockContextMenu}
+              onBlockPointerDown={beginBlockHoldSelection}
+              onBlockPointerMove={(_block: any, event: any) => updateBlockHoldSelection(event)}
+              onBlockPointerUp={handleBlockPointerUp}
+              onBlockSelect={handleBlockSelect}
+              onHighlightEnd={searchHighlightId ? handleSearchHighlightEnd : onHighlightEnd}
+              onAgentProfileOpen={openAgentProfile}
+              onApprovalDecision={(action: any) => { void onApprovalDecision?.(action) }}
+              onReviewFile={openReviewFile}
+              activeConversation={activeConversation}
+              selectedBlockIds={selectedBlockIds}
+              selectionMode={selectionMode}
+              softHiddenBlockIds={softHiddenBlockIds}
+              transcript={displayTranscript}
+            />
             <MessageSearchPanel
               open={searchOpen}
               onClose={() => setSearchOpen(false)}
