@@ -633,6 +633,10 @@ export const demoWorkbenchPins: WorkbenchDemoMessagePin[] = [
 export const demoWorkbenchTranscripts: Record<string, TranscriptBlock[]> = {
   'agent-collab': chatviewAgentCollabTranscript,
   builder: chatviewBuilderTranscript,
+  deployer: chatviewBuilderTranscript,
+  reviewer: chatviewBuilderTranscript,
+  researcher: chatviewBuilderTranscript,
+  orchestrator: chatviewBuilderTranscript,
   [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
 };
 

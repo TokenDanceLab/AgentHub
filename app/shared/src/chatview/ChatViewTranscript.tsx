@@ -29,7 +29,13 @@ export function ChatViewTranscript({ transcript }: Props) {
   return (
     <div className="chatview">
       <I18nProvider locale={locale} setLocale={setLocale}>
-        <Transcript items={items} chatMode="group" />
+        {items.length === 0 ? (
+          <div style={{ padding: 'var(--sp-xl)', textAlign: 'center', color: 'var(--text-3)', font: 'var(--body)' }}>
+            No messages yet. Start a conversation or select a channel.
+          </div>
+        ) : (
+          <Transcript items={items} chatMode="group" />
+        )}
       </I18nProvider>
     </div>
   )
