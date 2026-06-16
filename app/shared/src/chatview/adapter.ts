@@ -243,6 +243,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
     case 'result':
     case 'finished':
     case 'replay_gap':
+    case 'preview':       // browser preview — not rendered in ChatView cards
     case 'agent_timeline':
     case 'run_step_group':
       return null
