@@ -95,6 +95,7 @@ export const transcript: TranscriptItem[] = [
       { id: 's3', type: 'tool', label: 'ToolResult', status: 'ok', collapsible: true, standalone: true, content: '3 files processed. 0 errors.' },
       { id: 's4', type: 'tool', label: 'fibonacci.ts', status: 'ok', collapsible: true, standalone: true, codeLines: ['function fib(n: number): number {', '  if (n <= 1) return n;', '  return fib(n - 1) + fib(n - 2);', '}'], codeLang: 'typescript' },
       { id: 's5', type: 'approval', label: '权限检查通过', status: 'ok', collapsible: true, standalone: true, apReason: '自动审批：变更范围仅限已有文件的格式调整。' },
+      { id: 's6', type: 'ctx', label: '上下文使用', status: 'ok', collapsible: true, standalone: true, ctxPct: 42, ctxStats: ['输入 68.4k', '输出 2.1k', '上限 200k', 'Claude Sonnet 4.6'] },
     ]},
 ]
 
