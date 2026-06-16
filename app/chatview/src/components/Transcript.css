@@ -2,12 +2,12 @@
    TRANSCRIPT — unified grp-row (DM + Group share same flex layout)
    ══════════════════════════════════════════════════════════════════════ */
 
-.transcript { display:flex; flex-direction:column; gap:0; min-width:0 }
+.transcript { display:flex; flex-direction:column; gap:0; min-width:0; padding:0 var(--sp-md) }
 
 /* ── Row — symmetric: [avatar-l] [content flex:1] [avatar-r] ──────── */
 .grp-row {
-  display:flex; gap:8px; align-items:flex-start;
-  margin-bottom:var(--sp-sm);
+  display:flex; gap:var(--sp-md); align-items:flex-start;
+  margin-bottom:var(--sp-lg);
 }
 .grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px }
 .card-stack { display:flex; flex-direction:column; gap:0 }
@@ -32,13 +32,14 @@
 
 /* ── Avatars ───────────────────────────────────────────────────────── */
 .ag-av {
-  width:28px; height:28px; border-radius:50%;
+  width:32px; height:32px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  font:600 11px var(--font-sans); color:white; flex-shrink:0;
+  font:600 12px var(--font-sans); color:white; flex-shrink:0;
 }
 .ag-av.builder{background:var(--role-builder)} .ag-av.reviewer{background:var(--role-reviewer)}
 .ag-av.deployer{background:var(--role-deployer)} .ag-av.researcher{background:var(--role-researcher)}
 .ag-av.orch{background:var(--role-orch)} .ag-av.shield{background:var(--warning)}
+.ag-av.agent{background:var(--info)} .ag-av.system{background:var(--text-3)}
 .ag-av.user-av{background:var(--primary)}
 
 .ag-name { font:500 0.75rem var(--font-sans); color:var(--text-2) }
@@ -50,6 +51,8 @@
 .user-content-right { align-items:flex-end }
 
 .agent-meta { display:flex; align-items:center; gap:8px }
+
+.dm-avatar { flex-shrink:0 }
 
 /* ── Simulation controls ───────────────────────────────────────────── */
 .sim-ctrl { display:flex; gap:8px; margin-bottom:12px; align-items:center }
