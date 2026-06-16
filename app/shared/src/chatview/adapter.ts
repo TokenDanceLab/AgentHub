@@ -288,6 +288,46 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       continue
     }
 
+    // ── Agent timeline → flattened think cards ──
+    if (block.kind === 'agent_timeline') {
+      const t = block as any
+      if (t.items && Array.isArray(t.items)) {
+        for (const ti of t.items) {
+          const status = ti.status === 'completed' ? 'ok' : ti.status === 'failed' ? 'fail' : 'running'
+          const row = {
+            id: `${block.id}-${ti.label}`, type: 'think' as const,
+            label: '',
+            status: status as RowItem['status'],
+            collapsible: true,
+            content: `${ti.label}: ${ti.detail || ''}`,
+          } as RowItem
+          if (!currentAgent || currentAgent.id !== block.author.id) {
+            if (currentAgent) items.push(currentAgent)
+            currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+          }
+          currentAgent.rows.push(row)
+        }
+      }
+      continue
+    }
+
+    // ── Nested structures → recurse ──
+    if (block.kind === 'run_step_group') {
+      const g = block as any
+      if (g.children && Array.isArray(g.children)) {
+        for (const child of g.children) {
+          const childRow = mapBlock({ ...child, author: block.author })
+          if (!childRow) continue
+          if (!currentAgent || currentAgent.id !== block.author.id) {
+            if (currentAgent) items.push(currentAgent)
+            currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+          }
+          currentAgent.rows.push(childRow)
+        }
+      }
+      continue
+    }
+
     // ── Structured → rows ──
     if (role === 'agent' || role === 'system') {
       const row = mapBlock(block)

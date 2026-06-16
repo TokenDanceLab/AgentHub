@@ -116,6 +116,42 @@ export const demoBlocks: TranscriptBlock[] = [
     author: { id: 'builder', name: 'Builder', role: 'agent' },
     text: '审批通过。正在部署预览。',
   },
+  // ── Agent timeline (flattened to think cards) ──
+  {
+    id: 'timeline-1', kind: 'agent_timeline',
+    createdAt: '2026-06-16T14:48:40+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    title: '运行时间线',
+    items: [
+      { status: 'completed', label: '初始化会话', detail: '模型、工具权限已加载' },
+      { status: 'completed', label: '代码定位', detail: '找到 3 个需要修改的文件' },
+      { status: 'completed', label: '迁移脚本', detail: 'migrations/003.sql 已创建' },
+      { status: 'running', label: '部署预览', detail: '等待审批...' },
+    ],
+  },
+  // ── Artifact ──
+  {
+    id: 'artifact-1', kind: 'artifact',
+    createdAt: '2026-06-16T14:48:50+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    title: 'migration-plan.md', path: 'docs/migration-plan.md',
+    action: 'created', artifactKind: 'markdown',
+  },
+  // ── Sub-agent ──
+  {
+    id: 'subagent-1', kind: 'subagent',
+    createdAt: '2026-06-16T14:49:10+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    title: 'Linter 检查', worker: 'Linter', status: 'completed',
+    summary: '0 errors, 0 warnings — 全部通过',
+  },
+  // ── Failure (error recovery test) ──
+  {
+    id: 'failure-1', kind: 'failure',
+    createdAt: '2026-06-16T14:49:20+08:00',
+    author: { id: 'builder', name: 'Builder', role: 'agent' },
+    title: '部署失败', reason: 'preview.agenthub.dev 端口 443 超时 — 网络不可达',
+  },
   // ── Deploy ──
   {
     id: 'deploy-1', kind: 'deploy',
