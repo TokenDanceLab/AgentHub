@@ -77,12 +77,12 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   { id: 'ba3', kind: 'text', createdAt: T(17), author: B('builder'), text: '审批通过。正在部署预览。' },
   {
     id: 'bdep1', kind: 'deploy', createdAt: T(18), author: B('builder'),
-    runId: 'run_builder_001', status: 'deployed', url: 'https://preview.agenthub.dev/deploy-af3b21',
+    runId: 'run_builder_001', status: 'deployed', url: 'https://preview.example.com/deploy-af3b21',
   },
   {
     id: 'bctx1', kind: 'context_usage', createdAt: T(19), author: B('builder'),
     inputTokens: 68400, outputTokens: 2100, usagePercent: 42,
-    contextLimit: 200000, modelLabel: 'Claude Sonnet 4.6',
+    contextLimit: 200000, modelLabel: 'Claude Sonnet 4',
   },
   { id: 'ba4', kind: 'text', createdAt: T(20), author: B('builder'), text: '全部完成。迁移脚本 + 模型 + handler 已更新，测试 12/12 通过。' },
 ]
@@ -185,6 +185,6 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   {
     id: 'gctx1', kind: 'context_usage', createdAt: T(33), author: Q('qa'),
     inputTokens: 156000, outputTokens: 4800, usagePercent: 78,
-    contextLimit: 200000, modelLabel: 'Claude Sonnet 4.6',
+    contextLimit: 200000, modelLabel: 'Claude Sonnet 4',
   },
 ]
