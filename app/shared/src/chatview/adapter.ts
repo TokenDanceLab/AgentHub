@@ -4,7 +4,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import type {
-  TranscriptBlock, TranscriptAuthorRole,
+  TranscriptBlock,
   TextTranscriptBlock, ThinkingTranscriptBlock,
   ToolCallTranscriptBlock, ToolResultTranscriptBlock,
   FileChangeTranscriptBlock, ArtifactTranscriptBlock,
@@ -13,7 +13,7 @@ import type {
   RouteDecisionTranscriptBlock, ContextUsageTranscriptBlock,
   DeployTranscriptBlock, AttachmentTranscriptBlock,
   FailureTranscriptBlock,
-  AgentTimelineTranscriptBlock, AgentTimelineItem,
+  AgentTimelineTranscriptBlock,
   RunStepGroupTranscriptBlock,
   ChildAgentTranscriptBlock, SubtaskTranscriptBlock,
   EvidenceRefStatus,
@@ -23,7 +23,39 @@ import type { RowItem } from './data/mock'
 // Re-export for consumers
 export type { TranscriptBlock }
 
+// ── Constants ──
+
+export const SEP = ' · '
+
 // ── Helpers ──
+
+function patchToDiffLines(patch: string, maxLines = 40) {
+  return patch.split('\n').slice(0, maxLines).map(line => ({
+    type: (line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'ctx') as 'add' | 'del' | 'ctx',
+    text: line,
+  }))
+}
+
+function pickDisplay(b: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (b.displayTitle !== undefined) out.displayTitle = b.displayTitle
+  if (b.badgeLabel !== undefined) out.badgeLabel = b.badgeLabel
+  if (b.badgeVariant !== undefined) out.badgeVariant = b.badgeVariant
+  return out
+}
+
+function newAgentBlock(author: TranscriptBlock['author'], role: string, createdAt?: string): AgentTranscriptBlock {
+  return {
+    id: author.id,
+    agent: author.name || 'Agent',
+    role,
+    time: timeStr(createdAt),
+    rows: [],
+    bubbles: [],
+    standaloneRows: [],
+    runs: [],
+  }
+}
 
 function timeStr(iso?: string) {
   if (!iso) return ''
@@ -92,10 +124,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: true,
         fileOp: t.action === 'created' ? 'cr' : t.action === 'deleted' ? 'del' : 'mod',
         content: t.path?.split('.').pop()?.toUpperCase() || '',
-        diffLines: t.patch ? t.patch.split('\n').slice(0, 40).map(line => ({
-          type: (line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'ctx') as 'add' | 'del' | 'ctx',
-          text: line,
-        })) : undefined,
+        diffLines: t.patch ? patchToDiffLines(t.patch) : undefined,
       } as RowItem
     }
 
@@ -105,7 +134,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       const extraParts = [a.path || a.title]
       if (a.uri) extraParts.push(a.uri)
       if (a.mimeType) extraParts.push(a.mimeType)
-      const extra = extraParts.filter(Boolean).join(' · ')
+      const extra = extraParts.filter(Boolean).join(SEP)
       return {
         id: a.id, type: 'file',
         label: '',
@@ -132,10 +161,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: true,
         fileOp: 'mod',
         content: stats.filter(Boolean).join(' '),
-        diffLines: d.patch ? d.patch.split('\n').slice(0, 40).map(line => ({
-          type: (line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'ctx') as 'add' | 'del' | 'ctx',
-          text: line,
-        })) : undefined,
+        diffLines: d.patch ? patchToDiffLines(d.patch) : undefined,
       } as RowItem
     }
 
@@ -154,7 +180,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         label: a.title,
         status: a.status === 'completed' ? 'ok' : 'waiting',
         collapsible: true, standalone: true,
-        apReason: parts.filter(Boolean).join(' · '),
+        apReason: parts.filter(Boolean).join(SEP),
       } as RowItem
     }
 
@@ -182,7 +208,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       const name = block.kind === 'child_agent' ? block.agent : block.worker || block.title
       return {
         id: block.id, type: 'sub',
-        label: name ? `Agent · ${name}` : block.title,
+        label: name ? `Agent${SEP}${name}` : block.title,
         status: statusNorm(block.status),
         collapsible: true,
         content: block.summary || block.title,
@@ -235,7 +261,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: statusNorm(d.status || 'completed'),
         collapsible: true, standalone: true,
         url: d.url,
-        deployMeta: metaParts.length > 0 ? metaParts.join(' · ') : '已部署',
+        deployMeta: metaParts.length > 0 ? metaParts.join(SEP) : '已部署',
       } as RowItem
     }
 
@@ -310,9 +336,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       const t = block as TextTranscriptBlock
       items.push({
         type: 'user', name: block.author.name, time: timeStr(block.createdAt), text: t.text,
-        ...(t.displayTitle !== undefined ? { displayTitle: t.displayTitle } : {}),
-        ...(t.badgeLabel !== undefined ? { badgeLabel: t.badgeLabel } : {}),
-        ...(t.badgeVariant !== undefined ? { badgeVariant: t.badgeVariant } : {}),
+        ...pickDisplay(t as unknown as Record<string, unknown>),
       })
       continue
     }
@@ -322,13 +346,10 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       const t = block as TextTranscriptBlock
       if (!currentAgent || currentAgent.id !== block.author.id) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = {
-          id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt),
-          rows: [], bubbles: [], standaloneRows: [], runs: [],
-          ...(t.displayTitle !== undefined ? { displayTitle: t.displayTitle } : {}),
-          ...(t.badgeLabel !== undefined ? { badgeLabel: t.badgeLabel } : {}),
-          ...(t.badgeVariant !== undefined ? { badgeVariant: t.badgeVariant } : {}),
-        }
+        currentAgent = Object.assign(
+          newAgentBlock(block.author, role, block.createdAt),
+          pickDisplay(t as unknown as Record<string, unknown>),
+        )
       }
       const bubbleText = t.displayDetail || t.text
       if (bubbleText) currentAgent!.bubbles.push(bubbleText)
@@ -350,7 +371,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
           } as RowItem
           if (!currentAgent || currentAgent.id !== block.author.id) {
             if (currentAgent) items.push(currentAgent)
-            currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+            currentAgent = newAgentBlock(block.author, role, block.createdAt)
           }
           currentAgent.rows.push(row)
         }
@@ -367,7 +388,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
           if (!childRow) continue
           if (!currentAgent || currentAgent.id !== block.author.id) {
             if (currentAgent) items.push(currentAgent)
-            currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+            currentAgent = newAgentBlock(block.author, role, block.createdAt)
           }
           currentAgent.rows.push(childRow)
         }
