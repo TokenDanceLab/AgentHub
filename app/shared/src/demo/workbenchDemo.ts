@@ -3,6 +3,7 @@ import type { WorkbenchAgent, WorkbenchConversation } from '../platform';
 import type { TranscriptBlock } from '../transcript';
 import { normalizeHubMessagesToTranscript, type HubMessageTranscriptInput } from '../transcript/normalizeHubMessages';
 import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoTranscript } from './teamrunDemo';
+import { chatviewBuilderTranscript, chatviewAgentCollabTranscript } from './chatviewFixtures';
 
 export type WorkbenchDemoSurface = 'desktop' | 'web';
 
@@ -630,8 +631,8 @@ export const demoWorkbenchPins: WorkbenchDemoMessagePin[] = [
 ];
 
 export const demoWorkbenchTranscripts: Record<string, TranscriptBlock[]> = {
-  'agent-collab': projectGroupMessageLoopTranscript,
-  builder: builderTranscript,
+  'agent-collab': chatviewAgentCollabTranscript,
+  builder: chatviewBuilderTranscript,
   [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
 };
 
