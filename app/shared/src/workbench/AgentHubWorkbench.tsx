@@ -26,7 +26,7 @@ import {
 } from './floating';
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
-import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
+import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './transcriptEventTypes';
 import { ChatViewTranscript } from '../chatview/ChatViewTranscript';
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
