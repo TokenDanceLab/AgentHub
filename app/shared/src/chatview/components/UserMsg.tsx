@@ -1,7 +1,7 @@
-import type { UserMsg } from '../data/mock'
+import type { UserTranscriptMsg } from '../adapter'
 import { useI18n } from '../i18n/I18nProvider'
 
-interface Props { item: UserMsg; chatMode: 'dm' | 'group' }
+interface Props { item: UserTranscriptMsg; chatMode: 'dm' | 'group' }
 
 export default function UserMessage({ item, chatMode }: Props) {
   const { t } = useI18n()

@@ -1,11 +1,11 @@
-import type { AgentBlock } from '../data/mock'
+import type { AgentTranscriptBlock } from '../adapter'
 import RowItem from './RowItem'
 import OrchestratorCard from './OrchestratorCard'
 import { IconShield } from './Icons'
 import { roleInitial } from '../design/roles'
 import type { AgentRole } from '../design/roles'
 
-interface Props { block: AgentBlock; chatMode: 'dm' | 'group' }
+interface Props { block: AgentTranscriptBlock; chatMode: 'dm' | 'group' }
 
 export default function AgentGroup({ block, chatMode }: Props) {
   const initial = roleInitial[block.role as AgentRole] ?? block.agent[0]

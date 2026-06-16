@@ -88,7 +88,7 @@
 .row-item.route > .row-hd .row-icon { animation:routePulse var(--dur-route) ease infinite }
 
 @keyframes routeSlideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
-@keyframes routePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes routePulse { 0%,100%{opacity:1} 50%{opacity:var(--opacity-route-mid)} }
 
 /* Deploy */ .row-item.deploy > .row-hd .row-icon { color:var(--primary) }
 .row-item.deploy > .row-bd { display:grid; gap:var(--sp-xs); padding-bottom:var(--sp-sm) }
@@ -150,7 +150,7 @@
 .orch-plan-text { font:var(--body); color:var(--text-2); line-height:1.55 }
 
 .orch-dag { width:100%; height:auto; margin:var(--sp-sm) 0 }
-@keyframes dagPulse { 0%,100%{opacity:1 } 50%{opacity:0.3} }
+@keyframes dagPulse { 0%,100%{opacity:1 } 50%{opacity:var(--opacity-dag-mid)} }
 .dag-pulse { animation:dagPulse var(--dur-pulse) ease infinite }
 
 .orch-note { font:var(--label); color:var(--text-3); font-style:italic }
