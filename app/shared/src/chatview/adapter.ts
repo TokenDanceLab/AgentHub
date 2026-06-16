@@ -21,8 +21,6 @@ export type { TranscriptBlock }
 
 // ── Helpers ──
 
-let _id = 0
-function uid(prefix: string) { return `${prefix}-${++_id}` }
 function timeStr(iso?: string) {
   if (!iso) return ''
   return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
@@ -270,7 +268,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       const t = block as TextTranscriptBlock
       if (!currentAgent || currentAgent.id !== block.author.id) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = { id: uid('ag'), agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
       }
       const bubbleText = t.displayDetail || t.text
       if (bubbleText) currentAgent.bubbles.push(bubbleText)
@@ -283,7 +281,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       if (!row) continue
       if (!currentAgent || currentAgent.id !== block.author.id) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = { id: uid('ag'), agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
       }
       // Standalone cards vs inline rows
       const standalone = row.type === 'route' || row.type === 'deploy' || row.type === 'ctx' ||
