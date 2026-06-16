@@ -82,9 +82,9 @@ export default function OrchestratorCard({item}:{item:RowItemType}){
           return (src.dependsOn||[]).map(depId=>{
             const dp=pos.get(depId); if(!dp)return null
             const x1=P+dp.li*colW+NW
-            const y1=gy(dp.ri,layers[dp.li].length)+NH/2
+            const y1=gy(dp.ri,layers[dp.li]!.length)+NH/2
             const x2=P+sp.li*colW
-            const y2=gy(sp.ri,layers[sp.li].length)+NH/2
+            const y2=gy(sp.ri,layers[sp.li]!.length)+NH/2
             const mx=(x1+x2)/2
             return <path key={`${depId}-${src.id}`} d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`} fill="none" stroke="var(--bdr-strong)" strokeWidth={1.2} markerEnd="url(#ah)"/>
           })
