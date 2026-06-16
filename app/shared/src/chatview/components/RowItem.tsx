@@ -45,7 +45,7 @@ function FileTypeIcon({ item }: { item: RowItemType }) {
   return <Icon size={14} />
 }
 
-interface RowItemProps {
+interface Props {
   item: RowItemType
   onToggle?: (id: string) => void
   onApprove?: (id: string) => void
@@ -55,7 +55,7 @@ interface RowItemProps {
   onFileClick?: (id: string) => void
 }
 
-export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick }: RowItemProps) {
+export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick }: Props) {
   const { t } = useI18n()
   const [open, setOpen] = useState(item.open ?? false)
   const isOpen = item.type === 'route' ? true : open
@@ -127,7 +127,7 @@ export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, 
             <div className="ap-reason">{item.apReason}</div>
             {item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
           </>)}
-          {item.status==='fail' && onRetry && <div className="ap-actions"><button className="ap-approve" onClick={() => onRetry(item.id)}>↻ Retry</button></div>}
+          {item.status==='fail' && onRetry && <div className="ap-actions"><button className="ap-approve" onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
           {item.url && <div className="dp-url">{item.url}</div>}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
           {item.fileName && <div className="att-row" onClick={() => onFileClick?.(item.id)} style={{cursor: onFileClick ? 'pointer' : undefined}}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}

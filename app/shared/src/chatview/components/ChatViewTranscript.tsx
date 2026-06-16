@@ -5,16 +5,21 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import { useMemo, useState } from 'react'
-import Transcript from './components/Transcript'
-import { I18nProvider } from './i18n/I18nProvider'
-import { blocksToTranscriptItems, type TranscriptBlock } from './adapter'
+import Transcript from './Transcript'
+import { I18nProvider, useI18n } from '../i18n/I18nProvider'
+import { blocksToTranscriptItems, type TranscriptBlock } from '../adapter'
 
 // Load ChatView design tokens — scoped to .chatview, no :root pollution
-import './design/tokens.css'
-import './theme/tokens-dark.css'
+import '../design/tokens.css'
+import '../design/tokens-dark.css'
 
 interface Props {
   transcript: TranscriptBlock[]
+}
+
+function EmptyState() {
+  const { t } = useI18n()
+  return <div className="chatview-empty">{t('transcript.empty')}</div>
 }
 
 /**
@@ -30,9 +35,7 @@ export function ChatViewTranscript({ transcript }: Props) {
     <div className="chatview">
       <I18nProvider locale={locale} setLocale={setLocale}>
         {items.length === 0 ? (
-          <div style={{ padding: 'var(--sp-xl)', textAlign: 'center', color: 'var(--text-3)', font: 'var(--body)' }}>
-            No messages yet. Start a conversation or select a channel.
-          </div>
+          <EmptyState />
         ) : (
           <Transcript items={items} chatMode="group" />
         )}

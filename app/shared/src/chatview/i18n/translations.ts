@@ -60,6 +60,7 @@ export const translations = {
     'card.deploy.ready': 'Preview Ready',
     'card.route.dag': 'Dispatch · parallel → serial',
     'card.session.prefix': 'Session',
+    'card.fail.retry': '↻ Retry',
 
     // Sidebar
     'sidebar.overview': 'Overview',
@@ -79,6 +80,9 @@ export const translations = {
 
     // Code
     'code.copy': 'Copy',
+
+    // Transcript
+    'transcript.empty': 'No messages yet. Start a conversation or select a channel.',
 
     // Simulation
     'sim.next': 'Next',
@@ -255,6 +259,7 @@ export const translations = {
     'card.deploy.ready': '预览已就绪',
     'card.route.dag': '拆解完成 · 并行 + 串行',
     'card.session.prefix': '',
+    'card.fail.retry': '↻ 重试',
 
     // Sidebar
     'sidebar.overview': '概览',
@@ -274,6 +279,9 @@ export const translations = {
 
     // Code
     'code.copy': '复制',
+
+    // Transcript
+    'transcript.empty': '暂无消息。开始对话或选择一个频道。',
 
     // Simulation
     'sim.next': '下一步',
