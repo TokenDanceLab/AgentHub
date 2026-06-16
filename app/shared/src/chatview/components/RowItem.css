@@ -14,7 +14,7 @@
 .row-item:only-child { border-radius:var(--r-md) }
 
 .row-hd {
-  display:flex; align-items:center; gap:6px;
+  display:flex; align-items:center; gap:var(--sp-xxs);
   padding:4px 10px; cursor:pointer; user-select:none;
   font:var(--label); min-height:28px; line-height:1.3;
   transition:background var(--dur) ease;
@@ -26,7 +26,7 @@
 .row-item.running > .row-hd:hover,
 .row-item:not(.collapsible) > .row-hd:hover { background:transparent }
 
-.row-icon { color:var(--text-2); flex-shrink:0; width:18px; text-align:center; font-size:14px }
+.row-icon { color:var(--text-2); flex-shrink:0; width:var(--icon-size); text-align:center; font-size:14px }
 .row-label { font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .row-extra { color:var(--text-3); font:var(--label-xs); flex-shrink:0 }
 .row-chevron { color:var(--text-3); transition:transform var(--dur) ease; flex-shrink:0; font-size:10px }
@@ -45,7 +45,7 @@
 .row-children { display:flex; flex-direction:column; gap:4px; margin-top:4px }
 
 /* Think */  .row-item.think > .row-hd .row-icon { color:var(--info) }
-.row-item.think > .row-bd { color:var(--text-2); white-space:pre-wrap; max-height:240px; overflow-y:auto }
+.row-item.think > .row-bd { color:var(--text-2); white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto }
 
 /* Tool */  .row-item.tool > .row-hd .row-label { font-family:var(--font-mono); font-size:0.6875rem; font-weight:500 }
 .row-item.tool > .row-bd { font:400 0.75rem/1.5 var(--font-mono) }
@@ -83,9 +83,9 @@
 .ap-deny { background:var(--surface); color:var(--danger); border:1px solid var(--danger-bg) }
 
 /* Route — dispatch indicator */
-.row-item.route { margin:4px 0; animation:routeSlideIn 0.4s var(--ease) both }
+.row-item.route { margin:4px 0; animation:routeSlideIn var(--dur-slow) var(--ease) both }
 .row-item.route > .row-hd { color:var(--text-2); cursor:default; pointer-events:none }
-.row-item.route > .row-hd .row-icon { animation:routePulse 1.5s ease infinite }
+.row-item.route > .row-hd .row-icon { animation:routePulse var(--dur-route) ease infinite }
 
 @keyframes routeSlideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
 @keyframes routePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
@@ -96,7 +96,7 @@
 .row-item.deploy .dp-meta { font:var(--label-xs); color:var(--text-3) }
 
 /* Attachment */ .row-item.attachment > .row-hd .row-icon { color:var(--text-2) }
-.row-item.attachment .att-row { display:flex; align-items:center; gap:8px }
+.row-item.attachment .att-row { display:flex; align-items:center; gap:var(--sp-sm) }
 .row-item.attachment .att-name { font:var(--label); flex:1 }
 .row-item.attachment .att-size { font:var(--label-xs); color:var(--text-3) }
 
@@ -106,7 +106,7 @@
 .ctx-bar-wrap { display:flex; align-items:center; gap:var(--sp-sm) }
 .ctx-bar-wrap .pct { font:var(--label-xs); color:var(--text-3); flex-shrink:0; min-width:36px }
 .ctx-bar-wrap .ctx-bar { flex:1; height:4px; background:var(--surface-highest); border-radius:2px; overflow:hidden }
-.ctx-bar-wrap .ctx-fill { height:100%; border-radius:2px; transition:width 0.5s var(--ease) }
+.ctx-bar-wrap .ctx-fill { height:100%; border-radius:2px; transition:width var(--dur-bar) var(--ease) }
 .ctx-bar-wrap .ctx-fill.ok { background:var(--state-success) }
 .ctx-bar-wrap .ctx-fill.warn { background:var(--warning) }
 .ctx-meta { display:flex; gap:var(--sp-sm); font:var(--label-xs); color:var(--text-3); flex-wrap:wrap }
@@ -129,7 +129,7 @@
   padding:5px 12px; font:var(--label-xs); color:var(--text-2);
   background:var(--surface-low); border-bottom:1px solid var(--bdr);
 }
-.code-head-left { display:flex; align-items:center; gap:6px }
+.code-head-left { display:flex; align-items:center; gap:var(--sp-xxs) }
 .code-head-right { display:flex; align-items:center; gap:2px; font-family:var(--font-mono); font-size:0.6875rem }
 .code-copy {
   cursor:pointer; background:none; border:none; color:var(--text-3);
@@ -146,11 +146,11 @@
 .code-text { flex:1 }
 
 /* ── Orchestrator Dispatch DAG ─────────────────────────────────── */
-.orch-body { padding:0 14px 14px 14px !important; margin-left:0 !important; border-left:none !important; display:flex; flex-direction:column; gap:12px }
+.orch-body { padding:0 14px 14px 14px !important; margin-left:0 !important; border-left:none !important; display:flex; flex-direction:column; gap:var(--sp-md) }
 .orch-plan-text { font:var(--body); color:var(--text-2); line-height:1.55 }
 
 .orch-dag { width:100%; height:auto; margin:8px 0 }
 @keyframes dagPulse { 0%,100%{opacity:1 } 50%{opacity:0.3} }
-.dag-pulse { animation:dagPulse 1.2s ease infinite }
+.dag-pulse { animation:dagPulse var(--dur-pulse) ease infinite }
 
 .orch-note { font:var(--label); color:var(--text-3); font-style:italic }

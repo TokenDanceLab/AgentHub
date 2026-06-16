@@ -33,8 +33,7 @@ export default function AgentGroup({ block, chatMode }: Props) {
           ))}
         </div>
       )}
-      {/* Sub-agent runs: handled by AgentHub backend as separate agent blocks */}
-      {block.runs.length > 0 && null}
+      {/* Sub-agent runs: AgentHub backend handles these as separate top-level AgentBlocks. The adapter's AgentTranscriptBlock.runs is typed as never[]. No rendering needed here. */}
       {block.standaloneRows.length > 0 && (
         <div className="card-stack">
           {block.standaloneRows.map((row) => (
