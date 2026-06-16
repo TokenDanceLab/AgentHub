@@ -1679,11 +1679,11 @@ server {
 ## 18. 右侧检视面板增强（RightInspector）
 
 > 2026-06-10 · 设计文档 `docs/right-panel-enhancement-design.md`
-> 原则：不动主聊天流（GlobalRail / TranscriptView / Composer），只增强 RightInspector 三个 tab。
+> 原则：不动主聊天流（GlobalRail / ChatViewTranscript / Composer），只增强 RightInspector 三个 tab。
 
 ### 18.1 设计哲学
 
-- 左侧 `GlobalRail`、中间 `TranscriptView`、底部 `UnifiedComposer` — **不动**
+- 左侧 `GlobalRail`、中间 `ChatViewTranscript`、底部 `UnifiedComposer` — **不动**
 - 只改 `RightInspector`（overview / browser / files 三个 tab）
 - Inspector 宽度：默认 `400px`，可拖拽 `48-760px`，可折叠
 
@@ -1722,7 +1722,7 @@ server {
 
 ### 18.5 不做的事（保持简单）
 
-- 不改 GlobalRail / TranscriptView / Composer
+- 不改 GlobalRail / ChatViewTranscript / Composer
 - 不新建 tab（保持 overview/browser/files 三 tab 结构）
 - 不加力导向 DAG 图（只做 `<ul>` 树）
 - 不加 ContextBus 面板（现有 `ContextUsage` 足够）
