@@ -26,7 +26,7 @@ import {
 } from './floating';
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
-import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
+import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
 import { ChatViewTranscript } from '../chatview/ChatViewTranscript';
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
@@ -1461,28 +1461,7 @@ export function AgentHubWorkbench({
                 onExportEvidence={exportMainchainEvidence}
               />
             ) : null}
-            {/* ── CHATVIEW (new design system — primary view) ── */}
             <ChatViewTranscript transcript={displayTranscript} />
-            {/* ── TranscriptView (legacy — reference below) ── */}
-            <TranscriptView
-              actionedBlockIds={actionedBlockIds}
-              contextBlockId={contextMenu?.blockId}
-              highlightedBlockId={searchHighlightId ?? highlightedBlockId}
-              onBlockContextMenu={openBlockContextMenu}
-              onBlockPointerDown={beginBlockHoldSelection}
-              onBlockPointerMove={(_block: any, event: any) => updateBlockHoldSelection(event)}
-              onBlockPointerUp={handleBlockPointerUp}
-              onBlockSelect={handleBlockSelect}
-              onHighlightEnd={searchHighlightId ? handleSearchHighlightEnd : onHighlightEnd}
-              onAgentProfileOpen={openAgentProfile}
-              onApprovalDecision={(action: any) => { void onApprovalDecision?.(action) }}
-              onReviewFile={openReviewFile}
-              activeConversation={activeConversation}
-              selectedBlockIds={selectedBlockIds}
-              selectionMode={selectionMode}
-              softHiddenBlockIds={softHiddenBlockIds}
-              transcript={displayTranscript}
-            />
             <MessageSearchPanel
               open={searchOpen}
               onClose={() => setSearchOpen(false)}
