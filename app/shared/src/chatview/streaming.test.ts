@@ -60,13 +60,13 @@ export function verifyStreamingKeyStability(blocks: TranscriptBlock[]): string[]
 
 import { describe, it, expect } from 'vitest'
 
-const B = (id: string) => ({ id, name: 'Builder', role: 'agent' as const })
+const makeAuthor = (id: string) => ({ id, name: 'Builder', role: 'agent' as const })
 
 describe('simulateStreaming', () => {
   it('produces growing snapshots', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 't1', kind: 'thinking', createdAt: new Date().toISOString(), author: B('b1'), content: 'a', isThinking: true },
-      { id: 't2', kind: 'thinking', createdAt: new Date().toISOString(), author: B('b1'), content: 'b', isThinking: true },
+      { id: 't1', kind: 'thinking', createdAt: new Date().toISOString(), author: makeAuthor('b1'), content: 'a', isThinking: true },
+      { id: 't2', kind: 'thinking', createdAt: new Date().toISOString(), author: makeAuthor('b1'), content: 'b', isThinking: true },
     ] as TranscriptBlock[]
     const snapshots = simulateStreaming(blocks)
     expect(snapshots).toHaveLength(2)
@@ -76,9 +76,9 @@ describe('simulateStreaming', () => {
 
   it('maintains stable agent IDs across streaming steps', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 't1', kind: 'thinking', createdAt: new Date().toISOString(), author: B('b1'), content: 'a', isThinking: true },
-      { id: 't2', kind: 'tool_call', createdAt: new Date().toISOString(), author: B('b1'), toolName: 'Read', status: 'running' },
-      { id: 't3', kind: 'tool_result', createdAt: new Date().toISOString(), author: B('b1'), toolName: 'Read', status: 'completed', summary: 'ok' },
+      { id: 't1', kind: 'thinking', createdAt: new Date().toISOString(), author: makeAuthor('b1'), content: 'a', isThinking: true },
+      { id: 't2', kind: 'tool_call', createdAt: new Date().toISOString(), author: makeAuthor('b1'), toolName: 'Read', status: 'running' },
+      { id: 't3', kind: 'tool_result', createdAt: new Date().toISOString(), author: makeAuthor('b1'), toolName: 'Read', status: 'completed', summary: 'ok' },
     ] as TranscriptBlock[]
     const issues = verifyStreamingKeyStability(blocks)
     expect(issues).toEqual([])

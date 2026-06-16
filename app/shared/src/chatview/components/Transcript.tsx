@@ -1,5 +1,5 @@
 import type { TranscriptItem } from '../data/mock'
-import UserMsg from './UserMsg'
+import UserMessage from './UserMsg'
 import AgentGroup from './AgentGroup'
 import './Transcript.css'
 
@@ -18,7 +18,7 @@ export default function Transcript({ items, chatMode }: Props) {
     <div className="transcript">
       {items.map((item, i) => {
         if ('type' in item && item.type === 'divider') return null
-        if (isUser(item)) return <UserMsg key={item.text + (item.name || '')} item={item} chatMode={chatMode} />
+        if (isUser(item)) return <UserMessage key={item.text + (item.name || '')} item={item} chatMode={chatMode} />
         if (isAgent(item)) return <AgentGroup key={item.id} block={item} chatMode={chatMode} />
         return null
       })}

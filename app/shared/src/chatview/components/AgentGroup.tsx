@@ -1,11 +1,11 @@
-import type { AgentBlock as AgentBlockType } from '../data/mock'
+import type { AgentBlock } from '../data/mock'
 import RowItem from './RowItem'
 import OrchestratorCard from './OrchestratorCard'
 import { IconShield } from './Icons'
 import { roleInitial } from '../design/roles'
 import type { AgentRole } from '../design/roles'
 
-interface Props { block: AgentBlockType; chatMode: 'dm' | 'group' }
+interface Props { block: AgentBlock; chatMode: 'dm' | 'group' }
 
 export default function AgentGroup({ block, chatMode }: Props) {
   const initial = roleInitial[block.role as AgentRole] ?? block.agent[0]
@@ -63,7 +63,7 @@ export default function AgentGroup({ block, chatMode }: Props) {
       <div className="grp-row">
         <div className="dm-avatar">{avatar}</div>
         <div className="grp-content">{body}</div>
-        <div className="dm-avatar" style={{ visibility: 'hidden' }}><div className="ag-av"> </div></div>
+        <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
       </div>
     )
   }
@@ -72,7 +72,7 @@ export default function AgentGroup({ block, chatMode }: Props) {
     <div className="grp-row">
       <div className="dm-avatar">{avatar}</div>
       <div className="grp-content">{body}</div>
-      <div className="dm-avatar" style={{ visibility: 'hidden' }}><div className="ag-av"> </div></div>
+      <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
     </div>
   )
 }
