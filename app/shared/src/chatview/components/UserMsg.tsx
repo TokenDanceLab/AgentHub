@@ -1,15 +1,15 @@
-import type { UserMsg as UserMsgType } from '../data/mock'
+import type { UserMsg } from '../data/mock'
 import { useI18n } from '../i18n/I18nProvider'
 
-interface Props { item: UserMsgType; chatMode: 'dm' | 'group' }
+interface Props { item: UserMsg; chatMode: 'dm' | 'group' }
 
-export default function UserMsg({ item, chatMode }: Props) {
+export default function UserMessage({ item, chatMode }: Props) {
   const { t } = useI18n()
 
   if (chatMode === 'dm') {
     return (
       <div className="grp-row user-row-right">
-        <div className="dm-avatar" style={{ visibility: 'hidden' }}><div className="ag-av">&nbsp;</div></div>
+        <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
         <div className="grp-content user-content-right">
           <div className="user-bubble">{item.text}</div>
         </div>
@@ -20,7 +20,7 @@ export default function UserMsg({ item, chatMode }: Props) {
 
   return (
     <div className="grp-row user-row-right">
-      <div className="dm-avatar" style={{ visibility: 'hidden' }}><div className="ag-av">&nbsp;</div></div>
+      <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
       <div className="grp-content user-content-right">
         <div className="user-meta">
           <span className="ag-time">{item.time}</span>
