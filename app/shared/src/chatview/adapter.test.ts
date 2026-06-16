@@ -3,7 +3,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import { describe, it, expect } from 'vitest'
-import { blocksToTranscriptItems } from './adapter'
+import { blocksToTranscriptItems, type AgentTranscriptBlock } from './adapter'
 import type { TranscriptBlock } from '../transcript/types'
 
 const makeAuthor = (id: string, name = 'Builder') => ({ id, name, role: 'agent' as const })
@@ -37,10 +37,10 @@ describe('blocksToTranscriptItems', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(1)
-    const agent = items[0] as any
+    const agent = items[0] as AgentTranscriptBlock
     expect(agent.rows).toHaveLength(2)
-    expect(agent.rows[0].type).toBe('think')
-    expect(agent.rows[1].type).toBe('tool')
+    expect(agent.rows![0]!.type).toBe('think')
+    expect(agent.rows![1]!.type).toBe('tool')
   })
 
   it('splits different agents into separate blocks', () => {
@@ -56,8 +56,8 @@ describe('blocksToTranscriptItems', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(2)
-    expect((items[0] as any).agent).toBe('Builder')
-    expect((items[1] as any).agent).toBe('Reviewer')
+    expect((items[0] as AgentTranscriptBlock).agent).toBe('Builder')
+    expect((items[1] as AgentTranscriptBlock).agent).toBe('Reviewer')
   })
 
   it('maps thinking block to think RowItem', () => {
@@ -65,7 +65,7 @@ describe('blocksToTranscriptItems', () => {
       { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'analyzing...', isThinking: true },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
-    const row = (items[0] as any).rows[0]
+    const row = (items[0] as AgentTranscriptBlock).rows![0]!
     expect(row.type).toBe('think')
     expect(row.status).toBe('running')
     expect(row.content).toBe('analyzing...')
@@ -77,12 +77,12 @@ describe('blocksToTranscriptItems', () => {
       { id: 'tr1', kind: 'tool_result', createdAt: makeTime(2), author: makeAuthor('b1'), toolName: 'Read', status: 'completed', summary: 'found 42 lines' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
-    const rows = (items[0] as any).rows
-    expect(rows[0].type).toBe('tool')
-    expect(rows[0].status).toBe('running')
-    expect(rows[1].type).toBe('tool')
-    expect(rows[1].status).toBe('ok')
-    expect(rows[1].isResult).toBe(true)
+    const rows = (items[0] as AgentTranscriptBlock).rows
+    expect(rows![0]!.type).toBe('tool')
+    expect(rows![0]!.status).toBe('running')
+    expect(rows![1]!.type).toBe('tool')
+    expect(rows![1]!.status).toBe('ok')
+    expect(rows![1]!.isResult).toBe(true)
   })
 
   it('maps file_change with patch to diffLines', () => {
@@ -94,7 +94,7 @@ describe('blocksToTranscriptItems', () => {
       },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
-    const row = (items[0] as any).rows[0]
+    const row = (items[0] as AgentTranscriptBlock).rows![0]!
     expect(row.type).toBe('file')
     expect(row.fileOp).toBe('mod')
     expect(row.diffLines).toHaveLength(2)
@@ -105,10 +105,10 @@ describe('blocksToTranscriptItems', () => {
       { id: 'ap1', kind: 'approval', createdAt: makeTime(1), author: makeAuthor('b1'), title: 'Deploy approval', status: 'pending', reason: 'needs review' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
-    const rows = (items[0] as any).standaloneRows
+    const rows = (items[0] as AgentTranscriptBlock).standaloneRows
     expect(rows).toHaveLength(1)
-    expect(rows[0].type).toBe('approval')
-    expect(rows[0].status).toBe('waiting')
+    expect(rows![0]!.type).toBe('approval')
+    expect(rows![0]!.status).toBe('waiting')
   })
 
   it('skips result/finished/replay_gap blocks', () => {
@@ -132,9 +132,9 @@ describe('blocksToTranscriptItems', () => {
       },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
-    const rows = (items[0] as any).rows
+    const rows = (items[0] as AgentTranscriptBlock).rows
     expect(rows).toHaveLength(1)
-    expect(rows[0].type).toBe('tool')
+    expect(rows![0]!.type).toBe('tool')
   })
 
   it('handles user message between agent blocks', () => {
@@ -147,8 +147,8 @@ describe('blocksToTranscriptItems', () => {
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(4) // user, agent, user, agent
     expect(items[0]).toMatchObject({ type: 'user' })
-    expect((items[1] as any).rows).toHaveLength(1)
+    expect((items[1] as AgentTranscriptBlock).rows).toHaveLength(1)
     expect(items[2]).toMatchObject({ type: 'user' })
-    expect((items[3] as any).rows).toHaveLength(1)
+    expect((items[3] as AgentTranscriptBlock).rows).toHaveLength(1)
   })
 })
