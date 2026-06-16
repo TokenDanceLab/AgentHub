@@ -2,10 +2,10 @@ export { AgentHubWorkbench } from './AgentHubWorkbench';
 export { ConversationSidebar } from './ConversationSidebar';
 export { GlobalRail } from './GlobalRail';
 export { RightInspector } from './RightInspector';
-export { TranscriptView } from './TranscriptView';
 export { UnifiedComposer } from './UnifiedComposer';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
+export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 export * from './mockData';
 export {
   buildAgentCapabilityContractFromConfig,
@@ -65,7 +65,6 @@ export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
 export type { ConversationSidebarProps } from './ConversationSidebar';
 export type { GlobalRailProps, GlobalRailPage, ConnectionStatusKind } from './GlobalRail';
 export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './RightInspector';
-export type { TranscriptViewProps } from './TranscriptView';
 export type { UnifiedComposerProps } from './UnifiedComposer';
 export type {
   WorkbenchAgentProfilesStatus,
@@ -134,48 +133,6 @@ export type {
   TasksPane,
   ViewMode,
 } from './pages';
-
-/* ═══ Blocks ═══ */
-export {
-  AgentMessage,
-  UserMessage,
-  ToolCardBlock,
-  TOOL_STATUS_LABELS,
-  FileChangeCard,
-  DiffCard,
-  DateDivider,
-  PinnedAnnouncement,
-  ApprovalCardBlock,
-  ThinkingBlock,
-  SubagentBlock,
-  ChildAgentBlock,
-  RunSessionCard,
-  ResultBlock,
-  RouteDecisionBlock,
-  STATUS_LABELS,
-  ContextUsageBlock,
-  AgentTimeline,
-  URLPreviewCard,
-} from './blocks';
-export type {
-  AgentMessageProps,
-  UserMessageProps,
-  ToolCardBlockProps,
-  FileChangeCardProps,
-  DiffCardProps,
-  DateDividerProps,
-  PinnedAnnouncementProps,
-  ApprovalCardBlockProps,
-  ThinkingBlockProps,
-  SubagentBlockProps,
-  ChildAgentBlockProps,
-  RunSessionCardProps,
-  ResultBlockProps,
-  RouteDecisionBlockProps,
-  ContextUsageBlockProps,
-  AgentTimelineProps,
-  URLPreviewCardProps,
-} from './blocks';
 
 /* ═══ Inspector panels ═══ */
 export {

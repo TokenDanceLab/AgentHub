@@ -1,6 +1,6 @@
 # AgentHub 架构文档
 
-> 最后更新：2026-06-10 | 当前架构基准：Desktop/Web v4 shared workbench clean rebuild + 2026-06-10 数据流打通
+> 最后更新：2026-06-17 | ChatView 迁移完成，旧 TranscriptView + blocks 已退役
 >
 > **详细子文档**：[docs/architecture/](architecture/) 目录包含 6 份独立模块文档，本文档保留核心概览并链接到各子文档。
 
@@ -212,6 +212,50 @@ src-tauri/src/host/
 - Tauri 巨石 `commands.rs`
 
 迁移期间可以通过小 commit 做 adapter 或 compatibility shim，但最终验收必须证明旧入口不再承载 active route。
+
+## 10. ChatView 卡片渲染系统（替代 TranscriptView）
+
+`app/shared/src/chatview/` 是唯一的卡片渲染系统，替代了旧的 `TranscriptView` + 20+ block renderers。
+
+```
+chatview/
+  index.ts                   ChatViewTranscript, adapter public API
+  ChatViewTranscript.tsx      I18nProvider 包裹 + TranscriptBlock[] 入口
+  adapter.ts                  TranscriptBlock[] → RowItem[] 映射
+  components/
+    RowItem.tsx               10 种卡片：think/tool/file/sub/approval/route/deploy/attachment/ctx/session
+    OrchestratorCard.tsx      编排 DAG 拓扑布局 SVG
+    Transcript.tsx            grp-row DM/Group 消息列表
+    AgentGroup.tsx            头像 + card-stack + bubbles 容器
+    UserMsg.tsx               用户消息气泡
+    Icons.tsx                 20 SVG 图标组件
+  design/
+    tokens.css                .chatview 作用域 CSS 变量（零全局污染）
+    labels.ts                 cardLabelKey() 状态感知标签解析
+    roles.ts                  AgentRole SSOT
+  i18n/
+    translations.ts           中英双语 120 键
+    I18nProvider.tsx          自定义 I18nProvider（与 AgentHub react-i18next 共存）
+  theme/
+    ThemeProvider.tsx          亮/暗主题切换
+    tokens-dark.css           暗色变量
+```
+
+**数据流：**
+```
+Hub API → TranscriptBlock[] → blocksToTranscriptItems() → TranscriptItem[]
+  → Transcript → AgentGroup → RowItem[] + standaloneRows
+```
+
+**关键设计决策：**
+- CSS 作用域在 `.chatview` 下，不与 AgentHub `:root` 冲突
+- I18n 通过嵌套 Provider 与 AgentHub react-i18next 共存
+- Adapter 使用稳定 `block.author.id` 作为 key，支持 streaming 增量更新
+- 25 种 TranscriptBlock kind 全映射：15 种映射到 RowItem，5 种递归/展平，5 种显式跳过
+
+**已退役：** `TranscriptView.tsx`、`workbench/blocks/`（20+ 渲染器）、旧 `ChatView` 组件
+
+## 11. 旧系统清理策略
 
 ### 旧 UI 剩余债务分类
 
