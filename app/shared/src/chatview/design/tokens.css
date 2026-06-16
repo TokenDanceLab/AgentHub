@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   DESIGN TOKENS — tightened for TRAESOLO density
+   DESIGN TOKENS — scoped to .chatview to avoid AgentHub :root pollution
    ══════════════════════════════════════════════════════════════════════ */
 
-:root {
+.chatview {
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
   --body: 400 0.8125rem/1.5 var(--font-sans);
