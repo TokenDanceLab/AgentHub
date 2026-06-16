@@ -12,6 +12,10 @@ import type {
   RunSessionTranscriptBlock, SubagentTranscriptBlock,
   RouteDecisionTranscriptBlock, ContextUsageTranscriptBlock,
   DeployTranscriptBlock, AttachmentTranscriptBlock,
+  FailureTranscriptBlock,
+  AgentTimelineTranscriptBlock, AgentTimelineItem,
+  RunStepGroupTranscriptBlock,
+  ChildAgentTranscriptBlock, SubtaskTranscriptBlock,
   EvidenceRefStatus,
 } from '../transcript/types'
 import type { RowItem } from './data/mock'
@@ -143,7 +147,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       const parts: string[] = []
       if (a.toolName) parts.push(a.toolName)
       if (a.risk) parts.push(a.risk)
-      const baseReason = (a as any).reason || a.title
+      const baseReason = a.reason || a.title
       parts.push(baseReason)
       return {
         id: a.id, type: 'approval',
@@ -174,14 +178,14 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
     case 'subagent':
     case 'subtask':
     case 'child_agent': {
-      const s = b as SubagentTranscriptBlock
-      const name = (s as any).kind === 'child_agent' ? (s as any).agent : s.worker || s.title
+      const block = b as SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock
+      const name = block.kind === 'child_agent' ? block.agent : block.worker || block.title
       return {
-        id: s.id, type: 'sub',
-        label: name ? `Agent · ${name}` : s.title,
-        status: statusNorm(s.status),
+        id: block.id, type: 'sub',
+        label: name ? `Agent · ${name}` : block.title,
+        status: statusNorm(block.status),
         collapsible: true,
-        content: s.summary || s.title,
+        content: block.summary || block.title,
       } as RowItem
     }
 
@@ -251,7 +255,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
 
     // ── Failure → error card ──
     case 'failure': {
-      const f = b as any
+      const f = b as FailureTranscriptBlock
       return {
         id: f.id, type: 'think',
         label: '',
@@ -306,9 +310,9 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
       const t = block as TextTranscriptBlock
       items.push({
         type: 'user', name: block.author.name, time: timeStr(block.createdAt), text: t.text,
-        ...(t.displayTitle !== undefined ? { displayTitle: t.displayTitle } as any : {}),
-        ...(t.badgeLabel !== undefined ? { badgeLabel: t.badgeLabel } as any : {}),
-        ...(t.badgeVariant !== undefined ? { badgeVariant: t.badgeVariant } as any : {}),
+        ...(t.displayTitle !== undefined ? { displayTitle: t.displayTitle } : {}),
+        ...(t.badgeLabel !== undefined ? { badgeLabel: t.badgeLabel } : {}),
+        ...(t.badgeVariant !== undefined ? { badgeVariant: t.badgeVariant } : {}),
       })
       continue
     }
@@ -321,9 +325,9 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
         currentAgent = {
           id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt),
           rows: [], bubbles: [], standaloneRows: [], runs: [],
-          ...(t.displayTitle !== undefined ? { displayTitle: t.displayTitle } as any : {}),
-          ...(t.badgeLabel !== undefined ? { badgeLabel: t.badgeLabel } as any : {}),
-          ...(t.badgeVariant !== undefined ? { badgeVariant: t.badgeVariant } as any : {}),
+          ...(t.displayTitle !== undefined ? { displayTitle: t.displayTitle } : {}),
+          ...(t.badgeLabel !== undefined ? { badgeLabel: t.badgeLabel } : {}),
+          ...(t.badgeVariant !== undefined ? { badgeVariant: t.badgeVariant } : {}),
         }
       }
       const bubbleText = t.displayDetail || t.text
@@ -333,7 +337,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
 
     // ── Agent timeline → flattened think cards ──
     if (block.kind === 'agent_timeline') {
-      const t = block as any
+      const t = block as AgentTimelineTranscriptBlock
       if (t.items && Array.isArray(t.items)) {
         for (const ti of t.items) {
           const status = ti.status === 'completed' ? 'ok' : ti.status === 'failed' ? 'fail' : 'running'
@@ -356,7 +360,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
 
     // ── Nested structures → recurse ──
     if (block.kind === 'run_step_group') {
-      const g = block as any
+      const g = block as RunStepGroupTranscriptBlock
       if (g.children && Array.isArray(g.children)) {
         for (const child of g.children) {
           const childRow = mapBlock({ ...child, author: block.author })
