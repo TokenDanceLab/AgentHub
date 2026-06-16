@@ -158,11 +158,13 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
 
     // ── Sub-agent / subtask / child_agent ──
     case 'subagent':
-    case 'subtask': {
+    case 'subtask':
+    case 'child_agent': {
       const s = b as SubagentTranscriptBlock
+      const name = s.kind === 'child_agent' ? (s as any).agent : s.worker || s.title
       return {
         id: s.id, type: 'sub',
-        label: '',
+        label: name ? `Agent · ${name}` : s.title,
         status: statusNorm(s.status),
         collapsible: true,
         content: s.summary || s.title,
@@ -224,9 +226,20 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
+    // ── Failure → error card ──
+    case 'failure': {
+      const f = b as any
+      return {
+        id: f.id, type: 'think',
+        label: '',
+        status: 'fail',
+        collapsible: true,
+        content: f.reason || f.title || '运行失败',
+      } as RowItem
+    }
+
     // ── System-only → skipped ──
     case 'result':
-    case 'failure':
     case 'finished':
     case 'replay_gap':
     case 'agent_timeline':

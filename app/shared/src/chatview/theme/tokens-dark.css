@@ -2,7 +2,7 @@
    DARK THEME — toggled via [data-theme="dark"] on <html>
    ══════════════════════════════════════════════════════════════════════ */
 
-[data-theme="dark"] {
+[data-theme="dark"] .chatview {
   --app-bg: #121217;
   --surface: #1c1c24;
   --surface-dim: #16161d;
