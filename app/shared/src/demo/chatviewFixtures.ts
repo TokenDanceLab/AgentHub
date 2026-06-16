@@ -54,23 +54,23 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   },
   {
     id: 'bsub1', kind: 'subagent', createdAt: T(11), author: B('builder'),
-    title: 'Linter 检查', worker: 'Linter', status: 'completed',
+    title: 'Linter check', worker: 'Linter', status: 'completed',
     summary: '0 errors, 0 warnings · eslint + prettier + tsc all passed',
   },
   {
     id: 'bsub2', kind: 'subagent', createdAt: T(12), author: B('builder'),
-    title: '安全检查', worker: 'SecurityAuditor', status: 'completed',
+    title: 'Security audit', worker: 'SecurityAuditor', status: 'completed',
     summary: 'Audit complete: 0 vulnerabilities, 0 risk items. ENUM migration is safe, permission model unchanged.',
   },
   {
     id: 'bsub3', kind: 'subagent', createdAt: T(13), author: B('builder'),
-    title: '文档生成', worker: 'DocGenerator', status: 'completed',
+    title: 'Docs generation', worker: 'DocGenerator', status: 'completed',
     summary: 'CHANGELOG.md updated · API docs synced',
   },
   { id: 'ba2', kind: 'text', createdAt: T(14), author: B('builder'), text: 'Changes ready. Migration script and model definition updated, linter and security audit both passed. Approval required to proceed.', displayTitle: 'Changes ready', displayDetail: 'Migration script and model definition updated, linter and security audit both passed.' },
   {
     id: 'bap1', kind: 'approval', createdAt: T(15), author: B('builder'),
-    title: '部署/写入审批', status: 'pending',
+    title: 'Deploy / write approval', status: 'pending',
     reason: 'Builder requests modification of 3 files. Confirmation required to proceed.',
   },
   { id: 'bu2', kind: 'text', createdAt: T(16), author: U('ding'), text: 'Approved, proceed' },
@@ -129,7 +129,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   { id: 'gbto1', kind: 'tool_call', createdAt: T(10), author: B('builder2'), toolName: 'Read', status: 'running' },
   { id: 'gbtr1', kind: 'tool_result', createdAt: T(11), author: B('builder2'), toolName: 'Read', status: 'completed', summary: 'src/models/user.ts · 142 lines' },
   { id: 'gbto2', kind: 'tool_call', createdAt: T(12), author: B('builder2'), toolName: 'Read', status: 'running' },
-  { id: 'gbtr2', kind: 'tool_result', createdAt: T(13), author: B('builder2'), toolName: 'Read', status: 'completed', summary: 'src/handlers/user.ts · 89 行' },
+  { id: 'gbtr2', kind: 'tool_result', createdAt: T(13), author: B('builder2'), toolName: 'Read', status: 'completed', summary: 'src/handlers/user.ts · 89 lines' },
   {
     id: 'gbf1', kind: 'file_change', createdAt: T(14), author: B('builder2'),
     path: 'migrations/003_add_status_enum.sql', action: 'created', additions: 2,
@@ -142,34 +142,34 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     id: 'gbf3', kind: 'file_change', createdAt: T(16), author: B('builder2'),
     path: 'src/handlers/user.ts', action: 'modified', additions: 4, deletions: 3,
   },
-  { id: 'gb1', kind: 'text', createdAt: T(17), author: B('builder2'), text: '迁移脚本、模型定义和 API handler 已全部更新。', displayDetail: '迁移脚本、模型定义和 API handler 已全部更新。' },
+  { id: 'gb1', kind: 'text', createdAt: T(17), author: B('builder2'), text: 'Migration script, model definition, and API handler all updated.', displayDetail: 'Migration script, model definition, and API handler all updated.' },
 
   // ── Reviewer ──
   {
     id: 'grth1', kind: 'thinking', createdAt: T(18), author: R('reviewer'),
-    content: '收到审查任务。检查清单：(1) 迁移 SQL 语法与 USING 子句 (2) ENUM 值与现有数据一致性 (3) API handler 类型守卫完整性 (4) 回滚方案。',
+    content: 'Review task received. Checklist: (1) Migration SQL syntax and USING clause (2) ENUM value consistency with existing data (3) API handler type guard completeness (4) Rollback plan.',
     isThinking: true,
   },
   { id: 'grto1', kind: 'tool_call', createdAt: T(19), author: R('reviewer'), toolName: 'Read', status: 'running' },
-  { id: 'grtr1', kind: 'tool_result', createdAt: T(20), author: R('reviewer'), toolName: 'Read', status: 'completed', summary: 'migrations/003_add_status_enum.sql · 4 行' },
+  { id: 'grtr1', kind: 'tool_result', createdAt: T(20), author: R('reviewer'), toolName: 'Read', status: 'completed', summary: 'migrations/003_add_status_enum.sql · 4 lines' },
   { id: 'grto2', kind: 'tool_call', createdAt: T(21), author: R('reviewer'), toolName: 'Read', status: 'running' },
-  { id: 'grtr2', kind: 'tool_result', createdAt: T(22), author: R('reviewer'), toolName: 'Read', status: 'completed', summary: 'src/handlers/user.ts · 92 行' },
+  { id: 'grtr2', kind: 'tool_result', createdAt: T(22), author: R('reviewer'), toolName: 'Read', status: 'completed', summary: 'src/handlers/user.ts · 92 lines' },
   {
     id: 'grth2', kind: 'thinking', createdAt: T(23), author: R('reviewer'),
-    content: '结论：迁移 SQL 含 USING 子句可安全回滚，ENUM 值与现有数据完全一致，handler 类型守卫无遗漏，下游 API 无破坏性变更。建议合并。',
+    content: 'Conclusion: Migration SQL includes USING clause for safe rollback, ENUM values fully consistent with existing data, handler type guard covers all cases, no breaking changes to downstream API. Recommend merge.',
     isThinking: false,
   },
   {
     id: 'grsub1', kind: 'subagent', createdAt: T(24), author: R('reviewer'),
-    title: 'Linter 检查', worker: 'Linter', status: 'completed',
-    summary: '0 errors, 0 warnings · 3 文件',
+    title: 'Linter check', worker: 'Linter', status: 'completed',
+    summary: '0 errors, 0 warnings · 3 files',
   },
-  { id: 'gr1', kind: 'text', createdAt: T(25), author: R('reviewer'), text: '审查通过。ENUM 值与现有数据一致，回滚方案完善，建议合并。', displayDetail: '审查通过。ENUM 值与现有数据一致，回滚方案完善，建议合并。' },
+  { id: 'gr1', kind: 'text', createdAt: T(25), author: R('reviewer'), text: 'Review passed. ENUM values consistent with existing data, rollback plan solid, recommend merge.', displayDetail: 'Review passed. ENUM values consistent with existing data, rollback plan solid, recommend merge.' },
 
   // ── QA ──
   {
     id: 'gqth1', kind: 'thinking', createdAt: T(26), author: Q('qa'),
-    content: '总体验收清单：(1) 迁移脚本语法与回滚 (2) 模型定义完整性 (3) API handler 类型守卫 (4) 集成测试覆盖。',
+    content: 'Final acceptance checklist: (1) Migration script syntax and rollback (2) Model definition completeness (3) API handler type guard (4) Integration test coverage.',
     isThinking: true,
   },
   { id: 'gqto1', kind: 'tool_call', createdAt: T(27), author: Q('qa'), toolName: 'Test', status: 'running' },
@@ -178,10 +178,10 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   { id: 'gqtr2', kind: 'tool_result', createdAt: T(30), author: Q('qa'), toolName: 'Lint', status: 'completed', summary: 'eslint · 0 errors, 0 warnings' },
   {
     id: 'gqth2', kind: 'thinking', createdAt: T(31), author: Q('qa'),
-    content: '全部通过。迁移安全，测试覆盖完整，TypeScript 编译无错误。可以合并。',
+    content: 'All passed. Migration is safe, test coverage complete, TypeScript compilation clean. Ready to merge.',
     isThinking: false,
   },
-  { id: 'gq1', kind: 'text', createdAt: T(32), author: Q('qa'), text: '总体验收通过。12/12 测试通过，0 lint 错误。可以合并。', displayDetail: '总体验收通过。12/12 测试通过，0 lint 错误。可以合并。' },
+  { id: 'gq1', kind: 'text', createdAt: T(32), author: Q('qa'), text: 'Final acceptance passed. 12/12 tests passed, 0 lint errors. Ready to merge.', displayDetail: 'Final acceptance passed. 12/12 tests passed, 0 lint errors. Ready to merge.' },
   {
     id: 'gctx1', kind: 'context_usage', createdAt: T(33), author: Q('qa'),
     inputTokens: 156000, outputTokens: 4800, usagePercent: 78,
