@@ -219,10 +219,11 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       const a = b as AttachmentTranscriptBlock
       return {
         id: a.id, type: 'attachment',
-        label: String(a.attachmentRef),
+        label: a.attachmentRef.name,
         status: 'ok',
         collapsible: false, standalone: true,
-        fileName: String(a.attachmentRef),
+        fileName: a.attachmentRef.name,
+        fileSize: a.attachmentRef.size ? `${Math.round(a.attachmentRef.size / 1024)} KB` : undefined,
       } as RowItem
     }
 
