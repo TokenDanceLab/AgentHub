@@ -161,7 +161,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
     case 'subtask':
     case 'child_agent': {
       const s = b as SubagentTranscriptBlock
-      const name = s.kind === 'child_agent' ? (s as any).agent : s.worker || s.title
+      const name = (s as any).kind === 'child_agent' ? (s as any).agent : s.worker || s.title
       return {
         id: s.id, type: 'sub',
         label: name ? `Agent · ${name}` : s.title,
