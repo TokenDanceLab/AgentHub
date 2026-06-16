@@ -1,5 +1,4 @@
 import type { AgentBlock as AgentBlockType } from '../data/mock'
-import RunGroup from './RunGroup'
 import RowItem from './RowItem'
 import OrchestratorCard from './OrchestratorCard'
 import { IconShield } from './Icons'
@@ -34,8 +33,8 @@ export default function AgentGroup({ block, chatMode }: Props) {
           ))}
         </div>
       )}
-      {/* RunGroups — for subagent nesting only */}
-      {block.runs.map((run) => <RunGroup key={run.id} group={run} />)}
+      {/* Sub-agent runs: handled by AgentHub backend as separate agent blocks */}
+      {block.runs.length > 0 && null}
       {block.standaloneRows.length > 0 && (
         <div className="card-stack">
           {block.standaloneRows.map((row) => (
