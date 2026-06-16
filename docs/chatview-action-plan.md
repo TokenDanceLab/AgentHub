@@ -16,12 +16,18 @@
 ## Phase 3: Fix P1 High Priority ✅
 - [x] ChatViewTranscript empty state ('No messages yet')
 - [x] 7/10 conversations now rich fixtures (was 3/10)
-- [ ] Web/desktop App.tsx duplication audit (workflow pending)
-- [ ] Platform adapter consolidation (workflow pending)
-- [ ] i18n key de-duplication (workflow pending)
-- [ ] CSS token unification (workflow pending)
+- [x] CSS dedup: themes.css 435×2 → 1 shared + 2 proxies (-878 lines)
+- [x] Dead code: builderTranscript + BUILDER_PINNED_ANNOUNCEMENT identified
+- [ ] tokens.css + presets.css dedup (pending)
+- [ ] i18n key de-duplication (pending)
 
-## Phase 4: Fix P2 Medium Priority (in progress)
+## Phase 4: Fix P2 Medium Priority
+- [x] Adapter field passthrough — 50+ fields no longer silently dropped
+- [x] Streaming simulation harness (simulateStreaming + key stability test)
+- [x] Edge→TranscriptBlock normalization + adapter roundtrip (5 tests)
+- [ ] Adapter standalone test fixture
+- [ ] Missing card type coverage in group mock
+- [ ] Desktop Tauri ChatView verification
 
 ## Phase 5: Fix P3 Low Priority
 - [ ] Stale docs cleanup
