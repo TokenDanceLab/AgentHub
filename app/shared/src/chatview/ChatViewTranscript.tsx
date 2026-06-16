@@ -9,8 +9,9 @@ import Transcript from './components/Transcript'
 import { I18nProvider } from './i18n/I18nProvider'
 import { blocksToTranscriptItems, type TranscriptBlock } from './adapter'
 
-// Load ChatView design tokens only (NOT global.css — avoids body override)
+// Load ChatView design tokens — scoped to .chatview, no :root pollution
 import './design/tokens.css'
+import './theme/tokens-dark.css'
 
 interface Props {
   transcript: TranscriptBlock[]
@@ -26,8 +27,10 @@ export function ChatViewTranscript({ transcript }: Props) {
   const items = useMemo(() => blocksToTranscriptItems(transcript) as any, [transcript])
 
   return (
-    <I18nProvider locale={locale} setLocale={setLocale}>
-      <Transcript items={items} chatMode="group" />
-    </I18nProvider>
+    <div className="chatview">
+      <I18nProvider locale={locale} setLocale={setLocale}>
+        <Transcript items={items} chatMode="group" />
+      </I18nProvider>
+    </div>
   )
 }

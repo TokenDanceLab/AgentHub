@@ -1461,41 +1461,10 @@ export function AgentHubWorkbench({
                 onExportEvidence={exportMainchainEvidence}
               />
             ) : null}
-            <TranscriptView
-              actionedBlockIds={actionedBlockIds}
-              contextBlockId={contextMenu?.blockId}
-              highlightedBlockId={searchHighlightId ?? highlightedBlockId}
-              onBlockContextMenu={openBlockContextMenu}
-              onBlockPointerDown={beginBlockHoldSelection}
-              onBlockPointerMove={(_block, event) => updateBlockHoldSelection(event)}
-              onBlockPointerUp={handleBlockPointerUp}
-              onBlockSelect={handleBlockSelect}
-              onHighlightEnd={searchHighlightId ? handleSearchHighlightEnd : onHighlightEnd}
-              onAgentProfileOpen={openAgentProfile}
-              onApprovalDecision={(action) => {
-                void onApprovalDecision?.(action);
-              }}
-              onReviewFile={openReviewFile}
-              activeConversation={activeConversation}
-              pinnedAnnouncement={activeConversation?.pinnedAnnouncement && !dismissedPinnedIds.has(activeConversation.id) ? {
-                ...activeConversation.pinnedAnnouncement,
-                onCopy: () => showWorkbenchToast('已打开置顶内容'),
-                onDismiss: () => {
-                  setDismissedPinnedIds((prev) => {
-                    const next = new Set(prev);
-                    next.add(activeConversation.id);
-                    return next;
-                  });
-                  showWorkbenchToast('已关闭置顶');
-                },
-              } : undefined}
-              selectedBlockIds={selectedBlockIds}
-              selectionMode={selectionMode}
-              softHiddenBlockIds={softHiddenBlockIds}
-              transcript={displayTranscript}
-            />
-            {/* ── NEW ChatView (TokenDance design system) ── */}
+            {/* ── CHATVIEW (new design system — primary view) ── */}
             <ChatViewTranscript transcript={displayTranscript} />
+            {/* ── TranscriptView (legacy — reference below) ── */}
+            <TranscriptView
             <MessageSearchPanel
               open={searchOpen}
               onClose={() => setSearchOpen(false)}
