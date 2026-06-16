@@ -2,7 +2,7 @@
    STREAMING SIMULATION — helper for testing incremental block arrival
    ══════════════════════════════════════════════════════════════════════ */
 
-import { blocksToTranscriptItems } from './adapter'
+import { blocksToTranscriptItems, type AgentTranscriptBlock } from './adapter'
 import type { TranscriptBlock } from '../transcript/types'
 
 /**
@@ -45,9 +45,11 @@ export function verifyStreamingKeyStability(blocks: TranscriptBlock[]): string[]
         }
       }
       // User messages should have stable content-based keys
-      if (prevItem.type === 'user' && currItem.type === 'user') {
-        if (prevItem.text !== currItem.text) {
-          issues.push(`Step ${i}: user text changed at position ${j}`)
+      if ('type' in prevItem && 'type' in currItem) {
+        if (prevItem.type === 'user' && currItem.type === 'user') {
+          if (prevItem.text !== currItem.text) {
+            issues.push(`Step ${i}: user text changed at position ${j}`)
+          }
         }
       }
     }
@@ -70,8 +72,8 @@ describe('simulateStreaming', () => {
     ] as TranscriptBlock[]
     const snapshots = simulateStreaming(blocks)
     expect(snapshots).toHaveLength(2)
-    expect((snapshots[0]![0]! as any).rows).toHaveLength(1)
-    expect((snapshots[1]![0]! as any).rows).toHaveLength(2)
+    expect((snapshots[0]![0]! as AgentTranscriptBlock).rows).toHaveLength(1)
+    expect((snapshots[1]![0]! as AgentTranscriptBlock).rows).toHaveLength(2)
   })
 
   it('maintains stable agent IDs across streaming steps', () => {
