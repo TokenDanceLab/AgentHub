@@ -70,7 +70,8 @@ export function cardLabelKey(item: RowItem): LabelResult {
       return { key: item.label as TransKey }
 
     case 'session':
-      return { key: 'card.session.prefix' }
+      // Session uses item.label (the run session title)
+      return item.label ? { key: item.label as TransKey } : { key: 'card.session.prefix' }
 
     default:
       return { key: item.label as TransKey }
