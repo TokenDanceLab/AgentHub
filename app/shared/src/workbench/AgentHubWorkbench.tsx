@@ -27,6 +27,7 @@ import {
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { TranscriptView, type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './TranscriptView';
+import { ChatViewTranscript } from '../chatview/ChatViewTranscript';
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import { UnifiedComposer, type AttachmentUploadState } from './UnifiedComposer';
@@ -1493,6 +1494,8 @@ export function AgentHubWorkbench({
               softHiddenBlockIds={softHiddenBlockIds}
               transcript={displayTranscript}
             />
+            {/* ── NEW ChatView (TokenDance design system) ── */}
+            <ChatViewTranscript transcript={displayTranscript} />
             <MessageSearchPanel
               open={searchOpen}
               onClose={() => setSearchOpen(false)}
