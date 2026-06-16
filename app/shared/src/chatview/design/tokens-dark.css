@@ -18,6 +18,7 @@
   --bdr-strong: rgba(255,255,255,0.12);
 
   --primary: #3399dd; --primary-bg: rgba(51,153,221,0.10);
+  --on-primary: #ffffff;  /* stays white — text on primary backgrounds works in both themes */
   --success: #4dab7a; --success-bg: rgba(77,171,122,0.10);
   --warning: #d4a84a; --warning-bg: rgba(212,168,74,0.10);
   --danger: #e06565; --danger-bg: rgba(224,101,101,0.10);

@@ -6,9 +6,9 @@ import { describe, it, expect } from 'vitest'
 import { blocksToTranscriptItems } from './adapter'
 import type { TranscriptBlock } from '../transcript/types'
 
-const B = (id: string, name = 'Builder') => ({ id, name, role: 'agent' as const })
-const U = (id: string, name = 'Ding') => ({ id, name, role: 'human' as const })
-const T = (offsetMin = 0) => new Date(Date.UTC(2026, 5, 17, 14, 30 + offsetMin)).toISOString()
+const makeAuthor = (id: string, name = 'Builder') => ({ id, name, role: 'agent' as const })
+const makeUser = (id: string, name = 'Ding') => ({ id, name, role: 'human' as const })
+const makeTime = (offsetMin = 0) => new Date(Date.UTC(2026, 5, 17, 14, 30 + offsetMin)).toISOString()
 
 describe('blocksToTranscriptItems', () => {
   it('returns empty array for empty input', () => {
@@ -17,7 +17,7 @@ describe('blocksToTranscriptItems', () => {
 
   it('converts user text to UserTranscriptMsg', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'u1', kind: 'text', createdAt: T(0), author: U('ding'), text: 'hello' },
+      { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('ding'), text: 'hello' },
     ]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(1)
@@ -27,11 +27,11 @@ describe('blocksToTranscriptItems', () => {
   it('groups consecutive agent blocks into single AgentTranscriptBlock', () => {
     const blocks: TranscriptBlock[] = [
       {
-        id: 'th1', kind: 'thinking', createdAt: T(1), author: B('b1'),
+        id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'),
         content: 'thinking...', isThinking: true,
       },
       {
-        id: 'tc1', kind: 'tool_call', createdAt: T(2), author: B('b1'),
+        id: 'tc1', kind: 'tool_call', createdAt: makeTime(2), author: makeAuthor('b1'),
         toolName: 'Read', status: 'running',
       },
     ] as TranscriptBlock[]
@@ -46,11 +46,11 @@ describe('blocksToTranscriptItems', () => {
   it('splits different agents into separate blocks', () => {
     const blocks: TranscriptBlock[] = [
       {
-        id: 'th1', kind: 'thinking', createdAt: T(1), author: B('b1'),
+        id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'),
         content: 'a', isThinking: true,
       },
       {
-        id: 'th2', kind: 'thinking', createdAt: T(2), author: { id: 'r1', name: 'Reviewer', role: 'agent' },
+        id: 'th2', kind: 'thinking', createdAt: makeTime(2), author: { id: 'r1', name: 'Reviewer', role: 'agent' },
         content: 'b', isThinking: true,
       },
     ] as TranscriptBlock[]
@@ -62,7 +62,7 @@ describe('blocksToTranscriptItems', () => {
 
   it('maps thinking block to think RowItem', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'th1', kind: 'thinking', createdAt: T(1), author: B('b1'), content: 'analyzing...', isThinking: true },
+      { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'analyzing...', isThinking: true },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as any).rows[0]
@@ -73,8 +73,8 @@ describe('blocksToTranscriptItems', () => {
 
   it('maps tool_call + tool_result pair', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'tc1', kind: 'tool_call', createdAt: T(1), author: B('b1'), toolName: 'Read', status: 'running' },
-      { id: 'tr1', kind: 'tool_result', createdAt: T(2), author: B('b1'), toolName: 'Read', status: 'completed', summary: 'found 42 lines' },
+      { id: 'tc1', kind: 'tool_call', createdAt: makeTime(1), author: makeAuthor('b1'), toolName: 'Read', status: 'running' },
+      { id: 'tr1', kind: 'tool_result', createdAt: makeTime(2), author: makeAuthor('b1'), toolName: 'Read', status: 'completed', summary: 'found 42 lines' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const rows = (items[0] as any).rows
@@ -88,7 +88,7 @@ describe('blocksToTranscriptItems', () => {
   it('maps file_change with patch to diffLines', () => {
     const blocks: TranscriptBlock[] = [
       {
-        id: 'fc1', kind: 'file_change', createdAt: T(1), author: B('b1'),
+        id: 'fc1', kind: 'file_change', createdAt: makeTime(1), author: makeAuthor('b1'),
         path: 'src/models/user.ts', action: 'modified', additions: 2, deletions: 1,
         patch: '- old line\n+ new line',
       },
@@ -102,7 +102,7 @@ describe('blocksToTranscriptItems', () => {
 
   it('maps approval to standalone RowItem', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'ap1', kind: 'approval', createdAt: T(1), author: B('b1'), title: 'Deploy approval', status: 'pending', reason: 'needs review' },
+      { id: 'ap1', kind: 'approval', createdAt: makeTime(1), author: makeAuthor('b1'), title: 'Deploy approval', status: 'pending', reason: 'needs review' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const rows = (items[0] as any).standaloneRows
@@ -113,9 +113,9 @@ describe('blocksToTranscriptItems', () => {
 
   it('skips result/finished/replay_gap blocks', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'r1', kind: 'result', createdAt: T(1), author: B('b1'), success: true },
-      { id: 'r2', kind: 'finished', createdAt: T(2), author: B('b1'), title: 'done', runId: 'r1' },
-      { id: 'r3', kind: 'replay_gap', createdAt: T(3), author: B('b1'), replayedCount: 5 },
+      { id: 'r1', kind: 'result', createdAt: makeTime(1), author: makeAuthor('b1'), success: true },
+      { id: 'r2', kind: 'finished', createdAt: makeTime(2), author: makeAuthor('b1'), title: 'done', runId: 'r1' },
+      { id: 'r3', kind: 'replay_gap', createdAt: makeTime(3), author: makeAuthor('b1'), replayedCount: 5 },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(0)
@@ -124,10 +124,10 @@ describe('blocksToTranscriptItems', () => {
   it('flattens run_step_group children', () => {
     const blocks: TranscriptBlock[] = [
       {
-        id: 'rsg1', kind: 'run_step_group', createdAt: T(1), author: B('b1'),
+        id: 'rsg1', kind: 'run_step_group', createdAt: makeTime(1), author: makeAuthor('b1'),
         icon: '>', title: 'Commands', status: 'completed', open: true,
         children: [
-          { id: 'tc1', kind: 'tool_call', author: B('b1'), toolName: 'Read', status: 'running' } as TranscriptBlock,
+          { id: 'tc1', kind: 'tool_call', author: makeAuthor('b1'), toolName: 'Read', status: 'running' } as TranscriptBlock,
         ] as TranscriptBlock[],
       },
     ] as TranscriptBlock[]
@@ -139,10 +139,10 @@ describe('blocksToTranscriptItems', () => {
 
   it('handles user message between agent blocks', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'u1', kind: 'text', createdAt: T(0), author: U('ding'), text: 'do X' },
-      { id: 'th1', kind: 'thinking', createdAt: T(1), author: B('b1'), content: 'ok', isThinking: true },
-      { id: 'u2', kind: 'text', createdAt: T(2), author: U('ding'), text: 'also do Y' },
-      { id: 'tc1', kind: 'tool_call', createdAt: T(3), author: B('b1'), toolName: 'Write', status: 'running' },
+      { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('ding'), text: 'do X' },
+      { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'ok', isThinking: true },
+      { id: 'u2', kind: 'text', createdAt: makeTime(2), author: makeUser('ding'), text: 'also do Y' },
+      { id: 'tc1', kind: 'tool_call', createdAt: makeTime(3), author: makeAuthor('b1'), toolName: 'Write', status: 'running' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(4) // user, agent, user, agent
