@@ -7,7 +7,7 @@ import type { TransKey } from '../i18n/translations'
 
 export interface LabelResult {
   key: TransKey
-  params?: Record<string, string>
+  params?: Record<string, string> | undefined
 }
 
 /** Extract sub-agent name from label like "Agent · Linter" */

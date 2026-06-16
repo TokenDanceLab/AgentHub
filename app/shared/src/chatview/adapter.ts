@@ -48,7 +48,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: t.isThinking ? 'running' : 'ok',
         collapsible: true,
         content: t.content || '',
-      }
+      } as RowItem
     }
 
     // ── Tool call (running) ──
@@ -61,7 +61,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: true,
         toolName: t.toolName.toLowerCase(),
         content: t.summary ?? t.target,
-      }
+      } as RowItem
     }
 
     // ── Tool result ──
@@ -75,7 +75,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         toolName: t.toolName.toLowerCase(),
         content: t.summary,
         isResult: true,
-      }
+      } as RowItem
     }
 
     // ── File change ──
@@ -93,7 +93,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
           type: (line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'ctx') as 'add' | 'del' | 'ctx',
           text: line,
         })) : undefined,
-      }
+      } as RowItem
     }
 
     // ── Artifact ──
@@ -105,9 +105,9 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         extra: a.path || a.title,
         status: 'ok',
         collapsible: true,
-        fileOp: a.action === 'delete' ? 'del' : a.action === 'create' ? 'cr' : 'mod',
+        fileOp: a.action === 'deleted' ? 'del' : a.action === 'created' ? 'cr' : 'mod',
         content: (a.path || a.title)?.split('.').pop()?.toUpperCase() || a.artifactKind || '',
-      }
+      } as RowItem
     }
 
     // ── Diff ──
@@ -125,7 +125,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
           type: (line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'ctx') as 'add' | 'del' | 'ctx',
           text: line,
         })) : undefined,
-      }
+      } as RowItem
     }
 
     // ── Approval ──
@@ -139,7 +139,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: a.status === 'completed' ? 'ok' : 'waiting',
         collapsible: true, standalone: true,
         apReason: (a as any).reason || a.title,
-      }
+      } as RowItem
     }
 
     // ── Run session ──
@@ -155,7 +155,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
           r.runtimeLabel ? `Runtime: ${r.runtimeLabel}` : '',
           r.meta || '',
         ].filter(Boolean),
-      }
+      } as RowItem
     }
 
     // ── Sub-agent / subtask / child_agent ──
@@ -168,7 +168,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: statusNorm(s.status),
         collapsible: true,
         content: s.summary || s.title,
-      }
+      } as RowItem
     }
 
     // ── Route decision ──
@@ -180,7 +180,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         status: 'ok',
         collapsible: false, standalone: true,
         content: r.summary,
-      }
+      } as RowItem
     }
 
     // ── Context usage ──
@@ -198,7 +198,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
           c.contextLimit ? `上限 ${(c.contextLimit / 1000).toFixed(0)}k` : '',
           c.modelLabel || '',
         ].filter(Boolean),
-      }
+      } as RowItem
     }
 
     // ── Deploy ──
@@ -211,7 +211,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: true, standalone: true,
         url: d.url,
         deployMeta: d.status || '已部署',
-      }
+      } as RowItem
     }
 
     // ── Attachment ──
@@ -219,11 +219,11 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       const a = b as AttachmentTranscriptBlock
       return {
         id: a.id, type: 'attachment',
-        label: a.attachmentRef,
+        label: String(a.attachmentRef),
         status: 'ok',
         collapsible: false, standalone: true,
-        fileName: a.attachmentRef,
-      }
+        fileName: String(a.attachmentRef),
+      } as RowItem
     }
 
     // ── System-only → skipped ──
