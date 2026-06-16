@@ -8,7 +8,7 @@
 
 **不改动的地方**（绝对不动）：
 - 左侧 `GlobalRail`（导航栏）
-- 中间 `TranscriptView`（聊天/对话流）
+- 中间 `ChatViewTranscript`（聊天/对话流）
 - 底部 `UnifiedComposer`（消息输入框）
 
 **只改这里**：
@@ -17,7 +17,7 @@
 
 ```
 ┌────────────┬──────────────────────────────┬──────────────────┐
-│ GlobalRail │    TranscriptView            │  RightInspector  │
+│ GlobalRail │    ChatViewTranscript            │  RightInspector  │
 │ (不动)     │    (不动)                     │  (只改这里)     │
 │            │                              │  ┌─ overview ─┐  │
 │            │                              │  │ · 运行状态  │  │
@@ -211,7 +211,7 @@ Overview Tab
 ### 不做的事（保持简单）
 
 - ❌ 不改 GlobalRail（导航栏）
-- ❌ 不改 TranscriptView（聊天流）
+- ❌ 不改 ChatViewTranscript（聊天流）
 - ❌ 不改 Composer（输入框）
 - ❌ 不新建 tab（保持 overview/browser/files 3 tab 结构）
 - ❌ 不加力导向 DAG 图（Toufumind WorkflowArch 233 行）——只用 `<ul>` 树
