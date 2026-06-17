@@ -5,6 +5,7 @@ import {
   projectGroupMessageLoopHubMessages,
   projectGroupMessageLoopTranscript,
   resolveDemoWorkbenchTranscript,
+  whenChatviewTranscriptsReady,
 } from './workbenchDemo';
 import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoScenario } from './teamrunDemo';
 
@@ -27,10 +28,10 @@ describe('workbench v4 demo data source', () => {
     expect(reviewer).not.toHaveProperty('pinnedAnnouncement');
   });
 
-  it('resolves per-conversation transcripts with a fallback preview transcript', () => {
+  it('resolves per-conversation transcripts with a fallback preview transcript', async () => {
     // Chatview transcripts are lazy-loaded and may not be available synchronously
-    // in test environments. Conversations without a loaded transcript fall back to
-    // the preview transcript.
+    // in test environments. Await the async load before asserting fixture data.
+    await whenChatviewTranscriptsReady();
     const johnnyTranscript = resolveDemoWorkbenchTranscript('johnny');
     expect(johnnyTranscript[0]).toEqual(expect.objectContaining({
       id: 'johnny-user-1',
@@ -38,10 +39,11 @@ describe('workbench v4 demo data source', () => {
     }));
     expect(johnnyTranscript).toHaveLength(3);
 
+    // builder IS in the chatview fixtures, so it resolves to the full fixture transcript.
     const builderTranscript = resolveDemoWorkbenchTranscript('builder');
     expect(builderTranscript[0]).toEqual(expect.objectContaining({
-      id: 'builder-user-1',
-      kind: 'text',
+      id: 'batt1',
+      kind: 'attachment',
     }));
   });
 

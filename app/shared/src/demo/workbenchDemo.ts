@@ -633,21 +633,27 @@ export const demoWorkbenchPins: WorkbenchDemoMessagePin[] = [
 // In production builds (import.meta.env.PROD), the dynamic import is
 // dead-code-eliminated by Vite, saving ~62 KB from the main bundle.
 let _demoWorkbenchTranscripts: Record<string, TranscriptBlock[]> | null = null;
+let _chatviewTranscriptsLoading = false;
 
 async function loadChatviewTranscripts(): Promise<void> {
-  if (_demoWorkbenchTranscripts) return;
+  if (_chatviewTranscriptsLoading) return;
   if (import.meta.env.DEV) {
-    const fixtures = await import('./chatviewFixtures');
-    _demoWorkbenchTranscripts = {
-      'agent-collab': fixtures.chatviewAgentCollabTranscript,
-      builder: fixtures.chatviewBuilderTranscript,
-      deployer: fixtures.chatviewBuilderTranscript,
-      reviewer: fixtures.chatviewBuilderTranscript,
-      researcher: fixtures.chatviewBuilderTranscript,
-      orchestrator: fixtures.chatviewBuilderTranscript,
-      'pinned-announcements': fixtures.chatviewAnnouncementTranscript,
-      [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
-    };
+    _chatviewTranscriptsLoading = true;
+    try {
+      const fixtures = await import('./chatviewFixtures');
+      _demoWorkbenchTranscripts = {
+        'agent-collab': fixtures.chatviewAgentCollabTranscript,
+        builder: fixtures.chatviewBuilderTranscript,
+        deployer: fixtures.chatviewBuilderTranscript,
+        reviewer: fixtures.chatviewBuilderTranscript,
+        researcher: fixtures.chatviewBuilderTranscript,
+        orchestrator: fixtures.chatviewBuilderTranscript,
+        'pinned-announcements': fixtures.chatviewAnnouncementTranscript,
+        [TEAMRUN_DEMO_CONVERSATION_ID]: teamRunDemoTranscript,
+      };
+    } catch {
+      // Dynamic import failed — fallback remains.
+    }
   }
 }
 
@@ -663,8 +669,19 @@ function getChatviewTranscripts(): Record<string, TranscriptBlock[]> {
 
 // Eager-load chatview transcripts in DEV so demo conversations render immediately.
 // In PROD this is a no-op (dead-code eliminated).
-if (import.meta.env.DEV) {
-  void loadChatviewTranscripts();
+const _chatviewTranscriptsReady: Promise<void> = (() => {
+  if (import.meta.env.DEV) {
+    return loadChatviewTranscripts();
+  }
+  return Promise.resolve();
+})();
+
+/**
+ * Returns a Promise that resolves when the lazy-loaded ChatView fixture
+ * transcripts are ready. Tests can await this before asserting fixture data.
+ */
+export function whenChatviewTranscriptsReady(): Promise<void> {
+  return _chatviewTranscriptsReady;
 }
 
 export function createWorkbenchDemoStore(): WorkbenchDemoStore {
@@ -689,10 +706,11 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
   }
 
   function createSnapshot(): WorkbenchDemoStore {
+    const liveTranscripts = { ...getChatviewTranscripts(), ...transcripts };
     return {
-      conversations: demoConversationsBase.map((conversation) => conversationWithPins(conversation, transcripts, pins)),
+      conversations: demoConversationsBase.map((conversation) => conversationWithPins(conversation, liveTranscripts, pins)),
       agents: demoWorkbenchAgents.map((agent) => ({ ...agent })),
-      transcripts: cloneTranscripts(transcripts),
+      transcripts: cloneTranscripts(liveTranscripts),
       pins: pins.map((pin) => ({ ...pin })),
     };
   }
@@ -704,14 +722,14 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
       return () => listeners.delete(listener);
     },
     resolveTranscript(conversationId: string): TranscriptBlock[] {
-      return transcripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
+      return transcripts[conversationId] ?? getChatviewTranscripts()[conversationId] ?? createConversationPreviewTranscript(conversationId);
     },
     async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
       sequence += 1;
       const now = new Date().toISOString();
       const userMessageId = `demo-user-${sequence}`;
       const agentMessageId = `demo-agent-${sequence}`;
-      const current = transcripts[intent.conversationId] ?? createConversationPreviewTranscript(intent.conversationId);
+      const current = transcripts[intent.conversationId] ?? getChatviewTranscripts()[intent.conversationId] ?? createConversationPreviewTranscript(intent.conversationId);
       transcripts = {
         ...transcripts,
         [intent.conversationId]: [
@@ -740,13 +758,16 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
       return { intentId: agentMessageId };
     },
     pinMessage(conversationId: string, messageId: string, pinnedBy = 'Demo'): void {
-      // Search across ALL transcripts (and fallback preview) for the message,
+      // Search across ALL transcripts (live + internal + fallback preview) for the message,
       // not just the current conversation's transcript.
-      const exists = Object.entries(transcripts).some(([, blocks]) =>
+      const liveTranscripts = getChatviewTranscripts();
+      const exists = Object.entries(liveTranscripts).some(([, blocks]) =>
+        blocks.some((block) => block.id === messageId),
+      ) || Object.entries(transcripts).some(([, blocks]) =>
         blocks.some((block) => block.id === messageId),
       ) || createConversationPreviewTranscript(conversationId).some((block) => block.id === messageId);
       if (!exists) return;
-      const current = transcripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
+      const current = transcripts[conversationId] ?? liveTranscripts[conversationId] ?? createConversationPreviewTranscript(conversationId);
       if (!transcripts[conversationId]) {
         transcripts = {
           ...transcripts,

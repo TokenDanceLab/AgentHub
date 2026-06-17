@@ -138,7 +138,7 @@ func TestAgentProfileHandlerCreateProfileRejectsInvalidJSONLikeField(t *testing.
 	h.CreateProfile(c)
 
 	require.Equal(t, 400, w.Code)
-	require.Contains(t, w.Body.String(), "BAD_REQUEST")
+	require.Contains(t, w.Body.String(), "bad_request")
 	require.False(t, svc.createCalled)
 }
 
@@ -150,7 +150,7 @@ func TestAgentProfileHandlerCreateProfileBadRequest(t *testing.T) {
 	h.CreateProfile(c)
 
 	require.Equal(t, 400, w.Code)
-	require.Contains(t, w.Body.String(), "BAD_REQUEST")
+	require.Contains(t, w.Body.String(), "bad_request")
 	require.False(t, svc.createCalled)
 }
 
@@ -229,7 +229,7 @@ func TestAgentProfileHandlerUpdateProfileRejectsInvalidJSONLikeField(t *testing.
 	h.UpdateProfile(c)
 
 	require.Equal(t, 400, w.Code)
-	require.Contains(t, w.Body.String(), "BAD_REQUEST")
+	require.Contains(t, w.Body.String(), "bad_request")
 	require.False(t, svc.updateCalled)
 }
 

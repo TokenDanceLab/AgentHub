@@ -119,7 +119,7 @@ func RequireHubSession() gin.HandlerFunc {
 				"path":        c.FullPath(),
 			}, c.ClientIP())
 			fail(c, &errcode.Error{
-				Code:       "FORBIDDEN",
+				Code:       "forbidden",
 				Message:    "Hub-issued session is required for this API",
 				HTTPStatus: http.StatusForbidden,
 			})
@@ -164,7 +164,7 @@ func RequireAdmin() gin.HandlerFunc {
 				"reason": "admin_users_not_configured",
 			}, clientIP)
 			fail(c, &errcode.Error{
-				Code:       "FORBIDDEN",
+				Code:       "forbidden",
 				Message:    "admin access not configured — set AGENTHUB_ADMIN_USERS",
 				HTTPStatus: http.StatusForbidden,
 			})
@@ -185,7 +185,7 @@ func RequireAdmin() gin.HandlerFunc {
 			"path":   c.FullPath(),
 		}, clientIP)
 		fail(c, &errcode.Error{
-			Code:       "FORBIDDEN",
+			Code:       "forbidden",
 			Message:    "admin access required",
 			HTTPStatus: http.StatusForbidden,
 		})

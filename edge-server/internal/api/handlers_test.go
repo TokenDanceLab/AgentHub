@@ -1051,7 +1051,7 @@ func TestPostRunsRejectsWorkDirOutsideWorkspaceAllowlist(t *testing.T) {
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", resp)
 	}
-	if errObj["code"] != "WORKSPACE_NOT_ALLOWED" {
+	if errObj["code"] != "workspace_not_allowed" {
 		t.Fatalf("error code = %#v, want workspace_not_allowed", errObj["code"])
 	}
 	if len(executor.started) != 0 {
@@ -1149,7 +1149,7 @@ func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
 			if !ok {
 				t.Fatalf("error body = %#v, want error object", resp)
 			}
-			if errObj["code"] != "WORKSPACE_NOT_ALLOWED" {
+			if errObj["code"] != "workspace_not_allowed" {
 				t.Fatalf("error code = %#v, want workspace_not_allowed", errObj["code"])
 			}
 			msg, ok := errObj["message"].(string)
@@ -1246,7 +1246,7 @@ func TestPostRunsReturnsErrorWhenExecutorStartFails(t *testing.T) {
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", body)
 	}
-	if errObj["code"] != "EXECUTOR_START_FAILED" {
+	if errObj["code"] != "executor_start_failed" {
 		t.Fatalf("error code = %#v, want executor_start_failed", errObj["code"])
 	}
 }
@@ -1300,7 +1300,7 @@ func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", body)
 	}
-	if errObj["code"] != "ACTIVE_RUN_EXISTS" {
+	if errObj["code"] != "active_run_exists" {
 		t.Fatalf("error code = %#v, want active_run_exists", errObj["code"])
 	}
 	if body["runId"] != firstRunID {
@@ -1854,7 +1854,7 @@ func TestPostPermissionDecideRejectsInvalidDecision(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "INVALID_DECISION")
+	assertErrorCode(t, rec.Body.String(), "invalid_decision")
 }
 
 func TestPostPermissionDecideRequiresRunAndRequest(t *testing.T) {
@@ -1868,7 +1868,7 @@ func TestPostPermissionDecideRequiresRunAndRequest(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
 		}
-		assertErrorCode(t, rec.Body.String(), "RUN_ID_REQUIRED")
+		assertErrorCode(t, rec.Body.String(), "run_id_required")
 	})
 
 	t.Run("missing_request", func(t *testing.T) {
@@ -1881,7 +1881,7 @@ func TestPostPermissionDecideRequiresRunAndRequest(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
 		}
-		assertErrorCode(t, rec.Body.String(), "REQUEST_ID_REQUIRED")
+		assertErrorCode(t, rec.Body.String(), "request_id_required")
 	})
 }
 
@@ -1895,7 +1895,7 @@ func TestPostPermissionDecideRejectsUnknownRequest(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
 }
 
 func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
@@ -1912,7 +1912,7 @@ func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
 	if _, ok := h.PermissionRegistry.Consume("run_real", "req_1"); !ok {
 		t.Fatal("wrong-run decision consumed the real pending request")
 	}
@@ -2098,7 +2098,7 @@ func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("second status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
 }
 
 func TestPostPermissionDecideRejectsExpiredRequestWithoutPublishing(t *testing.T) {
@@ -2124,7 +2124,7 @@ func TestPostPermissionDecideRejectsExpiredRequestWithoutPublishing(t *testing.T
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), "PERMISSION_REQUEST_NOT_FOUND")
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
 	if got := h.Bus.HistoryLen(); got != 0 {
 		t.Fatalf("event history len = %d, want 0", got)
 	}
@@ -2157,7 +2157,7 @@ func TestErrorResponseFormat(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected error object, got %T", body["error"])
 	}
-	if errObj["code"] != "NOT_FOUND" {
+	if errObj["code"] != "not_found" {
 		t.Errorf("expected code=NOT_FOUND, got %v", errObj["code"])
 	}
 	if errObj["message"] != "something went wrong" {
@@ -2486,7 +2486,7 @@ func TestGetHealthWrongMethod(t *testing.T) {
 	var body map[string]any
 	json.NewDecoder(rec.Body).Decode(&body)
 	errObj := body["error"].(map[string]any)
-	if errObj["code"] != "METHOD_NOT_ALLOWED" {
+	if errObj["code"] != "method_not_allowed" {
 		t.Errorf("expected method_not_allowed, got %v", errObj["code"])
 	}
 }
