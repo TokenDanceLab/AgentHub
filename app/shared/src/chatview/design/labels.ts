@@ -13,9 +13,9 @@ export interface LabelResult {
 
 /** Extract sub-agent name from label like "Agent · Linter" */
 function subName(item: RowItem): string {
-  // If label contains " · ", extract the part after it
+  // If label contains SEP, extract the part after it
   const idx = item.label.indexOf(SEP)
-  if (idx > -1) return item.label.slice(idx + 3)
+  if (idx > -1) return item.label.slice(idx + SEP.length)
   return item.label.startsWith('Agent ') ? item.label.slice(6) : ''
 }
 
@@ -29,11 +29,13 @@ export function cardLabelKey(item: RowItem): LabelResult {
 
   switch (type) {
     case 'think': {
+      if (status === 'fail') return { key: 'card.think.fail' }
       if (toolName === 'analyze') return { key: running ? 'card.think.analyze' : 'card.think.analyzeDone' }
       return { key: running ? 'card.think.running' : 'card.think.done' }
     }
 
     case 'tool': {
+      if (status === 'fail') return { key: 'card.tool.fail' }
       const tn = (toolName || toolKey(item))
       if (running) {
         return { key: `card.tool.${tn}.running` as TransKey }
@@ -42,11 +44,14 @@ export function cardLabelKey(item: RowItem): LabelResult {
     }
 
     case 'file': {
+      if (status === 'fail') return { key: 'card.file.fail' }
       const op = toolName || toolKey(item)
       return { key: (running ? `card.file.${op}.running` : `card.file.${op}`) as TransKey }
     }
 
     case 'sub': {
+      if (status === 'fail') return { key: 'card.sub.agent.fail' }
+      if (status === 'ok') return { key: 'card.sub.agent.ok' }
       const name = subName(item)
       if (running) return { key: 'card.sub.agent.running', params: name ? { name } : undefined }
       // Done: show "Agent · {name}" or just "Agent"
@@ -61,21 +66,28 @@ export function cardLabelKey(item: RowItem): LabelResult {
       return { key: 'card.approval.title' }
 
     case 'route':
+      if (status === 'fail') return { key: 'card.route.fail' }
       return { key: 'card.route.dag' }
 
     case 'deploy':
+      if (status === 'fail') return { key: 'card.deploy.fail' }
+      if (status === 'running') return { key: 'card.deploy.running' }
       return { key: 'card.deploy.ready' }
 
-    case 'attachment':
-      // Attachment labels are filenames — pass through as-is
-      return { key: item.label as TransKey }
-
     case 'session':
-      // Session uses item.label (the run session title)
+      if (status === 'fail') return { key: 'card.session.fail' }
       return item.label ? { key: item.label as TransKey } : { key: 'card.session.prefix' }
 
-    default:
+    case 'ctx':
+      if (status === 'fail') return { key: 'card.ctx.fail' }
       return { key: item.label as TransKey }
+
+    case 'attachment':
+      if (status === 'fail') return { key: 'card.attachment.fail' }
+      return { key: item.label as TransKey }
+
+    default:
+      return { key: (item.label || item.type) as TransKey }
   }
 }
 
@@ -94,16 +106,16 @@ export function toolKey(item: RowItem): string {
   if (item.type === 'tool') {
     const l = item.label.toLowerCase()
     if (l.includes('result') || l.includes('结果')) return 'result'
-    if (l === 'read') return 'read'
-    if (l === 'grep') return 'grep'
-    if (l === 'write') return 'write'
+    if (l === 'read' || l === '阅读') return 'read'
+    if (l === 'grep' || l === '搜索') return 'grep'
+    if (l === 'write' || l === '写入') return 'write'
     if (l === 'eslint') return 'eslint'
     if (l === 'prettier') return 'prettier'
     if (l.includes('tsc')) return 'tsc'
-    if (l === 'test') return 'test'
+    if (l === 'test' || l === '测试') return 'test'
     if (l === 'lint') return 'lint'
-    if (l === 'audit') return 'audit'
-    if (l === 'check') return 'check'
+    if (l === 'audit' || l === '审计') return 'audit'
+    if (l === 'check' || l === '检查') return 'check'
     return 'result'
   }
   if (item.type === 'think') {

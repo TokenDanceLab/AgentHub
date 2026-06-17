@@ -97,6 +97,7 @@
 
 /* Attachment */ .row-item.attachment > .row-hd .row-icon { color:var(--text-2) }
 .row-item.attachment .att-row { display:flex; align-items:center; gap:var(--sp-sm) }
+.row-item.attachment .att-row.clickable { cursor:pointer }
 .row-item.attachment .att-name { font:var(--label); flex:1 }
 .row-item.attachment .att-size { font:var(--label-xs); color:var(--text-3) }
 
@@ -106,7 +107,7 @@
 .ctx-bar-wrap { display:flex; align-items:center; gap:var(--sp-sm) }
 .ctx-bar-wrap .pct { font:var(--label-xs); color:var(--text-3); flex-shrink:0; min-width:36px }
 .ctx-bar-wrap .ctx-bar { flex:1; height:var(--sp-xs); background:var(--surface-highest); border-radius:2px; overflow:hidden }
-.ctx-bar-wrap .ctx-fill { height:100%; border-radius:2px; transition:width var(--dur-bar) var(--ease) }
+.ctx-bar-wrap .ctx-fill { height:100%; border-radius:2px; transition:width var(--dur-bar) var(--ease); width:var(--ctx-pct, 0%) }
 .ctx-bar-wrap .ctx-fill.ok { background:var(--state-success) }
 .ctx-bar-wrap .ctx-fill.warn { background:var(--warning) }
 .ctx-meta { display:flex; gap:var(--sp-sm); font:var(--label-xs); color:var(--text-3); flex-wrap:wrap }
