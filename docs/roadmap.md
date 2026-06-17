@@ -1117,7 +1117,7 @@ CLI permission request
 - ✅ Docker 网络 `agenthub-net`（172.18.0.0/16）已创建
 - ✅ 资源限制已配置（Hub 256MiB / PG 512MiB / Redis 384MiB）
 - ✅ Nginx 反向代理 + SSL 已配置（hub.vectorcontrol.tech）
-- ✅ 部署流程已文档化（`C:\Users\Ding\server\projects\agenthub\STATE.md`）
+- ✅ 部署流程已文档化（项目 `STATE.md`）
 - ✅ Docker healthcheck 已配置（PG 5s / Redis 5s / Hub 15s）
 - ✅ 回滚策略已文档化（roadmap 15.7）
 - ✅ Prometheus metrics 端点已实现（middleware/metrics.go + admin port 6060）
@@ -1313,7 +1313,7 @@ server {
 | `hub-server/internal/config/constants.go` | 运行时常量 | 超时/限制/TTL |
 | `deployments/docker-compose.prod.yml` | 部署 | Docker Compose 编排 |
 | Nginx 配置（hk2） | 运维 | SSL + 反代 + 静态站 |
-| `C:\Users\Ding\server\projects\agenthub\STATE.md` | 运维 | 部署状态文档 |
+| 项目 `STATE.md` | 运维 | 部署状态文档 |
 
 ### 15.9 实施步骤
 

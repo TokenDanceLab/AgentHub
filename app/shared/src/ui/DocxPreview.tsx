@@ -11,8 +11,10 @@
    the resulting HTML in a styled container.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, RotateCcw, X } from 'lucide-react';
+import DOMPurify from 'dompurify';
+import type { Config as DOMPurifyConfig } from 'dompurify';
 import styles from './DocxPreview.module.css';
 
 export interface DocxPreviewProps {
@@ -31,6 +33,24 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
   const [html, setHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // DOMPurify config: keep bold, italic, lists, tables, images — strip scripts, event handlers, etc.
+  const purifyConfig = useRef<DOMPurifyConfig>({
+    ALLOWED_TAGS: [
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'p', 'br', 'hr',
+      'ul', 'ol', 'li',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      'strong', 'b', 'em', 'i', 'u', 's', 'del', 'ins',
+      'a',  // keep for navigation but ATTRIBUTES will strip dangerous ones
+      'img',
+      'blockquote', 'pre', 'code',
+      'sup', 'sub',
+      'span', 'div',
+    ],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'width', 'height', 'colspan', 'rowspan', 'style'],
+    ALLOW_DATA_ATTR: false,
+  });
 
   const loadDocx = useCallback(async () => {
     setLoading(true);
@@ -52,7 +72,8 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
 
       const mammoth = await import('mammoth');
       const result = await mammoth.default.convertToHtml({ arrayBuffer });
-      setHtml(result.value);
+      const sanitized: string = DOMPurify.sanitize(result.value, purifyConfig.current);
+      setHtml(sanitized);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error parsing DOCX file';
       setError(message);
