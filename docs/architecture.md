@@ -1,6 +1,6 @@
 # AgentHub 架构文档
 
-> 最后更新：2026-06-17 | ChatView 迁移完成，旧 TranscriptView + blocks 已退役
+> 最后更新：2026-06-17 | ChatView 迁移 HARDENING (Round 6 完成)，37 commits，45 tests，0 TS errors。Phase 1-4/6 完成，Phase 5/7 进行中。
 >
 > **详细子文档**：[docs/architecture/](architecture/) 目录包含 6 份独立模块文档，本文档保留核心概览并链接到各子文档。
 
@@ -24,7 +24,7 @@ Claude Code、Codex、OpenCode 是 Agent Runtime，不是用户直接管理的�
 4. `app/desktop` 和 `app/web` 只提供 platform adapter、启动入口和平台专属能力。
 5. 旧 Desktop/Web UI 文件是迁移素材，不是长期架构。
 6. Tauri Host API 必须从巨石 command 文件拆成可测试、可审计的能力模块。
-7. v4 目标消息合同是 shared `TranscriptBlock` / `EvidenceRef`；旧 `ChatView.types`、旧 `ChatMessage` 和旧 `FileDiff` 只能作为迁移输入或测试素材，不能继续作为 Desktop/Web 的目标跨端模型。
+7. v4 目标消息合同是 shared `TranscriptBlock` / `EvidenceRef`；旧 `ChatMessage`（兼容层 `types/chat.ts`）和旧 `FileDiff` 只能作为迁移输入或测试素材，不能继续作为 Desktop/Web 的目标跨端模型。
 8. Desktop/Tauri 前端固定使用 `5173`，Web 前端固定使用 `5174`。Mobile 主线已切到 Expo + React Native，浏览器视觉预览固定使用 `5177`。
 
 ## 3. 五层架构
@@ -220,11 +220,11 @@ src-tauri/src/host/
 ```
 chatview/
   index.ts                   ChatViewTranscript, adapter public API
-  ChatViewTranscript.tsx      TranscriptBlock[] 入口 + <div className="chatview"> 包裹
   adapter.ts                  TranscriptBlock[] → TranscriptItem[] 映射
   types.ts                   RowItem, RowType, AgentRole 共享类型
   transcript-item.ts         TranscriptItem, TranscriptUserItem, TranscriptAgentItem
   components/
+    ChatViewTranscript.tsx    TranscriptBlock[] 入口 + <div className="chatview"> 包裹
     RowItem.tsx               Card renderer（状态感知，collapsible/content/diff/code/approval）
     RowItem.css               Card 样式：.row-item / .row-hd / .row-bd / .result-row
     OrchestratorCard.tsx      编排 DAG 拓扑布局 SVG（buildLayers 拓扑排序）
@@ -235,6 +235,7 @@ chatview/
     Icons.tsx                 20+ SVG 图标组件
   design/
     tokens.css                .chatview 作用域 CSS 变量（零全局污染，亮/暗双主题）
+    global.css                全局 chatview 样式（非作用域部分）
     labels.ts                 cardLabelKey() / toolKey() / isToolResult()
     roles.ts                  AgentRole SSOT + roleColor/roleInitial 映射
   i18n/
@@ -429,12 +430,12 @@ ChatView 卡片树不自己管理滚动。滚动由外层 Workbench 的 `.transc
 
 | 类别 | 对象 | 处理策略 |
 |---|---|---|
-| 已迁移到 shared 兼容层 | 旧 `ChatView.types` 中的 `ChatMessage`、`MessageBlock` 等 | 集中在 `app/shared/src/types/chat.ts`；只作为迁移兼容层 |
+| 已迁移到 shared 兼容层 | 旧 `ChatMessage`、`MessageBlock`、`FileDiff` 等 | 集中在 `app/shared/src/types/chat.ts`；只作为迁移兼容层，不承载新功能 |
 | 已删除组件本体 | Desktop/Web `ChatView`、`PromptInput`、`ThreadPanel` 等 | active import 已被扫描门禁阻断 |
 | 暂缓但必须隔离 | Desktop/Web `DiffViewer`、`ArtifactBrowser`、Search/Dialog 类 | 保留为功能参考或迁移输入 |
 | 已删除 active path | 旧 `viewRegistry`、旧 `MainView`、旧 `IMView` 等 | 由 `scripts/verify-v4-old-ui-active-paths.ps1` 持续阻断 |
 
-完整清单见 [v4-legacy-client-inventory-2026-06-07.md](v4-legacy-client-inventory-2026-06-07.md)。
+完整清单见 `scripts/verify-v4-old-ui-active-paths.ps1` 的持续扫描输出。
 
 ## 13. 验收门禁
 
@@ -452,13 +453,12 @@ ChatView 卡片树不自己管理滚动。滚动由外层 Workbench 的 `.transc
 
 | 阶段 | 目标 | 状态 |
 |---|---|---|
-| D0 | 文档架构、问题清单、roadmap 对齐 | 进行中 |
-| D1 | shared workbench contract 和文件结构 | 进行中 |
-| D2 | shared transcript/composer/inspector | 进行中 |
-| D3 | Desktop platform adapter + v4 shell | 进行中 |
-| D4 | Web platform adapter + v4 shell | 进行中 |
-| D5 | Tauri Host API 拆分 | 未开始 |
-| D6 | 旧 UI 清理、视觉 QA、发布门禁 | 旧主路径已完成，剩余迁移债务和正式 Visual QA 继续 |
+| Phase 1-2 | 审计、P0 阻塞修复（attachment block、adapter 测试、fixtures） | 已完成 |
+| Phase 3 | P1 高优先级修复（空状态、rich fixtures、CSS/i18n 去重、死代码） | 已完成 |
+| Phase 4 | P2 中优先级（adapter 字段透传、streaming harness、normalization 测试） | 基本完成（3 项 P2/P3 未完成） |
+| Phase 5 | P3 低优先级（stale docs 清理、命名一致性、Desktop 验证） | 进行中 |
+| Phase 6 | HARDENING Round 6（dark mode、i18n 统一、CSS 打磨、React key 去重） | 已完成 |
+| Phase 7 | Edge Runtime 集成（WS streaming、真实 agent 数据、roundtrip 验证） | 未开始 |
 
 ## 15. 文档权威
 

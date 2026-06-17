@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -204,31 +205,52 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 	return msgs, err
 }
 
+// SearchAllMessages searches messages across all sessions where the given user is
+// an active member. Unlike SearchMessages, it joins through session_members to
+// find relevant messages without requiring a specific session ID.
+//
+// Security: the SQL is built with fmt.Sprintf using the "m" table alias and
+// dialect-specific expressions (messageSearchCondition). The tableAlias "m" is
+// a hardcoded trusted literal from within this function, never from user input.
+// User-provided values (q, contentType, from, to) are always passed as
+// parameterized placeholders (?) and never interpolated into the SQL string.
 func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]model.Message, error) {
 	var msgs []model.Message
 	searchCondition, searchArgs := messageSearchCondition(db, "m", q)
-	sql := `SELECT m.* FROM messages m
-		INNER JOIN session_members sm ON m.session_id = sm.session_id
-		WHERE sm.member_type = ? AND sm.member_id = ? AND sm.left_at IS NULL
-			AND m.recalled = false
-			AND ` + searchCondition
+
 	args := []interface{}{"user", userID}
 	args = append(args, searchArgs...)
 
 	if contentType != "" {
-		sql += " AND m.content_type = ?"
 		args = append(args, contentType)
 	}
 	if from != "" {
-		sql += " AND m.created_at >= ?"
 		args = append(args, from)
 	}
 	if to != "" {
-		sql += " AND m.created_at <= ?"
 		args = append(args, to)
 	}
-	sql += " ORDER BY m.created_at DESC LIMIT ?"
 	args = append(args, config.MaxMessagePageLimit)
+
+	sql := fmt.Sprintf(
+		`SELECT m.* FROM messages m
+		INNER JOIN session_members sm ON m.session_id = sm.session_id
+		WHERE sm.member_type = ? AND sm.member_id = ? AND sm.left_at IS NULL
+			AND m.recalled = false
+			AND %s`,
+		searchCondition,
+	)
+
+	if contentType != "" {
+		sql += " AND m.content_type = ?"
+	}
+	if from != "" {
+		sql += " AND m.created_at >= ?"
+	}
+	if to != "" {
+		sql += " AND m.created_at <= ?"
+	}
+	sql += " ORDER BY m.created_at DESC LIMIT ?"
 
 	err := db.Raw(sql, args...).Scan(&msgs).Error
 	return msgs, err

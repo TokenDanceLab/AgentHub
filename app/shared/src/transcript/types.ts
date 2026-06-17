@@ -8,6 +8,7 @@ export interface TranscriptAuthor {
 
 export type EvidenceRefKind = 'tool' | 'file' | 'artifact' | 'preview' | 'run' | 'approval';
 export type EvidenceRefStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type BadgeVariant = 'thinking' | 'success' | 'warning' | 'danger' | 'primary';
 
 export interface EvidenceRef {
   id: string;
@@ -43,7 +44,7 @@ export interface TextTranscriptBlock extends TranscriptBlockBase {
   displayTitle?: string;
   displayDetail?: string;
   badgeLabel?: string;
-  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary';
+  badgeVariant?: BadgeVariant;
   /** ID of the message this is replying to. */
   replyToMessageId?: string;
   /** Short preview of the replied message content. */

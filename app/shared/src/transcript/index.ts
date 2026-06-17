@@ -30,6 +30,7 @@ export type {
   EvidenceRef,
   EvidenceRefKind,
   EvidenceRefStatus,
+  BadgeVariant,
   FailureTranscriptBlock,
   FileChangeTranscriptBlock,
   FinishedTranscriptBlock,

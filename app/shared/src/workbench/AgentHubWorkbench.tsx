@@ -272,6 +272,7 @@ export function AgentHubWorkbench({
   highlightedBlockId,
   onHighlightEnd,
   onRegenerate,
+  connectionStatus,
 }: AgentHubWorkbenchProps): React.ReactElement {
   // Create settings service if platform provides a settings port
   const settingsService = useMemo<SettingsService | null>(
@@ -1011,6 +1012,11 @@ export function AgentHubWorkbench({
     setReviewFileRequest({ ...file });
   }
 
+  function handleDeploySubmit(_id: string): void {
+    openInspector();
+    showWorkbenchToast('已打开部署预览');
+  }
+
   function handleSearchJump(messageId: string, _messageIndex?: number): void {
     setSearchOpen(false);
     setSearchHighlightId(messageId);
@@ -1519,12 +1525,25 @@ export function AgentHubWorkbench({
                 onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey })}
                 onBlockAction={handleTranscriptBlockAction}
                 onReviewFile={openReviewFile}
+                onDeploySubmit={handleDeploySubmit}
                 selectedBlockIds={new Set(selectedBlockIds)}
                 selectionMode={selectionMode}
                 softHiddenBlockIds={new Set(softHiddenBlockIds)}
                 actionedBlockIds={new Set(actionedBlockIds)}
                 highlightedBlockId={searchHighlightId}
                 onHighlightEnd={handleSearchHighlightEnd}
+                pinnedAnnouncement={activeConversation?.pinnedAnnouncement && !dismissedPinnedIds.has(activeConversation.id) ? {
+                  ...activeConversation.pinnedAnnouncement,
+                  onCopy: () => showWorkbenchToast('已打开置顶内容'),
+                  onDismiss: () => {
+                    setDismissedPinnedIds((prev) => {
+                      const next = new Set(prev);
+                      next.add(activeConversation.id);
+                      return next;
+                    });
+                    showWorkbenchToast('已关闭置顶');
+                  },
+                } : undefined}
               />
             </div>
             <MessageSearchPanel

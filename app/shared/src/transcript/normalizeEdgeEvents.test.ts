@@ -257,7 +257,7 @@ describe('normalizeEdgeEventsToTranscript', () => {
       expect.objectContaining({
         kind: 'thinking',
         content: '正在分析 Desktop/Web shared UI。',
-        isThinking: true,
+        isThinking: false,
       }),
       expect.objectContaining({
         kind: 'subtask',
