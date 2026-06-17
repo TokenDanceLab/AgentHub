@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { highlightLine, languageFromPath } from '../../ui/syntaxHighlight';
 import { DesignFileIcon, DesignNavIcon, DesignOpenWithIcon, type DesignOpenWithIconName } from '../designIcons';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import styles from './FilePreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════

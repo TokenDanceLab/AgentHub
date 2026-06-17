@@ -191,6 +191,9 @@ export const chatviewResources = {
     'action.approved': '已批准',
     'action.denied': '已拒绝',
     'action.regenerating': '正在重新生成',
+    'action.startAgentTask': '启动 Agent 任务',
+    'action.removeMention': '移除 @{label}',
+    'action.removeAttachment': '移除 {name}',
 
     // ═══ Mainchain labels ═══
     'mainchain.waitingTask': '等待 task/replay',
@@ -578,6 +581,9 @@ export const chatviewResources = {
     'action.approved': 'Approved',
     'action.denied': 'Denied',
     'action.regenerating': 'Regenerating',
+    'action.startAgentTask': 'Start agent task',
+    'action.removeMention': 'Remove @{label}',
+    'action.removeAttachment': 'Remove {name}',
 
     // ═══ Mainchain labels ═══
     'mainchain.waitingTask': 'Waiting task/replay',
