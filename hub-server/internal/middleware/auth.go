@@ -119,7 +119,7 @@ func RequireHubSession() gin.HandlerFunc {
 				"path":        c.FullPath(),
 			}, c.ClientIP())
 			fail(c, &errcode.Error{
-				Code:       "FORBIDDEN",
+				Code:       "forbidden",
 				Message:    "Hub-issued session is required for this API",
 				HTTPStatus: http.StatusForbidden,
 			})
@@ -164,7 +164,7 @@ func RequireAdmin() gin.HandlerFunc {
 				"reason": "admin_users_not_configured",
 			}, clientIP)
 			fail(c, &errcode.Error{
-				Code:       "FORBIDDEN",
+				Code:       "forbidden",
 				Message:    "admin access not configured — set AGENTHUB_ADMIN_USERS",
 				HTTPStatus: http.StatusForbidden,
 			})
@@ -185,7 +185,7 @@ func RequireAdmin() gin.HandlerFunc {
 			"path":   c.FullPath(),
 		}, clientIP)
 		fail(c, &errcode.Error{
-			Code:       "FORBIDDEN",
+			Code:       "forbidden",
 			Message:    "admin access required",
 			HTTPStatus: http.StatusForbidden,
 		})
@@ -193,7 +193,15 @@ func RequireAdmin() gin.HandlerFunc {
 	}
 }
 
-// getAdminUsers reads and caches the AGENTHUB_ADMIN_USERS env var.
+// getAdminUsers reads and caches the AGENTHUB_ADMIN_USERS env var once at
+// process startup via sync.Once. The admin list is read on the first call
+// (typically during the first admin-authenticated request) and then cached
+// for the lifetime of the process.
+//
+// This means changes to AGENTHUB_ADMIN_USERS require a process restart to
+// take effect. The sync.Once pattern is intentional: it avoids racing on
+// os.Getenv during concurrent requests and prevents mid-flight admin list
+// changes that could bypass access control.
 var (
 	adminUsersOnce sync.Once
 	adminUsersList []string

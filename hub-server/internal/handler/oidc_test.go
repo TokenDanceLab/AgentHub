@@ -49,8 +49,8 @@ func TestOIDCHandler_PostOIDCAuthorize_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseResponse[any](t, w)
-	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s", resp.Code)
+	if resp.Code != "ok" {
+		t.Fatalf("expected ok, got %s", resp.Code)
 	}
 	if !contains(w.Body.String(), "test-state-123") {
 		t.Fatalf("expected response to contain state, got %s", w.Body.String())
@@ -154,8 +154,8 @@ func TestOIDCHandler_PostOIDCCallback_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseResponse[any](t, w)
-	if resp.Code != "OK" {
-		t.Fatalf("expected OK, got %s", resp.Code)
+	if resp.Code != "ok" {
+		t.Fatalf("expected ok, got %s", resp.Code)
 	}
 	if !contains(w.Body.String(), "access-token-xxx") {
 		t.Fatalf("expected response to contain access token, got %s", w.Body.String())
@@ -273,8 +273,8 @@ func TestOIDCHandler_PostOIDCCallback_DoesNotLeakTokenEndpointBody(t *testing.T)
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
-	if !contains(w.Body.String(), "OIDC_CODE_EXCHANGE_FAILED") {
-		t.Fatalf("expected OIDC_CODE_EXCHANGE_FAILED response, got %s", w.Body.String())
+	if !contains(w.Body.String(), "oidc_code_exchange_failed") {
+		t.Fatalf("expected oidc_code_exchange_failed response, got %s", w.Body.String())
 	}
 	combined := w.Body.String() + "\n" + logBuf.String()
 	for _, forbidden := range []string{

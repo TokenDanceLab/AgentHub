@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
@@ -145,6 +146,12 @@ func (h *AgentProfileHandler) ListProfiles(c *gin.Context) {
 	q := c.Query("q")
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	if pageSize <= 0 {
+		pageSize = config.DefaultPaginationLimit
+	}
+	if pageSize > config.MaxPageLimit {
+		pageSize = config.MaxPageLimit
+	}
 
 	result, err := h.service.List(c.Request.Context(), userID, runtimeID, q, cursor, pageSize)
 	if err != nil {

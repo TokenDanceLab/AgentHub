@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { cx } from './cx';
 import styles from './RecoveryPanel.module.css';
 
 export interface RecoveryPanelAction {
@@ -30,9 +31,6 @@ export interface RecoveryPanelProps {
   actionClassName?: string;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 function RecoveryActionButton({
   action,

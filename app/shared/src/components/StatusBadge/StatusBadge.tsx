@@ -1,4 +1,5 @@
 import React from 'react';
+import { cx } from '../../ui/cx';
 import styles from './StatusBadge.module.css';
 
 export type StatusVariant = 'online' | 'offline' | 'running' | 'error' | 'pending' | 'done' | 'in progress' | 'review';
@@ -7,10 +8,6 @@ export interface StatusBadgeProps {
   status: StatusVariant;
   label?: string;
   className?: string;
-}
-
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
 }
 
 const statusLabel: Record<StatusVariant, string> = {

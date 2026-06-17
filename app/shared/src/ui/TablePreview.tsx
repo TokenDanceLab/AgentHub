@@ -7,13 +7,13 @@
      fileBlob  — Optional pre-fetched Blob (skips fetch)
      onClose   — Called when the close button is clicked
 
-   Fetches the file, parses via XLSX.read, and renders as a scrollable
-   HTML table with sortable columns.
+   Fetches the file, parses via XLSX.read (dynamic import — lazy-loaded
+   to keep ~694 KB xlsx out of the main bundle), and renders as a
+   scrollable HTML table with sortable columns.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, X } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import styles from './TablePreview.module.css';
 
 export interface TablePreviewProps {
@@ -28,6 +28,19 @@ type SortDirection = 'asc' | 'desc' | null;
 interface SortState {
   column: number;
   direction: SortDirection;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Lazy xlsx module loader — dynamic import keeps 694 KB out of main bundle
+// ═══════════════════════════════════════════════════════════════════════
+
+let xlsxModule: typeof import('xlsx') | null = null;
+
+async function getXLSX(): Promise<typeof import('xlsx')> {
+  if (!xlsxModule) {
+    xlsxModule = await import('xlsx');
+  }
+  return xlsxModule;
 }
 
 export const TablePreview: React.FC<TablePreviewProps> = ({
@@ -45,45 +58,8 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheet, setActiveSheet] = useState<string>('');
 
-  const loadFile = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setHeaders([]);
-    setRows([]);
-    setRawRows([]);
-
-    try {
-      let arrayBuffer: ArrayBuffer;
-
-      if (fileBlob) {
-        arrayBuffer = await fileBlob.arrayBuffer();
-      } else {
-        const response = await fetch(fileUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
-        }
-        arrayBuffer = await response.arrayBuffer();
-      }
-
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      const names = workbook.SheetNames;
-      setSheetNames(names);
-
-      const sheetName = names[0];
-      if (!sheetName) {
-        throw new Error('No sheets found in workbook');
-      }
-      setActiveSheet(sheetName);
-      parseSheet(workbook, sheetName);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error parsing spreadsheet';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [fileUrl, fileBlob]);
-
-  function parseSheet(workbook: XLSX.WorkBook, sheetName: string): void {
+  const parseSheet = useCallback((workbook: import('xlsx').WorkBook, sheetName: string) => {
+    const XLSX = xlsxModule!;
     const worksheet = workbook.Sheets[sheetName];
     if (!worksheet) return;
 
@@ -108,7 +84,46 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
     setRawRows(dataRows);
     setRows(dataRows);
     setSort({ column: -1, direction: null });
-  }
+  }, []);
+
+  const loadFile = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setHeaders([]);
+    setRows([]);
+    setRawRows([]);
+
+    try {
+      let arrayBuffer: ArrayBuffer;
+
+      if (fileBlob) {
+        arrayBuffer = await fileBlob.arrayBuffer();
+      } else {
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        }
+        arrayBuffer = await response.arrayBuffer();
+      }
+
+      const XLSX = await getXLSX();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const names = workbook.SheetNames;
+      setSheetNames(names);
+
+      const sheetName = names[0];
+      if (!sheetName) {
+        throw new Error('No sheets found in workbook');
+      }
+      setActiveSheet(sheetName);
+      parseSheet(workbook, sheetName);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error parsing spreadsheet';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [fileUrl, fileBlob, parseSheet]);
 
   useEffect(() => {
     void loadFile();
@@ -147,17 +162,18 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
   const handleSheetSwitch = useCallback((sheetName: string) => {
     setActiveSheet(sheetName);
     try {
-      let arrayBuffer: ArrayBuffer;
       if (fileBlob) {
         /* Re-parse from the same blob — we already have it loaded */
-        void fileBlob.arrayBuffer().then((ab) => {
+        void fileBlob.arrayBuffer().then(async (ab) => {
+          const XLSX = await getXLSX();
           const wb = XLSX.read(ab, { type: 'array' });
           parseSheet(wb, sheetName);
         });
       } else {
         void fetch(fileUrl).then((response) => {
           if (!response.ok) return;
-          void response.arrayBuffer().then((ab) => {
+          void response.arrayBuffer().then(async (ab) => {
+            const XLSX = await getXLSX();
             const wb = XLSX.read(ab, { type: 'array' });
             parseSheet(wb, sheetName);
           });
@@ -166,7 +182,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
     } catch {
       /* Ignore sheet switch errors */
     }
-  }, [fileBlob, fileUrl]);
+  }, [fileBlob, fileUrl, parseSheet]);
 
   const sortIcon = useMemo(() => {
     return (colIndex: number) => {

@@ -66,8 +66,8 @@ func (s *RelayService) CreateCommand(ctx context.Context, targetEdgeID, commandT
 	return cmd, nil
 }
 
-// GetCommand retrieves a relay command by ID from Redis.
-func (s *RelayService) GetCommand(ctx context.Context, id string) (*RelayCommandData, error) {
+// GetCommand retrieves a relay command by ID from Redis, verifying it belongs to userID.
+func (s *RelayService) GetCommand(ctx context.Context, id string, userID string) (*RelayCommandData, error) {
 	key := "relay:cmd:" + id
 	data, err := s.cache.GetRDB().Get(ctx, key).Result()
 	if err != nil {
@@ -77,12 +77,15 @@ func (s *RelayService) GetCommand(ctx context.Context, id string) (*RelayCommand
 	if err := json.Unmarshal([]byte(data), &cmd); err != nil {
 		return nil, fmt.Errorf("parse relay command: %w", err)
 	}
+	if cmd.CreatedBy != userID {
+		return nil, errcode.UserNotFound.WithMessage("relay command not found")
+	}
 	return &cmd, nil
 }
 
-// AckCommand marks a relay command as acknowledged by the Edge device.
-func (s *RelayService) AckCommand(ctx context.Context, id string) error {
-	cmd, err := s.GetCommand(ctx, id)
+// AckCommand marks a relay command as acknowledged by the Edge device, verifying it belongs to userID.
+func (s *RelayService) AckCommand(ctx context.Context, id string, userID string) error {
+	cmd, err := s.GetCommand(ctx, id, userID)
 	if err != nil {
 		return err
 	}

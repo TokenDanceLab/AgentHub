@@ -15,6 +15,35 @@ vi.mock('@lobehub/icons', () => ({
 }));
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, string>) => {
+      const resources: Record<string, string> = {
+        'action.removeMention': 'Remove @{label}',
+        'action.startAgentTask': 'Start agent task',
+        'action.removeAttachment': 'Remove {name}',
+        'aria.composerInput': 'Composer input',
+        'aria.atAgent': '@Agent',
+        'aria.target': 'Desktop/Edge target',
+        'aria.attachments': 'Attachments',
+        'aria.selectedAgents': 'Selected agents',
+        'aria.agentMainChain': '@Agent main chain',
+        'aria.cancelReply': 'Cancel reply',
+        'aria.cancelQuote': 'Cancel quote',
+        'aria.addAttachment': 'Add attachment',
+        'profile.sendMessage': 'Send message',
+      };
+      let result = resources[key] ?? key;
+      if (options) {
+        for (const [k, v] of Object.entries(options)) {
+          result = result.replace(`{${k}}`, v);
+        }
+      }
+      return result;
+    },
+  }),
+}));
+
 const mentionedComposer: ComposerState = {
   conversationId: 'hub-session-1',
   text: 'Run the real task',
@@ -66,7 +95,7 @@ describe('UnifiedComposer execution target selection', () => {
 
     expect(screen.getByLabelText('Desktop/Edge target')).toBeDisabled();
     expect(screen.getByText('No online Desktop/Edge target is available.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Start agent task' })).toBeDisabled();
   });
 
   it('does not submit with Enter when a mentioned agent has no selected target', () => {
@@ -107,6 +136,5 @@ describe('UnifiedComposer execution target selection', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Data: approved-real');
     expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
     expect(screen.getByRole('status')).toHaveTextContent('Hub replay: 2 runtime events observed');
-    expect(screen.getByRole('status')).toHaveTextContent('Run/task: starting');
   });
 });

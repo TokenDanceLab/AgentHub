@@ -423,7 +423,7 @@ func TestAgentTeamHandler_CreateTeam(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Contains(t, w.Body.String(), "BAD_REQUEST")
+		assert.Contains(t, w.Body.String(), "bad_request")
 	})
 }
 

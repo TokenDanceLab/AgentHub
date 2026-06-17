@@ -50,7 +50,7 @@ func TestDeviceHandler_Register_Success(t *testing.T) {
 	}
 	var resp handler.Response
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	if resp.Code != "OK" {
+	if resp.Code != "ok" {
 		t.Fatalf("expected OK, got %s", resp.Code)
 	}
 	data, err := json.Marshal(resp.Data)
@@ -100,7 +100,7 @@ func TestDeviceHandler_Register_InvalidDeviceID(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if resp.Error.Code != "BAD_REQUEST" {
+	if resp.Error.Code != "bad_request" {
 		t.Fatalf("expected BAD_REQUEST, got %s", resp.Error.Code)
 	}
 	if resp.Error.Message != "device_id must be a UUID" {

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { cx } from './cx';
 import { Check, X } from 'lucide-react';
 import type { DiffFile, DiffHunk, DiffLine } from '../diff';
 import { highlightLine, languageFromPath } from './syntaxHighlight';
@@ -193,9 +194,6 @@ const DEFAULT_LABELS: Required<DiffReviewLabels> = {
   rejected: 'Rejected',
 };
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 // ── DiffReviewPanel ────────────────────────────────────────────────────
 

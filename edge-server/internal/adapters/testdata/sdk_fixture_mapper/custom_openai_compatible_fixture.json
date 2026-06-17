@@ -28,7 +28,7 @@
           "spend": "blocked"
         },
         "metadata": {
-          "workspace_path": "D:\\Code\\TokenDance\\AgentHub\\private",
+          "workspace_path": "/home/testuser/private",
           "api_key": "sk-custom-not-real"
         }
       }
@@ -63,7 +63,7 @@
       "reason": "custom runtime requested test execution approval",
       "input": {
         "command": "go test ./internal/adapters -run TestSDKFixtureMapper -count=1",
-        "cwd": "D:\\Code\\TokenDance\\AgentHub"
+        "cwd": "/home/testuser/projects/agenthub"
       }
     },
     {
@@ -88,7 +88,7 @@
       "id": "custom_artifact_1",
       "type": "artifact.created",
       "artifactId": "artifact_custom_fixture",
-      "path": "C:\\Users\\Ding\\private\\custom-fixture-evidence.json",
+      "path": "/home/testuser/private/custom-fixture-evidence.json",
       "kind": "json",
       "sizeBytes": 512,
       "summary": "Custom OpenAI-compatible fixture evidence",

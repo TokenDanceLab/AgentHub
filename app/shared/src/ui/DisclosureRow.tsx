@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { cx } from './cx';
 import styles from './DisclosureRow.module.css';
 
 export interface DisclosureRowProps {
@@ -18,9 +19,6 @@ export interface DisclosureRowProps {
   bodyClassName?: string | undefined;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 export function DisclosureRow({
   label,

@@ -1,11 +1,25 @@
 export { AgentHubWorkbench } from './AgentHubWorkbench';
+export { ChatViewBridge } from './ChatViewBridge';
 export { ConversationSidebar } from './ConversationSidebar';
 export { GlobalRail } from './GlobalRail';
 export { RightInspector } from './RightInspector';
-export { TranscriptView } from './TranscriptView';
 export { UnifiedComposer } from './UnifiedComposer';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
+export { WorkbenchShell } from './WorkbenchShell';
 export { WorkspaceHeader } from './WorkspaceHeader';
+export {
+  INSPECTOR_MIN_WIDTH,
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_DEFAULT_WIDTH,
+  INSPECTOR_READABLE_WIDTH,
+  INSPECTOR_COLLAPSE_SNAP_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_COLLAPSE_SNAP_WIDTH,
+  WORKSPACE_AUTO_COLLAPSE_WIDTH,
+} from './WorkbenchShell';
+export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 export * from './mockData';
 export {
   buildAgentCapabilityContractFromConfig,
@@ -62,11 +76,21 @@ export {
 
 /* ── Types ── */
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
+export type { ChatViewBridgeProps } from './ChatViewBridge';
 export type { ConversationSidebarProps } from './ConversationSidebar';
 export type { GlobalRailProps, GlobalRailPage, ConnectionStatusKind } from './GlobalRail';
 export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './RightInspector';
-export type { TranscriptViewProps } from './TranscriptView';
 export type { UnifiedComposerProps } from './UnifiedComposer';
+export type {
+  WorkbenchShellProps,
+  AgentProfileState,
+  HumanProfileState,
+  GroupProfileState,
+  MainchainNode,
+  MainchainSummary,
+  MainchainStatusKind,
+  InspectorResizeDelegates,
+} from './WorkbenchShell';
 export type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsData,
@@ -134,48 +158,6 @@ export type {
   TasksPane,
   ViewMode,
 } from './pages';
-
-/* ═══ Blocks ═══ */
-export {
-  AgentMessage,
-  UserMessage,
-  ToolCardBlock,
-  TOOL_STATUS_LABELS,
-  FileChangeCard,
-  DiffCard,
-  DateDivider,
-  PinnedAnnouncement,
-  ApprovalCardBlock,
-  ThinkingBlock,
-  SubagentBlock,
-  ChildAgentBlock,
-  RunSessionCard,
-  ResultBlock,
-  RouteDecisionBlock,
-  STATUS_LABELS,
-  ContextUsageBlock,
-  AgentTimeline,
-  URLPreviewCard,
-} from './blocks';
-export type {
-  AgentMessageProps,
-  UserMessageProps,
-  ToolCardBlockProps,
-  FileChangeCardProps,
-  DiffCardProps,
-  DateDividerProps,
-  PinnedAnnouncementProps,
-  ApprovalCardBlockProps,
-  ThinkingBlockProps,
-  SubagentBlockProps,
-  ChildAgentBlockProps,
-  RunSessionCardProps,
-  ResultBlockProps,
-  RouteDecisionBlockProps,
-  ContextUsageBlockProps,
-  AgentTimelineProps,
-  URLPreviewCardProps,
-} from './blocks';
 
 /* ═══ Inspector panels ═══ */
 export {

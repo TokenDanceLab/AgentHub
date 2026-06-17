@@ -373,7 +373,7 @@ describe('ExecutionTargetsSection', () => {
 
     expect(screen.getByText('Codex CLI')).toBeInTheDocument();
     expect(screen.getByText('version: 0.27.0')).toBeInTheDocument();
-    expect(screen.getByText('path: C:/Users/Ding/AppData/Roaming/npm/codex.cmd')).toBeInTheDocument();
+    expect(screen.getByText('path: <HOMEDIR>/AppData/Roaming/npm/codex.cmd')).toBeInTheDocument();
 
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('version: 2.1.4')).toBeInTheDocument();

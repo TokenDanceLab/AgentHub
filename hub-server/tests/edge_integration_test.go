@@ -261,8 +261,8 @@ func TestEdgeAgentTaskAckNotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 	resp := parseEdgeResp(t, w)
-	if resp.Code != "AGENT_TASK_NOT_FOUND" {
-		t.Errorf("expected AGENT_TASK_NOT_FOUND, got %s", resp.Code)
+	if resp.Code != "agent_task_not_found" {
+		t.Errorf("expected agent_task_not_found, got %s", resp.Code)
 	}
 }
 

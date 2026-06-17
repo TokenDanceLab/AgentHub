@@ -26,7 +26,7 @@ func TestEdgeTaskCallbacksRejectWrongDesktopDevice(t *testing.T) {
 	wrongDeviceAck := parse(postAuth("/edge/agent-tasks/"+task.ID+"/ack", deviceBToken, map[string]string{
 		"run_id": "run-edge-1",
 	}))
-	mustCode(t, wrongDeviceAck, "AGENT_TASK_NOT_FOUND", "wrong device ack")
+	mustCode(t, wrongDeviceAck, "agent_task_not_found", "wrong device ack")
 
 	okAck := parse(postAuth("/edge/agent-tasks/"+task.ID+"/ack", deviceAToken, map[string]string{
 		"run_id": "run-edge-1",
@@ -56,7 +56,7 @@ func TestEdgeTaskCallbacksRejectWrongDesktopDevice(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := parse(postAuth(tc.path, deviceBToken, tc.body))
-			mustCode(t, r, "AGENT_TASK_NOT_FOUND", "wrong device "+tc.name)
+			mustCode(t, r, "agent_task_not_found", "wrong device "+tc.name)
 		})
 	}
 }
@@ -91,7 +91,7 @@ func TestEdgeTaskCallbacksRejectWrongRunID(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := parse(postAuth(tc.path, deviceAToken, tc.body))
-			mustCode(t, r, "BAD_REQUEST", "wrong run "+tc.name)
+			mustCode(t, r, "bad_request", "wrong run "+tc.name)
 		})
 	}
 }

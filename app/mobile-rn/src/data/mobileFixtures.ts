@@ -3,7 +3,7 @@ import type { TranscriptBlock } from '@agenthub/shared/transcript';
 import type { MobileAppFixture, MobileFixtureScenario } from '@/types';
 
 const agentAuthor = { id: 'agenthub', name: 'AgentHub', role: 'agent' } as const;
-const humanAuthor = { id: 'delicious', name: 'Delicious233', role: 'human' } as const;
+const humanAuthor = { id: 'alice', name: 'Alice', role: 'human' } as const;
 const safeAgentAuthor = { id: 'agenthub', name: 'AgentHub', role: 'agent' } as const;
 
 const designThreadTranscript: TranscriptBlock[] = [
@@ -546,7 +546,7 @@ const sendPendingFixture: MobileAppFixture = {
     {
       id: 'send-pending-chat',
       title: 'AgentHub message delivery',
-      subtitle: 'Delicious233 is sending a TokenDance mobile message through Hub.',
+      subtitle: 'Alice is sending a TokenDance mobile message through Hub.',
       initials: 'AH',
       avatarTone: 'brand',
       unread: 0,
@@ -583,7 +583,7 @@ const sendPendingFixture: MobileAppFixture = {
         id: 'send-pending-1',
         kind: 'text',
         author: humanAuthor,
-        text: 'Sending AgentHub message from Delicious233 to the TokenDance workspace.',
+        text: 'Sending AgentHub message from Alice to the TokenDance workspace.',
         createdAt: '16:02',
         badgeLabel: 'Sending',
         badgeVariant: 'primary',
@@ -647,7 +647,7 @@ const approvalResolvedFixture: MobileAppFixture = {
       previewIntent: 'approvalResolved',
       reviewDensity: 'normal',
       evidenceCount: 9,
-      statusDetail: 'Approved by Delicious233 for TokenDance mobile QA.',
+      statusDetail: 'Approved by Alice for TokenDance mobile QA.',
     },
   ],
   transcript: {
