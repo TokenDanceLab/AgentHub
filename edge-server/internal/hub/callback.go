@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/agenthub/edge-server/internal/errcode"
 )
 
 // CallbackClient reports Edge run lifecycle events to the Hub server.
@@ -162,16 +164,16 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 		resp.Body.Close()
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			// Validate Hub response format: {"code": "OK", ...} or {"code": "..."}
+			// Validate Hub response format: {"code": "ok", ...} or {"code": "..."}
 			var hubResp struct {
 				Code    string `json:"code"`
 				Message string `json:"message"`
 			}
-			if json.Unmarshal(respBody, &hubResp) == nil && hubResp.Code == "OK" {
+			if json.Unmarshal(respBody, &hubResp) == nil && hubResp.Code == errcode.OK.Code {
 				return nil
 			}
 			// Non-OK code from Hub is an application-level failure; do not retry
-			if hubResp.Code != "" && hubResp.Code != "OK" {
+			if hubResp.Code != "" && hubResp.Code != errcode.OK.Code {
 				return fmt.Errorf("hub callback rejected: %s", summarizeHubResponse(resp.StatusCode, respBody, "app_rejected"))
 			}
 			// 2xx without JSON body — accept as success

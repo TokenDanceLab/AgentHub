@@ -625,54 +625,6 @@ func TestPermissionDeciderDeny(t *testing.T) {
 		t.Fatalf("Message = %q, want 'blocked by policy'", innerResp.Message)
 	}
 }
-
-// TestChannelPermissionDecider verifies that the channel-based decider
-// correctly bridges permission requests over Go channels.
-func TestChannelPermissionDecider(t *testing.T) {
-	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:   "can_use_tool",
-		ToolName:  "Read",
-		ToolUseID: "tu-channel",
-	})
-
-	reqCh := make(chan PermissionRequest, 1)
-	decCh := make(chan PermissionDecision, 1)
-
-	decider := NewChannelPermissionDecider(reqCh, decCh)
-
-	// Simulate Desktop picking up the request in a goroutine
-	go func() {
-		req := <-reqCh
-		if req.ToolName != "Read" {
-			t.Errorf("ToolName = %q, want Read", req.ToolName)
-		}
-		decCh <- PermissionDecision{Behavior: "allow", DecisionClass: "user_approved"}
-	}()
-
-	handler := NewBridgedPermissionHandler(nil, decider.Decide)
-	var buf bytes.Buffer
-	if err := handler.HandleControlRequest(context.Background(), &buf, ControlMessage{
-		Type: "control_request", RequestID: "r-channel", Request: inner,
-	}); err != nil {
-		t.Fatalf("HandleControlRequest: %v", err)
-	}
-
-	var resp ControlMessage
-	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	var innerResp ControlResponseInner
-	if err := json.Unmarshal(resp.Response, &innerResp); err != nil {
-		t.Fatalf("inner unmarshal: %v", err)
-	}
-	if innerResp.Behavior != "allow" {
-		t.Fatalf("Behavior = %q, want allow", innerResp.Behavior)
-	}
-	if innerResp.DecisionClass != "user_approved" {
-		t.Fatalf("DecisionClass = %q, want user_approved", innerResp.DecisionClass)
-	}
-}
-
 func TestBrokeredPermissionHandlerWaitsForDecision(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
 		Subtype:   "can_use_tool",
@@ -828,18 +780,15 @@ func TestControlProtocolMissingSubtypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("HandleControlRequest for %q returned error: %v", subtype, err)
 			}
-			payload := decodeControlCapabilityResponse(t, buf.Bytes(), "r-stub")
-			if payload.Status != "unsupported" {
-				t.Fatalf("Status = %q, want unsupported", payload.Status)
+			payload := decodeControlCapabilityPayload(t, buf.Bytes(), "r-stub")
+			if payload["status"] != "unsupported" {
+				t.Fatalf("status = %q, want unsupported", payload["status"])
 			}
-			if payload.RequestID != "r-stub" {
-				t.Fatalf("RequestID = %q, want r-stub", payload.RequestID)
+			if payload["request_id"] != "r-stub" {
+				t.Fatalf("request_id = %q, want r-stub", payload["request_id"])
 			}
-			if payload.RequestedSubtype != subtype {
-				t.Fatalf("RequestedSubtype = %q, want %q", payload.RequestedSubtype, subtype)
-			}
-			if payload.Subtype != subtype {
-				t.Fatalf("Subtype = %q, want %q", payload.Subtype, subtype)
+			if payload["subtype"] != subtype {
+				t.Fatalf("subtype = %q, want %q", payload["subtype"], subtype)
 			}
 		})
 	}

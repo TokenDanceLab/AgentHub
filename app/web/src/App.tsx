@@ -1,6 +1,8 @@
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AgentHubWorkbench } from '@shared/workbench';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AgentConfig, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import {
   getWorkbenchDataModeOverrideSnapshot,
@@ -39,6 +41,7 @@ export default function App() {
 }
 
 function WebWorkbenchRoot() {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [agentActionError, setAgentActionError] = useState<string | undefined>();
@@ -70,7 +73,7 @@ function WebWorkbenchRoot() {
     staleTime: 60_000,
   });
   const agentLoadError = realMode && agentList.error
-    ? errorMessage(agentList.error, 'Agent Profile 加载失败')
+    ? errorMessage(agentList.error, t('error.agentProfile.load'))
     : undefined;
   const hubClientForConversations = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
   const hubReady = !realMode ? false : Boolean(getAccessToken());
@@ -117,7 +120,7 @@ function WebWorkbenchRoot() {
     try {
       await createAgentProfile.mutateAsync(agent);
     } catch (error) {
-      setAgentActionError(errorMessage(error, 'Agent Profile 创建失败'));
+      setAgentActionError(errorMessage(error, t('error.agentProfile.create')));
       throw error;
     } finally {
       setSavingAgentId(undefined);
@@ -130,7 +133,7 @@ function WebWorkbenchRoot() {
     try {
       await updateAgentProfile.mutateAsync({ agent });
     } catch (error) {
-      setAgentActionError(errorMessage(error, 'Agent Profile 保存失败'));
+      setAgentActionError(errorMessage(error, t('error.agentProfile.save')));
       throw error;
     } finally {
       setSavingAgentId(undefined);
@@ -143,7 +146,7 @@ function WebWorkbenchRoot() {
     try {
       await deleteAgentProfile.mutateAsync(agentId);
     } catch (error) {
-      setAgentActionError(errorMessage(error, 'Agent Profile 删除失败'));
+      setAgentActionError(errorMessage(error, t('error.agentProfile.delete')));
       throw error;
     } finally {
       setDeletingAgentId(undefined);

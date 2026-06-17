@@ -397,6 +397,12 @@ func (a *App) Shutdown(ctx context.Context) error {
 // setupRouter creates the Gin engine and installs all routes.
 func (a *App) setupRouter() *gin.Engine {
 	r := gin.New()
+	// Trust only loopback proxies (127.0.0.0/8, ::1) for X-Forwarded-For.
+	// Hub sits behind nginx on the same host, so loopback is sufficient.
+	// nil disables all external proxy trust; we explicitly trust loopback.
+	if err := r.SetTrustedProxies([]string{"127.0.0.0/8", "::1"}); err != nil {
+		panic(fmt.Errorf("failed to set trusted proxies: %w", err))
+	}
 	r.Use(gin.Recovery())
 	router.SetupRoutes(r, a.Config, a.Config.JWT.Secret, a.CacheClient,
 		a.AuthHandler, a.WebSocketHandler, a.DeviceHandler,
@@ -886,9 +892,12 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 func (a *App) syncLegacySeqs() {
 	ctx := a.coreCtx
 	var sessions []model.Session
-	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Find(&sessions).Error; err != nil {
+	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Order("created_at ASC").Limit(5000).Find(&sessions).Error; err != nil {
 		slog.Warn("failed to query sessions for seq sync", "error", err)
 		return
+	}
+	if len(sessions) == 5000 {
+		slog.Warn("syncLegacySeqs: processed batch of 5000, more sessions may remain; run migration again if needed")
 	}
 	count := 0
 	for _, sess := range sessions {

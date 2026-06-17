@@ -30,14 +30,6 @@ import type {
   TasksPane,
   ViewMode,
 } from './pages';
-import {
-  AgentsPage,
-  ContactsPage,
-  DocsPage,
-  ProjectsPage,
-  SettingsPage,
-  TasksPage,
-} from './pages';
 import type { AgentConfig, AgentsPaneId, ToolPermission, SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { TaskEditDraft } from './pages/TasksPage';
 import type { GlobalRailPage } from './GlobalRail';
@@ -71,7 +63,15 @@ import { createSettingsService } from './settingsService';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import type { HubClient } from '../hubClient';
 import { workspaceProjectToProjectInfo } from './hubDataMapping';
+import { ContactsPage } from './pages/ContactsPage';
+import { DocsPage } from './pages/DocsPage';
+import { AgentsPage } from './pages/AgentsPage';
+import { TasksPage } from './pages/TasksPage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import styles from './AgentHubWorkbench.module.css';
+
+// ── Static page imports (no React.lazy — lazy 在 jsdom 测试中无法同步解析) ──
 
 type WorkbenchPage = Exclude<GlobalRailPage, 'chat'>;
 type TaskSortMode = 'custom' | 'due';
@@ -671,6 +671,7 @@ export function WorkbenchRoutes({
     ?? (hubProjectsEnabled ? hubProjects : (realDataMode ? [] : WORKBENCH_MOCK_PROJECTS));
   const effectiveProjectsStatus = projectsStatus
     ?? (hubProjectsEnabled ? hubProjectsStatus : undefined);
+  const canMutateProject = Boolean(onProjectCreate ?? onProjectUpdate ?? hubClient);
   const [localProjectId, setLocalProjectId] = useState(sourceProjects[0]?.id ?? null);
   const controlledProjectId = activeProjectId && sourceProjects.some((project) => project.id === activeProjectId)
     ? activeProjectId
@@ -1155,7 +1156,7 @@ export function WorkbenchRoutes({
       setTaskActionLabel('请先选择任务');
       return;
     }
-    updateTask(selectedTask.id, { assignee: currentUserId ?? '当前用户' });
+    updateTask(selectedTask.id, { assignee: userDisplayName ?? currentUserId ?? '当前用户' });
     setTaskActionLabel(`${selectedTask.title} 已指派给 ${userDisplayName ?? '当前用户'}`);
   }
 
@@ -1373,9 +1374,9 @@ export function WorkbenchRoutes({
             setProjectPreview(createProjectArtifactPreview(id, artifact));
           }}
           onClosePreview={() => setProjectPreview(null)}
-          onProjectCreate={handleProjectCreate}
+          onProjectCreate={canMutateProject ? handleProjectCreate : undefined}
           onProjectSelect={selectProject}
-          onProjectUpdate={handleProjectUpdate}
+          onProjectUpdate={canMutateProject ? handleProjectUpdate : undefined}
           onTabChange={setProjectTab}
           projectActionError={effectiveProjectsStatus?.actionError}
           projectSaving={effectiveProjectsStatus?.saving}

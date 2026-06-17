@@ -362,52 +362,6 @@ func normalizePermissionDecision(decision PermissionDecision) PermissionDecision
 	}
 }
 
-// ChannelPermissionDecider bridges the permission decider to a channel-based
-// protocol suitable for the Desktop event bus. Send a PermissionRequest on
-// the requests channel and block until a PermissionDecision arrives on the
-// decisions channel (matched by RequestID).
-//
-// Usage from Desktop-side:
-//
-//	decider := adapters.NewChannelPermissionDecider(reqCh, decCh)
-//	handler := adapters.NewBridgedPermissionHandler(emitter, decider.Decide)
-//	go func() {
-//	    for req := range reqCh {
-//	        decision := showApprovalUI(req) // blocks until user responds
-//	        decCh <- decision
-//	    }
-//	}()
-func NewChannelPermissionDecider(requests chan<- PermissionRequest, decisions <-chan PermissionDecision) *ChannelPermissionDecider {
-	return &ChannelPermissionDecider{
-		requests:  requests,
-		decisions: decisions,
-	}
-}
-
-// ChannelPermissionDecider bridges permission decisions over channels.
-type ChannelPermissionDecider struct {
-	requests  chan<- PermissionRequest
-	decisions <-chan PermissionDecision
-}
-
-// Decide implements PermissionDecider by sending the request on the requests
-// channel and blocking until the matching decision arrives on the decisions
-// channel. The context is passed through for cancellation/timeout propagation.
-func (d *ChannelPermissionDecider) Decide(ctx context.Context, req PermissionRequest) PermissionDecision {
-	select {
-	case d.requests <- req:
-	case <-ctx.Done():
-		return PermissionDecision{Behavior: "deny", Message: "context cancelled before request could be sent"}
-	}
-
-	select {
-	case decision := <-d.decisions:
-		return decision
-	case <-ctx.Done():
-		return PermissionDecision{Behavior: "deny", Message: "context cancelled while waiting for decision"}
-	}
-}
-
 // WriteInterrupt sends an interrupt control_request to the CLI via stdin.
 func WriteInterrupt(stdin io.Writer, requestID string) error {
 	inner, err := json.Marshal(ControlRequestInner{Subtype: "interrupt"})

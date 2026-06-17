@@ -17,8 +17,7 @@ const (
 	RiskLow      RiskLevel = "low"      // read-only: Read, Grep, Glob
 	RiskMedium   RiskLevel = "medium"   // local write: Write, Edit
 	RiskHigh     RiskLevel = "high"     // network/shell: Bash, WebFetch, WebSearch
-	RiskCritical RiskLevel = "critical" // never allowed: rm -rf /, sudo bash, chmod 777 (same semantic as RiskBlocked)
-	RiskBlocked  RiskLevel = "blocked"  // legacy alias for RiskCritical — use RiskCritical in new code
+	RiskCritical RiskLevel = "critical" // never allowed: rm -rf /, sudo bash, chmod 777
 )
 
 // ApprovalMode controls the overall permission gating strategy.
@@ -26,7 +25,7 @@ const (
 type ApprovalMode string
 
 const (
-	// ApprovalYOLO auto-approves all tool calls except RiskCritical/Blocked.
+	// ApprovalYOLO auto-approves all tool calls except RiskCritical.
 	// The PermissionRequest hook returns PermAllow even for RiskHigh tools.
 	ApprovalYOLO ApprovalMode = "yolo"
 

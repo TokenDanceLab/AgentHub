@@ -76,8 +76,9 @@ const agent: AgentInfo = {
   status: 'available',
   capabilities: {
     streaming: true,
-    tools: true,
-    vision: false,
+    fileChanges: true,
+    thinkingVisible: true,
+    toolCalls: true,
     multiTurn: true,
     mcpIntegration: true,
     permissionHooks: true,
@@ -90,7 +91,7 @@ function renderCard() {
     <LocalAgentProfileCard
       agent={agent}
       edgeOnline
-      route={{ model: 'gpt-5.1-codex', provider: 'tokendance-gateway', reasoningEffort: 'medium' }}
+      route={{ model: 'gpt-5.1-codex', provider: 'tokendance-gateway', reasoningEffort: 'medium', modelMappingEnabled: true, providerFallbackEnabled: true }}
     />,
   );
 }

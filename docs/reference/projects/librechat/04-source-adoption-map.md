@@ -2,6 +2,8 @@
 
 > 分析日期: 2026-05-24 | 比较对象: LibreChat `reference/LibreChat/` vs AgentHub `app/` + `edge-server/`
 > 方法论: LibreChat 文件:行 → AgentHub 文件:行 → 具体代码差异 → P0/P1/P2 优先级
+>
+> **归档提示 (2026-06-17)**: 本文档撰写时引用的 `ChatView.types.ts` 已不存在。该文件已移入共享层并重命名为 `app/shared/src/chatview/transcript-item.ts`。本文档中对该文件的引用均已标注 `[archival: now transcript-item.ts]`。
 
 ---
 
@@ -104,9 +106,9 @@ function TreeNodeRow({ node, renderMessage, isLastSibling, ancestorConnectors })
 
 | LibreChat | AgentHub | 差异 |
 |-----------|----------|------|
-| `packages/data-provider/src/schemas.ts:635-750` — TMessage with Zod schema, 40+ fields | `app/desktop/src/components/ChatView.types.ts` — ChatMessage 接口 | AgentHub 没有 Zod schema 验证层；缺少 `children?: TMessage[]` 前端计算字段 |
+| `packages/data-provider/src/schemas.ts:635-750` — TMessage with Zod schema, 40+ fields | `app/shared/src/chatview/transcript-item.ts` [archival: was `app/desktop/src/components/ChatView.types.ts`] — ChatMessage 接口 | AgentHub 没有 Zod schema 验证层；缺少 `children?: TMessage[]` 前端计算字段 |
 
-AgentHub 的 ChatMessage 类型定义在 `ChatView.types.ts`（推断位置，由 `import type { ChatMessage } from './ChatView.types'` 引用）。类型定义比 LibreChat 精简，但缺少 runtime validation。
+AgentHub 的 ChatMessage 类型定义在 `app/shared/src/chatview/transcript-item.ts` [archival: 本文档撰写时位于 `app/desktop/src/components/ChatView.types.ts`，已删除并合并至此]。类型定义比 LibreChat 精简，但缺少 runtime validation。
 
 **P2 — 添加 Zod/Yup schema 验证**: AgentHub 的 Edge Server 用 Go 结构体定义消息模型，但桌面端 React 不验证 API 返回的消息形状。
 
@@ -787,7 +789,7 @@ LibreChat 在前端构建消息树（`buildTree` in data-provider），数据库
 | `app/desktop/src/components/SiblingSwitch.tsx` | 1-46 | 分支导航 ← N/M → |
 | `app/desktop/src/components/ThreadPanel.tsx` | 1-264 | 线程侧边栏 (rename/delete) |
 | `app/desktop/src/__tests__/tree.test.ts` | 1-116 | buildTree/flattenTree 单元测试 |
-| `app/desktop/src/components/ChatView.types.ts` | — | ChatMessage 类型定义 |
+| `app/shared/src/chatview/transcript-item.ts` [archival: was `app/desktop/src/components/ChatView.types.ts`] | — | ChatMessage 类型定义 |
 | `edge-server/internal/adapters/adapter.go` | 1-110 | AgentAdapter 接口 + 27 种 BusEvent |
 | `edge-server/internal/adapters/registry.go` | 1-92 | Registry (register/get/resolve/default) |
 | `edge-server/internal/adapters/orchestrator.go` | 1-102 | OrchestratorAdapter + DefaultOrchestratorPrompt |

@@ -1,9 +1,11 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { FilePreview } from './FilePreview';
 import type { FileItem } from './OverviewPanel';
 import { SlideshowPreview } from '../../ui/SlideshowPreview';
 import { TablePreview } from '../../ui/TablePreview';
 import { DocxPreview } from '../../ui/DocxPreview';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import styles from './FilePreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -131,8 +133,9 @@ function PdfPreview({ filename }: { filename: string }): React.ReactElement {
 }
 
 function HtmlPreview({ content }: { content: string }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <section className={styles.pane} aria-label="HTML 预览">
+    <section className={styles.pane} aria-label={t('aria.htmlPreview')}>
       <iframe
         title="HTML 预览"
         className={styles.nativeFrame}
@@ -158,8 +161,9 @@ function ImagePreview({ filename }: { filename: string }): React.ReactElement {
 }
 
 function TextPreview({ content }: { content: string }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <section className={styles.pane} aria-label="文本预览">
+    <section className={styles.pane} aria-label={t('aria.textPreview')}>
       <pre className={styles.code} tabIndex={0}>
         <code className={styles.codeInner}>{content}</code>
       </pre>

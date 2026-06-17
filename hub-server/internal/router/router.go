@@ -32,7 +32,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{
-				"code":    "NOT_FOUND",
+				"code":    "not_found",
 				"message": "route not found",
 			},
 		})
@@ -40,7 +40,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	r.NoMethod(func(c *gin.Context) {
 		c.JSON(http.StatusMethodNotAllowed, gin.H{
 			"error": gin.H{
-				"code":    "METHOD_NOT_ALLOWED",
+				"code":    "method_not_allowed",
 				"message": "method not allowed",
 			},
 		})

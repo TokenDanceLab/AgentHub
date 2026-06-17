@@ -75,6 +75,24 @@ async function waitForServer(url: string, maxRetries = 60, delayMs = 500): Promi
   throw new Error(`Server at ${url} did not become healthy within ${maxRetries * delayMs}ms`);
 }
 
+/**
+ * Unwraps the {@code {"code":"OK","data":...}} envelope used by Edge Server's
+ * writeSuccess helper, returning the inner data payload. Returns the raw
+ * input unchanged when no envelope is detected (backward compatibility).
+ */
+function unwrapEdgeResponse(raw: unknown): unknown {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    'code' in raw &&
+    'data' in raw &&
+    (raw as Record<string, unknown>).code === 'OK'
+  ) {
+    return (raw as Record<string, unknown>).data;
+  }
+  return raw;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Suite-level state
 // ═══════════════════════════════════════════════════════════════════
@@ -191,11 +209,11 @@ describeReal('Real Edge Server E2E', () => {
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toContain('application/json');
 
-      const body = await res.json();
+      const body = unwrapEdgeResponse(await res.json()) as Record<string, unknown>;
       expect(typeof body.status).toBe('string');
       expect(body.version).toBe('v1');
       expect(typeof body.edgeId).toBe('string');
-      expect(body.edgeId.length).toBeGreaterThan(0);
+      expect((body.edgeId as string).length).toBeGreaterThan(0);
 
       // Real server includes checks
       expect(body.checks).toBeDefined();
@@ -231,9 +249,8 @@ describeReal('Real Edge Server E2E', () => {
       const res = await fetch(`${BASE_URL}/v1/agents`);
       expect(res.status).toBe(200);
 
-      const body: ListResponse<AgentInfo> = await res.json();
+      const body = unwrapEdgeResponse(await res.json()) as ListResponse<AgentInfo>;
       expect(Array.isArray(body.items)).toBe(true);
-      expect(body.page).toBeDefined();
       expect(typeof body.page.hasMore).toBe('boolean');
 
       // Without --agent-default, the adapter registry may be empty.
@@ -368,13 +385,13 @@ describeReal('Real Edge Server E2E', () => {
       const res = await fetch(`${BASE_URL}/v1/runs`);
       expect(res.status).toBe(200);
 
-      const body = await res.json();
+      const body = unwrapEdgeResponse(await res.json()) as Record<string, unknown>;
       expect(Array.isArray(body.items)).toBe(true);
       expect(body.page).toBeDefined();
-      expect(typeof body.page.hasMore).toBe('boolean');
+      expect(typeof (body.page as Record<string, unknown>).hasMore).toBe('boolean');
 
-      if (body.items.length > 0) {
-        const run = body.items[0] as Record<string, unknown>;
+      if ((body.items as unknown[]).length > 0) {
+        const run = (body.items as Record<string, unknown>[])[0];
         expect(typeof run.runId).toBe('string');
         expect(typeof run.status).toBe('string');
       }
@@ -648,7 +665,13 @@ describeReal('Real Edge Server E2E', () => {
       requireServer();
       const res = await fetch(`${BASE_URL}/v1/health`);
       expect(res.ok).toBe(true);
-      const body = await res.json();
+      const raw = await res.json();
+
+      // The real client (edgeClient.fetchHealth) calls unwrapEdgeResponse
+      // which extracts the .data field from the unified {"code":"OK","data":{...}}
+      // envelope. The test mirrors this to verify the shape the client actually
+      // processes.
+      const body = raw?.code === 'OK' && raw?.data ? raw.data : raw;
 
       expect(body).toHaveProperty('status');
       expect(body).toHaveProperty('version');
@@ -669,11 +692,12 @@ describeReal('Real Edge Server E2E', () => {
       requireServer();
       const res = await fetch(`${BASE_URL}/v1/agents`);
       expect(res.ok).toBe(true);
-      const body = await res.json();
+      const raw = await res.json();
+      const body = unwrapEdgeResponse(raw) as Record<string, unknown>;
 
       expect(Array.isArray(body.items)).toBe(true);
       expect(body.page).toBeDefined();
-      expect(typeof body.page.hasMore).toBe('boolean');
+      expect(typeof (body.page as Record<string, unknown>).hasMore).toBe('boolean');
     });
 
     it('startRun returns executor_unavailable when no executor configured', async () => {

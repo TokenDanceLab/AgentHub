@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/hub"
 )
 
@@ -29,7 +30,7 @@ func TestCallbackClient_TaskAck(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 
@@ -64,7 +65,7 @@ func TestCallbackClient_TaskStream(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 
@@ -96,7 +97,7 @@ func TestCallbackClient_TaskDone(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 
@@ -134,7 +135,7 @@ func TestCallbackClient_TaskFail(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 
@@ -163,7 +164,7 @@ func TestCallbackClient_AuthHeader(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 
@@ -189,7 +190,7 @@ func TestCallbackClient_NoAuthToken(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 
@@ -220,7 +221,7 @@ func TestCallbackClient_RetryOnServerError(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 
@@ -370,7 +371,7 @@ func TestCallbackClient_TaskStreamReader(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": "OK"})
+		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
 	}))
 	defer srv.Close()
 

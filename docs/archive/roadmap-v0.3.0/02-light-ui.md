@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # 02 — 轻 UI 接线（复用现有组件）
 
 > 现有 @shared/ui 和 transcript 合同已能承载，改动在 normalize 层 + 渲染分支 + 少量 CSS。
