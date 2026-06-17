@@ -119,7 +119,7 @@ func TestFailHelper(t *testing.T) {
 
 		assert.True(t, c.IsAborted())
 		assert.Equal(t, http.StatusNotFound, w.Code)
-		assert.Contains(t, w.Body.String(), "SESSION_NOT_FOUND")
+		assert.Contains(t, w.Body.String(), "session_not_found")
 	})
 
 	t.Run("defaults to 500 when status is 0", func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestFailHelper(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request = httptest.NewRequest(http.MethodGet, "/api/test", nil)
 
-		e := errcode.New("CUSTOM", "some message", 0)
+		e := errcode.New("custom", "some message", 0)
 		fail(c, e)
 
 		assert.True(t, c.IsAborted())

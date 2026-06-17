@@ -149,7 +149,7 @@ func TestWorkspaceHandlerCreateSuccess(t *testing.T) {
 	require.Equal(t, "Demo", svc.createReq.Description)
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	require.Equal(t, "OK", body["code"])
+	require.Equal(t, "ok", body["code"])
 	require.NotNil(t, body["data"])
 }
 
@@ -214,7 +214,7 @@ func TestWorkspaceHandlerListEnvelopeAndQuery(t *testing.T) {
 		} `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	require.Equal(t, "OK", body.Code)
+	require.Equal(t, "ok", body.Code)
 	require.Len(t, body.Data.Items, 1)
 	require.True(t, body.Data.Page.HasMore)
 	require.Equal(t, "workspace-1", body.Data.Page.NextCursor)

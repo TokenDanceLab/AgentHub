@@ -66,7 +66,7 @@ func TestMarketHandlerGetMarketProfileRejectsPrivateProfiles(t *testing.T) {
 
 	require.Equal(t, 404, w.Code)
 	require.True(t, svc.getPublicCalled)
-	require.Contains(t, w.Body.String(), "AGENT_NOT_FOUND")
+	require.Contains(t, w.Body.String(), errcode.AgentNotFound.Code)
 }
 
 // ── New tests: Create, List, Update, Delete, Publish, Install ──────────────
@@ -275,7 +275,7 @@ func TestAgentProfileHandlerDeleteProfileNotFound(t *testing.T) {
 	h.DeleteProfile(c)
 
 	require.Equal(t, 404, w.Code)
-	require.Contains(t, w.Body.String(), "AGENT_NOT_FOUND")
+	require.Contains(t, w.Body.String(), errcode.AgentNotFound.Code)
 }
 
 func TestAgentProfileHandlerPublishProfileSuccess(t *testing.T) {
