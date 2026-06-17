@@ -82,6 +82,21 @@ function deployStatusNorm(s?: string): RowItem['status'] {
 }
 
 // ── Per-block mapper ──
+//
+// Status mapping convention:
+//   'running' — the block represents an in-flight / pending event (tool_call, thinking,
+//     deploy in progress, permission_request).  Completed blocks MUST never produce
+//     'running'.  For tool_call specifically, check the block's own `status` field and
+//     `evidenceRefs` — if either signals completion, map to 'ok'.
+//   'ok'     — the block is a finished / terminal event (completed tool_result,
+//     file_change, artifact, diff, route_decision, context_usage, attachment,
+//     non-thinking think, completed subagent, completed run_session, approval/permission
+//     result, completed deploy).
+//   'fail'   — the block signals an error (failure, failed tool_result, failed deploy,
+//     failed approval).
+//   'waiting' — the block is awaiting user input (permission_request).
+//   statusNorm() and deployStatusNorm() are the canonical mappers for EvidenceRefStatus
+//     → RowItem status; use them unless the block kind requires a different semantic.
 
 function mapBlock(b: TranscriptBlock): RowItem | null {
   switch (b.kind) {
@@ -98,10 +113,14 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
 
     case 'tool_call': {
       const t = b as ToolCallTranscriptBlock
+      // Tool call is a running event by nature, but a completed transcript
+      // may carry status:'completed' or evidenceRefs showing completion.
+      const hasCompletedEvidence = t.evidenceRefs?.some(ref => ref.status === 'completed')
+      const toolStatus = (t.status === 'completed' || hasCompletedEvidence) ? 'ok' : 'running'
       return {
         id: t.id, type: 'tool',
         label: t.toolName,
-        status: 'running',
+        status: toolStatus,
         collapsible: true,
         toolName: t.toolName.toLowerCase(),
         content: t.summary || t.target,
@@ -174,16 +193,20 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
     case 'approval':
     case 'permission_request':
     case 'permission_result': {
-      const a = b as ApprovalTranscriptBlock | PermissionResultTranscriptBlock
+      const a = b as ApprovalTranscriptBlock | PermissionRequestTranscriptBlock | PermissionResultTranscriptBlock
       const parts: string[] = []
       if (a.toolName) parts.push(a.toolName)
       if ('risk' in a && a.risk) parts.push(a.risk)
       const baseReason = 'reason' in a ? a.reason : (a as ApprovalTranscriptBlock).title
       if (baseReason) parts.push(baseReason)
+      // Permission requests are always waiting; others use statusNorm
+      const st = b.kind === 'permission_request'
+        ? 'waiting'
+        : statusNorm(a.status)
       return {
         id: a.id, type: 'approval',
         label: 'title' in a ? a.title : '',
-        status: statusNorm(a.status),
+        status: st,
         collapsible: true, standalone: true,
         apReason: parts.filter(Boolean).join(SEP),
       } as RowItem
