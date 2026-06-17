@@ -72,7 +72,7 @@ export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, 
     : iconOverride[toolKey(item)] || iconMap[item.type] || IconFileText
 
   const { key: labelKey, params: labelParams } = cardLabelKey(item)
-  const labelText = t(labelKey, labelParams)
+  const labelText = labelParams ? t(labelKey, labelParams) : t(labelKey)
   const resultClass = isToolResult(item) ? ' result-row' : ''
 
   const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}`

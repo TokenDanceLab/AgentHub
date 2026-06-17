@@ -5,6 +5,10 @@
 
 export const CHATVIEW_I18N_NAMESPACE = 'chatview'
 
+/** Union of all translatable keys in the chatview namespace */
+export type TransKey = keyof typeof chatviewResources.en
+export type Locale = 'zh' | 'en'
+
 // Flat key-value pairs per language (same keys as before, just repackaged)
 export const chatviewResources = {
   zh: {

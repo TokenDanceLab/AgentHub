@@ -1,45 +1,42 @@
 /* ═══════════════════════════════════════════════════════════════════════
    CHAT VIEW TRANSCRIPT — AgentHub integration wrapper
-   Wraps ChatView component tree with its own I18nProvider (coexists with
-   AgentHub's react-i18next via nested provider). Theme deferred to AgentHub.
+   Wraps ChatView component tree. Theme deferred to AgentHub.
+   Uses react-i18next with 'chatview' namespace (provided by AgentHub outer I18nextProvider).
    ══════════════════════════════════════════════════════════════════════ */
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Transcript from './Transcript'
-import { I18nProvider, useI18n } from '../i18n/I18nProvider'
+import { useTranslation } from 'react-i18next'
+import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { blocksToTranscriptItems, type TranscriptBlock } from '../adapter'
 
 // Load ChatView design tokens — scoped to .chatview, no :root pollution
 import '../design/tokens.css'
-import '../design/tokens-dark.css'
 
 interface Props {
   transcript: TranscriptBlock[]
 }
 
 function EmptyState() {
-  const { t } = useI18n()
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   return <div className="chatview-empty">{t('transcript.empty')}</div>
 }
 
 /**
  * Drop-in replacement for TranscriptView (subset of props).
  * Takes real AgentHub TranscriptBlock[] and renders via ChatView component tree.
- * Provides its own I18nProvider so ChatView's useI18n() resolves correctly.
+ * i18n resolved via react-i18next (chatview namespace), co-existing with AgentHub's root provider.
  */
 export function ChatViewTranscript({ transcript }: Props) {
-  const [locale, setLocale] = useState<'zh-CN' | 'en-US'>('zh-CN')
   const items = useMemo(() => blocksToTranscriptItems(transcript), [transcript])
 
   return (
     <div className="chatview">
-      <I18nProvider locale={locale} setLocale={setLocale}>
-        {items.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <Transcript items={items} chatMode="group" />
-        )}
-      </I18nProvider>
+      {items.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <Transcript items={items} chatMode="group" />
+      )}
     </div>
   )
 }
