@@ -1,6 +1,5 @@
-import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
-  buildComposerIntent,
   type ComposerMention,
   composerReducer,
   createInitialComposerState,
@@ -57,7 +56,7 @@ const SELECTION_HOLD_DELAY_MS = 520;
 const SELECTION_HOLD_CANCEL_DISTANCE = 36;
 const DEFAULT_BROWSER_PREVIEW_URL = '/demo-preview.html';
 
-const SIDEBAR_DEFAULT_WIDTH = 260;: LocalCliDiscoveryManifest = {
+const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
   mode: 'no-spend-discovery',
   readinessManifest: 'docs/audit/p0-edge-cli-real-readiness.md',
   readinessScript: 'scripts/verify-edge-cli-real-readiness.ps1',
@@ -290,7 +289,6 @@ export function AgentHubWorkbench({
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
-  const isSubmittingRef = useRef(false);
   const inspectorWidthRef = useRef(INSPECTOR_DEFAULT_WIDTH);
   const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
   const sidebarShouldCollapseRef = useRef(false);
@@ -307,28 +305,6 @@ export function AgentHubWorkbench({
     currentConversationId,
     createInitialComposerState,
   );
-  const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
-  /** Optimistic user message shown in transcript before the API confirms the run. */
-  const [pendingUserBlock, setPendingUserBlock] = useState<TextTranscriptBlock | null>(null);
-  const composerSubmitBehavior = useComposerSubmitBehavior();
-  const chatTranscript = useMemo(
-    () => transcript.filter((block) => !isSidebarOnlyTranscriptBlock(block)),
-    [transcript],
-  );
-  // Chat transcript with optimistic user message appended (for rendering only).
-  // Derived data (evidence, inspector blocks) continues to use the raw transcript.
-  const displayTranscript = useMemo(
-    () => pendingUserBlock ? [...chatTranscript, pendingUserBlock] : chatTranscript,
-    [chatTranscript, pendingUserBlock],
-  );
-  // Clear the optimistic block as soon as the real transcript gains new blocks
-  // (i.e. the API response has arrived and the query cache was updated).
-  useEffect(() => {
-    if (!pendingUserBlock) return;
-    if (transcript.some((block) => block.id === pendingUserBlock.id)) {
-      setPendingUserBlock(null);
-    }
-  }, [transcript, pendingUserBlock]);
   const evidence = collectTranscriptEvidence(transcript);
   const mainchainSummary = buildMainchainSummary({
     composerTargetLabel: composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label,
@@ -564,105 +540,6 @@ export function AgentHubWorkbench({
     window.addEventListener('resize', updateSelectBarRect);
     return () => window.removeEventListener('resize', updateSelectBarRect);
   }, [selectionMode, inspectorCollapsed, inspectorWidth]);
-
-  async function submitComposer(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    // Guard against double-submit race: two rapid Enter presses
-    if (isSubmittingRef.current) return;
-
-    // Read the textarea's current DOM value to avoid stale React state.
-    // When the user types and presses Enter quickly, React may not have
-    // re-rendered yet, so composer.text can be stale.
-    const form = event.currentTarget;
-    const textarea = form.querySelector<HTMLTextAreaElement>('textarea[aria-label="Composer input"]');
-    const liveText = textarea?.value ?? composer.text;
-
-    if (liveText.trim().length === 0 && composer.attachments.length === 0) return;
-
-    // Capture conversation ID to prevent thread-switch race:
-    // if the user switches threads during async operations, the intent
-    // must still target the original conversation.
-    const capturedConversationId = currentConversationId;
-
-    isSubmittingRef.current = true;
-    dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
-
-    try {
-      // Build intent and capture attachment state BEFORE resetting the composer.
-      const intent = buildComposerIntent(composer);
-      const intentWithLiveText = { ...intent, text: liveText.trim(), conversationId: capturedConversationId };
-      const capturedAttachments = composer.attachments;
-      const pendingAttachments = capturedAttachments.filter((a) => !a.attachmentRef && a.file);
-
-      // ── Optimistic UI: reset the composer immediately so the user can
-      // type the next message while uploads and the API call are in flight. ──
-      const optimisticId = `pending-user-${Date.now()}`;
-      setPendingUserBlock({
-        id: optimisticId,
-        kind: 'text',
-        text: liveText.trim(),
-        author: { id: 'user', name: 'You', role: 'human' as const },
-        createdAt: new Date().toISOString(),
-        ...(composer.replyTo ? { replyToMessageId: composer.replyTo.messageId, replyPreview: composer.replyTo.preview, replyAuthor: composer.replyTo.author } : {}),
-        ...(composer.quote ? { quote: composer.quote.text } : {}),
-      });
-
-      dispatchComposer({ type: 'resetAfterSubmit' });
-      dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
-      setUploadProgresses({});
-
-      // Upload attachments in background (composer is already cleared).
-      let enrichedAttachments = capturedAttachments;
-      if (pendingAttachments.length > 0 && platform.attachments?.uploadAttachment) {
-        const uploadPort = platform.attachments;
-        for (const attachment of pendingAttachments) {
-          if (!attachment.file) continue;
-          try {
-            setUploadProgresses((prev) => ({
-              ...prev,
-              [attachment.id]: { percent: 5, phase: 'hashing' },
-            }));
-            const ref = await uploadPort.uploadAttachment(attachment.file);
-            setUploadProgresses((prev) => ({
-              ...prev,
-              [attachment.id]: { percent: 100, phase: 'done' },
-            }));
-            enrichedAttachments = enrichedAttachments.map((a) =>
-              a.id === attachment.id ? { ...a, attachmentRef: ref } : a,
-            );
-          } catch {
-            setUploadProgresses((prev) => {
-              const next = { ...prev };
-              delete next[attachment.id];
-              return next;
-            });
-          }
-        }
-      }
-
-      const finalIntent = enrichedAttachments.length > 0
-        ? { ...intentWithLiveText, attachments: enrichedAttachments }
-        : intentWithLiveText;
-
-      const submitPayload = {
-        ...finalIntent,
-        ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}),
-      };
-
-      await platform.runs.submitComposerIntent(submitPayload);
-
-      setPendingUserBlock(null);
-      dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
-    } catch (err) {
-      setPendingUserBlock(null);
-      dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
-      setUploadProgresses({});
-      showWorkbenchToast(err instanceof Error ? err.message : '提交失败，请重试');
-    } finally {
-      isSubmittingRef.current = false;
-    }
-  }
 
   function clampInspectorWidth(value: number): number {
     return Math.min(INSPECTOR_MAX_WIDTH, Math.max(INSPECTOR_MIN_WIDTH, Math.round(value)));
@@ -979,15 +856,6 @@ export function AgentHubWorkbench({
   function handleDeploySubmit(_id: string): void {
     openInspector();
     showWorkbenchToast('已打开部署预览');
-  }
-
-  function handleSearchJump(messageId: string, _messageIndex?: number): void {
-    setSearchOpen(false);
-    setSearchHighlightId(messageId);
-  }
-
-  function handleSearchHighlightEnd(): void {
-    setSearchHighlightId(null);
   }
 
   function blockTitle(block: TranscriptBlock): string {
@@ -1463,73 +1331,48 @@ export function AgentHubWorkbench({
             <span className={styles.workspaceLoadingLabel}>正在连接 Edge 并加载数据...</span>
           </div>
         ) : isChatPage ? (
-          <>
-            <WorkspaceHeader
-              activeConversation={activeConversation}
-              dataMode={workbenchStatus?.dataMode}
-              inspectorCollapsed={inspectorCollapsed}
-              onToggleInspector={toggleInspector}
-              onOpenSearch={() => setSearchOpen(true)}
-            />
-            {showMainchainStatus ? (
-              <MainchainStatusStrip
-                summary={mainchainSummary}
-                onExportEvidence={exportMainchainEvidence}
-              />
-            ) : null}
-            <div className={styles.transcriptRegion}>
-              <ChatViewBridge
-                displayTranscript={displayTranscript}
-                activeConversation={activeConversation}
-                onAgentClick={openAgentProfile}
-                onBlockContextMenu={(blockId, event) => {
-                  const block = transcript.find((b) => b.id === blockId);
-                  if (block) openBlockContextMenu(block, event as unknown as TranscriptContextMenuEvent);
-                }}
-                onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey })}
-                onBlockAction={handleTranscriptBlockAction}
-                onReviewFile={openReviewFile}
-                onDeploySubmit={handleDeploySubmit}
-                selectedBlockIds={new Set(selectedBlockIds)}
-                selectionMode={selectionMode}
-                softHiddenBlockIds={new Set(softHiddenBlockIds)}
-                actionedBlockIds={new Set(actionedBlockIds)}
-                highlightedBlockId={searchHighlightId}
-                onHighlightEnd={handleSearchHighlightEnd}
-                connectionStatus={connectionStatus}
-                dismissedPinnedIds={dismissedPinnedIds}
-                onToast={showWorkbenchToast}
-              />
-            </div>
-            <MessageSearchPanel
-              open={searchOpen}
-              onClose={() => setSearchOpen(false)}
-              onJumpToMessage={handleSearchJump}
-              highlightMessageId={searchHighlightId}
-              onHighlightEnd={handleSearchHighlightEnd}
-              transcriptBlocks={displayTranscript}
-              searchLabel="搜索消息"
-              searchPlaceholder="搜索消息内容..."
-              noResultsLabel="未找到匹配的消息"
-            />
-            {!selectionMode && (
-              <UnifiedComposer
-                composer={composer}
-                dispatchComposer={dispatchComposer}
-                executionTargets={composerExecutionTargets}
-                executionTargetId={selectedExecutionTargetId}
-                inputRef={composerInputRef}
-                mentionableAgents={showComposerAgentPicker ? mentionableAgents : []}
-                onExecutionTargetChange={setSelectedExecutionTargetId}
-                onPickLocalAttachments={platform.attachments?.pickFiles}
-                onSubmit={submitComposer}
-                status={showComposerStatus ? workbenchStatus : undefined}
-                submitBehavior={composerSubmitBehavior}
-                targetLabel={activeConversation?.title ?? 'AgentHub'}
-                uploadProgresses={uploadProgresses}
-              />
-            )}
-          </>
+          <ConversationHost
+            transcript={transcript}
+            activeConversation={activeConversation}
+            connectionStatus={connectionStatus}
+            inspectorCollapsed={inspectorCollapsed}
+            onToggleInspector={toggleInspector}
+            showMainchainStatus={showMainchainStatus}
+            mainchainSummary={mainchainSummary}
+            onExportMainchainEvidence={exportMainchainEvidence}
+            workbenchStatus={workbenchStatus}
+            onAgentClick={openAgentProfile}
+            onBlockContextMenu={(blockId, event) => {
+              const block = transcript.find((b) => b.id === blockId);
+              if (block) openBlockContextMenu(block, event as unknown as TranscriptContextMenuEvent);
+            }}
+            onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey })}
+            onBlockAction={handleTranscriptBlockAction}
+            onReviewFile={openReviewFile}
+            onDeploySubmit={handleDeploySubmit}
+            selectedBlockIds={new Set(selectedBlockIds)}
+            selectionMode={selectionMode}
+            softHiddenBlockIds={new Set(softHiddenBlockIds)}
+            actionedBlockIds={new Set(actionedBlockIds)}
+            highlightedBlockId={highlightedBlockId}
+            onHighlightEnd={onHighlightEnd}
+            dismissedPinnedIds={dismissedPinnedIds}
+            onToast={showWorkbenchToast}
+            composerExecutionTargets={composerExecutionTargets}
+            selectedExecutionTargetId={selectedExecutionTargetId}
+            onExecutionTargetChange={setSelectedExecutionTargetId}
+            mentionableAgents={mentionableAgents}
+            showComposerAgentPicker={showComposerAgentPicker}
+            showComposerStatus={showComposerStatus}
+            composerTargetLabel={activeConversation?.title ?? 'AgentHub'}
+            currentConversationId={currentConversationId}
+            platform={platform}
+            composer={composer}
+            dispatchComposer={dispatchComposer}
+            composerInputRef={composerInputRef}
+            searchOpen={searchOpen}
+            onSearchOpenChange={setSearchOpen}
+          />
         ) : (
           <section aria-label="Workbench page" className={styles.workbenchPageHost}>
             <WorkbenchRoutes
@@ -1701,39 +1544,6 @@ export function AgentHubWorkbench({
       )}
       <Toast message={toastMessage} visible={toastVisible} />
     </div>
-  );
-}
-
-function MainchainStatusStrip({
-  onExportEvidence,
-  summary,
-}: {
-  onExportEvidence: () => void;
-  summary: MainchainSummary;
-}): React.ReactElement {
-  return (
-    <section className={styles.mainchainStrip} aria-label="Demo main chain status">
-      <div className={styles.mainchainTrack} role="list">
-        {summary.nodes.map((node) => (
-          <div className={styles.mainchainNode} data-state={node.state} key={node.id} role="listitem">
-            <span className={styles.mainchainDot} aria-hidden="true" />
-            <span className={styles.mainchainCopy}>
-              <strong>{node.label}</strong>
-              <em>{node.detail}</em>
-            </span>
-          </div>
-        ))}
-      </div>
-      <button
-        type="button"
-        className={styles.mainchainExport}
-        disabled={!summary.exportEnabled}
-        onClick={onExportEvidence}
-        title={summary.exportDetail}
-      >
-        {summary.exportLabel}
-      </button>
-    </section>
   );
 }
 

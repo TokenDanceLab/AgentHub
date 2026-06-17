@@ -3,14 +3,38 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ToolTimeline, type ToolTimelineBlock, type ToolTimelineLabels } from './ToolTimeline';
 
-vi.mock('@lobehub/icons', () => ({
-  ClaudeCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="claude-code-icon" />,
-  Codex: ({ size }: { size?: number }) => <span data-size={size} data-testid="codex-icon" />,
-  GeminiCLI: ({ size }: { size?: number }) => <span data-size={size} data-testid="gemini-cli-icon" />,
-  ModelIcon: ({ model, size }: { model: string; size?: number }) => <span data-model={model} data-size={size} data-testid="model-icon" />,
-  OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
-  ProviderIcon: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
-}));
+vi.mock('@lobehub/icons', () => {
+  const span = (props?: Record<string, unknown>) => React.createElement('span', props ?? {});
+  return {
+    Alibaba: span,
+    AlibabaCloud: span,
+    Anthropic: span,
+    Azure: span,
+    Aws: span,
+    Bedrock: span,
+    ByteDance: span,
+    Claude: span,
+    ClaudeCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="claude-code-icon" />,
+    Cohere: span,
+    Codex: ({ size }: { size?: number }) => <span data-size={size} data-testid="codex-icon" />,
+    DeepSeek: span,
+    Doubao: span,
+    Gemini: span,
+    GeminiCLI: ({ size }: { size?: number }) => <span data-size={size} data-testid="gemini-cli-icon" />,
+    Google: span,
+    Meta: span,
+    Mistral: span,
+    ModelIcon: ({ model, size }: { model: string; size?: number }) => <span data-model={model} data-size={size} data-testid="model-icon" />,
+    Moonshot: span,
+    OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
+    OpenAI: span,
+    Perplexity: span,
+    ProviderIcon: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
+    Qwen: span,
+    Volcengine: span,
+    Zhipu: span,
+  };
+});
 
 describe('ToolTimeline', () => {
   it('returns null when fewer than 2 entries', () => {
