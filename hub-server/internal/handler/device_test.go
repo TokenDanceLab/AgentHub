@@ -50,7 +50,7 @@ func TestDeviceHandler_Register_Success(t *testing.T) {
 	}
 	var resp handler.Response
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	if resp.Code != "OK" {
+	if resp.Code != "ok" {
 		t.Fatalf("expected OK, got %s", resp.Code)
 	}
 	data, err := json.Marshal(resp.Data)

@@ -84,7 +84,7 @@ func TestDeviceTypeCheck(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedAbort {
-				assert.Contains(t, w.Body.String(), "AUTH_DEVICE_MISMATCH")
+				assert.Contains(t, w.Body.String(), "auth_device_mismatch")
 			}
 		})
 	}
