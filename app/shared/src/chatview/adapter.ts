@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   ADAPTER — AgentHub TranscriptBlock[] → ChatView TranscriptItem[]
-   Uses REAL AgentHub types from shared/transcript. Zero mock types.
+   ADAPTER — TranscriptBlock[] → ChatView TranscriptItem[]
+   Converts upstream TranscriptBlock types into generic ChatView items.
    ══════════════════════════════════════════════════════════════════════ */
 
 import type {
@@ -9,6 +9,7 @@ import type {
   ToolCallTranscriptBlock, ToolResultTranscriptBlock,
   FileChangeTranscriptBlock, ArtifactTranscriptBlock,
   DiffTranscriptBlock, ApprovalTranscriptBlock,
+  PermissionRequestTranscriptBlock, PermissionResultTranscriptBlock,
   RunSessionTranscriptBlock, SubagentTranscriptBlock,
   RouteDecisionTranscriptBlock, ContextUsageTranscriptBlock,
   DeployTranscriptBlock, AttachmentTranscriptBlock,
@@ -18,7 +19,8 @@ import type {
   ChildAgentTranscriptBlock, SubtaskTranscriptBlock,
   EvidenceRefStatus,
 } from '../transcript/types'
-import type { RowItem } from './data/mock'
+import type { RowItem } from './types'
+import type { TranscriptItem, TranscriptUserItem, TranscriptAgentItem } from './transcript-item'
 
 // Re-export for consumers
 export type { TranscriptBlock }
@@ -44,7 +46,7 @@ function pickDisplay(b: Record<string, unknown>): Record<string, unknown> {
   return out
 }
 
-function newAgentBlock(author: TranscriptBlock['author'], role: string, createdAt?: string): AgentTranscriptBlock {
+function newAgentBlock(author: TranscriptBlock['author'], role: string, createdAt?: string): TranscriptAgentItem {
   return {
     id: author.id,
     agent: author.name || 'Agent',
@@ -70,11 +72,19 @@ function statusNorm(s: EvidenceRefStatus | string): RowItem['status'] {
   return 'ok'
 }
 
+/** Deploy status mapper — handles deploy-specific status values */
+function deployStatusNorm(s?: string): RowItem['status'] {
+  if (!s) return 'ok'
+  if (s === 'failed') return 'fail'
+  if (s === 'pending' || s === 'deploying') return 'running'
+  if (s === 'ready' || s === 'deployed') return 'ok'
+  return 'ok'
+}
+
 // ── Per-block mapper ──
 
 function mapBlock(b: TranscriptBlock): RowItem | null {
   switch (b.kind) {
-    // ── Thinking ──
     case 'thinking': {
       const t = b as ThinkingTranscriptBlock
       return {
@@ -86,7 +96,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Tool call (running) ──
     case 'tool_call': {
       const t = b as ToolCallTranscriptBlock
       return {
@@ -100,7 +109,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Tool result ──
     case 'tool_result': {
       const t = b as ToolResultTranscriptBlock
       return {
@@ -114,7 +122,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── File change ──
     case 'file_change': {
       const t = b as FileChangeTranscriptBlock
       return {
@@ -129,7 +136,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Artifact ──
     case 'artifact': {
       const a = b as ArtifactTranscriptBlock
       const extraParts = [a.path || a.title]
@@ -147,7 +153,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Diff ──
     case 'diff': {
       const d = b as DiffTranscriptBlock
       const ext = d.files?.[0]?.split('.').pop()?.toUpperCase() || ''
@@ -166,32 +171,30 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Approval ──
     case 'approval':
     case 'permission_request':
     case 'permission_result': {
-      const a = b as ApprovalTranscriptBlock
+      const a = b as ApprovalTranscriptBlock | PermissionResultTranscriptBlock
       const parts: string[] = []
       if (a.toolName) parts.push(a.toolName)
-      if (a.risk) parts.push(a.risk)
-      const baseReason = a.reason || a.title
-      parts.push(baseReason)
+      if ('risk' in a && a.risk) parts.push(a.risk)
+      const baseReason = 'reason' in a ? a.reason : (a as ApprovalTranscriptBlock).title
+      if (baseReason) parts.push(baseReason)
       return {
         id: a.id, type: 'approval',
-        label: a.title,
-        status: a.status === 'completed' ? 'ok' : 'waiting',
+        label: 'title' in a ? a.title : '',
+        status: statusNorm(a.status),
         collapsible: true, standalone: true,
         apReason: parts.filter(Boolean).join(SEP),
       } as RowItem
     }
 
-    // ── Run session ──
     case 'run_session': {
       const r = b as RunSessionTranscriptBlock
       return {
         id: r.id, type: 'session',
         label: r.title,
-        status: 'ok',
+        status: statusNorm(r.status || 'completed'),
         collapsible: true, standalone: true,
         sessionTags: [
           r.agentLabel ? `Agent: ${r.agentLabel}` : '',
@@ -201,7 +204,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Sub-agent / subtask / child_agent ──
     case 'subagent':
     case 'subtask':
     case 'child_agent': {
@@ -216,7 +218,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Route decision ──
     case 'route_decision': {
       const r = b as RouteDecisionTranscriptBlock
       return {
@@ -228,7 +229,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Context usage ──
     case 'context_usage': {
       const c = b as ContextUsageTranscriptBlock
       return {
@@ -248,7 +248,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Deploy ──
     case 'deploy': {
       const d = b as DeployTranscriptBlock
       const metaParts: string[] = []
@@ -259,14 +258,13 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       return {
         id: d.id, type: 'deploy',
         label: '',
-        status: statusNorm(d.status || 'completed'),
+        status: deployStatusNorm(d.status),
         collapsible: true, standalone: true,
         url: d.url,
         deployMeta: metaParts.length > 0 ? metaParts.join(SEP) : 'Deployed',
       } as RowItem
     }
 
-    // ── Attachment ──
     case 'attachment': {
       const a = b as AttachmentTranscriptBlock
       return {
@@ -280,7 +278,6 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── Failure → error card ──
     case 'failure': {
       const f = b as FailureTranscriptBlock
       return {
@@ -292,11 +289,10 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       } as RowItem
     }
 
-    // ── System-only → skipped ──
     case 'result':
     case 'finished':
     case 'replay_gap':
-    case 'preview':       // browser preview — not rendered in ChatView cards
+    case 'preview':
     case 'agent_timeline':
     case 'run_step_group':
       return null
@@ -307,27 +303,14 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
 }
 
 // ── TranscriptBlock[] → TranscriptItem[] ──
+// Re-export the generic types (backward-compat aliases)
+export type { TranscriptItem as ChatViewTranscriptItem }
+export type { TranscriptAgentItem as AgentTranscriptBlock }
+export type { TranscriptUserItem as UserTranscriptMsg }
 
-export interface AgentTranscriptBlock {
-  id: string; agent: string; role: string; time: string
-  rows: RowItem[]; bubbles: string[]; standaloneRows: RowItem[]
-  runs: never[]
-  groupId?: string
-  displayTitle?: string
-  badgeLabel?: string
-  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
-}
-export interface UserTranscriptMsg {
-  type: 'user'; name?: string; time?: string; text: string
-  displayTitle?: string
-  badgeLabel?: string
-  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
-}
-export type ChatViewTranscriptItem = UserTranscriptMsg | AgentTranscriptBlock
-
-export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTranscriptItem[] {
-  const items: ChatViewTranscriptItem[] = []
-  let currentAgent: AgentTranscriptBlock | null = null
+export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptItem[] {
+  const items: TranscriptItem[] = []
+  let currentAgent: TranscriptAgentItem | null = null
 
   let _seq = 0
   for (const block of blocks) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { RowItem as RowItemType } from '../data/mock'
+import type { RowItem as RowItemType } from '../types'
 import {
   IconBrain, IconFileText, IconSearch, IconFile, IconEdit,
   IconShield, IconArrowForward, IconSubtask, IconPlayerPlay, IconChevronDown,
