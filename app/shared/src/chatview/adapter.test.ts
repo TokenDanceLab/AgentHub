@@ -21,7 +21,7 @@ describe('blocksToTranscriptItems', () => {
 
   it('converts user text to TranscriptUserItem', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('ding'), text: 'hello' },
+      { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('alice'), text: 'hello' },
     ]
     const items = blocksToTranscriptItems(blocks)
     expect(items).toHaveLength(1)
@@ -137,9 +137,9 @@ describe('blocksToTranscriptItems', () => {
 
   it('handles user message between agent blocks', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('ding'), text: 'do X' },
+      { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('alice'), text: 'do X' },
       { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'ok', isThinking: true },
-      { id: 'u2', kind: 'text', createdAt: makeTime(2), author: makeUser('ding'), text: 'also do Y' },
+      { id: 'u2', kind: 'text', createdAt: makeTime(2), author: makeUser('alice'), text: 'also do Y' },
       { id: 'tc1', kind: 'tool_call', createdAt: makeTime(3), author: makeAuthor('b1'), toolName: 'Write', status: 'running' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
@@ -1248,7 +1248,7 @@ describe('blocksToTranscriptItems', () => {
 
   it('handles user text block with missing createdAt without crash', () => {
     const blocks: TranscriptBlock[] = [
-      { id: 'u1', kind: 'text', author: makeUser('ding'), text: 'no time' },
+      { id: 'u1', kind: 'text', author: makeUser('alice'), text: 'no time' },
     ] as TranscriptBlock[]
     expect(() => blocksToTranscriptItems(blocks)).not.toThrow()
     const items = blocksToTranscriptItems(blocks)
