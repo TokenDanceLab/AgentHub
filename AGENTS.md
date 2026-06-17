@@ -299,11 +299,11 @@ feat/* → dev/delicious223 → master
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
-- `master` 目前滞后于 `dev/delicious233`（差距较大），始终从 `dev/delicious233` 开始工作。
+- `master` 目前滞后于 `dev/delicious223`（差距较大），始终从 `dev/delicious223` 开始工作。
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
-- `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
+- `feat/*` 合并前需要 rebase 到最新 `dev/delicious223`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
-- Trump、Johnny 和旧 Web parity 残留内容不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
+- Trump、Johnny 和旧 Web parity 残留内容不合并到 `dev/delicious223`，除非先单独审查并拆成可验证的小 patch。
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
