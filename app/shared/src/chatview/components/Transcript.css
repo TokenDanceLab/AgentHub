@@ -4,6 +4,15 @@
 
 .transcript { display:flex; flex-direction:column; gap:0; min-width:0; flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth; scrollbar-gutter:stable; scrollbar-width:thin; padding:0 0 0 10px }
 
+/* ── Date divider ─────────────────────────────────────────────────── */
+.date-divider {
+  text-align: center;
+  font: 400 0.625rem var(--font-sans);
+  color: var(--text-3);
+  padding: var(--sp-sm) 0;
+  align-self: center;
+}
+
 /* ── Empty state ──────────────────────────────────────────────────── */
 .chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--text-3); font:var(--body) }
 
