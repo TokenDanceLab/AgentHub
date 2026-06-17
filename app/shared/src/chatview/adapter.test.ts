@@ -149,7 +149,7 @@ describe('blocksToTranscriptItems', () => {
     const items = blocksToTranscriptItems(blocks)
     const rows = (items[0] as AgentTranscriptBlock).rows
     expect(rows).toHaveLength(1)
-    expect(rows![0]!.type).toBe('tool')
+    expect(rows![0]!.type).toBe('sub')
   })
 
   it('handles user message between agent blocks', () => {
