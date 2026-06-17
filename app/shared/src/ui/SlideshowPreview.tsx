@@ -61,7 +61,8 @@ async function getJSZip(): Promise<typeof import('jszip')> {
 }
 
 async function parsePptx(arrayBuffer: ArrayBuffer): Promise<SlideData[]> {
-  const JSZip = await getJSZip();
+  const JSZipModule = await getJSZip();
+  const JSZip = JSZipModule.default ?? JSZipModule;
   const zip = await JSZip.loadAsync(arrayBuffer);
 
   /* Find slide files: ppt/slides/slide1.xml, slide2.xml, etc. */

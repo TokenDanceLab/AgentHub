@@ -4,6 +4,8 @@
 > 源码：`reference/opencode/`（MIT 协议，164K+ stars）
 > 版本：v1.15.10
 > 技术栈：Electron 41 + SolidJS + Effect-TS + Vite + Tailwind + Kobalte UI
+>
+> **【归档说明】2026-06-17**：`app/desktop/src/components/ChatView.tsx` 已删除，ChatView 重构迁移至 `app/shared/src/chatview/components/ChatViewTranscript.tsx`。本文档中所有旧路径引用已更新。
 
 ---
 

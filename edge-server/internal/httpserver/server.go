@@ -609,11 +609,18 @@ func edgeConfigDumper(cfg Config) debugpkg.ConfigDumper {
 			"dev":                 cfg.Dev,
 			"workspace_allowlist": cfg.WorkspaceAllowlist,
 			"hub_url":             cfg.HubURL,
-			"local_auth_token":    cfg.LocalAuthToken,
-			"hub_jwt_secret":      cfg.HubJWTSecret,
-			"hub_token":           cfg.HubToken,
+			"local_auth_token":    redactSecret(cfg.LocalAuthToken),
+			"hub_jwt_secret":      redactSecret(cfg.HubJWTSecret),
+			"hub_token":           redactSecret(cfg.HubToken),
 		}
 	}
+}
+
+func redactSecret(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	return "[REDACTED]"
 }
 
 func edgeStateDumper(h *api.Handler) debugpkg.StateDumper {

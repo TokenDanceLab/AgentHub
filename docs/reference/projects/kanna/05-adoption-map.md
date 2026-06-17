@@ -4,6 +4,8 @@
 > Reference: `D:\Code\AgentHub\reference\kanna\src\server\`
 > Target: `D:\Code\AgentHub\edge-server\internal\adapters\` + `D:\Code\AgentHub\app\desktop\src\`
 > Focus: Multi-agent concurrency patterns for AgentHub M3b group-chat support
+> 
+> **ARCHIVED REFERENCE -- written against pre-migration ChatView (retired). Current ChatViewTranscript at `app/shared/src/chatview/components/`.**
 
 ---
 
@@ -259,9 +261,9 @@ Kanna's frontend is single-agent: one chat = one agent's stream. The `ChatPage` 
 
 ### 5.2 AgentHub Current State
 
-**Source**: `app\desktop\src\components\ChatView.tsx:297-406`
+**Source**: `app\desktop\src\components\ChatView.tsx:297-406` *(ARCHIVED -- see ChatViewTranscript at `app/shared/src/chatview/components/`)*
 
-AgentHub's ChatView renders messages as a flat list with `isStreaming` flag:
+AgentHub's pre-migration ChatView rendered messages as a flat list with `isStreaming` flag:
 ```typescript
 // ChatView.tsx:321-324
 const lastMsg = messages[messages.length - 1];

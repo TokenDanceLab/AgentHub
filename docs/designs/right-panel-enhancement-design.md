@@ -1,5 +1,7 @@
 # AgentHub 右侧检视面板增强设计
 
+> **IMPLEMENTED -- 14/14 items completed as of 2026-06-11 (per STATE.md). This doc retained for design rationale reference only.**
+
 > 2026-06-10 · 设计原则：**不动主聊天流，只增强右侧侧栏**
 
 ---

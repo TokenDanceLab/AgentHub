@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 type authCache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error
+	IsRefreshTokenBlacklisted(ctx context.Context, key string) (bool, error)
 }
 
 // LoginResponse is returned to clients after successful authentication.
@@ -52,6 +54,25 @@ func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) 
 		return nil, errcode.AuthRefreshInvalid
 	}
 
+	// Check Redis blacklist: the token hash itself (set during rotation),
+	// the per-user-device key (set during logout without device_type), and
+	// the per-user-device-type key (set during logout with device_type).
+	// Any hit means the token was revoked through Redis before the DB
+	// commit completed, closing the race window.
+	if blacklisted, _ := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, tokenHash); blacklisted {
+		return nil, errcode.AuthRefreshInvalid
+	}
+	deviceKey := rt.UserID + ":" + rt.DeviceID
+	if blacklisted, _ := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, deviceKey); blacklisted {
+		return nil, errcode.AuthRefreshInvalid
+	}
+	if rt.DeviceType != "" {
+		deviceTypeKey := rt.UserID + ":" + rt.DeviceID + ":" + rt.DeviceType
+		if blacklisted, _ := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, deviceTypeKey); blacklisted {
+			return nil, errcode.AuthRefreshInvalid
+		}
+	}
+
 	// Rotate: revoke the old refresh token.
 	if err := repository.RevokeRefreshTokensByUserDevice(s.db, rt.UserID, rt.DeviceID); err != nil {
 		return nil, err
@@ -60,7 +81,9 @@ func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) 
 	// Blacklist the old token hash in Redis for the remaining TTL (#134).
 	remainingTTL := time.Until(rt.ExpiresAt)
 	if remainingTTL > 0 {
-		_ = resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, tokenHash, remainingTTL)
+		if err := resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, tokenHash, remainingTTL); err != nil {
+			slog.Warn("refresh token: failed to blacklist in Redis, fallback to DB-only", "error", err)
+		}
 	}
 
 	// Issue a new access token.
@@ -106,7 +129,9 @@ func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType s
 	if deviceType != "" {
 		blacklistKey = userID + ":" + deviceID + ":" + deviceType
 	}
-	_ = resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, blacklistKey, s.jwtCfg.RefreshTTL)
+	if err := resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, blacklistKey, s.jwtCfg.RefreshTTL); err != nil {
+		slog.Warn("logout: failed to blacklist in Redis, fallback to DB-only revocation", "key", blacklistKey, "error", err)
+	}
 
 	// Also revoke in the database (source of truth).
 	// Idempotent: skip when userID or deviceID is empty so that callers
