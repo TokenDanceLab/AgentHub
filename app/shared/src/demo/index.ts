@@ -32,7 +32,6 @@ export {
   createWorkbenchDemoRuntimeStore,
   demoWorkbenchAgents,
   demoWorkbenchPins,
-  demoWorkbenchTranscripts,
   projectGroupMessageLoopHubMessages,
   projectGroupMessageLoopTranscript,
   resolveDemoWorkbenchTranscript,
