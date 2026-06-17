@@ -409,27 +409,3 @@ html[data-theme-sync='true'] *::after {
   --elevated-card-shadow-strong: 0 10px 26px var(--glass-shadow-subtle);
 }
 
-/* ── Glass utility classes ───────────────────────────────────────────── */
-[data-theme='light'] .glass-panel {
-  background: rgba(255,255,255,0.72);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-[data-theme='light'] .glass-sidebar {
-  background: rgba(246,246,247,0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-[data-theme='dark'] .glass-panel {
-  background: rgba(36,36,45,0.45);
-  backdrop-filter: blur(40px) saturate(1.2);
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
-}
-
-[data-theme='dark'] .glass-sidebar {
-  background: rgba(30,30,38,0.55);
-  backdrop-filter: blur(40px) saturate(1.2);
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
-}

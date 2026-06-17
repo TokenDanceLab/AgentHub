@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Competitor Analysis: Web Agent UIs (ClaudeCodeUI + Kanna)
 
 > Researcher 3: Web UIs purpose-built for CLI agent interaction, operating as a visual layer on top of headless agent CLIs.

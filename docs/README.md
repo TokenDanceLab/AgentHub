@@ -29,10 +29,10 @@ docs/
 ├── adr/                               ← 架构决策记录（11 篇）
 ├── designs/                           ← 进行中设计文档
 ├── governance/                        ← 治理：分支规范、文档标准、安全风险、威胁模型
-├── archive/                           ← 历史归档（roadmap-v0.3.0）
+├── archive/                           ← 历史归档（roadmap-v0.3.0、竞品研究、已完成的参考项目调研）
 ├── images/                            ← 截图与图片资源
 ├── release/                           ← 发布清单
-└── reference/                         ← 技术参考 + 竞品调研
+└── reference/                         ← 技术参考 + cc-switch 集成 + 活跃项目调研
 ```
 
 ## 按需查阅
@@ -43,7 +43,7 @@ docs/
 | 右侧面板功能设计 | [designs/right-panel-enhancement-design.md](designs/right-panel-enhancement-design.md) |
 | Artifact 生命周期 | [designs/artifact-lifecycle-plan.md](designs/artifact-lifecycle-plan.md) |
 | Adapter 架构 | [designs/enhanced-adapter-architecture.md](designs/enhanced-adapter-architecture.md) |
-| 竞品分析 | [reference/competitive-analysis.md](reference/competitive-analysis.md) |
+| 竞品分析（已归档） | [archive/competitor-research/](archive/competitor-research/) — 历史研究 |
 | cc-switch 集成 | [reference/cc-switch-integration-design.md](reference/cc-switch-integration-design.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
 | 分支规则 | [governance/branch-governance.md](governance/branch-governance.md) |

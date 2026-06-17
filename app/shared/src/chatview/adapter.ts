@@ -492,18 +492,31 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
     if (block.kind === 'run_step_group') {
       const g = block as RunStepGroupTranscriptBlock
       if (g.children && Array.isArray(g.children)) {
+        const childRows: RowItem[] = []
         for (const child of g.children) {
           const childRow = mapBlock({ ...child, author: block.author })
           if (!childRow) continue
-          if (!currentAgent || currentAgent.groupId !== groupId) {
-            if (currentAgent) items.push(currentAgent)
-            currentAgent = newAgentBlock(block.author, role, block.createdAt)
-            ;(currentAgent as any).groupId = groupId
-            const refs = mapEvidenceRefs(block)
-            if (refs) currentAgent.evidenceRefs = refs
-          }
-          currentAgent.rows.push(childRow)
+          childRows.push(childRow)
         }
+        if (!currentAgent || currentAgent.groupId !== groupId) {
+          if (currentAgent) items.push(currentAgent)
+          currentAgent = newAgentBlock(block.author, role, block.createdAt)
+          ;(currentAgent as any).groupId = groupId
+          const refs = mapEvidenceRefs(block)
+          if (refs) currentAgent.evidenceRefs = refs
+        }
+        // Create a parent row that wraps the children in a collapsible group
+        const groupRow: RowItem = {
+          id: g.id,
+          type: 'sub',
+          label: g.title,
+          status: g.status === 'completed' ? 'ok' : g.status === 'failed' ? 'fail' : 'running',
+          collapsible: true,
+          open: g.open ?? false,
+          children: childRows,
+          extra: g.meta,
+        }
+        currentAgent.rows.push(groupRow)
       }
       continue
     }
