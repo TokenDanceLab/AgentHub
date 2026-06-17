@@ -1,10 +1,11 @@
+import { memo } from 'react'
 import type { TranscriptUserItem } from '../transcript-item'
 import { useTranslation } from 'react-i18next'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 
 interface Props { item: TranscriptUserItem; chatMode: 'dm' | 'group' }
 
-export default function UserMessage({ item, chatMode }: Props) {
+export default memo(function UserMessage({ item, chatMode }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
 
   if (chatMode === 'dm') {
@@ -32,4 +33,4 @@ export default function UserMessage({ item, chatMode }: Props) {
       <div className="dm-avatar"><div className="ag-av user-av">D</div></div>
     </div>
   )
-}
+})

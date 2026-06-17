@@ -12,6 +12,14 @@ const EDGE_TOKEN_PATH = path.join(
 
 function readEdgeTokenFile(): string {
   try {
+    const stat = fs.statSync(EDGE_TOKEN_PATH);
+    if (stat.size > 4096) {
+      console.warn(
+        `Edge auth token file at ${EDGE_TOKEN_PATH} is ${stat.size} bytes (max 4096). ` +
+        'Refusing to read oversized file — possible misconfiguration or log dump.',
+      );
+      return '';
+    }
     return fs.readFileSync(EDGE_TOKEN_PATH, 'utf-8').trim();
   } catch {
     return '';

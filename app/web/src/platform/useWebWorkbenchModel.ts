@@ -1140,10 +1140,35 @@ export function mergeHubRuntimeEvents(
 }
 
 function hubRuntimeEventKey(event: HubRuntimeEventTranscriptInput): string {
-  return event.id ?? [
+  const identityKey = event.id ?? [
     event.task_id,
     event.edge_run_id,
     event.event_seq,
     event.event_type,
   ].filter((part) => part != null && String(part).trim()).join(':');
+
+  // Content-based dedup: include a hash of the payload to catch duplicate
+  // events that arrive with different IDs but identical content (common
+  // with WebSocket reconnection replays or hub edge replay overlap).
+  const payloadHash = event.payload != null ? hashPayload(event.payload) : '';
+  return payloadHash ? `${identityKey}|${payloadHash}` : identityKey;
+}
+
+function hashPayload(payload: unknown): string {
+  if (typeof payload === 'string') return hashString(payload);
+  if (typeof payload === 'object' && payload !== null) {
+    // Sort keys for deterministic hashing
+    return hashString(JSON.stringify(payload, Object.keys(payload as Record<string, unknown>).sort()));
+  }
+  return hashString(JSON.stringify(payload));
+}
+
+function hashString(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    const char = value.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
 }

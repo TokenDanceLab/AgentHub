@@ -4,7 +4,7 @@
 // The hook operates in two phases:
 //  1. PreToolUse: classify tool risk + scan Bash/WebFetch input for
 //     blocked patterns (rm -rf /, curl|bash, sudo, chmod 777, >/dev/sda).
-//  2. PermissionRequest: deny RiskBlocked operations unconditionally.
+//  2. PermissionRequest: deny RiskCritical operations unconditionally.
 package adapters
 
 import (
@@ -20,7 +20,7 @@ import (
 // It implements AgentHook and integrates into the NDJSONStreamParser hook chain.
 type SecurityHook struct {
 	// Mode determines how PermissionRequest gates tool calls:
-	//   YOLO  — auto-approve all except RiskCritical/Blocked
+	//   YOLO  — auto-approve all except RiskCritical
 	//   Auto  — Low/Medium auto, High requires user confirmation (default)
 	//   Manual — all non-blocked tools require user confirmation
 	Mode ApprovalMode
@@ -32,7 +32,7 @@ type SecurityHook struct {
 	// The inspector can return:
 	//   - RiskLow/Medium for well-known safe skills (e.g. pdf, xlsx)
 	//   - RiskHigh for skills that execute code or access network
-	//   - RiskBlocked for forbidden skills
+	//   - RiskCritical for forbidden skills
 	SkillInspector func(skillName string) RiskLevel
 }
 
@@ -76,17 +76,17 @@ func NewSecurityHookWithSkillInspector(mode ApprovalMode, inspector SkillInspect
 //
 // Bash and WebFetch inputs are scanned for blocked patterns (see
 // dangerousPatternsRE). If a blocked pattern is detected the tool is
-// elevated to RiskBlocked and PreToolUse returns block=true.
+// elevated to RiskCritical and PreToolUse returns block=true.
 func (h *SecurityHook) PreToolUse(_ context.Context, toolName string, input map[string]any) (map[string]any, bool, string) {
 	risk := h.classifyRisk(toolName, input)
-	if risk == RiskBlocked {
+	if risk == RiskCritical {
 		cmd := extractCommand(input)
 		return input, true, "blocked: dangerous shell pattern — " + truncate(cmd, 80)
 	}
 	return input, false, ""
 }
 
-// PermissionRequest denies RiskBlocked operations without user recourse.
+// PermissionRequest denies RiskCritical operations without user recourse.
 // RiskHigh tools are gated based on the configured ApprovalMode:
 //
 //	YOLO        → PermAllow     (skip prompt)
@@ -96,7 +96,7 @@ func (h *SecurityHook) PreToolUse(_ context.Context, toolName string, input map[
 // Manual mode requires user confirmation for every non-blocked level.
 func (h *SecurityHook) PermissionRequest(_ context.Context, toolName string, risk RiskLevel) PermDecision {
 	switch risk {
-	case RiskBlocked, RiskCritical:
+	case RiskCritical:
 		return PermDeny
 	case RiskHigh:
 		switch h.Mode {
@@ -141,7 +141,7 @@ func (h *SecurityHook) PostResponse(_ context.Context, response string) string {
 
 // ClassifyRisk maps a tool name to its risk level. For Bash and WebFetch
 // the input is scanned for blocked patterns that escalate the risk to
-// RiskBlocked. This is the full classification (with input scanning);
+// RiskCritical. This is the full classification (with input scanning);
 // use adapters.ClassifyToolRisk for a cheaper name-only classification.
 func (h *SecurityHook) ClassifyRisk(toolName string, input map[string]any) RiskLevel {
 	return h.classifyRisk(toolName, input)
@@ -149,7 +149,7 @@ func (h *SecurityHook) ClassifyRisk(toolName string, input map[string]any) RiskL
 
 // classifyRisk maps a tool name to its risk level. For Bash and WebFetch
 // the input is scanned for blocked patterns that escalate the risk to
-// RiskBlocked. For Skill, the optional SkillInspector callback is consulted.
+// RiskCritical. For Skill, the optional SkillInspector callback is consulted.
 //
 // Tool taxonomy:
 //
@@ -166,7 +166,7 @@ func (h *SecurityHook) classifyRisk(toolName string, input map[string]any) RiskL
 	case "Bash", "WebFetch", "WebSearch":
 		cmd := extractCommand(input)
 		if h.containsDangerousPattern(cmd) {
-			return RiskBlocked
+			return RiskCritical
 		}
 		return RiskHigh
 	case "Skill":

@@ -4,6 +4,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import type { RowItem } from './types'
+import type { BadgeVariant, EvidenceRef } from '../transcript/types'
 
 /** A user message rendered in the transcript. */
 export interface TranscriptUserItem {
@@ -13,7 +14,7 @@ export interface TranscriptUserItem {
   text: string
   displayTitle?: string
   badgeLabel?: string
-  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
+  badgeVariant?: BadgeVariant
 }
 
 /** An agent block rendered in the transcript — groups rows, bubbles, standalone cards. */
@@ -29,7 +30,7 @@ export interface TranscriptAgentItem {
   groupId?: string
   displayTitle?: string
   badgeLabel?: string
-  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
+  badgeVariant?: BadgeVariant
   /** ID of the upstream block this message is replying to. */
   replyBlockId?: string
   /** Author name of the replied message. */
@@ -37,7 +38,7 @@ export interface TranscriptAgentItem {
   /** Short preview of the replied message content. */
   replyPreview?: string
   /** Evidence references collected from the block's evidenceRefs. */
-  evidenceRefs?: { id: string; kind: string; label: string; status?: string; path?: string; uri?: string; mimeType?: string }[]
+  evidenceRefs?: EvidenceRef[]
 }
 
 /** Union type of items Transcript can render. */
