@@ -17,6 +17,7 @@ import type { TranscriptBlock, ContextUsageTranscriptBlock, RouteDecisionTranscr
 import type { ApprovalDecisionAction } from '../transcript';
 import { ConversationHost, type MainchainSummary } from './ConversationHost';
 import { ConversationSidebar } from './ConversationSidebar';
+import type { MainchainNode } from './WorkbenchShell';
 import {
   ContextMenu,
   MultiSelectBar,
