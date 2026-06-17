@@ -431,12 +431,14 @@ OpenCode 在 dep 类型上的关键约定：
 
 ### 5.1 层到层映射
 
+> **Note:** As of ChatView migration, AgentHub no longer has a standalone `runner/` service; execution lifecycle lives in `edge-server/internal/lifecycle/` and `edge-server/internal/adapters/`. References to `runner/` below are retained for historical comparison with OpenCode's architecture only.
+
 | OpenCode Layer | OpenCode 包 | AgentHub 对应 | 关键差异 |
 |---------------|-------------|---------------|---------|
 | **Layer 0 Foundation** | `core`（Effect Services, Schema, 工具函数）| `packages/protocol/` + `packages/transport/` | OpenCode 的 core 是运行时+类型一体；AgentHub 的 protocol 是纯 proto 生成代码，transport 是纯接口。在 Go 中这些应分开。 |
 | **Layer 0 Foundation** | `llm`（LLM Protocol 状态机）| `packages/agent-core/` (agent loop model) + Runner 内部的 `internal/executor/` | Go 中 LLM 调用会通过 Agent CLI 子进程完成，不是 in-process 协议解析。但 LLMEvent/LLMError tagged union 的建模思路可直接映射为 Go sum types（interface + type switch）。 |
 | **Layer 0 Foundation** | `sdk`（OpenAPI codegen client）| `gen/go/` (ConnectRPC 生成) + `gen/ts/` (Connect-ES 生成) | 同等地位。OpenCode 用 `@hey-api/openapi-ts`；AgentHub 用 Buf + ConnectRPC。都是协议生成代码路线。 |
-| **Layer 1 Domain** | `plugin`（19 hooks + PluginInput）| `runner/internal/adapters/`（Agent adapter interfaces）+ `packages/approval-core/`（权限审批） | OpenCode 的 plugin hooks 是在进程内注册回调（TypeScript 特性），Go 中 adapter interface（Go interface）是更自然的映射。 |
+| **Layer 1 Domain** | `plugin`（19 hooks + PluginInput）| `edge-server/internal/adapters/`（Agent adapter interfaces）+ `packages/approval-core/`（权限审批） | OpenCode 的 plugin hooks 是在进程内注册回调（TypeScript 特性），Go 中 adapter interface（Go interface）是更自然的映射。 |
 | **Layer 1 Domain** | `ui`（SolidJS 组件）| `apps/web/`（React UI，独立 workspace）| UI 层独立，与 Go 服务不在同一 module。 |
 | **Layer 2 UI** | `app`（SolidStart SPA）| `apps/web/` | 同上。 |
 | **Layer 3 App** | `opencode`（CLI + Hono Server, 720 files）| **拆分为 3 个服务**：`hub/` + `edge/` + `runner/` | **这是最大差异**。OpenCode 是单体 CLI+Server（720 个 .ts 文件全在一个包里）；AgentHub 按职责拆分为 3 个独立 Go 服务。AgentHub 的拆分优于 OpenCode 的单体——部署独立、故障隔离、可独立扩展。 |
