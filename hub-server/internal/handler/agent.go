@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 )
@@ -346,6 +347,9 @@ func runEventFilterFromQuery(c *gin.Context) (model.AgentRunEventFilter, error) 
 		limit, err := strconv.Atoi(raw)
 		if err != nil || limit < 0 {
 			return filter, errcode.ErrBadRequest
+		}
+		if limit > config.MaxPageLimit {
+			limit = config.MaxPageLimit
 		}
 		filter.Limit = limit
 	}

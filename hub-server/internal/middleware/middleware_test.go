@@ -40,12 +40,12 @@ func TestDefaultCORSOrigins(t *testing.T) {
 		env  string
 		want string
 	}{
-		{name: "production", env: "production", want: "https://hub.example.invalid"},
-		{name: "prod alias", env: "prod", want: "https://hub.example.invalid"},
-		{name: "release alias", env: "release", want: "https://hub.example.invalid"},
-		{name: "development", env: "development", want: "https://hub.example.invalid,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"},
-		{name: "staging", env: "staging", want: "https://hub.example.invalid,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"},
-		{name: "empty env", env: "", want: "https://hub.example.invalid,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"},
+		{name: "production", env: "production", want: "https://hub.example.invalid,https://tauri.localhost"},
+		{name: "prod alias", env: "prod", want: "https://hub.example.invalid,https://tauri.localhost"},
+		{name: "release alias", env: "release", want: "https://hub.example.invalid,https://tauri.localhost"},
+		{name: "development", env: "development", want: "https://hub.example.invalid,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"},
+		{name: "staging", env: "staging", want: "https://hub.example.invalid,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"},
+		{name: "empty env", env: "", want: "https://hub.example.invalid,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

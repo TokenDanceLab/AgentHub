@@ -21,6 +21,30 @@ vi.mock('@lobehub/icons', () => ({
   OpenCode: ({ size }: { size?: number }) => (
     <svg data-testid="opencode-icon" width={size} height={size}><title>OpenCode</title></svg>
   ),
+  // RuntimeIcon re-exports all of these; AgentList -> RuntimeBrandIcon -> RuntimeIcon
+  // needs them present so vitest's static export check passes.
+  Alibaba: () => null,
+  AlibabaCloud: () => null,
+  Anthropic: () => null,
+  Aws: () => null,
+  Azure: () => null,
+  Bedrock: () => null,
+  ByteDance: () => null,
+  Claude: () => null,
+  Cohere: () => null,
+  DeepSeek: () => null,
+  Doubao: () => null,
+  Gemini: () => null,
+  GeminiCLI: () => null,
+  Google: () => null,
+  Meta: () => null,
+  Mistral: () => null,
+  Moonshot: () => null,
+  OpenAI: () => null,
+  Perplexity: () => null,
+  Qwen: () => null,
+  Volcengine: () => null,
+  Zhipu: () => null,
 }));
 
 import { describe, it, expect, vi } from 'vitest';

@@ -18,7 +18,7 @@ const (
 
 type SessionMember struct {
 	ID          string     `gorm:"primaryKey;type:uuid" json:"id"`
-	SessionID   string     `gorm:"type:uuid;not null" json:"session_id"`
+	SessionID   string     `gorm:"type:uuid;not null;index:idx_session_members_session_left,priority:1" json:"session_id"`
 	MemberType  string     `gorm:"type:varchar(16);not null" json:"member_type"`
 	MemberID    string     `gorm:"type:uuid;not null" json:"member_id"`
 	Role        string     `gorm:"type:varchar(16);not null" json:"role"`
@@ -27,7 +27,7 @@ type SessionMember struct {
 	Muted       bool       `gorm:"not null;default:false" json:"muted"`
 	LastReadSeq int64      `gorm:"not null;default:0" json:"last_read_seq"`
 	JoinedAt    time.Time  `gorm:"autoCreateTime" json:"joined_at"`
-	LeftAt      *time.Time `gorm:"type:timestamptz" json:"left_at,omitempty"`
+	LeftAt      *time.Time `gorm:"type:timestamptz;index:idx_session_members_session_left,priority:2" json:"left_at,omitempty"`
 }
 
 func (sm *SessionMember) BeforeCreate(tx *gorm.DB) error {

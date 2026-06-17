@@ -1,5 +1,31 @@
-import React from 'react';
-import { ClaudeCode, Codex, GeminiCLI, ModelIcon, OpenCode, ProviderIcon } from '@lobehub/icons';
+import React, { type ComponentType } from 'react';
+// Subpath imports — avoids @lobehub/icons barrel (index.d.ts re-exports all 302 icons
+// which fails under certain tsconfig contexts like web's moduleResolution + paths setup)
+import ClaudeCode from '@lobehub/icons/es/ClaudeCode';
+import Codex from '@lobehub/icons/es/Codex';
+import GeminiCLI from '@lobehub/icons/es/GeminiCLI';
+import OpenCode from '@lobehub/icons/es/OpenCode';
+import Alibaba from '@lobehub/icons/es/Alibaba';
+import AlibabaCloud from '@lobehub/icons/es/AlibabaCloud';
+import Anthropic from '@lobehub/icons/es/Anthropic';
+import Azure from '@lobehub/icons/es/Azure';
+import Aws from '@lobehub/icons/es/Aws';
+import Bedrock from '@lobehub/icons/es/Bedrock';
+import ByteDance from '@lobehub/icons/es/ByteDance';
+import Claude from '@lobehub/icons/es/Claude';
+import Cohere from '@lobehub/icons/es/Cohere';
+import DeepSeek from '@lobehub/icons/es/DeepSeek';
+import Doubao from '@lobehub/icons/es/Doubao';
+import Gemini from '@lobehub/icons/es/Gemini';
+import Google from '@lobehub/icons/es/Google';
+import Meta from '@lobehub/icons/es/Meta';
+import Mistral from '@lobehub/icons/es/Mistral';
+import Moonshot from '@lobehub/icons/es/Moonshot';
+import OpenAI from '@lobehub/icons/es/OpenAI';
+import Perplexity from '@lobehub/icons/es/Perplexity';
+import Qwen from '@lobehub/icons/es/Qwen';
+import Volcengine from '@lobehub/icons/es/Volcengine';
+import Zhipu from '@lobehub/icons/es/Zhipu';
 import { resolveRuntimeIconRegistry } from './runtimeIconRegistry';
 
 export type RuntimeIconKind = 'model' | 'provider' | 'runtime' | 'tool';
@@ -90,12 +116,89 @@ export function RuntimeIcon({
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Direct provider icon lookup — bypasses @lobehub/icons barrel
+// (ProviderIcon pulls providerMappings → providerConfig → ALL 302 icons)
+// Each entry maps a provider value (from runtimeIconRegistry) to a
+// lobehub icon component with a .Color subcomponent.
+// ═══════════════════════════════════════════════════════════════════════
+
+type LobeIcon = ComponentType<{ size?: number }> & {
+  Color?: ComponentType<{ size?: number }>;
+};
+
+const providerIconMap: Record<string, LobeIcon | undefined> = {
+  alibaba: Alibaba,
+  alibabacloud: AlibabaCloud,
+  anthropic: Anthropic,
+  azure: Azure,
+  aws: Aws,
+  bedrock: Bedrock,
+  bytedance: ByteDance,
+  claude: Claude,
+  cohere: Cohere,
+  deepseek: DeepSeek,
+  doubao: Doubao,
+  gemini: Gemini,
+  google: Google,
+  meta: Meta,
+  mistral: Mistral,
+  moonshot: Moonshot,
+  openai: OpenAI,
+  perplexity: Perplexity,
+  qwen: Qwen,
+  volcengine: Volcengine,
+  zhipu: Zhipu,
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Direct model icon lookup — bypasses @lobehub/icons barrel
+// (ModelIcon pulls modelMappings → modelConfig → ALL 302 icons)
+// ═══════════════════════════════════════════════════════════════════════
+
+const modelIconMap: Record<string, LobeIcon | undefined> = {
+  claude: Claude,
+  deepseek: DeepSeek,
+  doubao: Doubao,
+  gemini: Gemini,
+  glm: Zhipu,       // ChatGLM → Zhipu icon
+  gpt: OpenAI,
+  kimi: Moonshot,
+  qwen: Qwen,
+  'o1': OpenAI,
+  'o3': OpenAI,
+  'o4': OpenAI,
+};
+
+function resolveModelIcon(modelName: string): LobeIcon | undefined {
+  const key = modelName.toLowerCase().replace(/[._/]+/g, '-').replace(/[^a-z0-9-]+/g, '-');
+  // Try exact match first, then prefix match (e.g. "claude-sonnet-4" → "claude")
+  if (modelIconMap[key]) return modelIconMap[key];
+  for (const [prefix, Icon] of Object.entries(modelIconMap)) {
+    if (key.startsWith(prefix + '-') || key.startsWith(prefix)) return Icon;
+  }
+  return undefined;
+}
+
+function renderProviderColorIcon(provider: string, size: number): React.ReactNode {
+  const Icon = providerIconMap[provider.toLowerCase()];
+  const Color = Icon?.Color;
+  if (Color) return <Color size={size} />;
+  return runtimeIconFallbackSvg('provider', size);
+}
+
+function renderModelColorIcon(model: string, size: number): React.ReactNode {
+  const Icon = resolveModelIcon(model);
+  const Color = Icon?.Color;
+  if (Color) return <Color size={size} />;
+  return runtimeIconFallbackSvg('model', size);
+}
+
 function renderRuntimeIcon(resolution: RuntimeIconResolution, iconSize: number): React.ReactNode {
   if (resolution.source === 'lobehub') {
     if (resolution.lobeType === 'runtime') return renderLobeRuntimeIcon(resolution.value, iconSize);
-    if (resolution.lobeType === 'provider')
-      return <ProviderIcon provider={resolution.value} size={iconSize} type="color" />;
-    return <ModelIcon model={resolution.value} size={iconSize} />;
+    if (resolution.lobeType === 'provider') return renderProviderColorIcon(resolution.value, iconSize);
+    return renderModelColorIcon(resolution.value, iconSize);
   }
 
   return runtimeIconFallbackSvg(resolution.fallback, iconSize);

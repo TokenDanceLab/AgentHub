@@ -280,13 +280,13 @@ fix/short-topic
 当前分支状态和合并规则详见 `docs/governance/branch-governance.md`。摘要：
 
 ```
-feat/* → dev/maintainer → dev/maintainer → master
+feat/* → dev/maintainer → master
 ```
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **dev/maintainer** | 当前 v0.4.0 开发主线（从 dev/maintainer fork） | ✅ 活跃 |
-| **dev/maintainer** | v0.3.0 集成主线 | ✅ 当前 |
+| **dev/maintainer** | 当前集成开发分支 (HEAD 118bdd84)，从 dev/maintainer 创建 | ✅ 活跃 |
+| **dev/maintainer** | 上一版集成主线 (v0.3.0, 1e03b7ec) | ✅ 已归档 |
 | master | PR-only 稳定快照 | ✅ 当前 |
 | origin/feat/backend-edge-hub | 后端/Edge-Hub 并行线 | 隔离 |
 | ~~origin/dev/contributor-b~~ | 已归档 | ✅ 已清理 |

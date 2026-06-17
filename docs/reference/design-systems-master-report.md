@@ -247,7 +247,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Dependencies**: 1.2.
 
 #### 1.4 Replace Emoji Tool Icons with SVG Icons
-**File**: `app/desktop/src/components/ChatView.tsx` (lines 25-36)
+**File**: `app/shared/src/chatview/components/Transcript.tsx` (TOOL_ICONS record)
 **Action**: Replace the `TOOL_ICONS` Record<string, string> with proper lucide-react SVG components.
 **Specific mapping**:
 - Read → `FileText`
@@ -261,7 +261,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Dependencies**: None.
 
 #### 1.5 Redesign Tool Call Cards
-**File**: `app/desktop/src/components/ChatView.tsx` (tool call rendering section)
+**File**: `app/shared/src/chatview/components/RowItem.tsx`, `app/shared/src/chatview/components/AgentGroup.tsx` (tool call rendering sections)
 **Action**: Enhance tool call cards with:
 - Status indicator (spinner/check/X)
 - Elapsed time display
@@ -270,7 +270,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Dependencies**: 1.4.
 
 #### 1.6 Add Thinking Block Auto-Collapse
-**File**: `app/desktop/src/components/ChatView.tsx` (ThinkingBlock component, lines 96+)
+**File**: `app/shared/src/chatview/components/ChatViewTranscript.tsx` (ThinkingBlock component, streaming state)
 **Action**: Add auto-collapse behavior — thinking block starts expanded, auto-collapses when actual response text begins streaming.
 **Dependencies**: None.
 
@@ -316,7 +316,7 @@ These changes establish the visual foundation. They touch the most files but are
 **Specific files** (highest impact first):
 - `App.module.css` — Shell colors, sidebar, top bar
 - `SettingsPage.module.css` — Panel colors, card colors
-- `ChatView.module.css` — Message bubbles, tool cards, code blocks
+- `ChatViewTranscript.module.css` — Message bubbles, tool cards, code blocks
 - `WelcomeScreen.module.css` — Launcher panel, mode pills
 - `AgentList.module.css` — List items, status badges
 **Dependencies**: 1.1.
@@ -384,16 +384,16 @@ These changes establish the visual foundation. They touch the most files but are
 | 439-457 | Add search input above nav | P1 |
 | 1400-1405 | Environment section: add platform-specific icons | P2 |
 
-### 4.3 ChatView.tsx
+### 4.3 ChatViewTranscript.tsx / Transcript.tsx / AgentGroup.tsx / RowItem.tsx
 **Current state**: 5 lucide-react icons, emoji tool icons, basic thinking block.
 **Target state**: SVG tool icons, enhanced tool cards, auto-collapse thinking, streaming polish.
 **Changes**:
 | Line(s) | Change | Priority |
 |---------|--------|----------|
-| 25-36 | Replace emoji tool icons with lucide-react components | P0 |
-| Tool card rendering | Add status indicator, elapsed time, color coding | P0 |
-| 96+ | Auto-collapse thinking when response starts | P0 |
-| 4 | Keep lucide-react: Copy, RefreshCw, Trash2, ArrowDown | — |
+| Icons.tsx | Replace emoji tool icons with lucide-react components | P0 |
+| RowItem.tsx / AgentGroup.tsx | Add status indicator, elapsed time, color coding | P0 |
+| ChatViewTranscript.tsx | Auto-collapse thinking when response starts | P0 |
+| Icons.tsx | Keep lucide-react: Copy, RefreshCw, Trash2, ArrowDown | — |
 
 ### 4.4 App.tsx
 **Current state**: 20+ lucide-react icons, solid shell layout.
@@ -428,7 +428,7 @@ These changes establish the visual foundation. They touch the most files but are
 
 ### Files that keep lucide-react only:
 - **App.tsx** — Window controls, navigation, status
-- **ChatView.tsx** — Message actions, scroll control
+- **ChatViewTranscript.tsx** — Message actions, scroll control
 - **All form components** — Inputs, toggles, selects
 - **NotificationBell.tsx** — Bell icon
 - **SearchDialog.tsx** — Search icon
@@ -460,7 +460,7 @@ These changes establish the visual foundation. They touch the most files but are
 - AgentHub Desktop: `app/desktop/src/` — Current codebase
   - `App.tsx` — App shell with 3-panel layout
   - `SettingsPage.tsx` — Comprehensive settings with 30+ sections
-  - `ChatView.tsx` — Chat message display with tool calls
+  - `ChatViewTranscript.tsx` — Chat message display with tool calls
   - `WelcomeScreen.tsx` — Onboarding/launcher screen
 
 ### Design Systems Referenced

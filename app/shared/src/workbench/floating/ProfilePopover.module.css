@@ -236,35 +236,6 @@
   stroke-linejoin: round;
 }
 
-.accountSignature {
-  width: 100%;
-  min-height: 34px;
-  padding: var(--sp-sm) 10px;
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-sm);
-  background: var(--surface-low);
-  color: var(--text-3);
-  text-align: left;
-  font: 400 0.75rem/1.35 var(--font-sans);
-  cursor: text;
-  transition:
-    background var(--dur-normal) var(--ease),
-    border-color var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease),
-    box-shadow var(--dur-medium) var(--ease);
-}
-
-.accountSignature:hover {
-  border-color: var(--bdr-strong);
-  color: var(--text-2);
-  background: var(--surface);
-}
-
-.accountSignature:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
 .accountActions {
   padding: 10px 0;
 }
@@ -339,49 +310,12 @@
   background: var(--bdr);
 }
 
-/* ── Account Spaces ── */
-
-.accountSpaces {
-  margin-top: 7px;
-  padding: var(--sp-sm) 9px;
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--surface-low) 74%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.accountSpaceRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-md);
-  min-height: 22px;
-}
-
-.accountSpaceRow strong {
-  min-width: 0;
-  color: var(--text-1);
-  font: 600 0.75rem var(--font-sans);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.accountSpaceRow span {
-  flex: 0 0 auto;
-  color: var(--text-3);
-  font: 400 0.6875rem var(--font-sans);
-}
-
 /* ── Reduced motion ── */
 
 @media (prefers-reduced-motion: reduce) {
   .popover,
   .actions button,
   .accountStatus,
-  .accountSignature,
   .accountMenuRow {
     transition: none;
   }

@@ -22,7 +22,7 @@ func NewTraceID() string {
 // --- Common codes (re-exported from shared pkg/errcode) ---
 
 var (
-	OK                  = &Error{Code: "OK", Message: "", HTTPStatus: http.StatusOK}
+	OK                  = &Error{Code: "ok", Message: "", HTTPStatus: http.StatusOK}
 	ErrInternal         = sharederr.ErrInternal
 	ErrBadRequest       = sharederr.ErrBadRequest
 	ErrNotFound         = sharederr.ErrNotFound
@@ -36,49 +36,49 @@ var (
 
 var (
 	// Workspace security
-	ErrWorkspaceNotAllowed = New("WORKSPACE_NOT_ALLOWED", "workDir is outside the workspace allowlist", http.StatusForbidden)
+	ErrWorkspaceNotAllowed = New("workspace_not_allowed", "workDir is outside the workspace allowlist", http.StatusForbidden)
 
 	// Permission mode / decision
-	ErrInvalidPermissionMode = New("INVALID_PERMISSION_MODE", "invalid permission mode", http.StatusBadRequest)
-	ErrInvalidDecision       = New("INVALID_DECISION", "decision must be allow or deny", http.StatusBadRequest)
+	ErrInvalidPermissionMode = New("invalid_permission_mode", "invalid permission mode", http.StatusBadRequest)
+	ErrInvalidDecision       = New("invalid_decision", "decision must be allow or deny", http.StatusBadRequest)
 
 	// Executor lifecycle
-	ErrExecutorUnavailable    = New("EXECUTOR_UNAVAILABLE", "no executor configured", http.StatusServiceUnavailable)
-	ErrExecutorStartFailed    = New("EXECUTOR_START_FAILED", "executor failed to start", http.StatusInternalServerError)
-	ErrTooManyConcurrentRuns  = New("TOO_MANY_CONCURRENT_RUNS", "too many concurrent runs", http.StatusTooManyRequests)
+	ErrExecutorUnavailable    = New("executor_unavailable", "no executor configured", http.StatusServiceUnavailable)
+	ErrExecutorStartFailed    = New("executor_start_failed", "executor failed to start", http.StatusInternalServerError)
+	ErrTooManyConcurrentRuns  = New("too_many_concurrent_runs", "too many concurrent runs", http.StatusTooManyRequests)
 
 	// Run
-	ErrActiveRunExists = New("ACTIVE_RUN_EXISTS", "thread already has an active run", http.StatusConflict)
+	ErrActiveRunExists = New("active_run_exists", "thread already has an active run", http.StatusConflict)
 
 	// Agent discovery
-	ErrInvalidAgentID            = New("INVALID_AGENT_ID", "unknown agent adapter", http.StatusBadRequest)
-	ErrAgentRegistryNotConfigured = New("AGENT_REGISTRY_NOT_CONFIGURED", "agent registry not configured", http.StatusNotFound)
-	ErrAgentInstanceNotFound     = New("AGENT_INSTANCE_NOT_FOUND", "agent instance not found", http.StatusNotFound)
+	ErrInvalidAgentID            = New("invalid_agent_id", "unknown agent adapter", http.StatusBadRequest)
+	ErrAgentRegistryNotConfigured = New("agent_registry_not_configured", "agent registry not configured", http.StatusNotFound)
+	ErrAgentInstanceNotFound     = New("agent_instance_not_found", "agent instance not found", http.StatusNotFound)
 
 	// Permissions
-	ErrPermissionRequestNotFound = New("PERMISSION_REQUEST_NOT_FOUND", "permission request not found", http.StatusNotFound)
+	ErrPermissionRequestNotFound = New("permission_request_not_found", "permission request not found", http.StatusNotFound)
 
 	// Validation
-	ErrRunIDRequired     = New("RUN_ID_REQUIRED", "runId is required", http.StatusBadRequest)
-	ErrRequestIDRequired = New("REQUEST_ID_REQUIRED", "requestId is required", http.StatusBadRequest)
+	ErrRunIDRequired     = New("run_id_required", "runId is required", http.StatusBadRequest)
+	ErrRequestIDRequired = New("request_id_required", "requestId is required", http.StatusBadRequest)
 
 	// Plan approval
-	ErrPlanNotFound      = New("PLAN_NOT_FOUND", "no pending plan found for this run", http.StatusNotFound)
-	ErrInvalidPlanDecision = New("INVALID_PLAN_DECISION", "decision must be approve or reject", http.StatusBadRequest)
+	ErrPlanNotFound      = New("plan_not_found", "no pending plan found for this run", http.StatusNotFound)
+	ErrInvalidPlanDecision = New("invalid_plan_decision", "decision must be approve or reject", http.StatusBadRequest)
 
 	// Deploy
-	ErrDeployInvalidSlug    = New("DEPLOY_INVALID_SLUG", "slug must be lowercase alphanumeric with hyphens, 2-63 chars", http.StatusBadRequest)
-	ErrDeployNoArtifacts    = New("DEPLOY_NO_ARTIFACTS", "run has no deployable artifacts", http.StatusBadRequest)
-	ErrDeployRunNotFinished = New("DEPLOY_RUN_NOT_FINISHED", "run must be in a terminal state before deploying", http.StatusBadRequest)
+	ErrDeployInvalidSlug    = New("deploy_invalid_slug", "slug must be lowercase alphanumeric with hyphens, 2-63 chars", http.StatusBadRequest)
+	ErrDeployNoArtifacts    = New("deploy_no_artifacts", "run has no deployable artifacts", http.StatusBadRequest)
+	ErrDeployRunNotFinished = New("deploy_run_not_finished", "run must be in a terminal state before deploying", http.StatusBadRequest)
 
 	// Metrics
-	ErrNotConfigured = New("NOT_CONFIGURED", "resource not configured", http.StatusServiceUnavailable)
+	ErrNotConfigured = New("not_configured", "resource not configured", http.StatusServiceUnavailable)
 )
 
 // ErrorBody returns the JSON error envelope for use with writeJSON.
 // It produces the standard format:
 //
-//	{"error": {"code": "NOT_FOUND", "message": "...", "traceId": "trace_000001"}}
+//	{"error": {"code": "not_found", "message": "...", "traceId": "trace_000001"}}
 func ErrorBody(e *Error) map[string]any {
 	return map[string]any{
 		"error": map[string]any{

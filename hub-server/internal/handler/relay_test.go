@@ -82,8 +82,8 @@ func TestRelayHandlerCreateCommandRejectsMissingTargetOrPayload(t *testing.T) {
 type mockRelayService struct {
 	createCalled bool
 	createFn     func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*service.RelayCommandData, error)
-	getFn        func(ctx context.Context, id string) (*service.RelayCommandData, error)
-	ackFn        func(ctx context.Context, id string) error
+	getFn        func(ctx context.Context, id string, userID string) (*service.RelayCommandData, error)
+	ackFn        func(ctx context.Context, id string, userID string) error
 }
 
 func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*service.RelayCommandData, error) {
@@ -94,16 +94,16 @@ func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, comm
 	return nil, nil
 }
 
-func (m *mockRelayService) GetCommand(ctx context.Context, id string) (*service.RelayCommandData, error) {
+func (m *mockRelayService) GetCommand(ctx context.Context, id string, userID string) (*service.RelayCommandData, error) {
 	if m.getFn != nil {
-		return m.getFn(ctx, id)
+		return m.getFn(ctx, id, userID)
 	}
 	return nil, nil
 }
 
-func (m *mockRelayService) AckCommand(ctx context.Context, id string) error {
+func (m *mockRelayService) AckCommand(ctx context.Context, id string, userID string) error {
 	if m.ackFn != nil {
-		return m.ackFn(ctx, id)
+		return m.ackFn(ctx, id, userID)
 	}
 	return nil
 }

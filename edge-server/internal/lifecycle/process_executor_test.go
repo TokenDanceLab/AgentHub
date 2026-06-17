@@ -2119,7 +2119,7 @@ started:
 			return
 		case "run.failed":
 			payload, _ := evt.Payload.(map[string]any)
-			errInfo, _ := payload["error"]
+			errInfo := payload["error"]
 			t.Fatalf("run failed: %#v", errInfo)
 		}
 	}

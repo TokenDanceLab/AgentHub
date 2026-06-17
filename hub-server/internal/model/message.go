@@ -23,9 +23,9 @@ const (
 
 type Message struct {
 	ID           string     `gorm:"primaryKey;type:uuid" json:"id"`
-	SessionID    string     `gorm:"type:uuid;not null" json:"session_id"`
-	SeqID        int64      `gorm:"not null" json:"seq_id"`
-	ClientMsgID  string     `gorm:"type:uuid;not null" json:"client_msg_id"`
+	SessionID    string     `gorm:"type:uuid;not null;index:idx_messages_session_seq,priority:1;uniqueIndex:idx_messages_session_client_msg,priority:1" json:"session_id"`
+	SeqID        int64      `gorm:"not null;index:idx_messages_session_seq,priority:2" json:"seq_id"`
+	ClientMsgID  string     `gorm:"type:uuid;not null;uniqueIndex:idx_messages_session_client_msg,priority:2" json:"client_msg_id"`
 	SenderType   string     `gorm:"type:varchar(16);not null" json:"sender_type"`
 	SenderID     string     `gorm:"type:uuid;not null" json:"sender_id"`
 	ContentType  string     `gorm:"type:varchar(32);not null" json:"content_type"`

@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { cx } from './cx';
 import styles from './SectionHeader.module.css';
 
 export interface SectionHeaderAction {
@@ -19,9 +20,6 @@ export interface SectionHeaderProps {
   actionClassName?: string;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 export function SectionHeader({
   eyebrow,

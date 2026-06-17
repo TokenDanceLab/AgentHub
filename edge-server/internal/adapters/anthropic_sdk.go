@@ -412,9 +412,9 @@ func (a *AnthropicSDKAdapter) parseSSEStream(ctx context.Context, body io.Reader
 
 		// SSE lines start with "data: " or "event: "
 		if !strings.HasPrefix(line, "data: ") {
-			if strings.HasPrefix(line, "event: ") {
-				// Event type line -- we extract data from the data line
-			}
+			// "event: " lines carry the event type; we skip them and
+			// extract data from the "data: " line.
+			_ = strings.HasPrefix(line, "event: ")
 			continue
 		}
 
