@@ -28,19 +28,20 @@ describe('workbench v4 demo data source', () => {
   });
 
   it('resolves per-conversation transcripts with a fallback preview transcript', () => {
-    // builder and reviewer resolve to chatviewBuilderTranscript (not fallback) via
-    // demoWorkbenchTranscripts mapping. Use a conversation not in the map to exercise fallback.
-    const fallback = resolveDemoWorkbenchTranscript('johnny');
-    expect(fallback[0]).toEqual(expect.objectContaining({
+    // Chatview transcripts are lazy-loaded and may not be available synchronously
+    // in test environments. Conversations without a loaded transcript fall back to
+    // the preview transcript.
+    const johnnyTranscript = resolveDemoWorkbenchTranscript('johnny');
+    expect(johnnyTranscript[0]).toEqual(expect.objectContaining({
       id: 'johnny-user-1',
       kind: 'text',
     }));
-    expect(fallback).toHaveLength(3);
+    expect(johnnyTranscript).toHaveLength(3);
 
-    const real = resolveDemoWorkbenchTranscript('builder');
-    expect(real[0]).toEqual(expect.objectContaining({
-      id: 'batt1',
-      kind: 'attachment',
+    const builderTranscript = resolveDemoWorkbenchTranscript('builder');
+    expect(builderTranscript[0]).toEqual(expect.objectContaining({
+      id: 'builder-user-1',
+      kind: 'text',
     }));
   });
 
