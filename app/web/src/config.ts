@@ -13,4 +13,4 @@ export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'ws://localhost:8080/clien
 export const HEALTH_POLL_MS = 5000;
 export const RUNNERS_POLL_MS = 10000;
 export const EVENT_LOG_MAX = 1000;
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.4.1';

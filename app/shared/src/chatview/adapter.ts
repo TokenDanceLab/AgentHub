@@ -488,20 +488,24 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       const t = block as TextTranscriptBlock
       if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = Object.assign(newAgentBlock(block.author, role, block.createdAt), { groupId } as any,
+        const agent: TranscriptAgentItem = Object.assign(newAgentBlock(block.author, role, block.createdAt), { groupId },
           pickDisplay(t as unknown as Record<string, unknown>),
           { evidenceRefs: mapEvidenceRefs(block) },
         )
         // Unique React key: author.id + first-block-seq
-        currentAgent!.id = `${groupId}-${_seq}`
+        agent.id = `${groupId}-${_seq}`
+        currentAgent = agent
       }
+      // currentAgent is guaranteed non-null after the block above
+      const agent = currentAgent
+      if (!agent) continue
       const bubbleText = t.displayDetail || t.text
-      if (bubbleText) currentAgent!.bubbles.push(bubbleText)
+      if (bubbleText) agent.bubbles.push(bubbleText)
       // Map reply-to metadata from upstream block
-      if (t.replyToMessageId && !currentAgent!.replyBlockId) {
-        currentAgent!.replyBlockId = t.replyToMessageId
-        if (t.replyAuthor !== undefined) currentAgent!.replyAuthor = t.replyAuthor
-        if (t.replyPreview !== undefined) currentAgent!.replyPreview = t.replyPreview
+      if (t.replyToMessageId && !agent.replyBlockId) {
+        agent.replyBlockId = t.replyToMessageId
+        if (t.replyAuthor !== undefined) agent.replyAuthor = t.replyAuthor
+        if (t.replyPreview !== undefined) agent.replyPreview = t.replyPreview
       }
       continue
     }
@@ -526,7 +530,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
           if (!currentAgent || currentAgent.groupId !== groupId) {
             if (currentAgent) items.push(currentAgent)
             currentAgent = newAgentBlock(block.author, role, block.createdAt)
-            ;(currentAgent as any).groupId = groupId
+            currentAgent.groupId = groupId
             const refs = mapEvidenceRefs(block)
             if (refs) currentAgent.evidenceRefs = refs
           }
@@ -549,7 +553,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
         if (!currentAgent || currentAgent.groupId !== groupId) {
           if (currentAgent) items.push(currentAgent)
           currentAgent = newAgentBlock(block.author, role, block.createdAt)
-          ;(currentAgent as any).groupId = groupId
+          currentAgent.groupId = groupId
           const refs = mapEvidenceRefs(block)
           if (refs) currentAgent.evidenceRefs = refs
         }
@@ -594,7 +598,10 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
           const matchIdx = currentAgent.rows.findIndex(r => r.type === 'tool' && r.toolName === row.toolName && !r.isResult)
           if (matchIdx >= 0) {
             // Preserve the original id for React key stability; update status+content
-            currentAgent.rows[matchIdx] = { ...row, id: currentAgent.rows[matchIdx]!.id }
+            const matched = currentAgent.rows[matchIdx]
+            if (matched) {
+              currentAgent.rows[matchIdx] = { ...row, id: matched.id }
+            }
           } else {
             currentAgent.rows.push(row)
           }
