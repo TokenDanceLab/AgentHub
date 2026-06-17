@@ -1462,7 +1462,7 @@ export function AgentHubWorkbench({
               />
             ) : null}
             <div className={styles.transcriptRegion}>
-              <ChatViewTranscript transcript={displayTranscript} />
+              <ChatViewTranscript transcript={displayTranscript} chatMode={activeConversation?.kind === 'group' ? 'group' : 'dm'} />
             </div>
             <MessageSearchPanel
               open={searchOpen}
