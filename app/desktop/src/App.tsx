@@ -441,7 +441,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
           targetState: workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',
           targetLabel: workbench.isDemo ? 'Demo runtime' : 'Local Edge',
           initialLoading: workbench.threadsLoading === true && workbench.conversations.length === 0,
-          loadError: workbench.threadsError ?? workbench.itemsError,
+          ...((workbench.threadsError ?? workbench.itemsError) !== undefined
+            ? { loadError: (workbench.threadsError ?? workbench.itemsError) as string }
+            : {}),
         }}
       />
     </>

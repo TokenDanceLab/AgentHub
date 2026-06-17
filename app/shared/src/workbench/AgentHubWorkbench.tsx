@@ -100,14 +100,14 @@ export interface AgentHubWorkbenchProps {
   agents?: WorkbenchAgent[];
   composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
   workbenchStatus?: {
-    dataMode?: string | undefined;
-    replayLabel?: string | undefined;
-    targetLabel?: string | undefined;
-    targetState?: string | undefined;
+    dataMode?: string;
+    replayLabel?: string;
+    targetLabel?: string;
+    targetState?: string;
     /** Whether the workbench is loading initial data (threads/conversations not yet loaded). */
-    initialLoading?: boolean | undefined;
+    initialLoading?: boolean;
     /** Error message from initial data load, if any. */
-    loadError?: string | undefined;
+    loadError?: string;
   } | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
@@ -323,7 +323,7 @@ export function AgentHubWorkbench({
     targetRequired: Boolean(composerExecutionTargets),
     transcript,
     workbenchStatus,
-    t,
+    t: t as (key: string, options?: Record<string, unknown>) => string,
   });
 
   // ── Inspector data: route decisions, context usage, deploy preview ──
@@ -1374,7 +1374,7 @@ export function AgentHubWorkbench({
               const block = transcript.find((b) => b.id === blockId);
               if (block) openBlockContextMenu(block, event as unknown as TranscriptContextMenuEvent);
             }}
-            onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey })}
+            onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey: shiftKey ?? false })}
             onBlockAction={handleTranscriptBlockAction}
             onReviewFile={openReviewFile}
             onDeploySubmit={handleDeploySubmit}
