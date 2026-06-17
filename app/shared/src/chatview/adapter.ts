@@ -27,10 +27,22 @@ export type { TranscriptBlock }
 
 // ── Constants ──
 
+/** Separator used to join display parts (e.g. `'Agent · Linter'`, `'Read · medium · reason'`). */
 export const SEP = ' · '
 
 // ── Helpers ──
 
+/**
+ * Convert a unified-diff `patch` string into an array of line objects
+ * suitable for rendering in the transcript's diff viewer.
+ *
+ * Truncates to `maxLines` lines (default 40) to avoid huge diffs
+ * dominating the transcript.
+ *
+ * @param patch - A unified-diff patch string (lines starting with `+` / `-` / ` `).
+ * @param maxLines - Maximum number of lines to include (default 40).
+ * @returns An array of `{ type, text }` objects where type is `'add'`, `'del'`, or `'ctx'`.
+ */
 function patchToDiffLines(patch: string, maxLines = 40) {
   return patch.split('\n').slice(0, maxLines).map(line => ({
     type: (line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : 'ctx') as 'add' | 'del' | 'ctx',
@@ -38,6 +50,12 @@ function patchToDiffLines(patch: string, maxLines = 40) {
   }))
 }
 
+/**
+ * Extract optional display-override fields from a block.
+ * Picks `displayTitle`, `badgeLabel`, and `badgeVariant` when present.
+ * Used to propagate display annotations from upstream blocks into
+ * {@link TranscriptUserItem} and {@link TranscriptAgentItem}.
+ */
 function pickDisplay(b: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (b.displayTitle !== undefined) out.displayTitle = b.displayTitle
@@ -46,6 +64,14 @@ function pickDisplay(b: Record<string, unknown>): Record<string, unknown> {
   return out
 }
 
+/**
+ * Create a new {@link TranscriptAgentItem} with empty row/bubble/standalone arrays.
+ *
+ * @param author - The block's author metadata (id, name, role).
+ * @param role - The agent's role string (e.g. `'builder'`, `'reviewer'`).
+ * @param createdAt - ISO timestamp string for the time display.
+ * @returns A fresh agent block ready to accumulate rows and bubbles.
+ */
 function newAgentBlock(author: TranscriptBlock['author'], role: string, createdAt?: string): TranscriptAgentItem {
   return {
     id: author.id,
@@ -59,12 +85,29 @@ function newAgentBlock(author: TranscriptBlock['author'], role: string, createdA
   }
 }
 
+/**
+ * Format an ISO timestamp into a locale-aware time string (HH:MM).
+ * Falls back to `'en-US'` when `navigator` is not available (e.g. SSR).
+ *
+ * @param iso - ISO 8601 date string (e.g. `'2026-06-17T14:30:00.000Z'`).
+ * @returns A formatted time string like `'14:30'` or an empty string if input is falsy.
+ */
 function timeStr(iso?: string) {
   if (!iso) return ''
   const locale = (typeof navigator !== 'undefined' && navigator.language) || 'en-US'
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * Canonical mapper from {@link EvidenceRefStatus} (or generic status string)
+ * to {@link RowItem} status.
+ *
+ * Mapping:
+ * - `'running'` / `'pending'`  -> `'running'`
+ * - `'failed'`                 -> `'fail'`
+ * - `'completed'`              -> `'ok'`
+ * - Everything else            -> `'ok'`
+ */
 function statusNorm(s: EvidenceRefStatus | string): RowItem['status'] {
   if (s === 'running' || s === 'pending') return 'running'
   if (s === 'failed') return 'fail'
@@ -72,7 +115,16 @@ function statusNorm(s: EvidenceRefStatus | string): RowItem['status'] {
   return 'ok'
 }
 
-/** Deploy status mapper — handles deploy-specific status values */
+/**
+ * Deploy-specific status mapper. Handles deploy lifecycle states that
+ * differ from the generic {@link EvidenceRefStatus} set.
+ *
+ * Mapping:
+ * - `'failed'`                 -> `'fail'`
+ * - `'pending'` / `'deploying'` -> `'running'`
+ * - `'ready'` / `'deployed'`   -> `'ok'`
+ * - `undefined` / other        -> `'ok'`
+ */
 function deployStatusNorm(s?: string): RowItem['status'] {
   if (!s) return 'ok'
   if (s === 'failed') return 'fail'
@@ -81,23 +133,20 @@ function deployStatusNorm(s?: string): RowItem['status'] {
   return 'ok'
 }
 
-// ── Per-block mapper ──
-//
-// Status mapping convention:
-//   'running' — the block represents an in-flight / pending event (tool_call, thinking,
-//     deploy in progress, permission_request).  Completed blocks MUST never produce
-//     'running'.  For tool_call specifically, check the block's own `status` field and
-//     `evidenceRefs` — if either signals completion, map to 'ok'.
-//   'ok'     — the block is a finished / terminal event (completed tool_result,
-//     file_change, artifact, diff, route_decision, context_usage, attachment,
-//     non-thinking think, completed subagent, completed run_session, approval/permission
-//     result, completed deploy).
-//   'fail'   — the block signals an error (failure, failed tool_result, failed deploy,
-//     failed approval).
-//   'waiting' — the block is awaiting user input (permission_request).
-//   statusNorm() and deployStatusNorm() are the canonical mappers for EvidenceRefStatus
-//     → RowItem status; use them unless the block kind requires a different semantic.
-
+/**
+ * Map a single {@link TranscriptBlock} to a {@link RowItem}, or return `null`
+ * if the block kind should be skipped (e.g. `'result'`, `'finished'`,
+ * `'replay_gap'`, `'agent_timeline'`, `'run_step_group'`).
+ *
+ * Status mapping conventions (see the block comment above for full rationale):
+ * - `'running'` -- in-flight / pending events (tool_call, thinking, deploy in progress)
+ * - `'ok'`      -- finished / terminal events (tool_result, file_change, artifact, diff, etc.)
+ * - `'fail'`    -- error events (failure, failed deploy, failed approval)
+ * - `'waiting'` -- awaiting user input (permission_request)
+ *
+ * Uses {@link statusNorm} and {@link deployStatusNorm} for canonical
+ * EvidenceRefStatus -> RowItem status conversion.
+ */
 function mapBlock(b: TranscriptBlock): RowItem | null {
   switch (b.kind) {
     case 'thinking': {
@@ -331,6 +380,30 @@ export type { TranscriptItem as ChatViewTranscriptItem }
 export type { TranscriptAgentItem as AgentTranscriptBlock }
 export type { TranscriptUserItem as UserTranscriptMsg }
 
+/**
+ * Convert an array of upstream {@link TranscriptBlock} objects into
+ * generic {@link TranscriptItem} objects ready for rendering.
+ *
+ * This is the primary integration point for ChatView. Upstream data sources
+ * produce `TranscriptBlock[]`, call this function, and feed the resulting
+ * `TranscriptItem[]` to the Transcript component.
+ *
+ * Grouping rules:
+ * - Consecutive blocks with the same `author.id` are merged into one
+ *   {@link TranscriptAgentItem}.
+ * - User text blocks (`role === 'human'`, `kind === 'text'`) produce
+ *   {@link TranscriptUserItem} entries.
+ * - Agent text blocks become chat bubbles.
+ * - Tool call + tool result pairs with the same `toolName` are merged into
+ *   a single card (the result replaces the call).
+ * - Standalone cards (route, deploy, context, approval, session, attachment)
+ *   are placed in `standaloneRows` for separate rendering.
+ * - `agent_timeline` items are flattened into individual think cards.
+ * - `run_step_group` children are recursed into.
+ *
+ * @param blocks - Array of upstream transcript blocks.
+ * @returns Array of generic transcript items (user messages + agent blocks).
+ */
 export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptItem[] {
   const items: TranscriptItem[] = []
   let currentAgent: TranscriptAgentItem | null = null
@@ -383,8 +456,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
           } as RowItem
           if (!currentAgent || currentAgent.groupId !== groupId) {
             if (currentAgent) items.push(currentAgent)
-            currentAgent = newAgentBlock(block.author, role, block.createdAt);
-            (currentAgent as any).groupId = groupId
+            currentAgent = newAgentBlock(block.author, role, block.createdAt)
+            ;(currentAgent as any).groupId = groupId
           }
           currentAgent.rows.push(row)
         }
@@ -401,8 +474,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
           if (!childRow) continue
           if (!currentAgent || currentAgent.groupId !== groupId) {
             if (currentAgent) items.push(currentAgent)
-            currentAgent = newAgentBlock(block.author, role, block.createdAt);
-            (currentAgent as any).groupId = groupId
+            currentAgent = newAgentBlock(block.author, role, block.createdAt)
+            ;(currentAgent as any).groupId = groupId
           }
           currentAgent.rows.push(childRow)
         }
