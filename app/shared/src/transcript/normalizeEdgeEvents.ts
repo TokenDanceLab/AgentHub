@@ -58,10 +58,11 @@ export function normalizeEdgeEventsToTranscript(events: EventEnvelope[] | undefi
       last.author.id === block.author.id &&
       sameRun
     ) {
+      const mergedIsThinking = last.isThinking || block.isThinking
       acc[acc.length - 1] = {
         ...last,
         content: (last.content ?? '') + (block.content ?? ''),
-        isThinking: (last.isThinking || block.isThinking),
+        ...(mergedIsThinking ? { isThinking: true as const } : {}),
       };
       return acc;
     }

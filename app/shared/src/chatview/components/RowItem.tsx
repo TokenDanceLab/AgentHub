@@ -64,7 +64,10 @@ interface Props {
   actioned?: boolean
 }
 
-export default memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
+/** Render a single card/row inside an agent group in the transcript.
+ *  Handles think, tool, file, sub, approval, route, deploy, attachment,
+ *  context, and session card types with collapsible content areas. */
+export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const isOpen = item.type === 'route' ? true : open

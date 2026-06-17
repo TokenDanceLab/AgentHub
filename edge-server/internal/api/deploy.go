@@ -158,12 +158,17 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract on remote and clean up tar.
-	extractCmd := fmt.Sprintf("sudo tar -xzf %s -C %s && sudo rm -f %s && sudo chown -R www-data:www-data %s",
-		remoteTmp, remotePath, remoteTmp, remotePath)
-	if err := runSSHCommand(targetHost, "bash", "-c", extractCmd); err != nil {
+	// Use separate SSH invocations instead of bash -c to avoid shell injection risk.
+	if err := runSSHCommand(targetHost, "sudo", "tar", "-xzf", remoteTmp, "-C", remotePath); err != nil {
 		slog.Error("deploy: remote extract failed", "err", err)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to extract on remote")))
 		return
+	}
+	if err := runSSHCommand(targetHost, "sudo", "rm", "-f", remoteTmp); err != nil {
+		slog.Warn("deploy: failed to remove remote temp archive", "err", err, "path", remoteTmp)
+	}
+	if err := runSSHCommand(targetHost, "sudo", "chown", "-R", "www-data:www-data", remotePath); err != nil {
+		slog.Warn("deploy: failed to chown deployed files", "err", err, "path", remotePath)
 	}
 
 	url := fmt.Sprintf("https://%s.%s", req.Slug, PagesDomain())
