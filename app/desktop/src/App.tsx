@@ -1,6 +1,8 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, writeWorkbenchDataModeOverride, workbenchDemoRuntimeStore } from '@shared/demo';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { AgentHubWorkbench } from '@shared/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
@@ -89,6 +91,7 @@ export interface DesktopWorkbenchAppProps {
 }
 
 export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {}) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const workbench = useDesktopWorkbenchModel(selectedConversationId);
   const { online: edgeOnline } = useHealth();
@@ -155,7 +158,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     [liveEdgeEnabled, documentListData?.items],
   );
   const documentsActions = useMemo(() => ({
-    onCreateDoc: liveEdgeEnabled ? async () => { await createDocumentMutation.mutateAsync({ title: '未命名文档' }); } : undefined,
+    onCreateDoc: liveEdgeEnabled ? async () => { await createDocumentMutation.mutateAsync({ title: t('doc.untitled') }); } : undefined,
   }), [liveEdgeEnabled, createDocumentMutation]);
 
   const activeRunId = useMemo(() => {
@@ -218,7 +221,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const submitRunWithRefresh = useCallback(
     async (req: Parameters<typeof createRun.mutateAsync>[0]) => {
       if (submitRunRef.current) {
-        showToast('warning', '已有正在运行的请求，请等待完成后再试。');
+        showToast('warning', t('toast.requestRunning'));
         return undefined as unknown as ReturnType<typeof createRun.mutateAsync>;
       }
       submitRunRef.current = true;
@@ -300,7 +303,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     try {
       await createAgentProfile.mutateAsync(agent);
     } catch (error) {
-      setAgentActionError(error instanceof Error ? error.message : 'Agent Profile 创建失败');
+      setAgentActionError(error instanceof Error ? error.message : t('error.agentProfile.create'));
       throw error;
     } finally {
       setSavingAgentId(undefined);
@@ -313,7 +316,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     try {
       await updateAgentProfile.mutateAsync({ id: agent.id, agent });
     } catch (error) {
-      setAgentActionError(error instanceof Error ? error.message : 'Agent Profile 保存失败');
+      setAgentActionError(error instanceof Error ? error.message : t('error.agentProfile.save'));
       throw error;
     } finally {
       setSavingAgentId(undefined);
@@ -326,7 +329,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     try {
       await deleteAgentProfile.mutateAsync(agentId);
     } catch (error) {
-      setAgentActionError(error instanceof Error ? error.message : 'Agent Profile 删除失败');
+      setAgentActionError(error instanceof Error ? error.message : t('error.agentProfile.delete'));
       throw error;
     } finally {
       setDeletingAgentId(undefined);

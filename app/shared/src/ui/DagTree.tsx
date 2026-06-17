@@ -101,7 +101,7 @@ function DagTreeNode({ node }: { node: DagNode }): React.ReactElement {
       </div>
       {hasChildren && expanded && (
         <ul style={{ margin: 0, padding: '0 0 0 18px', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }} role="group">
-          {node.children!.map((child) => <DagTreeNode key={child.id} node={child} />)}
+          {node.children?.map((child) => <DagTreeNode key={child.id} node={child} />) ?? null}
         </ul>
       )}
     </li>

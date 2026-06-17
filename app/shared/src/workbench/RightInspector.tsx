@@ -1101,7 +1101,8 @@ function InteractiveDiffPreview({
   file: PreviewFile;
   onClose: () => void;
 }): React.ReactElement {
-  const { runId, fileDiff, workDir } = file.interactiveDiff!;
+  if (!file.interactiveDiff) return (<></>);
+  const { runId, fileDiff, workDir } = file.interactiveDiff;
 
   const reviewFiles: DiffReviewFile[] = useMemo(() => [{
     filePath: fileDiff.filePath,

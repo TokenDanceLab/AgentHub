@@ -56,7 +56,7 @@ export function WorkspaceHeader({
             {threadLabel}
           </span>
           {hasModel ? (
-            <span className={styles.workspaceModel}>{activeConversation!.model}</span>
+            <span className={styles.workspaceModel}>{activeConversation?.model}</span>
           ) : null}
         </div>
 
