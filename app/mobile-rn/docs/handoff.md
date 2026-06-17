@@ -17,7 +17,7 @@ Last updated: 2026-06-10
 - Default visual mode is light/white-first.
 - i18n follows system language through Expo localization, with zh/en strings in `src/i18n/strings.ts`.
 - Reduced motion is a release gate. The visual QA harness must keep interaction scenes under `prefers-reduced-motion: reduce` free of active CSS transitions or animations.
-- Mock and preview data must stay limited to `Delicious233`, `TokenDance`, and `AgentHub`.
+- Mock and preview data must stay limited to generic placeholders (e.g. `Alice`), `TokenDance`, and `AgentHub`.
 - User-visible UI must not expose raw transport/debug details such as WebSocket reconnect state, localhost URLs, REST paths, or `/v1` endpoints.
 
 ## Design Contract
