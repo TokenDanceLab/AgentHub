@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
@@ -79,6 +80,12 @@ func (h *WorkspaceHandler) GetWorkspace(c *gin.Context) {
 
 func (h *WorkspaceHandler) ListWorkspaces(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	if pageSize <= 0 {
+		pageSize = config.DefaultPaginationLimit
+	}
+	if pageSize > config.MaxPageLimit {
+		pageSize = config.MaxPageLimit
+	}
 	result, err := h.service.List(c.Request.Context(), c.GetString("user_id"), c.Query("q"), c.Query("pageCursor"), pageSize)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
@@ -181,6 +188,12 @@ func (h *WorkspaceHandler) CreateProjectThreadMessage(c *gin.Context) {
 
 func (h *WorkspaceHandler) ListProjectThreadMessages(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if limit <= 0 {
+		limit = config.DefaultPaginationLimit
+	}
+	if limit > config.MaxPageLimit {
+		limit = config.MaxPageLimit
+	}
 	messages, err := h.service.ListThreadMessages(c.Request.Context(), c.Param("id"), c.Param("threadId"), c.GetString("user_id"), limit)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
