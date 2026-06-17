@@ -53,7 +53,7 @@ Last updated: 2026-06-10
 - Visual QA includes phone and tablet split-pane composer interaction scenes with reduced motion enabled.
 - Native readiness config checker for development build prerequisites.
 - Local Windows Android release APK packager at `scripts/package-android.ps1`, defaulting to short real paths `D:\ah\agenthub-mobile` and `D:\p\agenthub-mobile` to avoid RN/Expo/Gradle root mismatches and CMake/ninja path-length failures. The `v0.3.0-rc.7` proof used explicit paths `D:\ah\a` and `D:\p\a`.
-- Android release APK install/open proof on Wi-Fi ADB device `192.168.1.105:5555` (`V2405A`), with the app launching into the bundled demo instead of requiring Metro.
+- Android release APK install/open proof on Wi-Fi ADB device `<DEVICE_IP>:5555` (`<DEVICE_MODEL>`), with the app launching into the bundled demo instead of requiring Metro.
 
 ## Commands
 
@@ -64,7 +64,7 @@ corepack pnpm --filter agenthub-mobile-rn verify
 corepack pnpm --filter agenthub-mobile-rn run verify:brand
 corepack pnpm --filter agenthub-mobile-rn native:check
 corepack pnpm --filter agenthub-mobile-rn mock:hub:check
-corepack pnpm --filter agenthub-mobile-rn android:package -- -Version 0.3.0-rc.7 -InstallSerial 192.168.1.105:5555 -Launch
+corepack pnpm --filter agenthub-mobile-rn android:package -- -Version 0.3.0-rc.7 -InstallSerial <DEVICE_IP>:5555 -Launch
 corepack pnpm --filter agenthub-mobile-rn verify:qa
 ```
 
@@ -76,7 +76,7 @@ Gate mapping:
 | zh/en/i18n | `corepack pnpm --filter agenthub-mobile-rn verify` | i18n tests keep zh/en dictionaries aligned and system-locale fallback covered. |
 | Reduced motion | `corepack pnpm --filter agenthub-mobile-rn visual:qa` | Reduced-motion interaction scenes verify the media query and reject active CSS motion samples. |
 | Privacy scan | `corepack pnpm --filter agenthub-mobile-rn verify` plus `visual:qa` | Static and rendered checks reject private names, secret patterns, raw transport/debug strings, and API paths. |
-| Android release APK proof | `corepack pnpm --filter agenthub-mobile-rn android:package -- -InstallSerial 192.168.1.105:5555 -Launch` | Builds an installable `assembleRelease` APK with embedded JS, installs over Wi-Fi ADB, and launches the app. `native:check` remains config readiness only. |
+| Android release APK proof | `corepack pnpm --filter agenthub-mobile-rn android:package -- -InstallSerial <DEVICE_IP>:5555 -Launch` | Builds an installable `assembleRelease` APK with embedded JS, installs over Wi-Fi ADB, and launches the app. `native:check` remains config readiness only. |
 
 For live preview:
 

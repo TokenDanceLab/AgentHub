@@ -452,6 +452,17 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | `friend.request` | 收到好友请求 (service-emitted; receiver_id/push contract gap remains)，payload: `{ request_id, from_user_id, message }`；当前 payload 尚未携带 `receiver_id`，因此接收方 WS push contract 仍需补齐 |
 | `friend.accepted` | 好友请求被接受 (service-emitted + WS pushed to accepting user)，payload: `{ friendship_id, user_id }` |
 
+#### TeamRun 事件（Hub↔Client/Edge）
+
+TeamRun WebSocket 事件由 Hub 在 TeamRun 生命周期中推送，覆盖运行开始、事件日志和任务赋值完成/失败。
+
+| type | 方向 | 说明 |
+|------|------|------|
+| `team.run.started` | Hub→Client | TeamRun 已启动，payload: `{ team_run_id, team_id, trigger_user_id }` |
+| `team.event` | Hub→Client | 通用 TeamRun 事件日志条目，payload: `{ team_run_id, event_type, event_data }`；用于跨切片 TeamEvent 推送，event_type 可包含 `team.route.decided`、`team.route.rejected`、`team.task.created`、`team.approval.decided`、`team.conflict.resolved` 等 |
+| `team.assignment.done` | Hub→Client | TeamAssignment 已成功完成，payload: `{ team_run_id, assignment_id, result }` |
+| `team.assignment.failed` | Hub→Client | TeamAssignment 执行失败，payload: `{ team_run_id, assignment_id, error }` |
+
 ### 7.4 代码示例
 
 ```json

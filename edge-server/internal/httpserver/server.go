@@ -144,8 +144,12 @@ func Run(cfg Config) error {
 
 	// Register MCP (Model Context Protocol) endpoint for external AI clients.
 	// This exposes project/thread/run capabilities as standard MCP tools.
+	// MCP-level auth mirrors the global local auth token for defense-in-depth:
+	// even if a request bypasses the middleware chain, the MCP handler itself
+	// enforces the same bearer token.
 	mcpServer := mcp.NewServer(handler.Store, handler.Executor, handler.Bus, handler.PermissionRegistry)
 	mcpServer.SetWorkspaceAllowlist(cfg.WorkspaceAllowlist)
+	mcpServer.SetAuthToken(cfg.LocalAuthToken)
 	mux.Handle("/mcp", mcpServer)
 	slog.Info("mcp server endpoint registered at /mcp")
 
