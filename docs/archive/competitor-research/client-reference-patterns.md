@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # AgentHub Desktop Client -- 参考项目模式与采纳映射
 
 > 从 `docs/roadmap.md` 提取的参考项目模式、竞品对比、采纳映射表。

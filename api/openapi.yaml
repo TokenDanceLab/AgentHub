@@ -1,15 +1,9 @@
-openapi: "3.0.3"
+openapi: 3.0.3
 info:
-  title: "AgentHub API"
-  version: "0.4.1"
-  description: >
-    AgentHub REST JSON API — unified Hub + Edge contract.
-    Hub Server: auth, IM sessions, messages, agent tasks, profiles,
-    skills, MCP, teams, marketplace, provider bindings, targets,
-    devices, documents, settings, audit, relay, WebSocket.
-    Edge Server: health, projects, threads, runs, agents, diffs,
-    artifacts, previews, model catalog, metrics, permissions.
-
+  title: AgentHub API
+  version: 0.4.1
+  description: "AgentHub REST JSON API — unified Hub + Edge contract.\nHub Server: auth, IM sessions, messages, agent tasks, profiles, skills, MCP, teams, marketplace, provider bindings, execution targets,
+    devices, documents, settings, audit, relay, WebSocket.\nEdge Server: health, projects, threads, runs, diffs, artifacts, previews, model catalog, metrics, permissions.\nWebSocket typed events: see api/events.md."
 servers:
   - url: http://localhost:8080
     description: Local Hub Server (dev)
@@ -17,7 +11,6 @@ servers:
     description: Local Edge Server (dev)
   - url: https://api.hub.vectorcontrol.tech
     description: Production Hub Server
-
 tags:
   - name: Health
     description: Health checks, liveness, readiness probes
@@ -42,7 +35,7 @@ tags:
   - name: Projects
     description: Project/workspace CRUD and threads
   - name: AgentTasks
-    description: Agent task trigger, cancel, regenerate, events, approvals, artifacts
+    description: Agent task trigger, cancel, events, approvals, artifacts
   - name: EdgeTasks
     description: Edge-side task ack, stream, done, fail callbacks
   - name: AgentProfiles
@@ -52,7 +45,7 @@ tags:
   - name: MCPServers
     description: MCP server CRUD, publish, unpublish
   - name: Market
-    description: Agent profile marketplace search, install, rate
+    description: Agent profile marketplace
   - name: ProviderBindings
     description: Provider binding CRUD
   - name: ExecutionTargets
@@ -60,9 +53,9 @@ tags:
   - name: CustomAgents
     description: Custom agent CRUD
   - name: AgentTeams
-    description: Team CRUD, runs, approvals, assignments, conflicts
+    description: Team CRUD, runs, approvals, assignments
   - name: Audit
-    description: Audit event listing (admin only)
+    description: Audit event listing (admin)
   - name: Relay
     description: Hub-Edge relay commands
   - name: Public
@@ -70,19 +63,6033 @@ tags:
   - name: WebSocket
     description: WebSocket realtime event stream
   - name: EdgeFoundation
-    description: Edge health, events, model catalog, metrics
+    description: 'Edge: health, events, model catalog, metrics'
   - name: EdgeProjects
-    description: Edge project, thread, conversation APIs
+    description: 'Edge: project, thread, conversation APIs'
   - name: EdgeRuns
-    description: Edge agent run lifecycle
+    description: 'Edge: agent run lifecycle'
   - name: EdgeArtifacts
-    description: Edge artifacts and previews
+    description: 'Edge: artifacts and previews'
   - name: EdgePermissions
-    description: Edge permission decisions
+    description: 'Edge: permission decisions'
   - name: Legacy
-    description: Legacy /v1 endpoints planned for migration
-
+    description: Legacy /v1 endpoints (planned migration)
+paths:
+  /health:
+    get:
+      operationId: basicHealthCheck
+      summary: Basic health check
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /health/live:
+    get:
+      operationId: livenessProbe
+      summary: Liveness probe
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /health/ready:
+    get:
+      operationId: readinessProbe
+      summary: Readiness probe
+      tags:
+        - Health
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/public/stats:
+    get:
+      operationId: publicWebsiteStatisticsNoAuth
+      summary: Public website statistics (no auth)
+      tags:
+        - Public
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/auth/refresh:
+    post:
+      operationId: refreshAccessToken
+      summary: Refresh access token
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/auth/oidc/authorize:
+    post:
+      operationId: initiateOidcPkceAuthorization
+      summary: Initiate OIDC PKCE authorization
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OIDCAuthorizeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/auth/oidc/callback:
+    post:
+      operationId: completeOidcPkceTokenExchange
+      summary: Complete OIDC PKCE token exchange
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OIDCCallbackRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      operationId: oidcCallbackRedirectLandingPage
+      summary: OIDC callback redirect landing page
+      tags:
+        - Auth
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Authorization code from OIDC provider
+        - name: state
+          in: query
+          schema:
+            type: string
+          description: OIDC state parameter
+      responses:
+        '200':
+          description: Success HTML page
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/auth/me:
+    get:
+      operationId: getCurrentUserProfile
+      summary: Get current user profile
+      tags:
+        - Auth
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/auth/logout:
+    post:
+      operationId: logoutAndInvalidateSession
+      summary: Logout and invalidate session
+      tags:
+        - Auth
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/auth/profile:
+    put:
+      operationId: updateCurrentUserProfile
+      summary: Update current user profile
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/ws:
+    get:
+      operationId: websocketUpgradeForRealtimeEvents
+      summary: WebSocket upgrade for realtime events
+      tags:
+        - WebSocket
+      security:
+        - hubWebSocketQueryToken: []
+        - bearerAuth: []
+      responses:
+        '101':
+          description: Switching Protocols
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/search:
+    get:
+      operationId: searchUsers
+      summary: Search users
+      tags:
+        - Contacts
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query string
+          required: true
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts:
+    get:
+      operationId: listContactsFriends
+      summary: List contacts/friends
+      tags:
+        - Contacts
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/friend-requests:
+    get:
+      operationId: listIncomingFriendRequests
+      summary: List incoming friend requests
+      tags:
+        - Contacts
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: sendAFriendRequest
+      summary: Send a friend request
+      tags:
+        - Contacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendFriendRequestRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/friend-requests/{id}/accept:
+    post:
+      operationId: acceptAFriendRequest
+      summary: Accept a friend request
+      tags:
+        - Contacts
+      parameters:
+        - $ref: '#/components/parameters/FriendRequestId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/friend-requests/{id}/reject:
+    post:
+      operationId: rejectAFriendRequest
+      summary: Reject a friend request
+      tags:
+        - Contacts
+      parameters:
+        - $ref: '#/components/parameters/FriendRequestId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/{userId}:
+    delete:
+      operationId: removeAContact
+      summary: Remove a contact
+      tags:
+        - Contacts
+      parameters:
+        - $ref: '#/components/parameters/ContactUserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/{userId}/block:
+    post:
+      operationId: blockAContact
+      summary: Block a contact
+      tags:
+        - Contacts
+      parameters:
+        - $ref: '#/components/parameters/ContactUserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/{userId}/unblock:
+    post:
+      operationId: unblockAContact
+      summary: Unblock a contact
+      tags:
+        - Contacts
+      parameters:
+        - $ref: '#/components/parameters/ContactUserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/contacts/{userId}/remark:
+    put:
+      operationId: updateContactRemarkAlias
+      summary: Update contact remark/alias
+      tags:
+        - Contacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRemarkRequest'
+      parameters:
+        - $ref: '#/components/parameters/ContactUserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions:
+    get:
+      operationId: listUserSessions
+      summary: List user sessions
+      tags:
+        - Sessions
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createADirectSession
+      summary: Create a direct session
+      tags:
+        - Sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/search:
+    get:
+      operationId: searchSessions
+      summary: Search sessions
+      tags:
+        - Sessions
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query
+          required: true
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/private:
+    post:
+      operationId: createAPrivateSessionSelf
+      summary: Create a private session (self)
+      tags:
+        - Sessions
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePrivateSessionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/group:
+    post:
+      operationId: createAGroupSession
+      summary: Create a group session
+      tags:
+        - Sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupSessionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}:
+    delete:
+      operationId: deleteSessionForCurrentUser
+      summary: Delete session for current user
+      tags:
+        - Sessions
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/info:
+    put:
+      operationId: updateSessionGroupInfo
+      summary: Update session/group info
+      tags:
+        - Sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSessionInfoRequest'
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/members:
+    post:
+      operationId: addMembersToSession
+      summary: Add members to session
+      tags:
+        - Sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMembersRequest'
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/members/{userId}:
+    delete:
+      operationId: removeMemberFromSession
+      summary: Remove member from session
+      tags:
+        - Sessions
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/SessionMemberUserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/leave:
+    post:
+      operationId: leaveASession
+      summary: Leave a session
+      tags:
+        - Sessions
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/dissolve:
+    post:
+      operationId: dissolveAGroupSessionOwnerOnly
+      summary: Dissolve a group session (owner only)
+      tags:
+        - Sessions
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/transfer-owner:
+    post:
+      operationId: transferSessionOwnership
+      summary: Transfer session ownership
+      tags:
+        - Sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferOwnerRequest'
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/settings:
+    put:
+      operationId: updateMemberSettings
+      summary: Update member settings
+      tags:
+        - Sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSessionSettingsRequest'
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/messages:
+    get:
+      operationId: getSessionMessages
+      summary: Get session messages
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+        - name: before
+          in: query
+          schema:
+            type: string
+          description: Timestamp cursor for pagination
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: sendMessageToSession
+      summary: Send message to session
+      tags:
+        - Messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/messages/sync:
+    get:
+      operationId: getIncrementalMessagesSinceLastSync
+      summary: Get incremental messages since last sync
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: since
+          in: query
+          schema:
+            type: string
+          description: Timestamp/cursor for incremental sync
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/messages/search:
+    get:
+      operationId: searchMessagesWithinASession
+      summary: Search messages within a session
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query
+          required: true
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/pins:
+    get:
+      operationId: listPinnedMessages
+      summary: List pinned messages
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/read:
+    post:
+      operationId: markSessionAsRead
+      summary: Mark session as read
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/sessions/{id}/agents:
+    post:
+      operationId: addAgentToSessionAndTriggerTask
+      summary: Add agent to session and trigger task
+      tags:
+        - AgentTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddAgentToSessionRequest'
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/messages/search:
+    get:
+      operationId: searchAllMessages
+      summary: Search all messages
+      tags:
+        - Messages
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query
+          required: true
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/messages/{id}:
+    put:
+      operationId: editAMessage
+      summary: Edit a message
+      tags:
+        - Messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditMessageRequest'
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/messages/{id}/recall:
+    post:
+      operationId: recallDeleteAMessage
+      summary: Recall/delete a message
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/messages/{id}/pin:
+    post:
+      operationId: pinAMessage
+      summary: Pin a message
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: unpinAMessage
+      summary: Unpin a message
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/messages/{id}/reactions:
+    get:
+      operationId: listMessageReactions
+      summary: List message reactions
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: addAReaction
+      summary: Add a reaction
+      tags:
+        - Messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddReactionRequest'
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: removeAReaction
+      summary: Remove a reaction
+      tags:
+        - Messages
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/messages/{id}/forward:
+    post:
+      operationId: forwardMessageToAnotherSession
+      summary: Forward message to another session
+      tags:
+        - Messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForwardMessageRequest'
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/attachments/probe:
+    post:
+      operationId: probeAttachmentMetadataBeforeUpload
+      summary: Probe attachment metadata before upload
+      tags:
+        - Attachments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProbeAttachmentRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/attachments:
+    post:
+      operationId: uploadAFileAttachment
+      summary: Upload a file attachment
+      tags:
+        - Attachments
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadAttachmentRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/attachments/{id}:
+    get:
+      operationId: downloadAnAttachment
+      summary: Download an attachment
+      tags:
+        - Attachments
+      parameters:
+        - $ref: '#/components/parameters/AttachmentId'
+      responses:
+        '200':
+          description: File content
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/notifications:
+    get:
+      operationId: listNotifications
+      summary: List notifications
+      tags:
+        - Notifications
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/notifications/{id}/read:
+    post:
+      operationId: markNotificationAsRead
+      summary: Mark notification as read
+      tags:
+        - Notifications
+      parameters:
+        - $ref: '#/components/parameters/NotificationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/notifications/read-all:
+    post:
+      operationId: markAllNotificationsAsRead
+      summary: Mark all notifications as read
+      tags:
+        - Notifications
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /client/settings:
+    get:
+      operationId: getUserSettings
+      summary: Get user settings
+      tags:
+        - Settings
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: patchUserSettings
+      summary: Patch user settings
+      tags:
+        - Settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchSettingsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /edge/devices/register:
+    post:
+      operationId: registerADesktopEdgeDevice
+      summary: Register a desktop edge device
+      tags:
+        - Devices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /cloud/edge/register:
+    post:
+      operationId: registerACloudEdgeDevice
+      summary: Register a cloud edge device
+      tags:
+        - Devices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCloudEdgeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/devices:
+    get:
+      operationId: listUserDevices
+      summary: List user devices
+      tags:
+        - Devices
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks:
+    post:
+      operationId: triggerAnAgentTask
+      summary: Trigger an agent task
+      tags:
+        - AgentTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerTaskRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/cancel:
+    post:
+      operationId: cancelAnAgentTask
+      summary: Cancel an agent task
+      tags:
+        - AgentTasks
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/regenerate:
+    post:
+      operationId: regenerateAnAgentTaskResponse
+      summary: Regenerate an agent task response
+      tags:
+        - AgentTasks
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/summary:
+    get:
+      operationId: getTaskEventSummary
+      summary: Get task event summary
+      tags:
+        - AgentTasks
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/events/summary:
+    get:
+      operationId: getTaskEventSummaryAlias
+      summary: Get task event summary (alias)
+      tags:
+        - AgentTasks
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/events:
+    get:
+      operationId: getTaskEventStream
+      summary: Get task event stream
+      tags:
+        - AgentTasks
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: since
+          in: query
+          schema:
+            type: integer
+          description: Event sequence number to start from
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            maximum: 200
+          description: Max events to return
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/approvals:
+    get:
+      operationId: getTaskApprovalRequests
+      summary: Get task approval requests
+      tags:
+        - AgentTasks
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/approvals/{approvalId}/decide:
+    post:
+      operationId: decideTaskApprovalAllowDeny
+      summary: Decide task approval (allow/deny)
+      tags:
+        - AgentTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/TaskApprovalId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-tasks/{id}/artifacts:
+    get:
+      operationId: getTaskArtifacts
+      summary: Get task artifacts
+      tags:
+        - AgentTasks
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /edge/agent-tasks/{id}/ack:
+    post:
+      operationId: acknowledgeTaskDispatch
+      summary: Acknowledge task dispatch
+      tags:
+        - EdgeTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EdgeTaskAckRequest'
+      parameters:
+        - $ref: '#/components/parameters/EdgeTaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /edge/agent-tasks/{id}/stream:
+    post:
+      operationId: streamAgentOutputEvents
+      summary: Stream agent output events
+      tags:
+        - EdgeTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EdgeTaskStreamRequest'
+      parameters:
+        - $ref: '#/components/parameters/EdgeTaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /edge/agent-tasks/{id}/done:
+    post:
+      operationId: reportTaskCompletion
+      summary: Report task completion
+      tags:
+        - EdgeTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EdgeTaskDoneRequest'
+      parameters:
+        - $ref: '#/components/parameters/EdgeTaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /edge/agent-tasks/{id}/fail:
+    post:
+      operationId: reportTaskFailure
+      summary: Report task failure
+      tags:
+        - EdgeTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EdgeTaskFailRequest'
+      parameters:
+        - $ref: '#/components/parameters/EdgeTaskId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/custom-agents:
+    get:
+      operationId: listCustomAgents
+      summary: List custom agents
+      tags:
+        - CustomAgents
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createACustomAgent
+      summary: Create a custom agent
+      tags:
+        - CustomAgents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomAgentRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/custom-agents/{id}:
+    put:
+      operationId: updateACustomAgent
+      summary: Update a custom agent
+      tags:
+        - CustomAgents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomAgentRequest'
+      parameters:
+        - $ref: '#/components/parameters/CustomAgentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteACustomAgent
+      summary: Delete a custom agent
+      tags:
+        - CustomAgents
+      parameters:
+        - $ref: '#/components/parameters/CustomAgentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-profiles:
+    get:
+      operationId: listAgentProfiles
+      summary: List agent profiles
+      tags:
+        - AgentProfiles
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAnAgentProfile
+      summary: Create an agent profile
+      tags:
+        - AgentProfiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentProfileRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-profiles/{id}:
+    get:
+      operationId: getAnAgentProfile
+      summary: Get an agent profile
+      tags:
+        - AgentProfiles
+      parameters:
+        - $ref: '#/components/parameters/AgentProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateAnAgentProfile
+      summary: Update an agent profile
+      tags:
+        - AgentProfiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAgentProfileRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAnAgentProfile
+      summary: Delete an agent profile
+      tags:
+        - AgentProfiles
+      parameters:
+        - $ref: '#/components/parameters/AgentProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-profiles/{id}/publish:
+    post:
+      operationId: publishProfileToMarketplaceAdmin
+      summary: Publish profile to marketplace (admin)
+      tags:
+        - AgentProfiles
+      parameters:
+        - $ref: '#/components/parameters/AgentProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-profiles/{id}/install:
+    post:
+      operationId: installProfileFromMarketplace
+      summary: Install profile from marketplace
+      tags:
+        - AgentProfiles
+      parameters:
+        - $ref: '#/components/parameters/AgentProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/skills:
+    get:
+      operationId: listSkills
+      summary: List skills
+      tags:
+        - Skills
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createASkill
+      summary: Create a skill
+      tags:
+        - Skills
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSkillRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/skills/{id}:
+    get:
+      operationId: getASkill
+      summary: Get a skill
+      tags:
+        - Skills
+      parameters:
+        - $ref: '#/components/parameters/SkillId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: updateASkill
+      summary: Update a skill
+      tags:
+        - Skills
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSkillRequest'
+      parameters:
+        - $ref: '#/components/parameters/SkillId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteASkill
+      summary: Delete a skill
+      tags:
+        - Skills
+      parameters:
+        - $ref: '#/components/parameters/SkillId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/skills/{id}/publish:
+    post:
+      operationId: publishASkillAdmin
+      summary: Publish a skill (admin)
+      tags:
+        - Skills
+      parameters:
+        - $ref: '#/components/parameters/SkillId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/skills/{id}/unpublish:
+    post:
+      operationId: unpublishASkillAdmin
+      summary: Unpublish a skill (admin)
+      tags:
+        - Skills
+      parameters:
+        - $ref: '#/components/parameters/SkillId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/mcp-servers:
+    get:
+      operationId: listMcpServers
+      summary: List MCP servers
+      tags:
+        - MCPServers
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAnMcpServer
+      summary: Create an MCP server
+      tags:
+        - MCPServers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMCPServerRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/mcp-servers/{id}:
+    get:
+      operationId: getAnMcpServer
+      summary: Get an MCP server
+      tags:
+        - MCPServers
+      parameters:
+        - $ref: '#/components/parameters/MCPServerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: updateAnMcpServer
+      summary: Update an MCP server
+      tags:
+        - MCPServers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMCPServerRequest'
+      parameters:
+        - $ref: '#/components/parameters/MCPServerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAnMcpServer
+      summary: Delete an MCP server
+      tags:
+        - MCPServers
+      parameters:
+        - $ref: '#/components/parameters/MCPServerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/mcp-servers/{id}/publish:
+    post:
+      operationId: publishMcpServerAdmin
+      summary: Publish MCP server (admin)
+      tags:
+        - MCPServers
+      parameters:
+        - $ref: '#/components/parameters/MCPServerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/mcp-servers/{id}/unpublish:
+    post:
+      operationId: unpublishMcpServerAdmin
+      summary: Unpublish MCP server (admin)
+      tags:
+        - MCPServers
+      parameters:
+        - $ref: '#/components/parameters/MCPServerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/market/profiles:
+    get:
+      operationId: searchMarketplaceAgentProfiles
+      summary: Search marketplace agent profiles
+      tags:
+        - Market
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/market/profiles/{id}:
+    get:
+      operationId: getAMarketplaceAgentProfile
+      summary: Get a marketplace agent profile
+      tags:
+        - Market
+      parameters:
+        - $ref: '#/components/parameters/MarketProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/market/profiles/{id}/install:
+    post:
+      operationId: installAMarketplaceProfile
+      summary: Install a marketplace profile
+      tags:
+        - Market
+      parameters:
+        - $ref: '#/components/parameters/MarketProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/market/profiles/{id}/rate:
+    post:
+      operationId: rateAMarketplaceProfile
+      summary: Rate a marketplace profile
+      tags:
+        - Market
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateProfileRequest'
+      parameters:
+        - $ref: '#/components/parameters/MarketProfileId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/provider-bindings:
+    get:
+      operationId: listProviderBindings
+      summary: List provider bindings
+      tags:
+        - ProviderBindings
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAProviderBinding
+      summary: Create a provider binding
+      tags:
+        - ProviderBindings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProviderBindingRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/provider-bindings/{id}:
+    put:
+      operationId: updateAProviderBinding
+      summary: Update a provider binding
+      tags:
+        - ProviderBindings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProviderBindingRequest'
+      parameters:
+        - $ref: '#/components/parameters/ProviderBindingId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAProviderBinding
+      summary: Delete a provider binding
+      tags:
+        - ProviderBindings
+      parameters:
+        - $ref: '#/components/parameters/ProviderBindingId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/execution-targets:
+    get:
+      operationId: listExecutionTargets
+      summary: List execution targets
+      tags:
+        - ExecutionTargets
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAnExecutionTarget
+      summary: Create an execution target
+      tags:
+        - ExecutionTargets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExecutionTargetRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/execution-targets/{id}:
+    get:
+      operationId: getAnExecutionTarget
+      summary: Get an execution target
+      tags:
+        - ExecutionTargets
+      parameters:
+        - $ref: '#/components/parameters/ExecutionTargetId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateAnExecutionTarget
+      summary: Update an execution target
+      tags:
+        - ExecutionTargets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExecutionTargetRequest'
+      parameters:
+        - $ref: '#/components/parameters/ExecutionTargetId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAnExecutionTarget
+      summary: Delete an execution target
+      tags:
+        - ExecutionTargets
+      parameters:
+        - $ref: '#/components/parameters/ExecutionTargetId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/execution-targets/{id}/ping:
+    post:
+      operationId: pingAnExecutionTarget
+      summary: Ping an execution target
+      tags:
+        - ExecutionTargets
+      parameters:
+        - $ref: '#/components/parameters/ExecutionTargetId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/documents:
+    get:
+      operationId: listDocuments
+      summary: List documents
+      tags:
+        - Documents
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createADocument
+      summary: Create a document
+      tags:
+        - Documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/documents/{id}:
+    get:
+      operationId: getADocument
+      summary: Get a document
+      tags:
+        - Documents
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateADocument
+      summary: Update a document
+      tags:
+        - Documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteADocument
+      summary: Delete a document
+      tags:
+        - Documents
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/projects:
+    get:
+      operationId: listProjectsWorkspaces
+      summary: List projects/workspaces
+      tags:
+        - Projects
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAProjectWorkspace
+      summary: Create a project/workspace
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/projects/{id}:
+    get:
+      operationId: getAProjectWorkspace
+      summary: Get a project/workspace
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateAProjectWorkspace
+      summary: Update a project/workspace
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspaceRequest'
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/projects/{id}/threads:
+    get:
+      operationId: listProjectThreads
+      summary: List project threads
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAProjectThread
+      summary: Create a project thread
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceThreadRequest'
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/projects/{id}/threads/{threadId}/messages:
+    get:
+      operationId: listProjectThreadMessages
+      summary: List project thread messages
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkspaceThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createProjectThreadMessage
+      summary: Create project thread message
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateThreadMessageRequest'
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/WorkspaceThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/audit-events:
+    get:
+      operationId: listAuditEventsAdmin
+      summary: List audit events (admin)
+      tags:
+        - Audit
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/relay/commands:
+    post:
+      operationId: createRelayCommandAdmin
+      summary: Create relay command (admin)
+      tags:
+        - Relay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRelayCommandRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/relay/commands/{id}:
+    get:
+      operationId: getRelayCommandAdmin
+      summary: Get relay command (admin)
+      tags:
+        - Relay
+      parameters:
+        - $ref: '#/components/parameters/RelayCommandId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/relay/commands/{id}/ack:
+    post:
+      operationId: acknowledgeRelayCommandAdmin
+      summary: Acknowledge relay command (admin)
+      tags:
+        - Relay
+      parameters:
+        - $ref: '#/components/parameters/RelayCommandId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams:
+    get:
+      operationId: listAgentTeams
+      summary: List agent teams
+      tags:
+        - AgentTeams
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAnAgentTeam
+      summary: Create an agent team
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentTeamRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}:
+    get:
+      operationId: getAnAgentTeam
+      summary: Get an agent team
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: updateAnAgentTeam
+      summary: Update an agent team
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAgentTeamRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAnAgentTeam
+      summary: Delete an agent team
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/members:
+    post:
+      operationId: addMemberToTeam
+      summary: Add member to team
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeamMemberRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/members/{memberId}:
+    delete:
+      operationId: removeMemberFromTeam
+      summary: Remove member from team
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamMemberId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs:
+    get:
+      operationId: listTeamRuns
+      summary: List team runs
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: startATeamRun
+      summary: Start a team run
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartTeamRunRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}:
+    get:
+      operationId: getATeamRun
+      summary: Get a team run
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/state:
+    get:
+      operationId: getTeamRunState
+      summary: Get team run state
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/events:
+    get:
+      operationId: listTeamRunEvents
+      summary: List team run events
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/tasks:
+    get:
+      operationId: listTeamRunTasks
+      summary: List team run tasks
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/route-decisions:
+    post:
+      operationId: handleRouteDecision
+      summary: Handle route decision
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteDecisionRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/approvals/{approvalId}/decide:
+    post:
+      operationId: decideTeamApproval
+      summary: Decide team approval
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+        - $ref: '#/components/parameters/TeamApprovalId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/conflicts/{conflictId}/resolve:
+    post:
+      operationId: resolveATeamConflict
+      summary: Resolve a team conflict
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveConflictRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+        - $ref: '#/components/parameters/TeamConflictId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/assignments:
+    get:
+      operationId: listTeamAssignments
+      summary: List team assignments
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createTeamAssignment
+      summary: Create team assignment
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssignmentRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/assignments/{assignmentId}/dispatch:
+    post:
+      operationId: dispatchTeamAssignment
+      summary: Dispatch team assignment
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+        - $ref: '#/components/parameters/TeamAssignmentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/assignments/{assignmentId}/complete:
+    post:
+      operationId: completeTeamAssignment
+      summary: Complete team assignment
+      tags:
+        - AgentTeams
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+        - $ref: '#/components/parameters/TeamAssignmentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /web/agent-teams/{id}/runs/{runId}/assignments/{assignmentId}/fail:
+    post:
+      operationId: failTeamAssignment
+      summary: Fail team assignment
+      tags:
+        - AgentTeams
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FailAssignmentRequest'
+      parameters:
+        - $ref: '#/components/parameters/AgentTeamId'
+        - $ref: '#/components/parameters/TeamRunId'
+        - $ref: '#/components/parameters/TeamAssignmentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/health:
+    get:
+      operationId: edgeHealthCheck
+      summary: Edge health check
+      tags:
+        - EdgeFoundation
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/events:
+    get:
+      operationId: openEdgeWebsocketEventStream
+      summary: Open Edge WebSocket event stream
+      tags:
+        - EdgeFoundation
+      security:
+        - edgeWebSocketQueryToken: []
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
+      responses:
+        '101':
+          description: Switching Protocols
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/model-catalog:
+    get:
+      operationId: getModelCatalog
+      summary: Get model catalog
+      tags:
+        - EdgeFoundation
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/metrics:
+    get:
+      operationId: getEdgeMetrics
+      summary: Get Edge metrics
+      tags:
+        - EdgeFoundation
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/projects:
+    get:
+      operationId: listEdgeProjects
+      summary: List Edge projects
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createEdgeProject
+      summary: Create Edge project
+      tags:
+        - EdgeProjects
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEdgeProjectRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/projects/{projectId}:
+    get:
+      operationId: getEdgeProject
+      summary: Get Edge project
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeProjectId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateEdgeProjectPlanned
+      summary: Update Edge project (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeProjectId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteEdgeProjectPlanned
+      summary: Delete Edge project (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeProjectId'
+      responses:
+        '204':
+          description: Deleted
+  /v1/projects/{projectId}/memory:
+    get:
+      operationId: getProjectMemoryPlanned
+      summary: Get project memory (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeProjectId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateProjectMemoryPlanned
+      summary: Update project memory (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeProjectId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/threads:
+    get:
+      operationId: listEdgeThreads
+      summary: List Edge threads
+      tags:
+        - EdgeProjects
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+          description: Filter by project ID
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createEdgeThread
+      summary: Create Edge thread
+      tags:
+        - EdgeProjects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateThreadRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/threads/{threadId}:
+    get:
+      operationId: getEdgeThread
+      summary: Get Edge thread
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateEdgeThread
+      summary: Update Edge thread
+      tags:
+        - EdgeProjects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateThreadRequest'
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteEdgeThread
+      summary: Delete Edge thread
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/threads/{threadId}:archive:
+    post:
+      operationId: archiveThreadPlanned
+      summary: Archive thread (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/threads/{threadId}:fork:
+    post:
+      operationId: forkThreadPlanned
+      summary: Fork thread (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/threads/{threadId}/items:
+    get:
+      operationId: listThreadItems
+      summary: List thread items
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/threads/{threadId}/messages:
+    get:
+      operationId: listThreadMessages
+      summary: List thread messages
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/threads/{threadId}/pins:
+    get:
+      operationId: listThreadPins
+      summary: List thread pins
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeThreadId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/items/{itemId}:
+    get:
+      operationId: getItem
+      summary: Get item
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeItemId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/conversations:
+    get:
+      operationId: listConversationsPlanned
+      summary: List conversations (planned)
+      tags:
+        - EdgeProjects
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+    post:
+      operationId: createConversationPlanned
+      summary: Create conversation (planned)
+      tags:
+        - EdgeProjects
+      responses:
+        '201':
+          $ref: '#/components/responses/Created'
+  /v1/conversations/{conversationId}:
+    get:
+      operationId: getConversationPlanned
+      summary: Get conversation (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeConversationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateConversationPlanned
+      summary: Update conversation (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeConversationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/conversations/{conversationId}:archive:
+    post:
+      operationId: archiveConversationPlanned
+      summary: Archive conversation (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeConversationId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/conversations/{conversationId}/members:
+    get:
+      operationId: listConversationMembersPlanned
+      summary: List conversation members (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeConversationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+    post:
+      operationId: addConversationMemberPlanned
+      summary: Add conversation member (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeConversationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/conversations/{conversationId}/members/{memberId}:
+    delete:
+      operationId: removeConversationMemberPlanned
+      summary: Remove conversation member (planned)
+      tags:
+        - EdgeProjects
+      parameters:
+        - $ref: '#/components/parameters/EdgeConversationId'
+        - $ref: '#/components/parameters/EdgeMemberId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runners:
+    get:
+      operationId: listAgentRuntimes
+      summary: List agent runtimes
+      tags:
+        - EdgeRuns
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runners/{runnerId}:
+    get:
+      operationId: getAgentRuntimePlanned
+      summary: Get agent runtime (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunnerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runners/{runnerId}:ping:
+    post:
+      operationId: pingAgentRuntimePlanned
+      summary: Ping agent runtime (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunnerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runners/{runnerId}:drain:
+    post:
+      operationId: drainAgentRuntimePlanned
+      summary: Drain agent runtime (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunnerId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/agents:
+    get:
+      operationId: listAgents
+      summary: List agents
+      tags:
+        - EdgeRuns
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runs:
+    get:
+      operationId: listAgentRuns
+      summary: List agent runs
+      tags:
+        - EdgeRuns
+      parameters:
+        - name: threadId
+          in: query
+          schema:
+            type: string
+          description: Filter by thread
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Filter by status
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAnAgentRun
+      summary: Create an agent run
+      tags:
+        - EdgeRuns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRunRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runs/{runId}:
+    get:
+      operationId: getAnAgentRun
+      summary: Get an agent run
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runs/{runId}:cancel:
+    post:
+      operationId: cancelAnAgentRun
+      summary: Cancel an agent run
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/runs/{runId}:interrupt:
+    post:
+      operationId: interruptAgentRunPlanned
+      summary: Interrupt agent run (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/runs/{runId}:resume:
+    post:
+      operationId: resumeAgentRunPlanned
+      summary: Resume agent run (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/runs/{runId}:retry:
+    post:
+      operationId: retryAgentRunPlanned
+      summary: Retry agent run (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/runs/{runId}/items:
+    get:
+      operationId: listRunItemsPlanned
+      summary: List run items (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+  /v1/runs/{runId}/logs:
+    get:
+      operationId: getRunLogsPlanned
+      summary: Get run logs (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/runs/{runId}/diff:
+    get:
+      operationId: getRunDiffSnapshot
+      summary: Get run diff snapshot
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeRunId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/artifacts:
+    get:
+      operationId: listArtifacts
+      summary: List artifacts
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - name: runId
+          in: query
+          schema:
+            type: string
+          description: Filter by run
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/artifacts/{artifactId}:
+    get:
+      operationId: getArtifactMetadata
+      summary: Get artifact metadata
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgeArtifactId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/artifacts/{artifactId}/content:
+    get:
+      operationId: getArtifactContentPlanned
+      summary: Get artifact content (planned)
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgeArtifactId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/artifacts/{artifactId}:apply:
+    post:
+      operationId: applyArtifactPlanned
+      summary: Apply artifact (planned)
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgeArtifactId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/artifacts/{artifactId}:discard:
+    post:
+      operationId: discardArtifactPlanned
+      summary: Discard artifact (planned)
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgeArtifactId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/previews:
+    get:
+      operationId: listPreviews
+      summary: List previews
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - name: runId
+          in: query
+          schema:
+            type: string
+          description: Filter by run
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: startAPreviewPlanned
+      summary: Start a preview (planned)
+      tags:
+        - EdgeArtifacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePreviewRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/previews/{previewId}:
+    get:
+      operationId: getPreview
+      summary: Get preview
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgePreviewId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/previews/{previewId}:stop:
+    post:
+      operationId: stopPreview
+      summary: Stop preview
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgePreviewId'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+  /v1/workspaces/{workspaceId}:
+    get:
+      operationId: getWorkspacePlanned
+      summary: Get workspace (planned)
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgeWorkspaceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/workspaces/{workspaceId}/files:
+    get:
+      operationId: listWorkspaceFilesPlanned
+      summary: List workspace files (planned)
+      tags:
+        - EdgeArtifacts
+      parameters:
+        - $ref: '#/components/parameters/EdgeWorkspaceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/approvals:
+    get:
+      operationId: listApprovalRequestsPlanned
+      summary: List approval requests (planned)
+      tags:
+        - EdgeRuns
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+    post:
+      operationId: createApprovalRequestPlanned
+      summary: Create approval request (planned)
+      tags:
+        - EdgeRuns
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/approvals/{approvalId}:
+    get:
+      operationId: getApprovalRequestPlanned
+      summary: Get approval request (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeApprovalId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/approvals/{approvalId}:decide:
+    post:
+      operationId: decideApprovalPlanned
+      summary: Decide approval (planned)
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeApprovalId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/agent-instances:
+    get:
+      operationId: listAgentInstances
+      summary: List agent instances
+      tags:
+        - EdgeRuns
+      responses:
+        '200':
+          $ref: '#/components/responses/EdgeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAgentInstancePlanned
+      summary: Create agent instance (planned)
+      tags:
+        - EdgeRuns
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/agent-instances/{id}:
+    get:
+      operationId: getAgentInstance
+      summary: Get agent instance
+      tags:
+        - EdgeRuns
+      parameters:
+        - $ref: '#/components/parameters/EdgeAgentInstanceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/permissions/decide:
+    post:
+      operationId: decidePermissionRequest
+      summary: Decide permission request
+      tags:
+        - EdgePermissions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionDecisionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/auth/login:
+    post:
+      operationId: legacyAuthLoginPlanned
+      summary: Legacy auth login (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/auth/logout:
+    post:
+      operationId: legacyAuthLogoutPlanned
+      summary: Legacy auth logout (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/users/me:
+    get:
+      operationId: legacyGetCurrentUserPlanned
+      summary: Legacy get current user (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/contacts:
+    get:
+      operationId: legacyListContactsPlanned
+      summary: Legacy list contacts (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/contacts:request:
+    post:
+      operationId: legacySendFriendRequestPlanned
+      summary: Legacy send friend request (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/contacts/{userId}:accept:
+    post:
+      operationId: legacyAcceptFriendRequestPlanned
+      summary: Legacy accept friend request (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyUserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/contacts/{userId}:
+    delete:
+      operationId: legacyDeleteContactPlanned
+      summary: Legacy delete contact (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyUserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/groups:
+    get:
+      operationId: legacyListGroupsPlanned
+      summary: Legacy list groups (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: legacyCreateGroupPlanned
+      summary: Legacy create group (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/groups/{groupId}:
+    get:
+      operationId: legacyGetGroupPlanned
+      summary: Legacy get group (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyGroupId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: legacyDeleteGroupPlanned
+      summary: Legacy delete group (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyGroupId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/devices:
+    get:
+      operationId: legacyListDevicesPlanned
+      summary: Legacy list devices (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/devices:register:
+    post:
+      operationId: legacyRegisterDevicePlanned
+      summary: Legacy register device (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/devices/{deviceId}:
+    get:
+      operationId: legacyGetDevicePlanned
+      summary: Legacy get device (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyDeviceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/edges:
+    get:
+      operationId: legacyListEdgesPlanned
+      summary: Legacy list edges (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/edges:register:
+    post:
+      operationId: legacyRegisterEdgePlanned
+      summary: Legacy register edge (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/edges/{edgeId}:
+    get:
+      operationId: legacyGetEdgePlanned
+      summary: Legacy get edge (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyEdgeId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/edges/{edgeId}:heartbeat:
+    post:
+      operationId: legacyEdgeHeartbeatPlanned
+      summary: Legacy edge heartbeat (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyEdgeId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/sync/events:upload:
+    post:
+      operationId: legacySyncUploadEventsPlanned
+      summary: Legacy sync upload events (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/sync/events:
+    get:
+      operationId: legacySyncGetEventsPlanned
+      summary: Legacy sync get events (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/sync/ack:
+    post:
+      operationId: legacySyncAckPlanned
+      summary: Legacy sync ack (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/sync/state:
+    get:
+      operationId: legacySyncStatePlanned
+      summary: Legacy sync state (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/relay/commands:
+    post:
+      operationId: legacyCreateRelayCommandPlanned
+      summary: Legacy create relay command (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/relay/commands/{commandId}:
+    get:
+      operationId: legacyGetRelayCommandPlanned
+      summary: Legacy get relay command (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyCommandId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/relay/commands/{commandId}:ack:
+    post:
+      operationId: legacyAckRelayCommandPlanned
+      summary: Legacy ack relay command (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyCommandId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/relay/edges/{edgeId}:
+    get:
+      operationId: legacyGetRelayEdgePlanned
+      summary: Legacy get relay edge (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyEdgeId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/cloud/edges:
+    get:
+      operationId: legacyListCloudEdgesPlanned
+      summary: Legacy list cloud edges (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/cloud/runners:allocate:
+    post:
+      operationId: legacyAllocateCloudRunnerPlanned
+      summary: Legacy allocate cloud runner (planned)
+      tags:
+        - Legacy
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/cloud/runners/{runnerId}:release:
+    post:
+      operationId: legacyReleaseCloudRunnerPlanned
+      summary: Legacy release cloud runner (planned)
+      tags:
+        - Legacy
+      parameters:
+        - $ref: '#/components/parameters/LegacyRunnerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Hub-issued HS256 JWT access token
+    edgeBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Local Edge token
+      description: Optional Local Edge token
+    edgeLocalToken:
+      type: apiKey
+      in: header
+      name: X-AgentHub-Edge-Token
+      description: Header alternative for Local Edge token
+    edgeWebSocketQueryToken:
+      type: apiKey
+      in: query
+      name: access_token
+      description: Browser WebSocket Local Edge token
+    hubWebSocketQueryToken:
+      type: apiKey
+      in: query
+      name: access_token
+      description: Hub-issued JWT for browser WebSocket upgrade
+  parameters:
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        default: 50
+        minimum: 1
+        maximum: 200
+      description: Page size (1-200)
+    PageCursor:
+      name: pageCursor
+      in: query
+      schema:
+        type: string
+      description: Pagination cursor
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Session ID
+    MessageId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Message ID
+    ContactUserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Contact user ID
+    FriendRequestId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Friend request ID
+    SessionMemberUserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Member user ID
+    AttachmentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Attachment ID
+    NotificationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Notification ID
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Task ID
+    TaskApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Approval ID
+    EdgeTaskId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Edge task ID
+    CustomAgentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Custom agent ID
+    AgentProfileId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Agent profile ID
+    SkillId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Skill ID
+    MCPServerId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: MCP server ID
+    MarketProfileId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Market profile ID
+    ProviderBindingId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Provider binding ID
+    ExecutionTargetId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Execution target ID
+    DocumentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Document ID
+    WorkspaceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Workspace/project ID
+    WorkspaceThreadId:
+      name: threadId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Thread ID
+    RelayCommandId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Relay command ID
+    AgentTeamId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Agent team ID
+    TeamMemberId:
+      name: memberId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Team member ID
+    TeamRunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Team run ID
+    TeamApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Team approval ID
+    TeamConflictId:
+      name: conflictId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Team conflict ID
+    TeamAssignmentId:
+      name: assignmentId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Team assignment ID
+    EdgeProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Project ID
+    EdgeThreadId:
+      name: threadId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Thread ID
+    EdgeItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Item ID
+    EdgeConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Conversation ID
+    EdgeMemberId:
+      name: memberId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Conversation member ID
+    EdgeRunnerId:
+      name: runnerId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Runner ID
+    EdgeRunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Run ID
+    EdgeApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Approval ID
+    EdgeArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Artifact ID
+    EdgePreviewId:
+      name: previewId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Preview ID
+    EdgeWorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Workspace ID
+    EdgeAgentInstanceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Agent instance ID
+    LegacyUserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: User ID
+    LegacyGroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Group ID
+    LegacyDeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Device ID
+    LegacyEdgeId:
+      name: edgeId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Edge ID
+    LegacyCommandId:
+      name: commandId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Command ID
+    LegacyRunnerId:
+      name: runnerId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Runner ID
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            traceId:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+    ListResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    PageInfo:
+      type: object
+      required:
+        - hasMore
+      properties:
+        nextCursor:
+          type: string
+        hasMore:
+          type: boolean
+    RefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+    OIDCAuthorizeRequest:
+      type: object
+      required:
+        - code_challenge
+        - device_type
+        - device_id
+      properties:
+        code_challenge:
+          type: string
+        code_challenge_method:
+          type: string
+          enum:
+            - S256
+          default: S256
+        device_type:
+          type: string
+          enum:
+            - desktop
+            - web
+            - cli
+        device_id:
+          type: string
+          format: uuid
+        redirect_uri:
+          type: string
+          format: uri
+    OIDCCallbackRequest:
+      type: object
+      required:
+        - code
+        - state
+        - code_verifier
+        - device_type
+        - device_id
+      properties:
+        code:
+          type: string
+        state:
+          type: string
+        code_verifier:
+          type: string
+        device_type:
+          type: string
+          enum:
+            - desktop
+            - web
+            - cli
+        device_id:
+          type: string
+          format: uuid
+        redirect_uri:
+          type: string
+          format: uri
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+    UpdateRemarkRequest:
+      type: object
+      required:
+        - remark
+      properties:
+        remark:
+          type: string
+    SendFriendRequestRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+        message:
+          type: string
+    CreateSessionRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+    CreatePrivateSessionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+    CreateGroupSessionRequest:
+      type: object
+      required:
+        - name
+        - member_ids
+      properties:
+        name:
+          type: string
+        member_ids:
+          type: array
+          items:
+            type: string
+        avatar_url:
+          type: string
+    UpdateSessionInfoRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        avatar_url:
+          type: string
+        description:
+          type: string
+    AddMembersRequest:
+      type: object
+      required:
+        - user_ids
+      properties:
+        user_ids:
+          type: array
+          items:
+            type: string
+    TransferOwnerRequest:
+      type: object
+      required:
+        - new_owner_id
+      properties:
+        new_owner_id:
+          type: string
+    UpdateSessionSettingsRequest:
+      type: object
+      properties:
+        muted:
+          type: boolean
+        pinned:
+          type: boolean
+    SendMessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+        content_type:
+          type: string
+          default: text
+        reply_to:
+          type: string
+        mentions:
+          type: array
+          items:
+            type: string
+        attachments:
+          type: array
+          items:
+            type: string
+    EditMessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+    AddReactionRequest:
+      type: object
+      required:
+        - emoji
+      properties:
+        emoji:
+          type: string
+    RemoveReactionRequest:
+      type: object
+      required:
+        - emoji
+      properties:
+        emoji:
+          type: string
+    ForwardMessageRequest:
+      type: object
+      required:
+        - target_session_id
+      properties:
+        target_session_id:
+          type: string
+    AddAgentToSessionRequest:
+      type: object
+      required:
+        - agent_profile_id
+      properties:
+        agent_profile_id:
+          type: string
+        target_id:
+          type: string
+        message:
+          type: string
+    ProbeAttachmentRequest:
+      type: object
+      required:
+        - name
+        - size
+        - mime_type
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+          format: int64
+        mime_type:
+          type: string
+        session_id:
+          type: string
+    UploadAttachmentRequest:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+    PatchSettingsRequest:
+      type: object
+      additionalProperties: true
+    RegisterDeviceRequest:
+      type: object
+      required:
+        - device_id
+        - device_type
+        - device_name
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        device_type:
+          type: string
+          enum:
+            - desktop
+        device_name:
+          type: string
+        platform:
+          type: string
+        platform_version:
+          type: string
+    RegisterCloudEdgeRequest:
+      type: object
+      required:
+        - edge_id
+        - edge_name
+      properties:
+        edge_id:
+          type: string
+        edge_name:
+          type: string
+        region:
+          type: string
+    TriggerTaskRequest:
+      type: object
+      required:
+        - agent_profile_id
+        - session_id
+        - message
+      properties:
+        agent_profile_id:
+          type: string
+        session_id:
+          type: string
+        target_id:
+          type: string
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+    ApprovalDecisionRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+          enum:
+            - allow
+            - deny
+        reason:
+          type: string
+    EdgeTaskAckRequest:
+      type: object
+      properties:
+        run_id:
+          type: string
+          maxLength: 128
+        edge_run_id:
+          type: string
+          maxLength: 128
+    EdgeTaskStreamRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          maxLength: 1048576
+        event_type:
+          type: string
+          maxLength: 96
+        payload:
+          type: object
+          additionalProperties: true
+        client_msg_id:
+          type: string
+          format: uuid
+        run_id:
+          type: string
+          maxLength: 128
+        edge_run_id:
+          type: string
+          maxLength: 128
+    EdgeTaskDoneRequest:
+      type: object
+      properties:
+        run_id:
+          type: string
+          maxLength: 128
+        edge_run_id:
+          type: string
+          maxLength: 128
+        final_content:
+          type: string
+          maxLength: 1048576
+    EdgeTaskFailRequest:
+      type: object
+      required:
+        - error
+      properties:
+        run_id:
+          type: string
+          maxLength: 128
+        edge_run_id:
+          type: string
+          maxLength: 128
+        error:
+          type: string
+          maxLength: 1048576
+    CreateCustomAgentRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        system_prompt:
+          type: string
+        model:
+          type: string
+        tools:
+          type: array
+          items:
+            type: string
+    UpdateCustomAgentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        system_prompt:
+          type: string
+        model:
+          type: string
+        tools:
+          type: array
+          items:
+            type: string
+    CreateAgentProfileRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        system_prompt:
+          type: string
+        model:
+          type: string
+        tools:
+          type: array
+          items:
+            type: string
+        icon_url:
+          type: string
+    UpdateAgentProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        system_prompt:
+          type: string
+        model:
+          type: string
+        tools:
+          type: array
+          items:
+            type: string
+        icon_url:
+          type: string
+    CreateSkillRequest:
+      type: object
+      required:
+        - name
+        - content
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    UpdateSkillRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    CreateMCPServerRequest:
+      type: object
+      required:
+        - name
+        - command
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+    UpdateMCPServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+    RateProfileRequest:
+      type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+    CreateProviderBindingRequest:
+      type: object
+      required:
+        - provider
+        - api_key
+      properties:
+        provider:
+          type: string
+        api_key:
+          type: string
+        base_url:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+    UpdateProviderBindingRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+        api_key:
+          type: string
+        base_url:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+    CreateExecutionTargetRequest:
+      type: object
+      required:
+        - name
+        - target_type
+      properties:
+        name:
+          type: string
+        target_type:
+          type: string
+          enum:
+            - desktop
+            - web
+            - cli
+            - cloud
+        description:
+          type: string
+        device_id:
+          type: string
+    UpdateExecutionTargetRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        device_id:
+          type: string
+    CreateDocumentRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        format:
+          type: string
+          default: markdown
+    UpdateDocumentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        format:
+          type: string
+    CreateWorkspaceRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    UpdateWorkspaceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    CreateWorkspaceThreadRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    CreateThreadMessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+        role:
+          type: string
+          default: user
+    CreateRelayCommandRequest:
+      type: object
+      required:
+        - command
+        - target_edge_id
+      properties:
+        command:
+          type: string
+        target_edge_id:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+    CreateAgentTeamRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        member_ids:
+          type: array
+          items:
+            type: string
+    UpdateAgentTeamRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    AddTeamMemberRequest:
+      type: object
+      required:
+        - user_id
+        - role
+      properties:
+        user_id:
+          type: string
+        role:
+          type: string
+          enum:
+            - member
+            - admin
+    StartTeamRunRequest:
+      type: object
+      required:
+        - task
+      properties:
+        task:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+    RouteDecisionRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+        agent_id:
+          type: string
+        reasoning:
+          type: string
+    ResolveConflictRequest:
+      type: object
+      required:
+        - resolution
+      properties:
+        resolution:
+          type: string
+        comment:
+          type: string
+    CreateAssignmentRequest:
+      type: object
+      required:
+        - agent_id
+        - task
+      properties:
+        agent_id:
+          type: string
+        task:
+          type: string
+        priority:
+          type: integer
+          default: 0
+    FailAssignmentRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+    CreateEdgeProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    CreateThreadRequest:
+      type: object
+      required:
+        - projectId
+      properties:
+        projectId:
+          type: string
+        title:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    UpdateThreadRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    CreateRunRequest:
+      type: object
+      required:
+        - threadId
+        - agentId
+      properties:
+        threadId:
+          type: string
+        agentId:
+          type: string
+        instructions:
+          type: string
+        model:
+          type: string
+        tools:
+          type: array
+          items:
+            type: string
+    CreatePreviewRequest:
+      type: object
+      required:
+        - runId
+      properties:
+        previewId:
+          type: string
+        runId:
+          type: string
+        threadId:
+          type: string
+    PermissionDecisionRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+          enum:
+            - allow
+            - deny
+        requestId:
+          type: string
+        reason:
+          type: string
+    AgentRunEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+        session_id:
+          type: string
+        agent_instance_id:
+          type: string
+        event_seq:
+          type: integer
+          format: int64
+        event_type:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+    AgentRunEventSummary:
+      type: object
+      properties:
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+        status:
+          type: string
+        total_events:
+          type: integer
+        last_event_seq:
+          type: integer
+          format: int64
+        event_type_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        tool_call_count:
+          type: integer
+        step_count:
+          type: integer
+        artifact_count:
+          type: integer
+        approval_count:
+          type: integer
+        pending_approvals:
+          type: integer
+        decided_approvals:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        output_bytes:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        elapsed_ms:
+          type: integer
+          format: int64
+    RunDiff:
+      type: object
+      required:
+        - runId
+        - files
+      properties:
+        runId:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunDiffFile'
+    RunDiffFile:
+      type: object
+      required:
+        - path
+        - diff
+        - status
+      properties:
+        path:
+          type: string
+        diff:
+          type: string
+        status:
+          type: string
+          enum:
+            - added
+            - modified
+            - deleted
+    Artifact:
+      type: object
+      required:
+        - id
+        - runId
+        - threadId
+        - kind
+        - path
+        - sizeBytes
+        - createdAt
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        threadId:
+          type: string
+        kind:
+          type: string
+        path:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Preview:
+      type: object
+      required:
+        - id
+        - runId
+        - threadId
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        threadId:
+          type: string
+        url:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum:
+            - starting
+            - ready
+            - stopped
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ModelCatalog:
+      type: object
+      required:
+        - items
+        - sources
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelCatalogItem'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelCatalogSource'
+    ModelCatalogItem:
+      type: object
+      required:
+        - id
+        - value
+        - label
+        - sourceId
+        - sourceLabel
+        - status
+      properties:
+        id:
+          type: string
+        value:
+          type: string
+        label:
+          type: string
+        provider:
+          type: string
+        runtimeId:
+          type: string
+        resolvedModel:
+          type: string
+        sourceId:
+          type: string
+        sourceLabel:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        default:
+          type: boolean
+    ModelCatalogSource:
+      type: object
+      required:
+        - id
+        - label
+        - status
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+        detail:
+          type: string
+    HubWebSocketFrame:
+      type: object
+      required:
+        - type
+        - payload
+      properties:
+        type:
+          type: string
+          enum:
+            - auth
+            - auth.ok
+            - auth.fail
+            - typing
+            - message.new
+            - message.edited
+            - message.recall
+            - message.pin
+            - message.unpin
+            - message.read
+            - message.reaction_added
+            - message.reaction_removed
+            - session.created
+            - session.dissolved
+            - session.member_joined
+            - session.member_left
+            - session.info_updated
+            - device.online
+            - device.offline
+            - device.kicked
+            - agent.dispatch
+            - agent.stream
+            - agent.done
+            - agent.failed
+            - agent.cancel
+            - agent.control
+            - agent.timeout
+            - team.run.started
+            - team.event
+            - team.assignment.done
+            - team.assignment.failed
+            - notification.new
+            - friend.request
+            - friend.accepted
+        payload:
+          type: object
+          additionalProperties: true
+  responses:
+    Ok:
+      description: Successful operation
+    Created:
+      description: Resource created
+    Accepted:
+      description: Request accepted for processing
+    NoContent:
+      description: No content
+    ListResponse:
+      description: Paginated list response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ListResponse'
+    EdgeListResponse:
+      description: Edge paginated list response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ListResponse'
+    BadRequest:
+      description: BadRequest
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: NotFound
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: InternalError
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
 security:
   - bearerAuth: []
-
-paths:
