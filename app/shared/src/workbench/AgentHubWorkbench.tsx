@@ -1279,6 +1279,52 @@ export function AgentHubWorkbench({
     showWorkbenchToast(cardActionLabel(action, title));
   }
 
+  /** Handles block actions (approve/deny/retry/copy/regenerate) from the ChatViewTranscript component chain. */
+  function handleTranscriptBlockAction(action: string, blockId: string, metadata?: Record<string, unknown>): void {
+    const block = transcript.find((b) => b.id === blockId);
+    if (!block) return;
+
+    if (action === 'approve' || action === 'deny') {
+      // Approval blocks carry PermissionRequestTranscriptBlock data
+      if (block.kind === 'permission_request') {
+        const decision: ApprovalDecisionAction = {
+          approvalId: block.requestId,
+          decision: action === 'approve' ? 'allow' : 'deny',
+          teamId: block.teamId,
+          teamRunId: block.teamRunId,
+          agentTaskId: block.agentTaskId,
+          targetId: block.targetId,
+          edgeDeviceId: block.edgeDeviceId,
+          correlationId: block.correlationId,
+        };
+        onApprovalDecision?.(decision);
+        pulseBlock(blockId);
+        showWorkbenchToast(action === 'approve' ? '已批准' : '已拒绝');
+      }
+    }
+
+    if (action === 'retry' || action === 'regenerate') {
+      // Retry a failed agent message -- dispatch regeneration
+      if (block.kind === 'text' && block.author.role === 'agent') {
+        setSoftHiddenBlockIds((current) => {
+          const next = new Set(current);
+          next.add(block.id);
+          return Array.from(next);
+        });
+        onRegenerate?.(blockId);
+        pulseBlock(blockId);
+        showWorkbenchToast('正在重新生成');
+      }
+    }
+
+    if (action === 'copy') {
+      const title = (metadata?.text as string) || blockTitle(block);
+      copyText(title);
+      pulseBlock(blockId);
+      showWorkbenchToast(cardActionLabel('copy', title));
+    }
+  }
+
   function runMultiAction(action: string): void {
     const count = selectedBlockIds.length;
     if (!count) {
@@ -1462,7 +1508,24 @@ export function AgentHubWorkbench({
               />
             ) : null}
             <div className={styles.transcriptRegion}>
-              <ChatViewTranscript transcript={displayTranscript} chatMode={activeConversation?.kind === 'group' ? 'group' : 'dm'} />
+              <ChatViewTranscript
+                transcript={displayTranscript}
+                chatMode={activeConversation?.kind === 'group' ? 'group' : 'dm'}
+                onAgentClick={openAgentProfile}
+                onBlockContextMenu={(blockId, event) => {
+                  const block = transcript.find((b) => b.id === blockId);
+                  if (block) openBlockContextMenu(block, event as unknown as TranscriptContextMenuEvent);
+                }}
+                onBlockSelect={(blockId, shiftKey) => handleBlockSelect(blockId, { shiftKey })}
+                onBlockAction={handleTranscriptBlockAction}
+                onReviewFile={openReviewFile}
+                selectedBlockIds={new Set(selectedBlockIds)}
+                selectionMode={selectionMode}
+                softHiddenBlockIds={new Set(softHiddenBlockIds)}
+                actionedBlockIds={new Set(actionedBlockIds)}
+                highlightedBlockId={searchHighlightId}
+                onHighlightEnd={handleSearchHighlightEnd}
+              />
             </div>
             <MessageSearchPanel
               open={searchOpen}

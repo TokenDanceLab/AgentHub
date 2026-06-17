@@ -30,7 +30,24 @@ export interface TranscriptAgentItem {
   displayTitle?: string
   badgeLabel?: string
   badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
+  /** ID of the upstream block this message is replying to. */
+  replyBlockId?: string
+  /** Author name of the replied message. */
+  replyAuthor?: string
+  /** Short preview of the replied message content. */
+  replyPreview?: string
+  /** Evidence references collected from the block's evidenceRefs. */
+  evidenceRefs?: { id: string; kind: string; label: string; status?: string; path?: string; uri?: string; mimeType?: string }[]
 }
 
 /** Union type of items Transcript can render. */
 export type TranscriptItem = TranscriptUserItem | TranscriptAgentItem
+
+/** Generic action callback from Transcript to consumer.
+ *  Actions: 'copy', 'regenerate', 'pin', 'reply', 'quote', 'link', 'delete'.
+ *  Metadata carries action-specific payload (e.g. selected text for copy). */
+export type BlockActionCallback = (
+  action: string,
+  blockId: string,
+  metadata?: Record<string, unknown>,
+) => void

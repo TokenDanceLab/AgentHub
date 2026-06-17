@@ -54,9 +54,16 @@ interface Props {
   onRetry?: (id: string) => void
   onCopy?: (id: string, text: string) => void
   onFileClick?: (id: string) => void
+  onContextMenu?: (id: string, event: React.MouseEvent) => void
+  onBlockSelect?: (id: string, shiftKey: boolean) => void
+  onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
+  selected?: boolean
+  selectedAny?: boolean
+  softHidden?: boolean
+  actioned?: boolean
 }
 
-export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick }: Props) {
+export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const isOpen = item.type === 'route' ? true : open
@@ -75,15 +82,23 @@ export default function RowItem({ item, onToggle, onApprove, onReject, onRetry, 
   const labelText = labelParams ? t(labelKey, labelParams) : t(labelKey)
   const resultClass = isToolResult(item) ? ' result-row' : ''
 
-  const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}`
+  const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}${selected ? ' selected' : ''}${softHidden ? ' soft-hidden' : ''}`
 
   const handleClick = () => {
     if (item.status === 'running' || !item.collapsible) return
     setOpen(!open); onToggle?.(item.id)
   }
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    onContextMenu?.(item.id, e)
+  }
+
+  const handleSelectClick = (e: React.MouseEvent) => {
+    onBlockSelect?.(item.id, e.shiftKey)
+  }
+
   return (
-    <div className={cls}>
+    <div className={cls} onContextMenu={onContextMenu ? handleContextMenu : undefined} onClick={onBlockSelect ? handleSelectClick : undefined} data-block-id={item.id} tabIndex={0}>
       <div className="row-hd" onClick={handleClick}>
         <IconComp className={`row-icon${item.fileOp === 'cr' ? ' cr' : item.fileOp === 'mod' ? ' mod' : item.fileOp === 'del' ? ' del' : ''}`} size={16} />
         <span className="row-label">
