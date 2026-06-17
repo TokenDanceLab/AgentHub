@@ -16,7 +16,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import JSZip from 'jszip';
 import { AlertCircle, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
 import styles from './SlideshowPreview.module.css';
 
@@ -47,7 +46,22 @@ function extractTextFromXml(xmlString: string): string[] {
   return texts;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Lazy JSZip loader — dynamic import keeps ~96 KB out of main bundle.
+// Only loaded when a slideshow file (.pptx/.odp) is actually opened.
+// ═══════════════════════════════════════════════════════════════════════
+
+let jszipModule: typeof import('jszip') | null = null;
+
+async function getJSZip(): Promise<typeof import('jszip')> {
+  if (!jszipModule) {
+    jszipModule = await import('jszip');
+  }
+  return jszipModule;
+}
+
 async function parsePptx(arrayBuffer: ArrayBuffer): Promise<SlideData[]> {
+  const JSZip = await getJSZip();
   const zip = await JSZip.loadAsync(arrayBuffer);
 
   /* Find slide files: ppt/slides/slide1.xml, slide2.xml, etc. */
