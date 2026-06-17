@@ -143,6 +143,12 @@ paths:
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
       responses:
         "201":
           $ref: "#/components/responses/Created"
@@ -338,6 +344,12 @@ paths:
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadRequest"
       responses:
         "201":
           $ref: "#/components/responses/Created"
@@ -364,6 +376,12 @@ paths:
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateThreadRequest"
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -1204,6 +1222,12 @@ paths:
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePrivateSessionRequest"
       responses:
         "201":
           description: Session created.
@@ -1217,6 +1241,12 @@ paths:
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupSessionRequest"
       responses:
         "201":
           description: Group created.
@@ -1249,6 +1279,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendSessionMessageRequest"
       responses:
         "201":
           description: Message sent.
@@ -5433,22 +5469,33 @@ components:
         type:
           type: string
           enum:
+            - auth
+            - auth.ok
+            - auth.fail
+            - typing
             - message.new
             - message.edited
+            - message.recall
+            - message.pin
+            - message.unpin
+            - message.read
             - message.reaction_added
             - message.reaction_removed
-            - device.online
-            - device.offline
             - session.created
+            - session.dissolved
             - session.member_joined
             - session.member_left
             - session.info_updated
+            - device.online
+            - device.offline
+            - device.kicked
             - agent.dispatch
             - agent.stream
             - agent.done
             - agent.failed
             - agent.cancel
             - agent.control
+            - agent.timeout
             - team.run.started
             - team.event
             - team.assignment.done
@@ -5747,6 +5794,75 @@ components:
           type: string
           maxLength: 1048576
           description: Failure reason persisted on the task and broadcast as agent.failed. Hub rejects values above the 1 MiB callback payload budget.
+    CreateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Project display name.
+        description:
+          type: string
+          description: Optional project description.
+    CreateThreadRequest:
+      type: object
+      required: [projectId]
+      properties:
+        projectId:
+          type: string
+          description: Owning project id.
+        title:
+          type: string
+          description: Optional thread title.
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Optional key/value metadata for the thread.
+    UpdateThreadRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Updated thread title.
+        status:
+          type: string
+          description: Updated thread status.
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Optional key/value metadata to merge or replace.
+    CreatePrivateSessionRequest:
+      type: object
+      required: [peer_user_id]
+      properties:
+        peer_user_id:
+          type: string
+          description: The other user id for this 1-on-1 session.
+    CreateGroupSessionRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Group session name.
+        member_ids:
+          type: array
+          items:
+            type: string
+          description: Initial member user ids. May be empty for owner-only group sessions that later invite an Agent.
+    SendSessionMessageRequest:
+      type: object
+      required: [content_type, content]
+      properties:
+        content_type:
+          type: string
+          description: Message content type, such as text, code, diff, image, or file.
+        content:
+          type: string
+          description: Message content payload. Text messages carry the message body directly.
+        client_msg_id:
+          type: string
+          format: uuid
+          description: Client-generated idempotency key.
     StartRunRequest:
       type: object
       properties:

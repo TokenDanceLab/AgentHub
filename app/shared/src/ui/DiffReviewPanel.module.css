@@ -191,6 +191,8 @@
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.55;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
 }
 
 /* ── Side-by-side columns ─────────────────────────────────────── */

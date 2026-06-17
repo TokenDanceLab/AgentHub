@@ -431,7 +431,6 @@ func (e *decisionLoopEmitter) runScope() map[string]any {
 // this factory wraps the raw adapter emitter with step tracking.
 type DecisionLoopEmitterFactory struct {
 	loop *DecisionLoop
-	stdin io.Writer
 }
 
 // NewDecisionLoopEmitterFactory creates a factory that wraps emitters with

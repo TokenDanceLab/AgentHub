@@ -33,7 +33,7 @@ describe('Hub session reducer', () => {
         type: 'session.received',
         accessToken: 'hub-access',
         refreshToken: 'hub-refresh',
-        userSub: 'tokendance-Delicious233',
+        userSub: 'tokendance-alice',
         expiresAt: '2026-06-08T10:30:00.000Z',
       },
     );
@@ -42,7 +42,7 @@ describe('Hub session reducer', () => {
       status: 'active',
       accessToken: 'hub-access',
       refreshToken: 'hub-refresh',
-      userSub: 'tokendance-Delicious233',
+      userSub: 'tokendance-alice',
       expiresAt: '2026-06-08T10:30:00.000Z',
     });
     expect(Object.keys(next)).not.toContain('providerAccessToken');
@@ -70,7 +70,7 @@ describe('Hub session reducer', () => {
           status: 'active',
           accessToken: 'hub-access',
           refreshToken: 'hub-refresh',
-          userSub: 'tokendance-Delicious233',
+          userSub: 'tokendance-alice',
         },
         { type: 'session.cleared' },
       ),
@@ -92,7 +92,7 @@ describe('Hub session storage', () => {
       status: 'active',
       accessToken: 'hub-access-TokenDance',
       refreshToken: 'hub-refresh-TokenDance',
-      userSub: 'tokendance-Delicious233',
+      userSub: 'tokendance-alice',
       expiresAt: '2026-06-08T10:30:00.000Z',
     };
 
@@ -114,7 +114,7 @@ describe('Hub session storage', () => {
       status: 'active',
       accessToken: 'hub-access',
       refreshToken: 'hub-refresh',
-      userSub: 'tokendance-Delicious233',
+      userSub: 'tokendance-alice',
     });
     await storage.clear();
 
@@ -130,7 +130,7 @@ describe('Hub session expiry and identity boundary', () => {
           status: 'active',
           accessToken: 'hub-access',
           refreshToken: 'hub-refresh',
-          userSub: 'tokendance-Delicious233',
+          userSub: 'tokendance-alice',
           expiresAt: '2026-06-08T10:30:00.000Z',
         },
         new Date('2026-06-08T10:30:00.000Z'),
@@ -142,7 +142,7 @@ describe('Hub session expiry and identity boundary', () => {
           status: 'active',
           accessToken: 'hub-access',
           refreshToken: 'hub-refresh',
-          userSub: 'tokendance-Delicious233',
+          userSub: 'tokendance-alice',
           expiresAt: '2026-06-08T10:30:01.000Z',
         },
         new Date('2026-06-08T10:30:00.000Z'),
@@ -156,11 +156,11 @@ describe('Hub session expiry and identity boundary', () => {
         status: 'active',
         accessToken: 'hub-access',
         refreshToken: 'hub-refresh',
-        userSub: 'tokendance-Delicious233',
+        userSub: 'tokendance-alice',
       }),
     ).toEqual({
       hubSessionStatus: 'active',
-      tokenDanceIdSubject: 'tokendance-Delicious233',
+      tokenDanceIdSubject: 'tokendance-alice',
       hasHubAccessToken: true,
       hasHubRefreshToken: true,
       storesTokenDanceIdToken: false,

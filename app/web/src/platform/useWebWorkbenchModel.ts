@@ -13,8 +13,6 @@ import {
   workbenchDataModeLabel,
 } from '@shared/demo';
 import {
-  contactInfoToMember,
-  hubEmptyContacts,
   resolveHubContacts,
   type HubContactLike,
 } from '@shared/workbench/hubDataMapping';
@@ -242,7 +240,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   // Contact mutation hooks (Hub)
   const searchUser = useSearchHubUser();
   const sendFriendRequest = useSendFriendRequest();
-  const friendRequests = useListFriendRequests({ enabled: hubReady });
+  useListFriendRequests({ enabled: hubReady });
   const acceptFriendRequest = useAcceptFriendRequest();
   const rejectFriendRequest = useRejectFriendRequest();
   const removeContact = useRemoveContact();
@@ -381,6 +379,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     messages.data,
     mergedRuntimeEvents,
     dataMode,
+    selectedConversationId,
   );
   const taskContractStatusBlocks = resolveWebTaskContractStatusBlocks(
     activeAgentTaskId,
@@ -1098,11 +1097,12 @@ export function resolveWebWorkbenchTranscript(
   messages: HubMessageTranscriptInput[] | undefined,
   liveRuntimeEvents: HubRuntimeEventTranscriptInput[],
   dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
+  conversationId?: string,
 ): TranscriptBlock[] {
   if (!hubReady) {
     return isWorkbenchRealDataMode(dataMode)
       ? webHubEmptyTranscript
-      : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
+      : resolveDemoWorkbenchTranscript(conversationId || WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
   }
   if (activeHubSessionId) {
     return [
@@ -1112,7 +1112,7 @@ export function resolveWebWorkbenchTranscript(
   }
   return isWorkbenchRealDataMode(dataMode)
     ? webHubEmptyTranscript
-    : resolveDemoWorkbenchTranscript(WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
+    : resolveDemoWorkbenchTranscript(conversationId || WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
 }
 
 export function appendHubRuntimeEvent(
@@ -1138,10 +1138,40 @@ export function mergeHubRuntimeEvents(
 }
 
 function hubRuntimeEventKey(event: HubRuntimeEventTranscriptInput): string {
-  return event.id ?? [
+  // When an explicit ID is present, use it as the key for ID-based dedup.
+  // Content hashing is reserved for events without IDs (composite-key fallback).
+  if (event.id) {
+    return event.id;
+  }
+  const identityKey = [
     event.task_id,
     event.edge_run_id,
     event.event_seq,
     event.event_type,
   ].filter((part) => part != null && String(part).trim()).join(':');
+
+  // Content-based dedup: include a hash of the payload to catch duplicate
+  // events that arrive with different IDs but identical content (common
+  // with WebSocket reconnection replays or hub edge replay overlap).
+  const payloadHash = event.payload != null ? hashPayload(event.payload) : '';
+  return payloadHash ? `${identityKey}|${payloadHash}` : identityKey;
+}
+
+function hashPayload(payload: unknown): string {
+  if (typeof payload === 'string') return hashString(payload);
+  if (typeof payload === 'object' && payload !== null) {
+    // Sort keys for deterministic hashing
+    return hashString(JSON.stringify(payload, Object.keys(payload as Record<string, unknown>).sort()));
+  }
+  return hashString(JSON.stringify(payload));
+}
+
+function hashString(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    const char = value.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
 }
