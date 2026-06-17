@@ -8,6 +8,8 @@
   background:var(--surface); border:1px solid var(--bdr); margin:0;
   overflow:hidden;
 }
+.row-item.selected { outline: 2px solid var(--primary); outline-offset: -2px }
+.row-item.soft-hidden { display:none }
 .row-item + .row-item { border-top:none; margin-top:-1px }
 .row-item:first-child { border-radius:var(--r-md) var(--r-md) 0 0 }
 .row-item:last-child { border-radius:0 0 var(--r-md) var(--r-md) }
@@ -98,6 +100,10 @@
 @keyframes routeSlideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
 @keyframes routePulse { 0%,100%{opacity:1} 50%{opacity:var(--opacity-route-mid)} }
 
+/* ── Scroll-to-block highlight (search jump) ────────────────────── */
+@keyframes highlightFadeOut { 0%{background:var(--highlight-flash, rgba(0,113,188,0.12));box-shadow:0 0 0 2px var(--primary)} 70%{background:var(--highlight-flash, rgba(0,113,188,0.12))} 100%{background:transparent;box-shadow:none} }
+.row-item.highlighted { animation:highlightFadeOut var(--dur-highlight, 3s) ease forwards }
+
 /* Deploy */ .row-item.deploy > .row-hd .row-icon { color:var(--primary) }
 .row-item.deploy > .row-bd { display:grid; gap:var(--sp-xs); padding-bottom:var(--sp-sm) }
 .row-item.deploy .dp-url { font:var(--label); color:var(--primary); word-break:break-all }
@@ -165,3 +171,15 @@
 .dag-pulse { animation:dagPulse var(--dur-pulse) ease infinite }
 
 .orch-note { font:var(--label); color:var(--text-3); font-style:italic }
+
+/* ── Evidence chips (rendered in AgentGroup, co-located with RowItem styles) ── */
+.evidence-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:4px }
+.evidence-chip {
+  display:inline-flex; align-items:center; gap:2px;
+  font:var(--label-xs); padding:1px 6px; border-radius:var(--r-xs);
+  background:var(--surface-low); color:var(--text-2);
+  cursor:default; line-height:1.4;
+}
+.evidence-chip:hover {
+  background:var(--surface-high); color:var(--text-1);
+}
