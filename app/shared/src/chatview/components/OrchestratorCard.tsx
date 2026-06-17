@@ -85,7 +85,7 @@ export const OrchestratorCard = memo(function OrchestratorCard({item}:{item:RowI
     </div>
     <div className="row-bd orch-body">
       {item.content&&<div className="orch-plan-text">{item.content}</div>}
-      {sw <= 0 ? <span className="orch-plan-text">No DAG</span> : <svg viewBox={`0 0 ${sw} ${sh}`} className="orch-dag">
+      {sw <= 0 ? <span className="orch-plan-text">No DAG</span> : <svg viewBox={`0 0 ${sw} ${sh}`} className="orch-dag" role="img" aria-label={item.label || 'Orchestrator DAG'}>
         <defs>
           <marker id={markerId} viewBox="0 0 10 7" refX={9} refY={3.5} markerWidth={5} markerHeight={4} orient="auto-start-reverse">
             <polygon points="0 0, 10 3.5, 0 7" fill="var(--bdr-strong)"/>

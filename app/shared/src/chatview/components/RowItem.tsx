@@ -104,7 +104,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
 
   return (
     <div className={cls} onContextMenu={onContextMenu ? handleContextMenu : undefined} onClick={onBlockSelect ? handleSelectClick : undefined} data-block-id={item.id} tabIndex={0}>
-      <div className="row-hd" onClick={handleClick}>
+      <div className="row-hd" onClick={handleClick} {...(item.collapsible ? { 'aria-expanded': isOpen } : {})}>
         <IconComp className={`row-icon${item.fileOp === 'cr' ? ' cr' : item.fileOp === 'mod' ? ' mod' : item.fileOp === 'del' ? ' del' : ''}`} size={16} />
         <span className="row-label">
           {item.type === 'file' ? (
@@ -129,7 +129,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
             <div className="code-block">
               <div className="code-head">
                 <span className="code-head-left"><FileTypeIcon item={item} /><span>{item.codeLang || labelText}</span></span>
-                <button className="code-copy" onClick={() => { const text = item.codeLines?.join('\n') || ''; onCopy ? onCopy(item.id, text) : navigator.clipboard?.writeText(text) }}>{t('code.copy')}</button>
+                <button className="code-copy" aria-label={t('code.copy')} onClick={() => { const text = item.codeLines?.join('\n') || ''; onCopy ? onCopy(item.id, text) : navigator.clipboard?.writeText(text) }}>{t('code.copy')}</button>
               </div>
               <div className="code-lines">{item.codeLines.map((line, i) => (
                 <div key={i} className="code-line"><span className="code-num">{i + 1}</span><span className="code-text">{line}</span></div>
@@ -146,7 +146,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
           )}
           {item.apReason && (<>
             <div className="ap-reason">{item.apReason}</div>
-            {item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
+            {item.status==='waiting' && <div className="ap-actions"><button className="ap-approve" aria-label={t('card.approval.approve')} onClick={() => onApprove?.(item.id)}>{t('card.approval.approve')}</button><button className="ap-deny" aria-label={t('card.approval.deny')} onClick={() => onReject?.(item.id)}>{t('card.approval.deny')}</button></div>}
           </>)}
           {item.url && <div className="dp-url" onClick={() => onDeploySubmit?.(item.id)} style={{cursor: onDeploySubmit ? 'pointer' : undefined}}>{item.url}</div>}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
@@ -163,7 +163,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
           )}
         </div>
       )}
-      {item.status==='fail' && onRetry && <div className="retry-bar"><button className="retry-btn" onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
+      {item.status==='fail' && onRetry && <div className="retry-bar"><button className="retry-btn" aria-label={t('card.fail.retry')} onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
     </div>
   )
 })

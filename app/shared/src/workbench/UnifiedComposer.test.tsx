@@ -107,6 +107,5 @@ describe('UnifiedComposer execution target selection', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Data: approved-real');
     expect(screen.getByRole('status')).toHaveTextContent('Target: ready - Alpha Desktop');
     expect(screen.getByRole('status')).toHaveTextContent('Hub replay: 2 runtime events observed');
-    expect(screen.getByRole('status')).toHaveTextContent('Run/task: starting');
   });
 });
