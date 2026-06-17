@@ -71,7 +71,7 @@ Current state: AgentHub has a basic prompt input via the `prompt-input` slot. It
 
 ### 3.3 What AgentHub Should Do
 
-Current state: ChatView.tsx renders messages with MarkdownRenderer, CodeBlock, and tool call cards. It supports streaming text and thinking display.
+Current state: ChatViewTranscript.tsx in app/shared/src/chatview/components/ renders messages with MarkdownRenderer, CodeBlock, and tool call cards. It supports streaming text and thinking display.
 
 **Recommended improvements:**
 1. **Tool call cards redesign** — Status indicators, expandable details, color coding (P0)

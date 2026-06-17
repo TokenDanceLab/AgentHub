@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Archive,
@@ -31,38 +31,6 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import GeneralSection from './settings/sections/GeneralSection';
-import ConfigurationSection from './settings/sections/ConfigurationSection';
-import PersonalizationSection from './settings/sections/PersonalizationSection';
-import PermissionsSection from './settings/sections/PermissionsSection';
-import AgentProfilesSection from './settings/sections/AgentProfilesSection';
-import ExecutionTargetsSection from './settings/sections/ExecutionTargetsSection';
-import TasksSection from './settings/sections/TasksSection';
-import OnlineImSection from './settings/sections/OnlineImSection';
-import GroupChatSection from './settings/sections/GroupChatSection';
-import AgentSchedulingSection from './settings/sections/AgentSchedulingSection';
-import AgentMarketSection from './settings/sections/AgentMarketSection';
-import KeyboardSection from './settings/sections/KeyboardSection';
-import McpSection from './settings/sections/McpSection';
-import SkillsSection from './settings/sections/SkillsSection';
-import HooksSection from './settings/sections/HooksSection';
-import ModelsSection from './settings/sections/ModelsSection';
-import ModelMappingSection from './settings/sections/ModelMappingSection';
-import CcSwitchSection from './settings/sections/CcSwitchSection';
-import AppearanceSection from './settings/sections/AppearanceSection';
-import ConnectionsSection from './settings/sections/ConnectionsSection';
-import RemoteControlSection from './settings/sections/RemoteControlSection';
-import GitSection from './settings/sections/GitSection';
-import EnvironmentSection from './settings/sections/EnvironmentSection';
-import WorktreeSection from './settings/sections/WorktreeSection';
-import BrowserSection from './settings/sections/BrowserSection';
-import ComputerUseSection from './settings/sections/ComputerUseSection';
-import PlatformsSection from './settings/sections/PlatformsSection';
-import AccountSection from './settings/sections/AccountSection';
-import SecurityAuditSection from './settings/sections/SecurityAuditSection';
-import ArchivedSection from './settings/sections/ArchivedSection';
-import DataSection from './settings/sections/DataSection';
-import AboutSection from './settings/sections/AboutSection';
 import { useHubStore } from '@/stores/hubStore';
 import { getEdgeBaseUrl } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
@@ -101,6 +69,39 @@ import {
   NOOP,
 } from './settings/utils';
 
+// ── Lazily loaded section components (33 sections, only one visible at a time) ──
+const GeneralSection = lazy(() => import('./settings/sections/GeneralSection'));
+const ConfigurationSection = lazy(() => import('./settings/sections/ConfigurationSection'));
+const PersonalizationSection = lazy(() => import('./settings/sections/PersonalizationSection'));
+const PermissionsSection = lazy(() => import('./settings/sections/PermissionsSection'));
+const AgentProfilesSection = lazy(() => import('./settings/sections/AgentProfilesSection'));
+const ExecutionTargetsSection = lazy(() => import('./settings/sections/ExecutionTargetsSection'));
+const TasksSection = lazy(() => import('./settings/sections/TasksSection'));
+const OnlineImSection = lazy(() => import('./settings/sections/OnlineImSection'));
+const GroupChatSection = lazy(() => import('./settings/sections/GroupChatSection'));
+const AgentSchedulingSection = lazy(() => import('./settings/sections/AgentSchedulingSection'));
+const AgentMarketSection = lazy(() => import('./settings/sections/AgentMarketSection'));
+const KeyboardSection = lazy(() => import('./settings/sections/KeyboardSection'));
+const McpSection = lazy(() => import('./settings/sections/McpSection'));
+const SkillsSection = lazy(() => import('./settings/sections/SkillsSection'));
+const HooksSection = lazy(() => import('./settings/sections/HooksSection'));
+const ModelsSection = lazy(() => import('./settings/sections/ModelsSection'));
+const ModelMappingSection = lazy(() => import('./settings/sections/ModelMappingSection'));
+const CcSwitchSection = lazy(() => import('./settings/sections/CcSwitchSection'));
+const AppearanceSection = lazy(() => import('./settings/sections/AppearanceSection'));
+const ConnectionsSection = lazy(() => import('./settings/sections/ConnectionsSection'));
+const RemoteControlSection = lazy(() => import('./settings/sections/RemoteControlSection'));
+const GitSection = lazy(() => import('./settings/sections/GitSection'));
+const EnvironmentSection = lazy(() => import('./settings/sections/EnvironmentSection'));
+const WorktreeSection = lazy(() => import('./settings/sections/WorktreeSection'));
+const BrowserSection = lazy(() => import('./settings/sections/BrowserSection'));
+const ComputerUseSection = lazy(() => import('./settings/sections/ComputerUseSection'));
+const PlatformsSection = lazy(() => import('./settings/sections/PlatformsSection'));
+const AccountSection = lazy(() => import('./settings/sections/AccountSection'));
+const SecurityAuditSection = lazy(() => import('./settings/sections/SecurityAuditSection'));
+const ArchivedSection = lazy(() => import('./settings/sections/ArchivedSection'));
+const DataSection = lazy(() => import('./settings/sections/DataSection'));
+const AboutSection = lazy(() => import('./settings/sections/AboutSection'));
 
 export type SectionId =
   | 'general'
@@ -529,6 +530,7 @@ export default function SettingsPage({
             <h1>{activeLabel}</h1>
           </div>
 
+          <Suspense fallback={<div className={styles.content} />}>
           {active === 'general' && (
             <GeneralSection
               detailLevel={detailLevel}
@@ -818,6 +820,7 @@ export default function SettingsPage({
             />
           )}
           {active === 'about' && <AboutSection />}
+          </Suspense>
         </div>
       </main>
     </div>

@@ -119,7 +119,7 @@ func TestCreatePrivateWithSelf(t *testing.T) {
 	w := postAuth("/client/sessions/private", a.Token, map[string]string{
 		"target_user_id": a.ID,
 	})
-	mustCode(t, parse(w), "BAD_REQUEST", "private with self")
+	mustCode(t, parse(w), "bad_request", "private with self")
 }
 
 func TestCreateGroupWithoutFriends(t *testing.T) {
@@ -141,7 +141,7 @@ func TestCreateGroupWithoutFriends(t *testing.T) {
 	w2 := postAuth("/client/sessions/group", a.Token, map[string]interface{}{
 		"name": "BadGroup", "member_ids": []string{c.ID},
 	})
-	mustCode(t, parse(w2), "BAD_REQUEST", "group with non-friend")
+	mustCode(t, parse(w2), "bad_request", "group with non-friend")
 }
 
 func TestDuplicateFriendRequest(t *testing.T) {
@@ -223,7 +223,7 @@ func TestInvalidContentType(t *testing.T) {
 		"content_type":  "invalid_type",
 		"content":       "test",
 	})
-	mustCode(t, parse(w2), "BAD_REQUEST", "invalid content_type")
+	mustCode(t, parse(w2), "bad_request", "invalid content_type")
 }
 
 func TestGetMessagesWithoutMembership(t *testing.T) {
@@ -290,14 +290,14 @@ func TestLoginWithInvalidDeviceType(t *testing.T) {
 		"username": "tlidt", "password": "pass1234",
 		"device_type": "", "device_id": "dddddddd-dddd-dddd-dddd-dddddddddd01",
 	})
-	mustCode(t, parse(w), "BAD_REQUEST", "empty device_type")
+	mustCode(t, parse(w), "bad_request", "empty device_type")
 
 	// Try to login with missing device_id - should fail (binding required)
 	w2 := post("/client/auth/login", map[string]interface{}{
 		"username": "tlidt", "password": "pass1234",
 		"device_type": "web",
 	})
-	mustCode(t, parse(w2), "BAD_REQUEST", "missing device_id")
+	mustCode(t, parse(w2), "bad_request", "missing device_id")
 
 	// Verify normal login still works
 	w3 := post("/client/auth/login", map[string]interface{}{

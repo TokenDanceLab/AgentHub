@@ -375,7 +375,7 @@ func TestScenarioDispatch_CreateTargetViaAPI(t *testing.T) {
 			json.NewDecoder(resp.Body).Decode(&r)
 			resp.Body.Close()
 			// All valid target types should succeed with OK code.
-			assert.Equal(t, "OK", r.GetCode(), "create target type=%s: code=%s message=%s", targetType, r.GetCode(), r.GetMsg())
+			assert.Equal(t, "ok", r.GetCode(), "create target type=%s: code=%s message=%s", targetType, r.GetCode(), r.GetMsg())
 		})
 	}
 }
@@ -426,7 +426,7 @@ func TestScenarioDispatch_InvalidTargetTypeViaAPI(t *testing.T) {
 			json.NewDecoder(resp.Body).Decode(&r)
 			resp.Body.Close()
 			// Invalid target types should be rejected with BAD_REQUEST.
-			assert.Equal(t, "BAD_REQUEST", r.GetCode(), "invalid type %s should be rejected, got code=%s message=%s", tp, r.GetCode(), r.GetMsg())
+			assert.Equal(t, "bad_request", r.GetCode(), "invalid type %s should be rejected, got code=%s message=%s", tp, r.GetCode(), r.GetMsg())
 		})
 	}
 }
@@ -491,7 +491,7 @@ func TestScenarioDispatch_TargetListByType(t *testing.T) {
 	var listResp apiResp
 	json.NewDecoder(resp.Body).Decode(&listResp)
 	resp.Body.Close()
-	assert.Equal(t, "OK", listResp.Code)
+	assert.Equal(t, "ok", listResp.Code)
 
 	// List filtered by type
 	for _, targetType := range []string{"local_edge", "tailscale"} {
@@ -499,7 +499,7 @@ func TestScenarioDispatch_TargetListByType(t *testing.T) {
 		var filterResp apiResp
 		json.NewDecoder(resp.Body).Decode(&filterResp)
 		resp.Body.Close()
-		assert.Equal(t, "OK", filterResp.Code, "list with filter target_type=%s", targetType)
+		assert.Equal(t, "ok", filterResp.Code, "list with filter target_type=%s", targetType)
 	}
 }
 

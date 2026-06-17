@@ -254,6 +254,13 @@ func (h *MessageHandler) AddMessageReaction(c *gin.Context) {
 		return
 	}
 
+	// Defense in depth: reject oversized reaction values at the HTTP boundary.
+	// The service layer also enforces maxMessageReactionLength (64 runes).
+	if len([]rune(req.Reaction)) > 100 {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
 	result, err := h.service.AddMessageReaction(c.Request.Context(), userID, req.SessionID, msgID, req.Reaction)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
@@ -275,6 +282,13 @@ func (h *MessageHandler) RemoveMessageReaction(c *gin.Context) {
 		Reaction  string `json:"reaction"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	// Defense in depth: reject oversized reaction values at the HTTP boundary.
+	// The service layer also enforces maxMessageReactionLength (64 runes).
+	if len([]rune(req.Reaction)) > 100 {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
@@ -333,7 +347,7 @@ func (h *MessageHandler) ForwardMessage(c *gin.Context) {
 	msgID := c.Param("id")
 
 	var req struct {
-		TargetSessionIDs []string `json:"target_session_ids"`
+		TargetSessionIDs []string `json:"target_session_ids" binding:"required,max=50"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, errcode.ErrBadRequest)

@@ -12,10 +12,6 @@
   line-height: 1;
 }
 
-.framed {
-  border: 1px solid var(--bdr);
-  background: var(--surface-low);
-}
 
 .compact {
   --runtime-brand-size: 16px;
@@ -36,12 +32,4 @@
   height: calc(var(--runtime-brand-size) * 0.76);
 }
 
-.fallbackText {
-  max-width: calc(var(--runtime-brand-size) - 4px);
-  overflow: hidden;
-  color: currentColor;
-  font: 750 0.625rem/1 var(--font-mono);
-  text-overflow: clip;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
+

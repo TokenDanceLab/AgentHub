@@ -41,19 +41,19 @@ export const localCliDiscoveryFixture: LocalCliDiscoveryManifest = {
       ...runtimeDefaults.codex,
       installed: true,
       version: '0.27.0',
-      path: 'C:/Users/Ding/AppData/Roaming/npm/codex.cmd',
+      path: '<HOMEDIR>/AppData/Roaming/npm/codex.cmd',
     },
     {
       ...runtimeDefaults['claude-code'],
       installed: true,
       version: '2.1.4',
-      path: 'C:/Users/Ding/AppData/Roaming/npm/claude.cmd',
+      path: '<HOMEDIR>/AppData/Roaming/npm/claude.cmd',
     },
     {
       ...runtimeDefaults.opencode,
       installed: true,
       version: '0.8.3',
-      path: 'C:/Users/Ding/AppData/Roaming/npm/opencode.cmd',
+      path: '<HOMEDIR>/AppData/Roaming/npm/opencode.cmd',
     },
   ],
 };

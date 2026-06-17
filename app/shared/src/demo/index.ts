@@ -32,10 +32,10 @@ export {
   createWorkbenchDemoRuntimeStore,
   demoWorkbenchAgents,
   demoWorkbenchPins,
-  demoWorkbenchTranscripts,
   projectGroupMessageLoopHubMessages,
   projectGroupMessageLoopTranscript,
   resolveDemoWorkbenchTranscript,
+  whenChatviewTranscriptsReady,
   workbenchDemoRuntimeStore,
 } from './workbenchDemo';
 export type {

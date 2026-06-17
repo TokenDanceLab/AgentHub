@@ -94,7 +94,7 @@
     "payload": {
       "input": {
         "command": "go test ./internal/adapters -run TestSDKFixtureMapper -count=1",
-        "cwd": "AgentHub"
+        "cwd": "agenthub"
       },
       "provider": "custom-openai-compatible-fixture",
       "reason": "custom runtime requested test execution approval",

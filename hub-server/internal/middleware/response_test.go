@@ -37,7 +37,7 @@ func TestFailHelper_ResponseFormat(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "BAD_REQUEST", resp.Error.Code)
+	assert.Equal(t, "bad_request", resp.Error.Code)
 	assert.NotEmpty(t, resp.Error.Message)
 }
 
@@ -54,19 +54,19 @@ func TestFailHelper_VariousErrorCodes(t *testing.T) {
 			name:           "bad request",
 			err:            errcode.ErrBadRequest,
 			expectedStatus: http.StatusBadRequest,
-			expectedCode:   "BAD_REQUEST",
+			expectedCode:   "bad_request",
 		},
 		{
 			name:           "internal error",
 			err:            errcode.ErrInternal,
 			expectedStatus: http.StatusInternalServerError,
-			expectedCode:   "INTERNAL_ERROR",
+			expectedCode:   "internal_error",
 		},
 		{
 			name:           "not found",
 			err:            errcode.SessionNotFound,
 			expectedStatus: http.StatusNotFound,
-			expectedCode:   "SESSION_NOT_FOUND",
+			expectedCode:   "session_not_found",
 		},
 		{
 			name:           "custom error with zero status",

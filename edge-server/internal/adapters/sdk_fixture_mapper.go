@@ -159,9 +159,7 @@ func MapSDKFixtureStream(stream SDKFixtureStream, scope map[string]any) []SDKMap
 		if eventProvider == "" {
 			eventProvider = "sdk-fixture"
 		}
-		for _, evt := range mapSDKFixtureEvent(fixtureEvent, eventProvider, scope) {
-			mapped = append(mapped, evt)
-		}
+		mapped = append(mapped, mapSDKFixtureEvent(fixtureEvent, eventProvider, scope)...)
 	}
 	return mapped
 }

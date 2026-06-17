@@ -431,15 +431,17 @@ OpenCode 在 dep 类型上的关键约定：
 
 ### 5.1 层到层映射
 
+> **Note:** As of ChatView migration, AgentHub no longer has a standalone `runner/` service; execution lifecycle lives in `edge-server/internal/lifecycle/` and `edge-server/internal/adapters/`. References to `runner/` below are retained for historical comparison with OpenCode's architecture only.
+
 | OpenCode Layer | OpenCode 包 | AgentHub 对应 | 关键差异 |
 |---------------|-------------|---------------|---------|
 | **Layer 0 Foundation** | `core`（Effect Services, Schema, 工具函数）| `packages/protocol/` + `packages/transport/` | OpenCode 的 core 是运行时+类型一体；AgentHub 的 protocol 是纯 proto 生成代码，transport 是纯接口。在 Go 中这些应分开。 |
-| **Layer 0 Foundation** | `llm`（LLM Protocol 状态机）| `packages/agent-core/` (agent loop model) + Runner 内部的 `internal/executor/` | Go 中 LLM 调用会通过 Agent CLI 子进程完成，不是 in-process 协议解析。但 LLMEvent/LLMError tagged union 的建模思路可直接映射为 Go sum types（interface + type switch）。 |
+| **Layer 0 Foundation** | `llm`（LLM Protocol 状态机）| `packages/agent-core/` (agent loop model) + `edge-server/internal/lifecycle/` (execution lifecycle) | Go 中 LLM 调用会通过 Agent CLI 子进程完成，不是 in-process 协议解析。但 LLMEvent/LLMError tagged union 的建模思路可直接映射为 Go sum types（interface + type switch）。 |
 | **Layer 0 Foundation** | `sdk`（OpenAPI codegen client）| `gen/go/` (ConnectRPC 生成) + `gen/ts/` (Connect-ES 生成) | 同等地位。OpenCode 用 `@hey-api/openapi-ts`；AgentHub 用 Buf + ConnectRPC。都是协议生成代码路线。 |
-| **Layer 1 Domain** | `plugin`（19 hooks + PluginInput）| `runner/internal/adapters/`（Agent adapter interfaces）+ `packages/approval-core/`（权限审批） | OpenCode 的 plugin hooks 是在进程内注册回调（TypeScript 特性），Go 中 adapter interface（Go interface）是更自然的映射。 |
+| **Layer 1 Domain** | `plugin`（19 hooks + PluginInput）| `edge-server/internal/adapters/`（Agent adapter interfaces）+ `packages/approval-core/`（权限审批） | OpenCode 的 plugin hooks 是在进程内注册回调（TypeScript 特性），Go 中 adapter interface（Go interface）是更自然的映射。 |
 | **Layer 1 Domain** | `ui`（SolidJS 组件）| `apps/web/`（React UI，独立 workspace）| UI 层独立，与 Go 服务不在同一 module。 |
 | **Layer 2 UI** | `app`（SolidStart SPA）| `apps/web/` | 同上。 |
-| **Layer 3 App** | `opencode`（CLI + Hono Server, 720 files）| **拆分为 3 个服务**：`hub/` + `edge/` + `runner/` | **这是最大差异**。OpenCode 是单体 CLI+Server（720 个 .ts 文件全在一个包里）；AgentHub 按职责拆分为 3 个独立 Go 服务。AgentHub 的拆分优于 OpenCode 的单体——部署独立、故障隔离、可独立扩展。 |
+| **Layer 3 App** | `opencode`（CLI + Hono Server, 720 files）| **拆分为 2 个服务**：`hub/` + `edge/`（runner 生命周期已合并进 edge-server） | **这是最大差异**。OpenCode 是单体 CLI+Server（720 个 .ts 文件全在一个包里）；AgentHub 按职责拆分为 2 个独立 Go 服务。AgentHub 的拆分优于 OpenCode 的单体——部署独立、故障隔离、可独立扩展。 |
 | **Layer 4 Delivery** | `desktop` (Electron) + `web` (Astro) | `apps/web/` (React) + 未来可能的 Tauri desktop | 文档站点：AgentHub 尚未有 Astro 等价物。Desktop：OpenCode 的 Electron 方案对 AgentHub 有参考价值。 |
 
 ### 5.2 架构范式可复用性
@@ -456,7 +458,7 @@ OpenCode 在 dep 类型上的关键约定：
 
 | 问题 | OpenCode 现状 | AgentHub 对策 |
 |------|-------------|--------------|
-| **单包过大** | `opencode` 包 720 个 .ts 文件，包含 agent + session + mcp + server + cli + config + lsp + sync + worktree 等所有应用逻辑 | AgentHub 已按职责拆分为 hub/edge/runner 三个服务，每个服务有独立的 `internal/` |
+| **单包过大** | `opencode` 包 720 个 .ts 文件，包含 agent + session + mcp + server + cli + config + lsp + sync + worktree 等所有应用逻辑 | AgentHub 已按职责拆分为 hub/edge 两个服务（原 runner 已合并进 edge-server），每个服务有独立的 `internal/` |
 | **Plugin 双系统** | V1 (`@opencode-ai/plugin`) 和 V2 (`core/plugin.ts`) 两套 plugin 并存 | 从 Day 1 就统一 Plugin/Adapter API |
 | **Agent 硬编码** | 7 个内置 agent（build/plan/general/explore/scout/compaction/title）在代码中 hardcode | 配置驱动：agent 定义从 YAML/TOML 读取 |
 | **Tool 定义分散** | Tool 定义同时在 V1 plugin hooks 和 V2 `llm/src/tool.ts` 中 | 统一 Tool Registry（已在 design 中规划） |
@@ -467,25 +469,25 @@ OpenCode 在 dep 类型上的关键约定：
 | OpenCode 包 | 文件数 | AgentHub 对应（规划） | 合理规模 |
 |-------------|--------|---------------------|---------|
 | `core` | 163 | `packages/protocol/` + `packages/transport/` | ~20-50 Go 文件 |
-| `llm` | 96 | `runner/internal/executor/` + `runner/internal/adapters/` | ~30-60 Go 文件 |
+| `llm` | 96 | `edge-server/internal/lifecycle/` + `edge-server/internal/adapters/`（原 runner/ 已废弃） | ~30-60 Go 文件 |
 | `sdk` | 43 | `gen/go/` + `gen/ts/` | 自动生成，不计 |
 | `plugin` | 8 | `packages/adapters/` (shared interface) | ~5-15 Go 文件 |
-| `opencode` | 720 | `hub/` + `edge/` + `runner/`（3 个服务） | 每个服务 ~30-80 Go 文件 |
+| `opencode` | 720 | `hub/` + `edge/`（2 个服务，runner 已合并进 edge） | 每个服务 ~30-80 Go 文件 |
 | `app` + `ui` | 219 | `apps/web/` (React, 独立) | 独立 workspace |
 
-**结论**：AgentHub 的 3 服务拆分避免了 OpenCode 的 720 文件单包问题。每个 Go 服务的 `internal/` 应按功能拆分为 5-15 个文件/包，而不是堆在单一级别。
+**结论**：AgentHub 的 2 服务拆分避免了 OpenCode 的 720 文件单包问题。每个 Go 服务的 `internal/` 应按功能拆分为 5-15 个文件/包，而不是堆在单一级别。
 
 ### 5.5 关键映射建议
 
 1. **`core` → `packages/protocol/` + `packages/transport/`**：Go 中类型定义和传输逻辑应分离，不要像 OpenCode 的 core 那样把文件系统、进程管理、GitHub Copilot adapter 都塞进一个包。
 
-2. **`llm` → Runner 内部**：LLM 协议解析在 AgentHub 中不直接做（通过 Agent CLI 子进程），但 LLMEvent 16 type 和 LLMError 10 variant 的 tagged union 建模应照搬。
+2. **`llm` → Edge Server 内部**：LLM 协议解析在 AgentHub 中不直接做（通过 Agent CLI 子进程），但 LLMEvent 16 type 和 LLMError 10 variant 的 tagged union 建模应照搬。原独立 `runner/` 已废弃，执行生命周期在 `edge-server/internal/lifecycle/`。
 
 3. **`plugin` → `packages/adapters/`**：OpenCode 的 PluginInput + 19 hooks 双向修改模式，在 Go 中映射为 `AgentAdapter` interface + middleware chain。
 
 4. **`sdk` → Buf + ConnectRPC**：同是协议生成代码，AgentHub 生成 Go + TypeScript 双端类型。
 
-5. **`opencode` (720 files) → hub/ + edge/ + runner/**：AgentHub 的拆分是正确方向。但需注意：hub/edge/runner 之间有共享逻辑（如 conversation CRUD），应提取到 `packages/im-core/` 而不是复制。
+5. **`opencode` (720 files) → hub/ + edge/**：AgentHub 的拆分是正确方向。原独立 `runner/` 已废弃，执行生命周期合并进 `edge-server/internal/lifecycle/`。但需注意：hub/edge 之间有共享逻辑（如 conversation CRUD），应提取到 `packages/im-core/` 而不是复制。
 
 6. **`desktop` → 未来 Tauri/SwiftUI**：OpenCode 的 Electron desktop（server + webview 内嵌）模式对 AgentHub 的 desktop app 有直接参考。
 
@@ -498,7 +500,7 @@ OpenCode 的 24-package monorepo 是 TypeScript 生态中大规模分层的优�
 - **严格 DAG 依赖**：Layer 0 → Layer 1 → Layer 2 → Layer 3 → Layer 4，零循环
 - **最优架构决策**：Protocol/Route 四轴分离（Protocol/Endpoint/Auth/Framing）使得 20+ provider 共享协议实现
 - **最大不足**：`opencode` 单包过大（720 files），CLI + Server + Agent + Session + MCP + Sync 全混在一起
-- **对 AgentHub 的价值**：证明了 monorepo 分层可行，但 AgentHub 的 hub/edge/runner 拆分是更正确的方向——避免单包过大
+- **对 AgentHub 的价值**：证明了 monorepo 分层可行，但 AgentHub 的 hub/edge 拆分是更正确的方向——避免单包过大
 
 AgentHub 应吸取的教训：
 - 保持包边界清晰：`core` 膨胀是天然趋势，需要从 Day 1 就主动控制
