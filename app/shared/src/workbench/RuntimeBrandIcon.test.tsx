@@ -44,6 +44,42 @@ vi.mock('@lobehub/icons', () => {
   };
 });
 
+function mkColorIcon(tag: string) {
+  const Icon = ({ size }: { size?: number }) => <span data-icon={tag} data-size={size} data-testid={`${tag}-icon`} />;
+  Icon.Color = ({ size }: { size?: number }) => <span data-icon={tag} data-size={size} data-testid={`${tag}-color-icon`} />;
+  return { default: Icon };
+}
+function mkRuntimeIcon(testid: string) {
+  return { default: ({ size }: { size?: number }) => <span data-size={size} data-testid={testid} /> };
+}
+
+vi.mock('@lobehub/icons/es/Alibaba', () => mkColorIcon('alibaba'));
+vi.mock('@lobehub/icons/es/AlibabaCloud', () => mkColorIcon('alibabacloud'));
+vi.mock('@lobehub/icons/es/Anthropic', () => mkColorIcon('anthropic'));
+vi.mock('@lobehub/icons/es/Azure', () => mkColorIcon('azure'));
+vi.mock('@lobehub/icons/es/Aws', () => mkColorIcon('aws'));
+vi.mock('@lobehub/icons/es/Bedrock', () => mkColorIcon('bedrock'));
+vi.mock('@lobehub/icons/es/ByteDance', () => mkColorIcon('bytedance'));
+vi.mock('@lobehub/icons/es/Claude', () => mkColorIcon('claude'));
+vi.mock('@lobehub/icons/es/ClaudeCode', () => mkRuntimeIcon('claude-code-icon'));
+vi.mock('@lobehub/icons/es/Codex', () => mkRuntimeIcon('codex-icon'));
+vi.mock('@lobehub/icons/es/Cohere', () => mkColorIcon('cohere'));
+vi.mock('@lobehub/icons/es/DeepSeek', () => mkColorIcon('deepseek'));
+vi.mock('@lobehub/icons/es/Doubao', () => mkColorIcon('doubao'));
+vi.mock('@lobehub/icons/es/Gemini', () => mkColorIcon('gemini'));
+vi.mock('@lobehub/icons/es/GeminiCLI', () => mkRuntimeIcon('gemini-cli-icon'));
+vi.mock('@lobehub/icons/es/Google', () => mkColorIcon('google'));
+vi.mock('@lobehub/icons/es/Meta', () => mkColorIcon('meta'));
+vi.mock('@lobehub/icons/es/Mistral', () => mkColorIcon('mistral'));
+vi.mock('@lobehub/icons/es/Moonshot', () => mkColorIcon('moonshot'));
+vi.mock('@lobehub/icons/es/OpenAI', () => mkColorIcon('openai'));
+vi.mock('@lobehub/icons/es/OpenCode', () => mkRuntimeIcon('opencode-icon'));
+vi.mock('@lobehub/icons/es/Perplexity', () => mkColorIcon('perplexity'));
+vi.mock('@lobehub/icons/es/Qwen', () => mkColorIcon('qwen'));
+vi.mock('@lobehub/icons/es/Volcengine', () => mkColorIcon('volcengine'));
+vi.mock('@lobehub/icons/es/Zhipu', () => mkColorIcon('zhipu'));
+vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
+
 describe('RuntimeBrandIcon', () => {
   it('resolves known runtimes to LobeHub runtime icons', () => {
     expect(resolveRuntimeBrandIcon({ kind: 'runtime', name: 'Claude Code' })).toMatchObject({
