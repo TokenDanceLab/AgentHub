@@ -75,11 +75,7 @@ export function ConversationSidebar({
           type="button"
         >
           <span className={styles.archiveFilterIcon} aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="12" height="3" rx="1" />
-              <path d="M3 6v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6" />
-              <path d="M6.5 8.5h3" />
-            </svg>
+            <DesignNavIcon name="archive" size={14} />
           </span>
           <span>{showArchived ? '已归档' : '归档'}</span>
           <span className={styles.archiveFilterCount}>{archivedCount}</span>
@@ -146,9 +142,7 @@ export function ConversationSidebar({
                 </span>
                 {isPinned && (
                   <span className={styles.conversationPinIndicator} aria-label={t('aria.pinned')} title={t('aria.pinned')}>
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                      <path d="M9.828 1.282a1 1 0 0 1 1.414 0l3.47 3.47a1 1 0 0 1 0 1.414L12.2 8.274l1.092 1.092a.5.5 0 0 1-.708.708L11.5 8.988l-2.97 2.97a.5.5 0 0 1-.708-.708L10.794 8.28 6.164 3.65a1 1 0 0 1 0-1.414l3.664-.954zM8.06 7.564l1.768-1.768-2.122-2.122-1.768 1.768a.5.5 0 0 0 0 .708l1.414 1.414a.5.5 0 0 0 .708 0zM4.222 9.28l-1.98 1.98a.5.5 0 1 0 .708.708l1.98-1.98-.708-.708z" />
-                    </svg>
+                    <DesignNavIcon name="pin" size={12} />
                   </span>
                 )}
                 <span className={styles.conversationCopy}>
@@ -180,10 +174,7 @@ export function ConversationSidebar({
                       title={isPinned ? '取消置顶' : '置顶'}
                       type="button"
                     >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M9.828 1.282a1 1 0 0 1 1.414 0l3.47 3.47a1 1 0 0 1 0 1.414L12.2 8.274l1.092 1.092a.5.5 0 0 1-.708.708L11.5 8.988l-2.97 2.97a.5.5 0 0 1-.708-.708L10.794 8.28 6.164 3.65a1 1 0 0 1 0-1.414l3.664-.954z" />
-                        <path d="M4.222 9.28l-2.48 2.48" />
-                      </svg>
+                      <DesignNavIcon name="pin" size={14} />
                     </button>
                   )}
                   {onArchiveConversation && !showArchived && (
@@ -198,11 +189,7 @@ export function ConversationSidebar({
                       title="归档"
                       type="button"
                     >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="2" y="3" width="12" height="3" rx="1" />
-                        <path d="M3 6v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6" />
-                        <path d="M6.5 8.5h3" />
-                      </svg>
+                      <DesignNavIcon name="archive" size={14} />
                     </button>
                   )}
                   {onArchiveConversation && showArchived && (
@@ -213,11 +200,7 @@ export function ConversationSidebar({
                       title="取消归档"
                       type="button"
                     >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M3 6v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6" />
-                        <rect x="2" y="3" width="12" height="3" rx="1" />
-                        <path d="M6.5 10.5l1.5 1.5 2.5-3" />
-                      </svg>
+                      <DesignNavIcon name="inbox" size={14} />
                     </button>
                   )}
                 </span>
