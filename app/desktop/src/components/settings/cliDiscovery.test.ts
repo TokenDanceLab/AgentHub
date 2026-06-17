@@ -39,7 +39,7 @@ describe('buildLocalCliDiscoveryFromAgents', () => {
           name: 'Codex CLI',
           installed: true,
           version: 'host-0.2.0',
-          path: 'C:/Tools/codex.cmd',
+          path: '/opt/tools/codex',
           noSpend: true,
         },
       ],
@@ -50,7 +50,7 @@ describe('buildLocalCliDiscoveryFromAgents', () => {
     expect(discovery.items.find((item) => item.id === 'codex')).toMatchObject({
       installed: true,
       version: 'host-0.2.0',
-      path: 'C:/Tools/codex.cmd',
+      path: '/opt/tools/codex',
     });
     expect(discovery.items.find((item) => item.id === 'claude-code')).toMatchObject({
       installed: true,

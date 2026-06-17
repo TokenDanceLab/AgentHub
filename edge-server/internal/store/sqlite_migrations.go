@@ -9,8 +9,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const sqliteMigrationsTable = "agenthub_sqlite_migrations"
-
 type SQLiteMigrationInfo struct {
 	Version   int
 	Name      string

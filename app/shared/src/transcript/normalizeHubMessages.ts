@@ -1,5 +1,5 @@
 import type { AttachmentRef } from '../composer';
-import type { TranscriptAuthor, TranscriptBlock } from './types';
+import type { TranscriptAuthor, TranscriptBlock, BadgeVariant } from './types';
 
 export interface HubMessageAgentRef {
   id?: string;
@@ -208,7 +208,7 @@ function visibleIMState(
   displayTitle?: string;
   displayDetail?: string;
   badgeLabel?: string;
-  badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary';
+  badgeVariant?: BadgeVariant;
 } {
   if (!metadata) return {};
 

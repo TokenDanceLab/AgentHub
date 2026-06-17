@@ -1,19 +1,19 @@
 # AgentHub Governance Execution
 
-最后更新：2026-06-10
+最后更新：2026-06-17
 
 This file maps TokenDance system governance into AgentHub execution items. AgentHub is the multi-agent collaboration platform; it is a relying party of TokenDance ID and owns Hub, Edge, Desktop, Web, and Mobile clients.
 
 ## Root Inputs
 
-- `..\..\docs\ecosystem\ecosystem-execution-queue.md`
-- `..\..\docs\identity\identity-auth.md`
-- `..\..\docs\identity\authorization-model.md`
-- `..\..\docs\identity\feishu-integration.md`
-- `..\..\docs\security\security-risk.md`
-- `..\..\docs\identity\i18n-packaging.md`
-- `..\..\docs\design\design-system.md`
-- `..\..\docs\design\visual-qa-matrix.md`
+- `../../../docs/ecosystem/ecosystem-execution-queue.md`（TokenDance ID workspace）
+- `../../../docs/identity/identity-auth.md`（TokenDance ID workspace）
+- `../../../docs/identity/authorization-model.md`（TokenDance ID workspace）
+- `../../../docs/identity/feishu-integration.md`（TokenDance ID workspace）
+- `../../../docs/security/security-risk.md`（TokenDance ID workspace）
+- `../../../docs/identity/i18n-packaging.md`（TokenDance ID workspace）
+- `../../../docs/design/design-system.md`（TokenDance ID workspace）
+- `../../../docs/design/visual-qa-matrix.md`（TokenDance ID workspace）
 
 ## AgentHub Queue Map
 
@@ -40,7 +40,7 @@ This file maps TokenDance system governance into AgentHub execution items. Agent
 
 - Update this file when a queue ID moves from open to partial or done.
 - Update `docs/roadmap.md` when major features or batches complete.
-- Update `docs/handoffs/STATE.md` for deployment version and commit hash changes.
+- Update root `STATE.md` for deployment version and commit hash changes.
 - Update `docs/governance/security-risk-register.md` for new findings, mitigations, or deployment verification.
 - Update root `docs/identity/identity-auth.md` / `docs/identity/authorization-model.md` when Hub session or token rules change.
 - Update `api/openapi.yaml` and `api/events.md` for API contract changes.

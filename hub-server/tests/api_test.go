@@ -3,6 +3,8 @@ package tests
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/agenthub/hub-server/internal/errcode"
 )
 
 func TestAuth(t *testing.T) {
@@ -15,7 +17,7 @@ func TestAuth(t *testing.T) {
 		w = post("/client/auth/register", map[string]string{
 			"username": "ta01", "password": "pass1234", "nickname": "A1",
 		})
-		mustCode(t, parse(w), "USER_USERNAME_TAKEN", "duplicate")
+		mustCode(t, parse(w), errcode.UserUsernameTaken.Code, "duplicate")
 	})
 
 	t.Run("LoginAndMe", func(t *testing.T) {
@@ -29,11 +31,11 @@ func TestAuth(t *testing.T) {
 
 	t.Run("WrongPassword", func(t *testing.T) {
 		w := post("/client/auth/login", map[string]interface{}{"username": "ta02", "password": "wrong", "device_type": "web", "device_id": "00000000-0000-0000-0000-00000000a002"})
-		mustCode(t, parse(w), "AUTH_INVALID_CREDENTIALS", "wrong pw")
+		mustCode(t, parse(w), errcode.AuthInvalidCredentials.Code, "wrong pw")
 	})
 
 	t.Run("NoToken", func(t *testing.T) {
-		mustCode(t, parse(get("/client/auth/me", "")), "AUTH_INVALID_TOKEN", "no token")
+		mustCode(t, parse(get("/client/auth/me", "")), errcode.AuthInvalidToken.Code, "no token")
 	})
 
 	t.Run("RefreshToken", func(t *testing.T) {

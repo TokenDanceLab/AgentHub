@@ -80,27 +80,27 @@ func TestControlProtocolCapabilitySubtypesReturnExplicitUnsupported(t *testing.T
 				t.Fatalf("HandleControlRequest: %v", err)
 			}
 
-			payload := decodeControlCapabilityResponse(t, buf.Bytes(), "req-"+tt.subtype)
-			if payload.RequestedSubtype != tt.subtype {
-				t.Fatalf("RequestedSubtype = %q, want %q", payload.RequestedSubtype, tt.subtype)
+			payload := decodeControlCapabilityPayload(t, buf.Bytes(), "req-"+tt.subtype)
+			if payload["requestedSubtype"] != tt.subtype {
+				t.Fatalf("requestedSubtype = %q, want %q", payload["requestedSubtype"], tt.subtype)
 			}
-			if payload.RequestID != "req-"+tt.subtype {
-				t.Fatalf("RequestID = %q, want %q", payload.RequestID, "req-"+tt.subtype)
+			if payload["request_id"] != "req-"+tt.subtype {
+				t.Fatalf("request_id = %q, want %q", payload["request_id"], "req-"+tt.subtype)
 			}
-			if payload.Subtype != tt.subtype {
-				t.Fatalf("Subtype = %q, want %q", payload.Subtype, tt.subtype)
+			if payload["subtype"] != tt.subtype {
+				t.Fatalf("subtype = %q, want %q", payload["subtype"], tt.subtype)
 			}
-			if payload.Capability != tt.capability {
-				t.Fatalf("Capability = %q, want %q", payload.Capability, tt.capability)
+			if payload["capability"] != tt.capability {
+				t.Fatalf("capability = %q, want %q", payload["capability"], tt.capability)
 			}
-			if payload.Supported {
-				t.Fatal("Supported = true, want false for an unwired capability")
+			if supported, _ := payload["supported"].(bool); supported {
+				t.Fatal("supported = true, want false for an unwired capability")
 			}
-			if payload.Status != "unsupported" {
-				t.Fatalf("Status = %q, want unsupported", payload.Status)
+			if payload["status"] != "unsupported" {
+				t.Fatalf("status = %q, want unsupported", payload["status"])
 			}
-			if payload.Message == "" {
-				t.Fatal("Message should explain the unsupported capability")
+			if msg, _ := payload["message"].(string); msg == "" {
+				t.Fatal("message should explain the unsupported capability")
 			}
 		})
 	}
@@ -156,9 +156,9 @@ func TestControlProtocolActionSubtypesDoNotClaimAppliedWork(t *testing.T) {
 				t.Fatalf("HandleControlRequest: %v", err)
 			}
 
-			payload := decodeControlCapabilityResponse(t, buf.Bytes(), "req-action")
-			if payload.Applied {
-				t.Fatal("Applied = true, want false when no backing action is wired")
+			payload := decodeControlCapabilityPayload(t, buf.Bytes(), "req-action")
+			if applied, _ := payload["applied"].(bool); applied {
+				t.Fatal("applied = true, want false when no backing action is wired")
 			}
 		})
 	}
@@ -171,7 +171,7 @@ func TestWriteUnsupportedControlResponseWriteError(t *testing.T) {
 	}
 }
 
-func decodeControlCapabilityResponse(t *testing.T, data []byte, requestID string) ControlCapabilityResponse {
+func decodeControlCapabilityPayload(t *testing.T, data []byte, requestID string) map[string]any {
 	t.Helper()
 	if len(data) == 0 {
 		t.Fatal("expected control response, got no output")
@@ -212,7 +212,7 @@ func decodeControlCapabilityResponse(t *testing.T, data []byte, requestID string
 	if err != nil {
 		t.Fatalf("marshal inner.UpdatedInput: %v", err)
 	}
-	var payload ControlCapabilityResponse
+	var payload map[string]any
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		t.Fatalf("unmarshal capability payload: %v", err)
 	}

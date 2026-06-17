@@ -35,10 +35,10 @@ func (AgentTeam) TableName() string {
 // AgentTeamMember represents a member of an AgentTeam.
 type AgentTeamMember struct {
 	ID             string    `gorm:"primaryKey;type:uuid" json:"id"`
-	TeamID         string    `gorm:"type:uuid;not null" json:"team_id"`
+	TeamID         string    `gorm:"type:uuid;not null;index:idx_team_members_team_pos,priority:1" json:"team_id"`
 	AgentProfileID *string   `gorm:"type:uuid" json:"agent_profile_id,omitempty"`
 	Role           string    `gorm:"type:varchar(20);not null;default:executor" json:"role"`
-	Position       int       `gorm:"not null;default:0" json:"position"`
+	Position       int       `gorm:"not null;default:0;index:idx_team_members_team_pos,priority:2" json:"position"`
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 

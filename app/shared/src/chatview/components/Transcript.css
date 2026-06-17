@@ -1,0 +1,71 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   TRANSCRIPT — unified grp-row (DM + Group share same flex layout)
+   ══════════════════════════════════════════════════════════════════════ */
+
+.transcript { display:flex; flex-direction:column; gap:0; min-width:0; flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth; scrollbar-gutter:stable; scrollbar-width:thin; padding:0 0 0 10px }
+
+/* ── Date divider ─────────────────────────────────────────────────── */
+.date-divider {
+  text-align: center;
+  font: 400 0.625rem var(--font-sans);
+  color: var(--text-3);
+  padding: var(--sp-sm) 0;
+  align-self: center;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--text-3); font:var(--body) }
+
+/* ── Row — symmetric: [avatar-l] [content flex:1] [avatar-r] ──────── */
+.grp-row {
+  display:flex; gap:var(--sp-md); align-items:flex-start;
+  margin-bottom:var(--sp-lg);
+}
+.grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-xxs) }
+.card-stack { display:flex; flex-direction:column; gap:0 }
+/* first child aligns flush to avatar top */
+.grp-content > :first-child { margin-top:0 }
+/* bubbles: fit content, not full width */
+.grp-content > .agent-bubble { align-self:flex-start; max-width:72% }
+.grp-content > .user-bubble { align-self:flex-end; max-width:68% }
+
+/* ── Bubbles ───────────────────────────────────────────────────────── */
+.user-bubble {
+  background:var(--primary); color:var(--on-primary);
+  border-radius:var(--r-lg); padding:var(--sp-sm) var(--sp-14);
+  font:var(--bubble-font); line-height:1.6; word-break:break-word;
+}
+.agent-bubble {
+  background:var(--surface); border:1px solid var(--bdr);
+  border-radius:var(--r-md); padding:var(--sp-sm) var(--sp-14);
+  font:var(--body); color:var(--text-1); line-height:1.55;
+}
+.agent-bubble code { font:var(--label); background:var(--surface-high); padding:1px 5px; border-radius:var(--r-xs) }
+
+/* ── Avatars ───────────────────────────────────────────────────────── */
+.ag-av {
+  width:var(--avatar-size); height:var(--avatar-size); border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font:600 0.75rem var(--font-sans); color:var(--on-primary); flex-shrink:0;
+}
+.ag-av.builder{background:var(--role-builder)} .ag-av.reviewer{background:var(--role-reviewer)}
+.ag-av.deployer{background:var(--role-deployer)} .ag-av.researcher{background:var(--role-researcher)}
+.ag-av.orch{background:var(--role-orch)} .ag-av.shield{background:var(--warning)}
+.ag-av.agent{background:var(--info)} .ag-av.system{background:var(--text-3)}
+.ag-av.user-av{background:var(--primary)}
+
+.ag-name { font:var(--label); color:var(--text-2) }
+.ag-time { font:var(--label-xs); font-family:var(--font-mono); font-weight:400; color:var(--text-3) }
+
+.user-meta { display:flex; align-items:center; gap:var(--sp-sm); margin-bottom:var(--sp-2) }
+
+.user-row-right { justify-content:flex-end }
+.user-content-right { align-items:flex-end }
+
+.agent-meta { display:flex; align-items:center; gap:var(--sp-sm) }
+
+.dm-avatar { flex-shrink:0 }
+
+/* ── Spacer placeholder — preserves symmetric grp-row layout ──────── */
+.dm-spacer { flex-shrink:0; visibility:hidden }
+.dm-spacer .ag-av { visibility:hidden }

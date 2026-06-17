@@ -12,6 +12,10 @@ import (
 
 var ErrRunEventLimitExceeded = errors.New("run event limit exceeded for task")
 
+// maxAgentEventsPerQuery caps the number of agent run events returned per query
+// to prevent unbounded memory consumption on tasks with many events.
+const maxAgentEventsPerQuery = 2000
+
 func CreateAgentInstance(db *gorm.DB, ai *model.AgentInstance) error {
 	return db.Create(ai).Error
 }
@@ -187,7 +191,7 @@ func UpdatePendingTaskEdgeRunID(db *gorm.DB, id, edgeRunID string) (int64, error
 
 func ScanExpiredTasks(db *gorm.DB) ([]model.PendingAgentTask, error) {
 	var tasks []model.PendingAgentTask
-	err := db.Where("expire_at < ? AND status IN ?", time.Now(), []string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning}).Find(&tasks).Error
+	err := db.Where("expire_at < ? AND status IN ?", time.Now(), []string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning}).Limit(1000).Find(&tasks).Error
 	return tasks, err
 }
 
@@ -253,6 +257,8 @@ func ListAgentRunEventsByTaskIDFiltered(db *gorm.DB, taskID string, filter model
 	}
 	if filter.Limit > 0 {
 		query = query.Limit(filter.Limit)
+	} else {
+		query = query.Limit(maxAgentEventsPerQuery)
 	}
 	err := query.Order("event_seq ASC, created_at ASC, id ASC").Find(&events).Error
 	return events, err

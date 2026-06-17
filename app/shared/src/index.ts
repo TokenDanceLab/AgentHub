@@ -385,7 +385,6 @@ export {
   createWorkbenchDemoStore,
   demoWorkbenchAgents,
   demoWorkbenchPins,
-  demoWorkbenchTranscripts,
   normalizeWorkbenchDataMode,
   resolveDemoWorkbenchTranscript,
   workbenchDemoRuntimeStore,
@@ -447,7 +446,6 @@ export {
   ConversationSidebar,
   GlobalRail,
   RightInspector,
-  TranscriptView,
   UnifiedComposer,
   WorkspaceHeader,
   agentConfigToAgentSpecFixture,
@@ -456,7 +454,6 @@ export type {
   AgentHubWorkbenchProps,
   ConversationSidebarProps,
   RightInspectorProps,
-  TranscriptViewProps,
   UnifiedComposerProps,
   WorkspaceHeaderProps,
 } from './workbench';

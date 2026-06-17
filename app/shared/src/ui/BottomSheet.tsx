@@ -1,4 +1,5 @@
 import React, { useRef, type ReactNode } from 'react';
+import { cx } from './cx';
 import { useFocusTrap } from './focusTrap';
 import styles from './BottomSheet.module.css';
 
@@ -25,9 +26,6 @@ export interface BottomSheetProps {
   footerClassName?: string;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 export function BottomSheet({
   ariaLabel,

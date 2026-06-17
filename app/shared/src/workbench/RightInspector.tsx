@@ -205,19 +205,19 @@ export function RightInspector({
   }, [reviewFileRequest]);
 
   const overviewTasks = useMemo<TaskItem[]>(() => {
-    if (!runtimeEvidence) return [];
-    return runtimeEvidenceOverviewTasks(runtimeEvidence);
-  }, [runtimeEvidence]);
+    if (runtimeEvidence) return runtimeEvidenceOverviewTasks(runtimeEvidence);
+    return evidenceOverviewTasks(evidence);
+  }, [evidence, runtimeEvidence]);
 
   const overviewFiles = useMemo<PreviewFile[]>(() => {
     const files = runtimeEvidence
       ? runtimeEvidenceOverviewFiles(runtimeEvidence)
-      : [];
+      : evidenceOverviewFiles(evidence);
     return files.map((file) => ({
       ...file,
       isOpen: previewFile?.name === file.name,
     }));
-  }, [previewFile?.name, runtimeEvidence]);
+  }, [evidence, previewFile?.name, runtimeEvidence]);
 
   const handleFileClick = useCallback((file: FileItem) => {
     // Look up the full PreviewFile (with content/URL data) from overviewFiles,
@@ -464,6 +464,65 @@ export function RightInspector({
       </div>
     </aside>
   );
+}
+
+function evidenceOverviewTasks(evidence: EvidenceRef[]): TaskItem[] {
+  const tasks: TaskItem[] = [];
+  const artifactCount = evidence.filter((ref) => ref.kind === 'artifact').length;
+  const fileCount = evidence.filter((ref) => ref.kind === 'file').length;
+  const toolCount = evidence.filter((ref) => ref.kind === 'tool').length;
+  const runRef = evidence.find((ref) => ref.kind === 'run');
+
+  if (runRef) {
+    tasks.push({ label: runRef.label || `运行 ${runRef.id}`, status: runRef.status === 'completed' ? 'done' : 'active' });
+  }
+  if (artifactCount > 0) {
+    tasks.push({ label: `产物索引: ${artifactCount}`, status: 'done' });
+  }
+  if (fileCount > 0) {
+    tasks.push({ label: `变更文件: ${fileCount}`, status: 'done' });
+  }
+  if (toolCount > 0) {
+    tasks.push({ label: `工具调用: ${toolCount}`, status: 'done' });
+  }
+  return tasks.length > 0
+    ? tasks
+    : [{ label: '等待 transcript evidence', status: 'todo' }];
+}
+
+function evidenceOverviewFiles(evidence: EvidenceRef[]): PreviewFile[] {
+  const files: PreviewFile[] = [];
+
+  for (const ref of evidence) {
+    if (ref.kind === 'file') {
+      files.push({
+        name: ref.label || ref.id,
+        type: fileTypeFromName(ref.label || ref.id),
+        isPrimary: true,
+        owner: 'transcript',
+        content: `# ${ref.label || ref.id}\n\n${ref.uri || '暂无文件内容。'}`,
+      });
+    } else if (ref.kind === 'artifact') {
+      files.push({
+        name: ref.label || ref.id,
+        type: fileTypeFromName(ref.label || ref.id),
+        isPrimary: false,
+        owner: 'transcript',
+        content: `# ${ref.label || ref.id}\n\n产物来自 transcript evidence。`,
+      });
+    }
+  }
+
+  return files;
+}
+
+function fileTypeFromName(name: string): string {
+  if (name.endsWith('.md')) return 'md';
+  if (name.endsWith('.ts') || name.endsWith('.tsx')) return 'ts';
+  if (name.endsWith('.sql')) return 'sql';
+  if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.gif')) return 'image';
+  if (name.endsWith('.html') || name.endsWith('.htm')) return 'html';
+  return 'txt';
 }
 
 function runtimeEvidenceOverviewTasks(runtimeEvidence: RuntimeEvidenceSnapshot): TaskItem[] {
@@ -1042,7 +1101,8 @@ function InteractiveDiffPreview({
   file: PreviewFile;
   onClose: () => void;
 }): React.ReactElement {
-  const { runId, fileDiff, workDir } = file.interactiveDiff!;
+  if (!file.interactiveDiff) return (<></>);
+  const { runId, fileDiff, workDir } = file.interactiveDiff;
 
   const reviewFiles: DiffReviewFile[] = useMemo(() => [{
     filePath: fileDiff.filePath,

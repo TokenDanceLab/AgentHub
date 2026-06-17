@@ -127,6 +127,8 @@
   border-radius: var(--r-md);
   background: color-mix(in srgb, var(--surface) 94%, var(--surface-low) 6%);
   box-shadow: var(--e-3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
   opacity: 0;
   transform: translateY(4px) scale(0.985);
   animation: fileMenuIn var(--dur-medium) var(--ease-panel) forwards;
@@ -242,12 +244,6 @@
   color: var(--text-1);
 }
 
-.fileTitleLang {
-  display: block;
-  margin-top: 2px;
-  font: 500 0.6875rem var(--font-sans);
-  color: var(--text-3);
-}
 
 /* ── Close button ── */
 .closeBtn {
@@ -327,6 +323,8 @@
   color: var(--text-1);
   font: 400 0.6875rem/1.45 var(--font-mono);
   tab-size: 2;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
 }
 
 .code:focus-visible {
@@ -421,6 +419,8 @@
   color: var(--text-1);
   font: var(--body);
   line-height: 1.48;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
 }
 
 .markdownPreview h1 {

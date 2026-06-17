@@ -532,6 +532,21 @@ func (c *Client) BlacklistRefreshToken(ctx context.Context, tokenHash string, tt
 	return c.rdb.Set(ctx, "rt_blacklist:"+tokenHash, "1", ttl).Err()
 }
 
+// IsRefreshTokenBlacklisted checks whether a key (token hash, or compound
+// userID:deviceID[:deviceType] key) exists in the Redis refresh token
+// blacklist. Returns true if the key is present, false otherwise.
+// Redis errors are logged and result in a false return (fail-open to DB-only
+// revocation), so a transient Redis outage does not block all token refresh.
+func (c *Client) IsRefreshTokenBlacklisted(ctx context.Context, key string) (bool, error) {
+	n, err := c.rdb.Exists(ctx, "rt_blacklist:"+key).Result()
+	if err != nil {
+		slog.Warn("redis IsRefreshTokenBlacklisted failed, falling back to DB-only",
+			"key", key, "error", err)
+		return false, nil
+	}
+	return n > 0, nil
+}
+
 // PoolStats exposes the underlying Redis connection pool statistics.
 func (c *Client) PoolStats() *redis.PoolStats {
 	return c.rdb.PoolStats()
@@ -605,6 +620,9 @@ func (NoOpCache) PopPendingAgentControlsForDevice(ctx context.Context, userID, d
 }
 func (NoOpCache) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
 	return nil
+}
+func (NoOpCache) IsRefreshTokenBlacklisted(ctx context.Context, key string) (bool, error) {
+	return false, nil
 }
 
 // ErrCacheUnavailable is returned by NoOpCache methods that cannot operate

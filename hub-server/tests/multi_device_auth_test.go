@@ -55,7 +55,7 @@ func TestLoginRejectsDeviceIDOwnedByAnotherUser(t *testing.T) {
 		"password":    secondUser.Password,
 		"device_type": "desktop",
 		"device_id":   sharedDeviceID,
-	})), "BAD_REQUEST", "second user reuses first user's device_id")
+	})), "bad_request", "second user reuses first user's device_id")
 }
 
 func createLoginUser(t *testing.T, username, password, nickname string) testUser {

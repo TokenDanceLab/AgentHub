@@ -144,8 +144,12 @@ func Run(cfg Config) error {
 
 	// Register MCP (Model Context Protocol) endpoint for external AI clients.
 	// This exposes project/thread/run capabilities as standard MCP tools.
+	// MCP-level auth mirrors the global local auth token for defense-in-depth:
+	// even if a request bypasses the middleware chain, the MCP handler itself
+	// enforces the same bearer token.
 	mcpServer := mcp.NewServer(handler.Store, handler.Executor, handler.Bus, handler.PermissionRegistry)
 	mcpServer.SetWorkspaceAllowlist(cfg.WorkspaceAllowlist)
+	mcpServer.SetAuthToken(cfg.LocalAuthToken)
 	mux.Handle("/mcp", mcpServer)
 	slog.Info("mcp server endpoint registered at /mcp")
 
@@ -605,11 +609,18 @@ func edgeConfigDumper(cfg Config) debugpkg.ConfigDumper {
 			"dev":                 cfg.Dev,
 			"workspace_allowlist": cfg.WorkspaceAllowlist,
 			"hub_url":             cfg.HubURL,
-			"local_auth_token":    cfg.LocalAuthToken,
-			"hub_jwt_secret":      cfg.HubJWTSecret,
-			"hub_token":           cfg.HubToken,
+			"local_auth_token":    redactSecret(cfg.LocalAuthToken),
+			"hub_jwt_secret":      redactSecret(cfg.HubJWTSecret),
+			"hub_token":           redactSecret(cfg.HubToken),
 		}
 	}
+}
+
+func redactSecret(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	return "[REDACTED]"
 }
 
 func edgeStateDumper(h *api.Handler) debugpkg.StateDumper {

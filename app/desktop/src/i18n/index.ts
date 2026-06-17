@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE, sharedWorkbenchResources } from '@shared/i18n';
+import { CHATVIEW_I18N_NAMESPACE, chatviewResources } from '@shared/chatview/i18n/resources';
 import zh from './locales/zh.json';
 import en from './locales/en.json';
 
@@ -25,10 +26,12 @@ try {
       zh: {
         translation: zh,
         [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.zh,
+        [CHATVIEW_I18N_NAMESPACE]: chatviewResources.zh,
       },
       en: {
         translation: en,
         [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.en,
+        [CHATVIEW_I18N_NAMESPACE]: chatviewResources.en,
       },
     },
     lng: detectLanguage(),
