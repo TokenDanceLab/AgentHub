@@ -70,7 +70,7 @@ export function GlobalRail({
     chat: t('nav.chat'),
     contacts: t('nav.contacts'),
     docs: t('nav.docs'),
-    agents: 'Agent',
+    agents: t('nav.agents'),
     runs: t('nav.tasks'),
     projects: t('nav.projects'),
     settings: t('user.settings'),
