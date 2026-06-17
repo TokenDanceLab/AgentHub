@@ -173,7 +173,7 @@ func TestOIDCSmoke(t *testing.T) {
 			"device_type":           "web",
 			"device_id":             deviceID,
 		})
-		r := parseAndAssertCode(t, resp, "OK", "authorize")
+		r := parseAndAssertCode(t, resp, "ok", "authorize")
 		state = extract(r.Data, "state")
 		authURL = extract(r.Data, "authorization_url")
 		assert.NotEmpty(t, state)
@@ -190,7 +190,7 @@ func TestOIDCSmoke(t *testing.T) {
 			"device_type":   "web",
 			"device_id":     deviceID,
 		})
-		r := parseAndAssertCode(t, resp, "OK", "callback")
+		r := parseAndAssertCode(t, resp, "ok", "callback")
 		accessToken = extract(r.Data, "access_token")
 		refreshToken := extract(r.Data, "refresh_token")
 		assert.NotEmpty(t, accessToken)
@@ -274,7 +274,7 @@ func TestOIDCSmoke(t *testing.T) {
 		})
 		var r apiResp
 		json.Unmarshal(readBody(resp), &r)
-		assertContains(t, r, "BAD", "no challenge")
+		assertContains(t, r, "bad", "no challenge")
 	})
 	t.Run("Authorize_InvalidDeviceType_Fails", func(t *testing.T) {
 		resp := doJSON(t, httpClient, ts.URL, "POST", "/oidc/authorize", map[string]string{
@@ -296,7 +296,7 @@ func TestOIDCSmoke(t *testing.T) {
 		})
 		var r apiResp
 		json.Unmarshal(readBody(resp), &r)
-		assertContains(t, r, "BAD", "no code")
+		assertContains(t, r, "bad", "no code")
 	})
 
 	// ── 10. Second device login works ────────────────────────────────────────
@@ -310,7 +310,7 @@ func TestOIDCSmoke(t *testing.T) {
 			"device_type":           "desktop",
 			"device_id":             id2,
 		})
-		r := parseAndAssertCode(t, resp, "OK", "2nd auth")
+		r := parseAndAssertCode(t, resp, "ok", "2nd auth")
 		s2 := extract(r.Data, "state")
 
 		// Callback — mock service returns a different token with the same userID.
@@ -321,7 +321,7 @@ func TestOIDCSmoke(t *testing.T) {
 			"code":          "c2", "state": s2, "code_verifier": "v2",
 			"device_type":   "desktop", "device_id": id2,
 		})
-		r = parseAndAssertCode(t, resp, "OK", "2nd cb")
+		r = parseAndAssertCode(t, resp, "ok", "2nd cb")
 		tok2FromResp := extract(r.Data, "access_token")
 		assert.NotEmpty(t, tok2FromResp)
 
