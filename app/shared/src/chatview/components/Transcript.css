@@ -2,7 +2,7 @@
    TRANSCRIPT — unified grp-row (DM + Group share same flex layout)
    ══════════════════════════════════════════════════════════════════════ */
 
-.transcript { display:flex; flex-direction:column; gap:0; min-width:0 }
+.transcript { display:flex; flex-direction:column; gap:0; min-width:0; flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth }
 
 /* ── Empty state ──────────────────────────────────────────────────── */
 .chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--text-3); font:var(--body) }

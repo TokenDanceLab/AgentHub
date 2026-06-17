@@ -15,6 +15,8 @@ import '../design/tokens.css'
 
 interface Props {
   transcript: TranscriptBlock[]
+  /** DM or group mode. Inferred from agent count when not provided. */
+  chatMode?: 'dm' | 'group'
 }
 
 function EmptyState() {
@@ -27,7 +29,7 @@ function EmptyState() {
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export function ChatViewTranscript({ transcript }: Props) {
+export function ChatViewTranscript({ transcript, chatMode = 'group' }: Props) {
   const items = useMemo(() => blocksToTranscriptItems(transcript), [transcript])
 
   return (
@@ -35,7 +37,7 @@ export function ChatViewTranscript({ transcript }: Props) {
       {items.length === 0 ? (
         <EmptyState />
       ) : (
-        <Transcript items={items} chatMode="group" />
+        <Transcript items={items} chatMode={chatMode} />
       )}
     </div>
   )
