@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Competitor Analysis: Jean (Tauri Desktop App)
 
 > Researcher 1: Jean is our **closest comparison** -- a Tauri 2 desktop app for AI-assisted development with Claude CLI, Codex CLI, OpenCode CLI, and Cursor CLI.

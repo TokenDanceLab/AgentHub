@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Claude Code Viewer 深度调研报告
 
 > Repository: `d-kimuson/claude-code-viewer` v0.7.5 | License: MIT | 1,150+ stars

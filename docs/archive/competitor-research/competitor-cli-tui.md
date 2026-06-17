@@ -1,3 +1,11 @@
+<!--
+  ⚠ ARCHIVED — HISTORICAL REFERENCE ONLY
+  This document has been archived from docs/reference/.
+  It represents completed research/analysis and is NOT actively maintained.
+  The information here may be outdated. Refer to docs/reference/ for current reference material.
+  Archived: 2026-06-17
+-->
+
 # Competitor Analysis: CLI/TUI Agents (Goose + Crush)
 
 > Researcher 4: Terminal-native agents built with Rust/Go using TUI frameworks, offering lessons in agent architecture and UX patterns that inform desktop app design.

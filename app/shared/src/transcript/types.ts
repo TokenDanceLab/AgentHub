@@ -339,3 +339,25 @@ export type TranscriptBlock =
   | ReplayGapTranscriptBlock
   | AttachmentTranscriptBlock
   | DeployTranscriptBlock;
+
+/**
+ * Returns `true` for transcript blocks that carry orchestration metadata
+ * (routing decisions, agent timelines, subagent / child-agent spans,
+ * context usage, etc.) and should be rendered in side panels rather than
+ * the main chat transcript.
+ */
+export function isSidebarOnlyTranscriptBlock(block: TranscriptBlock): boolean {
+  switch (block.kind) {
+    case 'run_step_group':
+    case 'run_session':
+    case 'agent_timeline':
+    case 'route_decision':
+    case 'subagent':
+    case 'subtask':
+    case 'child_agent':
+    case 'context_usage':
+      return true;
+    default:
+      return false;
+  }
+}

@@ -89,8 +89,9 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
 
   const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}${selected ? ' selected' : ''}${softHidden ? ' soft-hidden' : ''}`
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     if (item.status === 'running' || !item.collapsible) return
+    e.stopPropagation()
     setOpen(!open); onToggle?.(item.id)
   }
 
@@ -103,8 +104,13 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   }
 
   return (
-    <div className={cls} onContextMenu={onContextMenu ? handleContextMenu : undefined} onClick={onBlockSelect ? handleSelectClick : undefined} data-block-id={item.id} tabIndex={0}>
-      <div className="row-hd" onClick={handleClick} {...(item.collapsible ? { 'aria-expanded': isOpen } : {})}>
+    <div className={cls} onContextMenu={onContextMenu ? handleContextMenu : undefined} onClick={onBlockSelect ? handleSelectClick : undefined} data-block-id={item.id} data-selectable-card={item.id} tabIndex={0}>
+      <button
+        type="button"
+        className="row-hd"
+        onClick={handleClick}
+        {...(item.collapsible ? { 'aria-expanded': isOpen, 'aria-label': isOpen ? t('card.collapse') : t('card.expand') } : {})}
+      >
         <IconComp className={`row-icon${item.fileOp === 'cr' ? ' cr' : item.fileOp === 'mod' ? ' mod' : item.fileOp === 'del' ? ' del' : ''}`} size={16} />
         <span className="row-label">
           {item.type === 'file' ? (
@@ -121,7 +127,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
         </span>
         {item.extra && <span className="row-extra">{item.extra}</span>}
         {item.collapsible && <IconChevronDown className="row-chevron" size={12} />}
-      </div>
+      </button>
       {isOpen && (
         <div className="row-bd">
           {item.content && item.type !== 'file' && <div className="row-text">{item.content}</div>}

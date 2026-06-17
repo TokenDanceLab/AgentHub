@@ -52,3 +52,5 @@ export type {
   TranscriptAuthorRole,
   TranscriptBlock,
 } from './types';
+
+export { isSidebarOnlyTranscriptBlock } from './types';
