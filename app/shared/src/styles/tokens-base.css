@@ -300,3 +300,4 @@ body {
   /* overflow-y: auto provides scroll fallback for layout overflows
      while preserving the desktop-SPA clip model via overflow-x: hidden */
 
+}
