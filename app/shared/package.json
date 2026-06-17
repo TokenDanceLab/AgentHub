@@ -65,6 +65,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@vitest/coverage-istanbul": "^4.1.7",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.16.0",
     "react": "^19.2.7",

@@ -311,6 +311,7 @@ export interface AgentTranscriptBlock {
   id: string; agent: string; role: string; time: string
   rows: RowItem[]; bubbles: string[]; standaloneRows: RowItem[]
   runs: never[]
+  groupId?: string
   displayTitle?: string
   badgeLabel?: string
   badgeVariant?: 'thinking' | 'success' | 'warning' | 'danger' | 'primary'
@@ -327,8 +328,11 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
   const items: ChatViewTranscriptItem[] = []
   let currentAgent: AgentTranscriptBlock | null = null
 
+  let _seq = 0
   for (const block of blocks) {
     const role = block.author?.role ?? 'system'
+    _seq++
+    const groupId = block.author?.id ?? 'unknown'
 
     // ── User text ──
     if (role === 'human' && block.kind === 'text') {
@@ -344,12 +348,13 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
     // ── Agent text → bubble ──
     if ((role === 'agent' || role === 'system') && block.kind === 'text') {
       const t = block as TextTranscriptBlock
-      if (!currentAgent || currentAgent.id !== block.author.id) {
+      if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = Object.assign(
-          newAgentBlock(block.author, role, block.createdAt),
+        currentAgent = Object.assign(newAgentBlock(block.author, role, block.createdAt), { groupId } as any,
           pickDisplay(t as unknown as Record<string, unknown>),
         )
+        // Unique React key: author.id + first-block-seq
+        currentAgent!.id = `${groupId}-${_seq}`
       }
       const bubbleText = t.displayDetail || t.text
       if (bubbleText) currentAgent!.bubbles.push(bubbleText)
@@ -369,7 +374,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
             collapsible: true,
             content: `${ti.label}: ${ti.detail || ''}`,
           } as RowItem
-          if (!currentAgent || currentAgent.id !== block.author.id) {
+          if (!currentAgent || currentAgent.groupId !== groupId) {
             if (currentAgent) items.push(currentAgent)
             currentAgent = newAgentBlock(block.author, role, block.createdAt)
           }
@@ -386,7 +391,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
         for (const child of g.children) {
           const childRow = mapBlock({ ...child, author: block.author })
           if (!childRow) continue
-          if (!currentAgent || currentAgent.id !== block.author.id) {
+          if (!currentAgent || currentAgent.groupId !== groupId) {
             if (currentAgent) items.push(currentAgent)
             currentAgent = newAgentBlock(block.author, role, block.createdAt)
           }
@@ -400,15 +405,30 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): ChatViewTran
     if (role === 'agent' || role === 'system') {
       const row = mapBlock(block)
       if (!row) continue
-      if (!currentAgent || currentAgent.id !== block.author.id) {
+      if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
         currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [] }
+        currentAgent.id = `${block.author.id}-${_seq}`
       }
       // Standalone cards vs inline rows
       const standalone = row.type === 'route' || row.type === 'deploy' || row.type === 'ctx' ||
         row.type === 'approval' || row.type === 'session' || row.type === 'attachment'
-      if (standalone) currentAgent.standaloneRows.push(row)
-      else currentAgent.rows.push(row)
+      if (standalone) {
+        currentAgent.standaloneRows.push(row)
+      } else {
+        // Merge: tool_result replaces matching tool_call (same toolName, same card)
+        if (row.type === 'tool' && row.isResult) {
+          const matchIdx = currentAgent.rows.findLastIndex(r => r.type === 'tool' && r.toolName === row.toolName)
+          if (matchIdx >= 0) {
+            // Preserve the original id for React key stability; update status+content
+            currentAgent.rows[matchIdx] = { ...row, id: currentAgent.rows[matchIdx]!.id }
+          } else {
+            currentAgent.rows.push(row)
+          }
+        } else {
+          currentAgent.rows.push(row)
+        }
+      }
     }
   }
 
