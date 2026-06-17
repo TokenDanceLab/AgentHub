@@ -426,7 +426,7 @@ func TestScenarioDispatch_InvalidTargetTypeViaAPI(t *testing.T) {
 			json.NewDecoder(resp.Body).Decode(&r)
 			resp.Body.Close()
 			// Invalid target types should be rejected with BAD_REQUEST.
-			assert.Equal(t, "BAD_REQUEST", r.GetCode(), "invalid type %s should be rejected, got code=%s message=%s", tp, r.GetCode(), r.GetMsg())
+			assert.Equal(t, "bad_request", r.GetCode(), "invalid type %s should be rejected, got code=%s message=%s", tp, r.GetCode(), r.GetMsg())
 		})
 	}
 }

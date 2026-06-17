@@ -385,7 +385,7 @@ func TestTeamRunSmoke(t *testing.T) {
 	t.Run("CreateTeam_EmptyName_Fails", func(t *testing.T) {
 		resp := post("/web/agent-teams", map[string]string{"name": ""})
 		r := parse(resp)
-		assertCode(t, r, "BAD_REQUEST", "empty name")
+		assertCode(t, r, "bad_request", "empty name")
 	})
 
 	// Extract team ID for subsequent tests.
@@ -483,7 +483,7 @@ func TestTeamRunSmoke(t *testing.T) {
 		})
 		r = parse(resp)
 		// Should fail because team has no members.
-		assertCode(t, r, "BAD_REQUEST", "run with no members")
+		assertCode(t, r, "bad_request", "run with no members")
 	})
 
 	// ── 4. Submit typed Supervisor route decision ───────────────────────
@@ -518,7 +518,7 @@ func TestTeamRunSmoke(t *testing.T) {
 				Instructions: "Run something",
 			})
 		r := parse(resp)
-		assertCode(t, r, "BAD_REQUEST", "invalid route action")
+		assertCode(t, r, "bad_request", "invalid route action")
 	})
 
 	t.Run("RouteDecision_MissingWorker_Fails", func(t *testing.T) {
@@ -529,7 +529,7 @@ func TestTeamRunSmoke(t *testing.T) {
 				// NextWorker is empty — should be rejected.
 			})
 		r := parse(resp)
-		assertCode(t, r, "BAD_REQUEST", "missing next_worker")
+		assertCode(t, r, "bad_request", "missing next_worker")
 	})
 
 	// ── 5. Verify TeamEvent append-only log ─────────────────────────────
@@ -627,7 +627,7 @@ func TestTeamRunSmoke(t *testing.T) {
 			})
 		r := parse(resp)
 		// Non-existent approval -> BAD_REQUEST (not found in state)
-		assert.True(t, r.GetCode() == "BAD_REQUEST" || r.GetCode() == "AGENT_TASK_NOT_FOUND",
+		assert.True(t, r.GetCode() == "bad_request" || r.GetCode() == "agent_task_not_found",
 			"non-existent approval should fail, got code=%q message=%q", r.GetCode(), r.GetMsg())
 	})
 
@@ -637,7 +637,7 @@ func TestTeamRunSmoke(t *testing.T) {
 				"decision": "maybe", // invalid — only "allow" or "deny"
 			})
 		r := parse(resp)
-		assertCode(t, r, "BAD_REQUEST", "invalid approval decision")
+		assertCode(t, r, "bad_request", "invalid approval decision")
 	})
 
 	// ── 9. Conflict resolution ──────────────────────────────────────────
@@ -655,7 +655,7 @@ func TestTeamRunSmoke(t *testing.T) {
 			})
 		r := parse(resp)
 		// Without actual conflicting artifacts, this returns BAD_REQUEST.
-		assertCode(t, r, "BAD_REQUEST", "resolve conflict without actual conflict")
+		assertCode(t, r, "bad_request", "resolve conflict without actual conflict")
 	})
 
 	t.Run("ResolveConflict_InvalidResolution_Fails", func(t *testing.T) {
@@ -664,7 +664,7 @@ func TestTeamRunSmoke(t *testing.T) {
 				"resolution": "magic_fix", // invalid resolution
 			})
 		r := parse(resp)
-		assertCode(t, r, "BAD_REQUEST", "invalid conflict resolution type")
+		assertCode(t, r, "bad_request", "invalid conflict resolution type")
 	})
 
 	// ── 10. TeamRun completion — finish route ──────────────────────────

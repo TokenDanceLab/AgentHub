@@ -285,7 +285,7 @@ func TestOIDCSmoke(t *testing.T) {
 		})
 		var r apiResp
 		json.Unmarshal(readBody(resp), &r)
-		assertCode(t, r, "BAD_REQUEST", "bad device type")
+		assertCode(t, r, "bad_request", "bad device type")
 	})
 	t.Run("Callback_NoCode_Fails", func(t *testing.T) {
 		resp := doJSON(t, httpClient, ts.URL, "POST", "/oidc/callback", map[string]string{
