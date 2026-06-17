@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProfilePopover, Toast } from './floating';
 import { DesignNavIcon, type DesignNavIconName } from './designIcons';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
 
 /* ═══ Page routing ═══ */
@@ -54,14 +56,25 @@ export function GlobalRail({
   userAvatarUrl,
   connectionStatus,
 }: GlobalRailProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [internalPage, setInternalPage] = useState<GlobalRailPage>('chat');
   const avatarRef = useRef<HTMLDivElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
 
-  const displayName = userDisplayName ?? '用户';
+  const displayName = userDisplayName ?? t('user.fallbackName');
   const displayInitial = displayName.slice(0, 1).toUpperCase();
+
+  const navLabelMap: Record<GlobalRailPage, string> = {
+    chat: t('nav.chat'),
+    contacts: t('nav.contacts'),
+    docs: t('nav.docs'),
+    agents: 'Agent',
+    runs: t('nav.tasks'),
+    projects: t('nav.projects'),
+    settings: t('user.settings'),
+  };
 
   // Use controlled props when provided, otherwise fall back to internal state.
   const isControlled = activePageProp !== undefined;
@@ -82,13 +95,13 @@ export function GlobalRail({
   }
 
   function handleProfileAction(action: string): void {
-    if (action === '退出登录') {
+    if (action === t('user.logout')) {
       setProfileOpen(false);
       onLogout?.();
-      showToast('已退出登录');
+      showToast(t('toast.loggedOut'));
       return;
     }
-    showToast(profileActionLabel(action));
+    showToast(profileActionLabel(action, t));
   }
 
   function handleAvatarKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
@@ -121,11 +134,11 @@ export function GlobalRail({
       {topNavItems.map((item) => (
         <button
           aria-current={activePage === item.id ? 'page' : undefined}
-          aria-label={item.label}
+          aria-label={navLabelMap[item.id] ?? item.label}
           className={styles.railButton}
           key={item.id}
           onClick={() => handleNavigate(item.id)}
-          title={item.label}
+          title={navLabelMap[item.id] ?? item.label}
           type="button"
         >
           <DesignNavIcon name={item.icon} size={18} />
@@ -135,19 +148,19 @@ export function GlobalRail({
       <div className={styles.railSpacer} />
 
       <button
-        aria-label="设置"
+        aria-label={t('aria.settings')}
         className={styles.railButton}
         onClick={() => handleNavigate('settings')}
-        title="设置"
+        title={t('user.settings')}
         type="button"
       >
         <DesignNavIcon name="railSettings" size={18} />
       </button>
       <button
-        aria-label="切换主题"
+        aria-label={t('aria.toggleTheme')}
         className={styles.railButton}
         onClick={onToggleTheme}
-        title="切换主题"
+        title={t('user.toggleTheme')}
         type="button"
       >
         <DesignNavIcon name="sun" size={18} />
@@ -155,38 +168,38 @@ export function GlobalRail({
 
       {connectionStatus && (
         <span
-          aria-label={`WebSocket ${connectionStatusLabel(connectionStatus)}`}
+          aria-label={t('connectionDot.label', { status: connectionStatusLabel(connectionStatus, t) })}
           className={styles.connectionDot}
           data-status={connectionStatus}
-          title={`WebSocket ${connectionStatusLabel(connectionStatus)}`}
+          title={t('connectionDot.label', { status: connectionStatusLabel(connectionStatus, t) })}
         />
       )}
 
       <ProfilePopover
         accountMenu={[
-          { label: '我的个人名片' },
-          { label: '我的二维码与链接' },
-          { label: '登录更多账号' },
+          { label: t('user.myCard') },
+          { label: t('user.myQr') },
+          { label: t('user.loginMore') },
           { divider: true },
-          { label: '退出登录', style: 'danger' },
+          { label: t('user.logout'), style: 'danger' },
         ]}
         actions={[
-          { label: '编辑资料' },
-          { label: '复制链接' },
+          { label: t('user.editProfile') },
+          { label: t('profile.copyLink') },
         ]}
         anchorRef={avatarRef}
         avatar={userAvatarUrl ? '' : displayInitial}
         avatarColor="var(--primary)"
         {...(userAvatarUrl ? { avatarUrl: userAvatarUrl } : {})}
-        badge="当前用户"
+        badge={t('user.currentBadge')}
         isOpen={profileOpen}
         name={displayName}
         onAccountMenu={handleProfileAction}
         onAction={handleProfileAction}
         onClose={() => setProfileOpen(false)}
-        onStatusToggle={() => showToast('状态已保持在线')}
+        onStatusToggle={() => showToast(t('toast.onlineStatus'))}
         org="TokenDance"
-        status="在线"
+        status={t('status.online')}
         variant="account"
       />
       <Toast message={toastMessage} visible={toastVisible} />
@@ -194,33 +207,33 @@ export function GlobalRail({
   );
 }
 
-function profileActionLabel(action: string): string {
+function profileActionLabel(action: string, t: (key: string) => string): string {
   switch (action) {
     case '编辑资料':
-      return '已打开资料编辑';
+      return t('toast.editProfile');
     case '复制链接':
-      return '已复制链接';
+      return t('toast.linkCopiedGeneric');
     case '我的个人名片':
-      return '已打开个人名片';
+      return t('toast.profileCard');
     case '我的二维码与链接':
-      return '已打开二维码与链接';
+      return t('toast.qrLink');
     case '登录更多账号':
-      return '已打开账号登录入口';
+      return t('toast.accountLogin');
     case '设置':
-      return '已打开设置';
+      return t('toast.settingsOpened');
     default:
       return action;
   }
 }
 
-function connectionStatusLabel(status: ConnectionStatusKind): string {
+function connectionStatusLabel(status: ConnectionStatusKind, t: (key: string) => string): string {
   switch (status) {
     case 'connected':
-      return '已连接';
+      return t('connection.connected');
     case 'connecting':
-      return '连接中';
+      return t('connection.connectingBrief');
     case 'disconnected':
-      return '已断开';
+      return t('connection.disconnected');
     default:
       return status;
   }

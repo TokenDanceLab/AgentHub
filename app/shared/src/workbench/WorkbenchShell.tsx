@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ConversationSidebar, type ConversationSidebarProps } from './ConversationSidebar';
 import { ContextMenu, MultiSelectBar, ProfilePopover, Toast, type ContextMenuItem, type MultiSelectBarAction } from './floating';
 import { GlobalRail, type GlobalRailPage } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { workbenchProfileInitials, workbenchAgentColor } from './profileRegistry';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import styles from './AgentHubWorkbench.module.css';
@@ -78,6 +80,7 @@ export const WorkbenchShell = React.memo(function WorkbenchShell({
   toastMessage, toastVisible, surface,
   children,
 }: WorkbenchShellProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const handleSidebarKeyResize = useCallback((event: React.KeyboardEvent) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
@@ -173,10 +176,10 @@ export const WorkbenchShell = React.memo(function WorkbenchShell({
       {isChatPage && (
         <div className={styles.sidebarFrame}>
           <ConversationSidebar {...sidebarProps} />
-          <div aria-label="调整最近频道宽度" aria-orientation="vertical" aria-valuemax={SIDEBAR_MAX_WIDTH} aria-valuemin={SIDEBAR_MIN_WIDTH} aria-valuenow={sidebarWidth} className={styles.sidebarResizer} onKeyDown={handleSidebarKeyResize} onPointerDown={(e) => { if (sidebarCollapsed) return; e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); beginSidebarResize(e.clientX); }} role="separator" tabIndex={sidebarCollapsed ? -1 : 0} />
+          <div aria-label={t('aria.resizeSidebar')} aria-orientation="vertical" aria-valuemax={SIDEBAR_MAX_WIDTH} aria-valuemin={SIDEBAR_MIN_WIDTH} aria-valuenow={sidebarWidth} className={styles.sidebarResizer} onKeyDown={handleSidebarKeyResize} onPointerDown={(e) => { if (sidebarCollapsed) return; e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); beginSidebarResize(e.clientX); }} role="separator" tabIndex={sidebarCollapsed ? -1 : 0} />
         </div>
       )}
-      <main ref={workspaceRef} aria-label="Workspace" className={styles.workspace} data-mainchain={showMainchainStatus ? 'true' : 'false'} data-mode={isChatPage ? 'chat' : 'workbench'} data-surface={surface} data-workspace-main>{children}</main>
+      <main ref={workspaceRef} aria-label={t('aria.workspace')} className={styles.workspace} data-mainchain={showMainchainStatus ? 'true' : 'false'} data-mode={isChatPage ? 'chat' : 'workbench'} data-surface={surface} data-workspace-main>{children}</main>
       {isChatPage && (
         <RightInspector
           browserPreviewEnabled={inspectorProps.browserPreviewEnabled} canOpenPreview={inspectorProps.canOpenPreview} collapsed={inspectorCollapsed}

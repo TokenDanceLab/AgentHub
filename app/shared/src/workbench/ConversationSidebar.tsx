@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { WorkbenchConversation } from '../platform';
 import { DesignNavIcon } from './designIcons';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
 
 export interface ConversationSidebarProps {
@@ -22,6 +24,7 @@ export function ConversationSidebar({
   onPinConversation,
   onArchiveConversation,
 }: ConversationSidebarProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
@@ -55,9 +58,9 @@ export function ConversationSidebar({
   const archivedCount = conversations.filter((c) => c.archived).length;
 
   return (
-    <aside aria-label="Conversation sidebar" className={styles.sidebar}>
+    <aside aria-label={t('aria.conversationSidebar')} className={styles.sidebar}>
       <input
-        aria-label="搜索会话"
+        aria-label={t('aria.searchConversations')}
         className={styles.sidebarSearch}
         placeholder="搜索..."
         type="search"
@@ -142,7 +145,7 @@ export function ConversationSidebar({
                   )}
                 </span>
                 {isPinned && (
-                  <span className={styles.conversationPinIndicator} aria-label="已置顶" title="已置顶">
+                  <span className={styles.conversationPinIndicator} aria-label={t('aria.pinned')} title={t('aria.pinned')}>
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                       <path d="M9.828 1.282a1 1 0 0 1 1.414 0l3.47 3.47a1 1 0 0 1 0 1.414L12.2 8.274l1.092 1.092a.5.5 0 0 1-.708.708L11.5 8.988l-2.97 2.97a.5.5 0 0 1-.708-.708L10.794 8.28 6.164 3.65a1 1 0 0 1 0-1.414l3.664-.954zM8.06 7.564l1.768-1.768-2.122-2.122-1.768 1.768a.5.5 0 0 0 0 .708l1.414 1.414a.5.5 0 0 0 .708 0zM4.222 9.28l-1.98 1.98a.5.5 0 1 0 .708.708l1.98-1.98-.708-.708z" />
                     </svg>
@@ -185,7 +188,7 @@ export function ConversationSidebar({
                   )}
                   {onArchiveConversation && !showArchived && (
                     <button
-                      aria-label="归档"
+                      aria-label={t('aria.archive')}
                       className={styles.conversationActionBtn}
                       onClick={() => {
                         if (window.confirm('Archive this conversation?')) {
@@ -204,7 +207,7 @@ export function ConversationSidebar({
                   )}
                   {onArchiveConversation && showArchived && (
                     <button
-                      aria-label="取消归档"
+                      aria-label={t('aria.unarchive')}
                       className={styles.conversationActionBtn}
                       onClick={() => onArchiveConversation(conversation.id, false)}
                       title="取消归档"
