@@ -260,6 +260,8 @@ export const chatviewResources = {
     'nav.docs': '云文档',
     'nav.tasks': '任务',
     'nav.projects': '项目',
+    'nav.agents': 'Agent',
+    'nav.agentMarket': 'Agent 市场',
 
     // ═══ User menu ═══
     'user.fallbackName': '用户',
@@ -652,6 +654,8 @@ export const chatviewResources = {
     'nav.docs': 'Docs',
     'nav.tasks': 'Tasks',
     'nav.projects': 'Projects',
+    'nav.agents': 'Agent',
+    'nav.agentMarket': 'Agent Market',
 
     // ═══ User menu ═══
     'user.fallbackName': 'User',
