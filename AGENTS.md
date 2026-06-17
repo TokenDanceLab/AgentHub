@@ -232,7 +232,7 @@ git status --short --branch       # 确认只改了允许的路径
 开始工作前先同步：
 
 ```powershell
-git checkout dev/delicious233
+git checkout dev/delicious223
 git pull --ff-only
 ```
 
@@ -240,7 +240,7 @@ git pull --ff-only
 
 ```powershell
 git fetch origin
-git rebase origin/dev/delicious233
+git rebase origin/dev/delicious223
 ```
 
 Commit message 使用英文 type/scope + 中文摘要：
@@ -314,7 +314,7 @@ feat/* → dev/delicious223 → master
 - 每个开发者至少在一天结束前 push 当前分支。
 - 完成一个可说明的小阶段就 push，不要把多天工作只留在本机。
 - 跨方向改动尽早开 draft PR 或普通 PR，让另外两条线知道接口变化。
-- PR 合并前先同步最新 `dev/delicious233`，解决冲突后再合。
+- PR 合并前先同步最新 `dev/delicious223`，解决冲突后再合。
 - 不在共享分支上 force-push；确实需要时先在群里说明。
 - Issue 只保留三部分主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
 - 本地提交 hook 放在 `scripts/git-hooks/`。首次克隆后运行 `.\scripts\setup.ps1` 启用。
@@ -324,7 +324,7 @@ feat/* → dev/delicious223 → master
 
 - 项目级 worktree 固定放在 `.worktrees/`，已写入 `.gitignore`，不得提交。
 - 一个 worktree = 一个短分支 = 一个 PR。不要多个 Agent 共用同一 worktree。
-- 创建前同步 `dev/delicious233`：`git checkout dev/delicious233 && git pull --ff-only`。
+- 创建前同步 `dev/delicious223`：`git checkout dev/delicious223 && git pull --ff-only`。
 - 创建示例：`git worktree add .worktrees/client-edge-foundation -b feat/client-edge-foundation`。
 - 每个 worktree 必须绑定任务卡和写入范围；范围变化先更新任务卡或 PR 说明。
 - DeepSeek、Codex、Claude 等可在 worktree 内调度 subagent，但 subagent 只能在当前 worktree 的指定路径内工作。
