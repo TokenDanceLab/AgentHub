@@ -102,9 +102,9 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
-          'vendor-tanstack': ['@tanstack/react-query', '@tanstack/react-virtual'],
+          'vendor-tanstack': ['@tanstack/react-query'],
           'vendor-markdown': ['react-markdown', 'remark-gfm', 'react-syntax-highlighter'],
-          'vendor-ui': ['lucide-react', 'clsx', 'class-variance-authority'],
+          'vendor-ui': ['lucide-react'],
           'vendor-i18n': ['i18next', 'react-i18next'],
         },
       },

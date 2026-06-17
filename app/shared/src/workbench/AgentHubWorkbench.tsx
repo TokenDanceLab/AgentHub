@@ -322,6 +322,7 @@ export function AgentHubWorkbench({
     targetRequired: Boolean(composerExecutionTargets),
     transcript,
     workbenchStatus,
+    t,
   });
 
   // ── Inspector data: route decisions, context usage, deploy preview ──
@@ -1582,6 +1583,7 @@ function buildMainchainSummary({
   targetRequired,
   transcript,
   workbenchStatus,
+  t,
 }: {
   composerTargetLabel?: string | undefined;
   evidence: EvidenceRef[];
@@ -1591,6 +1593,7 @@ function buildMainchainSummary({
   targetRequired: boolean;
   transcript: TranscriptBlock[];
   workbenchStatus?: AgentHubWorkbenchProps['workbenchStatus'];
+  t: (key: string, options?: Record<string, unknown>) => string;
 }): MainchainSummary {
   const runSession = transcript.find((block) => block.kind === 'run_session');
   const taskId = runSession?.kind === 'run_session' ? runSession.taskId : undefined;
@@ -1655,7 +1658,7 @@ function buildMainchainSummary({
     {
       id: 'hub-task',
       label: 'Hub task',
-      detail: taskId ? taskId : workbenchStatus?.replayLabel ?? '等待 task/replay',
+      detail: taskId ? taskId : workbenchStatus?.replayLabel ?? t('mainchain.waitingTask'),
       state: taskId ? 'done' : workbenchStatus?.replayLabel ? 'active' : 'waiting',
     },
     {
@@ -1667,7 +1670,7 @@ function buildMainchainSummary({
     {
       id: 'worker',
       label: 'Worker',
-      detail: workerLabel ?? '等待 worker route',
+      detail: workerLabel ?? t('mainchain.waitingWorker'),
       state: workerLabel ? 'active' : 'waiting',
     },
     {
@@ -1679,19 +1682,19 @@ function buildMainchainSummary({
     {
       id: 'target',
       label: 'Exact target',
-      detail: targetLabel ?? (targetBlocked ? '没有在线 Desktop/Edge target' : '待选择 Desktop/Edge target'),
+      detail: targetLabel ?? (targetBlocked ? t('mainchain.noTarget') : t('mainchain.pickTarget')),
       state: targetState,
     },
     {
       id: 'edge',
       label: 'Active run',
-      detail: edgeRunId ?? runId ?? runtimeEvidenceSourceSummary(runtimeEvidence),
+      detail: edgeRunId ?? runId ?? runtimeEvidenceSourceSummary(runtimeEvidence, t),
       state: runId || edgeRunId ? 'active' : hasRuntimeEvidence ? 'done' : 'waiting',
     },
     {
       id: 'replay',
       label: 'Replay',
-      detail: transcript.length > 0 ? `${transcript.length} transcript blocks` : '暂无 transcript',
+      detail: transcript.length > 0 ? `${transcript.length} transcript blocks` : t('mainchain.noTranscript'),
       state: transcript.length > 0 ? 'done' : 'empty',
     },
     {
@@ -1699,7 +1702,7 @@ function buildMainchainSummary({
       label: 'Approval/artifact',
       detail: artifactCount + approvalCount + diffCount + previewCount > 0
         ? `${evidencePathDetail} / ${diffCount} diff / ${previewCount} preview`
-        : '无 approval/artifact evidence',
+        : t('mainchain.noApprovalArtifact'),
       state: approvalCount > 0 ? 'active' : artifactCount + diffCount + previewCount > 0 ? 'done' : 'empty',
     },
   ];
@@ -1707,15 +1710,15 @@ function buildMainchainSummary({
   return {
     nodes,
     exportEnabled: hasExportEvidence,
-    exportLabel: hasExportEvidence ? '导出证据 JSON' : '等待证据',
+    exportLabel: hasExportEvidence ? t('mainchain.exportJson') : t('mainchain.waitingEvidence'),
     exportDetail: hasExportEvidence
-      ? '复制 Web -> Hub task -> target -> Edge -> replay/artifact/approval evidence JSON'
-      : '暂无 transcript、runtime evidence 或 run session 可导出',
+      ? 'Copy Web -> Hub task -> target -> Edge -> replay/artifact/approval evidence JSON'
+      : t('mainchain.noRuntimeEvidence'),
   };
 }
 
-function runtimeEvidenceSourceSummary(runtimeEvidence: RuntimeEvidenceSnapshot | undefined): string {
-  if (!runtimeEvidence) return '等待 Edge evidence';
+function runtimeEvidenceSourceSummary(runtimeEvidence: RuntimeEvidenceSnapshot | undefined, t: (key: string) => string): string {
+  if (!runtimeEvidence) return t('mainchain.waitingEdgeEvidence');
   const loading = [
     runtimeEvidence.loading?.diff ? 'diff loading' : undefined,
     runtimeEvidence.loading?.artifacts ? 'artifact loading' : undefined,
@@ -1743,20 +1746,20 @@ function configuredAgentProfiles(): Array<Omit<AgentProfileState, 'anchor'>> {
   }));
 }
 
-function agentStateLabel(state: string): string {
+function agentStateLabel(t: (key: string) => string, state: string): string {
   switch (state) {
     case 'running':
-      return '运行中';
+      return t('agent.state.running');
     case 'ready':
     case 'available':
-      return '可运行';
+      return t('agent.state.ready');
     case 'waiting':
-      return '等待中';
+      return t('agent.state.waiting');
     case 'configuring':
-      return '配置中';
+      return t('agent.state.configuring');
     case 'unavailable':
-      return '不可用';
+      return t('agent.state.unavailable');
     default:
-      return state || 'Agent';
+      return state || t('label.agent');
   }
 }
