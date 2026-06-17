@@ -458,7 +458,7 @@ OpenCode 在 dep 类型上的关键约定：
 
 | 问题 | OpenCode 现状 | AgentHub 对策 |
 |------|-------------|--------------|
-| **单包过大** | `opencode` 包 720 个 .ts 文件，包含 agent + session + mcp + server + cli + config + lsp + sync + worktree 等所有应用逻辑 | AgentHub 已按职责拆分为 hub/edge/runner 三个服务，每个服务有独立的 `internal/` |
+| **单包过大** | `opencode` 包 720 个 .ts 文件，包含 agent + session + mcp + server + cli + config + lsp + sync + worktree 等所有应用逻辑 | AgentHub 已按职责拆分为 hub/edge 两个服务（原 runner 已合并进 edge-server），每个服务有独立的 `internal/` |
 | **Plugin 双系统** | V1 (`@opencode-ai/plugin`) 和 V2 (`core/plugin.ts`) 两套 plugin 并存 | 从 Day 1 就统一 Plugin/Adapter API |
 | **Agent 硬编码** | 7 个内置 agent（build/plan/general/explore/scout/compaction/title）在代码中 hardcode | 配置驱动：agent 定义从 YAML/TOML 读取 |
 | **Tool 定义分散** | Tool 定义同时在 V1 plugin hooks 和 V2 `llm/src/tool.ts` 中 | 统一 Tool Registry（已在 design 中规划） |
@@ -475,13 +475,13 @@ OpenCode 在 dep 类型上的关键约定：
 | `opencode` | 720 | `hub/` + `edge/`（2 个服务，runner 已合并进 edge） | 每个服务 ~30-80 Go 文件 |
 | `app` + `ui` | 219 | `apps/web/` (React, 独立) | 独立 workspace |
 
-**结论**：AgentHub 的 3 服务拆分避免了 OpenCode 的 720 文件单包问题。每个 Go 服务的 `internal/` 应按功能拆分为 5-15 个文件/包，而不是堆在单一级别。
+**结论**：AgentHub 的 2 服务拆分避免了 OpenCode 的 720 文件单包问题。每个 Go 服务的 `internal/` 应按功能拆分为 5-15 个文件/包，而不是堆在单一级别。
 
 ### 5.5 关键映射建议
 
 1. **`core` → `packages/protocol/` + `packages/transport/`**：Go 中类型定义和传输逻辑应分离，不要像 OpenCode 的 core 那样把文件系统、进程管理、GitHub Copilot adapter 都塞进一个包。
 
-2. **`llm` → Runner 内部**：LLM 协议解析在 AgentHub 中不直接做（通过 Agent CLI 子进程），但 LLMEvent 16 type 和 LLMError 10 variant 的 tagged union 建模应照搬。
+2. **`llm` → Edge Server 内部**：LLM 协议解析在 AgentHub 中不直接做（通过 Agent CLI 子进程），但 LLMEvent 16 type 和 LLMError 10 variant 的 tagged union 建模应照搬。原独立 `runner/` 已废弃，执行生命周期在 `edge-server/internal/lifecycle/`。
 
 3. **`plugin` → `packages/adapters/`**：OpenCode 的 PluginInput + 19 hooks 双向修改模式，在 Go 中映射为 `AgentAdapter` interface + middleware chain。
 
@@ -500,7 +500,7 @@ OpenCode 的 24-package monorepo 是 TypeScript 生态中大规模分层的优�
 - **严格 DAG 依赖**：Layer 0 → Layer 1 → Layer 2 → Layer 3 → Layer 4，零循环
 - **最优架构决策**：Protocol/Route 四轴分离（Protocol/Endpoint/Auth/Framing）使得 20+ provider 共享协议实现
 - **最大不足**：`opencode` 单包过大（720 files），CLI + Server + Agent + Session + MCP + Sync 全混在一起
-- **对 AgentHub 的价值**：证明了 monorepo 分层可行，但 AgentHub 的 hub/edge/runner 拆分是更正确的方向——避免单包过大
+- **对 AgentHub 的价值**：证明了 monorepo 分层可行，但 AgentHub 的 hub/edge 拆分是更正确的方向——避免单包过大
 
 AgentHub 应吸取的教训：
 - 保持包边界清晰：`core` 膨胀是天然趋势，需要从 Day 1 就主动控制

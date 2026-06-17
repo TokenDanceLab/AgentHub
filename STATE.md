@@ -141,6 +141,43 @@ Release tag：`v0.4.0`（unsigned release）
 | Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、**`verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**、**@Agent 真实 Claude Code 执行端到端验证** | WS ws 模块路径待修复。 |
 | Mobile | 已合入 rc7 集成线，**hubClient 30+ 方法全面对齐 Hub API**，**platform adapter + 3 数据模式**，**91 tests PASS** | **Android APK 已产出**（2026-06-10，Release arm64-v8a，29.83 MB）。 |
 
+## ChatView Migration（`feat/chatview-tokendance-migration`）
+
+| 项目 | 当前事实 |
+|---|---|
+| 工作树 | `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration` |
+| 分支 | `feat/chatview-tokendance-migration` |
+| HEAD | `076eb310` |
+| 提交数 | 73 commits（自 `f2690631` merge base 起） |
+| 基线 | 从 `dev/delicious223` 分支（`f2690631`），独立于 `dev/delicious233` |
+| 状态 | 进行中 |
+
+### 已完成工作（按 Wave 组织）
+
+| Wave | 描述 | 状态 |
+|------|------|------|
+| W1 | Fixtures — 98-block demo data（Builder DM + Agent Collab） | ✅ |
+| W2 | Per-conversation chatMode（DM vs Group layout） | ✅ |
+| W3 | 文档、安全、React.memo、bug 修复 | ✅ |
+| W4 | CSS 修复 — scrollbar-gutter、padding、avatar 位置 | ✅ |
+| W5 | Workflow Round 5 — 状态机、抽象、可复用性 | ✅ |
+| W6 | P0 交互功能 — 头像点击、右键菜单、选择、回复、高亮、动画、流式 | ✅ |
+| W7 | 隐私 — demo 数据假名化（`Ding`→`Alice`） | ✅ |
+| W8 | 30 bugs 修复、隐私加固、命名系统化 | ✅ |
+| W9 | 命名系统化续 | ✅ |
+| W10 | React.memo 全组件、crash safety、类型去重 | ✅ |
+| W11 | ESLint 修复、未使用导入清理、格式化 | ✅ |
+| W12 | 54 pipeline 集成测试（694 total, 679 pass） | ✅ |
+| W13 | Lazy loading、bundle 优化、test fixes | ✅ |
+| W14 | Desktop Tauri PASS、Edge live PASS、Mobile 审计 | ✅ |
+| 剩余 | 剩余性能项、test fixes、清理 | ⏳ |
+
+### 待完成
+
+- 剩余性能优化和 test 修复（W10+W13 tail，commit `076eb310`）
+- 与 `dev/delicious233` 的冲突解决与集成
+- 合并回主分支前需 typecheck + ESLint + 全量测试
+
 ## 分支治理
 
 - 新实现必须从最新可信基线开隔离 worktree，不在主工作树开发。
