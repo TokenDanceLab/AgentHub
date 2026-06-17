@@ -13,8 +13,6 @@ import {
   workbenchDataModeLabel,
 } from '@shared/demo';
 import {
-  contactInfoToMember,
-  hubEmptyContacts,
   resolveHubContacts,
   type HubContactLike,
 } from '@shared/workbench/hubDataMapping';
@@ -242,7 +240,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   // Contact mutation hooks (Hub)
   const searchUser = useSearchHubUser();
   const sendFriendRequest = useSendFriendRequest();
-  const friendRequests = useListFriendRequests({ enabled: hubReady });
+  useListFriendRequests({ enabled: hubReady });
   const acceptFriendRequest = useAcceptFriendRequest();
   const rejectFriendRequest = useRejectFriendRequest();
   const removeContact = useRemoveContact();

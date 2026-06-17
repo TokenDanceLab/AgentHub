@@ -5,7 +5,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import { Component, useMemo, useEffect, useRef, useCallback, memo } from 'react'
-import Transcript from './Transcript'
+import { Transcript } from './Transcript'
 import { useTranslation } from 'react-i18next'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { blocksToTranscriptItems, type TranscriptBlock } from '../adapter'
@@ -154,7 +154,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         <EmptyState />
       ) : (
         <TranscriptErrorBoundary>
-          <Transcript items={items} chatMode={chatMode} onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu} onBlockSelect={onBlockSelect} onBlockAction={onBlockAction} onReviewFile={onReviewFile} onDeploySubmit={onDeploySubmit} selectedBlockIds={selectedBlockIds} selectionMode={selectionMode} softHiddenBlockIds={softHiddenBlockIds} actionedBlockIds={actionedBlockIds} />
+          <Transcript items={items} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
         </TranscriptErrorBoundary>
       )}
     </div>

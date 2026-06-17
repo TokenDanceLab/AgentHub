@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { cx } from './cx';
 import styles from './MetricGrid.module.css';
 import { SkeletonBar } from './SkeletonBar';
 
@@ -29,9 +30,6 @@ export interface MetricGridProps {
   error?: string | ReactNode;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 export function MetricGrid({
   items,

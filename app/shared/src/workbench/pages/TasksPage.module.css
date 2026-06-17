@@ -2,32 +2,17 @@
    TasksPage — v4 Design Tokens
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Root layout: workbench-page pattern ── */
-.page {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  background: var(--surface);
-  color: var(--text-1);
-  overflow: hidden;
-}
+/* ── Root layout: workbench-page pattern (shared) ── */
+.page { composes: wbPage from './workbench-page-shared.module.css'; }
 
 /* ── Left nav (310px) ── */
 .nav {
-  width: 310px;
-  flex: 0 0 310px;
+  composes: wbNav from './workbench-page-shared.module.css';
   padding: 24px 12px 14px;
-  border-right: 1px solid var(--bdr);
-  background: var(--surface-low);
-  overflow-y: auto;
   position: relative;
 }
 
-.navTitle {
-  padding: 0 12px 18px;
-  font: 600 1.375rem/1.2 var(--font-sans);
-  letter-spacing: 0;
-}
+.navTitle { composes: wbNavTitle from './workbench-page-shared.module.css'; }
 
 .navMore {
   position: absolute;

@@ -60,15 +60,3 @@
 /* ── Spacer placeholder — preserves symmetric grp-row layout ──────── */
 .dm-spacer { flex-shrink:0; visibility:hidden }
 .dm-spacer .ag-av { visibility:hidden }
-
-/* ── Simulation controls ───────────────────────────────────────────── */
-.sim-ctrl { display:flex; gap:var(--sp-sm); margin-bottom:var(--sp-md); align-items:center }
-.sim-btn {
-  padding:var(--sp-xs) var(--sp-md); border-radius:var(--r-sm); border:1px solid var(--bdr);
-  background:var(--surface); color:var(--text-2);
-  font:var(--label); cursor:pointer;
-}
-.sim-btn:hover { background:var(--surface-high) }
-.sim-btn:disabled { opacity:var(--opacity-disabled); cursor:default }
-.sim-btn.active { background:var(--primary); color:var(--on-primary) }
-.sim-step { font:var(--label); color:var(--text-3) }
