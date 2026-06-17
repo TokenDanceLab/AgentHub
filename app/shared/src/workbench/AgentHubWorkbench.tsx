@@ -1,4 +1,4 @@
-import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { FormEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState, lazy, Suspense } from 'react';
 import {
   buildComposerIntent,
   type ComposerMention,
@@ -27,7 +27,8 @@ import {
 import { GlobalRail, type GlobalRailPage, type ConnectionStatusKind } from './GlobalRail';
 import { RightInspector, type RuntimeEvidenceSnapshot } from './RightInspector';
 import { type TranscriptContextMenuEvent, type TranscriptPointerEvent } from './transcriptEventTypes';
-import { ChatViewTranscript } from '../chatview/components/ChatViewTranscript';
+// ── Lazily loaded: ChatViewTranscript only renders when activePage === 'chat' ──
+const LazyChatViewTranscript = lazy(() => import('../chatview/components/ChatViewTranscript').then(m => ({ default: m.ChatViewTranscript })));
 import type { EvidenceRef } from '../transcript';
 import type { FileItem } from './inspector';
 import { UnifiedComposer, type AttachmentUploadState } from './UnifiedComposer';
@@ -1514,7 +1515,8 @@ export function AgentHubWorkbench({
               />
             ) : null}
             <div className={styles.transcriptRegion}>
-              <ChatViewTranscript
+              <Suspense fallback={<div className={styles.transcriptRegion} />}>
+              <LazyChatViewTranscript
                 transcript={displayTranscript}
                 chatMode={activeConversation?.kind === 'group' ? 'group' : 'dm'}
                 onAgentClick={openAgentProfile}

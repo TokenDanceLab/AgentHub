@@ -1,20 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/workbench/' : '/',
-  plugins: [
-    react(),
-    visualizer({
-      filename: 'dist/stats.html',
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-      template: 'treemap',
-    }),
-  ],
+  plugins: [react()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
