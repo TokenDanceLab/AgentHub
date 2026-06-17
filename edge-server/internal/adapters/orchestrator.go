@@ -17,13 +17,6 @@ import (
 )
 
 const (
-	// maxSpawnRetries is the maximum number of retry attempts when spawning a
-	// sub-agent fails. After this limit the failure is escalated to the user.
-	maxSpawnRetries = 3
-
-	// baseRetryDelay is the starting backoff duration for spawn retries.
-	baseRetryDelay = 500 * time.Millisecond
-
 	// DefaultDispatchConcurrency is the default maximum number of concurrent
 	// sub-agent dispatch goroutines. Matches OpenCode default tool concurrency of 10.
 	DefaultDispatchConcurrency = 10

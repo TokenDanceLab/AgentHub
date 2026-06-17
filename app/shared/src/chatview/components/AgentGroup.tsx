@@ -1,3 +1,4 @@
+import { useCallback, memo } from 'react'
 import type { TranscriptAgentItem, BlockActionCallback } from '../transcript-item'
 import RowItem from './RowItem'
 import OrchestratorCard from './OrchestratorCard'
@@ -22,13 +23,14 @@ interface Props {
   onBlockSelect?: (blockId: string, shiftKey: boolean) => void
   onBlockAction?: BlockActionCallback
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
+  onDeploySubmit?: (id: string) => void
   selectedBlockIds?: Set<string>
   selectionMode?: boolean
   softHiddenBlockIds?: Set<string>
   actionedBlockIds?: Set<string>
 }
 
-export default function AgentGroup({ block, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds }: Props) {
+export default memo(function AgentGroup({ block, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds }: Props) {
   const initial = roleInitial[block.role] ?? block.agent[0]
   const avatar = (
     <div className={`ag-av ${block.role}`}>
@@ -36,9 +38,9 @@ export default function AgentGroup({ block, chatMode, onAgentClick, onBlockConte
     </div>
   )
 
-  const handleApprove = onBlockAction ? (id: string) => onBlockAction('approve', id) : undefined
-  const handleReject = onBlockAction ? (id: string) => onBlockAction('deny', id) : undefined
-  const handleRetry = onBlockAction ? (id: string) => onBlockAction('retry', id) : undefined
+  const handleApprove = useCallback(onBlockAction ? (id: string) => onBlockAction('approve', id) : undefined, [onBlockAction]) as ((id: string) => void) | undefined
+  const handleReject = useCallback(onBlockAction ? (id: string) => onBlockAction('deny', id) : undefined, [onBlockAction]) as ((id: string) => void) | undefined
+  const handleRetry = useCallback(onBlockAction ? (id: string) => onBlockAction('retry', id) : undefined, [onBlockAction]) as ((id: string) => void) | undefined
 
   const body = (
     <>
@@ -53,7 +55,7 @@ export default function AgentGroup({ block, chatMode, onAgentClick, onBlockConte
           {block.rows.map((row) => (
             row.type === 'route' && row.orchAgents?.length
               ? <OrchestratorCard key={row.id} item={row} />
-              : <RowItem key={row.id} item={row} onApprove={handleApprove} onReject={handleReject} onRetry={handleRetry} onContextMenu={onBlockContextMenu} onBlockSelect={onBlockSelect} onReviewFile={onReviewFile} selected={selectedBlockIds?.has(row.id)} selectedAny={selectionMode} softHidden={softHiddenBlockIds?.has(row.id)} actioned={actionedBlockIds?.has(row.id)} />
+              : <RowItem key={row.id} item={row} onApprove={handleApprove} onReject={handleReject} onRetry={handleRetry} onDeploySubmit={onDeploySubmit} onContextMenu={onBlockContextMenu} onBlockSelect={onBlockSelect} onReviewFile={onReviewFile} selected={selectedBlockIds?.has(row.id)} selectedAny={selectionMode} softHidden={softHiddenBlockIds?.has(row.id)} actioned={actionedBlockIds?.has(row.id)} />
           ))}
         </div>
       )}
@@ -62,7 +64,7 @@ export default function AgentGroup({ block, chatMode, onAgentClick, onBlockConte
           {block.standaloneRows.map((row) => (
             row.type === 'route' && row.orchAgents?.length
               ? <OrchestratorCard key={row.id} item={row} />
-              : <RowItem key={row.id} item={row} onApprove={handleApprove} onReject={handleReject} onRetry={handleRetry} onContextMenu={onBlockContextMenu} onBlockSelect={onBlockSelect} onReviewFile={onReviewFile} selected={selectedBlockIds?.has(row.id)} selectedAny={selectionMode} softHidden={softHiddenBlockIds?.has(row.id)} actioned={actionedBlockIds?.has(row.id)} />
+              : <RowItem key={row.id} item={row} onApprove={handleApprove} onReject={handleReject} onRetry={handleRetry} onDeploySubmit={onDeploySubmit} onContextMenu={onBlockContextMenu} onBlockSelect={onBlockSelect} onReviewFile={onReviewFile} selected={selectedBlockIds?.has(row.id)} selectedAny={selectionMode} softHidden={softHiddenBlockIds?.has(row.id)} actioned={actionedBlockIds?.has(row.id)} />
           ))}
         </div>
       )}
@@ -131,4 +133,4 @@ export default function AgentGroup({ block, chatMode, onAgentClick, onBlockConte
       <div className="dm-spacer"><div className="ag-av">&nbsp;</div></div>
     </div>
   )
-}
+})

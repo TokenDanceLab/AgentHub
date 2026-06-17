@@ -74,8 +74,8 @@ function pickDisplay(b: Record<string, unknown>): Record<string, unknown> {
  */
 function newAgentBlock(author: TranscriptBlock['author'], role: string, createdAt?: string): TranscriptAgentItem {
   return {
-    id: author.id,
-    agent: author.name || 'Agent',
+    id: author?.id ?? 'unknown',
+    agent: author?.name || 'Agent',
     role,
     time: timeStr(createdAt),
     rows: [],
@@ -108,11 +108,12 @@ function timeStr(iso?: string) {
  * - `'completed'`              -> `'ok'`
  * - Everything else            -> `'ok'`
  */
-function statusNorm(s: EvidenceRefStatus | string): RowItem['status'] {
+function statusNorm(s: EvidenceRefStatus | string | undefined): RowItem['status'] {
+  if (!s) return 'running'
   if (s === 'running' || s === 'pending') return 'running'
   if (s === 'failed') return 'fail'
   if (s === 'completed') return 'ok'
-  return 'ok'
+  return 'running'
 }
 
 /**
@@ -165,13 +166,18 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
       // Tool call is a running event by nature, but a completed transcript
       // may carry status:'completed' or evidenceRefs showing completion.
       const hasCompletedEvidence = t.evidenceRefs?.some(ref => ref.status === 'completed')
-      const toolStatus = (t.status === 'completed' || hasCompletedEvidence) ? 'ok' : 'running'
+      const toolStatus = t.status === 'failed'
+        ? 'fail'
+        : (t.status === 'completed' || hasCompletedEvidence)
+          ? 'ok'
+          : 'running'
+      const tn = t.toolName?.toLowerCase() ?? 'unknown'
       return {
         id: t.id, type: 'tool',
-        label: t.toolName,
+        label: t.toolName ?? tn,
         status: toolStatus,
         collapsible: true,
-        toolName: t.toolName.toLowerCase(),
+        toolName: tn,
         content: t.summary || t.target,
         extra: t.target && !t.summary ? t.target : undefined,
       } as RowItem
@@ -179,12 +185,13 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
 
     case 'tool_result': {
       const t = b as ToolResultTranscriptBlock
+      const tn = t.toolName?.toLowerCase() ?? 'unknown'
       return {
         id: t.id, type: 'tool',
-        label: t.toolName,
+        label: t.toolName ?? tn,
         status: statusNorm(t.status),
         collapsible: true,
-        toolName: t.toolName.toLowerCase(),
+        toolName: tn,
         content: t.summary,
         isResult: true,
       } as RowItem
@@ -380,15 +387,7 @@ function mapBlock(b: TranscriptBlock): RowItem | null {
  */
 function mapEvidenceRefs(b: TranscriptBlock): TranscriptAgentItem['evidenceRefs'] | undefined {
   if (!b.evidenceRefs || b.evidenceRefs.length === 0) return undefined
-  return b.evidenceRefs.map(ref => ({
-    id: ref.id,
-    kind: ref.kind,
-    label: ref.label,
-    status: ref.status,
-    path: ref.path,
-    uri: ref.uri,
-    mimeType: ref.mimeType,
-  }))
+  return b.evidenceRefs
 }
 // Re-export the generic types (backward-compat aliases)
 export type { TranscriptItem as ChatViewTranscriptItem }
@@ -434,7 +433,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (currentAgent) { items.push(currentAgent); currentAgent = null }
       const t = block as TextTranscriptBlock
       items.push({
-        type: 'user', name: block.author.name, time: timeStr(block.createdAt), text: t.text,
+        type: 'user', name: block.author?.name, time: timeStr(block.createdAt), text: t.text,
         ...pickDisplay(t as unknown as Record<string, unknown>),
       })
       continue
@@ -468,7 +467,11 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       const t = block as AgentTimelineTranscriptBlock
       if (t.items && Array.isArray(t.items)) {
         for (const ti of t.items) {
-          const status = ti.status === 'completed' ? 'ok' : ti.status === 'failed' ? 'fail' : 'running'
+          const status =
+            ti.status === 'completed' || ti.status === 'done' ? 'ok' :
+            ti.status === 'failed' ? 'fail' :
+            ti.status === 'todo' ? 'waiting' :
+            'running'
           const row = {
             id: `${block.id}-${ti.label}`, type: 'think' as const,
             label: '',
@@ -513,8 +516,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (!row) continue
       if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
-        currentAgent = { id: block.author.id, agent: block.author.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId, evidenceRefs: mapEvidenceRefs(block) }
-        currentAgent.id = `${block.author.id}-${_seq}`
+        currentAgent = { id: block.author?.id ?? 'unknown', agent: block.author?.name || 'Agent', role, time: timeStr(block.createdAt), rows: [], bubbles: [], standaloneRows: [], runs: [], groupId, evidenceRefs: mapEvidenceRefs(block) }
+        currentAgent.id = `${block.author?.id ?? 'unknown'}-${_seq}`
       }
       // Standalone cards vs inline rows
       const standalone = row.type === 'route' || row.type === 'deploy' || row.type === 'ctx' ||
@@ -522,9 +525,12 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (standalone) {
         currentAgent.standaloneRows.push(row)
       } else {
-        // Merge: tool_result replaces matching tool_call (same toolName, same card)
+        // Merge: tool_result replaces the first unmatched tool_call (same toolName).
+        // Using FIFO (findIndex of first unmatched) instead of findLastIndex
+        // so that multiple calls to the same tool pair correctly with their results
+        // in order: result-1 matches call-1, result-2 matches call-2, etc.
         if (row.type === 'tool' && row.isResult) {
-          const matchIdx = currentAgent.rows.findLastIndex(r => r.type === 'tool' && r.toolName === row.toolName)
+          const matchIdx = currentAgent.rows.findIndex(r => r.type === 'tool' && r.toolName === row.toolName && !r.isResult)
           if (matchIdx >= 0) {
             // Preserve the original id for React key stability; update status+content
             currentAgent.rows[matchIdx] = { ...row, id: currentAgent.rows[matchIdx]!.id }
