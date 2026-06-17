@@ -69,8 +69,11 @@ export default memo(function OrchestratorCard({item}:{item:RowItemType}){
   const gy = (i:number, rows:number)=>P+(colH(maxColRows)-colH(rows))/2+i*(NH+RG)
 
   // Build a lookup: node id → {layer index, row index}
-  const pos = new Map<string,{li:number;ri:number}>()
-  allLayers.forEach((layer,li)=>{layer.forEach((n,ri)=>{pos.set(n.id,{li,ri})})})
+  const pos = useMemo(() => {
+    const m = new Map<string,{li:number;ri:number}>()
+    allLayers.forEach((layer,li)=>{layer.forEach((n,ri)=>{m.set(n.id,{li,ri})})})
+    return m
+  }, [allLayers])
 
   return <div className="row-item route standalone open">
     <div className="row-hd">
