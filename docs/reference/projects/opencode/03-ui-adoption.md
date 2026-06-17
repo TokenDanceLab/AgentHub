@@ -28,7 +28,7 @@ packages/
 
 | OpenCode 模块 | AgentHub 对应 | 技术差异 | 借鉴方式 |
 |------|------|------|------|
-| `packages/app/src/pages/session.tsx` | `app/desktop/src/components/ChatView.tsx` | SolidJS → React | 布局结构 + 交互模式 |
+| `packages/app/src/pages/session.tsx` | `app/shared/src/chatview/components/ChatViewTranscript.tsx` | SolidJS → React | 布局结构 + 交互模式 |
 | `packages/ui/session-diff.ts` | 无（AgentHub 无 Diff 渲染） | 纯逻辑，跨框架 | **直接移植算法** |
 | `packages/app/components/terminal.tsx` | AgentHub 无终端嵌入 | ghostty-web | 集成方案参考 |
 | `packages/app/components/session/session-context-tab.tsx` | AgentHub 无上下文用量展示 | SolidJS → React | **新增功能** |
@@ -122,7 +122,7 @@ if (estimated > input) {
 }
 ```
 
-**AgentHub 移植建议**：**P0**。AgentHub ChatView 当前完全不展示 token 用量，这是 Agent 对话场景的核心体验缺失。算法纯逻辑可直接移植，UI 用 React 重写（约 2 天）。
+**AgentHub 移植建议**：**P0**。AgentHub ChatViewTranscript 当前完全不展示 token 用量，这是 Agent 对话场景的核心体验缺失。算法纯逻辑可直接移植，UI 用 React 重写（约 2 天）。
 
 ---
 
@@ -191,7 +191,7 @@ if (estimated > input) {
 
 **AgentHub 借鉴优先级**：
 - **P0** — 消息自动滚动 + 用户滚动检测
-- **P1** — 面板 resize（ChatView ↔ DiffViewer ↔ Terminal）
+- **P1** — 面板 resize（ChatViewTranscript ↔ DiffViewer ↔ Terminal）
 - **P2** — Tab 拖拽排序
 
 ---
@@ -287,7 +287,7 @@ type SessionMetrics = {
 
 | # | 采纳项 | 天数 |
 |---|--------|:--:|
-| 1 | 面板 Resize（ChatView ↔ DiffViewer） | 2d |
+| 1 | 面板 Resize（ChatViewTranscript ↔ DiffViewer） | 2d |
 | 2 | "在 IDE 中打开"按钮（Tauri shell.open） | 1d |
 | 3 | Session 统计面板（17 维度） | 3d |
 | 4 | 费用追踪展示 | 2d |
