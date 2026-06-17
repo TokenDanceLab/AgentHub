@@ -1097,6 +1097,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
 		return
 	}
+		// Auto-detect continue: when the thread has prior assistant messages,
+		// set ContinueLast = true so adapters can resume the conversation.
+		if !req.Continue && threadHasAssistantHistory(repository, req.ThreadID) {
+			req.Continue = true
+		}
 	// Each run creates a fresh CC conversation via --session-id.
 
 	if h.Executor == nil {
@@ -1519,6 +1524,18 @@ func activeRunForThread(runs []store.Run) (store.Run, bool) {
 		}
 	}
 	return store.Run{}, false
+}
+
+// threadHasAssistantHistory returns true when the thread contains at least one
+// message from the agent (role "agent"), indicating the adapter should resume
+// rather than start a fresh conversation.
+func threadHasAssistantHistory(repo store.Repository, threadID string) bool {
+	for _, item := range repo.ListThreadItems(threadID) {
+		if item.Role == "agent" {
+			return true
+		}
+	}
+	return false
 }
 
 func isActiveRunStatus(status string) bool {
