@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/google/uuid"
 )
 
@@ -297,9 +298,9 @@ func TestSearchNonExistentUser(t *testing.T) {
 
 	// Search for a random UUID that doesn't exist
 	r := parse(get("/client/contacts/search?id="+uuid.New().String(), alice.Token))
-	mustCode(t, r, "USER_NOT_FOUND", "search non-existent user")
+	mustCode(t, r, errcode.UserNotFound.Code, "search non-existent user")
 
 	// Search for self — should return error (cannot search self)
 	r2 := parse(get("/client/contacts/search?id="+alice.ID, alice.Token))
-	mustCode(t, r2, "USER_INVALID_PARAM", "search self")
+	mustCode(t, r2, errcode.UserInvalidParam.Code, "search self")
 }

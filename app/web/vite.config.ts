@@ -22,6 +22,22 @@ export default defineConfig(({ command }) => ({
     port: 5174,
     strictPort: true,
     host: '127.0.0.1',
+    headers: {
+      'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://avatars.githubusercontent.com",
+        "connect-src 'self' ws://127.0.0.1:5174 http://localhost:* ws://localhost:* https://*.vectorcontrol.tech wss://*.vectorcontrol.tech",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "base-uri 'self'",
+      ].join('; '),
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    },
   },
   build: {
     target: ['es2021', 'chrome100', 'safari15'],

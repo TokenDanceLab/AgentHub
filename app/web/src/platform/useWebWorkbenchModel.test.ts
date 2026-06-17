@@ -102,7 +102,7 @@ describe('useWebWorkbenchModel helpers', () => {
   });
 
   it('keeps demo projects only in demo mode without Hub readiness', () => {
-    expect(resolveWebWorkbenchProjects(undefined, false)).toEqual([]);
+    expect(resolveWebWorkbenchProjects(undefined, false, 'auto')).toEqual([]);
     expect(resolveWebWorkbenchProjects(undefined, false, 'fixture')).toBeUndefined();
     expect(resolveWebWorkbenchProjects(undefined, false, 'approved-real')).toEqual([]);
     expect(resolveWebWorkbenchProjects([{
@@ -664,8 +664,8 @@ describe('useWebWorkbenchModel helpers', () => {
   });
 
   it('uses preview and Hub empty transcripts for unauthenticated and empty Hub states', () => {
-    expect(resolveWebWorkbenchTranscript(false, null, undefined, [])).toBe(webTranscript);
-    expect(resolveWebWorkbenchTranscript(true, null, undefined, [])[0]).toEqual(expect.objectContaining({
+    expect(resolveWebWorkbenchTranscript(false, null, undefined, [], 'fixture')).toBe(webTranscript);
+    expect(resolveWebWorkbenchTranscript(true, null, undefined, [], 'approved-real')[0]).toEqual(expect.objectContaining({
       id: 'web-hub-empty',
       text: 'Hub session 已连接，暂无可显示会话。',
     }));

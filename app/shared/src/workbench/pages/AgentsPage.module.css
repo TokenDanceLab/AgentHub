@@ -32,6 +32,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--surface);
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
 }
 
 /* ── Workbench nav (shared with other pages but scoped here) ── */
@@ -43,7 +45,8 @@
   border-right: 1px solid var(--bdr);
   background: var(--surface-low);
   overflow-y: auto;
-}
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-3) transparent;
 
 .workbench-title {
   padding: 0 12px 18px;
@@ -1500,7 +1503,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 .tool-matrix {
-  min-width: 860px;
+  min-width: 600px;
+  /* was 860px — lowered to allow narrower viewports; grid columns provide natural floor */
 }
 
 .tool-matrix-head,

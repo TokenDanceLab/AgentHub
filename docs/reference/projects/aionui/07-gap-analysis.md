@@ -1,6 +1,6 @@
 # 07 - AionUi vs AgentHub 针对性差距报告
 
-> 对照 AgentHub 当前 UI/客户端问题（来源：`docs/roadmap.md`、`docs/handoffs/STATE.md`），
+> 对照 AgentHub 当前 UI/客户端问题（来源：`docs/roadmap.md`、`STATE.md`），
 > 逐项给出 AionUi 的解决方式和 AgentHub 的具体采纳建议。
 
 ---

@@ -2,6 +2,8 @@
 
 > 生成日期: 2026-05-24 | 基准: Kanna v0.41.5 `<>` AgentHub `dev/delicious233`
 
+> **ARCHIVED REFERENCE -- written against pre-migration ChatView (retired). Current ChatViewTranscript at `app/shared/src/chatview/components/`.**
+
 ---
 
 ## 1. 流式 / WebSocket 架构

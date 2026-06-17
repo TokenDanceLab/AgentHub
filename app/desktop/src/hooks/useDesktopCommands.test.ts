@@ -64,7 +64,7 @@ const diagnostics: DesktopLocalEdgeDiagnostics = {
         name: 'Codex CLI',
         installed: true,
         version: '0.27.0',
-        path: 'C:/Users/Ding/AppData/Roaming/npm/codex.cmd',
+        path: 'C:/Users/TestUser/AppData/Roaming/npm/codex.cmd',
         noSpend: true,
       },
       {

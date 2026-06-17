@@ -30,6 +30,7 @@ export type {
   EvidenceRef,
   EvidenceRefKind,
   EvidenceRefStatus,
+  BadgeVariant,
   FailureTranscriptBlock,
   FileChangeTranscriptBlock,
   FinishedTranscriptBlock,
@@ -51,3 +52,5 @@ export type {
   TranscriptAuthorRole,
   TranscriptBlock,
 } from './types';
+
+export { isSidebarOnlyTranscriptBlock } from './types';

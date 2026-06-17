@@ -12,7 +12,7 @@ import (
 //
 // Wire format (JSON):
 //
-//	{"error": {"code": "NOT_FOUND", "message": "...", "traceId": "trace_000123"}}
+//	{"error": {"code": "not_found", "message": "...", "traceId": "trace_000123"}}
 //
 // All API consumers should check response.error for errors.
 type Error struct {

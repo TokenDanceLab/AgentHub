@@ -1,7 +1,7 @@
 # AgentHub 当前状态
 
-最后更新：2026-06-11 12:30 +08:00
-当前 dev HEAD：`118bdd84` (`dev/delicious223`)
+最后更新：2026-06-17 12:00 +08:00
+当前 dev HEAD：`5e653859` (`dev/delicious233`)
 Release tag：`v0.4.0`（unsigned release）
 
 ## Roadmap 最终状态
@@ -42,12 +42,12 @@ Release tag：`v0.4.0`（unsigned release）
 
 | 项目 | 当前事实 |
 |---|---|
-| 当前集成 dev | `dev/delicious223` HEAD `118bdd84`，从 `dev/delicious233` 创建；v0.4.0 roadmap 已归档。 |
-| 上一条 dev | `origin/dev/delicious233 = 1e03b7ec`，领先 `origin/master` 旧基线 1 个 commit（v0.4.0 roadmap 归档）。 |
+| 当前集成 dev | `dev/delicious233` HEAD `5e653859`，ChatView migration 进行中。 |
+| 上一条 dev | `origin/dev/delicious223 = 118bdd84`，v0.4.0 已归档，`dev/delicious233` 已吸收其提交。 |
 | RC tag | `v0.4.0`（指向 `ed4f6fda`，unsigned release） |
 | master | `origin/master = 8ac93e8b`，当前可信基线，指向 v0.4.0。 |
-| 当前工作树 | `D:\Code\TokenDance\AgentHub`，分支 `dev/delicious223`。 |
-| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/right-panel-enhancement-design.md` 写右侧面板设计规范；`docs/roadmap/` 写模块化路线图（3 个文件）。 |
+| 当前工作树 | 主工作树：`D:\Code\TokenDance\AgentHub`（分支 `dev/delicious233`）。ChatView migration 工作树：`D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration`（分支 `feat/chatview-tokendance-migration`，见 ChatView Migration 节）。 |
+| 当前文档分工 | `docs/roadmap.md` 只写路线、优先级和边界；`STATE.md` 写当前事实；`docs/architecture.md` 写结构和实现边界；`docs/designs/right-panel-enhancement-design.md` 写右侧面板设计规范（right-panel 工作已于 2026-06-11 完成，见 P1 UI 节）；`docs/roadmap/` 写模块化路线图（3 个文件）。 |
 | Git 维护风险 | 旧上下文记录过 bad-tree auto-gc 风险；未获明确批准前不做 destructive gc/prune/reset。 |
 
 ## 已合入能力
@@ -140,6 +140,43 @@ Release tag：`v0.4.0`（unsigned release）
 | Edge/CLI/SDK/SQLite | 最新 dev 已合入 **Claude Code + OpenCode 真实 CLI 执行**、**Anthropic SDK + OpenAI SDK HTTP 适配器（E2E verified）**、PreflightAdapter 接口、**cc-switch Edge 集成（模型别名路由）**、**AgentMemory 管道** | Codex 阻塞于 `OPENAI_API_KEY`；面向最终用户的 API key 管理闭环未完成。 |
 | Product-loop/readiness | 最新 dev 已合入 observed fixture E2E、**`verify-real-api-smoke.ps1` 13 个阶段 95+/96 PASS**、**@Agent 真实 Claude Code 执行端到端验证** | WS ws 模块路径待修复。 |
 | Mobile | 已合入 rc7 集成线，**hubClient 30+ 方法全面对齐 Hub API**，**platform adapter + 3 数据模式**，**91 tests PASS** | **Android APK 已产出**（2026-06-10，Release arm64-v8a，29.83 MB）。 |
+
+## ChatView Migration（`feat/chatview-tokendance-migration`）
+
+| 项目 | 当前事实 |
+|---|---|
+| 工作树 | `D:\Code\TokenDance\AgentHub\.worktrees\chatview-migration` |
+| 分支 | `feat/chatview-tokendance-migration` |
+| HEAD | `076eb310` |
+| 提交数 | 73 commits（自 `f2690631` merge base 起） |
+| 基线 | 从 `dev/delicious223` 分支（`f2690631`），独立于 `dev/delicious233` |
+| 状态 | 进行中 |
+
+### 已完成工作（按 Wave 组织）
+
+| Wave | 描述 | 状态 |
+|------|------|------|
+| W1 | Fixtures — 98-block demo data（Builder DM + Agent Collab） | ✅ |
+| W2 | Per-conversation chatMode（DM vs Group layout） | ✅ |
+| W3 | 文档、安全、React.memo、bug 修复 | ✅ |
+| W4 | CSS 修复 — scrollbar-gutter、padding、avatar 位置 | ✅ |
+| W5 | Workflow Round 5 — 状态机、抽象、可复用性 | ✅ |
+| W6 | P0 交互功能 — 头像点击、右键菜单、选择、回复、高亮、动画、流式 | ✅ |
+| W7 | 隐私 — demo 数据假名化（`Ding`→`Alice`） | ✅ |
+| W8 | 30 bugs 修复、隐私加固、命名系统化 | ✅ |
+| W9 | 命名系统化续 | ✅ |
+| W10 | React.memo 全组件、crash safety、类型去重 | ✅ |
+| W11 | ESLint 修复、未使用导入清理、格式化 | ✅ |
+| W12 | 54 pipeline 集成测试（694 total, 679 pass） | ✅ |
+| W13 | Lazy loading、bundle 优化、test fixes | ✅ |
+| W14 | Desktop Tauri PASS、Edge live PASS、Mobile 审计 | ✅ |
+| 剩余 | 剩余性能项、test fixes、清理 | ⏳ |
+
+### 待完成
+
+- 剩余性能优化和 test 修复（W10+W13 tail，commit `076eb310`）
+- 与 `dev/delicious233` 的冲突解决与集成
+- 合并回主分支前需 typecheck + ESLint + 全量测试
 
 ## 分支治理
 

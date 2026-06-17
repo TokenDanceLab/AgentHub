@@ -74,7 +74,7 @@ const scenes = [
     locale: 'zh-CN',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['Delicious233', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
+    expectedTexts: ['Alice', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
     forbiddenTexts: ['#'],
     expectedTabCount: 5,
     expectedBottomTabLabels: ['消息', '云文档', '任务', '项目', '更多'],
@@ -85,7 +85,7 @@ const scenes = [
     locale: 'en-US',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['Delicious233', 'TokenDance', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
+    expectedTexts: ['Alice', 'TokenDance', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
     forbiddenTexts: ['#'],
     expectedTabCount: 5,
     expectedBottomTabLabels: ['Chats', 'Docs', 'Tasks', 'Projects', 'More'],
@@ -134,7 +134,7 @@ const scenes = [
     locale: 'zh-CN',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['身份与会话', 'TokenDance ID', 'AgentHub', 'Agent Profiles', '切换工作区', 'Delicious233'],
+    expectedTexts: ['身份与会话', 'TokenDance ID', 'AgentHub', 'Agent Profiles', '切换工作区', 'Alice'],
     expectTabsHidden: true,
     actions: [
       { role: 'button', namePattern: 'Open account drawer|打开账号抽屉' },
@@ -853,7 +853,7 @@ function buildSceneUrl(scene) {
 
 async function waitForSceneReady(page, scene) {
   const readinessPatterns = scene.readyTextPatterns ?? [];
-  const fallbackPattern = 'Delicious233|AgentHub Mobile Workbench|AgentHub Mobile 工作台视觉校准|AgentHub|TokenDance';
+  const fallbackPattern = 'Alice|AgentHub Mobile Workbench|AgentHub Mobile 工作台视觉校准|AgentHub|TokenDance';
   const pattern = readinessPatterns.length > 0 ? readinessPatterns.join('|') : fallbackPattern;
 
   await page.getByText(new RegExp(pattern, 'i')).first().waitFor({ timeout: 60_000 });

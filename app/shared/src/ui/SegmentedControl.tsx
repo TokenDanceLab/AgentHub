@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { cx } from './cx';
 import styles from './SegmentedControl.module.css';
 
 export interface SegmentedControlOption<TValue extends string = string> {
@@ -23,9 +24,6 @@ export interface SegmentedControlProps<TValue extends string = string> {
   metaClassName?: string;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 export function SegmentedControl<TValue extends string = string>({
   options,

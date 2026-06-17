@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { highlightLine, languageFromPath } from '../../ui/syntaxHighlight';
 import { DesignFileIcon, DesignNavIcon, DesignOpenWithIcon, type DesignOpenWithIconName } from '../designIcons';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import styles from './FilePreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -67,6 +69,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   diffContent,
   onClose,
 }) => {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [mode, setMode] = useState<FilePreviewMode>(defaultPreviewMode(filename));
   const [openMenuVisible, setOpenMenuVisible] = useState(false);
   const [lastOpenTarget, setLastOpenTarget] = useState<string | null>(null);
@@ -92,7 +95,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           <DesignFileIcon className={styles.fileIcon} name={filename} />
           <strong className={styles.fileTitleName} title={filename}>{filename}</strong>
         </div>
-        <div className={styles.modeTabs} role="tablist" aria-label="文件预览模式">
+        <div className={styles.modeTabs} role="tablist" aria-label={t('aria.filePreviewMode')}>
           {nativeMode && (
             <button
               aria-selected={mode === nativeMode}
@@ -138,7 +141,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           <button
             aria-expanded={openMenuVisible}
             aria-haspopup="menu"
-            aria-label="打开方式"
+            aria-label={t('aria.openWith')}
             className={styles.openWithBtn}
             onClick={() => setOpenMenuVisible((value) => !value)}
             title="打开方式"
@@ -147,7 +150,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
             <DesignNavIcon name="tools" size={14} />
           </button>
           {openMenuVisible && (
-            <div className={styles.openWithMenu} role="menu" aria-label="打开方式菜单">
+            <div className={styles.openWithMenu} role="menu" aria-label={t('aria.openWithMenu')}>
               {openWithItems.map((item) => (
                 <button
                   key={item.label}
@@ -176,7 +179,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           type="button"
           onClick={onClose}
           title="返回概览"
-          aria-label="返回概览"
+          aria-label={t('aria.backToOverview')}
         >
           <DesignNavIcon name="close" size={15} />
         </button>
@@ -229,8 +232,9 @@ function CodePreview({ language, lines }: { language: string; lines: string[] })
 }
 
 function DiffPreview({ language, lines }: { language: string; lines: string[] }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <pre className={styles.code} tabIndex={0} aria-label="Diff 预览">
+    <pre className={styles.code} tabIndex={0} aria-label={t('aria.diffPreview')}>
       <code className={styles.codeInner}>
         {lines.map((line, i) => (
           <span className={`${styles.line} ${diffLineClass(line, styles)}`} key={i}>
@@ -247,8 +251,9 @@ function DiffPreview({ language, lines }: { language: string; lines: string[] })
 }
 
 function MarkdownPreview({ content }: { content: string }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <article className={styles.markdownPreview} aria-label="Markdown 预览">
+    <article className={styles.markdownPreview} aria-label={t('aria.markdownPreview')}>
       {content.split('\n').map((line, index) => renderMarkdownLine(line, index))}
     </article>
   );

@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { cx } from './cx';
 import styles from './SurfaceHeader.module.css';
 
 export interface SurfaceHeaderStatus {
@@ -23,9 +24,6 @@ export interface SurfaceHeaderProps {
   actionClassName?: string;
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(' ');
-}
 
 function toneColor(tone: SurfaceHeaderStatus['tone']): string | undefined {
   switch (tone) {

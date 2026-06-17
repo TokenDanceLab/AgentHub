@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
@@ -41,6 +42,12 @@ func (h *MarketHandler) SearchMarketProfiles(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort_by", "recent")
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	if pageSize <= 0 {
+		pageSize = config.DefaultPaginationLimit
+	}
+	if pageSize > config.MaxPageLimit {
+		pageSize = config.MaxPageLimit
+	}
 
 	result, err := h.service.SearchMarket(c.Request.Context(), runtimeID, q, sortBy, cursor, pageSize)
 	if err != nil {

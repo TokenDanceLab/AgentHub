@@ -157,7 +157,7 @@ const snapshot = {
       {
         id: 'mock-text-1',
         kind: 'text',
-        author: { id: 'delicious233', name: 'Delicious233', role: 'human' },
+        author: { id: 'alice', name: 'Alice', role: 'human' },
         text: '把移动端聊天、任务和云文档整理成 AgentHub Desktop v4 同一套工作台语义。',
         createdAt: '14:02',
       },

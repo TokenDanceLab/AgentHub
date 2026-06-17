@@ -1,9 +1,7 @@
 # AgentHub 全链路数据对接路线图
 
-> 最后更新：2026-06-10
-> ⚠️ **本文是架构参考 + 数据流基线 + gap 清单，不再承载功能 Roadmap。**
-> 功能收口 Roadmap 已拆分为：[docs/roadmap/README.md](roadmap/README.md)
-> 本文档只写路线、优先级和边界。当前分支状态和任务调度写在 `STATE.md`。
+> 最后更新：2026-06-17
+> 本文档是架构参考 + 数据流基线 + gap 清单，以及功能 Roadmap。
 > 验收标准：发布 Release，完成全部真实数据流打通。
 
 ---
@@ -55,7 +53,7 @@ Web / Desktop / Mobile / IM
               ├── src/inspector/    统一证据面板
               ├── src/platform/     Platform Adapter 接口
               │   └── types.ts      AgentHubPlatform 定义
-              ├── src/hubEvents.ts  26 个 WS 事件常量
+              ├── src/hubEvents.ts  33 个 WS 事件常量
               └── src/ui/           基础 UI primitives
                         │
          ┌──────────────┴──────────────┐
@@ -236,7 +234,7 @@ Web / Desktop / Mobile / IM
 | | `/web/relay/commands/:id/ack` | POST | `relayHandler.AckCommand` |
 | **Public** | `/api/public/stats` | GET | `publicHandler.Stats` |
 
-### 1.5 WebSocket 事件合同（26 个事件常量）
+### 1.5 WebSocket 事件合同（33 个事件常量）
 
 | 事件常量 | 事件类型字符串 | 方向 | 用途 |
 |---------|--------------|------|------|
@@ -262,9 +260,16 @@ Web / Desktop / Mobile / IM
 | `AGENT_FAILED` | `agent.failed` | S->C | Agent 任务失败 |
 | `AGENT_CANCEL` | `agent.cancel` | S->C | Agent 任务取消 |
 | `AGENT_CONTROL` | `agent.control` | S->C | Agent 控制指令 |
+| `AGENT_REGENERATE` | `agent.regenerate` | S->C | Agent 重新生成 |
 | `NOTIFICATION_NEW` | `notification.new` | S->C | 新通知 |
 | `FRIEND_REQUEST` | `friend.request` | S->C | 好友请求 |
 | `FRIEND_ACCEPTED` | `friend.accepted` | S->C | 好友请求被接受 |
+| `SYNC_REQUEST` | `sync.request` | C->S | 客户端请求同步 |
+| `SYNC_EVENTS` | `sync.events` | S->C | 服务端推送同步事件 |
+| `PLAN_PROPOSED` | `run.agent.plan_proposed` | S->C | Agent 计划已提议 |
+| `PLAN_APPROVED` | `run.agent.plan_approved` | S->C | Agent 计划已批准 |
+| `PLAN_REJECTED` | `run.agent.plan_rejected` | S->C | Agent 计划已拒绝 |
+| `PLAN_EXPIRED` | `run.agent.plan_expired` | S->C | Agent 计划已过期 |
 
 ### 1.6 关键文件索引
 
@@ -280,7 +285,7 @@ Web / Desktop / Mobile / IM
 | | `app/shared/src/workbench/pages/TasksPage.tsx` | 任务/运行页面 |
 | | `app/shared/src/workbench/pages/ProjectsPage.tsx` | 项目页面 |
 | | `app/shared/src/workbench/pages/SettingsPage.tsx` | 设置页面 |
-| **Hub WS 事件类型** | `app/shared/src/hubEvents.ts` | 26 个事件常量 |
+| **Hub WS 事件类型** | `app/shared/src/hubEvents.ts` | 33 个事件常量 |
 | **Web Hub REST** | `app/web/src/api/hubClient.ts` | Hub 全端点 typed client |
 | **Web Hub Query** | `app/web/src/api/contactQueries.ts` | 联系人/好友请求 React Query hooks |
 | | `app/web/src/api/agentQueries.ts` | Agent Profile CRUD hooks |
@@ -335,7 +340,7 @@ Web / Desktop / Mobile / IM
 | | `hub-server/internal/handler/ws.go` | WebSocket handler |
 | **Hub 数据层** | `hub-server/internal/model/` | 数据模型 |
 | | `hub-server/internal/repository/` | 数据仓储 |
-| | `hub-server/migrations/` | 49 个迁移文件 |
+| | `hub-server/migrations/` | 50 个迁移文件 |
 | | `hub-server/internal/cache/redis.go` | Redis 缓存客户端 |
 | | `hub-server/internal/service/eventbus.go` | 异步事件总线 |
 | **Hub 配置** | `hub-server/configs/config.yaml` | 服务器配置 |
@@ -385,7 +390,7 @@ Web / Desktop / Mobile / IM
 | 模块 | 能力 | 完成标志 |
 |------|------|---------|
 | **Web/Desktop 共享 workbench** | 7 个子页（chat/contacts/docs/agents/runs/projects/settings）全部有 UI + mock 数据 | WorkbenchRoutes.tsx 完整 |
-| **Hub Server** | 49 个迁移全部运行，100+ REST 端点 + WebSocket | `router.go` 完整注册 |
+| **Hub Server** | 50 个迁移全部运行，100+ REST 端点 + WebSocket | `router.go` 完整注册 |
 | **Edge Server** | SQLite durable store, 种子数据, fixture adapter | `edge-server/internal/` |
 | **Hub REST 客户端 (Web)** | `hubClient.ts` 全端点 typed 方法 | 所有 `request<T>()` 方法已实现 |
 | **Hub REST 客户端 (Desktop)** | `hubClient.ts` 全端点 typed 方法，含 streamTaskEvent、Reaction CRUD | 所有方法已实现 |
@@ -393,7 +398,7 @@ Web / Desktop / Mobile / IM
 | **Hub React Query hooks (Desktop)** | hubQueries/sessionQueries/agentProfileQueries/documentQueries/projectQueries/agentQueries/runQueries/runEvidenceQueries/agentTeamQueries/modelCatalogQueries | 含 getToken 认证注入 |
 | **Hub WS 客户端 (Web)** | `hubWS.ts` auth handshake + typed events + exponential backoff | 连接状态 store 已实现 |
 | **Hub WS 客户端 (Desktop)** | `hubWS.ts` + workbench model 实时缓存失效 | 接入 React Query |
-| **Hub WS 事件类型** | `hubEvents.ts` 26 个事件常量 | 完整 |
+| **Hub WS 事件类型** | `hubEvents.ts` 33 个事件常量 | 完整 |
 | **IM Chat Actions (Web)** | send/recall/edit/pin/unpin/forward/searchMessages/searchSessionMessages/markRead/addReaction/removeReaction（10 个） | `useWebWorkbenchModel.ts` |
 | **IM Chat Actions (Desktop)** | send/recall/edit/pin/unpin/markRead | `useDesktopWorkbenchModel.ts` |
 | **自动已读回执** | 进入会话后自动标记最后一条消息为已读 | workbench model 内 |
@@ -418,7 +423,7 @@ Web / Desktop / Mobile / IM
 | **Demo 模式** | 10 个会话各有独立 transcript, evidence, preview | mock data |
 | **Windows release dry gate** | SHA-256 manifests, CI green | release gate |
 | **OIDC Full PKCE Flow** | Hub authorize -> TokenDanceID -> callback -> JWT -> me -> sessions -> WS auth.ok | 真实验证 |
-| **生产部署** | hk2 Docker Compose（hub/postgres/redis）运行中 | `server/projects/agenthub/STATE.md` |
+| **生产部署** | hk2 Docker Compose（hub/postgres/redis）运行中 | `../server/projects/agenthub/STATE.md` |
 | **Hub 限流** | 全局 IP 限流 100/min + 认证滑动窗口 + Body 10MB 限制 | `middleware/rate_limit.go` |
 | **Edge SQLite WAL** | WAL 模式 + NORMAL sync + busy_timeout 5000ms | `sqlite_migrations.go` |
 
@@ -1110,7 +1115,7 @@ CLI permission request
 - ✅ Docker 网络 `agenthub-net`（172.18.0.0/16）已创建
 - ✅ 资源限制已配置（Hub 256MiB / PG 512MiB / Redis 384MiB）
 - ✅ Nginx 反向代理 + SSL 已配置（hub.vectorcontrol.tech）
-- ✅ 部署流程已文档化（`server/projects/agenthub/STATE.md`）
+- ✅ 部署流程已文档化（项目 `STATE.md`）
 - ✅ Docker healthcheck 已配置（PG 5s / Redis 5s / Hub 15s）
 - ✅ 回滚策略已文档化（roadmap 15.7）
 - ✅ Prometheus metrics 端点已实现（middleware/metrics.go + admin port 6060）
@@ -1306,7 +1311,7 @@ server {
 | `hub-server/internal/config/constants.go` | 运行时常量 | 超时/限制/TTL |
 | `deployments/docker-compose.prod.yml` | 部署 | Docker Compose 编排 |
 | Nginx 配置（hk2） | 运维 | SSL + 反代 + 静态站 |
-| `C:\Users\Ding\server\projects\agenthub\STATE.md` | 运维 | 部署状态文档 |
+| 项目 `STATE.md` | 运维 | 部署状态文档 |
 
 ### 15.9 实施步骤
 
@@ -1328,7 +1333,7 @@ server {
 ### 15.10 验收标准
 
 - [x] Hub Server 容器启动后 `/health` 返回 200 | 验证人：`curl -fsS https://hub.vectorcontrol.tech/health`
-- [x] PostgreSQL 连接正常，49 个迁移全部运行 | 验证人：`verify-real-api-smoke.ps1`
+- [x] PostgreSQL 连接正常，50 个迁移全部运行 | 验证人：`verify-real-api-smoke.ps1`
 - [x] Redis 连接正常，缓存写入读取正常 | 验证人：`verify-real-api-smoke.ps1`
 - [x] Nginx SSL 正确配置，HTTPS 可访问 | 验证人：浏览器访问
 - [x] Docker 资源限制生效 | 验证人：`docker stats`
@@ -1678,12 +1683,12 @@ server {
 
 ## 18. 右侧检视面板增强（RightInspector）
 
-> 2026-06-10 · 设计文档 `docs/right-panel-enhancement-design.md`
-> 原则：不动主聊天流（GlobalRail / TranscriptView / Composer），只增强 RightInspector 三个 tab。
+> 2026-06-10 · 设计文档 `docs/designs/right-panel-enhancement-design.md`
+> 原则：不动主聊天流（GlobalRail / ChatViewTranscript / Composer），只增强 RightInspector 三个 tab。
 
 ### 18.1 设计哲学
 
-- 左侧 `GlobalRail`、中间 `TranscriptView`、底部 `UnifiedComposer` — **不动**
+- 左侧 `GlobalRail`、中间 `ChatViewTranscript`、底部 `UnifiedComposer` — **不动**
 - 只改 `RightInspector`（overview / browser / files 三个 tab）
 - Inspector 宽度：默认 `400px`，可拖拽 `48-760px`，可折叠
 
@@ -1722,7 +1727,7 @@ server {
 
 ### 18.5 不做的事（保持简单）
 
-- 不改 GlobalRail / TranscriptView / Composer
+- 不改 GlobalRail / ChatViewTranscript / Composer
 - 不新建 tab（保持 overview/browser/files 三 tab 结构）
 - 不加力导向 DAG 图（只做 `<ul>` 树）
 - 不加 ContextBus 面板（现有 `ContextUsage` 足够）
@@ -1982,7 +1987,7 @@ Phase 6 (P4): 发布
 - [x] WS 连接后收到 `auth.ok`
 - [x] 断线重连不丢失事件（transport.ts 指数退避 + auth handshake 重验证，UI 层 pending）
 - [x] 连接状态指示器正确（workbenchState.ts 状态机已实现，UI 渲染 pending）
-- [x] 26 个事件全部路由到 store
+- [x] 33 个事件全部路由到 store
 
 ### B.4 @Agent（3 项）
 

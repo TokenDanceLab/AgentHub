@@ -12,6 +12,14 @@ const EDGE_TOKEN_PATH = path.join(
 
 function readEdgeTokenFile(): string {
   try {
+    const stat = fs.statSync(EDGE_TOKEN_PATH);
+    if (stat.size > 4096) {
+      console.warn(
+        `Edge auth token file at ${EDGE_TOKEN_PATH} is ${stat.size} bytes (max 4096). ` +
+        'Refusing to read oversized file — possible misconfiguration or log dump.',
+      );
+      return '';
+    }
     return fs.readFileSync(EDGE_TOKEN_PATH, 'utf-8').trim();
   } catch {
     return '';
@@ -65,6 +73,25 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     host: '127.0.0.1',
+    headers: {
+      'Content-Security-Policy': [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        // Embedded Edge sends back inline images as data: URIs for content previews.
+        // avatars.githubusercontent.com covers GitHub avatar proxying.
+        "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.vectorcontrol.tech https://fonts.gstatic.com",
+        // Connect covers: Edge localhost API, Hub API + WS, Desktop OIDC redirect.
+        "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://*.vectorcontrol.tech wss://*.vectorcontrol.tech",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "base-uri 'self'",
+      ].join('; '),
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    },
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
@@ -75,9 +102,9 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
-          'vendor-tanstack': ['@tanstack/react-query', '@tanstack/react-virtual'],
+          'vendor-tanstack': ['@tanstack/react-query'],
           'vendor-markdown': ['react-markdown', 'remark-gfm', 'react-syntax-highlighter'],
-          'vendor-ui': ['lucide-react', 'clsx', 'class-variance-authority'],
+          'vendor-ui': ['lucide-react'],
           'vendor-i18n': ['i18next', 'react-i18next'],
         },
       },

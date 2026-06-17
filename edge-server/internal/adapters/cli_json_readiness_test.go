@@ -298,9 +298,7 @@ func waitForBrokeredPermissionDecision(t *testing.T, broker *PermissionDecisionB
 		if ok {
 			return pending, true
 		}
-		select {
-		case <-time.After(10 * time.Millisecond):
-		}
+		time.Sleep(10 * time.Millisecond)
 	}
 	return PendingPermissionRequest{}, false
 }
