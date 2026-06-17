@@ -892,7 +892,7 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 func (a *App) syncLegacySeqs() {
 	ctx := a.coreCtx
 	var sessions []model.Session
-	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Find(&sessions).Error; err != nil {
+	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Limit(5000).Find(&sessions).Error; err != nil {
 		slog.Warn("failed to query sessions for seq sync", "error", err)
 		return
 	}

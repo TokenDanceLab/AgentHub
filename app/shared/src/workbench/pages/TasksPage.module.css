@@ -539,7 +539,8 @@
 
 /* ── Task table ── */
 .table {
-  min-width: 860px;
+  min-width: 600px;
+  /* was 860px — lowered; grid-template-columns provide natural floor */
   border-top: 1px solid var(--bdr);
 }
 

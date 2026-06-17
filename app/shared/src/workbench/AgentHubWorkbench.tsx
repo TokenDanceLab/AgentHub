@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   type ComposerMention,
   composerReducer,
@@ -32,6 +33,7 @@ import type { FileItem } from './inspector';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import type { WorkbenchAgentProfilesStatus, WorkbenchContactsData, WorkbenchContactsActions, WorkbenchDocumentsActions } from './WorkbenchRoutes';
 import type { HubClient } from '../hubClient';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS, WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
@@ -237,6 +239,8 @@ export function AgentHubWorkbench({
   onRegenerate,
   connectionStatus,
 }: AgentHubWorkbenchProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+
   // Create settings service if platform provides a settings port
   const settingsService = useMemo<SettingsService | null>(
     () => platform.settings ? createSettingsService(platform.settings, WORKBENCH_MOCK_SETTINGS_DEFAULTS) : null,
@@ -300,6 +304,9 @@ export function AgentHubWorkbench({
     y: number;
   } | null>(null);
   const suppressSelectionPointerUpRef = useRef(false);
+  const runMultiActionRef = useRef<((action: string) => void) | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const pulseTimersRef = useRef<Map<string, number>>(new Map());
   const [composer, dispatchComposer] = useReducer(
     composerReducer,
     currentConversationId,
@@ -489,12 +496,12 @@ export function AgentHubWorkbench({
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
         event.preventDefault();
-        runMultiAction('copy');
+        runMultiActionRef.current?.('copy');
         return;
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
-        runMultiAction('delete');
+        runMultiActionRef.current?.('delete');
       }
     }
 
@@ -522,6 +529,15 @@ export function AgentHubWorkbench({
       window.clearTimeout(selectionHoldRef.current.timer);
     }
     selectionHoldRef.current = null;
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    pulseTimersRef.current.forEach((id) => window.clearTimeout(id));
+    pulseTimersRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -696,9 +712,12 @@ export function AgentHubWorkbench({
   }
 
   function showWorkbenchToast(message: string): void {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(message);
     setToastVisible(true);
-    window.setTimeout(() => setToastVisible(false), 1700);
+    toastTimerRef.current = window.setTimeout(() => setToastVisible(false), 1700);
   }
 
   function openAgentProfile(agentName: string, anchor: HTMLElement): void {
@@ -767,9 +786,9 @@ export function AgentHubWorkbench({
     return {
       id: runtimeAgent.id,
       name: runtimeAgent.name,
-      role: runtimeAgent.description ?? 'Agent',
-      engine: 'AgentHub',
-      model: runtimeAgent.model ?? '未配置',
+      role: runtimeAgent.description ?? t('label.agent'),
+      engine: t('label.agentHub'),
+      model: runtimeAgent.model ?? t('status.unconfigured'),
       state: runtimeAgent.status ?? 'available',
       skills: [],
     };
@@ -789,10 +808,10 @@ export function AgentHubWorkbench({
       id: contact?.id ?? conversation?.id ?? resolvedName.toLowerCase(),
       name: resolvedName,
       initials: contact?.initials ?? conversation?.avatarLabel ?? resolvedName.slice(0, 1).toUpperCase(),
-      org: contact?.org ?? '联系人',
-      status: contact?.status ?? conversation?.updatedLabel ?? '在线',
-      tag: contact?.tag ?? (conversation?.kind === 'group' ? '群聊' : '好友'),
-      subtitle: conversation?.subtitle ?? contact?.org ?? '好友',
+      org: contact?.org ?? t('label.contact'),
+      status: contact?.status ?? conversation?.updatedLabel ?? t('status.online'),
+      tag: contact?.tag ?? (conversation?.kind === 'group' ? t('chat.kind.group') : t('chat.kind.friend')),
+      subtitle: conversation?.subtitle ?? contact?.org ?? t('chat.kind.friend'),
       avatarColor: conversation?.avatarColor,
       anchor,
     };
@@ -809,7 +828,7 @@ export function AgentHubWorkbench({
     } else if (onNavigateToConversation) {
       onNavigateToConversation({ name: activeAgentProfile.name, id: activeAgentProfile.id, kind: 'dm' });
     } else {
-      showWorkbenchToast(`还没有 ${activeAgentProfile.name} 的私聊会话`);
+      showWorkbenchToast(t('toast.noDmSession', { name: activeAgentProfile.name }));
       return;
     }
     setActivePage('chat');
@@ -830,7 +849,7 @@ export function AgentHubWorkbench({
     } else if (onNavigateToConversation) {
       onNavigateToConversation({ name: activeHumanProfile.name, id: activeHumanProfile.id, kind: 'dm' });
     } else {
-      showWorkbenchToast(`还没有 ${activeHumanProfile.name} 的私聊会话`);
+      showWorkbenchToast(t('toast.noDmSession', { name: activeHumanProfile.name }));
       return;
     }
     setActivePage('chat');
@@ -845,7 +864,7 @@ export function AgentHubWorkbench({
     setFocusedAgentId(activeAgentProfile.id);
     setActivePage('agents');
     setActiveAgentProfile(null);
-    showWorkbenchToast(`已打开 ${activeAgentProfile.name} 配置`);
+    showWorkbenchToast(t('toast.agentConfigOpened', { name: activeAgentProfile.name }));
   }
 
   function openReviewFile(file: FileItem): void {
@@ -855,7 +874,7 @@ export function AgentHubWorkbench({
 
   function handleDeploySubmit(_id: string): void {
     openInspector();
-    showWorkbenchToast('已打开部署预览');
+    showWorkbenchToast(t('toast.deployPreviewOpened'));
   }
 
   function blockTitle(block: TranscriptBlock): string {
@@ -885,11 +904,11 @@ export function AgentHubWorkbench({
       case 'run_step_group':
         return block.title;
       case 'agent_timeline':
-        return block.title ?? '运行时间线';
+        return block.title ?? t('mainchain.timeline');
       case 'result':
-        return block.summary || (block.success ? '运行结果' : '运行失败');
+        return block.summary || (block.success ? t('mainchain.result') : t('mainchain.fail'));
       case 'thinking':
-        return '思考过程';
+        return t('mainchain.thinking');
       case 'route_decision':
         return block.targetAgent || block.action;
       case 'context_usage':
@@ -901,7 +920,7 @@ export function AgentHubWorkbench({
 
   function blockTitleById(blockId: string): string {
     const block = transcript.find((item) => item.id === blockId);
-    return block ? blockTitle(block) : '选中卡片';
+    return block ? blockTitle(block) : t('mainchain.selectedCard');
   }
 
   function openBlockContextMenu(
@@ -1028,41 +1047,47 @@ export function AgentHubWorkbench({
   }
 
   function pulseBlock(blockId: string): void {
+    const existing = pulseTimersRef.current.get(blockId);
+    if (existing !== undefined) {
+      window.clearTimeout(existing);
+    }
     setActionedBlockIds((current) => (
       current.includes(blockId) ? current : [...current, blockId]
     ));
-    window.setTimeout(() => {
+    const timerId = window.setTimeout(() => {
       setActionedBlockIds((current) => current.filter((id) => id !== blockId));
+      pulseTimersRef.current.delete(blockId);
     }, 900);
+    pulseTimersRef.current.set(blockId, timerId);
   }
 
   function cardActionLabel(action: string, title: string): string {
     const labels: Record<string, string> = {
-      copy: '已复制卡片内容',
-      react: '已打开表情回复',
-      reply: `正在回复 ${title}`,
-      forward: '已加入转发队列',
-      topic: '已创建话题草稿',
-      pin: '已更新置顶',
-      link: '已复制消息链接',
-      translate: '已加入翻译队列',
-      task: '已添加到任务草稿',
-      export: '已导出到云文档草稿',
-      apps: '已打开快捷应用',
-      delete: '已标记删除',
+      copy: t('toast.cardCopied'),
+      react: t('toast.reactOpened'),
+      reply: `${t('context.reply')} ${title}`,
+      forward: t('toast.forwardQueued'),
+      topic: t('toast.topicDraft'),
+      pin: t('toast.pinUpdated'),
+      link: t('toast.linkCopied'),
+      translate: t('toast.translateQueued'),
+      task: t('toast.taskDraft'),
+      export: t('toast.exportDraft'),
+      apps: t('toast.appsOpened'),
+      delete: t('toast.deleteQueued'),
     };
-    return labels[action] ?? '操作已记录';
+    return labels[action] ?? t('toast.actionRecorded');
   }
 
   function multiActionLabel(action: string, count: number): string {
     const labels: Record<string, string> = {
-      copy: `已复制 ${count} 项`,
-      forward: `已准备转发 ${count} 项`,
-      task: `已为 ${count} 项创建任务草稿`,
-      export: `已导出 ${count} 项到文档草稿`,
-      delete: `已删除 ${count} 项`,
+      copy: t('toast.multiCopy', { count }),
+      forward: t('toast.multiForward', { count }),
+      task: t('toast.multiTaskDraft', { count }),
+      export: t('toast.multiExport', { count }),
+      delete: t('toast.multiDelete', { count }),
     };
-    return labels[action] ?? `已处理 ${count} 项`;
+    return labels[action] ?? t('toast.multiProcessed', { count });
   }
 
   function runContextAction(action: string, blockId: string): void {
@@ -1137,7 +1162,7 @@ export function AgentHubWorkbench({
         };
         onApprovalDecision?.(decision);
         pulseBlock(blockId);
-        showWorkbenchToast(action === 'approve' ? '已批准' : '已拒绝');
+        showWorkbenchToast(action === 'approve' ? t('action.approved') : t('action.denied'));
       }
     }
 
@@ -1151,7 +1176,7 @@ export function AgentHubWorkbench({
         });
         onRegenerate?.(blockId);
         pulseBlock(blockId);
-        showWorkbenchToast('正在重新生成');
+        showWorkbenchToast(t('action.regenerating'));
       }
     }
 
@@ -1166,7 +1191,7 @@ export function AgentHubWorkbench({
   function runMultiAction(action: string): void {
     const count = selectedBlockIds.length;
     if (!count) {
-      showWorkbenchToast('还没有选择卡片');
+      showWorkbenchToast(t('toast.noCardSelected'));
       return;
     }
     if (action === 'copy') {
@@ -1183,10 +1208,11 @@ export function AgentHubWorkbench({
     }
     showWorkbenchToast(multiActionLabel(action, count));
   }
+  runMultiActionRef.current = runMultiAction;
 
   function exportMainchainEvidence(): void {
     if (!mainchainSummary.exportEnabled) {
-      showWorkbenchToast('暂无可导出的主链证据');
+      showWorkbenchToast(t('toast.noEvidence'));
       return;
     }
     copyText(JSON.stringify({
@@ -1197,7 +1223,7 @@ export function AgentHubWorkbench({
       evidence,
       runtimeEvidence,
     }, null, 2));
-    showWorkbenchToast('已复制主链证据 JSON');
+    showWorkbenchToast(t('toast.evidenceCopied'));
   }
 
   function contextMenuGroups(blockId: string): Array<Array<ContextMenuItem>> {
@@ -1206,47 +1232,47 @@ export function AgentHubWorkbench({
     const isTextBlock = block?.kind === 'text';
     return [
       [
-        { label: '复制', icon: 'fileText', shortcut: 'Ctrl C', onClick: () => runContextAction('copy', blockId) },
-        { label: '表情回复', icon: 'star', chevron: true, onClick: () => runContextAction('react', blockId) },
-        { label: '回复', icon: 'notes', onClick: () => runContextAction('reply', blockId) },
-        ...(isTextBlock ? [{ label: '引用', icon: 'copy' as const, onClick: () => runContextAction('quote', blockId) }] : []),
-        { label: '转发', icon: 'external', onClick: () => runContextAction('forward', blockId) },
+        { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => runContextAction('copy', blockId) },
+        { label: t('context.react'), icon: 'star', chevron: true, onClick: () => runContextAction('react', blockId) },
+        { label: t('context.reply'), icon: 'notes', onClick: () => runContextAction('reply', blockId) },
+        ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => runContextAction('quote', blockId) }] : []),
+        { label: t('context.forward'), icon: 'external', onClick: () => runContextAction('forward', blockId) },
       ],
       [
-        { label: '创建话题', icon: 'groups', onClick: () => runContextAction('topic', blockId) },
-        { label: '多选', icon: 'grid', shortcut: 'Shift', onClick: () => enterSelection(blockId) },
-        { label: '置顶消息', icon: 'bell', onClick: () => runContextAction('pin', blockId) },
-        { label: '复制消息链接', icon: 'external', onClick: () => runContextAction('link', blockId) },
-        { label: '翻译', icon: 'library', onClick: () => runContextAction('translate', blockId) },
+        { label: t('context.createTopic'), icon: 'groups', onClick: () => runContextAction('topic', blockId) },
+        { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => enterSelection(blockId) },
+        { label: t('context.pinMessage'), icon: 'bell', onClick: () => runContextAction('pin', blockId) },
+        { label: t('context.copyLink'), icon: 'external', onClick: () => runContextAction('link', blockId) },
+        { label: t('context.translate'), icon: 'library', onClick: () => runContextAction('translate', blockId) },
       ],
       [
-        ...(isAgentText ? [{ label: '重新生成', icon: 'refresh' as const, onClick: () => runContextAction('regenerate', blockId) }] : []),
-        { label: '添加任务', icon: 'running', onClick: () => runContextAction('task', blockId) },
-        { label: '导出到文档', icon: 'download', onClick: () => runContextAction('export', blockId) },
-        { label: '快捷应用', icon: 'tools', chevron: true, onClick: () => runContextAction('apps', blockId) },
-        { label: '删除', icon: 'archive', danger: true, onClick: () => runContextAction('delete', blockId) },
+        ...(isAgentText ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => runContextAction('regenerate', blockId) }] : []),
+        { label: t('context.addTask'), icon: 'running', onClick: () => runContextAction('task', blockId) },
+        { label: t('context.exportDoc'), icon: 'download', onClick: () => runContextAction('export', blockId) },
+        { label: t('context.apps'), icon: 'tools', chevron: true, onClick: () => runContextAction('apps', blockId) },
+        { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runContextAction('delete', blockId) },
       ],
     ];
   }
 
   const multiSelectActions: Array<MultiSelectBarAction> = [
     {
-      label: '全选',
+      label: t('bar.selectAll'),
       icon: 'done',
       onClick: () => setSelectedBlockIds(transcript.map((block) => block.id)),
     },
     {
-      label: '清空',
+      label: t('bar.clear'),
       icon: 'filter',
       onClick: () => setSelectedBlockIds([]),
     },
-    { label: '复制', icon: 'fileText', onClick: () => runMultiAction('copy') },
-    { label: '转发', icon: 'external', onClick: () => runMultiAction('forward') },
-    { label: '添加任务', icon: 'running', onClick: () => runMultiAction('task') },
-    { label: '导出文档', icon: 'download', onClick: () => runMultiAction('export') },
-    { label: '删除', icon: 'archive', danger: true, onClick: () => runMultiAction('delete') },
+    { label: t('context.copy'), icon: 'fileText', onClick: () => runMultiAction('copy') },
+    { label: t('context.forward'), icon: 'external', onClick: () => runMultiAction('forward') },
+    { label: t('context.addTask'), icon: 'running', onClick: () => runMultiAction('task') },
+    { label: t('context.exportDoc'), icon: 'download', onClick: () => runMultiAction('export') },
+    { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => runMultiAction('delete') },
     {
-      label: '退出',
+      label: t('bar.exit'),
       icon: 'close',
       ghost: true,
       onClick: () => {
@@ -1292,7 +1318,7 @@ export function AgentHubWorkbench({
             onArchiveConversation={onConversationArchive}
           />
           <div
-            aria-label="调整最近频道宽度"
+            aria-label={t('aria.resizeSidebar')}
             aria-orientation="vertical"
             aria-valuemax={SIDEBAR_MAX_WIDTH}
             aria-valuemin={SIDEBAR_MIN_WIDTH}
@@ -1318,7 +1344,7 @@ export function AgentHubWorkbench({
 
       <main
         ref={workspaceRef}
-        aria-label="Workspace"
+        aria-label={t('aria.workspace')}
         className={styles.workspace}
         data-mainchain={showMainchainStatus ? 'true' : 'false'}
         data-mode={isChatPage ? 'chat' : 'workbench'}
@@ -1328,7 +1354,7 @@ export function AgentHubWorkbench({
         {workbenchStatus?.initialLoading && conversations.length === 0 ? (
           <div className={styles.workspaceLoading} role="status">
             <span className={styles.workspaceLoadingSpinner} />
-            <span className={styles.workspaceLoadingLabel}>正在连接 Edge 并加载数据...</span>
+            <span className={styles.workspaceLoadingLabel}>{t('connection.connecting')}</span>
           </div>
         ) : isChatPage ? (
           <ConversationHost
@@ -1374,7 +1400,7 @@ export function AgentHubWorkbench({
             onSearchOpenChange={setSearchOpen}
           />
         ) : (
-          <section aria-label="Workbench page" className={styles.workbenchPageHost}>
+          <section aria-label={t('aria.workbenchPage')} className={styles.workbenchPageHost}>
             <WorkbenchRoutes
               activePage={activePage}
               agents={agents}
@@ -1459,24 +1485,24 @@ export function AgentHubWorkbench({
       {activeAgentProfile && (
         <ProfilePopover
           actions={[
-            { label: '发送消息' },
-            { label: 'Agent 配置' },
+            { label: t('profile.sendMessage') },
+            { label: t('profile.agentConfig') },
           ]}
           anchorElement={activeAgentProfile.anchor}
           avatar={workbenchProfileInitials(activeAgentProfile.name)}
           avatarColor={workbenchAgentColor(activeAgentProfile)}
-          badge={agentStateLabel(activeAgentProfile.state)}
+          badge={agentStateLabel(t, activeAgentProfile.state)}
           isOpen
           meta={[
-            { label: '职责', value: activeAgentProfile.role },
-            { label: '引擎', value: activeAgentProfile.engine },
-            { label: '模型', value: activeAgentProfile.model },
-            { label: 'Skills', value: activeAgentProfile.skills.join(' · ') || '未配置' },
+            { label: t('profile.role'), value: activeAgentProfile.role },
+            { label: t('profile.engine'), value: activeAgentProfile.engine },
+            { label: t('profile.model'), value: activeAgentProfile.model },
+            { label: t('profile.skills'), value: activeAgentProfile.skills.join(' · ') || t('status.unconfigured') },
           ]}
           name={activeAgentProfile.name}
           onAction={(action) => {
-            if (action === '发送消息') openAgentDirectMessage();
-            if (action === 'Agent 配置') openAgentConfig();
+            if (action === t('profile.sendMessage')) openAgentDirectMessage();
+            if (action === t('profile.agentConfig')) openAgentConfig();
           }}
           onClose={() => setActiveAgentProfile(null)}
           subtitle={`${activeAgentProfile.role} · ${activeAgentProfile.engine}`}
@@ -1486,8 +1512,8 @@ export function AgentHubWorkbench({
       {activeHumanProfile && (
         <ProfilePopover
           actions={[
-            { label: '发送消息' },
-            { label: '复制链接' },
+            { label: t('profile.sendMessage') },
+            { label: t('profile.copyLink') },
           ]}
           anchorElement={activeHumanProfile.anchor}
           avatar={activeHumanProfile.initials}
@@ -1495,17 +1521,17 @@ export function AgentHubWorkbench({
           badge={activeHumanProfile.tag}
           isOpen
           meta={[
-            { label: '身份', value: activeHumanProfile.tag },
-            { label: '组织', value: activeHumanProfile.org },
-            { label: '状态', value: activeHumanProfile.status },
-            { label: '最近消息', value: activeHumanProfile.subtitle },
+            { label: t('profile.identity'), value: activeHumanProfile.tag },
+            { label: t('profile.org'), value: activeHumanProfile.org },
+            { label: t('profile.state'), value: activeHumanProfile.status },
+            { label: t('profile.recentMessage'), value: activeHumanProfile.subtitle },
           ]}
           name={activeHumanProfile.name}
           onAction={(action) => {
-            if (action === '发送消息') openHumanDirectMessage();
-            if (action === '复制链接') {
+            if (action === t('profile.sendMessage')) openHumanDirectMessage();
+            if (action === t('profile.copyLink')) {
               copyText(`agenthub://user/${activeHumanProfile.id}`);
-              showWorkbenchToast('已复制联系人链接');
+              showWorkbenchToast(t('toast.contactLinkCopied'));
             }
           }}
           onClose={() => setActiveHumanProfile(null)}
@@ -1515,30 +1541,30 @@ export function AgentHubWorkbench({
       {activeGroupProfile && (
         <ProfilePopover
           actions={[
-            { label: '发送消息' },
+            { label: t('profile.sendMessage') },
           ]}
           anchorElement={activeGroupProfile.anchor}
           avatar={workbenchProfileInitials(activeGroupProfile.name)}
           avatarColor="var(--primary)"
-          badge="群聊"
+          badge={t('profile.groupChat')}
           isOpen
           meta={[
-            { label: '类型', value: '协作群' },
+            { label: t('profile.type'), value: t('profile.groupType') },
             ...(activeGroupProfile.memberNames.length > 0
-              ? [{ label: '成员', value: activeGroupProfile.memberNames.join(' · ') }]
+              ? [{ label: t('profile.members'), value: activeGroupProfile.memberNames.join(' · ') }]
               : []),
           ]}
           name={activeGroupProfile.name}
           onAction={(action) => {
-            if (action === '发送消息') {
+            if (action === t('profile.sendMessage')) {
               selectConversation(activeGroupProfile.id);
               setActiveGroupProfile(null);
             }
           }}
           onClose={() => setActiveGroupProfile(null)}
           subtitle={activeGroupProfile.memberNames.length > 0
-            ? `${activeGroupProfile.memberNames.length} 人`
-            : '群聊会话'}
+            ? `${activeGroupProfile.memberNames.length} ${t('profile.members').toLowerCase()}`
+            : t('profile.groupSession')}
           variant="group"
         />
       )}
