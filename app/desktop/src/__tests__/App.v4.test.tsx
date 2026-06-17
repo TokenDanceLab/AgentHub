@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '@shared/demo';
 import type { EventEnvelope } from '@shared/events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -48,6 +49,8 @@ vi.mock('@/api/executionTargetQueries', () => ({
 
 vi.mock('@/api/modelCatalogQueries', () => ({
   useModelCatalog: vi.fn(),
+  useCCSwitchStatus: vi.fn(() => ({ data: undefined })),
+  useCCSwitchProviders: vi.fn(() => ({ data: undefined })),
 }));
 
 vi.mock('@/api/runEvidenceQueries', () => ({
@@ -60,6 +63,8 @@ vi.mock('@/api/agentProfileQueries', () => ({
   useUpdateAgentProfile: vi.fn(),
   useDeleteAgentProfile: vi.fn(),
   edgeAgentProfileToWorkbenchAgent: vi.fn((profile) => profile),
+  useHubAgentProfiles: vi.fn(() => ({ data: undefined })),
+  hubAgentProfileToWorkbenchAgent: vi.fn((profile) => profile),
 }));
 
 vi.mock('@/api/runQueries', () => ({
@@ -95,6 +100,67 @@ vi.mock('@/hooks/useDeviceRegistration', () => ({
 
 vi.mock('@/hooks/useHubIntegration', () => ({
   useHubIntegration: vi.fn(),
+}));
+
+vi.mock('@/api/agentTeamQueries', () => ({
+  useDecideTeamApproval: vi.fn(() => ({ mutateAsync: vi.fn() })),
+}));
+
+vi.mock('@/api/documentQueries', () => ({
+  useDocumentList: vi.fn(() => ({ data: undefined })),
+  useCreateDocument: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  hubDocToDocRow: vi.fn((doc: unknown) => doc),
+}));
+
+vi.mock('@/api/hubQueries', () => ({
+  getHubClient: vi.fn(() => ({
+    listPublicSkills: vi.fn(() => ({ items: [] })),
+    listPublicMCPServers: vi.fn(() => ({ items: [] })),
+  })),
+  useHubContacts: vi.fn(() => ({ data: undefined })),
+  useHubSearchUser: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubSendFriendRequest: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubAcceptFriendRequest: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubRejectFriendRequest: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubRemoveContact: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubBlockContact: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubUnblockContact: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubUpdateContactRemark: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubCreateContactGroup: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubWorkspaceProjects: vi.fn(() => ({ data: undefined })),
+  useCreateHubWorkspaceProject: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useUpdateHubWorkspaceProject: vi.fn(() => ({ mutateAsync: vi.fn() })),
+}));
+
+vi.mock('@/api/sessionQueries', () => ({
+  useHubSessions: vi.fn(() => ({ data: undefined })),
+  useHubMessages: vi.fn(() => ({ data: undefined })),
+  useHubSendMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubRecallMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubEditMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubPinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubUnpinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useHubMarkRead: vi.fn(() => ({ mutateAsync: vi.fn() })),
+}));
+
+vi.mock('@/stores/hubStore', () => ({
+  useHubStore: vi.fn(() => ({})),
+}));
+
+vi.mock('@/hooks/useHubWebSocket', () => ({
+  useHubWebSocket: vi.fn(() => null),
+}));
+
+vi.mock('@/stores/toastStore', () => ({
+  useToastStore: vi.fn(() => ({ showToast: vi.fn() })),
+}));
+
+vi.mock('@/demo/demoEvidence', () => ({
+  getDemoRuntimeEvidence: vi.fn(),
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
 }));
 
 const eventHandlers: EventHandler[] = [];
@@ -137,6 +203,10 @@ const mockedUseDeviceRegistration = vi.mocked(useDeviceRegistration);
 const mockedUseHealth = vi.mocked(useHealth);
 const mockedUseHubEventStream = vi.mocked(useHubEventStream);
 const mockedUseHubIntegration = vi.mocked(useHubIntegration);
+
+const testQueryClient = new QueryClient();
+const renderWithProviders = (ui: Parameters<typeof render>[0]) =>
+  render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>);
 
 describe('Desktop App v4 root', () => {
   beforeEach(() => {
@@ -269,7 +339,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('shows the Desktop login card before entering the workbench', () => {
-    render(<App />);
+    renderWithProviders(<App />);
 
     expect(screen.getByRole('group', { name: 'Window controls' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '最小化' })).toBeInTheDocument();
@@ -290,7 +360,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('enters a clean Desktop demo workbench from the login card', () => {
-    render(<App />);
+    renderWithProviders(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
 
@@ -323,7 +393,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('enters observed mode workbench when clicking Connect Local Edge', () => {
-    render(<App />);
+    renderWithProviders(<App />);
 
     // The "连接 Local Edge" button should be enabled since edgeOnline is true in mock
     const edgeButton = screen.getByRole('button', { name: '连接 Local Edge' });
@@ -347,14 +417,14 @@ describe('Desktop App v4 root', () => {
       refetch: refetchHealth,
     } as ReturnType<typeof useHealth>);
 
-    render(<App />);
+    renderWithProviders(<App />);
 
     const edgeButton = screen.getByRole('button', { name: 'Local Edge 未运行' });
     expect(edgeButton).toBeDisabled();
   });
 
   it('returns to the Desktop login card from the account logout action', () => {
-    render(<App />);
+    renderWithProviders(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delicious233' }));
@@ -366,7 +436,7 @@ describe('Desktop App v4 root', () => {
 
   it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
-    render(<DesktopWorkbenchApp />);
+    renderWithProviders(<DesktopWorkbenchApp />);
 
     await waitFor(() => {
       expect(mockedUseHubIntegration).toHaveBeenCalledWith({
@@ -396,7 +466,7 @@ describe('Desktop App v4 root', () => {
       error: null,
     });
 
-    render(<DesktopWorkbenchApp />);
+    renderWithProviders(<DesktopWorkbenchApp />);
 
     await waitFor(() => {
       expect(mockedUseHubIntegration).toHaveBeenCalledWith({
@@ -457,7 +527,7 @@ describe('Desktop App v4 root', () => {
       },
     } as ReturnType<typeof useThreadMessages>);
 
-    render(<DesktopWorkbenchApp />);
+    renderWithProviders(<DesktopWorkbenchApp />);
 
     expect(screen.getByRole('heading', { name: '真实 Edge 会话' })).toBeInTheDocument();
     expect(screen.getByText('把 Desktop 接到真实 thread')).toBeInTheDocument();
@@ -489,7 +559,7 @@ describe('Desktop App v4 root', () => {
       },
     } as ReturnType<typeof useThreadMessages>);
 
-    const { rerender } = render(<DesktopWorkbenchApp />);
+    const { rerender } = renderWithProviders(<DesktopWorkbenchApp />);
 
     act(() => {
       emitEdgeEvent({
@@ -556,7 +626,7 @@ describe('Desktop App v4 root', () => {
         page: { hasMore: false },
       },
     } as ReturnType<typeof useThreadMessages>);
-    rerender(<DesktopWorkbenchApp />);
+    rerender(<QueryClientProvider client={testQueryClient}><DesktopWorkbenchApp /></QueryClientProvider>);
 
     expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
     expect(mockedCreateEventStream).toHaveBeenCalledTimes(1);
@@ -586,7 +656,7 @@ describe('Desktop App v4 root', () => {
       },
     } as ReturnType<typeof useThreadMessages>);
 
-    render(<DesktopWorkbenchApp />);
+    renderWithProviders(<DesktopWorkbenchApp />);
 
     fireEvent.change(screen.getByLabelText('Composer input'), {
       target: { value: '跑一下 v4 smoke' },
